@@ -53,7 +53,7 @@ export function AppHandoffDebugCard() {
     <Card>
       <AppText variant="heading">App hand-off test</AppText>
       <AppText variant="caption" tone="muted">
-        Opens the chosen app, then tries to bring TrainingAi back. Not shown in the real app.
+        Opens the chosen app, then tries to bring TrainingAi back. Dev build only.
         Don’t use Oura until the ring has moved to the Oura API (#2808).
       </AppText>
       <ChipPicker

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import appConfig from '../../../../app.json';
+import { CHANGELOG } from '@trainingai/shared/changelog';
+import { OFF_ATTRIBUTION } from '@trainingai/shared/nutrition/open-food-facts';
+import { nativeAppVersion } from '../../../integrations/app-info/platform';
 import {
   AppButton,
   AppText,
@@ -24,7 +26,7 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
         <Stack style={{ paddingHorizontal: theme.spacing.lg }}>
           <Card>
             <AppText variant="hero">TrainingAi</AppText>
-            <AppText>Version {appConfig.expo.version}</AppText>
+            <AppText>Version {nativeAppVersion}</AppText>
             <AppText variant="caption" tone="muted">
               Your training, nutrition and health in one place.
             </AppText>
@@ -36,6 +38,20 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
               variant="ghost"
               onPress={() => setModal('feedback')}
             />
+          </Card>
+          <Card>
+            <AppText variant="heading">Data sources</AppText>
+            <AppText variant="caption" tone="muted">
+              {OFF_ATTRIBUTION}
+            </AppText>
+          </Card>
+          <Card>
+            <AppText variant="heading">What’s new in v{CHANGELOG[0].version}</AppText>
+            {CHANGELOG[0].changes.map((change) => (
+              <AppText key={change} variant="caption" tone="muted">
+                · {change}
+              </AppText>
+            ))}
           </Card>
           <AppHandoffDebugCard />
           <Card>
