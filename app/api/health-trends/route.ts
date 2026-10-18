@@ -10,6 +10,7 @@ import { median as medianOfValues } from '@trainingai/shared/stats'
 import { sorenessVsVolumePoints } from '@trainingai/shared/health/soreness-volume'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
+import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { sessionEffort, type SessionRpeSource } from '@trainingai/shared/workout/derive-session-rpe'
 import { isPlausibleSessionDuration } from '@trainingai/shared/health/workout-energy'
@@ -123,15 +124,13 @@ export async function GET(req: Request) {
   let result: TrendsResponse
 
   if (view === 'subjective-recovery') {
-    const [checkins, ouraDaily, derivedDaily] = await Promise.all([
+    const [checkins, derivedDaily] = await Promise.all([
       repo.listDayCheckins(userId, from90dIso, todayIso, 'morning'),
-      repo.getOuraDaily(userId, from90dIso, todayIso),
       repo.getOuraDailyDerived(userId, from90dIso, todayIso),
     ])
-    // Derived-first, matching /api/health/trends. Cloud readiness is null for anyone not on Oura
-    // Cloud (and frozen for the owner since the BLE re-key), which left this correlation empty.
-    const readinessByDate = new Map(ouraDaily.map(d => [d.date, d.readinessScore ?? null]))
-    for (const d of derivedDaily) if (d.readinessScore != null) readinessByDate.set(d.day, d.readinessScore)
+    // Our own composite only (#2992). Oura's readiness used to fill the days without one; since the
+    // 17 Oct switch the Oura connector writes it again, and it is Oura's score, not ours.
+    const readinessByDate = liveReadinessByDay(derivedDaily)
     // TN-57: `perceivedRecoveryTouched`, not just non-null. This is a user-facing correlation
     // against a series with a standard deviation of 0.286 across two distinct values, none of them
     // answered — a coefficient that cannot mean anything, presented as though it did.

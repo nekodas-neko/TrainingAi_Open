@@ -5,6 +5,7 @@ import { applyHealthConnectBatch, rebuildHealthConnect } from '../health-connect
 import { getNativeMovementIntervals } from '../native-movement';
 import { applyAppleHealthBatch, rebuildAppleHealth } from '../apple-health';
 import type { HealthConnectRecord } from '@trainingai/shared/validation/health-connect-import';
+import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils';
 const user = randomUUID(),
   other = randomUUID();
 const record: HealthConnectRecord = {
@@ -191,5 +192,50 @@ describe.skipIf(!canRun)('Health Connect ledger and projections', () => {
     expect((await getNativeMovementIntervals(db, other, 'steps', from, to))[0].value).toBe(
       9999,
     );
+  });
+  it('#2992: clears only readiness this import fed, so an Oura Cloud day keeps its scores', async () => {
+    // Inside the HR retention window, anchored to local midday two days ago.
+    const tz = 'Australia/Brisbane';
+    const day = shiftDateStr(todayInTz(tz), -2);
+    const noon = new Date(dateStrMidnightInTz(day, tz).getTime() + 12 * 3_600_000);
+    const heart: HealthConnectRecord = {
+      ...record,
+      id: 'heart-2992',
+      type: 'HeartRate',
+      value: undefined,
+      start: noon.toISOString(),
+      end: new Date(noon.getTime() + 120_000).toISOString(),
+      points: [{ at: noon.toISOString(), bpm: 66 }],
+    };
+    const third = randomUUID(), fourth = randomUUID();
+    await engine.query(
+      'INSERT INTO users(id,email) VALUES($1,$2),($3,$4)',
+      [third, `${third}@example.invalid`, fourth, `${fourth}@example.invalid`],
+    );
+    const contributors = (src: string | null) =>
+      JSON.stringify({ hrvBalance: { score: 60, provisional: false, input: 0.3, gap: null, ...(src ? { source: src } : {}) } });
+    try {
+      await engine.query(
+        `INSERT INTO oura_daily_derived(user_id,day,readiness_source,readiness_score,readiness_contributors) VALUES
+         ($1,$5,'generic-derived',71,$6::jsonb),($2,$5,'generic-derived',72,$7::jsonb),
+         ($3,$5,'generic-derived',73,$8::jsonb),($4,$5,'ble-derived',74,$7::jsonb)`,
+        [user, other, third, fourth, day, contributors('oura_cloud'), contributors('health_connect_native'), contributors(null)],
+      );
+      for (const id of [user, other, third, fourth]) {
+        await applyHealthConnectBatch(db, id, { records: [heart], deleted: [] });
+        await rebuildHealthConnect(db, id, tz);
+      }
+      const rows = await engine.query<{ user_id: string; readiness_score: number | null }>(
+        'SELECT user_id,readiness_score FROM oura_daily_derived WHERE day=$1 AND user_id=ANY($2::uuid[])',
+        [day, [user, other, third, fourth]],
+      );
+      const byUser = new Map(rows.rows.map((r) => [r.user_id, r.readiness_score]));
+      expect(byUser.get(user)).toBe(71); // Oura Cloud inputs: kept
+      expect(byUser.get(other)).toBeNull(); // this import's inputs: cleared for recompute
+      expect(byUser.get(third)).toBeNull(); // no provenance (before #2984): cleared as before
+      expect(byUser.get(fourth)).toBe(74); // ring-derived: never touched
+    } finally {
+      await getPool().query('DELETE FROM users WHERE id=ANY($1::uuid[])', [[third, fourth]]);
+    }
   });
 });

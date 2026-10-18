@@ -57,15 +57,16 @@ describe('buildWeekSchedule', () => {
 })
 
 describe('buildRecoverySummary', () => {
-  it('renders today scores and last-night sleep, preferring BLE temp (pre-re-key Cloud readiness fallback)', () => {
-    // 2026-07-01 is pre-re-key, so the Cloud readiness 78 is still a real reading (no derived row).
+  it('renders today scores and last-night sleep, preferring BLE temp, and never narrates Oura\'s readiness', () => {
+    // #2992: Oura's own readiness (78) is not ours, pre-re-key or not, so with no derived row there is
+    // no readiness to narrate.
     const out = buildRecoverySummary(
       [{ date: '2026-07-01', readinessScore: 78, sleepScore: 82, activityScore: null, temperatureDeviation: 0.5, resilienceLevel: 'solid' } as never],
       [{ date: '2026-07-01', durationHours: 7.4, efficiency: 91, averageHrvMs: 68, lowestHeartRate: 47 } as never],
       null, null, '2026-07-01', null,
       0.7, // BLE tempDevC
     )
-    expect(out).toContain('readiness 78/100')
+    expect(out).not.toContain('readiness 78/100')
     expect(out).toContain('+0.7°C')
     expect(out).toContain('ring baseline')
     expect(out).not.toContain('resilience')

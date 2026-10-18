@@ -95,7 +95,7 @@ describe('the battery-recovery calibration stops fitting to a seed', () => {
 })
 
 describe('the subjective-recovery correlation stops plotting a seed', () => {
-  const readinessRows = (days: string[]) => days.map((d, i) => ({ day: d, readinessScore: 60 + i * 5 }))
+  const readinessRows = (days: string[]) => days.map((d, i) => ({ day: d, readinessScore: 60 + i * 5, readinessSource: 'ble-derived' }))
 
   it('has no paired points when nothing was answered', async () => {
     const days = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04']

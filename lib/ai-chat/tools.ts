@@ -90,7 +90,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           repo.getOuraDailyDerived(userId, fromDate, toDate),
         ])
         // Readiness must be the own BLE-derived composite, not the frozen Cloud column (F8).
-        const readinessMap = liveReadinessByDay(derived, oura)
+        const readinessMap = liveReadinessByDay(derived)
         return {
           ouraDaily: oura.map(r => ({
             date: r.date, readiness: readinessMap.get(r.date) ?? null, sleepScore: r.sleepScore ?? null,
@@ -323,10 +323,10 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
       execute: async ({ days }) => {
         const from = daysAgo(days ?? 60)
         const fromIso = formatInTimeZone(from, tz, 'yyyy-MM-dd')
-        const [sessions, sleepSessions, ouraRows] = await Promise.all([
+        const [sessions, sleepSessions, derivedRows] = await Promise.all([
           repo.getWorkoutSessionsFrom(userId, from),
           repo.listSleepSessions(userId, fromIso, todayIso),
-          repo.getOuraDaily(userId, fromIso, todayIso),
+          repo.getOuraDailyDerived(userId, fromIso, todayIso),
         ])
         const sessionsByDate = new Map<string, { volume: number; avgRpe: number | null }>()
         for (const ws of sessions) {
@@ -338,7 +338,8 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         // Overnight HRV per night (Q-76) — a nap's HRV is not an overnight reading, and keying by
         // date let it overwrite the real one before this correlation ever ran.
         const hrvByDate = new Map(nightSessions(sleepSessions, tz).filter(s => s.averageHrvMs != null).map(s => [s.date, s.averageHrvMs!]))
-        const readinessByDate = new Map(ouraRows.filter(r => r.readinessScore != null).map(r => [r.date, r.readinessScore!]))
+        // Our own composite (#2992), never Oura's readiness score, which the connector writes again.
+        const readinessByDate = liveReadinessByDay(derivedRows)
 
         const hrvPairs: { hrv: number; volume: number }[] = []
         for (const [date, hrv] of hrvByDate) {

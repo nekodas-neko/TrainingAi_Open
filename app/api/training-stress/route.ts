@@ -27,6 +27,7 @@ import {
   TRAINING_STRESS_RECHECK_DAYS,
 } from '@trainingai/shared/health/training-stress-recheck';
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite';
+import { isOwnReadinessSource } from '@trainingai/shared/health/live-readiness';
 import { resolveDayMetPerMinute } from '@trainingai/shared/health/met-input';
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy';
 import { metForActivity, intensityFromRpe } from '@trainingai/shared/health/workout-energy';
@@ -141,8 +142,8 @@ async function evaluateTrainingStressDay(
   ]);
 
   const derived = derivedRows[0] ?? null;
-  // Readiness must be our own BLE-derived composite, never the frozen Cloud row.
-  const readiness = derived?.readinessSource === 'ble-derived' ? derived.readinessScore : null;
+  // Readiness must be our own composite, whatever device fed it (#2992), never Oura's own score.
+  const readiness = isOwnReadinessSource(derived?.readinessSource) ? derived!.readinessScore : null;
   const readinessProvisional = (summaryRows[0]?.nHistory ?? 0) < BASELINE_MIN_NIGHTS;
 
   // Weight stays the day's own; only the resting heart rate borrows from earlier days (#2401).
