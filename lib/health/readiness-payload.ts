@@ -778,9 +778,9 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     derivedPersists.push({ day: night.nightDate ?? todayIso, pillar: 'readiness', patch: {
       readinessScore: ownComposite.score,
       readinessContributors: ownComposite.contributors,
-      // Unchanged rule on purpose: AI surfaces read only 'ble-derived' (`liveReadinessByDay`) and the
-      // Health Connect recompute clears only 'generic-derived'. Where each input came from is now on
-      // the contributors themselves (`source`).
+      // Both labels are our own composite and AI surfaces read both (`liveReadinessByDay`, #2992).
+      // Where each input came from is on the contributors (`source`); the Health Connect recompute
+      // reads that, not this label, to decide which days to clear.
       readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
       modelVersions: { readiness: READINESS_MODEL_VERSION },
       // TN-64(a): the OTHER half of the early-deload gate. The score has always been stored and

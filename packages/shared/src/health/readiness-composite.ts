@@ -418,6 +418,34 @@ function rederiveContributor(
 }
 
 /**
+ * #2992. Whether a STORED composite is still learning its normals, read from its own contributors.
+ *
+ * Training stress used to ask the ring summary (`n_history < BASELINE_MIN_NIGHTS`), which reads as
+ * "learning" on every day without a ring row: every Oura Cloud day since the 17 Oct switch. Since
+ * normals are per device (#2984), the stored contributors are the record of whether the baseline
+ * inputs that fed this score were judged against a mature normal.
+ *
+ * Learning when no baseline-relative contributor was scored and at least one was waiting on its
+ * normal. Returns `null` when the row cannot say (no contributor map, or one written before
+ * contributors carried a `gap`), so the caller keeps its older rule for those rows.
+ */
+export function storedReadinessLearning(stored: unknown): boolean | null {
+  if (stored == null || typeof stored !== 'object' || Array.isArray(stored)) return null
+  const map = stored as Record<string, unknown>
+  const keys: BaselineContributorKey[] = ['restingHeartRate', 'hrvBalance', 'temperature', 'sleepBalance']
+  let scored = 0
+  let awaiting = 0
+  for (const key of keys) {
+    const c = map[key]
+    if (c == null || typeof c !== 'object' || !('gap' in c)) return null
+    const gap = (c as { gap: unknown }).gap
+    if (gap === null) scored++
+    else if (gap === 'awaiting_baseline') awaiting++
+  }
+  return scored === 0 && awaiting > 0
+}
+
+/**
  * Ask a persisted readiness row whether its own stored score follows from its own stored inputs.
  *
  * **This is the point of storing the input at all (Q-501).** A row used to hold `{score, provisional}`
