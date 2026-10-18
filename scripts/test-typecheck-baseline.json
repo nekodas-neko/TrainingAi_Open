@@ -7,7 +7,7 @@
   "app/api/admin/backfill-derived-scores/__tests__/backfill.test.ts": 1,
   "app/api/complete-workout/__tests__/route.test.ts": 2,
   "app/api/day-log/__tests__/sleep-night-selection.test.ts": 1,
-  "app/api/next-session/prescription/__tests__/prescription.test.ts": 6,
+  "app/api/next-session/prescription/__tests__/prescription.test.ts": 2,
   "app/api/oura-ble/accel-chunks/__tests__/window-span.test.ts": 2,
   "app/api/sync/pull/__tests__/route.test.ts": 6,
   "components/health/day-detail/__tests__/energy-summary.test.ts": 5,

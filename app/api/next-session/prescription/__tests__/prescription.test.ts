@@ -14,7 +14,7 @@ const getLastRealOneRmBatch = vi.fn(async () => new Map<string, { estimated1rm: 
 const listPersonalRecords = vi.fn(async () => new Map())
 // Q-5: the route resolves the working basis from logs + PRs + user-entered estimates.
 const getExerciseEstimates = vi.fn(async () => [] as { exerciseName: string; estimated1rm: number }[])
-const getSessionPeriodization = vi.fn(async () => null)
+const getSessionPeriodization = vi.fn(async (): Promise<Record<string, unknown> | null> => null)
 
 // Repo methods that mutate state — the endpoint must be a pure read, so none of
 // these should ever be invoked.

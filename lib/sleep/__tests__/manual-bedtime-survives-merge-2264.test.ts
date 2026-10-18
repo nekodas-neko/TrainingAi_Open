@@ -12,7 +12,7 @@ const row = (over: Partial<SleepRow>): SleepRow => ({
   date: '2026-10-06', ouraId: null,
   durationHours: 7, deepSleepHours: 1, remSleepHours: 1.5, lightSleepHours: 4.5, awakHours: 0.5,
   efficiency: 90, onsetLatencySec: 600, averageHrvMs: 50, avgHeartRate: 55, lowestHeartRate: 48,
-  restlessPeriods: 3, sleepScore: 80, respiratoryRate: 14, sleepPhase5Min: null,
+  restlessPeriods: 3, respiratoryRate: 14, sleepPhase5Min: null,
   sleepStart: '2026-10-05T14:00:00.000Z', sleepEnd: '2026-10-05T21:00:00.000Z',
   sleepTimeRecommendation: null, manualSleepStart: BEDTIME,
   ...over,
