@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getLocalStore } from "@/lib/local-store";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { shiftDateStr, todayInTz } from "@trainingai/shared/date-utils";
-import { restByPrescription, deltaPct, type RestPrescriptionSummary, type RestSet } from "./rest-prescription";
+import { restByPrescription, deltaPct, type RestPrescriptionSummary, type RestSet } from "@trainingai/shared/health/rest-prescription";
 
 /**
  * The plain half of Q-300, under the Rest discipline trend.

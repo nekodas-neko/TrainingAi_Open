@@ -58,6 +58,8 @@ export const typography = {
   hero: { fontSize: 24, lineHeight: 30, fontWeight: '700' },
   heading: { fontSize: 17, lineHeight: 24, fontWeight: '600' },
   body: { fontSize: 15, lineHeight: 22 },
+  // Typed text: the current app floors every input at 16 px (globals.css, mobile usability).
+  input: { fontSize: 16, lineHeight: 22 },
   label: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
   caption: { fontSize: 12, lineHeight: 18 },
   eyebrow: { fontSize: 11, lineHeight: 16, fontWeight: '600', letterSpacing: 0.8 },

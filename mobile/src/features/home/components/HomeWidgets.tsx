@@ -39,8 +39,19 @@ import { useHome } from '../data/HomeProvider';
 import { metricLabels } from '../data/models';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
+import { DEFAULT_SLEEP_GOAL_HOURS } from '@trainingai/shared/health/daily-goals';
 
-const DEFAULT_SLEEP_GOAL_HOURS = 8;
+/**
+ * A macro for Home's tiles and nutrition card. Nothing logged is "—", not "0 g": the totals of an
+ * empty day are zeros, but no macro was recorded, so only the device's own reading may stand in.
+ */
+function recordedMacro(
+  hasLogs: boolean,
+  logged: number | null | undefined,
+  fallback: number | null | undefined,
+) {
+  return (hasLogs ? logged : null) ?? fallback ?? null;
+}
 
 export function HomeMetricTiles({
   openBody,
@@ -59,7 +70,6 @@ export function HomeMetricTiles({
   const energy = useWorkoutResource(energySpec(health.today));
   const resolved = useRecordedIntake(health.today, energy.data?.balance);
   const nutrition = n.view.totals;
-  // Nothing logged is "—", not "0 g": the totals of an empty day are zeros, but no macro was recorded.
   const logged = n.view.logs.length > 0;
   const values: Record<
     string,
@@ -86,19 +96,19 @@ export function HomeMetricTiles({
     },
     distanceKm: { value: today?.distanceKm ?? null, unit: 'km', icon: 'legs' },
     protein: {
-      value: (logged ? nutrition?.proteinG : null) ?? today?.protein ?? null,
+      value: recordedMacro(logged, nutrition?.proteinG, today?.protein),
       unit: 'g',
       icon: 'nutrition',
       nutrition: true,
     },
     carb: {
-      value: (logged ? nutrition?.carbsG : null) ?? today?.carb ?? null,
+      value: recordedMacro(logged, nutrition?.carbsG, today?.carb),
       unit: 'g',
       icon: 'nutrition',
       nutrition: true,
     },
     fat: {
-      value: (logged ? nutrition?.fatG : null) ?? today?.fat ?? null,
+      value: recordedMacro(logged, nutrition?.fatG, today?.fat),
       unit: 'g',
       icon: 'nutrition',
       nutrition: true,
@@ -295,11 +305,11 @@ function HomeWidgetBody({
                   </AppText>
                   <AppText variant="micro">
                     {metricValue(
-                      n.view.logs.length > 0
-                        ? total?.[key]
-                        : today?.[
-                            ({ proteinG: 'protein', carbsG: 'carb', fatG: 'fat' } as const)[key]
-                          ],
+                      recordedMacro(
+                        n.view.logs.length > 0,
+                        total?.[key],
+                        today?.[({ proteinG: 'protein', carbsG: 'carb', fatG: 'fat' } as const)[key]],
+                      ),
                       'g',
                       1,
                     )}

@@ -10,7 +10,21 @@ export type BodyBatteryLabel = 'Charged' | 'Good' | 'Low' | 'Drained'
  * ships it as `label` — a client re-deriving the 75/50/25 tiers is a second copy of that formula.
  */
 export function bodyBatteryColor(label: BodyBatteryLabel): string {
-  if (label === 'Drained') return 'var(--destructive)'
-  if (label === 'Low') return 'var(--accent-amber)'
-  return 'var(--accent-green)' // Good / Charged
+  const band = bodyBatteryBand(label)
+  if (band === 'drained') return 'var(--destructive)'
+  if (band === 'low') return 'var(--accent-amber)'
+  return 'var(--accent-green)'
+}
+
+/**
+ * The three colour bands the labels fall into: Drained, Low, and Good / Charged together. The rule
+ * lives here so an app that paints in theme colours rather than CSS variables (the native app)
+ * reads the same bands.
+ */
+export type BodyBatteryBand = 'drained' | 'low' | 'good'
+
+export function bodyBatteryBand(label: BodyBatteryLabel): BodyBatteryBand {
+  if (label === 'Drained') return 'drained'
+  if (label === 'Low') return 'low'
+  return 'good'
 }

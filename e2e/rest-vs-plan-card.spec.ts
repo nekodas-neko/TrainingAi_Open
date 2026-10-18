@@ -28,7 +28,7 @@ test.setTimeout(120_000)
 
 /**
  * Two prescriptions, both over the five-set floor, shaped from the production figures in
- * `rest-prescription.ts`: 60 s planned is *exceeded* (75 s taken) and 120 s is undershot (110 s).
+ * `packages/shared/src/health/rest-prescription.ts`: 60 s planned is *exceeded* (75 s taken) and 120 s is undershot (110 s).
  *
  * The spans are what make the compression sentence fire — 60 s planned against 35 s actual is 0.58,
  * inside the two-thirds threshold — so the branch that only prints when it is *true* is covered

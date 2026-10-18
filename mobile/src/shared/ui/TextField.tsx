@@ -23,7 +23,7 @@ export function TextField({
   /** A glyph inside the field's left edge, e.g. 'search'. */
   leadingIcon?: IconName;
 }) {
-  const { theme } = useTheme();
+  const { theme, allowFontScaling } = useTheme();
   const id = useId();
   return (
     <Stack gap="xs" style={[{ flex: 1 }, containerStyle]}>
@@ -34,6 +34,7 @@ export function TextField({
       )}
       <View>
         <TextInput
+          allowFontScaling={allowFontScaling}
           {...props}
           accessibilityLabel={props.accessibilityLabel ?? label}
           accessibilityLabelledBy={hideLabel || props.accessibilityLabel ? undefined : id}
@@ -49,7 +50,7 @@ export function TextField({
               backgroundColor: theme.colors.raised,
               paddingHorizontal: theme.spacing.md,
               paddingVertical: theme.spacing.sm,
-              ...theme.typography.body,
+              ...theme.typography.input,
               ...(leadingIcon ? { paddingLeft: theme.spacing.md + theme.sizes.iconSmall + theme.spacing.sm } : {}),
             },
             style,

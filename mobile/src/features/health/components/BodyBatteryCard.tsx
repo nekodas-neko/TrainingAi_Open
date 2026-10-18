@@ -1,9 +1,17 @@
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import type { BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band';
+import {
+  BODY_BATTERY_EXPLAINER,
+  BODY_BATTERY_PROVISIONAL_SUFFIX,
+  BODY_BATTERY_SPARSE_DAY,
+  BODY_BATTERY_TREND_LABEL,
+  bodyBatteryAnchorSuffix,
+} from '@trainingai/shared/health/body-battery-copy';
 import { View } from 'react-native';
 import {
   AppText,
+  Badge,
   Card,
   ExpandableCard,
   Grid,
@@ -16,10 +24,7 @@ import { useHealthData } from '../data/HealthDataProvider';
 import { batterySpec, metricValue } from '../data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { StressDayCard } from './StressDayCard';
-import { batteryColor } from '../../nutrition/data/display';
-
-const trendLabel = { charging: 'Charging', draining: 'Draining', steady: 'Steady' } as const;
-const anchorFrom = { readiness: ' from readiness', sleep: ' from sleep', default: '' } as const;
+import { batteryColor } from '../../../shared/battery-color';
 
 export function BodyBatteryCard() {
   const { theme } = useTheme();
@@ -39,7 +44,7 @@ export function BodyBatteryCard() {
       title="Body Battery"
       subtitle={
         data?.hasData
-          ? `${data.label} · ${trendLabel[data.trend]}`
+          ? `${data.label} · ${BODY_BATTERY_TREND_LABEL[data.trend]}`
           : data
             ? 'No data yet'
             : 'Waiting for readings'
@@ -61,25 +66,10 @@ export function BodyBatteryCard() {
         data ? (
           <View style={{ gap: theme.spacing.xs }}>
             {lowData && (
-              <View
-                style={{
-                  alignSelf: 'flex-start',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: theme.spacing.xxs,
-                  borderRadius: theme.radii.pill,
-                  backgroundColor: theme.colors.brandSurface,
-                  paddingHorizontal: theme.spacing.sm,
-                  paddingVertical: theme.spacing.xxs,
-                }}
-              >
-                <AppText variant="micro" tone="muted">
-                  Limited data
-                </AppText>
-              </View>
+              <Badge label="Limited data" tone="brand" />
             )}
             <AppText variant="micro" tone="muted">
-              Energy left right now — opens at your readiness and drains as you use it.
+              {BODY_BATTERY_EXPLAINER}
             </AppText>
             <ProgressBar
               value={data.hasData ? data.current / 100 : 0}
@@ -106,8 +96,8 @@ export function BodyBatteryCard() {
               />
               <AppText variant="caption" tone="muted">
                 Started at {data.anchor}
-                {anchorFrom[data.anchorSource]}
-                {data.anchorProvisional ? ' · provisional until readiness lands' : ''}
+                {bodyBatteryAnchorSuffix(data.anchorSource)}
+                {data.anchorProvisional ? BODY_BATTERY_PROVISIONAL_SUFFIX : ''}
               </AppText>
               <Grid columns={2}>
                 <MetricTile label="Charged" value={`+${data.charged}`} />
@@ -115,10 +105,11 @@ export function BodyBatteryCard() {
               </Grid>
               {data.confidence && !data.confidence.sufficient && (
                 <AppText variant="caption" tone="muted">
-                  Your ring recorded only {metricValue(data.confidence.sampleCount)} heart-rate
-                  readings since you woke — about {metricValue(data.confidence.samplesPerHour, '', 1)} an
-                  hour. The ring stops sampling when you are still, so today’s line is mostly gaps
-                  held flat rather than a measured calm. Treat the number as a rough guide.
+                  {BODY_BATTERY_SPARSE_DAY[0]}
+                  {metricValue(data.confidence.sampleCount)}
+                  {BODY_BATTERY_SPARSE_DAY[1]}
+                  {metricValue(data.confidence.samplesPerHour, '', 1)}
+                  {BODY_BATTERY_SPARSE_DAY[2]}
                 </AppText>
               )}
             </>
