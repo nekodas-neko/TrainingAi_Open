@@ -1,11 +1,12 @@
 # Oura Ring v2 API Skill
 
-Comprehensive reference for the Oura Ring v2 API, derived from the official OpenAPI spec v1.34.
+Comprehensive reference for the Oura Ring v2 API, derived from the official OpenAPI spec v1.42 (v1.34 kept beside it).
 
 ## Contents
 
 - `SKILL.md` — curated endpoint reference, field names, types, gotchas, and DB mapping (auto-loaded as context)
-- `references/openapi-v1.34.json` — full OpenAPI spec (read on demand when you need schema details not in SKILL.md)
+- `references/openapi-v1.42.json` — full OpenAPI spec (read on demand when you need schema details not in SKILL.md)
+- `references/openapi-v1.34.json` — the previous pin, kept for diffs
 
 ## When this skill loads
 

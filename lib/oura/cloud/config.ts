@@ -2,7 +2,7 @@
 // directory: `lib/oura/__tests__/cloud-calls-only-from-connector.test.ts` fails a PR that builds one
 // anywhere else.
 //
-// Endpoints and scopes come from the pinned spec, `.claude/skills/oura-api/references/openapi-v1.34.json`
+// Endpoints and scopes come from the pinned spec, `.claude/skills/oura-api/references/openapi-v1.42.json`
 // (`components.securitySchemes.OAuth2`). The revoke URL is the one exception: the spec does not
 // describe revocation, so it comes from Oura's authentication page (cloud.ouraring.com/docs/authentication),
 // and disconnecting never depends on it succeeding.
@@ -13,23 +13,31 @@ export const OURA_REVOKE_URL = 'https://api.ouraring.com/oauth/revoke'
 export const OURA_API_BASE = 'https://api.ouraring.com'
 
 /**
- * What we ask the user to share, by the spec's scope names. `spo2Daily` is the spec's spelling;
- * the skill's prose once said `spo2`, which Oura would reject as an unknown scope. `email` and `tag`
- * are left out: nothing in #2808 reads them.
+ * What we ask the user to share, by the spec's scope names. v1.34 spelled the SpO2 scope `spo2Daily`;
+ * v1.42 spells it `spo2`, and Oura drops the old name without a word (#3026: the 18 Oct grant came
+ * back with no SpO2 scope at all). `heart_health` is new in v1.42 and covers cardiovascular age and
+ * VO2 max, which Oura refused under `daily`. `email` and `tag` are left out: nothing in #2808 reads
+ * them. A change here reaches a user only on their next connect.
  */
-export const OURA_SCOPES = ['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2Daily'] as const
+export const OURA_SCOPES = ['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health'] as const
 export type OuraScope = (typeof OURA_SCOPES)[number]
+
+/** Old scope names a stored grant may still carry, by the name we use now. */
+const LEGACY_SCOPE_NAMES: Readonly<Record<string, OuraScope>> = { spo2Daily: 'spo2' }
 
 /**
  * The scopes a stored grant covers, from `oura_tokens.scope`: Oura answers a space-separated list
  * with an `extapi:` prefix on each name (`extapi:personal extapi:daily`). The user can untick any
- * scope on Oura's consent page, so this is often less than `OURA_SCOPES` (#2974). `null` when the
- * grant carries no scope string (a legacy row, or a token answer without one): the caller then
- * cannot tell and tries everything.
+ * scope on Oura's consent page, so this is often less than `OURA_SCOPES` (#2974). A grant stored
+ * before #3026 that says `spo2Daily` reads as `spo2`. `null` when the grant carries no scope string
+ * (a legacy row, or a token answer without one): the caller then cannot tell and tries everything.
  */
 export function grantedOuraScopes(scope: string | null | undefined): ReadonlySet<string> | null {
   if (!scope || !scope.trim()) return null
-  return new Set(scope.trim().split(/\s+/).map(s => s.replace(/^extapi:/, '')))
+  return new Set(scope.trim().split(/\s+/).map(s => {
+    const name = s.replace(/^extapi:/, '')
+    return LEGACY_SCOPE_NAMES[name] ?? name
+  }))
 }
 
 /** Every request to Oura gives up after this long; a hung Oura must not hold a route open. */

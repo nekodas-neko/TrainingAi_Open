@@ -20,7 +20,7 @@ const CONFIG: OuraOAuthConfig = { clientId: 'cid', clientSecret: 'cs', redirectU
 const fetchMock = vi.fn<typeof fetch>()
 
 /** Everything we ask for, as Oura spells it in the token answer. */
-const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2Daily'
+const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health'
 
 function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
   const calls: string[] = []
@@ -130,26 +130,39 @@ describe('backfillOuraCloud (#2859)', () => {
     expect(out.ok && out.report.documents.workout).toBe(1)
   })
 
-  // #2974: the owner's grant came back without spo2Daily; Oura's 401 for it stopped the whole read.
-  it('skips a type the grant does not cover, reads the rest and heart rate, and reports it as not shared', async () => {
-    oura(path => (path === 'daily_spo2' ? new Response('', { status: 401 }) : null))
+  // #2974, #3026: the owner's 18 Oct grant, which carries neither spo2 nor heart_health. Oura's 401s
+  // for those types are what it does for a scope not granted, so they read as not shared, never as
+  // refused despite the grant, and nothing reads them.
+  it('skips the types the grant does not cover, reads the rest and heart rate, and reports them as not shared', async () => {
+    const ungranted = ['daily_spo2', 'daily_resilience', 'daily_cardiovascular_age', 'vO2_max']
+    oura(path => (ungranted.includes(path) ? new Response('', { status: 401 }) : null))
     const { repo, calls } = fakeRepo(true, 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session')
     const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
     expect(out.ok).toBe(true)
     if (!out.ok) return
-    expect(out.report.notShared).toEqual(['daily_spo2'])
+    expect(out.report.notShared).toEqual(['daily_spo2', 'daily_resilience', 'daily_cardiovascular_age', 'vo2_max'])
+    expect(out.report.refusedDespiteGrant).toEqual([])
     expect(out.report.stoppedEarly).toBeNull()
-    expect(out.report.documents).toMatchObject({
-      daily_readiness: 1, daily_stress: 1, daily_resilience: 1, daily_cardiovascular_age: 1, vo2_max: 1, sleep: 1, workout: 1, heartrate: 4,
-    })
-    expect(out.report.documents.daily_spo2).toBeUndefined()
-    expect(fetchMock.mock.calls.some(c => String(c[0]).includes('/daily_spo2'))).toBe(false)
+    expect(out.report.documents).toMatchObject({ daily_readiness: 1, daily_stress: 1, sleep: 1, workout: 1, heartrate: 4 })
+    for (const type of ['daily_spo2', 'daily_resilience', 'daily_cardiovascular_age', 'vo2_max'] as const) {
+      expect(out.report.documents[type]).toBeUndefined()
+    }
+    expect(fetchMock.mock.calls.some(c => ungranted.some(p => String(c[0]).includes(`/${p}`)))).toBe(false)
+    expect(fetchMock.mock.calls.some(c => String(c[0]).endsWith('/personal_info'))).toBe(false)
     expect(calls).toContain('hr:2')
+  })
+
+  it('reads SpO2 under a grant stored with the old spo2Daily name', async () => {
+    oura()
+    const { repo } = fakeRepo(true, 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2Daily')
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: true })
+    expect(out.ok && out.report.documents.daily_spo2).toBe(1)
+    expect(out.ok && out.report.notShared).toEqual(['daily_resilience', 'daily_cardiovascular_age', 'vo2_max'])
   })
 
   it('skips the heart-rate pass when heartrate is not shared', async () => {
     oura()
-    const { repo, calls } = fakeRepo(true, 'extapi:daily extapi:workout extapi:spo2Daily')
+    const { repo, calls } = fakeRepo(true, 'extapi:daily extapi:workout extapi:spo2 extapi:heart_health')
     const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
     // `session` too: this grant leaves it out (#2982 reads sessions).
     expect(out.ok && out.report.notShared).toEqual(['session', 'heartrate'])
@@ -176,7 +189,7 @@ describe('backfillOuraCloud (#2859)', () => {
       if (path === 'personal_info') return jsonResponse({ id: 'o', age: 40 })
       return null
     })
-    const { repo, calls } = fakeRepo(true, 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2Daily')
+    const { repo, calls } = fakeRepo(true, FULL_SCOPE)
     const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
     expect(out.ok).toBe(true)
     if (!out.ok) return

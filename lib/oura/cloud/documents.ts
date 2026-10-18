@@ -1,6 +1,6 @@
 // The Oura Cloud documents part 2 reads (#2859), and how each one lands in our tables.
 //
-// Every schema is the pinned spec's model (`.claude/skills/oura-api/references/openapi-v1.34.json`,
+// Every schema is the pinned spec's model (`.claude/skills/oura-api/references/openapi-v1.42.json`,
 // `components.schemas`), cut down to the fields we store. A field is read only under the name the
 // spec gives it, and a document that does not match its schema is dropped whole: half a document is
 // worse than none, because the per-field merge would keep its gaps as "measured nothing".
@@ -250,19 +250,21 @@ export const OURA_DOCUMENT_TYPE_NAMES = Object.keys(OURA_DOCUMENT_TYPES) as Oura
 /**
  * The OAuth scope each collection, and the heart-rate series, needs (#2974). Oura answers 401 for a
  * collection whose scope the user did not grant, the same status as a dead token, so the callers
- * check the grant first. The spec maps no route to a scope; these follow its scope descriptions.
- * It names no scope for stress, resilience, cardiovascular age or VO2 max: we assume `daily`, as
- * the oura-api skill does.
+ * check the grant first. The spec (v1.42) maps no route to a scope; these follow its scope
+ * descriptions and what Oura refused (#3026). It names no scope for stress; `daily` has been
+ * accepted for it.
  */
 export const OURA_SCOPE_FOR: Record<OuraDocumentType | 'heartrate', OuraScope> = {
   daily_readiness: 'daily',
   daily_sleep: 'daily',
   daily_activity: 'daily',
-  daily_spo2: 'spo2Daily',
+  daily_spo2: 'spo2',
   daily_stress: 'daily',
-  daily_resilience: 'daily',
-  daily_cardiovascular_age: 'daily',
-  vo2_max: 'daily',
+  // A guess. The spec names no scope for resilience; Oura refused it under `daily` while it took
+  // stress, and `heart_health` is the only scope left that could cover it (#3026).
+  daily_resilience: 'heart_health',
+  daily_cardiovascular_age: 'heart_health',
+  vo2_max: 'heart_health',
   sleep: 'daily',
   workout: 'workout',
   session: 'session',
