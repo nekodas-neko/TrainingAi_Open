@@ -55,3 +55,58 @@ export const appleImportBatch = z
   });
 export type AppleImportBatch = z.infer<typeof appleImportBatch>;
 export type AppleSample = z.infer<typeof appleSample> & { type: AppleSampleType };
+
+/** The outer shape of an Apple batch, with each sample left to be judged on its own. */
+const appleImportEnvelope = z
+  .object({
+    type: appleSampleType,
+    samples: z.array(z.unknown()).max(500),
+    deleted: z.array(z.uuid()).max(500),
+  })
+  .strict();
+export type AppleSampleRejection = { id: string | null; reason: string };
+
+/**
+ * #3045, the Apple twin of `splitHealthConnectBatch` (#2828 N3). Splits a `/api/apple-health/sync`
+ * body into the samples that can be stored and the ones that cannot, with a reason each. Judged as a
+ * whole, one sample the server refused (a newer server than the phone's bundle, say) failed all of it
+ * with a 400, and the phone retried that same head-of-queue batch forever. Only a body that is not a
+ * batch at all is `null`. The value checks are `appleImportBatch`'s per-type ones; a duplicate id keeps
+ * its first copy and a sample also listed in `deleted` is refused, so what comes back always passes
+ * `appleImportBatch`.
+ */
+export function splitAppleImportBatch(
+  body: unknown,
+): { batch: AppleImportBatch; rejected: AppleSampleRejection[] } | null {
+  const envelope = appleImportEnvelope.safeParse(body);
+  if (!envelope.success || new Set(envelope.data.deleted).size !== envelope.data.deleted.length)
+    return null;
+  const { type } = envelope.data;
+  const deleted = new Set(envelope.data.deleted);
+  const seen = new Set<string>();
+  const samples: AppleImportBatch['samples'] = [];
+  const rejected: AppleSampleRejection[] = [];
+  for (const raw of envelope.data.samples) {
+    const parsed = appleSample.safeParse(raw);
+    if (!parsed.success) {
+      const rawId = (raw as { id?: unknown } | null)?.id;
+      rejected.push({
+        id: z.uuid().safeParse(rawId).success ? (rawId as string) : null,
+        reason: parsed.error.issues[0]?.message ?? 'Invalid sample',
+      });
+    } else if (
+      parsed.data.value > appleTypes[type].max ||
+      (type === 'HKCategoryTypeIdentifierSleepAnalysis' && !Number.isInteger(parsed.data.value))
+    ) {
+      rejected.push({ id: parsed.data.id, reason: 'Invalid measurement value' });
+    } else if (seen.has(parsed.data.id)) {
+      rejected.push({ id: parsed.data.id, reason: 'Duplicate record identity' });
+    } else if (deleted.has(parsed.data.id)) {
+      rejected.push({ id: parsed.data.id, reason: 'Record is also deleted in this batch' });
+    } else {
+      seen.add(parsed.data.id);
+      samples.push(parsed.data);
+    }
+  }
+  return { batch: { type, samples, deleted: envelope.data.deleted }, rejected };
+}

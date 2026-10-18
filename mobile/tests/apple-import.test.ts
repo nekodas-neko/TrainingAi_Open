@@ -3,10 +3,11 @@ import { test } from 'node:test';
 import { AppleHealthImportStore } from '../src/features/health/data/AppleHealthImportStore.ts';
 import {
   appleImportBatch,
+  splitAppleImportBatch,
   type AppleImportBatch,
 } from '@trainingai/shared/validation/apple-health-import';
 import { projectAppleHealth } from '@trainingai/shared/health/apple-health-projection';
-import { createApiClient } from '../src/features/account/api/client.ts';
+import { ApiError, createApiClient } from '../src/features/account/api/client.ts';
 const now = Date.parse('2026-10-12T04:00:00Z');
 const type = 'HKCategoryTypeIdentifierSleepAnalysis' as const;
 const id = (n: number) => `50000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -300,3 +301,96 @@ test('account export streams authenticated chunks and rejects HTML and missing s
     /data export/,
   );
 });
+
+// #3045. The server of the day can refuse what the phone's bundle still accepts (schema drift), and
+// the phone sends its queue head first on every run.
+function refusingStore(
+  f: ReturnType<typeof fixture>,
+  post: (body: unknown) => Promise<unknown>,
+  batches: (typeof sample)[][],
+) {
+  const reader = async (kind: string, _from: string, anchor?: string) => {
+    if (kind !== type) return null;
+    const page = Number(anchor ?? 0);
+    return {
+      samples: batches[page] ?? [],
+      deleted: [],
+      anchor: String(Math.min(page + 1, batches.length)),
+      more: false,
+      skipped: 0,
+    };
+  };
+  const connection = {
+    ...f.connection,
+    post: async (path: string, body: unknown) =>
+      (body as { rebuild?: boolean }).rebuild ? f.connection.post(path, body) : post(body),
+  };
+  return new AppleHealthImportStore(f.storage, connection, reader, () => {}, () => now);
+}
+test('#3045: samples the server refuses one by one are settled, and the good ones land', async () => {
+  const f = fixture();
+  const bad = { ...sample, id: id(2), start: '2026-10-11T21:00:00Z', end: '2026-10-11T22:00:00Z', value: 3 };
+  const stored = new Set<string>();
+  const store = refusingStore(
+    f,
+    async (body) => {
+      const split = splitAppleImportBatch(body)!;
+      const samples = split.batch.samples.filter((row) => row.value !== 3);
+      for (const row of samples) stored.add(row.id);
+      return {
+        accepted: samples.length,
+        deleted: split.batch.deleted.length,
+        deferred: [],
+        rejected: split.batch.samples
+          .filter((row) => row.value === 3)
+          .map((row) => ({ id: row.id, reason: 'Invalid measurement value' })),
+      };
+    },
+    [[sample, bad]],
+  );
+  await store.run(true);
+  assert.deepEqual([...stored], [sample.id]);
+  assert.equal(store.getSnapshot().pending, 0);
+  assert.equal(store.getSnapshot().skipped, 1);
+});
+test('#3045: a batch the server refuses with a 400 is dropped instead of blocking every later upload', async () => {
+  const f = fixture();
+  const later = { ...sample, id: id(3), start: '2026-10-11T23:00:00Z', end: '2026-10-11T23:30:00Z' };
+  const stored = new Set<string>();
+  let refuse = true;
+  const store = refusingStore(
+    f,
+    async (body) => {
+      if (refuse) throw new ApiError(400);
+      const batch = appleImportBatch.parse(body);
+      for (const row of batch.samples) stored.add(row.id);
+      return { accepted: batch.samples.length, deleted: batch.deleted.length };
+    },
+    [[sample], [later]],
+  );
+  await store.run(true);
+  assert.equal(store.getSnapshot().pending, 0);
+  assert.equal(store.getSnapshot().skipped, 1);
+  assert.equal(JSON.parse(f.disk.get('apple-health-import.v1')!).queue.length, 0);
+  refuse = false;
+  await store.run(true);
+  assert.deepEqual([...stored], [later.id]);
+});
+for (const status of [500, 429]) {
+  test(`#3045: a ${status} keeps the batch for retry`, async () => {
+    const f = fixture();
+    const store = refusingStore(
+      f,
+      async () => {
+        throw new ApiError(status);
+      },
+      [[sample]],
+    );
+    await store.run(true);
+    assert.ok(store.getSnapshot().pending);
+    assert.equal(
+      JSON.parse(f.disk.get('apple-health-import.v1')!).queue[0].samples[0].id,
+      sample.id,
+    );
+  });
+}

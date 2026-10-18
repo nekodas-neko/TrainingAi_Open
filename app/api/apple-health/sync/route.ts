@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import { getRepository } from '@/lib/data';
 import { rateLimit } from '@/lib/rate-limit';
 import { readJsonLimited } from '@trainingai/shared/http/request-guards';
-import { appleImportBatch } from '@trainingai/shared/validation/apple-health-import';
+import { splitAppleImportBatch } from '@trainingai/shared/validation/apple-health-import';
 import { reportServerError } from '@/lib/observability';
 
 export async function POST(request: NextRequest) {
@@ -28,24 +28,26 @@ export async function POST(request: NextRequest) {
     typeof body.body === 'object' &&
     Object.keys(body.body).length === 1 &&
     (body.body as { rebuild?: unknown }).rebuild === true;
-  const batch = rebuild ? null : appleImportBatch.safeParse(body.body);
-  if (!rebuild && !batch?.success) {
+  // #3045: samples are judged one at a time, so a bad one is refused with its reason and the rest
+  // still land. Only a body that is not a batch at all is a 400.
+  const batch = rebuild ? null : splitAppleImportBatch(body.body);
+  if (!rebuild && !batch) {
     return NextResponse.json({ error: 'Invalid health records' }, { status: 400 });
   }
-  const deferred = batch?.success
-    ? batch.data.samples
+  const deferred = batch
+    ? batch.batch.samples
         .filter((row) => Date.parse(row.end) > Date.now() + 300000)
         .map((row) => row.id)
     : [];
-  const valid = batch?.success
-    ? { ...batch.data, samples: batch.data.samples.filter((row) => !deferred.includes(row.id)) }
+  const valid = batch
+    ? { ...batch.batch, samples: batch.batch.samples.filter((row) => !deferred.includes(row.id)) }
     : null;
   try {
     const repo = await getRepository();
     const result = rebuild
       ? await repo.rebuildAppleHealth(userId, session.user.timezone ?? DEFAULT_TZ)
       : await repo.applyAppleHealthBatch(userId, valid!, session.user.timezone ?? DEFAULT_TZ);
-    return NextResponse.json(rebuild ? result : { ...result, deferred });
+    return NextResponse.json(rebuild ? result : { ...result, deferred, rejected: batch!.rejected });
   } catch (error) {
     reportServerError(error, { userId, url: '/api/apple-health/sync' });
     return NextResponse.json({ error: 'Could not sync health records' }, { status: 500 });
