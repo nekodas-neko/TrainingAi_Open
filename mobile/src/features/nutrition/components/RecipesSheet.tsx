@@ -2,7 +2,8 @@ import { randomUUID } from 'expo-crypto';
 import { useState } from 'react';
 import { Image } from 'react-native';
 import { z } from 'zod';
-import { pickNutritionThumbnail } from '../../../integrations/nutrition/photo';
+import { PhotoPreparationError } from '../../../integrations/nutrition/image-encoding';
+import { pickNutritionImage, pickNutritionThumbnail } from '../../../integrations/nutrition/photo';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
   AppButton,
@@ -23,7 +24,7 @@ import {
 } from '../../../shared/ui';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
-import { foodSchema, scanSchema, type SavedMeal, type Scan } from '../data/models';
+import { foodSchema, type SavedMeal, type Scan } from '../data/models';
 import { useNutrition } from '../data/NutritionProvider';
 import { ingredientAmountLabel, qtyFromInput } from '../data/quantities';
 import { recipeDuplicate, recipeTotals, scanRecipe } from '../data/recipes';
@@ -32,6 +33,7 @@ import { MealLabelSheet } from './MealLabelSheet';
 import { recipeCountLine } from '../data/display';
 import { MacroLine } from './NutritionElements';
 import { aiFailureText } from '../../account/api/client';
+import { readRecipeScan, recipePhotoError } from '../data/scan-response';
 const editorSchema = z.object({
   name: z.string(),
   servings: z.string(),
@@ -150,6 +152,28 @@ export function RecipesSheet({
       setBusy(false);
     }
   }
+  function applyImport(response: ReturnType<typeof readRecipeScan>, thumbnail?: string) {
+    const count = response.recipeYield && response.recipeYield > 0 ? response.recipeYield : 1;
+    setYieldCount(count);
+    if ((response.candidates?.length ?? 0) > 1) {
+      setCandidates(
+        thumbnail
+          ? response.candidates!.map((c) => ({ ...c, imageDataUri: thumbnail }))
+          : response.candidates!,
+      );
+      setChoices([]);
+    } else {
+      const recipe = scanRecipe(response, count, randomUUID);
+      draft.setValue({
+        ...d,
+        ...recipe,
+        imageDataUri: thumbnail ?? recipe.imageDataUri,
+      });
+      if (!response.recipeYield) {
+        setError('Recipe yield was not stated. Review the portions before saving.');
+      }
+    }
+  }
   async function importRecipe() {
     if (!resources || busy) {
       return;
@@ -161,25 +185,45 @@ export function RecipesSheet({
         url: d.url,
         region: n.region,
       });
-      const response = scanSchema
-        .extend({
-          recipeYield: z.number().nullable().optional(),
-          candidates: z.array(scanSchema).optional(),
-        })
-        .parse(raw);
-      const count = response.recipeYield && response.recipeYield > 0 ? response.recipeYield : 1;
-      setYieldCount(count);
-      if ((response.candidates?.length ?? 0) > 1) {
-        setCandidates(response.candidates!);
-        setChoices([]);
-      } else {
-        draft.setValue({ ...d, ...scanRecipe(response, count, randomUUID) });
-        if (!response.recipeYield) {
-          setError('Recipe yield was not stated. Review the portions before saving.');
-        }
-      }
+      applyImport(readRecipeScan(raw));
     } catch (cause) {
       setError(aiFailureText(cause, 'Could not import this recipe. Your draft is preserved.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function importRecipePhoto(camera: boolean) {
+    if (!resources || busy) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    let image: Awaited<ReturnType<typeof pickNutritionImage>>;
+    try {
+      image = await pickNutritionImage(camera);
+    } catch (cause) {
+      setError(
+        cause instanceof PhotoPreparationError
+          ? cause.message
+          : 'Could not prepare the photo. Check camera/photo permission and the latest development build, then try again.',
+      );
+      setBusy(false);
+      return;
+    }
+    if (!image) {
+      setBusy(false);
+      return;
+    }
+    try {
+      const raw = await resources.connection.post('/api/nutrition/scan', {
+        image: image.base64,
+        mimeType: image.mimeType,
+        imageKind: 'recipe',
+        region: n.region,
+      });
+      applyImport(readRecipeScan(raw), image.thumbnail);
+    } catch (cause) {
+      setError(recipePhotoError(cause));
     } finally {
       setBusy(false);
     }
@@ -358,6 +402,20 @@ export function RecipesSheet({
                 disabled={!d.url.trim()}
                 onPress={() => void importRecipe()}
               />
+              <Stack direction="row">
+                <AppButton
+                  title="Take photo"
+                  variant="secondary"
+                  disabled={busy}
+                  onPress={() => void importRecipePhoto(true)}
+                />
+                <AppButton
+                  title="Choose photo"
+                  variant="secondary"
+                  disabled={busy}
+                  onPress={() => void importRecipePhoto(false)}
+                />
+              </Stack>
             </Disclosure>
             {error?.includes('already exists') && (
               <AppButton title="Save a copy" onPress={() => void save(true)} />

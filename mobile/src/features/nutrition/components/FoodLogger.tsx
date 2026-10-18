@@ -956,7 +956,7 @@ export function FoodLogger({
         title="Scan barcode"
         onClose={() => setScanner(false)}
       >
-        <NativeBarcodeScanner onCode={(code) => void lookup(code)} />
+        <NativeBarcodeScanner active={scanner} onCode={(code) => void lookup(code)} />
         <TextField
           label="Barcode"
           value={barcode}
@@ -981,9 +981,16 @@ export function FoodLogger({
     </>
   );
 }
-function NativeBarcodeScanner({ onCode }: { onCode: (code: string) => void }) {
+function NativeBarcodeScanner({
+  onCode,
+  active,
+}: {
+  onCode: (code: string) => void;
+  active: boolean;
+}) {
   const [Scanner, setScanner] = useState<React.ComponentType<{
     onCode: (code: string) => void;
+    active?: boolean;
   }> | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -1000,7 +1007,7 @@ function NativeBarcodeScanner({ onCode }: { onCode: (code: string) => void }) {
     };
   }, []);
   return Scanner ? (
-    <Scanner onCode={onCode} />
+    <Scanner onCode={onCode} active={active} />
   ) : (
     <AppText tone="muted">
       {failed
