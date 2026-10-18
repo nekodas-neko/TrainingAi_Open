@@ -27,20 +27,11 @@ const USER = '00000000-0000-4000-8000-00000000bf93'
 describe.skipIf(!canRun)('error_events retention', () => {
   let pool: import('pg').Pool
   let repo: import('@/lib/data/repository').Repository
+  let flushPendingWrites: () => Promise<void>
 
   const countOlderThan = async (days: number) => Number((await pool.query(
     `SELECT count(*)::int AS n FROM error_events
       WHERE user_id = $1 AND created_at < now() - make_interval(days => $2)`, [USER, days])).rows[0].n)
-
-  /** Poll until `check` holds or the deadline passes — the caller still asserts afterwards, so a
-   *  timeout produces the real assertion failure rather than a bare "timed out". */
-  const waitFor = async (check: () => Promise<boolean>, timeoutMs = 5_000) => {
-    const deadline = Date.now() + timeoutMs
-    while (Date.now() < deadline) {
-      if (await check()) return
-      await new Promise(r => setTimeout(r, 25))
-    }
-  }
 
   const seedAged = async (daysAgo: number, message: string) => {
     await pool.query(
@@ -49,6 +40,7 @@ describe.skipIf(!canRun)('error_events retention', () => {
   }
 
   beforeAll(async () => {
+    ;({ flushPendingWrites } = await import('@/lib/observability/pending-writes'))
     const { getPool } = await import('@/lib/data/postgres/client')
     pool = getPool()
     repo = await (await import('@/lib/data')).getRepositoryAsync()
@@ -81,11 +73,9 @@ describe.skipIf(!canRun)('error_events retention', () => {
     await repo.insertErrorEvent({ userId: USER, source: 'server', message: 'BF-93 fresh fault' })
 
     // The DELETE is deliberately not awaited, so a slow prune cannot delay recording a fault —
-    // which means this has to wait for the effect rather than for a duration. LA-83: a fixed
-    // 250 ms sleep was wrong under full-suite contention, where one queued round-trip made the
-    // prune land late and the test report 2 rows where it wanted 0. Polling to a deadline is slow
-    // under load instead of wrong under load.
-    await waitFor(async () => (await countOlderThan(30)) === 0)
+    // which means this has to wait for the write itself, not for a duration (LA-83: a fixed sleep,
+    // then a polling deadline, both raced the prune under load; #3048).
+    await flushPendingWrites()
 
     expect(await countOlderThan(30), 'rows past the window survived a write').toBe(0)
     // And nothing inside the window was taken with them.

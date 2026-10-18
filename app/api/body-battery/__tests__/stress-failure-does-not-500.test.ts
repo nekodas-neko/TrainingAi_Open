@@ -157,26 +157,18 @@ describe.skipIf(!canRun)('body-battery — a stress-model failure must not 500 t
     expect((await GET()).status).toBe(200)
 
     // `reportServerError` is fire-and-forget by design — it must never delay or mask the response —
-    // so the row lands after GET resolves and the assertion has to poll for it rather than read once.
-    // (BF-18 is the same lesson from the other direction: asserting an async phase with no wait
-    // passes on an idle machine and fails on a loaded runner.)
+    // so the row lands after GET resolves. Wait on the write itself through the test seam rather
+    // than polling a clock: a deadline only moves the race on a loaded runner (#3048).
     //
     // The COUNT is deliberately not asserted. The sibling test above calls `GET()` too and therefore
-    // reports too, and its write is fire-and-forget — so whether one row or two are visible here is
-    // a statement about which write won a race, not about the route. The first version of this test
-    // asserted exactly one: it passed locally and failed in CI with `expected […, …] to have a
-    // length of 1 but got 2`, which is BF-18's defect one file over and written by the same session
-    // that had just fixed it.
+    // reports too — so whether one row or two are visible here is a statement about which write won
+    // a race, not about the route.
     const STRESS_URL = '/api/body-battery#stress'
-    const deadline = Date.now() + 5_000
-    let rows: { url: string; message: string }[] = []
-    while (Date.now() < deadline) {
-      rows = (await pool.query(
-        `SELECT url, message FROM error_events WHERE user_id = $1 AND source = 'server'`,
-        [TEST_USER_ID])).rows
-      if (rows.some(r => r.url === STRESS_URL)) break
-      await new Promise(r => setTimeout(r, 50))
-    }
+    const { flushPendingReports } = await import('@/lib/observability')
+    await flushPendingReports()
+    const rows: { url: string; message: string }[] = (await pool.query(
+      `SELECT url, message FROM error_events WHERE user_id = $1 AND source = 'server'`,
+      [TEST_USER_ID])).rows
 
     // The fragment is what makes the row attributable to the stress strip rather than to the outer
     // catch, which reports the same route without it.

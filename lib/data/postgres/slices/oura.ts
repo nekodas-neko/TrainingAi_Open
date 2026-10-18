@@ -7,6 +7,7 @@ import type { OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow,
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/shared/date-utils'
 import { shouldPrune } from '../retention-throttle'
+import { trackPendingWrite } from '@/lib/observability/pending-writes'
 import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
@@ -66,11 +67,11 @@ type Db = ReturnType<typeof getDb>
 export function recordPruneFailure(db: Db, table: string, err: unknown): void {
   console.error(`[prune] ${table} failed:`, err)
   const message = `[prune] ${table} retention DELETE failed: ${err instanceof Error ? err.message : String(err)}`
-  db.insert(s.errorEvents).values({
+  trackPendingWrite(db.insert(s.errorEvents).values({
     userId: null, source: 'server', message: message.slice(0, 2000),
     stack: err instanceof Error ? (err.stack ?? null)?.slice(0, 8000) ?? null : null,
     url: `prune:${table}`, userAgent: null,
-  }).catch(e => console.error('[prune] could not record the failure either:', e))
+  }).catch(e => console.error('[prune] could not record the failure either:', e)))
 }
 
 // ── Daily Scores ───────────────────────────────────────────────────────────────
