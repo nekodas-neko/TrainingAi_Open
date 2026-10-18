@@ -211,6 +211,15 @@ test('prescribed loads, rated effort and accepted back-off survive reopening and
     workout.exercises[0].sets[1],
   );
   assert.ok(suggestion && suggestion.weightKg < 72.5);
+  // The current app reads the session's deload choice, not one exercise's flag (#3008).
+  const nextSet = workout.exercises[0].sets[1];
+  assert.equal(
+    loadSuggestion({ ...workout, intensityMode: 'deload' }, workout.exercises[0], nextSet),
+    null,
+  );
+  assert.ok(
+    loadSuggestion(workout, { ...workout.exercises[0], deloaded: true }, nextSet),
+  );
   assert.equal(
     await f.controller.resolveSuggestion(id, exerciseId, second.id, true),
     true,

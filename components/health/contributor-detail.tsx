@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { guideFor } from '@trainingai/shared/health/contributor-guide'
 import { scoreBand } from '@trainingai/shared/health/score-band'
+import { PROVISIONAL_BASELINE_NOTE } from '@trainingai/shared/health/score-gap-copy'
 
 /**
  * The tap-to-expand deep-dive shown under a contributor bar: what it measures, what it's
@@ -54,7 +55,7 @@ export function ContributorDetail({
           )}
           <p className="mt-1 text-muted-foreground">
             {provisional
-              ? 'Still learning your personal baseline — this factor stays neutral until enough nights of data accrue, then it scores against your own normal.'
+              ? PROVISIONAL_BASELINE_NOTE
               : meaning}
           </p>
         </div>

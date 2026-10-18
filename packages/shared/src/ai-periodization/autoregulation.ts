@@ -170,3 +170,14 @@ export function clampPrescribedPct(pct: number, zone: { pctMin: number; pctMax?:
   const ceiling = zone.pctMax ?? Infinity
   return Math.min(ceiling, Math.max(pct, floor))
 }
+
+/**
+ * The `phase` the mid-session load-cut suggestion hands `computeRpeAdjustment`. A baseline week is
+ * measuring and a deload's loads are deliberately light, so neither is offered a cut.
+ *
+ * `isDeload` is the SESSION's deload choice, not one exercise's `deloaded` flag: the current app and
+ * Preview must agree on which sessions never see a cut, whatever a single exercise was flagged.
+ */
+export function loadCutPhase(ctx: { isBaseline?: boolean; isDeload?: boolean }): 'baseline' | 'deload' | 'normal' {
+  return ctx.isBaseline ? 'baseline' : ctx.isDeload ? 'deload' : 'normal'
+}

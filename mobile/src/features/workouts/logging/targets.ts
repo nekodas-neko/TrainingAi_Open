@@ -2,7 +2,7 @@ import {
   expectedRpePrefill,
   expectedRpe as expectedSetRpe,
 } from '@trainingai/shared/ai-periodization/expected-rpe';
-import { computeRpeAdjustment } from '@trainingai/shared/ai-periodization/autoregulation';
+import { computeRpeAdjustment, loadCutPhase } from '@trainingai/shared/ai-periodization/autoregulation';
 import {
   MAX_BAR_KG,
   barIsCapped,
@@ -101,7 +101,10 @@ export function loadSuggestion(
       repCompletionRate: Number(previous.reps) / previous.planned.reps,
     },
     {
-      phase: workout.isBaseline ? 'baseline' : exercise.deloaded ? 'deload' : 'normal',
+      phase: loadCutPhase({
+        isBaseline: workout.isBaseline,
+        isDeload: workout.intensityMode === 'deload',
+      }),
       currentReps: previous.planned.reps,
       band: { repMin: previous.planned.reps, repMax: previous.planned.reps },
     },

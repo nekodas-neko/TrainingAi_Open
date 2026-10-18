@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Pressable, View } from 'react-native';
 import { guideFor } from '@trainingai/shared/health/contributor-guide';
 import { scoreBand } from '@trainingai/shared/health/score-band';
+import { PROVISIONAL_BASELINE_NOTE } from '@trainingai/shared/health/score-gap-copy';
 import { AppText, Badge, Card, Icon, Legend, ProgressBar, Stack, ZoneGauge } from '../../../shared/ui';
 import { useHealthAnchor } from '../../../shared/ui/HealthDetailLayout';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -72,7 +73,7 @@ export function ContributorDetails({
                 </AppText>
                 <AppText variant="caption">
                   {f.provisional
-                    ? 'Still learning your personal baseline — this factor stays neutral until enough nights of data accrue.'
+                    ? PROVISIONAL_BASELINE_NOTE
                     : f.score != null && f.score < 50
                       ? guide.low
                       : guide.high}
