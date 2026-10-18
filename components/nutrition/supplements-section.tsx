@@ -5,7 +5,7 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { CheckIcon, SettingsIcon, SyringeIcon } from "lucide-react";
 import { ManageSupplementsSheet } from "./manage-supplements-sheet";
 import { VialSheet } from "@/components/nutrition/reta/vial-sheet";
-import { isMilligramDosed } from "@/components/nutrition/reta/vial-plan";
+import { isMilligramDosed } from "@trainingai/shared/nutrition/vial-plan";
 import { EmptyState } from "@/components/ui/empty-state";
 import { supplementSubtitle } from "@/components/nutrition/supplement-subtitle";
 import { applyManualToggle } from "@/components/nutrition/supplement-day-totals";

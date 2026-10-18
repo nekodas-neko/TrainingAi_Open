@@ -3,7 +3,7 @@ import {
   metricPattern,
   type DoseLevelRecovery,
   type MetricRecoveryResponse,
-} from './weight-response'
+} from '@trainingai/shared/nutrition/weight-response'
 
 /**
  * Issue 2152 — turns `recoveryResponse` output into what the "Heart after a dose" card prints.

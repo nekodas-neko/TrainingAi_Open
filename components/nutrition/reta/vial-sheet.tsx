@@ -12,7 +12,7 @@ import { invalidateSupplements } from "@/lib/cache-groups";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import type { SupplementVial } from "@trainingai/shared/types/supplement";
-import { concentrationWorking, doseWorking, planDose, DEFAULT_BARREL_UNITS } from "./vial-plan";
+import { concentrationWorking, doseWorking, planDose, DEFAULT_BARREL_UNITS } from "@trainingai/shared/nutrition/vial-plan";
 import { WeightResponseCard } from "./weight-response-card";
 import { HeartResponseCard } from "./heart-response-card";
 import { VialOpenedNote } from "./vial-opened-note";

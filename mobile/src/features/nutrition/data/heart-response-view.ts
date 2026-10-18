@@ -3,7 +3,7 @@ import {
   metricPattern,
   type DoseLevelRecovery,
   type MetricRecoveryResponse,
-} from './weight-response';
+} from '@trainingai/shared/nutrition/weight-response';
 export type HeartCardState = 'not_enough' | 'no_clear_pattern' | 'clear';
 export interface HeartChartPoint {
   offset: number;

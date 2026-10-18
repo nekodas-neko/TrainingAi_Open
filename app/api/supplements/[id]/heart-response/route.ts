@@ -5,7 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { DEFAULT_TZ, todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
-import type { RecoveryDose, RecoveryNight } from '@/components/nutrition/reta/weight-response'
+import type { RecoveryDose, RecoveryNight } from '@trainingai/shared/nutrition/weight-response'
 
 /**
  * Issue 2152 — the two inputs of `recoveryResponse` for ONE supplement: its dose logs (with the

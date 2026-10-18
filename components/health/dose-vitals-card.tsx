@@ -8,7 +8,7 @@ import { DoseVitalsChart } from "./dose-vitals-chart";
 import {
   buildDoseVitalsSeries, doseLabel, latestDoses, METRIC_LABEL,
   type DoseMetric, type DoseVitalsNightInput,
-} from "./dose-vitals-series";
+} from "@trainingai/shared/health/dose-vitals-series";
 
 interface DoseVitalsResponse {
   from: string;
