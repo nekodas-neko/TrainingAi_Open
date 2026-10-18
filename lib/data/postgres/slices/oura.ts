@@ -744,7 +744,7 @@ export interface OuraWorkoutUpsertRow {
   calories: number | null
   distanceM: number | null
   intensity: string
-  source: string
+  source: string | null
   label: string | null
 }
 
