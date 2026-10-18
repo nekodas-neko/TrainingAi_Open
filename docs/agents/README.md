@@ -26,6 +26,26 @@ needs the phone to build or verify**. Those stay with the owner's machine. It cl
 for the owner's machine, and reads #2354 for "Orchestrator → cloud thread" instructions. Widening
 what it may take is the owner's call.
 
+## Commit identity (cloud threads)
+
+A cloud container commits as `Claude <noreply@anthropic.com>`. The PR is opened by the owner's
+account, so when auto-merge squashes, GitHub adds `Co-authored-by: Claude` to `main` for each commit
+author who is not the PR author. That put the trailer on 47 of 82 commits in a week (#2978), though
+no commit message carried it and `check-commit-attribution` read only messages.
+
+- **The identity is set for you.** `.claude/hooks/session-start.sh` runs
+  `git config user.name "nekodas-neko"` and `git config user.email
+  "279847013+nekodas-neko@users.noreply.github.com"` when the container's identity is still the
+  default. That email is GitHub's noreply form for the account, so GitHub counts the commits as the
+  PR author's own.
+- **Check it before your first commit** if you started a session some other way: `git config
+  user.email` must not be `noreply@anthropic.com`.
+- **The check now enforces it.** `scripts/check-commit-attribution.js` fails a PR with a commit
+  *authored* by `noreply@anthropic.com` or a name starting with Claude, and says how to fix it. A
+  pushed commit can't be amended without a force-push, so the fix is a fresh branch from
+  `origin/main` with the identity set, the work brought over with `git cherry-pick -n`, and a new PR.
+- **`main` is not rewritten**, so the 47 commits already there stay.
+
 ## Running several at once
 
 - **Every job is claimed before work starts** — the session adds the `in progress` label to the

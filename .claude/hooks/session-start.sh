@@ -9,6 +9,19 @@ fi
 
 cd "$CLAUDE_PROJECT_DIR"
 
+# #2978: a cloud session commits as "Claude <noreply@anthropic.com>", the container's default. The PR is
+# opened by the owner's account, so when auto-merge squashes, GitHub adds `Co-authored-by: Claude` to
+# main for every commit author who is not the PR author (47 of 82 commits in a week), whatever the
+# commit messages say. Set the repo's agent identity before the first commit. Only when the identity
+# is still the default: a session that was given another one keeps it. First in the file, so a slow
+# install below cannot skip it. The check in scripts/check-commit-attribution.js fails the PR if this
+# is missed. The noreply address is GitHub's own form (<id>+<login>@users.noreply.github.com), which
+# GitHub maps to the account, so it is not a second co-author.
+if [ "$(git config user.email || true)" = "noreply@anthropic.com" ]; then
+  git config user.name "nekodas-neko"
+  git config user.email "279847013+nekodas-neko@users.noreply.github.com"
+fi
+
 if [ ! -d node_modules ] || [ ! -d node_modules/.pnpm ]; then
   pnpm install
 fi
