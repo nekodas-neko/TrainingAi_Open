@@ -180,7 +180,15 @@ export const readinessSpec = (date: string) => ({
       sleepContributors: contributors,
       activityContributors: contributors,
       readinessCompositeContributors: z
-        .record(z.string(), z.object({ score: z.number().finite(), provisional: z.boolean() }))
+        .record(
+          z.string(),
+          z.object({
+            score: z.number().finite(),
+            provisional: z.boolean(),
+            gap: z.string().nullish(),
+            scale: z.string().nullish(),
+          }),
+        )
         .nullish(),
       sleepScoreCoverage: z
         .object({

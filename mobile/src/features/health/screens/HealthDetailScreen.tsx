@@ -268,6 +268,7 @@ export function HealthDetailScreen({
                       ([key, value]) => [key, value.score],
                     ),
                   )}
+                  cases={state.data.readinessCompositeContributors}
                   provisional={Object.entries(state.data.readinessCompositeContributors)
                     .filter(([, value]) => value.provisional)
                     .map(([key]) => key)}

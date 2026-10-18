@@ -4,6 +4,7 @@ import { InfoIcon } from 'lucide-react'
 import { labelFor } from '@trainingai/shared/health/contributor-labels'
 import { limitedInputsNote } from '@trainingai/shared/health/readiness-input-labels'
 import { scoreBand } from '@trainingai/shared/health/score-band'
+import { isLearningContributor } from '@trainingai/shared/health/score-gap-copy'
 import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite'
 import { FactorBar } from '@/components/health/contributor-chart'
 import { ContributorDetails } from '@/components/health/contributor-details'
@@ -42,13 +43,14 @@ function LimitedInputsNote({ readiness }: { readiness: ReadinessScoreResponse })
 function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }) {
   const contributors = readiness.readinessCompositeContributors
   const hasScores = contributors != null
-  const anyProvisional = contributors != null && Object.values(contributors).some(c => c?.provisional)
-  // Sort worst-scoring first (surface the weak spots). A provisional factor's `score` is the
-  // neutral 50 placeholder, not a measurement, so it must not sort as one — provisional factors go
-  // last, ordered by weight, rather than interleaving at 50 among real scores.
+  const anyLearning = contributors != null && Object.values(contributors).some(c => c != null && isLearningContributor(c))
+  // Sort worst-scoring first (surface the weak spots). A learning factor's `score` is the neutral 50
+  // placeholder, not a measurement, so it must not sort as one — learning factors go last, ordered by
+  // weight, rather than interleaving at 50 among real scores. A provisional factor with a real score
+  // (`gap: null`) is measured and sorts with the rest (#3029).
   const scoreOf = (k: keyof typeof READINESS_WEIGHTS) => {
     const c = contributors?.[k]
-    return c != null && !c.provisional ? c.score : null
+    return c != null && !isLearningContributor(c) ? c.score : null
   }
   const keys = (Object.keys(READINESS_WEIGHTS) as (keyof typeof READINESS_WEIGHTS)[]).sort((a, b) => {
     const sa = scoreOf(a)
@@ -76,15 +78,15 @@ function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }
             const weightPct = Math.round(READINESS_WEIGHTS[key] * 100)
             const c = contributors?.[key] ?? null
             const score = c?.score ?? null
-            const provisional = c?.provisional ?? false
-            const band = score != null && !provisional ? scoreBand(score) : null
+            const learning = c != null && isLearningContributor(c)
+            const band = score != null && !learning ? scoreBand(score) : null
             // With a real sub-score, colour by band and fill to the score. Without one, show the
             // factor's WEIGHT — bar and label both — in neutral brand colour. Previously the bar
             // filled to `weightPct / 0.17` and the trailing slot showed that bare number, which
             // reads as a sub-score: "Resting heart rate 88" for a user with no resting-HR data at
             // all (Q-45). Bar and label must agree, or a near-full grey bar still reads as "good".
             const color = band ? band.color : 'var(--color-brand)'
-            const scored = score != null && !provisional
+            const scored = score != null && !learning
             return (
               <FactorBar
                 key={key}
@@ -99,7 +101,7 @@ function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }
             )
           })}
         </div>
-        {anyProvisional && (
+        {anyLearning && (
           <p className="text-[10px] leading-snug text-muted-foreground/70">
             Factors still learning your baseline show how much they count (%) instead of a score.
           </p>
@@ -114,6 +116,8 @@ function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }
             label: labelFor(key),
             score: c?.score ?? null,
             provisional: c?.provisional ?? false,
+            gap: c?.gap,
+            scale: c?.scale,
             extra: extraFor(key, readiness),
             // Body temperature is a true golden-zone metric — at baseline is ideal, and both a rise
             // and a drop are worse. Drive a centered gauge from the actual °C deviation (±1.5°C span)

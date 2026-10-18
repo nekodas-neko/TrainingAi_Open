@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { scoreBand } from '@trainingai/shared/health/score-band'
+import { isLearningContributor } from '@trainingai/shared/health/score-gap-copy'
 import { guideFor } from '@trainingai/shared/health/contributor-guide'
 import { ContributorDetail } from '@/components/health/contributor-detail'
 import { ZoneGauge } from '@/components/health/zone-gauge'
@@ -11,6 +12,8 @@ export interface ContributorFactor {
   label: string
   score?: number | null
   provisional?: boolean
+  gap?: unknown
+  scale?: unknown
   extra?: ReactNode
   footer?: ReactNode
   // A "golden zone in the middle" gauge for metrics where both ends are bad (e.g. body-temperature
@@ -36,7 +39,8 @@ export function ContributorDetails({ factors, title = 'What each factor means' }
     <div className="space-y-3">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</p>
       {withGuide.map(f => {
-        const band = f.score != null && !f.provisional ? scoreBand(f.score) : null
+        const learning = isLearningContributor(f)
+        const band = f.score != null && !learning ? scoreBand(f.score) : null
         return (
           <div key={f.key} id={factorAnchorId(f.key)} className="scroll-mt-4 rounded-xl border border-border bg-muted/20 p-4">
             <div className="flex items-baseline justify-between gap-2">
@@ -55,10 +59,10 @@ export function ContributorDetails({ factors, title = 'What each factor means' }
                 Centered variant for middle-optimal metrics (both ends bad, e.g. temperature). */}
             {f.gauge
               ? <ZoneGauge variant="centered" pct={f.gauge.pct} lowLabel={f.gauge.lowLabel} midLabel={f.gauge.midLabel} highLabel={f.gauge.highLabel} />
-              : f.score != null && !f.provisional
+              : f.score != null && !learning
                 ? <ZoneGauge variant="toward-high" pct={f.score} />
                 : null}
-            <ContributorDetail contributorKey={f.key} score={f.score} provisional={f.provisional} extra={f.extra} hideScoreBadge />
+            <ContributorDetail contributorKey={f.key} score={f.score} provisional={f.provisional} gap={f.gap} scale={f.scale} extra={f.extra} hideScoreBadge />
             {f.footer}
           </div>
         )

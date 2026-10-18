@@ -27,7 +27,7 @@ import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
-import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
+import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult, type ContributorGap } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
 import { computeIllnessRadar, illnessAdvisory, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
@@ -253,7 +253,7 @@ export interface ReadinessScoreResponse {
   // Per-factor sub-scores (0-100) of the app's own readiness composite, keyed by the
   // composite's camelCase weight keys. Lets the Readiness detail show each factor's actual
   // score (not just its weight) with a tap-to-expand explanation. null when no composite.
-  readinessCompositeContributors: Record<string, { score: number; provisional: boolean }> | null
+  readinessCompositeContributors: Record<string, { score: number; provisional: boolean; gap?: ContributorGap | null; scale?: 'oura_contributor' }> | null
   // Illness radar (Sub-plan E §5.5) — vs-baseline deviation flag; null until we have a summary.
   illnessFlag: IllnessFlag | null
   illnessScore: number | null                                           // 0-100, 0 while learning
