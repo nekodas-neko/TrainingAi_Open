@@ -23,6 +23,27 @@ export function readFoodScan(value: unknown) {
   return [scanSchema.parse(value)];
 }
 
+/** A recipe answer: the first dish at the top level, more under `candidates`, and the stated yield. */
+export function readRecipeScan(value: unknown) {
+  if (z.object({ error: z.string() }).safeParse(value).success) {
+    throw new UnidentifiedFood();
+  }
+  return scanSchema
+    .extend({
+      recipeYield: z.number().nullable().optional(),
+      candidates: z.array(scanSchema).optional(),
+    })
+    .parse(value);
+}
+
+/** The photo import's failure line: the paused notice and the other photo failures as food scanning. */
+export function recipePhotoError(error: unknown) {
+  if (error instanceof UnidentifiedFood) {
+    return 'No recipe was found in this photo. Try a clearer photo of the whole recipe.';
+  }
+  return foodScanError(error);
+}
+
 export function foodScanError(error: unknown) {
   if (error instanceof UnidentifiedFood) {
     return 'No food was identified. Try another photo or describe what you ate.';

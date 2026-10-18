@@ -1,11 +1,22 @@
 import { CameraView,useCameraPermissions } from 'expo-camera';
-import { useRef } from 'react';
+import { useEffect,useRef } from 'react';
 import { Platform,View } from 'react-native';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { AppButton,AppText } from '../../shared/ui';
-export function BarcodeScanner({ onCode }: { onCode: (code: string) => void }) {
+import { createScanGate } from './scan-gate';
+export function BarcodeScanner({
+  onCode,
+  active = true,
+}: {
+  onCode: (code: string) => void;
+  active?: boolean;
+}) {
   const [permission, requestPermission] = useCameraPermissions();
-  const scanned = useRef(false);
+  const gate = useRef(createScanGate());
+  // Re-arm on mount and each time the sheet opens, whether or not it unmounts its content.
+  useEffect(() => {
+    if (active) gate.current.reset();
+  }, [active]);
   const { theme } = useTheme();
   return (
     <View
@@ -28,8 +39,7 @@ export function BarcodeScanner({ onCode }: { onCode: (code: string) => void }) {
             barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'qr'],
           }}
           onBarcodeScanned={(event) => {
-            if (!scanned.current) {
-              scanned.current = true;
+            if (gate.current.take()) {
               onCode(event.data);
             }
           }}
