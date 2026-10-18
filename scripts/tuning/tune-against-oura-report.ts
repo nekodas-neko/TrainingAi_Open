@@ -375,11 +375,17 @@ function activityReadDay(row: ShadowRow, day: string): boolean {
   return Object.entries(row.units ?? {}).some(([id, u]) => id.startsWith('activity.') && u?.daytimeThrough === day)
 }
 
-/** A readiness contributor's score, or null when it fell back to the neutral 50. */
+/**
+ * A readiness contributor's score, or null when it fell back to the neutral 50. `provisional` can't
+ * tell them apart: the recovery index is provisional whenever it has a real score (the hours curve,
+ * and Oura's own contributor since #2984). The fallback is the one with a `gap`, or, on rows written
+ * before `gap` existed (Q-278), the one with no `input`.
+ */
 function readinessInput(stored: unknown): number | null {
   if (stored == null || typeof stored !== 'object') return null
-  const c = stored as { score?: unknown; provisional?: unknown }
-  return c.provisional === true ? null : num(c.score)
+  const c = stored as { score?: unknown; gap?: unknown; input?: unknown }
+  if ('gap' in c ? c.gap != null : c.input === null) return null
+  return num(c.score)
 }
 
 function contributorsAsNumbers(stored: Record<string, unknown> | null | undefined): Record<string, number | null> | null {

@@ -133,6 +133,35 @@ describe('buildTuneReport', () => {
     expect(fit.daysUsed).toBe(19)
   })
 
+  it('keeps a real provisional recovery index in the readiness fit and drops the neutral fallbacks', () => {
+    const input = fixture(20)
+    const rnd = prng(3)
+    for (const [i, row] of input.derived.entries()) {
+      const hrv = 50 + rnd() * 40
+      const ri = 50 + rnd() * 40
+      // Real Oura readiness as a known blend of the two inputs that have values.
+      input.ouraDaily[i].readinessScore = 0.7 * hrv + 0.3 * ri
+      row.readinessScore = 70
+      row.readinessContributors = {
+        hrvBalance: { score: hrv, provisional: false, input: 0.4, gap: null },
+        // Scored, but provisional: Oura's contributor (#2984) on even days, the hours curve on odd.
+        recoveryIndex: i % 2 === 0
+          ? { score: ri, provisional: true, input: ri, gap: null, scale: 'oura_contributor' }
+          : { score: ri, provisional: true, input: 5.5, gap: null },
+        temperature: { score: 50, provisional: true, input: null, gap: 'no_input' },
+        sleepBalance: { score: 50, provisional: true, input: null, gap: 'awaiting_baseline' },
+        // A row written before `gap` existed: no input means the neutral fallback.
+        restingHeartRate: { score: 50, provisional: true, input: null },
+      }
+    }
+    const fit = buildTuneReport(input).ourFits[2]
+    expect(fit.meaningful).toBe(true)
+    expect(fit.daysUsed).toBe(20)
+    expect(fit.weights!.map(w => w.name).sort()).toEqual(['hrvBalance', 'recoveryIndex'])
+    expect(fit.weights!.find(w => w.name === 'recoveryIndex')!.fitted).toBeCloseTo(0.3, 2)
+    expect(fit.droppedInputs.map(d => d.name)).toEqual(expect.arrayContaining(['temperature', 'sleepBalance', 'restingHeartRate']))
+  })
+
   it('pairs a fully matched range and reports the difference', () => {
     const [sleepPillar, sleepScore, readiness] = buildTuneReport(fixture(20)).comparisons
     expect(sleepPillar.summary.n).toBe(20)
