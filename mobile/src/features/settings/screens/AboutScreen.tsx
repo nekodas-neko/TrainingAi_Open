@@ -46,10 +46,10 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
             </AppText>
           </Card>
           <Card>
-            <AppText variant="heading">What’s new in v{CHANGELOG[0].version}</AppText>
+            <AppText variant="heading">Whatâ€™s new in v{CHANGELOG[0].version}</AppText>
             {CHANGELOG[0].changes.map((change) => (
               <AppText key={change} variant="caption" tone="muted">
-                · {change}
+                Â· {change}
               </AppText>
             ))}
           </Card>
