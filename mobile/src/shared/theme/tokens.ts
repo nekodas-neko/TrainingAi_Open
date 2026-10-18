@@ -113,13 +113,33 @@ export const typography = {
 } satisfies Record<string, TextStyle>;
 export type Space = keyof typeof spacing;
 export type TextVariant = keyof typeof typography;
-export const anatomy = {
-  main: '#22c55e',
-  secondary: '#f59e0b',
-  injured: '#ef4444',
-  untrained: '#3f3f3f',
-  head: '#bebebe',
-  outline: 'rgba(128,128,128,0.3)',
+// The four status colours. Dark values are the ones the app has always drawn (Tailwind 500 steps);
+// the light ones are darker steps that reach 4.5:1 for text on every light card background
+// (tests/light-contrast.test.ts). `info` is the cool step for a state that is neither good nor bad.
+export const statusColors = {
+  light: { success: '#177a3c', warning: '#b04e06', danger: '#b91c1c', info: '#1d4ed8' },
+  dark: { success: '#22c55e', warning: '#f59e0b', danger: '#ef4444', info: '#60a5fa' },
+};
+// The muscle map and the good / watch / bad cues. Dark is unchanged. Light takes the status steps
+// for the three signals and a pale grey for an untrained muscle and the head, which were
+// near-black on a white card.
+export const anatomyColors = {
+  light: {
+    main: statusColors.light.success,
+    secondary: statusColors.light.warning,
+    injured: statusColors.light.danger,
+    untrained: '#d6d9d7',
+    head: '#c2c6c3',
+    outline: 'rgba(128,128,128,0.3)',
+  },
+  dark: {
+    main: '#22c55e',
+    secondary: '#f59e0b',
+    injured: '#ef4444',
+    untrained: '#3f3f3f',
+    head: '#bebebe',
+    outline: 'rgba(128,128,128,0.3)',
+  },
 };
 export const effortColors: Record<number, string> = {
   5: '#22c55e',
@@ -151,12 +171,30 @@ export const scoreColors = {
   dark: { readiness: '#60a5fa', heart: '#f87171', sleep: '#a78bfa', activity: '#f97316' },
 };
 export const weatherColors = {
-  uvLow: '#22c55e',
-  uvModerate: '#eab308',
-  uvHigh: '#f97316',
-  uvVeryHigh: '#ef4444',
-  uvExtreme: '#8b5cf6',
+  light: {
+    uvLow: statusColors.light.success,
+    uvModerate: '#8a5a00',
+    uvHigh: '#c2410c',
+    uvVeryHigh: statusColors.light.danger,
+    uvExtreme: '#6d28d9',
+  },
+  dark: {
+    uvLow: '#22c55e',
+    uvModerate: '#eab308',
+    uvHigh: '#f97316',
+    uvVeryHigh: '#ef4444',
+    uvExtreme: '#8b5cf6',
+  },
 };
+// Protein, carbs and fat in light: a darker step of each, so a gram figure drawn in the colour
+// reads on a white card. Dark is the shared MACRO_COLORS, read in theme.ts.
+export const macroColorsLight = {
+  protein: statusColors.light.success,
+  carbs: statusColors.light.info,
+  fat: '#c2410c',
+};
+// Heart-rate zones 1 to 5 in light, a darker step of each. Dark is the shared HR_ZONE_META.
+export const hrZoneColorsLight = ['#1d4ed8', '#177a3c', '#8a5a00', '#c2410c', '#b91c1c'];
 export const homeCardColors = {
   weightSparkline: '#00d4ff',
   nutritionDonut: '#bf5fff',

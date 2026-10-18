@@ -21,6 +21,13 @@ export function ScoreRing({
   const size = theme.sizes.scoreRing;
   const radius = (size - theme.spacing.md) / 2;
   const length = 2 * Math.PI * radius;
+  // The label sits at the bottom of the stack. Its room is the chord of the ring's inner circle at
+  // that height, so a long label is fitted inside the stroke instead of running under it.
+  const innerRadius = radius - theme.spacing.sm / 2;
+  const lineHeight = (variant: 'display' | 'caption') => theme.typography[variant].lineHeight ?? 0;
+  const halfStack =
+    (lineHeight('display') + lineHeight('caption') * (caption ? 2 : 1)) / 2 - theme.spacing.xxs;
+  const labelWidth = 2 * Math.sqrt(Math.max(0, innerRadius ** 2 - halfStack ** 2));
   const color = signal ? theme.anatomy[signal] : theme.tones[tone].foreground;
   return (
     <View
@@ -64,7 +71,14 @@ export function ScoreRing({
           {caption}
         </AppText>
       )}
-      <AppText variant="caption" tone="muted">
+      <AppText
+        variant="caption"
+        tone="muted"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        style={{ maxWidth: labelWidth, textAlign: 'center' }}
+      >
         {label}
       </AppText>
     </View>

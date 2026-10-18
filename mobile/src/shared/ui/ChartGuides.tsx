@@ -47,7 +47,7 @@ export function ChartGuides({
             x2="100%"
             y1={y}
             y2={y}
-            stroke={theme.colors.border}
+            stroke={theme.colors.grid}
             strokeWidth={1}
           />
         ))}

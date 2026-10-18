@@ -70,7 +70,7 @@ export function CardioTrends() {
                 segments: week.seconds.map((sec, index) => ({
                   label: `Z${index + 1}`,
                   value: sec / 60,
-                  color: HR_ZONE_META[index].color,
+                  color: theme.hrZoneColors[index] ?? HR_ZONE_META[index].color,
                 })),
               }))}
             />

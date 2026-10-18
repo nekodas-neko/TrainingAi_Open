@@ -12,7 +12,10 @@ import {
   icons,
   typography,
   domainTones,
-  anatomy,
+  anatomyColors,
+  statusColors,
+  macroColorsLight,
+  hrZoneColorsLight,
   sessionTones,
   sessionFills,
   scoreColors,
@@ -44,10 +47,14 @@ export type ThemeColors = {
   disabled: string;
   scrim: string;
   onSignal: string;
+  /** The empty part of a progress bar. */
+  track: string;
+  /** Chart gridlines and axes. */
+  grid: string;
 };
 export type Theme = {
   backgrounds: BackgroundTheme;
-  weatherColors: typeof weatherColors;
+  weatherColors: typeof weatherColors.dark;
   homeCards: typeof homeCardColors;
   scores: typeof scoreColors.light;
   macros: Record<keyof typeof MACRO_COLORS, string>;
@@ -61,7 +68,9 @@ export type Theme = {
   icons: typeof icons;
   typography: Record<TextVariant, TextStyle>;
   tones: Record<Tone, TonePalette>;
-  anatomy: typeof anatomy;
+  anatomy: typeof anatomyColors.dark & { high: string };
+  status: typeof statusColors.dark;
+  coachFab: { background: string; foreground: string };
   sessions: TonePalette[];
   effort: Record<number, string>;
   sleepStages: typeof STAGE_COLOR;
@@ -74,7 +83,7 @@ export type Theme = {
 };
 export type ThemeOverrides = {
   backgrounds?: Partial<BackgroundTheme>;
-  weatherColors?: Partial<typeof weatherColors>;
+  weatherColors?: Partial<typeof weatherColors.dark>;
   homeCards?: Partial<typeof homeCardColors>;
   scores?: Partial<typeof scoreColors.light>;
   macros?: Partial<Record<keyof typeof MACRO_COLORS, string>>;
@@ -87,7 +96,7 @@ export type ThemeOverrides = {
   icons?: Partial<typeof icons>;
   typography?: Partial<Record<TextVariant, TextStyle>>;
   tones?: Partial<Record<Tone, Partial<TonePalette>>>;
-  anatomy?: Partial<typeof anatomy>;
+  anatomy?: Partial<Theme['anatomy']>;
   sessions?: TonePalette[];
   effort?: Record<number, string>;
   sleepStages?: Partial<typeof STAGE_COLOR>;
@@ -105,7 +114,7 @@ export function createTheme(
   brand: Brand,
   overrides: ThemeOverrides = {},
 ): Theme {
-  const colors = {
+  const base = {
     ...palettes[brand][mode],
     text: mode === 'dark' ? '#fafafa' : '#121212',
     muted: mode === 'dark' ? '#b2b8b3' : '#666666',
@@ -114,7 +123,13 @@ export function createTheme(
     disabled: mode === 'dark' ? '#809084' : '#717a73',
     scrim: '#00000088',
     onSignal: '#000000',
+    grid: mode === 'dark' ? '#ffffff18' : '#d0d5d1',
     ...overrides.colors,
+  };
+  // Dark keeps the track it always had (the brand surface, whatever accent is chosen).
+  const colors: ThemeColors = {
+    ...base,
+    track: overrides.colors?.track ?? (mode === 'dark' ? base.brandSurface : '#dfe3e0'),
   };
   const tones = {
     ...domainTones[mode],
@@ -134,10 +149,10 @@ export function createTheme(
   }
   return {
     backgrounds: { ...createBackgroundTheme(mode), ...overrides.backgrounds },
-    weatherColors: { ...weatherColors, ...overrides.weatherColors },
+    weatherColors: { ...weatherColors[mode], ...overrides.weatherColors },
     homeCards: { ...homeCardColors, ...overrides.homeCards },
     scores: { ...scoreColors[mode], ...overrides.scores },
-    macros: { ...MACRO_COLORS, ...overrides.macros },
+    macros: { ...(mode === 'dark' ? MACRO_COLORS : macroColorsLight), ...overrides.macros },
     healthArtColors: { ...healthArtColors, ...overrides.healthArtColors },
     healthHeroGradients: { ...healthHeroGradients, ...overrides.healthHeroGradients },
     mode,
@@ -147,10 +162,21 @@ export function createTheme(
     radii: { ...radii, ...overrides.radii },
     sizes: { ...sizes, ...overrides.sizes },
     icons: { ...icons, ...overrides.icons },
-    anatomy: { ...anatomy, ...overrides.anatomy },
+    anatomy: {
+      ...anatomyColors[mode],
+      high: mode === 'dark' ? colors.brand : statusColors.light.info,
+      ...overrides.anatomy,
+    },
+    status: statusColors[mode],
+    coachFab:
+      mode === 'dark'
+        ? { background: colors.text, foreground: colors.background }
+        : { background: colors.brand, foreground: colors.onBrand },
     effort: { ...effortColors, ...overrides.effort },
     sleepStages: { ...STAGE_COLOR, ...overrides.sleepStages },
-    hrZoneColors: overrides.hrZoneColors ?? HR_ZONE_META.map((zone) => zone.color),
+    hrZoneColors:
+      overrides.hrZoneColors ??
+      (mode === 'dark' ? HR_ZONE_META.map((zone) => zone.color) : hrZoneColorsLight),
     friends: friendColors[mode],
     progress: {
       ...progressColors[mode],

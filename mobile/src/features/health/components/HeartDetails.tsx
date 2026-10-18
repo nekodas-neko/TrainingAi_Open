@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import {
   assessFromTrends,
   type MarkerAssessment,
@@ -23,6 +24,7 @@ import { useReadableCueColor } from './RangeBar';
 import type { z } from 'zod';
 
 export function HeartHeroValue({ bpm }: { bpm: number | null }) {
+  const { theme } = useTheme();
   const profile = useWorkoutResource(hrProfileSpec).data;
   const maxHr = profile?.maxHr ?? profile?.workingMax;
   const restingHr = profile?.restingHr;
@@ -33,9 +35,10 @@ export function HeartHeroValue({ bpm }: { bpm: number | null }) {
   const grade =
     bpm != null && zones && restingHr != null && maxHr != null
       ? bpm <= restingHr + HR_REST_THRESHOLD * hrReserve(maxHr, restingHr)
-        ? { name: 'Resting', color: zones[0].color }
+        ? { name: 'Resting', id: 1 }
         : zoneForBpm(bpm, zones)
       : null;
+  const zoneColor = grade ? (theme.hrZoneColors[grade.id - 1] ?? zones?.[0].color) : undefined;
   return (
     <Stack align="center">
       <Icon name="health" />
@@ -45,9 +48,28 @@ export function HeartHeroValue({ bpm }: { bpm: number | null }) {
           bpm
         </AppText>
       </AppText>
-      <AppText variant="caption" style={grade ? { color: grade.color } : undefined}>
-        {grade?.name ?? 'Current heart rate'}
-      </AppText>
+      {grade && theme.mode === 'light' ? (
+        // Light draws the zone as a pill: the zone colour alone on the hero's pink gradient read as
+        // plain blue text rather than a status.
+        <View
+          style={{
+            borderRadius: theme.radii.pill,
+            borderWidth: 1,
+            borderColor: zoneColor,
+            backgroundColor: theme.colors.surface,
+            paddingHorizontal: theme.spacing.sm,
+            paddingVertical: theme.spacing.xxs,
+          }}
+        >
+          <AppText variant="caption" style={{ color: zoneColor }}>
+            {grade.name}
+          </AppText>
+        </View>
+      ) : (
+        <AppText variant="caption" style={grade ? { color: zoneColor } : undefined}>
+          {grade?.name ?? 'Current heart rate'}
+        </AppText>
+      )}
     </Stack>
   );
 }

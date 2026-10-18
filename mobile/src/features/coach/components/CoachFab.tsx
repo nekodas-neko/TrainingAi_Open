@@ -13,13 +13,13 @@ export function CoachFab({ onPress }: { onPress: () => void }) {
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: theme.colors.text,
+        backgroundColor: theme.coachFab.background,
         alignItems: 'center',
         justifyContent: 'center',
         opacity: pressed ? 0.75 : 1,
       })}
     >
-      <Icon name="coach" color={theme.colors.background} />
+      <Icon name="coach" color={theme.coachFab.foreground} />
     </Pressable>
   );
 }

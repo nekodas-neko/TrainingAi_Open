@@ -102,6 +102,7 @@ export function ZoneQuotaCard({ data }: { data: CardioWeek }) {
   const quota = view === 'day' ? data.dayQuota : data.quota;
   const passive = quota.zones.find((row) => row.zoneId === 1);
   const passiveMeta = HR_ZONE_META.find((zone) => zone.id === 1);
+  const zoneColor = (id: number, fallback?: string) => theme.hrZoneColors[id - 1] ?? fallback;
   return (
     <Card>
       <SegmentedControl
@@ -136,7 +137,7 @@ export function ZoneQuotaCard({ data }: { data: CardioWeek }) {
                           width: theme.spacing.sm,
                           height: theme.spacing.sm,
                           borderRadius: theme.radii.pill,
-                          backgroundColor: meta?.color,
+                          backgroundColor: zoneColor(row.zoneId, meta?.color),
                         }}
                       />
                       <AppText variant="caption">
@@ -149,7 +150,7 @@ export function ZoneQuotaCard({ data }: { data: CardioWeek }) {
                         : `${row.doneMin} / ${row.targetMin} min`}
                     </AppText>
                   </Stack>
-                  <ProgressBar value={row.pctComplete / 100} color={meta?.color} />
+                  <ProgressBar value={row.pctComplete / 100} color={zoneColor(row.zoneId, meta?.color)} />
                   {row.status !== 'not-required' && (
                     <Stack direction="row" justify="space-between">
                       <AppText variant="micro" tone="muted">
@@ -169,7 +170,7 @@ export function ZoneQuotaCard({ data }: { data: CardioWeek }) {
                 variant="micro"
                 style={{
                   color:
-                    passive.status === 'complete' ? theme.progress.trendUp : passiveMeta?.color,
+                    passive.status === 'complete' ? theme.progress.trendUp : zoneColor(1, passiveMeta?.color),
                 }}
               >
                 Z1 {passiveMeta?.name}{' '}
