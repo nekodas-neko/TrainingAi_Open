@@ -56,7 +56,7 @@ export function MetricTile({
           adjustsFontSizeToFit
           style={{ fontVariant: ['tabular-nums'] }}
         >
-          {value ?? '—'}
+          {value ?? 'â€”'}
         </AppText>
         {unit && (
           <AppText variant="statUnit" tone="muted">
