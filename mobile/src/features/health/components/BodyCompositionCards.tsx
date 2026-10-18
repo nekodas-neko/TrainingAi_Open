@@ -59,6 +59,7 @@ export function LeanMassCard({ rows }: { rows: readonly BodyRow[] }) {
           points={series}
           label="Lean mass trend"
           readable
+          gaps="connect"
           color={theme.anatomy.main}
           axisLabels={[
             formatDateDisplay(series[0].label, 'short'),
@@ -120,6 +121,7 @@ export function ScaleCompositionCard({ rows }: { rows: readonly BodyRow[] }) {
             label="Skeletal muscle percent trend"
             readable
             fill
+            gaps="connect"
             tone="nutrition"
             color={theme.tones.nutrition.foreground}
             axisLabels={[

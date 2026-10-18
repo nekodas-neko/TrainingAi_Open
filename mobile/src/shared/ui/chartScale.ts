@@ -109,3 +109,34 @@ export function dotMask(values: readonly (number | null)[], mode: 'all' | 'isola
   const standalone = standaloneOrLatest([...values]);
   return values.map((value, index) => value !== null && (mode === 'all' || standalone[index]));
 }
+
+/** What a line does where a day has no reading: 'break' leaves a gap (a missing day stays visible),
+ *  'connect' joins the readings either side, as the current app does for body measurements. */
+export type GapMode = 'break' | 'connect';
+
+/**
+ * Split a day-by-day series of points (null = no reading) into the runs a line is drawn through.
+ * 'break' starts a new run after every empty day; 'connect' draws one run through all the readings,
+ * which is how a weight taken every few days becomes a line instead of floating dots.
+ */
+export function lineSegments<T>(points: readonly (T | null)[], gaps: GapMode): T[][] {
+  if (gaps === 'connect') {
+    const all = points.filter((point): point is T => point !== null);
+    return [all];
+  }
+  const segments: T[][] = [[]];
+  for (const point of points) {
+    if (point !== null) {
+      segments.at(-1)!.push(point);
+    } else if (segments.at(-1)!.length) {
+      segments.push([]);
+    }
+  }
+  return segments;
+}
+
+/** Index of the newest reading (last non-null), or -1 when there is none. */
+export function lastReadingIndex(values: readonly (number | null)[]): number {
+  for (let i = values.length - 1; i >= 0; i--) if (values[i] !== null) return i;
+  return -1;
+}

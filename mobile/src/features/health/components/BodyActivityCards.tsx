@@ -256,6 +256,7 @@ export function ActivityTrendCharts() {
                 gridlines: true,
                 yAxis: true,
                 fill: true,
+                dots: 'isolated',
                 color: def.color,
                 axisLabels: weekdayAxis(shown.map((day) => day.date)),
                 target: def.goal ? { value: def.goal, label: 'Goal' } : undefined,
@@ -364,6 +365,7 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
               gridlines
               yAxis
               fill
+              dots="isolated"
               axisLabels={weekdayAxis(shown.map((day) => day.date))}
             />
             {change && (

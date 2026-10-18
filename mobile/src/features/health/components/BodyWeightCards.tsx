@@ -66,7 +66,7 @@ export function BodyWeightCard({
       onLog={onLog}
       onOpen={onOpen}
       points={points}
-      chart={{ readable: true, axisLabels: endLabels(points) }}
+      chart={{ readable: true, gaps: 'connect', axisLabels: endLabels(points) }}
     >
       {gap && (
         <AppText variant="label" style={{ color: cueColor(gap.reached ? 'good' : 'watch') }}>
@@ -112,7 +112,7 @@ export function WeightTrendCard({
       tone="recovery"
       caption={slope === null ? 'Need more data' : `Last ${WEIGHT_TREND_WINDOW_DAYS} days`}
       points={points.filter((p) => p.value !== null).length >= 2 ? points : undefined}
-      chart={{ readable: true, axisLabels: endLabels(points) }}
+      chart={{ readable: true, gaps: 'connect', axisLabels: endLabels(points) }}
     >
       <Disclosure title="About this trend">
         <AppText variant="caption" tone="muted">
@@ -181,7 +181,7 @@ export function BodyFatCard({
       onOpen={onOpen}
       onLog={onLog}
       points={points}
-      chart={{ readable: true, fill: true, axisLabels: endLabels(points) }}
+      chart={{ readable: true, fill: true, gaps: 'connect', axisLabels: endLabels(points) }}
     >
       {delta !== null && (
         <Badge tone="nutrition" label={`${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`} />
