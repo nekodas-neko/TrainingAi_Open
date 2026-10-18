@@ -702,6 +702,10 @@ export async function tombstoneOuraCloudSleep(db: Db, userId: string, ouraIds: s
       isNull(s.sleepSessions.deletedAt),
     ))
     .returning({ id: s.sleepSessions.id })
+  // The period's stored detail (#2982) is kept and marked, never deleted: the label says it is gone.
+  await db.update(s.ouraCloudSleepPeriods)
+    .set({ sleepType: 'deleted', updatedAt: sql`NOW()` })
+    .where(and(eq(s.ouraCloudSleepPeriods.userId, userId), inArray(s.ouraCloudSleepPeriods.ouraId, ouraIds)))
   return rows.length
 }
 
@@ -720,6 +724,7 @@ export interface OuraWorkoutUpsertRow {
   distanceM: number | null
   intensity: string
   source: string
+  label: string | null
 }
 
 export async function upsertOuraWorkouts(db: Db, userId: string, rows: OuraWorkoutUpsertRow[]): Promise<number> {
@@ -732,12 +737,132 @@ export async function upsertOuraWorkouts(db: Db, userId: string, rows: OuraWorko
         day: sql`excluded.day`, activity: sql`excluded.activity`,
         startDatetime: sql`excluded.start_datetime`, endDatetime: sql`excluded.end_datetime`,
         calories: sql`excluded.calories`, distanceM: sql`excluded.distance_m`,
-        intensity: sql`excluded.intensity`, source: sql`excluded.source`,
+        intensity: sql`excluded.intensity`, source: sql`excluded.source`, label: sql`excluded.label`,
       },
       setWhere: sql`${s.ouraWorkouts.userId} = excluded.user_id`,
     })
     .returning({ id: s.ouraWorkouts.id })
   return written.length
+}
+
+// ── #2982: what Oura Cloud sends and no screen reads ──────────────────────────────────────────
+// Storage for #2860's later batches. Each table holds Oura's values only, so a write replaces what
+// Oura sent before; nothing here merges with, or ranks against, another source.
+
+/** One `oura_cloud_sleep_periods` row: a sleep period exactly as Oura last sent it. */
+export interface OuraCloudSleepPeriodRow {
+  ouraId: string
+  day: string
+  bedtimeStart: Date
+  bedtimeEnd: Date
+  sleepType: string | null
+  heartRate: s.OuraSampleSeries | null
+  hrv: s.OuraSampleSeries | null
+  sleepPhase30Sec: string | null
+  movement30Sec: string | null
+  sleepAlgorithmVersion: string | null
+  lowBatteryAlert: boolean | null
+  sleepAnalysisReason: string | null
+  period: number | null
+  ringId: string | null
+}
+
+export async function upsertOuraCloudSleepPeriods(db: Db, userId: string, rows: OuraCloudSleepPeriodRow[]): Promise<number> {
+  if (rows.length === 0) return 0
+  const values = collapseOnConflict(rows.map(r => ({ ...r, userId })), r => r.ouraId)
+  const t = s.ouraCloudSleepPeriods
+  await db.insert(t).values(values)
+    .onConflictDoUpdate({
+      target: [t.userId, t.ouraId],
+      set: {
+        day: sql`excluded.day`, bedtimeStart: sql`excluded.bedtime_start`, bedtimeEnd: sql`excluded.bedtime_end`,
+        sleepType: sql`excluded.sleep_type`, heartRate: sql`excluded.heart_rate`, hrv: sql`excluded.hrv`,
+        sleepPhase30Sec: sql`excluded.sleep_phase_30_sec`, movement30Sec: sql`excluded.movement_30_sec`,
+        sleepAlgorithmVersion: sql`excluded.sleep_algorithm_version`, lowBatteryAlert: sql`excluded.low_battery_alert`,
+        sleepAnalysisReason: sql`excluded.sleep_analysis_reason`, period: sql`excluded.period`, ringId: sql`excluded.ring_id`,
+        updatedAt: sql`now()`,
+      },
+    })
+  return values.length
+}
+
+/**
+ * One `oura_cloud_daily` row. Only the fields some document of that day provided are present: the
+ * readiness, sleep, activity and stress documents arrive as separate webhook events, so a write sets
+ * the fields it has and leaves the others as stored.
+ */
+export interface OuraCloudDailyRow {
+  date: string
+  met?: s.OuraSampleSeries | null
+  class5Min?: string | null
+  inactivityAlerts?: number | null
+  sedentaryMetMinutes?: number | null
+  targetCalories?: number | null
+  targetMeters?: number | null
+  metersToTarget?: number | null
+  readinessContributors?: Record<string, number | null> | null
+  sleepContributors?: Record<string, number | null> | null
+  activityContributors?: Record<string, number | null> | null
+  daySummary?: string | null
+}
+
+const CLOUD_DAILY_COLUMNS = {
+  met: 'met', class5Min: 'class_5_min', inactivityAlerts: 'inactivity_alerts',
+  sedentaryMetMinutes: 'sedentary_met_minutes', targetCalories: 'target_calories', targetMeters: 'target_meters',
+  metersToTarget: 'meters_to_target', readinessContributors: 'readiness_contributors',
+  sleepContributors: 'sleep_contributors', activityContributors: 'activity_contributors', daySummary: 'day_summary',
+} as const satisfies Record<Exclude<keyof OuraCloudDailyRow, 'date'>, string>
+
+export async function upsertOuraCloudDaily(db: Db, userId: string, rows: OuraCloudDailyRow[]): Promise<number> {
+  // One insert per set of present fields: the conflict arm may only overwrite what this write carries.
+  const groups = new Map<string, OuraCloudDailyRow[]>()
+  for (const r of rows) {
+    const present = (Object.keys(CLOUD_DAILY_COLUMNS) as (keyof typeof CLOUD_DAILY_COLUMNS)[]).filter(k => r[k] !== undefined)
+    if (present.length === 0) continue
+    const key = present.join(',')
+    groups.set(key, [...(groups.get(key) ?? []), r])
+  }
+  let written = 0
+  for (const [key, group] of groups) {
+    const fields = key.split(',') as (keyof typeof CLOUD_DAILY_COLUMNS)[]
+    const values = collapseOnConflict(group.map(r => ({ ...r, userId })), r => r.date)
+    const set: Record<string, SQL> = { updatedAt: sql`now()` }
+    for (const f of fields) set[f] = sql.raw(`excluded.${CLOUD_DAILY_COLUMNS[f]}`)
+    await db.insert(s.ouraCloudDaily).values(values)
+      .onConflictDoUpdate({ target: [s.ouraCloudDaily.userId, s.ouraCloudDaily.date], set })
+    written += values.length
+  }
+  return written
+}
+
+/** One `oura_sessions` row: a session exactly as Oura last sent it. */
+export interface OuraSessionRow {
+  ouraId: string
+  day: string
+  sessionType: string
+  startDatetime: Date
+  endDatetime: Date
+  mood: string | null
+  heartRate: s.OuraSampleSeries | null
+  heartRateVariability: s.OuraSampleSeries | null
+  motionCount: s.OuraSampleSeries | null
+}
+
+export async function upsertOuraSessions(db: Db, userId: string, rows: OuraSessionRow[]): Promise<number> {
+  if (rows.length === 0) return 0
+  const values = collapseOnConflict(rows.map(r => ({ ...r, userId })), r => r.ouraId)
+  const t = s.ouraSessions
+  await db.insert(t).values(values)
+    .onConflictDoUpdate({
+      target: [t.userId, t.ouraId],
+      set: {
+        day: sql`excluded.day`, sessionType: sql`excluded.session_type`,
+        startDatetime: sql`excluded.start_datetime`, endDatetime: sql`excluded.end_datetime`, mood: sql`excluded.mood`,
+        heartRate: sql`excluded.heart_rate`, heartRateVariability: sql`excluded.heart_rate_variability`,
+        motionCount: sql`excluded.motion_count`, updatedAt: sql`now()`,
+      },
+    })
+  return values.length
 }
 
 /**
@@ -853,7 +978,8 @@ export async function upsertAggregatorHeartrate(
 }
 
 /**
- * Oura Cloud's heart-rate series into the shared HR table (#2859), source `oura_cloud`.
+ * Oura Cloud's heart-rate series into the shared HR table (#2859), source `oura_cloud`, with Oura's
+ * label for each sample (`awake`, `rest`, `sleep` …) in `context` (#2982).
  *
  * The ladder already ranks the ring's own BLE rows above the Cloud feed (`source-rank.ts`), and this
  * write keeps to it rather than leaving the choice to read time: a Cloud point within
@@ -863,7 +989,7 @@ export async function upsertAggregatorHeartrate(
  * Returns how many points were offered to the insert (after the cover filter).
  */
 export async function upsertOuraCloudHeartrate(
-  db: Db, userId: string, rows: { timestamp: Date; bpm: number }[], tz: string,
+  db: Db, userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string,
 ): Promise<number> {
   if (rows.length === 0) return 0
   const times = rows.map(r => r.timestamp.getTime())
@@ -892,7 +1018,8 @@ export async function upsertOuraCloudHeartrate(
   if (kept.length === 0) return 0
   await writeHeartrateRows(
     db, userId, kept.map(r => ({ ...r, source: 'oura_cloud' })),
-    sql`${s.ouraHeartrate.source} IN (${notDevice}) AND (${s.ouraHeartrate.bpm} IS DISTINCT FROM excluded.bpm OR ${s.ouraHeartrate.source} IS DISTINCT FROM excluded.source)`,
+    // `context` too, so a point stored before #2982 gets its label when Oura's series is read again.
+    sql`${s.ouraHeartrate.source} IN (${notDevice}) AND (${s.ouraHeartrate.bpm} IS DISTINCT FROM excluded.bpm OR ${s.ouraHeartrate.source} IS DISTINCT FROM excluded.source OR ${s.ouraHeartrate.context} IS DISTINCT FROM excluded.context)`,
   )
   const earliest = kept.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
   await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'), tz)
@@ -917,14 +1044,14 @@ export async function getLatestOuraCloudHeartrateAt(db: Db, userId: string, sinc
 }
 
 async function writeHeartrateRows(
-  db: Db, userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[], setWhere: SQL,
+  db: Db, userId: string, rows: { timestamp: Date; bpm: number; source: string | null; context?: string | null }[], setWhere: SQL,
 ): Promise<void> {
   if (rows.length === 0) return
   // Collapse repeats on the conflict target BEFORE the insert — one duplicated timestamp otherwise
   // discards an entire 5,000-point CHUNK, which is what Q-214 was (see `collapse-conflicts.ts`).
   // Last value wins, matching the arms' bare excluded.* semantics.
   const values = collapseOnConflict(
-    rows.map(r => ({ userId, timestamp: r.timestamp, bpm: r.bpm, source: r.source })),
+    rows.map(r => ({ userId, timestamp: r.timestamp, bpm: r.bpm, source: r.source, context: r.context ?? null })),
     r => r.timestamp.getTime(),
   )
   // 4 params/row → chunk well under pg's 65535 bind-parameter ceiling. A BLE
@@ -936,7 +1063,9 @@ async function writeHeartrateRows(
       // The conflict target is (user_id, timestamp), so the matched row is already user-scoped.
       .onConflictDoUpdate({
         target: [s.ouraHeartrate.userId, s.ouraHeartrate.timestamp],
-        set: { bpm: sql`excluded.bpm`, source: sql`excluded.source`, updatedAt: sql`now()` },
+        // `context` is the writer's own label (only Oura Cloud has one, #2982); a row another writer
+        // takes over carries that writer's, which for every other writer is none.
+        set: { bpm: sql`excluded.bpm`, source: sql`excluded.source`, context: sql`excluded.context`, updatedAt: sql`now()` },
         setWhere,
       })
   }

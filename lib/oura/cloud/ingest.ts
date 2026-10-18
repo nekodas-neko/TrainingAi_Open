@@ -6,6 +6,8 @@
 //   - `sleep_sessions` and `oura_heartrate` are keyed by instant, not by day, so a Cloud period or
 //     point that a ring, strap or manual row already covers is skipped instead of duplicated.
 //   - `oura_workouts` holds only Oura's workouts, keyed by Oura's id.
+//   - `oura_cloud_sleep_periods`, `oura_cloud_daily` and `oura_sessions` (#2982) hold only Oura's
+//     values, read by no screen, so each write replaces what Oura sent before.
 // Every upsert is idempotent: the same documents written twice leave the same rows.
 //
 // The BLE raw archive (`oura_raw_samples`, `oura_raw_packed`) is never touched here.
@@ -15,7 +17,8 @@ import type { OuraCloudWrites } from './documents'
 /** The slice of the repository the writer needs, so tests can hand it a fake. */
 export type OuraCloudWriter = Pick<WorkoutRepository,
   'upsertOuraDaily' | 'upsertBodyMetrics' | 'upsertOuraCloudSleep' | 'tombstoneOuraCloudSleep' |
-  'upsertOuraWorkouts' | 'upsertOuraCloudHeartrate'>
+  'upsertOuraWorkouts' | 'upsertOuraCloudHeartrate' |
+  'upsertOuraCloudSleepPeriods' | 'upsertOuraCloudDaily' | 'upsertOuraSessions'>
 
 export interface OuraCloudWriteCounts {
   dailyRows: number
@@ -25,10 +28,14 @@ export interface OuraCloudWriteCounts {
   sleepTombstoned: number
   workouts: number
   heartRatePoints: number
+  sleepPeriods: number
+  cloudDays: number
+  sessions: number
 }
 
 export const NO_WRITES: OuraCloudWriteCounts = {
   dailyRows: 0, bodyRows: 0, sleepWritten: 0, sleepSkippedOverlap: 0, sleepTombstoned: 0, workouts: 0, heartRatePoints: 0,
+  sleepPeriods: 0, cloudDays: 0, sessions: 0,
 }
 
 /** What `writeOuraCloudData` would write, without writing: the dry run's numbers. */
@@ -41,6 +48,9 @@ export function plannedCounts(writes: OuraCloudWrites): OuraCloudWriteCounts {
     sleepTombstoned: writes.deletedSleepIds.length,
     workouts: writes.workouts.length,
     heartRatePoints: 0,
+    sleepPeriods: writes.sleepPeriods.length,
+    cloudDays: writes.cloudDaily.length,
+    sessions: writes.sessions.length,
   }
 }
 
@@ -51,6 +61,9 @@ export async function writeOuraCloudData(writer: OuraCloudWriter, userId: string
   const sleep = writes.sleep.length > 0 ? await writer.upsertOuraCloudSleep(userId, writes.sleep) : { written: 0, skippedOverlap: 0 }
   const sleepTombstoned = await writer.tombstoneOuraCloudSleep(userId, writes.deletedSleepIds)
   const workouts = await writer.upsertOuraWorkouts(userId, writes.workouts)
+  const sleepPeriods = await writer.upsertOuraCloudSleepPeriods(userId, writes.sleepPeriods)
+  const cloudDays = await writer.upsertOuraCloudDaily(userId, writes.cloudDaily)
+  const sessions = await writer.upsertOuraSessions(userId, writes.sessions)
   return {
     dailyRows: writes.daily.length,
     bodyRows: writes.body.length,
@@ -59,5 +72,8 @@ export async function writeOuraCloudData(writer: OuraCloudWriter, userId: string
     sleepTombstoned,
     workouts,
     heartRatePoints: 0,
+    sleepPeriods,
+    cloudDays,
+    sessions,
   }
 }

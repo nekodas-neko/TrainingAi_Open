@@ -41,6 +41,9 @@ function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
     tombstoneOuraCloudSleep: async (_u, ids) => ids.length,
     upsertOuraWorkouts: async (_u, rows) => { calls.push(`workouts:${rows.length}`); return rows.length },
     upsertOuraCloudHeartrate: async (_u, rows) => { calls.push(`hr:${rows.length}`); return rows.length },
+    upsertOuraCloudSleepPeriods: async (_u, rows) => { calls.push(`periods:${rows.length}`); return rows.length },
+    upsertOuraCloudDaily: async (_u, rows) => { calls.push(`cloudDaily:${rows.length}`); return rows.length },
+    upsertOuraSessions: async (_u, rows) => { calls.push(`sessions:${rows.length}`); return rows.length },
   }
   return { repo, calls }
 }
@@ -79,9 +82,11 @@ describe('backfillOuraCloud (#2859)', () => {
     const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
     expect(out.ok).toBe(true)
     if (!out.ok) return
-    expect(out.report.documents).toMatchObject({ daily_readiness: 1, sleep: 1, workout: 1, heartrate: 4 })
-    expect(out.report.counts).toMatchObject({ dailyRows: 1, bodyRows: 1, sleepWritten: 1, workouts: 1, heartRatePoints: 4 })
-    expect(calls).toEqual(['daily:1', 'body:1', 'sleep:1', 'workouts:1', 'hr:2', 'hr:2'])
+    expect(out.report.documents).toMatchObject({ daily_readiness: 1, sleep: 1, workout: 1, session: 1, heartrate: 4 })
+    expect(out.report.counts).toMatchObject({
+      dailyRows: 1, bodyRows: 1, sleepWritten: 1, workouts: 1, heartRatePoints: 4, sleepPeriods: 1, cloudDays: 1, sessions: 1,
+    })
+    expect(calls).toEqual(['daily:1', 'body:1', 'sleep:1', 'workouts:1', 'periods:1', 'cloudDaily:1', 'sessions:1', 'hr:2', 'hr:2'])
     const first = new URL(String(fetchMock.mock.calls[0][0]))
     expect(first.href.startsWith(`${OURA_API_BASE}/v2/usercollection/daily_readiness`)).toBe(true)
     expect(Object.fromEntries(first.searchParams)).toEqual({ start_date: '2026-10-01', end_date: '2026-10-12' })
@@ -146,7 +151,8 @@ describe('backfillOuraCloud (#2859)', () => {
     oura()
     const { repo, calls } = fakeRepo(true, 'extapi:daily extapi:workout extapi:spo2Daily')
     const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
-    expect(out.ok && out.report.notShared).toEqual(['heartrate'])
+    // `session` too: this grant leaves it out (#2982 reads sessions).
+    expect(out.ok && out.report.notShared).toEqual(['session', 'heartrate'])
     expect(fetchMock.mock.calls.some(c => String(c[0]).includes('/heartrate'))).toBe(false)
     expect(calls.some(c => c.startsWith('hr:'))).toBe(false)
   })
@@ -285,6 +291,31 @@ describe('startOuraConnectBackfill reporting', () => {
     expect(err.message).toMatch(/connect-backfill:stopped-early: Oura's sleep answered 503/)
     expect(err.message).not.toContain('acc')
     expect(ctx.userId).toBe(USER)
+  })
+
+  // #2982: a refused type and an empty heart-rate pass were visible only in a report nobody reads.
+  it('records a type Oura refused, and a heart-rate pass that read nothing', async () => {
+    oura(path => {
+      if (path === 'daily_spo2') return new Response('', { status: 403 })
+      if (path === 'heartrate') return jsonResponse({ data: [], next_token: null })
+      return null
+    })
+    dataRepo = { ...fakeRepo().repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
+    startOuraConnectBackfill(USER)
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(2))
+    const messages = reportServerError.mock.calls.map(c => (c[0] as Error).message)
+    expect(messages[0]).toMatch(/connect-backfill:forbidden: Oura refused daily_spo2 \(403\)/)
+    expect(messages[1]).toMatch(/connect-backfill:heartrate-empty: Oura answered no heart rate for /)
+  })
+
+  it('records nothing extra for a full, clean connect backfill', async () => {
+    oura()
+    const { repo, calls } = fakeRepo()
+    dataRepo = { ...repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
+    startOuraConnectBackfill(USER)
+    await vi.waitFor(() => expect(calls.filter(c => c.startsWith('hr:')).length).toBeGreaterThan(0))
+    await new Promise(r => setTimeout(r, 20))
+    expect(reportServerError).not.toHaveBeenCalled()
   })
 
   it('records a connect whose backfill could not run', async () => {
