@@ -174,7 +174,11 @@ export const SleepDoc = z.object({
   ring_id: added(z.string().min(1)),
 })
 
-/** `PublicWorkout` */
+/**
+ * `PublicWorkout`. `source` is a label, so it never costs us the workout: v1.42 added two values
+ * (#3033) that dropped every live-heart-rate workout whole while we read only v1.34's four. A value
+ * outside the spec's list, or none, stores as `null` ("not stated") and the workout lands.
+ */
 export const WorkoutDoc = z.object({
   id: z.string().min(1),
   day: Day,
@@ -184,7 +188,8 @@ export const WorkoutDoc = z.object({
   calories: NullableNum,
   distance: NullableNum,
   intensity: z.enum(['easy', 'moderate', 'hard']),
-  source: z.enum(['manual', 'autodetected', 'confirmed', 'workout_heart_rate']),
+  source: z.enum(['manual', 'autodetected', 'confirmed', 'workout_heart_rate', 'live_third_party_heart_rate', 'live_oura_heart_rate'])
+    .nullable().optional().catch(null),
   label: added(z.string()),
 })
 
@@ -308,7 +313,7 @@ export interface OuraWorkoutRow {
   calories: number | null
   distanceM: number | null
   intensity: string
-  source: string
+  source: string | null
   label: string | null
 }
 
@@ -493,7 +498,7 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
         if (!(end.getTime() >= start.getTime())) break
         workouts.set(doc.id, {
           id: doc.id, day: doc.day, activity: doc.activity, startDatetime: start, endDatetime: end,
-          calories: doc.calories ?? null, distanceM: doc.distance ?? null, intensity: doc.intensity, source: doc.source,
+          calories: doc.calories ?? null, distanceM: doc.distance ?? null, intensity: doc.intensity, source: doc.source ?? null,
           label: doc.label ?? null,
         })
         break

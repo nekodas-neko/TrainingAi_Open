@@ -136,6 +136,25 @@ describe('Oura Cloud document mapping (#2859)', () => {
     }])
   })
 
+  // #3033: v1.42's two live-heart-rate sources dropped the whole workout while we read v1.34's four.
+  it.each(['live_third_party_heart_rate', 'live_oura_heart_rate'])('parses and maps a workout whose source is %s', source => {
+    const doc = parseOuraDocument('workout', { ...FIXTURES.workout, source })
+    expect(doc).not.toBeNull()
+    expect(mapOuraDocuments([doc!]).workouts).toMatchObject([{ id: 'wo-1', activity: 'running', source }])
+  })
+
+  it('keeps a workout whose source is not in the spec, or missing, with a null source', () => {
+    for (const raw of [{ ...FIXTURES.workout, source: 'some_future_source' }, { ...FIXTURES.workout, source: null }, { ...FIXTURES.workout, source: undefined }]) {
+      const doc = parseOuraDocument('workout', raw)
+      expect(doc).not.toBeNull()
+      expect(mapOuraDocuments([doc!]).workouts).toMatchObject([{ id: 'wo-1', calories: 420.5, label: 'Morning run', source: null }])
+    }
+  })
+
+  it('still drops a workout that breaks a field we cannot do without', () => {
+    expect(parseOuraDocument('workout', { ...FIXTURES.workout, intensity: 'extreme' })).toBeNull()
+  })
+
   it('lists a deleted period for a tombstone and skips a rest period', () => {
     const deleted = parseOuraDocument('sleep', { ...sleepPeriod, id: 'gone', type: 'deleted' })!
     const rest = parseOuraDocument('sleep', { ...sleepPeriod, id: 'rest', type: 'rest' })!
