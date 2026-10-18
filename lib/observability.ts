@@ -1,10 +1,14 @@
 import { getRepositoryAsync } from "@/lib/data"
 import { summariseCause } from "@/lib/observability/pg-cause"
+import { trackPendingWrite, flushPendingWrites } from "@/lib/observability/pending-writes"
 
 // `summariseCause` lives in ./observability/pg-cause because `request-error.ts` needs it too and
 // cannot import this module (it would drag the Drizzle adapter into the instrumentation bundle).
 // Re-exported here so the existing import path keeps working.
 export { summariseCause }
+
+/** Test seam: resolves once every report started so far has landed (or failed). Not for production paths. */
+export const flushPendingReports = flushPendingWrites
 
 // Fire-and-forget server-error capture. Never throws — a failure to record
 // an error must never mask or replace the original error being reported.
@@ -18,7 +22,7 @@ export function reportServerError(err: unknown, context?: { userId?: string; url
   const message = `${prefix}${baseMessage}`
   const fullStack = block ? `${block}\n${stack ?? ''}` : stack
 
-  getRepositoryAsync()
+  trackPendingWrite(getRepositoryAsync()
     .then(repo => repo.insertErrorEvent({
       userId: context?.userId ?? null,
       source: "server",
@@ -26,5 +30,5 @@ export function reportServerError(err: unknown, context?: { userId?: string; url
       stack: fullStack?.slice(0, 8000) ?? null,
       url: context?.url ?? null,
     }))
-    .catch(() => {})
+    .catch(() => {}))
 }

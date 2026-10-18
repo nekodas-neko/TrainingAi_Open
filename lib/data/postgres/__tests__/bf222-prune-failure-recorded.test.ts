@@ -22,11 +22,10 @@ describe('BF-222 prune failures are recorded', () => {
       const { recordPruneFailure } = await import('@/lib/data/postgres/slices/oura')
       pool = getPool()
       recordPruneFailure(getDb(), 'bf222_test', new Error('simulated delete failure'))
-      let rows: { message: string; source: string }[] = []
-      for (let i = 0; i < 20 && rows.length === 0; i++) {
-        await new Promise(r => setTimeout(r, 100))
-        rows = (await pool.query(`SELECT message, source FROM error_events WHERE url = 'prune:bf222_test'`)).rows
-      }
+      const { flushPendingWrites } = await import('@/lib/observability/pending-writes')
+      await flushPendingWrites()
+      const rows: { message: string; source: string }[] =
+        (await pool.query(`SELECT message, source FROM error_events WHERE url = 'prune:bf222_test'`)).rows
       expect(rows).toHaveLength(1)
       expect(rows[0]).toMatchObject({ source: 'server' })
       expect(rows[0].message).toContain('bf222_test retention DELETE failed: simulated delete failure')

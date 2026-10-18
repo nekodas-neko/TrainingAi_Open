@@ -1,4 +1,5 @@
 import * as healthConnect from './slices/health-connect'
+import { trackPendingWrite } from '@/lib/observability/pending-writes'
 import * as appleHealth from './slices/apple-health'
 import * as authData from './slices/auth'
 import * as mealLogging from './slices/meal-logging-statuses'
@@ -6449,7 +6450,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const now = Date.now()
     if (shouldPrune(lastErrorEventPrune, now, ERROR_EVENT_PRUNE_THROTTLE_MS)) {
       lastErrorEventPrune = now
-      this.db.execute(sql`DELETE FROM error_events WHERE created_at < now() - interval '30 days'`).catch(err => console.error('[prune] error_events failed:', err))
+      trackPendingWrite(this.db.execute(sql`DELETE FROM error_events WHERE created_at < now() - interval '30 days'`).catch(err => console.error('[prune] error_events failed:', err)))
     }
   }
 
