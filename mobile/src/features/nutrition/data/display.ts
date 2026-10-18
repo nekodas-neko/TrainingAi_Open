@@ -1,5 +1,4 @@
 import { plural } from "@trainingai/shared/format/plural";
-import type { BodyBatteryLabel } from "@trainingai/shared/health/body-battery-band";
 
 const thousands = (value: number) => Math.round(value).toLocaleString();
 
@@ -50,14 +49,4 @@ export function dayTotalFigures(input: {
   };
 }
 
-type BatteryTheme = {
-  colors: { danger: string };
-  tones: { checkin: { foreground: string }; activity: { foreground: string } };
-};
-
-/** Same three bands as the shared `bodyBatteryColor`, in theme colours rather than CSS variables. */
-export function batteryColor(label: BodyBatteryLabel, theme: BatteryTheme) {
-  if (label === "Drained") return theme.colors.danger;
-  if (label === "Low") return theme.tones.checkin.foreground;
-  return theme.tones.activity.foreground;
-}
+export { batteryColor } from '../../../shared/battery-color';

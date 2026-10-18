@@ -44,7 +44,7 @@ export function BottomNavigation<T extends string>({
             <Pressable
               key={item.key}
               accessibilityRole="tab"
-              accessibilityLabel={item.label}
+              accessibilityLabel={item.badge ? `${item.label}, needs attention` : item.label}
               accessibilityState={{ selected: active }}
               aria-selected={active}
               onPress={() => onSelect(item.key)}
@@ -78,7 +78,8 @@ export function BottomNavigation<T extends string>({
                   {item.renderIcon(color, theme.sizes.iconSmall)}
                   {item.badge && (
                     <View
-                      accessibilityLabel="Needs attention"
+                      // The tab's own label says it ("More, needs attention"); a Pressable hides its children from TalkBack.
+                      accessible={false}
                       style={{
                         position: 'absolute',
                         top: -theme.spacing.xxs,
