@@ -123,14 +123,13 @@ export async function GET(req: Request) {
   let result: TrendsResponse
 
   if (view === 'subjective-recovery') {
-    const [checkins, ouraDaily, derivedDaily] = await Promise.all([
+    const [checkins, derivedDaily] = await Promise.all([
       repo.listDayCheckins(userId, from90dIso, todayIso, 'morning'),
-      repo.getOuraDaily(userId, from90dIso, todayIso),
       repo.getOuraDailyDerived(userId, from90dIso, todayIso),
     ])
-    // Derived-first, matching /api/health/trends. Cloud readiness is null for anyone not on Oura
-    // Cloud (and frozen for the owner since the BLE re-key), which left this correlation empty.
-    const readinessByDate = new Map(ouraDaily.map(d => [d.date, d.readinessScore ?? null]))
+    // Our readiness only, matching /api/health/trends. Oura's readiness is never ours, so a day we
+    // did not score drops out of the pairing rather than pairing on Oura's number (#3000).
+    const readinessByDate = new Map<string, number | null>()
     for (const d of derivedDaily) if (d.readinessScore != null) readinessByDate.set(d.day, d.readinessScore)
     // TN-57: `perceivedRecoveryTouched`, not just non-null. This is a user-facing correlation
     // against a series with a standard deviation of 0.286 across two distinct values, none of them

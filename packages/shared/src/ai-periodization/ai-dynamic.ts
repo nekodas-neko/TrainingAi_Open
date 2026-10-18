@@ -32,7 +32,6 @@ export interface AiDynamicInput {
   // solid (≥ TEMP_BASELINE_MIN_DAYS) so an immature baseline (or the frozen pre-re-key Cloud value)
   // can't trigger a deload off noise. Absent ⇒ treated as 0 (won't fire).
   temperatureBaselineDays?: number
-  daySummary: string | null
   timezone: string
   reminderEnabled: boolean
   reminderTime: string | null
@@ -223,7 +222,6 @@ function computeDeloadStrength(
   readinessScore: number | null,
   temperatureDeviation: number | null,
   temperatureBaselineDays: number,
-  daySummary: string | null,
   illnessFlag: IllnessFlag | null,
   stressHighMinutes: number | null,
   temperatureTrusted: boolean,
@@ -267,10 +265,10 @@ function computeDeloadStrength(
   // input is a sleep-weighted average wearing a daytime label. Re-wire it when TN-33's level-2 test
   // passes, ideally against this user's own distribution (a percentile, not a constant).
   //
-  // The frozen Cloud `day_summary` arm stays, and temperature and illness still override.
-  const stressOverride = daySummary === 'very_stressful'
-
-  if (tempAlert || stressOverride || illnessFlag === 'elevated') {
+  // A `day_summary === 'very_stressful'` arm used to sit here. Oura's enum has no such value and
+  // nothing writes the column it read, so it could never fire; it was removed with #3000.
+  // Temperature and illness still override.
+  if (tempAlert || illnessFlag === 'elevated') {
     return { recommended: true, strength: 'recommended', temperatureAlert: tempAlert }
   }
 
@@ -289,7 +287,7 @@ function computeDeloadStrength(
 export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionRecommendation {
   const {
     sessions, muscleAssignments, muscleRecovery, history, soreMuscles, suggestedSoreMuscles,
-    readinessScore, temperatureDeviation, temperatureBaselineDays, daySummary, timezone,
+    readinessScore, temperatureDeviation, temperatureBaselineDays, timezone,
     reminderEnabled, reminderTime, sleepTrend, energyLevel, selfReportedSick, hrvTrend, illnessFlag, stressHighMinutes,
     temperatureTrusted,
   } = input
@@ -339,7 +337,7 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
 
   const deload = computeDeloadStrength(
     consecutiveTrainingDays, readinessScore, temperatureDeviation, temperatureBaselineDays ?? 0,
-    daySummary, illnessFlag, stressHighMinutes, temperatureTrusted ?? false,
+    illnessFlag, stressHighMinutes, temperatureTrusted ?? false,
   )
   let recommended = deload.recommended
   let strength = deload.strength

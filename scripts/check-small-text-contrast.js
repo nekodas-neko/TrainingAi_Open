@@ -235,7 +235,7 @@ const BASELINE = {
   'components/health/body-cards/rhr-hrv-spo2-card.tsx': 1,
   'components/health/body-cards/sleep-card.tsx': 2,
   'components/health/oura-section.tsx': 2,
-  'components/health/readiness-breakdown.tsx': 3,
+  'components/health/readiness-breakdown.tsx': 2,
   'components/more/friend-feed.tsx': 1,
   'components/more/trophy-case.tsx': 1,
   'components/nutrition/meal-macro-bars.tsx': 1,

@@ -94,9 +94,9 @@ export async function POST(req: Request) {
   const todayOura = ouraRows.find(r => r.date === date) ?? ouraRows[ouraRows.length - 1] ?? null
   const latestSummary = summaries[summaries.length - 1] ?? null
   // todayOura can fall back to an older row — annotate so the model never reads a stale
-  // day's Cloud scores as "today" (ring Cloud data is frozen since the 2026-07-07 re-key).
+  // day's Oura values as "today".
   const staleNote = todayOura && todayOura.date !== date
-    ? `NOTE: Oura daily fields below are from ${todayOura.date} (latest available — ring Cloud data is frozen since the 2026-07-07 re-key).`
+    ? `NOTE: Oura daily fields below are from ${todayOura.date} (latest available, not today).`
     : null
 
   let entries: (MetricLine | string)[]
@@ -109,13 +109,13 @@ export async function POST(req: Request) {
     const latestIllness = latestIllnessFromDerived(derivedRows)
     // Readiness is the own BLE-derived composite (contributors still come from the derived row),
     // never the frozen Cloud score the Health screen no longer shows (F8).
-    const readinessMap = liveReadinessByDay(derivedRows, ouraRows)
+    const readinessMap = liveReadinessByDay(derivedRows)
     const todayReadiness = readinessMap.get(date) ?? (todayOura ? readinessMap.get(todayOura.date) ?? null : null)
     const todayDerived = derivedRows.find(r => r.day === date) ?? derivedRows[derivedRows.length - 1] ?? null
-    // No cast. The derived row's contributors are `{score, input, gap, provisional}` objects and
-    // the Cloud row's are plain numbers; asserting the latter is what let `[object Object]` reach
-    // the model for every readiness insight. `formatContributors` reads both shapes now.
-    const contributors = todayDerived?.readinessContributors ?? todayOura?.readinessContributors
+    // No cast. The derived row's contributors are `{score, input, gap, provisional}` objects;
+    // asserting plain numbers is what let `[object Object]` reach the model for every readiness
+    // insight. Ours only: Oura's readiness contributors are never ours (#3000).
+    const contributors = todayDerived?.readinessContributors
     if (todayReadiness != null) headline = { label: 'Readiness', value: `${todayReadiness}/100`, band: bandLabel(todayReadiness) }
     weakest = weakestContributor(contributors)
     // Today is excluded from its own baseline, so "above the past week" cannot be satisfied by
@@ -131,7 +131,7 @@ export async function POST(req: Request) {
       latestSummary?.tempDevC != null
         ? metric('Body temp deviation (vs personal ring baseline)', `${latestSummary.tempDevC > 0 ? '+' : ''}${latestSummary.tempDevC.toFixed(1)}°C`)
         : metric('Body temp deviation', todayOura?.temperatureDeviation != null
-          ? `${todayOura.temperatureDeviation > 0 ? '+' : ''}${todayOura.temperatureDeviation.toFixed(1)}°C (pre-re-key Cloud value — not current)`
+          ? `${todayOura.temperatureDeviation > 0 ? '+' : ''}${todayOura.temperatureDeviation.toFixed(1)}°C (Oura's reading)`
           : null),
       metric('Illness radar', latestIllness ? `${latestIllness.flag} (score ${latestIllness.score}/100, vs personal baseline)` : null),
     ]
@@ -141,22 +141,27 @@ export async function POST(req: Request) {
     // last row has the same exposure.
     const nights = nightSessions(sleepRows, tz)
     const todaySleep = canonicalNightForDate(nights, date, tz) ?? canonicalLatestNight(nights, tz)
-    if (todayOura?.sleepScore != null) {
-      headline = { label: 'Sleep score', value: `${todayOura.sleepScore}/100`, band: bandLabel(todayOura.sleepScore) }
+    // Our own sleep score and contributors (computeSleepScore, persisted by the readiness read under
+    // the night's wake day), never Oura's sleep score or contributors (#3000).
+    const ownSleep = derivedRows.find(r => r.day === (todaySleep?.date ?? date)) ?? null
+    const sleepScore = ownSleep?.sleepScore ?? null
+    const sleepContributors = ownSleep?.sleepContributors ?? null
+    if (sleepScore != null) {
+      headline = { label: 'Sleep score', value: `${sleepScore}/100`, band: bandLabel(sleepScore) }
     } else if (todaySleep?.durationHours != null) {
       // No score tonight, so duration leads rather than the card opening on an absence.
       headline = { label: 'Sleep duration', value: `${Math.round(todaySleep.durationHours * 60)} min`, band: null }
     }
-    weakest = weakestContributor(todayOura?.sleepContributors as Record<string, number | null> | null | undefined)
+    weakest = weakestContributor(sleepContributors)
     entries = [
-      ...(todayOura?.sleepScore == null ? [metric('Sleep score', null)] : []),
-      ...(todayOura?.sleepScore != null
+      ...(sleepScore == null ? [metric('Sleep score', null)] : []),
+      ...(sleepScore != null
         ? [metric('Duration', todaySleep?.durationHours != null ? `${Math.round(todaySleep.durationHours * 60)} min` : null)]
         : []),
       metric('Efficiency', todaySleep?.efficiency != null ? `${todaySleep.efficiency}%` : null),
       metric('Overnight HRV', todaySleep?.averageHrvMs != null ? `${Math.round(todaySleep.averageHrvMs)} ms` : null),
       metric('Avg sleeping HR', todaySleep?.avgHeartRate != null ? `${Math.round(todaySleep.avgHeartRate)} bpm` : null),
-      `Contributors: ${formatContributors(todayOura?.sleepContributors)}`,
+      `Contributors: ${formatContributors(sleepContributors)}`,
     ]
   } else if (section === 'heart-rate') {
     const todayBm = bodyMetrics.find(r => r.date === date) ?? bodyMetrics[bodyMetrics.length - 1] ?? null

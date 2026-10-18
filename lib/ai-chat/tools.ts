@@ -77,7 +77,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
     }),
 
     getRecoveryData: tool({
-      description: 'Recovery data per day for a date range: readiness (the app\'s OWN BLE-derived composite score, not the frozen Cloud value), sleep scores/activity/temp deviation, sleep sessions (duration, efficiency, overnight HRV, lowest HR), body metrics (HRV, resting HR, SpO2, steps, weight), the app\'s illness-radar flag, daytime stress (dHRV level −1..+1, negative = stressed; minutes in high stress per day), stress-resilience level (1–5, higher = more resilient) and whole-day training-stress (OTS, with a HIGH flag). Use for recovery, sleep, HRV, SpO2, readiness, resilience, overtraining/training-load and "am I getting sick?" questions.',
+      description: 'Recovery data per day for a date range: the app\'s own readiness, sleep and activity scores (never Oura\'s own scores), temp deviation, sleep sessions (duration, efficiency, overnight HRV, lowest HR), body metrics (HRV, resting HR, SpO2, steps, weight), the app\'s illness-radar flag, daytime stress (dHRV level −1..+1, negative = stressed; minutes in high stress per day), stress-resilience level (1–5, higher = more resilient) and whole-day training-stress (OTS, with a HIGH flag). Use for recovery, sleep, HRV, SpO2, readiness, resilience, overtraining/training-load and "am I getting sick?" questions.',
       inputSchema: z.object({
         fromDate: z.string().describe('YYYY-MM-DD inclusive'),
         toDate: z.string().describe('YYYY-MM-DD inclusive'),
@@ -89,12 +89,18 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           repo.listBodyMetrics(userId, fromDate, toDate),
           repo.getOuraDailyDerived(userId, fromDate, toDate),
         ])
-        // Readiness must be the own BLE-derived composite, not the frozen Cloud column (F8).
-        const readinessMap = liveReadinessByDay(derived, oura)
+        // Readiness, sleep and activity scores are ours (oura_daily_derived). Oura's own scores are
+        // never sent as ours (scoring doc rule 5, #3000); its temperature deviation is a reading.
+        const readinessMap = liveReadinessByDay(derived)
+        const derivedByDate = new Map(derived.map(d => [d.day, d]))
+        const tempByDate = new Map(oura.map(r => [r.date, r.temperatureDeviation ?? null]))
+        const days = [...new Set([...derivedByDate.keys(), ...tempByDate.keys()])].sort()
         return {
-          ouraDaily: oura.map(r => ({
-            date: r.date, readiness: readinessMap.get(r.date) ?? null, sleepScore: r.sleepScore ?? null,
-            activityScore: r.activityScore ?? null, tempDeviationC: r.temperatureDeviation ?? null,
+          daily: days.map(date => ({
+            date, readiness: readinessMap.get(date) ?? null,
+            sleepScore: derivedByDate.get(date)?.sleepScore ?? null,
+            activityScore: derivedByDate.get(date)?.activityScore ?? null,
+            tempDeviationC: tempByDate.get(date) ?? null,
           })),
           // Nights, not rows (Q-76): the model reads this as one row per night, so a same-day nap
           // arrives as a second "night" with a 0.1 h duration and its own efficiency.
@@ -323,10 +329,10 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
       execute: async ({ days }) => {
         const from = daysAgo(days ?? 60)
         const fromIso = formatInTimeZone(from, tz, 'yyyy-MM-dd')
-        const [sessions, sleepSessions, ouraRows] = await Promise.all([
+        const [sessions, sleepSessions, derivedRows] = await Promise.all([
           repo.getWorkoutSessionsFrom(userId, from),
           repo.listSleepSessions(userId, fromIso, todayIso),
-          repo.getOuraDaily(userId, fromIso, todayIso),
+          repo.getOuraDailyDerived(userId, fromIso, todayIso),
         ])
         const sessionsByDate = new Map<string, { volume: number; avgRpe: number | null }>()
         for (const ws of sessions) {
@@ -338,7 +344,8 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         // Overnight HRV per night (Q-76) — a nap's HRV is not an overnight reading, and keying by
         // date let it overwrite the real one before this correlation ever ran.
         const hrvByDate = new Map(nightSessions(sleepSessions, tz).filter(s => s.averageHrvMs != null).map(s => [s.date, s.averageHrvMs!]))
-        const readinessByDate = new Map(ouraRows.filter(r => r.readinessScore != null).map(r => [r.date, r.readinessScore!]))
+        // Our readiness days, never Oura's (#3000).
+        const readinessByDate = liveReadinessByDay(derivedRows)
 
         const hrvPairs: { hrv: number; volume: number }[] = []
         for (const [date, hrv] of hrvByDate) {

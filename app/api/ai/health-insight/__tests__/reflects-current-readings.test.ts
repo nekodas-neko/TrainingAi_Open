@@ -23,8 +23,9 @@ vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
     getAiHealthInsightWithHash: async () => { cacheReads.push('read'); return null },
     upsertAiHealthInsight: async (...args: unknown[]) => { written.push(args) },
-    getOuraDaily: async () => [{ date: '2026-08-18', sleepScore: readingsScore, readinessContributors: null, sleepContributors: null, temperatureDeviation: null }],
-    getOuraDailyDerived: async () => [],
+    getOuraDaily: async () => [{ date: '2026-08-18', sleepScore: null, readinessContributors: null, sleepContributors: null, temperatureDeviation: null }],
+    // Our own sleep score (#3000: the insight reads ours, never Oura's).
+    getOuraDailyDerived: async () => [{ day: '2026-08-18', sleepScore: readingsScore, sleepContributors: null }],
     getOuraDailySummary: async () => [],
     listSleepSessions: async () => [],
     listBodyMetrics: async () => [],

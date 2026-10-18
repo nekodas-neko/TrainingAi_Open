@@ -5,7 +5,6 @@ import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite
 import {
   AppText,
   Badge,
-  Card,
   Grid,
   IconButton,
   MetricTile,
@@ -13,7 +12,6 @@ import {
   ScoreRing,
   StatusIndicator,
   HealthDetailLayout,
-  KeyValueGrid,
 } from '../../../shared/ui';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
@@ -82,7 +80,9 @@ export function HealthDetailScreen({
       ? state.data?.sleepContributors
       : detail === 'activity'
         ? state.data?.activityContributors
-        : state.data?.readinessContributors;
+        : // Readiness's own breakdown is `readinessCompositeContributors` below. The payload's
+          // `readinessContributors` was Oura's and is never shown as ours (#3000).
+          null;
   const currentNight = health.sleep[0];
   const trendField =
     detail === 'sleep'
@@ -199,7 +199,7 @@ export function HealthDetailScreen({
                 tone="recovery"
               />
             )}
-            {state.data?.ouraScore === null && score !== null && (
+            {state.data && score !== null && (
               <AppText variant="caption" tone="muted">
                 Computed by the app from your health and training data.
               </AppText>
@@ -251,61 +251,33 @@ export function HealthDetailScreen({
                     )}
                 </HealthMetricCard>
               )}
-            {detail === 'readiness' &&
-            state.data?.ouraScore === null &&
-            state.data.readinessCompositeContributors ? (
-              <ContributorCard
-                title="What goes into this score"
-                weights={READINESS_WEIGHTS}
-                temperature={state.data.temperatureDeviation}
-                extras={{
-                  hrvBalance: `Recent 7-day HRV ${metricValue(state.data.recentHrv, 'ms')} · baseline ${metricValue(state.data.baselineHrv, 'ms')}`,
-                  ...(state.data.temperatureDeviation != null
-                    ? {
-                        temperature: `${state.data.temperatureDeviation > 0 ? '+' : ''}${state.data.temperatureDeviation.toFixed(1)}°C vs your baseline`,
-                      }
-                    : {}),
-                }}
-                note={state.data.limited ? limitedInputsNote(knownInputKeys(state.data.inputsMissing ?? [])) : null}
-                contributors={Object.fromEntries(
-                  Object.entries(state.data.readinessCompositeContributors).map(
-                    ([key, value]) => [key, value.score],
-                  ),
-                )}
-                provisional={Object.entries(state.data.readinessCompositeContributors)
-                  .filter(([, value]) => value.provisional)
-                  .map(([key]) => key)}
-              />
+            {detail === 'readiness' ? (
+              state.data?.readinessCompositeContributors && (
+                <ContributorCard
+                  title="What goes into this score"
+                  weights={READINESS_WEIGHTS}
+                  temperature={state.data.temperatureDeviation}
+                  extras={{
+                    hrvBalance: `Recent 7-day HRV ${metricValue(state.data.recentHrv, 'ms')} · baseline ${metricValue(state.data.baselineHrv, 'ms')}`,
+                    ...(state.data.temperatureDeviation != null
+                      ? {
+                          temperature: `${state.data.temperatureDeviation > 0 ? '+' : ''}${state.data.temperatureDeviation.toFixed(1)}°C vs your baseline`,
+                        }
+                      : {}),
+                  }}
+                  note={state.data.limited ? limitedInputsNote(knownInputKeys(state.data.inputsMissing ?? [])) : null}
+                  contributors={Object.fromEntries(
+                    Object.entries(state.data.readinessCompositeContributors).map(
+                      ([key, value]) => [key, value.score],
+                    ),
+                  )}
+                  provisional={Object.entries(state.data.readinessCompositeContributors)
+                    .filter(([, value]) => value.provisional)
+                    .map(([key]) => key)}
+                />
+              )
             ) : (
-              <>
-                {detail === 'readiness' && state.data?.ouraScore != null && score != null && (
-                  <Card>
-                    <AppText variant="eyebrow" tone="muted">
-                      How this score is built
-                    </AppText>
-                    <KeyValueGrid
-                      rows={[
-                        {
-                          label: 'Baseline',
-                          value: metricValue(state.data.ouraScore),
-                        },
-                        {
-                          label:
-                            state.data.source === 'oura+acwr'
-                              ? 'Training load (ACWR)'
-                              : 'Adjustment',
-                          value: metricValue(score - state.data.ouraScore),
-                        },
-                        {
-                          label: 'Final readiness',
-                          value: `${scoreBand(score).label} · ${score}`,
-                        },
-                      ]}
-                    />
-                  </Card>
-                )}
-                <ContributorCard title={`${title} Contributors`} contributors={contributors} />
-              </>
+              <ContributorCard title={`${title} Contributors`} contributors={contributors} />
             )}
             {detail === 'sleep' && (
               <>
@@ -341,11 +313,6 @@ export function HealthDetailScreen({
                   />
                 )}
               </>
-            )}
-            {detail === 'readiness' && state.data?.daySummary && (
-              <Card>
-                <AppText>{state.data.daySummary}</AppText>
-              </Card>
             )}
             {detail === 'readiness' && <DoseVitalsCard />}
             {detail === 'activity' && <ActivitySignalsCard />}
@@ -409,8 +376,8 @@ export function HealthDetailScreen({
                 unit="ml/kg/min"
                 caption={
                   state.data?.cloudVitalsDate
-                    ? `As of ${state.data.cloudVitalsDate}`
-                    : undefined
+                    ? `Oura's estimate · as of ${state.data.cloudVitalsDate}`
+                    : "Oura's estimate"
                 }
               />
               <HealthMetricCard
@@ -419,8 +386,8 @@ export function HealthDetailScreen({
                 unit="years"
                 caption={
                   state.data?.cloudVitalsDate
-                    ? `As of ${state.data.cloudVitalsDate}`
-                    : undefined
+                    ? `Oura's estimate · as of ${state.data.cloudVitalsDate}`
+                    : "Oura's estimate"
                 }
               />
             </Grid>

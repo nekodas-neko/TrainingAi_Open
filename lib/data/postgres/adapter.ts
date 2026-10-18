@@ -2131,11 +2131,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
       const muscleRecovery = computeMuscleRecovery(recentWorkouts, exerciseLibrary)
 
-      // Live BLE-derived readiness — the frozen Cloud column (ouraToday.readinessScore) has been
-      // null since the 2026-07-07 re-key. Computed once and reused for BOTH the scoring engine and
+      // Live BLE-derived readiness, never Oura's own readiness score (#3000). Computed once and reused for BOTH the scoring engine and
       // the signals block below, so the "Why this?" explain page shows the same number the
       // recommendation was actually computed from (W3 §3.2 — the signals read the dead column).
-      const liveReadiness = liveReadinessForDay(todayIso, derivedRows, ouraRows)
+      const liveReadiness = liveReadinessForDay(todayIso, derivedRows)
 
       // Live temp deviation (from the derived summary), never the frozen Cloud columns (dead
       // since the 2026-07-07 re-key). Cloud stays an explicit pre-re-key fallback only. Computed
@@ -2166,7 +2165,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         temperatureDeviation,
         temperatureBaselineDays,
         temperatureTrusted,
-        daySummary: ouraToday?.daySummary ?? null,
         sleepTrend,
         energyLevel: moodLog?.energyLevel ?? null,
         selfReportedSick: resolveSelfReportedSick(moodLog?.bodyState, morningCheckin?.illnessContext),

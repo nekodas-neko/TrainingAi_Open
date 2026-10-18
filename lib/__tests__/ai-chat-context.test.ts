@@ -57,35 +57,36 @@ describe('buildWeekSchedule', () => {
 })
 
 describe('buildRecoverySummary', () => {
-  it('renders today scores and last-night sleep, preferring BLE temp (pre-re-key Cloud readiness fallback)', () => {
-    // 2026-07-01 is pre-re-key, so the Cloud readiness 78 is still a real reading (no derived row).
+  it('renders our scores and last-night sleep, preferring BLE temp', () => {
     const out = buildRecoverySummary(
-      [{ date: '2026-07-01', readinessScore: 78, sleepScore: 82, activityScore: null, temperatureDeviation: 0.5, resilienceLevel: 'solid' } as never],
+      [{ date: '2026-07-01', readinessScore: 78, sleepScore: 82, activityScore: 64, temperatureDeviation: 0.5, resilienceLevel: 'solid' } as never],
       [{ date: '2026-07-01', durationHours: 7.4, efficiency: 91, averageHrvMs: 68, lowestHeartRate: 47 } as never],
       null, null, '2026-07-01', null,
       0.7, // BLE tempDevC
+      [{ day: '2026-07-01', readinessScore: 55, readinessSource: 'ble-derived', sleepScore: 71, activityScore: 40 } as never],
     )
-    expect(out).toContain('readiness 78/100')
+    expect(out).toContain('readiness 55/100')
+    expect(out).toContain('sleep score 71/100')
+    expect(out).toContain('activity score 40/100')
     expect(out).toContain('+0.7°C')
     expect(out).toContain('ring baseline')
     expect(out).not.toContain('resilience')
-    expect(out).not.toContain('pre-re-key')
     expect(out).toContain('7.4h sleep')
     expect(out).toContain('No check-ins logged.')
   })
-  it('falls back to the Cloud temp deviation with a pre-re-key annotation', () => {
+  it("falls back to Oura's temperature deviation, labelled as Oura's", () => {
     const out = buildRecoverySummary(
       [{ date: '2026-07-01', readinessScore: 78, sleepScore: 82, activityScore: null, temperatureDeviation: 0.5, resilienceLevel: 'solid' } as never],
       [], null, null, '2026-07-01', null,
       null, // no BLE temp
     )
-    expect(out).toContain('+0.5°C')
-    expect(out).toContain('pre-re-key')
+    expect(out).toContain("+0.5°C (Oura's reading)")
+    expect(out).not.toContain('pre-re-key')
     expect(out).not.toContain('resilience')
   })
   it('degrades to explicit no-data lines', () => {
     const out = buildRecoverySummary([], [], null, null, '2026-07-01', null)
-    expect(out).toContain('Today: no Oura data')
+    expect(out).toContain('Today: no scores or readings yet')
   })
   it('uses the BLE-derived composite over the frozen Cloud readiness on a post-re-key day (F8)', () => {
     // 2026-07-15 is post-re-key: the Cloud readinessScore (88) is frozen and must NOT be narrated;
@@ -98,12 +99,17 @@ describe('buildRecoverySummary', () => {
     expect(out).toContain('readiness 35/100')
     expect(out).not.toContain('88/100')
   })
-  it('shows no readiness on a post-re-key day with only a frozen Cloud row (no composite yet)', () => {
-    const out = buildRecoverySummary(
-      [{ date: '2026-07-15', readinessScore: 88, sleepScore: 80, activityScore: null, temperatureDeviation: null } as never],
-      [], null, null, '2026-07-15', null, null, [],
-    )
-    expect(out).not.toContain('readiness 88/100')
-    expect(out).toContain('sleep score 80/100') // sleep still shows; only frozen readiness is withheld
+  it("never narrates Oura's readiness, sleep or activity score when ours is missing (#3000)", () => {
+    // Pre- and post-re-key alike: Oura's scores are never ours, for any day.
+    for (const day of ['2026-07-01', '2026-10-17']) {
+      const out = buildRecoverySummary(
+        [{ date: day, readinessScore: 88, sleepScore: 81, activityScore: 77, temperatureDeviation: null } as never],
+        [], null, null, day, null, null, [],
+      )
+      expect(out).not.toContain('88/100')
+      expect(out).not.toContain('81/100')
+      expect(out).not.toContain('77/100')
+      expect(out).toContain('Today: no scores or readings yet')
+    }
   })
 })

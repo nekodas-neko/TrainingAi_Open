@@ -117,29 +117,31 @@ export function buildRecoverySummary(
   illness: LatestIllness | null,
   /** Last rolled-up night's BLE temperature deviation (°C, oura_daily_summary.temp_dev_c). */
   bleTempDevC: number | null = null,
-  /** oura_daily_derived rows — the live BLE composite readiness (F8), not the frozen Cloud column. */
+  /** oura_daily_derived rows: our own readiness, sleep and activity scores, never Oura's (#3000). */
   derived: OuraDailyDerivedRow[] = [],
 ): string {
   const lines: string[] = ['## Recovery & Wellness']
 
-  // Readiness is the own BLE-derived composite; the frozen Cloud readinessScore is never narrated.
-  const readinessMap = liveReadinessByDay(derived, ouraRows)
+  // Readiness, sleep and activity scores are ours (oura_daily_derived). Oura's own scores are never
+  // narrated as ours (scoring doc rule 5, #3000).
+  const readinessMap = liveReadinessByDay(derived)
   const ouraToday = ouraRows.find(r => r.date === todayIso) ?? null
+  const derivedToday = derived.find(r => r.day === todayIso) ?? null
   const todayReadiness = readinessMap.get(todayIso) ?? null
-  // BLE-first temp deviation, appended even when today has no Oura row. The frozen Cloud value
-  // survives only as an explicitly-annotated fallback (dead since the 2026-07-07 re-key).
+  // BLE-first temp deviation, appended even when today has no Oura row. Oura's own reading is the
+  // fallback, labelled as Oura's.
   const tempLine = bleTempDevC != null && Math.abs(bleTempDevC) > 0.3
     ? `body temp deviation ${bleTempDevC > 0 ? '+' : ''}${bleTempDevC.toFixed(1)}°C (vs ring baseline)`
     : ouraToday?.temperatureDeviation != null && Math.abs(ouraToday.temperatureDeviation) > 0.3
-      ? `body temp deviation ${ouraToday.temperatureDeviation > 0 ? '+' : ''}${ouraToday.temperatureDeviation.toFixed(1)}°C (pre-re-key Cloud value — not current)`
+      ? `body temp deviation ${ouraToday.temperatureDeviation > 0 ? '+' : ''}${ouraToday.temperatureDeviation.toFixed(1)}°C (Oura's reading)`
       : null
   const ouraParts: string[] = ([
     todayReadiness != null ? `readiness ${todayReadiness}/100` : null,
-    ouraToday?.sleepScore != null ? `sleep score ${ouraToday.sleepScore}/100` : null,
-    ouraToday?.activityScore != null ? `activity score ${ouraToday.activityScore}/100` : null,
+    derivedToday?.sleepScore != null ? `sleep score ${derivedToday.sleepScore}/100` : null,
+    derivedToday?.activityScore != null ? `activity score ${derivedToday.activityScore}/100` : null,
   ]).filter((x): x is string => x != null)
   if (tempLine) ouraParts.push(tempLine)
-  lines.push(ouraParts.length > 0 ? `Today: ${ouraParts.join(', ')}` : 'Today: no Oura data')
+  lines.push(ouraParts.length > 0 ? `Today: ${ouraParts.join(', ')}` : 'Today: no scores or readings yet')
 
   const sorted = [...sleepSessions].sort((a, b) => b.date.localeCompare(a.date))
   const lastSleep = sorted[0] ?? null

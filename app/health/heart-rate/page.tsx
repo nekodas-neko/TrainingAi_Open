@@ -190,22 +190,18 @@ export default function HeartRateDetailPage() {
               <div className="rounded-xl border border-border bg-muted/20 p-4 text-center">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">VO₂ Max</p>
                 <p className="text-xl font-bold tabular-nums mt-1">{data.vo2Max}</p>
-                {data.cloudVitalsDate && (
-                  <p className="mt-1 flex items-center justify-center gap-1 text-[9px] text-muted-foreground">
-                    <HistoryIcon className="h-2.5 w-2.5" /> as of {formatDayShort(data.cloudVitalsDate)}
-                  </p>
-                )}
+                <p className="mt-1 flex items-center justify-center gap-1 text-[9px] text-muted-foreground">
+                  <HistoryIcon className="h-2.5 w-2.5" /> Oura&apos;s estimate{data.cloudVitalsDate && <> · as of {formatDayShort(data.cloudVitalsDate)}</>}
+                </p>
               </div>
             )}
             {data.vascularAge != null && (
               <div className="rounded-xl border border-border bg-muted/20 p-4 text-center">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Vascular Age</p>
                 <p className="text-xl font-bold tabular-nums mt-1">{data.vascularAge} <span className="text-xs font-normal text-muted-foreground">yrs</span></p>
-                {data.cloudVitalsDate && (
-                  <p className="mt-1 flex items-center justify-center gap-1 text-[9px] text-muted-foreground">
-                    <HistoryIcon className="h-2.5 w-2.5" /> as of {formatDayShort(data.cloudVitalsDate)}
-                  </p>
-                )}
+                <p className="mt-1 flex items-center justify-center gap-1 text-[9px] text-muted-foreground">
+                  <HistoryIcon className="h-2.5 w-2.5" /> Oura&apos;s estimate{data.cloudVitalsDate && <> · as of {formatDayShort(data.cloudVitalsDate)}</>}
+                </p>
               </div>
             )}
           </div>

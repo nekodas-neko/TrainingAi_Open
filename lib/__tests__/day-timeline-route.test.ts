@@ -150,13 +150,15 @@ describe('/api/day-timeline — sleep', () => {
     expect(wake.sleepScore).toBe(79)
   })
 
-  it('falls back to the Cloud column when nothing was derived', async () => {
+  // #3000 (scoring doc rule 5): Oura's readiness and sleep score are never ours. With Oura's scores
+  // present and ours absent, the event carries no score rather than Oura's.
+  it("never falls back to Oura's own scores when nothing was derived", async () => {
     listSleepSessions.mockResolvedValue([sleep()])
     getOuraDaily.mockResolvedValue([{ date: DAY, readinessScore: 55, sleepScore: 60 }])
 
     const [wake] = await eventsOf('wakeup')
-    expect(wake.readinessScore).toBe(55)
-    expect(wake.sleepScore).toBe(60)
+    expect(wake.readinessScore).toBeUndefined()
+    expect(wake.sleepScore).toBeUndefined()
   })
 
   // The session's own score outranks both — it is the row the night was scored on.

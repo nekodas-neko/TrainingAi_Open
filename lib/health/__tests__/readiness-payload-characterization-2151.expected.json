@@ -13,7 +13,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "none",
-    "ouraScore": null,
     "inputsAvailable": [],
     "inputsMissing": [
       "sleep",
@@ -71,7 +70,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [],
     "inputsMissing": [
       "sleep",
@@ -129,7 +127,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [
       "sleep"
     ],
@@ -217,7 +214,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [
       "sleep",
       "hrv",
@@ -289,7 +285,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [
       "restingHeartRate",
       "activity"
@@ -369,7 +364,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [
       "sleep",
       "hrv",
@@ -432,7 +426,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [
       "sleep",
       "hrv",
@@ -503,7 +496,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [
       "activity"
     ],
@@ -567,7 +559,6 @@
       "acwrThreshold": 1.2
     },
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [
       "hrv",
       "restingHeartRate",
@@ -643,7 +634,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [
       "sleep",
       "hrv",
@@ -715,7 +705,6 @@
     "earlyDeloadRecommended": false,
     "earlyDeload": null,
     "source": "custom",
-    "ouraScore": null,
     "inputsAvailable": [
       "hrv",
       "restingHeartRate",

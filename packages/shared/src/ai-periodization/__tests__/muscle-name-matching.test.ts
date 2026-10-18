@@ -42,7 +42,6 @@ const base: AiDynamicInput = {
   suggestedSoreMuscles: [],   // everything below is a LIFTER-ADDED tick, so BF-173 lets it clamp
   readinessScore: 80,
   temperatureDeviation: null,
-  daySummary: null,
   timezone: 'Australia/Brisbane',
   reminderEnabled: false,
   reminderTime: null,
