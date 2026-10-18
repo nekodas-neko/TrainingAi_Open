@@ -79,6 +79,44 @@ const currentApp: Record<string, Expected> = {
     fontWeight: '500',
     source: 'shell/bottom-nav.tsx, text-[10px] font-medium',
   },
+  calendarDay: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    source: 'calendar-widget.tsx day digit and month name, text-xs font-medium',
+  },
+  calendarWeekday: {
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '500',
+    source: 'calendar-widget.tsx weekday row, text-[10px] font-medium (measured 10/15)',
+  },
+  statLabel: {
+    fontSize: 9,
+    lineHeight: 13.5,
+    fontWeight: undefined,
+    letterSpacing: 0.45,
+    uppercase: true,
+    source: 'observed-hr-card.tsx Stat label, text-[9px] uppercase tracking-wider',
+  },
+  statValue: {
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '600',
+    source: 'observed-hr-card.tsx Stat value, text-xl font-semibold',
+  },
+  statValueStrong: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '700',
+    source: 'observed-hr-card.tsx emphasised Stat value, text-2xl font-bold',
+  },
+  statUnit: {
+    fontSize: 9,
+    lineHeight: 13.5,
+    fontWeight: undefined,
+    source: 'observed-hr-card.tsx Stat unit, text-[9px]',
+  },
   input: { fontSize: 16, lineHeight: 24, source: 'globals.css forces 16 px on input, textarea, select' },
 };
 
@@ -123,6 +161,19 @@ test('the tap target and input size follow the current app stylesheet', async ()
   const input = /input,\s*textarea,\s*select\s*\{\s*font-size:\s*(\d+)px/.exec(css);
   assert.ok(input, 'input font-size rule not found in app/globals.css');
   assert.equal(typography.input.fontSize, Number(input[1]));
+});
+
+test('calendar digits, the Nutrition action row and the Heart rate tiles use the web sizes', async () => {
+  assert.equal(sizes.calendarDay, 28, 'calendar-widget.tsx day circle is h-7 w-7');
+  assert.equal(sizes.iconCompact, 16, 'nutrition-action-row.tsx icons are w-4 h-4');
+  const files = new Map((await sources()).map(({ file, text }) => [file, text]));
+  const calendar = files.get('shared/ui/MonthCalendar.tsx') ?? '';
+  assert.match(calendar, /variant="calendarWeekday"/);
+  assert.match(calendar, /variant="calendarDay"/);
+  const action = files.get('shared/ui/ActionTile.tsx') ?? '';
+  assert.match(action, /variant="subheading"/, 'Log Food, Water and My Foods are text-sm font-semibold');
+  const heart = files.get('features/health/components/RecordedHealthCards.tsx') ?? '';
+  assert.equal((heart.match(/^\s+stat$/gm) ?? []).length >= 3, true, 'Heart rate tiles use the stat tile');
 });
 
 test('text sizes come only from the tokens, through the scaled primitives', async () => {
