@@ -110,3 +110,14 @@ describe('mergeByDate files a night under its local wake day', () => {
     expect(nightSessions([{ ...r, sleepStart: new Date(r.sleepStart!), sleepEnd: new Date(r.sleepEnd!) }], 'Australia/Brisbane')[0].date).toBe('2026-10-19')
   })
 })
+
+// #3106 review: every reader takes `[0]` as last night and `slice(0, n)` as the recent nights.
+describe('mergeByDate returns nights newest first', () => {
+  it('whatever order the rows arrive in', () => {
+    const nightOn = (date: string, prev: string) =>
+      row({ date, ouraId: `o-${date}`, sleepStart: `${prev}T12:30:00Z`, sleepEnd: `${prev}T20:30:00Z`, durationHours: 7.5 })
+    const rows = [nightOn('2026-10-15', '2026-10-14'), nightOn('2026-10-18', '2026-10-17'), nightOn('2026-10-16', '2026-10-15')]
+    // 22:30 → 06:30 Brisbane, waking on `date`.
+    expect(mergeByDate(rows, 'Australia/Brisbane').map(r => r.date)).toEqual(['2026-10-18', '2026-10-16', '2026-10-15'])
+  })
+})

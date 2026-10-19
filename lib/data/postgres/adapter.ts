@@ -8187,7 +8187,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async tombstoneOuraCloudSleep(userId: string, ouraIds: string[], opts?: { keepPeriodType?: boolean }) { return oura.tombstoneOuraCloudSleep(this.db, userId, ouraIds, opts) }
   /**
    * #3080. A day's HRV and resting heart rate in `body_metrics` stand for its main Oura period
-   * (`getOuraMainSleepPeriods`), set after every Oura sleep write for the days it touched. They used
+   * (`getOuraMainSleepPeriods`, never a nap), set after every Oura sleep write for the days it touched. They used
    * to be set from whichever `long_sleep` document a batch held, so the last webhook won, a night Oura
    * typed `sleep` wrote none, and a delete, a retype or a revision to null left the old value standing.
    * A value goes in through the normal merge (`oura_cloud`, so the ring and manual still outrank it
@@ -8196,7 +8196,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async syncOuraMainSleepBodyMetrics(userId: string, touched: { days: string[]; ouraIds: string[] }) {
     const dates = [...new Set([...touched.days, ...await oura.getOuraCloudSleepDatesForIds(this.db, userId, touched.ouraIds)])].sort()
     if (dates.length === 0) return { written: 0, cleared: 0 }
-    const main = new Map((await oura.getOuraMainSleepPeriods(this.db, userId, dates)).map(m => [m.date, m]))
+    const tz = (await this.getUserById(userId))?.timezone ?? DEFAULT_TZ
+    const main = new Map((await oura.getOuraMainSleepPeriods(this.db, userId, dates, tz)).map(m => [m.date, m]))
     const values: { date: string; hrvMs?: number; restingHeartRate?: number }[] = []
     let cleared = 0
     for (const date of dates) {

@@ -244,7 +244,8 @@ export interface SleepSession {
    * **Read only by the bedtime estimate.** It is deliberately not `sleepStart`, and the distinction
    * is load-bearing rather than tidy: `aggregateNight` derives time-in-bed and efficiency from
    * `sleepEnd − sleepStart`, the daytime-HRV model decides which samples are "nightly" by window
-   * membership, and `primaryCluster` unions same-date rows within an hour of the window. Widening
+   * membership, and the sleep list's night grouping (`groupSleepPeriods`) joins windows within 3 h
+   * of each other. Widening
    * the measured window with a remembered time turned a 3 h 5 m night into 9.05 h at 34% efficiency
    * and moved five awake hours into a training set — see
    * `docs/reviews/2026-08-26-manual-bedtime-write-audit.md`.

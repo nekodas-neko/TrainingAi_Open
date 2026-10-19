@@ -38,8 +38,8 @@ canonical-display-source table in the same section).
   commissioned audit, which falsified Q-519's design). Three consumers derive behaviour from
   `sleepStart`/`sleepEnd` rather than from `duration_hours`/`efficiency`: `aggregateNight` recomputes
   time-in-bed **and efficiency** from the span on a fragmented night, the daytime-HRV model decides
-  which samples are "nightly" by window membership off **stored** rows, and `primaryCluster` unions
-  same-date rows within an hour of the window. Widening a measured 3 h 5 m night with a remembered
+  which samples are "nightly" by window membership off **stored** rows, and the sleep list's night
+  grouping (`groupSleepPeriods`, the same as the score's since #3080) joins windows within 3 h. Widening a measured 3 h 5 m night with a remembered
   23:00 gave **10.0 h at 35%** against 4.62 h at 75%, reproduced in a test. **Read this before writing
   anything to `sleep_start`** — the standing assumption that duration and efficiency are "stored, not
   derived" is true of the columns and false of the pipeline. Also records one consumer that looks

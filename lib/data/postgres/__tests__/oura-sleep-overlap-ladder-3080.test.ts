@@ -140,4 +140,63 @@ describe.skipIf(!canRun)('Oura sleep overlap follows the source ladder (#3080)',
     await writeSleep({ ...sleepPeriod, type: 'rest' })
     expect(await vitals()).toMatchObject({ hrv_ms: 55, hrv_source: 'manual' })
   })
+
+  // ── #3106 review ────────────────────────────────────────────────────────────────────────────
+
+  it.each([['stale first'], ['new first']])('a batch holding a stale and a new version of one night ends with one live row (%s)', async order => {
+    const stale = { ...sleepPeriod, id: 'old-id', bedtime_start: '2026-10-09T22:40:00+10:00', bedtime_end: '2026-10-10T05:30:00+10:00' }
+    await writeSleep(stale)
+    await writeSleep(...(order === 'stale first' ? [stale, sleepPeriod] : [sleepPeriod, stale]))
+    expect((await nights()).filter(n => !n.gone)).toHaveLength(1)
+  })
+
+  it('a manual night Oura covered comes back when Oura deletes its period', async () => {
+    await pool.query(
+      `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, manual_entry)
+       VALUES ($1, $2, '2026-10-09T12:00:00Z', '2026-10-09T20:00:00Z', 8, true)`, [USER, DAY])
+    await writeSleep(sleepPeriod)
+    expect((await repo.listSleepSessions(USER, DAY, DAY)).map(r => r.manualEntry ?? false)).toEqual([false])
+
+    const { withNightRescore } = await import('@/lib/health/rescore-nights')
+    await withNightRescore(repo, USER, async () => {
+      await repo.tombstoneOuraCloudSleep(USER, ['sl-1'])
+      await repo.syncOuraMainSleepBodyMetrics(USER, { days: [], ouraIds: ['sl-1'] })
+    })
+    expect((await repo.listSleepSessions(USER, DAY, DAY)).map(r => r.manualEntry)).toEqual([true])
+  })
+
+  it('a manual night Oura covered comes back when Oura retypes its period to rest', async () => {
+    await pool.query(
+      `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, manual_entry)
+       VALUES ($1, $2, '2026-10-09T12:00:00Z', '2026-10-09T20:00:00Z', 8, true)`, [USER, DAY])
+    await writeSleep(sleepPeriod)
+    await writeSleep({ ...sleepPeriod, type: 'rest' })
+    expect((await repo.listSleepSessions(USER, DAY, DAY)).map(r => r.manualEntry)).toEqual([true])
+  })
+
+  it('never takes HRV or resting HR from a nap: a daytime sleep period or a late_nap', async () => {
+    await writeSleep(
+      { ...sleepPeriod, id: 'nap-day', type: 'sleep', bedtime_start: '2026-10-10T14:00:00+10:00', bedtime_end: '2026-10-10T15:30:00+10:00', total_sleep_duration: 5000, average_hrv: 90, lowest_heart_rate: 40 },
+      { ...sleepPeriod, id: 'nap-late', type: 'late_nap', bedtime_start: '2026-10-10T18:00:00+10:00', bedtime_end: '2026-10-10T19:00:00+10:00', total_sleep_duration: 3000, average_hrv: 95, lowest_heart_rate: 39 },
+    )
+    expect(await vitals()).toBeNull()
+  })
+
+  it('a revision of the same id that widens over a fragment tombstones the fragment and keeps one row per id', async () => {
+    await writeSleep({ ...sleepPeriod, id: 'frag', bedtime_start: '2026-10-10T06:40:00+10:00', bedtime_end: '2026-10-10T07:00:00+10:00', total_sleep_duration: 900 })
+    await writeSleep(sleepPeriod)
+    await writeSleep({ ...sleepPeriod, bedtime_end: '2026-10-10T07:10:00+10:00' })
+    expect((await nights()).map(n => [n.oura_id, n.gone])).toEqual([['sl-1', false], ['frag', true]])
+    expect((await pool.query(`SELECT count(*)::int AS n FROM sleep_sessions WHERE user_id = $1 AND oura_id = 'sl-1'`, [USER])).rows[0].n).toBe(1)
+  })
+
+  it('a delete then a re-create of the same period revives its row, live once', async () => {
+    await writeSleep(sleepPeriod)
+    const [{ id }] = (await pool.query(`SELECT id FROM sleep_sessions WHERE user_id = $1`, [USER])).rows
+    await repo.tombstoneOuraCloudSleep(USER, ['sl-1'])
+    await writeSleep(sleepPeriod)
+    const rows = (await pool.query(`SELECT id, deleted_at IS NOT NULL AS gone FROM sleep_sessions WHERE user_id = $1`, [USER])).rows
+    expect(rows).toEqual([{ id, gone: false }])
+    expect(await vitals()).toMatchObject({ hrv_ms: 62, resting_heart_rate: 47 })
+  })
 })

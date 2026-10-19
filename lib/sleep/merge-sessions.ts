@@ -146,7 +146,9 @@ export function mergeByDate(rows: SleepRow[], tz: string = DEFAULT_TZ): SleepRow
       phaseWindowEnd: main.row.sleepPhase5Min ? main.row.sleepEnd : null,
     })
   }
-  return [...results, ...untimed]
+  // Newest first, as the route always returned them: every reader takes `[0]` as last night and
+  // `slice(0, n)` as the recent nights (#3106 review). Grouping yields them oldest first.
+  return [...results.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)), ...untimed]
 }
 
 /**
@@ -154,10 +156,9 @@ export function mergeByDate(rows: SleepRow[], tz: string = DEFAULT_TZ): SleepRow
  * night, newest first. The cold-open seed for every screen that reads that route.
  *
  * **A date is merged only when every row on it carries its window.** `mergeByDate` is the route's
- * own formula and is right for timed rows: `primaryCluster` drops naps and evening fragments, so
- * only contiguous splits reach the additive merge. Untimed rows defeat that — clustering returns
- * early and the additive merge SUMS a night and its naps into a fabricated 11.5 h night (BF-115's
- * refutation). Rows pulled before SQLite v50 have no window, so a date holding any such row passes
+ * own formula and is right for timed rows: the night grouping (`groupSleepPeriods`, #3080) leaves naps
+ * and evening fragments out and aggregates only a night's own windows. Untimed rows cannot be placed
+ * in a night at all, and summing them is what once fabricated an 11.5 h night (BF-115's refutation). Rows pulled before SQLite v50 have no window, so a date holding any such row passes
  * through raw, exactly as the seed always passed it.
  *
  * **Oura's period type is not on the device (#3057).** The local table has no `sleep_type`, so an Oura

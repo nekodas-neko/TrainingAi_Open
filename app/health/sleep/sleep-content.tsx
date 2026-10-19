@@ -57,14 +57,14 @@ export function SleepContent({ userId }: { userId?: string }) {
   // a night just removed and lacks one just typed. Applied to every reply, not only the first.
   const applyServerRows = useCallback((rows: SleepSessionRow[] | null) => {
     if (!rows) return;
-    void withPendingManualWrites(rows, userId, cutoffDate()).then(r => { setSleepRows(r); setLoaded(true); });
-  }, [userId, cutoffDate]);
+    void withPendingManualWrites(rows, userId, cutoffDate(), tz).then(r => { setSleepRows(r); setLoaded(true); });
+  }, [userId, cutoffDate, tz]);
 
   // After the card saves or removes a night, show it at once from the local store (no network wait
   // on the device); the invalidation the writer fires then refetches the server copy.
   const onNightChanged = useCallback(() => {
-    void withPendingManualWrites(rowsRef.current, userId, cutoffDate()).then(setSleepRows);
-  }, [userId, cutoffDate]);
+    void withPendingManualWrites(rowsRef.current, userId, cutoffDate(), tz).then(setSleepRows);
+  }, [userId, cutoffDate, tz]);
 
   useEffect(() => {
     const cached = readCacheSync<SleepSessionRow[]>("sleep-sessions");

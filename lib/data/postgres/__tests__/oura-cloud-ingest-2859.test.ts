@@ -259,14 +259,16 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
   })
 
   // #3080: a device night always wins over a typed one (#2338), so a manual night no longer blocks
-  // Oura's. It yields: tombstoned, never deleted, and Oura's period is written.
-  it('makes a manual night yield to Oura\'s, by tombstone (#3080)', async () => {
+  // Oura's. Oura's period is written and the manual night is left live: readers show the device night
+  // over it (`preferDeviceNights`), and it shows again if Oura's night goes (#3106 review).
+  it("writes Oura's night over a manual one and leaves the manual night alone (#3080)", async () => {
     await pool.query(
       `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, manual_entry)
        VALUES ($1, $2, '2026-10-09T12:00:00Z', '2026-10-09T20:00:00Z', 8, true)`, [USER, DAY])
-    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 1, skippedOverlap: 0, yielded: 1 })
+    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 1, skippedOverlap: 0, yielded: 0 })
     const rows = (await pool.query(`SELECT manual_entry, oura_id, deleted_at IS NOT NULL AS gone FROM sleep_sessions WHERE user_id = $1 ORDER BY manual_entry`, [USER])).rows
-    expect(rows).toEqual([{ manual_entry: false, oura_id: 'sl-1', gone: false }, { manual_entry: true, oura_id: null, gone: true }])
+    expect(rows).toEqual([{ manual_entry: false, oura_id: 'sl-1', gone: false }, { manual_entry: true, oura_id: null, gone: false }])
+    expect((await repo.listSleepSessions(USER, DAY, DAY)).map(r => r.ouraId)).toEqual(['sl-1'])
   })
 
   it('follows a period Oura moved to a new start, and tombstones one Oura deleted', async () => {
