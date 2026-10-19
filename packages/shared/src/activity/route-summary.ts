@@ -33,10 +33,10 @@ export interface RouteSummary {
  * app's activity screen, its guided walk and TrainingAi Preview (#2845), which used to each spell
  * the same nine fields out by hand.
  *
- * `paceElapsedSec` is the denominator of the average pace and is the caller's choice, because the
- * two current-app screens differ: the activity screen uses the GPS fix span (so the pace reconciles
- * with the splits, which also run on fix time), the guided walk uses the walk's own elapsed time.
- * Omitted, it is the fix span.
+ * `paceElapsedSec` is the denominator of the average pace: the activity's active (unpaused) seconds,
+ * the same time its saved duration counts. It is required because the obvious default, the span
+ * from the first GPS fix to the last, keeps running through a pause and so counted the paused
+ * minutes as running ones (#3092). Splits and the pace series stay on fix time.
  *
  * Null with fewer than two points: one fix is a position, not a route.
  *
@@ -46,12 +46,11 @@ export interface RouteSummary {
  * that slow are left out (every display keys a split by its km), pace-series buckets are clamped to
  * the cap, and an average that slow (a walk that lost GPS for most of its time) is left out.
  */
-export function summariseRoute(points: RoutePoint[], paceElapsedSec?: number): RouteSummary | null {
+export function summariseRoute(points: RoutePoint[], paceElapsedSec: number): RouteSummary | null {
   if (points.length < 2) return null
   const distanceKm = computeTotalDistanceKm(points)
   const { gainM, lossM } = computeElevationChange(points)
-  const fixSpanSec = (points[points.length - 1].t - points[0].t) / 1000
-  const avgPaceSecPerKm = computeAvgPaceSecPerKm(distanceKm, paceElapsedSec ?? fixSpanSec)
+  const avgPaceSecPerKm = computeAvgPaceSecPerKm(distanceKm, paceElapsedSec)
   return {
     distanceKm: Math.round(distanceKm * 100) / 100,
     routePolyline: encodeRoute(simplifyRoute(points, ROUTE_SIMPLIFY_TOLERANCE_M)),

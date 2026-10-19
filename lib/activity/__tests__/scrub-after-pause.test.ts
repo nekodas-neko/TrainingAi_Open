@@ -30,7 +30,7 @@ describe('scrub position after a pause (#3093)', () => {
       // Every alignment of the pause against the 30 s pace buckets.
       for (let before = 90; before < 105; before++) {
         const points = pausedRun(before, pauseSec)
-        const { paceSeries } = summariseRoute(points)!
+        const { paceSeries } = summariseRoute(points, (before + 300) * 2)!
         const endSec = (points.at(-1)!.t - points[0].t) / 1000
         for (let t = before * 2 + pauseSec + 30; t <= endSec; t += 30) {
           const truth = trueKmAt(points, t)
