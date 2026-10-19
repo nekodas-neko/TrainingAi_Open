@@ -1,12 +1,16 @@
 import { Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo';
 
+import { createRestCue } from './rest-cue';
+
 let lastFeedbackAt = 0;
-let lastRestCue: string | null = null;
-export function restFeedback(cueId: string) {
-  if (lastRestCue === cueId) return;
-  lastRestCue = cueId;
-  feedback('success', true);
+const restCue = createRestCue({
+  haptic: () => feedback('success', true),
+  beep: () => void import('./beep').then((m) => m.playBeep()).catch(() => {}),
+});
+/** `notificationSounds`: the rest notification plays the sound, so no in-app beep (#3084). */
+export function restFeedback(cueId: string, notificationSounds = true) {
+  restCue(cueId, notificationSounds);
 }
 export function feedback(
   kind: 'selection' | 'success' | 'impact' = 'selection',
