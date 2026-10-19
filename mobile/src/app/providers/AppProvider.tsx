@@ -7,6 +7,7 @@ import { WorkoutDataProvider } from '../../features/workouts/data/WorkoutDataPro
 import { HistoryQueueProvider } from '../../features/workouts/data/HistoryQueueProvider';
 import { HealthDataProvider } from '../../features/health/data/HealthDataProvider';
 import { NutritionProvider } from '../../features/nutrition/data/NutritionProvider';
+import { HistoryDownloadProvider } from '../../features/settings/data/HistoryDownloadProvider';
 import { ActivityProvider } from '../../features/activities/data/ActivityProvider';
 import { HomeProvider } from '../../features/home/data/HomeProvider';
 import { PlatformProvider } from '../../features/platform/PlatformProvider';
@@ -21,15 +22,17 @@ export function AppProvider({ children }: PropsWithChildren) {
             <HealthProvider>
               <HealthDataProvider>
                 <NutritionProvider>
-                  <HomeProvider>
-                    <ActivityProvider>
-                      <PlatformProvider>
-                        <OuraHandoffProvider>
-                          <ReportsProvider>{children}</ReportsProvider>
-                        </OuraHandoffProvider>
-                      </PlatformProvider>
-                    </ActivityProvider>
-                  </HomeProvider>
+                  <HistoryDownloadProvider>
+                    <HomeProvider>
+                      <ActivityProvider>
+                        <PlatformProvider>
+                          <OuraHandoffProvider>
+                            <ReportsProvider>{children}</ReportsProvider>
+                          </OuraHandoffProvider>
+                        </PlatformProvider>
+                      </ActivityProvider>
+                    </HomeProvider>
+                  </HistoryDownloadProvider>
                 </NutritionProvider>
               </HealthDataProvider>
             </HealthProvider>

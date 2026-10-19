@@ -167,6 +167,9 @@ export class TrainingStore {
     this.writes = result.catch(() => undefined);
     return result;
   }
+  tracks(path: string) {
+    return this.domain(path) !== null;
+  }
   private domain(path: string) {
     return path === programSpec.path
       ? ('programs' as const)
