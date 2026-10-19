@@ -14,8 +14,10 @@ export function planAlerts(
   const scope = settings.scope;
   const result: Alert[] = [];
   for (const workout of workouts) {
+    // The rest cue's alarm must survive backgrounding (#3062); the Alerts setting adds one when
+    // the cue is off.
     if (
-      (foreground ? workout.timers.restCues : settings.restAlerts) &&
+      (workout.timers.restCues || (!foreground && settings.restAlerts)) &&
       workout.status === 'active' &&
       workoutFlow(workout).stage !== 'summary' &&
       workout.rest &&
