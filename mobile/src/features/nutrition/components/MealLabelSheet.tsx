@@ -17,6 +17,7 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { mealLabelArtwork } from '../data/meal-label';
 import { MEAL_LABEL_STYLES } from '@trainingai/shared/nutrition/meal-label-geometry';
 import type { SavedMeal } from '../data/models';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const styles = MEAL_LABEL_STYLES;
 export function MealLabelSheet({ meal, onClose }: { meal: SavedMeal; onClose: () => void }) {
   const draft = useWorkoutDraft('meal-label-style', z.object({ style: z.string() }), {
@@ -65,9 +66,12 @@ export function MealLabelSheet({ meal, onClose }: { meal: SavedMeal; onClose: ()
       });
       await shareLabelImage(data, meal.name);
       setError(null);
-    } catch {
+    } catch (failure) {
       setError(
-        'Could not save the label image. Use Print/PDF, or retry in the latest build.',
+        failureNotice(
+          'Could not save the label image. Use Print/PDF, or retry in the latest build.',
+          failure,
+        ),
       );
     } finally {
       setBusy(false);

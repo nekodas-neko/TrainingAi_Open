@@ -169,27 +169,37 @@ export function ContributorCard({
               gap: theme.spacing.xs,
             }}
           >
-            <Stack direction="row" justify="space-between">
-              <Stack direction="row" align="center" gap="xs" style={{ flex: 1 }}>
-                <AppText variant="caption">{f.label}</AppText>
-                {guideFor(f.key) && <Icon name="forward" size={14} tone="muted" />}
+            <Stack direction="row" align="center" gap="sm">
+              <Stack direction="row" align="center" gap="xxs" style={{ width: 128 }}>
+                <AppText variant="factorLabel" style={{ flexShrink: 1 }}>
+                  {f.label}
+                </AppText>
+                {guideFor(f.key) && <Icon name="forward" size={12} tone="muted" />}
               </Stack>
-              <AppText variant="label">
+              <View style={{ flex: 1 }}>
+                <ProgressBar
+                  height={10}
+                  value={f.learning ? (f.weight ?? 0) : f.score! / 100}
+                  color={
+                    f.learning ? undefined : bandColors[scoreBand(f.score!).label]
+                  }
+                />
+              </View>
+              <AppText
+                variant="factorValue"
+                tone={f.learning ? 'muted' : undefined}
+                style={[
+                  { width: 32, textAlign: 'right', fontVariant: ['tabular-nums'] },
+                  f.learning ? null : { color: bandColors[scoreBand(f.score!).label] },
+                ]}
+              >
                 {f.learning
                   ? weights?.[f.key] != null
-                    ? `${Math.round(weights[f.key] * 100)}% weight`
-                    : 'Building baseline'
+                    ? `${Math.round(weights[f.key] * 100)}%`
+                    : '—'
                   : f.score}
               </AppText>
             </Stack>
-            <ProgressBar
-              value={f.learning ? (f.weight ?? 0) : f.score! / 100}
-              color={
-                f.learning
-                  ? undefined
-                  : bandColors[scoreBand(f.score!).label]
-              }
-            />
           </Pressable>
         ))}
         {!weights && (

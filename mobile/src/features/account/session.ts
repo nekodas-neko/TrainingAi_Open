@@ -1,5 +1,6 @@
 import { ApiError, backendOrigin, createApiClient } from './api/client.ts';
 import type { AccountProfile, SessionToken } from './api/client.ts';
+import { failureNotice } from '../../core/reporting/index.ts';
 
 export const AUTH_CALLBACK = 'com.fitnessai.training:/auth/callback';
 export const MOBILE_CALLBACKS = {
@@ -41,6 +42,16 @@ export type AccountState = {
   expiresAt: number | null;
   message: string | null;
 };
+/**
+ * "Retry account check" is for a saved session whose account could not be read: no profile yet, or
+ * a check that failed and left a message. A signed-in account with its profile and no problem has
+ * nothing to retry, so the button would only be noise.
+ */
+export function canRetryAccountCheck(
+  state: Pick<AccountState, 'hasSession' | 'profile' | 'message'>,
+): boolean {
+  return state.hasSession && (state.profile === null || state.message !== null);
+}
 export type AuthPlatform = {
   client?: MobileClient;
   fetch?: typeof fetch;
@@ -336,7 +347,7 @@ export class AccountSession {
           );
         }
       }
-    } catch {
+    } catch (failure) {
       if (generation !== this.generation) {
         return;
       }
@@ -344,7 +355,10 @@ export class AccountSession {
       this.pending = null;
       this.publish(
         'signedOut',
-        'Could not read secure sign-in storage. Try again on an unlocked phone with the latest development build.',
+        failureNotice(
+          'Could not read secure sign-in storage. Try again on an unlocked phone with the latest development build.',
+          failure,
+        ),
       );
     }
   }
@@ -611,11 +625,14 @@ export class AccountSession {
       if (generation === this.generation) {
         this.publish(this.session ? 'signedIn' : 'signedOut', message, this.current.profile);
       }
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
         this.publish(
           'storageError',
-          'Could not clear the interrupted sign-in. Retry on an unlocked phone.',
+          failureNotice(
+            'Could not clear the interrupted sign-in. Retry on an unlocked phone.',
+            failure,
+          ),
         );
       }
     }
@@ -646,11 +663,14 @@ export class AccountSession {
           await this.platform.revokeSession(previous.origin, previous.accessToken);
         } catch {}
       }
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
         this.publish(
           'storageError',
-          'Sign-in is cleared in memory, but secure storage could not be cleared. Retry sign-out before closing the app.',
+          failureNotice(
+            'Sign-in is cleared in memory, but secure storage could not be cleared. Retry sign-out before closing the app.',
+            failure,
+          ),
         );
       }
     }

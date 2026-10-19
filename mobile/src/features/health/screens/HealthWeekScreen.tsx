@@ -15,6 +15,7 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { digestSpec, monthWindowSpec, metricValue } from '../data/models';
 import { HealthViewReady } from '../components/HealthViewReady';
 import { HealthMetricCard } from '../components/HealthMetricCard';
+import { WeekMetricTile } from '../components/WeekMetricTile';
 import { HealthResourceHeader } from '../components/HealthResourceHeader';
 import { MuscleVolumeFigure } from '../components/MuscleVolumeFigure';
 import {
@@ -72,6 +73,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                 height={theme.sizes.weekVolumeChart}
                 readable
                 yAxis
+                tickCount={4}
                 bars={m.training.byDay.map((d) => ({
                   label: weekdayInitial(d.date),
                   accessibleLabel: weekdayName(d.date),
@@ -81,7 +83,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
               />
             </Card>
             <AppText variant="heading">Recovery</AppText>
-            <Grid columns={2}>
+            <Grid columns={2} gap="sm">
               {(
                 ['readiness', 'sleepScore', 'sleepHours', 'hrv', 'stressHighMinutes'] as const
               ).map((key) => {
@@ -92,19 +94,18 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                     : key === 'hrv'
                       ? 'ms'
                       : key === 'stressHighMinutes'
-                        ? 'min'
+                        ? 'm'
                         : '';
                 const decimals = key === 'sleepHours' ? 1 : 0;
                 const delta = weekDelta(metric.week, metric.priorWeek, {
-                  unit: key === 'stressHighMinutes' ? 'm' : unit,
+                  unit,
                   decimals,
                   higherIsBetter: key !== 'stressHighMinutes',
                 });
                 return (
-                  <HealthMetricCard
+                  <WeekMetricTile
                     key={key}
-                    compactChart
-                    title={
+                    label={
                       {
                         readiness: 'Readiness',
                         sleepScore: 'Sleep score',
@@ -113,31 +114,23 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                         stressHighMinutes: 'High stress',
                       }[key]
                     }
-                    value={metric.week}
-                    unit={unit}
                     valueText={fixedValue(metric.week, decimals)}
-                    points={metric.byDay.map((d) => ({ label: d.date, value: d.value }))}
-                    chart={{ color: theme.colors.brand, dots: 'isolated' }}
-                  >
-                    <AppText
-                      variant="caption"
-                      tone={delta.cue === 'good' || delta.cue === 'bad' ? undefined : 'muted'}
-                      style={
-                        delta.cue === 'good'
-                          ? { color: theme.progress.trendUp }
-                          : delta.cue === 'bad'
-                            ? { color: theme.tones.checkin.foreground }
-                            : undefined
-                      }
-                    >
-                      {delta.text}
-                    </AppText>
-                    {key === 'hrv' && metric.source === 'body-metrics' && (
-                      <AppText variant="micro" tone="muted">
-                        From daytime readings
-                      </AppText>
-                    )}
-                  </HealthMetricCard>
+                    unit={unit}
+                    delta={delta.text}
+                    deltaColor={
+                      delta.cue === 'good'
+                        ? theme.progress.trendUp
+                        : delta.cue === 'bad'
+                          ? theme.tones.checkin.foreground
+                          : undefined
+                    }
+                    note={
+                      key === 'hrv' && metric.source === 'body-metrics'
+                        ? 'From daytime readings'
+                        : undefined
+                    }
+                    days={metric.byDay}
+                  />
                 );
               })}
             </Grid>

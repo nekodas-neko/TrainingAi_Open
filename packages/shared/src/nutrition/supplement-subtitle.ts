@@ -1,4 +1,11 @@
-import type { SupplementWithStatus } from '@trainingai/shared/types/supplement'
+
+/** The fields the line reads: the server's `SupplementWithStatus` and the native app's `Supplement` both fit. */
+export interface SupplementSubtitleInput {
+  dose?: string | null
+  defaultAmount?: number | null
+  unit?: string | null
+  loggedAmount?: { amount?: number | null; unit?: string | null; contributions: number } | null
+}
 
 /**
  * The line under a supplement's name: what the day actually recorded, falling back to what the
@@ -12,7 +19,7 @@ import type { SupplementWithStatus } from '@trainingai/shared/types/supplement'
  * **A null amount is not zero.** A tick with no number means "taken", not "took none of it", so an
  * amount-less log falls through to the definition rather than rendering `0`.
  */
-export function supplementSubtitle(s: Pick<SupplementWithStatus, 'dose' | 'defaultAmount' | 'unit' | 'loggedAmount'>): string | null {
+export function supplementSubtitle(s: SupplementSubtitleInput): string | null {
   const withUnit = (n: number, unit: string | null | undefined) => `${n}${unit ? ` ${unit}` : ''}`
 
   const logged = s.loggedAmount

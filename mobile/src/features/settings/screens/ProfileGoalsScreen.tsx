@@ -27,6 +27,7 @@ import {
   useWorkoutResources,
 } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const profile = z
   .object({
     displayName: z.string().nullish(),
@@ -224,9 +225,12 @@ function ProfileGoalsForm({
       await resources!.clearDraft('profile-goals');
       setError(null);
       onSaved();
-    } catch {
+    } catch (failure) {
       setError(
-        'Could not save goals. Check the target values and retry when connected. Your edits are preserved.',
+        failureNotice(
+          'Could not save goals. Check the target values and retry when connected. Your edits are preserved.',
+          failure,
+        ),
       );
     } finally {
       setBusy(false);

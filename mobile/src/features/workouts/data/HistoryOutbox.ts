@@ -3,6 +3,7 @@ import { MutationSchema } from '@trainingai/shared/sync/mutation-schema';
 import { EditedAtSchema, withEditedAt } from '@trainingai/shared/sync/edited-at';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 const operation = MutationSchema.extend({
   id: z.uuid(),
@@ -63,6 +64,9 @@ export class HistoryOutbox {
     private uuid: () => string,
     private invalidate: (change?: HistoryOperation) => void,
     private now: () => number = Date.now,
+    // Runs once the server confirms a change and before it leaves the queue, while the change
+    // still overlays every view of its day.
+    private confirmed: (change: HistoryOperation) => Promise<void> = async () => {},
   ) {}
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -91,11 +95,14 @@ export class HistoryOutbox {
       }
       this.publish({ ready: true, operations: data?.operations ?? [], error: null });
       void this.sync();
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
         this.publish({
           ready: false,
-          error: 'Could not open saved history changes. Existing changes have been preserved.',
+          error: failureNotice(
+            'Could not open saved history changes. Existing changes have been preserved.',
+            failure,
+          ),
         });
       }
     }
@@ -193,16 +200,22 @@ export class HistoryOutbox {
           }
           this.invalidate(change);
         }
+        await this.confirmed(change);
+        if (generation !== this.generation) {
+          return;
+        }
         await this.write((operations) =>
           operations.filter((operation) => operation.id !== change.id),
         );
         this.invalidate();
       }
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
         this.publish({
-          error:
+          error: failureNotice(
             'Saved on this phone. History changes will upload when connected; retry if needed.',
+            failure,
+          ),
         });
       }
     }

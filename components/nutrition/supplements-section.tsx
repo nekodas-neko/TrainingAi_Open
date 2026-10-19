@@ -7,7 +7,7 @@ import { ManageSupplementsSheet } from "./manage-supplements-sheet";
 import { VialSheet } from "@/components/nutrition/reta/vial-sheet";
 import { isMilligramDosed } from "@trainingai/shared/nutrition/vial-plan";
 import { EmptyState } from "@/components/ui/empty-state";
-import { supplementSubtitle } from "@/components/nutrition/supplement-subtitle";
+import { supplementSubtitle } from "@trainingai/shared/nutrition/supplement-subtitle";
 import { applyManualToggle } from "@/components/nutrition/supplement-day-totals";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";

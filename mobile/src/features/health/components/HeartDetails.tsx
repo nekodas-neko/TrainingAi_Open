@@ -207,22 +207,27 @@ export function HeartTrendCard({
         fill: true,
         dots: 'isolated',
         color,
+        // trend-sparkline.tsx: an 88 px plot with at most four y labels.
+        height: 88,
+        tickCount: 4,
         axisLabels: weekdayAxis(shown.map((day) => day.date)),
       }}
-    >
-      {change && (
-        <AppText
-          variant="label"
-          tone={change.direction === 'same' ? 'muted' : undefined}
-          style={
-            change.direction === 'same'
-              ? undefined
-              : { color: cueColor(change.direction === 'up' ? 'good' : 'bad') }
-          }
-        >
-          {change.text}
-        </AppText>
-      )}
-    </HealthMetricCard>
+      // The change sits at the top right of the title row, as the current app's does.
+      status={
+        change && (
+          <AppText
+            variant="micro"
+            tone={change.direction === 'same' ? 'muted' : undefined}
+            style={
+              change.direction === 'same'
+                ? undefined
+                : { color: cueColor(change.direction === 'up' ? 'good' : 'bad') }
+            }
+          >
+            {change.text}
+          </AppText>
+        )
+      }
+    />
   );
 }

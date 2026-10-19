@@ -4,6 +4,7 @@ import { AppText, Card, Icon, IconButton, Stack, StableContent } from '../../../
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const savedInsight = z.object({ insight: z.string(), savedAt: z.number() });
 export function HealthInsight({
   section,
@@ -16,7 +17,7 @@ export function HealthInsight({
   const { theme } = useTheme();
   const { today, operations } = useHealthData();
   const [insight, setInsight] = useState<string | null>(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(hasData && !operations.length);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
@@ -46,7 +47,7 @@ export function HealthInsight({
           );
         if (active) {
           setInsight(result.insight);
-          setError(false);
+          setError(null);
         }
         if (!result.degraded) {
           await resources.saveDraft(key, {
@@ -54,9 +55,11 @@ export function HealthInsight({
             savedAt: Date.now(),
           });
         }
-      } catch {
+      } catch (failure) {
         if (active) {
-          setError(true);
+          setError(
+            failureNotice('Could not refresh this insight. Try again when connected.', failure),
+          );
         }
       } finally {
         if (active) {
@@ -96,7 +99,7 @@ export function HealthInsight({
           {insight
             ? insight
             : error
-              ? 'Could not refresh this insight. Try again when connected.'
+              ? error
               : operations.length
                 ? 'Insight will update after your changes upload.'
                 : 'No insight available yet.'}
@@ -104,7 +107,7 @@ export function HealthInsight({
       </StableContent>
       {error && insight && (
         <AppText variant="micro" tone="muted">
-          Could not refresh this insight. Try again when connected.
+          {error}
         </AppText>
       )}
     </Card>

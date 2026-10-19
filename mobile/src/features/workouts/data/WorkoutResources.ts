@@ -5,6 +5,7 @@ import type { AccountConnection } from '../../account/session.ts';
 import { ApiError, aiFailureText } from '../../account/api/client.ts';
 import { overlayHistory, type HistoryOperation } from './HistoryOutbox.ts';
 import { TrainingStore } from './TrainingStore.ts';
+import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 
 export type ResourceSpec<T> = {
   path: string;
@@ -184,13 +185,16 @@ export class WorkoutResources {
     const revision = entry.revision;
     try {
       await this.changes.initialize();
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
         this.publish(entry, {
           ...entry.state,
           loading: false,
           refreshing: false,
-          error: 'Could not open saved training changes. Existing changes have been preserved.',
+          error: failureNotice(
+            'Could not open saved training changes. Existing changes have been preserved.',
+            failure,
+          ),
         });
       }
       return;
@@ -211,7 +215,9 @@ export class WorkoutResources {
     try {
       await this.invalidationWrites;
       cacheEpoch = Number(await this.storage.get('workout-resource-epoch.v1')) || 0;
-    } catch {}
+    } catch (failure) {
+      reportError(failure);
+    }
     if (generation !== this.generation) {
       return;
     }
@@ -246,7 +252,9 @@ export class WorkoutResources {
             });
           }
         }
-      } catch {}
+      } catch (failure) {
+        reportError(failure, { apiPath: entry.spec.path });
+      }
       if (generation !== this.generation) {
         return;
       }
@@ -290,8 +298,8 @@ export class WorkoutResources {
             }),
           );
         }
-      } catch {
-        error = 'Loaded, but could not save this view for offline use.';
+      } catch (failure) {
+        error = failureNotice('Loaded, but could not save this view for offline use.', failure);
       }
       if (generation !== this.generation) {
         return;
@@ -331,9 +339,13 @@ export class WorkoutResources {
           ? 'Check your account to access this view.'
           : aiFailureText(
               error,
-              entry.state.data
-                ? 'Could not update this view. Showing saved data.'
-                : 'Could not load this view. Check your connection and retry.',
+              failureNotice(
+                entry.state.data
+                  ? 'Could not update this view. Showing saved data.'
+                  : 'Could not load this view. Check your connection and retry.',
+                error,
+                { apiPath: entry.spec.path },
+              ),
             ),
       });
     }
@@ -367,6 +379,61 @@ export class WorkoutResources {
         data,
       }),
     );
+  }
+  // Saves a view for offline use without registering it as visible, so a long history download
+  // does not make `refreshVisible` re-read hundreds of past days on every app open. Throws when
+  // the read or the save fails, so the caller keeps its cursor on this view. Resolves false when a
+  // newer local change or read of the view overtook it and nothing was saved.
+  async download<T>(spec: ResourceSpec<T>): Promise<boolean> {
+    if (this.changes.tracks(spec.path)) {
+      throw new Error('Training changes overlay this view; load it instead.');
+    }
+    const generation = this.generation;
+    const key = resourceKey(spec);
+    const revision = this.entries.get(key)?.revision;
+    await this.invalidationWrites;
+    const cacheEpoch = Number(await this.storage.get('workout-resource-epoch.v1')) || 0;
+    const data = spec.schema.parse(await this.connection.get(spec.path, spec.query));
+    if (generation !== this.generation) {
+      throw new Error('The account changed.');
+    }
+    const entry = this.entries.get(key);
+    // A local change or a newer read of this view landed while it downloaded: keep that one.
+    if ((entry && entry.revision !== revision) || entry?.request) {
+      return false;
+    }
+    if (spec.cache && !spec.cache(data)) {
+      return false;
+    }
+    await this.storage.set(
+      `workout-resource.v1:${key}`,
+      JSON.stringify({
+        origin: this.connection.origin,
+        userId: this.connection.userId,
+        savedAt: this.now(),
+        cacheEpoch,
+        data,
+      }),
+    );
+    if (generation !== this.generation || !entry || entry.revision !== revision) {
+      return true;
+    }
+    entry.hydrated = true;
+    entry.policy.succeeded();
+    this.publish(entry, { data, loading: false, refreshing: false, saved: false, error: null });
+    return true;
+  }
+  // After an edit to a saved view uploads, the outbox stops laying it over that view, so the saved
+  // copy must already hold the edit. Read it again, or drop the copy when that fails: a day that
+  // is missing offline is better than one showing an exercise that was deleted.
+  async resave<T>(spec: ResourceSpec<T>) {
+    let saved = false;
+    try {
+      saved = await this.download(spec);
+    } catch {}
+    if (!saved) {
+      await this.storage.remove(`workout-resource.v1:${resourceKey(spec)}`).catch(() => undefined);
+    }
   }
   async forget<T>(spec: ResourceSpec<T>) {
     const entry = this.entry(spec);
@@ -535,7 +602,9 @@ export class WorkoutResources {
     let cached: string | null = null;
     try {
       cached = await this.storage.get(key);
-    } catch {}
+    } catch (failure) {
+      reportError(failure);
+    }
     if (generation !== this.generation) {
       throw new Error('The account changed.');
     }
@@ -551,7 +620,9 @@ export class WorkoutResources {
     }
     try {
       await this.storage.set(key, data);
-    } catch {}
+    } catch (failure) {
+      reportError(failure);
+    }
     return data;
   }
   cancel() {

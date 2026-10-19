@@ -13,6 +13,7 @@ import {
 import { useHealthData } from '../data/HealthDataProvider';
 import { manualNightWindow } from '../data/manual-night';
 import { metricValue } from '../data/models';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 export function ManualNightCard() {
   const health = useHealthData();
@@ -64,8 +65,8 @@ export function ManualNightCard() {
       await health.store.removeNight(night.id, night.date);
       setRemove(false);
       setEditing(false);
-    } catch {
-      setError('Could not remove that night. Try again.');
+    } catch (failure) {
+      setError(failureNotice('Could not remove that night. Try again.', failure));
     } finally {
       setBusy(false);
     }

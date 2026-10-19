@@ -24,6 +24,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
+import { balanceProvenance, budgetLine } from '../../nutrition/data/budget-line';
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { useHealthData } from '../data/HealthDataProvider';
 import { energySpec, goalsSpec, trendsSpec } from '../data/models';
@@ -51,22 +52,7 @@ export function EnergyBalanceCard() {
     intake.intake !== null && budget !== null
       ? balanceZone(Math.round(intake.intake) - Math.round(budget))
       : null;
-  const provenance =
-    balance &&
-    balance.restingBaseKcal != null &&
-    balance.activeKcal != null &&
-    typeof balance.targetNetKcal === 'number'
-      ? budgetProvenance({
-          restingBaseKcal: balance.restingBaseKcal,
-          activeKcal: balance.activeKcal,
-          targetNetKcal: balance.targetNetKcal,
-          restingRateKcal: balance.restingRateKcal,
-          deficitKcal: typeof balance.deficitKcal === 'number' ? balance.deficitKcal : null,
-          stepCreditKcal:
-            typeof balance.stepCreditKcal === 'number' ? balance.stepCreditKcal : null,
-          ownTargetKcal: typeof balance.ownTargetKcal === 'number' ? balance.ownTargetKcal : null,
-        })
-      : null;
+  const provenance = balanceProvenance(balance);
   const bar =
     intake.intake !== null && budget !== null
       ? barProgress({ intakeKcal: intake.intake, budgetKcal: budget })
@@ -146,13 +132,7 @@ export function EnergyBalanceCard() {
             </AppText>
             {provenance && (
               <AppText variant="caption" tone="muted">
-                {provenance.ownTarget
-                  ? `Your own target: ${provenance.total.toLocaleString()} kcal.`
-                  : provenance.chain
-                    ? provenance.chain.totalFloored
-                      ? `${provenance.total.toLocaleString()} minimum budget, never below your resting rate.`
-                      : `${provenance.chain.rmr.toLocaleString()} resting rate${provenance.chain.deficit === 0 ? '' : ` ${provenance.chain.deficit > 0 ? '−' : '+'} ${Math.abs(provenance.chain.deficit).toLocaleString()} for your goal`} ${provenance.chain.dailyLiving < 0 ? '−' : '+'} ${Math.abs(provenance.chain.dailyLiving).toLocaleString()} daily living + ${provenance.chain.movement.toLocaleString()} movement = ${provenance.total.toLocaleString()} kcal.`
-                    : `${provenance.base.toLocaleString()} base + ${provenance.earned.toLocaleString()} movement = ${provenance.total.toLocaleString()} kcal.`}
+                {budgetLine(provenance, balance)}.
               </AppText>
             )}
             <AppText variant="caption" tone="muted">

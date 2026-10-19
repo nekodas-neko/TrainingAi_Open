@@ -2,6 +2,7 @@ import { ApiError } from '../account/api/client.ts';
 import type { AccountReader } from '../account/session.ts';
 import type { ScopedStorage } from '../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../core/sync/RefreshPolicy.ts';
+import { failureNotice } from '../../core/reporting/index.ts';
 import {
   applyMuscleLibrary,
   buildCatalog,
@@ -87,8 +88,8 @@ export class WorkoutCatalogStore {
     let notice: string | null = null;
     try {
       catalog = readSavedCatalog(await this.storage.get(key), this.reader);
-    } catch {
-      notice = 'Could not read the saved program. Trying the backend.';
+    } catch (error) {
+      notice = failureNotice('Could not read the saved program. Trying the backend.', error);
     }
     if (generation !== this.generation) {
       return;
@@ -192,8 +193,11 @@ export class WorkoutCatalogStore {
       let notice: string | null = null;
       try {
         await this.storage.set(key, JSON.stringify(catalog));
-      } catch {
-        notice = 'Your program loaded, but could not be saved for offline use. Retry to save it.';
+      } catch (error) {
+        notice = failureNotice(
+          'Your program loaded, but could not be saved for offline use. Retry to save it.',
+          error,
+        );
       }
       if (generation !== this.generation) {
         return;
@@ -220,6 +224,7 @@ export class WorkoutCatalogStore {
       if (revision === this.revision) {
         this.freshness.failed();
       }
+      const reported = { apiPath: '/api/workout-data' };
       this.publish({
         cacheReady: true,
         status: unauthorized ? 'unauthorized' : catalog ? 'ready' : 'error',
@@ -230,8 +235,16 @@ export class WorkoutCatalogStore {
         notice: unauthorized
           ? 'Your account could not access the program. Check your sign-in in Settings.'
           : catalog
-            ? 'Could not update your program. Showing the saved version; retry when connected.'
-            : 'Could not load your program. Check your connection and retry.',
+            ? failureNotice(
+                'Could not update your program. Showing the saved version; retry when connected.',
+                error,
+                reported,
+              )
+            : failureNotice(
+                'Could not load your program. Check your connection and retry.',
+                error,
+                reported,
+              ),
       });
     }
   }

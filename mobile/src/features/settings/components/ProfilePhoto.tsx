@@ -5,6 +5,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { failureNotice } from '../../../core/reporting/index.ts';
 export function ProfilePhoto({
   name,
   uri,
@@ -49,8 +50,10 @@ export function ProfilePhoto({
         ['/api/user/profile'],
       );
       onSaved();
-    } catch {
-      setError('Could not save your profile photo. Try again when connected.');
+    } catch (failure) {
+      setError(
+        failureNotice('Could not save your profile photo. Try again when connected.', failure),
+      );
     } finally {
       setBusy(false);
     }

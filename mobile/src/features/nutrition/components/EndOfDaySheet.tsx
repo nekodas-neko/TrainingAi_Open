@@ -39,6 +39,7 @@ import { DayReviewTrends, MealBackfill } from './DayReviewDetails';
 import { FoodLogger } from './FoodLogger';
 import { DayTotals } from './DayTotals';
 import { aiFailureText } from '../../account/api/client';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const scalesSchema = z.object({
   physicalTiredness: z.number().min(1).max(5),
   mentalDrain: z.number().min(1).max(5),
@@ -188,8 +189,8 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
       ]);
       await resources?.clearDraft(`evening-checkin:${date}`);
       onClose();
-    } catch {
-      setError('Could not save the review. Your draft is still here.');
+    } catch (failure) {
+      setError(failureNotice('Could not save the review. Your draft is still here.', failure));
     } finally {
       setBusy(false);
     }

@@ -5,6 +5,7 @@ import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { planSpec } from '../../nutrition/data/models';
 import { savePlanMeal } from '../../meal-plans/components/PlanMeals';
 import type { PlanCardArgs, WidgetResult } from '../data/widgets';
+import { failureNotice } from '../../../core/reporting/index.ts';
 export function PlanCard({
   args,
   onResult,
@@ -53,8 +54,11 @@ export function PlanCard({
         id: 'save_all',
         label: `Saved ${saved} ${saved === 1 ? 'meal' : 'meals'} to My Foods`,
       });
-    } catch {
-      setError(`Saved ${saved} of ${unsaved.length} meals. Retry to save the rest.`);
+    } catch (failure) {
+      setError(failureNotice(
+        `Saved ${saved} of ${unsaved.length} meals. Retry to save the rest.`,
+        failure,
+      ));
     } finally {
       guard.current = false;
       setBusy(false);

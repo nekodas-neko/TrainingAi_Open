@@ -36,6 +36,13 @@ export const sizes = {
   weekDay: 32,
   // calendar-widget.tsx: the day digit sits in an h-7 w-7 circle.
   calendarDay: 28,
+  // calendar-widget.tsx and weekly-stats-hub.tsx legends: h-1.5 w-1.5 dots.
+  legendDot: 6,
+  // strength-trend-card.tsx: <Sparkline height={64} responsive />.
+  sparkline: 64,
+  // strength-progress-card.tsx: an h-[11px] row of 60 / 70 / 80 labels over a 6 px bar.
+  strengthMarkerRow: 11,
+  strengthBar: 6,
   // nutrition-action-row.tsx: w-4 h-4 icons.
   iconCompact: 16,
   weightSparkline: 110,
@@ -48,6 +55,10 @@ export const sizes = {
   demonstration: 64,
   summaryWidth: 320,
   chartHeight: 96,
+  // week-metric-card.tsx: the tile's sparkline is h-10.
+  weekTileChart: 40,
+  // hr-day-chart.tsx and the cardio trend charts are h-40.
+  hrChartHeight: 160,
   miniChart: 48,
   metricValue: 48,
   compactMetricWidth: 104,
@@ -124,8 +135,42 @@ export const typography = {
   },
   statValue: { fontSize: 20, lineHeight: 28, fontWeight: '600' },
   statValueStrong: { fontSize: 24, lineHeight: 32, fontWeight: '700' },
+  // week-metric-card.tsx: text-xl font-bold value and a text-[11px] delta under it.
+  weekTileValue: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
+  weekTileDelta: { fontSize: 11, lineHeight: 16.5 },
+  // contributor-chart.tsx FactorBar: a text-[11px] leading-tight name and a text-[11px] font-semibold
+  // score or weight either side of the bar.
+  factorLabel: { fontSize: 11, lineHeight: 13.75 },
+  factorValue: { fontSize: 11, lineHeight: 16.5, fontWeight: '600' },
   statUnit: { fontSize: 9, lineHeight: 13.5 },
   micro: { fontSize: 10, lineHeight: 14, fontWeight: '600' },
+  // day-sections.tsx Stat: text-[0.95rem] font-bold leading-none over a text-[8.5px] uppercase
+  // tracking-[0.16em] label (Eaten / Burned / Net).
+  figureValue: { fontSize: 15.2, lineHeight: 15.2, fontWeight: '700' },
+  figureLabel: {
+    fontSize: 8.5,
+    lineHeight: 12.75,
+    letterSpacing: 1.36,
+    textTransform: 'uppercase',
+  },
+  // food-list.tsx: the "N items" line over a list, text-[11px] font-semibold uppercase
+  // tracking-[0.05em] muted.
+  listCount: {
+    fontSize: 11,
+    lineHeight: 16.5,
+    fontWeight: '600',
+    letterSpacing: 0.55,
+    textTransform: 'uppercase',
+  },
+  // energy-card.tsx: the remaining-calories number beside the ring, text-lg font-bold.
+  remainingValue: { fontSize: 18, lineHeight: 27, fontWeight: '700' },
+  // energy-card.tsx MacroColumn: text-[11.5px] font-semibold share, text-[15px] font-bold grams,
+  // text-[10.5px] target / unit / name. Line heights are the 1.5 the page inherits.
+  macroShare: { fontSize: 11.5, lineHeight: 17.25, fontWeight: '600' },
+  macroValue: { fontSize: 15, lineHeight: 22.5, fontWeight: '700' },
+  macroCaption: { fontSize: 10.5, lineHeight: 15.75, fontWeight: '400' },
+  // strength-progress-card.tsx: the 60 / 70 / 80 labels over a strength bar, 7 px bold at -0.02em.
+  strengthMarker: { fontSize: 7, lineHeight: 7, fontWeight: '700', letterSpacing: -0.14 },
   display: { fontSize: 48, lineHeight: 56, fontWeight: '800' },
   wheelValue: { fontSize: 32, lineHeight: 40, fontWeight: '700' },
 } satisfies Record<string, TextStyle>;
@@ -299,6 +344,8 @@ export const progressColors = {
     strength: '#7e22ce',
     trendUp: '#166534',
     trendDown: '#b91c1c',
+    // trends-section.tsx accentCardStyle('#8b5cf6'): the Trends card's tint.
+    trends: '#8b5cf6',
     goals: {
       Steps: '#15803d',
       Calories: '#c2410c',
@@ -311,6 +358,7 @@ export const progressColors = {
     strength: '#bf5fff',
     trendUp: TREND_COLOR.up,
     trendDown: TREND_COLOR.down,
+    trends: '#8b5cf6',
     goals: {
       Steps: '#22c55e',
       Calories: '#f97316',

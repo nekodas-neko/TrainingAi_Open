@@ -1,3 +1,4 @@
+import { balanceProvenance, budgetLine } from '../../nutrition/data/budget-line';
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { HrDayCard } from '../../health/components/HrDayCard';
 import { verdictSpec } from '../../health/data/checkin';
@@ -259,6 +260,7 @@ function HomeWidgetBody({
         : n.view.totals;
     const goal = energy?.data?.balance?.budgetKcal ?? null;
     const remaining = total && goal !== null ? goal - total.calories : null;
+    const provenance = balanceProvenance(energy?.data?.balance);
     return (
       <Pressable
         onPress={openNutrition}
@@ -286,6 +288,11 @@ function HomeWidgetBody({
                 {goal === null ? '' : ` / ${Math.round(goal).toLocaleString()}`}
               </AppText>
               <ProgressBar value={total && goal ? total.calories / goal : 0} />
+              {provenance && (
+                <AppText variant="micro" tone="muted">
+                  {budgetLine(provenance, energy?.data?.balance)}
+                </AppText>
+              )}
               {(['proteinG', 'carbsG', 'fatG'] as const).map((key, index) => (
                 <Stack key={key} direction="row" align="center" gap="xs">
                   <View

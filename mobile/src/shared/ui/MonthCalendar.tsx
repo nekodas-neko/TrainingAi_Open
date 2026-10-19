@@ -85,7 +85,7 @@ export function MonthCalendar({
           </AppText>
         ))}
       </Stack>
-      <Stack direction="row" wrap style={{ gap: 0 }}>
+      <Stack direction="row" wrap style={{ gap: 0, rowGap: theme.spacing.xxs }}>
         {Array.from({ length: cells }, (_, index) => {
           const day = index - first + 1;
           if (day < 1 || day > count) {

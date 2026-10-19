@@ -22,6 +22,7 @@ import { CoachHistory } from '../components/CoachHistory';
 import { ChangeRows, Consequences } from '../components/CoachChanges';
 import type { Destination } from '../components/CoachWidget';
 import type { CoachConversation } from '../data/CoachConversation';
+import { failureNotice } from '../../../core/reporting/index.ts';
 export function CoachScreen({
   scope,
   onBack,
@@ -285,8 +286,11 @@ function ReviewChange({
           setError(null);
         }
       })
-      .catch(() => {
-        if (current) setError('Could not check the consequences. Retry before confirming.');
+      .catch((failure) => {
+        if (current) setError(failureNotice(
+          'Could not check the consequences. Retry before confirming.',
+          failure,
+        ));
       });
     return () => {
       current = false;

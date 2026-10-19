@@ -80,7 +80,7 @@ export function HrDayCard({
   if (embedded && readings.length < 2) {
     const waiting = state.loading && !state.data;
     return (
-      <View style={{ minHeight: theme.sizes.chartHeight, justifyContent: 'center' }}>
+      <View style={{ minHeight: theme.sizes.hrChartHeight, justifyContent: 'center' }}>
         {!waiting && (
           <AppText variant="caption" tone="muted">
             {state.error && !state.data ? 'Couldn’t load heart rate' : 'No heart-rate data today'}
@@ -124,7 +124,9 @@ export function HrDayCard({
         readable
         gridlines
         yAxis
-        dots="isolated"
+        dots="none"
+        height={theme.sizes.hrChartHeight}
+        tickCount={4}
         label="24h heart rate in bpm"
         tone="heart"
         bands={bands}
@@ -143,9 +145,11 @@ export function HrDayCard({
         }
       />
       <Legend items={legend} />
-      <AppText variant="micro" tone="muted">
-        Averaged in 10-minute buckets. Gaps mean no recording.
-      </AppText>
+      {!embedded && (
+        <AppText variant="micro" tone="muted">
+          Averaged in 10-minute buckets. Gaps mean no recording.
+        </AppText>
+      )}
     </Card>
   );
 }

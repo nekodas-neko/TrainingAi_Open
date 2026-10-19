@@ -10,6 +10,9 @@ import {
 /** Width of one strength bar. */
 export const STRENGTH_BAR_WIDTH = 112;
 
+/** Width of the box each 60 / 70 / 80 label is centred in. Wide enough that scaled digits never wrap; the digits themselves are narrower than the 11 px between guides. */
+export const STRENGTH_MARKER_LABEL_WIDTH = 20;
+
 /** Where the dashed 60 / 70 / 80 guides sit on a strength bar. */
 export const STRENGTH_BAR_MARKERS = [60, 70, 80] as const;
 

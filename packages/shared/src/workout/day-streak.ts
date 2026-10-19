@@ -99,3 +99,21 @@ export function computeDayStreak(
 
   return { current, best: Math.max(best, current) }
 }
+
+export type StreakRestNotice = { kind: 'safe' | 'warning' | 'broken'; text: string }
+
+/**
+ * The line under Home's Streak / This Week cards on a rest day. Both apps print it, so the wording
+ * and the three states live here. Null until the first rest day, and for a recommendation with no
+ * rest-day count (weekly and rotation programs do not report one).
+ */
+export function streakRestNotice(rec: {
+  consecutiveRestDays?: number | null
+  streakWarning?: boolean | null
+  streakBroken?: boolean | null
+} | null | undefined): StreakRestNotice | null {
+  if (rec?.consecutiveRestDays == null || rec.consecutiveRestDays < 1) return null
+  if (rec.streakBroken) return { kind: 'broken', text: 'Resting today breaks your streak' }
+  if (rec.streakWarning) return { kind: 'warning', text: 'Rest again tomorrow and your streak breaks' }
+  return { kind: 'safe', text: 'Day 1 of 2 rest days — streak safe' }
+}

@@ -3,7 +3,7 @@ import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { dateStrMidnightInTz, formatMinutesOfDay } from '@trainingai/shared/date-utils';
 import Svg, { Rect, Polyline } from 'react-native-svg';
 import type { z } from 'zod';
-import { AppText, Card, Grid, KeyValueGrid, MetricTile, Stack } from '../../../shared/ui';
+import { AppText, Card, KeyValueGrid, MetricTile, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { energySpec, foodTimelineSpec, hrProfileSpec, metricValue } from '../data/models';
 import { signedKcal } from '../../nutrition/data/display';
@@ -66,14 +66,15 @@ export function EnergyDay({
         Energy
       </AppText>
       <Card>
-        <Grid columns={3}>
-          <MetricTile label="Eaten" value={metricValue(balance.intakeKcal, 'kcal')} />
-          <MetricTile label="Burned" value={metricValue(balance.expenditureKcal, 'kcal')} />
+        <Stack direction="row" gap="none">
+          <MetricTile figure label="Eaten" value={metricValue(balance.intakeKcal)} />
+          <MetricTile figure label="Burned" value={metricValue(balance.expenditureKcal)} />
           <MetricTile
+            figure
             label={balance.netKcal > 0 ? 'Surplus' : 'Deficit'}
-            value={`${signedKcal(balance.netKcal)} kcal`}
+            value={signedKcal(balance.netKcal)}
           />
-        </Grid>
+        </Stack>
         <KeyValueGrid
           rows={[
             { label: 'Workouts', value: metricValue(active.workoutKcal, 'kcal') },

@@ -20,6 +20,7 @@ import { useHealthData } from '../data/HealthDataProvider';
 import { readinessSpec, trendsSpec, metricValue } from '../data/models';
 import { HealthMetricCard } from '../components/HealthMetricCard';
 import { ContributorCard } from '../components/ContributorCard';
+import { ResilienceNote } from '../components/ResilienceNote';
 import { ManualNightCard } from '../components/ManualNightCard';
 import { SleepNight } from '../components/SleepNight';
 import { HealthSyncNotice } from '../components/HealthSyncNotice';
@@ -221,32 +222,17 @@ export function HealthDetailScreen({
               state.data &&
               (state.data.ownResilienceLevel != null ||
                 state.data.ownResilienceUnavailable) && (
-                <HealthMetricCard
-                  title="Resilience"
-                  value={state.data.ownResilienceLevel}
-                  decimals={1}
-                  caption={
-                    state.data.ownResilienceLevel != null
-                      ? `${state.data.ownResilienceBand ?? ''} ${resilienceAsOfLine(state.data.ownResilienceAsOf, health.today) ?? ''}`
-                      : 'Not published yet'
+                <ResilienceNote
+                  level={state.data.ownResilienceLevel}
+                  band={state.data.ownResilienceBand}
+                  confidence={state.data.ownResilienceConfidence}
+                  asOf={resilienceAsOfLine(state.data.ownResilienceAsOf, health.today)}
+                  shortfall={
+                    state.data.ownResilienceLevel == null && state.data.ownResilienceUnavailable
+                      ? resilienceShortfallLine(state.data.ownResilienceUnavailable)
+                      : null
                   }
-                >
-                  {state.data.ownResilienceLevel == null &&
-                    state.data.ownResilienceUnavailable && (
-                      <AppText variant="caption" tone="muted">
-                        {resilienceShortfallLine(state.data.ownResilienceUnavailable)}
-                      </AppText>
-                    )}
-                  {state.data.ownResilienceLevel != null &&
-                    state.data.ownResilienceConfidence != null &&
-                    state.data.ownResilienceConfidence < 1 && (
-                      <AppText variant="caption" tone="muted">
-                        Still building — based on{' '}
-                        {Math.round(state.data.ownResilienceConfidence * 14)} of the last 14
-                        days.
-                      </AppText>
-                    )}
-                </HealthMetricCard>
+                />
               )}
             {detail === 'readiness' ? (
               state.data?.readinessCompositeContributors && (
