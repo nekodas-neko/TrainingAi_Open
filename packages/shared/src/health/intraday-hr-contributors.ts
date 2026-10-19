@@ -13,6 +13,11 @@
 // the merged series (`hc-heart-rate-ranked-below-ring.test.ts`), so the owner's days do not move —
 // the measured outcome the decision stated. One implementation for the live payload and the day
 // audit, so the two cannot drift.
+//
+// Oura Cloud is gated too (#3078). Since the switch to the API the ring's heart rate is no longer
+// the dense BLE stream: Oura serves 5-minute points at rest and asleep, irregular bursts while
+// awake, and 5-second points only inside an Oura-app workout. An hour of that with a gap over the
+// ring's cadence is unmeasured, the same rule as Health Connect; nothing else about the rule moves.
 import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes';
 import {
   computeMovedHours,
@@ -29,6 +34,7 @@ export const DENSITY_GATED_HR_SOURCES: ReadonlySet<string> = new Set([
   'health_connect',
   'health_connect_native',
   'apple_health',
+  'oura_cloud',
 ]);
 
 type Row = { timestamp: Date | number; bpm: number; source?: string | null };

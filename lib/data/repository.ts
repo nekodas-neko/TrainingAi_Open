@@ -1605,6 +1605,8 @@ export interface WorkoutRepository {
   /** `sessionId → avgBpm` for the sessions that have one (Q-421). Absent = no usable HR. */
   getAvgBpmBySession(userId: string, sessionIds: string[]): Promise<Map<string, number>>
   listSessionsMissingHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
+  /** Completed sessions whose HR window overlaps `[from, to]`, newest first (#3078: re-attribute after late HR). */
+  listCompletedSessionsOverlapping(userId: string, from: Date, to: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   // Per-SET HR metric snapshot (migration 139) — durable per-set record for per-exercise HR trends,
   // sibling of workout_hr_stats. getSetDetailsForSession feeds the formula; the rest persist/read it.
   getSetDetailsForSession(userId: string, workoutSessionId: string): Promise<import('@trainingai/shared/workout/set-hr-stats').RichSetMarker[]>

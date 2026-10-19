@@ -5,6 +5,8 @@ import { getPool } from '../client'
 import * as s from '../schema'
 import type { OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
+import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
+import { avgBpmDenseEnough } from '@trainingai/shared/health/workout-energy'
 import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/shared/date-utils'
 import { shouldPrune } from '../retention-throttle'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
@@ -1569,7 +1571,8 @@ export async function computeDayZoneSeconds(
 ): Promise<[number, number, number, number, number] | null> {
   const from = fromZonedTime(`${day}T00:00:00`, tz)
   const to = fromZonedTime(`${day}T23:59:59`, tz)
-  // #2437: a sparse Health Connect hour is missing, the same rule the Activity score applies.
+  // #2437, #3078: a sparse Health Connect or Oura Cloud hour is missing, the same rule the Activity
+  // score applies.
   const rows = dropSparseHrHours(await getHrForWindow(db, userId, from, to), tz).rows
   if (rows.length === 0) return null
   const readings: HrReading[] = rows.map(r => ({
@@ -1786,17 +1789,27 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
  * `getWorkoutHrStats` above would be N queries on a route that already runs a lot of them. Sessions
  * with no snapshot, or a snapshot whose `avg_bpm` is null, are simply absent from the map — the
  * caller falls back to the MET estimate for those, which is 36 of the owner's 78 sessions.
+ *
+ * So is a session whose snapshot is too sparse to average (#3078, `avgBpmDenseEnough`): a handful of
+ * scattered Oura points is missing heart rate, not a measured one. Every calorie surface reads
+ * `avg_bpm` through here, so the gate is in one place.
  */
 export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: string[]): Promise<Map<string, number>> {
   if (sessionIds.length === 0) return new Map()
   const rows = await db
-    .select({ id: s.workoutHrStats.workoutSessionId, avgBpm: s.workoutHrStats.avgBpm })
+    .select({
+      id: s.workoutHrStats.workoutSessionId, avgBpm: s.workoutHrStats.avgBpm, readingsCount: s.workoutHrStats.readingsCount,
+      startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt,
+    })
     .from(s.workoutHrStats)
+    .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.workoutHrStats.workoutSessionId))
     .where(and(
       eq(s.workoutHrStats.userId, userId),
       inArray(s.workoutHrStats.workoutSessionId, sessionIds),
     ))
-  return new Map(rows.filter(r => r.avgBpm != null).map(r => [r.id, r.avgBpm as number]))
+  return new Map(rows
+    .filter(r => r.avgBpm != null && avgBpmDenseEnough(r.readingsCount, r.startedAt, r.completedAt))
+    .map(r => [r.id, r.avgBpm as number]))
 }
 
 export async function getWorkoutHrStats(db: Db, userId: string, sessionId: string): Promise<WorkoutHrStatsRow | null> {
@@ -1863,6 +1876,28 @@ export async function listSessionsMissingHrStats(db: Db, userId: string, since: 
       ),
     ))
     .orderBy(asc(s.workoutSessions.startedAt))
+    .limit(limit)
+}
+
+/**
+ * Completed sessions whose heart-rate window (`computeWorkoutHr`: start − pad … end + pad) overlaps
+ * `[from, to]` — the work-list for re-attributing workouts after heart rate lands late (#3078). The
+ * Oura Cloud feed uploads in batches, often hours after a workout was completed and its stats were
+ * computed, and the coverage-aware lists above only re-list a session with no usable snapshot, so a
+ * thin early compute was never refreshed. Newest first, at most `limit`.
+ */
+export async function listCompletedSessionsOverlapping(db: Db, userId: string, from: Date, to: Date, limit: number) {
+  return db
+    .select({ id: s.workoutSessions.id, startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt })
+    .from(s.workoutSessions)
+    .where(and(
+      eq(s.workoutSessions.userId, userId),
+      isNotNull(s.workoutSessions.completedAt),
+      isNull(s.workoutSessions.deletedAt),
+      lte(s.workoutSessions.startedAt, new Date(to.getTime() + WORKOUT_HR_PAD_MS)),
+      gte(s.workoutSessions.completedAt, new Date(from.getTime() - WORKOUT_HR_PAD_MS)),
+    ))
+    .orderBy(desc(s.workoutSessions.startedAt))
     .limit(limit)
 }
 
