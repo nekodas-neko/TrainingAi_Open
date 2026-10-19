@@ -88,6 +88,7 @@ import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
 import { computeStreak, type StreakSchedule } from "./compute-streak";
 import type { SleepRow } from "@/app/health/health-sections";
 import { DEFAULT_SLEEP_GOAL_HOURS } from "@trainingai/shared/health/daily-goals";
+import { activityStepsForDayCount } from "@trainingai/shared/health/activity-steps";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 import { useBodyBattery } from "@/lib/hooks/use-body-battery";
 // Derived from the canonical shape rather than restated as a sixth local copy: the fields Home
@@ -488,7 +489,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           setMetaLoading(false);
 
           // weekToDate fast-path — matches the server's steps/waterMl computation
-          // exactly (body_metrics + activity_logs steps, same weekStartForFetch
+          // exactly (body_metrics + indoor activity_logs steps, same weekStartForFetch
           // anchor). calories is body_metrics-only here: the server additionally
           // prefers food_logs' per-day total over body_metrics on days that have
           // one (to avoid double-counting), which needs a food-item join this fast
@@ -500,8 +501,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           const weekActivityLogs = (await store.getActivityLogs(weekStart))
             .filter(a => !a.deletedAt && a.date >= weekStart);
           setWeekToDate({
-            steps: wk.reduce((s, m) => s + (m.steps ?? 0), 0)
-              + weekActivityLogs.reduce((s, a) => s + (a.steps ?? 0), 0),
+            steps: wk.reduce((s, m) => s + (m.steps ?? 0), 0) + activityStepsForDayCount(weekActivityLogs),
             calories: wk.reduce((s, m) => s + (m.calories ?? 0), 0),
             waterMl: wk.reduce((s, m) => s + (m.waterMl ?? 0), 0),
           });
