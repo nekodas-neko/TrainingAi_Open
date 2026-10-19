@@ -712,6 +712,24 @@ export async function upsertOuraCloudSleep(
  * for this user: never a manual night or a ring (`ble:`) night. `deleted_at` rides the delta pull, so
  * a phone that already holds the night learns it is gone.
  */
+/**
+ * #3099. Wake dates in `[from, to]` that have ever held an Oura Cloud sleep row, live or tombstoned.
+ * The night re-score reads it before a write: a night "arrives" only on a day that never had one, so
+ * a delete followed by a re-create (which can revive the same row) is a revision, not an arrival.
+ * Ring (`ble:`) and manual rows are not Oura Cloud's and do not count.
+ */
+export async function listOuraCloudSleepDates(db: Db, userId: string, from: string, to: string): Promise<string[]> {
+  const rows = await db.selectDistinct({ date: s.sleepSessions.date }).from(s.sleepSessions)
+    .where(and(
+      eq(s.sleepSessions.userId, userId),
+      gte(s.sleepSessions.date, from), lte(s.sleepSessions.date, to),
+      isNotNull(s.sleepSessions.ouraId),
+      sql`${s.sleepSessions.ouraId} NOT LIKE 'ble:%'`,
+      eq(s.sleepSessions.manualEntry, false),
+    ))
+  return rows.map(r => r.date)
+}
+
 export async function tombstoneOuraCloudSleep(db: Db, userId: string, ouraIds: string[]): Promise<number> {
   if (ouraIds.length === 0) return 0
   const rows = await db.update(s.sleepSessions)

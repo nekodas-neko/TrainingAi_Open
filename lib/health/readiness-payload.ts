@@ -20,7 +20,7 @@ import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
-import { scoreSleepForDate } from '@trainingai/shared/health/sleep-score-for-date'
+import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
@@ -394,9 +394,11 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.
   const hrProfileP = resolveHrProfile(repo, userId, tz).catch(() => null)
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors] = await Promise.all([
+  const [bodyMetrics, sleepHistory, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
-    repo.listSleepSessions(userId, from28dIso, todayIso),
+    // One day deeper than the 28-day window (#3099): the Sleep Score of the newest night is scored
+    // against the 28 days before ITS date, which is yesterday's before Oura delivers last night.
+    repo.listSleepSessions(userId, shiftDateStr(todayIso, -(SLEEP_SCORE_HISTORY_DAYS + 1)), todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
     repo.getOuraDaily(userId, from28dIso, todayIso),
     repo.getActiveProgram(userId),
@@ -441,6 +443,9 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // the first scored a post-waking nap instead of the night (F-1/Q-1) — a 20-minute nap once produced
   // a Sleep Score of 5 against a 7.86 h night. `nightSessions` classifies by circadian position and
   // reassembles fragmented nights, so a wake-up in the middle no longer splits one night into two.
+  // Everything but the Sleep Score keeps the 28-day window it always had; only `scoreSleepForDate`
+  // reads the extra day, through its own date-relative window.
+  const sleepSessions = sleepHistory.filter(s => s.date >= from28dIso)
   const nights = nightSessions(sleepSessions, tz)
   const lastSleep  = canonicalLatestNight(nights, tz)
   const sleepHours = lastSleep?.durationHours ?? null
@@ -450,7 +455,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Baselines come from the *prior* nights only, by the scored night's end (#2456), so the night
   // never contributes to the bar it is judged against. #3079: through `scoreSleepForDate`, the one
   // night window the re-score of a changed night uses too, so the two paths cannot disagree.
-  const sleepScoreResult = lastSleep ? scoreSleepForDate(sleepSessions, lastSleep.date, tz)?.result ?? null : null
+  const sleepScoreResult = lastSleep ? scoreSleepForDate(sleepHistory, lastSleep.date, tz)?.result ?? null : null
   const sleepScore100 = sleepScoreResult?.score ?? null
   const ownSleepContributors = sleepScoreResult ? sleepComponentsToContributors(sleepScoreResult.components) : null
   const sleepComponent = sleepScore100 != null

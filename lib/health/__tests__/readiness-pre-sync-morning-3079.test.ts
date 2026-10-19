@@ -130,3 +130,41 @@ describe.each([
     })
   })
 })
+
+// #3099: before the sync, the newest night is yesterday's, scored against the 28 days before
+// yesterday. The read loaded sleep from today − 28, one day short, so the score on screen could
+// differ from the one stored for the same night. The repository here honours the range it is asked
+// for, which is what makes the missing day visible.
+describe('the sleep score shown before the sync is the one stored for that night (#3099)', () => {
+  it('loads the history the scored date needs', async () => {
+    const tz = 'Australia/Brisbane'
+    const today = todayInTz(tz)
+    // 35 ordinary nights, except the one dated today − 29: inside yesterday's 28-day window, outside
+    // today's. It is late, short and broken, so leaving it out moves yesterday's score by a point.
+    const edge = shiftDateStr(today, -29)
+    const sleep = Array.from({ length: 35 }, (_, i) => {
+      const d = shiftDateStr(today, -35 + i)
+      const mid = dateStrMidnightInTz(d, tz).getTime()
+      const odd = d === edge
+      const shift = odd ? 5 * HOUR : 0
+      return {
+        id: `s${i}`, date: d, ouraId: `cloud-${d}`,
+        sleepStart: new Date(mid - 2.5 * HOUR + shift), sleepEnd: new Date(mid + 6 * HOUR + shift),
+        durationHours: odd ? 4.5 : 7.6, deepSleepHours: 1.4, remSleepHours: 1.7, lightSleepHours: 4.5,
+        awakHours: odd ? 3 : 0.4 + (i % 3) * 0.3, efficiency: odd ? 55 : 88 + (i % 4),
+        averageHrvMs: odd ? 20 : 50, lowestHeartRate: 52, respiratoryRate: 14.5,
+      }
+    }).filter(n => n.date < today)
+    repo.listSleepSessions.mockImplementation(async (_u: string, from: string, to: string) => sleep.filter(n => n.date >= from && n.date <= to))
+    repo.listBodyMetrics.mockResolvedValue([])
+
+    const out = await buildReadinessPayload('u1', tz)
+
+    // What the night stored when it was today's, or when the re-score wrote it: its own window.
+    const stored = scoreSleepForDate(sleep as never, shiftDateStr(today, -1), tz)?.result.score
+    expect(stored).toEqual(expect.any(Number))
+    // The fixture really depends on the edge night, so a short load could not pass by accident.
+    expect(scoreSleepForDate(sleep.filter(n => n.date !== edge) as never, shiftDateStr(today, -1), tz)?.result.score).not.toBe(stored)
+    expect(out.sleepScore).toBe(stored)
+  })
+})
