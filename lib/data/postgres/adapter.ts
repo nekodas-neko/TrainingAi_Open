@@ -71,6 +71,7 @@ import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibili
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
+import { averagePaceSecPerKm } from '@trainingai/shared/activity/route-summary'
 import { describeZodFailure } from './push-error-detail'
 import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite, DetectionEventWrite } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
@@ -2638,10 +2639,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // Q-307: pace was read from the column and never derived, so it was absent on 32 of 39 logs
     // that carried both inputs — a client either sends it or leaves it null forever. Same shape as
     // caloriesBurned above: derive server-side when the client didn't supply one, from the two
-    // fields that are already present far more often than pace is.
+    // fields that are already present far more often than pace is. Through the clients' own rule
+    // (#3120): slower than MAX_PACE_SEC_PER_KM stores no pace, rather than filling back in the one
+    // a client deliberately left out.
     const avgPaceSecPerKm = data.avgPaceSecPerKm
-      ?? (data.durationMin != null && data.distanceKm != null && data.distanceKm > 0
-        ? (data.durationMin * 60) / data.distanceKm
+      ?? (data.durationMin != null && data.distanceKm != null
+        ? averagePaceSecPerKm(data.distanceKm, data.durationMin * 60) ?? null
         : null)
     const values = {
       ...(id ? { id } : {}),
