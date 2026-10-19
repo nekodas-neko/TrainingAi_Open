@@ -1533,9 +1533,11 @@ export interface WorkoutRepository {
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>
   /** #2859: Oura Cloud sleep periods (`oura_cloud`), keyed by Oura's id; a period another row already
    *  covers is skipped, never duplicated. */
-  upsertOuraCloudSleep(userId: string, sessions: OuraSleepUpsertRow[]): Promise<{ written: number; skippedOverlap: number }>
+  upsertOuraCloudSleep(userId: string, sessions: OuraSleepUpsertRow[]): Promise<{ written: number; skippedOverlap: number; yielded?: number }>
   /** #2859: tombstones Cloud sleep periods Oura reports deleted. Never a manual or ring night. */
-  tombstoneOuraCloudSleep(userId: string, ouraIds: string[]): Promise<number>
+  tombstoneOuraCloudSleep(userId: string, ouraIds: string[], opts?: { keepPeriodType?: boolean }): Promise<number>
+  /** #3080: sets each touched day's HRV and resting HR from its main Oura period, or clears Oura's. */
+  syncOuraMainSleepBodyMetrics(userId: string, touched: { days: string[]; ouraIds: string[] }): Promise<{ written: number; cleared: number }>
   /** #3079: runs `run` as the only Oura sleep write (and its night re-score) for this user, across
    *  requests and replicas. */
   withOuraSleepWriteLock<T>(userId: string, run: () => Promise<T>): Promise<T>

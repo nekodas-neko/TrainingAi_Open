@@ -205,7 +205,7 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     }], 'oura_ble')
     const out = await repo.upsertOuraCloudSleep(USER, (await import('@/lib/oura/cloud/documents')).mapOuraDocuments(
       [{ type: 'sleep', doc: (await import('@/lib/oura/cloud/documents')).SleepDoc.parse(sleepPeriod) }]).sleep)
-    expect(out).toEqual({ written: 0, skippedOverlap: 1 })
+    expect(out).toEqual({ written: 0, skippedOverlap: 1, yielded: 0 })
     const rows = (await pool.query(`SELECT oura_id, duration_hours FROM sleep_sessions WHERE user_id = $1 AND deleted_at IS NULL`, [USER])).rows
     expect(rows).toEqual([{ oura_id: 'ble:1', duration_hours: 7.1 }])
   })
@@ -229,7 +229,7 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     const before = await rawArchiveCount()
     await repo.upsertOuraSleep(USER, [partialRingNight], 'oura_ble')
 
-    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 1, skippedOverlap: 0 })
+    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toMatchObject({ written: 1, skippedOverlap: 0 })
     // The ring's night is tombstoned, not deleted, so a device that holds it learns it is gone.
     expect(await nights()).toEqual([{ oura_id: 'ble:partial', gone: true }, { oura_id: 'sl-1', gone: false }])
 
@@ -246,7 +246,7 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     expect(await nights()).toEqual([{ oura_id: 'ble:partial', gone: true }, { oura_id: 'sl-1', gone: false }])
 
     // Oura re-sending the night changes nothing.
-    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 1, skippedOverlap: 0 })
+    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toMatchObject({ written: 1, skippedOverlap: 0 })
     expect(await nights()).toEqual([{ oura_id: 'ble:partial', gone: true }, { oura_id: 'sl-1', gone: false }])
     expect(await rawArchiveCount()).toBe(before)
   })
@@ -254,16 +254,19 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
   it('keeps the ring\'s night before the switch day (#2998)', async () => {
     await lastRingFrameOn('2026-10-11')
     await repo.upsertOuraSleep(USER, [partialRingNight], 'oura_ble')
-    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 0, skippedOverlap: 1 })
+    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 0, skippedOverlap: 1, yielded: 0 })
     expect(await nights()).toEqual([{ oura_id: 'ble:partial', gone: false }])
   })
 
-  it('still lets a manual night block Oura\'s on the switch day (#2998)', async () => {
-    await lastRingFrameOn(DAY)
+  // #3080: a device night always wins over a typed one (#2338), so a manual night no longer blocks
+  // Oura's. It yields: tombstoned, never deleted, and Oura's period is written.
+  it('makes a manual night yield to Oura\'s, by tombstone (#3080)', async () => {
     await pool.query(
       `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, manual_entry)
        VALUES ($1, $2, '2026-10-09T12:00:00Z', '2026-10-09T20:00:00Z', 8, true)`, [USER, DAY])
-    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 0, skippedOverlap: 1 })
+    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 1, skippedOverlap: 0, yielded: 1 })
+    const rows = (await pool.query(`SELECT manual_entry, oura_id, deleted_at IS NOT NULL AS gone FROM sleep_sessions WHERE user_id = $1 ORDER BY manual_entry`, [USER])).rows
+    expect(rows).toEqual([{ manual_entry: false, oura_id: 'sl-1', gone: false }, { manual_entry: true, oura_id: null, gone: true }])
   })
 
   it('follows a period Oura moved to a new start, and tombstones one Oura deleted', async () => {

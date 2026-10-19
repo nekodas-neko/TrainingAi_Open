@@ -39,6 +39,7 @@ function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
     upsertBodyMetrics: async (_u, rows) => { calls.push(`body:${rows.length}`) },
     upsertOuraCloudSleep: async (_u, rows) => { calls.push(`sleep:${rows.length}`); return { written: rows.length, skippedOverlap: 0 } },
     tombstoneOuraCloudSleep: async (_u, ids) => ids.length,
+    syncOuraMainSleepBodyMetrics: async () => ({ written: 0, cleared: 0 }),
     upsertOuraWorkouts: async (_u, rows) => { calls.push(`workouts:${rows.length}`); return rows.length },
     upsertOuraCloudHeartrate: async (_u, rows) => { calls.push(`hr:${rows.length}`); return rows.length },
     upsertOuraCloudSleepPeriods: async (_u, rows) => { calls.push(`periods:${rows.length}`); return rows.length },

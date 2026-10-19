@@ -80,7 +80,7 @@ export function SleepContent({ userId }: { userId?: string }) {
       if (store) {
         const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000);
         store.getSleepSessions(toAestDay(cutoff, tz)).then(localSleep => {
-          if (localSleep.length > 0) setSleepRows(prev => (prev.length > 0 ? prev : localSleepRowsAsNights(localSleep)));
+          if (localSleep.length > 0) setSleepRows(prev => (prev.length > 0 ? prev : localSleepRowsAsNights(localSleep, tz)));
           // The device is the source of truth: an empty local read is an answer, not "not loaded".
           setLoaded(true);
         }).catch(() => {});

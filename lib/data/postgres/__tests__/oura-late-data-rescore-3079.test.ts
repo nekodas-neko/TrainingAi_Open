@@ -153,7 +153,7 @@ describe.skipIf(!canRun)('Oura late data re-scores its day (#3079)', () => {
     return { sleep, periods: [period(`frag-3085-${date}`, fragment, fragmentType), period(`main-3085-${date}`, main, 'long_sleep')] }
   }
 
-  const noWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] }
+  const noWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], retypedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] }
 
   /** The score the readiness read's own scorer gives `date` from what is stored now, types included. */
   async function scoredFromStore(date: string) {

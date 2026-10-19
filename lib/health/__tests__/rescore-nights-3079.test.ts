@@ -173,10 +173,11 @@ describe('writeOuraCloudData brackets a sleep write with the re-score', () => {
     upsertOuraDaily: async () => {}, upsertBodyMetrics: async () => {},
     upsertOuraCloudSleep: vi.fn(async () => ({ written: 1, skippedOverlap: 0 })),
     tombstoneOuraCloudSleep: vi.fn(async () => 0),
+    syncOuraMainSleepBodyMetrics: vi.fn(async () => ({ written: 0, cleared: 0 })),
     upsertOuraWorkouts: async () => 0, upsertOuraCloudHeartrate: async () => 0,
     upsertOuraCloudSleepPeriods: async () => 0, upsertOuraCloudDaily: async () => 0, upsertOuraSessions: async () => 0,
   } as unknown as OuraCloudWriter
-  const empty: OuraCloudWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] }
+  const empty: OuraCloudWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], retypedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] }
 
   it('reads the nights before and after a sleep or delete write', async () => {
     const { repo } = makeRepo(todayInTz(TZ))

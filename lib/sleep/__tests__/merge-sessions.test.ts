@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mergeByDate, type SleepRow } from '@/lib/sleep/merge-sessions'
+import { nightSessions } from '@trainingai/shared/health/sleep-night'
 
 // Minimal row factory — only the fields the merge/cluster logic reads matter.
 const row = (o: Partial<SleepRow> & { date: string; sleepStart: string; sleepEnd: string }): SleepRow => ({
@@ -15,19 +16,25 @@ describe('mergeByDate — distant fragments do not distort the night (real prod 
     const out = mergeByDate([
       row({ date: '2026-07-02', ouraId: 'a', sleepStart: '2026-07-01T19:40:00Z', sleepEnd: '2026-07-01T20:19:00Z', durationHours: 0.2, onsetLatencySec: 1890 }),
       row({ date: '2026-07-02', ouraId: 'b', sleepStart: '2026-07-01T21:40:00Z', sleepEnd: '2026-07-02T06:53:00Z', durationHours: 8.4, onsetLatencySec: 1080 }),
-    ])
+    ], 'UTC')
     expect(out).toHaveLength(1)
     expect(out[0].sleepStart).toBe('2026-07-01T21:40:00Z') // not the 19:40 fragment
     expect(out[0].sleepEnd).toBe('2026-07-02T06:53:00Z')
     expect(out[0].durationHours).toBe(8.4) // not 8.4 + 0.2 summed
     expect(out[0].onsetLatencySec).toBe(1080) // the night's onset, not the fragment's 1890
+    // #3080: the score leaves that evening fragment out too, so the card and the score agree.
+    const [scored] = nightSessions([
+      { date: '2026-07-02', sleepStart: new Date('2026-07-01T19:40:00Z'), sleepEnd: new Date('2026-07-01T20:19:00Z'), durationHours: 0.2, onsetLatencySec: 1890 },
+      { date: '2026-07-02', sleepStart: new Date('2026-07-01T21:40:00Z'), sleepEnd: new Date('2026-07-02T06:53:00Z'), durationHours: 8.4, onsetLatencySec: 1080 },
+    ], 'UTC').filter(n => n.date === '2026-07-02')
+    expect(scored.sleepStart.toISOString()).toBe('2026-07-01T21:40:00.000Z')
   })
 
   it('07-04: drops the 14:39 afternoon nap so wake stays 07:16 (not 14:59)', () => {
     const out = mergeByDate([
       row({ date: '2026-07-04', ouraId: 'a', sleepStart: '2026-07-03T21:56:00Z', sleepEnd: '2026-07-04T07:16:00Z', durationHours: 8.2 }),
       row({ date: '2026-07-04', ouraId: 'b', sleepStart: '2026-07-04T14:39:00Z', sleepEnd: '2026-07-04T14:59:00Z', durationHours: 0.1 }),
-    ])
+    ], 'UTC')
     expect(out).toHaveLength(1)
     expect(out[0].sleepEnd).toBe('2026-07-04T07:16:00Z') // not 14:59
     expect(out[0].durationHours).toBe(8.2)
@@ -37,7 +44,7 @@ describe('mergeByDate — distant fragments do not distort the night (real prod 
     const out = mergeByDate([
       row({ date: '2026-07-07', ouraId: 'cloud', sleepStart: '2026-07-06T22:16:00Z', sleepEnd: '2026-07-07T07:02:00Z', durationHours: 7.9 }),
       row({ date: '2026-07-07', ouraId: 'ble:1474260', sleepStart: '2026-07-07T10:44:00Z', sleepEnd: '2026-07-07T11:03:00Z', durationHours: 0.3 }),
-    ])
+    ], 'UTC')
     expect(out).toHaveLength(1)
     expect(out[0].sleepEnd).toBe('2026-07-07T07:02:00Z') // not 11:03
   })
@@ -47,7 +54,7 @@ describe('mergeByDate — distant fragments do not distort the night (real prod 
     const out = mergeByDate([
       row({ date: '2026-07-10', sleepStart: '2026-07-09T22:30:00Z', sleepEnd: '2026-07-10T00:00:00Z', durationHours: 1.5 }),
       row({ date: '2026-07-10', sleepStart: '2026-07-10T00:00:00Z', sleepEnd: '2026-07-10T06:30:00Z', durationHours: 6.5 }),
-    ])
+    ], 'UTC')
     expect(out).toHaveLength(1)
     expect(out[0].sleepStart).toBe('2026-07-09T22:30:00Z')
     expect(out[0].sleepEnd).toBe('2026-07-10T06:30:00Z')
@@ -56,7 +63,7 @@ describe('mergeByDate — distant fragments do not distort the night (real prod 
 
   it('passes a single-row date through untouched', () => {
     const r = row({ date: '2026-07-09', ouraId: 'ble:2739761', sleepStart: '2026-07-08T21:53:00Z', sleepEnd: '2026-07-09T06:25:00Z', durationHours: 7.3 })
-    expect(mergeByDate([r])).toEqual([r])
+    expect(mergeByDate([r], 'UTC')).toEqual([r])
   })
 })
 
@@ -89,5 +96,17 @@ describe('a zero-duration row is not a night (Q-274)', () => {
     const out = mergeByDate([{ ...base, durationHours: 0 }, night])
     expect(out).toHaveLength(1)
     expect(out[0].durationHours).toBe(7.5)
+  })
+})
+
+// #3080: the card's night is the scored night, so a row whose stored date disagrees with its local
+// wake day is shown on the wake day, as the score files it.
+describe('mergeByDate files a night under its local wake day', () => {
+  it('restamps a row whose stored date is the day before it ended (Brisbane)', () => {
+    const r = row({ date: '2026-10-18', ouraId: 'oura-1', sleepStart: '2026-10-18T12:30:00Z', sleepEnd: '2026-10-18T20:30:00Z', durationHours: 7.5 })
+    const out = mergeByDate([r], 'Australia/Brisbane')
+    expect(out).toHaveLength(1)
+    expect(out[0].date).toBe('2026-10-19')
+    expect(nightSessions([{ ...r, sleepStart: new Date(r.sleepStart!), sleepEnd: new Date(r.sleepEnd!) }], 'Australia/Brisbane')[0].date).toBe('2026-10-19')
   })
 })

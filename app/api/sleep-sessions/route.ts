@@ -53,9 +53,10 @@ export async function GET() {
     manualSleepStart: r.manualSleepStart ? r.manualSleepStart.toISOString() : null,
     // #2338. Only true on a night no device recorded — `listSleepSessions` already dropped the rest.
     manualEntry: r.manualEntry ?? false,
-    // #3057. `mergeByDate` keeps an Oura period beside a `long_sleep` out of the night.
+    // #3057. `mergeByDate` keeps an Oura period beside a `long_sleep` out of the night. Since #3080 it
+    // returns the night the Sleep Score scores, so the card and the score describe the same night.
     ouraSleepType: r.ouraSleepType ?? null,
-  })));
+  })), tz);
 
   // A night the rollup has not yet derived past is still growing, and saying so is the whole of
   // BF-83: the owner saw the same night read 6 h 15 m and then 7 h 40 m four minutes apart, with

@@ -327,7 +327,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       // #2414: one row per night, newest first, as the route returns — not the raw per-session
       // rows the store holds. Rows pulled before SQLite v50 carry no window and pass through
       // unmerged; see `localSleepRowsAsNights` for why merging those would invent a night.
-      if (localSleep.length > 0) setSleepRows(localSleepRowsAsNights(localSleep));
+      if (localSleep.length > 0) setSleepRows(localSleepRowsAsNights(localSleep, tz));
     })();
     const networkPromise = Promise.all([
       cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null; bodyFatCalibration?: BodyFatCalibrationMeta | null }>(

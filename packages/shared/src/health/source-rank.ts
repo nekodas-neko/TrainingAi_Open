@@ -42,3 +42,12 @@ export const SOURCE_RANK: Record<HealthSource, number> = {
 export function sourceRank(source: string | null | undefined): number {
   return source && source in SOURCE_RANK ? SOURCE_RANK[source as HealthSource] : 0;
 }
+
+/**
+ * #3080: the ladder for a whole NIGHT rather than one field. Every device keeps its field rank, but a
+ * night the user typed in ranks below every device: a device night always wins over a typed one
+ * (#2338), even though a typed value outranks a device value field by field.
+ */
+export function nightSourceRank(source: string | null | undefined, manualEntry: boolean): number {
+  return manualEntry ? -1 : sourceRank(source);
+}
