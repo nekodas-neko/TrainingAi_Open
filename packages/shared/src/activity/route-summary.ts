@@ -16,6 +16,17 @@ import { MAX_PACE_SEC_PER_KM } from '../validation/plausibility'
 
 export const ROUTE_SIMPLIFY_TOLERANCE_M = 5
 
+/**
+ * An activity's average pace (s/km) as it is stored: distance over elapsed seconds, or undefined when
+ * there is none (no distance, or no time) or it is slower than `MAX_PACE_SEC_PER_KM`. Slower than that is not a pace (an hour
+ * per km is a standstill), and the save schema rejects it. The one rule for both `summariseRoute`
+ * and the server, which works the pace out itself when a client sends none (#3120).
+ */
+export function averagePaceSecPerKm(distanceKm: number, elapsedSec: number): number | undefined {
+  const pace = computeAvgPaceSecPerKm(distanceKm, elapsedSec)
+  return pace != null && pace > 0 && pace <= MAX_PACE_SEC_PER_KM ? pace : undefined
+}
+
 export interface RouteSummary {
   distanceKm: number
   routePolyline: string
@@ -50,7 +61,6 @@ export function summariseRoute(points: RoutePoint[], paceElapsedSec: number): Ro
   if (points.length < 2) return null
   const distanceKm = computeTotalDistanceKm(points)
   const { gainM, lossM } = computeElevationChange(points)
-  const avgPaceSecPerKm = computeAvgPaceSecPerKm(distanceKm, paceElapsedSec)
   return {
     distanceKm: Math.round(distanceKm * 100) / 100,
     routePolyline: encodeRoute(simplifyRoute(points, ROUTE_SIMPLIFY_TOLERANCE_M)),
@@ -62,8 +72,7 @@ export function summariseRoute(points: RoutePoint[], paceElapsedSec: number): Ro
       ...point,
       paceSec: Math.min(point.paceSec, MAX_PACE_SEC_PER_KM),
     })),
-    avgPaceSecPerKm:
-      avgPaceSecPerKm != null && avgPaceSecPerKm <= MAX_PACE_SEC_PER_KM ? avgPaceSecPerKm : undefined,
+    avgPaceSecPerKm: averagePaceSecPerKm(distanceKm, paceElapsedSec),
     elevationGainM: gainM,
     elevationLossM: lossM,
     elevationProfile: computeElevationProfile(points),
