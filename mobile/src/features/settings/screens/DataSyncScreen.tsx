@@ -7,6 +7,7 @@ import {
   ConfirmationCard,
   PageLayout,
   Picker,
+  ProgressBar,
   Stack,
   StatusIndicator,
   TabPanel,
@@ -17,6 +18,9 @@ import { useAppleImport } from '../../health/HealthProvider';
 import { shareAccountExport } from '../../../integrations/sharing/account-export';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
+import { todayInTz } from '@trainingai/shared/date-utils';
+import { HISTORY_DOWNLOAD_DAYS } from '../data/history-domains';
+import { useHistoryDownload } from '../data/HistoryDownloadProvider';
 // The shortest "how far back" choice is the current app's 30-day import window
 // (`HISTORY_WINDOW_DAYS` in `lib/health-connect-history-import.ts`).
 const HISTORY_WINDOW_DAYS = 30;
@@ -24,9 +28,11 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
   const actions = useNativeDataActions(),
     account = useAccountContext(),
     health = useAppleImport(),
+    history = useHistoryDownload(),
     { theme } = useTheme();
   const [restore, setRestore] = useState(false),
     [days, setDays] = useState('30'),
+    [range, setRange] = useState('90'),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null);
   async function exportData() {
@@ -50,8 +56,8 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
       actions={
         <StatusIndicator
           label="Data & Sync"
-          busy={busy || actions.busy || health.busy}
-          error={error ?? actions.error ?? health.error}
+          busy={busy || actions.busy || health.busy || history.status === 'running'}
+          error={error ?? actions.error ?? health.error ?? history.error}
           message={actions.message}
         />
       }
@@ -78,26 +84,72 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="subheading">Restore from cloud</AppText>
             <AppText variant="caption" tone="muted">
-              Older history loads when opened. Your unsent changes and unfinished workouts
-              are kept.
+              Saves your history to this phone so it opens offline. Your unsent changes and
+              unfinished workouts are kept.
             </AppText>
-            <AppButton
-              title="Restore from cloud"
-              variant="secondary"
-              disabled={!account.dataReader || actions.busy || busy}
-              onPress={() => setRestore(true)}
+            <Picker
+              label="How far back to restore"
+              value={range}
+              options={HISTORY_DOWNLOAD_DAYS.map((days) => ({
+                value: String(days),
+                label: days === 365 ? '1 year' : `${days} days`,
+              }))}
+              onChange={setRange}
             />
+            {history.plan && history.status !== 'idle' && (
+              <>
+                <ProgressBar
+                  value={history.total ? history.done / history.total : 0}
+                  complete={history.status === 'complete'}
+                />
+                <AppText variant="caption" tone="muted">
+                  {history.status === 'complete'
+                    ? `${history.plan.days} days saved for offline use`
+                    : `${history.done} of ${history.total} saved${
+                        history.status === 'paused' ? ' · Paused' : ''
+                      }`}
+                </AppText>
+              </>
+            )}
+            {history.status === 'running' ? (
+              <AppButton
+                title="Cancel"
+                variant="secondary"
+                onPress={() => void history.download?.cancel()}
+              />
+            ) : history.status === 'paused' || history.status === 'failed' ? (
+              <AppButton
+                title="Resume"
+                disabled={!history.download}
+                onPress={() => void history.download?.resume()}
+              />
+            ) : (
+              <AppButton
+                title="Restore from cloud"
+                variant="secondary"
+                disabled={!account.dataReader || !history.download || actions.busy || busy}
+                onPress={() => setRestore(true)}
+              />
+            )}
           </Card>
           {restore && (
             <ConfirmationCard
               title="Restore saved records?"
-              message="Your local changes are kept. The app will upload what it can and refresh your account records."
+              message="Your local changes are kept. The app will upload what it can, then save your history to this phone."
               confirmLabel="Restore"
               cancelLabel="Cancel"
               onCancel={() => setRestore(false)}
               onConfirm={() => {
                 setRestore(false);
-                void actions.sync(true);
+                void actions.sync(true).then(() =>
+                  history.download?.start({
+                    anchor: todayInTz(
+                      account.dataReader?.timezone ??
+                        Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    ),
+                    days: Number(range),
+                  }),
+                );
               }}
             />
           )}

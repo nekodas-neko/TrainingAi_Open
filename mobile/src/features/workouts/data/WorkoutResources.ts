@@ -368,6 +368,47 @@ export class WorkoutResources {
       }),
     );
   }
+  // Saves a view for offline use without registering it as visible, so a long history download
+  // does not make `refreshVisible` re-read hundreds of past days on every app open. Throws when
+  // the read or the save fails, so the caller keeps its cursor on this view.
+  async download<T>(spec: ResourceSpec<T>) {
+    if (this.changes.tracks(spec.path)) {
+      throw new Error('Training changes overlay this view; load it instead.');
+    }
+    const generation = this.generation;
+    const key = resourceKey(spec);
+    const revision = this.entries.get(key)?.revision;
+    await this.invalidationWrites;
+    const cacheEpoch = Number(await this.storage.get('workout-resource-epoch.v1')) || 0;
+    const data = spec.schema.parse(await this.connection.get(spec.path, spec.query));
+    if (generation !== this.generation) {
+      throw new Error('The account changed.');
+    }
+    const entry = this.entries.get(key);
+    // A local change or a newer read of this view landed while it downloaded: keep that one.
+    if ((entry && entry.revision !== revision) || entry?.request) {
+      return;
+    }
+    if (spec.cache && !spec.cache(data)) {
+      return;
+    }
+    await this.storage.set(
+      `workout-resource.v1:${key}`,
+      JSON.stringify({
+        origin: this.connection.origin,
+        userId: this.connection.userId,
+        savedAt: this.now(),
+        cacheEpoch,
+        data,
+      }),
+    );
+    if (generation !== this.generation || !entry || entry.revision !== revision) {
+      return;
+    }
+    entry.hydrated = true;
+    entry.policy.succeeded();
+    this.publish(entry, { data, loading: false, refreshing: false, saved: false, error: null });
+  }
   async forget<T>(spec: ResourceSpec<T>) {
     const entry = this.entry(spec);
     entry.revision++;

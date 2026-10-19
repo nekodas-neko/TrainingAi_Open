@@ -11,6 +11,7 @@ import { useAccountContext } from '../../account/AccountProvider';
 import { refreshAccountViews } from './refreshAccountViews';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
+import { useHistoryDownload } from './HistoryDownloadProvider';
 export function useNativeDataActions() {
   const health = useHealthData(),
     home = useHome(),
@@ -26,7 +27,8 @@ export function useNativeDataActions() {
     [error, setError] = useState<string | null>(null),
     [message, setMessage] = useState<string | null>(null);
   const activities = useActivities(),
-    history = useHistoryQueue();
+    history = useHistoryQueue(),
+    download = useHistoryDownload().download;
   const pending =
     health.operations.length +
     home.operations.length +
@@ -105,6 +107,7 @@ export function useNativeDataActions() {
     imported.store?.cancel();
     activities.store?.cancel();
     history.queue?.cancel();
+    download?.stop();
     resources?.cancel();
     await storage.clearAccount(connection.origin, connection.userId);
   }
