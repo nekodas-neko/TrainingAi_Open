@@ -7,7 +7,7 @@ import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metri
 import { ingestDayRejection } from "@trainingai/shared/validation/ingest-clock";
 import { type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
-import { activityStepsForDayCount } from "@trainingai/shared/health/activity-steps";
+import { activityStepsForDayCount, dayStepCount } from "@trainingai/shared/health/activity-steps";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
@@ -51,7 +51,15 @@ export interface BodyMetaRow {
   protein: number | null;
   carb: number | null;
   fat: number | null;
+  /** The day's step count: the device's own plus indoor activity steps (`dayStepCount`). */
   steps: number | null;
+  /**
+   * The device's own count before indoor activity steps were added; set on today's row only when
+   * they were. The Log value sheet pre-fills from it: seeding the combined figure and saving it
+   * unchanged would write the treadmill's steps into body_metrics, and the next read would add them
+   * again (#3095). Absent means `steps` already is the device's count.
+   */
+  deviceSteps?: number | null;
   distanceKm: number | null;
   restingHeartRate: number | null;
   hrvMs: number | null;
@@ -266,12 +274,13 @@ export async function GET(req: NextRequest) {
     : null;
 
   // Fold today's activity steps into the today row (surface them even when there's
-  // no body_metrics row yet for the day).
+  // no body_metrics row yet for the day). `deviceSteps` keeps the unfolded count for the Log value
+  // sheet, which must not write the treadmill's steps back into body_metrics (#3095).
   if (todayActivitySteps > 0) {
     todayRow = todayRow
-      ? { ...todayRow, steps: (todayRow.steps ?? 0) + todayActivitySteps }
+      ? { ...todayRow, steps: dayStepCount(todayRow.steps, todayActivityLogs), deviceSteps: todayRow.steps }
       : { date: today, weightKg: null, bodyFat: null, calories: null, protein: null,
-          carb: null, fat: null, steps: todayActivitySteps, distanceKm: null,
+          carb: null, fat: null, steps: todayActivitySteps, deviceSteps: null, distanceKm: null,
           restingHeartRate: null, hrvMs: null, spo2Pct: null, waterMl: null,
           waistCm: null, chestCm: null, armCm: null, thighCm: null, hipCm: null, neckCm: null,
           skeletalMusclePct: null, fatFreeMassKg: null, subcutaneousFatPct: null, visceralFatIndex: null,

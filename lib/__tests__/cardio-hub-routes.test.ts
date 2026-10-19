@@ -269,8 +269,32 @@ describe('/api/cardio-week', () => {
     expect((await (await getWeek()).json()).trainedToday).toBe(true)
 
     getDayExerciseNames.mockResolvedValue([])
-    listActivityLogs.mockResolvedValue([run()])
+    // Dated today: the route reads the week's logs (#3095) and credits today's, as the repository
+    // would hand them back.
+    listActivityLogs.mockResolvedValue([run({ date: todayInTz(TZ) })])
     expect((await (await getWeek()).json()).trainedToday).toBe(true)
+  })
+
+  it('a cardio session earlier in the week does not credit today', async () => {
+    listActivityLogs.mockResolvedValue([run({ date: '2026-09-01' })])
+    expect((await (await getWeek()).json()).trainedToday).toBe(false)
+  })
+
+  // #3095: the same builder as Home and the day screen. A treadmill session's steps are added (the
+  // ring misses them); a GPS walk's stored steps are not (the ring already counted them).
+  it('adds a treadmill session\'s steps to today and the week, and never a GPS walk\'s', async () => {
+    const today = todayInTz(TZ)
+    listBodyMetrics.mockResolvedValue([
+      { date: '2026-09-07', steps: 4000 }, { date: today, steps: 6000 },
+    ])
+    listActivityLogs.mockResolvedValue([
+      { activityType: 'treadmill', date: today, steps: 3500, startTime: '12:00:00' },
+      { activityType: 'treadmill', date: '2026-09-07', steps: 2000, startTime: '12:00:00' },
+      { activityType: 'walk', date: today, steps: 4100, distanceKm: 3.2, startTime: '12:00:00' },
+    ])
+    const body = await (await getWeek()).json()
+    expect(body.steps.today).toBe(9500)
+    expect(body.steps.week).toBe(15_500)
   })
 
   it('sums only this week\'s steps and reads today\'s from today\'s row', async () => {

@@ -54,9 +54,14 @@ describe('every body-fat display site renders the corrected reading', () => {
     // The inverse, and the one that is silent and unrecoverable if broken: `openLog` POSTs its value
     // back at source `manual`, which outranks `scale_ble`. Seeding it from a corrected number would
     // overwrite the measurement permanently and collapse the next calibration toward zero.
+    // #3095 moved the seed into `logSeedValue`, shared with Home's Log value sheet: `openLog` must
+    // still go through it, and it must still read the stored field, never the display helper.
     const src = code(source('app/health/health-content.tsx'))
-    expect(src).toMatch(/const openLog[\s\S]{0,400}metaToday\?\.\[field\]/)
+    expect(src).toMatch(/const openLog[\s\S]{0,400}logSeedValue\(field, metaToday/)
     expect(src).not.toMatch(/const openLog[\s\S]{0,400}displayBodyFat/)
+    const seed = code(source('components/health/log-seed-value.ts'))
+    expect(seed).toMatch(/today\?\.\[field as keyof BodyMetaRow\]/)
+    expect(seed).not.toMatch(/displayBodyFat|bodyFatCorrected/)
   })
 })
 

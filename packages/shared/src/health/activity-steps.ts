@@ -40,3 +40,23 @@ export function activityStepsForDayCount(
     0,
   )
 }
+
+/**
+ * The day's step count: the device's own total plus the indoor activity steps it could not see.
+ * Every surface that shows a day's steps builds it here (#3095), so Home, the cardio week, the day
+ * screen and the goals cards cannot disagree on a treadmill day. Null only when there is neither a
+ * device count nor any indoor steps — "no reading", which a surface must not print as zero.
+ *
+ * #3095 also checked the premise this rests on, that the ring misses treadmill steps: on 4 of 12
+ * treadmill days with both figures the ring's whole-day total was below the session's own steps,
+ * and treadmill days ran only 11% above plain days. The ring counts few of them, so adding the
+ * session's steps does not double-count in any material way.
+ */
+export function dayStepCount(
+  deviceSteps: number | null | undefined,
+  activities: readonly { activityType: string; steps?: number | null }[],
+): number | null {
+  const indoor = activityStepsForDayCount(activities)
+  if (deviceSteps == null && indoor === 0) return null
+  return (deviceSteps ?? 0) + indoor
+}

@@ -14,6 +14,7 @@ import { cn } from "@trainingai/shared/utils"
 import { invalidateBodyMetricWrite, invalidateReadinessInputs } from "@/lib/cache-groups"
 import type { LocalBodyMetric } from "@/lib/local-store/types"
 import { metricBoundError } from "@/components/health/metric-bounds"
+import { logSeedValue } from "@/components/health/log-seed-value"
 
 interface LogValueSheetProps {
   widget: WidgetDef | null
@@ -32,11 +33,8 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
 
   useEffect(() => {
     if (!widget) return
-    let current = metaToday?.[widget.key as keyof typeof metaToday]
-    if (widget.key === "weightKg" && current == null) {
-      current = metaRecent.find(r => r.weightKg != null)?.weightKg ?? null
-    }
-    setLogValue(current != null ? String(current) : "")
+    // #3095: seeds the device's own steps, not the treadmill-inclusive figure.
+    setLogValue(logSeedValue(widget.key, metaToday, metaRecent))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget])
 

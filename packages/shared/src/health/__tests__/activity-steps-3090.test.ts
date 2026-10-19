@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { activityStepsForDayCount, INDOOR_STEP_ACTIVITY_TYPES, PEDOMETER_ACTIVITY_TYPES } from '../activity-steps'
+import { activityStepsForDayCount, dayStepCount, INDOOR_STEP_ACTIVITY_TYPES, PEDOMETER_ACTIVITY_TYPES } from '../activity-steps'
 
 describe('activityStepsForDayCount (#3090)', () => {
   it('folds a treadmill session in and leaves outdoor foot activity out', () => {
@@ -43,5 +43,29 @@ describe('activityStepsForDayCount (#3090)', () => {
     const src = readFileSync(path.join(__dirname, '../activity-steps.ts'), 'utf8')
     expect(src).not.toMatch(/^\s*import\s/m)
     expect(src).not.toMatch(/\brequire\(/)
+  })
+})
+
+describe('dayStepCount (#3095)', () => {
+  const treadmill = { activityType: 'treadmill', steps: 3_500 }
+  const gpsWalk = { activityType: 'walk', steps: 4_100 }
+
+  it('adds indoor steps to the device count and leaves outdoor ones out', () => {
+    expect(dayStepCount(9_000, [treadmill, gpsWalk])).toBe(12_500)
+    expect(dayStepCount(9_000, [gpsWalk])).toBe(9_000)
+  })
+
+  it('counts a treadmill-only day with no device reading', () => {
+    expect(dayStepCount(null, [treadmill])).toBe(3_500)
+  })
+
+  // "No reading" must not become a confident zero on any surface.
+  it('is null with neither a device count nor indoor steps', () => {
+    expect(dayStepCount(null, [])).toBeNull()
+    expect(dayStepCount(undefined, [gpsWalk])).toBeNull()
+  })
+
+  it('keeps a device count of zero as zero', () => {
+    expect(dayStepCount(0, [])).toBe(0)
   })
 })

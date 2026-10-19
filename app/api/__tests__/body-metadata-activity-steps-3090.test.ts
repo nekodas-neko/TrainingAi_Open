@@ -46,7 +46,7 @@ const activity = (activityType: string, steps: number | null, distanceKm: number
 async function get() {
   const res = await GET(new NextRequest('http://localhost/api/body-metadata'))
   expect(res.status).toBe(200)
-  return res.json() as Promise<{ today: { steps: number | null } | null; weekToDate: { steps: number } }>
+  return res.json() as Promise<{ today: { steps: number | null; deviceSteps?: number | null } | null; weekToDate: { steps: number } }>
 }
 
 describe('#3090 the day step count does not add an outdoor walk the ring already counted', () => {
@@ -72,6 +72,8 @@ describe('#3090 the day step count does not add an outdoor walk the ring already
     repo.activityLogs = [activity('treadmill', 3_500, 2.8)]
     const body = await get()
     expect(body.today?.steps).toBe(RING_STEPS + 3_500)
+    // #3095: the device's own count rides alongside, for the log sheets to seed from.
+    expect(body.today?.deviceSteps).toBe(RING_STEPS)
     expect(body.weekToDate.steps).toBe(RING_STEPS + 3_500)
   })
 
