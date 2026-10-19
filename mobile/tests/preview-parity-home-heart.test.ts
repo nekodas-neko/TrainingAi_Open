@@ -15,6 +15,7 @@ import {
 const source = (path: string) => readFile(new URL(`../src/${path}`, import.meta.url), 'utf8');
 
 test('a budget held at its floor reads as the web does', () => {
+  // Signs and zero terms are covered branch by branch in the shared budget-provenance test.
   const floored = balanceProvenance({
     restingBaseKcal: 1500,
     activeKcal: 0,
@@ -36,8 +37,9 @@ test('Home and the Nutrition tab print the budget line from the same function', 
   for (const file of [
     'features/home/components/HomeWidgets.tsx',
     'features/nutrition/components/NutritionEnergyCard.tsx',
+    'features/health/components/BodyActivityCards.tsx',
   ]) {
-    assert.match(await source(file), /budgetLine\(provenance\)/, file);
+    assert.match(await source(file), /budgetLine\(provenance, /, file);
   }
 });
 
@@ -98,4 +100,11 @@ test('the Home rest strip needs the rest-day fields the catalog now carries', ()
   assert.equal(parsed.recommendation.consecutiveRestDays, 2);
   assert.equal(parsed.recommendation.streakWarning, true);
   assert.equal(parsed.recommendation.streakBroken, false);
+});
+
+test('only a bar chart that passes tickCount has its axis rounded up', async () => {
+  for (const file of ['shared/ui/BarChart.tsx', 'shared/ui/StackedBarChart.tsx']) {
+    const text = await source(file);
+    assert.match(text, /tickCount === undefined\s*\?\s*niceTicks\(0, wanted\)/, file);
+  }
 });

@@ -290,7 +290,7 @@ function HomeWidgetBody({
               <ProgressBar value={total && goal ? total.calories / goal : 0} />
               {provenance && (
                 <AppText variant="micro" tone="muted">
-                  {budgetLine(provenance)}
+                  {budgetLine(provenance, energy?.data?.balance)}
                 </AppText>
               )}
               {(['proteinG', 'carbsG', 'fatG'] as const).map((key, index) => (

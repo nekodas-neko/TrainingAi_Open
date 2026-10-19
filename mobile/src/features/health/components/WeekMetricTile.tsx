@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { AppText, Card, LineChart } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -26,9 +26,15 @@ export function WeekMetricTile({
   days: readonly { date: string; value: number | null }[];
 }) {
   const { theme } = useTheme();
+  // The web's dot is 2 CSS px; the chart draws in a 320-unit box scaled to the tile's width.
+  const [width, setWidth] = useState(0);
+  const dotRadius = width > 0 ? (2 * 320) / width : 2;
   const hasAny = days.some((d) => d.value !== null);
   const tail: ReactNode = hasAny && (
-    <View style={{ marginTop: theme.spacing.sm }}>
+    <View
+      style={{ marginTop: theme.spacing.sm }}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
       <LineChart
         points={days.map((d) => ({ label: d.date, value: d.value }))}
         label={label}
@@ -36,7 +42,7 @@ export function WeekMetricTile({
         showLabels={false}
         color={theme.colors.brand}
         dots="all"
-        dotRadius={2}
+        dotRadius={dotRadius}
         gaps="connect"
       />
     </View>

@@ -43,7 +43,11 @@ export function BarChart({
   gridlines?: boolean;
   yAxis?: boolean;
   target?: ChartTarget;
-  /** About how many gridlines / y labels to aim for; 3 unless a chart asks for more. */
+  /**
+   * About how many gridlines / y labels to aim for. A chart that passes it (the web's
+   * `maxTicksLimit`) also gets its axis rounded up to the next label, as chart.js does; one that
+   * does not keeps about three labels and the top at its tallest bar.
+   */
   tickCount?: number;
   tickFormat?: 'compact' | 'full';
   bars: readonly {
@@ -64,7 +68,9 @@ export function BarChart({
   const plotHeight = height ?? 64;
   const max = Math.max(1, ...bars.map((bar) => bar.value));
   const wanted = guides ? includeTarget(0, max, target)[1] : max;
-  const ticks = gridlines || yAxis ? coverTicks(niceTicks(0, wanted, tickCount), wanted) : [];
+  const ticks = gridlines || yAxis ? tickCount === undefined
+      ? niceTicks(0, wanted)
+      : coverTicks(niceTicks(0, wanted, tickCount), wanted) : [];
   const top = ticks.length ? Math.max(wanted, ticks[ticks.length - 1]) : wanted;
   const tickTexts = tickLabels(ticks, tickFormat);
   const toY = (v: number) => yPixel(v, 0, top, plotHeight);

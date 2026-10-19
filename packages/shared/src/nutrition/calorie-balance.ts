@@ -434,3 +434,44 @@ export function budgetProvenance(
   const earned = Math.round(activeKcal)
   return { base, earned, total: base + earned, anchoredToRestingRate, chain: null, ownTarget: false, workedOutTotal: base + earned }
 }
+
+/**
+ * The sentence under the calorie bar that says where the budget came from, as plain text. It is the
+ * text of `components/nutrition/calorie-zone-bar.tsx` (which dims its operators in markup, so the
+ * web keeps its own JSX), and Preview's Home card, Nutrition tab and energy details print it from
+ * here. Each term carries its own sign, so a negative deficit reads "+ 300 for your goal", a
+ * negative daily-living term "− 50 daily living", and a zero goal term is left out.
+ *
+ * `restingBaseKcal` and `targetNetKcal` are needed only for the legacy unanchored path, which
+ * prints the resting base and the goal delta separately (BF-99). `movementParts` is the web's
+ * "(workouts 120 · steps 80)" breakdown, when a caller has one.
+ */
+export function budgetProvenanceText(
+  p: BudgetProvenance,
+  opts: { restingBaseKcal?: number | null; targetNetKcal?: number | null; movementParts?: string | null } = {},
+): string {
+  const n = (v: number) => Math.round(v).toLocaleString()
+  const total = n(p.total)
+  if (p.ownTarget) return `Your own target: ${total} kcal`
+  const chain = p.chain
+  if (chain?.totalFloored) return `${total} minimum budget — never below your resting rate`
+
+  let head: string
+  if (chain) {
+    head = `${n(chain.rmr)} resting rate`
+    if (chain.deficit !== 0) head += ` ${chain.deficit > 0 ? '−' : '+'} ${n(Math.abs(chain.deficit))} for your goal`
+    head += ` ${chain.dailyLiving < 0 ? '−' : '+'} ${n(Math.abs(chain.dailyLiving))} daily living`
+  } else if (p.anchoredToRestingRate) {
+    head = `${n(p.base)} resting rate`
+  } else {
+    const delta = Math.round(opts.targetNetKcal ?? 0)
+    head = `${n(opts.restingBaseKcal ?? p.base - delta)} base`
+    if (delta !== 0) head += ` ${delta < 0 ? '−' : '+'} ${n(Math.abs(delta))} for your goal`
+  }
+  // With a floored still day, `earned` is only what movement added above the floor; the chain
+  // prints the whole movement, because the chain's own arithmetic is what lifted the day past it.
+  const shownEarned = chain != null && chain.floored ? chain.movement : p.earned
+  return shownEarned > 0
+    ? `${head} + ${n(shownEarned)} earned from movement${opts.movementParts ? ` (${opts.movementParts})` : ''}`
+    : `${head} — no movement recorded yet today`
+}

@@ -78,7 +78,8 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="subheading">Restore from cloud</AppText>
             <AppText variant="caption" tone="muted">
-              Rebuild full history after a wipe / on a new device
+              Older history loads when opened. Your unsent changes and unfinished workouts
+              are kept.
             </AppText>
             <AppButton
               title="Restore from cloud"

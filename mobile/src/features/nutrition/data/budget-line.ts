@@ -1,4 +1,4 @@
-import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance';
+import { budgetProvenance, budgetProvenanceText } from '@trainingai/shared/nutrition/calorie-balance';
 
 type Balance = {
   restingBaseKcal?: number | null;
@@ -33,18 +33,12 @@ export function balanceProvenance(b: Balance | null | undefined): BudgetProvenan
 }
 
 /**
- * The line under the calorie bar. The own-target and floored wordings are the web's
- * (components/nutrition/calorie-zone-bar.tsx), so Home's Nutrition card and the Nutrition tab say
- * the same thing about a budget held at its floor.
+ * The line under the calorie bar, from the one shared builder, so Home's Nutrition card, the
+ * Nutrition tab and the energy details say the same thing with the same signs.
  */
-export function budgetLine(provenance: BudgetProvenance): string {
-  const total = provenance.total.toLocaleString();
-  if (provenance.ownTarget) return `Your own target: ${total} kcal`;
-  const chain = provenance.chain;
-  if (chain) {
-    return chain.totalFloored
-      ? `${total} minimum budget — never below your resting rate`
-      : `${chain.rmr.toLocaleString()} resting rate − ${chain.deficit.toLocaleString()} goal + ${chain.dailyLiving.toLocaleString()} daily living + ${chain.movement.toLocaleString()} movement = ${total} kcal`;
-  }
-  return `${provenance.base.toLocaleString()} base + ${provenance.earned.toLocaleString()} movement = ${total} kcal`;
+export function budgetLine(provenance: BudgetProvenance, balance?: Balance | null): string {
+  return budgetProvenanceText(provenance, {
+    restingBaseKcal: balance?.restingBaseKcal,
+    targetNetKcal: typeof balance?.targetNetKcal === 'number' ? balance.targetNetKcal : null,
+  });
 }
