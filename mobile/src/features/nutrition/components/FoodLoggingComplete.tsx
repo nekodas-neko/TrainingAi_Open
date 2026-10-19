@@ -6,6 +6,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { AppButton, AppText, Card, Icon, Stack } from '../../../shared/ui';
 import { feedback } from '../../../integrations/feedback/haptics';
 import { useNutrition } from '../data/NutritionProvider';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 // The server's timestamp once synced; 'pending' while the mark waits in the outbox.
 function markedAt(checkin: unknown): string | null | undefined {
@@ -47,8 +48,10 @@ export function FoodLoggingComplete({
       await n.store?.queueHttp('complete', date, { date, complete: next });
       feedback('success');
       setError(null);
-    } catch {
-      setError(next ? 'Could not mark the day complete.' : 'Could not undo.');
+    } catch (failure) {
+      setError(
+        failureNotice(next ? 'Could not mark the day complete.' : 'Could not undo.', failure),
+      );
     } finally {
       setBusy(false);
     }

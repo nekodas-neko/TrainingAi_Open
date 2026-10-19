@@ -223,7 +223,7 @@ export async function GET(req: NextRequest) {
       // this route reported a different burn for the same workout than the screen that logged it.
       // Q-421: and `avgBpm` takes precedence over the tier where the strap was worn.
       .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
-    activities: todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),
+    activities: todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null })),
     pedometerSteps: todayMetric?.steps ?? null,
   });
   const activeEnergyKcalToday = activeEnergy.total;

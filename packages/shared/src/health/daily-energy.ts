@@ -66,8 +66,8 @@ export interface ActiveEnergyInput {
    * at `moderate`, exactly as before.
    */
   strengthSessions: { durationMin: number; id?: string; rpe?: number | null; avgBpm?: number | null }[]
-  /** Today's logged activities. */
-  activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null }[]
+  /** Today's logged activities. `steps` is the row's own stored step count, where it has one. */
+  activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null; steps?: number | null }[]
   /** Phone-pedometer steps today (body_metrics), excluding treadmill/logged-indoor steps. */
   pedometerSteps: number | null
 }
@@ -124,6 +124,28 @@ function activityDurationMin(a: { activityType: string; durationMin?: number | n
     return Math.min((a.distanceKm / speed) * 60, MAX_PLAUSIBLE_SESSION_MIN)
   }
   return null
+}
+
+/**
+ * The steps a logged outdoor activity already put in the phone pedometer's total — what the passive
+ * step term must not pay for a second time. 0 for an activity whose steps never reach the pedometer.
+ *
+ * Its own stored step count first, then its distance, then its duration at walking cadence.
+ *
+ * **#3082: the duration fallback is the fix.** A walk the app detected from the ring's MET and the
+ * owner saved has no distance (`exercise-review-sheet.tsx` stores null, because 0 would read as a
+ * measured one) and no steps, since the detection only ever saw MET. This used to subtract only on
+ * `distanceKm > 0`, so such a walk was paid twice: its MET kcal as an activity, and its steps again
+ * in the day's step total. A manual walk or run logged with a duration and no distance had the same
+ * hole. Walking cadence under-reads a run's steps, which errs toward subtracting too little rather
+ * than removing steps the pedometer never counted.
+ */
+function pedometerStepsInside(a: ActiveEnergyInput['activities'][number]): number {
+  if (!PEDOMETER_ACTIVITY_TYPES.has(a.activityType.toLowerCase())) return 0
+  if (a.steps != null && a.steps > 0) return a.steps
+  if (a.distanceKm != null && a.distanceKm > 0) return a.distanceKm * STEPS_PER_KM
+  const dur = activityDurationMin(a)
+  return dur != null && dur > 0 ? dur * WALKING_CADENCE_SPM : 0
 }
 
 /**
@@ -193,9 +215,7 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
   let stepsKcal = 0
   const ped = input.pedometerSteps ?? 0
   if (ped > 0) {
-    const loggedOutdoorSteps = input.activities
-      .filter(a => PEDOMETER_ACTIVITY_TYPES.has(a.activityType.toLowerCase()) && a.distanceKm != null && a.distanceKm > 0)
-      .reduce((sum, a) => sum + a.distanceKm! * STEPS_PER_KM, 0)
+    const loggedOutdoorSteps = input.activities.reduce((sum, a) => sum + pedometerStepsInside(a), 0)
     const netSteps = Math.max(0, ped - loggedOutdoorSteps)
     if (netSteps > 0) stepsKcal = est(14, netSteps / WALKING_CADENCE_SPM)
   }

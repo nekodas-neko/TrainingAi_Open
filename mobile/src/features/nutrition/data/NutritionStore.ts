@@ -42,6 +42,7 @@ import {
   type SavedMeal,
   type Supplement,
 } from './models.ts';
+import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 const logBody = z.object({
   id: z.uuid(),
   mealTypeId: z.uuid(),
@@ -424,11 +425,14 @@ export class NutritionStore {
         if (generation === this.generation) {
           this.publish({ ...frame, ready: true });
         }
-      } catch {
+      } catch (failure) {
         if (generation === this.generation) {
           this.initializing = null;
           this.publish({
-            error: 'Could not open saved nutrition records. Existing records are preserved.',
+            error: failureNotice(
+              'Could not open saved nutrition records. Existing records are preserved.',
+              failure,
+            ),
           });
         }
       }
@@ -663,6 +667,7 @@ export class NutritionStore {
           if (denied) {
             this.denialRevision++;
           }
+          reportError(cause);
           this.publish({
             denied: this.current.denied || denied,
             errors: {
@@ -1185,7 +1190,10 @@ export class NutritionStore {
           }
           this.publish({
             denied: this.current.denied || denied,
-            error: 'Saved on this phone. Nutrition changes will upload when connected.',
+            error: failureNotice(
+              'Saved on this phone. Nutrition changes will upload when connected.',
+              cause,
+            ),
           });
         }
       }

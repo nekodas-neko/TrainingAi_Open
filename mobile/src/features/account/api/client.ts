@@ -1,25 +1,29 @@
 import { AI_PAUSED_CODE, AI_PAUSED_MESSAGE, aiPausedMessage } from '@trainingai/shared/ai-paused-notice';
+import { reportError } from '../../../core/reporting/index.ts';
 
 export class ApiError extends Error {
   status: number;
   code?: string;
   /** Set only for the AI-paused 503: the fixed sentence a screen may show as it is. */
   notice?: string;
-  constructor(status: number, code?: string, notice?: string) {
+  /** The `/api/` path that failed, when the client made the request. */
+  path?: string;
+  constructor(status: number, code?: string, notice?: string, path?: string) {
     super(`TrainingAi request failed (${status}).`);
     this.status = status;
     this.code = code;
     this.notice = notice;
+    this.path = path;
   }
 }
 /**
  * The error for a failed response whose body (already parsed, or null) may be the paused notice.
  * Only the fixed sentence is kept, never the body's own text.
  */
-function failedRequest(status: number, body: unknown, code?: string) {
+function failedRequest(path: string, status: number, body: unknown, code?: string) {
   return aiPausedMessage(status, body) === null
-    ? new ApiError(status, code)
-    : new ApiError(status, AI_PAUSED_CODE, AI_PAUSED_MESSAGE);
+    ? new ApiError(status, code, undefined, path)
+    : new ApiError(status, AI_PAUSED_CODE, AI_PAUSED_MESSAGE, path);
 }
 /** The paused sentence for an AI failure, else the caller's own line. Never any other server text. */
 export function aiFailureText(error: unknown, fallback: string): string {
@@ -125,7 +129,7 @@ export function createApiClient(
             code = value.error;
           }
         }
-        throw failedRequest(response.status, value, code);
+        throw failedRequest(path, response.status, value, code);
       }
       if (path === '/api/session-explain/insight') {
         if (!response.headers.get('content-type')?.includes('text/plain'))
@@ -164,6 +168,11 @@ export function createApiClient(
         throw new Error('Expected JSON from TrainingAi.');
       }
       return await response.json();
+    } catch (error) {
+      // Every screen's server faults pass here, so they are reported once, with their path. The
+      // reporter skips offline, auth and other expected failures, and its own intake.
+      if (path !== '/api/client-error') reportError(error, { apiPath: path });
+      throw error;
     } finally {
       clearTimeout(timeout);
     }
@@ -187,7 +196,7 @@ export function createApiClient(
         signal,
       });
       if (!response.ok) {
-        throw failedRequest(response.status, await response.json().catch(() => null));
+        throw failedRequest('/api/coach', response.status, await response.json().catch(() => null));
       }
       if (
         !response.headers.get('content-type')?.includes('text/event-stream') ||

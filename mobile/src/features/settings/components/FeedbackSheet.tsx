@@ -16,6 +16,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { imageResize } from '../../../integrations/nutrition/image-size';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
+import { failureNotice } from '../../../core/reporting/index.ts';
 // The web sheet's limits: longest edge 800 px, JPEG at 0.7. The server refuses a screenshot over
 // 500,000 characters, which this stays well under.
 const SCREENSHOT_MAX_EDGE = 800;
@@ -81,8 +82,11 @@ export function FeedbackSheet({ onClose }: { onClose: () => void }) {
       await resources.clearDraft('feedback');
       setScreenshot(null);
       onClose();
-    } catch {
-      setError('Could not send feedback. Your text is saved; re-attach the screenshot and retry when connected.');
+    } catch (failure) {
+      setError(failureNotice(
+        'Could not send feedback. Your text is saved; re-attach the screenshot and retry when connected.',
+        failure,
+      ));
     } finally {
       setBusy(false);
     }

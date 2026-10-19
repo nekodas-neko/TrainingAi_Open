@@ -64,6 +64,7 @@ import {
 } from '../data/scan-response';
 import { photoDraftSchema } from '../data/photo-draft';
 import { MacroLine, NutritionFieldsForm, foodFields, macroKeys } from './NutritionElements';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const draftSchema = z.object({
   step: z.enum(['capture', 'review', 'assign']),
   recipeServings: z.number().default(1),
@@ -196,10 +197,13 @@ export function FoodLogger({
             setPhotoLoadedScope(photoScope);
           }
         })
-        .catch(() => {
+        .catch((failure) => {
           if (current) {
             setError(
-              'Could not read your saved photo. Close and reopen food logging to retry.',
+              failureNotice(
+                'Could not read your saved photo. Close and reopen food logging to retry.',
+                failure,
+              ),
             );
           }
         });
@@ -660,7 +664,7 @@ export function FoodLogger({
                   />
                 )}
                 {meals.length > 0 && (
-                  <AppText variant="eyebrow" tone="muted">
+                  <AppText variant="listCount" tone="muted">
                     {plural(meals.length, 'item', 'items')}
                   </AppText>
                 )}
@@ -803,8 +807,8 @@ export function FoodLogger({
                     );
                     update({ shared: false });
                     setError(null);
-                  } catch {
-                    setError('Could not save this recipe.');
+                  } catch (failure) {
+                    setError(failureNotice('Could not save this recipe.', failure));
                   }
                 }}
               />

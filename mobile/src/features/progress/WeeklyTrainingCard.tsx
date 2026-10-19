@@ -59,6 +59,8 @@ export function WeeklyTrainingCard({
       />
       {!!sessions.length && (
         <Legend
+          ruled
+          tinted
           items={sessions.map((session) => ({
             label: shortSessionName(session.name),
             color: color(session.name),

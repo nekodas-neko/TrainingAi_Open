@@ -82,13 +82,22 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
             {goal != null ? `of ${Math.round(goal).toLocaleString()}` : 'kcal'}
           </AppText>
         </SegmentRing>
-        <Stack style={{ flex: 1 }}>
-          <Stack direction="row" align="center" justify="space-between">
-            <AppText variant="hero" style={{ flex: 1, minWidth: 0 }}>
-              {remaining == null
-                ? 'Set a goal'
-                : Math.round(Math.abs(remaining)).toLocaleString()}
-            </AppText>
+        <Stack gap="md" style={{ flex: 1, minWidth: 0 }}>
+          <Stack direction="row" align="center" gap="xs">
+            {remaining == null ? (
+              <AppText variant="caption" tone="muted" style={{ flex: 1 }}>
+                Set a calorie goal to see what’s left
+              </AppText>
+            ) : (
+              <>
+                <AppText variant="remainingValue" style={{ fontVariant: ['tabular-nums'] }}>
+                  {Math.round(Math.abs(remaining)).toLocaleString()}
+                </AppText>
+                <AppText variant="caption" tone="muted" style={{ flex: 1 }}>
+                  kcal {remaining < 0 ? 'over' : 'left'}
+                </AppText>
+              </>
+            )}
             <StatusIndicator
               label="Calorie budget"
               busy={state.loading || state.refreshing}
@@ -97,45 +106,34 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
               onRetry={state.refresh}
             />
           </Stack>
-          <AppText variant="caption" tone="muted">
-            {remaining == null ? 'Calorie budget' : `kcal ${remaining < 0 ? 'over' : 'left'}`}
-          </AppText>
+          {/* Plain columns, as the current app draws them (energy-card.tsx MacroColumn): the share
+              in the macro's colour, grams over target, then the name. */}
+          <Stack direction="row" gap="xs">
+            {(['proteinG', 'carbsG', 'fatG'] as const).map((key, i) => (
+              <Stack key={key} gap="none" align="center" style={{ flex: 1, minWidth: 0 }}>
+                <AppText variant="macroShare" style={{ color: colors[i], fontVariant: ['tabular-nums'] }}>
+                  {total ? Math.round(Object.values(shares)[i] * 100) : 0}%
+                </AppText>
+                <AppText variant="macroValue" style={{ fontVariant: ['tabular-nums'] }}>
+                  {total ? Math.round(total[key]) : '—'}
+                  {targets[key] != null && (
+                    <AppText variant="macroCaption" tone="muted">
+                      /{Math.round(targets[key]!)}
+                    </AppText>
+                  )}
+                  <AppText variant="macroCaption" tone="muted">
+                    {' '}
+                    g
+                  </AppText>
+                </AppText>
+                <AppText variant="macroCaption" tone="muted">
+                  {['Protein', 'Carbs', 'Fat'][i]}
+                </AppText>
+              </Stack>
+            ))}
+          </Stack>
         </Stack>
       </Stack>
-      <Grid columns={3} gap="sm">
-        {(['proteinG', 'carbsG', 'fatG'] as const).map((key, i) => (
-          <Card
-            key={key}
-            style={{
-              flex: 1,
-              padding: theme.spacing.sm,
-              gap: theme.spacing.xs,
-              borderColor: colors[i] + '40',
-            }}
-          >
-            <AppText variant="caption" style={{ color: colors[i] }}>
-              {['Protein', 'Carbs', 'Fat'][i]}
-              {total ? ` · ${Math.round(Object.values(shares)[i] * 100)}%` : ''}
-            </AppText>
-            <AppText variant="heading" style={{ fontVariant: ['tabular-nums'] }}>
-              {total ? Math.round(total[key]) : '—'}
-              <AppText variant="caption" tone="muted">
-                {' '}
-                g
-              </AppText>
-            </AppText>
-            <AppText variant="micro" tone="muted">
-              {targets[key] != null
-                ? `of ${Math.round(targets[key]!)} g`
-                : 'No target'}
-            </AppText>
-            <ProgressBar
-              value={total && targets[key] ? total[key] / targets[key]! : 0}
-              color={colors[i]}
-            />
-          </Card>
-        ))}
-      </Grid>
       <AppText variant="caption" tone="muted">
         {n.view.loggingComplete
           ? 'All meals recorded or skipped.'

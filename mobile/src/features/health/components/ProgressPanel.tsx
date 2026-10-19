@@ -1,6 +1,7 @@
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { useState } from 'react';
 import { View } from 'react-native';
+import Svg, { Line } from 'react-native-svg';
 import type { StrengthMode } from '@trainingai/shared/health/strength-progress';
 import {
   AppText,
@@ -29,6 +30,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
   STRENGTH_BAR_MARKERS,
   STRENGTH_BAR_WIDTH,
+  STRENGTH_MARKER_LABEL_WIDTH,
   goalCountText,
   lastTrainedSession,
   strengthDelta,
@@ -57,12 +59,13 @@ function TrendsCard() {
   const series = data?.series ?? [];
   const sufficient = data !== null && (data.hasSufficientData || series.length > 0);
   return (
-    <Card>
+    <Card accent={theme.progress.trends}>
       <HealthResourceHeader title={'Trends'} state={state} refresh={state.refresh} />
       <ChipPicker
         label="Trend view"
         showLabel={false}
         horizontal
+        solid
         options={views}
         value={view}
         onChange={(next) => next && setView(next)}
@@ -119,18 +122,19 @@ function StrengthBar({ pct, color }: { pct: number; color: string }) {
   const { theme } = useTheme();
   return (
     <View style={{ width: STRENGTH_BAR_WIDTH }}>
-      <View style={{ height: theme.spacing.md }}>
+      <View style={{ height: theme.sizes.strengthMarkerRow }}>
         {STRENGTH_BAR_MARKERS.map((marker) => (
           <AppText
             key={marker}
-            variant="micro"
+            variant="strengthMarker"
             tone="muted"
+            numberOfLines={1}
             style={{
               position: 'absolute',
               bottom: 0,
               left: `${marker}%`,
-              width: 20,
-              marginLeft: -10,
+              width: STRENGTH_MARKER_LABEL_WIDTH,
+              marginLeft: -STRENGTH_MARKER_LABEL_WIDTH / 2,
               textAlign: 'center',
             }}
           >
@@ -138,40 +142,48 @@ function StrengthBar({ pct, color }: { pct: number; color: string }) {
           </AppText>
         ))}
       </View>
-      <View
-        accessibilityRole="progressbar"
-        accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}
-        style={{
-          height: theme.spacing.sm,
-          borderRadius: theme.radii.pill,
-          backgroundColor: theme.colors.raised,
-          overflow: 'hidden',
-        }}
-      >
+      <View style={{ height: theme.sizes.strengthBar }}>
         <View
+          accessibilityRole="progressbar"
+          accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}
           style={{
             height: '100%',
-            width: `${strengthFillPct(pct)}%`,
-            backgroundColor: color,
             borderRadius: theme.radii.pill,
+            backgroundColor: theme.colors.raised,
+            overflow: 'hidden',
           }}
-        />
-      </View>
-      {STRENGTH_BAR_MARKERS.map((marker) => (
-        <View
-          key={marker}
+        >
+          <View
+            style={{
+              height: '100%',
+              width: `${strengthFillPct(pct)}%`,
+              backgroundColor: color,
+              borderRadius: theme.radii.pill,
+            }}
+          />
+        </View>
+        {/* Dashed guides drawn as strokes: a one-sided dashed border renders solid on Android. They
+            sit inside the bar's own box, so they stay on it whatever height the label row is. */}
+        <Svg
           pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: theme.spacing.md,
-            height: theme.spacing.sm,
-            left: `${marker}%`,
-            borderLeftWidth: 1,
-            borderStyle: 'dashed',
-            borderColor: theme.colors.border,
-          }}
-        />
-      ))}
+          width="100%"
+          height="100%"
+          style={{ position: 'absolute', left: 0, top: 0 }}
+        >
+          {STRENGTH_BAR_MARKERS.map((marker) => (
+            <Line
+              key={marker}
+              x1={`${marker}%`}
+              x2={`${marker}%`}
+              y1={0}
+              y2="100%"
+              stroke={theme.colors.border}
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+          ))}
+        </Svg>
+      </View>
     </View>
   );
 }

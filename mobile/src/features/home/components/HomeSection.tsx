@@ -16,6 +16,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHome } from '../data/HomeProvider';
 import { homeSections, moveHomeSection, sectionLabels } from '../data/models';
+import { failureNotice } from '../../../core/reporting/index.ts';
 export function HomeSection({
   id,
   editing,
@@ -43,8 +44,8 @@ export function HomeSection({
       layoutMotion(reduced);
       await home.store?.savePreferences(patch);
       setError(null);
-    } catch {
-      setError('Could not save your layout on this phone.');
+    } catch (failure) {
+      setError(failureNotice('Could not save your layout on this phone.', failure));
     }
   }
   const reorder = useCallback(

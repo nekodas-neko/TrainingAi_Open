@@ -17,6 +17,7 @@ export function MetricTile({
   captionColor,
   stat = false,
   emphasize = false,
+  figure = false,
 }: {
   label: string;
   value: string | null;
@@ -32,8 +33,29 @@ export function MetricTile({
   stat?: boolean;
   // Larger bold value for the tile that leads the row.
   emphasize?: boolean;
+  // The day screen's Eaten / Burned / Net (day-sections.tsx Stat): a small bold figure over a tiny
+  // uppercase label, with no tile of its own.
+  figure?: boolean;
 }) {
   const { theme } = useTheme();
+  if (figure) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
+        <AppText
+          variant="figureValue"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          tone={value === null ? 'muted' : 'text'}
+          style={{ fontVariant: ['tabular-nums'] }}
+        >
+          {value ?? '—'}
+        </AppText>
+        <AppText variant="figureLabel" tone="muted">
+          {label}
+        </AppText>
+      </View>
+    );
+  }
   if (stat) {
     return (
       <View

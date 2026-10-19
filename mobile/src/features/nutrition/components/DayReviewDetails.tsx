@@ -22,6 +22,7 @@ import { useNutrition } from '../data/NutritionProvider';
 import { scanSchema } from '../data/models';
 import { MealLoggingStatus } from './MealLoggingStatus';
 import { aiFailureText } from '../../account/api/client';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const values = z.object({
   restingHeartRate: z.number().nullable(),
   steps: z.number().nullable(),
@@ -173,7 +174,10 @@ export function MealBackfill({
               onChange={(skipped) => {
                 void n.store
                   ?.setMealSkipped(mt.id, date, skipped)
-                  .catch(() => setError('Could not save this meal status.'));
+                  .catch((failure) => setError(failureNotice(
+                    'Could not save this meal status.',
+                    failure,
+                  )));
               }}
             />
             {logs.map((l) => (

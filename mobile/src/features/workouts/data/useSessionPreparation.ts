@@ -6,6 +6,7 @@ import { prepareSession, type SessionStartOptions } from '../logging/session-opt
 import { useWorkoutResource, useWorkoutResources } from './WorkoutDataProvider';
 import { periodizationSpec } from './models';
 import { useWorkoutAction } from './useWorkoutAction';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 const response = z
   .object({
@@ -63,8 +64,12 @@ export function useSessionPreparation(
         ...readSessionResponse(current.data, resources.connection, programId, session.id),
         durationMinutes: session.durationMinutes,
       };
-    } catch {
-      parseError = 'This session changed while loading. Refresh it before starting.';
+    } catch (failure) {
+      parseError = failureNotice(
+        'This session changed while loading. Refresh it before starting.',
+        failure,
+        { apiPath: '/api/workout-data' },
+      );
     }
   }
   const prescribed = state.data?.state?.prescription;

@@ -117,6 +117,7 @@ function TrendChartCard({
         fill
         readable
         yAxis
+        niceBounds
         dots="isolated"
         compactAxisLabels
       />

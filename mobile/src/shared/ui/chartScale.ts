@@ -1,10 +1,42 @@
 import { standaloneOrLatest } from '@trainingai/shared/health/series-gaps';
+import { niceTicks } from '@trainingai/shared/ui/nice-ticks';
 
 // Pure geometry for the chart components' opt-in axes, gridlines and target line. Kept free of
 // React so it can be unit-tested. `niceTicks` itself lives in `@trainingai/shared/ui/nice-ticks`.
 
 /** Round-number gridline values spanning [lo, hi], about three of them. Shared with the current app (#3041). */
-export { niceTicks } from '@trainingai/shared/ui/nice-ticks';
+export { niceTicks };
+
+/**
+ * [lo, hi] widened outwards to the round values the gridlines sit on, with those ticks, the way
+ * chart.js's linear scale does it (`generateTicks`, bounds 'ticks'): space the ticks for
+ * `maxTicks`, and when that gives more spaces than `maxTicks - 1` allows, widen the spacing and
+ * round the ends to it. The current app's 14-day cards pass `maxTicksLimit: 4`, so a 35-65 range
+ * reads 20/40/60/80, not 30...70. The lowest gridline is then the bottom of the plot. A flat range
+ * keeps its one tick and is not widened.
+ */
+export function niceScale(
+  lo: number,
+  hi: number,
+  maxTicks = 4,
+): { min: number; max: number; ticks: number[] } {
+  if (hi - lo < 1e-6) return { min: lo, max: hi, ticks: [lo] };
+  const niceNum = (range: number) => {
+    const base = 10 ** Math.floor(Math.log10(range));
+    const fraction = range / base;
+    return (fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10) * base;
+  };
+  const maxSpaces = Math.max(1, maxTicks - 1);
+  let spacing = niceNum((hi - lo) / maxSpaces);
+  const spaces = Math.ceil(hi / spacing - 1e-9) - Math.floor(lo / spacing + 1e-9);
+  if (spaces > maxSpaces) spacing = niceNum((spaces * spacing) / maxSpaces);
+  const round = (v: number) => Math.round(v * 1e6) / 1e6;
+  const min = round(Math.floor(lo / spacing + 1e-9) * spacing);
+  const max = round(Math.ceil(hi / spacing - 1e-9) * spacing);
+  const ticks: number[] = [];
+  for (let v = min; v <= max + 1e-9; v += spacing) ticks.push(round(v));
+  return { min, max, ticks };
+}
 
 /** A reference line a chart can draw, e.g. a daily goal. */
 export type ChartTarget = { value: number; label: string };
@@ -27,14 +59,18 @@ export function yPixel(value: number, min: number, max: number, height: number):
 
 /**
  * Axis label text for a set of gridline values: decimals follow the tick step so labels never
- * repeat, and ticks that are all multiples of 100 and reach 1000 abbreviate ("12.5k") to stay short.
+ * repeat. Ticks write out in full with a thousands separator ("500", "1,500", as chart.js's default
+ * number format does in the current app) until a label would be five digits: those, when all
+ * multiples of 100, abbreviate ("12.5k") to stay short.
  */
 export function tickLabels(ticks: readonly number[]): string[] {
   const step = ticks.length > 1 ? Math.round(Math.abs(ticks[1] - ticks[0]) * 1e6) / 1e6 : 0;
-  const compact = ticks.some((t) => Math.abs(t) >= 1000) && ticks.every((t) => t % 100 === 0);
+  const compact = ticks.some((t) => Math.abs(t) >= 10000) && ticks.every((t) => t % 100 === 0);
   const decimals = step > 0 ? Math.max(0, -Math.floor(Math.log10(step) + 1e-9)) : 2;
   return ticks.map((t) =>
-    compact && t !== 0 ? `${Number((t / 1000).toFixed(1))}k` : String(Number(t.toFixed(decimals))),
+    compact && t !== 0
+      ? `${Number((t / 1000).toFixed(1))}k`
+      : Number(t.toFixed(decimals)).toLocaleString('en-AU', { maximumFractionDigits: decimals }),
   );
 }
 
@@ -83,18 +119,43 @@ export function pointCentreX(
   plotWidth: number,
   plotHeight: number,
   leftInset = 0,
+  stretch = false,
 ) {
+  // Stretched, the viewBox fills the box (x 0..320 across the whole width); otherwise it is fitted and inset.
+  if (stretch) {
+    return leftInset + (xMin === xMax ? plotWidth / 2 : ((x - xMin) / (xMax - xMin)) * plotWidth);
+  }
   const box = meetBox(plotWidth, plotHeight, 320, 90);
   const vb = xMin === xMax ? 160 : 12 + ((x - xMin) / (xMax - xMin)) * 296;
   return leftInset + box.offsetX + box.scale * vb;
 }
 
 /**
+ * Where an axis label `boxWidth` wide goes, given the pixel centre of its point. The label is
+ * centred under the point, but a point near either end would push it past the chart's edge and
+ * clip it ("Sat", "Sun"), so the box is slid back inside and the text aligned to the edge it
+ * leans on, which keeps the whole word visible and as close to its point as the edge allows.
+ */
+export function axisLabelBox(centre: number, boxWidth: number, totalWidth: number) {
+  const left = centre - boxWidth / 2;
+  if (totalWidth <= boxWidth) return { left: 0, alignItems: 'center' as const };
+  if (left < 0) return { left: 0, alignItems: 'flex-start' as const };
+  if (left + boxWidth > totalWidth) {
+    return { left: totalWidth - boxWidth, alignItems: 'flex-end' as const };
+  }
+  return { left, alignItems: 'center' as const };
+}
+
+/**
  * Which points of a line get a dot. 'all' dots every reading; 'isolated' dots only the latest one
  * and a reading with no neighbour either side (a line needs two points, so it would not show at
- * all), as the current app's sparklines do.
+ * all), as the current app's sparklines do. 'none' draws no dots, like the Strength Trend's Sparkline.
  */
-export function dotMask(values: readonly (number | null)[], mode: 'all' | 'isolated'): boolean[] {
+export function dotMask(
+  values: readonly (number | null)[],
+  mode: 'all' | 'isolated' | 'none',
+): boolean[] {
+  if (mode === 'none') return values.map(() => false);
   const standalone = standaloneOrLatest([...values]);
   return values.map((value, index) => value !== null && (mode === 'all' || standalone[index]));
 }
