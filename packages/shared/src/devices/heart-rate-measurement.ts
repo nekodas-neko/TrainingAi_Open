@@ -43,6 +43,20 @@ export function parseHeartRateMeasurement(v: Uint8Array): HrMeasurement | null {
   return { bpm, rr, contact: contactSupported ? (flags & 0x02) !== 0 : null }
 }
 
+/**
+ * A Device Information string such as Firmware Revision (0x2A26): UTF-8, often padded with NULs.
+ * Only printable ASCII is kept, which every revision string the H10 sends is. Null when empty.
+ */
+export function parseRevisionString(v: Uint8Array): string | null {
+  let text = ''
+  for (const byte of v) {
+    if (byte === 0) break
+    if (byte >= 0x20 && byte < 0x7f) text += String.fromCharCode(byte)
+  }
+  text = text.trim()
+  return text ? text : null
+}
+
 /** 0x2A19 Battery Level: one uint8 percentage. Anything outside 0–100 is not a reading. */
 export function parseBatteryLevel(v: Uint8Array): number | null {
   if (v.length < 1) return null

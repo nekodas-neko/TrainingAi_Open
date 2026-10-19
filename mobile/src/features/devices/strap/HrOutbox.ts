@@ -66,6 +66,11 @@ export class HrOutbox {
     return result;
   }
 
+  /** Which account this outbox saves for. */
+  get account() {
+    return JSON.stringify([this.connection.origin, this.connection.userId]);
+  }
+
   pending() {
     return this.samples.length;
   }

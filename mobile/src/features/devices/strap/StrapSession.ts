@@ -2,8 +2,10 @@ import { z } from 'zod';
 import {
   parseBatteryLevel,
   parseHeartRateMeasurement,
+  parseRevisionString,
 } from '@trainingai/shared/devices/heart-rate-measurement';
 import { decideLowBatteryAlert } from '@trainingai/shared/devices/low-battery';
+import { isPlausibleHrSample } from '@trainingai/shared/health/hr-smoothing';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type {
   BleAdapter,
@@ -20,7 +22,7 @@ import {
   type LinkPhase,
   type LinkState,
 } from './reconnect.ts';
-import type { HrOutbox, StrapSample } from './HrOutbox.ts';
+import { MAX_SAVED_SAMPLES, type HrOutbox, type StrapSample } from './HrOutbox.ts';
 
 // One chest strap per phone, reached over the standard Heart Rate Service. The link is held only
 // while something wants it: an active workout (which also records) or the Devices screen (which
@@ -34,6 +36,8 @@ const FLUSH_EVERY_MS = 10_000;
 const FLUSH_AT_COUNT = 40;
 const BATTERY_POLL_MS = 10 * 60_000;
 export const SCAN_MS = 20_000;
+/** The workout's in-memory trace, as the current app's `exercise-trace` keeps it: 90 min at 1 Hz. */
+const MAX_TRACE_SAMPLES = 5_400;
 /** A reading older than this is shown as held, not live (the current app's `useLiveHr`). */
 export const STALE_MS = 8_000;
 
@@ -42,6 +46,8 @@ const pairedSchema = z.object({
   name: z.string(),
   battery: z.number().int().min(0).max(100).nullable().default(null),
   batteryAt: z.number().nullable().default(null),
+  /** Device Information 0x2A26, kept so a PMD change after a Polar Flow update can be traced. */
+  firmware: z.string().nullable().default(null),
 });
 export type PairedStrap = z.infer<typeof pairedSchema>;
 export type StrapHold = 'workout' | 'settings';
@@ -59,6 +65,8 @@ export type StrapState = {
   /** False once the strap has reported no chest contact for the grace period. */
   worn: boolean;
   recording: boolean;
+  /** This workout's plausible readings, for the rest-screen trace. Cleared when a workout starts. */
+  trace: { at: number; bpm: number }[];
   scanning: boolean;
   /** A scan has finished since the screen opened, so "nothing found" is a real answer. */
   scanned: boolean;
@@ -92,6 +100,8 @@ export class StrapSession {
   private notWornSince: number | null = null;
   private buffer: StrapSample[] = [];
   private outbox: HrOutbox | null = null;
+  /** The account the buffered samples were recorded for. */
+  private bufferAccount: string | null = null;
   private batteryAlerted = false;
   private initialized: Promise<void> | null = null;
   private now: () => number;
@@ -115,6 +125,7 @@ export class StrapSession {
       bpmAt: null,
       worn: true,
       recording: false,
+      trace: [],
       scanning: false,
       scanned: false,
       found: [],
@@ -173,7 +184,19 @@ export class StrapSession {
     if (outbox === this.outbox) return;
     this.flush();
     this.outbox = outbox;
+    if (outbox) {
+      // Samples kept through a sign-out or an expired session belong to whoever recorded them.
+      if (this.bufferAccount !== null && this.bufferAccount !== outbox.account)
+        this.buffer.splice(0);
+      this.bufferAccount = outbox.account;
+      this.flush();
+    }
     void outbox?.sync();
+  }
+
+  /** Uploads whatever is saved. The provider calls it on a timer and when the app returns. */
+  sync() {
+    void this.outbox?.sync();
   }
 
   hold(reason: StrapHold, on: boolean) {
@@ -185,7 +208,7 @@ export class StrapSession {
   }
 
   private setRecording(on: boolean) {
-    this.publish({ recording: on });
+    this.publish(on ? { recording: true, trace: [] } : { recording: false });
     if (on) {
       this.scheduleFlush();
       return;
@@ -203,10 +226,10 @@ export class StrapSession {
   }
 
   private flush() {
-    if (!this.buffer.length) return;
-    const samples = this.buffer.splice(0);
     const outbox = this.outbox;
-    if (!outbox) return;
+    // With no account to save to (signed out, session expired) the samples wait here.
+    if (!this.buffer.length || !outbox) return;
+    const samples = this.buffer.splice(0);
     void outbox
       .append(samples)
       .then(() => outbox.sync())
@@ -283,9 +306,20 @@ export class StrapSession {
         this.link = link;
         this.notWornSince = null;
         this.publish({ worn: true });
-        this.stopHr = link.onHeartRate((value) => this.onHeartRate(value));
+        this.stopHr = link.onHeartRate(
+          (value) => this.onHeartRate(value),
+          () => {
+            // Connected with no notifications is no link at all: drop it and reconnect.
+            if (generation !== this.generation) return;
+            this.release();
+            this.step({ type: 'lost' });
+          },
+        );
+        if (generation !== this.generation) return;
         this.step({ type: 'connected' });
-        if (this.link === link) this.pollBattery(link, generation);
+        if (this.link !== link) return;
+        this.pollBattery(link, generation);
+        if (this.current.paired?.firmware === null) void this.readFirmware(link, generation);
       })
       .catch(() => {
         if (generation === this.generation) this.step({ type: 'lost' });
@@ -315,11 +349,39 @@ export class StrapSession {
     if (reading.contact !== false) this.notWornSince = null;
     else this.notWornSince ??= at;
     const worn = this.notWornSince === null || at - this.notWornSince <= NOT_WORN_GRACE_MS;
-    this.publish({ bpm: reading.bpm, bpmAt: at, worn });
     // Off the chest the strap reports junk; it is shown as such and never saved.
-    if (!worn || !this.current.recording) return;
+    const keep = worn && this.current.recording;
+    const trace = this.current.trace;
+    // The current app's display filter: a strap-on 0 or a lone spike never reaches the trace.
+    const plausible =
+      keep &&
+      isPlausibleHrSample(
+        reading.bpm,
+        trace.slice(-8).map((x) => x.bpm),
+      );
+    this.publish({
+      bpm: reading.bpm,
+      bpmAt: at,
+      worn,
+      ...(plausible
+        ? { trace: [...trace.slice(-(MAX_TRACE_SAMPLES - 1)), { at, bpm: reading.bpm }] }
+        : {}),
+    });
+    if (!keep) return;
     this.buffer.push({ at, bpm: reading.bpm, rr: reading.rr.slice(0, 100) });
+    if (this.buffer.length > MAX_SAVED_SAMPLES)
+      this.buffer.splice(0, this.buffer.length - MAX_SAVED_SAMPLES);
     if (this.buffer.length >= FLUSH_AT_COUNT) this.flush();
+  }
+
+  private async readFirmware(link: StrapLink, generation: number) {
+    const value = await link.readFirmware().catch(() => null);
+    const firmware = value ? parseRevisionString(value) : null;
+    const paired = this.current.paired;
+    if (generation !== this.generation || !firmware || !paired) return;
+    const next = { ...paired, firmware };
+    this.publish({ paired: next });
+    await this.deps.storage.set(PAIRED_KEY, JSON.stringify(next)).catch(() => {});
   }
 
   private pollBattery(link: StrapLink, generation: number) {
@@ -388,6 +450,7 @@ export class StrapSession {
       name: device.name?.trim() || 'Heart-rate strap',
       battery: null,
       batteryAt: null,
+      firmware: null,
     };
     if (this.current.paired) this.forgetLink();
     this.publish({ paired, found: [] });

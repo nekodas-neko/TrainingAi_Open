@@ -54,9 +54,19 @@ export function StrapProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     session.setOutbox(outbox);
     const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void outbox?.sync();
+      if (state !== 'active') return;
+      // A permission granted in Android Settings, or Bluetooth turned on, is noticed here.
+      void session.retry();
+      session.sync();
     });
-    return () => listener.remove();
+    // The training sync's cadence: a workout finished offline uploads once the signal returns.
+    const retry = setInterval(() => {
+      if (AppState.currentState === 'active') session.sync();
+    }, 60_000);
+    return () => {
+      listener.remove();
+      clearInterval(retry);
+    };
   }, [session, outbox]);
   const workoutActive = journal.data.workouts.some((workout) => workout.status === 'active');
   useEffect(() => {
@@ -72,12 +82,21 @@ export function useStrap() {
   return { state, session };
 }
 
-/** Holds the strap link while the calling screen is shown. */
+/**
+ * Holds the strap link while the calling screen is shown and the app is in the foreground. A
+ * phone left on this screen in a pocket must not keep reconnecting; a workout holds its own.
+ */
 export function useStrapHold(reason: StrapHold) {
   const session = useContext(Context);
   useEffect(() => {
     if (!session) return;
-    session.hold(reason, true);
-    return () => session.hold(reason, false);
+    session.hold(reason, AppState.currentState === 'active');
+    const listener = AppState.addEventListener('change', (state) =>
+      session.hold(reason, state === 'active'),
+    );
+    return () => {
+      listener.remove();
+      session.hold(reason, false);
+    };
   }, [session, reason]);
 }

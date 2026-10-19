@@ -1,3 +1,9 @@
+import {
+  HR_MAX_PLAUSIBLE,
+  HR_MIN_PLAUSIBLE,
+  rollingMedian,
+} from '@trainingai/shared/health/hr-smoothing';
+import { computeHrZones, zoneForBpm } from '@trainingai/shared/health/hr-zones';
 import { STALE_MS, type StrapState } from './StrapSession.ts';
 
 /** Why the strap cannot connect, before any link state matters. Null when nothing blocks it. */
@@ -41,10 +47,41 @@ export function strapLinkLabel(state: StrapState): string {
   }
 }
 
-/** The live reading: held and dimmed once stale, never shown off the chest. */
-export function liveBpm(state: StrapState, now: number) {
-  if (state.bpm === null || state.bpmAt === null || state.link !== 'connected' || !state.worn)
-    return { bpm: null, live: false };
-  const live = now - state.bpmAt < STALE_MS;
-  return { bpm: state.bpm, live };
+/**
+ * The rest-screen Live HR card, as the current app's `LiveHrChart` computes it: the rest window of
+ * the workout's plausible readings, a 3-sample rolling median, the last smoothed value as the big
+ * number, and its zone. The last reading is held (dimmed) across gaps rather than blanked.
+ */
+export function liveHrView(
+  state: StrapState,
+  now: number,
+  sinceMs: number | null,
+  profile: { maxHr: number; restingHr: number } | null,
+) {
+  const samples = sinceMs === null ? state.trace : state.trace.filter((x) => x.at >= sinceMs);
+  const smoothed = rollingMedian(
+    samples.map((x) => x.bpm),
+    3,
+  );
+  // Without a trace the raw reading stands in, unless it is a strap-on 0 or another non-heartbeat.
+  const raw =
+    state.bpm !== null && state.bpm >= HR_MIN_PLAUSIBLE && state.bpm <= HR_MAX_PLAUSIBLE
+      ? state.bpm
+      : null;
+  const bpm = smoothed.length ? smoothed[smoothed.length - 1] : raw;
+  const live =
+    bpm !== null &&
+    state.bpmAt !== null &&
+    state.link === 'connected' &&
+    state.worn &&
+    now - state.bpmAt < STALE_MS;
+  const zone = profile && bpm !== null ? zoneForBpm(bpm, computeHrZones(profile)) : null;
+  return {
+    bpm,
+    live,
+    stale: bpm !== null && !live,
+    zone,
+    points: samples.map((x, index) => ({ at: x.at, bpm: smoothed[index] })),
+    message: live ? 'Reading…' : bpm !== null ? 'Holding last reading…' : 'Waiting for your strap…',
+  };
 }

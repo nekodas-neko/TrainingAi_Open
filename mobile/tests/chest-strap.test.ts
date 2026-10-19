@@ -20,7 +20,12 @@ import {
 } from '../src/features/devices/strap/HrOutbox.ts';
 import { StrapSession } from '../src/features/devices/strap/StrapSession.ts';
 import { ApiError } from '../src/features/account/api/client.ts';
-import type { BleAdapter, BleRadio, StrapLink } from '../src/integrations/ble/types.ts';
+import type {
+  BleAdapter,
+  BlePermission,
+  BleRadio,
+  StrapLink,
+} from '../src/integrations/ble/types.ts';
 import type { ScopedStorage } from '../src/core/storage/LocalStorage.ts';
 
 const bytes = (...b: number[]) => new Uint8Array(b);
@@ -296,7 +301,10 @@ function fakeTimers() {
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
-function fakeBle(options: { battery?: number } = {}) {
+type FakeOptions = { battery?: number; firmware?: string; permission?: BlePermission };
+function fakeBle(options: FakeOptions = {}) {
+  let permission: BlePermission = options.permission ?? 'granted';
+  let hrFailed: (() => void) | null = null;
   let radioListener: ((radio: BleRadio) => void) | null = null;
   const log: string[] = [];
   let fail = 0;
@@ -309,7 +317,7 @@ function fakeBle(options: { battery?: number } = {}) {
       radioListener = listener;
       return () => {};
     },
-    permission: async () => 'granted',
+    permission: async () => permission,
     scan: (onFound) => {
       onFound({ id: 'AA:BB', name: 'Polar H10 1234ABCD', rssi: -60 });
       return () => log.push('scan stopped');
@@ -322,13 +330,18 @@ function fakeBle(options: { battery?: number } = {}) {
       }
       drop = onDisconnected;
       const link: StrapLink = {
-        onHeartRate: (listener) => {
+        onHeartRate: (listener, onFailed) => {
           hr = listener;
+          hrFailed = onFailed;
           return () => {
             hr = null;
           };
         },
         readBattery: async () => (options.battery === undefined ? null : bytes(options.battery)),
+        readFirmware: async () =>
+          options.firmware === undefined
+            ? null
+            : new Uint8Array([...options.firmware].map((c) => c.charCodeAt(0)).concat([0, 0])),
         disconnect: async () => {
           log.push('disconnect');
         },
@@ -345,10 +358,16 @@ function fakeBle(options: { battery?: number } = {}) {
     drop: () => drop?.(),
     beat: (value: Uint8Array) => hr?.(value),
     radio: (radio: BleRadio) => radioListener?.(radio),
+    grant: (next: BlePermission) => {
+      permission = next;
+    },
+    failNotifications: () => hrFailed?.(),
   };
 }
 
-async function pairedSession(options: { battery?: number; alerted?: boolean } = {}) {
+async function pairedSession(
+  options: FakeOptions & { alerted?: boolean; noOutbox?: boolean } = {},
+) {
   const clock = fakeTimers();
   const ble = fakeBle(options);
   const storage = memoryStorage({
@@ -366,18 +385,18 @@ async function pairedSession(options: { battery?: number; alerted?: boolean } = 
       alerts.push(percent);
     },
   });
-  session.setOutbox(
+  const outbox = (userId = 'u1') =>
     new HrOutbox(memoryStorage(), {
       origin: 'https://example.test',
-      userId: 'u1',
+      userId,
       post: async (_path, body) => {
         posts.push((body as { samples: StrapSample[] }).samples);
         return { ok: true };
       },
-    }),
-  );
+    });
+  if (!options.noOutbox) session.setOutbox(outbox());
   await session.initialize();
-  return { session, ble, clock, storage, alerts, posts };
+  return { session, ble, clock, storage, alerts, posts, outbox };
 }
 
 test('a workout connects the paired strap, shows live bpm and uploads what it records', async () => {
@@ -498,8 +517,7 @@ test('Bluetooth turned off during a workout waits, then reconnects', async () =>
 });
 
 test('the strap card and workout readout name what blocks the link', async () => {
-  const { strapBlocker, strapLinkLabel, liveBpm } =
-    await import('../src/features/devices/strap/labels.ts');
+  const { strapBlocker, strapLinkLabel } = await import('../src/features/devices/strap/labels.ts');
   const { session, ble, clock } = await pairedSession();
   const base = session.getSnapshot();
   assert.equal(strapBlocker(base), null);
@@ -517,12 +535,108 @@ test('the strap card and workout readout name what blocks the link', async () =>
   assert.match(strapBlocker({ ...base, permission: 'blocked' })!.message, /Settings/);
   assert.equal(strapBlocker({ ...base, radio: 'off' })?.title, 'Bluetooth is off');
   assert.equal(strapLinkLabel({ ...base, link: 'waiting' }), 'Strap not reachable — retrying');
+});
 
+test('the rest card smooths, filters and zones the trace like the current app', async () => {
+  const { liveHrView } = await import('../src/features/devices/strap/labels.ts');
+  const { session, ble, clock } = await pairedSession();
   session.hold('workout', true);
   await settle();
-  ble.beat(bytes(0x06, 150));
-  assert.deepEqual(liveBpm(session.getSnapshot(), clock.now()), { bpm: 150, live: true });
-  assert.deepEqual(liveBpm(session.getSnapshot(), clock.now() + 9_000), { bpm: 150, live: false });
+  // A strap-on 0 never shows as a number, with or without a trace.
+  ble.beat(bytes(0x06, 0));
+  let view = liveHrView(session.getSnapshot(), clock.now(), null, null);
+  assert.equal(view.bpm, null);
+  assert.equal(view.message, 'Waiting for your strap…');
+  for (const bpm of [120, 124, 122, 180, 126]) {
+    await clock.advance(1_000);
+    ble.beat(bytes(0x06, bpm));
+  }
+  const snapshot = session.getSnapshot();
+  // Once three readings stand, 180 jumps more than 30 bpm off their median: dropped from the trace, as in exercise-trace.
+  assert.deepEqual(
+    snapshot.trace.map((x) => x.bpm),
+    [120, 124, 122, 126],
+  );
+  view = liveHrView(snapshot, clock.now(), null, { maxHr: 190, restingHr: 60 });
+  assert.deepEqual(
+    view.points.map((x) => x.bpm),
+    [122, 122, 124, 124],
+  );
+  assert.equal(view.bpm, 124);
+  assert.equal(view.live, true);
+  // Zone 2 starts at 60 % of reserve: 60 + 0.6 × 130 = 138.
+  assert.deepEqual([view.zone?.name, view.zone?.color], ['Recovery', '#3b82f6']);
+  assert.equal(
+    liveHrView({ ...snapshot, trace: [], bpm: 140 }, clock.now(), null, {
+      maxHr: 190,
+      restingHr: 60,
+    }).zone?.name,
+    'Light',
+  );
+  // The rest window starts at the rest, not the workout.
+  assert.equal(liveHrView(snapshot, clock.now(), 3_000, null).points.length, 2);
+  // Held and dimmed after 8 s without a beat, or once the link drops.
+  assert.equal(liveHrView(snapshot, clock.now() + 9_000, null, null).stale, true);
   ble.drop();
-  assert.deepEqual(liveBpm(session.getSnapshot(), clock.now()), { bpm: null, live: false });
+  const dropped = liveHrView(session.getSnapshot(), clock.now(), null, null);
+  assert.deepEqual([dropped.bpm, dropped.stale], [124, true]);
+});
+
+test('a permission granted in Android Settings is noticed on return', async () => {
+  const { session, ble } = await pairedSession({ permission: 'blocked' });
+  session.hold('workout', true);
+  await settle();
+  assert.deepEqual(
+    [session.getSnapshot().permission, session.getSnapshot().link],
+    ['blocked', 'idle'],
+  );
+  ble.grant('granted');
+  // What the provider does when the app becomes active again.
+  await session.retry();
+  await settle();
+  assert.deepEqual(
+    [session.getSnapshot().permission, session.getSnapshot().link],
+    ['granted', 'connected'],
+  );
+});
+
+test('samples recorded while signed out wait for the account, never for another one', async () => {
+  const { session, ble, clock, posts, outbox } = await pairedSession({ noOutbox: true });
+  session.hold('workout', true);
+  await settle();
+  for (let i = 0; i < 45; i++) {
+    ble.beat(bytes(0x06, 120));
+    await clock.advance(1_000);
+  }
+  assert.deepEqual(posts, []);
+  session.setOutbox(outbox('u1'));
+  await settle();
+  assert.equal(posts.flat().length, 45);
+
+  // Signed out mid-workout, then a different account signs in: those samples are not theirs.
+  session.setOutbox(null);
+  ble.beat(bytes(0x06, 121));
+  await clock.advance(10_000);
+  session.setOutbox(outbox('u2'));
+  await settle();
+  assert.equal(posts.flat().length, 45);
+});
+
+test('a failed notification subscription is a lost link, and it reconnects', async () => {
+  const { session, ble, clock } = await pairedSession();
+  session.hold('workout', true);
+  await settle();
+  ble.failNotifications();
+  assert.equal(session.getSnapshot().link, 'waiting');
+  assert.ok(ble.log.includes('disconnect'));
+  await clock.advance(2_000);
+  assert.equal(session.getSnapshot().link, 'connected');
+});
+
+test('the firmware revision is recorded once, after pairing', async () => {
+  const { session, storage, clock } = await pairedSession({ firmware: '3.0.35' });
+  session.hold('settings', true);
+  await clock.advance(1);
+  assert.equal(session.getSnapshot().paired?.firmware, '3.0.35');
+  assert.equal(JSON.parse(storage.values.get('paired-hr-strap.v1')!).firmware, '3.0.35');
 });

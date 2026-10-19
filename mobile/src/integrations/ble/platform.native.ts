@@ -4,6 +4,8 @@ import { decodeBase64 } from './base64';
 import {
   BATTERY_LEVEL,
   BATTERY_SERVICE,
+  DEVICE_INFO_SERVICE,
+  FIRMWARE_REVISION,
   HR_MEASUREMENT,
   HR_SERVICE,
   type BleAdapter,
@@ -112,32 +114,40 @@ export const bleAdapter: BleAdapter = {
       await manager.cancelDeviceConnection(id).catch(() => {});
       throw error;
     }
+    async function read(service: string, characteristic: string) {
+      try {
+        const value = await manager.readCharacteristicForDevice(id, service, characteristic);
+        return decodeBase64(value.value);
+      } catch {
+        return null;
+      }
+    }
     return {
-      onHeartRate(listener) {
+      onHeartRate(listener, onFailed) {
+        // Removing the subscription ourselves reports a cancellation error; that is no failure.
+        let stopped = false;
         const subscription = manager.monitorCharacteristicForDevice(
           id,
           HR_SERVICE,
           HR_MEASUREMENT,
           (error, characteristic) => {
-            if (error) return;
+            if (stopped) return;
+            if (error) {
+              stopped = true;
+              onFailed();
+              return;
+            }
             const value = decodeBase64(characteristic?.value);
             if (value) listener(value);
           },
         );
-        return () => subscription.remove();
+        return () => {
+          stopped = true;
+          subscription.remove();
+        };
       },
-      async readBattery() {
-        try {
-          const characteristic = await manager.readCharacteristicForDevice(
-            id,
-            BATTERY_SERVICE,
-            BATTERY_LEVEL,
-          );
-          return decodeBase64(characteristic.value);
-        } catch {
-          return null;
-        }
-      },
+      readBattery: () => read(BATTERY_SERVICE, BATTERY_LEVEL),
+      readFirmware: () => read(DEVICE_INFO_SERVICE, FIRMWARE_REVISION),
       async disconnect() {
         dropped = true;
         drop.remove();

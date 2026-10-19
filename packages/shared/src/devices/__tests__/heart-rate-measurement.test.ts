@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseBatteryLevel, parseHeartRateMeasurement } from '../heart-rate-measurement'
+import { parseBatteryLevel, parseHeartRateMeasurement, parseRevisionString } from '../heart-rate-measurement'
 
 const bytes = (...b: number[]) => new Uint8Array(b)
 
@@ -38,5 +38,19 @@ describe('parseBatteryLevel', () => {
     expect(parseBatteryLevel(bytes())).toBeNull()
     expect(parseBatteryLevel(bytes(101))).toBeNull()
     expect(parseBatteryLevel(bytes(0xff))).toBeNull()
+  })
+})
+
+describe('parseRevisionString', () => {
+  const ascii = (text: string, ...tail: number[]) => new Uint8Array([...text].map(c => c.charCodeAt(0)).concat(tail))
+
+  it('reads a NUL-padded firmware revision', () => {
+    expect(parseRevisionString(ascii('3.0.35', 0, 0, 0))).toBe('3.0.35')
+  })
+
+  it('returns null for an empty or unprintable value', () => {
+    expect(parseRevisionString(new Uint8Array())).toBeNull()
+    expect(parseRevisionString(new Uint8Array([0, 0x41]))).toBeNull()
+    expect(parseRevisionString(new Uint8Array([0x07, 0x20]))).toBeNull()
   })
 })
