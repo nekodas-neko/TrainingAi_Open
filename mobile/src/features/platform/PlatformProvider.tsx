@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { AppState } from 'react-native';
 import { restFeedback } from '../../integrations/feedback/haptics';
+import { notificationSoundsRest } from '../../integrations/feedback/rest-cue';
 import { workoutFlow } from '../workouts/logging/flow';
 import { randomUUID } from 'expo-crypto';
 import { useAccountContext } from '../account/AccountProvider';
@@ -148,10 +149,11 @@ export function PlatformProvider({ children }: PropsWithChildren) {
     )
       return;
     const timer = setTimeout(() => {
-      if (AppState.currentState === 'active') restFeedback(restCueId);
+      if (AppState.currentState === 'active')
+        restFeedback(restCueId, notificationSoundsRest(permission, alertError));
     }, restDeadline - Date.now());
     return () => clearTimeout(timer);
-  }, [foreground, restCueId, restDeadline]);
+  }, [foreground, restCueId, restDeadline, permission, alertError]);
   const serialized =
     state?.ready && permission
       ? JSON.stringify(
