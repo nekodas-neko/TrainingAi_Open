@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeRoute } from '@trainingai/shared/activity/route-encoding';
 import { haversineDistanceKm } from '@trainingai/shared/activity/route-metrics';
@@ -18,6 +18,9 @@ import {
   type LocationProblem,
   type LocationSource,
   type RoutePoint,
+  type RouteWatchState,
+  ROUTE_CLOCK_TICK_MS,
+  watchRoute,
 } from '../src/features/activities/data/route-recording.ts';
 import type { AccountConnection } from '../src/features/account/session.ts';
 
@@ -536,4 +539,52 @@ test('a guided walk that lost GPS for most of it saves without an average pace',
   assert.equal(row.avgPaceSecPerKm, undefined);
   assert.ok(row.routePolyline);
   f.done();
+});
+
+// #3093 review. The screen's readout clock lives in `watchRoute`, which `useRouteRecording` wraps.
+// It used to move only on its 5 s tick, so after Resume the active time still came from before the
+// pause and live pace read 0:00/km for up to 5 s.
+test('the readout clock starts with the watcher and moves with every fix', async () => {
+  mock.timers.enable({ apis: ['setInterval'] });
+  try {
+    const f = fixture(),
+      source = new FakeLocation(),
+      store = await begun(f);
+    let state: RouteWatchState | null = null;
+    const pace = () =>
+      liveRouteReadout(store.getSnapshot().session!, store.getSnapshot().route, state!.now)
+        .paceSecPerKm;
+    let stop = watchRoute(source, store, (next) => (state = next), f.now);
+    assert.equal(state!.now, f.now());
+    // 60 s at 10 km/h. Each fix moves the clock with the distance, ticks or no ticks.
+    const at = moveNorth(f, source, 0, 30, 5.6);
+    assert.equal(state!.now, f.now());
+    assert.equal(state!.lastFixMs, f.now());
+    const before = pace()!;
+    assert.ok(before > 300 && before < 400, `${before}`);
+    // Pause: the screen stops the watcher, two minutes pass, then Resume starts a new one.
+    stop();
+    await store.pause();
+    f.advance(120_000);
+    await store.pause();
+    stop = watchRoute(source, store, (next) => (state = next), f.now);
+    // Straight after Resume, before any fix or tick: the same pace, not 0:00/km.
+    assert.equal(state!.now, f.now());
+    assert.equal(pace(), before);
+    // The tick keeps the clock moving while no fix arrives.
+    f.advance(ROUTE_CLOCK_TICK_MS);
+    mock.timers.tick(ROUTE_CLOCK_TICK_MS);
+    assert.equal(state!.now, f.now());
+    moveNorth(f, source, at, 5, 5.6);
+    assert.equal(state!.now, f.now());
+    stop();
+    // A stopped watcher publishes nothing more.
+    const last = state!.now;
+    f.advance(ROUTE_CLOCK_TICK_MS);
+    mock.timers.tick(ROUTE_CLOCK_TICK_MS);
+    assert.equal(state!.now, last);
+    f.done();
+  } finally {
+    mock.timers.reset();
+  }
 });

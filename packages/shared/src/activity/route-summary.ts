@@ -40,10 +40,11 @@ export interface RouteSummary {
  *
  * Null with fewer than two points: one fix is a position, not a route.
  *
- * A pace slower than `MAX_PACE_SEC_PER_KM` is left out: the save schema rejects it, and it is not a
- * pace anyway. A 30 s bucket or a split that spans a pause, or a stop at a crossing, covers a few
- * metres and reads as hours per km; one such value used to make the whole activity unsaveable
- * (#3093 review). The same goes for an average over a walk that lost GPS for most of its time.
+ * A pace slower than `MAX_PACE_SEC_PER_KM` never reaches the save schema, which rejects it. A 30 s
+ * bucket or a split that spans a pause, or a stop at a crossing, covers a few metres and reads as
+ * hours per km; one such value used to make the whole activity unsaveable (#3093 review). Splits
+ * that slow are left out (every display keys a split by its km), pace-series buckets are clamped to
+ * the cap, and an average that slow (a walk that lost GPS for most of its time) is left out.
  */
 export function summariseRoute(points: RoutePoint[], paceElapsedSec?: number): RouteSummary | null {
   if (points.length < 2) return null
@@ -56,7 +57,12 @@ export function summariseRoute(points: RoutePoint[], paceElapsedSec?: number): R
     routePolyline: encodeRoute(simplifyRoute(points, ROUTE_SIMPLIFY_TOLERANCE_M)),
     splits: computeSplits(points).filter(split => split.paceSec <= MAX_PACE_SEC_PER_KM),
     bestEfforts: computeBestEfforts(points),
-    paceSeries: computePaceSeries(points).filter(point => point.paceSec <= MAX_PACE_SEC_PER_KM),
+    // Clamped, not dropped: the route map's scrub marker and HR-zone colours turn the series back
+    // into distance bucket by bucket, so a missing bucket would count the pause at running pace.
+    paceSeries: computePaceSeries(points).map(point => ({
+      ...point,
+      paceSec: Math.min(point.paceSec, MAX_PACE_SEC_PER_KM),
+    })),
     avgPaceSecPerKm:
       avgPaceSecPerKm != null && avgPaceSecPerKm <= MAX_PACE_SEC_PER_KM ? avgPaceSecPerKm : undefined,
     elevationGainM: gainM,

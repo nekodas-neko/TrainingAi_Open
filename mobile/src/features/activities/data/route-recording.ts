@@ -37,6 +37,58 @@ export function keepsFix(last: RoutePoint | undefined, next: RoutePoint) {
   );
 }
 
+// What the recording screen reads from the watcher. `now` is the readout's clock: it is set when
+// the watcher starts and on every fix, then every 5 s, so distance and active time always move
+// together. Left to the 5 s tick alone, it kept the time from before a pause for up to 5 s after
+// Resume, and live pace read 0:00/km (#3093 review).
+export type RouteWatchState = {
+  problem: LocationProblem | null;
+  lastFixMs: number | null;
+  now: number;
+};
+export const ROUTE_CLOCK_TICK_MS = 5000;
+// Starts the location source and feeds each fix to the store. Returns the stop function. Kept
+// apart from React so the clock can be tested with fake timers; `useRouteRecording` wraps it.
+export function watchRoute(
+  source: LocationSource,
+  sink: { appendFix(point: RoutePoint): unknown },
+  onState: (state: RouteWatchState) => void,
+  clock: () => number = Date.now,
+) {
+  let cancelled = false,
+    stop: (() => void) | null = null,
+    state: RouteWatchState = { problem: null, lastFixMs: null, now: clock() };
+  const publish = (patch: Partial<RouteWatchState>) => {
+    if (!cancelled) {
+      state = { ...state, ...patch };
+      onState(state);
+    }
+  };
+  publish({});
+  source
+    .watch({
+      fix: (point) => {
+        if (cancelled) {
+          return;
+        }
+        sink.appendFix(point);
+        const at = clock();
+        publish({ problem: null, lastFixMs: at, now: at });
+      },
+      problem: (problem) => publish({ problem }),
+    })
+    .then(
+      (remove) => (cancelled ? remove() : (stop = remove)),
+      () => publish({ problem: 'failed' }),
+    );
+  const timer = setInterval(() => publish({ now: clock() }), ROUTE_CLOCK_TICK_MS);
+  return () => {
+    cancelled = true;
+    stop?.();
+    clearInterval(timer);
+  };
+}
+
 export type GpsStatus = LocationProblem | 'paused' | 'searching' | 'lost' | 'tracking';
 // No fix for this long reads as a dropped signal rather than standing still: the adapter asks
 // for a fix every few seconds whether or not the walker moves.

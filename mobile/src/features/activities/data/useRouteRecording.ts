@@ -8,8 +8,9 @@ import {
   liveRouteStats,
   recordsRoute,
   routeEligible,
-  type LocationProblem,
+  watchRoute,
   type LocationSource,
+  type RouteWatchState,
 } from './route-recording';
 
 // Watches GPS while a route-recording activity runs on screen, as the current app's active
@@ -20,44 +21,17 @@ export function useRouteRecording(source: LocationSource = routeLocation) {
     store = activity.store,
     session = activity.session;
   const recording = activity.ready && !!session && recordsRoute(session);
-  const [problem, setProblem] = useState<LocationProblem | null>(null);
-  const [lastFixMs, setLastFixMs] = useState<number | null>(null);
+  const [watch, setWatch] = useState<RouteWatchState>(() => ({
+    problem: null,
+    lastFixMs: null,
+    now: Date.now(),
+  }));
   const [attempt, setAttempt] = useState(0);
-  const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!recording || !store) {
       return;
     }
-    let stop: (() => void) | null = null,
-      cancelled = false;
-    setProblem(null);
-    setLastFixMs(null);
-    source
-      .watch({
-        fix: (point) => {
-          if (cancelled) {
-            return;
-          }
-          setLastFixMs(Date.now());
-          setProblem(null);
-          store.appendFix(point);
-        },
-        problem: (next) => {
-          if (!cancelled) {
-            setProblem(next);
-          }
-        },
-      })
-      .then(
-        (remove) => (cancelled ? remove() : (stop = remove)),
-        () => !cancelled && setProblem('failed'),
-      );
-    const timer = setInterval(() => setNow(Date.now()), 5000);
-    return () => {
-      cancelled = true;
-      stop?.();
-      clearInterval(timer);
-    };
+    return watchRoute(source, store, setWatch);
   }, [recording, store, source, attempt]);
   useEffect(() => {
     if (!recording || !store) {
@@ -68,22 +42,22 @@ export function useRouteRecording(source: LocationSource = routeLocation) {
     const listener = AppState.addEventListener('change', (state) => {
       if (state !== 'active') {
         void store.checkpoint().catch(() => {});
-      } else if (problem) {
+      } else if (watch.problem) {
         setAttempt((value) => value + 1);
       }
     });
     return () => listener.remove();
-  }, [recording, store, problem]);
+  }, [recording, store, watch.problem]);
   const eligible = !!session && routeEligible(session);
   const status = gpsStatus({
-    problem,
+    problem: watch.problem,
     paused: session?.pauseStartMs != null,
     points: activity.route.length,
-    lastFixMs,
-    now,
+    lastFixMs: watch.lastFixMs,
+    now: watch.now,
   });
   const stats = session
-    ? liveRouteReadout(session, activity.route, now)
+    ? liveRouteReadout(session, activity.route, watch.now)
     : liveRouteStats(activity.route, 0);
   return { eligible, status, ...stats };
 }
