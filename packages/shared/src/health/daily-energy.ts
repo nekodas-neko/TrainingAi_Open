@@ -25,6 +25,10 @@ import { estSessionKcal, estWorkoutKcal, MAX_PLAUSIBLE_SESSION_MIN, type Intensi
 export { SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT, WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
 import { WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
 import { DEFAULT_ACTIVITY_ID } from './workout-activities'
+// activityTypes whose steps land in the phone pedometer (outdoor, foot-based) — their step-equivalent
+// comes off the passive total so a logged outdoor walk/run isn't counted twice. Declared in
+// `activity-steps.ts` beside the indoor list, so the day's step count and this model classify alike.
+import { PEDOMETER_ACTIVITY_TYPES } from './activity-steps'
 
 
 // App activityType string → Oura MET-table id (`energy-expenditure-features.json` activity_type_dict).
@@ -46,9 +50,6 @@ export function ouraIdForActivityType(activityType: string | null | undefined): 
 const TYPICAL_SPEED_KMH: Record<string, number> = {
   walk: 5, run: 9, treadmill: 6, hike: 4, cycle: 18, swim: 3, row: 8, elliptical: 8,
 }
-// activityTypes whose steps land in the phone pedometer (outdoor, foot-based) — subtract their
-// step-equivalent from the passive total so a logged outdoor walk/run isn't counted twice.
-const PEDOMETER_ACTIVITY_TYPES = new Set(['walk', 'run', 'hike'])
 
 export interface EnergyProfile {
   ageYears: number | null
@@ -141,7 +142,7 @@ function activityDurationMin(a: { activityType: string; durationMin?: number | n
  * than removing steps the pedometer never counted.
  */
 function pedometerStepsInside(a: ActiveEnergyInput['activities'][number]): number {
-  if (!PEDOMETER_ACTIVITY_TYPES.has(a.activityType.toLowerCase())) return 0
+  if (!PEDOMETER_ACTIVITY_TYPES.includes(a.activityType.toLowerCase())) return 0
   if (a.steps != null && a.steps > 0) return a.steps
   if (a.distanceKm != null && a.distanceKm > 0) return a.distanceKm * STEPS_PER_KM
   const dur = activityDurationMin(a)

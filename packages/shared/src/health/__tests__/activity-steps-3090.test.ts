@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { activityStepsForDayCount, INDOOR_STEP_ACTIVITY_TYPES } from '../activity-steps'
+import { activityStepsForDayCount, INDOOR_STEP_ACTIVITY_TYPES, PEDOMETER_ACTIVITY_TYPES } from '../activity-steps'
 
 describe('activityStepsForDayCount (#3090)', () => {
   it('folds a treadmill session in and leaves outdoor foot activity out', () => {
@@ -28,6 +28,13 @@ describe('activityStepsForDayCount (#3090)', () => {
 
   it('lists treadmill as the one indoor type', () => {
     expect(INDOOR_STEP_ACTIVITY_TYPES).toEqual(['treadmill'])
+  })
+
+  // A type on both lists would be added to the day's steps here AND taken back out of the energy
+  // model's step term as already counted: the drift #3088 and #3090 each fixed one half of.
+  it('never lists a type as both indoor and pedometer', () => {
+    expect(INDOOR_STEP_ACTIVITY_TYPES.filter(t => PEDOMETER_ACTIVITY_TYPES.includes(t))).toEqual([])
+    expect(PEDOMETER_ACTIVITY_TYPES).toEqual(['walk', 'run', 'hike'])
   })
 
   // A client component imports this module; a node builtin reached through an import would take the

@@ -21,6 +21,14 @@
  */
 export const INDOOR_STEP_ACTIVITY_TYPES: readonly string[] = ['treadmill']
 
+/**
+ * Outdoor foot activity: its steps are already inside the ring's (or phone pedometer's) day total.
+ * `daily-energy.ts` takes them back out of the passive step term (`pedometerStepsInside`, #3082),
+ * and `activityStepsForDayCount` never adds them. Kept beside the indoor list so the two cannot
+ * drift into claiming the same type; a test holds them disjoint.
+ */
+export const PEDOMETER_ACTIVITY_TYPES: readonly string[] = ['walk', 'run', 'hike']
+
 /** Steps from logged activities that the day's step count must add on top of the device total. */
 export function activityStepsForDayCount(
   activities: readonly { activityType: string; steps?: number | null }[],
