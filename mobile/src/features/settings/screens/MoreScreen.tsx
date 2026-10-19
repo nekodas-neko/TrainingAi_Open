@@ -32,17 +32,9 @@ import { FeedbackSheet } from '../components/FeedbackSheet';
 import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
 import { SignOutSheet } from '../components/SignOutSheet';
 import { memberSinceLabel } from '../data/profile';
-const stats = z
-  .object({
-    lifetimeStats: z.object({
-      sessions: z.number(),
-      totalVolumeKg: z.number(),
-      bestStreak: z.number(),
-      totalSets: z.number(),
-      totalDistanceKm: z.number(),
-    }),
-  })
-  .passthrough();
+import { useRewards } from '../../rewards/data/useRewards';
+import { LevelHeader } from '../../rewards/components/LevelHeader';
+import { AchievementsSection } from '../../rewards/components/AchievementsSection';
 export function MoreScreen({
   openSettings,
   openAccount,
@@ -77,7 +69,7 @@ export function MoreScreen({
     [modal, setModal] = useState<'feedback' | 'delete' | 'signout' | null>(null);
   const profile = useWorkoutResource(profileSpec),
     goals = useWorkoutResource(goalsSpec),
-    history = useWorkoutResource({ path: '/api/achievements', schema: stats, ttl: 300000 });
+    history = useRewards();
   const user = profile.data?.user;
   const name =
     typeof user?.displayName === 'string'
@@ -156,6 +148,7 @@ export function MoreScreen({
                 <FriendCode
                   code={typeof user?.friendCode === 'string' ? user.friendCode : null}
                 />
+                <LevelHeader rewards={history.data} failed={!!history.error} />
               </Stack>
               <ProfileStats
                 lifetime={lifetime}
@@ -171,6 +164,7 @@ export function MoreScreen({
                   <Badge label="Coming soon" style={{ alignSelf: 'center' }} />
                 </Stack>
               </Card>
+              <AchievementsSection rewards={history.data} loading={history.loading} />
               <Card padded={false}>
                 <ListRow
                   title="Your Year"

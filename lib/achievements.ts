@@ -2,6 +2,7 @@ import { getDb } from '@/lib/data/postgres/client'
 import { sql } from 'drizzle-orm'
 import { todayInTz, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
+import { LEVEL_THRESHOLDS, getLevelLabel } from '@trainingai/shared/achievement-display'
 import { calorieDayHitsGoal, computeEntryStreak } from '@trainingai/shared/achievements-calc'
 import { computeDayStreak, streakRestGapFor } from '@trainingai/shared/workout/day-streak'
 import { reconcileUserStats } from '@/lib/data/postgres/slices/user-stats'
@@ -9,17 +10,6 @@ import { getRepository } from '@/lib/data'
 import { calorieBudgetsByDay, budgetMetricsStart } from '@trainingai/shared/nutrition/day-budget'
 import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
-
-const LEVEL_THRESHOLDS = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5800, 8000]
-
-function getLevelLabel(level: number): string {
-  if (level <= 2) return 'Novice'
-  if (level <= 4) return 'Beginner'
-  if (level <= 6) return 'Intermediate'
-  if (level <= 8) return 'Advanced'
-  if (level <= 10) return 'Elite'
-  return 'Legend'
-}
 
 function computeLevel(xp: number): { level: number; levelLabel: string; currentLevelXp: number; nextLevelXp: number } {
   let level = 1

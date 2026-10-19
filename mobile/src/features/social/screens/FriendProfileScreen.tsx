@@ -1,4 +1,5 @@
 import { plural } from '@trainingai/shared/format/plural';
+import { levelProgress } from '@trainingai/shared/achievement-display';
 import { useState } from 'react';
 import { z } from 'zod';
 import {
@@ -42,16 +43,7 @@ function Profile({ userId, onBack }: { userId: string; onBack: () => void }) {
     { theme } = useTheme();
   const [selected, setSelected] = useState<z.infer<typeof achievementSchema> | null>(null);
   const xpProgress = profile
-    ? profile.nextLevelXp > profile.currentLevelXp
-      ? Math.min(
-          1,
-          Math.max(
-            0,
-            (profile.xp - profile.currentLevelXp) /
-              (profile.nextLevelXp - profile.currentLevelXp),
-          ),
-        )
-      : 1
+    ? levelProgress(profile.xp, profile.currentLevelXp, profile.nextLevelXp)
     : 0;
   const trophies =
     profile?.achievements.filter(
