@@ -282,7 +282,7 @@ describe('startOuraConnectBackfill reporting', () => {
   // The connect backfill passes the repository as the night re-scorer (#3079); an empty store.
   const rescore = {
     withOuraSleepWriteLock: <T,>(_u: string, run: () => Promise<T>) => run(),
-    listOuraCloudSleepDates: async () => [],
+    listDeletedOuraCloudSleepDates: async () => [],
     listSleepSessions: async () => [], getOuraDailyDerived: async () => [],
     upsertOuraDailyDerived: async () => {}, clearNightDerivedScores: async () => false, releaseBodyBatteryAnchor: async () => false,
   }

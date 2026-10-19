@@ -24,9 +24,9 @@
  *   day's curve in the evening (Orchestrator's decision on #3085). An anchor frozen before today's
  *   night existed was frozen on a readiness without it (from that morning's body metrics), so it is
  *   released and the next read re-chooses it. "Arrived" means no night for today before the write,
- *   one after, AND no Oura Cloud sleep row ever stored for the day, tombstoned ones included
- *   (#3099): a delete then a re-create in two webhooks is a revision, so the anchor stays. A
- *   finished day's battery is left for the re-derive.
+ *   one after, AND no tombstoned Oura Cloud sleep row for the day (#3099): a delete then a
+ *   re-create in two webhooks is a revision, so the anchor stays. A live nap or rest row on the day
+ *   does not count (#3104 review). A finished day's battery is left for the re-derive.
  *
  * **One user at a time.** Two sleep webhooks for the same user can land in the same second (19 Oct's
  * two periods did). Interleaved, an older fingerprint can be re-scored last and a stale score stick on
@@ -50,7 +50,7 @@ export const RESCORE_WINDOW_DAYS = 7
 
 export type NightRescoreRepo = Pick<WorkoutRepository,
   'getUserById' | 'listSleepSessions' | 'getOuraDailyDerived' | 'upsertOuraDailyDerived' |
-  'clearNightDerivedScores' | 'releaseBodyBatteryAnchor' | 'withOuraSleepWriteLock' | 'listOuraCloudSleepDates'>
+  'clearNightDerivedScores' | 'releaseBodyBatteryAnchor' | 'withOuraSleepWriteLock' | 'listDeletedOuraCloudSleepDates'>
 
 export interface NightWatch {
   userId: string
@@ -58,8 +58,8 @@ export interface NightWatch {
   today: string
   /** Wake date → fingerprint of that date's canonical night, before the write. */
   before: Map<string, string>
-  /** Wake dates that had ever held an Oura Cloud sleep row before the write, tombstoned included. */
-  everHadOuraNight: Set<string>
+  /** Wake dates that held a tombstoned Oura Cloud sleep row before the write. */
+  hadDeletedOuraNight: Set<string>
 }
 
 export interface RescoreOutcome {
@@ -125,9 +125,9 @@ export async function watchNights(repo: NightRescoreRepo, userId: string): Promi
   const from = windowFrom(today)
   const [sessions, ouraDates] = await Promise.all([
     repo.listSleepSessions(userId, shiftDateStr(from, -1), today),
-    repo.listOuraCloudSleepDates(userId, from, today),
+    repo.listDeletedOuraCloudSleepDates(userId, from, today),
   ])
-  return { userId, tz, today, before: nightFingerprints(sessions, tz, from, today), everHadOuraNight: new Set(ouraDates) }
+  return { userId, tz, today, before: nightFingerprints(sessions, tz, from, today), hadDeletedOuraNight: new Set(ouraDates) }
 }
 
 /** After the write: re-scores every recent day whose night changed. See the file header for what each pillar gets. */
@@ -156,9 +156,10 @@ export async function rescoreChangedNights(repo: NightRescoreRepo, watch: NightW
 
     if (day === today) {
       if (await repo.clearNightDerivedScores(userId, day, { sleep: false, readiness: true })) out.readinessCleared.push(day)
-      // #3099: a day that had any Oura night before, even a deleted one, is a revision: a delete
-      // and a re-create in two webhooks must not release an anchor frozen while the night was there.
-      const arrived = !watch.before.has(day) && after.has(day) && !watch.everHadOuraNight.has(day)
+      // #3099: a night appearing on a day where Oura had deleted one is a re-create, a revision: a
+      // delete and a re-create in two webhooks must not release an anchor frozen while the night was
+      // there. Only deleted rows count; a live nap or rest row on the day leaves a late night an arrival.
+      const arrived = !watch.before.has(day) && after.has(day) && !watch.hadDeletedOuraNight.has(day)
       if (arrived && await repo.releaseBodyBatteryAnchor(userId, day)) out.batteryReleased.push(day)
     } else if (stored.get(day)?.readinessScore != null) {
       await repo.upsertOuraDailyDerived(userId, day, { modelVersions: { readinessNightRevisedAt: now.toISOString() } })

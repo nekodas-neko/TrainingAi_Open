@@ -136,14 +136,19 @@ describe.each([
 // differ from the one stored for the same night. The repository here honours the range it is asked
 // for, which is what makes the missing day visible.
 describe('the sleep score shown before the sync is the one stored for that night (#3099)', () => {
-  it('loads the history the scored date needs', async () => {
+  // #3104 review: the window follows the scored date however old it is. Yesterday's night (before the
+  // sync) and a night three days old (the ring not worn since) both get their full 28 days.
+  it.each([[1], [3]])('loads the history the scored date needs (newest night %i day(s) old)', async lastDaysAgo => {
     const tz = 'Australia/Brisbane'
     const today = todayInTz(tz)
-    // 35 ordinary nights, except the one dated today − 29: inside yesterday's 28-day window, outside
-    // today's. It is late, short and broken, so leaving it out moves yesterday's score by a point.
-    const edge = shiftDateStr(today, -29)
+    const scoredDate = shiftDateStr(today, -lastDaysAgo)
+    // Ordinary nights, except the one 29 days before the scored date: inside its 28-day window
+    // (counted inclusively), outside today's 28-day load. It is late, short and broken, so leaving it
+    // out moves the score by a point.
+    const edge = shiftDateStr(scoredDate, -28)
+    // Anchored to the scored date, so every case has the same shape around it.
     const sleep = Array.from({ length: 35 }, (_, i) => {
-      const d = shiftDateStr(today, -35 + i)
+      const d = shiftDateStr(scoredDate, -34 + i)
       const mid = dateStrMidnightInTz(d, tz).getTime()
       const odd = d === edge
       const shift = odd ? 5 * HOUR : 0
@@ -154,17 +159,17 @@ describe('the sleep score shown before the sync is the one stored for that night
         awakHours: odd ? 3 : 0.4 + (i % 3) * 0.3, efficiency: odd ? 55 : 88 + (i % 4),
         averageHrvMs: odd ? 20 : 50, lowestHeartRate: 52, respiratoryRate: 14.5,
       }
-    }).filter(n => n.date < today)
+    })
     repo.listSleepSessions.mockImplementation(async (_u: string, from: string, to: string) => sleep.filter(n => n.date >= from && n.date <= to))
     repo.listBodyMetrics.mockResolvedValue([])
 
     const out = await buildReadinessPayload('u1', tz)
 
     // What the night stored when it was today's, or when the re-score wrote it: its own window.
-    const stored = scoreSleepForDate(sleep as never, shiftDateStr(today, -1), tz)?.result.score
+    const stored = scoreSleepForDate(sleep as never, scoredDate, tz)?.result.score
     expect(stored).toEqual(expect.any(Number))
     // The fixture really depends on the edge night, so a short load could not pass by accident.
-    expect(scoreSleepForDate(sleep.filter(n => n.date !== edge) as never, shiftDateStr(today, -1), tz)?.result.score).not.toBe(stored)
+    expect(scoreSleepForDate(sleep.filter(n => n.date !== edge) as never, scoredDate, tz)?.result.score).not.toBe(stored)
     expect(out.sleepScore).toBe(stored)
   })
 })

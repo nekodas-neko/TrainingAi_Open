@@ -58,7 +58,7 @@ function hits(): Hit[] {
  */
 const ALLOWED: { file: string; marker: string; reason: string }[] = [
   { file: 'lib/data/postgres/slices/oura.ts', marker: 'const rows = await db.selectDistinct({ date: s.sleepSessions.date }).from(s.sleepSessions)',
-    reason: 'issue 3099: the night re-score asks which days have EVER held an Oura Cloud night, tombstoned ones included, so a delete then a re-create reads as a revision and never shows a removed night' },
+    reason: 'issue 3099: the night re-score asks which days hold a TOMBSTONED Oura Cloud night, so a delete then a re-create reads as a revision; it reads removed rows on purpose and never shows one' },
   { file: 'lib/local-store/sqlite-backend.ts', marker: "WHERE sync_status = 'synced' AND oura_id LIKE 'ble:%' AND COALESCE(manual_entry, 0) = 0",
     reason: 'issue 2752: the ghost sweep compares every synced ring row with the server id list, which includes tombstones; a tombstoned row the server still holds is never deleted' },
   { file: 'lib/local-store/sqlite-backend.ts', marker: "DELETE FROM sleep_sessions WHERE sync_status = 'synced' AND id IN",
