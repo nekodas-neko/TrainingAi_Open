@@ -18,6 +18,7 @@ import { fetchOuraDocuments, fetchOuraHeartRate, OuraForbiddenError, OuraRateLim
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType } from './documents'
 import { NO_WRITES, plannedCounts, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
 import { reportOuraCloudIssue } from './report'
+import type { NightRescoreRepo } from '@/lib/health/rescore-nights'
 import { getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
 
 /** How far back a new connection reads. Inside the 180-day heart-rate retention. */
@@ -73,6 +74,8 @@ export type OuraBackfillDeps = {
   config: OuraOAuthConfig
   /** How a Retry-After is waited out; replaceable for tests. */
   wait?: (ms: number) => Promise<void>
+  /** #3079: re-scores a recent night the read changed (`rescore-nights.ts`). */
+  rescore?: NightRescoreRepo
 }
 
 export type OuraBackfillResult =
@@ -174,7 +177,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
     }
   }
   const writes = mapOuraDocuments(docs)
-  report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes)
+  report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes, deps.rescore)
 
   if (opts.heartRate && !report.stoppedEarly && !isOuraTypeShared(granted, 'heartrate')) report.notShared.push('heartrate')
   else if (opts.heartRate && !report.stoppedEarly) {
@@ -245,7 +248,7 @@ export function startOuraConnectBackfill(userId: string): void {
       const user = await repo.getUserById(userId)
       const tz = user?.timezone ?? DEFAULT_TZ
       const to = todayInTz(tz)
-      const result = await backfillOuraCloud({ repo, config }, userId, {
+      const result = await backfillOuraCloud({ repo, config, rescore: repo }, userId, {
         from: shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1)), to, dryRun: false, heartRate: true, tz,
       })
       // A connect whose history did not arrive is otherwise invisible: the account reads connected.

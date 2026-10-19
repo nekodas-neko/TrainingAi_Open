@@ -848,7 +848,15 @@ export async function upsertOuraCloudDaily(db: Db, userId: string, rows: OuraClo
   for (const [key, group] of groups) {
     const fields = key.split(',') as (keyof typeof CLOUD_DAILY_COLUMNS)[]
     const values = collapseOnConflict(group.map(r => ({ ...r, userId })), r => r.date)
-    const set: Record<string, SQL> = { updatedAt: sql`now()` }
+    // #3079: `updated_at` moves only when a written value differs, so it says when Oura last CHANGED
+    // the row. The daily reconciliation re-reads the same days every day, and the training-stress
+    // re-check reads this stamp to decide whether a finished day's MET changed after its verdict.
+    const cols = fields.map(f => CLOUD_DAILY_COLUMNS[f])
+    const stored = cols.map(c => `oura_cloud_daily.${c}`).join(', ')
+    const incoming = cols.map(c => `excluded.${c}`).join(', ')
+    const set: Record<string, SQL> = {
+      updatedAt: sql.raw(`CASE WHEN ROW(${stored}) IS DISTINCT FROM ROW(${incoming}) THEN now() ELSE oura_cloud_daily.updated_at END`),
+    }
     for (const f of fields) set[f] = sql.raw(`excluded.${CLOUD_DAILY_COLUMNS[f]}`)
     await db.insert(s.ouraCloudDaily).values(values)
       .onConflictDoUpdate({ target: [s.ouraCloudDaily.userId, s.ouraCloudDaily.date], set })
@@ -870,6 +878,18 @@ export async function getOuraCloudActivitySeries(db: Db, userId: string, from: s
 }
 
 export interface OuraCloudActivitySeries { date: string; met: s.OuraSampleSeries | null; class5Min: string | null }
+
+/**
+ * #3079: when each day's stored Oura MET series last changed (`oura_cloud_daily.updated_at`, which
+ * moves only on a changed value). Days with no MET are left out. The training-stress re-check reads
+ * it to re-evaluate a finished day once more when Oura's MET for it lands or changes after its verdict.
+ */
+export async function getOuraCloudMetChangedAt(db: Db, userId: string, from: string, to: string): Promise<{ date: string; changedAt: Date }[]> {
+  const t = s.ouraCloudDaily
+  return db.select({ date: t.date, changedAt: t.updatedAt }).from(t)
+    .where(and(eq(t.userId, userId), gte(t.date, from), lte(t.date, to), isNotNull(t.met)))
+    .orderBy(asc(t.date))
+}
 
 /** One `oura_sessions` row: a session exactly as Oura last sent it. */
 export interface OuraSessionRow {
@@ -2442,6 +2462,34 @@ export async function upsertOuraDailyDerived(db: Db, userId: string, day: string
     .insert(s.ouraDailyDerived)
     .values(values as typeof s.ouraDailyDerived.$inferInsert)
     .onConflictDoUpdate({ target: [s.ouraDailyDerived.userId, s.ouraDailyDerived.day], set })
+}
+
+/**
+ * #3079. Nulls a day's stored Sleep Score and/or readiness when the night they were scored from has
+ * changed or gone (an Oura revision or delete). `upsertOuraDailyDerived` COALESCEs, so it can never
+ * clear a column; this is the one statement that does, and only the named pillar's columns.
+ * `updated_at` moves so the delta pull carries the nulls to the device (its apply writes every column
+ * as sent), as `deleteManualSleepNight` does. Returns whether a row was changed.
+ */
+export async function clearNightDerivedScores(
+  db: Db, userId: string, day: string, pillars: { sleep: boolean; readiness: boolean },
+): Promise<boolean> {
+  const set: Partial<typeof s.ouraDailyDerived.$inferInsert> = {}
+  const present: SQL[] = []
+  if (pillars.sleep) {
+    Object.assign(set, { sleepScore: null, sleepContributors: null })
+    present.push(isNotNull(s.ouraDailyDerived.sleepScore), isNotNull(s.ouraDailyDerived.sleepContributors))
+  }
+  if (pillars.readiness) {
+    Object.assign(set, { readinessScore: null, readinessContributors: null })
+    present.push(isNotNull(s.ouraDailyDerived.readinessScore), isNotNull(s.ouraDailyDerived.readinessContributors))
+  }
+  if (present.length === 0) return false
+  const rows = await db.update(s.ouraDailyDerived)
+    .set({ ...set, updatedAt: new Date() })
+    .where(and(eq(s.ouraDailyDerived.userId, userId), eq(s.ouraDailyDerived.day, day), or(...present)))
+    .returning({ day: s.ouraDailyDerived.day })
+  return rows.length > 0
 }
 
 export async function getOuraDailyDerived(db: Db, userId: string, from: string, to: string): Promise<OuraDailyDerivedRow[]> {

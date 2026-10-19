@@ -39,24 +39,35 @@ export async function runOuraWebhookRenewal(
   const config = ouraWebhookConfig(ouraOAuthConfig())
   if (!config) return null
   const { pool, ensure } = deps ?? { pool: getPool(), ensure: ensureOuraWebhookSubscriptions }
+  return withSessionLock(pool, LOCK_KEY, () => ensure(config, { dryRun }), 'webhook renewal')
+}
+
+/**
+ * Runs `run` under a session-level advisory lock on `key`, or answers `null` when another replica
+ * holds it. Shared with the daily reconciliation (`reconcile.ts`, #3079), whose pass is also many
+ * Oura calls long; see the file header for why the lock is session-level.
+ */
+export async function withSessionLock<T>(
+  pool: Pick<Pool, 'connect'>, key: string, run: () => Promise<T>, label: string,
+): Promise<T | null> {
   const client = await pool.connect()
   // A dropped connection while held must not become an uncaught exception; the pass's own next
   // query fails instead, and the client is discarded below.
   let broken: Error | undefined
   const onError = (err: Error) => {
     broken = err
-    console.error('[oura] webhook renewal: database connection error:', err.message)
+    console.error(`[oura] ${label}: database connection error:`, err.message)
   }
   client.on('error', onError)
   let locked = false
   try {
-    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked', [LOCK_KEY])
+    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS locked', [key])
     locked = rows[0]?.locked === true
     if (!locked) return null
-    return await ensure(config, { dryRun })
+    return await run()
   } finally {
     if (locked && !broken) {
-      await client.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [LOCK_KEY]).catch((err: Error) => { broken = err })
+      await client.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [key]).catch((err: Error) => { broken = err })
     }
     client.removeListener('error', onError)
     // A client whose unlock failed may still hold the lock; destroy it rather than hand it back to

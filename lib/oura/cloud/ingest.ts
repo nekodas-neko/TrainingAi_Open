@@ -14,6 +14,7 @@
 //
 // The BLE raw archive (`oura_raw_samples`, `oura_raw_packed`) is never touched here.
 import type { WorkoutRepository } from '@/lib/data/repository'
+import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import type { OuraCloudWrites } from './documents'
 
 /** The slice of the repository the writer needs, so tests can hand it a fake. */
@@ -56,12 +57,23 @@ export function plannedCounts(writes: OuraCloudWrites): OuraCloudWriteCounts {
   }
 }
 
-/** Writes one batch of mapped documents. The heart-rate series goes through `upsertOuraCloudHeartrate` directly. */
-export async function writeOuraCloudData(writer: OuraCloudWriter, userId: string, writes: OuraCloudWrites): Promise<OuraCloudWriteCounts> {
+/**
+ * Writes one batch of mapped documents. The heart-rate series goes through `upsertOuraCloudHeartrate` directly.
+ *
+ * `rescore` (#3079): with it, a sleep write that changes, adds or removes a recent night re-scores
+ * that night's day (`rescore-nights.ts`). Production passes the repository; tests that only count
+ * writes leave it out.
+ */
+export async function writeOuraCloudData(
+  writer: OuraCloudWriter, userId: string, writes: OuraCloudWrites, rescore?: NightRescoreRepo,
+): Promise<OuraCloudWriteCounts> {
   await writer.upsertOuraDaily(userId, writes.daily, 'oura_cloud')
   await writer.upsertBodyMetrics(userId, writes.body, 'oura_cloud')
-  const sleep = writes.sleep.length > 0 ? await writer.upsertOuraCloudSleep(userId, writes.sleep) : { written: 0, skippedOverlap: 0 }
-  const sleepTombstoned = await writer.tombstoneOuraCloudSleep(userId, writes.deletedSleepIds)
+  const touchesSleep = writes.sleep.length > 0 || writes.deletedSleepIds.length > 0
+  const { sleep, sleepTombstoned } = await withNightRescore(touchesSleep ? rescore : undefined, userId, async () => ({
+    sleep: writes.sleep.length > 0 ? await writer.upsertOuraCloudSleep(userId, writes.sleep) : { written: 0, skippedOverlap: 0 },
+    sleepTombstoned: await writer.tombstoneOuraCloudSleep(userId, writes.deletedSleepIds),
+  }))
   const workouts = await writer.upsertOuraWorkouts(userId, writes.workouts)
   const sleepPeriods = await writer.upsertOuraCloudSleepPeriods(userId, writes.sleepPeriods)
   const cloudDays = await writer.upsertOuraCloudDaily(userId, writes.cloudDaily)

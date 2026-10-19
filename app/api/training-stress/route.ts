@@ -24,6 +24,7 @@ import {
 } from '@trainingai/shared/health/training-stress-rhr';
 import {
   staleTrainingStressDays,
+  trainingStressMetLookbackFrom,
   TRAINING_STRESS_RECHECK_DAYS,
 } from '@trainingai/shared/health/training-stress-recheck';
 import { BASELINE_MIN_NIGHTS, storedReadinessLearning } from '@trainingai/shared/health/readiness-composite';
@@ -78,13 +79,18 @@ export async function GET(req: Request) {
   // on it and a first visit does not open seven evaluations at once.
   if (!raw) {
     const from = shiftDateStr(date, -TRAINING_STRESS_RECHECK_DAYS);
-    const rows = await repo
-      .getOuraDailyDerived(userId, from, shiftDateStr(date, -1))
-      .catch(() => []);
+    const [rows, metChanged] = await Promise.all([
+      repo.getOuraDailyDerived(userId, from, shiftDateStr(date, -1)).catch(() => []),
+      // #3079: a finished day is evaluated once more when Oura's MET for it changed after its verdict.
+      repo
+        .getOuraCloudMetChangedAt(userId, trainingStressMetLookbackFrom(date), shiftDateStr(date, -1))
+        .catch(() => []),
+    ]);
     const stale = staleTrainingStressDays(
       date,
       tz,
       new Map(rows.map((r) => [r.day, r.trainingLoadEvaluatedAt ?? null])),
+      new Map(metChanged.map((r) => [r.date, r.changedAt])),
     );
     void (async () => {
       for (const day of stale) {

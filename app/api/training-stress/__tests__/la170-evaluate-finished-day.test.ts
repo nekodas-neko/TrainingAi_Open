@@ -10,6 +10,7 @@ type Row = Record<string, unknown>
 
 const upsertOuraDailyDerived = vi.fn(async (..._a: unknown[]) => undefined)
 const getOuraDailyDerived = vi.fn(async (..._a: unknown[]) => [] as Row[])
+const getOuraCloudMetChangedAt = vi.fn(async (..._a: unknown[]) => [] as { date: string; changedAt: Date }[])
 
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u-1', timezone: 'Australia/Brisbane' } }) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
@@ -21,6 +22,7 @@ vi.mock('@/lib/data', () => ({
     getUserById: async () => ({ dateOfBirth: '1990-01-01', sex: 'male' }),
     getOuraDaytimeSignals: async () => ({ met: [], temp: [], still: [], motion: [] }),
     getOuraCloudActivitySeries: async () => [],
+    getOuraCloudMetChangedAt: (...a: unknown[]) => getOuraCloudMetChangedAt(...a),
     listSleepSessions: async () => [],
     listActivityLogs: async () => [],
     getHealthConnectIntervals: async () => [],
@@ -54,6 +56,8 @@ beforeEach(() => {
   upsertOuraDailyDerived.mockClear()
   getOuraDailyDerived.mockReset()
   getOuraDailyDerived.mockResolvedValue([])
+  getOuraCloudMetChangedAt.mockReset()
+  getOuraCloudMetChangedAt.mockResolvedValue([])
 })
 
 describe('/api/training-stress — a finished day gets a whole-day verdict (LA-170)', () => {
@@ -102,6 +106,18 @@ describe('/api/training-stress — a finished day gets a whole-day verdict (LA-1
     await vi.waitFor(() => expect(writtenDays()).toContain(edge))
     await new Promise(r => setTimeout(r, 50))
     expect(writtenDays()).not.toContain(beyond)
+  })
+
+  // #3079: Oura's MET for a day can land after the day's final verdict (the Oura app syncs late).
+  it('re-evaluates a final day once more when its Oura MET changed after the verdict', async () => {
+    const day = shiftDateStr(today(), -2)
+    const verdict = new Date(endOf(day).getTime() + 60_000)
+    allFinalExcept({ [day]: verdict })
+    getOuraCloudMetChangedAt.mockResolvedValue([{ date: day, changedAt: new Date(verdict.getTime() + 2 * 3_600_000) }])
+    await GET(new Request('http://localhost/api/training-stress'))
+    await vi.waitFor(() => expect(writtenDays()).toContain(day))
+    await new Promise(r => setTimeout(r, 50))
+    expect(writtenDays().sort()).toEqual([day, today()].sort())
   })
 
   it('does not reach for yesterday when a specific date was asked for', async () => {

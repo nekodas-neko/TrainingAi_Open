@@ -879,6 +879,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async deleteOuraCloudTokens(userId: string) { return ouraCloudTokens.deleteOuraCloudTokens(this.db, userId) }
   async getUserIdByOuraUserId(ouraUserId: string) { return ouraCloudTokens.getUserIdByOuraUserId(this.db, ouraUserId) }
   async getOuraCloudSwitchDay(userId: string) { return ouraCloudTokens.getOuraCloudSwitchDay(this.db, userId) }
+  async listOuraCloudConnectedUserIds() { return ouraCloudTokens.listOuraCloudConnectedUserIds(this.db) }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
     // lower(), not eq: it matches a row stored before LA-61's backfill (or one a collision kept it
@@ -8173,6 +8174,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async upsertBodyBatteryDaily(userId: string, row: import('../repository').BodyBatteryDailyRow) { return bodyBattery.upsertBodyBatteryDaily(this.db, userId, row) }
   async getBodyBatteryHistory(userId: string, startDate: string, endDate: string) { return bodyBattery.getBodyBatteryHistory(this.db, userId, startDate, endDate) }
+  async releaseBodyBatteryAnchor(userId: string, date: string) { return bodyBattery.releaseBodyBatteryAnchor(this.db, userId, date) }
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }
   async upsertOuraCloudSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[]) { return oura.upsertOuraCloudSleep(this.db, userId, sessions) }
   async tombstoneOuraCloudSleep(userId: string, ouraIds: string[]) { return oura.tombstoneOuraCloudSleep(this.db, userId, ouraIds) }
@@ -8182,6 +8184,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraCloudDaily(userId: string, rows: oura.OuraCloudDailyRow[]) { return oura.upsertOuraCloudDaily(this.db, userId, rows) }
   async upsertOuraSessions(userId: string, rows: oura.OuraSessionRow[]) { return oura.upsertOuraSessions(this.db, userId, rows) }
   async getOuraCloudActivitySeries(userId: string, from: string, to: string) { return oura.getOuraCloudActivitySeries(this.db, userId, from, to) }
+  async getOuraCloudMetChangedAt(userId: string, from: string, to: string) { return oura.getOuraCloudMetChangedAt(this.db, userId, from, to) }
   async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
@@ -8224,6 +8227,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraDailySummary(userId: string, from: string, to: string) { return oura.getOuraDailySummary(this.db, userId, from, to) }
   async getOuraCloudReadinessContributors(userId: string, from: string, to: string) { return oura.getOuraCloudReadinessContributors(this.db, userId, from, to) }
   async upsertOuraDailyDerived(userId: string, day: string, patch: import('../repository').OuraDailyDerivedPatch) { return oura.upsertOuraDailyDerived(this.db, userId, day, patch) }
+  async clearNightDerivedScores(userId: string, day: string, pillars: { sleep: boolean; readiness: boolean }) { return oura.clearNightDerivedScores(this.db, userId, day, pillars) }
   async getOuraStorageStats() { return oura.getOuraStorageStats(this.db) }
   async nullHistoricalDecoded(userId: string, maxRows?: number) { return oura.nullHistoricalDecoded(this.db, userId, maxRows) }
   async vacuumOuraRawSamples() { return oura.vacuumOuraRawSamples() }

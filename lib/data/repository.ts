@@ -690,6 +690,8 @@ export interface WorkoutRepository {
   /** #2985: the local day the user switched to the Oura API, or null without a connection: the day of
    *  their newest raw Bluetooth frame, else the connection's creation. Survives a reconnect. */
   getOuraCloudSwitchDay(userId: string): Promise<string | null>
+  /** #3079: users with a live Oura OAuth connection, for the daily reconciliation read. Not user-scoped. */
+  listOuraCloudConnectedUserIds(): Promise<string[]>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
@@ -1526,6 +1528,8 @@ export interface WorkoutRepository {
   /** `false` when the TN-20 guard kept the stored day instead. */
   upsertBodyBatteryDaily(userId: string, row: BodyBatteryDailyRow): Promise<boolean>
   getBodyBatteryHistory(userId: string, startDate: string, endDate: string): Promise<BodyBatteryDailyRow[]>
+  /** #3079: a `readiness` anchor goes back to provisional, so the next read re-chooses it. */
+  releaseBodyBatteryAnchor(userId: string, date: string): Promise<boolean>
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>
   /** #2859: Oura Cloud sleep periods (`oura_cloud`), keyed by Oura's id; a period another row already
    *  covers is skipped, never duplicated. */
@@ -1542,6 +1546,8 @@ export interface WorkoutRepository {
   upsertOuraCloudDaily(userId: string, rows: import('./postgres/slices/oura').OuraCloudDailyRow[]): Promise<number>
   /** #2985: Oura's stored MET series and 5-minute activity class per day, for the MET cascade. */
   getOuraCloudActivitySeries(userId: string, from: string, to: string): Promise<import('./postgres/slices/oura').OuraCloudActivitySeries[]>
+  /** #3079: when each day's Oura MET series last changed; days without MET are left out. */
+  getOuraCloudMetChangedAt(userId: string, from: string, to: string): Promise<{ date: string; changedAt: Date }[]>
   /** #2982: Oura's sessions (breathing, meditation …) with their series and mood. */
   upsertOuraSessions(userId: string, rows: import('./postgres/slices/oura').OuraSessionRow[]): Promise<number>
   /** #2895: the newest `oura_cloud` HR point at or after `since`; where the next Cloud HR read starts. */
@@ -1646,6 +1652,8 @@ export interface WorkoutRepository {
   // per-day upsert: only the fields present in `patch` are written, via COALESCE so a partial
   // recompute never nulls an existing good value. Read by range for the readiness/health routes.
   upsertOuraDailyDerived(userId: string, day: string, patch: OuraDailyDerivedPatch): Promise<void>
+  /** #3079: nulls a day's stored sleep and/or readiness scores when their night changed or went. */
+  clearNightDerivedScores(userId: string, day: string, pillars: { sleep: boolean; readiness: boolean }): Promise<boolean>
   getOuraStorageStats(): Promise<OuraStorageStats>
   nullHistoricalDecoded(userId: string, maxRows?: number): Promise<{ nulled: number; remaining: number }>
   vacuumOuraRawSamples(): Promise<{ beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number }>

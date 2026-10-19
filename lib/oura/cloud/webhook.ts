@@ -22,6 +22,7 @@ import { fetchOuraDocument, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthor
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
 import { writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
+import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import { getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
 
 /** The webhook settings, from the environment. `null` when any is missing: the route answers 503. */
@@ -131,6 +132,8 @@ export type OuraWebhookDeps = {
   config: OuraOAuthConfig
   /** Starts the heart-rate catch-up for a user; replaceable for tests. Default: `startOuraCloudHeartRateCatchUp`. */
   heartRate?: (userId: string) => void
+  /** #3079: re-scores a recent night a sleep event changed or deleted (`rescore-nights.ts`). */
+  rescore?: NightRescoreRepo
 }
 
 function isStoredType(t: string): t is OuraDocumentType {
@@ -148,7 +151,8 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
 
   if (event.event_type === 'delete') {
     if (event.data_type !== 'sleep') return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
-    return { result: 'deleted', tombstoned: await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id]) }
+    const tombstoned = await withNightRescore(deps.rescore, userId, () => deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id]))
+    return { result: 'deleted', tombstoned }
   }
 
   // Oura answers 401 for a type the user did not share, which would read as `reauth` (#2974).
@@ -160,7 +164,7 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     if (!token) return { result: 'unknown_user' }
     const doc = await fetchOuraDocument(token, event.data_type, event.object_id)
     if (!doc) return { result: 'not_found' }
-    const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]))
+    const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]), deps.rescore)
     if (HEART_RATE_TRIGGERS.has(event.data_type)) {
       if (isOuraTypeShared(granted, 'heartrate')) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
       // The user's choice on Oura's consent page, not a failure: logged, never reported (as the backfill does).

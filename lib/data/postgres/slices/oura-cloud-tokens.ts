@@ -83,6 +83,16 @@ export async function getUserIdByOuraUserId(db: Db, ouraUserId: string): Promise
 }
 
 /**
+ * #3079: every user with a live OAuth connection (an access token, no personal access token), for
+ * the daily reconciliation read. App-level like the webhook subscriptions: one pass covers everyone.
+ */
+export async function listOuraCloudConnectedUserIds(db: Db): Promise<string[]> {
+  const rows = await db.select({ userId: t.userId }).from(t)
+    .where(sql`${t.accessToken} IS NOT NULL AND ${t.personalAccessToken} IS NULL`)
+  return rows.map(r => r.userId)
+}
+
+/**
  * #2985: the local day the user switched to the Oura API, or null when they never did.
  *
  * It has to survive a disconnect and reconnect (the Oura screen offers only "Disconnect", so

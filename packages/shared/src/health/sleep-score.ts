@@ -210,6 +210,15 @@ export const SLEEP_AWAKE_FRACTION_BASELINE_MIN_NIGHTS = 14
 export const MAIN_SLEEP_MIN_HOURS = 4
 
 /**
+ * Stamped on every persisted Sleep Score as `oura_daily_derived.model_versions.sleep` (#3079), the
+ * way readiness stamps `READINESS_MODEL_VERSION`. Sleep shipped without one, so the 17 Oct move of
+ * the night's source to the Oura API and the 19 Oct night composition (#3061) are unmarked steps in
+ * its history: a row with no `sleep` key was scored before this stamp existed. Change it whenever a
+ * weight, curve, baseline rule or the choice of which periods make the night changes.
+ */
+export const SLEEP_SCORE_MODEL_VERSION = 'v1:oura-long-sleep-night:2026-10-19'
+
+/**
  * The Sleep Score model in serialisable form — every weight, curve anchor and constant the score
  * is built from. Exported so tooling (the admin day-review audit) can present a score alongside
  * the exact model that produced it without copying any of it. Read-only mirror of the constants

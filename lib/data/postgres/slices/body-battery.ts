@@ -102,6 +102,21 @@ export async function upsertBodyBatteryDaily(db: Db, userId: string, row: BodyBa
  * `measured(incoming) || !measured(stored)`. `tn20-empty-snapshot-guard.test.ts` runs both over the
  * same rows, so the two cannot drift apart silently.
  */
+/**
+ * #3079. A readiness anchor is frozen for the rest of its day (`resolveAnchor`), so when the night
+ * that readiness was scored from changes, the day's curve would stay walked from the old score. This
+ * marks the stored anchor provisional again (`default`), so the next read re-chooses it: readiness
+ * once it is recomputed, the night's own sleep score until then. Only a `readiness` anchor is
+ * touched; a provisional one is re-chosen on every read already. Returns whether a row changed.
+ */
+export async function releaseBodyBatteryAnchor(db: Db, userId: string, date: string): Promise<boolean> {
+  const rows = await db.update(s.bodyBatteryDaily)
+    .set({ anchorSource: 'default', updatedAt: new Date() })
+    .where(and(eq(s.bodyBatteryDaily.userId, userId), eq(s.bodyBatteryDaily.date, date), eq(s.bodyBatteryDaily.anchorSource, 'readiness')))
+    .returning({ id: s.bodyBatteryDaily.id })
+  return rows.length > 0
+}
+
 export function isMeasuredBatteryDay(row: Pick<BodyBatteryDailyRow, 'hrSampleCount' | 'totalCharged' | 'totalDrained'>): boolean {
   return row.hrSampleCount > 0 && (row.totalCharged > 0 || row.totalDrained > 0)
 }
