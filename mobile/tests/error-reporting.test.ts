@@ -25,11 +25,13 @@ function harness() {
     return 0 as unknown as ReturnType<typeof setTimeout>;
   }) as never);
   reporter.enable(build);
-  reporter.connect(async (_path, body) => {
-    sent.push(body);
+  const poster = (account: string) => async (_path: string, body: unknown) => {
+    sent.push({ account, body });
     if (fail) throw new TypeError('Network request failed');
-  });
+  };
+  reporter.connect('user-a', poster('user-a'));
   return {
+    poster,
     reporter,
     sent,
     failNext: () => (fail = true),
@@ -67,6 +69,24 @@ test('a report never carries a token, an email, a number or quoted text', () => 
   }
   assert.match(message, /^Error: Rejected Bearer \[redacted\]/);
   assert.match(message, /weight # kg, HRV # ms/);
+});
+
+test('relative query strings, snake_case key names and auth credentials are scrubbed too', () => {
+  const message = reportMessage(
+    new Error(
+      'GET /api/foods/search?q=chicken breast failed; api_key=AKIAabc client_secret: s3cr3t-val ' +
+        'authorization: Basic dXNlcjpwYXNz then Authorization: Bearer opaque-value',
+    ),
+  );
+  for (const leaked of ['chicken', 'q=', 'AKIAabc', 's3cr3t', 'dXNlcjpwYXNz', 'opaque-value']) {
+    assert.ok(!message.includes(leaked), `${leaked} leaked into: ${message}`);
+  }
+  assert.match(message, /GET \/api\/foods\/search/);
+  assert.match(reportMessage(new Error('api_key=abc')), /api_key=\[redacted\]/);
+  assert.match(
+    reportMessage(new Error('authorization: Basic dXNlcjpwYXNz')),
+    /authorization: \[redacted\]$/,
+  );
 });
 
 test('the HTTP status comes from the error, not its scrubbed text', () => {
@@ -109,7 +129,7 @@ test('reports are batched, sent in the intake shape, and repeats are dropped', a
   assert.equal(h.sent.length, 0, 'nothing leaves before the batching delay');
   await h.advance(1);
   assert.equal(h.sent.length, 1);
-  const body = NativeClientErrorBatchSchema.parse(h.sent[0]);
+  const body = NativeClientErrorBatchSchema.parse((h.sent[0] as { body: unknown }).body);
   assert.deepEqual(
     body.events.map((event) => [event.message, event.screen, event.apiPath]),
     [
@@ -133,7 +153,7 @@ test('sends are spaced, the queue is bounded, and a failed send is dropped, not 
   for (let i = 0; i < 25; i++) h.reporter.report(new Error(`fault ${'x'.repeat(i + 1)}`));
   await h.advance(5_000);
   assert.equal(h.sent.length, 1);
-  assert.equal((h.sent[0] as { events: unknown[] }).events.length, 5);
+  assert.equal((h.sent[0] as { body: { events: unknown[] } }).body.events.length, 5);
   await h.advance(9_000);
   assert.equal(h.sent.length, 1, 'the next send waits out the gap');
   await h.advance(1_000);
@@ -141,7 +161,7 @@ test('sends are spaced, the queue is bounded, and a failed send is dropped, not 
   await h.advance(60_000);
   await h.advance(60_000);
   const total = h.sent.reduce<number>(
-    (sum, body) => sum + (body as { events: unknown[] }).events.length,
+    (sum, sent) => sum + (sent as { body: { events: unknown[] } }).body.events.length,
     0,
   );
   assert.equal(total, 10, 'the queue held at most 10, and the failed batch was not resent');
@@ -150,7 +170,7 @@ test('sends are spaced, the queue is bounded, and a failed send is dropped, not 
 test('the reporter is off until enabled, and never throws', async () => {
   const reporter = new ErrorReporter();
   const sent: unknown[] = [];
-  reporter.connect(async (_path, body) => void sent.push(body));
+  reporter.connect('user-a', async (_path, body) => void sent.push(body));
   assert.doesNotThrow(() => reporter.report(new Error('before enable')));
   const hostile = {
     get message() {
@@ -221,4 +241,28 @@ test('a schema failure reports its first field path and code, never the data or 
   const message = reportMessage(parsed.error);
   assert.match(message, /unexpected data at program\.sessions\.\*\.sets \(invalid_type\)/);
   assert.ok(!/Nordic|82|four/.test(message), message);
+});
+
+test('a report is only sent as the account it happened under', async () => {
+  const h = harness();
+  h.reporter.report(new Error('under account A'));
+  h.reporter.connect('user-b', h.poster('user-b'));
+  h.reporter.report(new Error('under account B'));
+  await h.advance(5_000);
+  assert.equal(h.sent.length, 1);
+  const sent = h.sent[0] as { account: string; body: { events: { message: string }[] } };
+  assert.equal(sent.account, 'user-b');
+  assert.deepEqual(
+    sent.body.events.map((event) => event.message),
+    ['Error: under account B'],
+  );
+  h.reporter.connect(null, null);
+  h.reporter.report(new Error('while signed out'));
+  h.reporter.connect('user-b', h.poster('user-b'));
+  await h.advance(60_000);
+  assert.equal(
+    h.sent.length,
+    1,
+    'nothing is queued while signed out, so nothing leaks to the next sign-in',
+  );
 });

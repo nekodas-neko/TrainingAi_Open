@@ -13,7 +13,7 @@ import {
 } from './models.ts';
 import { WidgetResultSchema, type WidgetResult } from './widgets.ts';
 import { CoachTransport } from './CoachTransport.ts';
-import { failureNotice, reportError } from '../../../core/reporting/index.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 type State = {
   ready: boolean;
@@ -424,8 +424,10 @@ export class CoachConversation {
           this.checkpoint();
           this.resources.invalidate([historySpec.path]);
         } catch (failure) {
-          reportError(failure);
-          this.update({ historyError: coachError(failure, 'save conversation history') });
+          // coachError(null): its status texts are about suggestions, not saving the history.
+          this.update({
+            historyError: failureNotice(coachError(null, 'save conversation history'), failure),
+          });
         }
       });
     return this.historyWrites;

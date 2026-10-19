@@ -543,7 +543,10 @@ function AppShell() {
 function ErrorReportConnection() {
   const { dataReader } = useAccountContext();
   useEffect(() => {
-    errorReporter.connect(dataReader ? (path, body) => dataReader.post(path, body) : null);
+    errorReporter.connect(
+      dataReader?.userId ?? null,
+      dataReader ? (path, body) => dataReader.post(path, body) : null,
+    );
   }, [dataReader]);
   return null;
 }

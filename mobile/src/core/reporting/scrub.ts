@@ -7,22 +7,28 @@ const MAX_MESSAGE = 300;
 const MAX_REASON = 80;
 
 export function scrubText(value: string, limit = MAX_MESSAGE): string {
-  return value
-    .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
-    .replace(/\beyJ[\w-]*(?:\.[\w-]*)+/g, '[token]')
-    .replace(
-      /\b(token|access_?token|refresh_?token|key|secret|password|authorization|cookie|code|verifier|state)\b(\s*[:=]\s*)\S+/gi,
-      '$1$2[redacted]',
-    )
-    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '[email]')
-    .replace(/(https?:\/\/[^\s?#]+)[?#]\S*/gi, '$1')
-    .replace(/\b[\w-]{24,}\b/g, '[id]')
-    .replace(/"[^"]*"|“[^”]*”|‘[^’]*’/g, '"…"')
-    .replace(/(^|[^\w'])'[^']*'(?!\w)/g, '$1"…"')
-    .replace(/\d+(?:[.,:]\d+)*/g, '#')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, limit);
+  return (
+    value
+      .replace(/\b(Bearer|Basic|Digest)\s+\S+/gi, '$1 [redacted]')
+      .replace(/\beyJ[\w-]*(?:\.[\w-]*)+/g, '[token]')
+      // Any key name containing a credential word, snake_case or not (api_key, client_secret); the
+      // value after an auth scheme word was redacted above and stays so.
+      .replace(
+        /\b([\w-]*(?:token|key|secret|password|passwd|authorization|cookie|code|verifier|state)[\w-]*)(\s*[:=]\s*)(?:(?:Bearer|Basic|Digest) \[redacted\]|\S+)/gi,
+        '$1$2[redacted]',
+      )
+      .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '[email]')
+      .replace(/(https?:\/\/[^\s?#]+)[?#]\S*/gi, '$1')
+      // Relative paths too: a search query is user text (/api/foods/search?q=chicken breast).
+      .replace(/((?:^|[\s(])\/[\w/.:-]*)[?#][^)]*?(?=\)|$|\s\[|\.\s)/g, '$1')
+      .replace(/\b[\w-]{24,}\b/g, '[id]')
+      .replace(/"[^"]*"|“[^”]*”|‘[^’]*’/g, '"…"')
+      .replace(/(^|[^\w'])'[^']*'(?!\w)/g, '$1"…"')
+      .replace(/\d+(?:[.,:]\d+)*/g, '#')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, limit)
+  );
 }
 
 /** An `/api/` path with ids replaced and the query dropped, or undefined if it is not one. */

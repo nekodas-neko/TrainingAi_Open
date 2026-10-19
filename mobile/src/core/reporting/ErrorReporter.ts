@@ -24,6 +24,7 @@ const HOURLY_LIMIT = 30;
 export class ErrorReporter {
   private build: BuildInfo | null = null;
   private send: Send | null = null;
+  private account: string | null = null;
   private screen = 'App';
   private queue: NativeClientError[] = [];
   private seen = new Map<string, number>();
@@ -40,10 +41,20 @@ export class ErrorReporter {
   enable(build: BuildInfo) {
     this.build = build;
   }
-  /** The signed-in account's poster, or null when signed out; reports wait in the queue meanwhile. */
-  connect(send: Send | null) {
-    this.send = send;
-    if (send) this.arm();
+  /**
+   * The signed-in account and its poster, or nulls when signed out. A report is only ever sent as
+   * the account it happened under: a change of account clears the queue, and while signed out
+   * nothing is queued.
+   */
+  connect(account: string | null, send: Send | null) {
+    if (account !== this.account) {
+      this.queue = [];
+      if (this.timer !== null) clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.account = send ? account : null;
+    this.send = this.account ? send : null;
+    this.arm();
   }
   setScreen(name: string) {
     this.screen = scrubScreen(name);
@@ -51,7 +62,7 @@ export class ErrorReporter {
 
   report(error: unknown, context: ReportContext = {}): void {
     try {
-      if (!this.build || isExpectedFailure(error)) return;
+      if (!this.build || !this.account || isExpectedFailure(error)) return;
       if (typeof error === 'object' && error !== null) {
         if (this.reported.has(error)) return;
         this.reported.add(error);
@@ -100,7 +111,7 @@ export class ErrorReporter {
 
   private async flush() {
     const send = this.send;
-    if (!send || this.queue.length === 0) return;
+    if (!send || !this.account || this.queue.length === 0) return;
     const events = this.queue.splice(0, MAX_CLIENT_ERROR_BATCH);
     this.lastSend = this.now();
     try {

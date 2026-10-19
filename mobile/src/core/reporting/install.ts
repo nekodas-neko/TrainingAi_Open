@@ -20,11 +20,17 @@ let installed = false;
 export function installErrorReporting() {
   if (installed || __DEV__ || (Platform.OS !== 'android' && Platform.OS !== 'ios')) return;
   installed = true;
+  // Runs as App.tsx loads: reporting failing to start must never stop the app from starting.
+  try {
+    install(Platform.OS);
+  } catch {}
+}
+function install(platform: 'android' | 'ios') {
   // Kept to the intake's character set, or every report would fail its schema and drop.
   errorReporter.enable({
     appVersion: nativeAppVersion.replace(/[^0-9A-Za-z.+-]/g, '').slice(0, 32) || '0',
     buildCode: nativeBuildCode.replace(/[^0-9A-Za-z.]/g, '').slice(0, 16) || '0',
-    platform: Platform.OS,
+    platform,
   });
   const previous = ErrorUtils.getGlobalHandler();
   ErrorUtils.setGlobalHandler((error, isFatal) => {
