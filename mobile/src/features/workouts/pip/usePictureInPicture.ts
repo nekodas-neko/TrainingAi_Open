@@ -1,45 +1,42 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { pictureInPicture } from '../../../integrations/pip/platform';
+import type { PictureInPicture } from '../../../integrations/pip/types';
 import type { WorkoutJournalStore } from '../logging/WorkoutJournalStore';
 import type { WorkoutRecord } from '../logging/workout';
-import { pipCommand, pipPhaseFor, type PipAction } from './pip';
-
-/** True while the app shows as the picture-in-picture window. */
-export function usePipMode() {
-  const [active, setActive] = useState(false);
-  useEffect(() => {
-    const subscription = pictureInPicture?.addListener('onModeChange', (event) =>
-      setActive(event.active),
-    );
-    return () => subscription?.remove();
-  }, []);
-  return active;
-}
-
-/** The window's clock: native ticks in PiP, where JS timers are paused, else a timer. */
-export function usePipNow() {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    const subscription = pictureInPicture?.addListener('onTick', () => setNow(Date.now()));
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => {
-      subscription?.remove();
-      clearInterval(timer);
-    };
-  }, []);
-  return now;
-}
+import { pipCommand, pipPhaseFor, pipViewFor, type PipAction } from './pip';
 
 /**
- * The workout screen reports its phase while it is open, and idle once it closes, so a later
- * Home press elsewhere never opens the window (#2908). The window's buttons act on this workout.
+ * Tells the module what the workout screen shows. Sends only on change, and "idle" once closed:
+ * after that a Home press anywhere never opens the window (#2908).
  */
+export function createPipReporter(native: Pick<PictureInPicture, 'setPhase'> | null) {
+  let last: string | null = null;
+  let closed = false;
+  return {
+    update(workout: WorkoutRecord) {
+      if (closed || !native) return;
+      const phase = pipPhaseFor(workout);
+      const view = pipViewFor(workout);
+      const key = JSON.stringify([phase, view]);
+      if (key === last) return;
+      last = key;
+      native.setPhase(phase, view);
+    },
+    close() {
+      if (closed) return;
+      closed = true;
+      native?.setPhase('idle', null);
+    },
+  };
+}
+
+/** The workout screen's half of picture-in-picture: its phase, and the window's buttons. */
 export function useWorkoutPip(workout: WorkoutRecord, controller: WorkoutJournalStore) {
-  const phase = pipPhaseFor(workout);
-  useEffect(() => {
-    pictureInPicture?.setPhase(phase);
-  }, [phase]);
-  useEffect(() => () => pictureInPicture?.setPhase('idle'), []);
+  const reporter = useMemo(() => createPipReporter(pictureInPicture), []);
+  // A layout effect runs inside the commit, so a change made from a window button reaches the
+  // native view without waiting on JS timers, which are paused while the app is in PiP.
+  useLayoutEffect(() => reporter.update(workout), [reporter, workout]);
+  useEffect(() => () => reporter.close(), [reporter]);
   const latest = useRef({ workout, controller });
   latest.current = { workout, controller };
   useEffect(() => {

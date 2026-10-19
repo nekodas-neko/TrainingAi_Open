@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import {
   allowsPip,
-  pipClock,
   pipCommand,
   pipPhaseFor,
   pipViewFor,
@@ -93,7 +92,7 @@ test('only an active workout past its warm-up opens the window (#2908)', () => {
   );
 });
 
-test('resting shows the elapsed rest against its target and the sets done', () => {
+test('resting sends the rest anchor, its target and the sets done', () => {
   const view = timer(
     pipViewFor(
       recorded(2, {
@@ -107,20 +106,22 @@ test('resting shows the elapsed rest against its target and the sets done', () =
       }),
     ),
   );
-  assert.deepEqual(
-    [view.exerciseName, view.phase, view.currentSet, view.sets, view.restTargetSec],
-    ['Bench press', 'rest', 2, 3, 90],
-  );
-  const early = pipClock(view, T0 + 90_000 + 45_500);
-  assert.deepEqual(
-    [early.seconds, early.overTime, early.fraction, early.label],
-    [45, false, 0.5, 'rest · 2/3'],
-  );
-  const late = pipClock(view, T0 + 90_000 + 100_000);
-  assert.deepEqual([late.seconds, late.overTime, late.over, late.fraction], [100, true, 10, 1]);
+  assert.deepEqual(view, {
+    kind: 'timer',
+    exerciseName: 'Bench press',
+    phase: 'rest',
+    currentSet: 2,
+    sets: 3,
+    restTargetSec: 90,
+    restStartMs: T0 + 90_000,
+    setStartMs: null,
+    load: null,
+    setColor: null,
+  });
+  assert.equal(timer(pipViewFor(recorded(1))).restTargetSec, 0, 'no rest timer: no target');
 });
 
-test('a running set shows its time, its number and the load', () => {
+test('a running set sends its start, the load and the set colour', () => {
   const base = recorded(1, { runningSet: { exerciseId: ids.bench, setId: ids.set(2) } });
   base.exercises[0].sets[1] = {
     ...base.exercises[0].sets[1],
@@ -129,22 +130,47 @@ test('a running set shows its time, its number and the load', () => {
     reps: '6',
   };
   const view = timer(pipViewFor(base));
-  assert.equal(view.load, '62.5 kg × 6');
-  const clock = pipClock(view, T0 + 100_000 + 90_000);
-  assert.deepEqual([clock.seconds, clock.fraction, clock.label], [90, 0.5, 'set 2/3']);
-  assert.equal(pipClock(view, T0 + 100_000 + 400_000).fraction, 1, 'capped at three minutes');
+  assert.deepEqual(
+    [view.phase, view.currentSet, view.setStartMs, view.load, view.setColor],
+    ['set', 1, T0 + 100_000, '62.5 kg × 6', '#a78bfa'],
+  );
+  // Past the six-colour table the shared palette turns oklch, which Android cannot parse.
+  const many = recorded(7, { runningSet: { exerciseId: ids.bench, setId: ids.set(1) } });
+  many.exercises[0].sets = [...Array(8)].map((_, i) =>
+    i < 7 ? { ...set(i + 1), completedAt: T0 + i } : set(i + 1),
+  );
+  assert.match(timer(pipViewFor(many)).setColor ?? '', /^#[\da-f]{6}$/i);
 });
 
-test('the exercise summary times the last set’s rest, or shows the placeholder', () => {
+test('the exercise summary shows the placeholder until Preview runs a last-set rest (#3111)', () => {
   const summary = recorded(3, { flow: { stage: 'summary', exerciseId: ids.bench } });
-  const view = timer(pipViewFor(summary));
-  assert.deepEqual([view.restStartMs, view.restTargetSec], [T0 + 150_000, 90]);
-  assert.equal(pipClock(view, T0 + 160_000).label, 'done');
-  assert.deepEqual(pipViewFor(workout({ flow: { stage: 'summary', exerciseId: ids.bench } })), {
-    kind: 'placeholder',
-    exerciseName: 'Bench press',
-  });
+  assert.deepEqual(pipViewFor(summary), { kind: 'placeholder', exerciseName: 'Bench press' });
   assert.equal(pipViewFor(workout({ flow: { stage: 'warmup', exerciseId: ids.bench } })), null);
+});
+
+test('the workout screen reports changes only, and idle once it closes (#2908)', async () => {
+  const { createPipReporter } = await import('../src/features/workouts/pip/usePictureInPicture.ts');
+  const sent: [string, unknown][] = [];
+  const reporter = createPipReporter({ setPhase: (phase, view) => void sent.push([phase, view]) });
+  reporter.update(recorded(1));
+  reporter.update(recorded(1));
+  reporter.update(recorded(1, { runningSet: { exerciseId: ids.bench, setId: ids.set(2) } }));
+  assert.deepEqual(
+    sent.map(([phase]) => phase),
+    ['rest', 'set'],
+    'a re-render with nothing new sends nothing',
+  );
+  assert.equal((sent[0][1] as { kind: string }).kind, 'timer');
+  reporter.close();
+  reporter.close();
+  reporter.update(recorded(2));
+  assert.deepEqual(sent.slice(2), [['idle', null]]);
+  // A warm-up or a finished workout reports a phase that never opens the window, with no view.
+  const later = createPipReporter({ setPhase: (phase, view) => void sent.push([phase, view]) });
+  later.update(workout({ flow: { stage: 'warmup', exerciseId: ids.bench } }));
+  assert.deepEqual(sent.at(-1), ['pre', null]);
+  // Without the module (iOS, an older build) nothing is called and nothing throws.
+  createPipReporter(null).update(recorded(1));
 });
 
 test('the window buttons act as the current app’s', () => {

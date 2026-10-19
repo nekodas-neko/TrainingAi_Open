@@ -171,28 +171,6 @@ export const typography = {
   macroCaption: { fontSize: 10.5, lineHeight: 15.75, fontWeight: '400' },
   // strength-progress-card.tsx: the 60 / 70 / 80 labels over a strength bar, 7 px bold at -0.02em.
   strengthMarker: { fontSize: 7, lineHeight: 7, fontWeight: '700', letterSpacing: -0.14 },
-  // pip-view.tsx, the workout's picture-in-picture window: text-[9px] uppercase tracking-widest
-  // captions, a 2rem bold mono clock (leading-none), and text-sm bold for the set's load.
-  pipCaption: { fontSize: 9, lineHeight: 13.5, letterSpacing: 0.9, textTransform: 'uppercase' },
-  pipClock: {
-    fontSize: 32,
-    lineHeight: 32,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-    fontVariant: ['tabular-nums'],
-  },
-  pipLoad: { fontSize: 14, lineHeight: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  // workout-screen.tsx's summary placeholder in the window: text-xs semibold and text-[10px]
-  // uppercase tracking-widest labels around a text-lg bold leading-snug exercise name.
-  pipDone: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '600',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  pipName: { fontSize: 18, lineHeight: 24.75, fontWeight: '700' },
-  pipHint: { fontSize: 10, lineHeight: 15, letterSpacing: 1, textTransform: 'uppercase' },
   display: { fontSize: 48, lineHeight: 56, fontWeight: '800' },
   wheelValue: { fontSize: 32, lineHeight: 40, fontWeight: '700' },
 } satisfies Record<string, TextStyle>;

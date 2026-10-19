@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Rational
+import android.view.ViewGroup
 import androidx.core.app.OnPictureInPictureModeChangedProvider
 import androidx.core.app.PictureInPictureModeChangedInfo
 import androidx.core.util.Consumer
@@ -24,19 +25,23 @@ import expo.modules.kotlin.modules.ModuleDefinition
 // the same 3:4 window, entered from onUserLeaveHint, and the same buttons per phase. JS reports
 // the phase whenever the workout screen changes it and sends "idle" when the screen closes, so
 // leaving the app with no workout open never shrinks it into a window (#2908).
+//
+// The window's content is a native view (PipWindowView) laid over the app while in PiP. React
+// Native stops applying UI updates while the activity is paused, and an activity in PiP is paused,
+// so a React-drawn window would freeze on its first frame. JS keeps the view's data current through
+// setPhase; a Handler here redraws it every second.
 class PictureInPictureModule : Module() {
-  private val activePhases = setOf("rest", "set", "complete", "summary")
-  @Volatile private var phase = "idle"
+  @Volatile private var phase = PipPolicy.IDLE
+  @Volatile private var window: PipWindow? = null
+  private var windowView: PipWindowView? = null
   private var receiverRegistered = false
   private var watched: OnPictureInPictureModeChangedProvider? = null
   private var inPip = false
   private val main = Handler(Looper.getMainLooper())
-  // React Native pauses JS timers while the activity is paused, and an activity in PiP is paused,
-  // so the window's clock is driven from here. The current app's WebView kept running on its own.
   private val tick = object : Runnable {
     override fun run() {
       if (!inPip) return
-      sendEvent("onTick", mapOf("at" to System.currentTimeMillis().toDouble()))
+      windowView?.render(window, System.currentTimeMillis())
       main.postDelayed(this, 1_000)
     }
   }
@@ -57,15 +62,17 @@ class PictureInPictureModule : Module() {
 
   override fun definition() = ModuleDefinition {
     Name("PictureInPicture")
-    Events("onModeChange", "onAction", "onTick")
+    Events("onModeChange", "onAction")
 
     Function("isAvailable") {
       Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
 
-    Function("setPhase") { next: String ->
+    Function("setPhase") { next: String, view: Map<String, Any?>? ->
       phase = next
+      window = if (PipPolicy.isActivePhase(next)) PipState.fromMap(view) else null
+      main.post { windowView?.render(window, System.currentTimeMillis()) }
       val activity = appContext.currentActivity ?: return@Function
       watch(activity)
       activity.runOnUiThread {
@@ -91,6 +98,7 @@ class PictureInPictureModule : Module() {
       watched = null
       inPip = false
       main.removeCallbacks(tick)
+      removeWindow()
     }
 
     OnActivityEntersForeground {
@@ -102,7 +110,7 @@ class PictureInPictureModule : Module() {
 
     OnUserLeavesActivity {
       val activity = appContext.currentActivity ?: return@OnUserLeavesActivity
-      if (phase !in activePhases) return@OnUserLeavesActivity
+      if (!PipPolicy.isActivePhase(phase)) return@OnUserLeavesActivity
       val params = params(activity, phase) ?: return@OnUserLeavesActivity
       watch(activity)
       if (runCatching { activity.enterPictureInPictureMode(params) }.getOrDefault(false)) report(true)
@@ -122,7 +130,30 @@ class PictureInPictureModule : Module() {
     inPip = active
     sendEvent("onModeChange", mapOf("active" to active))
     main.removeCallbacks(tick)
-    if (active) main.post(tick)
+    if (active) {
+      showWindow()
+      main.post(tick)
+    } else {
+      removeWindow()
+    }
+  }
+
+  private fun showWindow() {
+    val activity = appContext.currentActivity ?: return
+    val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return
+    val view = windowView ?: PipWindowView(activity).also { windowView = it }
+    if (view.parent !== content) {
+      (view.parent as? ViewGroup)?.removeView(view)
+      content.addView(view, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
+    view.bringToFront()
+    view.render(window, System.currentTimeMillis())
+  }
+
+  private fun removeWindow() {
+    val view = windowView ?: return
+    (view.parent as? ViewGroup)?.removeView(view)
+    windowView = null
   }
 
   private fun params(activity: Activity, phase: String): PictureInPictureParams? {

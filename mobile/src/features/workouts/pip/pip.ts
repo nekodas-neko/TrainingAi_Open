@@ -1,10 +1,12 @@
 import { formatLoadKg } from '@trainingai/shared/format/units';
+import { CATEGORICAL_PALETTE, categoricalColor } from '@trainingai/shared/chart-colors';
 import { workoutFlow } from '../logging/flow.ts';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
 
 // Picture-in-picture for the workout screen (#3064), ported from the current app:
 // lib/workout/pip-phase.ts (the phase reported to the shell), components/workout/pip-view.tsx (what
-// the window shows) and the PiP buttons wired in components/workout-screen.tsx.
+// the window shows, drawn natively by modules/picture-in-picture) and the PiP buttons wired in
+// components/workout-screen.tsx.
 
 /** Only the four active phases open the window on leave; the shell starts in, and returns to, idle. */
 export type PipPhase = 'idle' | 'pre' | 'set' | 'rest' | 'complete' | 'summary' | 'done';
@@ -48,16 +50,10 @@ export type PipView =
       setStartMs: number | null;
       /** "60 kg × 8" during a set. */
       load: string | null;
+      /** The running set's arc colour, as the current app's setColor(currentSet). */
+      setColor: string | null;
     }
   | { kind: 'placeholder'; exerciseName: string };
-
-function lastRecorded(exercise: WorkoutExercise) {
-  return exercise.sets
-    .filter((set) => set.completedAt !== null)
-    .reduce<
-      WorkoutExercise['sets'][number] | null
-    >((latest, set) => (latest && latest.completedAt! >= set.completedAt! ? latest : set), null);
-}
 
 function load(exercise: WorkoutExercise, set: WorkoutExercise['sets'][number]) {
   const weight = Number(set.weight.trim().replace(',', '.'));
@@ -70,13 +66,26 @@ function repsOf(set: WorkoutExercise['sets'][number]) {
   const reps = Number(set.reps);
   return set.reps.trim() && Number.isInteger(reps) ? reps : (set.planned?.reps ?? 10);
 }
+function setColor(index: number) {
+  const color = categoricalColor(index);
+  // Past the six-colour table the palette is oklch, which Android cannot parse.
+  return /^#[\da-f]{6}$/i.test(color)
+    ? color
+    : CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length];
+}
 
-/** What the window draws, as the current app's PipView and its summary branch. */
+/**
+ * What the window draws, as the current app's PipView. The native module draws it (React cannot
+ * repaint in PiP) and keeps the clock running from these anchors.
+ */
 export function pipViewFor(workout: WorkoutRecord | null): PipView | null {
   const phase = pipPhaseFor(workout);
   if (!workout || !allowsPip(phase)) return null;
   const { exercise } = current(workout);
   if (!exercise) return null;
+  // Preview's exercise summary runs no last-set rest (#3111), so there is nothing to time: the
+  // current app's placeholder, until that rest exists.
+  if (phase === 'summary') return { kind: 'placeholder', exerciseName: exercise.name };
   const base = {
     exerciseName: exercise.name,
     sets: exercise.sets.length,
@@ -92,21 +101,7 @@ export function pipViewFor(workout: WorkoutRecord | null): PipView | null {
       restStartMs: null,
       setStartMs: set?.startedAt ?? null,
       load: set ? load(exercise, set) : null,
-    };
-  }
-  if (phase === 'summary') {
-    // The last set's rest still counts in the window; with nothing recorded there is nothing to time.
-    const last = lastRecorded(exercise);
-    if (!last) return { kind: 'placeholder', exerciseName: exercise.name };
-    const planned = last.planned?.restSeconds ?? 0;
-    return {
-      kind: 'timer',
-      ...base,
-      phase: 'rest',
-      restTargetSec: planned > 0 ? Math.max(0, planned + workout.restAdjustmentSeconds) : 0,
-      restStartMs: last.completedAt,
-      setStartMs: null,
-      load: null,
+      setColor: setColor(base.currentSet),
     };
   }
   return {
@@ -119,38 +114,7 @@ export function pipViewFor(workout: WorkoutRecord | null): PipView | null {
     restStartMs: workout.restAnchor?.startedAt ?? null,
     setStartMs: null,
     load: null,
-  };
-}
-
-/** The window's clock, as PipView computes it at one instant. */
-export function pipClock(view: Extract<PipView, { kind: 'timer' }>, now: number) {
-  const restElapsed =
-    view.phase === 'rest' && view.restStartMs !== null
-      ? Math.max(0, Math.floor((now - view.restStartMs) / 1000))
-      : 0;
-  const setElapsed =
-    view.phase === 'set' && view.setStartMs !== null
-      ? Math.max(0, Math.floor((now - view.setStartMs) / 1000))
-      : 0;
-  const overTime =
-    view.phase === 'rest' && view.restTargetSec > 0 && restElapsed >= view.restTargetSec;
-  return {
-    seconds: view.phase === 'rest' ? restElapsed : setElapsed,
-    overTime,
-    over: overTime ? restElapsed - view.restTargetSec : 0,
-    // Rest fills toward its target and stays full; a set grows to a three-minute visual cap.
-    fraction:
-      view.phase === 'rest'
-        ? view.restTargetSec > 0
-          ? Math.min(restElapsed / view.restTargetSec, 1)
-          : 0
-        : Math.min(setElapsed / 180, 1),
-    label:
-      view.phase === 'rest'
-        ? view.currentSet >= view.sets
-          ? 'done'
-          : `rest · ${view.currentSet}/${view.sets}`
-        : `set ${view.currentSet + 1}/${view.sets}`,
+    setColor: null,
   };
 }
 
