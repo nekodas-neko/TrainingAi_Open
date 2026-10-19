@@ -7,6 +7,7 @@ import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metri
 import { ingestDayRejection } from "@trainingai/shared/validation/ingest-clock";
 import { type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
+import { activityStepsForDayCount } from "@trainingai/shared/health/activity-steps";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
@@ -193,13 +194,13 @@ export async function GET(req: NextRequest) {
   const ageYears = ageFromDob(session.user.dateOfBirth ?? null, now);
   const userSex = (session.user.sex === 'male' || session.user.sex === 'female') ? session.user.sex as Sex : null;
 
-  // Steps logged against an activity (only treadmill sessions carry a step count —
-  // walks/runs record distance, not steps) live in activity_logs, separate from the
-  // pedometer/Health-Connect steps in body_metrics. Fold them into the day/week
-  // totals so a treadmill walk counts toward the steps goal.
+  // Steps logged against an indoor activity (a treadmill walk) live in activity_logs, separate from
+  // the pedometer/Health-Connect steps in body_metrics, so they are folded into the day/week totals
+  // and count toward the steps goal. An outdoor walk's stored steps are already in body_metrics
+  // (#3090): `activityStepsForDayCount` holds which types fold.
   const todayActivityLogs = activityLogs.filter(a => a.date === today);
-  const todayActivitySteps = todayActivityLogs.reduce((sum, a) => sum + (a.steps ?? 0), 0);
-  const weekActivitySteps = activityLogs.reduce((sum, a) => sum + (a.steps ?? 0), 0);
+  const todayActivitySteps = activityStepsForDayCount(todayActivityLogs);
+  const weekActivitySteps = activityStepsForDayCount(activityLogs);
 
   const todayMetric = metrics.find(m => m.date === today);
   // Newest first, at most BODY_RECENT_DAYS rows: `listBodyMetrics` is ordered by date descending, and
