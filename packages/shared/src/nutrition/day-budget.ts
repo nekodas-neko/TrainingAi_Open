@@ -157,6 +157,7 @@ export interface BudgetActivity {
   activityType: string
   durationMin?: number | null
   distanceKm?: number | null
+  steps?: number | null
 }
 
 /** The day's measured movement: completed strength sessions that started that local day, the day's
@@ -185,7 +186,9 @@ export function activeEnergyForDay(input: {
       })),
     activities: input.activities
       .filter(a => a.date === input.day)
-      .map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),
+      .map(a => ({
+        activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null,
+      })),
     pedometerSteps: input.steps,
   })
 }
