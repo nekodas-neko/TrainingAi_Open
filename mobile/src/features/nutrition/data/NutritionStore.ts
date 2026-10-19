@@ -351,6 +351,7 @@ type Collection = keyof typeof coreSpecs;
 function nutritionRefreshError(
   kind: Collection | 'logs' | 'checkin' | 'answers' | 'mealStatuses',
   cause: unknown,
+  olderThanKept = false,
 ) {
   const label = {
     mealTypes: 'meal groups',
@@ -374,6 +375,10 @@ function nutritionRefreshError(
   }
   if (cause instanceof Error && cause.name === 'AbortError') {
     return `Refreshing ${label} timed out. Saved records have been kept.`;
+  }
+  // A day older than the window kept on the phone has nothing saved to fall back on.
+  if (olderThanKept) {
+    return `This phone keeps ${label} for the last ${NUTRITION_DAYS_KEPT} days. Check your connection and retry to load this day.`;
   }
   return `Could not refresh ${label}. Saved records have been kept. Check your connection and retry.`;
 }
@@ -404,14 +409,16 @@ export class NutritionStore {
     private changed = () => {},
     private now = Date.now,
   ) {
-    this.persistence = new NutritionPersistence(storage, () =>
-      shiftDateStr(
-        toAestDay(
-          new Date(this.now()),
-          this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-        ),
-        -(NUTRITION_DAYS_KEPT - 1),
+    this.persistence = new NutritionPersistence(storage, () => this.oldestKept());
+  }
+  // The first day of the window of days kept on this phone.
+  private oldestKept() {
+    return shiftDateStr(
+      toAestDay(
+        new Date(this.now()),
+        this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
       ),
+      -(NUTRITION_DAYS_KEPT - 1),
     );
   }
   subscribe = (fn: () => void) => {
@@ -697,7 +704,7 @@ export class NutritionStore {
             denied: this.current.denied || denied,
             errors: {
               ...this.current.errors,
-              [key]: nutritionRefreshError(kind, cause),
+              [key]: nutritionRefreshError(kind, cause, date < this.oldestKept()),
             },
           });
         }

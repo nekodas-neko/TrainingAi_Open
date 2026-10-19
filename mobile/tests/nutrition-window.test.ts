@@ -8,7 +8,12 @@ import {
   NutritionPersistence,
   type NutritionFrame,
 } from '../src/features/nutrition/data/nutrition-persistence.ts';
-import { foodSchema, mealTypeSchema, scaledLog } from '../src/features/nutrition/data/models.ts';
+import {
+  foodSchema,
+  mealSchema,
+  mealTypeSchema,
+  scaledLog,
+} from '../src/features/nutrition/data/models.ts';
 import { sqliteFixture } from './storage-fixture.ts';
 
 const origin = 'https://example.com';
@@ -75,14 +80,18 @@ function remote() {
     },
   };
 }
-const make = (storage: ScopedStorage, connection: ReturnType<typeof remote>['connection']) => {
+const make = (
+  storage: ScopedStorage,
+  connection: ReturnType<typeof remote>['connection'],
+  today = anchor,
+) => {
   let n = 9000;
   return new NutritionStore(
     storage,
     connection,
     () => id(n++),
     () => {},
-    () => Date.parse(`${anchor}T03:00:00Z`),
+    () => Date.parse(`${today}T03:00:00Z`),
   );
 };
 async function open(t: { after(fn: () => void): void }) {
@@ -284,10 +293,59 @@ test('a prune killed at any point leaves a store that opens with the window inta
   }
 });
 
-test('pruning leaves the photos of kept days in place and removes the ones only old days showed', async (t) => {
+test('pruning removes a photo only old days showed, and keeps day, library and saved-meal photos', async (t) => {
   const { scope, keys } = await open(t);
-  await saved200(scope);
-  const photosBefore = keys('nutrition-photo.v1:');
+  const dates = Array.from({ length: 200 }, (_, n) => daysAgo(n));
+  // Food 77 was only ever logged on days now outside the window.
+  const onlyOld = food(77);
+  const oldLog = (date: string) =>
+    scaledLog(onlyOld, {
+      id: `${id(0).slice(0, 24)}${String(900000 + dates.indexOf(date)).padStart(12, '0')}`,
+      date,
+      mealTypeId: mealType.id,
+      foodItemId: onlyOld.id,
+      quantityMultiplier: 1,
+      loggedAt: `${date}T03:00:00.000Z`,
+    } as Parameters<typeof scaledLog>[1]);
+  const savedMeal = mealSchema.parse({
+    id: id(7001),
+    name: 'Usual lunch',
+    servings: 1,
+    imageDataUri: 'data:image/webp;base64,MEALAAAA',
+    mealTypeIds: [mealType.id],
+    items: [{ id: id(7002), foodItemId: food(61).id, quantityMultiplier: 1, foodItem: food(61) }],
+    totals: { calories: 200, proteinG: 10, carbsG: 20, fatG: 5 },
+  });
+  const frame = {
+    version: 1,
+    origin,
+    userId: 'one',
+    data: {
+      supplementDate: null,
+      mealTypes: [mealType],
+      foods: [food(60)],
+      meals: [savedMeal],
+      supplements: [],
+      targets: {},
+      planLinks: {},
+      days: Object.fromEntries(
+        dates.map((date) => [
+          date,
+          date < oldest ? [...logsFor(date), oldLog(date)] : logsFor(date),
+        ]),
+      ),
+      checkins: {},
+      answers: {},
+      mealStatuses: {},
+    },
+    operations: [],
+    loaded: [],
+    savedAt: {},
+    http: [],
+  };
+  await new NutritionPersistence(scope).write(frame as unknown as NutritionFrame);
+  const photo = (ref: string) => `nutrition-photo.v1:${ref}`;
+  assert.ok(keys('nutrition-photo.v1:').includes(photo(`food:${onlyOld.id}`)));
   const server = remote();
   server.state.offline = true;
   const writes: string[] = [];
@@ -301,13 +359,73 @@ test('pruning leaves the photos of kept days in place and removes the ones only 
   const store = make(recorded, server.connection);
   await store.initialize();
   assert.ok(!writes.some((key) => key.startsWith('nutrition-photo.v1:')), 'no photo rewritten');
-  const kept = new Set(
-    Object.values(store.getSnapshot().data.days)
+  const after = keys('nutrition-photo.v1:');
+  assert.ok(!after.includes(photo(`food:${onlyOld.id}`)), 'the old-only photo is removed');
+  for (const kept of [
+    photo(`food:${food(60).id}`),
+    photo(`food:${food(61).id}`),
+    photo(`meal:${savedMeal.id}`),
+    ...Object.values(store.getSnapshot().data.days)
       .flat()
-      .map((log) => `nutrition-photo.v1:food:${log.foodItemId}`),
+      .map((log) => photo(`food:${log.foodItemId}`)),
+  ]) {
+    assert.ok(after.includes(kept), `${kept} is kept`);
+  }
+  assert.equal(store.getSnapshot().data.meals[0].imageDataUri, savedMeal.imageDataUri);
+});
+
+test('the next day, opening removes the day that left the window and rewrites only the core record', async (t) => {
+  const { scope, keys } = await open(t);
+  const server = remote();
+  const store = make(scope, server.connection);
+  await store.initialize();
+  await store.refresh('mealTypes', anchor, true);
+  for (let n = 0; n < NUTRITION_DAYS_KEPT; n++) {
+    await store.download('logs', daysAgo(n));
+  }
+  assert.equal(keys('nutrition-day.v2:').length, NUTRITION_DAYS_KEPT);
+  const tomorrow = shiftDateStr(anchor, 1);
+  const writes: [string, string | null][][] = [];
+  const recorded: ScopedStorage = {
+    ...scope,
+    setMany: async (entries) => {
+      writes.push(entries);
+      await scope.setMany!(entries);
+    },
+  };
+  server.state.offline = true;
+  const next = make(recorded, server.connection, tomorrow);
+  await next.initialize();
+  assert.equal(next.getSnapshot().ready, true);
+  assert.deepEqual(
+    writes.map((entries) =>
+      entries.map(([key, value]) => [key, value === null ? 'removed' : 'set']),
+    ),
+    [
+      [
+        ['nutrition-records.v3', 'set'],
+        [`nutrition-day.v2:${daysAgo(NUTRITION_DAYS_KEPT - 1)}`, 'removed'],
+      ],
+    ],
   );
-  assert.deepEqual(keys('nutrition-photo.v1:').sort(), [...kept].sort());
-  assert.ok(photosBefore.length >= kept.size);
+  assert.equal(keys('nutrition-day.v2:').length, NUTRITION_DAYS_KEPT - 1);
+});
+
+test('offline, a day older than the window says it needs a connection to load', async (t) => {
+  const { scope } = await open(t);
+  const server = remote();
+  const store = make(scope, server.connection);
+  await store.initialize();
+  server.state.offline = true;
+  const old = daysAgo(120);
+  await store.refresh('logs', old, true);
+  assert.equal(store.view(old).logs.length, 0);
+  assert.match(
+    store.getSnapshot().errors[`logs:${old}`] ?? '',
+    /keeps food logs for the last 90 days\. Check your connection and retry to load this day\./,
+  );
+  await store.refresh('logs', anchor, true);
+  assert.match(store.getSnapshot().errors[`logs:${anchor}`] ?? '', /Saved records have been kept/);
 });
 
 test('old #3096 day entries are removed even when their index is damaged', async (t) => {

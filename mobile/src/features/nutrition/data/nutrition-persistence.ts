@@ -253,6 +253,8 @@ export class NutritionPersistence {
   // and removes them last, in the same transaction; an old index goes after the entries it lists,
   // so a move cut short without a transaction can still find and remove what is left.
   private stale: string[] = [];
+  // Whether `read` found the current saved shape, as opposed to moving an older one.
+  private current = false;
   // `oldest` is the first day of the window kept on the phone, or null to keep every day.
   constructor(
     private storage: ScopedStorage,
@@ -345,10 +347,12 @@ export class NutritionPersistence {
         ...(await this.leftovers(new Set(days.keys()), saved, core.dayKeys)),
         ...(await this.older('v3')),
       ];
+      this.current = true;
       return join(core, restoreLibrary(stored, saved), days);
     }
     const v2 = await this.storage.get(v2Key);
     if (v2) {
+      this.current = false;
       const core = JSON.parse(v2) as NutritionFrame & { dayKeys: string[] };
       const keep = keeper(this.oldest(), core);
       const logs: Record<string, Log[]> = {};
@@ -379,6 +383,7 @@ export class NutritionPersistence {
         },
       };
     }
+    this.current = false;
     const v1 = await this.storage.get(v1Key);
     this.stale = v1 === null ? [] : [v1Key];
     return v1 === null ? null : JSON.parse(v1);
@@ -388,12 +393,23 @@ export class NutritionPersistence {
   // shape stays readable, the failure is reported, and the next write retries. Otherwise the
   // frame is what is on disk, so the first change rewrites only what it touched.
   async opened(frame: NutritionFrame) {
-    if (this.stale.length) {
-      await this.write(frame).catch(reportError);
+    if (!this.stale.length) {
+      this.remember(frame);
+      this.core = JSON.stringify(split(frame, keeper(this.oldest(), frame)).core);
       return;
     }
-    const { core, library, days } = split(frame, keeper(this.oldest(), frame));
-    this.core = JSON.stringify(core);
+    // Opened from the current shape with leftovers to remove (a day that slid out of the window,
+    // or what a cut-short write left): the kept entries are already on disk, so only the core
+    // record, which still lists the removed days, is rewritten. A move from an older shape
+    // rewrites everything.
+    if (this.current) {
+      this.remember(frame);
+    }
+    await this.write(frame).catch(reportError);
+  }
+  // Records the kept part of the frame as what is on disk, except the core record.
+  private remember(frame: NutritionFrame) {
+    const { library, days } = split(frame, keeper(this.oldest(), frame));
     this.library = {
       refs: [library.foods, library.meals],
       json: JSON.stringify(stripLibrary(library)),
