@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { routeLocation } from '../../../integrations/location/route-location';
 import { useActivities } from './ActivityProvider';
-import { elapsedMs } from './ActivityStore';
+import { liveRouteReadout } from './ActivityStore';
 import {
   gpsStatus,
   liveRouteStats,
@@ -82,10 +82,8 @@ export function useRouteRecording(source: LocationSource = routeLocation) {
     lastFixMs,
     now,
   });
-  // Pace as of the latest kept fix, over active time, as the current app's appendPoint works it.
-  const stats = liveRouteStats(
-    activity.route,
-    session ? elapsedMs(session, activity.route.at(-1)?.t ?? now) / 1000 : 0,
-  );
+  const stats = session
+    ? liveRouteReadout(session, activity.route, now)
+    : liveRouteStats(activity.route, 0);
   return { eligible, status, ...stats };
 }

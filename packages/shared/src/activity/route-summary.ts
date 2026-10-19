@@ -12,6 +12,7 @@ import {
   type PacePoint,
   type ElevationPoint,
 } from './route-metrics'
+import { MAX_PACE_SEC_PER_KM } from '../validation/plausibility'
 
 export const ROUTE_SIMPLIFY_TOLERANCE_M = 5
 
@@ -38,19 +39,26 @@ export interface RouteSummary {
  * Omitted, it is the fix span.
  *
  * Null with fewer than two points: one fix is a position, not a route.
+ *
+ * A pace slower than `MAX_PACE_SEC_PER_KM` is left out: the save schema rejects it, and it is not a
+ * pace anyway. A 30 s bucket or a split that spans a pause, or a stop at a crossing, covers a few
+ * metres and reads as hours per km; one such value used to make the whole activity unsaveable
+ * (#3093 review). The same goes for an average over a walk that lost GPS for most of its time.
  */
 export function summariseRoute(points: RoutePoint[], paceElapsedSec?: number): RouteSummary | null {
   if (points.length < 2) return null
   const distanceKm = computeTotalDistanceKm(points)
   const { gainM, lossM } = computeElevationChange(points)
   const fixSpanSec = (points[points.length - 1].t - points[0].t) / 1000
+  const avgPaceSecPerKm = computeAvgPaceSecPerKm(distanceKm, paceElapsedSec ?? fixSpanSec)
   return {
     distanceKm: Math.round(distanceKm * 100) / 100,
     routePolyline: encodeRoute(simplifyRoute(points, ROUTE_SIMPLIFY_TOLERANCE_M)),
-    splits: computeSplits(points),
+    splits: computeSplits(points).filter(split => split.paceSec <= MAX_PACE_SEC_PER_KM),
     bestEfforts: computeBestEfforts(points),
-    paceSeries: computePaceSeries(points),
-    avgPaceSecPerKm: computeAvgPaceSecPerKm(distanceKm, paceElapsedSec ?? fixSpanSec) ?? undefined,
+    paceSeries: computePaceSeries(points).filter(point => point.paceSec <= MAX_PACE_SEC_PER_KM),
+    avgPaceSecPerKm:
+      avgPaceSecPerKm != null && avgPaceSecPerKm <= MAX_PACE_SEC_PER_KM ? avgPaceSecPerKm : undefined,
     elevationGainM: gainM,
     elevationLossM: lossM,
     elevationProfile: computeElevationProfile(points),

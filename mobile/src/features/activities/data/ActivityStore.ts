@@ -24,6 +24,7 @@ import { failureNotice } from '../../../core/reporting/index.ts';
 import { summariseRoute } from '@trainingai/shared/activity/route-summary';
 import {
   keepsFix,
+  liveRouteStats,
   routeEligible,
   routePointSchema,
   type RoutePoint,
@@ -104,6 +105,12 @@ export function elapsedMs(session: ActivitySession, now: number) {
     0,
     (session.pauseStartMs ?? session.endMs ?? now) - session.startMs - session.pausedMs,
   );
+}
+// The recording screen's live readout: distance over active time to now. Measured to now, not to
+// the last fix: a pause that ended after the last fix is already subtracted, and measuring to the
+// fix then read 0:00/km after every resume.
+export function liveRouteReadout(session: ActivitySession, route: RoutePoint[], now: number) {
+  return liveRouteStats(route, elapsedMs(session, now) / 1000);
 }
 export function sessionPayload(
   session: ActivitySession,

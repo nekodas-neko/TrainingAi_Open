@@ -5,8 +5,11 @@ import { haversineDistanceKm } from '@trainingai/shared/activity/route-metrics';
 import {
   ActivityStore,
   ROUTE_CHECKPOINT_MS,
+  liveRouteReadout,
   sessionPayload,
 } from '../src/features/activities/data/ActivityStore.ts';
+import { ActivityLogBody } from '@trainingai/shared/validation/activity-log';
+import { MAX_PACE_SEC_PER_KM } from '@trainingai/shared/validation/plausibility';
 import {
   GPS_LOST_AFTER_MS,
   gpsStatus,
@@ -415,6 +418,122 @@ test('a guided walk saves its route with pace over the walk time', async () => {
   const km = haversineDistanceKm(route[0], route.at(-1)!);
   assert.equal(row.distanceKm, Math.round(km * 100) / 100);
   assert.equal(row.avgPaceSecPerKm, Math.round(240 / km));
+  assert.ok(row.routePolyline);
+  f.done();
+});
+
+// #3093 review: a pace bucket or split spanning a pause or a stop covers a few metres and reads as
+// hours per km, which the save schema rejects. These tracks are the ones real activities produce.
+const walkConfig = {
+  sets: 1,
+  fastSec: 120,
+  slowSec: 120,
+  warmupSec: 0,
+  cooldownSec: 0,
+  treadmill: false,
+  fastCadenceSpm: 120,
+  slowCadenceSpm: 95,
+};
+async function guidedWalk(f: ReturnType<typeof fixture>) {
+  const store = f.create();
+  await store.initialize();
+  await store.start(
+    { id: 'walk', label: 'Walk', icon: 'PersonSimpleWalk', isDistanceBased: true },
+    { kind: 'walk', saved: false, config: walkConfig },
+  );
+  await store.begin();
+  return store;
+}
+// `metres` further north every 2 s, starting `from` metres up.
+function moveNorth(
+  f: ReturnType<typeof fixture>,
+  source: FakeLocation,
+  from: number,
+  count: number,
+  metres: number,
+) {
+  for (let step = 1; step <= count; step++) {
+    f.advance(2000);
+    source.fix({ lat: metresNorth(from + step * metres), lng: origin.lng, t: f.now() });
+  }
+  return from + count * metres;
+}
+function withinSchemaPaces(row: {
+  splits?: { paceSec: number }[];
+  paceSeries?: { paceSec: number }[];
+}) {
+  return [...(row.splits ?? []), ...(row.paceSeries ?? [])].every(
+    (point) => point.paceSec <= MAX_PACE_SEC_PER_KM,
+  );
+}
+
+test('a run with a pause saves, and live pace after resuming is not 0:00', async () => {
+  const f = fixture(),
+    source = new FakeLocation(),
+    store = await begun(f);
+  f.watch(store, source);
+  // 10 km/h: 5.6 m every 2 s, for 3 minutes. The pause starts on a 30 s pace bucket's boundary,
+  // so the next bucket is the few metres either side of the pause.
+  let at = moveNorth(f, source, 0, 91, 5.6);
+  await store.pause();
+  f.advance(120_000);
+  await store.pause();
+  // Straight after resuming, before any new fix: distance over the active time so far.
+  const resumed = liveRouteReadout(
+    store.getSnapshot().session!,
+    store.getSnapshot().route,
+    f.now(),
+  );
+  assert.ok(resumed.paceSecPerKm! > 300 && resumed.paceSecPerKm! < 400, `${resumed.paceSecPerKm}`);
+  at = moveNorth(f, source, at, 90, 5.6);
+  const live = liveRouteReadout(store.getSnapshot().session!, store.getSnapshot().route, f.now());
+  assert.equal(live.paceSecPerKm, Math.round(362 / live.distanceKm!));
+  await store.finish();
+  await store.save(timezone);
+  const row = store.getSnapshot().rows[0].payload;
+  assert.ok(row.distanceKm! > 0.9);
+  assert.ok(withinSchemaPaces(row));
+  assert.equal(ActivityLogBody.safeParse(row).success, true);
+  f.done();
+});
+
+test('a guided walk with a long stop at a crossing saves', async () => {
+  for (const stopAfter of [10, 25, 40, 55]) {
+    const f = fixture(),
+      source = new FakeLocation(),
+      store = await guidedWalk(f);
+    f.watch(store, source);
+    let at = moveNorth(f, source, 0, stopAfter, 2.8);
+    // 90 s standing still: the fixes keep coming, within a metre or two, and are filtered out.
+    for (let n = 0; n < 30; n++) {
+      f.advance(3000);
+      source.fix({ lat: metresNorth(at + (n % 2)), lng: origin.lng, t: f.now() });
+    }
+    at = moveNorth(f, source, at, 60 - stopAfter, 2.8);
+    f.advance(Math.max(0, 240_000 - (f.now() - midday)));
+    await store.finishGuided();
+    await store.saveWalk(timezone);
+    const row = store.getSnapshot().rows[0].payload;
+    assert.ok(row.routePolyline, `stop after ${stopAfter}`);
+    assert.ok(withinSchemaPaces(row), `stop after ${stopAfter}`);
+    f.done();
+  }
+});
+
+test('a guided walk that lost GPS for most of it saves without an average pace', async () => {
+  const f = fixture(),
+    source = new FakeLocation(),
+    store = await guidedWalk(f);
+  f.watch(store, source);
+  // 6 m every 2 s for 20 s, then no signal for the rest of the 4-minute walk.
+  moveNorth(f, source, 0, 10, 6);
+  f.advance(220_000);
+  await store.finishGuided();
+  await store.saveWalk(timezone);
+  const row = store.getSnapshot().rows[0].payload;
+  assert.equal(row.distanceKm, 0.05);
+  // 240 s over 54 m is 4,400 s/km: not a pace the walker held, so it is left out.
+  assert.equal(row.avgPaceSecPerKm, undefined);
   assert.ok(row.routePolyline);
   f.done();
 });

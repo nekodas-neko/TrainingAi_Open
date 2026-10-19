@@ -51,10 +51,12 @@ function ManualActivityScreen({
       : null;
   const { theme } = useTheme();
   const gps = useRouteRecording();
-  // The done screen shows what will be saved: the same builder the save uses.
+  // The done screen shows what will be saved: the same builder the save uses. Only built there;
+  // while recording, the live readout comes from `useRouteRecording`.
+  const done = session?.mode === 'done';
   const route = useMemo(
-    () => (session && routeEligible(session) ? summariseRoute(activity.route) : null),
-    [session?.type, session?.guidance, activity.route],
+    () => (done && routeEligible(session) ? summariseRoute(activity.route) : null),
+    [done, session?.type, session?.guidance, activity.route],
   );
   const [now, setNow] = useState(Date.now),
     [busy, setBusy] = useState(false);
