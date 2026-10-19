@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { pinTrophy, unpinTrophy } from '@trainingai/shared/achievement-display';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { useAccountContext } from '../../account/AccountProvider';
 import {
@@ -6,7 +7,9 @@ import {
   useWorkoutResources,
 } from '../../workouts/data/WorkoutDataProvider';
 import { achievementsSpec } from './models';
+import { equipTitle } from './titles';
 import { markSeen, readSeen } from './seen';
+import { readTrophyCase, writeTrophyCase } from './trophy';
 import { WorkoutXpTracker } from './xp';
 
 /** The signed-in account's XP, level and achievements, as the server last calculated them. */
@@ -14,14 +17,18 @@ export function useRewards() {
   return useWorkoutResource(achievementsSpec);
 }
 
-/** Achievement ids this account has been shown as unlocked; null until read from the phone. */
-export function useSeenAchievements() {
+function useAccountStorage() {
   const storage = useLocalStorage();
   const connection = useAccountContext().dataReader;
-  const scoped = useMemo(
+  return useMemo(
     () => (connection ? storage.account(connection.origin, connection.userId) : null),
     [storage, connection],
   );
+}
+
+/** Achievement ids this account has been shown as unlocked; null until read from the phone. */
+export function useSeenAchievements() {
+  const scoped = useAccountStorage();
   const [seen, setSeen] = useState<string[] | null>(null);
   useEffect(() => {
     let live = true;
@@ -42,6 +49,46 @@ export function useSeenAchievements() {
     [scoped, seen],
   );
   return { seen, mark };
+}
+
+/** The achievements pinned in this account's trophy case on this phone; null until read. */
+export function useTrophyCase() {
+  const scoped = useAccountStorage();
+  const [pinned, setPinned] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setPinned(null);
+    if (scoped) {
+      void readTrophyCase(scoped).then((ids) => live && setPinned(ids));
+    }
+    return () => {
+      live = false;
+    };
+  }, [scoped]);
+  const change = useCallback(
+    (next: (pinned: readonly string[]) => string[]) => {
+      if (!scoped || !pinned) return;
+      const value = next(pinned);
+      setPinned(value);
+      void writeTrophyCase(scoped, value).catch(() => {});
+    },
+    [scoped, pinned],
+  );
+  return {
+    pinned,
+    pin: (id: string) => change((now) => pinTrophy(now, id)),
+    unpin: (id: string) => change((now) => unpinTrophy(now, id)),
+  };
+}
+
+/** Equip a title, or clear it with null. The server checks the player has earned it. */
+export function useEquipTitle() {
+  const resources = useWorkoutResources();
+  return useCallback(
+    (titleId: string | null) =>
+      resources ? equipTitle(resources, titleId) : Promise.resolve(false),
+    [resources],
+  );
 }
 
 /**

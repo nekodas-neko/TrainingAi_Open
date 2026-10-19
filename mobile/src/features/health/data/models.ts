@@ -527,6 +527,7 @@ export const profileSpec = {
           name: text,
           displayName: text,
           avatar: text,
+          equippedTitle: text,
           activityLevel: text,
           fitnessGoal: text,
           lastGoalReviewAt: text,

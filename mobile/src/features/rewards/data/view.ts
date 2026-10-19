@@ -5,7 +5,9 @@ import {
   getLevelLabel,
   type BadgeTier,
 } from '@trainingai/shared/achievement-display';
-import type { Achievement, Rewards } from './models.ts';
+import { TITLE_CATALOGUE } from '@trainingai/shared/achievement-display';
+import { TROPHY_SLOTS } from '@trainingai/shared/achievement-display';
+import type { Achievement, Rewards, Season } from './models.ts';
 
 type Level = Pick<Rewards, 'level' | 'xp' | 'currentLevelXp' | 'nextLevelXp'>;
 
@@ -114,4 +116,23 @@ export function xpGained(
   after: number | null | undefined,
 ) {
   return before == null || after == null ? null : Math.max(0, after - before);
+}
+
+/** The trophy case's slots: the pinned achievement in each, or undefined for an empty one. */
+export function trophySlots(achievements: Achievement[], pinned: readonly string[]) {
+  return Array.from({ length: TROPHY_SLOTS }, (_, index) =>
+    pinned[index] ? achievements.find((row) => row.id === pinned[index]) : undefined,
+  );
+}
+
+/** Seasons this player has a result in, as the Season Badges card lists them. */
+export function seasonBadges(seasons: Season[]) {
+  return seasons.flatMap((season) =>
+    season.result ? [{ ...season, result: season.result }] : [],
+  );
+}
+
+/** A title's display name; null when none is equipped, the id itself spelled out if unknown. */
+export function titleName(id: string | null | undefined) {
+  return id ? (TITLE_CATALOGUE[id]?.display ?? id.replace(/_/g, ' ')) : null;
 }

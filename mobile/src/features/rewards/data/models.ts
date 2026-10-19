@@ -25,3 +25,25 @@ export const achievementsSpec = {
   schema: achievementsSchema,
   ttl: 300000,
 };
+
+export const seasonSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  startDate: z.string(),
+  endDate: z.string(),
+  result: z
+    .object({
+      rank: z.number(),
+      sessions: z.number(),
+      volumeKg: z.number(),
+      badgeLabel: z.string(),
+    })
+    .nullish(),
+});
+export type Season = z.infer<typeof seasonSchema>;
+/** `GET /api/seasons`: each season, with this player's result once one is in. */
+export const seasonsSpec = {
+  path: '/api/seasons',
+  schema: z.object({ seasons: z.array(seasonSchema) }),
+  ttl: 1_800_000,
+};

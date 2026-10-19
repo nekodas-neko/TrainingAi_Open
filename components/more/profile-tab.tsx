@@ -16,7 +16,7 @@ import { useSignOutFlow } from './sign-out-flow'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
 import { EditProfileSheet } from '@/components/profile/edit-profile-sheet'
 import { GoalsSection } from '@/components/profile/goals-section'
-import { getLevelLabel, levelProgress } from '@trainingai/shared/achievement-display'
+import { getLevelLabel, levelProgress, seasonBadgeTier } from '@trainingai/shared/achievement-display'
 import { LevelSheet } from '@/components/profile/level-sheet'
 import { TITLES } from '@trainingai/shared/types/friends'
 import type { User } from '@trainingai/shared/types/user'
@@ -39,6 +39,8 @@ const AchievementsSection = dynamic(
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
+
+const SEASON_BADGE_COLOR = { gold: '#f59e0b', silver: '#9ca3af', bronze: '#cd7c2e' }
 
 interface AchievementsData {
   level: number
@@ -391,8 +393,8 @@ export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friend
                 key={season.id}
                 className="rounded-xl px-3 py-1.5 text-xs font-semibold border"
                 style={{
-                  borderColor: season.result!.badgeLabel === 'Gold' ? '#f59e0b' : season.result!.badgeLabel === 'Silver' ? '#9ca3af' : '#cd7c2e',
-                  color: season.result!.badgeLabel === 'Gold' ? '#f59e0b' : season.result!.badgeLabel === 'Silver' ? '#9ca3af' : '#cd7c2e',
+                  borderColor: SEASON_BADGE_COLOR[seasonBadgeTier(season.result!.badgeLabel)],
+                  color: SEASON_BADGE_COLOR[seasonBadgeTier(season.result!.badgeLabel)],
                   background: 'var(--muted)',
                 }}
               >
