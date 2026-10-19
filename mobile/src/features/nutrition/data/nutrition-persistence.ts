@@ -1,3 +1,4 @@
+import { reportError } from '../../../core/reporting/index.ts';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 
 // Nutrition used to be saved as one record holding every food log and every photo, rewritten
@@ -117,9 +118,12 @@ export class NutritionPersistence {
     const stored: Record<string, Log[]> = {};
     for (const date of core.dayKeys) {
       const value = await this.storage.get(dayKey(date));
-      if (value) {
-        stored[date] = JSON.parse(value) as Log[];
+      // A day the index lists but storage lacks means the saved records are damaged: refuse to
+      // open them rather than show that day empty and later save over what remains.
+      if (value === null) {
+        throw new Error(`Saved food day ${date} is missing.`);
       }
+      stored[date] = JSON.parse(value) as Log[];
     }
     // The photos to read are the ones something saved without its photo points at.
     const saved = new Map<string, string>();
@@ -159,7 +163,7 @@ export class NutritionPersistence {
   // Otherwise the frame is what is on disk, so the first change rewrites only what it touched.
   async opened(frame: NutritionFrame) {
     if (this.legacy) {
-      await this.write(frame).catch(() => undefined);
+      await this.write(frame).catch(reportError);
       return;
     }
     const entries = this.entries(frame);

@@ -7,6 +7,7 @@ import { historyDomains } from '../src/features/settings/data/history-domains.ts
 import { NutritionStore } from '../src/features/nutrition/data/NutritionStore.ts';
 import {
   foodSchema,
+  mealSchema,
   mealTypeSchema,
   scaledLog,
   type FoodLog,
@@ -44,6 +45,23 @@ function food(n: number, photographed: boolean) {
     ...(photographed ? { imageDataUri: photoOf(n) } : {}),
   });
 }
+// A saved meal with its own photo, made of two foods with photos.
+function meal(n: number) {
+  return mealSchema.parse({
+    id: id(7000 + n),
+    name: `Meal ${n}`,
+    servings: 1,
+    imageDataUri: photoOf(500 + n),
+    mealTypeIds: [mealType.id],
+    items: [food(n, true), food(n + 1, true)].map((item, index) => ({
+      id: id(7100 + n * 10 + index),
+      foodItemId: item.id,
+      quantityMultiplier: 1,
+      foodItem: item,
+    })),
+    totals: { calories: 500, proteinG: 24, carbsG: 60, fatG: 16 },
+  });
+}
 function logsFor(date: string): FoodLog[] {
   const day = Math.round(Date.parse(`${date}T12:00:00Z`) / 86_400_000);
   return Array.from({ length: 10 }, (_, i) => {
@@ -59,7 +77,7 @@ function logsFor(date: string): FoodLog[] {
   });
 }
 function remote(userId = 'one') {
-  const state = { offline: false };
+  const state = { offline: false, meals: [] as ReturnType<typeof meal>[] };
   return {
     state,
     connection: {
@@ -75,6 +93,9 @@ function remote(userId = 'one') {
         }
         if (path.endsWith('food-logs')) {
           return logsFor(query!.date);
+        }
+        if (path.endsWith('saved-meals')) {
+          return state.meals;
         }
         if (path.endsWith('day-checkin')) {
           return null;
@@ -233,7 +254,7 @@ test('the old single record moves across on first launch in one step, and nothin
       supplementDate: null,
       mealTypes: [mealType],
       foods: [food(4, true)],
-      meals: [],
+      meals: [meal(1), meal(4)],
       supplements: [],
       targets: {},
       days,
@@ -264,6 +285,9 @@ test('the old single record moves across on first launch in one step, and nothin
   await reopened.initialize();
   assert.deepEqual(reopened.getSnapshot().data.days, store.getSnapshot().data.days);
   assert.deepEqual(reopened.getSnapshot().data.foods, legacy.data.foods);
+  assert.deepEqual(reopened.getSnapshot().data.meals, legacy.data.meals);
+  assert.equal(reopened.getSnapshot().data.meals[0].imageDataUri, photoOf(501));
+  assert.equal(reopened.getSnapshot().data.meals[1].items[0].foodItem.imageDataUri, photoOf(4));
   assert.equal(reopened.getSnapshot().operations.length, 1);
   assert.equal(reopened.view(anchor).logs.length, 11, 'the pending log still overlays');
 });
@@ -317,7 +341,30 @@ test('a move that fails keeps the old record, and the next change moves it', asy
 test('a corrupt or another account’s saved core is kept and never overwritten', async (t) => {
   const { scope } = await open(t);
   const server = remote();
-  for (const raw of ['{broken', JSON.stringify({ origin, userId: 'two', version: 2 })]) {
+  // A well-formed core record saved by another account, so only the account check can refuse it.
+  const other = JSON.stringify({
+    version: 2,
+    origin,
+    userId: 'two',
+    dayKeys: [],
+    data: {
+      supplementDate: null,
+      mealTypes: [mealType],
+      foods: [],
+      meals: [],
+      supplements: [],
+      targets: {},
+      planLinks: {},
+      checkins: {},
+      answers: {},
+      mealStatuses: {},
+    },
+    operations: [],
+    loaded: [],
+    savedAt: {},
+    http: [],
+  });
+  for (const raw of ['{broken', other]) {
     await scope.set('nutrition-records.v2', raw);
     const store = make(scope, server.connection);
     await store.initialize();
@@ -399,4 +446,91 @@ test('a batch of writes that fails part-way leaves nothing changed', async (t) =
   ]);
   assert.equal(await scope.get('a'), null);
   assert.equal(await scope.get('b'), 'new');
+});
+
+test('deleting the account while the old record is being read never writes it back', async (t) => {
+  const { storage, scope, saved } = await open(t);
+  const server = remote();
+  server.state.offline = true;
+  await scope.set(
+    'nutrition-records.v1',
+    JSON.stringify({
+      version: 1,
+      origin,
+      userId: 'one',
+      data: {
+        mealTypes: [mealType],
+        foods: [food(1, true)],
+        meals: [meal(2)],
+        supplements: [],
+        targets: {},
+        days: { [anchor]: logsFor(anchor) },
+        checkins: {},
+        answers: {},
+      },
+      operations: [],
+      loaded: [],
+      savedAt: {},
+    }),
+  );
+  let store: NutritionStore | null = null;
+  let cleared: Promise<unknown> = Promise.resolve();
+  // Delete Account runs `cancel()` then clears the account's storage, here just as the old record
+  // has been read and before the store has moved it.
+  const racing: ScopedStorage = {
+    ...scope,
+    get: async (key) => {
+      const value = await scope.get(key);
+      if (key === 'nutrition-records.v1') {
+        store!.cancel();
+        cleared = storage.clearAccount(origin, 'one');
+      }
+      return value;
+    },
+  };
+  store = make(racing, server.connection);
+  await store.initialize();
+  await cleared;
+  assert.deepEqual(saved(), []);
+});
+
+test('a photo nothing shows any more is removed from storage', async (t) => {
+  const { scope, saved } = await open(t);
+  const server = remote();
+  server.state.meals = [meal(1)];
+  const store = make(scope, server.connection);
+  await store.initialize();
+  await store.refresh('meals', anchor, true);
+  const photos = () =>
+    saved()
+      .filter((row) => row.key.startsWith('nutrition-photo.v1:'))
+      .map((row) => row.key)
+      .sort();
+  assert.deepEqual(photos(), [
+    `nutrition-photo.v1:food:${id(1001)}`,
+    `nutrition-photo.v1:food:${id(1002)}`,
+    `nutrition-photo.v1:meal:${id(7001)}`,
+  ]);
+  server.state.meals = [];
+  await store.refresh('meals', anchor, true);
+  assert.deepEqual(photos(), []);
+});
+
+test('a saved day that has gone missing stops the records opening instead of showing it empty', async (t) => {
+  const { scope } = await open(t);
+  const server = remote();
+  const store = make(scope, server.connection);
+  await store.initialize();
+  await store.refresh('mealTypes', anchor, true);
+  await store.download('logs', anchor);
+  await store.download('logs', shiftDateStr(anchor, -1));
+  const core = await scope.get('nutrition-records.v2');
+  await scope.remove(`nutrition-day.v1:${anchor}`);
+  const reopened = make(scope, server.connection);
+  await reopened.initialize();
+  assert.equal(reopened.getSnapshot().ready, false);
+  await assert.rejects(
+    reopened.logFoods([{ ...food(1, false), quantityMultiplier: 1 }], anchor, mealType.id),
+  );
+  assert.equal(await scope.get('nutrition-records.v2'), core);
 });

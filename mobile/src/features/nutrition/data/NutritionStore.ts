@@ -432,7 +432,9 @@ export class NutritionStore {
         ) {
           throw new Error('Wrong account.');
         }
-        if (frame) {
+        // Checked in the same synchronous run that queues the move, so an account cleared after
+        // `cancel()` never gets the old record written back into its scope.
+        if (frame && generation === this.generation) {
           await this.persistence.opened(frame);
         }
         if (generation === this.generation) {
