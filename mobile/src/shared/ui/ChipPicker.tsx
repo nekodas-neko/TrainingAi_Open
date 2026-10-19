@@ -10,6 +10,7 @@ export function ChipPicker<T extends string | number>({
   disabled = false,
   horizontal = false,
   showLabel = true,
+  solid = false,
 }: {
   label: string;
   value: T | null;
@@ -18,6 +19,8 @@ export function ChipPicker<T extends string | number>({
   disabled?: boolean;
   horizontal?: boolean;
   showLabel?: boolean;
+  /** The chosen chip is filled with the brand colour (the current app's view pills), not tinted. */
+  solid?: boolean;
 }) {
   const { theme } = useTheme();
   const choices = (
@@ -38,10 +41,20 @@ export function ChipPicker<T extends string | number>({
             borderWidth: 1,
             borderColor: value === option.value ? theme.colors.brand : theme.colors.border,
             backgroundColor:
-              value === option.value ? theme.tones.brand.background : theme.colors.surface,
+              value === option.value
+                ? solid
+                  ? theme.colors.brand
+                  : theme.tones.brand.background
+                : solid
+                  ? theme.colors.raised
+                  : theme.colors.surface,
           }}
         >
-          <AppText variant="caption" tone={value === option.value ? 'brand' : 'muted'}>
+          <AppText
+            variant="caption"
+            tone={value === option.value ? (solid ? undefined : 'brand') : 'muted'}
+            style={value === option.value && solid ? { color: theme.colors.onBrand } : undefined}
+          >
             {option.label}
           </AppText>
         </Pressable>

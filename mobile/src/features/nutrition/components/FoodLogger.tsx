@@ -660,7 +660,7 @@ export function FoodLogger({
                   />
                 )}
                 {meals.length > 0 && (
-                  <AppText variant="eyebrow" tone="muted">
+                  <AppText variant="listCount" tone="muted">
                     {plural(meals.length, 'item', 'items')}
                   </AppText>
                 )}

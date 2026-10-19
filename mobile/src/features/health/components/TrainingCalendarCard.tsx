@@ -57,6 +57,8 @@ export function TrainingCalendarCard({ openDay }: { openDay: (date: string) => v
         }}
       />
       <Legend
+        ruled
+        centered
         items={[
           ...sessions.map((session) => ({
             label: shortSessionName(session.name),

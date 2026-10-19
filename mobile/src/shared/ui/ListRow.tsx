@@ -27,7 +27,8 @@ export function ListRow({
   onLongPress?: () => void;
   disabled?: boolean;
   leading?: ReactNode;
-  density?: 'normal' | 'compact';
+  /** 'snug' is the current app's py-3 px-4 row (supplements); 'compact' is tighter, 'normal' roomier. */
+  density?: 'normal' | 'snug' | 'compact';
   divider?: boolean;
   checked?: boolean;
 }) {
@@ -37,7 +38,12 @@ export function ListRow({
     minHeight: theme.sizes.touchTarget,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: density === 'compact' ? theme.spacing.sm : theme.spacing.lg,
+    paddingVertical:
+      density === 'compact'
+        ? theme.spacing.sm
+        : density === 'snug'
+          ? theme.spacing.md
+          : theme.spacing.lg,
     paddingHorizontal: density === 'compact' ? theme.spacing.md : theme.spacing.lg,
     gap: theme.spacing.md,
     borderBottomWidth: divider ? 1 : 0,
