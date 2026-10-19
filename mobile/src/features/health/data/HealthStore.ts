@@ -24,6 +24,7 @@ import {
   type SleepRow,
 } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { withLoggedDeviceSteps } from '@trainingai/shared/health/activity-steps';
 
 const operationSchema = MutationSchema.extend({
   id: z.uuid(),
@@ -596,7 +597,11 @@ export function overlayBody(
       row.bodyFatCorrected = null;
       row.bodyFatIsCorrected = false;
     } else {
-      Object.assign(row, op.payload);
+      // #3095: a logged step count replaces the device's count, not the treadmill-inclusive figure
+      // the row may carry, so the tile keeps the session's steps after a save.
+      const { steps, ...rest } = op.payload;
+      Object.assign(row, rest);
+      if (typeof steps === 'number') Object.assign(row, withLoggedDeviceSteps(row, steps));
     }
     if (result.weekToDate && op.date >= weekStartForDay(today) && op.date <= today) {
       result.weekToDate = { ...result.weekToDate };
@@ -604,7 +609,7 @@ export function overlayBody(
         result.weekToDate.waterMl += op.payload.waterMlDelta;
       }
       if (typeof op.payload.steps === 'number' && result.weekToDate.steps !== null) {
-        result.weekToDate.steps += op.payload.steps - (previousSteps ?? 0);
+        result.weekToDate.steps += (row.steps ?? 0) - (previousSteps ?? 0);
       }
     }
     if (index >= 0) {

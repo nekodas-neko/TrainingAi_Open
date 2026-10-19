@@ -5,6 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import {
   DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, dateStrMidnightInTz, toAestDay,
 } from '@trainingai/shared/date-utils'
+import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 
 /** One day of the comparison window. A stat is null when nothing was recorded for it that day —
  *  never 0, which would read as "you did nothing" rather than "nothing was measured". */
@@ -52,14 +53,17 @@ export async function GET(req: Request) {
   const from = shiftDateStr(date, -7)
   const repo = await getRepository()
 
-  const [metrics, sessions] = await Promise.all([
+  const [metrics, sessions, activities] = await Promise.all([
     repo.listBodyMetrics(userId, from, date),
     // Anchored at the window's own local midnight, never `Date.now() - N × 86_400_000` — an
     // ms-offset window straddles two local days and merges them (CLAUDE.md, six prior copies).
     repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(from, tz)),
+    // #3095: indoor (treadmill) steps join each day's count, as on every other surface.
+    repo.listActivityLogs(userId, from, date).catch(() => []),
   ])
 
   const byDate = new Map(metrics.map(m => [m.date, m]))
+  const stepsByDate = dayStepCountsByDate(metrics, activities)
 
   // Several sessions can share a day, so volume is summed per day rather than last-write-wins.
   const volumeByDate = new Map<string, number>()
@@ -78,7 +82,7 @@ export async function GET(req: Request) {
     return {
       date: d,
       restingHeartRate: m?.restingHeartRate ?? null,
-      steps: m?.steps ?? null,
+      steps: stepsByDate.get(d) ?? null,
       sessionVolumeKg: volume == null ? null : Math.round(volume),
       weightKg: m?.weightKg ?? null,
     }

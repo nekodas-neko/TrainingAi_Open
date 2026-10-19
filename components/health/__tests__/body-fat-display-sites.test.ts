@@ -59,9 +59,13 @@ describe('every body-fat display site renders the corrected reading', () => {
     const src = code(source('app/health/health-content.tsx'))
     expect(src).toMatch(/const openLog[\s\S]{0,400}logSeedValue\(field, metaToday/)
     expect(src).not.toMatch(/const openLog[\s\S]{0,400}displayBodyFat/)
+    // …and the reading itself is the shared `logSeedReading`, which Preview's sheets use too.
     const seed = code(source('components/health/log-seed-value.ts'))
-    expect(seed).toMatch(/today\?\.\[field as keyof BodyMetaRow\]/)
+    expect(seed).toMatch(/logSeedReading\(field, today/)
     expect(seed).not.toMatch(/displayBodyFat|bodyFatCorrected/)
+    const shared = code(source('packages/shared/src/health/activity-steps.ts'))
+    expect(shared).toMatch(/return today\[field\] \?\? null/)
+    expect(shared).not.toMatch(/displayBodyFat|bodyFatCorrected/)
   })
 })
 

@@ -15,6 +15,7 @@ import { invalidateBodyMetricWrite, invalidateReadinessInputs } from "@/lib/cach
 import type { LocalBodyMetric } from "@/lib/local-store/types"
 import { metricBoundError } from "@/components/health/metric-bounds"
 import { logSeedValue } from "@/components/health/log-seed-value"
+import { withIndoorSteps } from "@trainingai/shared/health/activity-steps"
 
 interface LogValueSheetProps {
   widget: WidgetDef | null
@@ -118,8 +119,11 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
           const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000);
           const fresh = await store.getBodyMetrics(toAestDay(cutoff, tz));
           const todayMeta = fresh.find(r => r.date === date) ?? null;
+          // #3095: the rebuilt row folds today's treadmill steps, as the route's does, so the tile
+          // does not drop the session the moment anything is logged.
+          const todayActivities = (await store.getActivityLogs(date)).filter(a => !a.deletedAt && a.date === date);
           if (todayMeta) {
-            setMetaToday({
+            setMetaToday(withIndoorSteps({
               date:             todayMeta.date,
               weightKg:         todayMeta.weightKg,
               bodyFat:          todayMeta.bodyFatPct,
@@ -149,7 +153,7 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
               proteinPct:         todayMeta.proteinPct,
               bmrKcal:            todayMeta.bmrKcal,
               metabolicAge:       todayMeta.metabolicAge,
-            });
+            }, todayActivities));
           }
           invalidateBodyMetricWrite().catch(() => {});
           invalidateReadinessInputs().catch(() => {});

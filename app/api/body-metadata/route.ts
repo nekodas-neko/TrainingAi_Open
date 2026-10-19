@@ -7,7 +7,7 @@ import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metri
 import { ingestDayRejection } from "@trainingai/shared/validation/ingest-clock";
 import { type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
-import { activityStepsForDayCount, dayStepCount } from "@trainingai/shared/health/activity-steps";
+import { activityStepsForDayCount, withIndoorSteps } from "@trainingai/shared/health/activity-steps";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
@@ -168,7 +168,8 @@ export async function GET(req: NextRequest) {
   const [metrics, foodLogs, activityLogs, weekFoodSummary, weightHistory, todayWorkouts, bodyFatCalibration] = await Promise.all([
     repo.listBodyMetrics(userId, from, today),
     repo.listFoodLogs(userId, today).catch(() => []),
-    repo.listActivityLogs(userId, weekStartForFetch, today).catch(() => []),
+    // From the earlier of the week's start and the 7-day `recent` window: both fold indoor steps (#3095).
+    repo.listActivityLogs(userId, [weekStartForFetch, from].sort()[0], today).catch(() => []),
     repo.listFoodLogsSummary(userId, weekStartForFetch, today).catch(() => []),
     repo.listBodyMetrics(userId, from180, today).catch(() => { weightHistoryFailed = true; return []; }),
     repo.getWorkoutSessionsFrom(userId, todayStartUtc).catch(() => []),
@@ -208,12 +209,15 @@ export async function GET(req: NextRequest) {
   // (#3090): `activityStepsForDayCount` holds which types fold.
   const todayActivityLogs = activityLogs.filter(a => a.date === today);
   const todayActivitySteps = activityStepsForDayCount(todayActivityLogs);
-  const weekActivitySteps = activityStepsForDayCount(activityLogs);
+  const weekActivitySteps = activityStepsForDayCount(activityLogs.filter(a => a.date >= weekStartForFetch));
 
   const todayMetric = metrics.find(m => m.date === today);
   // Newest first, at most BODY_RECENT_DAYS rows: `listBodyMetrics` is ordered by date descending, and
   // the local-store seed in Health builds the same window from the same helper (#2505).
-  const recent = metrics.slice(0, BODY_RECENT_DAYS).map(m => toRow(m, bodyFatCalibration));
+  // #3095: each day's steps include its indoor (treadmill) steps, as today's do — Health's Steps
+  // history and Home's sparkline read these rows.
+  const recent = metrics.slice(0, BODY_RECENT_DAYS)
+    .map(m => withIndoorSteps(toRow(m, bodyFatCalibration), activityLogs.filter(a => a.date === m.date)));
 
   // Total active energy to add to the energy budget's "burned" — strength workouts + logged
   // activities (walk/run/cycle/…) + passive steps above a sedentary baseline, all net-of-rest via
@@ -278,7 +282,7 @@ export async function GET(req: NextRequest) {
   // sheet, which must not write the treadmill's steps back into body_metrics (#3095).
   if (todayActivitySteps > 0) {
     todayRow = todayRow
-      ? { ...todayRow, steps: dayStepCount(todayRow.steps, todayActivityLogs), deviceSteps: todayRow.steps }
+      ? withIndoorSteps(todayRow, todayActivityLogs)
       : { date: today, weightKg: null, bodyFat: null, calories: null, protein: null,
           carb: null, fat: null, steps: todayActivitySteps, deviceSteps: null, distanceKm: null,
           restingHeartRate: null, hrvMs: null, spo2Pct: null, waterMl: null,

@@ -24,7 +24,7 @@
  *   · **The trend curves see runs only**, filtered before the maths rather than inside it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
+import { shiftDateStr, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { MIN_RELIABLE_SAMPLES, CORROBORATION, computeObservedHr } from '@trainingai/shared/health/observed-hr'
 
 type Row = Record<string, unknown>
@@ -57,6 +57,9 @@ import { GET as getBests } from '@/app/api/running-bests/route'
 
 const TZ = 'Australia/Brisbane'
 const zeroDay = (day: string): Day => ({ day, seconds: [0, 0, 0, 0, 0] })
+// Week-relative fixtures are derived from the user's today, never hardcoded: a fixed date stops
+// being "this week" the week after it is written. Rows that carry a time start at local midday.
+const daysBefore = (n: number) => shiftDateStr(todayInTz(TZ), -n)
 const run = (over: Row = {}) => ({
   activityType: 'run', date: '2026-09-01', distanceKm: 5, durationMin: 25,
   avgHeartRate: 150, cadenceSpm: 170, ...over,
@@ -246,7 +249,7 @@ describe('/api/cardio-week', () => {
   // Measuring three days of a week against a seven-day goal always reads as failure.
   it('scales the week goal to the days elapsed', async () => {
     const today = todayInTz(TZ)
-    getZoneMinutesRange.mockResolvedValue([zeroDay('2026-09-07'), zeroDay('2026-09-08'), zeroDay(today)])
+    getZoneMinutesRange.mockResolvedValue([zeroDay(daysBefore(2)), zeroDay(daysBefore(1)), zeroDay(today)])
     const body = await (await getWeek()).json()
 
     expect(body.steps.weekGoal).toBe(body.steps.todayGoal * 7)
@@ -275,8 +278,8 @@ describe('/api/cardio-week', () => {
     expect((await (await getWeek()).json()).trainedToday).toBe(true)
   })
 
-  it('a cardio session earlier in the week does not credit today', async () => {
-    listActivityLogs.mockResolvedValue([run({ date: '2026-09-01' })])
+  it('a cardio session on an earlier day does not credit today', async () => {
+    listActivityLogs.mockResolvedValue([run({ date: daysBefore(1) })])
     expect((await (await getWeek()).json()).trainedToday).toBe(false)
   })
 
@@ -285,11 +288,11 @@ describe('/api/cardio-week', () => {
   it('adds a treadmill session\'s steps to today and the week, and never a GPS walk\'s', async () => {
     const today = todayInTz(TZ)
     listBodyMetrics.mockResolvedValue([
-      { date: '2026-09-07', steps: 4000 }, { date: today, steps: 6000 },
+      { date: daysBefore(1), steps: 4000 }, { date: today, steps: 6000 },
     ])
     listActivityLogs.mockResolvedValue([
       { activityType: 'treadmill', date: today, steps: 3500, startTime: '12:00:00' },
-      { activityType: 'treadmill', date: '2026-09-07', steps: 2000, startTime: '12:00:00' },
+      { activityType: 'treadmill', date: daysBefore(1), steps: 2000, startTime: '12:00:00' },
       { activityType: 'walk', date: today, steps: 4100, distanceKm: 3.2, startTime: '12:00:00' },
     ])
     const body = await (await getWeek()).json()
@@ -300,7 +303,7 @@ describe('/api/cardio-week', () => {
   it('sums only this week\'s steps and reads today\'s from today\'s row', async () => {
     const today = todayInTz(TZ)
     listBodyMetrics.mockResolvedValue([
-      { date: '2026-09-07', steps: 4000 }, { date: today, steps: 6000 },
+      { date: daysBefore(1), steps: 4000 }, { date: today, steps: 6000 },
     ])
     const body = await (await getWeek()).json()
     expect(body.steps.today).toBe(6000)

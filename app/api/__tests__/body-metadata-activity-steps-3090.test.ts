@@ -30,7 +30,7 @@ vi.mock('@/lib/data', () => ({
 
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/body-metadata/route'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
 // "Today" from the same helper the route uses, never a hardcoded date; the activities start at local
 // midday so neither the day nor the week window can flip on a timezone edge.
@@ -46,7 +46,11 @@ const activity = (activityType: string, steps: number | null, distanceKm: number
 async function get() {
   const res = await GET(new NextRequest('http://localhost/api/body-metadata'))
   expect(res.status).toBe(200)
-  return res.json() as Promise<{ today: { steps: number | null; deviceSteps?: number | null } | null; weekToDate: { steps: number } }>
+  return res.json() as Promise<{
+    today: { steps: number | null; deviceSteps?: number | null } | null
+    recent: { date: string; steps: number | null; deviceSteps?: number | null }[]
+    weekToDate: { steps: number }
+  }>
 }
 
 describe('#3090 the day step count does not add an outdoor walk the ring already counted', () => {
@@ -75,6 +79,18 @@ describe('#3090 the day step count does not add an outdoor walk the ring already
     // #3095: the device's own count rides alongside, for the log sheets to seed from.
     expect(body.today?.deviceSteps).toBe(RING_STEPS)
     expect(body.weekToDate.steps).toBe(RING_STEPS + 3_500)
+  })
+
+  // #3095: Health's Steps history and Home's sparkline read `recent`; it folds the same way.
+  it('folds an earlier day\'s treadmill session into its recent row', async () => {
+    const yesterday = shiftDateStr(today, -1)
+    repo.bodyMetrics = [{ date: today, steps: RING_STEPS }, { date: yesterday, steps: 8_000 }]
+    repo.activityLogs = [{ ...activity('treadmill', 2_000, 1.6), date: yesterday }]
+    const body = await get()
+    const row = body.recent.find(r => r.date === yesterday)
+    expect(row?.steps).toBe(10_000)
+    expect(row?.deviceSteps).toBe(8_000)
+    expect(body.recent.find(r => r.date === today)?.deviceSteps).toBeUndefined()
   })
 
   it('a day with both adds the treadmill only', async () => {

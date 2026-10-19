@@ -472,8 +472,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         if (rows.length > 0) {
           // #3095: the week start in the USER's zone, not the module default.
           const weekStart = startOfWeekInTz(tz);
-          const weekActivityLogs = (await store.getActivityLogs(weekStart)).filter(a => !a.deletedAt);
-          const seed = localMetaSeed(rows, weekActivityLogs, todayInTz(tz), weekStart);
+          const activityLogs = (await store.getActivityLogs(cutoffStr)).filter(a => !a.deletedAt);
+          const seed = localMetaSeed(rows, activityLogs, todayInTz(tz), weekStart);
           setMetaRecent(seed.recent);
           if (seed.today) setMetaToday(seed.today);
           setMetaLoading(false);
