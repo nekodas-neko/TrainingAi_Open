@@ -169,7 +169,7 @@ test('90 days with photos: each photo is saved once, and a food log writes only 
   // The old single record held all 90 days with a copy of the photo in every photographed log.
   const legacy = JSON.stringify({ data: store.getSnapshot().data }).length;
   assert.equal(saved().filter((row) => row.key.startsWith('nutrition-photo.v1:')).length, 30);
-  assert.equal(saved().filter((row) => row.key.startsWith('nutrition-day.v1:')).length, 90);
+  assert.equal(saved().filter((row) => row.key.startsWith('nutrition-day.v2:')).length, 90);
   assert.ok(total < legacy / 4, `saved ${total} bytes, the single record was ${legacy}`);
   assert.ok(downloadBytes < 2_000_000, `the download wrote ${downloadBytes} bytes`);
 
@@ -178,7 +178,7 @@ test('90 days with photos: each photo is saved once, and a food log writes only 
   await store.logFoods([{ ...food(7, true), quantityMultiplier: 1 }], anchor, mealType.id);
   assert.deepEqual(
     recorded.writes.map((write) => write.keys),
-    [['nutrition-records.v2']],
+    [['nutrition-records.v3']],
   );
   assert.ok(recorded.writes[0].bytes < 20_000, `one log wrote ${recorded.writes[0].bytes} bytes`);
   assert.ok(legacy > 1_500_000, 'the single record would have rewritten over 1.5 MB');
@@ -202,7 +202,7 @@ test('a day that changed on the server rewrites only that day', async (t) => {
   // the same. No other day and no photo is rewritten.
   assert.deepEqual(
     recorded.writes.map((write) => write.keys),
-    [['nutrition-day.v1:2026-10-09']],
+    [['nutrition-day.v2:2026-10-09']],
   );
 });
 
@@ -278,8 +278,8 @@ test('the old single record moves across on first launch in one step, and nothin
   assert.ok(recorded.writes[0].keys.includes('nutrition-records.v1'));
   const keys = saved().map((row) => row.key);
   assert.ok(!keys.includes('nutrition-records.v1'));
-  assert.ok(keys.includes('nutrition-records.v2'));
-  assert.equal(keys.filter((key) => key.startsWith('nutrition-day.v1:')).length, 3);
+  assert.ok(keys.includes('nutrition-records.v3'));
+  assert.equal(keys.filter((key) => key.startsWith('nutrition-day.v2:')).length, 3);
 
   const reopened = make(scope, server.connection);
   await reopened.initialize();
@@ -335,7 +335,7 @@ test('a move that fails keeps the old record, and the next change moves it', asy
   await store.logFoods([{ ...food(1, true), quantityMultiplier: 1 }], anchor, mealType.id);
   const keys = saved().map((row) => row.key);
   assert.ok(!keys.includes('nutrition-records.v1'));
-  assert.ok(keys.includes(`nutrition-day.v1:${anchor}`));
+  assert.ok(keys.includes(`nutrition-day.v2:${anchor}`));
 });
 
 test('a corrupt or another account’s saved core is kept and never overwritten', async (t) => {
@@ -343,36 +343,32 @@ test('a corrupt or another account’s saved core is kept and never overwritten'
   const server = remote();
   // A well-formed core record saved by another account, so only the account check can refuse it.
   const other = JSON.stringify({
-    version: 2,
+    version: 3,
     origin,
     userId: 'two',
     dayKeys: [],
     data: {
       supplementDate: null,
       mealTypes: [mealType],
-      foods: [],
-      meals: [],
       supplements: [],
       targets: {},
       planLinks: {},
-      checkins: {},
-      answers: {},
-      mealStatuses: {},
     },
     operations: [],
     loaded: [],
     savedAt: {},
     http: [],
   });
+  await scope.set('nutrition-library.v1', JSON.stringify({ foods: [], meals: [] }));
   for (const raw of ['{broken', other]) {
-    await scope.set('nutrition-records.v2', raw);
+    await scope.set('nutrition-records.v3', raw);
     const store = make(scope, server.connection);
     await store.initialize();
     assert.equal(store.getSnapshot().ready, false);
     await assert.rejects(
       store.logFoods([{ ...food(1, false), quantityMultiplier: 1 }], anchor, mealType.id),
     );
-    assert.equal(await scope.get('nutrition-records.v2'), raw);
+    assert.equal(await scope.get('nutrition-records.v3'), raw);
   }
 });
 
@@ -409,7 +405,7 @@ test('a history download killed mid-way still resumes from its cursor into the p
   assert.equal(reopened.getSnapshot().done, 2);
   await reopened.resumeIfInterrupted();
   assert.equal(reopened.getSnapshot().status, 'complete');
-  assert.equal(saved().filter((row) => row.key.startsWith('nutrition-day.v1:')).length, 5);
+  assert.equal(saved().filter((row) => row.key.startsWith('nutrition-day.v2:')).length, 5);
   server.state.offline = true;
   const offline = make(scope, server.connection);
   await offline.initialize();
@@ -524,13 +520,322 @@ test('a saved day that has gone missing stops the records opening instead of sho
   await store.refresh('mealTypes', anchor, true);
   await store.download('logs', anchor);
   await store.download('logs', shiftDateStr(anchor, -1));
-  const core = await scope.get('nutrition-records.v2');
-  await scope.remove(`nutrition-day.v1:${anchor}`);
+  const core = await scope.get('nutrition-records.v3');
+  await scope.remove(`nutrition-day.v2:${anchor}`);
   const reopened = make(scope, server.connection);
   await reopened.initialize();
   assert.equal(reopened.getSnapshot().ready, false);
   await assert.rejects(
     reopened.logFoods([{ ...food(1, false), quantityMultiplier: 1 }], anchor, mealType.id),
   );
-  assert.equal(await scope.get('nutrition-records.v2'), core);
+  assert.equal(await scope.get('nutrition-records.v3'), core);
+});
+
+// A server holding a full history: a 300-food library, and for each day an evening check-in of
+// about 0.6 KB, a meal status and a plan answer.
+function historyServer() {
+  const server = remote();
+  const library = Array.from({ length: 300 }, (_, n) => food(2000 + n, false));
+  const get = server.connection.get;
+  server.connection.get = async (path, query) => {
+    if (server.state.offline) {
+      throw new TypeError('Network request failed');
+    }
+    const date = query?.date ?? anchor;
+    if (path.endsWith('food-items')) {
+      return library;
+    }
+    if (path.endsWith('day-checkin')) {
+      return { date, phase: 'evening', note: `Evening ${date} `.padEnd(600, '.') };
+    }
+    if (path.endsWith('meal-statuses')) {
+      return {
+        date,
+        statuses: [{ mealTypeId: mealType.id, skipped: true, decisionId: id(8000) }],
+      };
+    }
+    if (path.endsWith('plan-meal-answers')) {
+      return { answers: [{ planMealId: id(8100), logDate: date, answer: 'ate' }] };
+    }
+    return get(path, query);
+  };
+  return server;
+}
+async function fullHistory(store: NutritionStore, days: number) {
+  await store.initialize();
+  await store.refresh('mealTypes', anchor, true);
+  await store.refresh('foods', anchor, true);
+  for (let day = 0; day < days; day++) {
+    const date = shiftDateStr(anchor, -day);
+    await store.download('logs', date);
+    await store.download('checkin', date);
+    await store.refresh('mealStatuses', date, true);
+    await store.refresh('answers', date, true);
+  }
+}
+
+test('with 90 days of check-ins and a 300-food library, one food log writes a small core record', async (t) => {
+  const { scope, saved } = await open(t);
+  const server = historyServer();
+  const recorded = spy(scope);
+  const store = make(recorded.storage, server.connection);
+  await fullHistory(store, 90);
+  const core = saved().find((row) => row.key === 'nutrition-records.v3')!.size;
+  assert.ok(core < 8_000, `the core record is ${core} bytes`);
+  const library = saved().find((row) => row.key === 'nutrition-library.v1')!.size;
+  assert.ok(library > 40_000, 'the library is large, so it must not be in every write');
+
+  recorded.writes.length = 0;
+  server.state.offline = true;
+  await store.logFoods([{ ...food(7, true), quantityMultiplier: 1 }], anchor, mealType.id);
+  assert.deepEqual(
+    recorded.writes.map((write) => write.keys),
+    [['nutrition-records.v3']],
+  );
+  assert.ok(recorded.writes[0].bytes < 10_000, `one log wrote ${recorded.writes[0].bytes} bytes`);
+
+  // A check-in changed from another device: reading that day again writes only that day.
+  server.state.offline = false;
+  const read = server.connection.get;
+  server.connection.get = async (path, query) => {
+    const reply = await read(path, query);
+    return path.endsWith('day-checkin') ? { ...(reply as object), note: 'Changed' } : reply;
+  };
+  recorded.writes.length = 0;
+  await store.refresh('checkin', shiftDateStr(anchor, -30), true);
+  assert.deepEqual(
+    recorded.writes.map((write) => write.keys.sort()),
+    [['nutrition-day.v2:2026-09-19']],
+  );
+});
+
+test('the core record grows only by its list of saved days', async (t) => {
+  const sizes: number[] = [];
+  for (const days of [10, 90]) {
+    const { scope, saved } = await open(t);
+    await fullHistory(make(scope, historyServer().connection), days);
+    // Only the list of saved days grows, by one date per day; everything else stays the same.
+    const { dayKeys, ...rest } = JSON.parse((await scope.get('nutrition-records.v3'))!);
+    assert.equal(dayKeys.length, days);
+    sizes.push(JSON.stringify(rest).length);
+  }
+  assert.equal(sizes[1], sizes[0], `10 days: ${sizes[0]}, 90 days: ${sizes[1]}`);
+});
+
+// The #3096 shape: a core record holding check-ins, statuses, answers, the library and every
+// day's `loaded`/`savedAt` keys, food logs per day as bare lists, and photos once each.
+async function savedAs3096(scope: ScopedStorage) {
+  const dates = [0, 1, 2].map((day) => shiftDateStr(anchor, -day));
+  const strip = (item: ReturnType<typeof food>) =>
+    item.imageDataUri ? { ...item, imageDataUri: 'photo:' } : item;
+  const library = { foods: [food(4, true)], meals: [meal(1)] };
+  const pending = {
+    id: id(9001),
+    domain: 'food_logs',
+    date: anchor,
+    payload: {
+      id: id(9002),
+      foodItemId: food(4, true).id,
+      mealTypeId: mealType.id,
+      quantityMultiplier: 1,
+      loggedAt: `${anchor}T05:00:00.000Z`,
+    },
+  };
+  const core = {
+    version: 2,
+    origin,
+    userId: 'one',
+    dayKeys: dates,
+    data: {
+      supplementDate: null,
+      mealTypes: [mealType],
+      foods: library.foods.map(strip),
+      meals: library.meals.map((item) => ({
+        ...item,
+        imageDataUri: 'photo:',
+        items: item.items.map((entry) => ({ ...entry, foodItem: strip(entry.foodItem) })),
+      })),
+      supplements: [],
+      targets: {},
+      planLinks: {},
+      checkins: Object.fromEntries(dates.map((date) => [date, { note: `Evening ${date}` }])),
+      answers: Object.fromEntries(
+        dates.map((date) => [date, [{ planMealId: id(8100), logDate: date, answer: 'ate' }]]),
+      ),
+      mealStatuses: { [anchor]: [] },
+    },
+    operations: [pending],
+    loaded: ['mealTypes', ...dates.flatMap((date) => [`logs:${date}`, `checkin:${date}`])],
+    savedAt: Object.fromEntries([
+      ['mealTypes', 1],
+      ...dates.map((date, index) => [`logs:${date}`, 100 + index]),
+    ]),
+    http: [],
+  };
+  await scope.set('nutrition-records.v2', JSON.stringify(core));
+  for (const date of dates) {
+    await scope.set(
+      `nutrition-day.v1:${date}`,
+      JSON.stringify(logsFor(date).map((log) => ({ ...log, foodItem: strip(log.foodItem) }))),
+    );
+  }
+  const photos: Record<string, string> = {};
+  for (const date of dates) {
+    for (const log of logsFor(date)) {
+      if (log.foodItem.imageDataUri) photos[`food:${log.foodItem.id}`] = log.foodItem.imageDataUri;
+    }
+  }
+  photos[`food:${food(1, true).id}`] = food(1, true).imageDataUri!;
+  photos[`food:${food(2, true).id}`] = food(2, true).imageDataUri!;
+  photos[`food:${food(4, true).id}`] = food(4, true).imageDataUri!;
+  photos[`meal:${meal(1).id}`] = meal(1).imageDataUri!;
+  for (const [ref, value] of Object.entries(photos)) {
+    await scope.set(`nutrition-photo.v1:${ref}`, value);
+  }
+  // What the store should open with, whatever shape it was saved in.
+  return {
+    data: {
+      mealTypes: [mealType],
+      ...library,
+      days: Object.fromEntries(dates.map((date) => [date, logsFor(date)])),
+      checkins: core.data.checkins,
+      answers: core.data.answers,
+      mealStatuses: core.data.mealStatuses,
+    },
+    loaded: [...core.loaded].sort(),
+    savedAt: core.savedAt,
+    operations: [{ ...pending, acknowledged: false }],
+  };
+}
+function opened(store: NutritionStore) {
+  const state = store.getSnapshot();
+  return {
+    data: {
+      mealTypes: state.data.mealTypes,
+      foods: state.data.foods,
+      meals: state.data.meals,
+      days: state.data.days,
+      checkins: state.data.checkins,
+      answers: state.data.answers,
+      mealStatuses: state.data.mealStatuses,
+    },
+    loaded: [...state.loaded].sort(),
+    savedAt: state.savedAt,
+    operations: state.operations,
+  };
+}
+
+test('the #3096 shape moves across in one transaction, removing it last, and nothing is lost', async (t) => {
+  const { scope, saved } = await open(t);
+  const expected = await savedAs3096(scope);
+  const server = historyServer();
+  server.state.offline = true;
+  const recorded = spy(scope);
+  const store = make(recorded.storage, server.connection);
+  await store.initialize();
+  assert.deepEqual(opened(store), expected);
+  assert.equal(recorded.writes.length, 1, 'one transaction');
+  const keys = recorded.writes[0].keys;
+  assert.ok(!keys.some((key) => key.startsWith('nutrition-photo.v1:')), 'photos stay in place');
+  const firstRemoval = keys.findIndex((key) => key.startsWith('nutrition-day.v1:'));
+  assert.ok(firstRemoval > keys.indexOf('nutrition-records.v3'), 'old shape removed last');
+  assert.deepEqual(
+    saved()
+      .map((row) => row.key)
+      .filter((key) => /records\.v2|day\.v1:/.test(key)),
+    [],
+  );
+  const reopened = make(scope, server.connection);
+  await reopened.initialize();
+  assert.deepEqual(opened(reopened), expected);
+  assert.equal(reopened.view(anchor).logs.length, 11, 'the pending log still overlays');
+});
+
+test('a move killed at any point leaves records that open intact and finish moving', async (t) => {
+  const probe = await open(t);
+  await savedAs3096(probe.scope);
+  const recorded = spy(probe.scope);
+  const server = historyServer();
+  server.state.offline = true;
+  await make(recorded.storage, server.connection).initialize();
+  const steps = recorded.writes[0].keys.length;
+  for (let killAt = 0; killAt < steps; killAt++) {
+    const { scope, saved } = await open(t);
+    const expected = await savedAs3096(scope);
+    // Without a transaction, the app dies after `killAt` of the move's writes.
+    let done = 0;
+    const dying: ScopedStorage = {
+      get: scope.get,
+      set: async (key, value) => {
+        if (done++ >= killAt) throw new Error('killed');
+        await scope.set(key, value);
+      },
+      remove: async (key) => {
+        if (done++ >= killAt) throw new Error('killed');
+        await scope.remove(key);
+      },
+    };
+    await make(dying, server.connection).initialize();
+    const reopened = make(scope, server.connection);
+    await reopened.initialize();
+    assert.equal(reopened.getSnapshot().ready, true, `killed after ${killAt} writes`);
+    assert.deepEqual(opened(reopened), expected, `killed after ${killAt} writes`);
+    assert.deepEqual(
+      saved()
+        .map((row) => row.key)
+        .filter((key) => /records\.v[12]|day\.v1:/.test(key)),
+      [],
+      `killed after ${killAt} writes`,
+    );
+  }
+});
+
+test('a move whose transaction fails part-way changes nothing and moves on the next launch', async (t) => {
+  const db = sqliteFixture();
+  t.after(() => db.connection.close());
+  let failing = false;
+  let writes = 0;
+  const storage = await createLocalStorage({
+    ...db.database,
+    runAsync: async (sql, ...params) => {
+      if (failing && sql.startsWith('INSERT') && ++writes === 3) {
+        throw new Error('killed');
+      }
+      return db.database.runAsync(sql, ...params);
+    },
+  });
+  const scope = storage.account(origin, 'one');
+  const expected = await savedAs3096(scope);
+  const before = db.connection.prepare('SELECT key, value FROM local_values ORDER BY key').all();
+  failing = true;
+  const server = historyServer();
+  server.state.offline = true;
+  const first = make(scope, server.connection);
+  await first.initialize();
+  assert.deepEqual(opened(first), expected);
+  assert.deepEqual(
+    db.connection.prepare('SELECT key, value FROM local_values ORDER BY key').all(),
+    before,
+  );
+  failing = false;
+  const second = make(scope, server.connection);
+  await second.initialize();
+  assert.deepEqual(opened(second), expected);
+  const keys = (
+    db.connection.prepare('SELECT key FROM local_values').all() as { key: string }[]
+  ).map((row) => row.key);
+  assert.ok(keys.includes('nutrition-records.v3'));
+  assert.ok(!keys.includes('nutrition-records.v2'));
+});
+
+test('a missing food library stops the records opening and leaves them untouched', async (t) => {
+  const { scope } = await open(t);
+  const server = historyServer();
+  await fullHistory(make(scope, server.connection), 2);
+  const core = await scope.get('nutrition-records.v3');
+  await scope.remove('nutrition-library.v1');
+  const reopened = make(scope, server.connection);
+  await reopened.initialize();
+  assert.equal(reopened.getSnapshot().ready, false);
+  assert.equal(await scope.get('nutrition-records.v3'), core);
 });

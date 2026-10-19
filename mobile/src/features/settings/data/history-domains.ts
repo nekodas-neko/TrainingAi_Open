@@ -12,9 +12,8 @@ import {
 import type { ResourceSpec, WorkoutResources } from '../../workouts/data/WorkoutResources.ts';
 
 export const HISTORY_DOWNLOAD_DAYS = [30, 90, 365] as const;
-// Food logs are saved per day, but evening check-ins (and the index of saved days) still live in
-// the core nutrition record that is rewritten on every nutrition change (issue 3101), so food and
-// check-ins stop at 90 days to keep each of those writes small.
+// Food logs and evening check-ins are saved one entry per day (issues 3094 and 3101), and every
+// saved day is read when nutrition opens, so they stop at 90 days to keep opening quick.
 export const NUTRITION_HISTORY_DAYS = 90;
 
 const summaries: Record<string, ResourceSpec<unknown>> = {
