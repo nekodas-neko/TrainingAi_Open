@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- No permissions on purpose: on Android 10+ a MediaStore insert into Pictures/ needs none
+       (#3065). Below 10 the module reports unavailable instead of asking for storage access. -->
+</manifest>

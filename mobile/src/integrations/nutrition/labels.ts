@@ -4,11 +4,21 @@ import { Platform,Share } from 'react-native';
 import { mealLabelArtwork } from '../../features/nutrition/data/meal-label';
 import { labelPrintDpi } from '@trainingai/shared/nutrition/meal-label-geometry';
 import type { SavedMeal } from '../../features/nutrition/data/models';
-export async function shareLabelImage(base64: string, name: string) {
+import { mediaSave } from '../media-save/platform';
+import { labelFilename, saveImageToGallery } from '../media-save/gallery';
+/** The rendered label's PNG, stamped with the density it was drawn at so it prints at 50 mm. */
+function labelPng(base64: string) {
   const bytes = Uint8Array.from(atob(base64.replace(/^data:image\/png;base64,/, '')), (c) =>
     c.charCodeAt(0),
   );
-  const png = withPngDensity(bytes, labelPrintDpi(1179));
+  return withPngDensity(bytes, labelPrintDpi(1179));
+}
+/** Save the label to the gallery's TrainingAI album, as the current app's Save to gallery does. */
+export function saveLabelImage(base64: string, name: string) {
+  return saveImageToGallery(mediaSave, labelPng(base64), labelFilename(name));
+}
+export async function shareLabelImage(base64: string, name: string) {
+  const png = labelPng(base64);
   const { File, Paths } = await import('expo-file-system');
   const file = new File(
     Paths.cache,
