@@ -260,4 +260,10 @@ export interface SleepSession {
    * ever sees one where nothing measured it.
    */
   manualEntry?: boolean
+  /**
+   * #3057 — Oura Cloud's type for this period (`oura_cloud_sleep_periods.sleep_type`, joined on
+   * `oura_id`): `long_sleep`, `sleep`, `late_nap`. Null on every row that is not from the Cloud feed.
+   * Read only by `isOuraSecondaryPeriod`, which keeps a non-`long_sleep` period out of the night.
+   */
+  ouraSleepType?: string | null
 }

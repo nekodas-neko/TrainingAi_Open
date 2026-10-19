@@ -55,6 +55,28 @@ export interface SleepWindow {
   sleepStart: Date
   sleepEnd: Date
   durationHours?: number | null
+  /** Oura Cloud's own type for the period (`oura_cloud_sleep_periods.sleep_type`); see
+   *  {@link isOuraSecondaryPeriod}. Absent on ring, Health Connect, manual and pre-Cloud rows. */
+  ouraSleepType?: string | null
+}
+
+/**
+ * **On an Oura Cloud night, Oura's `long_sleep` period is the night (#3058).** Any other Oura
+ * period (`sleep`, `late_nap`, `rest`) is a nap: never grouped into a night, for the score
+ * ({@link groupSleepPeriods}) or for the sleep list (`mergeByDate` in `lib/sleep/merge-sessions.ts`).
+ * Both call this, so the card and the score cannot disagree about what the night was.
+ *
+ * Oura has already classified its periods, and #2860 takes Oura's values as Oura calculated them.
+ * The circadian rule below exists because the ring's windows carry no such label. Without this, a
+ * 20-minute `sleep` fragment 37 minutes before the main period (19 Oct, #3057) joined the night:
+ * the window started an hour early, its awake time was added, and the card printed its 10%
+ * efficiency.
+ *
+ * A row with no type (ring `ble:`, Health Connect, manual, an Oura row from before the Cloud feed)
+ * is never secondary, so those nights keep the circadian grouping unchanged.
+ */
+export function isOuraSecondaryPeriod(w: { ouraSleepType?: string | null }): boolean {
+  return w.ouraSleepType != null && w.ouraSleepType !== 'long_sleep'
 }
 
 /**
@@ -179,7 +201,8 @@ export interface SleepPeriod<T extends SleepWindow> {
 
 /**
  * Group a set of sleep windows into nights. Naps (anything whose midpoint falls outside the night
- * band) are returned separately and never join a night.
+ * band, and any Oura period that is not `long_sleep`, see {@link isOuraSecondaryPeriod}) are
+ * returned separately and never join a night.
  *
  * Night windows are merged when the gap between them is at most {@link MAX_INTRA_NIGHT_GAP_HOURS};
  * a longer gap starts a new night. Periods are returned oldest-first.
@@ -192,7 +215,7 @@ export function groupSleepPeriods<T extends SleepWindow>(
   const nightWindows: T[] = []
   for (const s of sessions) {
     if (!hasSleep(s)) continue
-    ;(isNightWindow(s, tz) ? nightWindows : naps).push(s)
+    ;(!isOuraSecondaryPeriod(s) && isNightWindow(s, tz) ? nightWindows : naps).push(s)
   }
   nightWindows.sort((a, b) => a.sleepStart.getTime() - b.sleepStart.getTime())
 

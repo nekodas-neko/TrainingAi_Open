@@ -1,4 +1,4 @@
-import { recordsSleep } from '@trainingai/shared/health/sleep-night';
+import { isOuraSecondaryPeriod, recordsSleep } from '@trainingai/shared/health/sleep-night';
 import type { LocalSleepSession } from '@/lib/local-store/types';
 
 export type SleepRow = {
@@ -39,6 +39,12 @@ export type SleepRow = {
    * built. Optional so a payload from before it existed still parses. Lets a screen say whose night it is.
    */
   manualEntry?: boolean;
+  /**
+   * #3057 — Oura Cloud's type for the period (`long_sleep`, `sleep`, `late_nap`); null on every other
+   * source. `mergeByDate` never folds a non-`long_sleep` period into the night. Optional because the
+   * device's local store does not carry it (see `localSleepRowsAsNights`).
+   */
+  ouraSleepType?: string | null;
 };
 
 // Contiguity threshold for treating two same-date rows as one sleep period. Midnight-split
@@ -53,8 +59,7 @@ const CONTIGUOUS_GAP_MS = 60 * 60 * 1000;
 function primaryCluster(list: SleepRow[]): SleepRow[] {
   const timed = list.filter(r => r.sleepStart && r.sleepEnd);
   if (timed.length <= 1) return list;
-  const span = (r: SleepRow) => new Date(r.sleepEnd!).getTime() - new Date(r.sleepStart!).getTime();
-  const longest = timed.reduce((a, b) => ((b.durationHours ?? span(b)) > (a.durationHours ?? span(a)) ? b : a));
+  const longest = mainRow(timed);
   let start = new Date(longest.sleepStart!).getTime();
   let end = new Date(longest.sleepEnd!).getTime();
   const kept = new Set<SleepRow>([longest]);
@@ -72,6 +77,13 @@ function primaryCluster(list: SleepRow[]): SleepRow[] {
   return list.filter(r => kept.has(r) || !r.sleepStart || !r.sleepEnd);
 }
 
+// The night's main period: its longest row by sleep, by window when a row has no duration.
+const span = (r: SleepRow) =>
+  r.sleepStart && r.sleepEnd ? new Date(r.sleepEnd).getTime() - new Date(r.sleepStart).getTime() : 0;
+function mainRow(list: SleepRow[]): SleepRow {
+  return list.reduce((a, b) => ((b.durationHours ?? span(b)) > (a.durationHours ?? span(a)) ? b : a));
+}
+
 // Merge same-date sleep rows (Samsung Health splits midnight sessions).
 // When exactly one of the rows has an ouraId, the Oura row is authoritative
 // for all duration fields (Oura reports sleep onset, not in-bed time) and the
@@ -87,7 +99,10 @@ export function mergeByDate(rows: SleepRow[]) {
   //
   // The predicate is imported rather than rewritten: `sleep-night.ts` is where "does this row
   // record any sleep" is decided, and a second copy here is how the two drift.
-  for (const r of rows.filter(r => recordsSleep(r.durationHours))) {
+  //
+  // #3057: an Oura period that is not `long_sleep` is a nap, never part of the night. The rule is
+  // `isOuraSecondaryPeriod`, the same call `groupSleepPeriods` makes for the score.
+  for (const r of rows.filter(r => recordsSleep(r.durationHours) && !isOuraSecondaryPeriod(r))) {
     const list = byDate.get(r.date) ?? [];
     list.push(r);
     byDate.set(r.date, list);
@@ -123,15 +138,18 @@ export function mergeByDate(rows: SleepRow[]) {
       continue;
     }
 
-    // Same source (multiple Samsung splits or multiple Oura sessions): additive merge
+    // Same source (multiple Samsung splits or multiple Oura sessions): additive merge.
+    // #3057: the main period goes first, so efficiency, onset and the vitals below are its own
+    // and never whichever row the query happened to return first.
+    const main = mainRow(list);
     const merged = {
-      ...list[0],
-      phaseWindowStart: list[0].sleepPhase5Min ? list[0].sleepStart : null,
-      phaseWindowEnd:   list[0].sleepPhase5Min ? list[0].sleepEnd   : null,
+      ...main,
+      phaseWindowStart: main.sleepPhase5Min ? main.sleepStart : null,
+      phaseWindowEnd:   main.sleepPhase5Min ? main.sleepEnd   : null,
     };
     const add = (a: number | null, b: number | null) =>
       a != null && b != null ? +(a + b).toFixed(2) : (a ?? b);
-    for (const r of list.slice(1)) {
+    for (const r of list.filter(r => r !== main)) {
       merged.durationHours   = add(merged.durationHours,   r.durationHours);
       merged.deepSleepHours  = add(merged.deepSleepHours,  r.deepSleepHours);
       merged.remSleepHours   = add(merged.remSleepHours,   r.remSleepHours);
@@ -173,6 +191,11 @@ export function mergeByDate(rows: SleepRow[]) {
  * early and the additive merge SUMS a night and its naps into a fabricated 11.5 h night (BF-115's
  * refutation). Rows pulled before SQLite v50 have no window, so a date holding any such row passes
  * through raw, exactly as the seed always passed it.
+ *
+ * **Oura's period type is not on the device (#3057).** The local table has no `sleep_type`, so an Oura
+ * `sleep` fragment beside its `long_sleep` night still merges into it here, until the route's reply
+ * replaces the seed. Guessing the type from length is not safe: a short night Oura typed `long_sleep`
+ * and a pre-Cloud Oura row look the same on the device.
  *
  * Newest first because the route is and every reader assumes it (`sleepRows[0]` is "last night");
  * the store returns oldest first. `sleepTimeRecommendation` and `provisional` are not in the local

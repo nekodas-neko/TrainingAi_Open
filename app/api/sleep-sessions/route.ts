@@ -53,6 +53,8 @@ export async function GET() {
     manualSleepStart: r.manualSleepStart ? r.manualSleepStart.toISOString() : null,
     // #2338. Only true on a night no device recorded — `listSleepSessions` already dropped the rest.
     manualEntry: r.manualEntry ?? false,
+    // #3057. `mergeByDate` keeps an Oura period that is not `long_sleep` out of the night.
+    ouraSleepType: r.ouraSleepType ?? null,
   })));
 
   // A night the rollup has not yet derived past is still growing, and saying so is the whole of
