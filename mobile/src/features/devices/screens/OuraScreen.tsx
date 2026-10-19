@@ -37,6 +37,7 @@ import {
   type OuraResult,
   type OuraStatus,
 } from '../data/oura';
+import { ChestStrapCard } from '../components/ChestStrapCard';
 
 const CHECKLIST: { title: string; steps: string; page: OuraSettingsPage; button: string }[] = [
   {
@@ -186,7 +187,7 @@ export function OuraScreen({
 
   const connected = status?.connected === true;
   return (
-    <PageLayout title="Oura" onBack={onBack}>
+    <PageLayout title="Devices" onBack={onBack}>
       <TabPanel>
         <Stack style={{ paddingHorizontal: theme.spacing.lg }}>
           <Card>
@@ -310,6 +311,7 @@ export function OuraScreen({
           {statusError && status === null && busy === null && (
             <Notice title="Oura status unavailable" message={statusError} error />
           )}
+          <ChestStrapCard />
         </Stack>
       </TabPanel>
     </PageLayout>

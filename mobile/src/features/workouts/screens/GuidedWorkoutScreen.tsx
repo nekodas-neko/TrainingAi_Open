@@ -24,6 +24,7 @@ import { workoutFlow } from '../logging/flow';
 import { recordedSets, type WorkoutRecord } from '../logging/workout';
 import { SetEntry, SetActions } from '../components/SetEntry';
 import { RestCard } from '../components/WorkoutClocks';
+import { LiveHrCard } from '../components/LiveHrCard';
 import { WorkoutSaveNotice } from '../components/WorkoutSaveNotice';
 import { ExerciseReady } from '../components/ExerciseReady';
 import { LoadSuggestion } from '../components/LoadSuggestion';
@@ -371,6 +372,7 @@ export function GuidedWorkoutScreen({
                         : undefined
                     }
                   />
+                  <LiveHrCard />
                   {exercise.exerciseType !== 'bodyweight' &&
                     exerciseResult(workout, exercise).estimate !== null && (
                       <AppText

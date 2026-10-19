@@ -162,3 +162,21 @@ export async function observeAlerts(onOpen: (data: Record<string, unknown>) => v
   const listener = notifications.addNotificationResponseReceivedListener(handle);
   return () => listener.remove();
 }
+/**
+ * A one-off device alert, shown now, such as the strap's low battery (#3066). Never asks for the
+ * permission: without it the Devices screen still shows the level.
+ */
+export async function deviceAlert(title: string, body: string) {
+  if (!(await alertPermission(false))) return;
+  const notifications = await sdk();
+  if (Platform.OS === 'android')
+    await notifications.setNotificationChannelAsync('device-alerts', {
+      name: 'Device battery',
+      importance: notifications.AndroidImportance.DEFAULT,
+      sound: 'default',
+    });
+  await notifications.scheduleNotificationAsync({
+    content: { title, body, sound: 'default' },
+    trigger: Platform.OS === 'android' ? { channelId: 'device-alerts' } : null,
+  });
+}

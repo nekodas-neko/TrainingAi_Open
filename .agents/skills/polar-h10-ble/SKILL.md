@@ -61,12 +61,13 @@ touch the Oura native Kotlin stack (`android/.../oura/`), `oura_raw_samples`, or
 | Source interface + `'chest_strap'` id | `lib/live-hr/types.ts` (shipped) |
 | Precedence (strap first, ring fallback) | `lib/live-hr/manager.ts` — registration order = precedence; `activeSourceId()` = first non-disconnected source |
 | Strap source implementation | `lib/live-hr/chest-strap-source.ts` (planned) over `@capacitor-community/bluetooth-le` |
-| `0x2A37` parser (pure, unit-tested) | `lib/live-hr/hr-measurement.ts` (planned) |
+| `0x2A37` parser (pure, unit-tested) | `packages/shared/src/devices/heart-rate-measurement.ts` (re-exported by `lib/live-hr/hr-measurement.ts`; Preview uses it too) |
 | Paired-device persistence | `lib/live-hr/paired-strap.ts` (planned, localStorage — safe because the H10's MAC is stable, §5) |
 | Pairing UI | `components/settings/chest-strap-pairing.tsx` (planned) |
 | Sample persistence | `POST /api/hr-ingest` → `oura_heartrate` with `source='chest_strap'` (planned) |
 | Read precedence | `getHrForWindow` (`lib/data/postgres/slices/oura.ts`) — strap over `ble` per time bucket (planned) |
 | UI consumption | `useLiveHr()` + `LiveHrChart` etc. — **source-agnostic, no changes needed** |
+| TrainingAi Preview (`mobile/`, #2844 phase 1) | `mobile/src/features/devices/strap/` over `react-native-ble-plx`: pairing on the Devices screen, link held during a workout, samples saved locally then posted to `/api/hr-ingest`, low-battery alert via `decideLowBatteryAlert` |
 
 BLE transport is the **community Capacitor plugin** (`@capacitor-community/bluetooth-le`),
 not hand-written Kotlin: standard GATT needs no foreground service, no auth, no drain state

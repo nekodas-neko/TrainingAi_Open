@@ -231,7 +231,7 @@ export function MoreScreen({
                 <ListRow
                   density="compact"
                   title="Devices & connections"
-                  subtitle="Oura account"
+                  subtitle="Oura account, heart-rate strap"
                   leading={<Icon name="activity" />}
                   onPress={openDevices}
                 />
