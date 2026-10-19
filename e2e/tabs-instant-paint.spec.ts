@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { visitTwice, expectNoSkeleton } from './fixtures'
+import { visitTwice, expectNoSkeleton, suppressMorningCheckin } from './fixtures'
 
 /**
  * Q-249, spec 1 — the instant-paint rule, made executable.
@@ -50,6 +50,12 @@ test.describe('the five tabs paint without a skeleton on a repeat visit', () => 
         failures.push(`${r.status()} ${r.url()}`)
       })
 
+      // Home opens the morning check-in sheet on the user's first visit of a local morning, and a
+      // modal dialog hides the tab bar from the accessibility tree, so the shell assertion below
+      // finds no link. That made Home red only when CI ran in the seeded user's morning (it failed
+      // at 00:2x Brisbane, passed at 23:55): a clock dependency, not a paint regression. The sheet
+      // is not what this spec measures; `checkin-pills-one-line` covers it opening.
+      await suppressMorningCheckin(page)
       await visitTwice(page, tab.href)
 
       // The tab bar is the app shell — if it is not here, the route did not render at all.
