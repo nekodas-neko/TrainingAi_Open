@@ -19,11 +19,8 @@ import { buildIntervalPlan, type WalkConfig } from '@/lib/walk/interval-plan'
 import { ZoneBreakdown } from '@/components/health/zone-breakdown'
 import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
 import { registerWalkExit } from '@/lib/walk/walk-exit'
-import {
-  computeTotalDistanceKm, computeSplits, computeBestEfforts, computePaceSeries,
-  computeElevationChange, computeElevationProfile, computeAvgPaceSecPerKm,
-} from '@/lib/activity/activity-metrics'
-import { simplifyRoute, encodeRoute } from '@/lib/activity/route-encoding'
+import { computePaceSeries } from '@/lib/activity/activity-metrics'
+import { summariseRoute } from '@trainingai/shared/activity/route-summary'
 import { computeWalkSegmentStats, aggregateSegmentsByKind, walkEffortDisplay, type KindAggregate } from '@/lib/walk/segment-stats'
 import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
@@ -42,7 +39,6 @@ const ActivityRouteMap = dynamic(
   { ssr: false },
 )
 
-const ROUTE_SIMPLIFY_TOLERANCE_M = 5
 
 function avg(nums: number[]) { return nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null }
 export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs, userId, onDone }: {
@@ -170,21 +166,22 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
     const activityType = isTreadmill ? 'treadmill' : 'walk'
     const title = isTreadmill ? 'Treadmill interval walk' : 'Interval walk'
 
-    // GPS-derived fields, mirroring activity-store.ts's finish() computation exactly.
+    // GPS-derived fields, from the same summariseRoute as activity-store.ts's finish().
     // On a treadmill the watcher never started, so rawPoints is empty and every field below
     // falls to null through the existing hasRoute guard rather than a second code path.
     const rawPoints = useGuidedWalkStore.getState().rawPoints
     const hasRoute = !isTreadmill && rawPoints.length >= 2
-    const distanceKm = hasRoute ? computeTotalDistanceKm(rawPoints) : null
-    const routePolyline = hasRoute ? encodeRoute(simplifyRoute(rawPoints, ROUTE_SIMPLIFY_TOLERANCE_M)) : null
-    const splits = hasRoute ? computeSplits(rawPoints) : null
-    const bestEfforts = hasRoute ? computeBestEfforts(rawPoints) : null
-    const paceSeries = hasRoute ? computePaceSeries(rawPoints) : null
-    const avgPaceSecPerKm = hasRoute ? computeAvgPaceSecPerKm(distanceKm!, actualSec) ?? null : null
-    const elevation = hasRoute ? computeElevationChange(rawPoints) : null
-    const elevationGainM = elevation?.gainM ?? null
-    const elevationLossM = elevation?.lossM ?? null
-    const elevationProfile = hasRoute ? computeElevationProfile(rawPoints) : null
+    // The pace denominator is the walk's own elapsed time, not the GPS fix span.
+    const route = hasRoute ? summariseRoute(rawPoints, actualSec) : null
+    const distanceKm = route?.distanceKm ?? null
+    const routePolyline = route?.routePolyline ?? null
+    const splits = route?.splits ?? null
+    const bestEfforts = route?.bestEfforts ?? null
+    const paceSeries = route?.paceSeries ?? null
+    const avgPaceSecPerKm = route?.avgPaceSecPerKm ?? null
+    const elevationGainM = route?.elevationGainM ?? null
+    const elevationLossM = route?.elevationLossM ?? null
+    const elevationProfile = route?.elevationProfile ?? null
     const cadenceFields = cadenceFieldsForSave(cadence)
     // Steps were hardcoded null here (Q-230); they integrate the strap cadence series this same walk
     // already persists. Calories are derived server-side in saveActivityLog — the MET table behind

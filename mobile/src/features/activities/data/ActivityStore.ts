@@ -21,6 +21,13 @@ import {
   type FitnessProfile,
 } from './guidance.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { summariseRoute } from '@trainingai/shared/activity/route-summary';
+import {
+  keepsFix,
+  routeEligible,
+  routePointSchema,
+  type RoutePoint,
+} from './route-recording.ts';
 
 const sessionSchema = z.object({
   id: z.uuid(),
@@ -58,18 +65,37 @@ const savedSchema = z.object({
     .default([]),
   tests: z.array(z.object({ payload: fitnessPayloadSchema, pending: z.boolean() })).default([]),
 });
+// The recording's GPS points, kept apart from the main record so a fix every few seconds does not
+// rewrite every saved activity with it. Tied to the recording by its start time, which is set once
+// at Start and survives the session's ID being replaced by the server's after an upload.
+const routeSchema = z.object({
+  version: z.literal(1),
+  origin: z.string(),
+  userId: z.string(),
+  startMs: z.number(),
+  points: z.array(routePointSchema),
+});
 type Data = Pick<z.infer<typeof savedSchema>, 'session' | 'rows' | 'tests' | 'runs'>;
-export type ActivityState = Data & { ready: boolean; syncing: boolean; error: string | null };
+export type ActivityState = Data & {
+  route: RoutePoint[];
+  ready: boolean;
+  syncing: boolean;
+  error: string | null;
+};
 export const emptyActivity: ActivityState = {
   session: null,
   rows: [],
   tests: [],
   runs: [],
+  route: [],
   ready: false,
   syncing: false,
   error: null,
 };
 const key = 'activities.v1';
+const routeKey = 'activities.route.v1';
+// At most this long between route checkpoints, so a kill loses a few seconds of points at most.
+export const ROUTE_CHECKPOINT_MS = 5000;
 export function elapsedMs(session: ActivitySession, now: number) {
   if (session.startMs === null) {
     return 0;
@@ -79,13 +105,29 @@ export function elapsedMs(session: ActivitySession, now: number) {
     (session.pauseStartMs ?? session.endMs ?? now) - session.startMs - session.pausedMs,
   );
 }
-export function sessionPayload(session: ActivitySession, timezone: string): ActivityPayload {
+export function sessionPayload(
+  session: ActivitySession,
+  timezone: string,
+  route: RoutePoint[] = [],
+): ActivityPayload {
   if (session.mode !== 'done' || session.startMs === null || session.endMs === null) {
     throw new Error('Finish this activity before saving.');
   }
-  const distanceKm = session.distance.trim()
-    ? Number(session.distance.replace(',', '.'))
-    : undefined;
+  // The same fields the current app saves for a GPS activity. A guided walk's average pace is over
+  // its elapsed time (`walk-summary.tsx`), any other activity's over the GPS fix span
+  // (`activity-store.ts` finish).
+  const summary = routeEligible(session)
+    ? summariseRoute(
+        route,
+        session.guidance?.kind === 'walk' ? elapsedMs(session, session.endMs) / 1000 : undefined,
+      )
+    : null;
+  const { distanceKm: routeKm, ...routeFields } = summary ?? {};
+  const distanceKm = summary
+    ? routeKm || undefined
+    : session.distance.trim()
+      ? Number(session.distance.replace(',', '.'))
+      : undefined;
   return activityPayload.parse({
     id: session.id,
     date: toAestDay(new Date(session.startMs), timezone),
@@ -95,6 +137,7 @@ export function sessionPayload(session: ActivitySession, timezone: string): Acti
     startTime: msToHHMMInTz(session.startMs, timezone),
     endTime: msToHHMMInTz(session.endMs, timezone),
     ...(distanceKm !== undefined ? { distanceKm } : {}),
+    ...routeFields,
     ...(session.guidance?.kind === 'walk'
       ? {
           segments: walkSegments(
@@ -139,20 +182,29 @@ export function sameActivityField(a: unknown, b: unknown): boolean {
   }
   return false;
 }
+// Whether a server activity row holds a value this phone saved. The row's date may come back with
+// slashes, and its start and end times come back with seconds ("12:07:00", a Postgres `time`)
+// where the phone sends "12:07"; compared exactly, no activity upload was ever confirmed.
+export function sameActivityValue(field: string, row: unknown, value: unknown) {
+  if (field === 'date') {
+    return String(row).replace(/\//g, '-') === value;
+  }
+  if (field === 'startTime' || field === 'endTime') {
+    return typeof row === 'string' && row.slice(0, 5) === value;
+  }
+  return sameActivityField(row, value);
+}
 export function confirmedActivity(payload: ActivityPayload, rows: Record<string, unknown>[]) {
   return (
     rows.find(
       (row) =>
         z.uuid().safeParse(row.id).success &&
         (row.id === payload.id ||
-          (!!payload.startTime && row.startTime === payload.startTime)) &&
+          (!!payload.startTime &&
+            sameActivityValue('startTime', row.startTime, payload.startTime))) &&
         Object.entries(payload).every(
           ([field, value]) =>
-            field === 'id' ||
-            value === undefined ||
-            (field === 'date'
-              ? String(row.date).replace(/\//g, '-') === value
-              : sameActivityField(row[field], value)),
+            field === 'id' || value === undefined || sameActivityValue(field, row[field], value),
         ),
     ) ?? null
   );
@@ -163,6 +215,9 @@ export class ActivityStore {
   private writes: Promise<unknown> = Promise.resolve();
   private flushing: Promise<void> | null = null;
   private generation = 0;
+  private routeWrites: Promise<unknown> = Promise.resolve();
+  private routeSavedMs = -Infinity;
+  private routeTimer: ReturnType<typeof setTimeout> | null = null;
   constructor(
     private storage: ScopedStorage,
     private connection: AccountConnection,
@@ -192,6 +247,7 @@ export class ActivityStore {
       ) {
         throw new Error('Wrong account.');
       }
+      const route = await this.loadRoute(data?.session?.startMs ?? null);
       if (generation === this.generation) {
         this.publish({
           ready: true,
@@ -199,6 +255,7 @@ export class ActivityStore {
           rows: data?.rows ?? [],
           tests: data?.tests ?? [],
           runs: data?.runs ?? [],
+          route,
           error: null,
         });
         void this.sync();
@@ -213,6 +270,99 @@ export class ActivityStore {
         });
       }
     }
+  }
+  // A route from another recording, or another account, is never attached to this one. Leftovers
+  // are what a kill between saving an activity and clearing its route leaves behind.
+  private async loadRoute(startMs: number | null) {
+    const raw = await this.storage.get(routeKey);
+    let saved: ReturnType<typeof routeSchema.safeParse> | null = null;
+    try {
+      saved = raw ? routeSchema.safeParse(JSON.parse(raw)) : null;
+    } catch {}
+    if (
+      saved?.success &&
+      startMs !== null &&
+      saved.data.startMs === startMs &&
+      saved.data.origin === this.connection.origin &&
+      saved.data.userId === this.connection.userId
+    ) {
+      return saved.data.points;
+    }
+    if (raw) {
+      await this.storage.remove(routeKey);
+    }
+    return [];
+  }
+  // Records one fix from the location adapter. Kept only while a route-recording activity is
+  // running and not paused, and only past the current app's 5 m filter.
+  appendFix(point: RoutePoint) {
+    const session = this.current.session;
+    if (
+      !this.current.ready ||
+      !session ||
+      session.mode !== 'active' ||
+      session.pauseStartMs !== null ||
+      !routeEligible(session) ||
+      !keepsFix(this.current.route.at(-1), point)
+    ) {
+      return false;
+    }
+    this.publish({ route: [...this.current.route, point] });
+    if (this.now() - this.routeSavedMs >= ROUTE_CHECKPOINT_MS) {
+      void this.checkpoint().catch(() => {});
+    } else if (!this.routeTimer) {
+      this.routeTimer = setTimeout(
+        () => {
+          this.routeTimer = null;
+          void this.checkpoint().catch(() => {});
+        },
+        ROUTE_CHECKPOINT_MS - (this.now() - this.routeSavedMs),
+      );
+    }
+    return true;
+  }
+  // Writes the route as it stands. Called on a timer while recording, and on pause, finish and the
+  // app leaving the foreground, so the points survive the app being killed or the phone restarting.
+  checkpoint() {
+    const generation = this.generation;
+    if (this.routeTimer) {
+      clearTimeout(this.routeTimer);
+      this.routeTimer = null;
+    }
+    this.routeSavedMs = this.now();
+    const result = this.routeWrites.then(async () => {
+      const session = this.current.session;
+      if (generation !== this.generation || !session || session.startMs === null) {
+        return;
+      }
+      await this.storage.set(
+        routeKey,
+        JSON.stringify(
+          routeSchema.parse({
+            version: 1,
+            origin: this.connection.origin,
+            userId: this.connection.userId,
+            startMs: session.startMs,
+            points: this.current.route,
+          }),
+        ),
+      );
+    });
+    this.routeWrites = result.catch(() => undefined);
+    return result;
+  }
+  private clearRoute() {
+    if (this.routeTimer) {
+      clearTimeout(this.routeTimer);
+      this.routeTimer = null;
+    }
+    this.routeSavedMs = -Infinity;
+    if (this.current.route.length) {
+      this.publish({ route: [] });
+    }
+    const result = this.routeWrites.then(() => this.storage.remove(routeKey));
+    this.routeWrites = result.catch(() => undefined);
+    return result;
   }
   private write(change: (data: Data) => Data) {
     const generation = this.generation;
@@ -285,7 +435,9 @@ export class ActivityStore {
       session.mode !== 'pre' ? session : { ...session, mode: 'active', startMs: this.now() },
     );
   }
-  pause() {
+  async pause() {
+    // A failed route write must not hold up the recording; the points are still in memory.
+    await this.checkpoint().catch(() => {});
     return this.transition((session) =>
       session.mode !== 'active'
         ? session
@@ -300,7 +452,9 @@ export class ActivityStore {
           },
     );
   }
-  finish() {
+  async finish() {
+    // A failed route write must not hold up the recording; the points are still in memory.
+    await this.checkpoint().catch(() => {});
     return this.transition((session) =>
       session.mode !== 'active'
         ? session
@@ -317,8 +471,9 @@ export class ActivityStore {
           },
     );
   }
-  discard() {
-    return this.write((data) => ({ ...data, session: null }));
+  async discard() {
+    await this.write((data) => ({ ...data, session: null }));
+    await this.clearRoute();
   }
   async save(
     timezone: string,
@@ -329,7 +484,7 @@ export class ActivityStore {
         throw new Error('No activity to save.');
       }
       const payload = activityPayload.parse({
-        ...sessionPayload(data.session, timezone),
+        ...sessionPayload(data.session, timezone, this.current.route),
         ...(metrics.avgHr != null ? { avgHr: Math.round(metrics.avgHr) } : {}),
         ...(metrics.maxHr != null ? { maxHr: Math.round(metrics.maxHr) } : {}),
         ...(metrics.steps != null ? { steps: metrics.steps } : {}),
@@ -343,6 +498,7 @@ export class ActivityStore {
         ],
       };
     });
+    await this.clearRoute().catch(() => {});
     this.invalidate();
     void this.sync();
   }
@@ -377,7 +533,7 @@ export class ActivityStore {
       if (elapsedMs(session, this.now()) < 60_000) {
         throw new Error('This walk is too short to save.');
       }
-      const payload = sessionPayload(session, timezone);
+      const payload = sessionPayload(session, timezone, this.current.route);
       return {
         ...data,
         session: { ...session, guidance: { ...session.guidance, saved: true } },
@@ -428,6 +584,8 @@ export class ActivityStore {
     void this.sync();
   }
   async finishGuided() {
+    // A failed route write must not hold up the recording; the points are still in memory.
+    await this.checkpoint().catch(() => {});
     await this.transition((session) => {
       if (session.mode !== 'active' || !session.guidance || session.startMs === null) {
         return session;
@@ -609,6 +767,10 @@ export class ActivityStore {
   }
   cancel() {
     this.generation++;
+    if (this.routeTimer) {
+      clearTimeout(this.routeTimer);
+      this.routeTimer = null;
+    }
   }
   reconcile(ids: string[]) {
     if (!this.current.rows.some((row) => !row.pending && ids.includes(row.payload.id))) {

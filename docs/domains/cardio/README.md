@@ -13,7 +13,7 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 | Area | Where |
 |---|---|
 | Running & walking | `packages/shared/src/running/`, `lib/walk/` |
-| GPS & routes | `lib/activity/gps-tracking.ts`, `gps-watchdog.ts`, `route-encoding.ts`, `route-hr-zones.ts`, `scrub.ts`, `treadmill-utils.ts` |
+| GPS & routes | `packages/shared/src/activity/` (`route-metrics.ts`, `route-encoding.ts`, `route-summary.ts`, shared with Preview), `lib/activity/gps-tracking.ts`, `gps-watchdog.ts`, `route-hr-zones.ts`, `scrub.ts`, `treadmill-utils.ts`; Preview's recorder in `mobile/src/features/activities/data/route-recording.ts` |
 | Cadence & gait | `lib/activity/cadence-tracker.ts`, `use-cadence-tracking.ts`, `gait-confirm.ts`, `packages/shared/src/health/cadence.ts`, `gait-classifier.ts` |
 | Fitness & load | `packages/shared/src/health/vo2max.ts`, `vdot.ts`, `training-stress.ts`, `cardio-trends.ts`, `session-picker.ts`, `fitness-tests.ts`, `packages/shared/src/fitness-tests/` |
 | UI | `app/cardio/`, `app/running/`, `app/baselines/`, `components/cardio/`, `components/running/`, `components/guided-walk/`, `components/cadence/` |

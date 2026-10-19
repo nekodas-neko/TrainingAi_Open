@@ -4,18 +4,9 @@ import type { ActivityMode, ActivityDraftSummary } from '@/components/activity/t
 import type { RoutePoint } from '@/lib/activity/route-encoding'
 import type { CadenceSummary } from '@trainingai/shared/health/cadence'
 import { stepsEstimateIfCovered } from './cadence-coverage'
-import { simplifyRoute, encodeRoute } from '@/lib/activity/route-encoding'
+import { summariseRoute } from '@trainingai/shared/activity/route-summary'
 import { debouncedLocalStorage } from '@/lib/stores/debounced-storage'
-import {
-  haversineDistanceKm,
-  computeTotalDistanceKm,
-  computeSplits,
-  computeBestEfforts,
-  computePaceSeries,
-  computeElevationChange,
-  computeElevationProfile,
-  computeAvgPaceSecPerKm,
-} from '@/lib/activity/activity-metrics'
+import { haversineDistanceKm, computeAvgPaceSecPerKm } from '@/lib/activity/activity-metrics'
 
 // Exported because `reconcileRehydratedActivity` and `clearActivitySetup` take it — an exported
 // function whose parameter type is private cannot be called from anywhere that has to name it.
@@ -61,8 +52,6 @@ export type ActivityStore = ActivityState & ActivityActions
 export function isActivityActive(state: { mode: ActivityMode }): boolean {
   return state.mode === 'active'
 }
-
-const ROUTE_SIMPLIFY_TOLERANCE_M = 5
 
 // A mode:'active' session older than this on rehydrate is abandoned, not resumable — see the
 // onRehydrateStorage comment below.
@@ -218,27 +207,11 @@ export const useActivityStore = create<ActivityStore>()(
 
         let draftSummary: ActivityDraftSummary = { durationMin }
 
-        if (s.isDistanceBased && s.rawPoints.length >= 2) {
-          const distanceKm = computeTotalDistanceKm(s.rawPoints)
-          const simplified = simplifyRoute(s.rawPoints, ROUTE_SIMPLIFY_TOLERANCE_M)
-          const { gainM, lossM } = computeElevationChange(s.rawPoints)
-          // Denominator must come from the same stream as the distance numerator (GPS fix time),
-          // not the phone wall clock — splits/paceSeries/bestEfforts already derive from
-          // s.rawPoints, and mixing clocks means avgPaceSecPerKm can never reconcile with them.
-          const gpsElapsedSec = (s.rawPoints[s.rawPoints.length - 1].t - s.rawPoints[0].t) / 1000
-          draftSummary = {
-            ...draftSummary,
-            distanceKm: Math.round(distanceKm * 100) / 100,
-            routePolyline: encodeRoute(simplified),
-            splits: computeSplits(s.rawPoints),
-            bestEfforts: computeBestEfforts(s.rawPoints),
-            paceSeries: computePaceSeries(s.rawPoints),
-            avgPaceSecPerKm: computeAvgPaceSecPerKm(distanceKm, gpsElapsedSec) ?? undefined,
-            elevationGainM: gainM,
-            elevationLossM: lossM,
-            elevationProfile: computeElevationProfile(s.rawPoints),
-          }
-        }
+        // The pace denominator is the GPS fix span (summariseRoute's default), not the phone wall
+        // clock — splits/paceSeries/bestEfforts already derive from s.rawPoints, and mixing clocks
+        // means avgPaceSecPerKm can never reconcile with them.
+        const route = s.isDistanceBased ? summariseRoute(s.rawPoints) : null
+        if (route) draftSummary = { ...draftSummary, ...route }
 
         // Cadence is measured, not derived from the route, so it applies to every
         // foot-based activity - including the treadmill, which has no GPS at all.
