@@ -17,10 +17,11 @@ import { MAX_PACE_SEC_PER_KM } from '../validation/plausibility'
 export const ROUTE_SIMPLIFY_TOLERANCE_M = 5
 
 /**
- * An activity's average pace (s/km) as it is stored: distance over elapsed seconds, or undefined when
- * there is none (no distance, or no time) or it is slower than `MAX_PACE_SEC_PER_KM`. Slower than that is not a pace (an hour
- * per km is a standstill), and the save schema rejects it. The one rule for both `summariseRoute`
- * and the server, which works the pace out itself when a client sends none (#3120).
+ * An activity's average pace (s/km) as it is stored: distance over elapsed seconds, or undefined
+ * when there is none (no distance, or no time) or it is slower than `MAX_PACE_SEC_PER_KM`. Slower
+ * than that is not a pace (an hour per km is a standstill), and the save schema rejects it. The one
+ * rule for `summariseRoute`, a guided walk's segments (#3128) and the server, which works the pace
+ * out itself when a client sends none (#3120).
  */
 export function averagePaceSecPerKm(distanceKm: number, elapsedSec: number): number | undefined {
   const pace = computeAvgPaceSecPerKm(distanceKm, elapsedSec)
