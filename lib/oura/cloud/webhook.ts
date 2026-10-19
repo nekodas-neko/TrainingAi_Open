@@ -21,7 +21,7 @@ import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { fetchOuraDocument, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthorizedError } from './data'
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
-import { writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
+import { reattributeAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import { getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
 
@@ -135,10 +135,10 @@ export type OuraWebhookDeps = {
   /** #3079: re-scores a recent night a sleep event changed or deleted (`rescore-nights.ts`). */
   rescore?: NightRescoreRepo
   /**
-   * #3078: re-attributes completed workouts whose window the heart-rate catch-up just wrote
-   * (`reattributeWorkoutsHrInWindow`). Without it the catch-up writes heart rate and nothing else.
+   * #3078: re-attributes completed workouts whose window the heart-rate catch-up just changed
+   * (`workoutHrReattributor`). Without it the catch-up writes heart rate and nothing else.
    */
-  workoutHr?: (userId: string, from: Date, to: Date, tz: string) => Promise<number>
+  workoutHr?: OuraWorkoutHrReattribute
 }
 
 function isStoredType(t: string): t is OuraDocumentType {
@@ -220,9 +220,9 @@ export type OuraHeartRateReader = Pick<WorkoutRepository, 'getLatestOuraCloudHea
 /**
  * Reads the user's heart rate from `HEART_RATE_OVERLAP_MS` behind the newest stored `oura_cloud` point
  * (at most a week back) to now, and writes it through `upsertOuraCloudHeartrate` with the user's
- * timezone. When points were written, the completed workouts they overlap are re-attributed
+ * timezone. When points were new or changed, the completed workouts they overlap are re-attributed
  * (`deps.workoutHr`, #3078); a failure there is reported and does not fail the read. Returns points
- * written, or `null` when the user has no usable connection.
+ * written (offered after the device-row cover filter), or `null` when the user has no usable connection.
  *
  * A read that lands nothing is reported, never silent (#2982: no Oura heart rate had landed and
  * nothing said why): an empty answer over an hour or more, rows that failed the spec's shape, and
@@ -242,21 +242,17 @@ export async function catchUpOuraCloudHeartRate(
   const from = newest ? new Date(Math.max(floor.getTime(), newest.getTime() - HEART_RATE_OVERLAP_MS)) : floor
   const got = await fetchOuraHeartRate(token, from, new Date(now))
   const points = mapHeartRateRows(got.rows)
-  const written = points.length === 0 ? 0 : await deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
-  if (written > 0 && deps.workoutHr) {
-    const times = points.map(p => p.timestamp.getTime())
-    try {
-      await deps.workoutHr(userId, new Date(Math.min(...times)), new Date(Math.max(...times)), tz)
-    } catch (err) {
-      reportOuraCloudIssue('webhook-heartrate:workouts', err instanceof Error ? err.message : 'unknown', { userId })
-    }
-  }
+  const write = points.length === 0
+    ? { offered: 0, changed: 0, changedFrom: null, changedTo: null }
+    : await deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
+  const written = write.offered
+  await reattributeAfterHeartRate(deps.workoutHr, userId, write, tz, 'webhook-heartrate:workouts')
   // The span with nothing stored yet: what an empty answer says Oura is missing.
   const unseenFrom = newest ?? floor
   const hours = Math.round((now - unseenFrom.getTime()) / 3_600_000)
   // Every read says what happened to it, so a partial loss to the device-row cover filter (plausible
   // points not written) shows in the logs too, not only a total one.
-  console.info(`[oura] heart-rate catch-up from ${from.toISOString()}: ${got.rows.length} read, ${points.length} plausible, ${written} written, ${points.length - written} covered by device rows`)
+  console.info(`[oura] heart-rate catch-up from ${from.toISOString()}: ${got.rows.length} read, ${points.length} plausible, ${written} written (${write.changed} new or changed), ${points.length - written} covered by device rows`)
   if (got.dropped > 0) {
     reportOuraCloudIssue('webhook-heartrate:dropped', `${got.dropped} of ${got.rows.length + got.dropped} rows did not match the spec`, { userId })
   }

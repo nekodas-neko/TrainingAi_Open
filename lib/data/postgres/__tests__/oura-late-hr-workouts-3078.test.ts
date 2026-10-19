@@ -1,7 +1,7 @@
 // #3078 — Oura Cloud heart rate lands in batches, often hours after a workout was completed and its
 // HR stats were computed from a thin series. The catch-up re-reads 6 h behind its newest point and
-// re-attributes the completed workouts the points it wrote overlap; a sparse snapshot no longer
-// drives the calorie estimate.
+// re-attributes the completed workouts the points it actually changed overlap; a session whose HR
+// fails the #2437 density rule no longer drives the calorie estimate.
 //
 // Runs against a real Postgres (DATABASE_URL) and skips without one. Oura is mocked at `fetch`.
 // Fixtures are anchored to yesterday's local midday, never a hardcoded date.
@@ -9,11 +9,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { fromZonedTime } from 'date-fns-tz'
 import { OURA_API_BASE, type OuraOAuthConfig } from '@/lib/oura/cloud/config'
 import { encryptOuraToken } from '@/lib/oura/cloud/token-cipher'
-import { jsonResponse, OURA_USER } from '@/lib/oura/cloud/__tests__/fixtures'
+import { jsonResponse } from '@/lib/oura/cloud/__tests__/fixtures'
 import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-000000003078'
+// Its own Oura account id: `oura_tokens.oura_user_id` is unique, and other files run in parallel.
+const OURA_USER = 'oura-user-3078'
 const TZ = 'Australia/Brisbane'
 const CONFIG: OuraOAuthConfig = { clientId: 'cid', clientSecret: 'csecret', redirectUri: 'http://localhost:3000/api/oura/callback' }
 const ws = (n: number) => `00000000-0000-4000-8000-00000000307${n}`
@@ -81,7 +83,7 @@ describe.skipIf(!canRun)('late Oura heart rate re-attributes workouts (#3078)', 
   const stats = async (id: string) => (await pool.query(
     `SELECT avg_bpm, readings_count FROM workout_hr_stats WHERE workout_session_id = $1`, [id])).rows[0] ?? null
 
-  it('lists only completed, live sessions whose HR window overlaps, newest first and bounded', async () => {
+  it('lists only completed, live sessions whose HR window overlaps, oldest first and bounded', async () => {
     await addSession(ws(1), START, END)
     await addSession(ws(2), new Date(START.getTime() - 3 * 60 * MIN), new Date(START.getTime() - 2 * 60 * MIN))
     await addSession(ws(3), START, null)
@@ -91,8 +93,8 @@ describe.skipIf(!canRun)('late Oura heart rate re-attributes workouts (#3078)', 
     const pad = await repo.listCompletedSessionsOverlapping(USER, new Date(END.getTime() + 9 * MIN), new Date(END.getTime() + 60 * MIN), 20)
     expect(pad.map(s => s.id)).toEqual([ws(1)])
     const day = await repo.listCompletedSessionsOverlapping(USER, new Date(START.getTime() - 4 * 60 * MIN), END, 20)
-    expect(day.map(s => s.id)).toEqual([ws(1), ws(2)])
-    expect((await repo.listCompletedSessionsOverlapping(USER, new Date(START.getTime() - 4 * 60 * MIN), END, 1)).map(s => s.id)).toEqual([ws(1)])
+    expect(day.map(s => s.id)).toEqual([ws(2), ws(1)])
+    expect((await repo.listCompletedSessionsOverlapping(USER, new Date(START.getTime() - 4 * 60 * MIN), END, 1)).map(s => s.id)).toEqual([ws(2)])
   })
 
   it('a batch Oura stamps behind the newest stored point is read, and the workout it covers is refreshed, idempotently', async () => {
@@ -108,30 +110,63 @@ describe.skipIf(!canRun)('late Oura heart rate re-attributes workouts (#3078)', 
     expect(await stats(ws(1))).toEqual({ avg_bpm: 93, readings_count: 2 })
     // A later sync stored a point two hours after the workout; the workout's own batch arrives after it.
     const newest = new Date(END.getTime() + 2 * 60 * MIN)
-    await repo.upsertOuraCloudHeartrate(USER, [{ timestamp: newest, bpm: 60 }], TZ)
+    await repo.upsertOuraCloudHeartrate(USER, [{ timestamp: newest, bpm: 60, context: 'workout' }], TZ)
     for (let t = START.getTime(); t <= END.getTime(); t += MIN) points.push({ at: new Date(t), bpm: 120 })
     points.push({ at: newest, bpm: 60 })
 
-    const deps = { repo, config: CONFIG, workoutHr: (u: string, f: Date, to: Date, tz: string) => reattributeWorkoutsHrInWindow(repo, u, f, to, tz) }
+    const spans: [string, string][] = []
+    const deps = {
+      repo, config: CONFIG,
+      workoutHr: (u: string, f: Date, to: Date, tz: string) => { spans.push([f.toISOString(), to.toISOString()]); return reattributeWorkoutsHrInWindow(repo, u, f, to, tz) },
+    }
     const now = newest.getTime() + 30 * MIN
     expect(await catchUpOuraCloudHeartRate(deps, USER, now)).toBe(points.length)
     expect(fetchedFrom[0]).toBe(new Date(newest.getTime() - 6 * 60 * MIN).toISOString())
+    // Re-attributed over the points that changed: the workout's batch, not the stored point after it.
+    expect(spans).toEqual([[START.toISOString(), END.toISOString()]])
     const after = await stats(ws(1))
     expect(after.readings_count).toBe(46)
     expect(after.avg_bpm).toBe(120)
 
-    // Again: nothing new, nothing changes.
+    // Again: the re-read changes nothing, so nothing is re-attributed.
     expect(await catchUpOuraCloudHeartRate(deps, USER, now + 10 * MIN)).toBe(points.length)
+    expect(spans).toHaveLength(1)
     expect(await stats(ws(1))).toEqual(after)
   })
 
-  it('a sparse snapshot does not drive the calorie estimate; a dense one does', async () => {
-    await addSession(ws(1), START, END)
-    await addSession(ws(2), START, END)
-    // 65-minute HR window (45 min + two 10-minute pads). 9 readings is under the 5.5-minute cadence
-    // (65 / 5.5 ≈ 11.8); 13 is a full 5-minute series; a strap writes hundreds.
-    await repo.upsertWorkoutHrStats(USER, ws(1), { avgBpm: 100, peakBpm: 120, hrr1Best: null, workoutHrvMs: null, readingsCount: 9, source: 'oura_cloud' })
-    await repo.upsertWorkoutHrStats(USER, ws(2), { avgBpm: 130, peakBpm: 160, hrr1Best: null, workoutHrvMs: null, readingsCount: 13, source: 'oura_cloud' })
+  it('upsertOuraCloudHeartrate says which points it actually changed', async () => {
+    const pts = [0, 5, 10].map(m => ({ timestamp: new Date(START.getTime() + m * MIN), bpm: 70 }))
+    expect(await repo.upsertOuraCloudHeartrate(USER, pts, TZ)).toEqual({ offered: 3, changed: 3, changedFrom: pts[0].timestamp, changedTo: pts[2].timestamp })
+    expect(await repo.upsertOuraCloudHeartrate(USER, pts, TZ)).toEqual({ offered: 3, changed: 0, changedFrom: null, changedTo: null })
+    const revised = [{ ...pts[1], bpm: 72 }, pts[2]]
+    expect(await repo.upsertOuraCloudHeartrate(USER, revised, TZ)).toEqual({ offered: 2, changed: 1, changedFrom: pts[1].timestamp, changedTo: pts[1].timestamp })
+  })
+
+  it('a session whose HR fails the #2437 rule does not drive the calorie estimate; a dense one does', async () => {
+    const strapStart = new Date(START.getTime() + 3 * 60 * MIN)
+    const strapEnd = new Date(strapStart.getTime() + 45 * MIN)
+    await addSession(ws(1), START, new Date(START.getTime() + 71 * MIN))
+    await addSession(ws(2), strapStart, strapEnd)
+    // ws(1): 21 Oura points over 71 minutes, gaps up to 19 minutes — a high enough average rate, but
+    // not the ring's cadence across the session. ws(2): a strap at 1 Hz.
+    const gaps = [...Array(19).fill((71 - 19) / 19), 19]
+    let t = START.getTime()
+    const sparse = [{ timestamp: new Date(t), bpm: 100 }]
+    for (const g of gaps) { t += g * MIN; sparse.push({ timestamp: new Date(Math.round(t)), bpm: 100 }) }
+    await repo.upsertOuraCloudHeartrate(USER, sparse, TZ)
+    await pool.query(
+      `INSERT INTO oura_heartrate (user_id, timestamp, bpm, source)
+       SELECT $1, ts, 130, 'chest_strap' FROM generate_series($2::timestamptz, $3::timestamptz, interval '1 second') ts`,
+      [USER, strapStart, strapEnd])
+    await repo.upsertWorkoutHrStats(USER, ws(1), { avgBpm: 100, peakBpm: 120, hrr1Best: null, workoutHrvMs: null, readingsCount: 21, source: 'oura_cloud' })
+    await repo.upsertWorkoutHrStats(USER, ws(2), { avgBpm: 130, peakBpm: 160, hrr1Best: null, workoutHrvMs: null, readingsCount: 2701, source: 'chest_strap' })
     expect([...(await repo.getAvgBpmBySession(USER, [ws(1), ws(2)])).entries()]).toEqual([[ws(2), 130]])
+  })
+
+  it('a session past HR retention keeps its snapshot: there is no series left to check', async () => {
+    const old = new Date(Date.now() - 200 * 86_400_000)
+    await addSession(ws(3), old, new Date(old.getTime() + 45 * MIN))
+    await repo.upsertWorkoutHrStats(USER, ws(3), { avgBpm: 125, peakBpm: 150, hrr1Best: null, workoutHrvMs: null, readingsCount: 2700, source: 'chest_strap' })
+    expect([...(await repo.getAvgBpmBySession(USER, [ws(3)])).entries()]).toEqual([[ws(3), 125]])
   })
 })

@@ -8,7 +8,7 @@ import { readTextLimited } from '@trainingai/shared/http/request-guards'
 import { ouraOAuthConfig } from '@/lib/oura/cloud/config'
 import { hasOuraTokenKey } from '@/lib/oura/cloud/token-cipher'
 import { reportOuraCloudIssue } from '@/lib/oura/cloud/report'
-import { reattributeWorkoutsHrInWindow } from '@/lib/workout/post-completion-hr'
+import { workoutHrReattributor } from '@/lib/workout/post-completion-hr'
 import {
   OuraWebhookEvent, handleOuraWebhookEvent, isOurVerificationToken, isRetryableOuraError, ouraWebhookConfig, verifyOuraSignature,
 } from '@/lib/oura/cloud/webhook'
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     const repo = await getRepositoryAsync()
     const outcome = await handleOuraWebhookEvent({
       repo, config: config.oauth, rescore: repo,
-      workoutHr: (userId, from, to, tz) => reattributeWorkoutsHrInWindow(repo, userId, from, to, tz),
+      workoutHr: workoutHrReattributor(repo),
     }, event.data)
     // Only the outcome's name goes back; no user id, no health data.
     return json({ received: true, result: outcome.result })

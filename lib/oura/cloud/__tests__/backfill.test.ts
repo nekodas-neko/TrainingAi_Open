@@ -40,7 +40,7 @@ function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
     upsertOuraCloudSleep: async (_u, rows) => { calls.push(`sleep:${rows.length}`); return { written: rows.length, skippedOverlap: 0 } },
     tombstoneOuraCloudSleep: async (_u, ids) => ids.length,
     upsertOuraWorkouts: async (_u, rows) => { calls.push(`workouts:${rows.length}`); return rows.length },
-    upsertOuraCloudHeartrate: async (_u, rows) => { calls.push(`hr:${rows.length}`); return rows.length },
+    upsertOuraCloudHeartrate: async (_u, rows) => { calls.push(`hr:${rows.length}`); return { offered: rows.length, changed: rows.length, changedFrom: rows[0]?.timestamp ?? null, changedTo: rows[rows.length - 1]?.timestamp ?? null } },
     upsertOuraCloudSleepPeriods: async (_u, rows) => { calls.push(`periods:${rows.length}`); return rows.length },
     upsertOuraCloudDaily: async (_u, rows) => { calls.push(`cloudDaily:${rows.length}`); return rows.length },
     upsertOuraSessions: async (_u, rows) => { calls.push(`sessions:${rows.length}`); return rows.length },
@@ -327,14 +327,21 @@ describe('startOuraConnectBackfill reporting', () => {
     expect(messages[1]).toMatch(/connect-backfill:heartrate-empty: Oura answered no heart rate for /)
   })
 
-  it('records nothing extra for a full, clean connect backfill', async () => {
+  // #3078: the connect backfill re-attributes the workouts its heart rate changed, like the catch-up.
+  it('records nothing extra for a full, clean connect backfill, and re-attributes workouts over its heart rate', async () => {
     oura()
     const { repo, calls } = fakeRepo()
-    dataRepo = { ...rescore, ...repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
+    const overlaps: unknown[][] = []
+    dataRepo = {
+      ...rescore, ...repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }),
+      listCompletedSessionsOverlapping: async (...a: unknown[]) => { overlaps.push(a); return [] },
+    }
     startOuraConnectBackfill(USER)
     await vi.waitFor(() => expect(calls.filter(c => c.startsWith('hr:')).length).toBeGreaterThan(0))
     await new Promise(r => setTimeout(r, 20))
     expect(reportServerError).not.toHaveBeenCalled()
+    expect(overlaps.length).toBeGreaterThan(0)
+    expect(overlaps[0][0]).toBe(USER)
   })
 
   it('records a connect whose backfill could not run', async () => {

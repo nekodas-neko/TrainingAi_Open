@@ -1,11 +1,13 @@
 // #3078: since the switch to the Oura API the ring's heart rate is a 5-minute series at rest, with
-// irregular bursts while awake. An hour of it with a gap over the ring's cadence is missing — the
-// #2437 rule — not a low hour; a dense strap hour is scored as before. The calorie estimate and
-// Body Battery are held to the same idea of "measured".
+// irregular bursts while awake. Whether Activity's lanes gate it is the owner's call (#3114),
+// so they are pinned UNCHANGED here. The calorie estimate is held to the #2437 rule, and Body
+// Battery's gate is pinned against a complete Oura series.
 import { describe, it, expect } from 'vitest'
-import { dropSparseHrHours, intradayHrContributors, DENSITY_GATED_HR_SOURCES } from '../intraday-hr-contributors'
+import {
+  dropSparseHrHours, intradayHrContributors, isDenseHrSeries, isDenseHrSpan, DENSITY_GATED_HR_SOURCES, HR_DENSE_MAX_GAP_MS,
+} from '../intraday-hr-contributors'
 import { moveHoursGoal } from '../hourly-movement'
-import { avgBpmDenseEnough, estSessionKcal, MIN_HR_READINGS_PER_MIN_FOR_ENERGY } from '../workout-energy'
+import { estSessionKcal } from '../workout-energy'
 import { batteryConfidence, MIN_SAMPLES_PER_WAKING_HOUR } from '../body-battery-inputs'
 
 const TZ = 'Australia/Brisbane'
@@ -21,9 +23,15 @@ const series = (source: string, from: Date, to: Date, everySec: number, bpm: num
 const run = (hrRows: { timestamp: Date; bpm: number; source?: string | null }[]) =>
   intradayHrContributors({ hrRows, ...PROFILE, tz: TZ, dateIso: DAY })
 
-describe('zone minutes and move hours: sparse Oura Cloud against a dense strap', () => {
-  it('gates oura_cloud like Health Connect', () => {
-    expect(DENSITY_GATED_HR_SOURCES.has('oura_cloud')).toBe(true)
+describe('zone minutes and move hours: Oura Cloud stays ungated until the owner decides', () => {
+  it('does not gate oura_cloud', () => {
+    expect(DENSITY_GATED_HR_SOURCES.has('oura_cloud')).toBe(false)
+  })
+
+  it('a scattered midday Oura half-hour still scores, as it did before this PR', () => {
+    const oura = series('oura_cloud', at(12), at(12, 30), 8 * 60, 140)
+    expect(dropSparseHrHours(oura, TZ).rows).toHaveLength(oura.length)
+    expect(run(oura).moveHoursGoal).toBe(moveHoursGoal())
   })
 
   it('a dense strap hour at midday scores its zone minutes', () => {
@@ -31,65 +39,36 @@ describe('zone minutes and move hours: sparse Oura Cloud against a dense strap',
     expect(run(strap).zoneMinutes).toBeGreaterThanOrEqual(29)
   })
 
-  it('the same midday half-hour seen by Oura in scattered points is missing, not a low score', () => {
-    // Awake bursts with 8-minute holes: under the ring's own cadence, so the hour is unmeasured.
-    const oura = series('oura_cloud', at(12), at(12, 30), 8 * 60, 140)
-    expect(run(oura)).toEqual({ zoneMinutes: null, moveHours: null, moveHoursGoal: null })
-    // Before the gate these points were scored as a few minutes of zone time — under the strap's 30.
-    expect(dropSparseHrHours(oura, TZ).rows).toEqual([])
-  })
-
-  it('a full 5-minute Oura series is measured, so the owner\'s resting hours still count', () => {
-    const oura = series('oura_cloud', at(7), at(22), 5 * 60, 70)
-    const c = run(oura)
-    expect(c.moveHoursGoal).toBe(moveHoursGoal())
-    expect(c.zoneMinutes).toBe(0)
-  })
-
-  it('a sparse Oura hour leaves the move goal, and a strap hour beside it is kept', () => {
-    const oura = [...series('oura_cloud', at(8), at(12), 5 * 60, 70), ...series('oura_cloud', at(12), at(13), 20 * 60, 70)]
-    const strap = series('chest_strap', at(13), at(13, 30), 1, 140)
-    const c = run([...oura, ...strap])
-    expect(c.moveHoursGoal).toBe(moveHoursGoal() - 1)
-    expect(c.zoneMinutes).toBeGreaterThanOrEqual(29)
-  })
-
-  it('an hour the strap covers keeps its strap readings even when Oura was sparse in it', () => {
-    const strap = series('chest_strap', at(12), at(12, 30), 1, 140)
-    const oura = series('oura_cloud', at(12), at(13), 20 * 60, 70)
-    const { rows, sparseHours } = dropSparseHrHours([...strap, ...oura], TZ)
-    expect(rows).toHaveLength(strap.length)
-    expect(sparseHours).toEqual([])
+  it('Health Connect is still gated by the same rule', () => {
+    expect(run(series('health_connect', at(12), at(12, 30), 8 * 60, 140))).toEqual({ zoneMinutes: null, moveHours: null, moveHoursGoal: null })
   })
 })
 
-describe('the HR calorie estimate falls back to METs when the session\'s HR is sparse', () => {
-  const start = at(12)
-  const end = at(12, 45) // a 65-minute HR window with the two 10-minute pads
-  const body = { ageYears: 33, weightKg: 80, sex: 'male' as const, rpe: 6, durationMin: 45 }
-  const kcalFor = (readings: number) =>
-    estSessionKcal({ ...body, avgBpm: avgBpmDenseEnough(readings, start, end) ? 130 : null })
+describe('the HR calorie estimate falls back to METs when the session\'s HR fails the #2437 rule', () => {
+  const body = { ageYears: 33, weightKg: 80, sex: 'male' as const, rpe: 6, durationMin: 71 }
+  const kcalFor = (times: number[]) => estSessionKcal({ ...body, avgBpm: isDenseHrSeries(times) ? 130 : null })
 
-  it('uses the ring\'s cadence as the rate: about one reading per 5.5 minutes', () => {
-    expect(MIN_HR_READINGS_PER_MIN_FOR_ENERGY).toBeCloseTo(60 / 330, 9)
-  })
-
-  it('a full 5-minute series (13 readings) drives the HR estimate', () => {
-    expect(avgBpmDenseEnough(13, start, end)).toBe(true)
-    expect(kcalFor(13).source).toBe('hr')
-  })
-
-  it('scattered points (9 readings) fall back to METs', () => {
-    expect(avgBpmDenseEnough(9, start, end)).toBe(false)
-    const est = kcalFor(9)
+  it('21 points over 71 minutes with gaps up to 19 minutes fall back to METs, though their average rate is high enough', () => {
+    // 20 gaps summing to 71 minutes: nineteen of ~2.7 min and one of 19.
+    const gaps = [...Array(19).fill((71 - 19) / 19), 19]
+    const times = gaps.reduce<number[]>((acc, g) => [...acc, acc[acc.length - 1] + g * 60_000], [at(12).getTime()])
+    expect(times).toHaveLength(21)
+    expect(21 / 71).toBeGreaterThan(60_000 / HR_DENSE_MAX_GAP_MS) // the rate rule this replaced passed it
+    expect(isDenseHrSeries(times)).toBe(false)
+    const est = kcalFor(times)
     expect(est.source).toBe('met')
     expect(est.kcal).toBeGreaterThan(0)
   })
 
-  it('a strap session passes; an incomplete session or an unusable count does not', () => {
-    expect(avgBpmDenseEnough(3900, start, end)).toBe(true)
-    expect(avgBpmDenseEnough(13, start, null)).toBe(false)
-    expect(avgBpmDenseEnough(Number.NaN, start, end)).toBe(false)
+  it('a dense strap session uses the HR estimate', () => {
+    expect(kcalFor(series('chest_strap', at(12), at(13, 11), 1, 130).map(r => r.timestamp.getTime())).source).toBe('hr')
+  })
+
+  it('a complete 5-minute series passes; a lone reading or a gap one second over the cadence does not', () => {
+    expect(isDenseHrSeries(series('oura_cloud', at(12), at(13), 5 * 60, 70).map(r => r.timestamp.getTime()))).toBe(true)
+    expect(isDenseHrSpan(1, null)).toBe(false)
+    expect(isDenseHrSpan(2, HR_DENSE_MAX_GAP_MS)).toBe(true)
+    expect(isDenseHrSpan(2, HR_DENSE_MAX_GAP_MS + 1000)).toBe(false)
   })
 })
 

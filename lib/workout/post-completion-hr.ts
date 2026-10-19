@@ -48,9 +48,9 @@ async function attributeSessionHr(
   return { readings, attributed: true }
 }
 
-/** The most sessions one heart-rate write re-attributes. A catch-up reads at most a week back
- *  (`HEART_RATE_LOOKBACK_MS`), which holds far fewer workouts than this. */
-export const REATTRIBUTE_MAX_SESSIONS = 20
+/** The most sessions one heart-rate write re-attributes. One write spans at most a week (the
+ *  catch-up's `HEART_RATE_LOOKBACK_MS`, the backfill's 7-day heart-rate chunk), which holds far fewer. */
+export const REATTRIBUTE_MAX_SESSIONS = 50
 
 /**
  * Re-attributes every completed workout whose heart-rate window overlaps `[from, to]`, after heart
@@ -58,7 +58,10 @@ export const REATTRIBUTE_MAX_SESSIONS = 20
  * after the workout was completed, so the completion-time pass above saw a thin series or none, and
  * nothing refreshed it unless the recap was opened. Idempotent: both upserts keep the fuller compute
  * (`readings_count >=`), so a session whose series did not grow is rewritten with the same values.
- * Bounded by `REATTRIBUTE_MAX_SESSIONS`, newest first. Returns how many sessions were attributed.
+ *
+ * Oldest first, because a session's HRR rest bar reads the `hrr1` of the sessions before it. One
+ * session failing does not stop the rest; when any failed, it throws once at the end, naming how
+ * many, so the caller reports it. Returns how many sessions were attributed.
  */
 export async function reattributeWorkoutsHrInWindow(
   repo: WorkoutRepository,
@@ -69,8 +72,22 @@ export async function reattributeWorkoutsHrInWindow(
 ): Promise<number> {
   const sessions = await repo.listCompletedSessionsOverlapping(userId, from, to, REATTRIBUTE_MAX_SESSIONS)
   let attributed = 0
+  const failures: string[] = []
   for (const ws of sessions) {
-    if ((await attributeSessionHr(repo, userId, ws, tz)).attributed) attributed++
+    try {
+      if ((await attributeSessionHr(repo, userId, ws, tz)).attributed) attributed++
+    } catch (err) {
+      failures.push(err instanceof Error ? err.message : 'unknown')
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(`re-attributing workout HR: ${failures.length} of ${sessions.length} sessions failed (first: ${failures[0]})`)
   }
   return attributed
+}
+
+/** `reattributeWorkoutsHrInWindow` bound to a repository: the `workoutHr` every Oura Cloud heart-rate
+ *  writer takes (webhook catch-up, connect backfill, daily reconciliation, the agent backfill job). */
+export function workoutHrReattributor(repo: WorkoutRepository) {
+  return (userId: string, from: Date, to: Date, tz: string) => reattributeWorkoutsHrInWindow(repo, userId, from, to, tz)
 }

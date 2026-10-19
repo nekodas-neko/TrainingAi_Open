@@ -1,12 +1,11 @@
-import { dropSparseHrHours } from '@trainingai/shared/health/intraday-hr-contributors'
+import { dropSparseHrHours, isDenseHrSpan } from '@trainingai/shared/health/intraday-hr-contributors'
 import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, type SQL } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
-import type { OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
+import type { OuraCloudHeartrateWrite, OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
-import { avgBpmDenseEnough } from '@trainingai/shared/health/workout-energy'
 import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/shared/date-utils'
 import { shouldPrune } from '../retention-throttle'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
@@ -1076,12 +1075,14 @@ export async function upsertAggregatorHeartrate(
  * `AGGREGATOR_COVER_MS` of a ring or strap row is not written, because both would be read as device
  * rows and the same minutes would count twice. Choosing between the two per field is #2860.
  * At an exact timestamp collision only a Cloud or aggregator row is replaced, never a device one.
- * Returns how many points were offered to the insert (after the cover filter).
+ * Returns how many points were offered to the insert (after the cover filter), and which of them
+ * were actually inserted or changed: a re-read of stored points changes nothing (#3078).
  */
 export async function upsertOuraCloudHeartrate(
   db: Db, userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string,
-): Promise<number> {
-  if (rows.length === 0) return 0
+): Promise<OuraCloudHeartrateWrite> {
+  const none: OuraCloudHeartrateWrite = { offered: 0, changed: 0, changedFrom: null, changedTo: null }
+  if (rows.length === 0) return none
   const times = rows.map(r => r.timestamp.getTime())
   const from = new Date(Math.min(...times) - AGGREGATOR_COVER_MS)
   const to = new Date(Math.max(...times) + AGGREGATOR_COVER_MS)
@@ -1105,15 +1106,18 @@ export async function upsertOuraCloudHeartrate(
     return lo < deviceTimes.length && deviceTimes[lo] <= t + AGGREGATOR_COVER_MS
   }
   const kept = rows.filter(r => !covered(r.timestamp.getTime()))
-  if (kept.length === 0) return 0
-  await writeHeartrateRows(
+  if (kept.length === 0) return none
+  const changed = await writeHeartrateRows(
     db, userId, kept.map(r => ({ ...r, source: 'oura_cloud' })),
     // `context` too, so a point stored before #2982 gets its label when Oura's series is read again.
     sql`${s.ouraHeartrate.source} IN (${notDevice}) AND (${s.ouraHeartrate.bpm} IS DISTINCT FROM excluded.bpm OR ${s.ouraHeartrate.source} IS DISTINCT FROM excluded.source OR ${s.ouraHeartrate.context} IS DISTINCT FROM excluded.context)`,
   )
-  const earliest = kept.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
+  if (changed.length === 0) return { ...none, offered: kept.length }
+  let earliest = Infinity
+  let latest = -Infinity
+  for (const t of changed) { earliest = Math.min(earliest, t.getTime()); latest = Math.max(latest, t.getTime()) }
   await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'), tz)
-  return kept.length
+  return { offered: kept.length, changed: changed.length, changedFrom: new Date(earliest), changedTo: new Date(latest) }
 }
 
 /**
@@ -1133,10 +1137,12 @@ export async function getLatestOuraCloudHeartrateAt(db: Db, userId: string, sinc
   return row?.timestamp ?? null
 }
 
+/** Writes the rows; returns the timestamps actually inserted or changed (a row the `setWhere` arm
+ *  leaves alone is not returned), so a caller can tell new heart rate from a re-read (#3078). */
 async function writeHeartrateRows(
   db: Db, userId: string, rows: { timestamp: Date; bpm: number; source: string | null; context?: string | null }[], setWhere: SQL,
-): Promise<void> {
-  if (rows.length === 0) return
+): Promise<Date[]> {
+  if (rows.length === 0) return []
   // Collapse repeats on the conflict target BEFORE the insert — one duplicated timestamp otherwise
   // discards an entire 5,000-point CHUNK, which is what Q-214 was (see `collapse-conflicts.ts`).
   // Last value wins, matching the arms' bare excluded.* semantics.
@@ -1147,8 +1153,9 @@ async function writeHeartrateRows(
   // 4 params/row → chunk well under pg's 65535 bind-parameter ceiling. A BLE
   // rollup can produce thousands of binned rows in one pass.
   const CHUNK = 5000
+  const changed: Date[] = []
   for (let i = 0; i < values.length; i += CHUNK) {
-    await db.insert(s.ouraHeartrate)
+    const written = await db.insert(s.ouraHeartrate)
       .values(values.slice(i, i + CHUNK))
       // The conflict target is (user_id, timestamp), so the matched row is already user-scoped.
       .onConflictDoUpdate({
@@ -1158,6 +1165,8 @@ async function writeHeartrateRows(
         set: { bpm: sql`excluded.bpm`, source: sql`excluded.source`, context: sql`excluded.context`, updatedAt: sql`now()` },
         setWhere,
       })
+      .returning({ timestamp: s.ouraHeartrate.timestamp })
+    for (const r of written) changed.push(r.timestamp)
   }
 
   const now = Date.now()
@@ -1165,6 +1174,7 @@ async function writeHeartrateRows(
     lastHeartrateStorePrune = now
     db.execute(sql`DELETE FROM oura_heartrate WHERE timestamp < now() - (${HR_RETENTION_DAYS} || ' days')::interval`).catch(err => recordPruneFailure(db, 'oura_heartrate', err))
   }
+  return changed
 }
 
 // ── Coarse trend buckets (RRD ladder) ─────────────────────────────────────────
@@ -1571,8 +1581,7 @@ export async function computeDayZoneSeconds(
 ): Promise<[number, number, number, number, number] | null> {
   const from = fromZonedTime(`${day}T00:00:00`, tz)
   const to = fromZonedTime(`${day}T23:59:59`, tz)
-  // #2437, #3078: a sparse Health Connect or Oura Cloud hour is missing, the same rule the Activity
-  // score applies.
+  // #2437: a sparse Health Connect hour is missing, the same rule the Activity score applies.
   const rows = dropSparseHrHours(await getHrForWindow(db, userId, from, to), tz).rows
   if (rows.length === 0) return null
   const readings: HrReading[] = rows.map(r => ({
@@ -1790,16 +1799,27 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
  * with no snapshot, or a snapshot whose `avg_bpm` is null, are simply absent from the map — the
  * caller falls back to the MET estimate for those, which is 36 of the owner's 78 sessions.
  *
- * So is a session whose snapshot is too sparse to average (#3078, `avgBpmDenseEnough`): a handful of
- * scattered Oura points is missing heart rate, not a measured one. Every calorie surface reads
- * `avg_bpm` through here, so the gate is in one place.
+ * So is a session whose heart rate was too sparse to average (#3078): the #2437 density rule
+ * (`isDenseHrSpan`: two readings at least, no gap over `HR_DENSE_MAX_GAP_MS`) applied to the stored
+ * series between the session's start and end, checked here, when the estimate is made, so a snapshot
+ * computed before the rule is held to it too. A session past HR retention has no series left to
+ * check, so its snapshot stands, as a zone-minutes day past retention does. Every calorie surface
+ * reads `avg_bpm` through here, so the gate is in one place.
  */
 export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: string[]): Promise<Map<string, number>> {
   if (sessionIds.length === 0) return new Map()
+  const retentionFloor = new Date(Date.now() - HR_RETENTION_DAYS * 86_400_000)
   const rows = await db
     .select({
-      id: s.workoutHrStats.workoutSessionId, avgBpm: s.workoutHrStats.avgBpm, readingsCount: s.workoutHrStats.readingsCount,
-      startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt,
+      id: s.workoutHrStats.workoutSessionId, avgBpm: s.workoutHrStats.avgBpm, completedAt: s.workoutSessions.completedAt,
+      // The session's own series: how many readings, and the longest gap between consecutive ones.
+      span: sql<{ n: number; max_gap_ms: number | null } | null>`(
+        SELECT json_build_object('n', count(*), 'max_gap_ms', max(g.gap_ms)) FROM (
+          SELECT extract(epoch FROM r.timestamp - lag(r.timestamp) OVER (ORDER BY r.timestamp)) * 1000 AS gap_ms
+          FROM ${s.ouraHeartrate} r
+          WHERE r.user_id = ${userId}
+            AND r.timestamp >= ${s.workoutSessions.startedAt} AND r.timestamp <= ${s.workoutSessions.completedAt}
+        ) g)`,
     })
     .from(s.workoutHrStats)
     .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.workoutHrStats.workoutSessionId))
@@ -1807,9 +1827,12 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
       eq(s.workoutHrStats.userId, userId),
       inArray(s.workoutHrStats.workoutSessionId, sessionIds),
     ))
-  return new Map(rows
-    .filter(r => r.avgBpm != null && avgBpmDenseEnough(r.readingsCount, r.startedAt, r.completedAt))
-    .map(r => [r.id, r.avgBpm as number]))
+  const usable = (r: (typeof rows)[number]) => {
+    if (r.avgBpm == null || r.completedAt == null) return false
+    if (r.completedAt < retentionFloor) return true
+    return isDenseHrSpan(Number(r.span?.n ?? 0), r.span?.max_gap_ms == null ? null : Number(r.span.max_gap_ms))
+  }
+  return new Map(rows.filter(usable).map(r => [r.id, r.avgBpm as number]))
 }
 
 export async function getWorkoutHrStats(db: Db, userId: string, sessionId: string): Promise<WorkoutHrStatsRow | null> {
@@ -1884,7 +1907,8 @@ export async function listSessionsMissingHrStats(db: Db, userId: string, since: 
  * `[from, to]` — the work-list for re-attributing workouts after heart rate lands late (#3078). The
  * Oura Cloud feed uploads in batches, often hours after a workout was completed and its stats were
  * computed, and the coverage-aware lists above only re-list a session with no usable snapshot, so a
- * thin early compute was never refreshed. Newest first, at most `limit`.
+ * thin early compute was never refreshed. Oldest first, at most `limit`: a session's HRR rest bar
+ * reads the sessions before it, so those are refreshed first.
  */
 export async function listCompletedSessionsOverlapping(db: Db, userId: string, from: Date, to: Date, limit: number) {
   return db
@@ -1897,7 +1921,7 @@ export async function listCompletedSessionsOverlapping(db: Db, userId: string, f
       lte(s.workoutSessions.startedAt, new Date(to.getTime() + WORKOUT_HR_PAD_MS)),
       gte(s.workoutSessions.completedAt, new Date(from.getTime() - WORKOUT_HR_PAD_MS)),
     ))
-    .orderBy(desc(s.workoutSessions.startedAt))
+    .orderBy(asc(s.workoutSessions.startedAt))
     .limit(limit)
 }
 

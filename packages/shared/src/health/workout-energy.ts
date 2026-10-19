@@ -14,8 +14,6 @@
  */
 import { getEnergyFeatureSpec } from '@/lib/oura-models/constants'
 import { DEFAULT_ACTIVITY_ID } from '@trainingai/shared/health/workout-activities'
-import { HR_DENSE_MAX_GAP_MS } from '@trainingai/shared/health/intraday-hr-contributors'
-import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
 
 export type Sex = 'male' | 'female'
 export type Intensity = 'easy' | 'moderate' | 'hard'
@@ -176,26 +174,6 @@ export const HR_MIN_PLAUSIBLE = 60
 export const HR_MAX_PLAUSIBLE = 220
 const KJ_PER_KCAL = 4.184
 
-/**
- * The fewest heart-rate readings per minute of a session's HR window for its `avg_bpm` to drive the
- * estimate (#3078). Below it the average is of a few scattered points — the Oura Cloud feed outside
- * an Oura-app workout, whose ring power-gates its PPG while moving — and the MET path is used, as for
- * a session with no heart rate. Not a new threshold: it is the app's one density rule (#2437, at
- * least the ring's 5-minute cadence, `HR_DENSE_MAX_GAP_MS`) expressed as a rate, about 0.18 a minute.
- */
-export const MIN_HR_READINGS_PER_MIN_FOR_ENERGY = 60_000 / HR_DENSE_MAX_GAP_MS
-
-/**
- * Whether a session's stored HR summary is dense enough for `estWorkoutKcalFromHr`. `readingsCount`
- * counts the whole HR window, start − `WORKOUT_HR_PAD_MS` to end + `WORKOUT_HR_PAD_MS`, so the rate is
- * taken over that window. False for a session with no completion time or an unusable count.
- */
-export function avgBpmDenseEnough(readingsCount: number | null | undefined, startedAt: Date, completedAt: Date | null): boolean {
-  if (completedAt == null || typeof readingsCount !== 'number' || !Number.isFinite(readingsCount)) return false
-  const windowMin = (completedAt.getTime() - startedAt.getTime() + 2 * WORKOUT_HR_PAD_MS) / 60_000
-  if (!(windowMin > 0)) return false
-  return readingsCount / windowMin >= MIN_HR_READINGS_PER_MIN_FOR_ENERGY
-}
 
 export interface HrEnergyInput {
   durationMin: number
