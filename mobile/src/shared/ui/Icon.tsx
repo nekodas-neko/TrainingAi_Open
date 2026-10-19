@@ -67,6 +67,22 @@ import CloudRain from 'lucide-react-native/icons/cloud-rain';
 import CloudFog from 'lucide-react-native/icons/cloud-fog';
 import CloudSnow from 'lucide-react-native/icons/cloud-snow';
 import CloudLightning from 'lucide-react-native/icons/cloud-lightning';
+import RotateCcw from 'lucide-react-native/icons/rotate-ccw';
+import Trophy from 'lucide-react-native/icons/trophy';
+import Crown from 'lucide-react-native/icons/crown';
+import Building from 'lucide-react-native/icons/building';
+import Diamond from 'lucide-react-native/icons/diamond';
+import Shield from 'lucide-react-native/icons/shield';
+import Rocket from 'lucide-react-native/icons/rocket';
+import Star from 'lucide-react-native/icons/star';
+import Calendar from 'lucide-react-native/icons/calendar';
+import CalendarCheck from 'lucide-react-native/icons/calendar-check';
+import Leaf from 'lucide-react-native/icons/leaf';
+import CircleCheck from 'lucide-react-native/icons/circle-check';
+import Bed from 'lucide-react-native/icons/bed';
+import ChartNoAxesColumn from 'lucide-react-native/icons/chart-no-axes-column';
+import ChartLine from 'lucide-react-native/icons/chart-line';
+import Lock from 'lucide-react-native/icons/lock';
 import type { LucideProps } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -141,6 +157,22 @@ const icons = {
   fog: CloudFog,
   snow: CloudSnow,
   storm: CloudLightning,
+  repeat: RotateCcw,
+  trophy: Trophy,
+  crown: Crown,
+  building: Building,
+  diamond: Diamond,
+  shieldPlain: Shield,
+  rocket: Rocket,
+  star: Star,
+  calendarPlain: Calendar,
+  calendarCheck: CalendarCheck,
+  leaf: Leaf,
+  circleCheck: CircleCheck,
+  bed: Bed,
+  barChart: ChartNoAxesColumn,
+  lineChart: ChartLine,
+  lock: Lock,
 };
 
 export type IconName = keyof typeof icons;

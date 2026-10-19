@@ -7,6 +7,7 @@ import {
   useState,
   type PropsWithChildren,
   type ReactNode,
+  type Ref,
 } from 'react';
 import {
   Animated,
@@ -17,6 +18,7 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  ScrollView,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -39,6 +41,8 @@ export function Sheet({
   fullHeight = false,
   scroll = true,
   onDismiss,
+  titleColor,
+  scrollRef,
 }: PropsWithChildren<{
   visible: boolean;
   title: string;
@@ -48,6 +52,10 @@ export function Sheet({
   fullHeight?: boolean;
   scroll?: boolean;
   onDismiss?: () => void;
+  /** The title in this colour instead of the text colour. */
+  titleColor?: string;
+  /** Reaches the scroll view, to scroll the content to a position. */
+  scrollRef?: Ref<ScrollView>;
 }>) {
   const { theme } = useTheme();
   const nestedScroll = useNestedScrollBoundary();
@@ -295,7 +303,10 @@ export function Sheet({
               align="center"
               justify="space-between"
             >
-              <AppText variant="heading" style={{ flex: 1 }}>
+              <AppText
+                variant="heading"
+                style={[{ flex: 1 }, titleColor ? { color: titleColor } : undefined]}
+              >
                 {title}
               </AppText>
               {actions}
@@ -304,6 +315,7 @@ export function Sheet({
             {scroll ? (
               <ReorderScrollView
                 scrollEnabled={!nestedScroll.locked}
+                scrollRef={scrollRef}
                 style={{ flexShrink: 1 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"

@@ -34,6 +34,7 @@ import {
   Sun,
   Lock,
 } from 'lucide-react'
+import { ACHIEVEMENT_CATEGORY_ORDER, getBadgeTier, type BadgeTier } from '@trainingai/shared/achievement-display'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const SEEN_KEY = 'ta_seen_achievements'
@@ -47,14 +48,6 @@ function getSeenIds(): string[] {
 
 function markSeen(ids: string[]) {
   try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids)) } catch { /* ignore */ }
-}
-
-type BadgeTier = 'bronze' | 'silver' | 'gold'
-
-function getBadgeTier(xpReward: number): BadgeTier {
-  if (xpReward >= 200) return 'gold'
-  if (xpReward >= 50) return 'silver'
-  return 'bronze'
 }
 
 const TIER_BORDER: Record<BadgeTier, string> = {
@@ -146,20 +139,6 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'Body Metrics':    '#14b8a6',
   'Lift Milestones': '#ef4444',
 }
-
-const CATEGORY_ORDER = [
-  'Workouts',
-  'Volume',
-  'Sets',
-  'Streaks',
-  'Records',
-  'Timing',
-  'Consistency',
-  'Nutrition',
-  'Sleep',
-  'Body Metrics',
-  'Lift Milestones',
-]
 
 function BadgeCard({ achievement, isNew = false, rarityLabel }: { achievement: AchievementResult; isNew?: boolean; rarityLabel?: string }) {
   const { id, unlocked, progress, name, description, xpReward, category, goal, current } = achievement
@@ -300,7 +279,7 @@ export function AchievementsGrid({ achievements, onlyUnlocked = false }: Achieve
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const byCategory = CATEGORY_ORDER.reduce<Record<string, AchievementResult[]>>((acc, cat) => {
+  const byCategory = ACHIEVEMENT_CATEGORY_ORDER.reduce<Record<string, AchievementResult[]>>((acc, cat) => {
     const items = achievements.filter(a => a.category === cat)
     if (items.length > 0) acc[cat] = items
     return acc
