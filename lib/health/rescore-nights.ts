@@ -10,16 +10,26 @@
  * night is fingerprinted on both sides, and only a day whose night actually changed is touched:
  *
  * - **Sleep Score: recomputed now**, for any changed day in the window. It is a function of the
- *   night and the nights before it, so it can be rebuilt exactly as the readiness read builds it
- *   (same 28-day list, same grouping, prior-night baselines). A day left with no night is cleared.
+ *   night and the nights before it, so it is rebuilt by the readiness read's own scorer
+ *   (`scoreSleepForDate`, one night window for both). A day left with no night is cleared.
  * - **Readiness, today: cleared.** The readiness read rewrites today on its next read once today's
  *   night exists (it persists on every read), and leaves it empty if the night is gone.
  * - **Readiness, a finished day: kept and marked** (`model_versions.readinessNightRevisedAt`). A
  *   finished day's readiness is what it said that morning, built from that morning's activity, load
  *   and illness inputs, which no later read can rebuild. Clearing it would turn a revised value into a
  *   gap; the marker lets the Orchestrator find and re-derive it from a verified snapshot.
- * - **Body Battery, today: released.** A readiness anchor is frozen for its day; it goes back to
- *   provisional so the next read re-chooses it. A finished day's battery is left for the re-derive.
+ * - **Body Battery, today: released only when the night ARRIVED in this write.** A readiness anchor
+ *   is frozen for its day, and a revision of a night that was already there must not move it: on
+ *   18 Oct Oura revised the night at 22:23 local, and releasing then would have shifted that whole
+ *   day's curve in the evening (Orchestrator's decision on #3085). An anchor frozen before today's
+ *   night existed was frozen on a readiness without it (from that morning's body metrics), so it is
+ *   released and the next read re-chooses it. "Arrived" is exact: no night for today before the
+ *   write, one after. A finished day's battery is left for the re-derive.
+ *
+ * **One user at a time.** Two sleep webhooks for the same user can land in the same second (19 Oct's
+ * two periods did). Interleaved, an older fingerprint can be re-scored last and a stale score stick on
+ * a finished day, so the read-before, the write and the re-score run under a per-user lock
+ * (`withOuraSleepWriteLock`).
  *
  * A re-read of identical documents (the daily reconciliation, a webhook repeat) changes no
  * fingerprint and so writes nothing. Changes older than {@link RESCORE_WINDOW_DAYS} are not acted
@@ -30,16 +40,15 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import type { SleepSession } from '@trainingai/shared/types/body'
 import { DEFAULT_TZ, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
-import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
+import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
+import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 
 /** How many days back a changed night is re-scored. Matches the training-stress look-back. */
 export const RESCORE_WINDOW_DAYS = 7
-/** The readiness read's history window, so a night re-scored here is scored on the same nights. */
-const SLEEP_HISTORY_DAYS = 28
 
 export type NightRescoreRepo = Pick<WorkoutRepository,
   'getUserById' | 'listSleepSessions' | 'getOuraDailyDerived' | 'upsertOuraDailyDerived' |
-  'clearNightDerivedScores' | 'releaseBodyBatteryAnchor'>
+  'clearNightDerivedScores' | 'releaseBodyBatteryAnchor' | 'withOuraSleepWriteLock'>
 
 export interface NightWatch {
   userId: string
@@ -94,19 +103,10 @@ export function changedNightDates(before: Map<string, string>, after: Map<string
   return [...dates].filter(d => before.get(d) !== after.get(d)).sort()
 }
 
-/**
- * `date`'s Sleep Score exactly as the readiness read scores its newest night: the sessions dated in
- * the 28 days up to it, grouped into nights, its canonical night against baselines of the nights
- * that ended before it. Null when the date has no night to score.
- */
+/** `date`'s Sleep Score and contributors through the readiness read's own scorer. Null with no night. */
 export function scoreNightForDate(sessions: readonly SleepSession[], date: string, tz: string) {
-  const nights = nightSessions(sessions.filter(s => s.date >= shiftDateStr(date, -SLEEP_HISTORY_DAYS) && s.date <= date), tz)
-  const night = canonicalNightForDate(nights, date, tz)
-  if (!night) return null
-  const result = computeSleepScore(night, tz, sleepScoreBaselines(
-    nights.filter(n => n.sleepEnd.getTime() < night.sleepEnd.getTime()), tz,
-  ))
-  return result ? { score: result.score, contributors: sleepComponentsToContributors(result.components) } : null
+  const scored = scoreSleepForDate(sessions, date, tz)
+  return scored ? { score: scored.result.score, contributors: sleepComponentsToContributors(scored.result.components) } : null
 }
 
 function windowFrom(today: string): string {
@@ -127,8 +127,9 @@ export async function watchNights(repo: NightRescoreRepo, userId: string): Promi
 export async function rescoreChangedNights(repo: NightRescoreRepo, watch: NightWatch, now: Date = new Date()): Promise<RescoreOutcome> {
   const { userId, tz, today } = watch
   const from = windowFrom(today)
-  const sessions = await repo.listSleepSessions(userId, shiftDateStr(from, -SLEEP_HISTORY_DAYS), today)
-  const changed = changedNightDates(watch.before, nightFingerprints(sessions, tz, from, today))
+  const sessions = await repo.listSleepSessions(userId, shiftDateStr(from, -SLEEP_SCORE_HISTORY_DAYS), today)
+  const after = nightFingerprints(sessions, tz, from, today)
+  const changed = changedNightDates(watch.before, after)
   const out: RescoreOutcome = { changed, sleepRescored: [], sleepCleared: [], readinessCleared: [], readinessMarked: [], batteryReleased: [] }
   if (changed.length === 0) return out
 
@@ -148,7 +149,8 @@ export async function rescoreChangedNights(repo: NightRescoreRepo, watch: NightW
 
     if (day === today) {
       if (await repo.clearNightDerivedScores(userId, day, { sleep: false, readiness: true })) out.readinessCleared.push(day)
-      if (await repo.releaseBodyBatteryAnchor(userId, day)) out.batteryReleased.push(day)
+      const arrived = !watch.before.has(day) && after.has(day)
+      if (arrived && await repo.releaseBodyBatteryAnchor(userId, day)) out.batteryReleased.push(day)
     } else if (stored.get(day)?.readinessScore != null) {
       await repo.upsertOuraDailyDerived(userId, day, { modelVersions: { readinessNightRevisedAt: now.toISOString() } })
       out.readinessMarked.push(day)
@@ -163,20 +165,22 @@ export async function rescoreChangedNights(repo: NightRescoreRepo, watch: NightW
  */
 export async function withNightRescore<T>(repo: NightRescoreRepo | undefined, userId: string, write: () => Promise<T>): Promise<T> {
   if (!repo) return write()
-  let watch: NightWatch | null = null
-  try {
-    watch = await watchNights(repo, userId)
-  } catch (err) {
-    console.error('[rescore-nights] could not read the nights before an Oura sleep write:', err)
-  }
-  const result = await write()
-  if (watch) {
+  return repo.withOuraSleepWriteLock(userId, async () => {
+    let watch: NightWatch | null = null
     try {
-      const outcome = await rescoreChangedNights(repo, watch)
-      if (outcome.changed.length > 0) console.info(`[rescore-nights] nights changed: ${JSON.stringify(outcome)}`)
+      watch = await watchNights(repo, userId)
     } catch (err) {
-      console.error('[rescore-nights] re-scoring the changed nights failed:', err)
+      console.error('[rescore-nights] could not read the nights before an Oura sleep write:', err)
     }
-  }
-  return result
+    const result = await write()
+    if (watch) {
+      try {
+        const outcome = await rescoreChangedNights(repo, watch)
+        if (outcome.changed.length > 0) console.info(`[rescore-nights] nights changed: ${JSON.stringify(outcome)}`)
+      } catch (err) {
+        console.error('[rescore-nights] re-scoring the changed nights failed:', err)
+      }
+    }
+    return result
+  })
 }

@@ -880,9 +880,14 @@ export async function getOuraCloudActivitySeries(db: Db, userId: string, from: s
 export interface OuraCloudActivitySeries { date: string; met: s.OuraSampleSeries | null; class5Min: string | null }
 
 /**
- * #3079: when each day's stored Oura MET series last changed (`oura_cloud_daily.updated_at`, which
- * moves only on a changed value). Days with no MET are left out. The training-stress re-check reads
- * it to re-evaluate a finished day once more when Oura's MET for it lands or changes after its verdict.
+ * #3079: when each day's `oura_cloud_daily` row last changed, for days that carry MET. The
+ * training-stress re-check reads it to re-evaluate a finished day once more when Oura's MET for it
+ * lands or changes after its verdict.
+ *
+ * `updated_at` moves when ANY written column of the row changes, not only `met`: a revised readiness
+ * contributor or day summary counts too. That over-triggers a re-evaluation now and then, which is
+ * bounded (the look-back is 7 days, and each re-evaluation stamps a later time) and harmless (the
+ * verdict is recomputed from the same inputs), so it does not earn a MET-only column.
  */
 export async function getOuraCloudMetChangedAt(db: Db, userId: string, from: string, to: string): Promise<{ date: string; changedAt: Date }[]> {
   const t = s.ouraCloudDaily

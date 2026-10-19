@@ -30,6 +30,7 @@ vi.mock('@/lib/data', () => ({
 }))
 
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
+import { scoreSleepForDate } from '@trainingai/shared/health/sleep-score-for-date'
 import { todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 
 /**
@@ -92,9 +93,12 @@ describe.each([
     expect(out.readinessDisplayScore).not.toBeNull()
     // ...but yesterday's stored readiness is the morning's, and today has no night to key one on.
     expect(readinessWrites()).toEqual([])
-    // The sleep score still goes to its own night's day, which is yesterday's.
+    // Nor a sleep score: yesterday's night was scored when it was today's, or by the re-score when
+    // Oura changed it, never by a read of a later day (#3085 review). The screen still shows one.
+    expect(out.sleepScore).not.toBeNull()
     const sleepDays = repo.upsertOuraDailyDerived.mock.calls.filter(([, , p]) => p.sleepScore !== undefined).map(([, day]) => day)
-    expect(sleepDays).toEqual([shiftDateStr(today, -1)])
+    expect(sleepDays).toEqual([])
+    expect(repo.upsertOuraDailyDerived.mock.calls.map(([, day]) => day)).not.toContain(shiftDateStr(today, -1))
   })
 
   it("after the sync: writes today's row, and only today's", async () => {
@@ -118,7 +122,8 @@ describe.each([
     await buildReadinessPayload('u1', tz)
 
     const todays = repo.upsertOuraDailyDerived.mock.calls.find(([, day]) => day === today)
-    expect(todays?.[2].sleepScore).toEqual(expect.any(Number))
+    // The same scorer and night window the re-score of a changed night uses (#3085 review).
+    expect(todays?.[2].sleepScore).toBe(scoreSleepForDate(sleep as never, today, tz)?.result.score)
     expect(todays?.[2].modelVersions).toEqual({
       readiness: expect.any(String),
       sleep: expect.stringMatching(/^v\d+:/),

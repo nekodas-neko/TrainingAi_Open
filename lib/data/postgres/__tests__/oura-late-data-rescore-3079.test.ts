@@ -40,7 +40,7 @@ describe.skipIf(!canRun)('Oura late data re-scores its day (#3079)', () => {
   })
 
   beforeEach(async () => {
-    for (const t of ['oura_daily_derived', 'body_battery_daily', 'oura_cloud_daily', 'sleep_sessions', 'oura_tokens']) {
+    for (const t of ['oura_daily_derived', 'body_battery_daily', 'oura_cloud_daily', 'sleep_sessions', 'oura_cloud_sleep_periods', 'oura_tokens']) {
       await pool.query(`DELETE FROM ${t} WHERE user_id = $1`, [USER])
     }
   })
@@ -121,5 +121,112 @@ describe.skipIf(!canRun)('Oura late data re-scores its day (#3079)', () => {
     expect(row.sleep_score).toBeNull()
     expect(row.readiness_score).toBeNull()
     expect(row.activity_score).toBe(55)
+  })
+
+  // ── #3085 review ────────────────────────────────────────────────────────────────────────────
+
+  /** Ten plain nights before `date`, so the scored night has baselines. */
+  function history(date: string) {
+    return Array.from({ length: 10 }, (_, i) => {
+      const d = shiftDateStr(date, -10 + i)
+      const mid = dateStrMidnightInTz(d, TZ).getTime()
+      return {
+        ouraId: `cloud-3085-${d}`, date: d, sleepStart: new Date(mid - 1.5 * HOUR), sleepEnd: new Date(mid + 6.5 * HOUR),
+        durationHours: 7.4, deepSleepHours: 1.4, remSleepHours: 1.6, lightSleepHours: 4.4, awakHours: 0.6, efficiency: 90,
+      }
+    })
+  }
+
+  /** 19 Oct's shape on `date`: a 20-minute `sleep` 23:05–23:25, then the `long_sleep` 00:02–06:46. */
+  function nineteenthShape(date: string, fragmentType: string) {
+    const mid = dateStrMidnightInTz(date, TZ).getTime()
+    const fragment = { start: new Date(mid - 55 * 60_000), end: new Date(mid - 35 * 60_000) }
+    const main = { start: new Date(mid + 2 * 60_000), end: new Date(mid + 6 * HOUR + 46 * 60_000) }
+    const sleep = [
+      { ouraId: `frag-3085-${date}`, date, sleepStart: fragment.start, sleepEnd: fragment.end, durationHours: 0.25, lightSleepHours: 0.25, awakHours: 0.08, efficiency: 75 },
+      { ouraId: `main-3085-${date}`, date, sleepStart: main.start, sleepEnd: main.end, durationHours: 6.07, deepSleepHours: 1.2, remSleepHours: 1.5, lightSleepHours: 3.37, awakHours: 0.67, efficiency: 90, onsetLatencySec: 600 },
+    ]
+    const period = (ouraId: string, w: { start: Date; end: Date }, sleepType: string) => ({
+      ouraId, day: date, bedtimeStart: w.start, bedtimeEnd: w.end, sleepType, heartRate: null, hrv: null, sleepPhase30Sec: null,
+      movement30Sec: null, sleepAlgorithmVersion: null, lowBatteryAlert: null, sleepAnalysisReason: null, period: null, ringId: null,
+    })
+    return { sleep, periods: [period(`frag-3085-${date}`, fragment, fragmentType), period(`main-3085-${date}`, main, 'long_sleep')] }
+  }
+
+  const noWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] }
+
+  /** The score the readiness read's own scorer gives `date` from what is stored now, types included. */
+  async function scoredFromStore(date: string) {
+    const { scoreNightForDate } = await import('@/lib/health/rescore-nights')
+    return scoreNightForDate(await repo.listSleepSessions(USER, shiftDateStr(date, -40), today), date, TZ)?.score ?? null
+  }
+
+  it("a finished day's night arriving late is scored with its periods' types (the 19 Oct shape)", async () => {
+    const { writeOuraCloudData } = await import('@/lib/oura/cloud/ingest')
+    const yesterday = shiftDateStr(today, -1)
+    await repo.upsertOuraCloudSleep(USER, history(yesterday))
+    const { sleep, periods } = nineteenthShape(yesterday, 'sleep')
+
+    await writeOuraCloudData(repo, USER, { ...noWrites, sleep, sleepPeriods: periods }, repo)
+
+    const stored = (await derivedRow(yesterday))?.sleep_score
+    expect(stored).toEqual(expect.any(Number))
+    expect(stored).toBe(await scoredFromStore(yesterday))
+    // The fragment really is held out: the night the scorer sees starts at the long_sleep.
+    const sessions = await repo.listSleepSessions(USER, yesterday, yesterday)
+    expect(sessions.find(x => x.ouraId === `frag-3085-${yesterday}`)?.ouraSleepType).toBe('sleep')
+  })
+
+  it("a write that only retypes a period re-scores the night", async () => {
+    const { writeOuraCloudData } = await import('@/lib/oura/cloud/ingest')
+    const yesterday = shiftDateStr(today, -1)
+    await repo.upsertOuraCloudSleep(USER, history(yesterday))
+    // First seen with the fragment typed as part of the night...
+    const first = nineteenthShape(yesterday, 'long_sleep')
+    await writeOuraCloudData(repo, USER, { ...noWrites, sleep: first.sleep, sleepPeriods: first.periods }, repo)
+    const before = (await derivedRow(yesterday))?.sleep_score
+    // ...then Oura retypes it; only the period row changes.
+    await writeOuraCloudData(repo, USER, { ...noWrites, sleepPeriods: nineteenthShape(yesterday, 'sleep').periods }, repo)
+
+    const after = (await derivedRow(yesterday))?.sleep_score
+    expect(after).toBe(await scoredFromStore(yesterday))
+    expect(after).not.toBe(before)
+  })
+
+  it('two sleep writes for one user never interleave their read, write and re-score', async () => {
+    const { withNightRescore } = await import('@/lib/health/rescore-nights')
+    const events: string[] = []
+    const logged = new Proxy(repo, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver)
+        if (prop === 'listSleepSessions') return (...a: Parameters<typeof repo.listSleepSessions>) => { events.push('read'); return repo.listSleepSessions(...a) }
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+    const write = (tag: string) => async () => {
+      events.push(`${tag}:start`)
+      await new Promise(r => setTimeout(r, 120))
+      events.push(`${tag}:end`)
+    }
+    await Promise.all([withNightRescore(logged, USER, write('A')), withNightRescore(logged, USER, write('B'))])
+    expect(events.join(',')).toMatch(/^read,(A|B):start,\1:end,read,read,(A|B):start,\2:end,read$/)
+  })
+
+  it('a holder on another connection (another replica) makes the write wait for it', async () => {
+    const { withUserLock } = await import('@/lib/data/postgres/user-lock')
+    const key = `oura-sleep-write:${USER}`
+    const other = await pool.connect()
+    try {
+      await other.query('SELECT pg_advisory_lock(hashtextextended($1, 0))', [key])
+      let ran = false
+      const run = withUserLock(pool, key, async () => { ran = true }, { waitMs: 5_000, pollMs: 20 })
+      await new Promise(r => setTimeout(r, 200))
+      expect(ran).toBe(false)
+      await other.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [key])
+      await run
+      expect(ran).toBe(true)
+    } finally {
+      other.release()
+    }
   })
 })

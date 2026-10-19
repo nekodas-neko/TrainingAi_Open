@@ -19,7 +19,8 @@ import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDos
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
-import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
+import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
+import { scoreSleepForDate } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
@@ -443,20 +444,13 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const nights = nightSessions(sleepSessions, tz)
   const lastSleep  = canonicalLatestNight(nights, tz)
   const sleepHours = lastSleep?.durationHours ?? null
-  // Personal baselines for the Sleep Score's opt-in contributors (overnight HRV, overnight HR, and
-  // habitual bed/wake times), derived from the *prior* nights only so the night being scored never
-  // contributes to the bar it is judged against. One shared derivation — see sleepScoreBaselines.
-  // "Prior" is by the scored night's end, the day audit's rule, not `slice(0, -1)`: the scored
-  // night is not always the last element (a later window on its date, or a short evening window
-  // it passed over, #2456), and then `slice` left the scored night inside its own baseline.
-  const sleepBaselines = sleepScoreBaselines(
-    lastSleep ? nights.filter(n => n.sleepEnd.getTime() < lastSleep.sleepEnd.getTime()) : nights,
-    tz,
-  )
   // Our own 0–100 Sleep Score (recovered open_health weights + contributor curves). Feeds both
   // the standalone Sleep chip (0–100) and the readiness composite's internal 0–40 sleep term.
   // Falls back to the crude duration-only estimate when there's no session to score at all.
-  const sleepScoreResult = lastSleep ? computeSleepScore(lastSleep, tz, sleepBaselines) : null
+  // Baselines come from the *prior* nights only, by the scored night's end (#2456), so the night
+  // never contributes to the bar it is judged against. #3079: through `scoreSleepForDate`, the one
+  // night window the re-score of a changed night uses too, so the two paths cannot disagree.
+  const sleepScoreResult = lastSleep ? scoreSleepForDate(sleepSessions, lastSleep.date, tz)?.result ?? null : null
   const sleepScore100 = sleepScoreResult?.score ?? null
   const ownSleepContributors = sleepScoreResult ? sleepComponentsToContributors(sleepScoreResult.components) : null
   const sleepComponent = sleepScore100 != null
@@ -821,7 +815,11 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // columns — never the shared source/model_versions (same clobber hazard as the readiness
   // persist). COALESCE means a later recompute with richer inputs overwrites with the better value.
   // Best-effort: a persist failure must never fail the read.
-  if (sleepScoreResult && lastSleep) {
+  //
+  // #3079: and only for TODAY's night. Before Oura delivers last night the newest night is
+  // yesterday's, and every read rewrote yesterday's stored score. A finished day's night is scored
+  // when it changes instead (`rescore-nights.ts`), never by a read of a later day.
+  if (sleepScoreResult && lastSleep && lastSleep.date === todayIso) {
     derivedPersists.push({ day: lastSleep.date, pillar: 'sleep', patch: {
       sleepScore: sleepScoreResult.score,
       sleepContributors: ownSleepContributors,

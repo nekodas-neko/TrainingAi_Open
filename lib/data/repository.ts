@@ -1536,6 +1536,9 @@ export interface WorkoutRepository {
   upsertOuraCloudSleep(userId: string, sessions: OuraSleepUpsertRow[]): Promise<{ written: number; skippedOverlap: number }>
   /** #2859: tombstones Cloud sleep periods Oura reports deleted. Never a manual or ring night. */
   tombstoneOuraCloudSleep(userId: string, ouraIds: string[]): Promise<number>
+  /** #3079: runs `run` as the only Oura sleep write (and its night re-score) for this user, across
+   *  requests and replicas. */
+  withOuraSleepWriteLock<T>(userId: string, run: () => Promise<T>): Promise<T>
   /** #2859: Oura Cloud workouts, keyed by Oura's id; `reviewed` is kept. Returns rows written. */
   upsertOuraWorkouts(userId: string, rows: import('./postgres/slices/oura').OuraWorkoutUpsertRow[]): Promise<number>
   /** #2859: Oura Cloud's HR series (`oura_cloud`). Never displaces or duplicates a ring or strap row. */

@@ -10,7 +10,8 @@ import { normalizeEmail } from '@trainingai/shared/validation/email'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
-import { getDb } from './client'
+import { getDb, getPool } from './client'
+import { withUserLock } from './user-lock'
 import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
@@ -8178,6 +8179,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }
   async upsertOuraCloudSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[]) { return oura.upsertOuraCloudSleep(this.db, userId, sessions) }
   async tombstoneOuraCloudSleep(userId: string, ouraIds: string[]) { return oura.tombstoneOuraCloudSleep(this.db, userId, ouraIds) }
+  async withOuraSleepWriteLock<T>(userId: string, run: () => Promise<T>) { return withUserLock(getPool(), `oura-sleep-write:${userId}`, run, { label: 'oura sleep write' }) }
   async upsertOuraWorkouts(userId: string, rows: oura.OuraWorkoutUpsertRow[]) { return oura.upsertOuraWorkouts(this.db, userId, rows) }
   async upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string) { return oura.upsertOuraCloudHeartrate(this.db, userId, rows, tz) }
   async upsertOuraCloudSleepPeriods(userId: string, rows: oura.OuraCloudSleepPeriodRow[]) { return oura.upsertOuraCloudSleepPeriods(this.db, userId, rows) }

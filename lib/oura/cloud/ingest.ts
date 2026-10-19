@@ -69,13 +69,19 @@ export async function writeOuraCloudData(
 ): Promise<OuraCloudWriteCounts> {
   await writer.upsertOuraDaily(userId, writes.daily, 'oura_cloud')
   await writer.upsertBodyMetrics(userId, writes.body, 'oura_cloud')
-  const touchesSleep = writes.sleep.length > 0 || writes.deletedSleepIds.length > 0
-  const { sleep, sleepTombstoned } = await withNightRescore(touchesSleep ? rescore : undefined, userId, async () => ({
-    sleep: writes.sleep.length > 0 ? await writer.upsertOuraCloudSleep(userId, writes.sleep) : { written: 0, skippedOverlap: 0 },
-    sleepTombstoned: await writer.tombstoneOuraCloudSleep(userId, writes.deletedSleepIds),
-  }))
+  // The period rows go first and inside the re-score window: `listSleepSessions` reads each
+  // period's type from them, and the type decides which periods make the night (#3061). Written
+  // after the sleep rows, a new night was scored before its types existed, so a short `sleep`
+  // fragment beside the `long_sleep` joined it; and a write that only retyped a period was never
+  // seen at all. The tombstone still runs after, so it has the last word on a deleted period.
+  const touchesSleep = writes.sleep.length > 0 || writes.deletedSleepIds.length > 0 || writes.sleepPeriods.length > 0
+  const { sleep, sleepTombstoned, sleepPeriods } = await withNightRescore(touchesSleep ? rescore : undefined, userId, async () => {
+    const sleepPeriods = await writer.upsertOuraCloudSleepPeriods(userId, writes.sleepPeriods)
+    const sleep = writes.sleep.length > 0 ? await writer.upsertOuraCloudSleep(userId, writes.sleep) : { written: 0, skippedOverlap: 0 }
+    const sleepTombstoned = await writer.tombstoneOuraCloudSleep(userId, writes.deletedSleepIds)
+    return { sleep, sleepTombstoned, sleepPeriods }
+  })
   const workouts = await writer.upsertOuraWorkouts(userId, writes.workouts)
-  const sleepPeriods = await writer.upsertOuraCloudSleepPeriods(userId, writes.sleepPeriods)
   const cloudDays = await writer.upsertOuraCloudDaily(userId, writes.cloudDaily)
   const sessions = await writer.upsertOuraSessions(userId, writes.sessions)
   return {

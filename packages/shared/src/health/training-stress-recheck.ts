@@ -13,8 +13,9 @@ export const TRAINING_STRESS_RECHECK_DAYS = 7
  *
  * #3079: **except when Oura's MET for the day changes after the final verdict.** Under the Oura API
  * a day's MET can land hours after the day ends (the Oura app syncs late), so the first post-midnight
- * verdict could be taken without it. `metChangedAtByDay` says when the stored MET for each Oura day
- * last changed; a day is re-evaluated once when the MET it reads changed after its verdict. The
+ * verdict could be taken without it. `metChangedAtByDay` says when each Oura day's stored row (with
+ * its MET) last changed; any column counts, which can re-evaluate a day whose MET did not move, a
+ * bounded and harmless extra. A day is re-evaluated once when that row changed after its verdict. The
  * re-evaluation stamps a later time, so it runs again only if the MET changes again. A day's minutes
  * read Oura's day and the day before (Oura's activity day starts at 4 a.m.), so both count.
  */

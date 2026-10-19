@@ -47,6 +47,7 @@ function makeRepo(today: string) {
       if (row && pillars.readiness) row.readinessScore = null
       return had
     }),
+    withOuraSleepWriteLock: vi.fn(async <T,>(_u: string, run: () => Promise<T>) => run()),
     releaseBodyBatteryAnchor: vi.fn(async (_u: string, day: string) => {
       if (battery.get(day) !== 'readiness') return false
       battery.set(day, 'default')
@@ -68,7 +69,7 @@ describe('re-scoring a night Oura changed (#3079)', () => {
     yesterday = shiftDateStr(today, -1)
   })
 
-  it("a revised night today: re-scores sleep, clears today's readiness, releases the battery anchor", async () => {
+  it("a revised night today: re-scores sleep, clears today's readiness, keeps the battery anchor frozen", async () => {
     const { repo, calls, derived, battery, setSessions } = makeRepo(today)
     derived.set(today, { readinessScore: 71, sleepScore: 80 })
     battery.set(today, 'readiness')
@@ -81,7 +82,10 @@ describe('re-scoring a night Oura changed (#3079)', () => {
     expect(sleepWrite?.patch.sleepScore).toBe(scoreNightForDate(await repo.listSleepSessions('u1', shiftDateStr(today, -40), today), today, TZ)?.score)
     expect(sleepWrite?.patch.modelVersions).toEqual({ sleep: expect.stringMatching(/^v\d+:/) })
     expect(derived.get(today)?.readinessScore).toBeNull()
-    expect(battery.get(today)).toBe('default')
+    // The night was already there when the anchor froze: a revision must not shift the day's curve
+    // (docs/domains/readiness/README.md, the anchor rule).
+    expect(battery.get(today)).toBe('readiness')
+    expect(repo.releaseBodyBatteryAnchor).not.toHaveBeenCalled()
     // Nothing else moved.
     expect(calls.upserts.every(u => u.day === today)).toBe(true)
   })
@@ -105,15 +109,18 @@ describe('re-scoring a night Oura changed (#3079)', () => {
     expect(repo.releaseBodyBatteryAnchor).not.toHaveBeenCalled()
   })
 
-  it('a night that arrives late for today is scored at once', async () => {
-    const { repo, calls, setSessions } = makeRepo(today)
+  it('a night that arrives late for today is scored at once, and releases an anchor frozen without it', async () => {
+    const { repo, calls, battery, setSessions } = makeRepo(today)
     setSessions(s => s.filter(n => n.date !== today))
+    // A readiness from that morning's body metrics alone froze the anchor before the night existed.
+    battery.set(today, 'readiness')
 
     await withNightRescore(repo, 'u1', async () => {
       setSessions(s => [...s, night(today)])
     })
 
     expect(calls.upserts.find(u => u.day === today)?.patch.sleepScore).toEqual(expect.any(Number))
+    expect(battery.get(today)).toBe('default')
   })
 
   it('an identical re-send writes nothing', async () => {
