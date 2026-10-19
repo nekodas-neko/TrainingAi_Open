@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { decodeRoute, encodeRoute, type RoutePoint } from '../activity/route-encoding'
 import { computeTotalDistanceKm } from '../activity/route-metrics'
-import { summariseRoute } from '../activity/route-summary'
+import { averagePaceSecPerKm, summariseRoute } from '../activity/route-summary'
 import { ActivityLogBody } from '../validation/activity-log'
 import { MAX_PACE_SEC_PER_KM } from '../validation/plausibility'
 
@@ -79,5 +79,18 @@ describe('summariseRoute output always fits the save schema (#3093)', () => {
   it('keeps the average out rather than saving a standstill as a pace', () => {
     expect(summariseRoute(leg(0, 0, 10, 6), 240)!.avgPaceSecPerKm).toBeUndefined()
     expect(summariseRoute(leg(0, 0, 10, 6), 18)!.avgPaceSecPerKm).toBe(Math.round(18 / 0.054))
+  })
+})
+
+// #3120. One capped rule for the clients and for the server's own derivation.
+describe('averagePaceSecPerKm (#3120)', () => {
+  it('is distance over time, rounded', () => {
+    expect(averagePaceSecPerKm(3, 1800)).toBe(600)
+    expect(averagePaceSecPerKm(2, 7200)).toBe(MAX_PACE_SEC_PER_KM)
+  })
+  it('is undefined with no distance, no time, or slower than the cap', () => {
+    expect(averagePaceSecPerKm(0, 1800)).toBeUndefined()
+    expect(averagePaceSecPerKm(2, 0)).toBeUndefined()
+    expect(averagePaceSecPerKm(2, 10_800)).toBeUndefined()
   })
 })

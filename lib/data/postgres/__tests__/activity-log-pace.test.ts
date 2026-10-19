@@ -56,6 +56,24 @@ describe.skipIf(!canRun)('saveActivityLog — derives pace when the caller has n
     expect(log.avgPaceSecPerKm ?? null).toBeNull()
   })
 
+  // #3120. The clients leave out an average slower than MAX_PACE_SEC_PER_KM; the server used to
+  // derive it straight back in. 3 h over 2 km is 5,400 s/km.
+  it('stores no pace when the derived one is slower than the cap', async () => {
+    const log = await repo.saveActivityLog(USER, { ...base, startTime: '13:00', endTime: '16:00', durationMin: 180, distanceKm: 2 })
+    expect(log.avgPaceSecPerKm ?? null).toBeNull()
+  })
+
+  it('still derives a pace right at the cap', async () => {
+    // 120 min over 2 km is exactly 3,600 s/km.
+    const log = await repo.saveActivityLog(USER, { ...base, startTime: '17:00', endTime: '19:00', durationMin: 120, distanceKm: 2 })
+    expect(log.avgPaceSecPerKm).toBe(3600)
+  })
+
+  it('stores no pace for a zero duration', async () => {
+    const log = await repo.saveActivityLog(USER, { ...base, startTime: '20:00', endTime: '20:00', durationMin: 0 })
+    expect(log.avgPaceSecPerKm ?? null).toBeNull()
+  })
+
   it('stays null when distance is zero (division guard)', async () => {
     const log = await repo.saveActivityLog(USER, { ...base, startTime: '12:00', endTime: '12:45', distanceKm: 0 })
     expect(log.avgPaceSecPerKm ?? null).toBeNull()
