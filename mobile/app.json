@@ -55,6 +55,14 @@
       "./src/integrations/oura/oura-package-visibility.cjs",
       "expo-sqlite",
       [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "neverForLocation": true,
+          "bluetoothAlwaysPermission": "TrainingAi connects to your heart-rate strap to show and save your heart rate during workouts."
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "TrainingAi uses the camera to scan food barcodes.",

@@ -11,3 +11,4 @@ export const nativeAlerts = {
 export async function observeAlerts(_onOpen: (data: Record<string, unknown>) => void) {
   return () => {};
 }
+export async function deviceAlert(_title: string, _body: string) {}

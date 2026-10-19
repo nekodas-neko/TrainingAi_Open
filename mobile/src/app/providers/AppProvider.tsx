@@ -12,6 +12,7 @@ import { ActivityProvider } from '../../features/activities/data/ActivityProvide
 import { HomeProvider } from '../../features/home/data/HomeProvider';
 import { PlatformProvider } from '../../features/platform/PlatformProvider';
 import { OuraHandoffProvider } from '../../features/health/OuraHandoffProvider';
+import { StrapProvider } from '../../features/devices/strap/StrapProvider';
 
 export function AppProvider({ children }: PropsWithChildren) {
   return (
@@ -19,23 +20,25 @@ export function AppProvider({ children }: PropsWithChildren) {
       <WorkoutDataProvider>
         <HistoryQueueProvider>
           <WorkoutJournalProvider>
-            <HealthProvider>
-              <HealthDataProvider>
-                <NutritionProvider>
-                  <HistoryDownloadProvider>
-                    <HomeProvider>
-                      <ActivityProvider>
-                        <PlatformProvider>
-                          <OuraHandoffProvider>
-                            <ReportsProvider>{children}</ReportsProvider>
-                          </OuraHandoffProvider>
-                        </PlatformProvider>
-                      </ActivityProvider>
-                    </HomeProvider>
-                  </HistoryDownloadProvider>
-                </NutritionProvider>
-              </HealthDataProvider>
-            </HealthProvider>
+            <StrapProvider>
+              <HealthProvider>
+                <HealthDataProvider>
+                  <NutritionProvider>
+                    <HistoryDownloadProvider>
+                      <HomeProvider>
+                        <ActivityProvider>
+                          <PlatformProvider>
+                            <OuraHandoffProvider>
+                              <ReportsProvider>{children}</ReportsProvider>
+                            </OuraHandoffProvider>
+                          </PlatformProvider>
+                        </ActivityProvider>
+                      </HomeProvider>
+                    </HistoryDownloadProvider>
+                  </NutritionProvider>
+                </HealthDataProvider>
+              </HealthProvider>
+            </StrapProvider>
           </WorkoutJournalProvider>
         </HistoryQueueProvider>
       </WorkoutDataProvider>
