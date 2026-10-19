@@ -9,7 +9,13 @@ import {
 import { achievementsSpec } from './models';
 import { equipTitle } from './titles';
 import { markSeen, readSeen } from './seen';
-import { readTrophyCase, writeTrophyCase } from './trophy';
+import {
+  cachedTrophyCase,
+  readTrophyCase,
+  rememberTrophyCase,
+  trophyCacheKey,
+  writeTrophyCase,
+} from './trophy';
 import { WorkoutXpTracker } from './xp';
 
 /** The signed-in account's XP, level and achievements, as the server last calculated them. */
@@ -51,28 +57,37 @@ export function useSeenAchievements() {
   return { seen, mark };
 }
 
-/** The achievements pinned in this account's trophy case on this phone; null until read. */
+/** The achievements pinned in this account's trophy case on this phone; null until first read. */
 export function useTrophyCase() {
   const scoped = useAccountStorage();
-  const [pinned, setPinned] = useState<string[] | null>(null);
+  const connection = useAccountContext().dataReader;
+  const key = connection ? trophyCacheKey(connection.origin, connection.userId) : null;
+  const [pinned, setPinned] = useState<string[] | null>(() =>
+    key ? (cachedTrophyCase(key) ?? null) : null,
+  );
   useEffect(() => {
     let live = true;
-    setPinned(null);
-    if (scoped) {
-      void readTrophyCase(scoped).then((ids) => live && setPinned(ids));
+    setPinned(key ? (cachedTrophyCase(key) ?? null) : null);
+    if (scoped && key) {
+      void readTrophyCase(scoped).then((ids) => {
+        if (!live) return;
+        rememberTrophyCase(key, ids);
+        setPinned(ids);
+      });
     }
     return () => {
       live = false;
     };
-  }, [scoped]);
+  }, [scoped, key]);
   const change = useCallback(
     (next: (pinned: readonly string[]) => string[]) => {
-      if (!scoped || !pinned) return;
+      if (!scoped || !key || !pinned) return;
       const value = next(pinned);
+      rememberTrophyCase(key, value);
       setPinned(value);
       void writeTrophyCase(scoped, value).catch(() => {});
     },
-    [scoped, pinned],
+    [scoped, key, pinned],
   );
   return {
     pinned,

@@ -84,6 +84,17 @@ export function pinTrophy(pinned: readonly string[], id: string): string[] {
   return [...pinned, id].slice(-TROPHY_SLOTS)
 }
 
+/** The case's slots in order: the pinned achievement in each, or undefined for an empty one. */
+export function trophySlots<T extends { id: string }>(
+  achievements: readonly T[],
+  pinned: readonly string[],
+): (T | undefined)[] {
+  return Array.from({ length: TROPHY_SLOTS }, (_, i) => {
+    const id = pinned[i]
+    return id ? achievements.find(a => a.id === id) : undefined
+  })
+}
+
 export function unpinTrophy(pinned: readonly string[], id: string): string[] {
   return pinned.filter(p => p !== id)
 }

@@ -51,7 +51,7 @@ function markSeen(ids: string[]) {
   try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids)) } catch { /* ignore */ }
 }
 
-const TIER_BORDER: Record<BadgeTier, string> = {
+export const TIER_BORDER: Record<BadgeTier, string> = {
   bronze: '#cd7c2e',
   silver: '#9ca3af',
   gold:   '#f59e0b',

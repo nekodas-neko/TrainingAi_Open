@@ -1,17 +1,23 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { z } from 'zod';
-import { TITLE_CATALOGUE } from '@trainingai/shared/achievement-display';
+import { TITLE_CATALOGUE, trophySlots } from '@trainingai/shared/achievement-display';
 import { createLocalStorage } from '../src/core/storage/LocalStorage.ts';
 import { WorkoutResources } from '../src/features/workouts/data/WorkoutResources.ts';
 import { profileSpec } from '../src/features/health/data/models.ts';
 import { seasonsSpec, type Achievement } from '../src/features/rewards/data/models.ts';
-import { readTrophyCase, writeTrophyCase } from '../src/features/rewards/data/trophy.ts';
+import {
+  cachedTrophyCase,
+  readTrophyCase,
+  rememberTrophyCase,
+  trophyCacheKey,
+  writeTrophyCase,
+} from '../src/features/rewards/data/trophy.ts';
 import { equipTitle } from '../src/features/rewards/data/titles.ts';
 import {
   seasonBadges,
   titleName,
-  trophySlots,
+  equippedTitleName,
 } from '../src/features/rewards/data/view.ts';
 import { titleIcons } from '../src/features/rewards/components/titleIcons.ts';
 import { titleLabel } from '../src/features/social/data/models.ts';
@@ -46,6 +52,7 @@ async function setup(t: { after: (fn: () => void) => void }) {
   const storage = await createLocalStorage(db.database);
   const state = {
     title: null as string | null,
+    hold: null as Promise<void> | null,
     offline: false,
     refuse: false,
     reads: [] as string[],
@@ -60,8 +67,10 @@ async function setup(t: { after: (fn: () => void) => void }) {
       if (state.offline) throw new Error('Offline');
       if (path === '/api/seasons')
         return { seasons: [season(userId, 'Gold'), season('open')] };
-      if (path === '/api/user/profile')
+      if (path === '/api/user/profile') {
+        await state.hold;
         return { user: { name: 'One', equippedTitle: state.title } };
+      }
       return { rows: [] };
     },
     post: async () => ({}),
@@ -141,7 +150,7 @@ test('trophy slots show the pinned achievement in each place and Empty for the r
     [undefined, undefined, undefined],
   );
   assert.deepEqual(
-    trophySlots([], []).map((s) => s?.id),
+    trophySlots<Achievement>([], []).map((s) => s?.id),
     [undefined, undefined, undefined],
   );
 });
@@ -155,7 +164,17 @@ test('the trophy case is kept per account on this phone and a damaged record rea
   assert.deepEqual(await readTrophyCase(one), ['a', 'b']);
   assert.deepEqual(await readTrophyCase(two), []);
   await writeTrophyCase(one, ['a', 'b', 'c', 'd']);
-  assert.deepEqual(await readTrophyCase(one), ['a', 'b', 'c'], 'never more than three');
+  assert.deepEqual(
+    await readTrophyCase(one),
+    ['b', 'c', 'd'],
+    'the newest three, as pinning keeps',
+  );
+  await one.set('trophy-case.v1', JSON.stringify(['a', 'b', 'c', 'd', 'e']));
+  assert.deepEqual(
+    await readTrophyCase(one),
+    ['c', 'd', 'e'],
+    'an old longer record too',
+  );
   await two.set('trophy-case.v1', '{broken');
   assert.deepEqual(await readTrophyCase(two), []);
   await two.set('trophy-case.v1', JSON.stringify({ a: 1 }));
@@ -190,6 +209,10 @@ test('equipping a title writes through the existing route and shows at once', as
     count('/api/user/profile'),
     count('/api/friends/leaderboard'),
   ];
+  // The profile re-read after the save is held back, so what the screen shows right after the
+  // save can only be the update made from the save itself, not the server's answer.
+  let release!: () => void;
+  state.hold = new Promise<void>((resolve) => (release = resolve));
   assert.equal(await equipTitle(resources, 'unbroken'), true);
   assert.deepEqual(state.patches, [
     { path: '/api/user/equipped-title', body: { titleId: 'unbroken' } },
@@ -198,14 +221,22 @@ test('equipping a title writes through the existing route and shows at once', as
     (resources.state(profileSpec).data?.user as { equippedTitle?: string | null })
       .equippedTitle,
     'unbroken',
-    'the profile shows it before the re-read',
+    'the profile shows it before the re-read has answered',
   );
+  state.hold = null;
+  release();
   await resources.refreshVisible();
   assert.equal(count('/api/user/profile'), profileBefore + 1, 'the profile re-reads');
   assert.equal(
     count('/api/friends/leaderboard'),
     boardBefore + 1,
     'so do the friends views',
+  );
+  assert.equal(
+    (resources.state(profileSpec).data?.user as { equippedTitle?: string | null })
+      .equippedTitle,
+    'unbroken',
+    'and the server agrees',
   );
   resources.cancel();
 });
@@ -234,4 +265,30 @@ test('clearing a title sends null, and a refused or failed save changes nothing'
   });
   assert.equal(equipped(), null);
   resources.cancel();
+});
+
+test('pins read once this session are known at once next time, per account', () => {
+  const one = trophyCacheKey('https://example.com', 'one');
+  const two = trophyCacheKey('https://example.com', 'two');
+  const other = trophyCacheKey('https://other.example.com', 'one');
+  assert.equal(cachedTrophyCase(one), undefined, 'nothing known before the first read');
+  rememberTrophyCase(one, ['a', 'b']);
+  assert.deepEqual(cachedTrophyCase(one), ['a', 'b']);
+  assert.equal(cachedTrophyCase(two), undefined, 'another account has none');
+  assert.equal(cachedTrophyCase(other), undefined, 'nor the same id on another server');
+  rememberTrophyCase(one, ['b', 'c', 'd', 'e']);
+  assert.deepEqual(cachedTrophyCase(one), ['c', 'd', 'e'], 'never more than three');
+  rememberTrophyCase(one, []);
+  assert.deepEqual(
+    cachedTrophyCase(one),
+    [],
+    'an empty case is a known answer, not a missing one',
+  );
+});
+
+test('the hero shows "Tap to set title" for no title and for an id the catalogue does not list', () => {
+  assert.equal(equippedTitleName(null), null);
+  assert.equal(equippedTitleName(undefined), null);
+  assert.equal(equippedTitleName('some_new_title'), null);
+  assert.equal(equippedTitleName('unbroken'), 'Unbroken');
 });

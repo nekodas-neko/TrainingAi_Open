@@ -12,12 +12,22 @@ const ids = z.array(z.string());
 export async function readTrophyCase(storage: ScopedStorage) {
   try {
     const raw = await storage.get(key);
-    return raw ? ids.parse(JSON.parse(raw)).slice(0, TROPHY_SLOTS) : [];
+    return raw ? ids.parse(JSON.parse(raw)).slice(-TROPHY_SLOTS) : [];
   } catch {
     return [];
   }
 }
 
 export async function writeTrophyCase(storage: ScopedStorage, pinned: readonly string[]) {
-  await storage.set(key, JSON.stringify(pinned.slice(0, TROPHY_SLOTS)));
+  await storage.set(key, JSON.stringify(pinned.slice(-TROPHY_SLOTS)));
+}
+
+// The pins read this session, per account, so a screen that mounts again paints them at once
+// instead of three empty slots until the phone has answered.
+const known = new Map<string, string[]>();
+export const trophyCacheKey = (origin: string, userId: string) =>
+  JSON.stringify([origin, userId]);
+export const cachedTrophyCase = (key: string) => known.get(key);
+export function rememberTrophyCase(key: string, pinned: readonly string[]) {
+  known.set(key, pinned.slice(-TROPHY_SLOTS));
 }

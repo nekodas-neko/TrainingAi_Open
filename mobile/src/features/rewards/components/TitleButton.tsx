@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable } from 'react-native';
 import { AppText, Icon } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { titleName } from '../data/view';
+import { equippedTitleName } from '../data/view';
 import { titleIcon } from './titleIcons';
 import { TitlePickerSheet } from './TitlePickerSheet';
 
@@ -16,7 +16,7 @@ export function TitleButton({
 }) {
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
-  const name = titleName(equipped);
+  const name = equippedTitleName(equipped);
   return (
     <>
       <Pressable

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { AppButton, AppText, Card, Grid, Icon, Sheet, Stack } from '../../../shared/ui';
+import { trophySlots } from '@trainingai/shared/achievement-display';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { Achievement } from '../data/models';
-import { trophySlots } from '../data/view';
 import { useTrophyCase } from '../data/useRewards';
 import { achievementIcon } from './achievementIcons';
 import { glow } from './glow';
@@ -13,17 +13,20 @@ import { useCategoryColor } from './useCategoryColor';
 function Slot({
   achievement,
   onPress,
+  pending = false,
 }: {
   achievement?: Achievement;
   onPress: () => void;
+  /** Pins not read yet: an outline only, so a slot is never called Empty before it is known to be. */
+  pending?: boolean;
 }) {
   const { theme } = useTheme();
   const color = useCategoryColor(achievement?.category ?? '');
   if (!achievement) {
     return (
       <View
-        accessible
-        accessibilityLabel="Empty trophy slot"
+        accessibilityLabel={pending ? undefined : 'Empty trophy slot'}
+        accessible={!pending}
         style={{
           aspectRatio: 1,
           alignItems: 'center',
@@ -34,10 +37,18 @@ function Slot({
           borderColor: theme.colors.border,
         }}
       >
-        <Icon name="lock" size={theme.sizes.iconSmall} tone="muted" />
-        <AppText variant="statUnit" tone="muted" style={{ marginTop: theme.spacing.xs }}>
-          Empty
-        </AppText>
+        {!pending && (
+          <>
+            <Icon name="lock" size={theme.sizes.iconSmall} tone="muted" />
+            <AppText
+              variant="statUnit"
+              tone="muted"
+              style={{ marginTop: theme.spacing.xs }}
+            >
+              Empty
+            </AppText>
+          </>
+        )}
       </View>
     );
   }
@@ -164,7 +175,12 @@ export function TrophyCase({ achievements }: { achievements: Achievement[] }) {
       </Stack>
       <Grid columns={3} gap="snug">
         {slots.map((row, index) => (
-          <Slot key={index} achievement={row} onPress={() => row && setSelected(row)} />
+          <Slot
+            key={index}
+            achievement={row}
+            pending={pinned === null}
+            onPress={() => row && setSelected(row)}
+          />
         ))}
       </Grid>
       {editing && unlocked.length > 0 && (
