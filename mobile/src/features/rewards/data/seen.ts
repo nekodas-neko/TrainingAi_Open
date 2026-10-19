@@ -1,7 +1,7 @@
-import { z } from "zod";
-import type { ScopedStorage } from "../../../core/storage/LocalStorage.ts";
+import { z } from 'zod';
+import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 
-const key = "seen-achievements.v1";
+const key = 'seen-achievements.v1';
 const ids = z.array(z.string());
 
 /** Achievement ids this account has already been shown as unlocked. */

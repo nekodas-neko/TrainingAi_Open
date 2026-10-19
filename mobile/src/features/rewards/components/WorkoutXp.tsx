@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
-import { Animated, Easing, View } from "react-native";
-import { AppText } from "../../../shared/ui";
-import { useReducedMotion } from "../../../shared/ui/useReducedMotion";
-import { useTheme } from "../../../shared/theme/ThemeProvider";
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, View } from 'react-native';
+import { AppText } from '../../../shared/ui';
+import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 /** The workout summary's "XP Earned" badge. Absent, not zero, when no gain is known. */
 export function WorkoutXp({ xp }: { xp: number | null }) {
@@ -32,12 +32,12 @@ export function WorkoutXp({ xp }: { xp: number | null }) {
       accessible
       accessibilityLabel={`XP earned, ${xp}`}
       style={{
-        width: "100%",
+        width: '100%',
         maxWidth: theme.sizes.summaryWidth,
         opacity: pop.interpolate({
           inputRange: [0, 1],
           outputRange: [0, 1],
-          extrapolate: "clamp",
+          extrapolate: 'clamp',
         }),
         transform: [
           {
@@ -57,7 +57,7 @@ export function WorkoutXp({ xp }: { xp: number | null }) {
     >
       <View
         style={{
-          alignItems: "center",
+          alignItems: 'center',
           borderRadius: theme.radii.card,
           borderWidth: 1,
           borderColor: theme.colors.brandBorder,
@@ -72,7 +72,7 @@ export function WorkoutXp({ xp }: { xp: number | null }) {
         <AppText
           variant="hero"
           tone="brand"
-          style={{ fontWeight: "900", fontVariant: ["tabular-nums"] }}
+          style={{ fontWeight: '900', fontVariant: ['tabular-nums'] }}
         >
           +{xp}
         </AppText>

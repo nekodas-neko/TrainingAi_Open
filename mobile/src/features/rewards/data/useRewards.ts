@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocalStorage } from "../../../core/storage/StorageProvider";
-import { useAccountContext } from "../../account/AccountProvider";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocalStorage } from '../../../core/storage/StorageProvider';
+import { useAccountContext } from '../../account/AccountProvider';
 import {
   useWorkoutResource,
   useWorkoutResources,
-} from "../../workouts/data/WorkoutDataProvider";
-import { achievementsSpec } from "./models";
-import { markSeen, readSeen } from "./seen";
-import { earnedXp, settledXp } from "./xp";
+} from '../../workouts/data/WorkoutDataProvider';
+import { achievementsSpec } from './models';
+import { markSeen, readSeen } from './seen';
+import { WorkoutXpTracker } from './xp';
 
 /** The signed-in account's XP, level and achievements, as the server last calculated them. */
 export function useRewards() {
@@ -19,8 +19,7 @@ export function useSeenAchievements() {
   const storage = useLocalStorage();
   const connection = useAccountContext().dataReader;
   const scoped = useMemo(
-    () =>
-      connection ? storage.account(connection.origin, connection.userId) : null,
+    () => (connection ? storage.account(connection.origin, connection.userId) : null),
     [storage, connection],
   );
   const [seen, setSeen] = useState<string[] | null>(null);
@@ -46,49 +45,33 @@ export function useSeenAchievements() {
 }
 
 /**
- * XP a workout earned, for its summary. The baseline is the server's total, read once while the
- * workout is active; the gain is the server's total after the workout has uploaded, minus that.
- * Preview adds up nothing itself. A workout opened from history, or one started offline, has no
- * baseline and shows no XP.
+ * XP a workout earned, for its summary (see `WorkoutXpTracker`). The start total is read when the
+ * workout is active, the gain once it has uploaded. Reads go through the resource directly, never
+ * `useWorkoutResource`, so this screen cannot turn the view More shares into a local-only one.
  */
 export function useWorkoutXp(
   workout: { id: string; status: string; pending: unknown[] } | undefined,
 ) {
   const resources = useWorkoutResources();
-  const id = workout?.id;
-  const active = workout?.status === "active";
-  const [baseline, setBaseline] = useState<{ id: string; xp: number } | null>(
-    null,
+  const tracker = useMemo(
+    () => (resources ? new WorkoutXpTracker(resources) : null),
+    [resources],
   );
-  const [earned, setEarned] = useState<{
-    id: string;
-    xp: number | null;
-  } | null>(null);
+  const [earned, setEarned] = useState<{ id: string; xp: number | null } | null>(null);
   const requested = useRef<string | null>(null);
-  const state = useWorkoutResource(
-    achievementsSpec,
-    active || (!!id && baseline?.id === id),
-  );
-  const known = settledXp(state);
+  const id = workout?.id;
+  const active = workout?.status === 'active';
+  const uploaded = workout?.status === 'completed' && workout.pending.length === 0;
   useEffect(() => {
-    if (active && id && known !== null && baseline?.id !== id)
-      setBaseline({ id, xp: known });
-  }, [active, id, known, baseline?.id]);
-  const uploaded =
-    workout?.status === "completed" && workout.pending.length === 0;
+    if (tracker && id && active) void tracker.start(id);
+  }, [tracker, id, active]);
   useEffect(() => {
-    if (
-      !resources ||
-      !id ||
-      !uploaded ||
-      baseline?.id !== id ||
-      requested.current === id
-    )
-      return;
+    if (!tracker || !id || !uploaded || requested.current === id) return;
     requested.current = id;
-    void earnedXp(resources, baseline.xp)
+    void tracker
+      .earned(id)
       .catch(() => null)
       .then((xp) => setEarned({ id, xp }));
-  }, [resources, id, uploaded, baseline]);
+  }, [tracker, id, uploaded]);
   return earned && earned.id === id ? earned.xp : null;
 }

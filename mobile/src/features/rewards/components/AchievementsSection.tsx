@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import {
   AppButton,
   AppText,
@@ -7,18 +7,18 @@ import {
   Grid,
   LoadingIndicator,
   Stack,
-} from "../../../shared/ui";
-import { useTheme } from "../../../shared/theme/ThemeProvider";
-import type { Achievement, Rewards } from "../data/models";
+} from '../../../shared/ui';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import type { Achievement, Rewards } from '../data/models';
 import {
   achievementCounts,
   achievementGroups,
   recentUnlocked,
   unseenUnlocks,
-} from "../data/view";
-import { useSeenAchievements } from "../data/useRewards";
-import { AchievementBadge } from "./AchievementBadge";
-import { AchievementDetail } from "./AchievementDetail";
+} from '../data/view';
+import { useSeenAchievements } from '../data/useRewards';
+import { AchievementBadge } from './AchievementBadge';
+import { AchievementDetail } from './AchievementDetail';
 
 /** More › Profile › Achievements: a four-badge preview that opens into every category. */
 export function AchievementsSection({
@@ -44,9 +44,9 @@ export function AchievementsSection({
         accessibilityState={{ expanded }}
         onPress={() => setExpanded((open) => !open)}
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           minHeight: theme.sizes.touchTarget,
           paddingHorizontal: theme.spacing.xxs,
         }}
@@ -56,21 +56,19 @@ export function AchievementsSection({
         </AppText>
         <Stack direction="row" align="center" gap="sm">
           <AppText variant="micro" tone="brand">
-            {counts ? `${counts.unlocked} / ${counts.total}` : "— / —"}
+            {counts ? `${counts.unlocked} / ${counts.total}` : '— / —'}
           </AppText>
           <DisclosureIcon expanded={expanded} />
         </Stack>
       </Pressable>
       {loading && !rewards ? (
-        <View
-          style={{ alignItems: "center", paddingVertical: theme.spacing.xxl }}
-        >
+        <View style={{ alignItems: 'center', paddingVertical: theme.spacing.xxl }}>
           <LoadingIndicator />
         </View>
       ) : !rewards ? (
         <AppText
           tone="muted"
-          style={{ textAlign: "center", paddingVertical: theme.spacing.lg }}
+          style={{ textAlign: 'center', paddingVertical: theme.spacing.lg }}
         >
           Could not load achievements
         </AppText>
@@ -81,10 +79,7 @@ export function AchievementsSection({
             variant="surface"
             onPress={() => setExpanded(false)}
           />
-          <AchievementGrid
-            achievements={rewards.achievements}
-            onSelect={setSelected}
-          />
+          <AchievementGrid achievements={rewards.achievements} onSelect={setSelected} />
         </Stack>
       ) : recent.length === 0 ? (
         <View
@@ -101,20 +96,13 @@ export function AchievementsSection({
           </AppText>
         </View>
       ) : (
-        <Grid columns={4} gap="sm">
+        <Grid columns={4} gap="snug">
           {recent.map((row) => (
-            <AchievementBadge
-              key={row.id}
-              achievement={row}
-              onPress={setSelected}
-            />
+            <AchievementBadge key={row.id} achievement={row} onPress={setSelected} />
           ))}
         </Grid>
       )}
-      <AchievementDetail
-        achievement={selected}
-        onClose={() => setSelected(null)}
-      />
+      <AchievementDetail achievement={selected} onClose={() => setSelected(null)} />
     </View>
   );
 }
@@ -157,7 +145,7 @@ function AchievementGrid({
               {group.unlocked} / {group.items.length}
             </AppText>
           </Stack>
-          <Grid columns={4} gap="sm">
+          <Grid columns={4} gap="snug">
             {group.items.map((row) => (
               <AchievementBadge
                 key={row.id}

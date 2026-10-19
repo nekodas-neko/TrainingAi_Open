@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { Pressable, View } from "react-native";
-import { AppText, ProgressBar, Stack } from "../../../shared/ui";
-import { useTheme } from "../../../shared/theme/ThemeProvider";
-import type { Rewards } from "../data/models";
-import { levelHeadline, levelProgress } from "../data/view";
-import { LevelSheet } from "./LevelSheet";
+import { useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { AppText, ProgressBar, Stack } from '../../../shared/ui';
+import { levelProgress } from '@trainingai/shared/achievement-display';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import type { Rewards } from '../data/models';
+import { levelHeadline } from '../data/view';
+import { LevelSheet } from './LevelSheet';
 
 /** More › Profile: the level badge (opens Level & XP) and the XP bar under it. */
 export function LevelHeader({
@@ -24,12 +25,12 @@ export function LevelHeader({
         accessibilityLabel={
           headline
             ? `${headline.title}, ${rewards!.xp} XP total. Open Level and XP`
-            : "Level and XP"
+            : 'Level and XP'
         }
         onPress={() => setOpen(true)}
         style={({ pressed }) => ({
-          flexDirection: "row",
-          alignItems: "center",
+          flexDirection: 'row',
+          alignItems: 'center',
           gap: theme.spacing.sm,
           minHeight: theme.sizes.touchTarget,
           borderRadius: theme.radii.card,
@@ -47,29 +48,31 @@ export function LevelHeader({
             height: theme.sizes.foodThumbnail,
             borderRadius: theme.radii.control,
             backgroundColor: theme.colors.brand,
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <AppText
             variant="subheading"
-            style={{ color: theme.colors.onBrand, fontWeight: "900" }}
+            style={{ color: theme.colors.onBrand, fontWeight: '900' }}
           >
-            {rewards ? rewards.level : "—"}
+            {rewards ? rewards.level : '—'}
           </AppText>
         </View>
         <View>
-          <AppText variant="caption" tone="brand" style={{ fontWeight: "700" }}>
-            {headline ? headline.title : "Level —"}
+          <AppText variant="caption" tone="brand" style={{ fontWeight: '700' }}>
+            {headline ? headline.title : 'Level —'}
           </AppText>
           <AppText variant="micro" tone="muted">
-            {headline ? headline.detail : "Tap for details"}
+            {headline ? headline.detail : 'Tap for details'}
           </AppText>
         </View>
       </Pressable>
       {rewards && headline && (
-        <View style={{ width: "100%", maxWidth: theme.sizes.summaryWidth }}>
-          <ProgressBar value={levelProgress(rewards)} />
+        <View style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
+          <ProgressBar
+            value={levelProgress(rewards.xp, rewards.currentLevelXp, rewards.nextLevelXp)}
+          />
           <Stack
             direction="row"
             justify="space-between"
@@ -78,14 +81,14 @@ export function LevelHeader({
             <AppText
               variant="micro"
               tone="muted"
-              style={{ fontVariant: ["tabular-nums"] }}
+              style={{ fontVariant: ['tabular-nums'] }}
             >
               {headline.barStart}
             </AppText>
             <AppText
               variant="micro"
               tone="muted"
-              style={{ fontVariant: ["tabular-nums"] }}
+              style={{ fontVariant: ['tabular-nums'] }}
             >
               {headline.barEnd}
             </AppText>
@@ -93,15 +96,11 @@ export function LevelHeader({
         </View>
       )}
       {failed && !rewards && (
-        <AppText variant="caption" tone="muted" style={{ textAlign: "center" }}>
+        <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
           Couldn’t load your stats — tap Retry above.
         </AppText>
       )}
-      <LevelSheet
-        visible={open}
-        rewards={rewards}
-        onClose={() => setOpen(false)}
-      />
+      <LevelSheet visible={open} rewards={rewards} onClose={() => setOpen(false)} />
     </>
   );
 }

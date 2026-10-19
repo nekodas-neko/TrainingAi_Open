@@ -16,7 +16,7 @@ import { useSignOutFlow } from './sign-out-flow'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
 import { EditProfileSheet } from '@/components/profile/edit-profile-sheet'
 import { GoalsSection } from '@/components/profile/goals-section'
-import { getLevelLabel } from '@trainingai/shared/achievement-display'
+import { getLevelLabel, levelProgress } from '@trainingai/shared/achievement-display'
 import { LevelSheet } from '@/components/profile/level-sheet'
 import { TITLES } from '@trainingai/shared/types/friends'
 import type { User } from '@trainingai/shared/types/user'
@@ -197,9 +197,7 @@ export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friend
   const levelLabel = achievementsData?.levelLabel ?? getLevelLabel(level)
   const currentLevelXp = achievementsData?.currentLevelXp ?? 0
   const nextLevelXp = achievementsData?.nextLevelXp ?? 100
-  const xpProgress = nextLevelXp > currentLevelXp
-    ? Math.min(1, (xp - currentLevelXp) / (nextLevelXp - currentLevelXp))
-    : 1
+  const xpProgress = levelProgress(xp, currentLevelXp, nextLevelXp)
   const totalSessions = achievementsData?.lifetimeStats.sessions ?? 0
   const totalVolumeKg = achievementsData?.lifetimeStats.totalVolumeKg ?? 0
   const bestStreak = achievementsData?.lifetimeStats.bestStreak ?? 0

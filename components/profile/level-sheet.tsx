@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
-import { LEVEL_THRESHOLDS, getLevelLabel } from '@trainingai/shared/achievement-display'
+import { LEVEL_THRESHOLDS, getLevelLabel, levelProgress } from '@trainingai/shared/achievement-display'
 import type { AchievementResult } from './achievements-grid'
 
 
@@ -23,9 +23,7 @@ interface LevelSheetProps {
 }
 
 export function LevelSheet({ level, xp, currentLevelXp, nextLevelXp, achievements, children }: LevelSheetProps) {
-  const xpProgress = nextLevelXp > currentLevelXp
-    ? Math.min(1, (xp - currentLevelXp) / (nextLevelXp - currentLevelXp))
-    : 1
+  const xpProgress = levelProgress(xp, currentLevelXp, nextLevelXp)
 
   const unlockedAchievements = achievements.filter(a => a.unlocked).sort((a, b) => b.xpReward - a.xpReward)
 

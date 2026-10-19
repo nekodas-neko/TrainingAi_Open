@@ -80,7 +80,7 @@ import CalendarCheck from 'lucide-react-native/icons/calendar-check';
 import Leaf from 'lucide-react-native/icons/leaf';
 import CircleCheck from 'lucide-react-native/icons/circle-check';
 import Bed from 'lucide-react-native/icons/bed';
-import ChartColumn from 'lucide-react-native/icons/chart-column';
+import ChartNoAxesColumn from 'lucide-react-native/icons/chart-no-axes-column';
 import ChartLine from 'lucide-react-native/icons/chart-line';
 import Lock from 'lucide-react-native/icons/lock';
 import type { LucideProps } from 'lucide-react-native';
@@ -170,7 +170,7 @@ const icons = {
   leaf: Leaf,
   circleCheck: CircleCheck,
   bed: Bed,
-  barChart: ChartColumn,
+  barChart: ChartNoAxesColumn,
   lineChart: ChartLine,
   lock: Lock,
 };

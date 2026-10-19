@@ -4,24 +4,10 @@ import {
   getBadgeTier,
   getLevelLabel,
   type BadgeTier,
-} from "@trainingai/shared/achievement-display";
-import type { Achievement, Rewards } from "./models.ts";
+} from '@trainingai/shared/achievement-display';
+import type { Achievement, Rewards } from './models.ts';
 
-type Level = Pick<Rewards, "level" | "xp" | "currentLevelXp" | "nextLevelXp">;
-
-/** Fraction of the way from this level's XP to the next level's, as the current app draws it. */
-export function levelProgress({
-  xp,
-  currentLevelXp,
-  nextLevelXp,
-}: Omit<Level, "level">) {
-  return nextLevelXp > currentLevelXp
-    ? Math.min(
-        1,
-        Math.max(0, (xp - currentLevelXp) / (nextLevelXp - currentLevelXp)),
-      )
-    : 1;
-}
+type Level = Pick<Rewards, 'level' | 'xp' | 'currentLevelXp' | 'nextLevelXp'>;
 
 /** The More screen's level badge and XP bar text. */
 export function levelHeadline(rewards: Level & { levelLabel?: string }) {
@@ -33,17 +19,14 @@ export function levelHeadline(rewards: Level & { levelLabel?: string }) {
     barEnd:
       nextLevelXp > xp
         ? `${(nextLevelXp - xp).toLocaleString()} to next level`
-        : "Max level",
+        : 'Max level',
   };
 }
 
 /** The Level & XP sheet's hero: XP into this level, and what the level asks for in all. */
-export function levelSheetHero({
-  level,
-  xp,
-  currentLevelXp,
-  nextLevelXp,
-}: Level) {
+export function levelSheetHero(rewards: Level | null) {
+  if (!rewards) return { label: 'Level —', total: '—', start: '—', end: '—' };
+  const { level, xp, currentLevelXp, nextLevelXp } = rewards;
   return {
     label: `Level ${level} · ${getLevelLabel(level)}`,
     total: `${xp} XP total`,
@@ -56,7 +39,7 @@ export type LevelRow = {
   level: number;
   label: string;
   threshold: number;
-  state: "past" | "current" | "upcoming";
+  state: 'past' | 'current' | 'upcoming';
 };
 export function levelRows(level: number): LevelRow[] {
   return LEVEL_THRESHOLDS.map((threshold, index) => {
@@ -65,7 +48,7 @@ export function levelRows(level: number): LevelRow[] {
       level: row,
       label: getLevelLabel(row),
       threshold,
-      state: row === level ? "current" : row < level ? "past" : "upcoming",
+      state: row === level ? 'current' : row < level ? 'past' : 'upcoming',
     };
   });
 }
@@ -83,9 +66,7 @@ export type AchievementGroup = {
   unlocked: number;
 };
 /** Categories in the current app's order; one the app does not list is not shown. */
-export function achievementGroups(
-  achievements: Achievement[],
-): AchievementGroup[] {
+export function achievementGroups(achievements: Achievement[]): AchievementGroup[] {
   return ACHIEVEMENT_CATEGORY_ORDER.flatMap((category) => {
     const items = achievements.filter((row) => row.category === category);
     return items.length
@@ -120,10 +101,7 @@ export function tierOf(row: Achievement): BadgeTier | null {
 }
 
 /** Unlocked and not yet seen on this account, in list order. */
-export function unseenUnlocks(
-  achievements: Achievement[],
-  seen: readonly string[],
-) {
+export function unseenUnlocks(achievements: Achievement[], seen: readonly string[]) {
   const known = new Set(seen);
   return achievements
     .filter((row) => row.unlocked && !known.has(row.id))

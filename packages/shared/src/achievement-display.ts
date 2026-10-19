@@ -36,3 +36,10 @@ export const ACHIEVEMENT_CATEGORY_ORDER = [
   'Body Metrics',
   'Lift Milestones',
 ] as const
+
+/** How far through the current level `xp` is, 0 to 1. A top level with nothing above it reads as full. */
+export function levelProgress(xp: number, currentLevelXp: number, nextLevelXp: number): number {
+  return nextLevelXp > currentLevelXp
+    ? Math.min(1, Math.max(0, (xp - currentLevelXp) / (nextLevelXp - currentLevelXp)))
+    : 1
+}

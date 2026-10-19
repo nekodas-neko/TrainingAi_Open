@@ -1,10 +1,10 @@
-import { View } from "react-native";
-import { AppText, ProgressBar, Sheet, Stack } from "../../../shared/ui";
-import { useTheme } from "../../../shared/theme/ThemeProvider";
-import type { Achievement } from "../data/models";
-import { tierOf } from "../data/view";
-import { useCategoryColor } from "./useCategoryColor";
-import { tint } from "./tint";
+import { View } from 'react-native';
+import { AppText, ProgressBar, Sheet, Stack } from '../../../shared/ui';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import type { Achievement } from '../data/models';
+import { tierOf } from '../data/view';
+import { useCategoryColor } from './useCategoryColor';
+import { tint } from './tint';
 
 /** The popover on the current app's badge: description, progress toward the goal, the XP it pays. */
 export function AchievementDetail({
@@ -15,31 +15,33 @@ export function AchievementDetail({
   onClose: () => void;
 }) {
   const { theme } = useTheme();
-  const color = useCategoryColor(achievement?.category ?? "");
+  const color = useCategoryColor(achievement?.category ?? '');
   const tier = achievement ? tierOf(achievement) : null;
   const tierColor = tier ? theme.rewards.tiers[tier] : null;
   return (
     <Sheet
       visible={achievement !== null}
-      title={achievement?.name ?? "Achievement"}
+      title={achievement?.name ?? 'Achievement'}
+      titleColor={color}
       onClose={onClose}
+      actions={
+        tier && tierColor ? (
+          <View
+            style={{
+              borderRadius: theme.radii.small / 2,
+              backgroundColor: tint(tierColor, 0.125),
+              paddingHorizontal: theme.spacing.xs + theme.spacing.xxs,
+            }}
+          >
+            <AppText variant="eyebrow" style={{ color: tierColor }}>
+              {tier}
+            </AppText>
+          </View>
+        ) : undefined
+      }
     >
       {achievement && (
         <>
-          {tier && tierColor && (
-            <View
-              style={{
-                alignSelf: "flex-start",
-                borderRadius: theme.radii.small / 2,
-                backgroundColor: tint(tierColor, 0.125),
-                paddingHorizontal: theme.spacing.xs + theme.spacing.xxs,
-              }}
-            >
-              <AppText variant="eyebrow" style={{ color: tierColor }}>
-                {tier}
-              </AppText>
-            </View>
-          )}
           <AppText variant="caption" tone="muted">
             {achievement.description}
           </AppText>
@@ -50,13 +52,10 @@ export function AchievementDetail({
               </AppText>
               <AppText
                 variant="caption"
-                style={{ fontWeight: "600", fontVariant: ["tabular-nums"] }}
+                style={{ fontWeight: '600', fontVariant: ['tabular-nums'] }}
               >
-                {Math.min(
-                  achievement.current,
-                  achievement.goal,
-                ).toLocaleString()}{" "}
-                / {achievement.goal.toLocaleString()}
+                {Math.min(achievement.current, achievement.goal).toLocaleString()} /{' '}
+                {achievement.goal.toLocaleString()}
               </AppText>
             </Stack>
             <ProgressBar value={achievement.progress} color={color} />
@@ -65,7 +64,7 @@ export function AchievementDetail({
             <AppText variant="caption" tone="muted">
               Reward
             </AppText>
-            <AppText variant="caption" style={{ color, fontWeight: "700" }}>
+            <AppText variant="caption" style={{ color, fontWeight: '700' }}>
               +{achievement.xpReward} XP
             </AppText>
           </Stack>

@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, View } from "react-native";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import { AppText, Icon } from "../../../shared/ui";
-import { useReducedMotion } from "../../../shared/ui/useReducedMotion";
-import { useTheme } from "../../../shared/theme/ThemeProvider";
-import type { Achievement } from "../data/models";
-import { tierOf } from "../data/view";
-import { achievementIcon } from "./achievementIcons";
-import { useCategoryColor } from "./useCategoryColor";
-import { tint } from "./tint";
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { AppText, Icon } from '../../../shared/ui';
+import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import type { Achievement } from '../data/models';
+import { tierOf } from '../data/view';
+import { achievementIcon } from './achievementIcons';
+import { useCategoryColor } from './useCategoryColor';
+import { tint } from './tint';
+import { glow } from './glow';
 
 /** One tile of the achievement grid: icon, name, tier, lock and progress as the current app draws it. */
 export function AchievementBadge({
@@ -29,26 +30,29 @@ export function AchievementBadge({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${unlocked ? "unlocked" : "locked"}${isNew ? ", new" : ""}`}
+      accessibilityLabel={`${name}, ${unlocked ? 'unlocked' : 'locked'}${isNew ? ', new' : ''}`}
       onPress={() => onPress(achievement)}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       style={({ pressed }) => ({
+        ...(tier
+          ? glow(border, tier === 'gold' ? 12 : 8, tier === 'gold' ? 0.5 : 0.35)
+          : null),
         aspectRatio: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
         borderRadius: theme.radii.card,
-        borderWidth: tier === "gold" ? 2 : 1,
+        borderWidth: tier === 'gold' ? 2 : 1,
         borderColor: unlocked ? (tier ? border : color) : theme.colors.border,
         backgroundColor: unlocked ? tint(color, 0.12) : theme.colors.raised,
         padding: theme.spacing.sm,
         transform: [{ scale: pressed ? 0.95 : 1 }],
       })}
     >
-      {tier === "gold" && (
+      {tier === 'gold' && (
         <View
           style={{
-            position: "absolute",
+            position: 'absolute',
             top: theme.spacing.xs,
             left: theme.spacing.xs,
             borderRadius: theme.radii.small / 2,
@@ -71,7 +75,7 @@ export function AchievementBadge({
         numberOfLines={2}
         style={{
           color: unlocked ? color : theme.colors.muted,
-          textAlign: "center",
+          textAlign: 'center',
           marginTop: theme.spacing.xs,
         }}
       >
@@ -80,19 +84,19 @@ export function AchievementBadge({
       {!unlocked && (
         <View
           style={{
-            position: "absolute",
+            position: 'absolute',
             top: theme.spacing.xs,
             right: theme.spacing.xs,
             opacity: 0.4,
           }}
         >
-          <Icon name="lock" size={theme.sizes.iconCompact} tone="muted" />
+          <Icon name="lock" size={theme.spacing.sm + theme.spacing.xxs} tone="muted" />
         </View>
       )}
       {!unlocked && progress > 0 && (
         <View
           style={{
-            position: "absolute",
+            position: 'absolute',
             left: 0,
             right: 0,
             bottom: 0,
@@ -102,7 +106,7 @@ export function AchievementBadge({
         >
           <View
             style={{
-              height: "100%",
+              height: '100%',
               width: `${Math.round(progress * 100)}%`,
               backgroundColor: color,
             }}
@@ -137,7 +141,7 @@ function Shimmer({ width }: { width: number }) {
     <Animated.View
       pointerEvents="none"
       style={{
-        position: "absolute",
+        position: 'absolute',
         top: 0,
         bottom: 0,
         width,
