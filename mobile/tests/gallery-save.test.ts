@@ -36,19 +36,30 @@ test('a large label survives the base64 encoding intact', async () => {
   assert.deepEqual(Uint8Array.from(atob(calls[0].base64), (c) => c.charCodeAt(0)), big);
 });
 
-test('a failed save comes back as a reason, never a throw', async () => {
-  const failure = new Error('save failed: IOException: disk full');
+// The fake rejects the way MediaSaveModule.kt does: `promise.reject` with the current app's text,
+// which reaches JS unwrapped. (A thrown Kotlin exception would arrive as "Call to function
+// 'MediaSave.saveImage' has been rejected. → Caused by: …", which the sheet must never show.)
+function moduleRejection(message: string) {
+  return Object.assign(new Error(message), { code: 'ERR_MEDIA_SAVE' });
+}
+
+test('a failed save comes back as the current app\'s reason, never a throw', async () => {
+  const failure = moduleRejection('save failed: IOException: disk full');
   const { media } = fakeMedia({ saveImage: async () => Promise.reject(failure) });
   const outcome = await saveImageToGallery(media, png, 'x-label.png');
-  assert.deepEqual(outcome, { ok: false, reason: failure.message, error: failure });
+  assert.deepEqual(outcome, {
+    ok: false,
+    reason: 'save failed: IOException: disk full',
+    error: failure,
+  });
 });
 
 test('a refused write (no permission) is a stated failure, not a crash', async () => {
-  const denied = new Error('SecurityException: Permission denial');
+  const denied = moduleRejection('save failed: SecurityException: Permission denial');
   const { media } = fakeMedia({ saveImage: async () => Promise.reject(denied) });
   const outcome = await saveImageToGallery(media, png, 'x-label.png');
   assert.equal(outcome.ok, false);
-  assert.match(!outcome.ok ? outcome.reason : '', /Permission denial/);
+  assert.equal(!outcome.ok && outcome.reason, 'save failed: SecurityException: Permission denial');
 });
 
 test('below Android 10 nothing is written and no permission is sought', async () => {
@@ -77,10 +88,11 @@ test('the save asks for no permission on any save, first or later', () => {
   assert.doesNotMatch(kotlin, /requestPermissions|Manifest\.permission/);
   assert.match(kotlin, /"\$\{Environment\.DIRECTORY_PICTURES\}\/\$albumDir"/);
   assert.match(kotlin, /private val albumDir = "TrainingAI"/);
-  // The same album as the current app.
-  const reference = readFileSync(
-    '../android/app/src/main/java/com/trainingai/app/media/MediaSavePlugin.kt',
-    'utf8',
-  );
-  assert.match(reference, /private val albumDir = "TrainingAI"/);
+  // The same album and failure text as the current app's
+  // android/app/src/main/java/com/trainingai/app/media/MediaSavePlugin.kt (albumDir, and the
+  // "save failed: <exception>: <message>" reject). Inlined, not read: that folder goes at the
+  // switch-over.
+  assert.match(kotlin, /promise\.reject\(code, "save failed: \$\{e\.javaClass\.simpleName\}: \$\{e\.message\}", e\)/);
+  // Every rejection goes through the promise, never a throw, so JS gets the text unwrapped.
+  assert.doesNotMatch(kotlin.slice(kotlin.indexOf('AsyncFunction'), kotlin.indexOf('@RequiresApi')), /\bthrow\b/);
 });

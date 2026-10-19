@@ -8,6 +8,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Base64
 import androidx.annotation.RequiresApi
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -18,6 +19,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
 // for WRITE_EXTERNAL_STORAGE, as the current app does.
 class MediaSaveModule : Module() {
   private val albumDir = "TrainingAI"
+  private val code = "ERR_MEDIA_SAVE"
 
   private val context: Context
     get() = requireNotNull(appContext.reactContext) { "The app context is not available." }
@@ -27,20 +29,26 @@ class MediaSaveModule : Module() {
 
     Function("isAvailable") { Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q }
 
-    // `base64` is the raw payload with no data: prefix. Resolves with the content URI; rejects
-    // with the real reason, because the caller shows it.
-    AsyncFunction("saveImage") { base64: String, filename: String, mimeType: String ->
-      if (base64.isEmpty()) throw IllegalArgumentException("base64 required")
+    // `base64` is the raw payload with no data: prefix. Resolves with the content URI. Rejects
+    // through the promise rather than by throwing: a thrown exception reaches JS wrapped as
+    // "Call to function 'MediaSave.saveImage' has been rejected. → Caused by: …", and the sheet
+    // shows the reason verbatim, so it must be the current app's text (MediaSavePlugin.kt).
+    AsyncFunction("saveImage") { base64: String, filename: String, mimeType: String, promise: Promise ->
+      if (base64.isEmpty()) return@AsyncFunction promise.reject(code, "base64 required", null)
       val bytes = try {
         Base64.decode(base64, Base64.DEFAULT)
       } catch (e: IllegalArgumentException) {
-        throw IllegalArgumentException("base64 is not decodable: ${e.message}")
+        return@AsyncFunction promise.reject(code, "base64 is not decodable: ${e.message}", e)
       }
-      if (bytes.isEmpty()) throw IllegalArgumentException("base64 decoded to nothing")
+      if (bytes.isEmpty()) return@AsyncFunction promise.reject(code, "base64 decoded to nothing", null)
       if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-        throw IllegalStateException("saving to the gallery needs Android 10 or newer")
+        return@AsyncFunction promise.reject(code, "saving to the gallery needs Android 10 or newer", null)
       }
-      insertViaMediaStore(bytes, sanitiseFilename(filename), mimeType.ifEmpty { "image/png" }).toString()
+      try {
+        promise.resolve(insertViaMediaStore(bytes, sanitiseFilename(filename), mimeType.ifEmpty { "image/png" }).toString())
+      } catch (e: Exception) {
+        promise.reject(code, "save failed: ${e.javaClass.simpleName}: ${e.message}", e)
+      }
     }
   }
 

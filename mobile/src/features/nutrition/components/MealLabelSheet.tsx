@@ -70,12 +70,8 @@ export function MealLabelSheet({ meal, onClose }: { meal: SavedMeal; onClose: ()
       setError(null);
       setMessage(null);
     } catch (failure) {
-      setError(
-        failureNotice(
-          'Could not save the label image. Use Print/PDF, or retry in the latest build.',
-          failure,
-        ),
-      );
+      // The current app's share failure (`components/nutrition/meal-label-sheet.tsx`).
+      setError(failureNotice('Could not share the label', failure));
     } finally {
       setBusy(false);
     }
