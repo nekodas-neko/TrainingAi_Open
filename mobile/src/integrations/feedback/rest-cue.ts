@@ -1,30 +1,38 @@
 /**
- * The cue when a rest ends with the app open (#3084): one buzz, and one sound.
+ * The cue when a rest ends: one buzz and exactly one sound, wherever the app is (#3084, #3110).
  *
- * The current app beeps and buzzes at rest end whether or not notifications are allowed
- * (`components/workout-screen.tsx`, `playBeep()` + `hapticSuccess()`). Here the sound normally
- * comes from the rest notification's channel, which plays even in the foreground without showing
- * the banner. When that notification cannot sound (permission refused, no scheduler in the build,
- * or the schedule failed), the app plays its own beep instead, so a rest never ends silently and
- * never ends with two sounds.
+ * The current app beeps and buzzes at rest end whether or not notifications are allowed, and its
+ * beep is Web Audio on the media stream, so the ringer switch does not silence it
+ * (`components/workout-screen.tsx`, `playBeep()` + `hapticSuccess()`). Preview matches that by
+ * making its own beep the sound whenever the app is on screen:
+ *
+ * - **foreground**: the JS timer beeps and buzzes; the rest notification is told not to sound.
+ * - **pip**: JS timers are paused, so the native module, armed when the rest started, beeps and
+ *   buzzes; the notification, if any, is again silent.
+ * - **background**: nothing of the app is visible, so the notification channel is the sound, as
+ *   the current app's rest notification is. Without the permission there is none, also as there.
  */
-export type RestCueOutputs = { haptic(): void; beep(): void };
+export type RestVisibility = 'foreground' | 'pip' | 'background';
+export type RestSoundSource = 'app' | 'native' | 'channel' | 'none';
 
-/** Whether the rest notification will make the sound, so the app must not add its own. */
-export function notificationSoundsRest(permission: boolean, alertError: string | null) {
-  return permission && !alertError;
+export function restSoundSource(visibility: RestVisibility, permission: boolean): RestSoundSource {
+  if (visibility === 'foreground') return 'app';
+  if (visibility === 'pip') return 'native';
+  return permission ? 'channel' : 'none';
 }
 
+export type RestCueOutputs = { haptic(): void; beep(): void };
+
 /**
- * The timer and the notification listener can both report the same rest ending; the first one
- * cues it and the second is ignored.
+ * The foreground cue. The timer and the notification listener can both report the same rest
+ * ending; the first one cues it and the second is ignored.
  */
 export function createRestCue(outputs: RestCueOutputs) {
   let lastCue: string | null = null;
-  return (cueId: string, notificationSounds: boolean) => {
+  return (cueId: string) => {
     if (lastCue === cueId) return;
     lastCue = cueId;
     outputs.haptic();
-    if (!notificationSounds) outputs.beep();
+    outputs.beep();
   };
 }
