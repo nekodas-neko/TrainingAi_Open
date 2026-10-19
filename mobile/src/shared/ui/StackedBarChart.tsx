@@ -7,6 +7,7 @@ import {
   drawableTarget,
   guideSummary,
   includeTarget,
+  coverTicks,
   niceTicks,
   tickLabels,
   yPixel,
@@ -28,11 +29,18 @@ export function StackedBarChart({
   gridlines = false,
   yAxis = false,
   target: targetProp,
+  tickCount,
+  tickFormat,
+  height,
 }: {
   readable?: boolean;
   gridlines?: boolean;
   yAxis?: boolean;
   target?: ChartTarget;
+  /** About how many gridlines / y labels to aim for; 3 unless a chart asks for more. */
+  tickCount?: number;
+  tickFormat?: 'compact' | 'full';
+  height?: number;
   label: string;
   unit: string;
   bars: readonly {
@@ -47,10 +55,12 @@ export function StackedBarChart({
   );
   const target = drawableTarget(targetProp);
   const guides = gridlines || yAxis || target !== undefined;
-  const plotHeight = theme.sizes.chartHeight;
-  const top = guides ? includeTarget(0, maximum, target)[1] : maximum;
-  const ticks = gridlines || yAxis ? niceTicks(0, top) : [];
-  const tickTexts = tickLabels(ticks);
+  const plotHeight = height ?? theme.sizes.chartHeight;
+  const wanted = guides ? includeTarget(0, maximum, target)[1] : maximum;
+  const ticks =
+    gridlines || yAxis ? coverTicks(niceTicks(0, wanted, tickCount), wanted) : [];
+  const top = ticks.length ? Math.max(wanted, ticks[ticks.length - 1]) : wanted;
+  const tickTexts = tickLabels(ticks, tickFormat);
   const toY = (v: number) => yPixel(v, 0, top, plotHeight);
   const row = (
     <Stack

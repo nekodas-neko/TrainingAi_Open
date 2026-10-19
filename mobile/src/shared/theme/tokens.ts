@@ -48,6 +48,10 @@ export const sizes = {
   demonstration: 64,
   summaryWidth: 320,
   chartHeight: 96,
+  // week-metric-card.tsx: the tile's sparkline is h-10.
+  weekTileChart: 40,
+  // hr-day-chart.tsx and the cardio trend charts are h-40.
+  hrChartHeight: 160,
   miniChart: 48,
   metricValue: 48,
   compactMetricWidth: 104,
@@ -124,6 +128,13 @@ export const typography = {
   },
   statValue: { fontSize: 20, lineHeight: 28, fontWeight: '600' },
   statValueStrong: { fontSize: 24, lineHeight: 32, fontWeight: '700' },
+  // week-metric-card.tsx: text-xl font-bold value and a text-[11px] delta under it.
+  weekTileValue: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
+  weekTileDelta: { fontSize: 11, lineHeight: 16.5 },
+  // contributor-chart.tsx FactorBar: a text-[11px] leading-tight name and a text-[11px] font-semibold
+  // score or weight either side of the bar.
+  factorLabel: { fontSize: 11, lineHeight: 13.75 },
+  factorValue: { fontSize: 11, lineHeight: 16.5, fontWeight: '600' },
   statUnit: { fontSize: 9, lineHeight: 13.5 },
   micro: { fontSize: 10, lineHeight: 14, fontWeight: '600' },
   display: { fontSize: 48, lineHeight: 56, fontWeight: '800' },

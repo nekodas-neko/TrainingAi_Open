@@ -26,11 +26,30 @@ export function yPixel(value: number, min: number, max: number, height: number):
 }
 
 /**
- * Axis label text for a set of gridline values: decimals follow the tick step so labels never
- * repeat, and ticks that are all multiples of 100 and reach 1000 abbreviate ("12.5k") to stay short.
+ * Extend round gridline values upward until the last one reaches `top`. Chart.js, which draws the
+ * current app's bar charts, rounds the axis up to the next tick, so the tallest bar sits under a
+ * label ("6,000", not "4,000" with a bar poking past it).
  */
-export function tickLabels(ticks: readonly number[]): string[] {
+export function coverTicks(ticks: readonly number[], top: number): number[] {
+  if (ticks.length < 2) return [...ticks];
+  const step = ticks[1] - ticks[0];
+  const out = [...ticks];
+  let last = out[out.length - 1];
+  while (last < top - 1e-9) {
+    last = Math.round((last + step) * 1e6) / 1e6;
+    out.push(last);
+  }
+  return out;
+}
+
+/**
+ * Axis label text for a set of gridline values: decimals follow the tick step so labels never
+ * repeat, and ticks that are all multiples of 100 and reach 1000 abbreviate ("12.5k") to stay short
+ * unless `format` is 'full' ("6,000", as the current app's zone chart prints them).
+ */
+export function tickLabels(ticks: readonly number[], format: 'compact' | 'full' = 'compact'): string[] {
   const step = ticks.length > 1 ? Math.round(Math.abs(ticks[1] - ticks[0]) * 1e6) / 1e6 : 0;
+  if (format === 'full') return ticks.map((t) => t.toLocaleString('en-US', { maximumFractionDigits: 6 }));
   const compact = ticks.some((t) => Math.abs(t) >= 1000) && ticks.every((t) => t % 100 === 0);
   const decimals = step > 0 ? Math.max(0, -Math.floor(Math.log10(step) + 1e-9)) : 2;
   return ticks.map((t) =>
@@ -68,6 +87,20 @@ export function meetBox(width: number, height: number, vbWidth: number, vbHeight
   };
 }
 
+/**
+ * The viewBox height that makes a 320-wide viewBox exactly fill a `plotWidth` x `plotHeight` box, so
+ * the plot uses the whole height it is given instead of being letterboxed to 320:90 (the "short
+ * chart with empty space below" on a taller card). 90 until the box is measured.
+ */
+export function chartViewBoxHeight(plotWidth: number, plotHeight: number): number {
+  return plotWidth > 1 && plotHeight > 0 ? (320 * plotHeight) / plotWidth : 90;
+}
+
+/** Top and bottom margin inside that viewBox: 12 units, less on a very short sparkline. */
+export function chartPadY(vbHeight: number): number {
+  return Math.min(12, (vbHeight * 12) / 90);
+}
+
 /** True when `axisLabels` has one entry per point and some are blank: the caller has thinned the axis
  *  and each remaining label belongs under its own point, not spread across the row. */
 export function isPointAlignedAxis(labelCount: number, pointCount: number, labels: readonly string[]) {
@@ -84,17 +117,21 @@ export function pointCentreX(
   plotHeight: number,
   leftInset = 0,
 ) {
-  const box = meetBox(plotWidth, plotHeight, 320, 90);
+  const box = meetBox(plotWidth, plotHeight, 320, chartViewBoxHeight(plotWidth, plotHeight));
   const vb = xMin === xMax ? 160 : 12 + ((x - xMin) / (xMax - xMin)) * 296;
   return leftInset + box.offsetX + box.scale * vb;
 }
 
 /**
- * Which points of a line get a dot. 'all' dots every reading; 'isolated' dots only the latest one
+ * Which points of a line get a dot. 'none' draws no dots; 'all' dots every reading; 'isolated' dots only the latest one
  * and a reading with no neighbour either side (a line needs two points, so it would not show at
  * all), as the current app's sparklines do.
  */
-export function dotMask(values: readonly (number | null)[], mode: 'all' | 'isolated'): boolean[] {
+export function dotMask(
+  values: readonly (number | null)[],
+  mode: 'all' | 'isolated' | 'none',
+): boolean[] {
+  if (mode === 'none') return values.map(() => false);
   const standalone = standaloneOrLatest([...values]);
   return values.map((value, index) => value !== null && (mode === 'all' || standalone[index]));
 }

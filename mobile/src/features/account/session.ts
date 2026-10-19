@@ -41,6 +41,16 @@ export type AccountState = {
   expiresAt: number | null;
   message: string | null;
 };
+/**
+ * "Retry account check" is for a saved session whose account could not be read: no profile yet, or
+ * a check that failed and left a message. A signed-in account with its profile and no problem has
+ * nothing to retry, so the button would only be noise.
+ */
+export function canRetryAccountCheck(
+  state: Pick<AccountState, 'hasSession' | 'profile' | 'message'>,
+): boolean {
+  return state.hasSession && (state.profile === null || state.message !== null);
+}
 export type AuthPlatform = {
   client?: MobileClient;
   fetch?: typeof fetch;

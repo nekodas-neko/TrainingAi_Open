@@ -8,6 +8,7 @@ import {
   drawableTarget,
   guideSummary,
   includeTarget,
+  coverTicks,
   niceTicks,
   tickLabels,
   yPixel,
@@ -32,6 +33,8 @@ export function BarChart({
   gridlines = false,
   yAxis = false,
   target: targetProp,
+  tickCount,
+  tickFormat,
 }: {
   label: string;
   height?: number;
@@ -40,6 +43,9 @@ export function BarChart({
   gridlines?: boolean;
   yAxis?: boolean;
   target?: ChartTarget;
+  /** About how many gridlines / y labels to aim for; 3 unless a chart asks for more. */
+  tickCount?: number;
+  tickFormat?: 'compact' | 'full';
   bars: readonly {
     label: string;
     /** What a screen reader says for this bar when the visible label is not enough ("M" → "Monday"). */
@@ -57,9 +63,10 @@ export function BarChart({
   const guides = gridlines || yAxis || target !== undefined;
   const plotHeight = height ?? 64;
   const max = Math.max(1, ...bars.map((bar) => bar.value));
-  const top = guides ? includeTarget(0, max, target)[1] : max;
-  const ticks = gridlines || yAxis ? niceTicks(0, top) : [];
-  const tickTexts = tickLabels(ticks);
+  const wanted = guides ? includeTarget(0, max, target)[1] : max;
+  const ticks = gridlines || yAxis ? coverTicks(niceTicks(0, wanted, tickCount), wanted) : [];
+  const top = ticks.length ? Math.max(wanted, ticks[ticks.length - 1]) : wanted;
+  const tickTexts = tickLabels(ticks, tickFormat);
   const toY = (v: number) => yPixel(v, 0, top, plotHeight);
   const row = (
     <Stack

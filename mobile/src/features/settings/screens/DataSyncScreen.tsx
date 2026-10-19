@@ -78,8 +78,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="subheading">Restore from cloud</AppText>
             <AppText variant="caption" tone="muted">
-              Older history loads when opened. Your unsent changes and unfinished workouts
-              are kept.
+              Rebuild full history after a wipe / on a new device
             </AppText>
             <AppButton
               title="Restore from cloud"
@@ -104,7 +103,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="subheading">Import more history</AppText>
             <AppText variant="caption" tone="muted">
-              Pull older {deviceHealthName} data. Choose how far back to read
+              Pull older {deviceHealthName} data, {HISTORY_WINDOW_DAYS} days at a time
             </AppText>
             <Picker
               label="How far back to read"
@@ -140,7 +139,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="subheading">Export my data</AppText>
             <AppText variant="caption" tone="muted">
-              Download everything as a single file, and choose where to save it.
+              Download everything as a single file
             </AppText>
             <AppButton
               title="Export my data"

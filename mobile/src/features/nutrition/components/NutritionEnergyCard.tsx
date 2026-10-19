@@ -1,9 +1,5 @@
 import { useRecordedIntake } from '../data/useRecordedIntake';
-import {
-  balanceZone,
-  barProgress,
-  budgetProvenance,
-} from '@trainingai/shared/nutrition/calorie-balance';
+import { balanceZone, barProgress } from '@trainingai/shared/nutrition/calorie-balance';
 import { useState } from 'react';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
@@ -21,6 +17,7 @@ import {
 } from '../../../shared/ui';
 import { energySpec } from '../../health/data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
+import { balanceProvenance, budgetLine } from '../data/budget-line';
 import { useNutrition } from '../data/NutritionProvider';
 import { macroShares } from '@trainingai/shared/nutrition/macro-energy';
 export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: () => void }) {
@@ -43,21 +40,7 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
   const fraction = total && goal && goal > 0 ? Math.min(1, total.calories / goal) : 0;
   const scaled = data?.macroTargets;
   const targets = scaled?.scaled ?? n.view.targets;
-  const provenance =
-    b &&
-    b.restingBaseKcal != null &&
-    b.activeKcal != null &&
-    typeof b.targetNetKcal === 'number'
-      ? budgetProvenance({
-          restingBaseKcal: b.restingBaseKcal,
-          activeKcal: b.activeKcal,
-          targetNetKcal: b.targetNetKcal,
-          restingRateKcal: b.restingRateKcal,
-          deficitKcal: typeof b.deficitKcal === 'number' ? b.deficitKcal : null,
-          stepCreditKcal: typeof b.stepCreditKcal === 'number' ? b.stepCreditKcal : null,
-          ownTargetKcal: typeof b.ownTargetKcal === 'number' ? b.ownTargetKcal : null,
-        })
-      : null;
+  const provenance = balanceProvenance(b);
   // The band's own colour, always with its label beside it (colour is never the only signal).
   const zone =
     total && goal != null
@@ -161,13 +144,7 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
           <CalorieProgress intake={total?.calories ?? null} budget={goal} />
           {provenance && (
             <AppText variant="micro" tone="muted">
-              {provenance.ownTarget
-                ? `Your own target: ${provenance.total.toLocaleString()} kcal`
-                : provenance.chain
-                  ? provenance.chain.totalFloored
-                    ? `${provenance.total.toLocaleString()} minimum budget · never below your resting rate`
-                    : `${provenance.chain.rmr.toLocaleString()} resting rate − ${provenance.chain.deficit.toLocaleString()} goal + ${provenance.chain.dailyLiving.toLocaleString()} daily living + ${provenance.chain.movement.toLocaleString()} movement = ${provenance.total.toLocaleString()} kcal`
-                  : `${provenance.base.toLocaleString()} base + ${provenance.earned.toLocaleString()} movement = ${provenance.total.toLocaleString()} kcal`}
+              {budgetLine(provenance)}
             </AppText>
           )}
           {info && (

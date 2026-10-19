@@ -9,12 +9,15 @@ export function ProgressBar({
   origin = 'left',
   color,
   target,
+  height,
 }: {
   value: number;
   complete?: boolean;
   origin?: 'left' | 'right';
   color?: string;
   target?: number;
+  /** Track height; the standard bar when omitted. */
+  height?: number;
 }) {
   const { theme } = useTheme();
   const reduced = useReducedMotion();
@@ -39,7 +42,7 @@ export function ProgressBar({
         now: Math.round(fraction * 100),
       }}
       style={{
-        height: theme.spacing.sm,
+        height: height ?? theme.spacing.sm,
         borderRadius: theme.radii.pill,
         backgroundColor: theme.colors.track,
         overflow: 'hidden',

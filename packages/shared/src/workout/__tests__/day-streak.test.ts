@@ -4,7 +4,7 @@
 // (sessions). On the owner's real history those read 111 and 83 for the same input, and the 49
 // was the session count at BF-122a's rotation gap of 1.
 import { describe, it, expect } from 'vitest'
-import { computeDayStreak, streakRestGapFor, DEFAULT_MAX_REST_GAP } from '../day-streak'
+import { computeDayStreak, streakRestGapFor, streakRestNotice, DEFAULT_MAX_REST_GAP } from '../day-streak'
 
 // A fixed January day as a plain string. Deliberately not built from a `Date` — the UTC-slicing
 // rule bans that shape everywhere, and a fixture has no need of a clock: both sides of every
@@ -96,5 +96,30 @@ describe('streakRestGapFor', () => {
 
   it('gives an unscheduled user the promise rather than the old 1', () => {
     expect(streakRestGapFor(null)).toBe(DEFAULT_MAX_REST_GAP)
+  })
+})
+
+// Home's rest-day strip. Both apps print it, so the wording and the three states live in one place.
+describe('streakRestNotice', () => {
+  it('says nothing before the first rest day, or when the program reports no count', () => {
+    expect(streakRestNotice(undefined)).toBeNull()
+    expect(streakRestNotice({})).toBeNull()
+    expect(streakRestNotice({ consecutiveRestDays: 0 })).toBeNull()
+  })
+
+  it('reads safe on the first rest day, then warns, then says the streak breaks', () => {
+    expect(streakRestNotice({ consecutiveRestDays: 1 })).toEqual({
+      kind: 'safe', text: 'Day 1 of 2 rest days — streak safe',
+    })
+    expect(streakRestNotice({ consecutiveRestDays: 2, streakWarning: true })).toEqual({
+      kind: 'warning', text: 'Rest again tomorrow and your streak breaks',
+    })
+    expect(streakRestNotice({ consecutiveRestDays: 3, streakBroken: true })).toEqual({
+      kind: 'broken', text: 'Resting today breaks your streak',
+    })
+  })
+
+  it('lets a broken streak win over a warning', () => {
+    expect(streakRestNotice({ consecutiveRestDays: 3, streakWarning: true, streakBroken: true })?.kind).toBe('broken')
   })
 })

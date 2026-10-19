@@ -8,6 +8,7 @@ import {
 } from '../../../shared/ui';
 import { useState } from 'react';
 import { useAccountContext } from '../AccountProvider';
+import { canRetryAccountCheck } from '../session';
 import { SignOutSheet } from '../../settings/components/SignOutSheet';
 
 export function AccountPanel() {
@@ -107,22 +108,18 @@ export function AccountPanel() {
               }}
             />
           )}
+          {canRetryAccountCheck(account.state) && (
+            <AppButton
+              title="Retry account check"
+              variant="secondary"
+              disabled={account.state.status === 'checking'}
+              onPress={() => {
+                void account.retry();
+              }}
+            />
+          )}
           {account.state.hasSession && (
-            <>
-              <AppButton
-                title="Retry account check"
-                variant="secondary"
-                disabled={account.state.status === 'checking'}
-                onPress={() => {
-                  void account.retry();
-                }}
-              />
-              <AppButton
-                title="Sign out"
-                variant="danger"
-                onPress={() => setSigningOut(true)}
-              />
-            </>
+            <AppButton title="Sign out" variant="danger" onPress={() => setSigningOut(true)} />
           )}
           <AppText variant="caption" tone="muted">
             Manage health-data syncing separately in More → {deviceHealthName}.

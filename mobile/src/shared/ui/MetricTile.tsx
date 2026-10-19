@@ -46,7 +46,14 @@ export function MetricTile({
           backgroundColor: `${theme.colors.background}66`,
         }}
       >
-        <AppText variant="statLabel" tone="muted" style={{ textAlign: 'center' }}>
+        <AppText
+          variant="statLabel"
+          tone="muted"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={{ textAlign: 'center' }}
+        >
           {label}
         </AppText>
         <AppText

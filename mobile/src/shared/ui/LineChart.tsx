@@ -12,6 +12,8 @@ import {
   lastReadingIndex,
   lineSegments,
   isPointAlignedAxis,
+  chartPadY,
+  chartViewBoxHeight,
   type GapMode,
   meetBox,
   pointCentreX,
@@ -51,6 +53,8 @@ export function LineChart({
   yAxis = false,
   target: targetProp,
   dots = 'all',
+  tickCount,
+  dotRadius = 3,
   gaps = 'break',
   compactAxisLabels = false,
 }: {
@@ -79,7 +83,11 @@ export function LineChart({
   gridlines?: boolean;
   yAxis?: boolean;
   target?: ChartTarget;
-  dots?: 'all' | 'isolated';
+  dots?: 'all' | 'isolated' | 'none';
+  /** About how many gridlines / y labels to aim for; 3 unless a chart asks for more. */
+  tickCount?: number;
+  /** Radius of a reading's dot in viewBox units; the newest reading of a connected line is larger. */
+  dotRadius?: number;
   /** 'break' (default) leaves a gap where a day has no reading; 'connect' draws the line across it. */
   gaps?: GapMode;
   compactAxisLabels?: boolean;
@@ -129,16 +137,25 @@ export function LineChart({
   const xs = points.map((point, index) => point.x ?? index);
   const xMin = xDomain?.[0] ?? Math.min(...xs);
   const xMax = xDomain?.[1] ?? Math.max(...xs);
+  // The plot sits right of the y-axis column; overlays are absolute so the Svg and the touch
+  // responder below keep their existing layout (locationX is relative to the root View).
+  const ticksWanted = gridlines || yAxis;
+  const ticks0 = ticksWanted ? niceTicks(min, max, tickCount) : [];
+  const tickTexts = tickLabels(ticks0);
+  const leftInset = yAxis ? yAxisColumnWidth(tickTexts) : 0;
+  const plotWidth = Math.max(1, width - leftInset);
+  // The viewBox is as tall as the box, so a taller chart fills it instead of being letterboxed.
+  const vbHeight = chartViewBoxHeight(plotWidth, plotHeight);
+  const padY = chartPadY(vbHeight);
   const xx = (x: number) => (xMin === xMax ? 160 : 12 + ((x - xMin) / (xMax - xMin)) * 296);
   const yy = (v: number, bounds: readonly [number, number] = [min, max]) =>
-    bounds[0] === bounds[1] ? 45 : 78 - ((v - bounds[0]) / (bounds[1] - bounds[0])) * 66;
+    bounds[0] === bounds[1]
+      ? vbHeight / 2
+      : vbHeight - padY - ((v - bounds[0]) / (bounds[1] - bounds[0])) * (vbHeight - 2 * padY);
   const coords = points.map((point, index) =>
     point.value === null || !Number.isFinite(point.value)
       ? null
-      : {
-          x: xMin === xMax ? 160 : 12 + ((xs[index] - xMin) / (xMax - xMin)) * 296,
-          y: max === min ? 45 : 78 - ((point.value - min) / (max - min)) * 66,
-        },
+      : { x: xx(xs[index]), y: yy(point.value) },
   );
   const segments = lineSegments(coords, gaps);
   const color = accent ?? theme.tones[tone].foreground;
@@ -146,14 +163,9 @@ export function LineChart({
   const showDot = dotMask(readings, dots);
   // A connected line has no gaps to explain, so its newest reading is the one dot made larger.
   const endIndex = gaps === 'connect' ? lastReadingIndex(readings) : -1;
-  const ticks = gridlines || yAxis ? niceTicks(min, max) : [];
-  const tickTexts = tickLabels(ticks);
-  // The plot sits right of the y-axis column; overlays are absolute so the Svg and the touch
-  // responder below keep their existing layout (locationX is relative to the root View).
-  const leftInset = yAxis ? yAxisColumnWidth(tickTexts) : 0;
-  const plotWidth = Math.max(1, width - leftInset);
+  const ticks = ticks0;
   // Pixel y of a value on the main scale, matching how the Svg is fitted into its box.
-  const box = meetBox(plotWidth, plotHeight, 320, 90);
+  const box = meetBox(plotWidth, plotHeight, 320, vbHeight);
   const toY = (v: number) => box.offsetY + box.scale * yy(v);
   return (
     <View
@@ -185,7 +197,7 @@ export function LineChart({
         <View style={{ height: plotHeight }} />
       ) : (
         <Svg
-          viewBox="0 0 320 90"
+          viewBox={`0 0 320 ${vbHeight}`}
           width={yAxis ? plotWidth : '100%'}
           height={plotHeight}
           style={leftInset ? { marginLeft: leftInset } : undefined}
@@ -197,7 +209,7 @@ export function LineChart({
               x={xx(Math.max(xMin, band.from))}
               y={0}
               width={Math.max(0, xx(Math.min(xMax, band.to)) - xx(Math.max(xMin, band.from)))}
-              height={90}
+              height={vbHeight}
               fill={band.color}
               opacity={0.15}
             />
@@ -208,7 +220,7 @@ export function LineChart({
               x1={xx(marker.x)}
               x2={xx(marker.x)}
               y1={0}
-              y2={90}
+              y2={vbHeight}
               stroke={marker.color}
               strokeDasharray="3 3"
             />
@@ -241,7 +253,7 @@ export function LineChart({
               fill ? (
                 <Polygon
                   key={'fill' + index}
-                  points={`${segment[0].x},90 ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},90`}
+                  points={`${segment[0].x},${vbHeight} ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},${vbHeight}`}
                   fill={fillColor ?? theme.tones[tone].background}
                 />
               ) : null,
@@ -264,7 +276,7 @@ export function LineChart({
                   key={index}
                   cx={point.x}
                   cy={point.y}
-                  r={index === endIndex ? 4.5 : 3}
+                  r={index === endIndex ? dotRadius * 1.5 : dotRadius}
                   fill={color}
                 />,
           )}

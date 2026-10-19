@@ -43,7 +43,7 @@ export function CardioTrends() {
         ]}
       />
       <StableContent
-        minHeight={theme.sizes.chartHeight + theme.sizes.touchTarget}
+        minHeight={theme.sizes.hrChartHeight + theme.sizes.touchTarget}
         loading={!data && state.loading}
       >
         {!data ? (
@@ -65,6 +65,9 @@ export function CardioTrends() {
               unit="min"
               gridlines
               yAxis
+              height={theme.sizes.hrChartHeight}
+              tickCount={4}
+              tickFormat="full"
               bars={data.weeklyZoneStacks.map((week) => ({
                 label: week.weekStart.slice(5),
                 segments: week.seconds.map((sec, index) => ({
@@ -87,6 +90,8 @@ export function CardioTrends() {
                 readable
                 gridlines
                 yAxis
+                height={theme.sizes.hrChartHeight}
+                tickCount={4}
                 fill
                 color={theme.tones.heart.foreground}
                 series={[
@@ -117,6 +122,8 @@ export function CardioTrends() {
             readable
             gridlines
             yAxis
+            height={theme.sizes.hrChartHeight}
+            tickCount={4}
             fill
           />
         ) : (
