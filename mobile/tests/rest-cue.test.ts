@@ -52,20 +52,22 @@ test('the channel the allowed path relies on does sound in the foreground', () =
   assert.match(src, /shouldPlaySound: notification\.request\.content\.data\?\.owner === ALERT_OWNER/);
 });
 
-// The current app's components/workout/beep.ts: an 880 Hz sine, gain 0.4 ramping to 0.001 over
-// 400 ms. Inlined rather than read, because the web app's folder goes at the switch-over.
-test('the beep is the current app\'s: 880 Hz, 400 ms, fading from 0.4', () => {
-  const wav = readFileSync('assets/sounds/rest-beep.wav');
-  assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
-  const rate = wav.readUInt32LE(24);
-  const samples = (wav.length - 44) / 2;
-  assert.equal(samples / rate, 0.4);
-  const at = (i: number) => wav.readInt16LE(44 + i * 2) / 32767;
-  // Zero crossings upward per second ≈ the frequency.
-  let ups = 0;
-  for (let i = 1; i < samples; i++) if (at(i - 1) < 0 && at(i) >= 0) ups++;
-  assert.ok(Math.abs(ups / 0.4 - 880) <= 5, `${ups / 0.4} Hz`);
-  let peak = 0;
-  for (let i = 0; i < rate * 0.01; i++) peak = Math.max(peak, Math.abs(at(i)));
-  assert.ok(Math.abs(peak - 0.4) < 0.01, `peak ${peak}`);
+// The current app's components/workout/beep.ts: an 880 Hz sine, gain 0.4 ramping exponentially to
+// 0.001 over 400 ms. Inlined rather than read, because the web app's folder goes at the switch-over.
+test('the native beep is the current app\'s tone, on the media stream', () => {
+  const kotlin = readFileSync(
+    'modules/rest-beep/android/src/main/java/expo/modules/restbeep/RestBeepModule.kt',
+    'utf8',
+  );
+  assert.match(kotlin, /private val seconds = 0\.4\b/);
+  assert.match(kotlin, /private val frequency = 880\.0\b/);
+  assert.match(kotlin, /private val startGain = 0\.4\b/);
+  assert.match(kotlin, /private val endGain = 0\.001\b/);
+  assert.match(kotlin, /\(endGain \/ startGain\)\.pow\(t \/ seconds\)/);
+  // Media stream, no audio focus: music keeps playing, as under the WebView's Web Audio beep.
+  assert.match(kotlin, /USAGE_MEDIA/);
+  assert.doesNotMatch(kotlin, /requestAudioFocus/);
+  // No permission and no dependency: the module declares nothing.
+  const manifest = readFileSync('modules/rest-beep/android/src/main/AndroidManifest.xml', 'utf8');
+  assert.doesNotMatch(manifest, /uses-permission/);
 });
