@@ -272,7 +272,7 @@ describe('computeWalkSegmentStats — steps per segment', () => {
 describe('computeWalkSegmentStats — a near-stationary segment (#3128)', () => {
   // Local midday, clear of any date boundary.
   const t0 = Date.parse('2026-10-12T12:00:00+10:00')
-  const warmPlan = buildIntervalPlan({ sets: 1, fastSec: 180, slowSec: 180, warmupSec: 120, cooldownSec: 0 })
+  const warmPlan = buildIntervalPlan({ sets: 1, fastSec: 180, slowSec: 180, warmupSec: 120, cooldownSec: 0, treadmill: false })
   const north = (m: number, sec: number): RoutePoint => ({ lat: -27.47 + m / 111_195, lng: 153.02, t: t0 + sec * 1000 })
   // 20 m over the 120 s warm-up, then 1.4 m/s through the slow and fast blocks.
   const rawPoints: RoutePoint[] = [
