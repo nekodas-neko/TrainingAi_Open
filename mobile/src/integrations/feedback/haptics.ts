@@ -8,9 +8,9 @@ const restCue = createRestCue({
   haptic: () => feedback('success', true),
   beep: () => void import('./beep').then((m) => m.playBeep()).catch(() => {}),
 });
-/** `notificationSounds`: the rest notification plays the sound, so no in-app beep (#3084). */
-export function restFeedback(cueId: string, notificationSounds = true) {
-  restCue(cueId, notificationSounds);
+/** The foreground rest-end cue: one buzz and the in-app beep (#3110). */
+export function restFeedback(cueId: string) {
+  restCue(cueId);
 }
 export function feedback(
   kind: 'selection' | 'success' | 'impact' = 'selection',
