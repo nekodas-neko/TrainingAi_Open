@@ -5,6 +5,7 @@ import type { AccountConnection } from '../../account/session.ts';
 import { ApiError, aiFailureText } from '../../account/api/client.ts';
 import { overlayHistory, type HistoryOperation } from './HistoryOutbox.ts';
 import { TrainingStore } from './TrainingStore.ts';
+import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 
 export type ResourceSpec<T> = {
   path: string;
@@ -184,13 +185,16 @@ export class WorkoutResources {
     const revision = entry.revision;
     try {
       await this.changes.initialize();
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
         this.publish(entry, {
           ...entry.state,
           loading: false,
           refreshing: false,
-          error: 'Could not open saved training changes. Existing changes have been preserved.',
+          error: failureNotice(
+            'Could not open saved training changes. Existing changes have been preserved.',
+            failure,
+          ),
         });
       }
       return;
@@ -211,7 +215,9 @@ export class WorkoutResources {
     try {
       await this.invalidationWrites;
       cacheEpoch = Number(await this.storage.get('workout-resource-epoch.v1')) || 0;
-    } catch {}
+    } catch (failure) {
+      reportError(failure);
+    }
     if (generation !== this.generation) {
       return;
     }
@@ -246,7 +252,9 @@ export class WorkoutResources {
             });
           }
         }
-      } catch {}
+      } catch (failure) {
+        reportError(failure, { apiPath: entry.spec.path });
+      }
       if (generation !== this.generation) {
         return;
       }
@@ -290,8 +298,8 @@ export class WorkoutResources {
             }),
           );
         }
-      } catch {
-        error = 'Loaded, but could not save this view for offline use.';
+      } catch (failure) {
+        error = failureNotice('Loaded, but could not save this view for offline use.', failure);
       }
       if (generation !== this.generation) {
         return;
@@ -331,9 +339,13 @@ export class WorkoutResources {
           ? 'Check your account to access this view.'
           : aiFailureText(
               error,
-              entry.state.data
-                ? 'Could not update this view. Showing saved data.'
-                : 'Could not load this view. Check your connection and retry.',
+              failureNotice(
+                entry.state.data
+                  ? 'Could not update this view. Showing saved data.'
+                  : 'Could not load this view. Check your connection and retry.',
+                error,
+                { apiPath: entry.spec.path },
+              ),
             ),
       });
     }
@@ -535,7 +547,9 @@ export class WorkoutResources {
     let cached: string | null = null;
     try {
       cached = await this.storage.get(key);
-    } catch {}
+    } catch (failure) {
+      reportError(failure);
+    }
     if (generation !== this.generation) {
       throw new Error('The account changed.');
     }
@@ -551,7 +565,9 @@ export class WorkoutResources {
     }
     try {
       await this.storage.set(key, data);
-    } catch {}
+    } catch (failure) {
+      reportError(failure);
+    }
     return data;
   }
   cancel() {

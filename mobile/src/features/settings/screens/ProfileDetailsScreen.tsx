@@ -21,6 +21,7 @@ import { profileSpec, metricValue, bodyOverviewSpec } from '../../health/data/mo
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { ProfileOverview } from '../components/ProfileOverview';
 import { fillFromServer, profileFieldValue, profilePatch, timezoneOptions } from '../data/profile';
+import { failureNotice } from '../../../core/reporting/index.ts';
 // Name, birth year, height, sex and timezone are what the current app's Edit profile sheet and
 // Profile details hold. Activity level and Fitness goal are on the Goals screen there, and here.
 const FIELD_KEYS = ['displayName', 'heightCm', 'birthYear', 'sex', 'timezone'];
@@ -152,9 +153,12 @@ function ProfileDetailsForm({
       draft.setValue(next);
       setSaved(!next.dirty.length);
       if ('timezone' in body) await account.retry();
-    } catch {
+    } catch (failure) {
       setError(
-        'Could not save your profile. Your edits are saved on this phone; retry when connected.',
+        failureNotice(
+          'Could not save your profile. Your edits are saved on this phone; retry when connected.',
+          failure,
+        ),
       );
     } finally {
       setSaving((x) => Math.max(0, x - 1));

@@ -11,6 +11,7 @@ import {
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import type { HealthConnectReader } from '../../../integrations/health-connect/types.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const completedSchema = z.object({
   measurements: z.number(),
   nights: z.number(),
@@ -140,9 +141,14 @@ export class HealthConnectImportStore {
           this.disk = saved;
         }
         if (!this.canceled) this.publish({ ready: true });
-      } catch {
+      } catch (failure) {
         if (!this.canceled)
-          this.publish({ error: 'Could not open saved Health Connect imports.' });
+          this.publish({
+            error: failureNotice(
+              'Could not open saved Health Connect imports.',
+              failure,
+            ),
+          });
       }
     })();
     return this.initializing;
@@ -275,7 +281,12 @@ export class HealthConnectImportStore {
         }
         if (!('rebuild' in item)) throw error;
         await this.write({ ...this.disk, queue: [...this.disk.queue.slice(1), item] });
-        this.publish({ error: 'Health records are saved. Summaries need another sync.' });
+        this.publish({
+          error: failureNotice(
+            'Health records are saved. Summaries need another sync.',
+            error,
+          ),
+        });
         continue;
       }
       if (this.canceled) return;

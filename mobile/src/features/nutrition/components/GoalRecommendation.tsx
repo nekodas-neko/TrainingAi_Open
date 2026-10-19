@@ -15,6 +15,7 @@ import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { goalReviewError } from '../data/goal-recommendation-error';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const recSchema = z.object({
   id: z.string(),
   current: z
@@ -237,8 +238,8 @@ export function GoalRecommendation({
                   );
                   await resources!.clearDraft('nutrition-goal-recommendation');
                   onClose();
-                } catch {
-                  setError('Could not dismiss this review.');
+                } catch (failure) {
+                  setError(failureNotice('Could not dismiss this review.', failure));
                 }
               }}
             />

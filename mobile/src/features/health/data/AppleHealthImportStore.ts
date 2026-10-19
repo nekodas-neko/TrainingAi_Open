@@ -9,6 +9,7 @@ import {
 } from '@trainingai/shared/validation/apple-health-import';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage';
 import type { AccountConnection } from '../../account/session';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const resultSchema = z.object({
   measurements: z.number(),
   nights: z.number(),
@@ -130,9 +131,9 @@ export class AppleHealthImportStore {
         if (!this.canceled) {
           this.publish({ ready: true });
         }
-      } catch {
+      } catch (failure) {
         if (!this.canceled) {
-          this.publish({ error: 'Could not open saved health imports.' });
+          this.publish({ error: failureNotice('Could not open saved health imports.', failure) });
         }
       }
     })();
@@ -214,7 +215,12 @@ export class AppleHealthImportStore {
               }
               if (!('rebuild' in item)) throw error;
               await this.write({ ...this.disk, queue: [...this.disk.queue.slice(1), item] });
-              this.publish({ error: 'Health records are saved. Summaries need another sync.' });
+              this.publish({
+                error: failureNotice(
+                  'Health records are saved. Summaries need another sync.',
+                  error,
+                ),
+              });
               continue;
             }
             if (this.canceled) return;
@@ -314,11 +320,14 @@ export class AppleHealthImportStore {
             });
           }
         }
-      } catch {
+      } catch (failure) {
         if (!this.canceled) {
           this.publish({
             error:
-              'Could not sync Apple Health with your account. Saved records are kept for retry.',
+              failureNotice(
+                'Could not sync Apple Health with your account. Saved records are kept for retry.',
+                failure,
+              ),
           });
         }
       } finally {

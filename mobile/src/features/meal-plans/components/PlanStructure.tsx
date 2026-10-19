@@ -14,6 +14,7 @@ import {
 import type { MealPlan } from '../../nutrition/data/models';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const schema = z.object({
   mealCount: z.string(),
   trainingTime: z.string(),
@@ -82,8 +83,10 @@ export function PlanStructure({
               );
               await resources!.clearDraft('plan-structure:' + plan.id);
               onSaved();
-            } catch {
-              setError('Could not save the structure. Your edits are preserved.');
+            } catch (failure) {
+              setError(
+                failureNotice('Could not save the structure. Your edits are preserved.', failure),
+              );
             } finally {
               setBusy(false);
             }

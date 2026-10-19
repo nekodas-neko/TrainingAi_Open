@@ -14,6 +14,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWeather } from '../WeatherProvider';
 import { searchCities } from '../data/open-meteo';
 import { isWeatherDay, temperatureLabel, type WeatherPlace } from '../data/models';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 export function WeatherSettings() {
   const { theme } = useTheme();
@@ -41,9 +42,9 @@ export function WeatherSettings() {
       if (id !== searchId.current || !mounted.current) return;
       setResults(places);
       if (!places.length) setMessage('No matches. Try a city or suburb name.');
-    } catch {
+    } catch (failure) {
       if (id === searchId.current && mounted.current)
-        setMessage('Could not search cities. Please retry.');
+        setMessage(failureNotice('Could not search cities. Please retry.', failure));
     } finally {
       if (id === searchId.current && mounted.current) setSearching(false);
     }

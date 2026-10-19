@@ -18,6 +18,7 @@ import {
   widgetLabels,
   scoreStyles,
 } from '../data/models';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 export function HomeLayoutSheet({ onClose }: { onClose: () => void }) {
   const home = useHome();
@@ -35,8 +36,8 @@ export function HomeLayoutSheet({ onClose }: { onClose: () => void }) {
     try {
       await home.store.savePreferences(patch);
       return true;
-    } catch {
-      setError('Could not save your Home layout on this phone. Try again.');
+    } catch (failure) {
+      setError(failureNotice('Could not save your Home layout on this phone. Try again.', failure));
       return false;
     } finally {
       setBusy(false);
