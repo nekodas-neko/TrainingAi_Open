@@ -47,6 +47,8 @@ import { HealthWeekScreen } from '../features/health/screens/HealthWeekScreen';
 import { DataSyncScreen } from '../features/settings/screens/DataSyncScreen';
 import { AccountScreen } from '../features/settings/screens/AccountScreen';
 import { AboutScreen } from '../features/settings/screens/AboutScreen';
+import { WorkoutPipOverlay } from '../features/workouts/pip/WorkoutPipView';
+import { usePipMode } from '../features/workouts/pip/usePictureInPicture';
 import { OuraScreen, takeInitialOuraReturn } from '../features/devices/screens/OuraScreen';
 import { YearReviewScreen } from '../features/settings/screens/YearReviewScreen';
 
@@ -65,6 +67,8 @@ installErrorReporting();
 
 function AppShell() {
   const health = useHealthContext();
+  // Drawn over the shell rather than instead of it, so leaving the window restores the screen.
+  const pip = usePipMode();
   const { dataReader } = useAccountContext();
   const accountKey = JSON.stringify([dataReader?.origin, dataReader?.userId]);
   const { theme } = useTheme();
@@ -536,6 +540,7 @@ function AppShell() {
         }}
       />
       {!fullScreen && <TabBar selected={tab} onSelect={selectTab} />}
+      {pip && <WorkoutPipOverlay />}
     </SafeAreaView>
   );
 }

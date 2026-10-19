@@ -53,6 +53,7 @@
       "expo-apple-authentication",
       "./src/integrations/auth/private-backups.cjs",
       "./src/integrations/oura/oura-package-visibility.cjs",
+      "./src/integrations/pip/picture-in-picture.cjs",
       "expo-sqlite",
       [
         "react-native-ble-plx",

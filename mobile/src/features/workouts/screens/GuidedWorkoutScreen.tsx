@@ -25,6 +25,7 @@ import { recordedSets, type WorkoutRecord } from '../logging/workout';
 import { SetEntry, SetActions } from '../components/SetEntry';
 import { RestCard } from '../components/WorkoutClocks';
 import { LiveHrCard } from '../components/LiveHrCard';
+import { useWorkoutPip } from '../pip/usePictureInPicture';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { hrProfileSpec } from '../../health/data/models';
 import { WorkoutSaveNotice } from '../components/WorkoutSaveNotice';
@@ -61,6 +62,7 @@ export function GuidedWorkoutScreen({
 }) {
   const journal = useWorkoutJournal();
   const controller = journal.controller!;
+  useWorkoutPip(workout, controller);
   const { theme } = useTheme();
   // Read once for the screen, not per rest, as the current app does for its Live HR card (RV-64).
   const hrProfile = useWorkoutResource(hrProfileSpec).data;
