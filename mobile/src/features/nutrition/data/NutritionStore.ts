@@ -1,5 +1,6 @@
 import { dateStrMidnightInTz, toAestDay } from '@trainingai/shared/date-utils';
 import { RetryLater } from '../../../core/sync/HistoryDownload.ts';
+import { NutritionPersistence } from './nutrition-persistence.ts';
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at';
 import {
   mealLoggingStatus,
@@ -228,7 +229,6 @@ export const emptyNutrition: NutritionState = {
   denied: false,
   http: [],
 };
-const storageKey = 'nutrition-records.v1';
 function matches(row: unknown, expected: Record<string, unknown>) {
   if (!row || typeof row !== 'object') {
     return false;
@@ -391,6 +391,7 @@ export class NutritionStore {
   private flushing: Promise<void> | null = null;
   private requests = new Map<string, Promise<boolean | undefined>>();
   private failures = new Map<string, unknown>();
+  private persistence: NutritionPersistence;
   private policies = new Map<string, RefreshPolicy>();
   private generation = 0;
   private revision = 0;
@@ -402,7 +403,9 @@ export class NutritionStore {
     private uuid: () => string,
     private changed = () => {},
     private now = Date.now,
-  ) {}
+  ) {
+    this.persistence = new NutritionPersistence(storage);
+  }
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
     return () => {
@@ -421,13 +424,16 @@ export class NutritionStore {
     const generation = this.generation;
     this.initializing = (async () => {
       try {
-        const raw = await this.storage.get(storageKey);
-        const frame = raw ? savedSchema.parse(JSON.parse(raw)) : null;
+        const raw = await this.persistence.read();
+        const frame = raw ? savedSchema.parse(raw) : null;
         if (
           frame &&
           (frame.origin !== this.connection.origin || frame.userId !== this.connection.userId)
         ) {
           throw new Error('Wrong account.');
+        }
+        if (frame) {
+          await this.persistence.opened(frame);
         }
         if (generation === this.generation) {
           this.publish({ ...frame, ready: true });
@@ -455,15 +461,16 @@ export class NutritionStore {
       const patch = change(this.current);
       const next = { ...this.current, ...patch };
       const denialRevision = this.denialRevision;
-      await this.storage.set(
-        storageKey,
-        JSON.stringify({
-          ...next,
-          version: 1,
-          origin: this.connection.origin,
-          userId: this.connection.userId,
-        }),
-      );
+      await this.persistence.write({
+        version: 1,
+        origin: this.connection.origin,
+        userId: this.connection.userId,
+        data: next.data,
+        operations: next.operations,
+        loaded: next.loaded,
+        savedAt: next.savedAt,
+        http: next.http,
+      });
       if (generation === this.generation) {
         this.publish({
           ...patch,

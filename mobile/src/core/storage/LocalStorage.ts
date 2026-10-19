@@ -4,6 +4,8 @@ export type ScopedStorage = {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
   remove(key: string): Promise<void>;
+  // Writes (or, for null, removes) every entry in one transaction: all of them land or none do.
+  setMany?(entries: [key: string, value: string | null][]): Promise<void>;
 };
 
 function accountScope(origin: string, accountId: string) {
@@ -78,6 +80,31 @@ export class LocalStorage {
             scope,
             key,
           );
+        }),
+      setMany: (entries) =>
+        this.run(async () => {
+          await this.database.execAsync('BEGIN IMMEDIATE');
+          try {
+            for (const [key, value] of entries) {
+              await (value === null
+                ? this.database.runAsync(
+                    'DELETE FROM local_values WHERE scope = ? AND key = ?',
+                    scope,
+                    key,
+                  )
+                : this.database.runAsync(
+                    `INSERT INTO local_values (scope, key, value) VALUES (?, ?, ?)
+           ON CONFLICT (scope, key) DO UPDATE SET value = excluded.value`,
+                    scope,
+                    key,
+                    value,
+                  ));
+            }
+            await this.database.execAsync('COMMIT');
+          } catch (error) {
+            await this.database.execAsync('ROLLBACK');
+            throw error;
+          }
         }),
     };
   }
