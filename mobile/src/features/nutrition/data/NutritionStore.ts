@@ -1,6 +1,6 @@
-import { dateStrMidnightInTz, toAestDay } from '@trainingai/shared/date-utils';
+import { dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils';
 import { RetryLater } from '../../../core/sync/HistoryDownload.ts';
-import { NutritionPersistence } from './nutrition-persistence.ts';
+import { NUTRITION_DAYS_KEPT, NutritionPersistence } from './nutrition-persistence.ts';
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at';
 import {
   mealLoggingStatus,
@@ -404,7 +404,15 @@ export class NutritionStore {
     private changed = () => {},
     private now = Date.now,
   ) {
-    this.persistence = new NutritionPersistence(storage);
+    this.persistence = new NutritionPersistence(storage, () =>
+      shiftDateStr(
+        toAestDay(
+          new Date(this.now()),
+          this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+        ),
+        -(NUTRITION_DAYS_KEPT - 1),
+      ),
+    );
   }
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);

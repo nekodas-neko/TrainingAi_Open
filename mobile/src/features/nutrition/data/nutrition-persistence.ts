@@ -20,6 +20,10 @@ const libraryKey = 'nutrition-library.v1';
 const dayKey = (date: string) => `nutrition-day.v2:${date}`;
 const photoKey = (ref: string) => `nutrition-photo.v1:${ref}`;
 const PHOTO = 'photo:';
+// Days of food logs and check-ins kept on the phone (issue 3119). An older day is not saved, and
+// one already saved is removed, unless it still has a change waiting to upload; a screen that
+// asks for it reads it from the server again. The history download (#3072) stops at the same day.
+export const NUTRITION_DAYS_KEPT = 90;
 // A `loaded` or `savedAt` key that names a day, such as `logs:2026-10-19`, is saved with that day.
 const DATED = /^([A-Za-z]+):(\d{4}-\d{2}-\d{2})$/;
 
@@ -55,6 +59,19 @@ type Core = Record<string, unknown> & {
 };
 type Library = { foods: Item[]; meals: Meal[] };
 
+// Whether a day's entry is kept: inside the window starting at `oldest`, or holding a change that
+// has not uploaded yet, which is never dropped.
+function keeper(oldest: string | null, record: Record<string, unknown>) {
+  const pending = new Set<string>();
+  for (const list of [record.operations, record.http]) {
+    for (const change of Array.isArray(list) ? list : []) {
+      if (typeof change?.date === 'string') {
+        pending.add(change.date.replace(/\//g, '-'));
+      }
+    }
+  }
+  return (date: string) => oldest === null || date >= oldest || pending.has(date);
+}
 function photo(item: Item | undefined) {
   return typeof item?.imageDataUri === 'string' && item.imageDataUri && item.imageDataUri !== PHOTO
     ? item.imageDataUri
@@ -124,7 +141,7 @@ function restoreLibrary(library: Library, saved: Map<string, string>): Library {
 }
 
 // The frame cut into what each entry holds.
-function split(frame: NutritionFrame) {
+function split(frame: NutritionFrame, keep: (date: string) => boolean) {
   const { data, loaded = [], savedAt = {}, ...rest } = frame;
   const {
     days: logs,
@@ -164,6 +181,11 @@ function split(frame: NutritionFrame) {
       (day(dated[2]).savedAt ??= {})[dated[1]] = at;
     } else {
       coreSavedAt[key] = at;
+    }
+  }
+  for (const date of [...days.keys()]) {
+    if (!keep(date)) {
+      days.delete(date);
     }
   }
   const core: Core = {
@@ -212,7 +234,7 @@ function join(core: Core, library: Library, days: Map<string, Day>) {
     },
   };
 }
-// A day saved by an earlier version is a bare list of logs; later ones are a `Day`.
+// A day's entry, with each logged food's photo replaced by `PHOTO`.
 const dayJson = (entry: Day) =>
   JSON.stringify(entry.logs ? { ...entry, logs: stripLogs(entry.logs) } : entry);
 // What a day holds besides its data, compared as text since `savedAt` is rebuilt on each refresh.
@@ -231,7 +253,11 @@ export class NutritionPersistence {
   // and removes them last, in the same transaction; an old index goes after the entries it lists,
   // so a move cut short without a transaction can still find and remove what is left.
   private stale: string[] = [];
-  constructor(private storage: ScopedStorage) {}
+  // `oldest` is the first day of the window kept on the phone, or null to keep every day.
+  constructor(
+    private storage: ScopedStorage,
+    private oldest: () => string | null = () => null,
+  ) {}
   private async need(key: string) {
     const value = await this.storage.get(key);
     // An entry the index lists but storage lacks means the saved records are damaged: refuse to
@@ -262,10 +288,20 @@ export class NutritionPersistence {
     const stale: string[] = [];
     if (newest === 'v3') {
       const v2 = await this.storage.get(v2Key);
+      // The old day entries are found by their key, not the old index, which may be damaged.
+      const days = this.storage.keys
+        ? await this.storage.keys(v2DayKey(''))
+        : v2 === null
+          ? []
+          : (() => {
+              try {
+                return (JSON.parse(v2) as Core).dayKeys.map(v2DayKey);
+              } catch {
+                return [];
+              }
+            })();
+      stale.push(...days);
       if (v2 !== null) {
-        try {
-          stale.push(...(JSON.parse(v2) as Core).dayKeys.map(v2DayKey));
-        } catch {}
         stale.push(v2Key);
       }
     }
@@ -274,6 +310,16 @@ export class NutritionPersistence {
     }
     return stale;
   }
+  // Day and photo entries on disk that nothing kept refers to: days outside the window, photos
+  // only they showed, and whatever a write cut short left behind. Found by key where storage can
+  // list keys, so nothing is missed because an index was lost.
+  private async leftovers(kept: Set<string>, photos: Map<string, string>, listed: string[]) {
+    const keys = this.storage.keys
+      ? [...(await this.storage.keys(dayKey(''))), ...(await this.storage.keys(photoKey('')))]
+      : listed.map(dayKey);
+    const keep = new Set([...[...kept].map(dayKey), ...[...photos.keys()].map(photoKey)]);
+    return keys.filter((key) => !keep.has(key));
+  }
   // The saved frame, or null when nothing is saved. Reads the newest saved shape present; an
   // earlier one is moved across by `opened`.
   async read(): Promise<unknown> {
@@ -281,8 +327,9 @@ export class NutritionPersistence {
     if (raw) {
       const core = JSON.parse(raw) as Core;
       const stored = JSON.parse(await this.need(libraryKey)) as Library;
+      const keep = keeper(this.oldest(), core);
       const days = new Map<string, Day>();
-      for (const date of core.dayKeys) {
+      for (const date of core.dayKeys.filter(keep)) {
         days.set(date, JSON.parse(await this.need(dayKey(date))) as Day);
       }
       const saved = await this.readPhotos(
@@ -292,21 +339,33 @@ export class NutritionPersistence {
       for (const entry of days.values()) {
         if (entry.logs) entry.logs = restoreLogs(entry.logs, saved);
       }
-      this.stale = await this.older('v3');
+      // The photo entries read are on disk already: a write leaves them as they are.
+      this.photos = saved;
+      this.stale = [
+        ...(await this.leftovers(new Set(days.keys()), saved, core.dayKeys)),
+        ...(await this.older('v3')),
+      ];
       return join(core, restoreLibrary(stored, saved), days);
     }
     const v2 = await this.storage.get(v2Key);
     if (v2) {
       const core = JSON.parse(v2) as NutritionFrame & { dayKeys: string[] };
+      const keep = keeper(this.oldest(), core);
       const logs: Record<string, Log[]> = {};
-      for (const date of core.dayKeys) {
+      for (const date of core.dayKeys.filter(keep)) {
         logs[date] = JSON.parse(await this.need(v2DayKey(date))) as Log[];
       }
       const library = { foods: core.data.foods, meals: core.data.meals };
       const saved = await this.readPhotos(logs, library);
       // The photo entries are already in their final place: the move leaves them as they are.
       this.photos = saved;
-      this.stale = [...core.dayKeys.map(v2DayKey), v2Key, ...(await this.older('v2'))];
+      const photos = this.storage.keys ? await this.storage.keys(photoKey('')) : [];
+      this.stale = [
+        ...photos.filter((key) => !saved.has(key.slice(photoKey('').length))),
+        ...(this.storage.keys ? await this.storage.keys(v2DayKey('')) : core.dayKeys.map(v2DayKey)),
+        v2Key,
+        ...(await this.older('v2')),
+      ];
       const { dayKeys: _keys, ...frame } = core;
       return {
         ...frame,
@@ -333,13 +392,13 @@ export class NutritionPersistence {
       await this.write(frame).catch(reportError);
       return;
     }
-    const { core, library, days } = split(frame);
+    const { core, library, days } = split(frame, keeper(this.oldest(), frame));
     this.core = JSON.stringify(core);
     this.library = {
       refs: [library.foods, library.meals],
       json: JSON.stringify(stripLibrary(library)),
     };
-    this.photos = this.collect(frame);
+    this.photos = this.collect(frame, days);
     this.days = new Map(
       [...days].map(([date, entry]) => [
         date,
@@ -348,8 +407,8 @@ export class NutritionPersistence {
     );
   }
   async write(frame: NutritionFrame) {
-    const { core: coreValue, library, days } = split(frame);
-    const current = this.collect(frame);
+    const { core: coreValue, library, days } = split(frame, keeper(this.oldest(), frame));
+    const current = this.collect(frame, days);
     const core = JSON.stringify(coreValue);
     const changes: [string, string | null][] = [];
     for (const [ref, value] of current) {
@@ -396,8 +455,13 @@ export class NutritionPersistence {
         changes.push([photoKey(ref), null]);
       }
     }
+    // A leftover found on opening that this write saves again (a day back in the window, or with
+    // a change waiting) is not removed.
+    const writing = new Set(changes.map(([key]) => key));
     for (const key of this.stale) {
-      changes.push([key, null]);
+      if (!writing.has(key)) {
+        changes.push([key, null]);
+      }
     }
     if (changes.length) {
       await this.save(changes);
@@ -408,9 +472,11 @@ export class NutritionPersistence {
     this.photos = current;
     this.stale = [];
   }
-  private collect(frame: NutritionFrame) {
+  // The photos of the kept days, saved meals and the food list.
+  private collect(frame: NutritionFrame, days: Map<string, Day>) {
     const found = new Map<string, string>();
-    eachItem(frame.data.days, frame.data, (ref, item) => {
+    const logs = Object.fromEntries([...days].map(([date, entry]) => [date, entry.logs]));
+    eachItem(logs, frame.data, (ref, item) => {
       const value = photo(item);
       if (value) {
         found.set(ref, value);
