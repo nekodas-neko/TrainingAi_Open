@@ -20,7 +20,7 @@ describe.skipIf(!canRun)('getRecentSourceFacts (issue 2613)', () => {
   const at = (d: Date, ms: number) => new Date(d.getTime() + ms)
 
   const clean = async () => {
-    for (const t of ['oura_heartrate', 'health_connect_intervals', 'oura_raw_samples']) {
+    for (const t of ['oura_heartrate', 'health_connect_intervals', 'health_connect_records', 'native_health_projection_days', 'oura_raw_samples']) {
       await pool.query(`DELETE FROM ${t} WHERE user_id = ANY($1::uuid[])`, [[USER_A, USER_B]])
     }
   }
@@ -84,5 +84,37 @@ describe.skipIf(!canRun)('getRecentSourceFacts (issue 2613)', () => {
     await repo.upsertHealthConnectIntervals(USER_B, [interval('r2')])
     expect(await repo.getRecentSourceFacts(USER_A, since)).toEqual(none)
     expect(await repo.getRecentSourceFacts(USER_B, since)).toEqual({ strapHeartRate: true, healthConnectHeartRate: true, healthConnectIntervals: true })
+  })
+
+  // #3117: the native app's Health Connect import writes different labels and tables.
+  const record = (id: string, startAt: Date) => ({
+    id,
+    type: 'Steps' as const,
+    sourcePackage: 'com.test.watch',
+    recordingMethod: 2,
+    modifiedAt: at(startAt, 60_000).toISOString(),
+    start: startAt.toISOString(),
+    end: at(startAt, 60_000).toISOString(),
+    value: 120,
+  })
+
+  it('counts the native import: health_connect_native heart rate', async () => {
+    await repo.upsertOuraHeartrate(USER_A, [{ timestamp: recent, bpm: 70, source: 'health_connect_native' }])
+    expect(await repo.getRecentSourceFacts(USER_A, since)).toEqual({ ...none, healthConnectHeartRate: true })
+  })
+
+  it('counts the native import: a recent health_connect_records row, but not a deleted or old one', async () => {
+    await repo.applyHealthConnectBatch(USER_A, { records: [record('n1', recent)], deleted: [] })
+    expect(await repo.getRecentSourceFacts(USER_A, since)).toEqual({ ...none, healthConnectIntervals: true })
+    await repo.applyHealthConnectBatch(USER_A, { records: [], deleted: ['n1'] })
+    expect(await repo.getRecentSourceFacts(USER_A, since)).toEqual(none)
+    await repo.applyHealthConnectBatch(USER_A, { records: [record('n2', old)], deleted: [] })
+    expect(await repo.getRecentSourceFacts(USER_A, since)).toEqual(none)
+  })
+
+  it("keeps the native import scoped to the user", async () => {
+    await repo.applyHealthConnectBatch(USER_B, { records: [record('n3', recent)], deleted: [] })
+    await repo.upsertOuraHeartrate(USER_B, [{ timestamp: recent, bpm: 70, source: 'health_connect_native' }])
+    expect(await repo.getRecentSourceFacts(USER_A, since)).toEqual(none)
   })
 })

@@ -12,6 +12,19 @@ import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import type { HealthConnectReader } from '../../../integrations/health-connect/types.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
+/**
+ * Health Connect's own read limit, an instant rule rather than a calendar window: without the
+ * history permission an app reads back to 30 days before its first grant.
+ */
+const READ_LIMIT_MS = 30 * 24 * 60 * 60 * 1000;
+/** Records held back for a revoked permission are dropped, and counted as skipped, after this. */
+const BLOCKED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** A rescan after an expired token starts this many local days before the last good token,
+ *  because a watch can sync a day's records to Health Connect days late. */
+const RESCAN_OVERLAP_DAYS = 7;
+const RESTORE_PERMISSION =
+  'Restore the relevant Health Connect permissions to upload saved records.';
 const completedSchema = z.object({
   measurements: z.number(),
   nights: z.number(),
@@ -58,6 +71,20 @@ const diskSchema = z.object({
     ]),
   ),
   token: z.string().nullable(),
+  // When the token was last read successfully, so an expired one rescans from there (#3117).
+  tokenAt: z.string().nullable().default(null),
+  rescanFrom: z.string().nullable().default(null),
+  // First seen with a permission granted: the floor of what Health Connect lets us read.
+  grantedAt: z.string().nullable().default(null),
+  // Records whose type lost its permission, held until it returns (#3117).
+  blocked: z
+    .array(
+      z.object({
+        batch: z.custom<HealthConnectBatch>((value) => healthConnectBatch.safeParse(value).success),
+        since: z.string(),
+      }),
+    )
+    .default([]),
   permissionKey: z.string(),
   scan: scanSchema.nullable(),
   needsRebuild: z.boolean(),
@@ -93,10 +120,18 @@ export class HealthConnectImportStore {
       origin: connection.origin,
       userId: connection.userId,
       enabled: false,
-      from: new Date(now() - 30 * 86400000).toISOString(),
+      from: midnightDaysAgoInTz(
+        connection.timezone ?? DEFAULT_TZ,
+        30,
+        new Date(now()),
+      ).toISOString(),
       records: {},
       queue: [],
       token: null,
+      tokenAt: null,
+      rescanFrom: null,
+      grantedAt: null,
+      blocked: [],
       permissionKey: '',
       scan: null,
       needsRebuild: false,
@@ -196,7 +231,14 @@ export class HealthConnectImportStore {
       if (!this.reader.historyPermission) throw new Error('Extended history is unavailable.');
       await this.reader.historyPermission();
     }
-    await this.write({ ...this.disk, from, token: null, scan: null, enabled: true });
+    await this.write({
+      ...this.disk,
+      from,
+      token: null,
+      rescanFrom: null,
+      scan: null,
+      enabled: true,
+    });
     return this.run(true);
   }
   private async append(
@@ -256,14 +298,33 @@ export class HealthConnectImportStore {
     let rebuilds = 0;
     while (remaining-- > 0 && this.disk.queue.length && !this.canceled) {
       const item = this.disk.queue[0];
+      if ('records' in item && item.records.some((row) => !types.includes(row.type))) {
+        // #3117: one revoked type used to stop the whole queue here, every run. Its records are
+        // set aside until the permission returns, and the rest of the batch carries on (keeping
+        // any retry backoff it had, which is checked next).
+        const held = item.records.filter((row) => !types.includes(row.type));
+        const rest = { ...item, records: item.records.filter((row) => types.includes(row.type)) };
+        const keep = rest.records.length || rest.deleted.length;
+        await this.write({
+          ...this.disk,
+          queue: [...(keep ? [rest] : []), ...this.disk.queue.slice(1)],
+          blocked: [
+            // A record held again replaces its earlier copy rather than being held twice.
+            ...this.disk.blocked.flatMap((entry) => {
+              const ids = new Set(held.map((row) => row.id));
+              const records = entry.batch.records.filter((row) => !ids.has(row.id));
+              return records.length ? [{ ...entry, batch: { records, deleted: [] } }] : [];
+            }),
+            { batch: { records: held, deleted: [] }, since: new Date(this.now()).toISOString() },
+          ],
+        });
+        if (keep) remaining++;
+        continue;
+      }
       if (!('rebuild' in item) && isDeferredUpload(item, this.now())) {
         await this.write({ ...this.disk, queue: [...this.disk.queue.slice(1), item] });
         continue;
       }
-      if ('records' in item && item.records.some((row) => !types.includes(row.type)))
-        throw new Error(
-          'Restore the relevant Health Connect permissions to upload saved records.',
-        );
       let reply;
       try {
         reply = await this.connection.post('/api/health-connect/sync', item);
@@ -317,6 +378,31 @@ export class HealthConnectImportStore {
       }
     }
   }
+  /**
+   * Puts set-aside records whose permission is back into the queue, and drops the ones held past
+   * `BLOCKED_TTL_MS`, counting them as skipped.
+   */
+  private async release(types: HealthConnectType[]) {
+    if (!this.disk.blocked.length) return;
+    const now = this.now();
+    const blocked: Disk['blocked'] = [];
+    const queue: Disk['queue'] = [];
+    let dropped = 0;
+    for (const entry of this.disk.blocked) {
+      const allowed = entry.batch.records.filter((row) => types.includes(row.type));
+      const held = entry.batch.records.filter((row) => !types.includes(row.type));
+      if (allowed.length) queue.push({ records: allowed, deleted: [] });
+      if (!held.length) continue;
+      if (now - Date.parse(entry.since) > BLOCKED_TTL_MS) dropped += held.length;
+      else blocked.push({ ...entry, batch: { records: held, deleted: [] } });
+    }
+    await this.write({
+      ...this.disk,
+      queue: [...this.disk.queue, ...queue],
+      blocked,
+      skipped: this.disk.skipped + dropped,
+    });
+  }
   run(manual = false): Promise<void> {
     if (this.running) return this.running;
     if (this.canceled || (!manual && this.now() - this.lastAttempt < 300000))
@@ -330,19 +416,41 @@ export class HealthConnectImportStore {
         const types = await this.reader.permissions();
         if (this.canceled) return;
         if (!types.length) throw new Error('No Health Connect read permissions are granted.');
+        if (!this.disk.grantedAt)
+          await this.write({ ...this.disk, grantedAt: new Date(this.now()).toISOString() });
+        await this.release(types);
         await this.flush(types);
         const hasHistory = (await this.reader.hasHistoryPermission?.()) ?? false;
         const permissionKey = [...types].sort().join(',') + (hasHistory ? ':history' : '');
         if (permissionKey !== this.disk.permissionKey)
-          await this.write({ ...this.disk, token: null, scan: null, permissionKey });
+          await this.write({
+            ...this.disk,
+            token: null,
+            rescanFrom: null,
+            scan: null,
+            permissionKey,
+          });
         if (!this.disk.token && !this.disk.scan) {
           const initial = await this.reader.changes(types);
           if (this.canceled) return;
+          // #3117: after an expired token, from the local midnight a week before the last good
+          // read, rather than only the last 30 days; never before what Health Connect allows.
+          const floor = hasHistory
+            ? 0
+            : Date.parse(this.disk.grantedAt ?? new Date(this.now()).toISOString()) - READ_LIMIT_MS;
+          const resume = this.disk.rescanFrom
+            ? midnightDaysAgoInTz(
+                this.connection.timezone ?? DEFAULT_TZ,
+                RESCAN_OVERLAP_DAYS,
+                new Date(this.disk.rescanFrom),
+              ).getTime()
+            : -Infinity;
           const from = new Date(
-            Math.max(Date.parse(this.disk.from), hasHistory ? 0 : this.now() - 30 * 86400000),
+            Math.max(Date.parse(this.disk.from), floor, resume),
           ).toISOString();
           await this.write({
             ...this.disk,
+            rescanFrom: null,
             scan: {
               types,
               index: 0,
@@ -372,7 +480,7 @@ export class HealthConnectImportStore {
             await this.append(
               [],
               scan.oldIds.filter((id) => !seen.has(id)),
-              { scan: null, token: scan.token, needsRebuild: true },
+              { scan: null, token: scan.token, tokenAt: scan.end, needsRebuild: true },
             );
             await this.flush(types);
             break;
@@ -405,11 +513,12 @@ export class HealthConnectImportStore {
           const page = await this.reader.changes(types, this.disk.token);
           if (this.canceled) return;
           if (page.expired) {
-            await this.write({ ...this.disk, token: null });
+            await this.write({ ...this.disk, token: null, rescanFrom: this.disk.tokenAt });
             break;
           }
           await this.append(page.records, page.deleted, {
             token: page.token,
+            tokenAt: new Date(this.now()).toISOString(),
             skipped: this.disk.skipped + page.skipped,
           });
           await this.flush(types);
@@ -425,6 +534,9 @@ export class HealthConnectImportStore {
           });
           await this.flush(types);
         }
+        // Everything else has gone; say what is still waiting on a permission.
+        if (this.disk.blocked.length && !this.canceled)
+          this.publish({ error: RESTORE_PERMISSION });
       } catch (error) {
         if (!this.canceled)
           this.publish({
