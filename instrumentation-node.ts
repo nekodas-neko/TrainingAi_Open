@@ -174,6 +174,12 @@ void (async () => {
   const { startOuraWebhookRenewal } = await import('@/lib/oura/cloud/renewal')
   startOuraWebhookRenewal()
 })().catch(err => console.error('[instrumentation] Oura webhook renewal did not start:', String(err).slice(0, 300)))
+// The daily Oura reconciliation read (#3079): the last three days for every connected user, so a
+// missed webhook, a revised night or late heart rate is picked up. Same gating; never fails the boot.
+void (async () => {
+  const { startOuraReconcile } = await import('@/lib/oura/cloud/reconcile')
+  startOuraReconcile()
+})().catch(err => console.error('[instrumentation] Oura daily reconciliation did not start:', String(err).slice(0, 300)))
 
 // Marks this file as a module (it has no other imports/exports) so instrumentation.ts can
 // `await import('./instrumentation-node')` it for its side effect.

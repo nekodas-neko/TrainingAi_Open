@@ -82,7 +82,8 @@ export async function POST(req: NextRequest) {
   if (!event.success) return json({ error: 'Invalid body' }, 400)
 
   try {
-    const outcome = await handleOuraWebhookEvent({ repo: await getRepositoryAsync(), config: config.oauth }, event.data)
+    const repo = await getRepositoryAsync()
+    const outcome = await handleOuraWebhookEvent({ repo, config: config.oauth, rescore: repo }, event.data)
     // Only the outcome's name goes back; no user id, no health data.
     return json({ received: true, result: outcome.result })
   } catch (err) {

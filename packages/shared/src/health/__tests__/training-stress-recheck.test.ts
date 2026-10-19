@@ -46,4 +46,34 @@ describe('staleTrainingStressDays (#2400)', () => {
     expect(days.at(-1)).toBe(shiftDateStr(TODAY, -1))
     expect(days).not.toContain(TODAY)
   })
+
+  // #3079: Oura's MET for a day can land hours after the day ended, after its final verdict.
+  describe('once more when Oura MET changed after the final verdict', () => {
+    const DAY = '2026-10-02'
+    const verdictAt = () => new Date(endOf(DAY).getTime() + 30 * 60_000)
+
+    it("names a finished day whose MET changed after its verdict", () => {
+      const m = allFinal(); m.set(DAY, verdictAt())
+      const met = new Map([[DAY, new Date(verdictAt().getTime() + 3 * 3_600_000)]])
+      expect(staleTrainingStressDays(TODAY, TZ, m, met)).toEqual([DAY])
+    })
+
+    it("counts the Oura day before it, whose activity day runs to 4 a.m. on this one", () => {
+      const m = allFinal(); m.set(DAY, verdictAt())
+      const met = new Map([[shiftDateStr(DAY, -1), new Date(verdictAt().getTime() + 60_000)]])
+      expect(staleTrainingStressDays(TODAY, TZ, m, met)).toContain(DAY)
+    })
+
+    it('is final again once re-evaluated after the change (one re-evaluation per change)', () => {
+      const changed = new Date(verdictAt().getTime() + 3 * 3_600_000)
+      const m = allFinal(); m.set(DAY, new Date(changed.getTime() + 1))
+      expect(staleTrainingStressDays(TODAY, TZ, m, new Map([[DAY, changed]]))).toEqual([])
+    })
+
+    it('ignores MET that changed before the verdict', () => {
+      const m = allFinal(); m.set(DAY, verdictAt())
+      const met = new Map([[DAY, new Date(verdictAt().getTime() - 60_000)]])
+      expect(staleTrainingStressDays(TODAY, TZ, m, met)).toEqual([])
+    })
+  })
 })

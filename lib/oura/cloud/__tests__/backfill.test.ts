@@ -86,7 +86,7 @@ describe('backfillOuraCloud (#2859)', () => {
     expect(out.report.counts).toMatchObject({
       dailyRows: 1, bodyRows: 1, sleepWritten: 1, workouts: 1, heartRatePoints: 4, sleepPeriods: 1, cloudDays: 1, sessions: 1,
     })
-    expect(calls).toEqual(['daily:1', 'body:1', 'sleep:1', 'workouts:1', 'periods:1', 'cloudDaily:1', 'sessions:1', 'hr:2', 'hr:2'])
+    expect(calls).toEqual(['daily:1', 'body:1', 'periods:1', 'sleep:1', 'workouts:1', 'cloudDaily:1', 'sessions:1', 'hr:2', 'hr:2'])
     const first = new URL(String(fetchMock.mock.calls[0][0]))
     expect(first.href.startsWith(`${OURA_API_BASE}/v2/usercollection/daily_readiness`)).toBe(true)
     expect(Object.fromEntries(first.searchParams)).toEqual({ start_date: '2026-10-01', end_date: '2026-10-12' })
@@ -279,6 +279,12 @@ describe('backfillOuraCloud (#2859)', () => {
 
 // #2895 review, item 5: a connect whose history read did not finish is recorded, not just logged.
 describe('startOuraConnectBackfill reporting', () => {
+  // The connect backfill passes the repository as the night re-scorer (#3079); an empty store.
+  const rescore = {
+    withOuraSleepWriteLock: <T,>(_u: string, run: () => Promise<T>) => run(),
+    listSleepSessions: async () => [], getOuraDailyDerived: async () => [],
+    upsertOuraDailyDerived: async () => {}, clearNightDerivedScores: async () => false, releaseBodyBatteryAnchor: async () => false,
+  }
   const saved: Record<string, string | undefined> = {}
   const ENV = { OURA_CLIENT_ID: 'cid', OURA_CLIENT_SECRET: 'cs', OURA_REDIRECT_URI: 'http://localhost:3000/api/oura/callback', OURA_TOKEN_KEY: 'k'.repeat(48) }
   beforeEach(() => {
@@ -297,7 +303,7 @@ describe('startOuraConnectBackfill reporting', () => {
 
   it('records a run that stopped early, with the reason and no token', async () => {
     oura(path => (path === 'sleep' ? new Response('', { status: 503 }) : null))
-    dataRepo = { ...fakeRepo().repo, getUserById: async () => ({ id: USER, timezone: null }) }
+    dataRepo = { ...rescore, ...fakeRepo().repo, getUserById: async () => ({ id: USER, timezone: null }) }
     startOuraConnectBackfill(USER)
     await vi.waitFor(() => expect(reportServerError).toHaveBeenCalled())
     const [err, ctx] = reportServerError.mock.calls[0] as [Error, { userId: string }]
@@ -313,7 +319,7 @@ describe('startOuraConnectBackfill reporting', () => {
       if (path === 'heartrate') return jsonResponse({ data: [], next_token: null })
       return null
     })
-    dataRepo = { ...fakeRepo().repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
+    dataRepo = { ...rescore, ...fakeRepo().repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
     startOuraConnectBackfill(USER)
     await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(2))
     const messages = reportServerError.mock.calls.map(c => (c[0] as Error).message)
@@ -324,7 +330,7 @@ describe('startOuraConnectBackfill reporting', () => {
   it('records nothing extra for a full, clean connect backfill', async () => {
     oura()
     const { repo, calls } = fakeRepo()
-    dataRepo = { ...repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
+    dataRepo = { ...rescore, ...repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
     startOuraConnectBackfill(USER)
     await vi.waitFor(() => expect(calls.filter(c => c.startsWith('hr:')).length).toBeGreaterThan(0))
     await new Promise(r => setTimeout(r, 20))
@@ -332,7 +338,7 @@ describe('startOuraConnectBackfill reporting', () => {
   })
 
   it('records a connect whose backfill could not run', async () => {
-    dataRepo = { ...fakeRepo(false).repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
+    dataRepo = { ...rescore, ...fakeRepo(false).repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
     startOuraConnectBackfill(USER)
     await vi.waitFor(() => expect(reportServerError).toHaveBeenCalled())
     expect((reportServerError.mock.calls[0][0] as Error).message).toMatch(/connect-backfill:not_connected/)

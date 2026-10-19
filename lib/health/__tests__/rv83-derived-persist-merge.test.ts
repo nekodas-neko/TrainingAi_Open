@@ -63,18 +63,37 @@ describe('mergeDerivedPersists', () => {
   })
 
   it('refuses a key two pillars both claim, naming the key and both pillars', () => {
-    // The invariant the merge rests on, asserted rather than assumed. If a later pillar starts
-    // stamping `modelVersions` too, a silent Object.assign would pick a winner and drop the other's
-    // stamp — the exact clobber Q-273 removed from this table. This is the mutation that a test
-    // asserting only the happy path would pass straight through.
+    // The invariant the merge rests on, asserted rather than assumed: a silent Object.assign would
+    // pick a winner and drop the other's value. This is the mutation that a test asserting only the
+    // happy path would pass straight through.
+    const alsoScores: DerivedPersist = {
+      day: '2026-09-21',
+      pillar: 'illness',
+      patch: { readinessScore: 12 },
+    }
+
+    expect(() => mergeDerivedPersists([READINESS, alsoScores]))
+      .toThrowError(/readinessScore.*readiness.*illness.*2026-09-21/)
+  })
+
+  // #3079: sleep stamps `model_versions` too. The column merges with `||` per pillar key, so two
+  // pillars stamping their own keys merge into one map, exactly what two separate writes would leave.
+  it('merges model-version stamps under different pillar keys', () => {
+    const stampedSleep: DerivedPersist = { ...SLEEP, patch: { ...SLEEP.patch, modelVersions: { sleep: 'v1' } } }
+    const [group] = mergeDerivedPersists([READINESS, stampedSleep])
+    expect(group.patch.modelVersions).toEqual({ readiness: 'v3:ri5:2026-08-18', sleep: 'v1' })
+    expect(group.patch.sleepScore).toBe(81)
+  })
+
+  it('refuses two pillars stamping the same model-version key (Q-273 clobber)', () => {
     const alsoStamps: DerivedPersist = {
       day: '2026-09-21',
       pillar: 'illness',
-      patch: { illnessScore: 12, modelVersions: { illness: 'v1' } },
+      patch: { illnessScore: 12, modelVersions: { readiness: 'v1' } },
     }
 
     expect(() => mergeDerivedPersists([READINESS, alsoStamps]))
-      .toThrowError(/modelVersions.*readiness.*illness.*2026-09-21/)
+      .toThrowError(/modelVersions\.readiness.*readiness.*illness.*2026-09-21/)
   })
 
   it('is empty for no persists, so a gated-out request writes nothing', () => {

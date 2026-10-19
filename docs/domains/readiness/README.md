@@ -485,6 +485,14 @@ Live at the time of writing (2026-07-30):
 - **The Body Battery anchor is frozen once readiness-derived** (`lib/health/body-battery-anchor.ts`).
   Re-picking it on every read is what made the whole day's curve jump mid-morning; a later
   readiness *recompute* must not move it either, or the same bug returns through a smaller door.
+  **One exception (#3079, Orchestrator's decision on #3085): the anchor is released when it was
+  frozen without that day's night, because the night arrived after it.** Under the Oura API the
+  night can land mid-morning, after a readiness built from that morning's body metrics alone has
+  already frozen the anchor; that anchor never saw the night it stands for, so it goes back to
+  provisional and the next read chooses it again (`rescore-nights.ts`, `releaseBodyBatteryAnchor`).
+  "Arrived" is exact: no night for the day before the write, one after. **A revision of a night that
+  was already there keeps the anchor frozen**: 18 Oct's night was revised at 22:23 local, and
+  releasing then would have shifted that whole day's curve in the evening.
 - **An evening nap once threw away the whole day's Body Battery** — nap-vs-night resolution is a
   readiness concern too, not only a sleep one.
 - **Temperature deviation is withheld until its baseline is mature** — an absent value here is

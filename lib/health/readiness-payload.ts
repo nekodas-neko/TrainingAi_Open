@@ -19,7 +19,8 @@ import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDos
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
-import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
+import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
+import { scoreSleepForDate } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
@@ -71,9 +72,10 @@ export interface DerivedPersist {
  *
  * Merging is safe because `upsertOuraDailyDerived` writes only the keys whose value is not
  * `undefined` and the three key sets are disjoint, so the merged patch writes exactly the union with
- * every column still sourced from exactly one pillar. `model_versions` — the one column with `||`
- * merge semantics rather than COALESCE — appears in one patch only, so grouping cannot change how it
- * combines with what is stored.
+ * every column still sourced from exactly one pillar. `model_versions` is the one column with `||`
+ * merge semantics rather than COALESCE, and it is merged here the same way: since #3079 both readiness
+ * and sleep stamp it, each under its own pillar key, so the union of their maps is exactly what two
+ * separate `||` writes would have left.
  *
  * **That disjointness is an invariant, not an observation, which is why a collision throws.** If a
  * later pillar starts writing a key another one already writes, a silent `Object.assign` would pick
@@ -85,12 +87,22 @@ export function mergeDerivedPersists(entries: DerivedPersist[]): { day: string; 
   const byDay = new Map<string, { day: string; pillars: string[]; patch: Record<string, unknown> }>()
   for (const e of entries) {
     const group = byDay.get(e.day) ?? { day: e.day, pillars: [], patch: {} }
+    const collision = (key: string) =>
+      new Error(`mergeDerivedPersists: '${key}' written by both '${group.pillars.join("'/'")}' and '${e.pillar}' on ${e.day}`)
     for (const key of Object.keys(e.patch)) {
-      if (key in group.patch) {
-        throw new Error(`mergeDerivedPersists: '${key}' written by both '${group.pillars.join("'/'")}' and '${e.pillar}' on ${e.day}`)
-      }
+      if (key === 'modelVersions') continue
+      if (key in group.patch) throw collision(key)
     }
-    Object.assign(group.patch, e.patch)
+    const { modelVersions, ...rest } = e.patch
+    if (modelVersions !== undefined) {
+      const merged = { ...(group.patch.modelVersions as Record<string, unknown> | undefined) }
+      for (const [k, v] of Object.entries(modelVersions ?? {})) {
+        if (k in merged) throw collision(`modelVersions.${k}`)
+        merged[k] = v
+      }
+      group.patch.modelVersions = merged
+    }
+    Object.assign(group.patch, rest)
     group.pillars.push(e.pillar)
     byDay.set(e.day, group)
   }
@@ -432,20 +444,13 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const nights = nightSessions(sleepSessions, tz)
   const lastSleep  = canonicalLatestNight(nights, tz)
   const sleepHours = lastSleep?.durationHours ?? null
-  // Personal baselines for the Sleep Score's opt-in contributors (overnight HRV, overnight HR, and
-  // habitual bed/wake times), derived from the *prior* nights only so the night being scored never
-  // contributes to the bar it is judged against. One shared derivation — see sleepScoreBaselines.
-  // "Prior" is by the scored night's end, the day audit's rule, not `slice(0, -1)`: the scored
-  // night is not always the last element (a later window on its date, or a short evening window
-  // it passed over, #2456), and then `slice` left the scored night inside its own baseline.
-  const sleepBaselines = sleepScoreBaselines(
-    lastSleep ? nights.filter(n => n.sleepEnd.getTime() < lastSleep.sleepEnd.getTime()) : nights,
-    tz,
-  )
   // Our own 0–100 Sleep Score (recovered open_health weights + contributor curves). Feeds both
   // the standalone Sleep chip (0–100) and the readiness composite's internal 0–40 sleep term.
   // Falls back to the crude duration-only estimate when there's no session to score at all.
-  const sleepScoreResult = lastSleep ? computeSleepScore(lastSleep, tz, sleepBaselines) : null
+  // Baselines come from the *prior* nights only, by the scored night's end (#2456), so the night
+  // never contributes to the bar it is judged against. #3079: through `scoreSleepForDate`, the one
+  // night window the re-score of a changed night uses too, so the two paths cannot disagree.
+  const sleepScoreResult = lastSleep ? scoreSleepForDate(sleepSessions, lastSleep.date, tz)?.result ?? null : null
   const sleepScore100 = sleepScoreResult?.score ?? null
   const ownSleepContributors = sleepScoreResult ? sleepComponentsToContributors(sleepScoreResult.components) : null
   const sleepComponent = sleepScore100 != null
@@ -760,7 +765,14 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // the day the trend surfaces read, and it is what stops a Health Connect user's readiness trend
   // from being empty every day (Q-43). It only ever back-fills forward: days before this shipped
   // stay null, since nothing recorded them at the time.
-  if (ownComposite) {
+  //
+  // #3079: and only when that night is TODAY's. Until Oura delivers last night (under the Oura API
+  // that is after the Oura app syncs, often mid-morning) the newest night is yesterday's, so this
+  // used to write yesterday's row with a score built from today's activity, load and illness inputs,
+  // replacing the readiness that day had actually shown, every morning. A finished day's readiness
+  // is what it said that morning; a read of today before the night lands writes no readiness, and the
+  // first read after it does. Today's `nightDate` never exceeds `todayIso` (the resolver caps it).
+  if (ownComposite && night.nightDate === todayIso) {
     // `model_versions` is one shared JSONB across every pillar on this row, and the upsert writes a
     // provided column wholesale — so it is MERGED with what is already stored rather than replaced.
     // Writing `{ readiness: ... }` alone would drop bodyBattery's stamp and any other pillar's.
@@ -773,9 +785,8 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // the statement, so this no longer has to read the row and spread it back. That read-merge was
     // a two-statement race against any other pillar stamping the same day, and it read a value
     // that could already be stale (Q-273).
-    // #2984: keyed on the night the inputs are for. With a current ring summary that is the same
-    // day as before; it differs only when the summary lags the night (or there is none).
-    derivedPersists.push({ day: night.nightDate ?? todayIso, pillar: 'readiness', patch: {
+    // #2984: keyed on the night the inputs are for, which #3079 now requires to be today.
+    derivedPersists.push({ day: todayIso, pillar: 'readiness', patch: {
       readinessScore: ownComposite.score,
       readinessContributors: ownComposite.contributors,
       // Both labels are our own composite and AI surfaces read both (`liveReadinessByDay`, #2992).
@@ -804,10 +815,17 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // columns — never the shared source/model_versions (same clobber hazard as the readiness
   // persist). COALESCE means a later recompute with richer inputs overwrites with the better value.
   // Best-effort: a persist failure must never fail the read.
-  if (sleepScoreResult && lastSleep) {
+  //
+  // #3079: and only for TODAY's night. Before Oura delivers last night the newest night is
+  // yesterday's, and every read rewrote yesterday's stored score. A finished day's night is scored
+  // when it changes instead (`rescore-nights.ts`), never by a read of a later day.
+  if (sleepScoreResult && lastSleep && lastSleep.date === todayIso) {
     derivedPersists.push({ day: lastSleep.date, pillar: 'sleep', patch: {
       sleepScore: sleepScoreResult.score,
       sleepContributors: ownSleepContributors,
+      // #3079: which model scored it, so a change of model or of what makes the night is a readable
+      // step in the history. Its own key in the shared map; the upsert merges it with `||`.
+      modelVersions: { sleep: SLEEP_SCORE_MODEL_VERSION },
     } })
   }
 
