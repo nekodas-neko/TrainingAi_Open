@@ -1,4 +1,5 @@
 import { definitionDose, hasFreeTextBesideAmount } from '@trainingai/shared/nutrition/definition-dose';
+import { supplementSubtitle } from '@trainingai/shared/nutrition/supplement-subtitle';
 import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
 import { Switch, View } from 'react-native';
@@ -99,12 +100,11 @@ export function SupplementsSection({ date }: { date: string }) {
                 checked={s.loggedToday}
                 leading={<Tick done={s.loggedToday} busy={toggling.has(s.id)} />}
                 trailing={false}
+                density="snug"
                 subtitle={
                   s.loggedAmount?.mixedUnits
                     ? 'Taken · multiple units; total unavailable'
-                    : s.loggedAmount?.amount != null
-                      ? `${s.loggedAmount.amount} ${s.loggedAmount.unit ?? ''} today${s.loggedAmount.contributions > 1 ? ' · ' + s.loggedAmount.contributions + ' doses' : ''}`
-                      : `${s.defaultAmount ?? s.dose ?? ''} ${s.unit ?? ''}`
+                    : (supplementSubtitle(s) ?? undefined)
                 }
                 onPress={() => {
                   if (toggling.has(s.id)) return;
