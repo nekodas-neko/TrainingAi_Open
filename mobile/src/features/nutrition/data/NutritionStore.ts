@@ -1,4 +1,5 @@
 import { dateStrMidnightInTz, toAestDay } from '@trainingai/shared/date-utils';
+import { RetryLater } from '../../../core/sync/HistoryDownload.ts';
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at';
 import {
   mealLoggingStatus,
@@ -376,6 +377,11 @@ function nutritionRefreshError(
   return `Could not refresh ${label}. Saved records have been kept. Check your connection and retry.`;
 }
 export type { FoodEntry } from './food-values.ts';
+export class NutritionBusy extends RetryLater {
+  constructor() {
+    super('Nutrition changed during refresh.');
+  }
+}
 export class NutritionStore {
   private current = emptyNutrition;
   private listeners = new Set<() => void>();
@@ -383,6 +389,7 @@ export class NutritionStore {
   private initializing: Promise<void> | null = null;
   private flushing: Promise<void> | null = null;
   private requests = new Map<string, Promise<boolean | undefined>>();
+  private failures = new Map<string, unknown>();
   private policies = new Map<string, RefreshPolicy>();
   private generation = 0;
   private revision = 0;
@@ -598,7 +605,7 @@ export class NutritionStore {
         }
         await this.write((state) => {
           if (revision !== this.revision) {
-            throw new Error('Nutrition changed during refresh.');
+            throw new NutritionBusy();
           }
           return {
             data: {
@@ -649,6 +656,7 @@ export class NutritionStore {
         policy.succeeded();
         return true;
       } catch (cause) {
+        this.failures.set(key, cause);
         if (generation === this.generation) {
           policy.failed();
           if (kind === 'mealStatuses' && cause instanceof ApiError && cause.status === 404) {
@@ -680,6 +688,26 @@ export class NutritionStore {
     this.requests.set(key, work);
     void work.finally(() => this.requests.delete(key));
     return work;
+  }
+  // A history download's read of one day. A read that a nutrition change on this phone overtook
+  // is not saved, so it is read again; any other failure is thrown for the download to judge.
+  async download(kind: 'logs' | 'checkin', date: string) {
+    const key = `${kind}:${date}`;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      this.failures.delete(key);
+      if (await this.refresh(kind, date, true)) {
+        return;
+      }
+      const cause = this.failures.get(key);
+      if (this.canceled) {
+        throw new Error('Account changed.');
+      }
+      if (cause !== undefined && !(cause instanceof NutritionBusy)) {
+        throw cause;
+      }
+      await this.writes;
+    }
+    throw new NutritionBusy();
   }
   async logFoods(
     entries: FoodEntry[],

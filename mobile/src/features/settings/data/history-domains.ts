@@ -31,27 +31,26 @@ export function historyDomains(
   plan: HistoryPlan,
   targets: {
     resources: Pick<WorkoutResources, 'download'>;
-    nutrition: Pick<NutritionStore, 'refresh'> | null;
+    nutrition: Pick<NutritionStore, 'download'> | null;
   },
 ): HistoryDomain[] {
   const days = Array.from({ length: plan.days }, (_, index) => shiftDateStr(plan.anchor, -index));
   const recent = days.slice(0, NUTRITION_HISTORY_DAYS);
   const months = [...new Set(days.map((day) => day.slice(0, 7)))];
-  const nutrition = (kind: 'logs' | 'checkin') => async (date: string) => {
-    if ((await targets.nutrition?.refresh(kind, date, true)) !== true) {
-      throw new Error('Nutrition history was not saved.');
-    }
-  };
+  const nutrition = (kind: 'logs' | 'checkin') => (date: string) =>
+    targets.nutrition!.download(kind, date);
   return [
     {
       id: 'days',
       label: 'Workouts, activities, sleep and body',
+      unit: 'day',
       keys: days,
       fetch: (date) => targets.resources.download(daySpec(date)),
     },
     {
       id: 'calendar',
       label: 'Training calendar',
+      unit: 'month',
       keys: months,
       fetch: (month) =>
         targets.resources.download(calendarSpec(Number(month.slice(0, 4)), Number(month.slice(5)))),
@@ -61,12 +60,14 @@ export function historyDomains(
           {
             id: 'food',
             label: 'Food logs',
+            unit: 'day' as const,
             keys: recent,
             fetch: nutrition('logs'),
           },
           {
             id: 'checkins',
             label: 'Evening check-ins',
+            unit: 'day' as const,
             keys: recent,
             fetch: nutrition('checkin'),
           },
@@ -75,6 +76,7 @@ export function historyDomains(
     {
       id: 'summaries',
       label: 'Trends and records',
+      unit: 'view',
       keys: Object.keys(summaries),
       fetch: (name) => targets.resources.download(summaries[name]),
     },

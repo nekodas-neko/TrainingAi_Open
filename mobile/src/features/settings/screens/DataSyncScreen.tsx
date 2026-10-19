@@ -18,7 +18,7 @@ import { useAppleImport } from '../../health/HealthProvider';
 import { shareAccountExport } from '../../../integrations/sharing/account-export';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
-import { todayInTz } from '@trainingai/shared/date-utils';
+import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils';
 import { HISTORY_DOWNLOAD_DAYS } from '../data/history-domains';
 import { useHistoryDownload } from '../data/HistoryDownloadProvider';
 // The shortest "how far back" choice is the current app's 30-day import window
@@ -30,6 +30,9 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
     health = useAppleImport(),
     history = useHistoryDownload(),
     { theme } = useTheme();
+  const timezone =
+    account.dataReader?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const today = todayInTz(timezone);
   const [restore, setRestore] = useState(false),
     [days, setDays] = useState('30'),
     [range, setRange] = useState('90'),
@@ -95,6 +98,11 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
                 label: days === 365 ? '1 year' : `${days} days`,
               }))}
               onChange={setRange}
+              disabled={
+                history.status === 'running' ||
+                history.status === 'paused' ||
+                history.status === 'failed'
+              }
             />
             {history.plan && history.status !== 'idle' && (
               <>
@@ -104,11 +112,26 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
                 />
                 <AppText variant="caption" tone="muted">
                   {history.status === 'complete'
-                    ? `${history.plan.days} days saved for offline use`
+                    ? `Saved for offline use. ${history.domains
+                        .map(
+                          (domain) =>
+                            `${domain.label}: ${plural(
+                              domain.total - domain.skipped,
+                              domain.unit,
+                              `${domain.unit}s`,
+                            )}`,
+                        )
+                        .join(' · ')}`
                     : `${history.done} of ${history.total} saved${
                         history.status === 'paused' ? ' · Paused' : ''
                       }`}
                 </AppText>
+                {history.skipped > 0 && (
+                  <AppText variant="caption" tone="muted">
+                    {plural(history.skipped, 'item', 'items')} couldn't be saved. Restore again
+                    later to retry.
+                  </AppText>
+                )}
               </>
             )}
             {history.status === 'running' ? (
@@ -143,10 +166,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
                 setRestore(false);
                 void actions.sync(true).then(() =>
                   history.download?.start({
-                    anchor: todayInTz(
-                      account.dataReader?.timezone ??
-                        Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    ),
+                    anchor: todayInTz(timezone),
                     days: Number(range),
                   }),
                 );
@@ -178,7 +198,9 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
               busy={health.busy}
               onPress={() =>
                 void health.store
-                  ?.importHistory(new Date(Date.now() - Number(days) * 86400000).toISOString())
+                  ?.importHistory(
+                    dateStrMidnightInTz(shiftDateStr(today, -Number(days)), timezone).toISOString(),
+                  )
                   .catch((cause) =>
                     setError(
                       cause instanceof Error

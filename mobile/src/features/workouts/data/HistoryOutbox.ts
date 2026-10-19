@@ -63,6 +63,9 @@ export class HistoryOutbox {
     private uuid: () => string,
     private invalidate: (change?: HistoryOperation) => void,
     private now: () => number = Date.now,
+    // Runs once the server confirms a change and before it leaves the queue, while the change
+    // still overlays every view of its day.
+    private confirmed: (change: HistoryOperation) => Promise<void> = async () => {},
   ) {}
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -192,6 +195,10 @@ export class HistoryOutbox {
             throw new Error('Activity deletion readback not confirmed.');
           }
           this.invalidate(change);
+        }
+        await this.confirmed(change);
+        if (generation !== this.generation) {
+          return;
         }
         await this.write((operations) =>
           operations.filter((operation) => operation.id !== change.id),

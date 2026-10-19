@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createLocalStorage, type LocalStorage } from '../src/core/storage/LocalStorage.ts';
 import { HistoryDownload, type HistoryDomain } from '../src/core/sync/HistoryDownload.ts';
+import type { HistoryOperation } from '../src/features/workouts/data/HistoryOutbox.ts';
 import { historyDomains } from '../src/features/settings/data/history-domains.ts';
 import { WorkoutResources } from '../src/features/workouts/data/WorkoutResources.ts';
 import { HistoryOutbox, overlayHistory } from '../src/features/workouts/data/HistoryOutbox.ts';
 import { daySpec } from '../src/features/workouts/data/models.ts';
 import { NutritionStore } from '../src/features/nutrition/data/NutritionStore.ts';
 import { foodSchema, mealTypeSchema, scaledLog } from '../src/features/nutrition/data/models.ts';
+import { ApiError } from '../src/features/account/api/client.ts';
 import { sqliteFixture } from './storage-fixture.ts';
 
 const origin = 'https://example.com';
@@ -247,7 +249,7 @@ test('a download does not replace a day that changed on this phone while it was 
   assert.equal(resources.state(daySpec(anchor)).data?.exercises.length, 1);
 });
 
-test('food logs and check-ins download into the nutrition record and pending logs stay on top', async (t) => {
+test('food logs and check-ins download, a food logged mid-read is kept, and the read is retried', async (t) => {
   const { storage } = await openStorage(t);
   const scope = storage.account(origin, 'one');
   const mealType = mealTypeSchema.parse({
@@ -271,6 +273,7 @@ test('food logs and check-ins download into the nutrition record and pending log
     fatG: 1,
   });
   let offline = false;
+  let duringRead: (() => Promise<void>) | null = null;
   const reads: string[] = [];
   const connection = {
     origin,
@@ -285,6 +288,9 @@ test('food logs and check-ins download into the nutrition record and pending log
         return [mealType];
       }
       if (path.endsWith('food-logs')) {
+        const local = duringRead;
+        duringRead = null;
+        await local?.();
         return query?.date === '2026-10-18'
           ? [
               scaledLog(food, {
@@ -321,9 +327,11 @@ test('food logs and check-ins download into the nutrition record and pending log
   const nutrition = make();
   await nutrition.initialize();
   await nutrition.refresh('mealTypes', anchor, true);
-  // A food logged on this phone before the download, not yet uploaded.
-  await nutrition.logFoods([{ ...food, quantityMultiplier: 2 }], anchor, mealType.id);
-  assert.equal(nutrition.getSnapshot().operations.length > 0, true);
+  // A food logged on this phone while the first day is being read, not yet uploaded. That read
+  // is overtaken, so it is read again instead of pausing the download.
+  duringRead = async () => {
+    await nutrition.logFoods([{ ...food, quantityMultiplier: 2 }], anchor, mealType.id);
+  };
 
   const resources = new WorkoutResources(scope, { ...server('one').connection });
   const download = new HistoryDownload(scope, connection, (plan) =>
@@ -334,6 +342,7 @@ test('food logs and check-ins download into the nutrition record and pending log
   await download.start({ anchor, days: 2 });
   assert.equal(download.getSnapshot().status, 'complete');
   assert.deepEqual(reads.slice(1), [
+    '/api/nutrition/food-logs:2026-10-19',
     '/api/nutrition/food-logs:2026-10-19',
     '/api/nutrition/food-logs:2026-10-18',
     '/api/day-checkin:2026-10-19',
@@ -438,10 +447,184 @@ test('clearing an account removes its download state', async (t) => {
 test('the supported domains cover the chosen range, with food and check-ins capped at 90 days', () => {
   const domains = historyDomains(
     { anchor, days: 365 },
-    { resources: { download: async () => {} }, nutrition: { refresh: async () => true } },
+    { resources: { download: async () => true }, nutrition: { download: async () => {} } },
   );
   const sizes = Object.fromEntries(domains.map((domain) => [domain.id, domain.keys.length]));
   assert.deepEqual(sizes, { days: 365, calendar: 13, food: 90, checkins: 90, summaries: 6 });
   assert.equal(domains[0].keys[0], anchor);
   assert.equal(domains[0].keys.at(-1), '2025-10-20');
+});
+
+// A server where uploaded history edits take effect, so a day read after the push no longer holds
+// the deleted exercise.
+function editingServer(userId: string) {
+  const deleted = new Set<string>();
+  const state = { offline: false, rereadFails: false, reads: 0 };
+  const connection = {
+    origin,
+    userId,
+    timezone: 'Australia/Brisbane',
+    get: async (path: string, query?: Record<string, string>): Promise<unknown> => {
+      if (state.offline || (state.rereadFails && deleted.size)) {
+        throw new TypeError('Network request failed');
+      }
+      state.reads++;
+      if (path === '/api/day-log') {
+        const row = exercise(query!.date);
+        return {
+          date: query!.date,
+          exercises: deleted.has(row.exerciseLogId) ? [] : [row],
+        };
+      }
+      if (path === '/api/calendar-data') {
+        return { trainedDays: {}, activityDays: {} };
+      }
+      throw new Error(`Unexpected ${path}`);
+    },
+    post: async (_path: string, body: unknown) => {
+      if (state.offline) {
+        throw new TypeError('Network request failed');
+      }
+      const change = (body as { mutations: HistoryOperation[] }).mutations[0];
+      deleted.add(change.payload.exerciseLogId as string);
+      return { processed: 1, errors: [] };
+    },
+  };
+  return { state, connection };
+}
+function outbox(
+  scope: ReturnType<LocalStorage['account']>,
+  remote: ReturnType<typeof editingServer>,
+) {
+  const resources = new WorkoutResources(scope, remote.connection);
+  return new HistoryOutbox(
+    scope,
+    remote.connection,
+    () => id(901),
+    () => {},
+    Date.now,
+    (change) => resources.resave(daySpec(change.date)),
+  );
+}
+
+test('an edit made offline, then a download, then the upload: the saved day holds the edit', async (t) => {
+  const { storage } = await openStorage(t);
+  const scope = storage.account(origin, 'one');
+  const remote = editingServer('one');
+  const date = '2026-10-18';
+  // Offline: the exercise is deleted on the phone and waits in the outbox.
+  remote.state.offline = true;
+  const first = outbox(scope, remote);
+  await first.initialize();
+  await first.enqueue('exercise_log_delete', date, { exerciseLogId: exercise(date).exerciseLogId });
+  await first.sync();
+  first.cancel();
+  // The app restarts online. The download reads the day before the outbox has pushed, so it saves
+  // the exercise the server still has.
+  remote.state.offline = false;
+  await new HistoryDownload(scope, remote.connection, () =>
+    dayDomain(new WorkoutResources(scope, remote.connection), 2),
+  ).start({ anchor, days: 2 });
+  const queue = outbox(scope, remote);
+  await queue.initialize();
+  await queue.sync();
+  assert.equal(queue.getSnapshot().operations.length, 0);
+  // Offline again, with nothing left to lay over the day: it must not show the exercise.
+  remote.state.offline = true;
+  const reopened = new WorkoutResources(scope, remote.connection);
+  await reopened.load(daySpec(date));
+  assert.deepEqual(reopened.state(daySpec(date)).data?.exercises, []);
+});
+
+test('an upload whose day cannot be read again drops that saved day rather than keep the deleted exercise', async (t) => {
+  const { storage } = await openStorage(t);
+  const scope = storage.account(origin, 'one');
+  const remote = editingServer('one');
+  const date = '2026-10-18';
+  await new HistoryDownload(scope, remote.connection, () =>
+    dayDomain(new WorkoutResources(scope, remote.connection), 2),
+  ).start({ anchor, days: 2 });
+  remote.state.rereadFails = true;
+  const queue = outbox(scope, remote);
+  await queue.initialize();
+  await queue.enqueue('exercise_log_delete', date, { exerciseLogId: exercise(date).exerciseLogId });
+  await queue.sync();
+  assert.equal(queue.getSnapshot().operations.length, 0);
+  const reopened = new WorkoutResources(scope, remote.connection);
+  await reopened.load(daySpec(date));
+  assert.equal(reopened.state(daySpec(date)).data, null);
+  await reopened.load(daySpec(anchor));
+  assert.equal(reopened.state(daySpec(anchor)).data?.exercises.length, 1);
+});
+
+test('a day the server keeps failing is retried, skipped and counted, and older days still save', async (t) => {
+  const { storage } = await openStorage(t);
+  const scope = storage.account(origin, 'one');
+  const remote = server('one');
+  const get = remote.connection.get;
+  let failures = 0;
+  remote.connection.get = async (path, query) => {
+    if (query?.date === '2026-10-18') {
+      failures++;
+      throw new ApiError(500);
+    }
+    return get(path, query);
+  };
+  const waits: number[] = [];
+  const download = new HistoryDownload(
+    scope,
+    remote.connection,
+    () => dayDomain(new WorkoutResources(scope, remote.connection), 4),
+    async (ms) => {
+      waits.push(ms);
+    },
+  );
+  await download.start({ anchor, days: 4 });
+  assert.equal(failures, 3);
+  assert.deepEqual(waits, [2000, 4000]);
+  assert.equal(download.getSnapshot().status, 'complete');
+  assert.equal(download.getSnapshot().skipped, 1);
+  assert.deepEqual(download.getSnapshot().domains[0], {
+    id: 'days',
+    label: 'Workouts, activities, sleep and body',
+    unit: 'day',
+    done: 4,
+    skipped: 1,
+    total: 4,
+  });
+  const reopened = new HistoryDownload(scope, remote.connection, () =>
+    dayDomain(new WorkoutResources(scope, remote.connection), 4),
+  );
+  await reopened.initialize();
+  assert.equal(reopened.getSnapshot().skipped, 1);
+});
+
+test('the paused message names the cause: offline, signed out or busy', async (t) => {
+  const { storage } = await openStorage(t);
+  const scope = storage.account(origin, 'one');
+  for (const [error, text] of [
+    [new TypeError('Network request failed'), /no connection/],
+    [new ApiError(401), /check your account/],
+    [new ApiError(429), /busy/],
+  ] as const) {
+    const domain: HistoryDomain = {
+      id: 'days',
+      label: 'Days',
+      unit: 'day',
+      keys: [anchor],
+      fetch: async () => {
+        throw error;
+      },
+    };
+    const download = new HistoryDownload(
+      scope,
+      { origin, userId: 'one' },
+      () => [domain],
+      async () => {},
+    );
+    await download.start({ anchor, days: 1 });
+    assert.equal(download.getSnapshot().status, 'failed');
+    assert.match(download.getSnapshot().error ?? '', text);
+    assert.equal(download.getSnapshot().done, 0);
+  }
 });

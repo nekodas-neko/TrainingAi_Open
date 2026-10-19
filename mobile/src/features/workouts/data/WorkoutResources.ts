@@ -370,8 +370,9 @@ export class WorkoutResources {
   }
   // Saves a view for offline use without registering it as visible, so a long history download
   // does not make `refreshVisible` re-read hundreds of past days on every app open. Throws when
-  // the read or the save fails, so the caller keeps its cursor on this view.
-  async download<T>(spec: ResourceSpec<T>) {
+  // the read or the save fails, so the caller keeps its cursor on this view. Resolves false when a
+  // newer local change or read of the view overtook it and nothing was saved.
+  async download<T>(spec: ResourceSpec<T>): Promise<boolean> {
     if (this.changes.tracks(spec.path)) {
       throw new Error('Training changes overlay this view; load it instead.');
     }
@@ -387,10 +388,10 @@ export class WorkoutResources {
     const entry = this.entries.get(key);
     // A local change or a newer read of this view landed while it downloaded: keep that one.
     if ((entry && entry.revision !== revision) || entry?.request) {
-      return;
+      return false;
     }
     if (spec.cache && !spec.cache(data)) {
-      return;
+      return false;
     }
     await this.storage.set(
       `workout-resource.v1:${key}`,
@@ -403,11 +404,24 @@ export class WorkoutResources {
       }),
     );
     if (generation !== this.generation || !entry || entry.revision !== revision) {
-      return;
+      return true;
     }
     entry.hydrated = true;
     entry.policy.succeeded();
     this.publish(entry, { data, loading: false, refreshing: false, saved: false, error: null });
+    return true;
+  }
+  // After an edit to a saved view uploads, the outbox stops laying it over that view, so the saved
+  // copy must already hold the edit. Read it again, or drop the copy when that fails: a day that
+  // is missing offline is better than one showing an exercise that was deleted.
+  async resave<T>(spec: ResourceSpec<T>) {
+    let saved = false;
+    try {
+      saved = await this.download(spec);
+    } catch {}
+    if (!saved) {
+      await this.storage.remove(`workout-resource.v1:${resourceKey(spec)}`).catch(() => undefined);
+    }
   }
   async forget<T>(spec: ResourceSpec<T>) {
     const entry = this.entry(spec);

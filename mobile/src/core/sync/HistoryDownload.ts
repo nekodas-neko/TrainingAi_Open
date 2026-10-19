@@ -7,9 +7,44 @@ import type { ScopedStorage } from '../storage/LocalStorage.ts';
 export type HistoryDomain = {
   id: string;
   label: string;
+  unit: 'day' | 'month' | 'view';
   keys: string[];
-  fetch(key: string): Promise<void>;
+  fetch(key: string): Promise<unknown>;
 };
+// Thrown by a domain whose source is briefly busy: the download stops and carries on later
+// rather than skipping the key.
+export class RetryLater extends Error {}
+type Failure = 'offline' | 'account' | 'busy' | 'unreadable';
+// An HTTP status or a reply that does not parse comes from the server; anything else thrown by a
+// read (a fetch that never connected) is the phone being offline.
+function classify(error: unknown): Failure {
+  if (error instanceof RetryLater) {
+    return 'busy';
+  }
+  const status =
+    error && typeof error === 'object' && 'status' in error && typeof error.status === 'number'
+      ? error.status
+      : null;
+  if (status === 401 || status === 403) {
+    return 'account';
+  }
+  if (status === 408 || status === 429) {
+    return 'busy';
+  }
+  if (status !== null || (error instanceof Error && /^(ZodError|SyntaxError)$/.test(error.name))) {
+    return 'unreadable';
+  }
+  return 'offline';
+}
+const failureText: Record<Exclude<Failure, 'unreadable'>, string> = {
+  offline:
+    'History download paused: no connection. It carries on from where it stopped once you are online.',
+  account: 'History download paused: check your account, then tap Resume.',
+  busy: 'History download paused: TrainingAi is busy. It carries on from where it stopped.',
+};
+// A key the server keeps failing to serve is skipped after this many reads, so one bad day cannot
+// hold back every older one. Skipped keys are counted and shown when the download ends.
+const ATTEMPTS = 3;
 // The anchor day is fixed when a download starts, so a resume after midnight walks the same keys.
 export type HistoryPlan = { anchor: string; days: number };
 export type HistoryDownloadStatus = 'idle' | 'running' | 'paused' | 'failed' | 'complete';
@@ -17,18 +52,27 @@ export type HistoryDownloadState = {
   ready: boolean;
   status: HistoryDownloadStatus;
   plan: HistoryPlan | null;
-  domains: { id: string; label: string; done: number; total: number }[];
+  domains: {
+    id: string;
+    label: string;
+    unit: HistoryDomain['unit'];
+    done: number;
+    skipped: number;
+    total: number;
+  }[];
   done: number;
   total: number;
+  skipped: number;
   error: string | null;
 };
-const empty: HistoryDownloadState = {
+export const emptyHistoryDownload: HistoryDownloadState = {
   ready: false,
   status: 'idle',
   plan: null,
   domains: [],
   done: 0,
   total: 0,
+  skipped: 0,
   error: null,
 };
 // `cursors[id]` is the last key of that domain saved to the phone. Every save is keyed, so
@@ -40,21 +84,24 @@ const saved = z.object({
   status: z.enum(['running', 'paused', 'failed', 'complete']),
   plan: z.object({ anchor: z.string(), days: z.number().int().positive() }),
   cursors: z.record(z.string(), z.string().nullable()),
+  skipped: z.record(z.string(), z.array(z.string())).default({}),
 });
 const key = 'history-download.v1';
 
 export class HistoryDownload {
-  private current = empty;
+  private current = emptyHistoryDownload;
   private listeners = new Set<() => void>();
   private generation = 0;
   private domains: HistoryDomain[] = [];
   private cursors: Record<string, string | null> = {};
+  private skipped: Record<string, string[]> = {};
   private running: Promise<void> | null = null;
   private initializing: Promise<void> | null = null;
   constructor(
     private storage: ScopedStorage,
     private account: { origin: string; userId: string },
     private plan: (plan: HistoryPlan) => HistoryDomain[],
+    private wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
   ) {}
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -68,7 +115,9 @@ export class HistoryDownload {
     const domains = this.domains.map((domain) => ({
       id: domain.id,
       label: domain.label,
+      unit: domain.unit,
       done: this.position(domain),
+      skipped: this.skipped[domain.id]?.length ?? 0,
       total: domain.keys.length,
     }));
     this.current = {
@@ -76,6 +125,7 @@ export class HistoryDownload {
       domains,
       done: domains.reduce((sum, domain) => sum + domain.done, 0),
       total: domains.reduce((sum, domain) => sum + domain.total, 0),
+      skipped: domains.reduce((sum, domain) => sum + domain.skipped, 0),
     };
     this.listeners.forEach((listener) => listener());
   }
@@ -101,6 +151,7 @@ export class HistoryDownload {
           }
           this.domains = data ? this.plan(data.plan) : [];
           this.cursors = data?.cursors ?? {};
+          this.skipped = data?.skipped ?? {};
           this.publish({
             ready: true,
             status: data?.status ?? 'idle',
@@ -134,6 +185,7 @@ export class HistoryDownload {
     }
     this.domains = this.plan(plan);
     this.cursors = {};
+    this.skipped = {};
     this.publish({ plan });
     await this.go();
   }
@@ -176,11 +228,18 @@ export class HistoryDownload {
           if (generation !== this.generation) {
             return;
           }
-          await domain.fetch(domain.keys[index]);
+          const item = domain.keys[index];
+          const fetched = await this.fetch(domain, item, generation);
           if (generation !== this.generation) {
             return;
           }
-          this.cursors = { ...this.cursors, [domain.id]: domain.keys[index] };
+          if (!fetched) {
+            this.skipped = {
+              ...this.skipped,
+              [domain.id]: [...(this.skipped[domain.id] ?? []), item],
+            };
+          }
+          this.cursors = { ...this.cursors, [domain.id]: item };
           await this.save('running');
           this.publish({});
         }
@@ -189,16 +248,34 @@ export class HistoryDownload {
         await this.save('complete');
         this.publish({ status: 'complete' });
       }
-    } catch {
+    } catch (error) {
       if (generation !== this.generation) {
         return;
       }
+      const failure = classify(error);
       this.publish({
         status: 'failed',
-        error:
-          'History download paused: check your connection. It carries on from where it stopped.',
+        error: failureText[failure === 'unreadable' ? 'offline' : failure],
       });
       await this.save('failed').catch(() => undefined);
+    }
+  }
+  // True once the key is saved, false when the server failed it on every attempt. Throws for a
+  // failure that should stop the download: offline, signed out, busy, or a local save error.
+  private async fetch(domain: HistoryDomain, key: string, generation: number) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await domain.fetch(key);
+        return true;
+      } catch (error) {
+        if (classify(error) !== 'unreadable' || generation !== this.generation) {
+          throw error;
+        }
+        if (attempt >= ATTEMPTS) {
+          return false;
+        }
+        await this.wait(attempt * 2_000);
+      }
     }
   }
   private save(status: Exclude<HistoryDownloadStatus, 'idle'>) {
@@ -214,6 +291,7 @@ export class HistoryDownload {
         status,
         plan: this.current.plan,
         cursors: this.cursors,
+        skipped: this.skipped,
       }),
     );
   }

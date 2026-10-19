@@ -83,7 +83,7 @@ export function useNativeDataActions() {
       }
       setMessage(
         restore
-          ? 'Saved account data refreshed. Older history loads when you open it.'
+          ? 'Account data refreshed. Your history is now saving to this phone for offline use.'
           : 'Sync finished. Any changes still waiting to upload remain saved on this phone.',
       );
     } catch (cause) {

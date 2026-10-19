@@ -14,6 +14,7 @@ import { useWorkoutContext } from '../WorkoutProvider';
 import { useWorkoutResources } from './WorkoutDataProvider';
 import { HistoryOutbox, type HistoryQueueState } from './HistoryOutbox';
 import { healthReadPaths } from '../../../core/sync/health-invalidation';
+import { calendarSpec, daySpec } from './models';
 
 const Context = createContext<HistoryOutbox | null>(null);
 const empty: HistoryQueueState = { ready: false, operations: [], syncing: false, error: null };
@@ -49,6 +50,16 @@ export function HistoryQueueProvider({ children }: PropsWithChildren) {
                 void resources?.refreshVisible();
               }
               workouts.invalidate();
+            },
+            Date.now,
+            async (change) => {
+              const date = change.date.replace(/\//g, '-');
+              await Promise.all([
+                resources?.resave(daySpec(date)),
+                resources?.resave(
+                  calendarSpec(Number(date.slice(0, 4)), Number(date.slice(5, 7))),
+                ),
+              ]);
             },
           )
         : null,
