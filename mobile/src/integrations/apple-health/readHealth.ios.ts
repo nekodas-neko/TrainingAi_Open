@@ -3,8 +3,9 @@ import type { HealthMetric, HealthSnapshot } from '../../features/health/types';
 import { coveredMinutes } from '../../features/health/intervals';
 import { inspectHealth, inspectionReadTypes } from './inspectHealth.ios';
 import { healthKit } from './healthKit.ios';
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils';
 
-export async function readHealthSnapshot(): Promise<HealthSnapshot> {
+export async function readHealthSnapshot(timezone = DEFAULT_TZ): Promise<HealthSnapshot> {
   if (isRunningInExpoGo()) {
     throw new Error(
       'Apple Health is unavailable in Expo Go. Use Explore sample data for this preview.',
@@ -104,6 +105,6 @@ export async function readHealthSnapshot(): Promise<HealthSnapshot> {
       source: sample?.sourceRevision.source.name,
     });
   }
-  const inspection = await inspectHealth(health, end);
+  const inspection = await inspectHealth(health, end, timezone);
   return { mode: 'device', readAt: end.toISOString(), metrics, inspection };
 }

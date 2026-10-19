@@ -548,23 +548,23 @@ test('an expired change token rescans from a week before the last good read, not
   assert.ok(Date.parse(readFrom) < r.clock.at - 30 * 86400000, 'reaches past the old 30-day rescan');
 });
 
-test('the rescan never asks for more than Health Connect allows without the history permission', async () => {
+test('a permission change rescans the last 30 days, not everything since install', async () => {
   const f = fixture();
   const r = revocable(f);
   r.grant(['Steps']);
   await r.store.setEnabled(true);
   await r.store.run(true);
-  const grantedAt = r.clock.at;
-  // The last good read was the first one, so a week before it is past the grant's 30-day floor
-  // only if the floor is ignored. Push the clock and expire to rescan.
-  r.clock.at += 3 * 86400000;
-  f.expire();
+  // Syncing normally for two months: the token is fresh the day before the change.
+  r.clock.at += 59 * 86400000;
   await r.store.run(true);
-  let readFrom = '';
+  r.clock.at += 86400000;
+  r.grant(['Steps', 'Weight']);
+  const reads: string[] = [];
   f.reader.history = async (_type, from) => {
-    readFrom = from;
+    reads.push(from);
     return { records: [], pageToken: null, skipped: 0 };
   };
   await r.store.run(true);
-  assert.ok(Date.parse(readFrom) >= grantedAt - 30 * 86400000);
+  assert.ok(reads.length);
+  for (const from of reads) assert.equal(from, new Date(r.clock.at - 30 * 86400000).toISOString());
 });

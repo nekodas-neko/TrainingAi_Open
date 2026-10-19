@@ -303,6 +303,7 @@ export class HealthConnectImportStore {
         // set aside until the permission returns, and the rest of the batch carries on (keeping
         // any retry backoff it had, which is checked next).
         const held = item.records.filter((row) => !types.includes(row.type));
+        const ids = new Set(held.map((row) => row.id));
         const rest = { ...item, records: item.records.filter((row) => types.includes(row.type)) };
         const keep = rest.records.length || rest.deleted.length;
         await this.write({
@@ -311,7 +312,6 @@ export class HealthConnectImportStore {
           blocked: [
             // A record held again replaces its earlier copy rather than being held twice.
             ...this.disk.blocked.flatMap((entry) => {
-              const ids = new Set(held.map((row) => row.id));
               const records = entry.batch.records.filter((row) => !ids.has(row.id));
               return records.length ? [{ ...entry, batch: { records, deleted: [] } }] : [];
             }),
@@ -396,6 +396,7 @@ export class HealthConnectImportStore {
       if (now - Date.parse(entry.since) > BLOCKED_TTL_MS) dropped += held.length;
       else blocked.push({ ...entry, batch: { records: held, deleted: [] } });
     }
+    if (!queue.length && !dropped) return;
     await this.write({
       ...this.disk,
       queue: [...this.disk.queue, ...queue],
@@ -426,28 +427,30 @@ export class HealthConnectImportStore {
           await this.write({
             ...this.disk,
             token: null,
-            rescanFrom: null,
+            // A stale token as well as a permission change still covers the gap since it.
+            rescanFrom: this.disk.rescanFrom ?? this.disk.tokenAt,
             scan: null,
             permissionKey,
           });
         if (!this.disk.token && !this.disk.scan) {
           const initial = await this.reader.changes(types);
           if (this.canceled) return;
-          // #3117: after an expired token, from the local midnight a week before the last good
-          // read, rather than only the last 30 days; never before what Health Connect allows.
-          const floor = hasHistory
-            ? 0
-            : Date.parse(this.disk.grantedAt ?? new Date(this.now()).toISOString()) - READ_LIMIT_MS;
+          // #3117: without the history permission a full rescan reads the last 30 days, as
+          // before. After a gap (an expired token, or a permission change on a stale one) it
+          // reaches back to the local midnight a week before the last good read instead, but
+          // never past what Health Connect allows: 30 days before the first grant.
           const resume = this.disk.rescanFrom
             ? midnightDaysAgoInTz(
                 this.connection.timezone ?? DEFAULT_TZ,
                 RESCAN_OVERLAP_DAYS,
                 new Date(this.disk.rescanFrom),
               ).getTime()
-            : -Infinity;
-          const from = new Date(
-            Math.max(Date.parse(this.disk.from), floor, resume),
-          ).toISOString();
+            : Infinity;
+          const grantedAt = Date.parse(this.disk.grantedAt ?? new Date(this.now()).toISOString());
+          const floor = hasHistory
+            ? 0
+            : Math.max(grantedAt - READ_LIMIT_MS, Math.min(this.now() - READ_LIMIT_MS, resume));
+          const from = new Date(Math.max(Date.parse(this.disk.from), floor)).toISOString();
           await this.write({
             ...this.disk,
             rescanFrom: null,
