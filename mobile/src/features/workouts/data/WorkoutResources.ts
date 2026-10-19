@@ -6,6 +6,7 @@ import { ApiError, aiFailureText } from '../../account/api/client.ts';
 import { overlayHistory, type HistoryOperation } from './HistoryOutbox.ts';
 import { TrainingStore } from './TrainingStore.ts';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
+import { withRewardState } from '../../rewards/data/dependencies.ts';
 
 export type ResourceSpec<T> = {
   path: string;
@@ -453,6 +454,7 @@ export class WorkoutResources {
     if (!paths.length) {
       return;
     }
+    paths = withRewardState(paths);
     this.invalidationListeners.forEach((listener) => listener(paths));
     this.invalidationWrites = this.invalidationWrites
       .then(async () => {

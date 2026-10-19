@@ -27,6 +27,8 @@ import { WorkoutTiming } from '../components/WorkoutTiming';
 import { WorkoutHrRecovery } from '../components/WorkoutHrRecovery';
 import { WorkoutEnergy } from '../components/WorkoutEnergy';
 import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
+import { useWorkoutXp } from '../../rewards/data/useRewards';
+import { WorkoutXp } from '../../rewards/components/WorkoutXp';
 import { WorkoutCalendarAction } from '../../platform/components/WorkoutCalendarAction';
 
 export function WorkoutLogScreen({
@@ -45,6 +47,7 @@ export function WorkoutLogScreen({
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
   const workout = journal.data.workouts.find((workout) => workout.id === workoutId);
+  const xp = useWorkoutXp(workout);
   useTrainingKeepAwake(workout?.status === 'active');
   const previousStatus = useRef({ id: workoutId, status: workout?.status });
   useEffect(() => {
@@ -179,6 +182,7 @@ export function WorkoutLogScreen({
       )}
       {workout.syncError && <Notice title="Upload pending" message={workout.syncError} />}
       <WorkoutSaveNotice />
+      <WorkoutXp xp={xp} />
       <View style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
         <Grid>
           {stats.map((stat) => (
