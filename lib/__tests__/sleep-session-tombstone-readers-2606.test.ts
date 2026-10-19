@@ -63,6 +63,8 @@ const ALLOWED: { file: string; marker: string; reason: string }[] = [
     reason: 'issue 2752: deletes by id the ghosts chosen above, rows whose server copy no longer exists at all' },
   { file: 'lib/data/postgres/adapter.ts', marker: 'gt(s.sleepSessions.updatedAt, effectiveSince)',
     reason: 'the delta pull IS the tombstone channel: a device learns of a removal only because the removed row is sent' },
+  { file: 'lib/data/postgres/adapter.ts', marker: 'array_agg(id::text) AS ids FROM sleep_sessions WHERE user_id',
+    reason: 'issue 2752 (#2778): the id list the device ghost sweep compares against; a tombstoned row is not a ghost, so its id must be listed. It used to pass only because its window reached the next method\'s predicate' },
   { file: 'lib/data/postgres/adapter.ts', marker: 'NOT EXISTS (SELECT 1 FROM sleep_sessions d',
     reason: 'guards the (user_id, sleep_start) unique key, which a removed row still holds' },
   { file: 'lib/data/postgres/adapter.ts', marker: '.values({ ...(night.id ? { id: night.id } : {}), userId, date: night.date, ...fields, manualEntry: true })',

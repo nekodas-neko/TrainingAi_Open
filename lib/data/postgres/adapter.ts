@@ -9,7 +9,7 @@ import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES }
 import { normalizeEmail } from '@trainingai/shared/validation/email'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
-import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull } from 'drizzle-orm'
+import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb } from './client'
 import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
@@ -3342,7 +3342,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]> {
-    const rows = await this.db.select().from(s.sleepSessions)
+    // #3057: Oura's period type rides along so `ouraSecondaryPeriods` can keep a non-`long_sleep`
+    // period out of the night. It lives on the Cloud period table, keyed (user_id, oura_id), so a
+    // row from any other source joins nothing and reads null.
+    const rows = await this.db.select({ ...getTableColumns(s.sleepSessions), ouraSleepType: s.ouraCloudSleepPeriods.sleepType })
+      .from(s.sleepSessions)
+      .leftJoin(s.ouraCloudSleepPeriods, and(
+        eq(s.ouraCloudSleepPeriods.userId, s.sleepSessions.userId),
+        eq(s.ouraCloudSleepPeriods.ouraId, s.sleepSessions.ouraId),
+      ))
       .where(and(
         eq(s.sleepSessions.userId, userId),
         gte(s.sleepSessions.date, shiftDateStr(from, -1)),
@@ -3376,6 +3384,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       manualEntry:     r.manualEntry,
       durationSource:  r.manualEntry ? 'manual' : r.sourceMap?.duration_hours ?? undefined,
       respiratoryRateSource: r.manualEntry ? 'manual' : r.sourceMap?.respiratory_rate ?? undefined,
+      ouraSleepType:   r.ouraSleepType   ?? null,
     }))
   }
 

@@ -55,6 +55,56 @@ export interface SleepWindow {
   sleepStart: Date
   sleepEnd: Date
   durationHours?: number | null
+  /** Oura Cloud's own type for the period (`oura_cloud_sleep_periods.sleep_type`); see
+   *  {@link ouraSecondaryPeriods}. Absent on ring, Health Connect, manual and pre-Cloud rows. */
+  ouraSleepType?: string | null
+}
+
+/** The fields {@link ouraSecondaryPeriods} reads. Server sessions (Date windows) and the sleep list's
+ *  rows (ISO strings) both satisfy it. */
+export interface OuraTypedWindow {
+  sleepStart: Date | string | null
+  sleepEnd: Date | string | null
+  ouraSleepType?: string | null
+}
+
+/**
+ * **On an Oura Cloud night, Oura's `long_sleep` period is the night (#3058).** Returns the Oura
+ * periods that are NOT the night: a `sleep`, `late_nap` or `rest` period with a `long_sleep` period
+ * within {@link MAX_INTRA_NIGHT_GAP_HOURS} of it. Those are naps, never grouped into the night, for
+ * the score ({@link groupSleepPeriods}) or for the sleep list (`mergeByDate` in
+ * `lib/sleep/merge-sessions.ts`). Both call this, so the card and the score cannot disagree.
+ *
+ * Oura has already classified its periods, and #2860 takes Oura's values as Oura calculated them.
+ * Without this, a 20-minute `sleep` fragment 37 minutes before the main period (19 Oct, #3057) joined
+ * the night: the window started an hour early, its awake time was added, and the card printed its
+ * 10% efficiency.
+ *
+ * **Only beside a `long_sleep`.** A short night Oura typed `sleep` because nothing longer happened
+ * has no main period to defer to, so it groups exactly as before and never disappears from the list
+ * or the score. The proximity bar is the same gap that joins two windows into one night.
+ *
+ * A row with no type (ring `ble:`, Health Connect, manual, an Oura row from before the Cloud feed)
+ * is never returned, so those nights keep the circadian grouping unchanged. Nor is an untimed row,
+ * which cannot be placed beside anything.
+ */
+export function ouraSecondaryPeriods<T extends OuraTypedWindow>(windows: readonly T[]): Set<T> {
+  const span = (w: T): [number, number] | null => {
+    const s = instantMs(w.sleepStart)
+    const e = instantMs(w.sleepEnd)
+    return s == null || e == null ? null : [s, e]
+  }
+  const mains = windows.filter(w => w.ouraSleepType === 'long_sleep').map(span).filter(x => x != null)
+  const maxGapMs = MAX_INTRA_NIGHT_GAP_HOURS * 3_600_000
+  const out = new Set<T>()
+  for (const w of windows) {
+    if (w.ouraSleepType == null || w.ouraSleepType === 'long_sleep') continue
+    const ws = span(w)
+    if (!ws) continue
+    // The gap between the two windows; zero or negative when they touch or overlap.
+    if (mains.some(([ms, me]) => Math.max(ms - ws[1], ws[0] - me) <= maxGapMs)) out.add(w)
+  }
+  return out
 }
 
 /**
@@ -179,7 +229,8 @@ export interface SleepPeriod<T extends SleepWindow> {
 
 /**
  * Group a set of sleep windows into nights. Naps (anything whose midpoint falls outside the night
- * band) are returned separately and never join a night.
+ * band, and any Oura period that sits beside a `long_sleep`, see {@link ouraSecondaryPeriods}) are
+ * returned separately and never join a night.
  *
  * Night windows are merged when the gap between them is at most {@link MAX_INTRA_NIGHT_GAP_HOURS};
  * a longer gap starts a new night. Periods are returned oldest-first.
@@ -190,9 +241,10 @@ export function groupSleepPeriods<T extends SleepWindow>(
 ): { nights: SleepPeriod<T>[]; naps: T[] } {
   const naps: T[] = []
   const nightWindows: T[] = []
+  const secondary = ouraSecondaryPeriods(sessions)
   for (const s of sessions) {
     if (!hasSleep(s)) continue
-    ;(isNightWindow(s, tz) ? nightWindows : naps).push(s)
+    ;(!secondary.has(s) && isNightWindow(s, tz) ? nightWindows : naps).push(s)
   }
   nightWindows.sort((a, b) => a.sleepStart.getTime() - b.sleepStart.getTime())
 
