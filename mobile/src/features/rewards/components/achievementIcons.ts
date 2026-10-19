@@ -44,6 +44,12 @@ export const achievementIcons: Record<string, IconName> = {
   squat_100: 'workout',
   bench_100: 'activity',
   deadlift_100: 'down',
+  steps_5k: 'steps',
+  steps_10k: 'steps',
+  steps_20k: 'steps',
+  steps_30k: 'steps',
+  steps_40k: 'steps',
+  steps_50k: 'steps',
 };
 export const achievementIcon = (id: string): IconName =>
   achievementIcons[id] ?? 'workout';
