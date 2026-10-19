@@ -55,8 +55,11 @@ function ManualActivityScreen({
   // while recording, the live readout comes from `useRouteRecording`.
   const done = session?.mode === 'done';
   const route = useMemo(
-    () => (done && routeEligible(session) ? summariseRoute(activity.route) : null),
-    [done, session?.type, session?.guidance, activity.route],
+    () =>
+      done && routeEligible(session) && session.endMs !== null
+        ? summariseRoute(activity.route, elapsedMs(session, session.endMs) / 1000)
+        : null,
+    [done, session?.type, session?.guidance, session?.endMs, session?.pausedMs, activity.route],
   );
   const [now, setNow] = useState(Date.now),
     [busy, setBusy] = useState(false);

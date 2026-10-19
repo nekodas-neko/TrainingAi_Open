@@ -120,14 +120,10 @@ export function sessionPayload(
   if (session.mode !== 'done' || session.startMs === null || session.endMs === null) {
     throw new Error('Finish this activity before saving.');
   }
-  // The same fields the current app saves for a GPS activity. A guided walk's average pace is over
-  // its elapsed time (`walk-summary.tsx`), any other activity's over the GPS fix span
-  // (`activity-store.ts` finish).
+  // The same fields the current app saves for a GPS activity, with the average pace over the
+  // activity's active time, the seconds its duration counts (#3092).
   const summary = routeEligible(session)
-    ? summariseRoute(
-        route,
-        session.guidance?.kind === 'walk' ? elapsedMs(session, session.endMs) / 1000 : undefined,
-      )
+    ? summariseRoute(route, elapsedMs(session, session.endMs) / 1000)
     : null;
   const { distanceKm: routeKm, ...routeFields } = summary ?? {};
   const distanceKm = summary
