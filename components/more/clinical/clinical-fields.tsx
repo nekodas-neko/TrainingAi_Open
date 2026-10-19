@@ -71,8 +71,8 @@ export function NumberField({
     <FieldRow label={unit ? `${label} (${unit})` : label} hint={hint} htmlFor={id}>
       <Input
         id={id}
-        // `decimal` rather than `numeric`: several of these are fractional on the printout (BMD
-        // 1.046, T-score −1.6) and `numeric` gives a keypad with no decimal point on Android.
+        // `decimal` rather than `numeric`: several of these are fractional on the printout (a BMD
+        // like 1.2, a negative T-score) and `numeric` gives a keypad with no decimal point on Android.
         inputMode="decimal"
         type="number" enterKeyHint="done"
         step={step}
@@ -139,13 +139,13 @@ export function DateField({
  *
  * The DEXA schema stores mass in **grams** and bounds it at 0..500,000, which the route's own
  * comment explains is plausibility rather than validation — and it names the exact mistake it cannot
- * catch: "grams entered as kilograms is the likely one". The owner's printout reads `Fat 20,547.5 g`
- * and `Lean 49,532.8 g`; typing 20.5 instead of 20547.5 is inside the bound, saves cleanly, and is
- * wrong by a factor of a thousand in a column BF-2's calibration reads.
+ * catch: "grams entered as kilograms is the likely one". A printout reads something like
+ * `Fat 16,000 g` and `Lean 60,000 g`; typing 16 instead of 16000 is inside the bound, saves cleanly,
+ * and is wrong by a factor of a thousand in a column BF-2's calibration reads.
  *
  * A tighter bound is not the fix — the route is right that a real range spans children and adults.
- * Showing the value back in the unit the person actually thinks in is: 20,547.5 g reading as
- * "20.5 kg" is obviously fat mass, and 20.5 g reading as "0.02 kg" is obviously not.
+ * Showing the value back in the unit the person actually thinks in is: 16,000 g reading as "16 kg"
+ * is obviously fat mass, and 16 g reading as "0.02 kg" is obviously not.
  */
 export function GramsField({
   id,

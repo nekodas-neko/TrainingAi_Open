@@ -117,12 +117,12 @@ describe('RV-194 — the parts of an event that carry values', () => {
   // template comma-joins the real bound values into `.message`.
   const realDrizzleError = [
     'Failed query: select "id", "email", "timezone" from "users" where "users"."email" = $1',
-    'params: dasa.delan@gmail.com',
+    'params: someone@example.com',
   ].join('\n')
 
   it('cuts the bound parameters out of a real Drizzle message — this one carries an email', () => {
     const out = scrubExceptionValue(realDrizzleError)
-    expect(out).not.toContain('dasa.delan@gmail.com')
+    expect(out).not.toContain('someone@example.com')
     expect(out).toContain('params: [scrubbed]')
   })
 
@@ -138,7 +138,7 @@ describe('RV-194 — the parts of an event that carry values', () => {
     const out = scrubEvent(evt({
       exception: { values: [{ type: 'DrizzleQueryError', value: realDrizzleError }] },
     }))!
-    expect(out.exception!.values![0].value).not.toContain('dasa.delan@gmail.com')
+    expect(out.exception!.values![0].value).not.toContain('someone@example.com')
   })
 
   it('truncates a message with no params line at all, so a payload cannot ride in one', () => {
@@ -154,7 +154,7 @@ describe('RV-194 — the parts of an event that carry values', () => {
   it('drops console breadcrumbs — whatever the app last logged, verbatim', () => {
     const out = scrubEvent(evt({
       breadcrumbs: [
-        { category: 'console', message: 'saved weight 82.5kg for dasa.delan@gmail.com' },
+        { category: 'console', message: 'saved weight 82.5kg for someone@example.com' },
         { category: 'fetch', data: { url: '/api/version' } },
       ],
     }))!

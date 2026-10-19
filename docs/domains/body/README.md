@@ -118,7 +118,8 @@ Live at the time of writing (2026-07-30):
 - **Weight-band attribution (BF-58 option D, 2026-09-14)** — one scale, two people: the ingest route
   claims within 8% of the last confirmed weight, prompts up to 15%, and declines beyond, archiving
   the raw frame in all three branches. **The 8% is measured** off the owner's 70.0–72.8 kg cluster
-  against the 57.5–58.0 kg one he has dismissed — do not widen it without re-measuring. **Open:**
+  against the much lighter one he has dismissed (a household member's; no figure kept here) — do not
+  widen it without re-measuring. **Open:**
   LA-108's list (Lane B) and BF-58's two hardware questions. Shared with `devices`.
   [Journal](../../overview/history-2026-09-17-folded-1.md#2026-09-14-lane-a-bf58-weight-band-attribution).
 - **Claiming a declined weigh-in back (LA-108, 2026-09-14)** — `confirmScaleSample` accepts
