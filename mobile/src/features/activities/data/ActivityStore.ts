@@ -20,6 +20,7 @@ import {
   type Guidance,
   type FitnessProfile,
 } from './guidance.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 const sessionSchema = z.object({
   id: z.uuid(),
@@ -202,10 +203,13 @@ export class ActivityStore {
         });
         void this.sync();
       }
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
         this.publish({
-          error: 'Could not open saved activities. Existing records have been kept.',
+          error: failureNotice(
+            'Could not open saved activities. Existing records have been kept.',
+            failure,
+          ),
         });
       }
     }
@@ -592,9 +596,14 @@ export class ActivityStore {
         }));
         this.invalidate();
       }
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
-        this.publish({ error: 'Saved on this phone. Activities will upload when connected.' });
+        this.publish({
+          error: failureNotice(
+            'Saved on this phone. Activities will upload when connected.',
+            failure,
+          ),
+        });
       }
     }
   }

@@ -30,6 +30,7 @@ import { type Supplement } from '../data/models';
 import { openedOnProblem } from '@trainingai/shared/nutrition/vial-date';
 import { concentrationWorking, doseWorking, planDose } from '@trainingai/shared/nutrition/vial-plan';
 import { formatRange, recoveryResponse, weightResponse } from '@trainingai/shared/nutrition/weight-response';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const vialSchema = z
   .object({
     id: z.string(),
@@ -324,8 +325,8 @@ export function VialSheet({
                 ]);
                 setRemove(null);
                 state.refresh();
-              } catch {
-                setError('Could not delete the vial.');
+              } catch (failure) {
+                setError(failureNotice('Could not delete the vial.', failure));
               }
             }}
           />

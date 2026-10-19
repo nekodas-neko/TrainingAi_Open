@@ -1,5 +1,6 @@
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { platformSchema, type PlatformSettings, type Reminder } from './models.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 export class PlatformStore {
   private state: { ready: boolean; settings: PlatformSettings; error: string | null };
   private listeners = new Set<() => void>();
@@ -34,10 +35,13 @@ export class PlatformStore {
         else
           await this.storage.set('platform-settings.v1', JSON.stringify(this.state.settings));
         this.publish({ ready: true });
-      } catch {
+      } catch (failure) {
         this.publish({
           error:
-            'Could not open integration settings. Retry to keep alerts and calendar changes safe.',
+            failureNotice(
+              'Could not open integration settings. Retry to keep alerts and calendar changes safe.',
+              failure,
+            ),
         });
       }
     })());
@@ -61,9 +65,12 @@ export class PlatformStore {
     this.writes = operation.catch(() => {});
     try {
       await operation;
-    } catch {
+    } catch (failure) {
       this.publish({
-        error: 'Could not save integration settings. Your previous settings are kept.',
+        error: failureNotice(
+          'Could not save integration settings. Your previous settings are kept.',
+          failure,
+        ),
       });
       throw new Error(this.state.error!);
     }

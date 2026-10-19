@@ -5,6 +5,7 @@ import { sqliteFixture } from './storage-fixture.ts';
 import { loggingFixture, programId } from './logging-fixture.ts';
 import {
   createWorkout,
+  endRest,
   finishWorkout,
 } from '../src/features/workouts/logging/workout.ts';
 import {
@@ -21,6 +22,12 @@ import {
 } from '../src/features/platform/data/CalendarStore.ts';
 import { defaultWalk } from '../src/features/activities/data/guidance.ts';
 import type { ActivitySession } from '../src/features/activities/data/ActivityStore.ts';
+import { createRequire } from 'node:module';
+
+type Manifest = { manifest: { 'uses-permission'?: { $: Record<string, string> }[] } };
+const exactAlarms = createRequire(import.meta.url)(
+  '../src/integrations/notifications/exact-alarms.cjs',
+) as { addExactAlarmPermissions: (manifest: Manifest) => Manifest };
 
 const now = Date.UTC(2026, 9, 13, 0);
 function workout() {
@@ -96,11 +103,20 @@ test('rest deadlines reschedule one stable alert, and finished/skipped rests lea
     planAlerts(settings({ restAlerts: false }), [value], null, now, true).length,
     1,
   );
+  const background = planAlerts(
+    settings({ restAlerts: false }),
+    [value],
+    null,
+    now,
+    false,
+  );
+  assert.equal(background.length, 1);
+  assert.equal(alertSignature(background[0]), alertSignature(first[0]));
+  value.timers.restCues = false;
   assert.deepEqual(
     planAlerts(settings({ restAlerts: false }), [value], null, now, false),
     [],
   );
-  value.timers.restCues = false;
   assert.deepEqual(planAlerts(settings(), [value], null, now, true), []);
   assert.equal(planAlerts(settings(), [value], null, now, false).length, 1);
   value.timers.restCues = true;
@@ -111,6 +127,61 @@ test('rest deadlines reschedule one stable alert, and finished/skipped rests lea
   assert.deepEqual(planAlerts(settings(), [value], null, now + 90000), []);
   value.rest = null;
   assert.deepEqual(planAlerts(settings(), [value], null, now), []);
+});
+test('a rest alarm fires at its end, follows length changes and is cleared by the next set or ending', () => {
+  const resting = () => {
+    const value = workout();
+    value.exercises[0].sets[0] = {
+      ...value.exercises[0].sets[0],
+      weight: '20',
+      reps: '5',
+      startedAt: now - 30000,
+      completedAt: now,
+    };
+    value.rest = {
+      exerciseId: value.exercises[0].id,
+      setId: value.exercises[0].sets[0].id,
+      startedAt: now,
+      endsAt: now + 90000,
+    };
+    return value;
+  };
+  for (const foreground of [true, false]) {
+    const quiet = settings({ restAlerts: false });
+    const [alert] = planAlerts(quiet, [resting()], null, now, foreground);
+    assert.deepEqual(alert.trigger, { at: now + 90000 });
+    assert.equal(alert.title, 'Rest complete');
+  }
+  const longer = resting();
+  longer.rest!.endsAt += 30000;
+  assert.deepEqual(planAlerts(settings(), [longer], null, now + 1000)[0].trigger, {
+    at: now + 120000,
+  });
+  const later = now + 20000;
+  assert.deepEqual(planAlerts(settings(), [endRest(resting(), later)], null, later), []);
+  assert.deepEqual(planAlerts(settings(), [finishWorkout(resting(), later)], null, later), []);
+  const discarded = { ...resting(), status: 'discarded' as const };
+  assert.deepEqual(planAlerts(settings(), [discarded], null, now), []);
+});
+test('the manifest asks for exact alarms like the current app, once, with the pre-13 cap', () => {
+  const manifest: Manifest = {
+    manifest: {
+      'uses-permission': [
+        { $: { 'android:name': 'android.permission.POST_NOTIFICATIONS' } },
+        { $: { 'android:name': 'android.permission.SCHEDULE_EXACT_ALARM' } },
+      ],
+    },
+  };
+  exactAlarms.addExactAlarmPermissions(manifest);
+  exactAlarms.addExactAlarmPermissions(manifest);
+  assert.deepEqual(
+    manifest.manifest['uses-permission']!.map((row) => row.$),
+    [
+      { 'android:name': 'android.permission.POST_NOTIFICATIONS' },
+      { 'android:name': 'android.permission.SCHEDULE_EXACT_ALARM', 'android:maxSdkVersion': '32' },
+      { 'android:name': 'android.permission.USE_EXACT_ALARM' },
+    ],
+  );
 });
 test('walk cues follow paused elapsed time, cancel while paused and stop after ending', () => {
   const value = walk();

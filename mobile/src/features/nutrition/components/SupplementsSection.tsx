@@ -1,4 +1,5 @@
 import { definitionDose, hasFreeTextBesideAmount } from '@trainingai/shared/nutrition/definition-dose';
+import { supplementSubtitle } from '@trainingai/shared/nutrition/supplement-subtitle';
 import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
 import { Switch, View } from 'react-native';
@@ -29,6 +30,7 @@ import { SupplementCreateSchema, type Supplement } from '../data/models';
 import { VialSheet } from './VialSheet';
 import { isMilligramDosed } from '@trainingai/shared/nutrition/vial-plan';
 import { NutritionReminders } from '../../platform/components/NutritionReminders';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const formSchema = z.object({
   name: z.string(),
   dose: z.string(),
@@ -74,8 +76,8 @@ export function SupplementsSection({ date }: { date: string }) {
       await n.store?.logSupplement(s, date, dose);
       setPrompt(null);
       setError(null);
-    } catch {
-      setError('Could not save the dose.');
+    } catch (failure) {
+      setError(failureNotice('Could not save the dose.', failure));
     } finally {
       inFlight.current.delete(s.id);
       setToggling(new Set(inFlight.current));
@@ -99,12 +101,11 @@ export function SupplementsSection({ date }: { date: string }) {
                 checked={s.loggedToday}
                 leading={<Tick done={s.loggedToday} busy={toggling.has(s.id)} />}
                 trailing={false}
+                density="snug"
                 subtitle={
                   s.loggedAmount?.mixedUnits
                     ? 'Taken · multiple units; total unavailable'
-                    : s.loggedAmount?.amount != null
-                      ? `${s.loggedAmount.amount} ${s.loggedAmount.unit ?? ''} today${s.loggedAmount.contributions > 1 ? ' · ' + s.loggedAmount.contributions + ' doses' : ''}`
-                      : `${s.defaultAmount ?? s.dose ?? ''} ${s.unit ?? ''}`
+                    : (supplementSubtitle(s) ?? undefined)
                 }
                 onPress={() => {
                   if (toggling.has(s.id)) return;
@@ -240,8 +241,8 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
         { domain: 'supplements', date, payload: supplementPayload(s, { active: !s.active }) },
       ]);
       setError(null);
-    } catch {
-      setError('Could not change this supplement.');
+    } catch (failure) {
+      setError(failureNotice('Could not change this supplement.', failure));
     } finally {
       setBusy(false);
     }
@@ -262,8 +263,8 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
         })),
       );
       setError(null);
-    } catch {
-      setError('Could not save the new order.');
+    } catch (failure) {
+      setError(failureNotice('Could not save the new order.', failure));
     } finally {
       setBusy(false);
     }
@@ -460,8 +461,8 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
               );
               setEdit(null);
               setRemove(null);
-            } catch {
-              setError('Could not delete this supplement.');
+            } catch (failure) {
+              setError(failureNotice('Could not delete this supplement.', failure));
             }
           }}
         />

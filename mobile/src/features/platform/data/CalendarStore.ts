@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { WorkoutRecord } from '../../workouts/logging/workout.ts';
 import type { PlatformSettings } from './models.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 export type CalendarEvent = { title: string; notes: string; start: number; end: number };
 export type CalendarService = {
   find: (calendarId: string, marker: string, event: CalendarEvent) => Promise<string | null>;
@@ -72,9 +73,12 @@ export class CalendarStore {
         const raw = await this.storage.get('native-calendar.v1');
         if (raw) this.publish(schema.parse(JSON.parse(raw)));
         this.publish({ ready: true });
-      } catch {
+      } catch (failure) {
         this.publish({
-          error: 'Could not open saved calendar links. Retry before adding events.',
+          error: failureNotice(
+            'Could not open saved calendar links. Retry before adding events.',
+            failure,
+          ),
         });
       }
     })());

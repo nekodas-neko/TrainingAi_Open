@@ -19,7 +19,7 @@ const upsertBodyMetrics = vi.fn(async () => undefined)
 // so reading `[0]` off it is a type error. Same shape as the login rate-limit mock fixed in #912.
 // The row's shape is declared rather than left `unknown`, so the assertions below check against it
 // instead of casting — a cast would happily agree with a field the route stopped writing.
-const insertErrorEvent = vi.fn(async (_row: { message: string; stack: string | null; url: string | null; source: string }) => undefined)
+const insertErrorEvent = vi.fn(async (_row: { message: string; stack: string | null; url: string | null; userAgent: string | null; source: string }) => undefined)
 const getUserById = vi.fn(async () => ({ id: 'u-1', timezone: 'Australia/Brisbane' }))
 
 vi.mock('@/lib/data', () => ({
@@ -31,6 +31,7 @@ vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u-1' } }) }))
 
 import { POST as ingest } from '@/app/api/health-connect/ingest/route'
 import { POST as clientError } from '@/app/api/client-error/route'
+import { _resetRateLimitL1 } from '@/lib/rate-limit'
 
 const SECRET = 'a-secret-that-is-long-enough-to-compare'
 const WEBHOOK_USER = '00000000-0000-4000-8000-0000000000u1'.replace('u1', '0e1')
@@ -135,5 +136,52 @@ describe('client-error records what it is given, and refuses what it cannot', ()
     const row = insertErrorEvent.mock.calls[0][0]
     expect(row.stack).toBeNull()
     expect(row.url).toBeNull()
+  })
+})
+
+describe('client-error takes the native app\'s batches (#2913)', () => {
+  const event = {
+    message: 'Error: Invalid workout count.',
+    screen: 'Workouts',
+    apiPath: '/api/workout-data',
+    appVersion: '0.4.2',
+    buildCode: '57',
+    platform: 'android',
+  }
+
+  it('writes one row per event, with where it happened in the url and user-agent columns', async () => {
+    insertErrorEvent.mockClear()
+    const res = await post(clientError, 'http://localhost/api/client-error', {
+      events: [event, { ...event, apiPath: undefined, screen: 'Home' }],
+    })
+    expect(res.status).toBe(200)
+    expect(insertErrorEvent).toHaveBeenCalledTimes(2)
+    const [first, second] = insertErrorEvent.mock.calls.map((call) => call[0])
+    expect(first).toMatchObject({
+      source: 'client',
+      message: 'Error: Invalid workout count.',
+      stack: null,
+      url: 'native://Workouts?api=/api/workout-data',
+      userAgent: 'TrainingAi Preview/0.4.2 (57; android)',
+    })
+    expect(second.url).toBe('native://Home')
+  })
+
+  it('refuses a batch it cannot fully trust, and writes none of it', async () => {
+    for (const body of [
+      { events: [] },
+      { events: Array.from({ length: 6 }, () => event) },
+      { events: [event, { ...event, platform: 'web' }] },
+      { events: [{ ...event, screen: 'Workouts?token=abc' }] },
+      { events: [{ ...event, apiPath: '/api/workout-data?date=2026-10-19' }] },
+      { events: [{ ...event, message: 'm'.repeat(501) }] },
+    ]) {
+      // client-error limits per user, not per IP, so the cases are kept from throttling each other.
+      _resetRateLimitL1()
+      insertErrorEvent.mockClear()
+      const res = await post(clientError, 'http://localhost/api/client-error', body)
+      expect(res.status).toBe(400)
+      expect(insertErrorEvent).not.toHaveBeenCalled()
+    }
   })
 })

@@ -18,6 +18,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { SessionPreview } from '../../workouts/catalog';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { SessionGlyph } from '../../workouts/components/SessionGlyph';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 export function HomeRecommendation({
   trained,
@@ -50,8 +51,8 @@ export function HomeRecommendation({
     try {
       await home.store?.chooseRestDay(today, value);
       setError(null);
-    } catch {
-      setError('Could not save your rest-day choice. Try again.');
+    } catch (failure) {
+      setError(failureNotice('Could not save your rest-day choice. Try again.', failure));
     }
   }
   if (

@@ -73,8 +73,7 @@ test('four ticks of a heart-rate day, and an axis that reaches past the tallest 
   // 5,200 weekly zone minutes: ticks 0 / 2,000 / 4,000 would leave the bar above its top label.
   const ticks = coverTicks(niceTicks(0, 5200, 4), 5200);
   assert.deepEqual(ticks, [0, 2000, 4000, 6000]);
-  assert.deepEqual(tickLabels(ticks, 'full'), ['0', '2,000', '4,000', '6,000']);
-  assert.deepEqual(tickLabels(ticks), ['0', '2k', '4k', '6k']);
+  assert.deepEqual(tickLabels(ticks), ['0', '2,000', '4,000', '6,000']);
 });
 
 test('the 24-hour chart draws no dots, as the web does; the others keep their rule', () => {

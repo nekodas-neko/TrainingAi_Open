@@ -10,6 +10,7 @@ import { AppText, ChoiceTiles, Stack, StatusIndicator } from '../../../shared/ui
 import type { SessionPreview } from '../catalog';
 import { useWorkoutResource, useWorkoutResources } from '../data/WorkoutDataProvider';
 import { periodizationSpec } from '../data/models';
+import { failureNotice } from '../../../core/reporting/index.ts';
 export function SessionLengthControl({ session }: { session: SessionPreview }) {
   const resources = useWorkoutResources();
   const state = useWorkoutResource(periodizationSpec(session.id));
@@ -45,9 +46,11 @@ export function SessionLengthControl({ session }: { session: SessionPreview }) {
         ['/api/ai-periodization', '/api/workout-data', '/api/next-session'],
       );
       await resources.load(periodizationSpec(session.id), true);
-    } catch {
+    } catch (failure) {
       setPreset(previous);
-      setError('Could not rebuild today’s plan for that length. Try again.');
+      setError(
+        failureNotice('Could not rebuild today’s plan for that length. Try again.', failure),
+      );
     } finally {
       setBusy(false);
     }

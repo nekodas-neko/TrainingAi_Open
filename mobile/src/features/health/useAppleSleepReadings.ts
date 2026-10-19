@@ -5,6 +5,7 @@ import type { ScopedStorage } from '../../core/storage/LocalStorage';
 import { readDeviceSleep } from '../../integrations/device-health/readSleep';
 import { deviceHealthName } from '../../integrations/device-health/platform';
 import { sleepSchema, type SleepRow } from './data/models';
+import { failureNotice } from '../../core/reporting/index.ts';
 const cacheKey = Platform.OS === 'android' ? 'health-connect-sleep.v1' : 'apple-sleep.v1';
 
 const cacheSchema = z.object({
@@ -51,13 +52,17 @@ export function useAppleSleepReadings(storage: ScopedStorage, timezone: string) 
           } else {
             setState((value) => ({ ...value, ready: true, busy: false }));
           }
-        } catch {
+        } catch (failure) {
           if (current === generation.current) {
+            const error = failureNotice(
+              `Could not refresh ${deviceHealthName} sleep. Saved readings have been kept.`,
+              failure,
+            );
             setState((value) => ({
               ...value,
               ready: true,
               busy: false,
-              error: `Could not refresh ${deviceHealthName} sleep. Saved readings have been kept.`,
+              error,
             }));
           }
         } finally {

@@ -30,7 +30,6 @@ export function StackedBarChart({
   yAxis = false,
   target: targetProp,
   tickCount,
-  tickFormat,
   height,
 }: {
   readable?: boolean;
@@ -43,7 +42,6 @@ export function StackedBarChart({
    * does not keeps about three labels and the top at its tallest bar.
    */
   tickCount?: number;
-  tickFormat?: 'compact' | 'full';
   height?: number;
   label: string;
   unit: string;
@@ -66,7 +64,7 @@ export function StackedBarChart({
       ? niceTicks(0, wanted)
       : coverTicks(niceTicks(0, wanted, tickCount), wanted) : [];
   const top = ticks.length ? Math.max(wanted, ticks[ticks.length - 1]) : wanted;
-  const tickTexts = tickLabels(ticks, tickFormat);
+  const tickTexts = tickLabels(ticks);
   const toY = (v: number) => yPixel(v, 0, top, plotHeight);
   const row = (
     <Stack

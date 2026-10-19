@@ -35,7 +35,8 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
   `tuning:`, `question:`, `device-check:` — kept in step with the `type:` label automatically.
 - **A question for the owner is a `type: question` issue**, never a chat message. Write the brief
   into it: recommendation first, why it wins a year out, the alternatives and what each is better
-  at, the reversal cost, plain English, under a minute to read.
+  at, the reversal cost, plain English, under a minute to read. **Anything about how a screen looks
+  or reads comes with a mockup of every option** (owner, 19 Oct).
 - **Every change reaches `main` through a PR** with `Closes #N`. Five checks are required — Lint,
   Tests, Build, Migration Check, Custom Rules — and squash is the only merge method. Turn on
   auto-merge when you open the PR. Locally, `pnpm check:rules` runs the Custom Rules job (quote its
@@ -69,7 +70,7 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
 - **Check [`docs/module-map.md`](docs/module-map.md) before writing any helper or formula.** Domain
   math lives once, mostly in `packages/shared/src/`; two implementations of a metric is a bug.
 - **A change that visibly rearranges a daily-use screen needs a mockup and the owner's yes first**,
-  shown at the real 384 px dark viewport.
+  shown at the real 384 px dark viewport. So does any new screen, and any UI choice put to the owner.
 - **Test on `pnpm dev` before opening the PR**, exercising every changed route and flow. Green
   types and lint are not testing. Local database:
   [`docs/local-dev-database.md`](docs/local-dev-database.md).

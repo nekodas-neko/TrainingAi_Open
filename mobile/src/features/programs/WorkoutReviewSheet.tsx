@@ -25,6 +25,7 @@ import {
   type Decision,
   type Review,
 } from './review-model';
+import { failureNotice } from '../../core/reporting/index.ts';
 
 export function WorkoutReviewSheet({
   sessionId,
@@ -127,10 +128,13 @@ export function WorkoutReviewSheet({
         workouts.invalidate();
         await resources.load(programSpec, true);
         onClose();
-      } catch {
+      } catch (failure) {
         setUncertain(true);
         throw new Error(
-          'Could not confirm the update. Reopen this review to check the current session before making another change.',
+          failureNotice(
+            'Could not confirm the update. Reopen this review to check the current session before making another change.',
+            failure,
+          ),
         );
       }
     });

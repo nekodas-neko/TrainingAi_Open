@@ -503,3 +503,33 @@ test('invalidation while restoring fresh saved data still checks the server', as
   assert.equal(controller.getSnapshot().source, 'server');
   assert.equal(controller.getSnapshot().refreshingManually, false);
 });
+
+test('a program that fails to load says why, so a screenshot names the failure (#2913)', async (t) => {
+  const db = sqliteFixture();
+  t.after(() => db.connection.close());
+  const storage = await createLocalStorage(db.database);
+  const f = workoutFixture();
+  const reader = {
+    ...f.reader,
+    get: async (path: string, query?: Record<string, string>) => {
+      if (path === '/api/workout-data') throw new Error('Invalid workout count.');
+      return f.reader.get(path, query);
+    },
+  };
+  const controller = new WorkoutCatalogStore(storage.account(reader.origin, reader.userId), reader);
+  await controller.initialize();
+  assert.equal(controller.getSnapshot().status, 'error');
+  assert.equal(
+    controller.getSnapshot().notice,
+    'Could not load your program. Check your connection and retry. (Invalid workout count)',
+  );
+  const failed = new ApiError(500, undefined, undefined, '/api/next-session');
+  const server = new WorkoutCatalogStore(storage.account(reader.origin, reader.userId), {
+    ...f.reader,
+    get: async () => {
+      throw failed;
+    },
+  });
+  await server.initialize();
+  assert.match(server.getSnapshot().notice ?? '', /\(HTTP 500\)$/);
+});

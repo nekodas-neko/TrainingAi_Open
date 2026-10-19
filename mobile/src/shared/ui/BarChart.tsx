@@ -34,7 +34,6 @@ export function BarChart({
   yAxis = false,
   target: targetProp,
   tickCount,
-  tickFormat,
 }: {
   label: string;
   height?: number;
@@ -49,7 +48,6 @@ export function BarChart({
    * does not keeps about three labels and the top at its tallest bar.
    */
   tickCount?: number;
-  tickFormat?: 'compact' | 'full';
   bars: readonly {
     label: string;
     /** What a screen reader says for this bar when the visible label is not enough ("M" → "Monday"). */
@@ -72,7 +70,7 @@ export function BarChart({
       ? niceTicks(0, wanted)
       : coverTicks(niceTicks(0, wanted, tickCount), wanted) : [];
   const top = ticks.length ? Math.max(wanted, ticks[ticks.length - 1]) : wanted;
-  const tickTexts = tickLabels(ticks, tickFormat);
+  const tickTexts = tickLabels(ticks);
   const toY = (v: number) => yPixel(v, 0, top, plotHeight);
   const row = (
     <Stack

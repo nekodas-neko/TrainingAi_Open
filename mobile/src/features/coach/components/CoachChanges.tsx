@@ -13,6 +13,7 @@ import {
   type PatchChange,
 } from '../data/patch';
 import type { CoachWidget as Widget, WidgetResult } from '../data/widgets';
+import { failureNotice } from '../../../core/reporting/index.ts';
 export function patchValue(value: unknown, field: PatchChange['field']) {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
@@ -78,8 +79,11 @@ export function ChangeCard({
           setError(null);
         }
       })
-      .catch(() => {
-        if (current) setError('Could not check this suggestion. Retry before applying it.');
+      .catch((failure) => {
+        if (current) setError(failureNotice(
+          'Could not check this suggestion. Retry before applying it.',
+          failure,
+        ));
       });
     return () => {
       current = false;

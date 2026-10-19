@@ -6,6 +6,7 @@ import type { AccountConnection } from '../../account/session.ts';
 import { ApiError } from '../../account/api/client.ts';
 import { isCalendarDate } from '@trainingai/shared/date-utils';
 import { moodSchema, preferencesSchema, type HomePreferences, type Mood } from './models.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 const dateSchema = z
   .string()
@@ -116,10 +117,13 @@ export class HomeStore {
           if (generation === this.generation) {
             this.publish({ ...(saved ?? {}), ready: true });
           }
-        } catch {
+        } catch (failure) {
           if (generation === this.generation) {
             this.publish({
-              error: 'Could not open your saved Home data. Close and reopen the app to retry.',
+              error: failureNotice(
+                'Could not open your saved Home data. Close and reopen the app to retry.',
+                failure,
+              ),
             });
           }
         }
@@ -291,7 +295,10 @@ export class HomeStore {
             denied: this.current.denied || denied,
             errors: {
               ...this.current.errors,
-              [key]: `Could not refresh ${kind === 'mood' ? 'exercise readiness' : 'Home preferences'}. Saved data has been kept.`,
+              [key]: failureNotice(
+                `Could not refresh ${kind === 'mood' ? 'exercise readiness' : 'Home preferences'}. Saved data has been kept.`,
+                cause,
+              ),
             },
           });
         }
@@ -406,7 +413,7 @@ export class HomeStore {
           }
           this.publish({
             denied: this.current.denied || denied,
-            error: 'Saved on this phone. Could not sync your changes yet.',
+            error: failureNotice('Saved on this phone. Could not sync your changes yet.', cause),
           });
         }
       }

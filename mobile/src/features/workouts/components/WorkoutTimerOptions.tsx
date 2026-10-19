@@ -51,8 +51,8 @@ export function WorkoutTimerControls({
         disabled={journal.busy}
       />
       <AppText variant="caption" tone="muted">
-        Allow notification sounds when prompted. Lock-screen alerts use your Alerts &
-        calendar settings.
+        Allow notifications when prompted so the alert also sounds with the app closed or
+        the screen off.
       </AppText>
       <SwitchRow
         label="Set work elapsed"

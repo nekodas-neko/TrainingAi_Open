@@ -11,6 +11,7 @@ import {
 } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useNativeDataActions } from '../data/useNativeDataActions';
+import { failureNotice } from '../../../core/reporting/index.ts';
 export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
   const account = useAccountContext(),
     actions = useNativeDataActions();
@@ -34,8 +35,11 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
       await actions.clearAccount();
       await account.signOut();
       onClose();
-    } catch {
-      setError('Could not finish deleting your account. Retry when connected.');
+    } catch (failure) {
+      setError(failureNotice(
+        'Could not finish deleting your account. Retry when connected.',
+        failure,
+      ));
     } finally {
       setBusy(false);
     }

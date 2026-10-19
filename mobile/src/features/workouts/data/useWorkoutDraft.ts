@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ZodType } from 'zod';
 import { useWorkoutResources } from './WorkoutDataProvider';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 export function useWorkoutDraft<T>(key: string, schema: ZodType<T>, initial: T) {
   const resources = useWorkoutResources();
@@ -33,9 +34,12 @@ export function useWorkoutDraft<T>(key: string, schema: ZodType<T>, initial: T) 
           setLoadedKey(scopeKey);
         }
       })
-      .catch(() => {
+      .catch((failure) => {
         if (current) {
-          setError('Could not read the saved draft. Close and reopen this editor to retry.');
+          setError(failureNotice(
+            'Could not read the saved draft. Close and reopen this editor to retry.',
+            failure,
+          ));
         }
       });
     return () => {
@@ -45,9 +49,12 @@ export function useWorkoutDraft<T>(key: string, schema: ZodType<T>, initial: T) 
   useEffect(() => {
     if (activeReady && resources) {
       let current = true;
-      void resources.saveDraft(key, value).catch(() => {
+      void resources.saveDraft(key, value).catch((failure) => {
         if (current) {
-          setError('Could not save this draft on the phone. Keep the editor open and retry.');
+          setError(failureNotice(
+            'Could not save this draft on the phone. Keep the editor open and retry.',
+            failure,
+          ));
         }
       });
       return () => {

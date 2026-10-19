@@ -67,7 +67,6 @@ export function CardioTrends() {
               yAxis
               height={theme.sizes.hrChartHeight}
               tickCount={4}
-              tickFormat="full"
               bars={data.weeklyZoneStacks.map((week) => ({
                 label: week.weekStart.slice(5),
                 segments: week.seconds.map((sec, index) => ({
