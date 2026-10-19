@@ -34,6 +34,7 @@ export const ACHIEVEMENT_CATEGORY_ORDER = [
   'Nutrition',
   'Sleep',
   'Body Metrics',
+  'Steps',
   'Lift Milestones',
 ] as const
 

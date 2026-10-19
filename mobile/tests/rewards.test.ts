@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { z } from 'zod';
 import {
+  ACHIEVEMENT_CATEGORY_ORDER,
   LEVEL_THRESHOLDS,
   getBadgeTier,
   getLevelLabel,
@@ -159,7 +160,7 @@ test("categories follow the current app's order and an unlisted category is not 
     row('sleep', { category: 'Sleep', unlocked: true }),
     row('w1', { category: 'Workouts', unlocked: true }),
     row('w2', { category: 'Workouts' }),
-    row('steps', { category: 'Steps' }),
+    row('mystery', { category: 'Mystery' }),
   ];
   const groups = achievementGroups(list);
   assert.deepEqual(
@@ -193,9 +194,21 @@ test("a badge's tier follows its reward and only shows once unlocked", () => {
 });
 
 test('every achievement icon the current app maps is mapped here, and an unknown id gets the dumbbell', () => {
-  assert.equal(Object.keys(achievementIcons).length, 41);
+  assert.equal(Object.keys(achievementIcons).length, 47);
   assert.equal(achievementIcon('streak_7'), 'flame');
-  assert.equal(achievementIcon('steps_10000'), 'workout');
+  assert.equal(achievementIcon('steps_10k'), 'steps');
+  assert.equal(achievementIcon('not_an_achievement'), 'workout');
+});
+
+test('every category the grid draws has a colour in both themes; Workouts takes the brand colour', () => {
+  for (const mode of ['light', 'dark'] as const) {
+    const colors: Record<string, string> = createTheme(mode, 'green').rewards.categories;
+    const missing = ACHIEVEMENT_CATEGORY_ORDER.filter(
+      (category) => category !== 'Workouts' && !(category in colors),
+    );
+    assert.deepEqual(missing, [], mode);
+  }
+  assert.ok(ACHIEVEMENT_CATEGORY_ORDER.includes('Steps'));
 });
 
 test('only unlocks not yet shown are new', () => {

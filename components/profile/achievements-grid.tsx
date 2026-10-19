@@ -33,6 +33,7 @@ import {
   Swords,
   Sun,
   Lock,
+  Footprints,
 } from 'lucide-react'
 import { ACHIEVEMENT_CATEGORY_ORDER, getBadgeTier, type BadgeTier } from '@trainingai/shared/achievement-display'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -124,6 +125,12 @@ export const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
   squat_100:       Dumbbell,
   bench_100:       Activity,
   deadlift_100:    ArrowDown,
+  steps_5k:        Footprints,
+  steps_10k:       Footprints,
+  steps_20k:       Footprints,
+  steps_30k:       Footprints,
+  steps_40k:       Footprints,
+  steps_50k:       Footprints,
 }
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -137,6 +144,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'Nutrition':       '#84cc16',
   'Sleep':           '#6366f1',
   'Body Metrics':    '#14b8a6',
+  'Steps':           'var(--accent-green)',
   'Lift Milestones': '#ef4444',
 }
 
