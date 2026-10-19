@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { cn, accentCardStyle } from "@trainingai/shared/utils";
+import { streakRestNotice } from "@trainingai/shared/workout/day-streak";
 import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
 import { CARD_DEFAULT_COLORS } from "../constants";
 
@@ -46,6 +47,7 @@ function StreakCardComponent({
 }: StreakCardProps) {
   const _slColor = cardColors["streakLeft"] ?? CARD_DEFAULT_COLORS.streakLeft;
   const _srColor = cardColors["streakRight"] ?? CARD_DEFAULT_COLORS.streakRight;
+  const restNotice = streakRestNotice({ consecutiveRestDays, streakWarning, streakBroken });
 
   return (
     <div className="px-4 pb-3 pt-1 relative flex flex-col gap-2">
@@ -145,7 +147,7 @@ function StreakCardComponent({
         )}
       </div>
       </div>
-      {consecutiveRestDays != null && consecutiveRestDays >= 1 && (
+      {restNotice && (
         <div
           className="rounded-lg px-3 py-1.5 text-xs font-medium text-center"
           style={{
@@ -154,11 +156,7 @@ function StreakCardComponent({
             border: `1px solid ${streakBroken ? 'color-mix(in oklch, var(--destructive) 25%, transparent)' : streakWarning ? 'rgba(251,191,36,0.25)' : 'rgba(148,163,184,0.20)'}`,
           }}
         >
-          {streakBroken
-            ? 'Resting today breaks your streak'
-            : streakWarning
-              ? 'Rest again tomorrow and your streak breaks'
-              : 'Day 1 of 2 rest days — streak safe'}
+          {restNotice.text}
         </div>
       )}
     </div>

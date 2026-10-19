@@ -7,6 +7,7 @@ import {
   drawableTarget,
   guideSummary,
   includeTarget,
+  coverTicks,
   niceTicks,
   tickLabels,
   yPixel,
@@ -28,11 +29,20 @@ export function StackedBarChart({
   gridlines = false,
   yAxis = false,
   target: targetProp,
+  tickCount,
+  height,
 }: {
   readable?: boolean;
   gridlines?: boolean;
   yAxis?: boolean;
   target?: ChartTarget;
+  /**
+   * About how many gridlines / y labels to aim for. A chart that passes it (the web's
+   * `maxTicksLimit`) also gets its axis rounded up to the next label, as chart.js does; one that
+   * does not keeps about three labels and the top at its tallest bar.
+   */
+  tickCount?: number;
+  height?: number;
   label: string;
   unit: string;
   bars: readonly {
@@ -47,9 +57,13 @@ export function StackedBarChart({
   );
   const target = drawableTarget(targetProp);
   const guides = gridlines || yAxis || target !== undefined;
-  const plotHeight = theme.sizes.chartHeight;
-  const top = guides ? includeTarget(0, maximum, target)[1] : maximum;
-  const ticks = gridlines || yAxis ? niceTicks(0, top) : [];
+  const plotHeight = height ?? theme.sizes.chartHeight;
+  const wanted = guides ? includeTarget(0, maximum, target)[1] : maximum;
+  const ticks =
+    gridlines || yAxis ? tickCount === undefined
+      ? niceTicks(0, wanted)
+      : coverTicks(niceTicks(0, wanted, tickCount), wanted) : [];
+  const top = ticks.length ? Math.max(wanted, ticks[ticks.length - 1]) : wanted;
   const tickTexts = tickLabels(ticks);
   const toY = (v: number) => yPixel(v, 0, top, plotHeight);
   const row = (

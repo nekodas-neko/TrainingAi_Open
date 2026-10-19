@@ -73,6 +73,9 @@ export type WorkoutCatalog = {
     deloadOrRestRecommended?: boolean;
     temperatureAlert?: boolean;
     consecutiveTrainingDays?: number;
+    consecutiveRestDays?: number;
+    streakWarning?: boolean;
+    streakBroken?: boolean;
   };
   recovery?: MuscleRecovery[] | null;
 };
@@ -270,6 +273,11 @@ export function buildCatalog(
     ...(typeof next.consecutiveTrainingDays === 'number'
       ? { consecutiveTrainingDays: count(next.consecutiveTrainingDays) }
       : {}),
+    ...(typeof next.consecutiveRestDays === 'number'
+      ? { consecutiveRestDays: count(next.consecutiveRestDays) }
+      : {}),
+    ...(typeof next.streakWarning === 'boolean' ? { streakWarning: next.streakWarning } : {}),
+    ...(typeof next.streakBroken === 'boolean' ? { streakBroken: next.streakBroken } : {}),
   };
   const base = {
     version: 2 as const,
@@ -412,13 +420,21 @@ export function readSavedCatalog(
       return null;
     }
     const sessionId = recommendation.sessionId === null ? null : text(recommendation.sessionId);
-    for (const key of ['deloadOrRestRecommended', 'temperatureAlert']) {
+    for (const key of [
+      'deloadOrRestRecommended',
+      'temperatureAlert',
+      'streakWarning',
+      'streakBroken',
+    ]) {
       if (recommendation[key] !== undefined && typeof recommendation[key] !== 'boolean') {
         return null;
       }
     }
     if (recommendation.consecutiveTrainingDays !== undefined) {
       count(recommendation.consecutiveTrainingDays);
+    }
+    if (recommendation.consecutiveRestDays !== undefined) {
+      count(recommendation.consecutiveRestDays);
     }
     if (saved.program !== null) {
       const program = object(saved.program);

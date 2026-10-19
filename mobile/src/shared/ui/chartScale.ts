@@ -104,6 +104,37 @@ export function meetBox(width: number, height: number, vbWidth: number, vbHeight
   };
 }
 
+/**
+ * The viewBox height that makes a 320-wide viewBox exactly fill a `plotWidth` x `plotHeight` box, so
+ * the plot uses the whole height it is given instead of being letterboxed to 320:90 (the "short
+ * chart with empty space below" on a taller card). 90 until the box is measured.
+ */
+export function chartViewBoxHeight(plotWidth: number, plotHeight: number): number {
+  return plotWidth > 1 && plotHeight > 0 ? (320 * plotHeight) / plotWidth : 90;
+}
+
+/** Top and bottom margin inside that viewBox: 12 units, less on a very short sparkline. */
+export function chartPadY(vbHeight: number): number {
+  return Math.min(12, (vbHeight * 12) / 90);
+}
+
+/**
+ * Extend round gridline values upward until the last one reaches `top`. Chart.js, which draws the
+ * current app's bar charts, rounds the axis up to the next tick, so the tallest bar sits under a
+ * label ("6,000", not "4,000" with a bar poking past it).
+ */
+export function coverTicks(ticks: readonly number[], top: number): number[] {
+  if (ticks.length < 2) return [...ticks];
+  const step = ticks[1] - ticks[0];
+  const out = [...ticks];
+  let last = out[out.length - 1];
+  while (last < top - 1e-9) {
+    last = Math.round((last + step) * 1e6) / 1e6;
+    out.push(last);
+  }
+  return out;
+}
+
 /** True when `axisLabels` has one entry per point and some are blank: the caller has thinned the axis
  *  and each remaining label belongs under its own point, not spread across the row. */
 export function isPointAlignedAxis(labelCount: number, pointCount: number, labels: readonly string[]) {
@@ -125,7 +156,7 @@ export function pointCentreX(
   if (stretch) {
     return leftInset + (xMin === xMax ? plotWidth / 2 : ((x - xMin) / (xMax - xMin)) * plotWidth);
   }
-  const box = meetBox(plotWidth, plotHeight, 320, 90);
+  const box = meetBox(plotWidth, plotHeight, 320, chartViewBoxHeight(plotWidth, plotHeight));
   const vb = xMin === xMax ? 160 : 12 + ((x - xMin) / (xMax - xMin)) * 296;
   return leftInset + box.offsetX + box.scale * vb;
 }

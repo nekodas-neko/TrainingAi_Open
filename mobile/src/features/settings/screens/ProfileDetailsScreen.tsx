@@ -20,7 +20,15 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { profileSpec, metricValue, bodyOverviewSpec } from '../../health/data/models';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { ProfileOverview } from '../components/ProfileOverview';
-import { fillFromServer, profileFieldValue, profilePatch, timezoneOptions } from '../data/profile';
+import {
+  editProfileField,
+  fillFromServer,
+  keysToSaveOnBlur,
+  markProfileSaved,
+  profileFieldValue,
+  profilePatch,
+  timezoneOptions,
+} from '../data/profile';
 import { failureNotice } from '../../../core/reporting/index.ts';
 // Name, birth year, height, sex and timezone are what the current app's Edit profile sheet and
 // Profile details hold. Activity level and Fitness goal are on the Goals screen there, and here.
@@ -108,11 +116,7 @@ function ProfileDetailsForm({
     });
   }, [ready, setDraft, user]);
   function change(key: string, value: string, immediate = false) {
-    const next = {
-      ...current.current,
-      fields: { ...current.current.fields, [key]: value },
-      dirty: [...new Set([...current.current.dirty, key])],
-    };
+    const next = editProfileField(current.current, key, value);
     current.current = next;
     draft.setValue(next);
     setSaved(false);
@@ -120,7 +124,8 @@ function ProfileDetailsForm({
   }
   /** Blur saves only a field that was edited; tapping in and out of one changes nothing. */
   function saveIfDirty(key: string) {
-    if (current.current.dirty.includes(key)) void save([key]);
+    const keys = keysToSaveOnBlur(current.current, key);
+    if (keys.length) void save(keys);
   }
   async function save(keys = current.current.dirty, fields = current.current.fields) {
     if (!draft.ready || !draft.resources || !keys.length) return;
@@ -143,12 +148,7 @@ function ProfileDetailsForm({
         '/api/readiness',
         '/api/body-battery',
       ]);
-      const next = {
-        ...current.current,
-        dirty: current.current.dirty.filter(
-          (key) => !keys.includes(key) || current.current.fields[key] !== fields[key],
-        ),
-      };
+      const next = markProfileSaved(current.current, keys, fields);
       current.current = next;
       draft.setValue(next);
       setSaved(!next.dirty.length);

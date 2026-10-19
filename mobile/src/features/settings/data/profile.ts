@@ -74,6 +74,37 @@ export function fillFromServer(
   return next;
 }
 
+export type ProfileDraft = { fields: Record<string, string>; dirty: string[] };
+
+/** The draft after the user types `value` into `key`: the field is now dirty. */
+export function editProfileField(draft: ProfileDraft, key: string, value: string): ProfileDraft {
+  return {
+    ...draft,
+    fields: { ...draft.fields, [key]: value },
+    dirty: [...new Set([...draft.dirty, key])],
+  };
+}
+
+/**
+ * What leaving a text field saves: that field if it was edited, nothing otherwise. Tapping into
+ * Birth year and out again must send no request, so the stored date of birth cannot be touched.
+ */
+export function keysToSaveOnBlur(draft: ProfileDraft, key: string): string[] {
+  return draft.dirty.includes(key) ? [key] : [];
+}
+
+/** The draft after `keys` were saved with `saved` values: a key stays dirty if typed over since. */
+export function markProfileSaved(
+  draft: ProfileDraft,
+  keys: string[],
+  saved: Record<string, string>,
+): ProfileDraft {
+  return {
+    ...draft,
+    dirty: draft.dirty.filter((key) => !keys.includes(key) || draft.fields[key] !== saved[key]),
+  };
+}
+
 export function profilePatch(
   fields: Record<string, string>,
   keys: string[],

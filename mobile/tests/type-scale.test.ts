@@ -169,6 +169,30 @@ const currentApp: Record<string, Expected> = {
     fontWeight: undefined,
     source: 'observed-hr-card.tsx Stat unit, text-[9px]',
   },
+  weekTileValue: {
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '700',
+    source: 'week-metric-card.tsx value, text-xl font-bold',
+  },
+  weekTileDelta: {
+    fontSize: 11,
+    lineHeight: 16.5,
+    fontWeight: undefined,
+    source: 'week-metric-card.tsx delta, text-[11px]',
+  },
+  factorLabel: {
+    fontSize: 11,
+    lineHeight: 13.75,
+    fontWeight: undefined,
+    source: 'contributor-chart.tsx FactorBar name, text-[11px] leading-tight',
+  },
+  factorValue: {
+    fontSize: 11,
+    lineHeight: 16.5,
+    fontWeight: '600',
+    source: 'contributor-chart.tsx FactorBar value, text-[11px] font-semibold',
+  },
   input: { fontSize: 16, lineHeight: 24, source: 'globals.css forces 16 px on input, textarea, select' },
 };
 
