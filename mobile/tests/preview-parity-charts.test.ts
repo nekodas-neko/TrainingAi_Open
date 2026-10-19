@@ -35,6 +35,7 @@ test('strength bar guides use the 7 px label token and strokes, never a one-side
 test('the Strength Trend chart runs edge to edge at the current app height, without gridlines', async () => {
   const screen = await read('features/progress/StrengthScreen.tsx');
   assert.match(screen, /<LineChart[\s\S]*?stretch/);
+  assert.match(screen, /dots="none"/, 'the web Sparkline draws no dots');
   assert.match(screen, /theme\.sizes\.sparkline/);
   assert.doesNotMatch(screen, /^\s+gridlines\s*$/m);
   assert.doesNotMatch(screen, /chartWidth/, 'no first-paint width guess');

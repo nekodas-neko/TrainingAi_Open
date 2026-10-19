@@ -90,6 +90,7 @@ const currentApp: Record<string, Expected> = {
   macroCaption: {
     fontSize: 10.5,
     lineHeight: 15.75,
+    fontWeight: '400',
     source: 'energy-card.tsx MacroColumn target, unit and name, text-[10.5px]',
   },
   strengthMarker: {

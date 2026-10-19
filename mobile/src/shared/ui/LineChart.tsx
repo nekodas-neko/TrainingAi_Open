@@ -87,7 +87,7 @@ export function LineChart({
   gridlines?: boolean;
   yAxis?: boolean;
   target?: ChartTarget;
-  dots?: 'all' | 'isolated';
+  dots?: 'all' | 'isolated' | 'none';
   /** 'break' (default) leaves a gap where a day has no reading; 'connect' draws the line across it. */
   gaps?: GapMode;
   compactAxisLabels?: boolean;
@@ -158,6 +158,9 @@ export function LineChart({
         },
   );
   const segments = lineSegments(coords, gaps);
+  // The area fills down to the bottom of the plot: the lowest gridline when the axis is scaled to
+  // its ticks, else the edge of the box.
+  const floorY = scale ? yy(min) : 90;
   const color = accent ?? theme.tones[tone].foreground;
   const readings = coords.map((point) => (point ? 1 : null));
   const showDot = dotMask(readings, dots);
@@ -262,7 +265,7 @@ export function LineChart({
               fill ? (
                 <Polygon
                   key={'fill' + index}
-                  points={`${segment[0].x},90 ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},90`}
+                  points={`${segment[0].x},${floorY} ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},${floorY}`}
                   fill={fillColor ?? theme.tones[tone].background}
                 />
               ) : null,

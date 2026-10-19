@@ -68,12 +68,12 @@ test('tickLabels never repeat and never carry float noise', () => {
 
 test('tickLabels abbreviates only five-digit values, and only when every tick is a multiple of 100', () => {
   assert.deepEqual(tickLabels([0, 5000, 10000, 15000]), ['0', '5k', '10k', '15k']);
-  assert.deepEqual(tickLabels([0, 1250, 2500]), ['0', '1250', '2500']);
-  // The Nutrition 7-day chart's axis reads like the current app's: 500, not 0.5k.
-  assert.deepEqual(tickLabels([0, 500, 1000, 1500, 2000]), ['0', '500', '1000', '1500', '2000']);
-  assert.deepEqual(tickLabels([-1500, 0, 1500]), ['-1500', '0', '1500']);
+  assert.deepEqual(tickLabels([0, 1250, 2500]), ['0', '1,250', '2,500']);
+  // The Nutrition 7-day chart's axis reads like the current app's chart.js: 500 and 1,500, not 0.5k.
+  assert.deepEqual(tickLabels([0, 500, 1000, 1500, 2000]), ['0', '500', '1,000', '1,500', '2,000']);
+  assert.deepEqual(tickLabels([-1500, 0, 1500]), ['-1,500', '0', '1,500']);
   assert.deepEqual(tickLabels([-12500, 0, 12500]), ['-12.5k', '0', '12.5k']);
-  assert.deepEqual(tickLabels([1000, 1020, 1040]), ['1000', '1020', '1040']);
+  assert.deepEqual(tickLabels([1000, 1020, 1040]), ['1,000', '1,020', '1,040']);
 });
 
 test('yAxisWidth grows with the longest label and the font scale', () => {
@@ -169,6 +169,9 @@ test('lastReadingIndex finds the newest reading, skipping trailing empty days', 
 test('niceScale widens a range out to its round gridline values', () => {
   assert.deepEqual(niceScale(12, 48), { min: 0, max: 60, ticks: [0, 20, 40, 60] });
   assert.deepEqual(niceScale(62, 79), { min: 60, max: 80, ticks: [60, 70, 80] });
+  // chart.js (maxTicksLimit 4) widens the spacing when the first pass gives too many spaces.
+  assert.deepEqual(niceScale(35, 65), { min: 20, max: 80, ticks: [20, 40, 60, 80] });
+  assert.deepEqual(niceScale(15, 45), { min: 0, max: 60, ticks: [0, 20, 40, 60] });
   // Already round: not widened further.
   assert.deepEqual(niceScale(0, 60), { min: 0, max: 60, ticks: [0, 20, 40, 60] });
   // A flat series keeps its one gridline.
@@ -197,4 +200,9 @@ test('a stretched chart puts its first and last point on the edges', () => {
   assert.equal(pointCentreX(13, 0, 13, 300, 64, 40, true), 340);
   // Fitted (the default) keeps its inset.
   assert.ok(pointCentreX(0, 0, 13, 300, 90) > 0);
+});
+
+test('dotMask "none" draws no dot, not even the latest reading', () => {
+  assert.deepEqual(dotMask([1, 2, null, 3], 'none'), [false, false, false, false]);
+  assert.deepEqual(dotMask([1, 2, 3], 'isolated'), [false, false, true]);
 });

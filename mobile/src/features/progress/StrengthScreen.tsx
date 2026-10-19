@@ -148,7 +148,7 @@ export function StrengthScreen({
                 />
               </Stack>
               {/* The current app's responsive Sparkline: 64 px tall, line edge to edge across the
-                  card, no gridlines, and a dot only where a reading stands alone. */}
+                  card, no gridlines and no dots. */}
               <View>
                 <LineChart
                   label={oneRmLabel(exercise.exerciseType)}
@@ -156,7 +156,7 @@ export function StrengthScreen({
                   showLabels={false}
                   fill
                   stretch
-                  dots="isolated"
+                  dots="none"
                   points={exercise.history.map((point, index) => ({
                     label: point.date,
                     value: values[index],

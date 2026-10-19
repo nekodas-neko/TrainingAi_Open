@@ -157,7 +157,7 @@ export const typography = {
   // text-[10.5px] target / unit / name. Line heights are the 1.5 the page inherits.
   macroShare: { fontSize: 11.5, lineHeight: 17.25, fontWeight: '600' },
   macroValue: { fontSize: 15, lineHeight: 22.5, fontWeight: '700' },
-  macroCaption: { fontSize: 10.5, lineHeight: 15.75 },
+  macroCaption: { fontSize: 10.5, lineHeight: 15.75, fontWeight: '400' },
   // strength-progress-card.tsx: the 60 / 70 / 80 labels over a strength bar, 7 px bold at -0.02em.
   strengthMarker: { fontSize: 7, lineHeight: 7, fontWeight: '700', letterSpacing: -0.14 },
   display: { fontSize: 48, lineHeight: 56, fontWeight: '800' },
