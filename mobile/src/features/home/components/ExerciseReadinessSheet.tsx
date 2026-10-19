@@ -22,6 +22,7 @@ import type { SessionPreview } from '../../workouts/catalog';
 import { View } from 'react-native';
 import type { MoodFields } from '@trainingai/shared/validation/mood-log';
 import { SessionLengthControl } from '../../workouts/components/SessionLengthControl';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 const groups = [
   { label: 'Upper', muscles: ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'] },
@@ -105,8 +106,8 @@ export function ExerciseReadinessSheet({
         suggestedSoreMuscles: suggestions,
       });
       onClose();
-    } catch {
-      setError('Could not save your energy on this phone. Try again.');
+    } catch (failure) {
+      setError(failureNotice('Could not save your energy on this phone. Try again.', failure));
     } finally {
       setBusy(false);
     }

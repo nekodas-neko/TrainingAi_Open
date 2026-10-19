@@ -34,6 +34,7 @@ import { recipeCountLine } from '../data/display';
 import { MacroLine } from './NutritionElements';
 import { aiFailureText } from '../../account/api/client';
 import { readRecipeScan, recipePhotoError } from '../data/scan-response';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const editorSchema = z.object({
   name: z.string(),
   servings: z.string(),
@@ -504,9 +505,12 @@ export function RecipesSheet({
               }
               setCandidates([]);
               setError(skipped ? `${skipped} matching recipes already saved.` : null);
-            } catch {
+            } catch (failure) {
               setError(
-                'Some recipes could not save. Matching saved recipes are skipped on retry.',
+                failureNotice(
+                  'Some recipes could not save. Matching saved recipes are skipped on retry.',
+                  failure,
+                ),
               );
             } finally {
               setBusy(false);
@@ -556,8 +560,8 @@ export function RecipesSheet({
                 try {
                   await onLog(selected, bucket, Number(portions));
                   setSelected(null);
-                } catch {
-                  setError('Could not log this meal.');
+                } catch (failure) {
+                  setError(failureNotice('Could not log this meal.', failure));
                 } finally {
                   setBusy(false);
                 }
@@ -615,8 +619,8 @@ export function RecipesSheet({
                 setBulk([]);
                 setRemove(null);
                 setSelected(null);
-              } catch {
-                setError('Could not delete this meal.');
+              } catch (failure) {
+                setError(failureNotice('Could not delete this meal.', failure));
               }
             }}
           />

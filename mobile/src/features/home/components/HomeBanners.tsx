@@ -30,6 +30,7 @@ import {
   shouldOfferMorning,
 } from '../data/banner-data';
 import { GoalRecommendation } from '../../nutrition/components/GoalRecommendation';
+import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 
 export function HomeBanners({
   openWeek,
@@ -83,7 +84,9 @@ export function HomeBanners({
         } else {
           await home.store!.mark(`morning-prompt:${health.today}`);
         }
-      } catch {}
+      } catch (failure) {
+        reportError(failure);
+      }
     })();
     return () => {
       current = false;
@@ -96,8 +99,8 @@ export function HomeBanners({
     try {
       await home.store?.mark(key);
       setError(null);
-    } catch {
-      setError('Could not save your dismissal on this phone.');
+    } catch (failure) {
+      setError(failureNotice('Could not save your dismissal on this phone.', failure));
     }
   }
   const showDay = localHour(health.timezone) >= 17 && !home.markers[`day:${health.today}`];
@@ -173,8 +176,11 @@ export function HomeBanners({
         '/api/next-session',
       ]);
       await mark(`deload:${health.today}`);
-    } catch {
-      setError('Could not start the deload week. Check your connection and retry.');
+    } catch (failure) {
+      setError(failureNotice(
+        'Could not start the deload week. Check your connection and retry.',
+        failure,
+      ));
     } finally {
       setBusy(false);
     }

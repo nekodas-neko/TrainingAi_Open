@@ -12,6 +12,7 @@ import {
   type WeatherSettings,
   type WeatherSnapshot,
 } from './models.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 const savedSchema = z.object({
   settings: settingsSchema,
@@ -90,10 +91,13 @@ export class WeatherStore {
           this.lastDevice = saved.lastDevice;
           this.publish({ settings: saved.settings });
         }
-      } catch {
+      } catch (failure) {
         this.publish({
           saveError:
-            'Could not read saved weather settings. Your other records are unaffected.',
+            failureNotice(
+              'Could not read saved weather settings. Your other records are unaffected.',
+              failure,
+            ),
         });
       }
       this.publish({
@@ -113,9 +117,12 @@ export class WeatherStore {
     this.writes = write.catch(() => {});
     return write.then(
       () => this.publish({ saveError: null }),
-      () =>
+      (failure) =>
         this.publish({
-          saveError: 'Weather settings could not be saved. Retry to keep them after reopening.',
+          saveError: failureNotice(
+            'Weather settings could not be saved. Retry to keep them after reopening.',
+            failure,
+          ),
         }),
     );
   }
@@ -209,13 +216,16 @@ export class WeatherStore {
         ].slice(0, 8);
         this.publish({ snapshot });
         await this.persist();
-      } catch {
+      } catch (failure) {
         if (revision !== this.revision) return;
         policy.failed();
         this.publish({
-          error: saved
-            ? 'Could not refresh. Showing saved weather.'
-            : 'Weather is unavailable. Try again shortly.',
+          error: failureNotice(
+            saved
+              ? 'Could not refresh. Showing saved weather.'
+              : 'Weather is unavailable. Try again shortly.',
+            failure,
+          ),
         });
       }
     } finally {

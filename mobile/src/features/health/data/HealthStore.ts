@@ -23,6 +23,7 @@ import {
   type BodyData,
   type SleepRow,
 } from './models.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 const operationSchema = MutationSchema.extend({
   id: z.uuid(),
@@ -175,10 +176,13 @@ export class HealthStore {
         if (saved?.bodyAt && saved.sleepAt && !saved.stale) {
           this.policy.succeeded(Math.min(saved.bodyAt, saved.sleepAt));
         }
-      } catch {
+      } catch (failure) {
         if (generation === this.generation) {
           this.publish({
-            error: 'Could not open saved health records. Existing records have been preserved.',
+            error: failureNotice(
+              'Could not open saved health records. Existing records have been preserved.',
+              failure,
+            ),
           });
         }
       }
@@ -367,8 +371,13 @@ export class HealthStore {
             this.policy.succeeded();
             this.publish({ denied: false });
           }
-        } catch {
-          this.publish({ bodyError: 'Could not save updated health records.' });
+        } catch (failure) {
+          this.publish({
+            bodyError: failureNotice(
+              'Could not save updated health records.',
+              failure,
+            ),
+          });
           this.policy.failed();
         }
       } else {
@@ -434,8 +443,8 @@ export class HealthStore {
         }
         this.publish(
           domain === 'body_metrics'
-            ? { bodyError: 'Could not refresh body measurements.' }
-            : { sleepError: 'Could not refresh sleep records.' },
+            ? { bodyError: failureNotice('Could not refresh body measurements.', error) }
+            : { sleepError: failureNotice('Could not refresh sleep records.', error) },
         );
       }
       return false;
@@ -456,8 +465,8 @@ export class HealthStore {
       } else {
         await this.refresh();
       }
-    } catch {
-      this.publish({ bodyError: 'Could not save health refresh status.' });
+    } catch (failure) {
+      this.publish({ bodyError: failureNotice('Could not save health refresh status.', failure) });
     }
   }
   sync() {
@@ -535,10 +544,13 @@ export class HealthStore {
         if (generation === this.generation) {
           this.publish({ error: null });
         }
-      } catch {
+      } catch (failure) {
         if (generation === this.generation) {
           this.publish({
-            error: 'Saved on this phone. Health changes will upload when connected.',
+            error: failureNotice(
+              'Saved on this phone. Health changes will upload when connected.',
+              failure,
+            ),
           });
         }
       }

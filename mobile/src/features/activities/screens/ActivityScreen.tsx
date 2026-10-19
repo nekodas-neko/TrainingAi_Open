@@ -25,6 +25,7 @@ import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { z } from 'zod';
 import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 function ManualActivityScreen({
   onBack,
@@ -102,7 +103,10 @@ function ManualActivityScreen({
   const update = (patch: Parameters<NonNullable<typeof activity.store>['update']>[0]) => {
     void activity.store
       ?.update(patch)
-      .catch(() => setError('Could not save your draft. Please retry.'));
+      .catch((failure) => setError(failureNotice(
+        'Could not save your draft. Please retry.',
+        failure,
+      )));
   };
   return (
     <PageLayout

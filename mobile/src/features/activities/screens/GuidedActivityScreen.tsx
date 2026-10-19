@@ -26,6 +26,7 @@ import { profileSpec, healthDaySpec, healthDaySchema } from '../../health/data/m
 import { baselinesSpec } from '../data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
+import { reportError } from '../../../core/reporting/index.ts';
 export function GuidedActivityScreen({
   onBack,
   onSaved,
@@ -137,7 +138,9 @@ export function GuidedActivityScreen({
     if (session.mode === 'done' && guidance.kind === 'test') {
       result = fitnessResult(session, health.timezone, measured);
     }
-  } catch {}
+  } catch (failure) {
+    reportError(failure);
+  }
   const previous = [...(baseline.data?.fitnessTests ?? [])]
     .filter((row) => row.testType === protocol?.id && row.id !== session.id)
     .sort((a, b) => b.date.localeCompare(a.date))[0];

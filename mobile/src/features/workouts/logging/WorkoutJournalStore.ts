@@ -25,6 +25,7 @@ import {
   type WorkoutRecord,
   type WorkoutSet,
 } from './workout.ts';
+import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 
 export const PROGRAM_AS_WRITTEN =
   'Your AI coach could not prepare this session, so it starts from your program as written.';
@@ -161,13 +162,16 @@ export class WorkoutJournalStore {
         this.publish({ data, ready: true, busy: false, message: null });
         void this.sync();
       }
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
         this.publish({
           ready: false,
           busy: false,
           message:
-            'Could not open saved workouts. Retry loading; existing data has been preserved.',
+            failureNotice(
+              'Could not open saved workouts. Retry loading; existing data has been preserved.',
+              failure,
+            ),
         });
       }
     }
@@ -206,9 +210,12 @@ export class WorkoutJournalStore {
     try {
       await this.write();
       this.publish({ message: null });
-    } catch {
+    } catch (failure) {
       this.publish({
-        message: 'Changes could not be saved on this phone. Keep the app open and retry.',
+        message: failureNotice(
+          'Changes could not be saved on this phone. Keep the app open and retry.',
+          failure,
+        ),
       });
     }
   };
@@ -244,8 +251,9 @@ export class WorkoutJournalStore {
         return again;
       }
       pending = again;
-    } catch {
+    } catch (failure) {
       // A refused or failed generation falls through to the program as written.
+      reportError(failure);
     }
     this.publish({ message: PROGRAM_AS_WRITTEN });
     return { ...pending, prescriptionPending: false };
@@ -285,7 +293,10 @@ export class WorkoutJournalStore {
             this.publish({
               savedFallbackFor: fallback ? session.id : null,
               message: fallback
-                ? 'Could not fetch the current prescription. Retry, or explicitly start with the saved session.'
+                ? failureNotice(
+                    'Could not fetch the current prescription. Retry, or explicitly start with the saved session.',
+                    error,
+                  )
                 : 'Your account could not load this session. Check your sign-in and retry.',
             });
           }
@@ -381,11 +392,14 @@ export class WorkoutJournalStore {
     try {
       await saving;
       return generation === this.generation;
-    } catch {
+    } catch (failure) {
       if (generation === this.generation && issued === this.issued) {
         this.publish({
           message:
-            'Your latest entries could not be saved. Keep the app open and retry saving.',
+            failureNotice(
+              'Your latest entries could not be saved. Keep the app open and retry saving.',
+              failure,
+            ),
         });
       }
       return false;
@@ -1025,7 +1039,10 @@ export class WorkoutJournalStore {
           const message =
             error instanceof ApiError && [401, 403].includes(error.status)
               ? 'Sign in again to upload this workout. It is saved on this phone.'
-              : 'Workout saved on this phone. Upload is pending; retry when connected.';
+              : failureNotice(
+                  'Workout saved on this phone. Upload is pending; retry when connected.',
+                  error,
+                );
           await this.write((data) =>
             replaceWorkout(data, workout.id, (latest) => ({
               ...latest,
@@ -1035,11 +1052,14 @@ export class WorkoutJournalStore {
           return;
         }
       }
-    } catch {
+    } catch (failure) {
       if (generation === this.generation) {
         this.publish({
           message:
-            'Could not save the upload status locally. Your workout has been kept; retry saving.',
+            failureNotice(
+              'Could not save the upload status locally. Your workout has been kept; retry saving.',
+              failure,
+            ),
         });
       }
     }

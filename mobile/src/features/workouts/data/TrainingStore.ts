@@ -8,6 +8,7 @@ import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { ApiError } from '../../account/api/client.ts';
 import { programSpec, injurySpec, phaseSetsSpec, type SavedProgram } from './models.ts';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 const programBody = ProgramWriteSchema.extend({
   sessions: ProgramWriteSchema.shape.sessions.unwrap(),
@@ -134,8 +135,10 @@ export class TrainingStore {
       } catch (error) {
         if (generation === this.generation) {
           this.publish({
-            error:
+            error: failureNotice(
               'Could not open saved program and injury changes. Existing changes have been preserved.',
+              error,
+            ),
           });
         }
         throw error;
@@ -682,8 +685,14 @@ export class TrainingStore {
             error instanceof ApiError && [401, 403].includes(error.status)
               ? 'Sign in again to upload saved program and injury changes.'
               : error instanceof ApiError && [400, 404, 409, 422].includes(error.status)
-                ? 'The backend refused a saved change. Review the pending program or injury and save corrections before retrying.'
-                : 'Saved on this phone. Program and injury changes will upload when connected; retry if needed.',
+                ? failureNotice(
+                    'The backend refused a saved change. Review the pending program or injury and save corrections before retrying.',
+                    error,
+                  )
+                : failureNotice(
+                    'Saved on this phone. Program and injury changes will upload when connected; retry if needed.',
+                    error,
+                  ),
         });
       }
     }

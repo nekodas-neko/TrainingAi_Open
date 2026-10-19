@@ -29,6 +29,7 @@ import { SupplementCreateSchema, type Supplement } from '../data/models';
 import { VialSheet } from './VialSheet';
 import { isMilligramDosed } from '@trainingai/shared/nutrition/vial-plan';
 import { NutritionReminders } from '../../platform/components/NutritionReminders';
+import { failureNotice } from '../../../core/reporting/index.ts';
 const formSchema = z.object({
   name: z.string(),
   dose: z.string(),
@@ -74,8 +75,8 @@ export function SupplementsSection({ date }: { date: string }) {
       await n.store?.logSupplement(s, date, dose);
       setPrompt(null);
       setError(null);
-    } catch {
-      setError('Could not save the dose.');
+    } catch (failure) {
+      setError(failureNotice('Could not save the dose.', failure));
     } finally {
       inFlight.current.delete(s.id);
       setToggling(new Set(inFlight.current));
@@ -240,8 +241,8 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
         { domain: 'supplements', date, payload: supplementPayload(s, { active: !s.active }) },
       ]);
       setError(null);
-    } catch {
-      setError('Could not change this supplement.');
+    } catch (failure) {
+      setError(failureNotice('Could not change this supplement.', failure));
     } finally {
       setBusy(false);
     }
@@ -262,8 +263,8 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
         })),
       );
       setError(null);
-    } catch {
-      setError('Could not save the new order.');
+    } catch (failure) {
+      setError(failureNotice('Could not save the new order.', failure));
     } finally {
       setBusy(false);
     }
@@ -460,8 +461,8 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
               );
               setEdit(null);
               setRemove(null);
-            } catch {
-              setError('Could not delete this supplement.');
+            } catch (failure) {
+              setError(failureNotice('Could not delete this supplement.', failure));
             }
           }}
         />

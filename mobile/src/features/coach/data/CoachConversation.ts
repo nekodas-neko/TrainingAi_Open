@@ -13,6 +13,7 @@ import {
 } from './models.ts';
 import { WidgetResultSchema, type WidgetResult } from './widgets.ts';
 import { CoachTransport } from './CoachTransport.ts';
+import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 
 type State = {
   ready: boolean;
@@ -139,8 +140,13 @@ export class CoachConversation {
         threadId: saved?.threadId ?? null,
       });
       this.saved = JSON.stringify(this.chat.messages);
-    } catch {
-      this.update({ localError: 'Could not read your conversation. Reopen Coach to retry.' });
+    } catch (failure) {
+      this.update({
+        localError: failureNotice(
+          'Could not read your conversation. Reopen Coach to retry.',
+          failure,
+        ),
+      });
     }
   }
   input(value: string) {
@@ -169,10 +175,13 @@ export class CoachConversation {
         try {
           await this.resources.saveDraft(this.key, frame);
           this.update({ localError: null });
-        } catch {
+        } catch (failure) {
           this.update({
             localError:
-              'Could not save this conversation on the phone. Keep Coach open and retry.',
+              failureNotice(
+                'Could not save this conversation on the phone. Keep Coach open and retry.',
+                failure,
+              ),
           });
         }
       });
@@ -323,9 +332,12 @@ export class CoachConversation {
       this.update({ threadId: id, input: '', historyError: null, stopped: false });
       this.checkpoint();
       return true;
-    } catch {
+    } catch (failure) {
       this.update({
-        openError: 'Could not open that conversation. Your current chat is still here.',
+        openError: failureNotice(
+          'Could not open that conversation. Your current chat is still here.',
+          failure,
+        ),
       });
       return false;
     } finally {
@@ -358,11 +370,14 @@ export class CoachConversation {
       ].slice(0, 20);
       try {
         await this.resources.saveDraft(`${this.key}:archive`, archive);
-      } catch {
+      } catch (failure) {
         this.update({
           opening: false,
           localError:
-            'Could not keep this conversation on the phone. Retry before starting a new one.',
+            failureNotice(
+              'Could not keep this conversation on the phone. Retry before starting a new one.',
+              failure,
+            ),
         });
         return false;
       }
@@ -408,8 +423,9 @@ export class CoachConversation {
           this.update({ threadId: response.threadId, historyError: null });
           this.checkpoint();
           this.resources.invalidate([historySpec.path]);
-        } catch {
-          this.update({ historyError: coachError(null, 'save conversation history') });
+        } catch (failure) {
+          reportError(failure);
+          this.update({ historyError: coachError(failure, 'save conversation history') });
         }
       });
     return this.historyWrites;

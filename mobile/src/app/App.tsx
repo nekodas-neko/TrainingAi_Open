@@ -58,6 +58,10 @@ import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
 import { AlertNavigation } from '../features/platform/components/AlertNavigation';
 import { DynamicBackground } from '../features/weather/components/DynamicBackground';
 import type { BackgroundSection } from '../features/weather/data/background';
+import { errorReporter } from '../core/reporting/index.ts';
+import { installErrorReporting } from '../core/reporting/install';
+
+installErrorReporting();
 
 function AppShell() {
   const health = useHealthContext();
@@ -134,6 +138,9 @@ function AppShell() {
   }
   // An Oura return that cold-started the app goes to the Oura screen, which finishes the connect.
   const [ouraReturn, setOuraReturn] = useState<string | null>(null);
+  useEffect(() => {
+    errorReporter.setScreen(detail ?? tab);
+  }, [detail, tab]);
   useEffect(() => {
     let active = true;
     void takeInitialOuraReturn().then((url) => {
@@ -532,6 +539,14 @@ function AppShell() {
     </SafeAreaView>
   );
 }
+/** Reports go out as the signed-in account; while signed out they wait in the reporter's queue. */
+function ErrorReportConnection() {
+  const { dataReader } = useAccountContext();
+  useEffect(() => {
+    errorReporter.connect(dataReader ? (path, body) => dataReader.post(path, body) : null);
+  }, [dataReader]);
+  return null;
+}
 function NativeInteractions() {
   const { dataReader } = useAccountContext();
   const scope = JSON.stringify([dataReader?.origin, dataReader?.userId]);
@@ -547,6 +562,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AccountProvider>
+        <ErrorReportConnection />
         <LocalStorageProvider>
           <AppProvider>
             <AppStartupGate>
