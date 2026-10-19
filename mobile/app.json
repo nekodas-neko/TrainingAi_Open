@@ -26,6 +26,7 @@
       ],
       "expo-web-browser",
       "./src/integrations/notifications/local-only.cjs",
+      "./src/integrations/notifications/exact-alarms.cjs",
       ["expo-notifications", { "enableBackgroundRemoteNotifications": false }],
       [
         "expo-calendar",
