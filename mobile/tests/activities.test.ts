@@ -8,6 +8,7 @@ import {
   sessionPayload,
 } from '../src/features/activities/data/ActivityStore.ts';
 import type { AccountConnection } from '../src/features/account/session.ts';
+import { ApiError } from '../src/features/account/api/client.ts';
 const type = {
   id: 'treadmill',
   label: 'Treadmill',
@@ -536,4 +537,231 @@ test('rejection counts and dead letters survive a restart', async () => {
   assert.equal(row.rejected!.error, 'Rejected by the sync schema at payload');
   assert.equal(deadLettered(row), true);
   assert.equal(reopened.getSnapshot().rows.find((r) => r.payload.id === second)!.pending, false);
+});
+// --- Run queue, non-200 pushes, fitness tests, old blobs (#3179) ---
+const runA = '20000000-0000-4000-8000-00000000000a';
+const runB = '20000000-0000-4000-8000-00000000000b';
+const runBody = (runId: string) => ({ id: runId, status: 'completed' as const });
+const HOUR = 60 * 60_000;
+function runFixture(patch: (path: string, body: unknown) => Promise<unknown>) {
+  const f = fixture();
+  f.online();
+  const patched: string[] = [];
+  f.connection.patch = async (path, body) => {
+    patched.push((body as { id: string }).id);
+    return patch(path, body);
+  };
+  return { f, patched, store: f.create() };
+}
+const accepted = async (_: string, body: unknown) => ({
+  run: { ...(body as object), activityLogId: null, completedAs: null },
+});
+const failing = (status: number) => async () => {
+  throw new ApiError(status);
+};
+const runRow = (store: ActivityStore, runId: string) =>
+  store.getSnapshot().runs.find((row) => row.payload.id === runId)!;
+
+test('a run PATCH answering 404 five times is dead-lettered and the next run uploads', async () => {
+  const { f, store, patched } = runFixture(async (path, body) =>
+    (body as { id: string }).id === runA ? failing(404)() : accepted(path, body),
+  );
+  await store.initialize();
+  await store.completeRun('2026-10-12', runBody(runA));
+  await store.completeRun('2026-10-12', runBody(runB));
+  await store.sync();
+  assert.equal(runRow(store, runA).rejected!.attempts, 1);
+  assert.equal(runRow(store, runB).pending, false);
+  for (let attempt = 2; attempt <= 5; attempt++) {
+    f.advance(2 * HOUR);
+    await store.sync();
+    assert.equal(runRow(store, runA).rejected!.attempts, attempt);
+  }
+  assert.equal(deadLettered(runRow(store, runA)), true);
+  f.advance(24 * HOUR);
+  await store.sync();
+  assert.equal(patched.filter((runId) => runId === runA).length, 5);
+  assert.equal(runRow(store, runA).pending, true);
+});
+test('a run PATCH answering 500 is never counted, retries, and the next run still uploads', async () => {
+  const { f, store, patched } = runFixture(async (path, body) =>
+    (body as { id: string }).id === runA ? failing(500)() : accepted(path, body),
+  );
+  await store.initialize();
+  await store.completeRun('2026-10-12', runBody(runA));
+  await store.completeRun('2026-10-12', runBody(runB));
+  await store.sync();
+  for (let i = 0; i < 6; i++) {
+    f.advance(2 * HOUR);
+    await store.sync();
+  }
+  assert.equal(runRow(store, runA).rejected, undefined);
+  assert.equal(deadLettered(runRow(store, runA)), false);
+  assert.equal(runRow(store, runA).pending, true);
+  assert.equal(runRow(store, runB).pending, false);
+  assert.equal(patched.filter((runId) => runId === runA).length >= 6, true);
+  assert.match(store.getSnapshot().error ?? '', /Saved on this phone/);
+});
+test('a run that answers 404, or fails its readback, is counted and the next run uploads', async () => {
+  for (const bad of [failing(404), async () => ({ run: { id: runA, status: 'skipped' } })]) {
+    const { store } = runFixture(async (path, body) =>
+      (body as { id: string }).id === runA ? bad() : accepted(path, body),
+    );
+    await store.initialize();
+    await store.completeRun('2026-10-12', runBody(runA));
+    await store.completeRun('2026-10-12', runBody(runB));
+    await store.sync();
+    await store.sync();
+    assert.equal(runRow(store, runA).rejected!.attempts, 1);
+    assert.equal(runRow(store, runB).pending, false);
+  }
+});
+test('a run PATCH answering 429 or 503, or a lost connection, is not counted', async () => {
+  for (const bad of [
+    failing(429),
+    failing(503),
+    async () => Promise.reject(new Error('Offline')),
+  ]) {
+    const { store } = runFixture(bad);
+    await store.initialize();
+    await store.completeRun('2026-10-12', runBody(runA));
+    await store.sync();
+    assert.equal(runRow(store, runA).rejected, undefined);
+    assert.equal(runRow(store, runA).pending, true);
+  }
+});
+test('a run completes while an activity backs off', async () => {
+  const { f, store } = runFixture(accepted);
+  f.connection.post = async (_, body) => {
+    const change = (body as { mutations: { id: string; domain: string; date: string }[] })
+      .mutations[0];
+    return {
+      processed: 0,
+      errors: [{ id: change.id, domain: change.domain, date: change.date, error: 'No' }],
+    };
+  };
+  await store.initialize();
+  await store.saveRecord(record(id, '12:00'));
+  await store.completeRun('2026-10-12', runBody(runA));
+  await store.sync();
+  assert.equal(store.getSnapshot().rows[0].rejected!.attempts, 1);
+  assert.equal(runRow(store, runA).pending, false);
+});
+
+// A push the server answers with a non-200 status.
+async function refusedWith(status: number) {
+  const f = fixture();
+  f.online();
+  let calls = 0;
+  const accept = f.connection.post;
+  f.connection.post = async (path, body) => {
+    const change = (body as { mutations: { id: string }[] }).mutations[0];
+    if (change.id !== id) {
+      return accept(path, body);
+    }
+    calls++;
+    throw new ApiError(status);
+  };
+  const store = f.create();
+  await store.initialize();
+  await store.saveRecord(record(id, '12:00'));
+  await store.saveRecord(record(second, '12:30'));
+  await store.sync();
+  return { store, calls: () => calls };
+}
+test('a 400 push is counted against the item and the next one uploads', async () => {
+  const { store } = await refusedWith(400);
+  const rows = store.getSnapshot().rows;
+  assert.equal(rows.find((row) => row.payload.id === id)!.rejected!.attempts, 1);
+  assert.match(rows.find((row) => row.payload.id === id)!.rejected!.error, /HTTP 400/);
+  assert.equal(rows.find((row) => row.payload.id === second)!.pending, false);
+});
+test('a 429 or a 5xx push is not counted and retries', async () => {
+  for (const status of [429, 503]) {
+    const { store } = await refusedWith(status);
+    assert.equal(
+      store.getSnapshot().rows.find((row) => row.payload.id === id)!.rejected,
+      undefined,
+    );
+    assert.match(store.getSnapshot().error ?? '', /Saved on this phone/);
+  }
+});
+
+test('a fitness test the server rejects is counted and dead-lettered after 5', async () => {
+  const f = fixture();
+  f.online();
+  const stored: object[] = [];
+  f.connection.get = async (_, query) => ({ date: query!.date, activityLogs: stored });
+  let refused = 0;
+  f.connection.post = async (_path, body) => {
+    const change = (body as { mutations: { id: string; domain: string; date: string }[] })
+      .mutations[0];
+    if (change.domain !== 'fitness_tests') {
+      // The fixture's server blanks the distance, which this test's effort row would fail on.
+      stored.push({ ...(change as unknown as { payload: object }).payload });
+      return { processed: 1, errors: [] };
+    }
+    refused++;
+    return {
+      processed: 0,
+      errors: [{ id: change.id, domain: change.domain, date: change.date, error: 'Bad test' }],
+    };
+  };
+  const store = f.create();
+  await store.initialize();
+  await store.start(
+    { id: 'run', label: 'Run', icon: 'PersonSimpleRun', isDistanceBased: true },
+    {
+      kind: 'test',
+      protocol: 'cooper12',
+      activityId: second,
+      countdownUntil: f.now(),
+      restingHr: '',
+      peakHr: '',
+      recoveryHr: '',
+      saved: false,
+    },
+  );
+  await store.begin();
+  f.advance(720_000);
+  await store.update({ distance: '2.4' });
+  await store.finishGuided();
+  await store.saveFitness('Australia/Brisbane', {});
+  await store.sync();
+  const test0 = () => store.getSnapshot().tests[0];
+  assert.equal(test0().rejected!.attempts, 1);
+  assert.equal(store.getSnapshot().rows[0].pending, false);
+  for (let attempt = 2; attempt <= 5; attempt++) {
+    f.advance(2 * HOUR);
+    await store.sync();
+  }
+  assert.equal(deadLettered(test0()), true);
+  assert.equal(test0().rejected!.error, 'Bad test');
+  f.advance(24 * HOUR);
+  await store.sync();
+  assert.equal(refused, 5);
+});
+
+test('a blob stored before rejections existed, without `rejected`, loads and uploads', async () => {
+  const f = fixture();
+  f.online();
+  const store = f.create();
+  await store.initialize();
+  await store.saveRecord(record(id, '12:00'));
+  const [key] = [...f.values.keys()];
+  const blob = JSON.parse(f.values.get(key)!);
+  blob.rows = blob.rows.map(({ rejected: _, ...row }: Record<string, unknown>) => ({
+    ...row,
+    pending: true,
+  }));
+  blob.runs = [{ date: '2026-10-12', payload: runBody(runA), pending: true }];
+  blob.tests = [];
+  f.values.set(key, JSON.stringify(blob));
+  f.connection.patch = accepted;
+  const reopened = f.create();
+  await reopened.initialize();
+  assert.equal(reopened.getSnapshot().rows[0].rejected, undefined);
+  await reopened.sync();
+  assert.equal(reopened.getSnapshot().rows[0].pending, false);
+  assert.equal(runRow(reopened, runA).pending, false);
 });
