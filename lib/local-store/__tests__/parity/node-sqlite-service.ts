@@ -37,8 +37,18 @@ export const isSQLiteAvailable = () => true
 export const isLocalStoreDead = () => false
 export async function initSQLite(): Promise<void> { /* opened by openVectorDb */ }
 
-export async function runSQL(sql: string, values: unknown[] = []): Promise<void> {
+function write(sql: string, values: unknown[]): void {
   vectorDb().prepare(sql).run(...(values.map(bindable) as never[]))
+}
+
+// A standalone write. On the device it waits for an open transaction to end (#2520), so a
+// transaction body that calls it instead of `tx.run` hangs forever. A vector runs one thing at a
+// time, so a runSQL during a transaction can only be such a body: fail it loudly here instead.
+export async function runSQL(sql: string, values: unknown[] = []): Promise<void> {
+  if (inTransaction) {
+    throw new Error(`parity runner: standalone runSQL inside a transaction body — use tx.run [${sql.trim().slice(0, 80)}]`)
+  }
+  write(sql, values)
 }
 
 export async function querySQL<T = Record<string, unknown>>(sql: string, values: unknown[] = []): Promise<T[]> {
@@ -53,10 +63,12 @@ export async function rollbackTransaction(): Promise<void> {
 }
 
 /** The backend's only transaction entry point; same begin / commit / rollback-on-throw as the real one. */
-export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+export async function withTransaction<T>(
+  fn: (tx: { run: (sql: string, values?: unknown[]) => Promise<void> }) => Promise<T>,
+): Promise<T> {
   await beginTransaction()
   try {
-    const result = await fn()
+    const result = await fn({ run: async (sql, values = []) => write(sql, values) })
     await commitTransaction()
     return result
   } catch (err) {

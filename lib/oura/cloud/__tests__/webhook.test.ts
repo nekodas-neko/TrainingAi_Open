@@ -7,7 +7,7 @@ import { encryptOuraToken } from '../token-cipher'
 import { OuraUnavailableError } from '../client'
 import { NO_WRITES } from '../ingest'
 import {
-  catchUpOuraCloudHeartRate, handleOuraWebhookEvent, HEART_RATE_LOOKBACK_MS, MAX_EVENT_AGE_MS, ouraWebhookConfig,
+  catchUpOuraCloudHeartRate, handleOuraWebhookEvent, HEART_RATE_LOOKBACK_MS, HEART_RATE_OVERLAP_MS, MAX_EVENT_AGE_MS, ouraWebhookConfig,
   resetOuraCloudHeartRateThrottle, startOuraCloudHeartRateCatchUp, verifyOuraSignature, type OuraWebhookDeps,
 } from '../webhook'
 import type { User } from '@trainingai/shared/types'
@@ -98,7 +98,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
         upsertOuraWorkouts: async (_u, rows) => rows.length,
         tombstoneOuraWorkouts: async (_u, ids) => { writes.workoutsTombstoned.push(...ids); return ids.length },
         tombstoneOuraWorkoutsAbsent: async () => 0,
-        upsertOuraCloudHeartrate: async (_u, rows) => rows.length,
+        upsertOuraCloudHeartrate: async (_u, rows) => ({ offered: rows.length, changed: rows.length, changedFrom: null, changedTo: null }),
         upsertOuraCloudSleepPeriods: async (_u, rows) => rows.length,
         upsertOuraCloudDaily: async (_u, rows) => rows.length,
         upsertOuraSessions: async (_u, rows) => { writes.sessions += rows.length; return rows.length },
@@ -262,6 +262,8 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
   const contexts: (string | null)[] = []
   /** What the fake upsert answers; `null` = every point it is given. */
   let written: number | null
+  /** How many of those it reports as new or changed; `null` = all of them. */
+  let changed: number | null
 
   const deps = (timezone: string | null = 'Australia/Brisbane'): Pick<OuraWebhookDeps, 'repo' | 'config'> => ({
     config: CONFIG,
@@ -285,7 +287,9 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
       tombstoneOuraWorkoutsAbsent: async () => 0,
       upsertOuraCloudHeartrate: async (_u, rows, tz) => {
         upserts.push({ points: rows.length, tz }); contexts.push(...rows.map(r => r.context ?? null))
-        return written ?? rows.length
+        const n = written ?? rows.length
+        const times = rows.map(r => r.timestamp.getTime()).sort((a, b) => a - b)
+        return { offered: n, changed: changed ?? n, changedFrom: (changed ?? n) > 0 ? new Date(times[0]) : null, changedTo: (changed ?? n) > 0 ? new Date(times[times.length - 1]) : null }
       },
       upsertOuraCloudSleepPeriods: async () => 0,
       upsertOuraCloudDaily: async () => 0,
@@ -297,7 +301,7 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
 
   beforeEach(() => {
     process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
-    newest = null; since = null; upserts.length = 0; contexts.length = 0; written = null
+    newest = null; since = null; upserts.length = 0; contexts.length = 0; written = null; changed = null
     resetOuraCloudHeartRateThrottle()
     resetOuraCloudReportThrottle()
     reportServerError.mockReset()
@@ -320,16 +324,51 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
 
   const reported = () => reportServerError.mock.calls.map(c => (c[0] as Error).message)
 
-  it('reads from the newest oura_cloud point to now and writes in the user\'s timezone', async () => {
+  it('reads from 6 h behind the newest oura_cloud point to now and writes in the user\'s timezone', async () => {
     newest = new Date('2026-10-13T22:30:00Z')
     expect(await catchUpOuraCloudHeartRate(deps(), USER, now)).toBe(1)
     const url = new URL(String(fetchMock.mock.calls[0][0]))
     expect(url.pathname).toBe('/v2/usercollection/heartrate')
-    expect(url.searchParams.get('start_datetime')).toBe('2026-10-13T22:30:00.000Z')
+    // #3078: a batch Oura stamps earlier than a stored point is still read.
+    expect(url.searchParams.get('start_datetime')).toBe(new Date(newest.getTime() - HEART_RATE_OVERLAP_MS).toISOString())
+    expect(url.searchParams.get('start_datetime')).toBe('2026-10-13T16:30:00.000Z')
     expect(url.searchParams.get('end_datetime')).toBe('2026-10-14T02:00:00.000Z')
     expect(since?.getTime()).toBe(now - HEART_RATE_LOOKBACK_MS)
     // The implausible 400 bpm is dropped, not clamped.
     expect(upserts).toEqual([{ points: 1, tz: 'Australia/Brisbane' }])
+  })
+
+  it('never reads past the week floor, however old the newest point', async () => {
+    newest = new Date(now - HEART_RATE_LOOKBACK_MS + 60 * 60_000)
+    await catchUpOuraCloudHeartRate(deps(), USER, now)
+    const url = new URL(String(fetchMock.mock.calls[0][0]))
+    expect(Date.parse(url.searchParams.get('start_datetime')!)).toBe(now - HEART_RATE_LOOKBACK_MS)
+  })
+
+  // #3078: the workouts the written points overlap are re-attributed, once, over the points' span.
+  it('re-attributes workouts over the changed points\' span, and only when points changed', async () => {
+    const calls: [string, string, string, string][] = []
+    const workoutHr = async (u: string, f: Date, t: Date, tz: string) => { calls.push([u, f.toISOString(), t.toISOString(), tz]); return 1 }
+    fetchMock.mockImplementation(async () => jsonResponse({
+      data: [
+        { timestamp: '2026-10-14T00:10:00+00:00', bpm: 121, source: 'workout' },
+        { timestamp: '2026-10-14T00:00:00+00:00', bpm: 58, source: 'rest' },
+      ],
+      next_token: null,
+    }))
+    expect(await catchUpOuraCloudHeartRate({ ...deps(), workoutHr }, USER, now)).toBe(2)
+    expect(calls).toEqual([[USER, '2026-10-14T00:00:00.000Z', '2026-10-14T00:10:00.000Z', 'Australia/Brisbane']])
+
+    // A re-read that changes nothing re-attributes nothing.
+    changed = 0
+    expect(await catchUpOuraCloudHeartRate({ ...deps(), workoutHr }, USER, now)).toBe(2)
+    expect(calls).toHaveLength(1)
+  })
+
+  it('a failed re-attribution is reported and does not fail the heart-rate read', async () => {
+    const workoutHr = async () => { throw new Error('pool timeout') }
+    expect(await catchUpOuraCloudHeartRate({ ...deps(), workoutHr }, USER, now)).toBe(1)
+    await vi.waitFor(() => expect(reported()).toEqual([expect.stringMatching(/webhook-heartrate:workouts: pool timeout/)]))
   })
 
   it('reads at most a week back when there is no Cloud point yet, with the default timezone for a user without one', async () => {
@@ -375,7 +414,7 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
     }))
     written = 1
     expect(await catchUpOuraCloudHeartRate(deps(), USER, now)).toBe(1)
-    expect(info).toHaveBeenCalledWith(expect.stringMatching(/2 read, 2 plausible, 1 written, 1 covered by device rows$/))
+    expect(info).toHaveBeenCalledWith(expect.stringMatching(/2 read, 2 plausible, 1 written \(1 new or changed\), 1 covered by device rows$/))
     expect(reportServerError).not.toHaveBeenCalled()
   })
 

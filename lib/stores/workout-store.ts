@@ -479,10 +479,6 @@ export function isWorkoutActive(
   return !!state.workoutStartMs && !state.workoutEndMs && state.mode !== 'done'
 }
 
-// The single shared rest-target derivation (TMR-1/TMR-5) — a style-less set (no
-// configured restSec, lastSetRestSec === 0) still gets a real countdown target instead
-// of silently skipping the beep/notification (which gated on `> 0`) while the ring
-// visually assumed a hardcoded 90s.
-export function effectiveRestSec(lastSetRestSec: number): number {
-  return lastSetRestSec > 0 ? lastSetRestSec : 90
-}
+// The single shared rest-target derivation (TMR-1/TMR-5), now in packages/shared so TrainingAi
+// Preview's last-set rest uses the same one (#3111).
+export { effectiveRestSec } from '@trainingai/shared/workout/rest-target'

@@ -9,7 +9,7 @@ const db = { current: null as DatabaseSync | null }
 vi.mock('@/lib/sqlite/sqlite-service', () => ({
   runSQL: vi.fn(async (sql: string, p: unknown[] = []) => { db.current!.prepare(sql).run(...(p as never[])) }),
   querySQL: vi.fn(async (sql: string, p: unknown[] = []) => db.current!.prepare(sql).all(...(p as never[]))),
-  withTransaction: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  withTransaction: vi.fn(async (fn: (tx: { run: (sql: string, p?: unknown[]) => Promise<void> }) => Promise<unknown>) => fn({ run: (await import('@/lib/sqlite/sqlite-service')).runSQL })),
   isSQLiteAvailable: () => true, isLocalStoreDead: () => false,
 }))
 

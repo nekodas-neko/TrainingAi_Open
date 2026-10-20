@@ -1550,7 +1550,7 @@ export interface WorkoutRepository {
   /** #3087: tombstones the workouts on `from`..`to` that Oura's full list for those days no longer has. */
   tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }): Promise<number>
   /** #2859: Oura Cloud's HR series (`oura_cloud`). Never displaces or duplicates a ring or strap row. */
-  upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string): Promise<number>
+  upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string): Promise<OuraCloudHeartrateWrite>
   /** #2982: Oura's sleep periods as sent (series, hypnograms, flags); read by no screen. Returns rows written. */
   upsertOuraCloudSleepPeriods(userId: string, rows: import('./postgres/slices/oura').OuraCloudSleepPeriodRow[]): Promise<number>
   /** #2982: Oura's per-day series, goals, contributors and stress label; sets only the fields each row carries. */
@@ -1613,6 +1613,8 @@ export interface WorkoutRepository {
   /** `sessionId → avgBpm` for the sessions that have one (Q-421). Absent = no usable HR. */
   getAvgBpmBySession(userId: string, sessionIds: string[]): Promise<Map<string, number>>
   listSessionsMissingHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
+  /** Completed sessions whose HR window overlaps `[from, to]`, oldest first (#3078: re-attribute after late HR). */
+  listCompletedSessionsOverlapping(userId: string, from: Date, to: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   // Per-SET HR metric snapshot (migration 139) — durable per-set record for per-exercise HR trends,
   // sibling of workout_hr_stats. getSetDetailsForSession feeds the formula; the rest persist/read it.
   getSetDetailsForSession(userId: string, workoutSessionId: string): Promise<import('@trainingai/shared/workout/set-hr-stats').RichSetMarker[]>
@@ -1860,6 +1862,15 @@ export type OuraDailyDerivedPatch = Partial<Omit<OuraDailyDerivedRow, 'day'>>
 
 /** Per-workout HR summary snapshot (H-3 / Lever W). Scalars recomputed live from oura_heartrate +
  *  rr_intervals on every recap today; persisted here so old recaps survive the 180d/90d prunes. */
+/** What one Oura Cloud heart-rate write did (#3078): points offered after the device-row cover
+ *  filter, and how many of them were actually inserted or changed, with their span. */
+export interface OuraCloudHeartrateWrite {
+  offered: number
+  changed: number
+  changedFrom: Date | null
+  changedTo: Date | null
+}
+
 export interface WorkoutHrStatsInput {
   avgBpm: number | null
   peakBpm: number | null

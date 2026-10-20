@@ -49,6 +49,8 @@ describe('reconcileOuraCloud', () => {
       // #3087: and tombstones a workout gone from Oura's list for a day it re-read.
       expect(opts).toEqual({ from: shiftDateStr(to, -(RECONCILE_DAYS - 1)), to, dryRun: false, heartRate: true, tz, tombstoneAbsentWorkouts: true })
       expect(deps.rescore).toBe(repo)
+      // #3078: the reconciliation's heart rate re-attributes the workouts it changed.
+      expect(deps.workoutHr).toBeTypeOf('function')
     }
     // The two users' "today" differ: the window is each user's own local days.
     expect(out.map(o => o.to)).toEqual(['2026-10-19', '2026-10-18'])

@@ -1,6 +1,6 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { analyseHrRecovery, type SetHrStats } from './hr-analysis'
-import { summariseWorkoutHr, type WorkoutHrSummary } from './hr-summary'
+import { summariseWorkoutHr, WORKOUT_HR_PAD_MS, type WorkoutHrSummary } from './hr-summary'
 import { computeSetHrStats, type SetHrRow } from './set-hr-stats'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
@@ -28,8 +28,8 @@ export async function computeWorkoutHr(
 ): Promise<WorkoutHrComputed | null> {
   if (!ws.completedAt) return null
 
-  const from = new Date(ws.startedAt.getTime() - 10 * 60 * 1000)
-  const to = new Date(ws.completedAt.getTime() + 10 * 60 * 1000)
+  const from = new Date(ws.startedAt.getTime() - WORKOUT_HR_PAD_MS)
+  const to = new Date(ws.completedAt.getTime() + WORKOUT_HR_PAD_MS)
 
   // #2299 step 2: the rest bar is the person's own HRR60 over the 30 days before this session.
   const barFrom = dateStrMidnightInTz(shiftDateStr(toAestDay(ws.startedAt, tz), -HRR60_BAR_WINDOW_DAYS), tz)

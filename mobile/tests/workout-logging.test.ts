@@ -678,7 +678,9 @@ test('guided warm-up, rest, summary and next exercise persist without uploading 
     f.clock(20_000);
     await f.controller.recordSet(id, exerciseId, set.id);
     if (set.id === active().exercises[0].sets.at(-1)!.id) {
-      assert.equal(active().rest, null);
+      // The last set's rest runs on the summary (#3111).
+      assert.equal(active().rest?.lastSet, true);
+      assert.equal(active().restAnchor, null);
     } else {
       assert.ok(active().rest);
     }
@@ -921,7 +923,8 @@ test('timer choices persist per account and workout while hidden clocks still re
   await f.controller.recordSet(id, exerciseId, second.id);
   f.clock(90_000);
   const active = f.controller.getSnapshot().data.workouts[0];
-  assert.equal(active.rest, null);
+  // The summary times the last set's rest without recording it against the set (#3111).
+  assert.equal(active.rest?.lastSet, true);
   assert.equal(active.restAnchor, null);
   assert.equal(active.exercises[0].sets[1].restAfterSec, 0);
   const saved = readJournal(await f.scope.get('workout-journal.v1'), f.connection);

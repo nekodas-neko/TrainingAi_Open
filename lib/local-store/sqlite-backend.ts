@@ -1,4 +1,4 @@
-import { runSQL, querySQL, withTransaction } from '@/lib/sqlite/sqlite-service';
+import { runSQL, querySQL, withTransaction, type SQLTransaction } from '@/lib/sqlite/sqlite-service';
 import { MAX_MUTATION_ATTEMPTS, nextRetryDelayMs } from './sync-helpers';
 import type { LocalStore, LocalWorkoutHistory } from './index';
 import type {
@@ -218,6 +218,7 @@ export class SQLiteLocalStore implements LocalStore {
       timeInBedHours:  (r.time_in_bed_hours as number) ?? null,
       manualSleepStart: (r.manual_sleep_start as string) ?? null,
       manualEntry:     Number(r.manual_entry ?? 0) === 1,
+      ouraSleepType:   (r.oura_sleep_type as string) ?? null,
       syncStatus:      (r.sync_status as 'pending' | 'synced') ?? 'synced',
       updatedAt:       String(r.updated_at),
     })));
@@ -474,12 +475,12 @@ export class SQLiteLocalStore implements LocalStore {
     const exerciseLogId = payload.exerciseLogId ?? crypto.randomUUID();
     const localDate = (payload.localDate ?? now).slice(0, 10);
 
-    await withTransaction(async () => {
+    await withTransaction(async (tx) => {
       // Upsert the workout session row (idempotent — session may already exist).
       // session_id/intensity_mode/was_override carried through so a stranded
       // (dead-lettered-then-recovered) replay keeps its real program-session +
       // deload/override attribution instead of degrading to a name-fallback (SYN-6).
-      await runSQL(
+      await tx.run(
         `INSERT INTO workout_sessions
            (id, session_name, started_at, completed_at, updated_at, synced, sync_status,
             session_id, intensity_mode, was_override)
@@ -504,7 +505,7 @@ export class SQLiteLocalStore implements LocalStore {
       );
 
       // Insert the exercise_log row — use client-provided offline estimate if present
-      await runSQL(
+      await tx.run(
         `INSERT OR REPLACE INTO exercise_logs
            (id, workout_session_id, exercise_name, style_id, style_name,
             estimated_1rm, target_80, volume, avg_reps, time_to_complete,
@@ -533,7 +534,7 @@ export class SQLiteLocalStore implements LocalStore {
       // Insert all set rows — use client-provided ids if present
       for (let i = 0; i < payload.weights.length; i++) {
         const setId = payload.setLogIds?.[i] ?? crypto.randomUUID();
-        await runSQL(
+        await tx.run(
           `INSERT OR REPLACE INTO set_logs
              (id, exercise_log_id, set_number, weight_kg, reps, set_time_sec,
               rest_time_sec, intensity_pct, use_for_1rm, set_start_ms, set_end_ms,
@@ -1457,14 +1458,14 @@ export class SQLiteLocalStore implements LocalStore {
   }
 
   async applyDelta(delta: Parameters<LocalStore['applyDelta']>[0]): Promise<void> {
-    await withTransaction(() => this.applyDeltaBody(delta));
+    await withTransaction(tx => this.applyDeltaBody(delta, tx));
   }
 
-  private async applyDeltaBody(delta: Parameters<LocalStore['applyDelta']>[0]): Promise<void> {
+  private async applyDeltaBody(delta: Parameters<LocalStore['applyDelta']>[0], tx: SQLTransaction): Promise<void> {
     // Meal plans: server-authoritative, so a plain overwrite. A tombstoned plan keeps its row so
     // the delete propagates to a device that has not synced rather than silently reappearing.
     for (const p of delta.mealPlans ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT INTO meal_plans (id, name, is_active, meals_per_day, target_calories,
            target_protein_g, target_carbs_g, target_fat_g, training_time, generated_at,
            last_reviewed_at, updated_at, deleted_at, sync_status)
@@ -1488,15 +1489,15 @@ export class SQLiteLocalStore implements LocalStore {
     const changedMealPlanIds = (delta.mealPlans ?? []).map(p => p.id);
     if (changedMealPlanIds.length) {
       const ph = changedMealPlanIds.map(() => '?').join(',');
-      await runSQL(
+      await tx.run(
         `DELETE FROM meal_plan_meals WHERE variant_id IN
            (SELECT id FROM meal_plan_variants WHERE meal_plan_id IN (${ph}))`,
         changedMealPlanIds,
       );
-      await runSQL(`DELETE FROM meal_plan_variants WHERE meal_plan_id IN (${ph})`, changedMealPlanIds);
+      await tx.run(`DELETE FROM meal_plan_variants WHERE meal_plan_id IN (${ph})`, changedMealPlanIds);
     }
     for (const v of delta.mealPlanVariants ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT INTO meal_plan_variants (id, meal_plan_id, day_type, target_calories,
            target_protein_g, target_carbs_g, target_fat_g)
          VALUES (?,?,?,?,?,?,?)
@@ -1508,7 +1509,7 @@ export class SQLiteLocalStore implements LocalStore {
       );
     }
     for (const m of delta.mealPlanMeals ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT INTO meal_plan_meals (id, variant_id, position, name, notes, target_calories,
            target_protein_g, target_carbs_g, target_fat_g, ingredients, suggested_time)
          VALUES (?,?,?,?,?,?,?,?,?,?,?)
@@ -1530,7 +1531,7 @@ export class SQLiteLocalStore implements LocalStore {
     // offline — the row is only overwritten if the device has already confirmed it with the server.
     // Without this a decline made on a plane comes back as an unanswered prompt on landing.
     for (const a of delta.planMealAnswers ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT INTO plan_meal_answers
            (id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at,
             est_calories, est_protein_g, est_carbs_g, est_fat_g, est_bias_kcal, est_basis, sync_status)
@@ -1556,9 +1557,9 @@ export class SQLiteLocalStore implements LocalStore {
     }
     for (const r of delta.bodyMetrics ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM body_metrics WHERE date = ? AND sync_status='synced'`, [r.date]);
+        await tx.run(`DELETE FROM body_metrics WHERE date = ? AND sync_status='synced'`, [r.date]);
       } else {
-        await runSQL(
+        await tx.run(
           `INSERT INTO body_metrics
              (date, weight_kg, body_fat_pct, steps, calories, protein_g, carbs_g, fat_g,
               water_ml, resting_heart_rate, hrv_ms, spo2_pct, distance_km,
@@ -1596,9 +1597,9 @@ export class SQLiteLocalStore implements LocalStore {
 
     for (const r of delta.moodLogs ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM mood_logs WHERE log_date = ? AND sync_status='synced'`, [r.logDate]);
+        await tx.run(`DELETE FROM mood_logs WHERE log_date = ? AND sync_status='synced'`, [r.logDate]);
       } else {
-        await runSQL(
+        await tx.run(
           `INSERT INTO mood_logs
              (log_date, energy_level, sleep_quality, body_state, sore_muscles,
               updated_at, deleted_at, sync_status)
@@ -1631,15 +1632,20 @@ export class SQLiteLocalStore implements LocalStore {
       // because its updated_at does not advance and an unpushed removal is 'pending'. A NEWER live
       // copy does clear it — the night was entered again, or a device measured it — so this is not
       // the one-way `deleted_at IS NULL` guard mood_logs uses.
-      await runSQL(
+      //
+      // #3060: `oura_sleep_type` rides the same guard, with the v50 window's exception: a synced row
+      // pulled before v53 has no type, and a re-send at an EQUAL updated_at (Restore from cloud) fills
+      // it. Never from an older copy, which would revert the rest of the row. A changed type always
+      // arrives at a newer updated_at (the period upsert bumps the row).
+      await tx.run(
         `INSERT INTO sleep_sessions
            (id, date, duration_hours, deep_sleep_hours, rem_sleep_hours,
             light_sleep_hours, oura_id, efficiency, onset_latency_sec, average_hrv_ms,
             avg_heart_rate, lowest_heart_rate, restless_periods, sleep_score,
             respiratory_rate, sleep_phase_5_min, time_in_bed_hours, manual_sleep_start,
-            sleep_start, sleep_end, awake_hours, manual_entry, deleted_at,
+            sleep_start, sleep_end, awake_hours, manual_entry, deleted_at, oura_sleep_type,
             updated_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
            date=excluded.date, duration_hours=excluded.duration_hours,
            deep_sleep_hours=excluded.deep_sleep_hours,
@@ -1654,17 +1660,19 @@ export class SQLiteLocalStore implements LocalStore {
            manual_sleep_start=excluded.manual_sleep_start,
            sleep_start=excluded.sleep_start, sleep_end=excluded.sleep_end,
            awake_hours=excluded.awake_hours, manual_entry=excluded.manual_entry,
-           deleted_at=excluded.deleted_at,
+           deleted_at=excluded.deleted_at, oura_sleep_type=excluded.oura_sleep_type,
            updated_at=excluded.updated_at, sync_status='synced'
          WHERE sleep_sessions.sync_status='synced'
            AND (excluded.updated_at > sleep_sessions.updated_at
-                OR (sleep_sessions.sleep_start IS NULL AND excluded.sleep_start IS NOT NULL))`,
+                OR (sleep_sessions.sleep_start IS NULL AND excluded.sleep_start IS NOT NULL)
+                OR (sleep_sessions.oura_sleep_type IS NULL AND excluded.oura_sleep_type IS NOT NULL
+                    AND excluded.updated_at >= sleep_sessions.updated_at))`,
         [r.id, r.date, r.durationHours, r.deepSleepHours, r.remSleepHours, r.lightSleepHours,
          r.ouraId, r.efficiency, r.onsetLatencySec, r.averageHrvMs, r.avgHeartRate,
          r.lowestHeartRate, r.restlessPeriods, r.sleepScore, r.respiratoryRate,
          r.sleepPhase5Min, r.timeInBedHours, r.manualSleepStart,
          r.sleepStart ?? null, r.sleepEnd ?? null, r.awakHours ?? null, r.manualEntry ? 1 : 0,
-         r.deletedAt ?? null, r.updatedAt],
+         r.deletedAt ?? null, r.ouraSleepType ?? null, r.updatedAt],
       );
     }
 
@@ -1672,9 +1680,9 @@ export class SQLiteLocalStore implements LocalStore {
       if (r.deletedAt) {
         // Never delete a pending local session — it hasn't reached the server yet,
         // so the server's tombstone can't be about this row's latest state.
-        await runSQL(`DELETE FROM workout_sessions WHERE id = ? AND sync_status='synced'`, [r.id]);
+        await tx.run(`DELETE FROM workout_sessions WHERE id = ? AND sync_status='synced'`, [r.id]);
       } else {
-        await runSQL(
+        await tx.run(
           `INSERT INTO workout_sessions
              (id, session_name, started_at, completed_at, session_rpe, updated_at,
               session_id, intensity_mode, was_override, synced, sync_status)
@@ -1698,9 +1706,9 @@ export class SQLiteLocalStore implements LocalStore {
 
     for (const r of delta.exerciseLogs ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM exercise_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
+        await tx.run(`DELETE FROM exercise_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
       } else {
-        await runSQL(
+        await tx.run(
           `INSERT INTO exercise_logs
              (id, workout_session_id, exercise_name, style_id, style_name,
               estimated_1rm, target_80, volume, avg_reps, time_to_complete,
@@ -1729,7 +1737,7 @@ export class SQLiteLocalStore implements LocalStore {
 
     for (const r of delta.setLogs ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM set_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
+        await tx.run(`DELETE FROM set_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
       } else {
         // A live server set clears a synced local tombstone (issue 2721): an offline edit that
         // removed this set was superseded on the server, which kept the set. The tombstone is
@@ -1739,11 +1747,11 @@ export class SQLiteLocalStore implements LocalStore {
         // server mints its own when it upserts by (exercise_log_id, set_number). Without this, the
         // pull would leave both rows — one set shown twice. Only a SYNCED local row gives way; a
         // pending one is still on its way to the server and a pull must never revert it.
-        await runSQL(
+        await tx.run(
           `DELETE FROM set_logs WHERE exercise_log_id = ? AND set_number = ? AND id <> ? AND sync_status = 'synced'`,
           [r.exerciseLogId, r.setNumber, r.id],
         );
-        await runSQL(
+        await tx.run(
           `INSERT INTO set_logs
              (id, exercise_log_id, set_number, weight_kg, reps,
               set_time_sec, rest_time_sec, intensity_pct, use_for_1rm,
@@ -1777,7 +1785,7 @@ export class SQLiteLocalStore implements LocalStore {
       // Server is authoritative for PRs (computed server-side) — take the value
       // verbatim so a downward correction (C2) actually reaches devices instead
       // of being permanently clamped by a MAX() that can only go up.
-      await runSQL(
+      await tx.run(
         `INSERT INTO personal_records
            (exercise_name, exercise_id, estimated_1rm, achieved_at, updated_at, sync_status)
          VALUES (?,?,?,?,?,'synced')
@@ -1797,7 +1805,7 @@ export class SQLiteLocalStore implements LocalStore {
       // now a clobber-guarded upsert so a future device-authored (BLE rollup, pending) day
       // isn't reverted by a stale server pull (D4). All existing rows default 'synced', so
       // the guard permits every forward (updated_at-advancing) mirror update.
-      await runSQL(
+      await tx.run(
         `INSERT INTO oura_daily
            (day, readiness_score, sleep_score, activity_score,
             temperature_deviation, active_calories, contributors, updated_at, sync_status)
@@ -1822,7 +1830,7 @@ export class SQLiteLocalStore implements LocalStore {
     for (const r of delta.ouraDailySummary ?? []) {
       // Device-computed daily summary (raw physiology + EMA baseline state). All scalar.
       // Same clobber-guard as oura_daily so a pending device-authored day survives a pull.
-      await runSQL(
+      await tx.run(
         `INSERT INTO oura_daily_summary
            (day, sleep_duration_hours, sleep_efficiency, deep_sleep_hours, rem_sleep_hours,
             restless_periods, sleep_latency_sec, hrv_avg_ms, rhr_low_bpm, rhr_avg_bpm,
@@ -1863,7 +1871,7 @@ export class SQLiteLocalStore implements LocalStore {
     for (const r of delta.ouraDailyDerived ?? []) {
       // Device-computed derived metrics. Seven columns hold TEXT JSON (stringify on write);
       // training_load_high is a boolean stored 0/1; resilience_granular is a plain REAL.
-      await runSQL(
+      await tx.run(
         `INSERT INTO oura_daily_derived
            (day, source, model_versions, sleep_score, sleep_contributors, readiness_score,
             readiness_contributors, readiness_source, activity_score, activity_contributors,
@@ -1930,10 +1938,10 @@ export class SQLiteLocalStore implements LocalStore {
 
     for (const r of delta.activityLogs ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
+        await tx.run(`DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
         continue;
       }
-      await runSQL(
+      await tx.run(
         `INSERT INTO activity_logs
            (id, date, activity_type, title, duration_min, distance_km, steps,
             avg_hr, max_hr, calories_burned, start_time, end_time, notes,
@@ -1975,7 +1983,7 @@ export class SQLiteLocalStore implements LocalStore {
       // the walk lists twice. Once the server's row for that minute is here, any other synced
       // row at the same minute is that orphan. A pending one is still on its way and is kept.
       if (r.startTime) {
-        await runSQL(
+        await tx.run(
           `DELETE FROM activity_logs WHERE date = ? AND id <> ? AND sync_status = 'synced'
              AND (CASE WHEN length(start_time) = 5 THEN start_time || ':00' ELSE substr(start_time, 1, 8) END) = ?`,
           [r.date, r.id, r.startTime.length === 5 ? `${r.startTime}:00` : r.startTime.slice(0, 8)],
@@ -1985,10 +1993,10 @@ export class SQLiteLocalStore implements LocalStore {
 
     for (const r of delta.fitnessTests ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM fitness_tests WHERE id = ? AND sync_status='synced'`, [r.id]);
+        await tx.run(`DELETE FROM fitness_tests WHERE id = ? AND sync_status='synced'`, [r.id]);
         continue;
       }
-      await runSQL(
+      await tx.run(
         `INSERT INTO fitness_tests
            (id, test_type, date, duration_sec, distance_m, avg_hr, max_hr,
             resting_hr, hrr1_bpm, vo2max_est, method, notes,
@@ -2010,12 +2018,12 @@ export class SQLiteLocalStore implements LocalStore {
 
     for (const r of delta.prescribedRuns ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM prescribed_runs WHERE id = ? AND sync_status='synced'`, [r.id]);
+        await tx.run(`DELETE FROM prescribed_runs WHERE id = ? AND sync_status='synced'`, [r.id]);
         continue;
       }
       // Local pending completion wins — the WHERE guard blocks a pull from
       // reverting an unsynced status change.
-      await runSQL(
+      await tx.run(
         `INSERT INTO prescribed_runs
            (id, plan_id, date, run_type, duration_min, distance_km, target_hr_low,
             target_hr_high, target_zone_ids, rationale, gate_action, status,
@@ -2041,7 +2049,7 @@ export class SQLiteLocalStore implements LocalStore {
     // Parents upsert in place; children are replaced wholesale for any changed
     // program/style (delete-then-insert by parent id) so renames/removals propagate.
     for (const r of delta.programs ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT INTO local_programs
            (id, name, is_active, phase_mode, training_goal, started_at,
             sessions_per_cycle, total_weeks, auto_apply_prescriptions, created_at, updated_at)
@@ -2061,22 +2069,22 @@ export class SQLiteLocalStore implements LocalStore {
     const changedProgramIds = (delta.programs ?? []).map(p => p.id);
     if (changedProgramIds.length) {
       const ph = changedProgramIds.map(() => '?').join(',');
-      await runSQL(
+      await tx.run(
         `DELETE FROM session_exercises WHERE session_id IN
            (SELECT id FROM program_sessions WHERE program_id IN (${ph}))`,
         changedProgramIds,
       );
-      await runSQL(
+      await tx.run(
         `DELETE FROM schedule_days WHERE schedule_id IN
            (SELECT id FROM schedules WHERE program_id IN (${ph}))`,
         changedProgramIds,
       );
-      await runSQL(`DELETE FROM program_sessions WHERE program_id IN (${ph})`, changedProgramIds);
-      await runSQL(`DELETE FROM schedules WHERE program_id IN (${ph})`, changedProgramIds);
+      await tx.run(`DELETE FROM program_sessions WHERE program_id IN (${ph})`, changedProgramIds);
+      await tx.run(`DELETE FROM schedules WHERE program_id IN (${ph})`, changedProgramIds);
     }
 
     for (const r of delta.programSessions ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT OR REPLACE INTO program_sessions
            (id, program_id, name, position, icon, time_budget_minutes)
          VALUES (?,?,?,?,?,?)`,
@@ -2085,7 +2093,7 @@ export class SQLiteLocalStore implements LocalStore {
     }
 
     for (const r of delta.sessionExercises ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT OR REPLACE INTO session_exercises
            (id, session_id, exercise_name, style_id, muscle_groups, position, exercise_role, superset_group)
          VALUES (?,?,?,?,?,?,?,?)`,
@@ -2095,7 +2103,7 @@ export class SQLiteLocalStore implements LocalStore {
     }
 
     for (const r of delta.schedules ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT OR REPLACE INTO schedules
            (id, program_id, type, rest_after_n, reminder_enabled, reminder_time)
          VALUES (?,?,?,?,?,?)`,
@@ -2104,7 +2112,7 @@ export class SQLiteLocalStore implements LocalStore {
     }
 
     for (const r of delta.scheduleDays ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT OR REPLACE INTO schedule_days (schedule_id, day_of_week, session_id)
          VALUES (?,?,?)`,
         [r.scheduleId, r.dayOfWeek, r.sessionId],
@@ -2112,7 +2120,7 @@ export class SQLiteLocalStore implements LocalStore {
     }
 
     for (const r of delta.progressionStyles ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT INTO local_progression_styles (id, name, updated_at)
          VALUES (?,?,?)
          ON CONFLICT(id) DO UPDATE SET name=excluded.name, updated_at=excluded.updated_at`,
@@ -2123,11 +2131,11 @@ export class SQLiteLocalStore implements LocalStore {
     const changedStyleIds = (delta.progressionStyles ?? []).map(st => st.id);
     if (changedStyleIds.length) {
       const ph = changedStyleIds.map(() => '?').join(',');
-      await runSQL(`DELETE FROM style_sets WHERE style_id IN (${ph})`, changedStyleIds);
+      await tx.run(`DELETE FROM style_sets WHERE style_id IN (${ph})`, changedStyleIds);
     }
 
     for (const r of delta.styleSets ?? []) {
-      await runSQL(
+      await tx.run(
         `INSERT OR REPLACE INTO style_sets
            (id, style_id, set_number, pct, reps, rest_sec, use_for_1rm)
          VALUES (?,?,?,?,?,?,?)`,
@@ -2136,14 +2144,14 @@ export class SQLiteLocalStore implements LocalStore {
     }
 
     for (const r of delta.foodItems ?? []) {
-      await this.upsertFoodItem(r);
+      await this.upsertFoodItemWith(tx.run, r);
     }
 
     for (const r of delta.foodLogs ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM food_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
+        await tx.run(`DELETE FROM food_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
       } else {
-        await runSQL(
+        await tx.run(
           `INSERT INTO food_logs
              (id, date, meal_type_id, food_item_id, saved_meal_id, meal_group_id, meal_group_name,
               quantity_multiplier, logged_at, updated_at, deleted_at, sync_status)
@@ -2189,12 +2197,12 @@ export class SQLiteLocalStore implements LocalStore {
 
     for (const r of delta.supplements ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM supplements WHERE id = ? AND sync_status='synced'`, [r.id]);
+        await tx.run(`DELETE FROM supplements WHERE id = ? AND sync_status='synced'`, [r.id]);
       } else {
         // Q-124: was `this.upsertSupplement(r)`, an unconditional full overwrite — the only
         // applyDelta arm with no clobber guard, so a rename made offline reverted to the server's
         // old value on the next pull. Same shape as the injuries arm above.
-        await runSQL(
+        await tx.run(
           `INSERT INTO supplements
              (id, name, dose, default_amount, unit, started_on, stopped_on, dose_prompt,
               reminder_enabled, reminder_time, sort_order, active,
@@ -2239,14 +2247,14 @@ export class SQLiteLocalStore implements LocalStore {
     for (const r of delta.supplementLogs ?? []) {
       const isMeal = r.source === 'meal';
       if (r.deletedAt) {
-        await runSQL(
+        await tx.run(
           isMeal
             ? `DELETE FROM supplement_logs WHERE id=? AND sync_status='synced'`
             : `DELETE FROM supplement_logs WHERE supplement_id=? AND log_date=? AND source='manual' AND sync_status='synced'`,
           isMeal ? [r.id] : [r.supplementId, r.logDate],
         );
       } else {
-        await runSQL(
+        await tx.run(
           `INSERT INTO supplement_logs (id, supplement_id, log_date, amount, unit, dose_text,
              taken_at, vial_strength_mg, vial_water_ml, vial_units_per_ml,
              source, source_ref, updated_at, deleted_at, sync_status)
@@ -2275,9 +2283,9 @@ export class SQLiteLocalStore implements LocalStore {
     // time from whatever vial is current by then.
     for (const r of delta.supplementVials ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM supplement_vials WHERE id = ?`, [r.id]);
+        await tx.run(`DELETE FROM supplement_vials WHERE id = ?`, [r.id]);
       } else {
-        await runSQL(
+        await tx.run(
           `INSERT INTO supplement_vials
              (id, supplement_id, strength_mg, water_ml, syringe_units_per_ml, opened_on,
               updated_at, deleted_at, sync_status)
@@ -2295,9 +2303,9 @@ export class SQLiteLocalStore implements LocalStore {
 
     for (const r of delta.injuries ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM injuries WHERE id = ? AND sync_status='synced'`, [r.id]);
+        await tx.run(`DELETE FROM injuries WHERE id = ? AND sync_status='synced'`, [r.id]);
       } else {
-        await runSQL(
+        await tx.run(
           `INSERT INTO injuries
              (id, muscle_name, notes, severity, started_date, resolved_date,
               created_at, updated_at, deleted_at, sync_status)
@@ -2316,9 +2324,9 @@ export class SQLiteLocalStore implements LocalStore {
 
     for (const r of delta.dayCheckins ?? []) {
       if (r.deletedAt) {
-        await runSQL(`DELETE FROM day_checkins WHERE log_date=? AND phase=? AND sync_status='synced'`, [r.logDate, r.phase]);
+        await tx.run(`DELETE FROM day_checkins WHERE log_date=? AND phase=? AND sync_status='synced'`, [r.logDate, r.phase]);
       } else {
-        await runSQL(
+        await tx.run(
           `INSERT INTO day_checkins
              (log_date, phase, physical_tiredness, mental_drain, barely_moved,
               hydration, late_heavy_meal, wake_mood, perceived_recovery, motivation,
@@ -2560,10 +2568,10 @@ export class SQLiteLocalStore implements LocalStore {
   // GET is safe (no local edit can ever be pending to clobber) and avoids ever going stale on
   // a deleted/reordered row the way an upsert-only mirror would.
   async replaceMealTypes(entries: LocalMealType[]): Promise<void> {
-    await withTransaction(async () => {
-      await runSQL(`DELETE FROM meal_types`, []);
+    await withTransaction(async (tx) => {
+      await tx.run(`DELETE FROM meal_types`, []);
       for (const e of entries) {
-        await runSQL(
+        await tx.run(
           `INSERT INTO meal_types
              (id, name, emoji, sort_order, time_start_hour, time_end_hour, reminders_enabled, required)
            VALUES (?,?,?,?,?,?,?,?)`,
@@ -2591,7 +2599,12 @@ export class SQLiteLocalStore implements LocalStore {
   }
 
   async upsertFoodItem(record: LocalFoodItem): Promise<void> {
-    await runSQL(
+    await this.upsertFoodItemWith(runSQL, record);
+  }
+
+  // `run` is runSQL standalone, or the open transaction's tx.run when a pull applies food items.
+  private async upsertFoodItemWith(run: SQLTransaction['run'], record: LocalFoodItem): Promise<void> {
+    await run(
       `INSERT INTO food_items
          (id, name, brand, serving_size_g, calories, protein_g, carbs_g, fat_g,
           fiber_g, sugar_g, sodium_mg, sat_fat_g, source, barcode, image_data_uri, updated_at)

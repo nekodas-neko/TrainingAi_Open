@@ -4,7 +4,9 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { CollectionState } from '@trainingai/shared/collection/ladder'
 import { CatSprite } from '@/components/home/cat-sprite'
-import { penCats, seeded, shownForWidth, tagsForWidth, type PenCat } from '@/components/home/collection-pen-cats'
+import {
+  ASSUMED_PEN_W, PEN_HEIGHT, penCatMotion, penCats, shownForWidth, slotOf, tagsForWidth, type PenCat,
+} from '@/components/home/collection-pen-cats'
 import type { FaucetKey } from '@/components/home/collection-summary'
 
 /**
@@ -23,59 +25,26 @@ import type { FaucetKey } from '@/components/home/collection-summary'
  * revalidation that returns the same stock) does not reshuffle the pen.
  */
 
-const PEN_HEIGHT = 176
-/**
- * The pen's width before the observer has measured it: 412 dp less the page's 32 and the card's 32.
- *
- * A guess rather than a render-nothing gate, because the alternative is the card popping in — and
- * on the canonical runtime this guess is the answer, so the observer's first callback is normally
- * a no-op rather than a reflow.
- */
-const ASSUMED_PEN_W = 348
 /** Backdrops, all drawn; which trophy unlocks which is PS-51. */
 export type PenScene = 'meadow' | 'forest' | 'house' | 'castle' | 'gym' | 'park' | 'bedroom' | 'kitchen' | 'beach' | 'snow' | 'space' | 'sakura'
-/** Sprite size per engine tier, T1 first. */
-const SIZE = [34, 42, 50, 58, 64, 72]
-/** Lowest and highest walking line per tier, in px up from the pen's floor. T5 and T6 are in the air;
- *  the front row starts 14px up so its name tags stay inside the pen. */
-const BAND: [number, number][] = [[14, 24], [22, 34], [32, 44], [42, 54], [70, 86], [80, 94]]
-const FLYING_FROM_TIER = 4
-
-const sizeOf = (tier: number) => SIZE[Math.min(tier, SIZE.length - 1)]
 
 function catStyle(cat: PenCat, slot: number, slots: number): CSSProperties {
-  const size = sizeOf(cat.tier)
-  const [lo, hi] = BAND[Math.min(cat.tier, BAND.length - 1)]
-  // Each cat starts in its own slice of the width, so the pen fills edge to edge instead of piling up
-  // where the hash happens to cluster, then wanders up to a third of the pen either way.
-  const from = (slot + seeded(cat.id, 1)) / slots
-  const to = Math.min(1, Math.max(0, from + (seeded(cat.id, 2) - 0.5) * 0.66))
-  const dur = 10 + seeded(cat.id, 3) * 9
-  const y0 = Math.round(lo + seeded(cat.id, 4) * (hi - lo))
-  const y1 = Math.round(lo + seeded(cat.id, 7) * (hi - lo))
+  const m = penCatMotion(cat, slot, slots)
   return {
     position: 'absolute',
     left: 0,
     bottom: 0,
-    width: size,
-    // Smaller tiers are nearer, so they draw over the ones behind; tier is the depth.
-    zIndex: 100 - cat.tier * 10,
-    ['--pen-x0' as string]: `calc((var(--pen-w, 300px) - ${size}px) * ${from.toFixed(3)})`,
-    ['--pen-x1' as string]: `calc((var(--pen-w, 300px) - ${size}px) * ${to.toFixed(3)})`,
-    ['--pen-y0' as string]: `${-y0}px`,
-    ['--pen-y1' as string]: `${-y1}px`,
+    width: m.size,
+    zIndex: m.zIndex,
+    ['--pen-x0' as string]: `calc((var(--pen-w, 300px) - ${m.size}px) * ${m.from.toFixed(3)})`,
+    ['--pen-x1' as string]: `calc((var(--pen-w, 300px) - ${m.size}px) * ${m.to.toFixed(3)})`,
+    ['--pen-y0' as string]: `${-m.y0}px`,
+    ['--pen-y1' as string]: `${-m.y1}px`,
     ['--pen-s0' as string]: '1',
     ['--pen-s1' as string]: '1',
-    ['--pen-dur' as string]: `${dur.toFixed(1)}s`,
-    ['--pen-delay' as string]: `${(-seeded(cat.id, 5) * dur).toFixed(1)}s`,
+    ['--pen-dur' as string]: `${m.dur.toFixed(1)}s`,
+    ['--pen-delay' as string]: `${(-m.offset).toFixed(1)}s`,
   }
-}
-
-/** Interleaves slots so the biggest cats (listed first) land spread out, not all at the left. */
-function slotOf(i: number, n: number): number {
-  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a)
-  const step = [7, 5, 3, 1].find(k => gcd(k, n) === 1) ?? 1
-  return (i * step) % n
 }
 
 export const CollectionPen = memo(function CollectionPen({ collections, scene = 'meadow' }: { collections: Partial<Record<FaucetKey, CollectionState>>; scene?: PenScene }) {
@@ -113,8 +82,7 @@ export const CollectionPen = memo(function CollectionPen({ collections, scene = 
       aria-hidden="true"
     >
       {shown.map((cat, i) => {
-        const size = sizeOf(cat.tier)
-        const flying = cat.tier >= FLYING_FROM_TIER
+        const { size, flying } = penCatMotion(cat, 0, 1)
         return (
           <div key={cat.id} className="pen-cat" style={catStyle(cat, slotOf(i, shown.length), shown.length)}>
             {/* Ground shadow: under the feet for walkers, far below and fainter for flyers. */}
