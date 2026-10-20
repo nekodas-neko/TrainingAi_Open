@@ -26,11 +26,14 @@ export function planAlerts(
       const exercise = workout.exercises.find(
         (row) => row.id === workout.rest!.exerciseId,
       );
+      // The current app's wording: the number after the set just logged, so "Time for set N+1"
+      // after an exercise's last set (lib/notifications.ts, #3142).
+      const logged = exercise?.sets.findIndex((set) => set.id === workout.rest!.setId) ?? -1;
       result.push({
         id: `${scope}:rest:${workout.id}`,
         scope,
         title: 'Rest complete',
-        body: exercise ? `Ready for ${exercise.name}.` : 'Ready for your next set.',
+        body: logged >= 0 ? `Time for set ${logged + 2}` : 'Time for your next set',
         target: 'workout',
         recordId: workout.id,
         restCueId: `${workout.id}:${workout.rest.startedAt}:${workout.rest.endsAt}`,

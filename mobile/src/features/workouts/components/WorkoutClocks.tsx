@@ -1,10 +1,11 @@
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { transitionSecForEquipment } from '@trainingai/shared/workout/duration-model';
-import { AppButton, AppText, ProgressBar, Stack, TimerRing } from '../../../shared/ui';
+import { AppButton, AppText, ProgressBar, Stack } from '../../../shared/ui';
 import { useClock, formatDuration } from '../../../shared/hooks/useClock';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { RestRing } from './RestRing';
 
 export function SessionTimer({ workout }: { workout: WorkoutRecord; ring?: boolean }) {
   const { theme } = useTheme();
@@ -146,25 +147,36 @@ export function RestCard({
       </Stack>
     );
   }
+  // Whole seconds since the rest began, as the current app's useElapsedSec counts them.
+  const elapsed = Math.max(0, Math.floor((now - workout.rest.startedAt) / 1000));
+  const ringOvertime = elapsed > total;
+  const labelColor = ringOvertime ? theme.anatomy.injured : theme.colors.muted;
+  const ring = <RestRing elapsedSec={elapsed} targetSec={total} />;
   return (
     <Stack align="center" gap="md">
-      <AppText
-        variant="eyebrow"
-        style={{ color: expired ? theme.anatomy.injured : theme.colors.brandText }}
-      >
-        {expired ? 'OVERTIME' : onStartSet ? 'REST' : 'RESTING'}
+      {/* The current app's RestTimer and LastSetRestTimer: a muted label that turns red in
+          overtime, the shared ring, and the hint in the label's colour at 60% (#3142). */}
+      <AppText variant="eyebrow" style={{ color: labelColor, fontWeight: '700' }}>
+        {ringOvertime ? 'OVERTIME' : onStartSet ? 'REST' : 'RESTING'}
       </AppText>
-      <TimerRing
-        value={expired ? `+${overtime}` : String(remaining)}
-        caption={expired ? `target ${total}s` : `of ${total}s`}
-        progress={total > 0 ? remaining / total : 0}
-        overtime={expired}
-        countdown
-        onPress={onStartSet}
-      />
+      {onStartSet ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            ringOvertime
+              ? `${elapsed - total}s overtime, tap to start`
+              : `${total - elapsed} seconds remaining, tap to skip`
+          }
+          onPress={onStartSet}
+        >
+          {ring}
+        </Pressable>
+      ) : (
+        ring
+      )}
       {onStartSet && (
-        <AppText variant="caption" tone="muted">
-          {expired ? 'Rest complete · Tap to start' : 'Tap to start early'}
+        <AppText variant="caption" style={{ color: labelColor, opacity: 0.6 }}>
+          {ringOvertime ? 'Rest complete · Tap to start' : 'Tap to start early'}
         </AppText>
       )}
       <AppText variant="micro" tone="muted">
