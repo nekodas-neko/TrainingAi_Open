@@ -6,6 +6,8 @@ export type ScopedStorage = {
   remove(key: string): Promise<void>;
   // Writes (or, for null, removes) every entry in one transaction: all of them land or none do.
   setMany?(entries: [key: string, value: string | null][]): Promise<void>;
+  // Every saved key that starts with `prefix`, so entries an index no longer lists can be found.
+  keys?(prefix: string): Promise<string[]>;
 };
 
 function accountScope(origin: string, accountId: string) {
@@ -80,6 +82,16 @@ export class LocalStorage {
             scope,
             key,
           );
+        }),
+      keys: (prefix) =>
+        this.run(async () => {
+          const rows = await this.database.getAllAsync<{ key: string }>(
+            'SELECT key FROM local_values WHERE scope = ? AND substr(key, 1, ?) = ? ORDER BY key',
+            scope,
+            prefix.length,
+            prefix,
+          );
+          return rows.map((row) => row.key);
         }),
       setMany: (entries) =>
         this.run(async () => {

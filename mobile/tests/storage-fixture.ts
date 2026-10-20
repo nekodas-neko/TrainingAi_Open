@@ -13,6 +13,9 @@ export function sqliteFixture(path = ':memory:') {
     async getFirstAsync<T>(sql: string, ...params: SqlValue[]) {
       return (connection.prepare(sql).get(...params) as T | undefined) ?? null;
     },
+    async getAllAsync<T>(sql: string, ...params: SqlValue[]) {
+      return connection.prepare(sql).all(...params) as T[];
+    },
   };
   return { database, connection };
 }
