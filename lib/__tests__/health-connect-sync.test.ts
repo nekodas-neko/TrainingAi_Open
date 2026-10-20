@@ -181,3 +181,35 @@ describe('#2828 N5 — an untitled session gets a readable name', () => {
     expect(exerciseTypeLabel(undefined)).toBe('Workout')
   })
 })
+
+describe('oneAppPerNight (#3115)', () => {
+  const stage = (startTime: string, endTime: string, s = 'SLEEP_STAGE_LIGHT') => ({ startTime, endTime, stage: s })
+  const rec = (origin: string, startTime: string, endTime: string, stages?: ReturnType<typeof stage>[]) =>
+    ({ startTime, endTime, stages, metadata: { dataOrigin: origin } })
+
+  it('keeps one app per night: the one with the most staged sleep', async () => {
+    const { oneAppPerNight } = await import('@/lib/health-connect-sync')
+    const samsung = rec('com.sec.android.app.shealth', '2026-10-10T22:00:00Z', '2026-10-11T06:00:00Z',
+      [stage('2026-10-10T22:10:00Z', '2026-10-11T05:50:00Z')])
+    const oura = rec('com.ouraring.oura', '2026-10-10T22:05:00Z', '2026-10-11T06:02:00Z',
+      [stage('2026-10-10T22:20:00Z', '2026-10-11T03:00:00Z')])
+    expect(oneAppPerNight([oura, samsung])).toEqual([samsung])
+  })
+
+  it('a night split into two records by one app stays whole, and other nights are untouched', async () => {
+    const { oneAppPerNight } = await import('@/lib/health-connect-sync')
+    const a1 = rec('a', '2026-10-10T22:00:00Z', '2026-10-11T02:00:00Z')
+    const a2 = rec('a', '2026-10-11T02:30:00Z', '2026-10-11T06:00:00Z')
+    const b = rec('b', '2026-10-10T23:00:00Z', '2026-10-11T05:00:00Z')
+    const nextNight = rec('b', '2026-10-11T22:00:00Z', '2026-10-12T06:00:00Z')
+    // a: 7.5 h of span; b: 6 h. The overlap chain joins a1, b and a2 into one night.
+    expect(oneAppPerNight([b, a2, nextNight, a1])).toEqual([a1, a2, nextNight])
+  })
+
+  it('a tie goes to the earlier package name, so the choice is stable', async () => {
+    const { oneAppPerNight } = await import('@/lib/health-connect-sync')
+    const x = rec('z.app', '2026-10-10T22:00:00Z', '2026-10-11T06:00:00Z')
+    const y = rec('a.app', '2026-10-10T22:00:00Z', '2026-10-11T06:00:00Z')
+    expect(oneAppPerNight([x, y])).toEqual([y])
+  })
+})

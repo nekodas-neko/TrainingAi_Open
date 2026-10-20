@@ -685,7 +685,7 @@ export async function upsertOuraSleep(
  *  - **The switch day** (#2998): from the day the user moved to the Oura API the ring has stopped
  *    sending, so a ring night dated that day or later is at best the partial night the last frames
  *    made, and it yields like the rest. `dropBleNightsOuraCloudHolds` keeps a later ring re-roll, and
- *    `dropNightsOuraCloudHolds` a later Health Connect sync, from taking the night back.
+ *    `settleNights` a later Health Connect or Apple Health sync (#3115), from taking the night back.
  */
 export async function upsertOuraCloudSleep(
   db: Db, userId: string, rows: OuraSleepUpsertRow[],
@@ -745,6 +745,22 @@ export async function upsertOuraCloudSleep(
 }
 
 /**
+ * The source and night rank of a stored night (#3080, #3115): the ring's own rows rank as `oura_ble`
+ * except from the switch day (#2998), when they are partial leftovers that rank below everything;
+ * any other row by the source of its duration (`source_map`), or Oura Cloud for a legacy row that
+ * carries an Oura id and no source.
+ */
+function storedNight(
+  row: { ouraId: string | null; manualEntry: boolean; date: string; source: string | null },
+  switchDay: string | null,
+): { source: string | null; rank: number } {
+  const ring = row.ouraId?.startsWith('ble:') === true && !row.manualEntry
+  if (ring && switchDay != null && row.date >= switchDay) return { source: 'oura_ble', rank: -Infinity }
+  const source = ring ? 'oura_ble' : row.source ?? (row.ouraId != null ? 'oura_cloud' : null)
+  return { source, rank: nightSourceRank(source, row.manualEntry) }
+}
+
+/**
  * #3080: whether a stored night that overlaps an Oura Cloud period gives way to it, by the source
  * ladder applied per night (`source-rank.ts`, read through `nightSourceRank`). The ring keeps its
  * night only before the switch day (#2998): from that day its nights are partial leftovers.
@@ -753,33 +769,57 @@ export function nightYieldsToOuraCloud(
   row: { ouraId: string | null; manualEntry: boolean; date: string; source: string | null },
   switchDay: string | null,
 ): boolean {
-  const ring = row.ouraId?.startsWith('ble:') === true && !row.manualEntry
-  if (ring && switchDay != null && row.date >= switchDay) return true
-  const source = ring ? 'oura_ble' : row.source ?? (row.ouraId != null ? 'oura_cloud' : null)
-  return nightSourceRank(source, row.manualEntry) <= nightSourceRank('oura_cloud', false)
+  return storedNight(row, switchDay).rank <= nightSourceRank('oura_cloud', false)
 }
 
 /**
- * #3080. The Health Connect (and Apple Health) counterpart of `dropBleNightsOuraCloudHolds`: a night
- * from a source that ranks below Oura Cloud is not written where a live Oura Cloud night already holds
- * it. That night took its place by tombstoning it, and the shared upsert revives a tombstoned row at
- * the same start, so without this every sync would bring the yielded night back as a second fragment.
+ * #3115: the night ladder for the writers below Oura Cloud, `/api/sync-health` (`saveSleepSession`)
+ * and the native rebuild. It is the counterpart of `upsertOuraCloudSleep`'s overlap handling.
+ *
+ * Each incoming night is kept only if no live night overlapping it outranks it. A tie with a
+ * different source keeps the night already stored, so two equal writers (another app's copy through
+ * Health Connect, Apple Health) do not take it in turns. A night it outranks, or an earlier cut of
+ * the same night from the same source, is tombstoned, never deleted, so one night stays one row:
+ * `sleep-night.ts` would sum a second row into the night as another fragment. A row at the same
+ * start is not touched here: the upsert merges it field by field. A typed night is left alone, as
+ * `upsertOuraCloudSleep` leaves it: `preferDeviceNights` hides it on read. `ownPrefix` leaves the
+ * writer's own rows to it (the rebuild tombstones its own stale nights).
+ *
+ * Callers write each kept night before settling the next, so a batch with two cuts of one night
+ * keeps one.
  */
-export async function dropNightsOuraCloudHolds(
-  db: Db, userId: string, rows: OuraSleepUpsertRow[], source: HealthSource,
-): Promise<OuraSleepUpsertRow[]> {
-  if (rows.length === 0 || nightSourceRank(source, false) > nightSourceRank('oura_cloud', false)) return rows
-  const kept: OuraSleepUpsertRow[] = []
+export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date }>(
+  db: Db, userId: string, rows: T[], source: HealthSource, ownPrefix?: string,
+): Promise<{ kept: T[]; yielded: number }> {
+  if (rows.length === 0) return { kept: [], yielded: 0 }
+  const incoming = nightSourceRank(source, false)
+  const switchDay = await getOuraCloudSwitchDay(db, userId)
+  const kept: T[] = []
+  let yielded = 0
   for (const r of rows) {
-    const held = await db.execute(sql`
-      SELECT 1 FROM sleep_sessions o
+    const start = r.sleepStart.toISOString()
+    const overlapping = await db.execute<{ id: string; oura_id: string | null; date: string; source: string | null }>(sql`
+      SELECT o.id, o.oura_id, o.date::text AS date, o.source_map->>'duration_hours' AS source
+        FROM sleep_sessions o
        WHERE o.user_id = ${userId} AND o.deleted_at IS NULL AND NOT o.manual_entry
-         AND o.source_map->>'duration_hours' = 'oura_cloud'
-         AND o.sleep_start < ${r.sleepEnd.toISOString()}::timestamptz AND o.sleep_end > ${r.sleepStart.toISOString()}::timestamptz
-       LIMIT 1`)
-    if (held.rows.length === 0) kept.push(r)
+         AND o.sleep_start <> ${start}::timestamptz
+         AND o.sleep_start < ${r.sleepEnd.toISOString()}::timestamptz AND o.sleep_end > ${start}::timestamptz
+         ${ownPrefix ? sql`AND (o.oura_id IS NULL OR o.oura_id NOT LIKE ${ownPrefix + '%'})` : sql``}`)
+    const stored = overlapping.rows.map(o => ({
+      id: o.id,
+      ...storedNight({ ouraId: o.oura_id, manualEntry: false, date: o.date, source: o.source }, switchDay),
+    }))
+    if (stored.some(o => o.rank > incoming || (o.rank === incoming && o.source !== source))) continue
+    if (stored.length > 0) {
+      const gone = await db.update(s.sleepSessions)
+        .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
+        .where(and(eq(s.sleepSessions.userId, userId), isNull(s.sleepSessions.deletedAt), inArray(s.sleepSessions.id, stored.map(o => o.id))))
+        .returning({ id: s.sleepSessions.id })
+      yielded += gone.length
+    }
+    kept.push(r)
   }
-  return kept
+  return { kept, yielded }
 }
 
 /**
