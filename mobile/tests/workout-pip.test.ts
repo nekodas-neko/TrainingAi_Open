@@ -300,4 +300,8 @@ test('the load line always shows during a set, with the current app’s fallback
   base.exercises[0].weightUnit = 'lb';
   base.exercises[0].sets[0] = { ...base.exercises[0].sets[0], weight: '135' };
   assert.match(loadOf() ?? '', / lb × /);
+  base.exercises[0].sets[0] = { ...base.exercises[0].sets[0], weight: '7.5', reps: '8' };
+  assert.equal(loadOf(), '16.53 lb × 8', 'a pound exercise shows the kg weight converted, as the wheel');
+  base.exercises[0].weightUnit = 'kg';
+  assert.equal(loadOf(), '7.5 kg × 8', 'a kg exercise is unchanged');
 });
