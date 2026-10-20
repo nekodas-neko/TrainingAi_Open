@@ -562,9 +562,9 @@ const failing = (status: number) => async () => {
 const runRow = (store: ActivityStore, runId: string) =>
   store.getSnapshot().runs.find((row) => row.payload.id === runId)!;
 
-test('a run PATCH answering 500 five times is dead-lettered and the next run uploads', async () => {
+test('a run PATCH answering 404 five times is dead-lettered and the next run uploads', async () => {
   const { f, store, patched } = runFixture(async (path, body) =>
-    (body as { id: string }).id === runA ? failing(500)() : accepted(path, body),
+    (body as { id: string }).id === runA ? failing(404)() : accepted(path, body),
   );
   await store.initialize();
   await store.completeRun('2026-10-12', runBody(runA));
@@ -583,6 +583,25 @@ test('a run PATCH answering 500 five times is dead-lettered and the next run upl
   assert.equal(patched.filter((runId) => runId === runA).length, 5);
   assert.equal(runRow(store, runA).pending, true);
 });
+test('a run PATCH answering 500 is never counted, retries, and the next run still uploads', async () => {
+  const { f, store, patched } = runFixture(async (path, body) =>
+    (body as { id: string }).id === runA ? failing(500)() : accepted(path, body),
+  );
+  await store.initialize();
+  await store.completeRun('2026-10-12', runBody(runA));
+  await store.completeRun('2026-10-12', runBody(runB));
+  await store.sync();
+  for (let i = 0; i < 6; i++) {
+    f.advance(2 * HOUR);
+    await store.sync();
+  }
+  assert.equal(runRow(store, runA).rejected, undefined);
+  assert.equal(deadLettered(runRow(store, runA)), false);
+  assert.equal(runRow(store, runA).pending, true);
+  assert.equal(runRow(store, runB).pending, false);
+  assert.equal(patched.filter((runId) => runId === runA).length >= 6, true);
+  assert.match(store.getSnapshot().error ?? '', /Saved on this phone/);
+});
 test('a run that answers 404, or fails its readback, is counted and the next run uploads', async () => {
   for (const bad of [failing(404), async () => ({ run: { id: runA, status: 'skipped' } })]) {
     const { store } = runFixture(async (path, body) =>
@@ -597,8 +616,12 @@ test('a run that answers 404, or fails its readback, is counted and the next run
     assert.equal(runRow(store, runB).pending, false);
   }
 });
-test('a run PATCH answering 429, or a lost connection, is not counted', async () => {
-  for (const bad of [failing(429), async () => Promise.reject(new Error('Offline'))]) {
+test('a run PATCH answering 429 or 503, or a lost connection, is not counted', async () => {
+  for (const bad of [
+    failing(429),
+    failing(503),
+    async () => Promise.reject(new Error('Offline')),
+  ]) {
     const { store } = runFixture(bad);
     await store.initialize();
     await store.completeRun('2026-10-12', runBody(runA));

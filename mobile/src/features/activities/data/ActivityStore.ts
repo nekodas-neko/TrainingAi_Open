@@ -666,6 +666,10 @@ export class ActivityStore {
     return this.flushing;
   }
   private async flush(generation: number) {
+    // A run whose PATCH failed without counting (5xx, 429, no connection) is passed over for the
+    // rest of this flush so the runs behind it still upload; the failure is reported at the end.
+    const deferred = new Set<string>();
+    let deferredFailure: unknown;
     try {
       await this.writes;
       while (generation === this.generation) {
@@ -683,8 +687,11 @@ export class ActivityStore {
         const row = activityRow ?? this.current.tests.find(ready);
         const domain = activityRow ? 'activity_logs' : 'fitness_tests';
         if (!row) {
-          const run = this.current.runs.find(ready);
+          const run = this.current.runs.find((row) => ready(row) && !deferred.has(row.payload.id));
           if (!run) {
+            if (deferredFailure !== undefined) {
+              throw deferredFailure;
+            }
             return;
           }
           if (!this.connection.patch) {
@@ -697,16 +704,24 @@ export class ActivityStore {
               run.payload,
             );
           } catch (failure) {
-            // An answer from the server counts against this run, 404 and 500 included, so one run
-            // cannot hold the ones behind it. A rate limit or a lost connection says nothing about it.
-            if (failure instanceof ApiError && failure.status !== 429) {
+            // A 4xx other than 429 counts against this run, so one run cannot hold the ones behind
+            // it. A 5xx (the server's own trouble, as with pushes), a 429 or a lost connection says
+            // nothing about it: it is not counted and is retried on the next sync.
+            if (
+              failure instanceof ApiError &&
+              failure.status >= 400 &&
+              failure.status < 500 &&
+              failure.status !== 429
+            ) {
               if (generation !== this.generation) {
                 return;
               }
               await this.reject('runs', run, failure.message);
               continue;
             }
-            throw failure;
+            deferred.add(run.payload.id);
+            deferredFailure ??= failure;
+            continue;
           }
           if (generation !== this.generation) {
             return;
