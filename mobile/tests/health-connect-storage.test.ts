@@ -299,12 +299,17 @@ test('the record-id cache is pruned below the oldest rescan, keeping anything qu
 
 // A phone that syncs once a day for 150 days, each day bringing 20 new step records through the
 // change token, against a server that accepts everything.
-async function dailySyncs(days: number, perDay: number) {
+async function dailySyncs(
+  days: number,
+  perDay: number,
+  options: { history?: () => boolean; posts?: unknown[] } = {},
+) {
   const f = killable();
   const clock = { at: now };
   let n = 0;
   const reader: HealthConnectReader = {
     permissions: async () => ['Steps'],
+    hasHistoryPermission: async () => options.history?.() ?? false,
     history: async () => ({ records: [], pageToken: null, skipped: 0 }),
     changes: async (_types, token) => ({
       records: token
@@ -323,6 +328,7 @@ async function dailySyncs(days: number, perDay: number) {
     timezone: 'Australia/Brisbane',
     get: async () => ({}),
     post: async (_path: string, body: unknown) => {
+      options.posts?.push(body);
       const batch = body as { rebuild?: boolean; records?: unknown[]; deleted?: unknown[] };
       if (batch.rebuild)
         return { measurements: 0, nights: 0, days: 0, heartRate: 0, hrv: null, completedAt: at(clock.at) };
@@ -335,7 +341,10 @@ async function dailySyncs(days: number, perDay: number) {
     clock.at = now + day * DAY;
     await store.run(true);
   }
-  return { f, store, clock };
+  return { f, store, clock, run: async (at: number) => {
+    clock.at = at;
+    await store.run(true);
+  } };
 }
 
 test('150 daily syncs keep about the rescan window of ids, not every id since the grant', async () => {
@@ -393,4 +402,69 @@ test('a held id older than the floor survives the prune, and so does a queued on
   const { saved } = await open(f.storage);
   // The floor is now − 30 days, past the grant's: the plain 90-day-old id goes, the others stay.
   assert.deepEqual(Object.keys(saved!.records).sort(), ['held-old', 'queued-old', 'recent']);
+});
+
+test('accepted limit: granting the history permission later cannot delete a pruned old record on the server', async () => {
+  // Sixty daily syncs without the history permission: day 0's ids are pruned from the cache.
+  let history = false;
+  const posts: unknown[] = [];
+  const { f, run } = await dailySyncs(60, 2, { history: () => history, posts });
+  const before = await open(f.storage);
+  assert.ok(!('steps-0' in before.saved!.records), 'day 0 has been pruned');
+  // The history permission is granted; Health Connect no longer has day 0's records (deleted
+  // there meanwhile). The full rescan from `disk.from` cannot know they existed.
+  history = true;
+  posts.length = 0;
+  await run(now + 60 * DAY);
+  const deleted = posts.flatMap((body) => (body as { deleted?: string[] }).deleted ?? []);
+  // Pinned on purpose (#3145 review): the old deletion is not sent. If a change makes this send
+  // it, the trade-off the prune rests on has changed and should be looked at again.
+  assert.ok(!deleted.includes('steps-0'));
+  // Ids still in the cache that Health Connect no longer returns are deleted as usual.
+  assert.ok(deleted.length > 0, 'the rescan still deletes what the cache knows about');
+});
+
+test('a waiting rescan gap keeps the ids it will need, even older than 30 days', async () => {
+  const f = killable();
+  const clock = now + 200 * DAY;
+  const tokenAt = clock - 45 * DAY;
+  const inGap = row('in-gap', tokenAt - 3 * DAY);
+  const beforeGap = row('before-gap', tokenAt - 20 * DAY);
+  const queued = row('queued', clock - DAY);
+  f.saved.set(
+    'health-connect-import.v1',
+    JSON.stringify({
+      ...legacy(),
+      from: at(now - 365 * DAY),
+      grantedAt: at(now),
+      token: null,
+      tokenAt: at(tokenAt),
+      // The token expired; the rescan will resume from a week before the last good read.
+      rescanFrom: at(tokenAt),
+      records: cacheOf([inGap, beforeGap, queued]),
+      queue: [{ records: [queued], deleted: [] }],
+      blocked: [],
+      scan: null,
+      permissionKey: 'Steps',
+    }),
+  );
+  const reader: HealthConnectReader = {
+    permissions: async () => ['Steps'],
+    history: async () => ({ records: [], pageToken: null, skipped: 0 }),
+    changes: async () => ({ records: [], deleted: [], token: 't', expired: false, more: false, skipped: 0 }),
+  };
+  const connection = {
+    origin: 'https://example.com',
+    userId: 'account-one',
+    timezone: 'Australia/Brisbane',
+    get: async () => ({}),
+    // Offline, so the run stops after the prune, before the rescan starts.
+    post: async () => {
+      throw new Error('Offline');
+    },
+  };
+  const store = new HealthConnectImportStore(f.storage, connection, reader, () => {}, () => clock);
+  await store.run(true);
+  const { saved } = await open(f.storage);
+  assert.deepEqual(Object.keys(saved!.records).sort(), ['in-gap', 'queued']);
 });

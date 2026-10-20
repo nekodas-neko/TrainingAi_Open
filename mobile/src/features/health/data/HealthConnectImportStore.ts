@@ -438,9 +438,16 @@ export class HealthConnectImportStore {
    */
   private async prune(hasHistory: boolean) {
     if (this.disk.scan) return;
-    // #3143: the earliest any later rescan can start. `now` and `tokenAt` only move forward, so
-    // a rescan resuming from the last good read (or from a gap already waiting) starts no
-    // earlier than this, and the floor advances with each sync instead of staying at the grant.
+    // #3143: where a rescan would start now. `now` and `tokenAt` only move forward, so while
+    // the history permission stays as it is, a later rescan resuming from the last good read (or
+    // from a gap already waiting) starts no earlier, and the floor advances with each sync
+    // instead of staying at the grant.
+    //
+    // One accepted exception (the Orchestrator's ruling on #3145): granting the history
+    // permission after no-history syncs starts that rescan at `disk.from`, below this floor. A
+    // record older than the floor that was deleted in Health Connect since the last good read is
+    // then not removed on the server. Records it still has are re-uploaded harmlessly (the server
+    // keys on the record id). Keeping every id forever to close that is not worth it.
     const floor = this.rescanStart(hasHistory, this.disk.rescanFrom ?? this.disk.tokenAt);
     const waiting = new Set<string>();
     for (const item of this.disk.queue)
