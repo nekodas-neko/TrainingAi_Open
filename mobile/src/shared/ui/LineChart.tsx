@@ -54,6 +54,7 @@ export function LineChart({
   markers = [],
   interactive = false,
   onSelect,
+  onRelease,
   axisLabels,
   color: accent,
   fillColor,
@@ -91,6 +92,8 @@ export function LineChart({
   // Told the x of the point a tap selects, so a screen can follow it elsewhere (the route map's
   // marker, #2845).
   onSelect?: (x: number) => void;
+  // Told when the touch ends or is taken over, so the marker a tap placed can be cleared.
+  onRelease?: () => void;
   axisLabels?: readonly string[];
   color?: string;
   fillColor?: string;
@@ -226,6 +229,8 @@ export function LineChart({
         setSelection(selected);
         onSelect?.(selected);
       }}
+      onResponderRelease={() => onRelease?.()}
+      onResponderTerminate={() => onRelease?.()}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       accessibilityLabel={`${label}: ${valid.map((point) => `${point.label}: ${point.value}`).join('; ')}${guides ? guideSummary(min, max, target) : ''}`}
     >

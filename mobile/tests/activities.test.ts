@@ -228,6 +228,30 @@ test('guided walk saves actual segments once across summary reopening', async ()
   await reopened.saveWalk('Australia/Brisbane');
   assert.equal(reopened.getSnapshot().rows.length, 1);
 });
+test('a paused guided walk saved early is cut at its active seconds, not the wall clock', async () => {
+  const f = fixture(),
+    store = f.create();
+  await store.initialize();
+  await store.start(type, {
+    kind: 'walk',
+    config: { ...defaultWalk, sets: 1, fastSec: 600, slowSec: 600, warmupSec: 0, cooldownSec: 0 },
+    saved: false,
+  });
+  await store.begin();
+  f.advance(120_000);
+  await store.pause();
+  f.advance(300_000);
+  await store.pause();
+  f.advance(60_000);
+  await store.finishGuided();
+  // 8 minutes by the wall clock, 3 of them walked.
+  assert.equal(elapsedMs(store.getSnapshot().session!, f.now()), 180_000);
+  await store.saveWalk('Australia/Brisbane');
+  const { segments, durationMin } = store.getSnapshot().rows[0].payload;
+  assert.equal(durationMin, 3);
+  assert.equal(segments?.length, 1, 'the fast block was never reached');
+  assert.equal(segments?.[0].endSec, 180, 'the slow block ends at the stop, not at 480 or 600');
+});
 test('short guided walk cannot enter the upload queue', async () => {
   const f = fixture(),
     store = f.create();

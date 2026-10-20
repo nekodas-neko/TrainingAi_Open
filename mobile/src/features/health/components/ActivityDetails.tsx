@@ -3,11 +3,8 @@ import { ActivityEditor } from '../../activities/components/ActivityEditor';
 import { useActivities, useActivityLogs } from '../../activities/data/ActivityProvider';
 import { dayTimeInstant } from '../data/manual-night';
 import { z } from 'zod';
-import { computeHrZones } from '@trainingai/shared/health/hr-zones';
-import { zoneBreakdownFromReadings } from '@trainingai/shared/health/zone-minutes';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { decodeRoute } from '@trainingai/shared/activity/route-encoding';
-import { buildRouteZoneSegments } from '@trainingai/shared/activity/route-hr-zones';
 import {
   estimateDistanceKmAtTime,
   pointAtDistanceKm,
@@ -28,6 +25,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
+import { activityZoneModel } from '../data/activity-zones';
 import { activityHistorySpec, hrProfileSpec, metricValue } from '../data/models';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { HealthViewReady } from './HealthViewReady';
@@ -79,8 +77,10 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
   const start = log.startTime
     ? Date.parse(dayTimeInstant(log.date, log.startTime, timezone) ?? '')
     : null;
-  const readings =
-    hr.data?.readings.slice().sort((a, b) => a.timestamp.localeCompare(b.timestamp)) ?? [];
+  const readings = useMemo(
+    () => hr.data?.readings.slice().sort((a, b) => a.timestamp.localeCompare(b.timestamp)) ?? [],
+    [hr.data],
+  );
   const points = readings.flatMap((p, i) => [
     ...(i && Date.parse(p.timestamp) - Date.parse(readings[i - 1].timestamp) > 120000
       ? [
@@ -101,13 +101,6 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
   ]);
   const maxHr = profile.data?.workingMax ?? profile.data?.maxHr;
   const restingHr = profile.data?.restingHr;
-  const zones =
-    maxHr != null && restingHr != null && readings.length > 1
-      ? zoneBreakdownFromReadings(
-          readings.map((p) => ({ timestamp: Date.parse(p.timestamp), bpm: p.bpm })),
-          computeHrZones({ maxHr, restingHr }),
-        )
-      : null;
   const routePoints = useMemo(
     () => (log.routePolyline ? decodeRoute(log.routePolyline) : []),
     [log.routePolyline],
@@ -124,17 +117,21 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
   const end = log.endTime
     ? Date.parse(dayTimeInstant(log.date, log.endTime, timezone) ?? '')
     : null;
-  const zoneSegments =
-    maxHr != null && restingHr != null && readings.length && start != null && !Number.isNaN(start)
-      ? buildRouteZoneSegments({
-          points: routePoints,
-          paceSeries: log.paceSeries ?? [],
-          hrReadings: readings,
-          zones: computeHrZones({ maxHr, restingHr }),
-          startTime: new Date(start).toISOString(),
-          endTime: end != null && !Number.isNaN(end) ? new Date(end).toISOString() : undefined,
-        })
-      : null;
+  // Neither depends on the scrub, so a chart tap (which re-renders this component) must not
+  // recompute them; the keys are the data they are built from, never `scrubPoint`.
+  const { zones, zoneSegments } = useMemo(
+    () =>
+      activityZoneModel({
+        maxHr,
+        restingHr,
+        readings,
+        routePoints,
+        paceSeries: log.paceSeries ?? [],
+        start,
+        end,
+      }),
+    [maxHr, restingHr, readings, routePoints, log.paceSeries, start, end],
+  );
   return (
     <HealthViewReady view="day" requests={[hrProfileSpec, ...(enabled ? [windowSpec] : [])]}>
       <AppText variant="caption" tone="muted">
@@ -186,6 +183,7 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
             points={points}
             interactive
             onSelect={routePoints.length > 1 ? scrub : undefined}
+            onRelease={routePoints.length > 1 ? () => setScrubPoint(null) : undefined}
             tone="heart"
             series={
               log.paceSeries?.length
@@ -209,14 +207,6 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
           </AppText>
         </Card>
       )}
-      {routePoints.length > 1 && (
-        <Card>
-          <AppText variant="eyebrow" tone="muted">
-            Route
-          </AppText>
-          <RouteMap points={routePoints} activePoint={scrubPoint} zoneSegments={zoneSegments} />
-        </Card>
-      )}
       {zones && zones.totalSec > 0 && (
         <Card>
           <AppText variant="eyebrow" tone="muted">
@@ -235,6 +225,14 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
               <ProgressBar value={zone.pct / 100} color={zone.color} />
             </Stack>
           ))}
+        </Card>
+      )}
+      {routePoints.length > 1 && (
+        <Card>
+          <AppText variant="eyebrow" tone="muted">
+            Route
+          </AppText>
+          <RouteMap points={routePoints} activePoint={scrubPoint} zoneSegments={zoneSegments} />
         </Card>
       )}
       {!!log.splits?.length && (

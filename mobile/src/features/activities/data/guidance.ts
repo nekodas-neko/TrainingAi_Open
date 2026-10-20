@@ -83,15 +83,15 @@ export function walkPlan(config: WalkConfig) {
 }
 export function walkSegments(config: WalkConfig, elapsed: number) {
   return clipSegmentsAt(walkPlan(config).segments, elapsed).map((segment) => ({
-      ...segment,
-      avgHr: null,
-      maxHr: null,
-      hrAtStart: null,
-      avgPaceSecPerKm: null,
-      distanceKm: null,
-      avgCadenceSpm: null,
-      steps: null,
-    }));
+    ...segment,
+    avgHr: null,
+    maxHr: null,
+    hrAtStart: null,
+    avgPaceSecPerKm: null,
+    distanceKm: null,
+    avgCadenceSpm: null,
+    steps: null,
+  }));
 }
 export function testDuration(protocolId: string) {
   const protocol = getProtocol(protocolId)!;
