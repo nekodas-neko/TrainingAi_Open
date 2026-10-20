@@ -8216,7 +8216,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     await this.upsertBodyMetrics(userId, values, 'oura_cloud')
     return { written: values.length, cleared }
   }
-  async listDeletedOuraCloudSleepDates(userId: string, from: string, to: string) { return oura.listDeletedOuraCloudSleepDates(this.db, userId, from, to) }
+  async listDeletedOuraCloudSleepDates(userId: string, from: string, to: string, tz: string) { return oura.listDeletedOuraCloudSleepDates(this.db, userId, from, to, tz) }
   async withOuraSleepWriteLock<T>(userId: string, run: () => Promise<T>) { return withUserLock(getPool(), `oura-sleep-write:${userId}`, run, { label: 'oura sleep write' }) }
   async upsertOuraWorkouts(userId: string, rows: oura.OuraWorkoutUpsertRow[]) { return oura.upsertOuraWorkouts(this.db, userId, rows) }
   async upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string) { return oura.upsertOuraCloudHeartrate(this.db, userId, rows, tz) }

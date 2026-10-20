@@ -840,14 +840,22 @@ export async function clearOuraCloudBodyField(db: Db, userId: string, date: stri
 }
 
 /**
- * #3099. Wake dates in `[from, to]` that hold a TOMBSTONED Oura Cloud sleep row. The night re-score
- * reads it before a write: a night that appears on a day where Oura deleted one is a delete followed
- * by a re-create (which can revive the same row), a revision, not an arrival. Only deleted rows count
- * (#3104 review): a live nap or rest row on the day must not stop a late night from being an arrival.
+ * #3099. Wake dates in `[from, to]` that hold a TOMBSTONED Oura Cloud NIGHT. The night re-score reads
+ * it before a write: a night that appears on a day where Oura deleted one is a delete followed by a
+ * re-create (which can revive the same row), a revision, not an arrival.
+ *  - Only deleted rows count (#3104 review): a live nap or rest row must not stop a late night from
+ *    being an arrival.
+ *  - Only a deleted NIGHT counts (#3106 review): a nap Oura deleted, or retyped to `rest` (tombstoned
+ *    since #3080), is a tombstone too, and it kept the anchor frozen in the same way. A row counts
+ *    when its window is a night window in the user's timezone (`isNightWindow`). The period's stored
+ *    type cannot say, because a delete relabels it `deleted`.
  * Ring (`ble:`) and manual rows are not Oura Cloud's and do not count.
  */
-export async function listDeletedOuraCloudSleepDates(db: Db, userId: string, from: string, to: string): Promise<string[]> {
-  const rows = await db.selectDistinct({ date: s.sleepSessions.date }).from(s.sleepSessions)
+export async function listDeletedOuraCloudSleepDates(db: Db, userId: string, from: string, to: string, tz: string): Promise<string[]> {
+  const rows = await db.select({
+    date: s.sleepSessions.date, sleepStart: s.sleepSessions.sleepStart, sleepEnd: s.sleepSessions.sleepEnd,
+    durationHours: s.sleepSessions.durationHours,
+  }).from(s.sleepSessions)
     .where(and(
       eq(s.sleepSessions.userId, userId),
       gte(s.sleepSessions.date, from), lte(s.sleepSessions.date, to),
@@ -856,7 +864,7 @@ export async function listDeletedOuraCloudSleepDates(db: Db, userId: string, fro
       sql`${s.sleepSessions.ouraId} NOT LIKE 'ble:%'`,
       eq(s.sleepSessions.manualEntry, false),
     ))
-  return rows.map(r => r.date)
+  return [...new Set(rows.filter(r => isNightWindow(r, tz)).map(r => r.date))]
 }
 
 /**

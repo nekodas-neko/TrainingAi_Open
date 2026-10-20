@@ -24,9 +24,9 @@
  *   day's curve in the evening (Orchestrator's decision on #3085). An anchor frozen before today's
  *   night existed was frozen on a readiness without it (from that morning's body metrics), so it is
  *   released and the next read re-chooses it. "Arrived" means no night for today before the write,
- *   one after, AND no tombstoned Oura Cloud sleep row for the day (#3099): a delete then a
- *   re-create in two webhooks is a revision, so the anchor stays. A live nap or rest row on the day
- *   does not count (#3104 review). A finished day's battery is left for the re-derive.
+ *   one after, AND no tombstoned Oura Cloud NIGHT for the day (#3099): a delete then a re-create in
+ *   two webhooks is a revision, so the anchor stays. A nap does not count, live (#3104 review) or
+ *   deleted and retyped to `rest` (#3106 review). A finished day's battery is left for the re-derive.
  *
  * **One user at a time.** Two sleep webhooks for the same user can land in the same second (19 Oct's
  * two periods did). Interleaved, an older fingerprint can be re-scored last and a stale score stick on
@@ -58,7 +58,7 @@ export interface NightWatch {
   today: string
   /** Wake date → fingerprint of that date's canonical night, before the write. */
   before: Map<string, string>
-  /** Wake dates that held a tombstoned Oura Cloud sleep row before the write. */
+  /** Wake dates that held a tombstoned Oura Cloud night (never a nap) before the write. */
   hadDeletedOuraNight: Set<string>
 }
 
@@ -125,7 +125,7 @@ export async function watchNights(repo: NightRescoreRepo, userId: string): Promi
   const from = windowFrom(today)
   const [sessions, ouraDates] = await Promise.all([
     repo.listSleepSessions(userId, shiftDateStr(from, -1), today),
-    repo.listDeletedOuraCloudSleepDates(userId, from, today),
+    repo.listDeletedOuraCloudSleepDates(userId, from, today, tz),
   ])
   return { userId, tz, today, before: nightFingerprints(sessions, tz, from, today), hadDeletedOuraNight: new Set(ouraDates) }
 }
