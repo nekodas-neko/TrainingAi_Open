@@ -120,15 +120,16 @@ export async function POST(req: Request) {
     return NextResponse.json({
       status: 'confirmed', weightKg,
       // Widened from `!impedanceValid` (PS-33): an incomplete profile is now a skip too. The
-      // installed APK reads this name and shows its bare-feet copy, which is wrong for the new
+      // APK reads this name and shows its bare-feet copy, which is wrong for the new
       // reason — hence `compositionSkippedReason`, which a later APK can read to say which it was.
       compositionSkipped: composition == null,
       compositionSkippedReason: skipReason,
-      // Deliberately the inverse of `trendUpdated`, and deliberately NOT renamed: the installed
-      // APK reads this field name and renders "Additional reading today" from it, which is really
-      // saying "this did not change your trend". Since a lower second reading now DOES become the
-      // trend, that copy is only correct if the flag means "trend unchanged" — so the meaning moves
-      // and the wire name stays, and no new APK is needed for the toast to stay honest.
+      // Deliberately the inverse of `trendUpdated`, and deliberately NOT renamed: the toast renders
+      // "Additional reading today" from it, which is really saying "this did not change your
+      // trend". Since a lower second reading now DOES become the trend, that copy is only correct
+      // if the flag means "trend unchanged" — so the meaning moves and the wire name stays.
+      // APKs built before #3156 read `isAdditionalReadingToday` instead, which this route never
+      // sent, so they never showed the copy; from #3156 on, ScaleBleService reads this name.
       isAdditionalReadingForDay: !trendUpdated,
     })
   } catch (err) {

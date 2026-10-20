@@ -66,11 +66,13 @@ class ScaleBleService : Service(), ScaleGattClient.Listener {
         private const val SKIPPED_CHANNEL_ID = "scale-ble-skipped"
         private const val LOGGED_CHANNEL_ID = "scale-ble-logged"
         private const val FAILED_CHANNEL_ID = "scale-ble-failed"
+        private const val DECLINED_CHANNEL_ID = "scale-ble-declined"
         private const val NOTIF_ID = 2003
         private const val PENDING_NOTIF_ID = 2004
         private const val SKIPPED_NOTIF_ID = 2005
         private const val LOGGED_NOTIF_ID = 2006
         private const val FAILED_NOTIF_ID = 2007
+        private const val DECLINED_NOTIF_ID = 2008
         /** We're only ever started because the scan just saw the scale advertising, so a
          *  connect failure here is a transient GATT hiccup, not "asleep" — worth a handful of
          *  quick tries rather than giving up early. Bumped 3→5 2026-08-01: under the persistent-
@@ -442,12 +444,16 @@ class ScaleBleService : Service(), ScaleGattClient.Listener {
                 if (code in 200..299) {
                     val resp = conn.inputStream.bufferedReader().readText()
                     val json = JSONObject(resp)
-                    if (json.optString("status") == "pending") {
-                        notifyPendingConfirmation(json)
-                    } else if (json.optBoolean("compositionSkipped")) {
-                        notifyCompositionSkipped(json)
-                    } else {
-                        notifyWeighInLogged(json)
+                    when (ScaleWeighInOutcome.of(
+                        json.optString("status"),
+                        json.optBoolean("compositionSkipped"),
+                        json.optBoolean("isAdditionalReadingForDay"),
+                    )) {
+                        ScaleWeighInOutcome.PENDING -> notifyPendingConfirmation(json)
+                        ScaleWeighInOutcome.DECLINED -> notifyWeighInDeclined(json)
+                        ScaleWeighInOutcome.COMPOSITION_SKIPPED -> notifyCompositionSkipped(json)
+                        ScaleWeighInOutcome.ADDITIONAL -> notifyWeighInLogged(json, isAdditional = true)
+                        ScaleWeighInOutcome.LOGGED -> notifyWeighInLogged(json, isAdditional = false)
                     }
                 } else {
                     log("ingest HTTP $code")
@@ -564,15 +570,36 @@ class ScaleBleService : Service(), ScaleGattClient.Listener {
     }
 
     /**
+     * The server answered `dismissed`: the reading was far outside the account's usual band (most
+     * likely someone else on the scale) and was kept out of the trend. Worded as Preview words it
+     * (mobile/.../scale/labels.ts, kind `declined`). Not a decision to make, so low-importance.
+     */
+    private fun notifyWeighInDeclined(json: JSONObject) {
+        val weightKg = json.optDouble("weightKg")
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            nm.createNotificationChannel(
+                NotificationChannel(DECLINED_CHANNEL_ID, "Weigh-in not filed", NotificationManager.IMPORTANCE_LOW))
+        }
+        val notification = Notification.Builder(this, DECLINED_CHANNEL_ID)
+            .setContentTitle("%.1f kg — not filed".format(weightKg))
+            .setContentText("It is far from your usual weight, so it was kept out of your trend")
+            .setSmallIcon(R.drawable.ic_stat_dumbbell)
+            .setAutoCancel(true)
+            .build()
+        nm.notify(DECLINED_NOTIF_ID, notification)
+        eventSink?.invoke("scaleResult", JSONObject().put("outcome", "declined").put("weightKg", weightKg))
+    }
+
+    /**
      * The plain success path — a normal weigh-in with valid impedance, same-day trend or not.
      * Previously this case notified nothing at all: the transient "Weigh-in captured — syncing…"
      * foreground notification just disappeared the moment the service stopped, giving no lasting
      * confirmation the reading actually landed. Low-importance/one-shot, same as the
      * composition-skipped case — this isn't asking for a decision.
      */
-    private fun notifyWeighInLogged(json: JSONObject) {
+    private fun notifyWeighInLogged(json: JSONObject, isAdditional: Boolean) {
         val weightKg = json.optDouble("weightKg")
-        val isAdditional = json.optBoolean("isAdditionalReadingToday")
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             nm.createNotificationChannel(

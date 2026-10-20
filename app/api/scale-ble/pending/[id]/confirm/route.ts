@@ -53,7 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // See the note in /api/scale-ble/samples — widened to cover an incomplete profile (PS-33).
     compositionSkipped: composition == null,
     compositionSkippedReason: skipReason,
-    // See the note in /api/scale-ble/samples — the wire name is kept for the installed APK; the
+    // See the note in /api/scale-ble/samples — the wire name is kept; the
     // meaning is "trend unchanged", which is what its toast copy actually says.
     isAdditionalReadingForDay: !trendUpdated,
   })
