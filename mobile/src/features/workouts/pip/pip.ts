@@ -1,6 +1,6 @@
-import { formatLoadKg } from '@trainingai/shared/format/units';
 import { CATEGORICAL_PALETTE, categoricalColor } from '@trainingai/shared/chart-colors';
 import { workoutFlow } from '../logging/flow.ts';
+import { displayLoad } from '../logging/preferences.ts';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
 
 // Picture-in-picture for the workout screen (#3064), ported from the current app:
@@ -68,14 +68,15 @@ const numberIn = (text: string) => {
 /**
  * pip-view.tsx's "60 kg × 8": the set's weight, else the exercise's first, else 60, and the same
  * fallbacks for reps (the plan, the first set, 10), as the current app reads its per-set arrays.
- * The unit is the exercise's own, so a pound exercise reads "135 lb".
+ * The weight is kg; it is shown in the exercise's own unit through the set wheel's `displayLoad`,
+ * so a 7.5 kg set on a pound exercise reads "16.53 lb".
  */
 function load(exercise: WorkoutExercise, set: WorkoutSet | undefined) {
   const first = exercise.sets[0];
   const weight =
     (set && numberIn(set.weight)) ?? set?.plannedWeight ?? numberIn(first.weight) ?? 60;
   const reps = set ? repsOf(set, first) : repsOf(first, first);
-  return `${formatLoadKg(weight, { unit: false })} ${exercise.weightUnit} × ${reps}`;
+  return `${displayLoad(weight, exercise.weightUnit)} ${exercise.weightUnit} × ${reps}`;
 }
 function repsOf(set: WorkoutSet, first?: WorkoutSet) {
   const reps = numberIn(set.reps);
