@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { titleName } from '../../rewards/data/view.ts';
 export const userSchema = z.object({
   id: z.string(),
   displayName: z.string().nullable(),
@@ -140,26 +141,8 @@ export const friendProfileSpec = (id: string) => ({
   }),
 });
 export type PublicProfile = z.infer<ReturnType<typeof friendProfileSpec>['schema']>;
-export const titleLabels: Record<string, string> = {
-  iron_will: 'Iron Will',
-  unbroken: 'Unbroken',
-  powerhouse: 'Powerhouse',
-  iron_beast: 'Iron Beast',
-  the_veteran: 'The Veteran',
-  century_club: 'Century Club',
-  set_machine: 'Set Machine',
-  pr_machine: 'PR Machine',
-  dawn_warrior: 'Dawn Warrior',
-  ghost: 'Ghost',
-  macro_master: 'Macro Master',
-  well_rested: 'Well Rested',
-  relentless: 'Relentless',
-  road_runner: 'Road Runner',
-  ultramarathon: 'Ultramarathon',
-  built_different: 'Built Different',
-};
 export function titleLabel(key: string | null | undefined) {
-  return key ? (titleLabels[key] ?? key.replace(/_/g, ' ')) : null;
+  return titleName(key);
 }
 export function feedText(event: z.infer<typeof feedSpec.schema>['events'][number]) {
   const p = event.payload;
