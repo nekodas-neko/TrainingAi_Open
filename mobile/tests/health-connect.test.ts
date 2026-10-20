@@ -11,6 +11,7 @@ import { projectHealthConnect } from '@trainingai/shared/health/health-connect-p
 import { normalizeHealthConnectRecord } from '../src/integrations/health-connect/records.ts';
 import type { HealthConnectReader } from '../src/integrations/health-connect/types.ts';
 import { midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
+import { HealthConnectPersistence } from '../src/features/health/data/health-connect-persistence.ts';
 const now = Date.parse('2026-10-13T05:00:00Z');
 const record: HealthConnectRecord = {
   id: 'steps-one',
@@ -135,6 +136,10 @@ function fixture() {
     },
   };
 }
+// What is saved, read back through the storage layout the store writes (#3121).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const savedDisk = async (f: { storage: ConstructorParameters<typeof HealthConnectPersistence>[0] }): Promise<any> =>
+  new HealthConnectPersistence(f.storage).read();
 test('Health Connect captures the change boundary before history, saves upload retries and resumes after reopening', async () => {
   const f = fixture();
   f.offline(true);
@@ -144,7 +149,7 @@ test('Health Connect captures the change boundary before history, saves upload r
   assert.deepEqual(f.order.slice(0, 2), ['cursor', 'history']);
   assert.ok(store.getSnapshot().pending);
   assert.match(store.getSnapshot().error!, /Offline/);
-  const disk = JSON.parse(f.saved.get('health-connect-import.v1')!);
+  const disk = (await savedDisk(f));
   assert.equal(disk.queue[0].records[0].sourcePackage, record.sourcePackage);
   assert.equal(disk.records[record.id].value, undefined);
   f.offline(false);
@@ -180,7 +185,7 @@ test('a failed disk write cannot advance the history checkpoint or upload unsave
   await reopened.run(true);
   assert.equal(f.uploads.length, 0);
   assert.match(reopened.getSnapshot().error!, /Disk full/);
-  const disk = JSON.parse(f.saved.get('health-connect-import.v1')!);
+  const disk = (await savedDisk(f));
   assert.equal(disk.scan, null);
   assert.equal(disk.token, null);
 });
@@ -192,7 +197,7 @@ test('unconfirmed server acknowledgements retain the same upload batch', async (
   await store.run(true);
   assert.ok(store.getSnapshot().pending);
   assert.equal(
-    JSON.parse(f.saved.get('health-connect-import.v1')!).queue[0].records[0].id,
+    (await savedDisk(f)).queue[0].records[0].id,
     record.id,
   );
 });
@@ -335,11 +340,11 @@ test('a canceled import cannot write or upload a late native history result', as
   await store.setEnabled(true);
   const pending = store.run(true);
   while (!resolvePage) await new Promise((resolve) => setImmediate(resolve));
-  const saved = f.saved.get('health-connect-import.v1');
+  const saved = JSON.stringify([...f.saved]);
   store.cancel();
   resolvePage({ records: [record], pageToken: null, skipped: 0 });
   await pending;
-  assert.equal(f.saved.get('health-connect-import.v1'), saved);
+  assert.equal(JSON.stringify([...f.saved]), saved);
   assert.equal(f.uploads.length, 0);
 });
 
@@ -388,7 +393,7 @@ test('#2828 N3: a batch the server refuses with a 400 is dropped instead of bloc
   await store.run(true);
   assert.equal(store.getSnapshot().pending, 0);
   assert.equal(store.getSnapshot().skipped, 1);
-  assert.equal(JSON.parse(f.saved.get('health-connect-import.v1')!).queue.length, 0);
+  assert.equal((await savedDisk(f)).queue.length, 0);
   // A later reading still uploads: nothing is left wedged at the head of the queue.
   refuse = false;
   f.rows([{ ...record, id: 'steps-two' }]);
@@ -407,7 +412,7 @@ test('a server failure other than a 400 keeps the batch for retry', async () => 
   await store.run(true);
   assert.ok(store.getSnapshot().pending);
   assert.equal(
-    JSON.parse(f.saved.get('health-connect-import.v1')!).queue[0].records[0].id,
+    (await savedDisk(f)).queue[0].records[0].id,
     record.id,
   );
 });

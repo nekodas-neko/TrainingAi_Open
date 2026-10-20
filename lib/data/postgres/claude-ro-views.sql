@@ -1275,7 +1275,8 @@ SELECT
   t.source,
   t.reviewed,
   t.created_at,
-  t.label
+  t.label,
+  t.deleted_at
 FROM public.oura_workouts t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
