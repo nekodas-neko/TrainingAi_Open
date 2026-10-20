@@ -21,6 +21,7 @@ import { BodyFatCard, BodyWeightCard, WeightTrendCard } from './BodyWeightCards'
 import { LeanMassCard, ScaleCompositionCard } from './BodyCompositionCards';
 import { HeartTiles, HrvBaselineCard, TrainingLoadCard } from './BodyHeartCards';
 import { ActivityTrendCharts, EnergyBalanceCard, RingCards, WaterCard } from './BodyActivityCards';
+import { logSeedReading } from '@trainingai/shared/health/activity-steps';
 
 function GroupTitle({ children }: { children: string }) {
   const { theme } = useTheme();
@@ -50,8 +51,9 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
     sex: profile.data?.user.sex,
   });
   const slope = computeWeightRateKgPerWeek(health.body?.weightTrend ?? rows);
-  const rawInitial =
-    log === 'bodyFat' ? today?.bodyFat : log && log !== 'waterMl' ? today?.[log] : null;
+  // #3095: the shared seed — body fat's raw reading, and steps' device count, never the
+  // treadmill-inclusive figure a save would write back as a manual reading.
+  const rawInitial = log && log !== 'waterMl' ? (logSeedReading(log, today) as number | null) : null;
   const targetWeightKg = goals.data?.targetWeightKg ?? null;
   const targetBfPct = goals.data?.targetBfPct ?? null;
   return (

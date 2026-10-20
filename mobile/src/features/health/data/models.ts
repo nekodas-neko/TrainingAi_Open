@@ -47,6 +47,10 @@ export const bodySchema = z
       'metabolicAge',
     ] as const),
     bodyFatIsCorrected: z.boolean().optional(),
+    // #3095: today's device count when indoor (treadmill) steps were folded into `steps`. Not one of
+    // the `numericFields`, which turn absent into null: absent has its own meaning here, that
+    // `steps` already is the device's count.
+    deviceSteps: z.number().finite().nullable().optional(),
   })
   .passthrough();
 export type BodyRow = z.infer<typeof bodySchema>;

@@ -88,7 +88,7 @@ import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
 import { computeStreak, type StreakSchedule } from "./compute-streak";
 import type { SleepRow } from "@/app/health/health-sections";
 import { DEFAULT_SLEEP_GOAL_HOURS } from "@trainingai/shared/health/daily-goals";
-import { activityStepsForDayCount } from "@trainingai/shared/health/activity-steps";
+import { localMetaSeed } from "./local-meta-seed";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 import { useBodyBattery } from "@/lib/hooks/use-body-battery";
 // Derived from the canonical shape rather than restated as a sixth local copy: the fields Home
@@ -470,41 +470,14 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         const local = await store.getBodyMetrics(cutoffStr);
         const rows = local.filter(m => !m.deletedAt);
         if (rows.length > 0) {
-          const toRow = (m: typeof rows[number]): BodyMetaRow => ({
-            date: m.date, weightKg: m.weightKg, bodyFat: m.bodyFatPct,
-            calories: m.calories, protein: m.proteinG, carb: m.carbsG, fat: m.fatG,
-            steps: m.steps, distanceKm: m.distanceKm,
-            restingHeartRate: m.restingHeartRate, hrvMs: m.hrvMs, spo2Pct: m.spo2Pct,
-            waterMl: m.waterMl, waistCm: m.waistCm, chestCm: m.chestCm, armCm: m.armCm,
-            thighCm: m.thighCm, hipCm: m.hipCm, neckCm: m.neckCm,
-            skeletalMusclePct: m.skeletalMusclePct, fatFreeMassKg: m.fatFreeMassKg,
-            subcutaneousFatPct: m.subcutaneousFatPct, visceralFatIndex: m.visceralFatIndex,
-            bodyWaterPct: m.bodyWaterPct, muscleMassKg: m.muscleMassKg, boneMassKg: m.boneMassKg,
-            proteinPct: m.proteinPct, bmrKcal: m.bmrKcal, metabolicAge: m.metabolicAge,
-          });
-          setMetaRecent(rows.map(toRow));
-          const todayStr = todayInTz(tz);
-          const todayRow = rows.find(m => m.date === todayStr);
-          if (todayRow) setMetaToday(toRow(todayRow));
+          // #3095: the week start in the USER's zone, not the module default.
+          const weekStart = startOfWeekInTz(tz);
+          const activityLogs = (await store.getActivityLogs(cutoffStr)).filter(a => !a.deletedAt);
+          const seed = localMetaSeed(rows, activityLogs, todayInTz(tz), weekStart);
+          setMetaRecent(seed.recent);
+          if (seed.today) setMetaToday(seed.today);
           setMetaLoading(false);
-
-          // weekToDate fast-path — matches the server's steps/waterMl computation
-          // exactly (body_metrics + indoor activity_logs steps, same weekStartForFetch
-          // anchor). calories is body_metrics-only here: the server additionally
-          // prefers food_logs' per-day total over body_metrics on days that have
-          // one (to avoid double-counting), which needs a food-item join this fast
-          // path doesn't do — so a food-logged day is undercounted here until the
-          // network response (fired right after this block) replaces it. Real
-          // summed data, just possibly incomplete for a moment — not fabricated.
-          const weekStart = startOfWeekInTz();
-          const wk = rows.filter(m => m.date >= weekStart);
-          const weekActivityLogs = (await store.getActivityLogs(weekStart))
-            .filter(a => !a.deletedAt && a.date >= weekStart);
-          setWeekToDate({
-            steps: wk.reduce((s, m) => s + (m.steps ?? 0), 0) + activityStepsForDayCount(weekActivityLogs),
-            calories: wk.reduce((s, m) => s + (m.calories ?? 0), 0),
-            waterMl: wk.reduce((s, m) => s + (m.waterMl ?? 0), 0),
-          });
+          setWeekToDate(seed.weekToDate);
         }
       }
     }
@@ -1016,8 +989,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const weekStrip = useMemo(() => {
     const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
     const todayStr = todayInTz(tz).replace(/-/g, "/");
-    const todayDowIdx = todayDayOfWeek();
-    const mondayStr = startOfWeekInTz();
+    const todayDowIdx = todayDayOfWeek(tz);
+    const mondayStr = startOfWeekInTz(tz);
 
     return Array.from({ length: 7 }, (_, i) => {
       const dateKey = shiftDateStr(mondayStr, i).replace(/-/g, "/");

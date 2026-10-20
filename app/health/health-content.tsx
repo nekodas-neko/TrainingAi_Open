@@ -14,6 +14,8 @@ import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { pickSleepCardNight } from "@trainingai/shared/health/sleep-card-night";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { getLocalStore } from "@/lib/local-store";
+import { withIndoorSteps } from "@trainingai/shared/health/activity-steps";
+import { logSeedValue } from "@/components/health/log-seed-value";
 import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
 import { sleepReplyWithPending } from "@/lib/sleep/manual-night-view";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
@@ -247,9 +249,10 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       if (!store) return;
       // Calendar days on the local date, never `midnight − N × 86,400,000` (wrong day across DST).
       const cutoffStr = shiftDateStr(todayInTz(tz), -30);
-      const [localMetrics, localSleep] = await Promise.all([
+      const [localMetrics, localSleep, localActivities] = await Promise.all([
         store.getBodyMetrics(cutoffStr),
         store.getSleepSessions(cutoffStr),
+        store.getActivityLogs(cutoffStr),
       ]);
       if (localMetrics.length > 0) {
         const filtered = localMetrics.filter(m => !m.deletedAt);
@@ -293,10 +296,14 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         // store's oldest-first month. Every reader of `metaRecent` (the latest-weight tile, the
         // sparklines) assumes the network shape. The 30-day `filtered` below still feeds the weight
         // trend and today's tile, which have their own windows.
+        // #3095: each row folds its own day's indoor (treadmill) steps, as the route's `recent` does.
+        const liveActivities = localActivities.filter(a => !a.deletedAt);
+        const withSteps = (m: typeof filtered[number]) =>
+          withIndoorSteps(toRow(m), liveActivities.filter(a => a.date === m.date));
         setMetaRecent(prev => {
           const corrected = new Map(prev.map(r => [r.date, r]));
           return recentBodyRows(filtered, todayInTz(tz)).map(m => {
-            const row = toRow(m);
+            const row = withSteps(m);
             const had = corrected.get(row.date);
             if (had?.bodyFatCorrected != null && had.bodyFat === row.bodyFat) {
               row.bodyFatCorrected = had.bodyFatCorrected;
@@ -314,8 +321,10 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         // mirrors session-select-content.tsx's Home fetchMeta pattern (SYNC-R1).
         const todayStr = todayInTz(tz);
         const todayRow = filtered.find(m => m.date === todayStr);
+        // #3095: today's steps through the route's own fold, so a treadmill day does not paint the
+        // ring's count and then jump when the network answer adds the session's steps.
         if (todayRow) setMetaToday(prev => {
-          const row = toRow(todayRow);
+          const row = withSteps(todayRow);
           if (prev?.date === row.date && prev.bodyFatCorrected != null && prev.bodyFat === row.bodyFat) {
             row.bodyFatCorrected = prev.bodyFatCorrected;
             row.bodyFatIsCorrected = prev.bodyFatIsCorrected;
@@ -580,11 +589,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const { night: recentSleep, label: sleepNightLabel } = pickSleepCardNight(sleepRows, todayStr, tz)
 
   const openLog = (field: LogField, label: string, unit: string, step: number) => {
-    let current: number | null | undefined = metaToday?.[field];
-    if (field === "weightKg" && current == null) {
-      current = metaRecent.find(r => r.weightKg != null)?.weightKg ?? null;
-    }
-    setLogState({ field, label, unit, step, value: current != null ? String(current) : "" });
+    // #3095: seeds the device's own steps, not the treadmill-inclusive figure.
+    setLogState({ field, label, unit, step, value: logSeedValue(field, metaToday, metaRecent) });
   };
 
   // Hoisted so the 6 metaRecent-derived HealthMetricSheets below don't each re-reverse the

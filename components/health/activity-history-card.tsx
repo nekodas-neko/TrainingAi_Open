@@ -7,6 +7,7 @@ import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getActivityIcon } from '@trainingai/shared/constants/activity-icons'
 import dynamic from 'next/dynamic'
 import { startOfWeekInTz } from '@trainingai/shared/date-utils'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { getLocalStore } from '@/lib/local-store'
 import type { LocalActivityLog } from '@/lib/local-store/types'
 import type { ActivityLog, ActivityType } from '@trainingai/shared/types'
@@ -52,6 +53,7 @@ function localToActivityLog(l: LocalActivityLog): ActivityLog {
 const ACTIVITY_KEYS = ['activity-logs', 'activity-types'] as const
 
 export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }: { userId?: string }) {
+  const tz = useUserTimezone()
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [types, setTypes] = useState<ActivityType[]>([])
   const [selected, setSelected] = useState<ActivityLog | null>(null)
@@ -83,7 +85,7 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
     // (it also carries server-computed calories) and overwrites when it lands.
     const store = userId ? getLocalStore(userId) : null
     if (store) {
-      store.getActivityLogs(startOfWeekInTz())
+      store.getActivityLogs(startOfWeekInTz(tz))
         .then(local => {
           pendingLocalRef.current = local.filter(l => l.syncStatus === 'pending').map(localToActivityLog)
           if (local.length) setLogs(local.map(localToActivityLog))
@@ -103,7 +105,7 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
       // actually read.
       { onError: () => setFailed(true) },
     )
-  }, [userId])
+  }, [userId, tz])
 
   useEffect(() => {
     // Seed from the cache mirror so the card paints from the last response
@@ -119,7 +121,7 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
 
   useInvalidationRefetch(ACTIVITY_KEYS, load)
 
-  const weekStart = startOfWeekInTz()
+  const weekStart = startOfWeekInTz(tz)
   const weekLogs = logs.filter(l => l.date >= weekStart)
 
   const iconByType = new Map(types.map(t => [t.id, t.icon]))
