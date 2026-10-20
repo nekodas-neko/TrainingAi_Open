@@ -18,6 +18,12 @@ export const OURA_API_BASE = 'https://api.ouraring.com'
  * back with no SpO2 scope at all). `heart_health` is new in v1.42 and covers cardiovascular age and
  * VO2 max, which Oura refused under `daily`. `email` and `tag` are left out: nothing in #2808 reads
  * them. A change here reaches a user only on their next connect.
+ *
+ * `personal` is kept although nothing stores what it shares (age, sex, height, weight; #3081). The
+ * one `personal_info` read we make, for the account `id` every webhook is routed by
+ * (`fetchOuraUserId`), is the read this scope is named for, and the spec maps no scope to the route.
+ * Dropping it could make Oura refuse that read, which would leave every event `unknown_user`, and
+ * only a real reconnect could show it does not. We read `id` alone and store nothing else from it.
  */
 export const OURA_SCOPES = ['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health'] as const
 export type OuraScope = (typeof OURA_SCOPES)[number]

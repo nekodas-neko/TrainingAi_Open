@@ -908,7 +908,7 @@ export interface OuraWorkoutUpsertRow {
   endDatetime: Date
   calories: number | null
   distanceM: number | null
-  intensity: string
+  intensity: string | null
   source: string | null
   label: string | null
 }
@@ -931,9 +931,11 @@ export async function upsertOuraWorkouts(db: Db, userId: string, rows: OuraWorko
   return written.length
 }
 
-// ── #2982: what Oura Cloud sends and no screen reads ──────────────────────────────────────────
-// Storage for #2860's later batches. Each table holds Oura's values only, so a write replaces what
-// Oura sent before; nothing here merges with, or ranks against, another source.
+// ── #2982: what Oura Cloud sends, as Oura sent it ─────────────────────────────────────────────
+// Each table holds Oura's values only, so a write replaces what Oura sent before; nothing here
+// merges with, or ranks against, another source. Mostly storage for #2860's later batches, but
+// three columns are read now: `oura_cloud_sleep_periods.sleep_type` (night composition, #3057) and
+// `oura_cloud_daily.readiness_contributors` (#2984) and `met` (#2985).
 
 /** One `oura_cloud_sleep_periods` row: a sleep period exactly as Oura last sent it. */
 export interface OuraCloudSleepPeriodRow {
@@ -1064,7 +1066,7 @@ export async function getOuraCloudMetChangedAt(db: Db, userId: string, from: str
 export interface OuraSessionRow {
   ouraId: string
   day: string
-  sessionType: string
+  sessionType: string | null
   startDatetime: Date
   endDatetime: Date
   mood: string | null
@@ -1088,6 +1090,19 @@ export async function upsertOuraSessions(db: Db, userId: string, rows: OuraSessi
       },
     })
   return values.length
+}
+
+/**
+ * #3081: removes the session Oura reports deleted. `oura_sessions` is Oura's own copy, server-only and
+ * synced to no device, so the row goes rather than being tombstoned: there is no device to tell, and
+ * a tombstone would only keep a session the user removed. Scoped to the user, so another account's
+ * id removes nothing. Returns rows removed.
+ */
+export async function deleteOuraSession(db: Db, userId: string, ouraId: string): Promise<number> {
+  const removed = await db.delete(s.ouraSessions)
+    .where(and(eq(s.ouraSessions.userId, userId), eq(s.ouraSessions.ouraId, ouraId)))
+    .returning({ ouraId: s.ouraSessions.ouraId })
+  return removed.length
 }
 
 /**

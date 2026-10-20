@@ -7,8 +7,14 @@
 //
 // The fields #2982 added (series, hypnograms, flags, goals, labels) are the exception, through
 // `added`: a value that does not match the spec is stored as nothing rather than dropping a document
-// that parsed before they were read. They land in tables no screen reads, so a gap there is a gap,
-// never a "measured nothing" on a screen.
+// that parsed before they were read. A gap there is a gap, never a "measured nothing" on a screen.
+//
+// **Enum fields are the other exception (#3081, as #3033 was for `workout.source`).** Oura adds
+// values without a version bump in practice, and a value outside the list used to drop the whole
+// document: a night with a new `type` would vanish. Every enum field is read as a string and checked
+// against `OURA_ENUMS` in `mapOuraDocuments`. A value on the list is kept; one that is not is stored
+// as null (except `sleep.type`, kept raw, below), counted in `unknownValues`, and reported by the
+// ingest with counts only. The document lands either way.
 //
 // Pure: no fetch, no database. `data.ts` fetches, `ingest.ts` writes.
 import { z } from 'zod'
@@ -47,6 +53,33 @@ export const OuraSample = z.object({
   timestamp: Instant,
 })
 export type OuraSample = z.infer<typeof OuraSample>
+
+/**
+ * The spec's values for every enum field we read (v1.42, `components.schemas`), keyed `type.field`.
+ * Read leniently: see the top of this file. Adding a value Oura documents is a line here.
+ */
+export const OURA_ENUMS = {
+  'sleep.type': ['deleted', 'sleep', 'long_sleep', 'late_nap', 'rest'],
+  'sleep.sleep_analysis_reason': ['foreground_sleep_analysis', 'bedtime_edit', 'background_sleep_analysis', 'background_created_foreground_updated'],
+  'sleep.sleep_algorithm_version': ['v1', 'v2'],
+  'daily_stress.day_summary': ['restored', 'normal', 'stressful'],
+  'daily_resilience.level': ['limited', 'adequate', 'solid', 'strong', 'exceptional'],
+  'workout.intensity': ['easy', 'moderate', 'hard'],
+  'workout.source': ['manual', 'autodetected', 'confirmed', 'workout_heart_rate', 'live_third_party_heart_rate', 'live_oura_heart_rate'],
+  'session.type': ['breathing', 'meditation', 'nap', 'relaxation', 'rest', 'body_status'],
+  'session.mood': ['bad', 'worse', 'same', 'good', 'great'],
+} as const satisfies Record<string, readonly string[]>
+export type OuraEnumField = keyof typeof OURA_ENUMS
+
+/**
+ * An enum field as Oura sent it: any short string. A value outside the spec's list is decided in the
+ * mapping, never here, so it cannot cost the document. A non-string is not a new value; for a field
+ * the spec requires it still fails the document, as any wrong shape does.
+ */
+const Label = z.string().min(1).max(64)
+const OptionalLabel = Label.nullable().optional()
+/** For an optional enum field #2982 added: a wrong shape reads as null, as `added` does. */
+const AddedLabel = Label.nullable().optional().catch(null)
 
 /** A per-character class string (`sleep_phase_30_sec`, `movement_30_sec`, `class_5_min`). */
 const ClassString = (chars: RegExp) => z.string().regex(chars)
@@ -115,14 +148,14 @@ export const DailyStressDoc = z.object({
   day: Day,
   stress_high: NullableInt,
   recovery_high: NullableInt,
-  day_summary: z.enum(['restored', 'normal', 'stressful']).nullable().optional(),
+  day_summary: OptionalLabel,
 })
 
 /** `DailyResilienceModel` */
 export const DailyResilienceDoc = z.object({
   id: z.string().min(1),
   day: Day,
-  level: z.enum(['limited', 'adequate', 'solid', 'strong', 'exceptional']),
+  level: Label,
   contributors: z.object({ sleep_recovery: z.number(), daytime_recovery: z.number(), stress: z.number() }),
 })
 
@@ -147,7 +180,7 @@ export const SleepDoc = z.object({
   day: Day,
   bedtime_start: Instant,
   bedtime_end: Instant,
-  type: z.enum(['deleted', 'sleep', 'long_sleep', 'late_nap', 'rest']).nullable().optional(),
+  type: OptionalLabel,
   time_in_bed: Int,
   total_sleep_duration: NullableInt,
   awake_time: NullableInt,
@@ -167,9 +200,9 @@ export const SleepDoc = z.object({
   hrv: added(OuraSample),
   sleep_phase_30_sec: added(ClassString(/^[1-4]*$/)),
   movement_30_sec: added(ClassString(/^[1-4]*$/)),
-  sleep_algorithm_version: added(z.enum(['v1', 'v2'])),
+  sleep_algorithm_version: AddedLabel,
   low_battery_alert: added(z.boolean()),
-  sleep_analysis_reason: added(z.enum(['foreground_sleep_analysis', 'bedtime_edit'])),
+  sleep_analysis_reason: AddedLabel,
   period: added(Int),
   ring_id: added(z.string().min(1)),
 })
@@ -177,7 +210,8 @@ export const SleepDoc = z.object({
 /**
  * `PublicWorkout`. `source` is a label, so it never costs us the workout: v1.42 added two values
  * (#3033) that dropped every live-heart-rate workout whole while we read only v1.34's four. A value
- * outside the spec's list, or none, stores as `null` ("not stated") and the workout lands.
+ * outside the spec's list, or none, stores as `null` ("not stated") and the workout lands. #3081:
+ * `intensity` the same way.
  */
 export const WorkoutDoc = z.object({
   id: z.string().min(1),
@@ -187,9 +221,8 @@ export const WorkoutDoc = z.object({
   end_datetime: Instant,
   calories: NullableNum,
   distance: NullableNum,
-  intensity: z.enum(['easy', 'moderate', 'hard']),
-  source: z.enum(['manual', 'autodetected', 'confirmed', 'workout_heart_rate', 'live_third_party_heart_rate', 'live_oura_heart_rate'])
-    .nullable().optional().catch(null),
+  intensity: Label,
+  source: AddedLabel,
   label: added(z.string()),
 })
 
@@ -199,8 +232,8 @@ export const SessionDoc = z.object({
   day: Day,
   start_datetime: Instant,
   end_datetime: Instant,
-  type: z.enum(['breathing', 'meditation', 'nap', 'relaxation', 'rest', 'body_status']),
-  mood: added(z.enum(['bad', 'worse', 'same', 'good', 'great'])),
+  type: Label,
+  mood: AddedLabel,
   heart_rate: added(OuraSample),
   heart_rate_variability: added(OuraSample),
   motion_count: added(OuraSample),
@@ -251,6 +284,15 @@ export const OURA_DOCUMENT_TYPES = {
 
 export type OuraDocumentType = keyof typeof OURA_DOCUMENT_TYPES
 export const OURA_DOCUMENT_TYPE_NAMES = Object.keys(OURA_DOCUMENT_TYPES) as OuraDocumentType[]
+
+/**
+ * The types whose `delete` event the webhook acts on, and so subscribes to (`subscriptions.ts`). A
+ * sleep period is tombstoned (#2859) and a session removed (#3081). Not yet:
+ *   - `workout`: #3141 adds its delete with the `oura_workouts.deleted_at` tombstone (#3146);
+ *   - the daily documents: a delete names only the document's id, which we do not store, so it cannot
+ *     be traced to a day yet (#3153).
+ */
+export const OURA_DELETE_TYPES: readonly OuraDocumentType[] = ['sleep', 'session']
 
 /**
  * The OAuth scope each collection, and the heart-rate series, needs (#2974). Oura answers 401 for a
@@ -312,7 +354,7 @@ export interface OuraWorkoutRow {
   endDatetime: Date
   calories: number | null
   distanceM: number | null
-  intensity: string
+  intensity: string | null
   source: string | null
   label: string | null
 }
@@ -336,10 +378,12 @@ export interface OuraCloudWrites {
   /** #2982: per day, only the fields a document provided; merged so each day appears once. */
   cloudDaily: OuraCloudDailyRow[]
   sessions: OuraSessionRow[]
+  /**
+   * #3081: how many values outside `OURA_ENUMS` each field carried in this batch. The documents were
+   * kept; the ingest reports the counts. Absent or empty when every value was on the list.
+   */
+  unknownValues?: Partial<Record<OuraEnumField, number>>
 }
-
-/** Sleep types that are sleep. `rest` is a rest period and `deleted` is a removed one. */
-const SLEEP_TYPES = new Set(['sleep', 'long_sleep', 'late_nap'])
 
 const hours = (sec: number | null | undefined) => (sec == null ? null : sec / 3600)
 
@@ -366,6 +410,14 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
   const sleepPeriods = new Map<string, OuraCloudSleepPeriodRow>()
   const cloudDaily = new Map<string, OuraCloudDailyRow>()
   const sessions = new Map<string, OuraSessionRow>()
+  const unknownValues: Partial<Record<OuraEnumField, number>> = {}
+  /** `value` when the spec lists it, else null and counted. Null stays null, uncounted. */
+  const known = (field: OuraEnumField, value: string | null | undefined): string | null => {
+    if (value == null) return null
+    if ((OURA_ENUMS[field] as readonly string[]).includes(value)) return value
+    unknownValues[field] = (unknownValues[field] ?? 0) + 1
+    return null
+  }
 
   const cloudDay = (d: string) => {
     let row = cloudDaily.get(d)
@@ -437,10 +489,10 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
           stressHigh: doc.stress_high ?? null,
           recoveryHigh: doc.recovery_high ?? null,
         })
-        cloudDay(doc.day).daySummary = doc.day_summary ?? null
+        cloudDay(doc.day).daySummary = known('daily_stress.day_summary', doc.day_summary)
         break
       case 'daily_resilience':
-        Object.assign(day(doc.day), { resilienceLevel: doc.level, resilienceContributors: doc.contributors })
+        Object.assign(day(doc.day), { resilienceLevel: known('daily_resilience.level', doc.level), resilienceContributors: doc.contributors })
         break
       case 'daily_cardiovascular_age':
         Object.assign(day(doc.day), { vascularAge: doc.vascular_age ?? null, pulseWaveVelocity: doc.pulse_wave_velocity ?? null })
@@ -449,6 +501,11 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
         day(doc.day).vo2Max = doc.vo2_max
         break
       case 'sleep': {
+        // #3081: a type Oura adds is stored as sent, so it is never lost, and it is written as a
+        // period like `sleep`. It cannot become the night: only `long_sleep` is a main period, so
+        // beside one it is secondary (`ouraSecondaryPeriods`), and on its own it is an ordinary
+        // period, exactly as an untyped one is. Only `deleted` and `rest` remove a period.
+        known('sleep.type', doc.type) // counts a type off the list; the raw value is what is stored
         sleepPeriods.set(doc.id, {
           ouraId: doc.id,
           day: doc.day,
@@ -459,14 +516,14 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
           hrv: doc.hrv ?? null,
           sleepPhase30Sec: doc.sleep_phase_30_sec ?? null,
           movement30Sec: doc.movement_30_sec ?? null,
-          sleepAlgorithmVersion: doc.sleep_algorithm_version ?? null,
+          sleepAlgorithmVersion: known('sleep.sleep_algorithm_version', doc.sleep_algorithm_version),
           lowBatteryAlert: doc.low_battery_alert ?? null,
-          sleepAnalysisReason: doc.sleep_analysis_reason ?? null,
+          sleepAnalysisReason: known('sleep.sleep_analysis_reason', doc.sleep_analysis_reason),
           period: doc.period ?? null,
           ringId: doc.ring_id ?? null,
         })
         if (doc.type === 'deleted') { deletedSleepIds.push(doc.id); break }
-        if (doc.type != null && !SLEEP_TYPES.has(doc.type)) { retypedSleepIds.push(doc.id); break }
+        if (doc.type === 'rest') { retypedSleepIds.push(doc.id); break }
         const start = new Date(doc.bedtime_start)
         const end = new Date(doc.bedtime_end)
         if (!(end.getTime() > start.getTime())) break
@@ -501,7 +558,8 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
         if (!(end.getTime() >= start.getTime())) break
         workouts.set(doc.id, {
           id: doc.id, day: doc.day, activity: doc.activity, startDatetime: start, endDatetime: end,
-          calories: doc.calories ?? null, distanceM: doc.distance ?? null, intensity: doc.intensity, source: doc.source ?? null,
+          calories: doc.calories ?? null, distanceM: doc.distance ?? null,
+          intensity: known('workout.intensity', doc.intensity), source: known('workout.source', doc.source),
           label: doc.label ?? null,
         })
         break
@@ -511,8 +569,8 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
         const end = new Date(doc.end_datetime)
         if (!(end.getTime() >= start.getTime())) break
         sessions.set(doc.id, {
-          ouraId: doc.id, day: doc.day, sessionType: doc.type, startDatetime: start, endDatetime: end,
-          mood: doc.mood ?? null,
+          ouraId: doc.id, day: doc.day, sessionType: known('session.type', doc.type), startDatetime: start, endDatetime: end,
+          mood: known('session.mood', doc.mood),
           heartRate: doc.heart_rate ?? null,
           heartRateVariability: doc.heart_rate_variability ?? null,
           motionCount: doc.motion_count ?? null,
@@ -533,6 +591,7 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
     sleepPeriods: [...sleepPeriods.values()],
     cloudDaily: [...cloudDaily.values()],
     sessions: [...sessions.values()],
+    unknownValues,
   }
 }
 

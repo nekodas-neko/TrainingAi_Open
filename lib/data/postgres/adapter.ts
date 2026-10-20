@@ -8223,6 +8223,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraCloudSleepPeriods(userId: string, rows: oura.OuraCloudSleepPeriodRow[]) { return oura.upsertOuraCloudSleepPeriods(this.db, userId, rows) }
   async upsertOuraCloudDaily(userId: string, rows: oura.OuraCloudDailyRow[]) { return oura.upsertOuraCloudDaily(this.db, userId, rows) }
   async upsertOuraSessions(userId: string, rows: oura.OuraSessionRow[]) { return oura.upsertOuraSessions(this.db, userId, rows) }
+  async deleteOuraSession(userId: string, ouraId: string) { return oura.deleteOuraSession(this.db, userId, ouraId) }
   async getOuraCloudActivitySeries(userId: string, from: string, to: string) { return oura.getOuraCloudActivitySeries(this.db, userId, from, to) }
   async getOuraCloudMetChangedAt(userId: string, from: string, to: string) { return oura.getOuraCloudMetChangedAt(this.db, userId, from, to) }
   async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }

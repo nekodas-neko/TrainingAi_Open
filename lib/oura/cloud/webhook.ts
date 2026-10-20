@@ -19,7 +19,7 @@ import { OuraUnavailableError } from './client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { fetchOuraDocument, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthorizedError } from './data'
-import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
+import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DELETE_TYPES, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
 import { writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
@@ -114,8 +114,8 @@ export type OuraWebhookEvent = z.infer<typeof OuraWebhookEvent>
 export type OuraWebhookOutcome =
   /** The document was read and written. */
   | { result: 'written'; counts: OuraCloudWriteCounts }
-  /** A Cloud sleep period was tombstoned (or there was nothing of ours to tombstone). */
-  | { result: 'deleted'; tombstoned: number }
+  /** A delete was applied: a sleep period tombstoned or a session removed (0 when we held none). */
+  | { result: 'deleted'; rows: number }
   /** Nothing to do: a data type we do not store, or a delete of a type we keep no tombstone for. */
   | { result: 'ignored'; reason: string }
   /** Nobody here is connected to that Oura account (any more), or their connection cannot be used. */
@@ -128,7 +128,8 @@ export type OuraWebhookOutcome =
   | { result: 'forbidden' }
 
 export type OuraWebhookDeps = {
-  repo: OuraCloudWriter & OuraTokenStore & OuraHeartRateReader & { getUserIdByOuraUserId(ouraUserId: string): Promise<string | null> }
+  repo: OuraCloudWriter & OuraTokenStore & OuraHeartRateReader & Pick<WorkoutRepository, 'deleteOuraSession'> &
+    { getUserIdByOuraUserId(ouraUserId: string): Promise<string | null> }
   config: OuraOAuthConfig
   /** Starts the heart-rate catch-up for a user; replaceable for tests. Default: `startOuraCloudHeartRateCatchUp`. */
   heartRate?: (userId: string) => void
@@ -150,14 +151,15 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
   if (!userId) return { result: 'unknown_user' }
 
   if (event.event_type === 'delete') {
-    if (event.data_type !== 'sleep') return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
-    const tombstoned = await withNightRescore(deps.rescore, userId, async () => {
+    if (!OURA_DELETE_TYPES.includes(event.data_type)) return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
+    if (event.data_type === 'session') return { result: 'deleted', rows: await deps.repo.deleteOuraSession(userId, event.object_id) }
+    const rows = await withNightRescore(deps.rescore, userId, async () => {
       const n = await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id])
       // #3080: the day's HRV and resting HR follow its main period, which may have been this one.
       await deps.repo.syncOuraMainSleepBodyMetrics(userId, { days: [], ouraIds: [event.object_id] })
       return n
     })
-    return { result: 'deleted', tombstoned }
+    return { result: 'deleted', rows }
   }
 
   // Oura answers 401 for a type the user did not share, which would read as `reauth` (#2974).
