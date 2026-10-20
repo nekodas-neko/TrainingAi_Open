@@ -24,6 +24,7 @@ const repo = {
   upsertBodyMetrics: vi.fn(async () => {}),
   upsertOuraCloudSleep: vi.fn(async () => ({ written: 0, skippedOverlap: 0 })),
   tombstoneOuraCloudSleep: vi.fn(async (_u: string, ids: string[]) => ids.length),
+  syncOuraMainSleepBodyMetrics: async () => ({ written: 0, cleared: 0 }),
   upsertOuraWorkouts: vi.fn(async () => 0),
   upsertOuraCloudHeartrate: vi.fn(async () => ({ offered: 0, changed: 0, changedFrom: null, changedTo: null })),
   upsertOuraCloudSleepPeriods: vi.fn(async () => 0),

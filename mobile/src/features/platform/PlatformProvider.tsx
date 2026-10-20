@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { AppState } from 'react-native';
 import { restFeedback } from '../../integrations/feedback/haptics';
+import { armRestEnd, disarmRestEnd } from '../../integrations/feedback/beep';
 import { workoutFlow } from '../workouts/logging/flow';
 import { randomUUID } from 'expo-crypto';
 import { useAccountContext } from '../account/AccountProvider';
@@ -152,6 +153,13 @@ export function PlatformProvider({ children }: PropsWithChildren) {
     }, restDeadline - Date.now());
     return () => clearTimeout(timer);
   }, [foreground, restCueId, restDeadline]);
+  // Not tied to `foreground`: picture-in-picture reads as background, and that is exactly when
+  // the native cue is needed (#3110).
+  useEffect(() => {
+    if (!restCueId || restDeadline === undefined || restDeadline <= Date.now()) return;
+    armRestEnd(restDeadline);
+    return () => disarmRestEnd();
+  }, [restCueId, restDeadline]);
   const serialized =
     state?.ready && permission
       ? JSON.stringify(

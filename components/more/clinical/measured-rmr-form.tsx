@@ -103,7 +103,7 @@ export function MeasuredRmrForm({ onSaved }: { onSaved: (record: MeasuredRmrReco
         required
         value={rmrKcal}
         onChange={setRmrKcal}
-        placeholder="1325"
+        placeholder="1600"
         hint="The measured resting rate, not the predicted one the report prints beside it."
       />
 
@@ -113,15 +113,16 @@ export function MeasuredRmrForm({ onSaved }: { onSaved: (record: MeasuredRmrReco
         unit="kg"
         value={ffmKgAtTest}
         onChange={setFfmKgAtTest}
-        placeholder="51.5"
+        placeholder="64"
         hint="From the DEXA taken with it (Lean + BMC). Without this the measurement cannot be re-scaled as your lean mass changes, so it ages instead of tracking you."
       />
 
-      {/* BF-99, second half. The owner asked *"why is my base rate under the 1350 RMR value"* and
-          part of the answer is that the app never uses the measured number raw — it re-scales it
-          onto today's lean mass, so the figure it works from is not the figure he typed. Nothing on
-          any screen said so, which makes a measurement he paid for look ignored. The FFM field's
-          hint explains why the input is needed; this explains what the app then does with it. */}
+      {/* BF-99, second half. The owner asked why his base rate sat under the RMR value he had
+          entered, and part of the answer is that the app never uses the measured number raw — it
+          re-scales it onto today's lean mass, so the figure it works from is not the figure he
+          typed. Nothing on any screen said so, which makes a measurement he paid for look ignored.
+          The FFM field's hint explains why the input is needed; this explains what the app then
+          does with it. */}
       <p className="-mt-1 text-[11px] leading-snug text-muted-foreground">
         The app works from this test re-scaled onto your current lean mass, not the number as
         entered, so the resting rate it uses day to day drifts a little above or below it as your
@@ -136,7 +137,7 @@ export function MeasuredRmrForm({ onSaved }: { onSaved: (record: MeasuredRmrReco
             unit="kg"
             value={weightKgAtTest}
             onChange={setWeightKgAtTest}
-            placeholder="72.1"
+            placeholder="80"
           />
           <TextField id="rmr-method" label="Method" value={method} onChange={setMethod} placeholder="Indirect calorimetry" />
           <TextField id="rmr-provider" label="Provider" value={provider} onChange={setProvider} />

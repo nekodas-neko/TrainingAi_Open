@@ -13,10 +13,10 @@ import {
   Bluetooth, Camera, Cat, Check, CloudDownload, Copy, Dumbbell, Info, LogOut, Scan, Settings, Shield, Sparkles, UserRound,
 } from 'lucide-react'
 import { useSignOutFlow } from './sign-out-flow'
-import type { AchievementResult } from '@/components/profile/achievements-grid'
+import { TIER_BORDER, type AchievementResult } from '@/components/profile/achievements-grid'
 import { EditProfileSheet } from '@/components/profile/edit-profile-sheet'
 import { GoalsSection } from '@/components/profile/goals-section'
-import { getLevelLabel, levelProgress } from '@trainingai/shared/achievement-display'
+import { getLevelLabel, levelProgress, seasonBadgeTier } from '@trainingai/shared/achievement-display'
 import { LevelSheet } from '@/components/profile/level-sheet'
 import { TITLES } from '@trainingai/shared/types/friends'
 import type { User } from '@trainingai/shared/types/user'
@@ -391,8 +391,8 @@ export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friend
                 key={season.id}
                 className="rounded-xl px-3 py-1.5 text-xs font-semibold border"
                 style={{
-                  borderColor: season.result!.badgeLabel === 'Gold' ? '#f59e0b' : season.result!.badgeLabel === 'Silver' ? '#9ca3af' : '#cd7c2e',
-                  color: season.result!.badgeLabel === 'Gold' ? '#f59e0b' : season.result!.badgeLabel === 'Silver' ? '#9ca3af' : '#cd7c2e',
+                  borderColor: TIER_BORDER[seasonBadgeTier(season.result!.badgeLabel)],
+                  color: TIER_BORDER[seasonBadgeTier(season.result!.badgeLabel)],
                   background: 'var(--muted)',
                 }}
               >

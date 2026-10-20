@@ -105,6 +105,7 @@ const icons = {
   refresh: RefreshCw,
   cardio: HeartPulse,
   legs: Footprints,
+  steps: Footprints,
   activity: Activity,
   power: Zap,
   mind: Brain,

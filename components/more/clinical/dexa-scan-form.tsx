@@ -130,7 +130,7 @@ export function DexaScanForm({ onSaved }: { onSaved: (record: DexaScanRecord) =>
         required
         value={g('pctFat')}
         onChange={set('pctFat')}
-        placeholder="28.5"
+        placeholder="20"
         hint="The one figure the app reads today — it calibrates your scale against this scan."
       />
 
@@ -140,21 +140,21 @@ export function DexaScanForm({ onSaved }: { onSaved: (record: DexaScanRecord) =>
         unit="kg"
         value={g('weightKg')}
         onChange={set('weightKg')}
-        placeholder="72.1"
+        placeholder="80"
       />
 
       <CollapsibleSection title="Body composition">
         <div className="flex flex-col gap-3 pt-1">
-          <GramsField id="dexa-fat" label="Fat" value={g('fatG')} onChange={set('fatG')} placeholder="20547.5" />
-          <GramsField id="dexa-lean" label="Lean" value={g('leanG')} onChange={set('leanG')} placeholder="49532.8" />
+          <GramsField id="dexa-fat" label="Fat" value={g('fatG')} onChange={set('fatG')} placeholder="16000" />
+          <GramsField id="dexa-lean" label="Lean" value={g('leanG')} onChange={set('leanG')} placeholder="60000" />
           <GramsField
             id="dexa-leanbmc"
             label="Lean + BMC (fat-free mass)"
             value={g('leanPlusBmcG')}
             onChange={set('leanPlusBmcG')}
-            placeholder="51460.1"
+            placeholder="64000"
           />
-          <GramsField id="dexa-totalmass" label="Total mass" value={g('totalMassG')} onChange={set('totalMassG')} placeholder="72007.6" />
+          <GramsField id="dexa-totalmass" label="Total mass" value={g('totalMassG')} onChange={set('totalMassG')} placeholder="80000" />
           <NumberField id="dexa-android" label="Android fat" unit="%" value={g('androidPctFat')} onChange={set('androidPctFat')} />
           <NumberField id="dexa-gynoid" label="Gynoid fat" unit="%" value={g('gynoidPctFat')} onChange={set('gynoidPctFat')} />
           <NumberField
@@ -179,17 +179,17 @@ export function DexaScanForm({ onSaved }: { onSaved: (record: DexaScanRecord) =>
 
       <CollapsibleSection title="Bone">
         <div className="flex flex-col gap-3 pt-1">
-          <NumberField id="dexa-bmd" label="Total BMD" unit="g/cm²" value={g('totalBmd')} onChange={set('totalBmd')} placeholder="1.046" />
+          <NumberField id="dexa-bmd" label="Total BMD" unit="g/cm²" value={g('totalBmd')} onChange={set('totalBmd')} placeholder="1.2" />
           <NumberField
             id="dexa-tscore"
             label="T-score"
             value={g('tScore')}
             onChange={set('tScore')}
-            placeholder="-1.6"
+            placeholder="-1.0"
             hint="Negative is normal here — these are standard deviations."
           />
-          <NumberField id="dexa-zscore" label="Z-score" value={g('zScore')} onChange={set('zScore')} placeholder="-1.6" />
-          <GramsField id="dexa-bmc" label="Total BMC" value={g('totalBmcG')} onChange={set('totalBmcG')} placeholder="1927.25" />
+          <NumberField id="dexa-zscore" label="Z-score" value={g('zScore')} onChange={set('zScore')} placeholder="-0.5" />
+          <GramsField id="dexa-bmc" label="Total BMC" value={g('totalBmcG')} onChange={set('totalBmcG')} placeholder="4000" />
           <NumberField id="dexa-cv" label="BMD precision (CV)" unit="%" value={g('bmdPrecisionCvPct')} onChange={set('bmdPrecisionCvPct')} />
         </div>
       </CollapsibleSection>
@@ -200,7 +200,7 @@ export function DexaScanForm({ onSaved }: { onSaved: (record: DexaScanRecord) =>
           <NumberField id="dexa-agratio" label="Android / gynoid ratio" value={g('androidGynoidRatio')} onChange={set('androidGynoidRatio')} />
           <NumberField id="dexa-trunklegs" label="% fat trunk / legs" value={g('pctFatTrunkLegs')} onChange={set('pctFatTrunkLegs')} />
           <NumberField id="dexa-trunklimb" label="Trunk / limb fat mass" value={g('trunkLimbFatMassRatio')} onChange={set('trunkLimbFatMassRatio')} />
-          <GramsField id="dexa-vatmass" label="Est. VAT mass" value={g('vatMassG')} onChange={set('vatMassG')} placeholder="305" />
+          <GramsField id="dexa-vatmass" label="Est. VAT mass" value={g('vatMassG')} onChange={set('vatMassG')} placeholder="500" />
           <NumberField id="dexa-vatvol" label="Est. VAT volume" unit="cm³" value={g('vatVolumeCm3')} onChange={set('vatVolumeCm3')} />
           <NumberField id="dexa-vatarea" label="Est. VAT area" unit="cm²" value={g('vatAreaCm2')} onChange={set('vatAreaCm2')} />
           <NumberField id="dexa-leanh2" label="Lean / height²" unit="kg/m²" value={g('leanHeight2')} onChange={set('leanHeight2')} />

@@ -153,7 +153,7 @@ describe.skipIf(!canRun)('Oura late data re-scores its day (#3079)', () => {
     return { sleep, periods: [period(`frag-3085-${date}`, fragment, fragmentType), period(`main-3085-${date}`, main, 'long_sleep')] }
   }
 
-  const noWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] }
+  const noWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], retypedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] }
 
   /** The score the readiness read's own scorer gives `date` from what is stored now, types included. */
   async function scoredFromStore(date: string) {
@@ -228,5 +228,69 @@ describe.skipIf(!canRun)('Oura late data re-scores its day (#3079)', () => {
     } finally {
       other.release()
     }
+  })
+
+  // #3099: a day keeps counting as "had an Oura night" after Oura deletes it.
+  it('lists days that hold a tombstoned Oura Cloud night, never a live one, a ring or a manual one', async () => {
+    const d = shiftDateStr(today, -2)
+    const mid = dateStrMidnightInTz(d, TZ).getTime()
+    await repo.upsertOuraCloudSleep(USER, [{ ouraId: `cloud-3099-${d}`, date: d, sleepStart: new Date(mid - HOUR), sleepEnd: new Date(mid + 6 * HOUR), durationHours: 7 }])
+    await repo.tombstoneOuraCloudSleep(USER, [`cloud-3099-${d}`])
+    const ring = shiftDateStr(today, -3)
+    const rmid = dateStrMidnightInTz(ring, TZ).getTime()
+    await pool.query(
+      `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, oura_id, manual_entry)
+       VALUES ($1, $2, $3, $4, 7, $5, false)`, [USER, ring, new Date(rmid - HOUR), new Date(rmid + 6 * HOUR), `ble:3099-${ring}`])
+    // A live Oura nap on another day is not a deleted night (#3104 review).
+    const nap = shiftDateStr(today, -4)
+    const nmid = dateStrMidnightInTz(nap, TZ).getTime()
+    await repo.upsertOuraCloudSleep(USER, [{ ouraId: `nap-3099-${nap}`, date: nap, sleepStart: new Date(nmid + 13 * HOUR), sleepEnd: new Date(nmid + 13.7 * HOUR), durationHours: 0.6 }])
+    expect(await repo.listDeletedOuraCloudSleepDates(USER, shiftDateStr(today, -7), today, TZ)).toEqual([d])
+  })
+
+  // ── #3106 review: a deleted or rest-retyped NAP is not a deleted night ─────────────────────────
+
+  /** One Oura period on `date`, from local clock times (hours after local midnight; negative = the evening before). */
+  function period(id: string, date: string, startH: number, endH: number, type: string) {
+    const mid = dateStrMidnightInTz(date, TZ).getTime()
+    const start = new Date(mid + startH * HOUR), end = new Date(mid + endH * HOUR)
+    const sleep = { ouraId: id, date, sleepStart: start, sleepEnd: end, durationHours: endH - startH - 0.3, efficiency: 90 }
+    const p = {
+      ouraId: id, day: date, bedtimeStart: start, bedtimeEnd: end, sleepType: type, heartRate: null, hrv: null, sleepPhase30Sec: null,
+      movement30Sec: null, sleepAlgorithmVersion: null, lowBatteryAlert: null, sleepAnalysisReason: null, period: null, ringId: null,
+    }
+    return { sleep, period: p }
+  }
+  const frozenAnchor = async () => {
+    const base = { anchor: 72, endValue: 50, dayMin: 40, dayMax: 72, totalCharged: 0, totalDrained: 22, restingHr: 52, hrMax: 180, hrMaxObserved: null, hrSampleCount: 300, modelVersion: 'v7' }
+    await repo.upsertBodyBatteryDaily(USER, { ...base, date: today, anchorSource: 'readiness' })
+  }
+  const anchorSource = async () => (await pool.query(`SELECT anchor_source FROM body_battery_daily WHERE user_id = $1 AND date = $2`, [USER, today])).rows[0]?.anchor_source
+
+  it.each([['deleted'], ['retyped to rest']])("a nap Oura %s before the night arrives does not keep the anchor frozen", async how => {
+    const { writeOuraCloudData } = await import('@/lib/oura/cloud/ingest')
+    await repo.upsertOuraCloudSleep(USER, history(today))
+    const nap = period(`nap-3106-${today}`, today, 13, 13.7, 'sleep')
+    await writeOuraCloudData(repo, USER, { ...noWrites, sleep: [nap.sleep], sleepPeriods: [nap.period] }, repo)
+    if (how === 'deleted') await writeOuraCloudData(repo, USER, { ...noWrites, deletedSleepIds: [nap.sleep.ouraId] }, repo)
+    else await writeOuraCloudData(repo, USER, { ...noWrites, retypedSleepIds: [nap.sleep.ouraId], sleepPeriods: [{ ...nap.period, sleepType: 'rest' }] }, repo)
+    await frozenAnchor()
+
+    const night = period(`night-3106-${today}`, today, -1.5, 6.5, 'long_sleep')
+    await writeOuraCloudData(repo, USER, { ...noWrites, sleep: [night.sleep], sleepPeriods: [night.period] }, repo)
+
+    expect(await anchorSource()).toBe('default')
+  })
+
+  it('a deleted real night that is re-created keeps the anchor frozen (a revision, #3099)', async () => {
+    const { writeOuraCloudData } = await import('@/lib/oura/cloud/ingest')
+    await repo.upsertOuraCloudSleep(USER, history(today))
+    const night = period(`night-3106-${today}`, today, -1.5, 6.5, 'long_sleep')
+    await writeOuraCloudData(repo, USER, { ...noWrites, sleep: [night.sleep], sleepPeriods: [night.period] }, repo)
+    await frozenAnchor()
+    await writeOuraCloudData(repo, USER, { ...noWrites, deletedSleepIds: [night.sleep.ouraId] }, repo)
+    await writeOuraCloudData(repo, USER, { ...noWrites, sleep: [night.sleep], sleepPeriods: [night.period] }, repo)
+
+    expect(await anchorSource()).toBe('readiness')
   })
 })

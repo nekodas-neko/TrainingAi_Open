@@ -342,7 +342,8 @@ export const friendColors = {
 // Achievement badges. Dark values are the current app's (bronze/silver/gold tier borders and the
 // category colours in `achievements-grid.tsx`; dark Sleep is 4.15:1 on the dark card, under 4.5);
 // the light ones are darker steps, each at least 4.5:1 on #ffffff. "Workouts" has no entry: it
-// takes the brand colour.
+// takes the brand colour. Steps is the current app's `--accent-green` (oklch 0.52 / 0.84, hue 145)
+// as sRGB.
 export const rewardColors = {
   light: {
     tiers: { bronze: '#9a5a1a', silver: '#6b7280', gold: '#a16207' },
@@ -356,6 +357,7 @@ export const rewardColors = {
       Nutrition: '#4d7c0f',
       Sleep: '#4338ca',
       'Body Metrics': '#0f766e',
+      Steps: '#008300',
       'Lift Milestones': '#b91c1c',
     },
   },
@@ -371,6 +373,7 @@ export const rewardColors = {
       Nutrition: '#84cc16',
       Sleep: '#6366f1',
       'Body Metrics': '#14b8a6',
+      Steps: '#56ee66',
       'Lift Milestones': '#ef4444',
     },
   },

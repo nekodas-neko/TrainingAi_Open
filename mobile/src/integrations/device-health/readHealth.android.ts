@@ -8,7 +8,7 @@ import {
   healthConnectTypes,
   type HealthConnectRecord,
 } from '@trainingai/shared/validation/health-connect-import';
-import { todayInTz } from '@trainingai/shared/date-utils';
+import { DEFAULT_TZ, midnightDaysAgoInTz, todayInTz } from '@trainingai/shared/date-utils';
 import type { HealthSnapshot, HealthInspectionEntry } from '../../features/health/types';
 const labels = {
   SleepSession: 'Sleep',
@@ -19,14 +19,14 @@ const labels = {
   ActiveCaloriesBurned: 'Active energy',
   Weight: 'Body weight',
 };
-export async function readHealthSnapshot(
-  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
-): Promise<HealthSnapshot> {
+// The profile's zone, passed by HealthProvider; DEFAULT_TZ only when there is no profile yet,
+// never the device's zone (#3117).
+export async function readHealthSnapshot(timezone = DEFAULT_TZ): Promise<HealthSnapshot> {
   let granted = await grantedHealthConnectTypes();
   if (!granted.length) granted = await requestHealthConnectPermissions();
   if (!granted.length) throw new Error('No Health Connect read permissions were granted.');
   const health = await import('react-native-health-connect');
-  const startAt = new Date(Date.now() - 7 * 86400000).toISOString(),
+  const startAt = midnightDaysAgoInTz(timezone, 7).toISOString(),
     endAt = new Date().toISOString();
   const records: HealthConnectRecord[] = [],
     entries: HealthInspectionEntry[] = [];

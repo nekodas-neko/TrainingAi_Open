@@ -265,3 +265,35 @@ describe('computeWalkSegmentStats — steps per segment', () => {
     expect(res.success).toBe(true)
   })
 })
+
+// #3128. A segment where the walker barely moves, a 2-minute warm-up over 20 m, is 6,000 s/km.
+// The save schema caps a segment's pace at MAX_PACE_SEC_PER_KM, so that one value used to reject
+// the whole walk.
+describe('computeWalkSegmentStats — a near-stationary segment (#3128)', () => {
+  // Local midday, clear of any date boundary.
+  const t0 = Date.parse('2026-10-12T12:00:00+10:00')
+  const warmPlan = buildIntervalPlan({ sets: 1, fastSec: 180, slowSec: 180, warmupSec: 120, cooldownSec: 0, treadmill: false })
+  const north = (m: number, sec: number): RoutePoint => ({ lat: -27.47 + m / 111_195, lng: 153.02, t: t0 + sec * 1000 })
+  // 20 m over the 120 s warm-up, then 1.4 m/s through the slow and fast blocks.
+  const rawPoints: RoutePoint[] = [
+    // The window is [0, 120) s, so the last warm-up fix is at 119 s.
+    ...[0, 30, 60, 90, 119].map((sec, i) => north(i * 5, sec)),
+    ...Array.from({ length: 181 }, (_, i) => north(20 + (i + 1) * 2.8, 120 + (i + 1) * 2)),
+  ]
+
+  it('saves the walk with that segment pace null and the rest intact', () => {
+    const segments = computeWalkSegmentStats({ plan: warmPlan, startedAtMs: t0, hrSamples: [], rawPoints, cadenceSeries: null })
+    const warmup = segments.find(s => s.kind === 'warmup')!
+    expect(warmup.distanceKm).toBeCloseTo(0.02, 3)
+    expect(warmup.avgPaceSecPerKm).toBeNull()
+    for (const seg of segments.filter(s => s.kind !== 'warmup')) {
+      expect(seg.avgPaceSecPerKm).toBeGreaterThan(600)
+      expect(seg.avgPaceSecPerKm).toBeLessThan(800)
+    }
+    const res = ActivityLogBody.safeParse({
+      date: '2026-10-12', activityType: 'walk', title: 'Interval walk',
+      startTime: '12:00', durationMin: 8, segments,
+    })
+    expect(res.success).toBe(true)
+  })
+})

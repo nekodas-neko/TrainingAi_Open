@@ -13,6 +13,8 @@ import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
+import { nightSourceRank } from '@trainingai/shared/health/source-rank'
+import { isNightWindow } from '@trainingai/shared/health/sleep-night'
 import { getOuraCloudSwitchDay } from './oura-cloud-tokens'
 import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
@@ -446,7 +448,7 @@ export async function hasOuraBleSamples(db: Db, userId: string): Promise<boolean
 }
 
 /**
- * The recent-source facts behind `connectedSources` (issue 2613): three existence checks, each a
+ * The recent-source facts behind `connectedSources` (issue 2613): existence checks, each a
  * `LIMIT 1` probe scoped by `user_id` and bounded by `since`. The ring fact is `hasOuraBleSamples`, so it is
  * not repeated here. `oura_heartrate`'s primary key leads `(user_id, timestamp)`, so the window is a
  * range scan on the user's own rows and each check stops at its first match.
@@ -454,14 +456,24 @@ export async function hasOuraBleSamples(db: Db, userId: string): Promise<boolean
 export async function getRecentSourceFacts(db: Db, userId: string, since: Date) {
   const hr = s.ouraHeartrate
   const hc = s.healthConnectIntervals
-  const hrRow = (source: string) => db.select({ one: sql<number>`1` }).from(hr)
-    .where(and(eq(hr.userId, userId), gte(hr.timestamp, since), eq(hr.source, source))).limit(1)
-  const [[strap], [hcHr], [hcInterval]] = await Promise.all([
-    hrRow('chest_strap'),
-    hrRow('health_connect'),
+  const records = s.healthConnectRecords
+  const hrRow = (sources: string[]) => db.select({ one: sql<number>`1` }).from(hr)
+    .where(and(eq(hr.userId, userId), gte(hr.timestamp, since), inArray(hr.source, sources))).limit(1)
+  // #3117: the native app's Health Connect import labels its heart rate `health_connect_native` and
+  // keeps its records in `health_connect_records`; the web app's is `health_connect` and
+  // `health_connect_intervals`. Either one is Health Connect, or a native user reads as unconnected.
+  const [[strap], [hcHr], [hcInterval], [hcRecord]] = await Promise.all([
+    hrRow(['chest_strap']),
+    hrRow(['health_connect', 'health_connect_native']),
     db.select({ one: sql<number>`1` }).from(hc).where(and(eq(hc.userId, userId), gte(hc.startAt, since))).limit(1),
+    db.select({ one: sql<number>`1` }).from(records)
+      .where(and(eq(records.userId, userId), isNull(records.deletedAt), gte(records.startAt, since))).limit(1),
   ])
-  return { strapHeartRate: strap != null, healthConnectHeartRate: hcHr != null, healthConnectIntervals: hcInterval != null }
+  return {
+    strapHeartRate: strap != null,
+    healthConnectHeartRate: hcHr != null,
+    healthConnectIntervals: hcInterval != null || hcRecord != null,
+  }
 }
 
 /**
@@ -654,58 +666,206 @@ export async function upsertOuraSleep(
  *  - **Oura may move a period's start** when it re-analyses a night, keeping the id. The row holding
  *    the id is moved to the new start first (when that start is free), so the id's row is updated in
  *    place instead of the insert failing on `sleep_sessions_user_oura_id_key`; the upsert then
- *    replaces that row (`replaceOwnCloud`), so its end and day follow too.
- *  - **A period another row already covers is not written.** The ring's BLE rollup, a manual night or
- *    Health Connect may already hold that night at a slightly different start; a second row would be
- *    read as a second fragment of the same night (`sleep-night.ts`). The ladder ranks those sources
- *    at or above the Cloud feed, so the stored night stays. Choosing per field is #2860.
- *  - **Except a ring night from the switch day on** (#2998). Once the user has moved to the Oura API
- *    (`getOuraCloudSwitchDay`), the ring has stopped sending, so a ring night dated that day or later
- *    is at best the partial night the last frames made. It yields: it is tombstoned, never deleted,
- *    and Oura's period is written. Before the switch day nothing changes, and a manual or Health
- *    Connect night still blocks the period on any day. `dropBleNightsOuraCloudHolds` keeps a later
- *    ring re-roll from taking the night back.
+ *    replaces that row (`replaceOwnCloud`), so its end and day follow too. When the new start is held
+ *    by a TOMBSTONED row instead, the moving row is tombstoned and gives up the id, and the upsert
+ *    revives the tombstone at the new start under it (#3080: leaving both rows holding the id broke
+ *    that unique key and 503'd the webhook on every retry).
+ *  - **Another row that overlaps the period is decided by the ladder, per night** (#3080,
+ *    `nightYieldsToOuraCloud`). One night must not be two rows: `sleep-night.ts` would read a second
+ *    row as a second fragment. A row that ranks above the Cloud feed keeps the night and the period is
+ *    skipped (counted; the caller reports it). Every other overlapping row yields: it is tombstoned,
+ *    never deleted, so a device that holds it learns it is gone, and the period is written. Today the
+ *    only row that keeps a night is the ring's (`oura_ble`) before the switch day; Health Connect and
+ *    Apple Health rank below Oura, and another Oura period with a different id is a stale version of
+ *    the same night (a re-issued id, or a revision that widened over a fragment).
+ *  - **A manual night is left alone** (Orchestrator's decision on #3106). A device night always wins
+ *    over a typed one (#2338), but by being read over it, not by tombstoning it:
+ *    `preferDeviceNights` hides a typed night a device night covers on every reader, and shows it
+ *    again if the device night goes. Tombstoned here, it never came back when Oura later deleted or
+ *    retyped its period, and the date read as no night at all.
+ *  - **The switch day** (#2998): from the day the user moved to the Oura API the ring has stopped
+ *    sending, so a ring night dated that day or later is at best the partial night the last frames
+ *    made, and it yields like the rest. `dropBleNightsOuraCloudHolds` keeps a later ring re-roll, and
+ *    `dropNightsOuraCloudHolds` a later Health Connect sync, from taking the night back.
  */
 export async function upsertOuraCloudSleep(
   db: Db, userId: string, rows: OuraSleepUpsertRow[],
-): Promise<{ written: number; skippedOverlap: number }> {
-  const kept: OuraSleepUpsertRow[] = []
+): Promise<{ written: number; skippedOverlap: number; yielded: number }> {
+  let written = 0
   let skippedOverlap = 0
+  let yielded = 0
   const switchDay = rows.length > 0 ? await getOuraCloudSwitchDay(db, userId) : null
   for (const r of rows) {
     if (!r.ouraId) continue
     const start = r.sleepStart.toISOString()
     const end = r.sleepEnd.toISOString()
-    if (switchDay) {
-      // Ring nights the switch makes yield (#2998). Only live rollup rows (`ble:`, not manual) dated
-      // on or after the switch day; the raw BLE archive is not touched.
-      await db.execute(sql`
-        UPDATE sleep_sessions o
-           SET deleted_at = NOW(), updated_at = NOW()
-         WHERE o.user_id = ${userId} AND o.deleted_at IS NULL
-           AND o.oura_id LIKE 'ble:%' AND NOT o.manual_entry
-           AND o.date >= ${switchDay}::date
-           AND o.sleep_start < ${end}::timestamptz AND o.sleep_end > ${start}::timestamptz`)
+    const overlapping = await db.execute<{ id: string; oura_id: string | null; manual_entry: boolean; date: string; source: string | null }>(sql`
+      SELECT o.id, o.oura_id, o.manual_entry, o.date::text AS date, o.source_map->>'duration_hours' AS source
+        FROM sleep_sessions o
+       WHERE o.user_id = ${userId} AND o.deleted_at IS NULL AND NOT o.manual_entry
+         AND o.oura_id IS DISTINCT FROM ${r.ouraId}
+         AND o.sleep_start < ${end}::timestamptz AND o.sleep_end > ${start}::timestamptz`)
+    const holders = overlapping.rows.filter(o => !nightYieldsToOuraCloud({
+      ouraId: o.oura_id, manualEntry: o.manual_entry, date: o.date, source: o.source,
+    }, switchDay))
+    if (holders.length > 0) { skippedOverlap++; continue }
+    if (overlapping.rows.length > 0) {
+      const yielding = await db.update(s.sleepSessions)
+        .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
+        .where(and(eq(s.sleepSessions.userId, userId), isNull(s.sleepSessions.deletedAt), inArray(s.sleepSessions.id, overlapping.rows.map(o => o.id))))
+        .returning({ id: s.sleepSessions.id })
+      yielded += yielding.length
     }
-    await db.execute(sql`
+    const moved = await db.execute(sql`
       UPDATE sleep_sessions h
          SET sleep_start = ${start}::timestamptz, updated_at = NOW()
        WHERE h.user_id = ${userId} AND h.oura_id = ${r.ouraId} AND NOT h.manual_entry
          AND h.sleep_start <> ${start}::timestamptz
          AND NOT EXISTS (SELECT 1 FROM sleep_sessions t WHERE t.user_id = ${userId} AND t.sleep_start = ${start}::timestamptz)`)
-    const overlap = await db.execute(sql`
-      SELECT 1 FROM sleep_sessions o
-       WHERE o.user_id = ${userId} AND o.deleted_at IS NULL
-         AND o.oura_id IS DISTINCT FROM ${r.ouraId}
-         AND o.sleep_start < ${end}::timestamptz AND o.sleep_end > ${start}::timestamptz
-       LIMIT 1`)
-    if (overlap.rows.length > 0) { skippedOverlap++; continue }
-    kept.push(r)
+    if ((moved.rowCount ?? 0) === 0) {
+      // #3080: the new start is held by a tombstoned row, so the move above could not happen. The row
+      // still holding the id at its old start gives the id up and is tombstoned there; the upsert
+      // below then revives the tombstone at the new start under the id. Without this, two rows would
+      // hold one Oura id and the write would fail the unique key on every retry.
+      await db.execute(sql`
+        UPDATE sleep_sessions h
+           SET oura_id = NULL, deleted_at = COALESCE(h.deleted_at, NOW()), updated_at = NOW()
+         WHERE h.user_id = ${userId} AND h.oura_id = ${r.ouraId} AND NOT h.manual_entry
+           AND h.sleep_start <> ${start}::timestamptz
+           AND EXISTS (SELECT 1 FROM sleep_sessions t WHERE t.user_id = ${userId}
+                        AND t.sleep_start = ${start}::timestamptz AND t.deleted_at IS NOT NULL)`)
+    }
+    // The row now at this start is either new or this id's own (moved above, or never moved), so it
+    // takes Oura's latest version whole: end, day and every measured field. Written here, inside the
+    // loop, so a later period in the same batch sees it as an overlap (#3106 review: a batch holding
+    // a stale and a new version of one night used to leave both live).
+    await upsertOuraSleep(db, userId, [r], 'oura_cloud', { replaceOwnCloud: true })
+    written++
   }
-  // The row now at this start is either new or this id's own (moved above, or never moved), so it
-  // takes Oura's latest version whole: end, day and every measured field.
-  await upsertOuraSleep(db, userId, kept, 'oura_cloud', { replaceOwnCloud: true })
-  return { written: kept.length, skippedOverlap }
+  return { written, skippedOverlap, yielded }
+}
+
+/**
+ * #3080: whether a stored night that overlaps an Oura Cloud period gives way to it, by the source
+ * ladder applied per night (`source-rank.ts`, read through `nightSourceRank`). The ring keeps its
+ * night only before the switch day (#2998): from that day its nights are partial leftovers.
+ */
+export function nightYieldsToOuraCloud(
+  row: { ouraId: string | null; manualEntry: boolean; date: string; source: string | null },
+  switchDay: string | null,
+): boolean {
+  const ring = row.ouraId?.startsWith('ble:') === true && !row.manualEntry
+  if (ring && switchDay != null && row.date >= switchDay) return true
+  const source = ring ? 'oura_ble' : row.source ?? (row.ouraId != null ? 'oura_cloud' : null)
+  return nightSourceRank(source, row.manualEntry) <= nightSourceRank('oura_cloud', false)
+}
+
+/**
+ * #3080. The Health Connect (and Apple Health) counterpart of `dropBleNightsOuraCloudHolds`: a night
+ * from a source that ranks below Oura Cloud is not written where a live Oura Cloud night already holds
+ * it. That night took its place by tombstoning it, and the shared upsert revives a tombstoned row at
+ * the same start, so without this every sync would bring the yielded night back as a second fragment.
+ */
+export async function dropNightsOuraCloudHolds(
+  db: Db, userId: string, rows: OuraSleepUpsertRow[], source: HealthSource,
+): Promise<OuraSleepUpsertRow[]> {
+  if (rows.length === 0 || nightSourceRank(source, false) > nightSourceRank('oura_cloud', false)) return rows
+  const kept: OuraSleepUpsertRow[] = []
+  for (const r of rows) {
+    const held = await db.execute(sql`
+      SELECT 1 FROM sleep_sessions o
+       WHERE o.user_id = ${userId} AND o.deleted_at IS NULL AND NOT o.manual_entry
+         AND o.source_map->>'duration_hours' = 'oura_cloud'
+         AND o.sleep_start < ${r.sleepEnd.toISOString()}::timestamptz AND o.sleep_end > ${r.sleepStart.toISOString()}::timestamptz
+       LIMIT 1`)
+    if (held.rows.length === 0) kept.push(r)
+  }
+  return kept
+}
+
+/**
+ * #3080. Each wake date's main Oura Cloud period, the one whose HRV and resting heart rate stand for
+ * the night in `body_metrics`: the longest live `long_sleep`, else the longest live `sleep` period
+ * that is a night window in the user's timezone (a short night Oura typed `sleep`, #3061). Never a
+ * `late_nap`, and never a `sleep` period outside the night band: those are naps, and a nap's values
+ * would feed the readiness baselines and the "last night" resting HR (#3106 review). Chosen from every
+ * stored period of the day, so the answer does not depend on which webhook arrived last. Dates with
+ * no qualifying period are absent.
+ */
+export async function getOuraMainSleepPeriods(
+  db: Db, userId: string, dates: string[], tz: string,
+): Promise<{ date: string; averageHrvMs: number | null; lowestHeartRate: number | null }[]> {
+  if (dates.length === 0) return []
+  const rows = await db.execute<{
+    date: string; sleep_type: string; sleep_start: Date; sleep_end: Date; duration_hours: number | null
+    average_hrv_ms: number | null; lowest_heart_rate: number | null
+  }>(sql`
+    SELECT s.date::text AS date, p.sleep_type, s.sleep_start, s.sleep_end, s.duration_hours, s.average_hrv_ms, s.lowest_heart_rate
+      FROM sleep_sessions s
+      JOIN oura_cloud_sleep_periods p ON p.user_id = s.user_id AND p.oura_id = s.oura_id
+     WHERE s.user_id = ${userId} AND s.deleted_at IS NULL AND NOT s.manual_entry
+       AND s.date IN (${sql.join(dates.map(d => sql`${d}::date`), sql`, `)})
+       AND p.sleep_type IN ('long_sleep', 'sleep')
+     ORDER BY s.date, (p.sleep_type = 'long_sleep') DESC, s.duration_hours DESC NULLS LAST, s.sleep_start`)
+  const out = new Map<string, { date: string; averageHrvMs: number | null; lowestHeartRate: number | null }>()
+  for (const r of rows.rows) {
+    if (out.has(r.date)) continue
+    const window = { sleepStart: new Date(r.sleep_start), sleepEnd: new Date(r.sleep_end), durationHours: r.duration_hours }
+    if (r.sleep_type !== 'long_sleep' && !isNightWindow(window, tz)) continue
+    out.set(r.date, { date: r.date, averageHrvMs: r.average_hrv_ms, lowestHeartRate: r.lowest_heart_rate })
+  }
+  return [...out.values()]
+}
+
+/** #3080. The wake dates of the Oura Cloud sleep rows holding these ids, live or tombstoned. */
+export async function getOuraCloudSleepDatesForIds(db: Db, userId: string, ouraIds: string[]): Promise<string[]> {
+  if (ouraIds.length === 0) return []
+  const rows = await db.selectDistinct({ date: s.sleepSessions.date }).from(s.sleepSessions)
+    .where(and(eq(s.sleepSessions.userId, userId), inArray(s.sleepSessions.ouraId, ouraIds)))
+  return rows.map(r => r.date)
+}
+
+/**
+ * #3080. Clears a day's `body_metrics` field when Oura Cloud owns it and the day no longer has a main
+ * period with a value for it (a delete, a retype, a revision to null). A value another source wrote
+ * is never touched. `updated_at` moves so the delta pull carries the null to the device.
+ */
+export async function clearOuraCloudBodyField(db: Db, userId: string, date: string, col: 'hrv_ms' | 'resting_heart_rate'): Promise<boolean> {
+  const rows = await db.execute(sql`
+    UPDATE body_metrics
+       SET ${sql.raw(col)} = NULL, source_map = source_map - ${col}::text, updated_at = NOW()
+     WHERE user_id = ${userId} AND date = ${date}::date AND source_map->>${col}::text = 'oura_cloud'
+       AND ${sql.raw(col)} IS NOT NULL
+     RETURNING 1`)
+  return rows.rows.length > 0
+}
+
+/**
+ * #3099. Wake dates in `[from, to]` that hold a TOMBSTONED Oura Cloud NIGHT. The night re-score reads
+ * it before a write: a night that appears on a day where Oura deleted one is a delete followed by a
+ * re-create (which can revive the same row), a revision, not an arrival.
+ *  - Only deleted rows count (#3104 review): a live nap or rest row must not stop a late night from
+ *    being an arrival.
+ *  - Only a deleted NIGHT counts (#3106 review): a nap Oura deleted, or retyped to `rest` (tombstoned
+ *    since #3080), is a tombstone too, and it kept the anchor frozen in the same way. A row counts
+ *    when its window is a night window in the user's timezone (`isNightWindow`). The period's stored
+ *    type cannot say, because a delete relabels it `deleted`.
+ * Ring (`ble:`) and manual rows are not Oura Cloud's and do not count.
+ */
+export async function listDeletedOuraCloudSleepDates(db: Db, userId: string, from: string, to: string, tz: string): Promise<string[]> {
+  const rows = await db.select({
+    date: s.sleepSessions.date, sleepStart: s.sleepSessions.sleepStart, sleepEnd: s.sleepSessions.sleepEnd,
+    durationHours: s.sleepSessions.durationHours,
+  }).from(s.sleepSessions)
+    .where(and(
+      eq(s.sleepSessions.userId, userId),
+      gte(s.sleepSessions.date, from), lte(s.sleepSessions.date, to),
+      isNotNull(s.sleepSessions.deletedAt),
+      isNotNull(s.sleepSessions.ouraId),
+      sql`${s.sleepSessions.ouraId} NOT LIKE 'ble:%'`,
+      eq(s.sleepSessions.manualEntry, false),
+    ))
+  return [...new Set(rows.filter(r => isNightWindow(r, tz)).map(r => r.date))]
 }
 
 /**
@@ -713,7 +873,9 @@ export async function upsertOuraCloudSleep(
  * for this user: never a manual night or a ring (`ble:`) night. `deleted_at` rides the delta pull, so
  * a phone that already holds the night learns it is gone.
  */
-export async function tombstoneOuraCloudSleep(db: Db, userId: string, ouraIds: string[]): Promise<number> {
+export async function tombstoneOuraCloudSleep(
+  db: Db, userId: string, ouraIds: string[], opts: { keepPeriodType?: boolean } = {},
+): Promise<number> {
   if (ouraIds.length === 0) return 0
   const rows = await db.update(s.sleepSessions)
     .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
@@ -725,6 +887,8 @@ export async function tombstoneOuraCloudSleep(db: Db, userId: string, ouraIds: s
       isNull(s.sleepSessions.deletedAt),
     ))
     .returning({ id: s.sleepSessions.id })
+  // #3080: a period Oura retyped (`rest`) keeps Oura's own type; only a delete relabels it.
+  if (opts.keepPeriodType) return rows.length
   // The period's stored detail (#2982) is kept and marked, never deleted: the label says it is gone.
   await db.update(s.ouraCloudSleepPeriods)
     .set({ sleepType: 'deleted', updatedAt: sql`NOW()` })

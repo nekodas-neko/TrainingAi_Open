@@ -20,9 +20,9 @@ interface DexaRow { scannedOn: string; pctFat?: number | null }
  * rate the app quoted was predicted. The storage half existed; the way in did not.
  *
  * **The stored values are shown above the forms on purpose.** The question this screen has to answer
- * is "did my 1,325 actually land, and is the app using it" — and a form that saves into silence
- * cannot answer it. It is also what makes BF-42 runnable at all: that entry verifies the Energy
- * Balance card and the goal wizard agree, which needs a measurement to exist first.
+ * is "did my measured rate actually land, and is the app using it" — and a form that saves into
+ * silence cannot answer it. It is also what makes BF-42 runnable at all: that entry verifies the
+ * Energy Balance card and the goal wizard agree, which needs a measurement to exist first.
  *
  * **No invalidation group, deliberately.** `lib/cache-groups.ts` is where a named group would go,
  * and the standing rule forbids a hand-rolled key list at the write site. Neither key needs one:

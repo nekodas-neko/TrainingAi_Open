@@ -39,6 +39,7 @@ function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
     upsertBodyMetrics: async (_u, rows) => { calls.push(`body:${rows.length}`) },
     upsertOuraCloudSleep: async (_u, rows) => { calls.push(`sleep:${rows.length}`); return { written: rows.length, skippedOverlap: 0 } },
     tombstoneOuraCloudSleep: async (_u, ids) => ids.length,
+    syncOuraMainSleepBodyMetrics: async () => ({ written: 0, cleared: 0 }),
     upsertOuraWorkouts: async (_u, rows) => { calls.push(`workouts:${rows.length}`); return rows.length },
     upsertOuraCloudHeartrate: async (_u, rows) => { calls.push(`hr:${rows.length}`); return { offered: rows.length, changed: rows.length, changedFrom: rows[0]?.timestamp ?? null, changedTo: rows[rows.length - 1]?.timestamp ?? null } },
     upsertOuraCloudSleepPeriods: async (_u, rows) => { calls.push(`periods:${rows.length}`); return rows.length },
@@ -282,6 +283,7 @@ describe('startOuraConnectBackfill reporting', () => {
   // The connect backfill passes the repository as the night re-scorer (#3079); an empty store.
   const rescore = {
     withOuraSleepWriteLock: <T,>(_u: string, run: () => Promise<T>) => run(),
+    listDeletedOuraCloudSleepDates: async () => [],
     listSleepSessions: async () => [], getOuraDailyDerived: async () => [],
     upsertOuraDailyDerived: async () => {}, clearNightDerivedScores: async () => false, releaseBodyBatteryAnchor: async () => false,
   }

@@ -1,11 +1,12 @@
 import {
   ACHIEVEMENT_CATEGORY_ORDER,
   LEVEL_THRESHOLDS,
+  TITLE_CATALOGUE,
   getBadgeTier,
   getLevelLabel,
   type BadgeTier,
 } from '@trainingai/shared/achievement-display';
-import type { Achievement, Rewards } from './models.ts';
+import type { Achievement, Rewards, Season } from './models.ts';
 
 type Level = Pick<Rewards, 'level' | 'xp' | 'currentLevelXp' | 'nextLevelXp'>;
 
@@ -114,4 +115,21 @@ export function xpGained(
   after: number | null | undefined,
 ) {
   return before == null || after == null ? null : Math.max(0, after - before);
+}
+
+/** Seasons this player has a result in, as the Season Badges card lists them. */
+export function seasonBadges(seasons: Season[]) {
+  return seasons.flatMap((season) =>
+    season.result ? [{ ...season, result: season.result }] : [],
+  );
+}
+
+/** The title the hero button shows: the catalogue's name, or null for none or an id it does not list. */
+export function equippedTitleName(id: string | null | undefined) {
+  return id ? (TITLE_CATALOGUE[id]?.display ?? null) : null;
+}
+
+/** A title's display name; null when none is equipped, the id itself spelled out if unknown. */
+export function titleName(id: string | null | undefined) {
+  return id ? (TITLE_CATALOGUE[id]?.display ?? id.replace(/_/g, ' ')) : null;
 }

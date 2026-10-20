@@ -20,7 +20,7 @@ import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
-import { scoreSleepForDate } from '@trainingai/shared/health/sleep-score-for-date'
+import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
@@ -450,7 +450,15 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Baselines come from the *prior* nights only, by the scored night's end (#2456), so the night
   // never contributes to the bar it is judged against. #3079: through `scoreSleepForDate`, the one
   // night window the re-score of a changed night uses too, so the two paths cannot disagree.
-  const sleepScoreResult = lastSleep ? scoreSleepForDate(sleepSessions, lastSleep.date, tz)?.result ?? null : null
+  // #3099: scored against the 28 days before the NIGHT's date, not today's. Before Oura delivers last
+  // night, or when the ring was not worn, the newest night is older than today, so the days its window
+  // reaches before this read's 28-day load are fetched as well. Only the Sleep Score reads them; every
+  // other input keeps the window it always had.
+  const scoredFrom = lastSleep ? shiftDateStr(lastSleep.date, -SLEEP_SCORE_HISTORY_DAYS) : null
+  const olderSleep = scoredFrom != null && scoredFrom < from28dIso
+    ? await repo.listSleepSessions(userId, scoredFrom, shiftDateStr(from28dIso, -1)).catch(() => [])
+    : []
+  const sleepScoreResult = lastSleep ? scoreSleepForDate([...olderSleep, ...sleepSessions], lastSleep.date, tz)?.result ?? null : null
   const sleepScore100 = sleepScoreResult?.score ?? null
   const ownSleepContributors = sleepScoreResult ? sleepComponentsToContributors(sleepScoreResult.components) : null
   const sleepComponent = sleepScore100 != null

@@ -252,6 +252,15 @@ export function dayKeyInTz(tz: string, daysAgo = 0, at: Date = new Date()): stri
   return shiftDateStr(formatInTimeZone(at, tz, 'yyyy-MM-dd'), -daysAgo).replace(/-/g, '/')
 }
 
+/**
+ * The instant of local midnight `daysAgo` calendar days before `at`'s day in `tz` — the start of a
+ * "last N days" window, so it begins at the user's midnight rather than `now − N×24h` (#3117).
+ * DST-correct because the day is shifted as a calendar date before it is turned back into an instant.
+ */
+export function midnightDaysAgoInTz(tz: string, daysAgo: number, at: Date = new Date()): Date {
+  return dateStrMidnightInTz(dayKeyInTz(tz, daysAgo, at).replace(/\//g, '-'), tz)
+}
+
 // Whole calendar days between two date strings ('YYYY-MM-DD' or 'YYYY/MM/DD', either
 // separator). UTC-day arithmetic on pure date keys — matches shiftDateStr's semantics.
 // Positive when `toStr` is after `fromStr`.

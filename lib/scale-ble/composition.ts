@@ -23,12 +23,12 @@ export const SCALE_WEIGHT_ANOMALY_PCT = 0.15
  *
  *   · his confirmed weight   **70.0 – 72.8 kg**  (whole history spans 5.2 kg)
  *   · his day-to-day change  **0.39 kg mean, 1.40 at p95, 2.85 worst**
- *   · the dismissed cluster  **57.5 – 58.0 kg**  — tight, and 12.0 kg below his lowest
+ *   · the dismissed cluster  tight, and well below his lowest (a household member's weight, so
+ *     the figure is not recorded here)
  *
  * 8% of ~70 kg is ±5.6 kg: wider than his entire historical spread, so no genuine reading of his
- * falls outside it even after a long gap, and still **6.4 kg clear** of her cluster. The old 15%
- * (±10.5 kg) reached down to 59.5 and cleared her by only 1.5 kg, which is the thin margin BF-58
- * was written about.
+ * falls outside it even after a long gap, and it still clears her cluster by a wide margin. The old
+ * 15% (±10.5 kg) cleared her by only a thin margin, which is what BF-58 was written about.
  *
  * **This is identity by proxy and it degrades if the two weights converge** — which is why anything
  * between this band and `SCALE_WEIGHT_ANOMALY_PCT` still asks rather than guessing.

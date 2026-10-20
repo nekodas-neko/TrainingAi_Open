@@ -16,6 +16,18 @@ import { MAX_PACE_SEC_PER_KM } from '../validation/plausibility'
 
 export const ROUTE_SIMPLIFY_TOLERANCE_M = 5
 
+/**
+ * An activity's average pace (s/km) as it is stored: distance over elapsed seconds, or undefined
+ * when there is none (no distance, or no time) or it is slower than `MAX_PACE_SEC_PER_KM`. Slower
+ * than that is not a pace (an hour per km is a standstill), and the save schema rejects it. The one
+ * rule for `summariseRoute`, a guided walk's segments (#3128) and the server, which works the pace
+ * out itself when a client sends none (#3120).
+ */
+export function averagePaceSecPerKm(distanceKm: number, elapsedSec: number): number | undefined {
+  const pace = computeAvgPaceSecPerKm(distanceKm, elapsedSec)
+  return pace != null && pace > 0 && pace <= MAX_PACE_SEC_PER_KM ? pace : undefined
+}
+
 export interface RouteSummary {
   distanceKm: number
   routePolyline: string
@@ -33,10 +45,10 @@ export interface RouteSummary {
  * app's activity screen, its guided walk and TrainingAi Preview (#2845), which used to each spell
  * the same nine fields out by hand.
  *
- * `paceElapsedSec` is the denominator of the average pace and is the caller's choice, because the
- * two current-app screens differ: the activity screen uses the GPS fix span (so the pace reconciles
- * with the splits, which also run on fix time), the guided walk uses the walk's own elapsed time.
- * Omitted, it is the fix span.
+ * `paceElapsedSec` is the denominator of the average pace: the activity's active (unpaused) seconds,
+ * the same time its saved duration counts. It is required because the obvious default, the span
+ * from the first GPS fix to the last, keeps running through a pause and so counted the paused
+ * minutes as running ones (#3092). Splits and the pace series stay on fix time.
  *
  * Null with fewer than two points: one fix is a position, not a route.
  *
@@ -46,12 +58,10 @@ export interface RouteSummary {
  * that slow are left out (every display keys a split by its km), pace-series buckets are clamped to
  * the cap, and an average that slow (a walk that lost GPS for most of its time) is left out.
  */
-export function summariseRoute(points: RoutePoint[], paceElapsedSec?: number): RouteSummary | null {
+export function summariseRoute(points: RoutePoint[], paceElapsedSec: number): RouteSummary | null {
   if (points.length < 2) return null
   const distanceKm = computeTotalDistanceKm(points)
   const { gainM, lossM } = computeElevationChange(points)
-  const fixSpanSec = (points[points.length - 1].t - points[0].t) / 1000
-  const avgPaceSecPerKm = computeAvgPaceSecPerKm(distanceKm, paceElapsedSec ?? fixSpanSec)
   return {
     distanceKm: Math.round(distanceKm * 100) / 100,
     routePolyline: encodeRoute(simplifyRoute(points, ROUTE_SIMPLIFY_TOLERANCE_M)),
@@ -63,8 +73,7 @@ export function summariseRoute(points: RoutePoint[], paceElapsedSec?: number): R
       ...point,
       paceSec: Math.min(point.paceSec, MAX_PACE_SEC_PER_KM),
     })),
-    avgPaceSecPerKm:
-      avgPaceSecPerKm != null && avgPaceSecPerKm <= MAX_PACE_SEC_PER_KM ? avgPaceSecPerKm : undefined,
+    avgPaceSecPerKm: averagePaceSecPerKm(distanceKm, paceElapsedSec),
     elevationGainM: gainM,
     elevationLossM: lossM,
     elevationProfile: computeElevationProfile(points),

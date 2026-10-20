@@ -2,6 +2,7 @@ import { shiftDateStr } from '@trainingai/shared/date-utils';
 import type { HistoryDomain, HistoryPlan } from '../../../core/sync/HistoryDownload.ts';
 import { activityHistorySpec, progressSpec, weightsSpec } from '../../health/data/models.ts';
 import type { NutritionStore } from '../../nutrition/data/NutritionStore.ts';
+import { NUTRITION_DAYS_KEPT } from '../../nutrition/data/nutrition-persistence.ts';
 import {
   calendarSpec,
   daySpec,
@@ -12,10 +13,9 @@ import {
 import type { ResourceSpec, WorkoutResources } from '../../workouts/data/WorkoutResources.ts';
 
 export const HISTORY_DOWNLOAD_DAYS = [30, 90, 365] as const;
-// Food logs are saved per day, but evening check-ins (and the index of saved days) still live in
-// the core nutrition record that is rewritten on every nutrition change (issue 3101), so food and
-// check-ins stop at 90 days to keep each of those writes small.
-export const NUTRITION_HISTORY_DAYS = 90;
+// Food logs and evening check-ins are downloaded for as many days as the phone keeps them (issue
+// 3119): every kept day is read when nutrition opens, so the window keeps opening quick.
+export const NUTRITION_HISTORY_DAYS = NUTRITION_DAYS_KEPT;
 
 const summaries: Record<string, ResourceSpec<unknown>> = {
   streak: streakDataSpec,

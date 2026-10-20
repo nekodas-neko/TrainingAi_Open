@@ -10,6 +10,7 @@ import {
 import type { ScopedStorage } from '../../../core/storage/LocalStorage';
 import type { AccountConnection } from '../../account/session';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
 const resultSchema = z.object({
   measurements: z.number(),
   nights: z.number(),
@@ -82,8 +83,13 @@ export class AppleHealthImportStore {
       origin: connection.origin,
       userId: connection.userId,
       enabled: false,
-      from: new Date(now() - 7 * 86400000).toISOString(),
-      historyFrom: new Date(now() - 35 * 86400000).toISOString(),
+      // Local midnights in the profile's zone, not now − N×24h (#3117).
+      from: midnightDaysAgoInTz(connection.timezone ?? DEFAULT_TZ, 7, new Date(now())).toISOString(),
+      historyFrom: midnightDaysAgoInTz(
+        connection.timezone ?? DEFAULT_TZ,
+        35,
+        new Date(now()),
+      ).toISOString(),
       anchors: {},
       queue: [],
       completed: null,

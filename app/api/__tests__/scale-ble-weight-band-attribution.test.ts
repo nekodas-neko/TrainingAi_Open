@@ -43,6 +43,9 @@ const statusWritten = () => insertScaleRawSample.mock.calls[0]?.[1]?.status
 // His measured anchor: the midpoint of the 70.0–72.8 kg confirmed cluster.
 const ANCHOR = 71.0
 
+// A synthetic second person on the same scale: a round number well outside the outer band.
+const OTHER_PERSON = 50.0
+
 beforeEach(() => {
   insertScaleRawSample.mockClear()
   upsertBodyMetrics.mockClear()
@@ -79,18 +82,19 @@ describe('POST /api/scale-ble/samples — weight-band attribution (BF-58 option 
     expect(upsertBodyMetrics).not.toHaveBeenCalled()
   })
 
-  // The case the entry was filed for: the partner's dismissed cluster measured 57.5–58.0 kg against
-  // his 70.0–72.8. Under the old single 15% gate this raised "is this you?" every time and threw the
-  // reading away on Not me; it must now be declined silently and kept.
-  it('declines the partner\'s real cluster without prompting, and keeps the frame', async () => {
-    const { body } = await post(57.8)
+  // The case the entry was filed for: a second person on the same scale, well below his band.
+  // OTHER_PERSON is a synthetic stand-in, not anyone's measured weight. Under the old single 15%
+  // gate a reading like this raised "is this you?" every time and threw the reading away on Not
+  // me; it must now be declined silently and kept.
+  it('declines a second person\'s reading without prompting, and keeps the frame', async () => {
+    const { body } = await post(OTHER_PERSON)
     expect(body.status).toBe('dismissed')
     expect(insertScaleRawSample).toHaveBeenCalledTimes(1)
     expect(insertScaleRawSample.mock.calls[0][1]).toMatchObject({ rawHex: 'ab12', status: 'dismissed' })
   })
 
   it('archives the raw frame in all three bands — a declined reading is un-attributed, not destroyed', async () => {
-    for (const w of [ANCHOR, ANCHOR * 1.10, 57.8]) {
+    for (const w of [ANCHOR, ANCHOR * 1.10, OTHER_PERSON]) {
       insertScaleRawSample.mockClear()
       await post(w)
       expect(insertScaleRawSample).toHaveBeenCalledTimes(1)
@@ -100,7 +104,7 @@ describe('POST /api/scale-ble/samples — weight-band attribution (BF-58 option 
 
   it('claims a first reading — with no confirmed weight there is no band to be outside of', async () => {
     getMostRecentConfirmedWeightKg.mockResolvedValue(null)
-    const { body } = await post(57.8)
+    const { body } = await post(OTHER_PERSON)
     expect(body.status).toBe('confirmed')
     expect(upsertBodyMetrics).toHaveBeenCalledTimes(1)
   })

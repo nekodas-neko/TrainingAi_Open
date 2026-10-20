@@ -43,7 +43,7 @@ export async function reattributeAfterHeartRate(
 
 /** The slice of the repository the writer needs, so tests can hand it a fake. */
 export type OuraCloudWriter = Pick<WorkoutRepository,
-  'upsertOuraDaily' | 'upsertBodyMetrics' | 'upsertOuraCloudSleep' | 'tombstoneOuraCloudSleep' |
+  'upsertOuraDaily' | 'upsertBodyMetrics' | 'upsertOuraCloudSleep' | 'tombstoneOuraCloudSleep' | 'syncOuraMainSleepBodyMetrics' |
   'upsertOuraWorkouts' | 'upsertOuraCloudHeartrate' |
   'upsertOuraCloudSleepPeriods' | 'upsertOuraCloudDaily' | 'upsertOuraSessions'>
 
@@ -72,7 +72,7 @@ export function plannedCounts(writes: OuraCloudWrites): OuraCloudWriteCounts {
     bodyRows: writes.body.length,
     sleepWritten: writes.sleep.length,
     sleepSkippedOverlap: 0,
-    sleepTombstoned: writes.deletedSleepIds.length,
+    sleepTombstoned: writes.deletedSleepIds.length + writes.retypedSleepIds.length,
     workouts: writes.workouts.length,
     heartRatePoints: 0,
     sleepPeriods: writes.sleepPeriods.length,
@@ -98,13 +98,27 @@ export async function writeOuraCloudData(
   // after the sleep rows, a new night was scored before its types existed, so a short `sleep`
   // fragment beside the `long_sleep` joined it; and a write that only retyped a period was never
   // seen at all. The tombstone still runs after, so it has the last word on a deleted period.
-  const touchesSleep = writes.sleep.length > 0 || writes.deletedSleepIds.length > 0 || writes.sleepPeriods.length > 0
+  // #3080: a `rest` retype is tombstoned like a delete, and the day's HRV and resting HR are set from
+  // its main period once every period is in. All of it inside the window, so the re-score sees it.
+  const touchesSleep = writes.sleep.length > 0 || writes.deletedSleepIds.length > 0 ||
+    writes.retypedSleepIds.length > 0 || writes.sleepPeriods.length > 0
   const { sleep, sleepTombstoned, sleepPeriods } = await withNightRescore(touchesSleep ? rescore : undefined, userId, async () => {
     const sleepPeriods = await writer.upsertOuraCloudSleepPeriods(userId, writes.sleepPeriods)
     const sleep = writes.sleep.length > 0 ? await writer.upsertOuraCloudSleep(userId, writes.sleep) : { written: 0, skippedOverlap: 0 }
-    const sleepTombstoned = await writer.tombstoneOuraCloudSleep(userId, writes.deletedSleepIds)
+    const sleepTombstoned = await writer.tombstoneOuraCloudSleep(userId, writes.deletedSleepIds) +
+      (writes.retypedSleepIds.length > 0 ? await writer.tombstoneOuraCloudSleep(userId, writes.retypedSleepIds, { keepPeriodType: true }) : 0)
+    if (touchesSleep) {
+      await writer.syncOuraMainSleepBodyMetrics(userId, {
+        days: [...writes.sleep.map(r => r.date), ...writes.sleepPeriods.map(p => p.day)],
+        ouraIds: [...writes.deletedSleepIds, ...writes.retypedSleepIds],
+      })
+    }
     return { sleep, sleepTombstoned, sleepPeriods }
   })
+  // #3080: a period a higher-ranked night keeps out is reported, counts only, never silent.
+  if (sleep.skippedOverlap > 0) {
+    reportOuraCloudIssue('sleep:skipped-overlap', `${sleep.skippedOverlap} Oura sleep period(s) kept out by a higher-ranked night`, { userId })
+  }
   const workouts = await writer.upsertOuraWorkouts(userId, writes.workouts)
   const cloudDays = await writer.upsertOuraCloudDaily(userId, writes.cloudDaily)
   const sessions = await writer.upsertOuraSessions(userId, writes.sessions)

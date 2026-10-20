@@ -1,7 +1,10 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeRoute } from '@trainingai/shared/activity/route-encoding';
-import { haversineDistanceKm } from '@trainingai/shared/activity/route-metrics';
+import {
+  computeTotalDistanceKm,
+  haversineDistanceKm,
+} from '@trainingai/shared/activity/route-metrics';
 import {
   ActivityStore,
   ROUTE_CHECKPOINT_MS,
@@ -170,8 +173,8 @@ test('distance, pace, splits and elevation come from the recorded track', async 
   await store.finish();
   const payload = sessionPayload(store.getSnapshot().session!, timezone, track);
   assert.equal(payload.distanceKm, Math.round(expectedKm * 100) / 100);
-  // The current app's denominator: the span from the first fix to the last.
-  assert.equal(payload.avgPaceSecPerKm, Math.round(500 / expectedKm));
+  // Over active time (#3092): Start to Finish, 502 s, the seconds the duration counts.
+  assert.equal(payload.avgPaceSecPerKm, Math.round(502 / expectedKm));
   assert.equal(payload.elevationGainM, 250);
   assert.equal(payload.elevationLossM, 0);
   assert.equal(payload.splits!.length, 2);
@@ -492,9 +495,13 @@ test('a run with a pause saves, and live pace after resuming is not 0:00', async
   const live = liveRouteReadout(store.getSnapshot().session!, store.getSnapshot().route, f.now());
   assert.equal(live.paceSecPerKm, Math.round(362 / live.distanceKm!));
   await store.finish();
+  const km = computeTotalDistanceKm(store.getSnapshot().route);
   await store.save(timezone);
   const row = store.getSnapshot().rows[0].payload;
   assert.ok(row.distanceKm! > 0.9);
+  // #3092: the average leaves the 2-minute pause out. 362 s of running; the fixes span 482 s.
+  assert.equal(row.durationMin, 6);
+  assert.equal(row.avgPaceSecPerKm, Math.round(362 / km));
   assert.ok(withinSchemaPaces(row));
   assert.equal(ActivityLogBody.safeParse(row).success, true);
   f.done();

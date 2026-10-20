@@ -213,7 +213,7 @@ the code. Do not edit between the markers; CI compares this block with a fresh r
 | `oura_sessions` | SERVER-ONLY | — | — | exported | cascade | Oura Cloud connector -> server (#2982); session series and mood, read by no screen |
 | `oura_tags` | SERVER-ONLY | — | — | exported | cascade | sensor ingest -> server; writer: none found by static grep (raw SQL / script) |
 | `oura_tokens` | SERVER-ONLY | — | — | excluded (credentials) | cascade | integration secret (Oura Cloud: gone for good); writer: none found by static grep (raw SQL / script) |
-| `oura_workouts` | SERVER-ONLY | — | — | exported | cascade | sensor ingest -> server; writer: oura.ts |
+| `oura_workouts` | SERVER-ONLY | — | yes | exported | cascade | sensor ingest -> server; writer: oura.ts |
 | `personal_records` | SERVER-FIRST MIRROR | `personal_records` | — | exported | cascade | server derives on workout completion; delta pull; no outbox domain |
 | `phase_sets` | SERVER-ONLY | — | — | exported | cascade | program structure (not mirrored); writer: adapter.ts, programs.ts |
 | `plan_meal_answers` | DEVICE-FIRST | `plan_meal_answers` | yes | exported | cascade | local write + outbox push + delta pull |

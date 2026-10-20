@@ -15,6 +15,7 @@ import { todayMidnightUtc, shiftDateStr, dateStrMidnightInTz } from '@trainingai
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
+import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 
 export function buildChatTools(repo: WorkoutRepository, userId: string, tz: string, todayIso: string) {
   // User-local midnight, shared by every lookback window below — never Date.now(), which
@@ -83,16 +84,19 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         toDate: z.string().describe('YYYY-MM-DD inclusive'),
       }),
       execute: async ({ fromDate, toDate }) => {
-        const [oura, sleep, metrics, derived] = await Promise.all([
+        const [oura, sleep, metrics, derived, activities] = await Promise.all([
           repo.getOuraDaily(userId, fromDate, toDate),
           repo.listSleepSessions(userId, fromDate, toDate),
           repo.listBodyMetrics(userId, fromDate, toDate),
           repo.getOuraDailyDerived(userId, fromDate, toDate),
+          // #3095: indoor (treadmill) steps join each day's count, as on every app surface.
+          repo.listActivityLogs(userId, fromDate, toDate).catch(() => []),
         ])
         // Readiness, sleep and activity scores are ours (oura_daily_derived). Oura's own scores are
         // never sent as ours (scoring doc rule 5, #3000); its temperature deviation is a reading.
         const readinessMap = liveReadinessByDay(derived)
         const derivedByDate = new Map(derived.map(d => [d.day, d]))
+        const stepsByDate = dayStepCountsByDate(metrics, activities)
         const tempByDate = new Map(oura.map(r => [r.date, r.temperatureDeviation ?? null]))
         const days = [...new Set([...derivedByDate.keys(), ...tempByDate.keys()])].sort()
         return {
@@ -111,7 +115,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           bodyMetrics: metrics.map(m => ({
             date: m.date, hrvMs: m.hrvMs ?? null, restingHrBpm: m.restingHeartRate ?? null,
             spo2Pct: m.spo2Pct ?? null,
-            steps: m.steps ?? null, weightKg: m.weightKg ?? null,
+            steps: stepsByDate.get(m.date) ?? null, weightKg: m.weightKg ?? null,
           })),
           illnessRadar: derived
             .filter(r => r.illnessFlag != null)

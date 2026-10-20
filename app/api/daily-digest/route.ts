@@ -18,6 +18,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { MIN_LOGGED_DAYS, DEFAULT_WINDOW_DAYS } from '@trainingai/shared/nutrition/adaptive-tdee'
 import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
+import { dayStepCount, dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 
 // An optional force flag.
 const MAX_BODY_BYTES = 4 * 1024
@@ -103,7 +104,12 @@ export async function POST(req: Request) {
     }
   }
 
-  const todaySteps = bodyMetricsToday[0]?.steps ?? null
+  // #3095: the day's steps through the shared builder, so the digest quotes the figure Home shows on a
+  // treadmill day. Only read when a step goal makes the line appear.
+  const stepActivities = userGoals.stepsGoal != null
+    ? await repo.listActivityLogs(userId, startOfWeekInTz(tz), todayIso).catch(() => [])
+    : []
+  const todaySteps = dayStepCount(bodyMetricsToday[0]?.steps, stepActivities.filter(a => a.date === todayIso))
   if (userGoals.stepsGoal != null && todaySteps != null) {
     if (userGoals.stepsGoalType === 'weekly') {
       // stepsGoal is always stored as a DAILY figure (matches home-card-widget.tsx's
@@ -111,7 +117,7 @@ export async function POST(req: Request) {
       const weeklyTarget = userGoals.stepsGoal * 7
       const weekStart = startOfWeekInTz(tz)
       const weekMetrics = await repo.listBodyMetrics(userId, weekStart, todayIso)
-      const stepsThisWeek = weekMetrics.reduce((s, m) => s + (m.steps ?? 0), 0)
+      const stepsThisWeek = [...dayStepCountsByDate(weekMetrics, stepActivities).values()].reduce((s, n) => s + n, 0)
       const todayDow = parseInt(formatInTimeZone(new Date(), tz, 'i'), 10) // 1=Mon..7=Sun
       const daysLeft = 7 - todayDow
       const pace = stepsPaceToWeeklyGoal(weeklyTarget, stepsThisWeek, daysLeft)

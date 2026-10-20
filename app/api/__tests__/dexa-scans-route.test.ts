@@ -4,7 +4,7 @@
 //  * a **dash-only date regex** rejects every real request, because the client's `localDateString()`
 //    emits `YYYY/MM/DD` — CLAUDE.md records this costing `ai-chat` a full release;
 //  * a **`min(0)` on a T-score** rejects every osteopenic result, which is most of the ones worth
-//    storing at all (the owner's is −1.6);
+//    storing at all;
 //  * a **duplicate region** would be swallowed by the `(scan_id, region)` unique index, so a
 //    mis-parsed printout would store a scan quietly missing a leg.
 //
@@ -33,25 +33,25 @@ const post = async (body: unknown) => {
   }))
 }
 
-const MINIMAL = { scannedOn: '2026-08-27' }
+const MINIMAL = { scannedOn: '2026-01-15' }
 
 describe('POST /api/dexa-scans', () => {
   beforeEach(() => { saveDexaScan.mockClear(); listDexaScans.mockClear(); authMock.mockClear() })
 
   it('accepts the minimum: a date and nothing else', async () => {
     expect((await post(MINIMAL)).status).toBe(200)
-    expect(saveDexaScan).toHaveBeenCalledWith('u1', expect.objectContaining({ scannedOn: '2026-08-27' }))
+    expect(saveDexaScan).toHaveBeenCalledWith('u1', expect.objectContaining({ scannedOn: '2026-01-15' }))
   })
 
   // The regex accepts both separators and the handler normalises; a date reaching the repository
   // with slashes would land as a text date the `date` column rejects.
   it('accepts the slashed form the client actually sends, and stores it dashed', async () => {
-    expect((await post({ scannedOn: '2026/08/27' })).status).toBe(200)
-    expect(saveDexaScan.mock.calls[0][1]).toMatchObject({ scannedOn: '2026-08-27' })
+    expect((await post({ scannedOn: '2026/01/15' })).status).toBe(200)
+    expect(saveDexaScan.mock.calls[0][1]).toMatchObject({ scannedOn: '2026-01-15' })
   })
 
   it('rejects a malformed date without reaching the repository', async () => {
-    for (const scannedOn of ['not-a-date', '26-08-27', '2026-8-27', '', '2026-08-27T00:00:00Z']) {
+    for (const scannedOn of ['not-a-date', '26-01-15', '2026-1-15', '', '2026-01-15T00:00:00Z']) {
       const res = await post({ scannedOn })
       expect(res.status, JSON.stringify(scannedOn)).toBe(400)
     }
@@ -67,14 +67,14 @@ describe('POST /api/dexa-scans', () => {
   })
 
   it('stores a negative T and Z score rather than refusing them', async () => {
-    expect((await post({ ...MINIMAL, tScore: -1.6, zScore: -1.6 })).status).toBe(200)
-    expect(saveDexaScan.mock.calls[0][1]).toMatchObject({ tScore: -1.6, zScore: -1.6 })
+    expect((await post({ ...MINIMAL, tScore: -1.0, zScore: -0.5 })).status).toBe(200)
+    expect(saveDexaScan.mock.calls[0][1]).toMatchObject({ tScore: -1.0, zScore: -0.5 })
   })
 
   it('refuses a duplicate region instead of silently dropping one at the unique index', async () => {
     const res = await post({
       ...MINIMAL,
-      regions: [{ region: 'L Leg', bmd: 1.15 }, { region: 'l leg', bmd: 1.16 }],
+      regions: [{ region: 'L Leg', bmd: 1.2 }, { region: 'l leg', bmd: 1.3 }],
     })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Duplicate region in scan')
@@ -90,13 +90,14 @@ describe('POST /api/dexa-scans', () => {
   // `.strict()` is what stops a renamed client field arriving, being ignored, and reading as a save
   // that worked — the "save doesn't persist" shape CLAUDE.md names.
   it('rejects an unknown field rather than dropping it', async () => {
-    expect((await post({ ...MINIMAL, bodyFatPct: 28.5 })).status).toBe(400)
+    expect((await post({ ...MINIMAL, bodyFatPct: 20 })).status).toBe(400)
     expect(saveDexaScan).not.toHaveBeenCalled()
   })
 
   it('rejects a value outside plausibility — grams entered as kilograms', async () => {
-    expect((await post({ ...MINIMAL, weightKg: 72007.6 })).status).toBe(400)
-    expect((await post({ ...MINIMAL, pctFat: 285 })).status).toBe(400)
+    // 80 kg typed as its grams, and 20 % typed with the decimal point lost.
+    expect((await post({ ...MINIMAL, weightKg: 80000 })).status).toBe(400)
+    expect((await post({ ...MINIMAL, pctFat: 200 })).status).toBe(400)
     expect(saveDexaScan).not.toHaveBeenCalled()
   })
 

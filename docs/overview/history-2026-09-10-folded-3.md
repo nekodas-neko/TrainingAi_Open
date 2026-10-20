@@ -3753,17 +3753,18 @@ calibration pair.
 **The schema was written from the printout, not from a description.** BF-41's own rule, and the
 same rule this repo applies to external API field names. The fixture in the DB test is the owner's
 actual Hologic Horizon A report from `docs/clinical-baseline-2026-08-27.md` — every number in it is
-one the report prints — so the round-trip test can show "keep every field" (BF-43) survived a
-migration, a Drizzle schema, an insert, a select and a mapper. `rowToDexaScan` is the one of those
-five that fails silently, as "save doesn't persist".
+one the report prints (since replaced by a synthetic report that fills the same fields, #3127) — so
+the round-trip test can show "keep every field" (BF-43) survived a migration, a Drizzle schema, an
+insert, a select and a mapper. `rowToDexaScan` is the one of those five that fails silently, as
+"save doesn't persist".
 
 **Typed columns, not JSONB.** `measured_rmr` is the template BF-41 names, and the reason is that
 BF-2's calibration and BF-33's FFM comparison both do arithmetic on named columns.
 
-**Grams stay grams and percentiles stay percentiles.** The report prints fat as `20,547.5 g`;
+**Grams stay grams and percentiles stay percentiles.** The report prints fat mass in grams;
 converting on the way in would make the stored number something the printout does not say.
-`pct_fat_young_normal` (93) and `pct_fat_age_matched` (89) are **percentiles**, share the 0–100
-range with the percentages beside them, and the column names are the only thing that says so.
+`pct_fat_young_normal` and `pct_fat_age_matched` are **percentiles**, share the 0–100 range with
+the percentages beside them, and the column names are the only thing that says so.
 
 **Regions are a child table, and two of its rows are aggregates.** A region set is N rows, not N
 columns — the same reasoning BF-41 gives for a blood panel's analytes, and it makes a twelfth region
@@ -3774,7 +3775,7 @@ summing it must exclude them; the migration and the route both say so where some
 must leave ten, or a scan quietly keeps two rows from a parse nobody confirmed.
 
 **Negative T and Z scores.** A `min(0)` would reject every osteopenic result, which is most of the
-ones worth storing; the owner's is −1.6. Bounded at ±15 instead.
+ones worth storing. Bounded at ±15 instead.
 
 **No source document is stored.** BF-41 recommends against it outright: extract, confirm, save the
 fields, discard the file. The report carries a name, a date of birth and a patient reference; none

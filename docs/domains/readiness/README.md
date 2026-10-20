@@ -490,8 +490,14 @@ Live at the time of writing (2026-07-30):
   night can land mid-morning, after a readiness built from that morning's body metrics alone has
   already frozen the anchor; that anchor never saw the night it stands for, so it goes back to
   provisional and the next read chooses it again (`rescore-nights.ts`, `releaseBodyBatteryAnchor`).
-  "Arrived" is exact: no night for the day before the write, one after. **A revision of a night that
-  was already there keeps the anchor frozen**: 18 Oct's night was revised at 22:23 local, and
+  "Arrived" means no night for the day before the write and one after, **and no tombstoned Oura Cloud
+  night for that day** (#3099). Without that last condition a delete and a re-create in two separate
+  webhooks read as an arrival and released an anchor frozen while the night was there. Only a deleted
+  NIGHT counts, a tombstoned row whose window is a night window in the user's timezone: a live nap or
+  rest row (#3104 review), and a nap Oura deleted or retyped to `rest` (#3106 review), must not stop a
+  late night from being an arrival. It is still an inference from the rows, not a record of what the anchor saw: an
+  anchor frozen in the gap between such a delete and its re-create is kept, which errs toward a
+  steady curve. **A revision of a night that was already there keeps the anchor frozen**: 18 Oct's night was revised at 22:23 local, and
   releasing then would have shifted that whole day's curve in the evening.
 - **An evening nap once threw away the whole day's Body Battery** — nap-vs-night resolution is a
   readiness concern too, not only a sleep one.

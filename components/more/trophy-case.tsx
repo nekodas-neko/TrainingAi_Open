@@ -4,10 +4,10 @@ import { useId, useState, useEffect } from "react";
 import type { AchievementResult } from "@/components/profile/achievements-grid";
 import { ACHIEVEMENT_ICONS, CATEGORY_COLORS } from "@/components/profile/achievements-grid";
 import { Dumbbell, Lock } from "lucide-react";
+import { pinTrophy, trophySlots, unpinTrophy } from '@trainingai/shared/achievement-display';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const TROPHY_KEY = "ta_trophy_case";
-const SLOT_COUNT = 3;
 
 function loadTrophy(): string[] {
   try {
@@ -91,21 +91,18 @@ export function TrophyCase({ achievements, readOnly = false, pinnedIds: external
   }, [externalPinnedIds]);
 
   const unlockedAchievements = achievements.filter(a => a.unlocked);
-  const slots = Array.from({ length: SLOT_COUNT }, (_, i) => {
-    const id = pinnedIds[i];
-    return id ? achievements.find(a => a.id === id) : undefined;
-  });
+  const slots = trophySlots(achievements, pinnedIds);
 
   const pin = (id: string) => {
     if (pinnedIds.includes(id)) return;
-    const next = [...pinnedIds.filter(p => p !== id), id].slice(-SLOT_COUNT);
+    const next = pinTrophy(pinnedIds, id);
     setPinnedIds(next);
     saveTrophy(next);
     setPickerOpen(false);
   };
 
   const unpin = (id: string) => {
-    const next = pinnedIds.filter(p => p !== id);
+    const next = unpinTrophy(pinnedIds, id);
     setPinnedIds(next);
     saveTrophy(next);
   };

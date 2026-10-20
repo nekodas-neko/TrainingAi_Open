@@ -9,6 +9,7 @@ import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
 import { computeZoneQuota, weekWindow } from '@trainingai/shared/health/zone-quota'
+import { activityStepsForDayCount, dayStepCount } from '@trainingai/shared/health/activity-steps'
 
 // The Cardiovascular hub's week payload: HR profile + per-zone quota + steps.
 // Server-derived read only — no user writes here, so no outbox/local-store domain (spec D-9).
@@ -65,7 +66,7 @@ export async function GET() {
     repo.getObservedHrProfile(userId, priorFrom, priorTo).catch(() => EMPTY_OBSERVED_HR),
   ])
 
-  const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, todayActivityLogs, userGoals] = await Promise.all([
+  const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, weekActivityLogs, userGoals] = await Promise.all([
     repo.getZoneMinutesRange(userId, from, to, tz, profile).catch(() => []),
     // LA-82: the profile above already degrades on this read; this copy only feeds age and the step
     // goal's inputs, which all take null.
@@ -81,10 +82,12 @@ export async function GET() {
     // lifting check progress-summary's trainedToday uses, plus any logged cardio/guided-walk
     // activity for today — either one means today isn't a lazy day.
     repo.getDayExerciseNames(userId, today.replace(/-/g, '/'), tz).catch(() => []),
-    repo.listActivityLogs(userId, today, today).catch(() => []),
+    // The week's, not just today's: the step totals below add its indoor (treadmill) steps (#3095).
+    repo.listActivityLogs(userId, from, to).catch(() => []),
     // Q-524: the weekly steps target is the user's own goal × 7 when they set one.
     repo.getUserGoals(userId).catch(() => null),
   ])
+  const todayActivityLogs = weekActivityLogs.filter((a) => a.date === today)
   const trainedToday = dayExercises.length > 0 || todayActivityLogs.length > 0
 
   // Zone targets: the active running plan's framework supplies the SHAPE; a resolved fitness
@@ -124,8 +127,9 @@ export async function GET() {
     stepsGoal: userGoals?.stepsGoal ?? null,
   })
 
-  const stepsToday = weekMetrics.find((m) => m.date === today)?.steps ?? 0
-  const stepsWeek = weekMetrics.reduce((s, m) => s + (m.steps ?? 0), 0)
+  // #3095: the same builder as Home and the day screen, so a treadmill day reads one figure everywhere.
+  const stepsToday = dayStepCount(weekMetrics.find((m) => m.date === today)?.steps, todayActivityLogs) ?? 0
+  const stepsWeek = weekMetrics.reduce((s, m) => s + (m.steps ?? 0), 0) + activityStepsForDayCount(weekActivityLogs)
   const daysElapsed = days.length || 1
 
   return NextResponse.json(

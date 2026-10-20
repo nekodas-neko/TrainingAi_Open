@@ -89,7 +89,6 @@ const BASELINE = {
   // values, persisted to localStorage and applied through `accentCardStyle`. A theme token cannot
   // round-trip through the colour picker, so a tenth card slot is necessarily a tenth literal.
   'components/more/home-widgets-section.tsx': 17,
-  'components/more/profile-tab.tsx': 6,
   'components/more/stats-grid.tsx': 2,
   'components/muscle-heatmap.tsx': 8,
   'components/nutrition/end-of-day/scale-selector.tsx': 2,
