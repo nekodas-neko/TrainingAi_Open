@@ -94,6 +94,9 @@ export interface LocalSleepSession {
   /** Issue 2606 (v52) — set on a manual night the user removed. Carried by the pull (the tombstone
    *  channel); `getSleepSessions` never returns a removed row, so a reader always sees null/absent. */
   deletedAt?:      string | null;
+  /** #3060 (v53) — Oura's period type, from the server's Cloud period table. Null for any other
+   *  source; `localSleepRowsAsNights` feeds it to the same nap rule the server's card applies. */
+  ouraSleepType?:  string | null;
   syncStatus:      'pending' | 'synced';
   updatedAt:       string;
 }

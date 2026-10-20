@@ -161,10 +161,11 @@ export function mergeByDate(rows: SleepRow[], tz: string = DEFAULT_TZ): SleepRow
  * in a night at all, and summing them is what once fabricated an 11.5 h night (BF-115's refutation). Rows pulled before SQLite v50 have no window, so a date holding any such row passes
  * through raw, exactly as the seed always passed it.
  *
- * **Oura's period type is not on the device (#3057).** The local table has no `sleep_type`, so an Oura
- * `sleep` fragment beside its `long_sleep` night still merges into it here, until the route's reply
- * replaces the seed. Guessing the type from length is not safe: a short night Oura typed `long_sleep`
- * and a pre-Cloud Oura row look the same on the device.
+ * **Oura's period type rides along (#3060)**, pulled into SQLite v53, so `mergeByDate` keeps a `sleep`
+ * fragment beside its `long_sleep` night out of it, as the route does (#3057). A row pulled before v53
+ * has no type and reads as "unknown", which joins it as the seed always did, until the server re-sends
+ * it. Never guessed from length: a short night Oura typed `long_sleep` and a pre-Cloud Oura row look
+ * the same on the device.
  *
  * Newest first because the route is and every reader assumes it (`sleepRows[0]` is "last night");
  * the store returns oldest first. `sleepTimeRecommendation` and `provisional` are not in the local
@@ -185,6 +186,7 @@ export function localSleepRowsAsNights(local: readonly LocalSleepSession[], tz: 
       sleepTimeRecommendation: null,
       manualSleepStart: l.manualSleepStart,
       manualEntry: l.manualEntry,
+      ouraSleepType: l.ouraSleepType ?? null,
     };
     const list = byDate.get(row.date) ?? [];
     list.push(row);

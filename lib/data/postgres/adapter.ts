@@ -4968,8 +4968,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .where(and(eq(s.bodyMetrics.userId, userId), gt(s.bodyMetrics.updatedAt, effectiveSince)))
         .orderBy(asc(s.bodyMetrics.updatedAt)).limit(pageLimit),
       // Not filtered on `deleted_at` (issue 2606): this is the tombstone channel for a removed manual
-      // night, as for mood_logs and food_logs below.
-      this.db.select().from(s.sleepSessions)
+      // night, as for mood_logs and food_logs below. #3060: Oura's period type rides along, joined as
+      // `listSleepSessions` joins it, so the device seed keeps a nap out of the night as the server does.
+      this.db.select({ ...getTableColumns(s.sleepSessions), ouraSleepType: s.ouraCloudSleepPeriods.sleepType })
+        .from(s.sleepSessions)
+        .leftJoin(s.ouraCloudSleepPeriods, and(
+          eq(s.ouraCloudSleepPeriods.userId, s.sleepSessions.userId),
+          eq(s.ouraCloudSleepPeriods.ouraId, s.sleepSessions.ouraId),
+        ))
         .where(and(eq(s.sleepSessions.userId, userId), gt(s.sleepSessions.updatedAt, effectiveSince)))
         .orderBy(asc(s.sleepSessions.updatedAt)).limit(pageLimit),
       // Deliberately NOT filtered on `deleted_at`, unlike the two user-facing mood reads. This is
