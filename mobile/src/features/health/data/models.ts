@@ -499,6 +499,33 @@ export const sleepCorrelationSpec = {
     ),
   }),
 };
+// The current app's HR Recovery Profile card reads this same route; the bands and the month trend
+// are computed on the server by the shared computeHrRecoveryProfile.
+export const hrRecoveryProfileSpec = {
+  path: '/api/health/hr-recovery-profile',
+  ttl: 300_000,
+  schema: z.object({
+    bands: z.array(
+      z.object({
+        label: z.string(),
+        n: z.number().finite(),
+        medianRateBpmMin: n,
+        recoveredPct: n,
+        lowSignal: z.boolean(),
+        bySource: z.record(z.string(), z.number().finite().optional()).default({}),
+      }),
+    ),
+    informativeShare: n,
+    trend: z
+      .array(
+        z.object({
+          label: z.string(),
+          points: z.array(z.object({ period: z.string(), medianRateBpmMin: n, n: z.number() })),
+        }),
+      )
+      .default([]),
+  }),
+};
 export const hrProfileSpec = {
   path: '/api/hr-profile',
   ttl: 86_400_000,

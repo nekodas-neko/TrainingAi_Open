@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { informativeShareNote, MINORITY_MAX_PCT } from '@/components/health/hr-recovery-honesty'
+import { informativeShareNote, MINORITY_MAX_PCT } from '@trainingai/shared/health/hr-recovery-honesty'
 import { aggregateHrRecoveryProfile } from '@trainingai/shared/health/hr-recovery-profile'
 import type { RecoveryEpisode } from '@trainingai/shared/health/hr-recovery-profile'
 import { stripComments } from '../../scripts/lib/strip-comments.js'
