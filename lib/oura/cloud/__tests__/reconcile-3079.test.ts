@@ -19,7 +19,7 @@ function okResult(stoppedEarly: string | null = null): OuraBackfillResult {
   return {
     ok: true,
     report: {
-      dryRun: false, from: '', to: '', documents: {}, dropped: 0, counts: NO_WRITES,
+      dryRun: false, from: '', to: '', documents: {}, dropped: 0, counts: NO_WRITES, workoutsTombstoned: 0,
       forbidden: [], notShared: [], refusedDespiteGrant: [], stoppedEarly,
     },
   }
@@ -46,7 +46,8 @@ describe('reconcileOuraCloud', () => {
       const [deps, userId, opts] = calls[i]
       const to = toAestDay(NOW, tz)
       expect(userId).toBe(`u${i + 1}`)
-      expect(opts).toEqual({ from: shiftDateStr(to, -(RECONCILE_DAYS - 1)), to, dryRun: false, heartRate: true, tz })
+      // #3087: and tombstones a workout gone from Oura's list for a day it re-read.
+      expect(opts).toEqual({ from: shiftDateStr(to, -(RECONCILE_DAYS - 1)), to, dryRun: false, heartRate: true, tz, tombstoneAbsentWorkouts: true })
       expect(deps.rescore).toBe(repo)
     }
     // The two users' "today" differ: the window is each user's own local days.

@@ -4,7 +4,9 @@
 //
 // Webhooks are the primary feed, but Oura retries a failed delivery only about ten times over an
 // hour, so a missed event used to be recovered only by a manual backfill. Oura also revises a night
-// after it first arrives, and heart rate lands in batches. This catches all three. Every upsert is
+// after it first arrives, and heart rate lands in batches. This catches all three, and a workout
+// deleted in the Oura app whose delete event was missed: one gone from a day it re-read is
+// tombstoned (#3087). Every upsert is
 // idempotent, so a day that did not change writes the same rows and re-scores nothing
 // (`rescore-nights.ts` acts only on a night whose fingerprint changed).
 //
@@ -63,7 +65,7 @@ export async function reconcileOuraCloud(deps: ReconcileDeps): Promise<Reconcile
     const from = shiftDateStr(to, -(RECONCILE_DAYS - 1))
     try {
       const result = await backfill({ repo: deps.repo, config: deps.config, rescore: deps.repo }, userId, {
-        from, to, dryRun: false, heartRate: true, tz,
+        from, to, dryRun: false, heartRate: true, tz, tombstoneAbsentWorkouts: true,
       })
       const outcome = outcomeOf(result)
       out.push({ userId, from, to, result: outcome })

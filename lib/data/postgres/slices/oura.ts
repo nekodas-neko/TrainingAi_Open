@@ -898,7 +898,8 @@ export async function tombstoneOuraCloudSleep(
 /**
  * Oura Cloud workouts (#2859), keyed by Oura's id. A re-sent workout updates its measured fields and
  * keeps `reviewed`. An id held by another user is left alone: the conflict arm is scoped to the
- * caller, so the row count says how many were the caller's.
+ * caller, so the row count says how many were the caller's. A workout Oura sends again is live, so a
+ * tombstone on it is cleared (#3087).
  */
 export interface OuraWorkoutUpsertRow {
   id: string
@@ -924,11 +925,47 @@ export async function upsertOuraWorkouts(db: Db, userId: string, rows: OuraWorko
         startDatetime: sql`excluded.start_datetime`, endDatetime: sql`excluded.end_datetime`,
         calories: sql`excluded.calories`, distanceM: sql`excluded.distance_m`,
         intensity: sql`excluded.intensity`, source: sql`excluded.source`, label: sql`excluded.label`,
+        deletedAt: sql`NULL`,
       },
       setWhere: sql`${s.ouraWorkouts.userId} = excluded.user_id`,
     })
     .returning({ id: s.ouraWorkouts.id })
   return written.length
+}
+
+/**
+ * #3087: tombstones workouts the user deleted in the Oura app (a `workout` delete event). The row is
+ * kept and marked, never deleted; `getOuraWorkouts` leaves it out. Only this user's rows. Returns the
+ * rows newly tombstoned.
+ */
+export async function tombstoneOuraWorkouts(db: Db, userId: string, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  const rows = await db.update(s.ouraWorkouts)
+    .set({ deletedAt: sql`NOW()` })
+    .where(and(eq(s.ouraWorkouts.userId, userId), inArray(s.ouraWorkouts.id, ids), isNull(s.ouraWorkouts.deletedAt)))
+    .returning({ id: s.ouraWorkouts.id })
+  return rows.length
+}
+
+/**
+ * #3087: tombstones this user's workouts on `from`..`to` (Oura's `day`) that are not in `keepIds`,
+ * the full list Oura just returned for those days. The catch-up for a missed delete event: the
+ * caller passes only days it read completely.
+ */
+export async function tombstoneOuraWorkoutsAbsent(
+  db: Db, userId: string, range: { from: string; to: string; keepIds: string[] },
+): Promise<number> {
+  const conditions = [
+    eq(s.ouraWorkouts.userId, userId),
+    gte(s.ouraWorkouts.day, range.from), lte(s.ouraWorkouts.day, range.to),
+    isNull(s.ouraWorkouts.deletedAt),
+  ]
+  if (range.keepIds.length > 0) conditions.push(sql`${s.ouraWorkouts.id} NOT IN (${sql.join(range.keepIds.map(id => sql`${id}`), sql`, `)})`)
+  const rows = await db.update(s.ouraWorkouts)
+    .set({ deletedAt: sql`NOW()` })
+    .where(and(...conditions))
+    .returning({ id: s.ouraWorkouts.id })
+  return rows.length
 }
 
 // ── #2982: what Oura Cloud sends and no screen reads ──────────────────────────────────────────
@@ -2293,7 +2330,8 @@ export async function listSessionsMissingSetHrStats(db: Db, userId: string, sinc
 // ── Workouts ───────────────────────────────────────────────────────────────────
 
 export async function getOuraWorkouts(db: Db, userId: string, opts: { unreviewed?: boolean; from?: string; to?: string; timezone?: string }) {
-  const conditions = [eq(s.ouraWorkouts.userId, userId)]
+  // #3087: a workout deleted in the Oura app is tombstoned, and gone from every reader.
+  const conditions = [eq(s.ouraWorkouts.userId, userId), isNull(s.ouraWorkouts.deletedAt)]
   if (opts.unreviewed) {
     conditions.push(eq(s.ouraWorkouts.reviewed, false))
     conditions.push(gte(s.ouraWorkouts.day, shiftDateStr(todayInTz(opts.timezone ?? DEFAULT_TZ), -30)))

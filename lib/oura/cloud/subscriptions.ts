@@ -16,12 +16,14 @@ import type { OuraWebhookConfig } from './webhook'
 type EventType = 'create' | 'update' | 'delete'
 
 /**
- * What we subscribe to: every stored type on create and update, and `sleep` on delete too, because
- * a deleted sleep period is the one removal we act on (a tombstone).
+ * What we subscribe to: every stored type on create and update, and `sleep` and `workout` on delete
+ * too, the two removals we act on (a tombstone). A deleted workout must stop counting in the energy
+ * budget (#3087).
  */
 export const WANTED_SUBSCRIPTIONS: readonly { dataType: OuraDocumentType; eventType: EventType }[] = [
   ...OURA_DOCUMENT_TYPE_NAMES.flatMap(dataType => (['create', 'update'] as const).map(eventType => ({ dataType, eventType }))),
   { dataType: 'sleep', eventType: 'delete' },
+  { dataType: 'workout', eventType: 'delete' },
 ]
 
 /** Renew a subscription when it has less than this left. The job runs every 12 hours. */

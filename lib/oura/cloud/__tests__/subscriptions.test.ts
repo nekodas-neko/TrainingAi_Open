@@ -66,6 +66,8 @@ describe('Oura webhook subscription renewal (#2859)', () => {
     }
     expect(posts[0].body).toEqual({ callback_url: CALLBACK, verification_token: 'vt-123', event_type: 'create', data_type: 'daily_readiness' })
     expect(posts.map(p => `${(p.body as Sub).data_type}:${(p.body as Sub).event_type}`)).toContain('sleep:delete')
+    // #3087: a workout deleted in the Oura app is tombstoned, so its delete is subscribed too.
+    expect(posts.map(p => `${(p.body as Sub).data_type}:${(p.body as Sub).event_type}`)).toContain('workout:delete')
   })
 
   it('does nothing on a second run', async () => {
@@ -114,8 +116,8 @@ describe('Oura webhook subscription renewal (#2859)', () => {
       return oura.handler(input, init)
     }))
     const report = await ensureOuraWebhookSubscriptions(CONFIG, { dryRun: false, now: NOW })
-    expect(report.failed.map(f => f.subscription)).toEqual(['workout:create', 'workout:update'])
-    expect(report.created).toHaveLength(WANTED_SUBSCRIPTIONS.length - 2)
+    expect(report.failed.map(f => f.subscription)).toEqual(['workout:create', 'workout:update', 'workout:delete'])
+    expect(report.created).toHaveLength(WANTED_SUBSCRIPTIONS.length - 3)
   })
 
   it('a dry run lists what it would do and changes nothing at Oura', async () => {

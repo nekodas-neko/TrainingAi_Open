@@ -24,6 +24,7 @@ const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout
 
 function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
   const calls: string[] = []
+  const absent: { from: string; to: string; keepIds: string[] }[] = []
   const row: OuraCloudTokenRow | null = connected ? {
     userId: USER,
     accessToken: encryptOuraToken('acc', USER, 'access_token'),
@@ -41,12 +42,14 @@ function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
     tombstoneOuraCloudSleep: async (_u, ids) => ids.length,
     syncOuraMainSleepBodyMetrics: async () => ({ written: 0, cleared: 0 }),
     upsertOuraWorkouts: async (_u, rows) => { calls.push(`workouts:${rows.length}`); return rows.length },
+    tombstoneOuraWorkouts: async (_u, ids) => ids.length,
+    tombstoneOuraWorkoutsAbsent: async (_u, range) => { absent.push(range); return 1 },
     upsertOuraCloudHeartrate: async (_u, rows) => { calls.push(`hr:${rows.length}`); return rows.length },
     upsertOuraCloudSleepPeriods: async (_u, rows) => { calls.push(`periods:${rows.length}`); return rows.length },
     upsertOuraCloudDaily: async (_u, rows) => { calls.push(`cloudDaily:${rows.length}`); return rows.length },
     upsertOuraSessions: async (_u, rows) => { calls.push(`sessions:${rows.length}`); return rows.length },
   }
-  return { repo, calls }
+  return { repo, calls, absent }
 }
 
 /** Answers every collection with its one fixture, and heart rate with two points. */
@@ -344,5 +347,67 @@ describe('startOuraConnectBackfill reporting', () => {
     startOuraConnectBackfill(USER)
     await vi.waitFor(() => expect(reportServerError).toHaveBeenCalled())
     expect((reportServerError.mock.calls[0][0] as Error).message).toMatch(/connect-backfill:not_connected/)
+  })
+})
+
+// #3087: a workout deleted in the Oura app whose delete event was missed. The daily reconcile asks
+// the read to tombstone a stored workout gone from Oura's list for a day it read whole.
+describe('backfillOuraCloud tombstoneAbsentWorkouts (#3087)', () => {
+  const savedKey = process.env.OURA_TOKEN_KEY
+  beforeEach(() => {
+    process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    process.env.OURA_TOKEN_KEY = savedKey
+    vi.unstubAllGlobals()
+  })
+  const RANGE = { from: '2026-10-08', to: '2026-10-10', heartRate: false, tz: 'Australia/Brisbane' }
+
+  it('hands each workout chunk it read, with the ids Oura returned, to the tombstone', async () => {
+    oura()
+    const { repo, absent } = fakeRepo()
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-10', keepIds: ['wo-1'] }])
+    expect(out.ok && out.report.workoutsTombstoned).toBe(1)
+  })
+
+  it('an empty day list keeps nothing, so every stored workout on those days goes', async () => {
+    oura(path => (path === 'workout' ? jsonResponse({ data: [], next_token: null }) : null))
+    const { repo, absent } = fakeRepo()
+    await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-10', keepIds: [] }])
+  })
+
+  it('tombstones nothing unless asked, and nothing on a dry run', async () => {
+    oura()
+    const plain = fakeRepo()
+    await backfillOuraCloud({ repo: plain.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false })
+    expect(plain.absent).toEqual([])
+    const dry = fakeRepo()
+    const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsentWorkouts: true })
+    expect(dry.absent).toEqual([])
+    expect(out.ok && out.report.workoutsTombstoned).toBe(0)
+  })
+
+  // A list that was not read whole says nothing about what Oura still has.
+  it('skips a chunk with a document that failed the spec, and a workout read Oura refused', async () => {
+    oura(path => (path === 'workout' ? jsonResponse({ data: [{ id: 'wo-bad' }], next_token: null }) : null))
+    const dropped = fakeRepo()
+    await backfillOuraCloud({ repo: dropped.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    expect(dropped.absent).toEqual([])
+
+    fetchMock.mockReset()
+    oura(path => (path === 'workout' ? new Response('', { status: 403 }) : null))
+    const refused = fakeRepo()
+    await backfillOuraCloud({ repo: refused.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    expect(refused.absent).toEqual([])
+
+    const notShared = fakeRepo(true, 'extapi:personal extapi:daily extapi:heartrate extapi:session')
+    fetchMock.mockReset()
+    oura()
+    await backfillOuraCloud({ repo: notShared.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    expect(notShared.absent).toEqual([])
   })
 })
