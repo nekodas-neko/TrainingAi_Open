@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { HomeStore, type HomeChange } from '../src/features/home/data/HomeStore.ts';
 import {
+  homeCardsPatch,
   homeSections,
   homeStreak,
   moveHomeSection,
@@ -711,4 +712,52 @@ test('the avatar badge counts signups only, the More-tab dot signups plus feedba
   assert.equal(adminPendingTotal({ feedbackCount: 4 }), 4);
   assert.equal(adminSignupCount(null), 0);
   assert.equal(adminPendingTotal(undefined), 0);
+});
+
+test('a Home card turned on goes before Metric Tiles, with or without a saved order', () => {
+  const none = { homeCards: ['sleepWidget'] };
+  assert.deepEqual(homeSections({ ...none, homeCards: ['sleepWidget', 'stepsWidget'] }), [
+    'recommendation',
+    'streak',
+    'weekStrip',
+    'card_sleepWidget',
+    'card_stepsWidget',
+    'metricTiles',
+  ]);
+  const unsaved = homeCardsPatch(none, ['sleepWidget', 'stepsWidget']);
+  assert.deepEqual(unsaved.homeSectionOrder, [
+    'recommendation',
+    'streak',
+    'weekStrip',
+    'card_sleepWidget',
+    'card_stepsWidget',
+    'metricTiles',
+  ]);
+  const saved = {
+    homeCards: ['sleepWidget'],
+    homeSectionOrder: ['streak', 'recommendation', 'metricTiles', 'weekStrip', 'card_sleepWidget'],
+  };
+  const patch = homeCardsPatch(saved, ['sleepWidget', 'stepsWidget']);
+  assert.deepEqual(patch.homeSectionOrder, [
+    'streak',
+    'recommendation',
+    'card_stepsWidget',
+    'metricTiles',
+    'weekStrip',
+    'card_sleepWidget',
+  ]);
+  assert.deepEqual(homeSections({ ...patch }), patch.homeSectionOrder);
+  // An order saved before the card existed still shows it above the tiles.
+  assert.deepEqual(
+    homeSections({ homeCards: ['stepsWidget'], homeSectionOrder: saved.homeSectionOrder }),
+    ['streak', 'recommendation', 'card_stepsWidget', 'metricTiles', 'weekStrip'],
+  );
+  // Turning a card off drops it from the saved order, as the web does.
+  assert.deepEqual(homeCardsPatch(patch, ['stepsWidget']).homeSectionOrder, [
+    'streak',
+    'recommendation',
+    'card_stepsWidget',
+    'metricTiles',
+    'weekStrip',
+  ]);
 });
