@@ -9,6 +9,7 @@ import {
 } from '@trainingai/shared/health/fitness-tests';
 import { FitnessTestCreateBody } from '@trainingai/shared/validation/fitness-test';
 import { msToHHMMInTz, toAestDay } from '@trainingai/shared/date-utils';
+import { clipSegmentsAt } from '@trainingai/shared/walking/clip-segments';
 export const walkConfigSchema = z
   .object({
     sets: z.number().int().min(1).max(12),
@@ -81,11 +82,8 @@ export function walkPlan(config: WalkConfig) {
   return { segments, totalSec: time };
 }
 export function walkSegments(config: WalkConfig, elapsed: number) {
-  return walkPlan(config)
-    .segments.filter((segment) => segment.startSec < elapsed)
-    .map((segment) => ({
+  return clipSegmentsAt(walkPlan(config).segments, elapsed).map((segment) => ({
       ...segment,
-      endSec: Math.min(segment.endSec, elapsed),
       avgHr: null,
       maxHr: null,
       hrAtStart: null,
