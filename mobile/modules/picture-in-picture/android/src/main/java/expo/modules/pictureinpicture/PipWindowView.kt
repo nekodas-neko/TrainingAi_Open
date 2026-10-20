@@ -7,28 +7,36 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Build
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 
 // The current app's PiP window (components/workout/pip-view.tsx and the summary placeholder in
 // workout-screen.tsx), drawn natively so it keeps updating while the activity is paused. Sizes and
-// colours are the current app's: a black window, a 144 dp ring of radius 56 and stroke 9, a 32 sp
-// bold mono clock, and 9 sp uppercase captions tracked at 0.1 em.
+// colours are the current app's: a black window, a 144 dp ring of radius 56 and stroke 9, a 32 dp
+// bold mono clock, and 9 dp uppercase captions. Text is sized in dp, not sp: the current app's CSS
+// pixels ignore the system font scale, and the fixed ring has no room for a larger clock.
+// Preview bundles no Geist Mono, so the clock is the system mono face with tabular figures.
 class PipWindowView(context: Context) : FrameLayout(context) {
   private val density = resources.displayMetrics.density
   private fun dp(value: Float) = (value * density).toInt()
 
   private val ring = RingView(context)
-  private val name = caption(9f, FAINT)
-  private val time = text(32f, Color.WHITE, bold = true).apply { typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) }
-  private val target = caption(9f, TARGET)
-  private val label = caption(9f, FAINT)
-  private val load = text(14f, LOAD, bold = true)
+  // tracking-widest (0.1 em) on the name; tracking-wide (0.025 em) inside the ring.
+  private val name = caption(9f, FAINT, WIDEST)
+  private val time = text(32f, Color.WHITE, bold = true).apply {
+    typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+    fontFeatureSettings = "tnum"
+  }
+  private val target = caption(9f, TARGET, WIDE)
+  private val label = caption(9f, FAINT, WIDE)
+  private val load = text(14f, LOAD, bold = true).apply { fontFeatureSettings = "tnum" }
   private val timer = column(dp(4f)).apply {
     addView(name, wrap().apply { leftMargin = dp(12f); rightMargin = dp(12f) })
     addView(
@@ -47,14 +55,13 @@ class PipWindowView(context: Context) : FrameLayout(context) {
     )
     addView(load, wrap())
   }
-  private val doneName = text(18f, Color.WHITE, bold = true).apply {
-    setLineSpacing(0f, 1.375f)
-    maxLines = 3
-  }
+  // text-lg font-bold leading-snug, unclamped as on the web.
+  private val doneName = text(18f, Color.WHITE, bold = true).apply { setLineSpacing(0f, 1.375f) }
+  private val hint = caption(10f, HINT, WIDEST).apply { text = "Tap Next to continue" }
   private val placeholder = column(dp(8f)).apply {
-    addView(caption(12f, DONE_TITLE).apply { text = "Done"; setTypeface(typeface, Typeface.BOLD) }, wrap())
+    addView(caption(12f, DONE_TITLE, WIDEST).apply { text = "Done"; typeface = semibold() }, wrap())
     addView(doneName, wrap().apply { leftMargin = dp(24f); rightMargin = dp(24f) })
-    addView(caption(10f, HINT).apply { text = "Tap Next to continue" }, wrap())
+    addView(hint, wrap())
   }
   private var pulse: ValueAnimator? = null
 
@@ -66,10 +73,14 @@ class PipWindowView(context: Context) : FrameLayout(context) {
   }
 
   fun render(window: PipWindow?, nowMs: Long) {
+    // Without a timer to show (the summary, the workout done, or no data yet) the window shows the
+    // placeholder rather than going blank. "Tap Next" only where the window has a Next button.
     if (window == null || window.kind == "placeholder") {
       timer.visibility = GONE
-      placeholder.visibility = if (window == null) GONE else VISIBLE
+      placeholder.visibility = VISIBLE
       doneName.text = window?.exerciseName ?: ""
+      doneName.visibility = if (doneName.text.isEmpty()) GONE else VISIBLE
+      hint.visibility = if (window?.hint == true) VISIBLE else GONE
       setPulse(false)
       return
     }
@@ -85,7 +96,7 @@ class PipWindowView(context: Context) : FrameLayout(context) {
     target.setTextColor(if (clock.overTime) OVER else TARGET)
     label.text = clock.label
     load.text = window.load ?: ""
-    load.visibility = if (window.phase == "set" && window.load != null) VISIBLE else GONE
+    load.visibility = if (window.phase == "set") VISIBLE else GONE
     ring.fraction = clock.fraction
     ring.color = when {
       window.phase != "rest" -> window.setColor?.let(Color::parseColor) ?: REST
@@ -110,6 +121,7 @@ class PipWindowView(context: Context) : FrameLayout(context) {
     if (!on) return
     pulse = ValueAnimator.ofFloat(1f, 0.35f, 1f).apply {
       duration = 1_600
+      interpolator = LinearInterpolator()
       repeatCount = ValueAnimator.INFINITE
       addUpdateListener {
         ring.arcAlpha = it.animatedValue as Float
@@ -136,17 +148,17 @@ class PipWindowView(context: Context) : FrameLayout(context) {
     LinearLayout.LayoutParams.WRAP_CONTENT,
   ).apply { gravity = Gravity.CENTER_HORIZONTAL }
 
-  private fun text(sp: Float, color: Int, bold: Boolean = false) = TextView(context).apply {
-    setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
+  private fun text(size: Float, color: Int, bold: Boolean = false) = TextView(context).apply {
+    setTextSize(TypedValue.COMPLEX_UNIT_DIP, size)
     setTextColor(color)
     gravity = Gravity.CENTER
     includeFontPadding = false
     if (bold) setTypeface(typeface, Typeface.BOLD)
   }
 
-  private fun caption(sp: Float, color: Int) = text(sp, color).apply {
+  private fun caption(size: Float, color: Int, tracking: Float) = text(size, color).apply {
     isAllCaps = true
-    letterSpacing = 0.1f
+    letterSpacing = tracking
     maxLines = 1
     ellipsize = TextUtils.TruncateAt.END
   }
@@ -181,8 +193,15 @@ class PipWindowView(context: Context) : FrameLayout(context) {
     }
   }
 
+  // font-semibold is weight 600, which Android can name only from API 28.
+  private fun semibold(): Typeface =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) Typeface.create(Typeface.DEFAULT, 600, false)
+    else Typeface.create("sans-serif-medium", Typeface.NORMAL)
+
   companion object {
     private const val SIZE = 144f
+    private const val WIDEST = 0.1f
+    private const val WIDE = 0.025f
     private val REST = Color.parseColor("#94a3b8")
     private val OVER = Color.parseColor("#f87171")
     private val TRACK = Color.parseColor("#12FFFFFF")
