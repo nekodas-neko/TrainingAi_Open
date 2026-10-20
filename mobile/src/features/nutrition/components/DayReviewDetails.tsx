@@ -1,14 +1,11 @@
-import { trendRows, deltaSentence } from '@trainingai/shared/nutrition/day-trends';
+import { trendRows, TREND_TIME_DOMAIN } from '@trainingai/shared/nutrition/day-trends';
 import { useState } from 'react';
-import { View } from 'react-native';
 import { z } from 'zod';
-import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
   AppButton,
   AppText,
   Badge,
   Card,
-  LineChart,
   Stack,
   StatusIndicator,
   TextField,
@@ -20,6 +17,7 @@ import {
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { scanSchema } from '../data/models';
+import { TrendRowCard } from '../../health/components/TrendRowCard';
 import { MealLoggingStatus } from './MealLoggingStatus';
 import { aiFailureText } from '../../account/api/client';
 import { failureNotice } from '../../../core/reporting/index.ts';
@@ -29,7 +27,6 @@ const values = z.object({
   sessionVolumeKg: z.number().nullable(),
   weightKg: z.number().nullable(),
 });
-const ARROW = { up: '↑', down: '↓', level: '→' } as const;
 export function DayReviewTrends({ date }: { date: string }) {
   const state = useWorkoutResource({
     path: '/api/day-review/week-window',
@@ -41,7 +38,6 @@ export function DayReviewTrends({ date }: { date: string }) {
       sevenDayAverages: values,
     }),
   });
-  const { theme } = useTheme();
   const data = state.data?.date === date ? state.data : null;
   // The same rows, colours and wording as the current app: the maths is the shared `trendRows`.
   const rows = data ? trendRows(data) : [];
@@ -56,48 +52,13 @@ export function DayReviewTrends({ date }: { date: string }) {
           onRetry={state.refresh}
         />
       </Stack>
-      {rows.map(({ spec, today, delta, series }) => (
-        <Card key={spec.key} style={{ padding: theme.spacing.md }}>
-          <Stack direction="row" justify="space-between" align="center">
-            <Stack gap="xxs" style={{ flex: 1, minWidth: 0 }}>
-              <AppText variant="caption" tone="muted">
-                {spec.label}
-              </AppText>
-              {today == null ? (
-                <AppText variant="caption" tone="muted">
-                  No reading today
-                </AppText>
-              ) : (
-                <AppText variant="label" style={{ color: spec.color }}>
-                  {spec.format(today)}
-                </AppText>
-              )}
-            </Stack>
-            {series && (
-              <View style={{ width: theme.sizes.weightSparkline }}>
-                {/* Only the days with a reading are drawn, joined, at their own position in the
-                    eight-day window, so a stat recorded on three days is one line, not dots. */}
-                <LineChart
-                  label={spec.label + ' over eight days'}
-                  height={theme.sizes.miniChart}
-                  showLabels={false}
-                  color={spec.color}
-                  xDomain={[0, 7]}
-                  points={series.times.map((time, i) => ({
-                    label: String(time),
-                    x: time,
-                    value: series.values[i],
-                  }))}
-                />
-              </View>
-            )}
-          </Stack>
-          {delta && (
-            <AppText variant="micro" tone="muted">
-              {ARROW[delta.direction]} {deltaSentence(spec, delta)}
-            </AppText>
-          )}
-        </Card>
+      {rows.map((row) => (
+        <TrendRowCard
+          key={row.spec.key}
+          row={row}
+          timeDomain={TREND_TIME_DOMAIN}
+          absentLabel="No reading today"
+        />
       ))}
     </Card>
   );

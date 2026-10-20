@@ -9,6 +9,7 @@ import { sleepChips, sleepTimeRange } from '../data/body-view';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
 import { HealthMetricCard } from './HealthMetricCard';
 import { useCueColor } from './RangeBar';
+import { bodyCardColors } from '../../../shared/theme/tokens';
 
 /**
  * Health > Body > Sleep: duration and bed-to-wake range, the score badge, the stage chips and the
@@ -30,7 +31,7 @@ export function BodySleepCard({ openDetail }: { openDetail: (detail: HealthDetai
   return (
     <HealthMetricCard
       title="Sleep"
-      tone="sleep"
+      accent={bodyCardColors.sleep}
       onOpen={() => openDetail('sleep')}
       caption={nightLabel}
     >

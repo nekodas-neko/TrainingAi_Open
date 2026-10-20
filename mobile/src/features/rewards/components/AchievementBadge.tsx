@@ -8,7 +8,7 @@ import type { Achievement } from '../data/models';
 import { tierOf } from '../data/view';
 import { achievementIcon } from './achievementIcons';
 import { useCategoryColor } from './useCategoryColor';
-import { tint } from './tint';
+import { blend, tint } from './tint';
 import { glow } from './glow';
 
 /** One tile of the achievement grid: icon, name, tier, lock and progress as the current app draws it. */
@@ -44,7 +44,7 @@ export function AchievementBadge({
         borderRadius: theme.radii.card,
         borderWidth: tier === 'gold' ? 2 : 1,
         borderColor: unlocked ? (tier ? border : color) : theme.colors.border,
-        backgroundColor: unlocked ? tint(color, 0.12) : theme.colors.raised,
+        backgroundColor: unlocked ? blend(color, theme.colors.background, 0.12) : theme.colors.raised,
         padding: theme.spacing.sm,
         transform: [{ scale: pressed ? 0.95 : 1 }],
       })}

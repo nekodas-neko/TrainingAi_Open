@@ -185,7 +185,7 @@ export function HealthDetailScreen({
             </Grid>
             <ObservedHeartCard />
             <HeartFactors data={state.data} />
-            <HrDayCard />
+            <HrDayCard title="24h Heart Rate" />
             <HeartProgress trends={trends.data?.trends} />
           </>
         ) : (

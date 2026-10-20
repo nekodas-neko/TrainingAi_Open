@@ -8,6 +8,7 @@ import {
 import { ScrollView, RefreshControl, View } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { HealthHero, type HealthHeroKind } from './HealthHero';
+import { PageGradient } from './PageGradient';
 import { useAndroidBack } from './useAndroidBack';
 const AnchorContext = createContext<(node: View | null) => void>(() => {});
 export function useHealthAnchor() {
@@ -50,6 +51,7 @@ export function HealthDetailLayout({
       <ScrollView
         ref={scroll}
         style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           onRefresh ? (
@@ -61,7 +63,8 @@ export function HealthDetailLayout({
           ) : undefined
         }
       >
-        <View ref={content} collapsable={false}>
+        <View ref={content} collapsable={false} style={{ flexGrow: 1 }}>
+          <PageGradient css={theme.healthPageGradients[kind][theme.mode]} />
           <HealthHero kind={kind} title={title} onBack={onBack} actions={actions}>
             {hero}
           </HealthHero>

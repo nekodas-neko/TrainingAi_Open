@@ -33,6 +33,7 @@ import {
   trendSeries,
   weekActivities,
 } from '../data/training-view';
+import { useReadableCueColor } from './RangeBar';
 import { ActivityDetails, type HealthActivity } from './ActivityDetails';
 import { MuscleVolumeFigure } from './MuscleVolumeFigure';
 import { TrainingCalendarCard } from './TrainingCalendarCard';
@@ -86,28 +87,55 @@ function MovementCard() {
 // reading with no neighbour gets a dot, as in the current app.
 function TrendChartCard({
   title,
-  unit,
   series,
   color,
   status,
 }: {
   title: string;
-  unit: string;
   series: NonNullable<ReturnType<typeof trendSeries>>;
   color: string;
   status?: ReactNode;
 }) {
+  const cueColor = useReadableCueColor();
+  const { change } = series;
+  // trend-sparkline.tsx: "Title — 14 days" with the missing-days note beside it and the change
+  // since last week at the right, all on one row.
   return (
     <Card>
-      <Stack direction="row" justify="space-between" align="center">
-        <AppText variant="eyebrow" tone="muted" accessibilityRole="header" style={{ flex: 1 }}>
-          {title}
+      <Stack direction="row" justify="space-between" align="center" gap="sm">
+        <AppText
+          variant="eyebrow"
+          tone="muted"
+          accessibilityRole="header"
+          style={{ flex: 1, letterSpacing: 0.5 }}
+        >
+          {title} — 14 days
+          {series.missing ? (
+            <AppText
+              variant="eyebrow"
+              tone="muted"
+              style={{ textTransform: 'none', letterSpacing: 0, fontWeight: '400', opacity: 0.7 }}
+            >
+              {'  '}
+              {series.missing}
+            </AppText>
+          ) : null}
         </AppText>
+        {change && (
+          <AppText
+            variant="micro"
+            tone={change.direction === 'same' ? 'muted' : undefined}
+            style={
+              change.direction === 'same'
+                ? undefined
+                : { color: cueColor(change.direction === 'up' ? 'good' : 'bad') }
+            }
+          >
+            {change.text}
+          </AppText>
+        )}
         {status}
       </Stack>
-      <AppText variant="caption" tone="muted">
-        {['Last 14 days', unit, series.missing].filter(Boolean).join(' · ')}
-      </AppText>
       <LineChart
         label={title}
         points={series.points}
@@ -119,7 +147,7 @@ function TrendChartCard({
         yAxis
         niceBounds
         dots="isolated"
-        compactAxisLabels
+        smooth
       />
     </Card>
   );
@@ -283,7 +311,6 @@ export function TrainingPanel({
       {duration && (
         <TrendChartCard
           title="Session Duration"
-          unit="min"
           series={duration}
           color={theme.colors.brand}
           status={trendStatus}
@@ -292,7 +319,6 @@ export function TrainingPanel({
       {density && (
         <TrendChartCard
           title="Workout Density"
-          unit="kg lifted per active minute"
           series={density}
           color={theme.scores.activity}
           status={duration ? undefined : trendStatus}

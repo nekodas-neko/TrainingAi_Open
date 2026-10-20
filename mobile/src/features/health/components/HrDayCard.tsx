@@ -1,7 +1,7 @@
-import { View } from 'react-native';
 import { bucketAverage, hrChartDomain } from '@trainingai/shared/health/hr-smoothing';
 import { dateStrMidnightInTz, formatMinutesOfDay } from '@trainingai/shared/date-utils';
 import { bedtimeToMinuteWindow } from '@trainingai/shared/health/hr-sleep-band';
+import { noHrDataCopy } from '@trainingai/shared/health/hr-source-copy';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { AppText, Card, Legend, LineChart } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -12,7 +12,8 @@ import { hrSpec, stressSpec } from '../data/models';
 export function HrDayCard({
   embedded = false,
   color,
-}: { embedded?: boolean; color?: string } = {}) {
+  title = 'Heart Rate · Today',
+}: { embedded?: boolean; color?: string; title?: string } = {}) {
   const { today, timezone, sleep } = useHealthData();
   const { theme } = useTheme();
   const state = useWorkoutResource(hrSpec(today));
@@ -75,18 +76,29 @@ export function HrDayCard({
       : []),
     { x: minute(p.t) / 60000, value: p.level },
   ]);
-  // Home's card shows a box as tall as the chart when there is nothing to draw, so the card does
-  // not jump when readings arrive.
+  // With nothing to draw the card is a heading and one line, as the current app's is: no plot box,
+  // legend or footnote. The tall plot returns once readings arrive (Home needs two for a line).
+  const waiting = state.loading && !state.data;
+  const failed = state.error && !state.data;
   if (embedded && readings.length < 2) {
-    const waiting = state.loading && !state.data;
     return (
-      <View style={{ minHeight: theme.sizes.hrChartHeight, justifyContent: 'center' }}>
-        {!waiting && (
-          <AppText variant="caption" tone="muted">
-            {state.error && !state.data ? 'Couldn’t load heart rate' : 'No heart-rate data today'}
-          </AppText>
-        )}
-      </View>
+      <AppText variant="caption" tone="muted">
+        {waiting ? ' ' : failed ? 'Couldn’t load heart rate' : 'No heart-rate data today'}
+      </AppText>
+    );
+  }
+  if (!embedded && readings.length === 0) {
+    return (
+      <Card>
+        <HealthResourceHeader
+          title={title}
+          state={state}
+          refresh={state.refresh}
+        />
+        <AppText variant="caption" tone="muted">
+          {waiting ? ' ' : failed ? 'Couldn’t load today’s heart rate' : noHrDataCopy(null, 'day')}
+        </AppText>
+      </Card>
     );
   }
   const lineColor = color === 'transparent' ? undefined : color;
@@ -110,7 +122,7 @@ export function HrDayCard({
     >
       {!embedded && (
         <HealthResourceHeader
-          title="Heart Rate · Today"
+          title={title}
           state={state}
           refresh={state.refresh}
         />

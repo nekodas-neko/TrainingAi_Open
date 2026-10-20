@@ -239,6 +239,7 @@ export function ActivityTrendCharts() {
                 dots: 'isolated',
                 color: def.color,
                 axisLabels: weekdayAxis(shown.map((day) => day.date)),
+                smooth: true,
                 target: def.goal ? { value: def.goal, label: 'Goal' } : undefined,
               }}
               status={
@@ -347,6 +348,7 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
               fill
               dots="isolated"
               axisLabels={weekdayAxis(shown.map((day) => day.date))}
+              smooth
             />
             {change && (
               <AppText

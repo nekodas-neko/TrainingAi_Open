@@ -136,8 +136,8 @@ export function latestReading(
     : null;
 }
 
-/** One axis label per date, oldest first: the weekday on every `step`th day counting back from the newest, '' elsewhere. LineChart centres each non-blank label under its own point. */
-export function weekdayAxis(dates: readonly string[], max = 7): string[] {
+/** One axis label per date, oldest first: the weekday on every `step`th day counting back from the newest, '' elsewhere. LineChart centres each non-blank label under its own point. The current app labels all 14 days of a fortnight, so up to 14 is every day. */
+export function weekdayAxis(dates: readonly string[], max = 14): string[] {
   const step = Math.ceil(dates.length / max);
   return dates.map((date, i) =>
     (dates.length - 1 - i) % step === 0 ? formatDateDisplay(date, 'weekday') : '',

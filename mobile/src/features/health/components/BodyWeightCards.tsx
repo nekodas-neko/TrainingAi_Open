@@ -7,6 +7,7 @@ import {
 } from '@trainingai/shared/health/long-term-goal-progress';
 import { AppText, Badge, Disclosure, ProgressBar, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bodyCardColors } from '../../../shared/theme/tokens';
 import { displayFat, metricValue, type BodyRow } from '../data/models';
 import { readingCount, signedRate, weightPaceLine } from '../data/body-view';
 import { HealthMetricCard } from './HealthMetricCard';
@@ -61,7 +62,7 @@ export function BodyWeightCard({
       value={weight}
       unit="kg"
       decimals={1}
-      tone="recovery"
+      accent={bodyCardColors.weight}
       caption={weightDate && weightDate !== today ? `Last logged ${weightDate}` : 'Last 7 days'}
       onLog={onLog}
       onOpen={onOpen}
@@ -177,7 +178,7 @@ export function BodyFatCard({
       value={latest}
       unit="%"
       decimals={1}
-      tone="nutrition"
+      accent={bodyCardColors.fat}
       onOpen={onOpen}
       onLog={onLog}
       points={points}

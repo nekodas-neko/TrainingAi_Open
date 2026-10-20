@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import Svg, { Circle, Polygon, Polyline, Rect, Line } from 'react-native-svg';
+import Svg, { Circle, Path, Polygon, Polyline, Rect, Line } from 'react-native-svg';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
 import { ChartGuides, YAxisLabels, yAxisColumnWidth } from './ChartGuides';
@@ -20,6 +20,8 @@ import {
   meetBox,
   pointCentreX,
   niceTicks,
+  smoothPath,
+  DENSE_AXIS_POINTS,
   tickLabels,
   type ChartTarget,
 } from './chartScale';
@@ -66,6 +68,7 @@ export function LineChart({
   dotRadius = 3,
   niceBounds = false,
   stretch = false,
+  smooth = false,
 }: {
   points: readonly { label: string; value: number | null; x?: number }[];
   label: string;
@@ -105,6 +108,8 @@ export function LineChart({
   dotRadius?: number;
   niceBounds?: boolean;
   stretch?: boolean;
+  /** Curve the line through its readings (chart.js tension 0.4), as the current app's 14-day charts do. */
+  smooth?: boolean;
 }) {
   const { theme } = useTheme();
   const [selection, setSelection] = useState<number | null>(null);
@@ -112,7 +117,11 @@ export function LineChart({
   const labelVariant = readable ? 'caption' : 'micro';
   const labelTone = readable ? 'text' : 'muted';
   // Three-letter weekdays do not fit 14 columns at the readable size, so the x axis can drop to 10 px.
-  const axisVariant = compactAxisLabels ? 'micro' : labelVariant;
+  // A label on every day of a fortnight does not fit at 12 px either, so a dense axis takes the
+  // current app's 9 px ticks whether or not the caller asked.
+  const denseAxis =
+    (axisLabels?.filter((text) => text !== '').length ?? 0) >= DENSE_AXIS_POINTS;
+  const axisVariant = compactAxisLabels || denseAxis ? 'axisTick' : labelVariant;
   const plotHeight = height ?? theme.sizes.chartHeight;
   const target = drawableTarget(targetProp);
   const guides = gridlines || yAxis || target !== undefined;
@@ -280,24 +289,42 @@ export function LineChart({
             .filter((segment) => segment.length > 1)
             .map((segment, index) =>
               fill ? (
-                <Polygon
-                  key={'fill' + index}
-                  points={`${segment[0].x},${floorY} ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},${floorY}`}
-                  fill={fillColor ?? theme.tones[tone].background}
-                />
+                smooth ? (
+                  <Path
+                    key={'fill' + index}
+                    d={`M${segment[0].x},${floorY} L${smoothPath(segment).slice(1)} L${segment.at(-1)!.x},${floorY} Z`}
+                    fill={fillColor ?? theme.tones[tone].background}
+                  />
+                ) : (
+                  <Polygon
+                    key={'fill' + index}
+                    points={`${segment[0].x},${floorY} ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},${floorY}`}
+                    fill={fillColor ?? theme.tones[tone].background}
+                  />
+                )
               ) : null,
             )}
           {segments
             .filter((segment) => segment.length > 1)
-            .map((segment, index) => (
-              <Polyline
-                key={index}
-                points={segment.map((point) => `${point.x},${point.y}`).join(' ')}
-                fill="none"
-                stroke={color}
-                strokeWidth={2}
-              />
-            ))}
+            .map((segment, index) =>
+              smooth ? (
+                <Path
+                  key={index}
+                  d={smoothPath(segment)}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={2}
+                />
+              ) : (
+                <Polyline
+                  key={index}
+                  points={segment.map((point) => `${point.x},${point.y}`).join(' ')}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={2}
+                />
+              ),
+            )}
           {coords.map(
             (point, index) =>
               point &&
