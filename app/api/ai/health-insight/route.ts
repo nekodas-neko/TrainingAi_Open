@@ -14,6 +14,7 @@ import { nightSessions, canonicalNightForDate, canonicalLatestNight } from '@tra
 import { metric, splitMeasured, type MetricLine } from './metrics'
 import { buildInsightText, type RecentComparison } from './insight-text'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
 
 // An enum, a date and a boolean.
 const MAX_BODY_BYTES = 4 * 1024
@@ -75,7 +76,7 @@ export async function POST(req: Request) {
   // it starts a day before that window — the slack covers a DST day in the 7 × 24 h span.
   const since7 = shiftDateStr(date, -7)
   const sessionsFrom = dateStrMidnightInTz(shiftDateStr(date, -8), tz)
-  const [ouraRows, sleepRows, bodyMetrics, derivedRows, summaries, recentSessions, userProfile, userGoals] = await Promise.all([
+  const [ouraRows, sleepRows, bodyMetrics, derivedRows, summaries, recentSessions, userProfile, userGoals, switchDay] = await Promise.all([
     repo.getOuraDaily(userId, since7, date),
     repo.listSleepSessions(userId, since7, date),
     repo.listBodyMetrics(userId, since7, date),
@@ -84,10 +85,13 @@ export async function POST(req: Request) {
     repo.getWorkoutSessionsFrom(userId, sessionsFrom),
     repo.getUserById(userId),
     repo.getUserGoals(userId).catch(() => null),
+    repo.getOuraCloudSwitchDay(userId),
   ])
 
   const todayOura = ouraRows.find(r => r.date === date) ?? ouraRows[ouraRows.length - 1] ?? null
-  const todaySummary = summaries.find(s => s.date === date) ?? null
+  // The ring's rollup stands only before the day the user switched to the Oura API (#2998): from
+  // then its row is partial, and Oura's temperature is read instead.
+  const todaySummary = summaries.find(s => s.date === date && ringValueStands(s.date, switchDay)) ?? null
   // todayOura can fall back to an older row — annotate so the model never reads a stale
   // day's Oura values as "today".
   const staleNote = todayOura && todayOura.date !== date

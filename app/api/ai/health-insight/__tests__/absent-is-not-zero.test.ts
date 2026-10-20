@@ -25,6 +25,7 @@ vi.mock('@/lib/data', () => ({
     getOuraDaily: async () => [{ date: '2026-08-18', sleepScore: 80, readinessContributors: null, sleepContributors: null, temperatureDeviation: null }],
     getOuraDailyDerived: async () => [],
     getOuraDailySummary: async () => [],
+    getOuraCloudSwitchDay: async () => null,
     listSleepSessions: async () => [],
     listBodyMetrics: async () => [],
     getWorkoutSessionsFrom: async () => [],
