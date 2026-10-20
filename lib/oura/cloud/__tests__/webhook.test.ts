@@ -78,7 +78,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   const fetchMock = vi.fn<typeof fetch>()
   const savedKey = process.env.OURA_TOKEN_KEY
   let row: OuraCloudTokenRow | null
-  const writes = { daily: 0, sleep: 0, sessions: 0, tombstoned: [] as string[] }
+  const writes = { daily: 0, sleep: 0, sessions: 0, tombstoned: [] as string[], workoutsTombstoned: [] as string[] }
   const heartRate = vi.fn()
 
   function deps(): OuraWebhookDeps {
@@ -96,6 +96,8 @@ describe('handleOuraWebhookEvent (#2859)', () => {
         tombstoneOuraCloudSleep: async (_u, ids) => { writes.tombstoned.push(...ids); return ids.length },
         syncOuraMainSleepBodyMetrics: async () => ({ written: 0, cleared: 0 }),
         upsertOuraWorkouts: async (_u, rows) => rows.length,
+        tombstoneOuraWorkouts: async (_u, ids) => { writes.workoutsTombstoned.push(...ids); return ids.length },
+        tombstoneOuraWorkoutsAbsent: async () => 0,
         upsertOuraCloudHeartrate: async (_u, rows) => ({ offered: rows.length, changed: rows.length, changedFrom: null, changedTo: null }),
         upsertOuraCloudSleepPeriods: async (_u, rows) => rows.length,
         upsertOuraCloudDaily: async (_u, rows) => rows.length,
@@ -115,7 +117,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health',
       ouraUserId: OURA_USER, updatedAt: new Date(),
     }
-    writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []
+    writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []; writes.workoutsTombstoned = []
     heartRate.mockReset()
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
@@ -186,8 +188,32 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   })
 
   it('tombstones a deleted sleep period without calling Oura', async () => {
-    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'sleep', object_id: 'sl-1' }))).toEqual({ result: 'deleted', tombstoned: 1 })
+    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'sleep', object_id: 'sl-1' }))).toEqual({ result: 'deleted', rows: 1 })
     expect(writes.tombstoned).toEqual(['sl-1'])
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  // #3087: a workout deleted in the Oura app must stop counting in the energy budget.
+  it('tombstones a deleted workout without calling Oura, and leaves sleep alone', async () => {
+    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'workout', object_id: 'wo-1' }))).toEqual({ result: 'deleted', rows: 1 })
+    expect(writes.workoutsTombstoned).toEqual(['wo-1'])
+    expect(writes.tombstoned).toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('a workout delete for an Oura account nobody here holds tombstones nothing', async () => {
+    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'workout', object_id: 'wo-1', user_id: 'someone-else' }))).toEqual({ result: 'unknown_user' })
+    expect(writes.workoutsTombstoned).toEqual([])
+  })
+
+  // #3155 review: a delete only ever tombstones. Sessions and daily documents need a tombstone of
+  // their own first (#3153), so until then nothing is removed.
+  it('ignores a delete of a type it does not act on yet (session and daily documents until #3153)', async () => {
+    for (const data_type of ['session', 'daily_readiness', 'daily_activity']) {
+      expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type }))).toMatchObject({ result: 'ignored' })
+    }
+    expect(writes.tombstoned).toEqual([])
+    expect(writes.workoutsTombstoned).toEqual([])
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -268,6 +294,8 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
       tombstoneOuraCloudSleep: async () => 0,
       syncOuraMainSleepBodyMetrics: async () => ({ written: 0, cleared: 0 }),
       upsertOuraWorkouts: async () => 0,
+      tombstoneOuraWorkouts: async () => 0,
+      tombstoneOuraWorkoutsAbsent: async () => 0,
       upsertOuraCloudHeartrate: async (_u, rows, tz) => {
         upserts.push({ points: rows.length, tz }); contexts.push(...rows.map(r => r.context ?? null))
         const n = written ?? rows.length

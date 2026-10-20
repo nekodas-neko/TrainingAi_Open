@@ -41,9 +41,10 @@ export type SleepRow = {
    */
   manualEntry?: boolean;
   /**
-   * #3057 — Oura Cloud's type for the period (`long_sleep`, `sleep`, `late_nap`); null on every other
-   * source. `mergeByDate` never folds a non-`long_sleep` period beside a `long_sleep` into the night. Optional because the
-   * device's local store does not carry it (see `localSleepRowsAsNights`).
+   * #3057 — Oura Cloud's type for the period (`long_sleep`, `sleep`, `late_nap`, or a type Oura
+   * added, #3081); null on every other source. `mergeByDate` never folds a non-`long_sleep` period
+   * beside a `long_sleep` into the night. The device's store carries it since SQLite v53 (#3060);
+   * optional because a row pulled before v53, and a payload from before #3057, has none.
    */
   ouraSleepType?: string | null;
 };

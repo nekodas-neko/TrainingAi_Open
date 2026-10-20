@@ -216,12 +216,29 @@ function unavailable(op: string): Error {
 // replaces it, so they run strictly one after another. It never rejects.
 let _writeTail: Promise<void> = Promise.resolve();
 
+// #3162. A runSQL or withTransaction called from inside a withTransaction body waits for its own
+// transaction to end, which it never does: nothing throws, the pull and every write behind it just
+// stop. A real pull finishes well inside this, so in development a write still queued after it
+// says so. Reads (querySQL) do not queue and cannot hang this way.
+export const WRITE_QUEUE_STALL_WARN_MS = 20_000;
+
 /** Run `fn` after everything queued before it has finished; nothing queued later starts until it has. */
-async function enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
+async function enqueueWrite<T>(fn: () => Promise<T>, label: string): Promise<T> {
   const previous = _writeTail;
   let release!: () => void;
   _writeTail = new Promise<void>(resolve => { release = resolve; });
-  await previous;
+  const stall = process.env.NODE_ENV === 'production' ? null : setTimeout(() => {
+    console.warn(
+      `[sqlite] ${label} has waited ${WRITE_QUEUE_STALL_WARN_MS / 1000} s for the write queue. If a ` +
+      'withTransaction body called runSQL or withTransaction, it is waiting on itself and never ' +
+      'finishes: write through the body\'s tx.run instead.',
+    );
+  }, WRITE_QUEUE_STALL_WARN_MS);
+  try {
+    await previous;
+  } finally {
+    if (stall) clearTimeout(stall);
+  }
   try {
     return await fn();
   } finally {
@@ -237,7 +254,7 @@ async function enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
  * body that awaits a standalone write waits for its own transaction to end, which it never does.
  */
 export async function runSQL(sql: string, values?: unknown[]): Promise<void> {
-  return enqueueWrite(() => runOnPlugin(sql, values, true));
+  return enqueueWrite(() => runOnPlugin(sql, values, true), `runSQL [${sql.trim().replace(/\s+/g, ' ').slice(0, 80)}]`);
 }
 
 /** One plugin write. `ownTransaction` is the plugin's auto-wrap flag (see the comment above awaitOpen). */
@@ -351,7 +368,7 @@ export async function withTransaction<T>(fn: (tx: SQLTransaction) => Promise<T>)
       try { await rollbackTransaction(); } catch { /* already rolled back */ }
       throw err;
     }
-  });
+  }, 'withTransaction');
 }
 
 export async function querySQL<T = Record<string, unknown>>(

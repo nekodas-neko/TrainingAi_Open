@@ -1547,6 +1547,10 @@ export interface WorkoutRepository {
   withOuraSleepWriteLock<T>(userId: string, run: () => Promise<T>): Promise<T>
   /** #2859: Oura Cloud workouts, keyed by Oura's id; `reviewed` is kept. Returns rows written. */
   upsertOuraWorkouts(userId: string, rows: import('./postgres/slices/oura').OuraWorkoutUpsertRow[]): Promise<number>
+  /** #3087: tombstones workouts deleted in the Oura app; never a hard delete. Returns rows newly tombstoned. */
+  tombstoneOuraWorkouts(userId: string, ids: string[]): Promise<number>
+  /** #3087: tombstones the workouts on `from`..`to` that Oura's full list for those days no longer has. */
+  tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }): Promise<number>
   /** #2859: Oura Cloud's HR series (`oura_cloud`). Never displaces or duplicates a ring or strap row. */
   upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string): Promise<OuraCloudHeartrateWrite>
   /** #2982: Oura's sleep periods as sent (series, hypnograms, flags); read by no screen. Returns rows written. */

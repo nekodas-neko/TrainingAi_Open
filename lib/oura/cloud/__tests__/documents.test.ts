@@ -1,6 +1,6 @@
 // Oura Cloud documents → our rows (#2859): every field the spec provides lands, nothing else does.
 import { describe, expect, it } from 'vitest'
-import { mapHeartRateRows, mapOuraDocuments, parseOuraDocument, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument } from '../documents'
+import { mapHeartRateRows, mapOuraDocuments, parseOuraDocument, OURA_DOCUMENT_TYPE_NAMES, OURA_ENUMS, type OuraDocument } from '../documents'
 import { DAY, FIXTURES, heartRateRows, sleepPeriod, dailyActivity } from './fixtures'
 
 const all = (): OuraDocument[] => OURA_DOCUMENT_TYPE_NAMES.map(t => {
@@ -40,7 +40,7 @@ describe('Oura Cloud document mapping (#2859)', () => {
   })
 
   // #2895 review, item 7: until #2860 these would replace our own on the Sleep and Activity screens.
-  // #2982 keeps them, in `oura_cloud_daily`, which no screen reads.
+  // #2982 keeps them, in `oura_cloud_daily`, as Oura's reference (only readiness's feeds an input, #2984).
   it('keeps Oura\'s contributors and the stress day summary out of oura_daily, in oura_cloud_daily', () => {
     const { daily, cloudDaily } = mapOuraDocuments(all())
     for (const k of ['readinessContributors', 'sleepContributors', 'activityContributors', 'daySummary'] as const) {
@@ -156,7 +156,9 @@ describe('Oura Cloud document mapping (#2859)', () => {
   })
 
   it('still drops a workout that breaks a field we cannot do without', () => {
-    expect(parseOuraDocument('workout', { ...FIXTURES.workout, intensity: 'extreme' })).toBeNull()
+    expect(parseOuraDocument('workout', { ...FIXTURES.workout, start_datetime: 'this morning' })).toBeNull()
+    // #3081: a new intensity is a value, not a broken field (see the unknown-values tests); a number is.
+    expect(parseOuraDocument('workout', { ...FIXTURES.workout, intensity: 3 })).toBeNull()
   })
 
   it('lists a deleted period for a tombstone and skips a rest period', () => {
@@ -179,7 +181,7 @@ describe('Oura Cloud document mapping (#2859)', () => {
   })
 
   it('drops a document that is not the spec\'s shape rather than storing half of it', () => {
-    expect(parseOuraDocument('daily_stress', { id: 'x', day: DAY, day_summary: 'very_stressful' })).toBeNull()
+    expect(parseOuraDocument('daily_stress', { id: 'x', day: DAY, day_summary: 3 })).toBeNull()
     expect(parseOuraDocument('daily_activity', { id: 'x', day: DAY })).toBeNull()
     expect(parseOuraDocument('sleep', { ...sleepPeriod, bedtime_start: 'yesterday' })).toBeNull()
     expect(parseOuraDocument('daily_readiness', { ...FIXTURES.daily_readiness, day: '10/10/2026' })).toBeNull()
@@ -201,5 +203,70 @@ describe('Oura Cloud document mapping (#2859)', () => {
       { timestamp: new Date('2026-10-10T00:00:00Z'), bpm: 61, context: 'awake' },
       { timestamp: new Date('2026-10-10T00:05:00Z'), bpm: 64, context: 'awake' },
     ])
+  })
+})
+
+// #3081 (same class as #3033): a value Oura adds to an enum keeps its document, is stored as null
+// (a sleep type as sent), and is counted for the ingest's report. Each new or unknown value below is
+// a fixture of its own, so one field cannot pass for another.
+describe('Oura documents with a value the pinned spec does not list (#3081)', () => {
+  const NEW = 'a_value_oura_added'
+  const parse = (t: Parameters<typeof parseOuraDocument>[0], over: Record<string, unknown>) => {
+    const doc = parseOuraDocument(t, { ...FIXTURES[t], ...over })
+    expect(doc, `${t} kept`).not.toBeNull()
+    return doc!
+  }
+
+  it("stores v1.42's two new sleep analysis reasons, uncounted", () => {
+    for (const reason of ['background_sleep_analysis', 'background_created_foreground_updated']) {
+      const out = mapOuraDocuments([parse('sleep', { sleep_analysis_reason: reason })])
+      expect(out.sleepPeriods[0].sleepAnalysisReason).toBe(reason)
+      expect(out.unknownValues).toEqual({})
+    }
+  })
+
+  it.each([
+    ['daily_stress', 'day_summary', 'daily_stress.day_summary', (o: ReturnType<typeof mapOuraDocuments>) => o.cloudDaily[0].daySummary],
+    ['daily_resilience', 'level', 'daily_resilience.level', (o: ReturnType<typeof mapOuraDocuments>) => o.daily[0].resilienceLevel],
+    ['workout', 'intensity', 'workout.intensity', (o: ReturnType<typeof mapOuraDocuments>) => o.workouts[0].intensity],
+    ['workout', 'source', 'workout.source', (o: ReturnType<typeof mapOuraDocuments>) => o.workouts[0].source],
+    ['session', 'type', 'session.type', (o: ReturnType<typeof mapOuraDocuments>) => o.sessions[0].sessionType],
+    ['session', 'mood', 'session.mood', (o: ReturnType<typeof mapOuraDocuments>) => o.sessions[0].mood],
+    ['sleep', 'sleep_analysis_reason', 'sleep.sleep_analysis_reason', (o: ReturnType<typeof mapOuraDocuments>) => o.sleepPeriods[0].sleepAnalysisReason],
+    ['sleep', 'sleep_algorithm_version', 'sleep.sleep_algorithm_version', (o: ReturnType<typeof mapOuraDocuments>) => o.sleepPeriods[0].sleepAlgorithmVersion],
+  ] as const)('keeps a %s with a new %s, stores it as null and counts it', (type, field, key, read) => {
+    const out = mapOuraDocuments([parse(type, { [field]: NEW })])
+    expect(read(out)).toBeNull()
+    expect(out.unknownValues).toEqual({ [key]: 1 })
+    // A value the spec lists is kept and not counted.
+    const listed = OURA_ENUMS[key][0]
+    const ok = mapOuraDocuments([parse(type, { [field]: listed })])
+    expect(read(ok)).toBe(listed)
+    expect(ok.unknownValues).toEqual({})
+  })
+
+  it('counts per field across a batch', () => {
+    const out = mapOuraDocuments([
+      parse('workout', { id: 'w1', intensity: NEW }), parse('workout', { id: 'w2', intensity: NEW }),
+      parse('session', { id: 's1', type: NEW }),
+    ])
+    expect(out.workouts).toHaveLength(2)
+    expect(out.sessions).toHaveLength(1)
+    expect(out.unknownValues).toEqual({ 'workout.intensity': 2, 'session.type': 1 })
+  })
+
+  // The exception: a sleep type is stored as sent and the period is written, but it is never the night.
+  it('keeps a sleep period with a new type: stored raw, written as a period, never removed', () => {
+    const out = mapOuraDocuments([parse('sleep', { type: NEW })])
+    expect(out.sleepPeriods.map(p => p.sleepType)).toEqual([NEW])
+    expect(out.sleep.map(r => r.ouraId)).toEqual([sleepPeriod.id])
+    expect(out.deletedSleepIds).toEqual([])
+    expect(out.retypedSleepIds).toEqual([])
+    expect(out.unknownValues).toEqual({ 'sleep.type': 1 })
+  })
+
+  it('still drops a document whose enum field is not a string at all', () => {
+    expect(parseOuraDocument('sleep', { ...sleepPeriod, type: 7 })).toBeNull()
+    expect(parseOuraDocument('daily_resilience', { ...FIXTURES.daily_resilience, level: null })).toBeNull()
   })
 })

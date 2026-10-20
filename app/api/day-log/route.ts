@@ -327,7 +327,8 @@ export async function GET(req: NextRequest) {
   }
 
   const activityLogs = await repo.listActivityLogs(userId, pgDate, pgDate);
-  // #3095: the day's steps are the device's plus the indoor (treadmill) steps it could not see —
+  // #3095: the day's steps are the device's plus indoor (treadmill) steps — whether the ring already
+  // counts some of those is unknown, pending #3112 —
   // the one builder Home and the cardio week use, so the day screen reads the same figure.
   if (bodyMeta) bodyMeta.steps = dayStepCount(bodyMeta.steps, activityLogs);
 

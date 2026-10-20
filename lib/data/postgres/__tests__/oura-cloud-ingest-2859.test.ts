@@ -298,7 +298,7 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     await repo.upsertOuraCloudSleepPeriods(USER, mapOuraDocuments([{ type: 'sleep', doc: SleepDoc.parse(sleepPeriod) }]).sleepPeriods)
     const { handleOuraWebhookEvent } = await import('@/lib/oura/cloud/webhook')
     expect(await handleOuraWebhookEvent({ repo, config: CONFIG, heartRate: () => {} }, { event_type: 'delete', data_type: 'sleep', object_id: 'sl-1', user_id: OURA_USER }))
-      .toEqual({ result: 'deleted', tombstoned: 1 })
+      .toEqual({ result: 'deleted', rows: 1 })
     const gone = await one(`SELECT deleted_at FROM sleep_sessions WHERE user_id = $1`)
     expect(gone.deleted_at).not.toBeNull()
     // The period's detail stays, marked deleted (#2982).
