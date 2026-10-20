@@ -1594,7 +1594,7 @@ export const ouraDaily = pgTable('oura_daily', {
   sleepTimeStatus:         text('sleep_time_status'),
   sleepTimeRecommendation: text('sleep_time_recommendation'),
 
-  // Breathing disturbance index (from GET /v2/usercollection/spo2_daily) — migration 106
+  // Breathing disturbance index (from GET /v2/usercollection/daily_spo2) — migration 106
   breathingDisturbanceIndex: doublePrecision('breathing_disturbance_index'),
 
   sourceMap: jsonb('source_map').$type<Record<string, string>>(),   // per-field provenance (migration 120)
@@ -2126,8 +2126,10 @@ export const ouraTags = pgTable('oura_tags', {
 /** Oura's `PublicSample`: `items` taken every `interval` seconds from `timestamp`. Stored as sent. */
 export interface OuraSampleSeries { interval: number; items: (number | null)[]; timestamp: string }
 
-// #2982 (migration 202610180038) — what Oura Cloud sends and no screen reads. Storage for #2860's
-// later batches: nothing reads these tables yet. Kept out of `sleep_sessions` and `oura_daily`
+// #2982 (migration 202610180038) — what Oura Cloud sends, as Oura sent it. Mostly storage for
+// #2860's later batches; three columns are read now: `oura_cloud_sleep_periods.sleep_type` (night
+// composition, #3057), `oura_cloud_daily.readiness_contributors` (#2984) and `oura_cloud_daily.met`
+// (#2985, with `class_5_min` as its wear gate). Kept out of `sleep_sessions` and `oura_daily`
 // because both are read whole by routes and the device pull, and their `*_contributors` columns are
 // ours. Field names are the pinned spec's.
 

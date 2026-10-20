@@ -174,6 +174,9 @@ export const typography = {
   // strength-progress-card.tsx: the 60 / 70 / 80 labels over a strength bar, 7 px bold at -0.02em.
   strengthMarker: { fontSize: 7, lineHeight: 7, fontWeight: '700', letterSpacing: -0.14 },
   display: { fontSize: 48, lineHeight: 56, fontWeight: '800' },
+  // The current app's rest ring numerals: text-[56px] font-black, 44px in overtime (#3142).
+  restCountdown: { fontSize: 56, lineHeight: 56, fontWeight: '900' },
+  restOvertime: { fontSize: 44, lineHeight: 44, fontWeight: '900' },
   wheelValue: { fontSize: 32, lineHeight: 40, fontWeight: '700' },
 } satisfies Record<string, TextStyle>;
 export type Space = keyof typeof spacing;
@@ -273,6 +276,7 @@ export const homeCardColors = {
   muscleStatusWidget: '#22c55e',
   hrChartWidget: 'transparent',
   energyBalanceWidget: '#22c55e',
+  collectionWidget: '#fb923c',
 };
 export const domainTones = {
   light: {

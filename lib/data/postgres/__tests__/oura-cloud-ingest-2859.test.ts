@@ -296,7 +296,7 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     await repo.upsertOuraCloudSleepPeriods(USER, mapOuraDocuments([{ type: 'sleep', doc: SleepDoc.parse(sleepPeriod) }]).sleepPeriods)
     const { handleOuraWebhookEvent } = await import('@/lib/oura/cloud/webhook')
     expect(await handleOuraWebhookEvent({ repo, config: CONFIG, heartRate: () => {} }, { event_type: 'delete', data_type: 'sleep', object_id: 'sl-1', user_id: OURA_USER }))
-      .toEqual({ result: 'deleted', tombstoned: 1 })
+      .toEqual({ result: 'deleted', rows: 1 })
     const gone = await one(`SELECT deleted_at FROM sleep_sessions WHERE user_id = $1`)
     expect(gone.deleted_at).not.toBeNull()
     // The period's detail stays, marked deleted (#2982).
@@ -338,7 +338,8 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
       { timestamp: new Date('2026-10-09T23:50:00Z'), bpm: 61 },
       { timestamp: new Date('2026-10-10T00:05:00Z'), bpm: 64 },
     ], 'Australia/Brisbane')
-    expect(n).toBe(1)
+    expect(n.offered).toBe(1)
+    expect(n.changed).toBe(1)
     const rows = (await pool.query(`SELECT timestamp, bpm, source FROM oura_heartrate WHERE user_id = $1 ORDER BY timestamp`, [USER])).rows
     expect(rows.map(r => [r.timestamp.toISOString(), r.bpm, r.source])).toEqual([
       ['2026-10-09T23:50:00.000Z', 61, 'oura_cloud'],

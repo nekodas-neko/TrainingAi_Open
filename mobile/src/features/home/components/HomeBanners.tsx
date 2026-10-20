@@ -174,6 +174,7 @@ export function HomeBanners({
         '/api/workout-data',
         '/api/ai-periodization',
         '/api/next-session',
+        '/api/collection',
       ]);
       await mark(`deload:${health.today}`);
     } catch (failure) {

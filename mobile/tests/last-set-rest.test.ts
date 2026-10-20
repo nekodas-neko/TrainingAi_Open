@@ -106,7 +106,8 @@ test('the summary rest schedules the rest alarm at its end, in the foreground an
   for (const foreground of [true, false]) {
     const [alert] = planAlerts(settings(), [workout], null, f.now(), foreground);
     assert.equal(alert?.title, 'Rest complete');
-    assert.equal(alert.body, 'Ready for your next exercise.');
+    // The current app's wording after an exercise's last set: N+1 (#3142).
+    assert.equal(alert.body, 'Time for set 3');
     assert.deepEqual(alert.trigger, { at: workout.rest!.endsAt });
   }
   // With the rest cue off, only the background Alerts setting adds it, as for any rest.

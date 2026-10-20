@@ -11,7 +11,8 @@ const repo = {
     { date: '2026-07-15', hrvMs: 52, restingHeartRate: 48, steps: 9000, weightKg: 82.5, spo2Pct: 96.4 },
   ],
   getOuraDailyDerived: async () => [],
-  // #3095: a treadmill session the ring could not see — its steps join the day's, as on every screen.
+  // #3095: a treadmill session — its steps join the day's, as on every screen (whether the ring already
+  // counts some of them is unknown, pending #3112).
   listActivityLogs: async () => [{ date: '2026-07-15', activityType: 'treadmill', steps: 2000, startTime: '12:00:00' }],
 } as unknown as WorkoutRepository
 

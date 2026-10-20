@@ -65,21 +65,21 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 ## Deferred rewards
 
-- [ ] Own XP, levels and progress to the next level. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [ ] Own XP, levels and progress to the next level. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Achievement browser, criteria, progress and details. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [ ] Achievement browser, criteria, progress and details. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Personal trophy case. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [ ] Personal trophy case. Built, device check pending. Pins stay on the phone, as in the current app; whether friends should see them is [#3125](https://github.com/nekodas-neko/TrainingAi_Open/issues/3125). [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Equip and clear unlocked titles. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [ ] Equip and clear unlocked titles. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Current/past season results and badges. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [ ] Current/past season results and badges. Built, device check pending. The current app shows only the badges for seasons with a result. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Collection inventories, ladder progression, merging and decay explanations. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [ ] Collection inventories, ladder progression, merging and decay explanations. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Animated Home collection and interactions. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [ ] Animated Home collection and interactions. Built, device check pending. The cats walk; their on-the-spot movement is an owner decision, [#3139](https://github.com/nekodas-neko/TrainingAi_Open/issues/3139). [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Post-workout XP, unlock feedback and reward-state refresh. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [ ] Post-workout XP, unlock feedback and reward-state refresh. Built, device check pending. The current app has no unlock list after a workout, only the XP badge and the shimmer on new badges. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
 ## Deferred health and device integrations
 

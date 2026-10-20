@@ -5,6 +5,10 @@ import type { HrReading, SetHrStats } from './hr-analysis'
 // silently erases them for any workout older than 180d (strap rows are not re-derivable from
 // anything). This is the durable Tier-2 record — computed on first ready view and persisted, so old
 // recaps keep their numbers after the raw series thins.
+/** How far either side of a session its heart-rate window reaches (`computeWorkoutHr`): the warm-up
+ *  before the first set and the recovery after the last. `readingsCount` counts this whole window. */
+export const WORKOUT_HR_PAD_MS = 10 * 60 * 1000
+
 export interface WorkoutHrSummary {
   avgBpm: number | null
   peakBpm: number | null

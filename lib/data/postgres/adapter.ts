@@ -3141,12 +3141,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // per-field instead of first-write-wins. Before this it was a bare onConflictDoNothing with no
   // source_map, which made every Health Connect night a rank-0 writer (Q-43).
   async saveSleepSession(userId: string, session: Omit<SleepSession, 'id' | 'userId' | 'createdAt'>, source: HealthSource): Promise<void> {
-    // #3080: a Health Connect or Apple Health night yields to an Oura Cloud night that holds it, and
-    // must not come back as a second fragment on the next sync.
-    const rows = await oura.dropNightsOuraCloudHolds(this.db, userId, [{
-      date: session.date, sleepStart: session.sleepStart, sleepEnd: session.sleepEnd,
+    // #3080, #3115: a Health Connect or Apple Health night follows the night ladder. It yields to a
+    // higher-ranked night that holds it (Oura Cloud, the ring before the switch day) or to another
+    // source's copy already stored, and must not come back as a second fragment on the next sync;
+    // a lower-ranked overlapping night, or this source's earlier cut of it, is tombstoned.
+    const { kept } = await oura.settleNights(this.db, userId, [{
+      sleepStart: session.sleepStart, sleepEnd: session.sleepEnd, durationHours: session.durationHours,
     }], source)
-    if (rows.length === 0) return
+    if (kept.length === 0) return
     await oura.upsertOuraSleep(this.db, userId, [{
       date:             session.date,
       sleepStart:       session.sleepStart,
@@ -8225,6 +8227,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listDeletedOuraCloudSleepDates(userId: string, from: string, to: string, tz: string) { return oura.listDeletedOuraCloudSleepDates(this.db, userId, from, to, tz) }
   async withOuraSleepWriteLock<T>(userId: string, run: () => Promise<T>) { return withUserLock(getPool(), `oura-sleep-write:${userId}`, run, { label: 'oura sleep write' }) }
   async upsertOuraWorkouts(userId: string, rows: oura.OuraWorkoutUpsertRow[]) { return oura.upsertOuraWorkouts(this.db, userId, rows) }
+  async tombstoneOuraWorkouts(userId: string, ids: string[]) { return oura.tombstoneOuraWorkouts(this.db, userId, ids) }
+  async tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }) { return oura.tombstoneOuraWorkoutsAbsent(this.db, userId, range) }
   async upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string) { return oura.upsertOuraCloudHeartrate(this.db, userId, rows, tz) }
   async upsertOuraCloudSleepPeriods(userId: string, rows: oura.OuraCloudSleepPeriodRow[]) { return oura.upsertOuraCloudSleepPeriods(this.db, userId, rows) }
   async upsertOuraCloudDaily(userId: string, rows: oura.OuraCloudDailyRow[]) { return oura.upsertOuraCloudDaily(this.db, userId, rows) }
@@ -8253,6 +8257,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getWorkoutHrStats(userId: string, sessionId: string) { return oura.getWorkoutHrStats(this.db, userId, sessionId) }
   async getAvgBpmBySession(userId: string, sessionIds: string[]) { return oura.getAvgBpmBySession(this.db, userId, sessionIds) }
   async listSessionsMissingHrStats(userId: string, since: Date, limit: number) { return oura.listSessionsMissingHrStats(this.db, userId, since, limit) }
+  async listCompletedSessionsOverlapping(userId: string, from: Date, to: Date, limit: number) { return oura.listCompletedSessionsOverlapping(this.db, userId, from, to, limit) }
   async getSetDetailsForSession(userId: string, workoutSessionId: string) { return oura.getSetDetailsForSession(this.db, userId, workoutSessionId) }
   async upsertSetHrStats(userId: string, workoutSessionId: string, rows: import('@trainingai/shared/workout/set-hr-stats').SetHrRow[]) { return oura.upsertSetHrStats(this.db, userId, workoutSessionId, rows) }
   async getSetHrStatsForSession(userId: string, workoutSessionId: string) { return oura.getSetHrStatsForSession(this.db, userId, workoutSessionId) }

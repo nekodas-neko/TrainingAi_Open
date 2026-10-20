@@ -8,6 +8,7 @@ import { SupplementCreateSchema } from '@trainingai/shared/validation/supplement
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
 import { SavedMealSchema } from '@trainingai/shared/validators/saved-meal';
 import { z } from 'zod';
+import { rewardViewPaths } from '../../rewards/data/dependencies.ts';
 const n = z.number().finite();
 const optionalNumber = n.nullish();
 const optionalText = z.string().nullish();
@@ -319,6 +320,7 @@ export const scanSchema = z
   .passthrough();
 export type Scan = z.infer<typeof scanSchema>;
 export const nutritionPaths = [
+  ...rewardViewPaths,
   '/api/day-timeline',
   '/api/nutrition',
   '/api/body-metadata',
