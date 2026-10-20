@@ -35,7 +35,9 @@ SELECT
   t.cadence_series,
   t.cadence_source,
   t.elevation_profile,
-  t.segments
+  t.segments,
+  t.external_source,
+  t.external_id
 FROM public.activity_logs t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

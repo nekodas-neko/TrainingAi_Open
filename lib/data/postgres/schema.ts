@@ -420,6 +420,11 @@ export const activityLogs = pgTable('activity_logs', {
   avgHr:           integer('avg_hr'),
   maxHr:           integer('max_hr'),
   notes:           text('notes'),
+  // #3044, #2843 (migration 202610200318): the record id and source of a session imported from
+  // Health Connect, so it updates in place and tombstones when deleted there. NULL for every
+  // session logged in the app.
+  externalSource:  text('external_source'),
+  externalId:      text('external_id'),
   routePolyline:   text('route_polyline'),
   splits:          jsonb('splits').$type<{ km: number; paceSec: number }[]>(),
   bestEfforts:     jsonb('best_efforts').$type<Record<string, number>>(),
