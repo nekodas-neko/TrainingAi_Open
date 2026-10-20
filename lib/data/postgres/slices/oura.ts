@@ -1271,7 +1271,7 @@ export async function dropBleNightsOuraCloudHolds(
   if (!switchDay) return rows
   const kept: OuraSleepUpsertRow[] = []
   for (const r of rows) {
-    if (r.date < switchDay) { kept.push(r); continue }
+    if (ringValueStands(r.date, switchDay)) { kept.push(r); continue }
     const held = await db.execute(sql`
       SELECT 1 FROM sleep_sessions o
        WHERE o.user_id = ${userId} AND o.deleted_at IS NULL AND NOT o.manual_entry

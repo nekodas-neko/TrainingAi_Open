@@ -9,6 +9,7 @@ import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/healt
 import type { BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
 import { nightSessions, nightWokenFrom } from '@trainingai/shared/health/sleep-night'
 import { walkBodyBattery, restThresholdFromOffset } from '@trainingai/shared/health/body-battery-walk'
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { buildDaytimeStressSeriesFromModel, summarizeStressDay, type StressPoint, type DhrvBaselines } from '@/lib/health/daytime-stress'
 import { resolveAnchor, type AnchorSource } from '@/lib/health/body-battery-anchor'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
@@ -331,7 +332,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   // total with no times, so it is spread evenly over the waking span: the level is the share of the
   // span Oura counted as high stress, and a full-deviation minute drains at STRESS_DRAIN_RATE,
   // so the day's stress drain comes to about STRESS_DRAIN_RATE per high-stress minute.
-  const ouraStressHighMin = stressSeries.length === 0 && ouraCloudFrom != null && date >= ouraCloudFrom
+  const ouraStressHighMin = stressSeries.length === 0 && !ringValueStands(date, ouraCloudFrom)
     && ouraDay?.stressHigh != null && ouraDay.stressHigh >= 0
     ? Math.round(ouraDay.stressHigh / 60)
     : null
