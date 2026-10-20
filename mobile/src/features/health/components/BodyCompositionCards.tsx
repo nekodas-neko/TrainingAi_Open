@@ -1,6 +1,7 @@
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { bodyComposition } from '@trainingai/shared/health/body-composition';
 import { AppText, Card, Disclosure, Grid, LineChart, MetricTile, Stack } from '../../../shared/ui';
+import { bodyCardColors } from '../../../shared/theme/tokens';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { displayFat, latestMetric, type BodyRow } from '../data/models';
 import { useCueColor } from './RangeBar';
@@ -30,7 +31,7 @@ export function LeanMassCard({ rows }: { rows: readonly BodyRow[] }) {
     return c ? [{ label: row.date, value: round1(c.ffmKg), x: index }] : [];
   });
   return (
-    <Card>
+    <Card accent={bodyCardColors.leanMass}>
       <AppText variant="eyebrow" tone="muted">
         Body Composition
       </AppText>
@@ -105,7 +106,7 @@ export function ScaleCompositionCard({ rows }: { rows: readonly BodyRow[] }) {
     { label: 'Metabolic Age', value: fmt(latest.metabolicAge, ' yrs') },
   ].filter((tile) => tile.value !== null);
   return (
-    <Card>
+    <Card accent={bodyCardColors.composition}>
       <Stack gap="xxs">
         <AppText variant="eyebrow" tone="muted">
           Body Composition (Scale)

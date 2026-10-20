@@ -103,10 +103,19 @@ function TrendChartCard({
   return (
     <Card>
       <Stack direction="row" justify="space-between" align="center" gap="sm">
-        <AppText variant="cardTitle" tone="muted" accessibilityRole="header" style={{ flex: 1 }}>
+        <AppText
+          variant="eyebrow"
+          tone="muted"
+          accessibilityRole="header"
+          style={{ flex: 1, letterSpacing: 0.5 }}
+        >
           {title} — 14 days
           {series.missing ? (
-            <AppText variant="caption" tone="muted" style={{ textTransform: 'none', letterSpacing: 0 }}>
+            <AppText
+              variant="eyebrow"
+              tone="muted"
+              style={{ textTransform: 'none', letterSpacing: 0, fontWeight: '400', opacity: 0.7 }}
+            >
               {'  '}
               {series.missing}
             </AppText>

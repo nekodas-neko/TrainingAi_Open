@@ -12,7 +12,8 @@ import { hrSpec, stressSpec } from '../data/models';
 export function HrDayCard({
   embedded = false,
   color,
-}: { embedded?: boolean; color?: string } = {}) {
+  title = 'Heart Rate · Today',
+}: { embedded?: boolean; color?: string; title?: string } = {}) {
   const { today, timezone, sleep } = useHealthData();
   const { theme } = useTheme();
   const state = useWorkoutResource(hrSpec(today));
@@ -90,7 +91,7 @@ export function HrDayCard({
     return (
       <Card>
         <HealthResourceHeader
-          title="Heart Rate · Today"
+          title={title}
           state={state}
           refresh={state.refresh}
         />
@@ -121,7 +122,7 @@ export function HrDayCard({
     >
       {!embedded && (
         <HealthResourceHeader
-          title="Heart Rate · Today"
+          title={title}
           state={state}
           refresh={state.refresh}
         />

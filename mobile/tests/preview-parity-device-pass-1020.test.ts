@@ -70,3 +70,18 @@ test('a CSS gradient string becomes stops, and transparent keeps the colour befo
     { offset: '100%', color: '#3d0808', opacity: 0 },
   ]);
 });
+
+test('every Body card the web tints takes its accent (#3187)', async () => {
+  const expected: [string, string][] = [
+    ['BodyWeightCards.tsx', 'bodyCardColors.weight'],
+    ['BodyWeightCards.tsx', 'bodyCardColors.fat'],
+    ['BodyCompositionCards.tsx', 'bodyCardColors.leanMass'],
+    ['BodyCompositionCards.tsx', 'bodyCardColors.composition'],
+    ['BodySleepCard.tsx', 'bodyCardColors.sleep'],
+    ['BodyPanel.tsx', 'bodyCardColors.burned'],
+    ['BodyPanel.tsx', 'bodyCardColors.bmi'],
+  ];
+  for (const [file, token] of expected) {
+    assert.ok((await read(`features/health/components/${file}`)).includes(`accent={${token}}`), `${file} ${token}`);
+  }
+});

@@ -288,6 +288,9 @@ export const bodyCardColors = {
   fat: '#f43f5e',
   burned: '#f97316',
   bmi: '#a78bfa',
+  composition: '#a78bfa',
+  leanMass: '#22c55e',
+  sleep: '#2dd4bf',
 };
 export const domainTones = {
   light: {

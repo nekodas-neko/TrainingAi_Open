@@ -174,6 +174,9 @@ function WeekTrends({ week }: { week: string }) {
   const data = state.data;
   // The same rows the day review draws, over five weekly points against the four weeks before.
   const rows = data ? trendRowsFor({ points: data.weeks, priorAverages: data.priorAverages }) : [];
+  // The current app draws nothing when no stat has a reading; Preview keeps the heading only
+  // while the request is open or failed, so that state can still be retried.
+  if (data && rows.length === 0) return null;
   return (
     <Stack gap="sm">
       <Stack direction="row" justify="space-between" align="center">

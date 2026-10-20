@@ -28,7 +28,14 @@ export function TrendRowCard({
   const [width, setWidth] = useState(0);
   const dotRadius = (2.5 * 320) / (width || theme.sizes.weightSparkline);
   return (
-    <Card style={{ padding: theme.spacing.md, gap: theme.spacing.xs }}>
+    <Card
+      style={{
+        // px-3 py-2.5, with the change line mt-1.5 under the row.
+        paddingHorizontal: theme.spacing.md,
+        paddingVertical: theme.spacing.snug,
+        gap: theme.spacing.xs + theme.spacing.xxs,
+      }}
+    >
       <Stack direction="row" justify="space-between" align="center">
         <Stack gap="xxs" style={{ flex: 1, minWidth: 0 }}>
           <AppText variant="caption" tone="muted">
