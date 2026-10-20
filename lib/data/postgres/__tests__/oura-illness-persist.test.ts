@@ -94,4 +94,36 @@ describe.skipIf(!canRun)('aggregateOuraRawSamples — illness radar persisted pe
     expect(rows[0].illness_flag).toBe('learning')
     expect(Number(rows[0].illness_score)).toBe(0)
   })
+  // #3171: the live read owns the illness fields on a day it has stored a readiness for.
+  it('leaves the live read\'s illness fields and score explanation intact on a later rollup', async () => {
+    const { READINESS_SUPPRESSION, storedReadinessMatches } = await import('@trainingai/shared/health/illness-radar')
+    const { rows: before } = await pool.query(
+      `SELECT day::text AS day, illness_flag FROM oura_daily_derived WHERE user_id = $1 AND illness_flag IS NOT NULL`, [TEST_USER_ID])
+    const day = before[0].day as string
+    expect(before[0].illness_flag).toBe('learning') // rollup-only day: the rollup is its writer
+
+    const biomarkers = { rhr: { z: 2.4 } }
+    await repo.upsertOuraDailyDerived(TEST_USER_ID, day, {
+      readinessScore: 60, illnessFlag: 'elevated', illnessScore: 70, illnessBiomarkers: biomarkers,
+    })
+    await repo.aggregateOuraRawSamples(TEST_USER_ID, 'Australia/Brisbane')
+
+    const { rows } = await pool.query(
+      `SELECT readiness_score, illness_flag, illness_score, illness_biomarkers FROM oura_daily_derived
+        WHERE user_id = $1 AND day = $2`, [TEST_USER_ID, day])
+    expect(rows[0].readiness_score).toBe(60)
+    expect(rows[0].illness_flag).toBe('elevated')
+    expect(Number(rows[0].illness_score)).toBe(70)
+    expect(rows[0].illness_biomarkers).toEqual(biomarkers)
+    const composite = 60 + READINESS_SUPPRESSION.elevated
+    expect(storedReadinessMatches(rows[0].readiness_score, composite, rows[0].illness_flag)).toBe(true)
+  })
+
+  it('still writes the radar on a day with no live read', async () => {
+    await pool.query(`DELETE FROM oura_daily_derived WHERE user_id = $1`, [TEST_USER_ID])
+    await repo.aggregateOuraRawSamples(TEST_USER_ID, 'Australia/Brisbane')
+    const { rows } = await pool.query(
+      `SELECT illness_flag FROM oura_daily_derived WHERE user_id = $1 AND illness_flag IS NOT NULL`, [TEST_USER_ID])
+    expect(rows.length).toBeGreaterThanOrEqual(1)
+  })
 })

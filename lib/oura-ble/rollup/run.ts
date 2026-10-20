@@ -1023,8 +1023,18 @@ export async function runOuraRollup(
     // and displayed illness can't diverge. Own step so a failure can't block the summary write;
     // writes only the illness_* columns (COALESCE upsert) so it never clobbers body_comp's
     // source/model_versions on the same row. Each night keys off the prior night's baseline.
+    //
+    // #3171: a day whose row already holds a readiness score has had its live read, which stores
+    // the served readiness with the radar's own flag beside it (#3086). That flag explains the stored
+    // score (`storedReadinessMatches`), so the rollup leaves it alone; a different `nHistory` rule
+    // here would otherwise overwrite it and make the day audit report the weights moved. Days with
+    // no live read (past nights the rollup backfills) are still written here — it is their only writer.
     await step('illness_radar', async () => {
+      if (summaryRows.length < 2) return
+      const stored = await io.readDailyDerived(summaryRows[1].date, summaryRows[summaryRows.length - 1].date)
+      const liveReadDays = new Set(stored.filter(r => r.readinessScore != null).map(r => r.day))
       for (let i = 1; i < summaryRows.length; i++) {
+        if (liveReadDays.has(summaryRows[i].date)) continue
         const res = illnessFromSummaries(summaryRows[i - 1], summaryRows[i])
         await io.upsertDailyDerived(summaryRows[i].date, {
           illnessFlag: res.flag,
