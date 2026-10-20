@@ -15,6 +15,8 @@ import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-rada
 import { computeSleepScoreSeries } from '@trainingai/shared/health/sleep-score'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import {
   weekDays,
   type DailyPoint,
@@ -52,13 +54,16 @@ export async function computeWeeklyDigestMetrics(
   const priorWeekEndIso = formatInTimeZone(new Date(recapWeekStart.getTime() - 1), tz, 'yyyy-MM-dd')
   const from14dIso = formatInTimeZone(priorWeekStart, tz, 'yyyy-MM-dd')
 
-  const [sessions, bodyMetrics, sleepSessions, weekPrs, derivedRows, exerciseLibrary] = await Promise.all([
+  const [sessions, bodyMetrics, sleepSessions, weekPrs, derivedRows, exerciseLibrary, ouraRows, switchDay] = await Promise.all([
     repo.getWorkoutSessionsFrom(userId, priorWeekStart),
     repo.listBodyMetrics(userId, from14dIso, recapWeekEndIso),
     repo.listSleepSessions(userId, from14dIso, recapWeekEndIso),
     repo.listRecentPersonalRecords(userId, recapWeekStart, recapWeekEnd),
     repo.getOuraDailyDerived(userId, from14dIso, recapWeekEndIso),
     repo.listExerciseLibrary(),
+    repo.getOuraDaily(userId, from14dIso, recapWeekEndIso).catch(() => []),
+    // #3206: a failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
+    (async () => repo.getOuraCloudSwitchDay(userId))().catch(() => null),
   ])
   // A bodyweight PR is BW_REF-relative — never announce it as a weight (finding Q-19).
   const exerciseTypeByName = new Map(exerciseLibrary.map(e => [e.name, e.exerciseType]))
@@ -159,10 +164,17 @@ export async function computeWeeklyDigestMetrics(
 
   const latestIllness = latestIllnessFromDerived(derivedRows)
 
-  // Daytime stress (derived, dHRV): avg minutes of high stress per measured day
-  const stressPairs = derivedRows
-    .filter(r => r.stressHighMinutes != null)
+  // Daytime stress (derived, dHRV): avg minutes of high stress per measured day. From the day the user
+  // switched to the Oura API the ring's rows are partial leftovers and stand no longer; a day with no
+  // ring value takes Oura's (seconds, so /60), as the coach does (#3077). Display only, never a score input.
+  const ringStressPairs = derivedRows
+    .filter(r => r.stressHighMinutes != null && ringValueStands(r.day, switchDay))
     .map(r => [r.day, r.stressHighMinutes!] as [string, number])
+  const ringStressDays = new Set(ringStressPairs.map(([d]) => d))
+  const ouraStressPairs = ouraRows
+    .filter(r => r.stressHigh != null && !isPreRekey(r.date) && !ringStressDays.has(r.date))
+    .map(r => [r.date, Math.round(r.stressHigh! / 60)] as [string, number])
+  const stressPairs = [...ringStressPairs, ...ouraStressPairs]
   const stressOf = (from: string, to: string) =>
     meanOrNull(stressPairs.filter(([d]) => d >= from && d <= to).map(([, v]) => v))
 

@@ -377,7 +377,12 @@ export function latestRestingHrRow<T extends { date: string; restingHeartRate?: 
   return best
 }
 
-export async function buildReadinessPayload(userId: string, tz: string): Promise<ReadinessScoreResponse> {
+export async function buildReadinessPayload(
+  userId: string,
+  tz: string,
+  // #3206: a caller that has already read the switch day passes it (null = none) to spare the second lookup.
+  knownSwitchDay?: string | null,
+): Promise<ReadinessScoreResponse> {
   const repo = await getRepository()
 
   const todayIso    = todayInTz(tz)
@@ -418,7 +423,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // leaves that input missing, which is what it is without the read.
     (async () => repo.getOuraCloudReadinessContributors(userId, from28dIso, todayIso))().catch(() => []),
     // #3193: a failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
-    (async () => repo.getOuraCloudSwitchDay(userId))().catch(() => null),
+    (async () => knownSwitchDay !== undefined ? knownSwitchDay : repo.getOuraCloudSwitchDay(userId))().catch(() => null),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -426,13 +431,16 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // its daytime stress and recovery give way to Oura's. Display and availability only, never a score input.
   const ringStressToday = ringValueStands(todayIso, switchDay) ? derivedToday : null
   // Latest day with a produced resilience level (today may be too incomplete to resolve one yet).
-  const latestResilience = [...derivedTodayRows].reverse().find(r => r.resilienceLevel != null) ?? null
+  // #3206: from the switch day the ring's rows are leftovers, so none of them is offered as the level
+  // (the coach does the same). Oura's level is its own word and is not mapped onto this 1-5 scale.
+  const ringDerivedRows = derivedTodayRows.filter(r => ringValueStands(r.day, switchDay))
+  const latestResilience = [...ringDerivedRows].reverse().find(r => r.resilienceLevel != null) ?? null
   // LA-158: when there is no level, record what was actually observed rather than leaving the
   // surface to render nothing and say nothing. Measured 2026-09-27: resilience had published
   // nothing since 09-22 and the only reason anyone knew was a query against the table.
   const resilienceUnavailable = latestResilience?.resilienceLevel != null
     ? null
-    : observeResilienceCoverage(derivedTodayRows.map(r => r.daytimeStressCoverageMin))
+    : observeResilienceCoverage(ringDerivedRows.map(r => r.daytimeStressCoverageMin))
   const ouraToday = ouraRows.find(r => r.date === todayIso) ?? null
   const ouraByDate = toOuraByDate(ouraRows)
 

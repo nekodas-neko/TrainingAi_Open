@@ -29,6 +29,7 @@ const listBodyMetrics = vi.fn(async (_u: string, _f: string, _t: string) => [] a
 const listSleepSessions = vi.fn(async (_u: string, _f: string, _t: string) => [] as unknown[])
 const getOuraDaily = vi.fn(async (_u: string, _f: string, _t: string) => [] as unknown[])
 const getOuraDailyDerived = vi.fn(async (_u: string, _f: string, _t: string) => [] as unknown[])
+const getOuraCloudSwitchDay = vi.fn(async (_u: string) => null as string | null)
 const listRecentPersonalRecords = vi.fn(async (_u: string, _f: Date, _t: Date) => [] as unknown[])
 const listExerciseLibrary = vi.fn(async () => [] as unknown[])
 const getExerciseMuscleAssignments = vi.fn(async (_n: string[]) => ({}) as Record<string, unknown[]>)
@@ -42,7 +43,7 @@ let sessionUser: { id: string; timezone?: string } | null = { id: 'u-0', timezon
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
 const repo = () => ({
   getWorkoutSessionsFrom, listBodyMetrics, listSleepSessions, getOuraDaily, getOuraDailyDerived,
-  listRecentPersonalRecords, listExerciseLibrary, getExerciseMuscleAssignments, getFriendIds,
+  getOuraCloudSwitchDay, listRecentPersonalRecords, listExerciseLibrary, getExerciseMuscleAssignments, getFriendIds,
   upsertAiHealthInsight,
 })
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo(), getRepositoryAsync: async () => repo() }))
@@ -84,7 +85,8 @@ beforeEach(() => {
   for (const m of [getWorkoutSessionsFrom, listBodyMetrics, listSleepSessions, getOuraDaily,
                    getOuraDailyDerived, listRecentPersonalRecords, listExerciseLibrary,
                    getExerciseMuscleAssignments, getFriendIds, upsertAiHealthInsight,
-                   readFreshInsight, generateText]) m.mockClear()
+                   getOuraCloudSwitchDay, readFreshInsight, generateText]) m.mockClear()
+  getOuraCloudSwitchDay.mockResolvedValue(null)
   getWorkoutSessionsFrom.mockResolvedValue([])
   for (const m of [listBodyMetrics, listSleepSessions, getOuraDaily, getOuraDailyDerived,
                    listRecentPersonalRecords, listExerciseLibrary]) m.mockResolvedValue([])
@@ -105,6 +107,32 @@ describe('the digest is byte-identical to the text this fixture has always produ
     loadFixture()
     const json = await bodyOf(await post())
     expect(json.digest).toBe(DIGEST_TEXT)
+  })
+})
+
+describe('weekly stress follows the switch day (#3206)', () => {
+  const ring = (day: string, stressHighMinutes: number) => ({ day, stressHighMinutes })
+  const oura = (date: string, stressHigh: number) => ({ date, stressHigh })
+  const stress = async () => (await bodyOf(await post())).metrics.stressHighMinutes.byDay
+    .filter(p => p.value != null).map(p => [p.date, p.value])
+
+  it('with no switch, the ring stands and Oura fills a day the ring has none for', async () => {
+    getOuraDailyDerived.mockResolvedValue([ring('2026-09-01', 30)] as never)
+    getOuraDaily.mockResolvedValue([oura('2026-09-01', 7_200), oura('2026-09-02', 3_600)] as never)
+    expect(await stress()).toEqual([['2026-09-01', 30], ['2026-09-02', 60]])
+  })
+
+  it("from the switch day, the ring's leftover row gives way to Oura's", async () => {
+    getOuraCloudSwitchDay.mockResolvedValue('2026-09-03')
+    getOuraDailyDerived.mockResolvedValue([ring('2026-09-02', 30), ring('2026-09-03', 5), ring('2026-09-04', 5)] as never)
+    getOuraDaily.mockResolvedValue([oura('2026-09-03', 5_400)] as never)
+    expect(await stress()).toEqual([['2026-09-02', 30], ['2026-09-03', 90]])
+  })
+
+  it('a failed switch lookup reads as no switch', async () => {
+    getOuraCloudSwitchDay.mockRejectedValue(new Error('db down'))
+    getOuraDailyDerived.mockResolvedValue([ring('2026-09-03', 5)] as never)
+    expect(await stress()).toEqual([['2026-09-03', 5]])
   })
 })
 
