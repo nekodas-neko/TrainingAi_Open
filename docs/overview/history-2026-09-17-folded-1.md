@@ -658,14 +658,15 @@ nobody had looked. Measured against production on 2026-09-14 (`claude_ro`, so **
 
 - `body_metrics`, 100 confirmed readings — **67.6 – 72.8 kg**; day-to-day change **0.39 kg mean,
   1.40 at p95, 2.85 worst**.
-- `scale_raw_samples` — `confirmed` n=100 at **70.0 – 72.8 kg**; `dismissed` n=6 at **57.5 – 58.0
-  kg**. A **12.0 kg** gap, and the dismissed cluster is tight rather than scattered, which is what
-  says it is a person and not decode noise.
+- `scale_raw_samples` — `confirmed` n=100 at **70.0 – 72.8 kg**; `dismissed` n=6 in a second
+  cluster well below his (a household member's weight, so the figures are not kept here). The
+  dismissed cluster is tight rather than scattered, which is what says it is a person and not
+  decode noise.
 
 8% of ~70 kg is ±5.6 kg. That is **wider than his entire five-kilogram history**, so no genuine
-reading of his falls outside it even after a long gap, and still **6.4 kg clear** of her cluster.
-The old single 15% band (±10.5 kg) reached down to 59.5 — 1.5 kg from her readings, which is the
-thin margin the entry was written about.
+reading of his falls outside it even after a long gap, and it still clears her cluster by a wide
+margin. The old single 15% band (±10.5 kg) left only a thin margin to her readings, which is what
+the entry was written about.
 
 The width is therefore arithmetic against two measured clusters, not a judgement call. It is written
 into the constant's doc comment rather than only here, because the next person to touch it needs the
@@ -709,8 +710,8 @@ Everything that needs the hardware, none of which the band work could answer:
 
 Nine tests in `app/api/__tests__/scale-ble-weight-band-attribution.test.ts` cover the three bands,
 both boundaries to within 10 g, the symmetry of a light reading, the first-reading case where there
-is no band to be outside of, the partner's real 57.8 kg cluster, and that the frame is archived in
-every branch.
+is no band to be outside of, a reading from the partner's cluster (figure not kept here), and that
+the frame is archived in every branch.
 
 Mutation pass, real exit codes captured directly:
 

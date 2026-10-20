@@ -1,12 +1,13 @@
-// BF-41 / BF-2 — DEXA storage, tested against the real printout rather than a plausible one.
+// BF-41 / BF-2 — DEXA storage, round-tripped field by field.
 //
 // The entry's rule is that a schema invented from a description drops the field that turns out to
-// matter, so the fixture below is the owner's actual Hologic Horizon A report, de-identified, from
-// `docs/clinical-baseline-2026-08-27.md`. **Every number here is one the report prints.** The
-// round-trip test is therefore not ceremony: it is the only thing that can show "keep every field"
-// (BF-43) actually held through a migration, a Drizzle schema, an insert, a select and a mapper —
-// five places a column can be silently dropped, of which `rowToDexaScan` is the one CLAUDE.md
-// names as failing silently as "save doesn't persist".
+// matter, so the fixture below fills **every field the table has**. It is synthetic: round numbers,
+// a made-up serial and scan id, and no one's record. It is internally consistent (fat + lean + BMC
+// is the total mass, and BMI and the /height² indices follow from the stated height and masses) so
+// it reads like a printout without being one. The round-trip test is therefore not ceremony: it is
+// the only thing that can show "keep every field" (BF-43) actually held through a migration, a
+// Drizzle schema, an insert, a select and a mapper — five places a column can be silently dropped,
+// of which `rowToDexaScan` is the one CLAUDE.md names as failing silently as "save doesn't persist".
 //
 // Runs only against a real local dev Postgres — skips in CI's "Tests" job.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
@@ -15,63 +16,65 @@ const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-00000000d53a'
 const OTHER = '00000000-0000-4000-8000-00000000d53b'
 
-/** The 27 August 2026 report, in full. Grams are grams because that is how the printout reads. */
+/** A synthetic report with every field filled. Grams are grams, as a printout reads them.
+ *  200 cm makes height² exactly 4 m², so the indices below are the masses in kg divided by 4. */
 const REPORT = {
-  scannedOn: '2026-08-27',
-  manufacturer: 'Hologic',
-  model: 'Horizon A',
-  serialNumber: '307883M',
-  scanType: 'Auto Whole Body Fan Beam',
-  analysisVersion: '13.6.1.3',
-  providerScanId: 'A08272607',
-  heightCm: 158.1,
-  weightKg: 72.1,
-  ageYears: 33,
-  bmi: 28.8,
-  totalBmd: 1.046,
-  tScore: -1.6,
-  zScore: -1.6,
-  totalBmcG: 1927.25,
-  bmdPrecisionCvPct: 1.0,
-  fatG: 20547.5,
-  leanG: 49532.8,
-  leanPlusBmcG: 51460.1,
-  totalMassG: 72007.6,
-  pctFat: 28.5,
-  pctFatYoungNormal: 93,
-  pctFatAgeMatched: 89,
-  androidPctFat: 36.0,
-  gynoidPctFat: 30.3,
-  fatMassHeight2: 8.22,
-  androidGynoidRatio: 1.19,
-  pctFatTrunkLegs: 0.98,
-  trunkLimbFatMassRatio: 0.99,
-  vatMassG: 305,
-  vatVolumeCm3: 330,
-  vatAreaCm2: 63.3,
-  leanHeight2: 19.8,
-  appendicularLeanHeight2: 9.46,
-  boneReference: 'White Male, 2012 BMDCS/NHANES',
-  bodyCompReference: 'AIMSS',
+  scannedOn: '2026-01-15',
+  manufacturer: 'Example Medical',
+  model: 'DX-1000',
+  serialNumber: 'TEST0001',
+  scanType: 'Whole Body',
+  analysisVersion: '1.0.0',
+  providerScanId: 'SCAN-TEST-1',
+  heightCm: 200,
+  weightKg: 80,
+  ageYears: 40,
+  bmi: 20, // 80 / 2.0²
+  totalBmd: 1.2,
+  tScore: -1.0,
+  zScore: -0.5,
+  totalBmcG: 3600,
+  bmdPrecisionCvPct: 1.5,
+  fatG: 16000,
+  leanG: 60400,
+  leanPlusBmcG: 64000, // 60400 + 3600
+  totalMassG: 80000, // 16000 + 64000
+  pctFat: 20, // 16000 / 80000
+  pctFatYoungNormal: 50,
+  pctFatAgeMatched: 50,
+  androidPctFat: 25,
+  gynoidPctFat: 20,
+  fatMassHeight2: 4, // 16 kg / 4 m²
+  androidGynoidRatio: 1.25, // 25 / 20
+  pctFatTrunkLegs: 1.1,
+  trunkLimbFatMassRatio: 1.2,
+  vatMassG: 500,
+  vatVolumeCm3: 532, // 500 g at 0.94 g/cm³
+  vatAreaCm2: 100,
+  leanHeight2: 15.1, // 60.4 kg / 4 m²
+  appendicularLeanHeight2: 7, // 28 kg / 4 m²
+  boneReference: 'Test reference (bone)',
+  bodyCompReference: 'Test reference (body composition)',
   source: 'manual' as const,
   notes: null,
 }
 
-/** The provider's own row set, aggregates included. Values are illustrative shapes; the report
- *  prints per-region BMD/BMC/Area and what is being tested here is that N rows survive as N rows. */
+/** A full region set, aggregates included, in synthetic round numbers. Each row's BMD is its BMC
+ *  over its area, the nine regions sum to Subtotal, and Subtotal plus Head is the Total the report
+ *  above carries. What is being tested is that N rows survive as N rows. */
 const REGIONS = [
-  { region: 'L Arm', bmd: 0.72, bmcG: 118.4, areaCm2: 164.4 },
-  { region: 'R Arm', bmd: 0.74, bmcG: 122.7, areaCm2: 165.8 },
-  { region: 'L Ribs', bmd: 0.62, bmcG: 89.1, areaCm2: 143.7 },
-  { region: 'R Ribs', bmd: 0.63, bmcG: 91.5, areaCm2: 145.2 },
-  { region: 'T Spine', bmd: 0.79, bmcG: 131.0, areaCm2: 165.8 },
-  { region: 'L Spine', bmd: 0.94, bmcG: 66.2, areaCm2: 70.4 },
-  { region: 'Pelvis', bmd: 1.02, bmcG: 296.5, areaCm2: 290.7 },
-  { region: 'L Leg', bmd: 1.15, bmcG: 361.9, areaCm2: 314.7 },
-  { region: 'R Leg', bmd: 1.16, bmcG: 366.2, areaCm2: 315.6 },
-  { region: 'Subtotal', bmd: 0.95, bmcG: 1443.5, areaCm2: 1519.3 },
-  { region: 'Head', bmd: 2.11, bmcG: 483.8, areaCm2: 229.3 },
-  { region: 'Total', bmd: 1.046, bmcG: 1927.25, areaCm2: 1748.6 },
+  { region: 'L Arm', bmd: 0.75, bmcG: 150, areaCm2: 200 },
+  { region: 'R Arm', bmd: 0.75, bmcG: 150, areaCm2: 200 },
+  { region: 'L Ribs', bmd: 0.7, bmcG: 140, areaCm2: 200 },
+  { region: 'R Ribs', bmd: 0.7, bmcG: 140, areaCm2: 200 },
+  { region: 'T Spine', bmd: 1.0, bmcG: 200, areaCm2: 200 },
+  { region: 'L Spine', bmd: 0.9, bmcG: 90, areaCm2: 100 },
+  { region: 'Pelvis', bmd: 1.1, bmcG: 330, areaCm2: 300 },
+  { region: 'L Leg', bmd: 1.2, bmcG: 600, areaCm2: 500 },
+  { region: 'R Leg', bmd: 1.2, bmcG: 600, areaCm2: 500 },
+  { region: 'Subtotal', bmd: 1.0, bmcG: 2400, areaCm2: 2400 },
+  { region: 'Head', bmd: 2.0, bmcG: 1200, areaCm2: 600 },
+  { region: 'Total', bmd: 1.2, bmcG: 3600, areaCm2: 3000 },
 ]
 
 describe.skipIf(!canRun)('DEXA scan storage (BF-41 / BF-2)', () => {
@@ -105,7 +108,7 @@ describe.skipIf(!canRun)('DEXA scan storage (BF-41 / BF-2)', () => {
     }
   })
 
-  it('round-trips every field of the real report', async () => {
+  it('round-trips every field of a full report', async () => {
     await repo.saveDexaScan(USER, { ...REPORT, regions: REGIONS })
     const row = await repo.getLatestDexaScan(USER)
     expect(row).not.toBeNull()
@@ -138,26 +141,27 @@ describe.skipIf(!canRun)('DEXA scan storage (BF-41 / BF-2)', () => {
     expect(row!.regions).toHaveLength(REGIONS.length)
     expect(new Set(row!.regions.map(r => r.region))).toEqual(new Set(REGIONS.map(r => r.region)))
     const leg = row!.regions.find(r => r.region === 'L Leg')!
-    expect(leg).toEqual({ region: 'L Leg', bmd: 1.15, bmcG: 361.9, areaCm2: 314.7 })
+    expect(leg).toEqual({ region: 'L Leg', bmd: 1.2, bmcG: 600, areaCm2: 500 })
   })
 
-  // A T-score below zero is the ordinary case, not an edge one — the owner's is −1.6. Storing it as
-  // a positive (or refusing it) would misread osteopenia as normal bone.
+  // A T-score below zero is the ordinary case, not an edge one — anything under −1 already reads as
+  // low bone density. Storing it as a positive (or refusing it) would misread osteopenia as normal
+  // bone. T and Z differ in the fixture so a swapped column fails too.
   it('keeps negative T and Z scores negative', async () => {
     await repo.saveDexaScan(USER, { ...REPORT, regions: [] })
     const row = await repo.getLatestDexaScan(USER)
-    expect(row!.tScore).toBe(-1.6)
-    expect(row!.zScore).toBe(-1.6)
+    expect(row!.tScore).toBe(-1.0)
+    expect(row!.zScore).toBe(-0.5)
   })
 
   describe('re-entering the same scan', () => {
     it('updates in place rather than duplicating the day', async () => {
       await repo.saveDexaScan(USER, { ...REPORT, regions: REGIONS })
-      await repo.saveDexaScan(USER, { ...REPORT, pctFat: 29.1, regions: REGIONS })
+      await repo.saveDexaScan(USER, { ...REPORT, pctFat: 25, regions: REGIONS })
 
       const all = await repo.listDexaScans(USER)
       expect(all).toHaveLength(1)
-      expect(all[0].pctFat).toBe(29.1)
+      expect(all[0].pctFat).toBe(25)
     })
 
     // Regions are REPLACED, not merged: a re-extraction that reads ten regions instead of twelve
@@ -186,11 +190,11 @@ describe.skipIf(!canRun)('DEXA scan storage (BF-41 / BF-2)', () => {
     // The unique index is (user_id, scanned_on), so the conflict target can only ever match this
     // user's row. Two people scanned on the same day is otherwise one person overwriting the other.
     it('lets two users hold a scan for the same date', async () => {
-      await repo.saveDexaScan(USER, { ...REPORT, pctFat: 28.5, regions: [] })
-      await repo.saveDexaScan(OTHER, { ...REPORT, pctFat: 11.2, regions: [] })
+      await repo.saveDexaScan(USER, { ...REPORT, pctFat: 20, regions: [] })
+      await repo.saveDexaScan(OTHER, { ...REPORT, pctFat: 30, regions: [] })
 
-      expect((await repo.getLatestDexaScan(USER))!.pctFat).toBe(28.5)
-      expect((await repo.getLatestDexaScan(OTHER))!.pctFat).toBe(11.2)
+      expect((await repo.getLatestDexaScan(USER))!.pctFat).toBe(20)
+      expect((await repo.getLatestDexaScan(OTHER))!.pctFat).toBe(30)
     })
 
     it('never lists another user’s scans', async () => {
@@ -214,8 +218,8 @@ describe.skipIf(!canRun)('DEXA scan storage (BF-41 / BF-2)', () => {
     // two scans in one `inArray` read, every region row has to land on the scan it belongs to. A
     // mutation that hands the whole batch to every scan passes the test above and fails this one.
     it('gives each of a user’s own scans only its own regions', async () => {
-      await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2025-02-11', regions: REGIONS.slice(0, 2) })
-      await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2026-08-27', regions: REGIONS })
+      await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2024-01-15', regions: REGIONS.slice(0, 2) })
+      await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2026-01-15', regions: REGIONS })
 
       const [newest, oldest] = await repo.listDexaScans(USER)
       expect(newest.regions).toHaveLength(REGIONS.length)
@@ -224,13 +228,14 @@ describe.skipIf(!canRun)('DEXA scan storage (BF-41 / BF-2)', () => {
   })
 
   it('lists newest first, which is what a calibration series is read in', async () => {
-    await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2025-02-11', pctFat: 31.0, regions: [] })
-    await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2026-08-27', pctFat: 28.5, regions: [] })
-    await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2025-09-30', pctFat: 29.8, regions: [] })
+    // Inserted out of order on purpose: oldest, newest, then the middle one.
+    await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2024-01-15', pctFat: 30, regions: [] })
+    await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2026-01-15', pctFat: 20, regions: [] })
+    await repo.saveDexaScan(USER, { ...REPORT, scannedOn: '2025-01-15', pctFat: 25, regions: [] })
 
     expect((await repo.listDexaScans(USER)).map(r => r.scannedOn))
-      .toEqual(['2026-08-27', '2025-09-30', '2025-02-11'])
-    expect((await repo.getLatestDexaScan(USER))!.scannedOn).toBe('2026-08-27')
+      .toEqual(['2026-01-15', '2025-01-15', '2024-01-15'])
+    expect((await repo.getLatestDexaScan(USER))!.scannedOn).toBe('2026-01-15')
   })
 
   it('takes regions with a scan and drops them with it', async () => {
