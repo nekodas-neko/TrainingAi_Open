@@ -20,6 +20,7 @@ import { ZoneBreakdown } from '@/components/health/zone-breakdown'
 import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
 import { registerWalkExit } from '@/lib/walk/walk-exit'
 import { computePaceSeries } from '@/lib/activity/activity-metrics'
+import { clipSegmentsAt } from '@trainingai/shared/walking/clip-segments'
 import { summariseRoute } from '@trainingai/shared/activity/route-summary'
 import { computeWalkSegmentStats, aggregateSegmentsByKind, walkEffortDisplay, type KindAggregate } from '@/lib/walk/segment-stats'
 import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
@@ -94,11 +95,13 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   // "Per interval" display below and the data actually persisted on save, so a fast/slow
   // block has real numbers to compare and average across walks later (not just an
   // ephemeral display that used to be thrown away on save).
+  // Clipped at the seconds walked (#3132): an early save must not give the block it stopped in a
+  // pace over its whole planned time, nor save blocks it never reached.
   const segmentStats = useMemo(
     () => computeWalkSegmentStats({
-      plan, startedAtMs, hrSamples: samples, rawPoints, cadenceSeries: cadence?.series ?? null, pacerTallies,
+      plan: { ...plan, segments: clipSegmentsAt(plan.segments, actualSec) }, startedAtMs, hrSamples: samples, rawPoints, cadenceSeries: cadence?.series ?? null, pacerTallies,
     }),
-    [plan, startedAtMs, samples, rawPoints, cadence, pacerTallies],
+    [plan, actualSec, startedAtMs, samples, rawPoints, cadence, pacerTallies],
   )
 
   // Time-in-zone + Session Load — same shared primitive the regular activity detail view uses
