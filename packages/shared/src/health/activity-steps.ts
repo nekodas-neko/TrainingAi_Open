@@ -2,9 +2,10 @@
  * Which logged activities' steps add to the day's step count — the one rule, for the server route
  * and the client fast path that mirrors it.
  *
- * **Only activity the ring and the phone cannot see.** A treadmill walk happens indoors on a belt,
- * and its stored step count is the only record of it, so it is folded into the day. An outdoor walk
- * or run is already inside the ring's (or the phone pedometer's) total for the day.
+ * **Only activity treated as unseen by the ring and the phone.** A treadmill walk is on that list:
+ * its stored step count is added to the day. Whether the ring already counts some of those steps
+ * is unknown, pending the owner's call (#3112). An outdoor walk or run is already inside the
+ * ring's (or the phone pedometer's) total for the day.
  *
  * #3090: the fold used to add every row's `steps`, on the premise that only treadmill sessions
  * carried any. Q-230 made GPS walks and runs save strap-cadence steps too, so each one was counted
@@ -42,7 +43,8 @@ export function activityStepsForDayCount(
 }
 
 /**
- * The day's step count: the device's own total plus the indoor activity steps it could not see.
+ * The day's step count: the device's own total plus the indoor activity steps (treated as unseen
+ * by the device; see #3112).
  * Every surface that shows a day's steps builds it here (#3095), so Home, the cardio week, the day
  * screen and the goals cards cannot disagree on a treadmill day. Null only when there is neither a
  * device count nor any indoor steps — "no reading", which a surface must not print as zero.
