@@ -15,6 +15,7 @@ import { MetricLogSheet, type LogMetric } from './MetricLogSheet';
 import { MetricHistorySheet, type MetricKind } from './MetricHistorySheet';
 import { HrDayCard } from './HrDayCard';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
+import { HrRecoveryProfileCard } from './HrRecoveryProfileCard';
 import { TimeInZoneCard, SleepPerformanceCard } from './RecordedHealthCards';
 import { useAppleImport } from '../HealthProvider';
 import { BodySleepCard } from './BodySleepCard';
@@ -147,10 +148,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
       <TrainingLoadCard />
       <TimeInZoneCard />
       <SleepPerformanceCard />
-      <FeatureRow
-        title="Heart-rate recovery profile"
-        subtitle="Deferred with workout heart-rate integration"
-      />
+      <HrRecoveryProfileCard />
       <GroupTitle>Activity & intake</GroupTitle>
       <EnergyBalanceCard />
       <Grid columns={2}>

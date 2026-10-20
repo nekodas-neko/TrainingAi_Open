@@ -8,7 +8,7 @@ import { formatHrChange } from '@trainingai/shared/health/hr-change-display'
 import { Sparkline } from '@/components/ui/sparkline'
 import type { HrRecoveryProfile } from '@trainingai/shared/health/hr-recovery-profile'
 import type { BandTrend } from '@trainingai/shared/health/hr-recovery-trend'
-import { informativeShareNote } from '@/components/health/hr-recovery-honesty'
+import { informativeShareNote } from '@trainingai/shared/health/hr-recovery-honesty'
 
 // HR Recovery Profile card (plan 2026-07-22-hr-recovery-profile.md, HRP-1/2/3) — recovery rate
 // bucketed by the HR being recovered FROM, across between-set rests AND completed-workout cooldowns
