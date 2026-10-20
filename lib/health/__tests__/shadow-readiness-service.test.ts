@@ -148,10 +148,54 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
   it('days moved counts only days with both scores, at ≥ 5 points', async () => {
     const { daysMoved } = await import('../shadow-readiness-service')
     expect(daysMoved([
-      { shadowReadiness: 70, liveReadiness: 64 },
-      { shadowReadiness: 70, liveReadiness: 68 },
-      { shadowReadiness: null, liveReadiness: 50 },
-      { shadowReadiness: 40, liveReadiness: null },
-    ])).toEqual({ compared: 2, moved: 1, medianAbsDiff: 4, maxAbsDiff: 6 })
+      { shadowReadiness: 70, liveComposite: 64 },
+      { shadowReadiness: 70, liveComposite: 68 },
+      { shadowReadiness: null, liveComposite: 50 },
+      { shadowReadiness: 40, liveComposite: null },
+    ])).toEqual({ compared: 2, moved: 1, medianAbsDiff: 4, maxAbsDiff: 6, excluded: { clamped: 0, 'unknown-era': 0 } })
+  })
+
+  describe('live composite before illness suppression (#3170)', () => {
+    const FROM = '2026-10-21'
+    const day = '2026-10-22'
+
+    it('a suppressed day with identical shadow and live composites is not moved', async () => {
+      const { liveCompositeOf, daysMoved } = await import('../shadow-readiness-service')
+      // composite 70, served 60 under `elevated`
+      const live = liveCompositeOf(day, 60, 'elevated', FROM)
+      expect(live).toEqual({ liveComposite: 70, liveGap: null })
+      expect(daysMoved([{ shadowReadiness: 70, ...live }])).toMatchObject({ compared: 1, moved: 0, maxAbsDiff: 0 })
+    })
+
+    it('a suppressed day that really differs moves by the model difference only', async () => {
+      const { liveCompositeOf, daysMoved } = await import('../shadow-readiness-service')
+      const live = liveCompositeOf(day, 45, 'fever', FROM) // composite 70
+      expect(daysMoved([{ shadowReadiness: 78, ...live }])).toMatchObject({ compared: 1, moved: 1, maxAbsDiff: 8 })
+    })
+
+    it('an unsuppressed day is unchanged, whatever its flag', async () => {
+      const { liveCompositeOf } = await import('../shadow-readiness-service')
+      for (const flag of ['normal', 'watch', 'learning', null, 'bogus']) {
+        expect(liveCompositeOf(day, 64, flag, FROM)).toEqual({ liveComposite: 64, liveGap: null })
+      }
+      expect(liveCompositeOf('2020-01-01', 64, 'normal', null)).toEqual({ liveComposite: 64, liveGap: null })
+    })
+
+    it('a day clamped at 0 is excluded and counted apart', async () => {
+      const { liveCompositeOf, daysMoved } = await import('../shadow-readiness-service')
+      const live = liveCompositeOf(day, 0, 'fever', FROM)
+      expect(live).toEqual({ liveComposite: null, liveGap: 'clamped' })
+      expect(daysMoved([{ shadowReadiness: 20, ...live }])).toEqual({
+        compared: 0, moved: 0, medianAbsDiff: null, maxAbsDiff: null, excluded: { clamped: 1, 'unknown-era': 0 },
+      })
+    })
+
+    it('a suppressing flag before the cutoff, or with no cutoff set, is excluded as unknown era', async () => {
+      const { liveCompositeOf, daysMoved } = await import('../shadow-readiness-service')
+      expect(liveCompositeOf('2026-10-10', 70, 'elevated', FROM)).toEqual({ liveComposite: null, liveGap: 'unknown-era' })
+      const unset = liveCompositeOf(day, 60, 'elevated', null)
+      expect(unset.liveGap).toBe('unknown-era')
+      expect(daysMoved([{ shadowReadiness: 70, ...unset }]).excluded['unknown-era']).toBe(1)
+    })
   })
 })

@@ -30,6 +30,7 @@ import { resolveSelfReportedSick } from '@trainingai/shared/ai-periodization/sig
 import { resolveHrProfile, hasHrSource } from '@trainingai/shared/health/hr-profile'
 import { GOAL_DAILY_DELTA, KCAL_PER_KG } from '@trainingai/shared/nutrition/calorie-balance'
 import { DEFAULT_WATER_GOAL_ML } from '@trainingai/shared/nutrition/goal-recommendation'
+import { READINESS_SUPPRESSION, type IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { readinessModelVersionOf } from '@trainingai/shared/health/readiness-verdict'
 import { prepareShadowHistory, assembleShadowInputs, type ShadowRawHistory } from '@trainingai/shared/health/shadow-readiness/assemble'
 import { scoreShadowReadiness, type FuelParts } from '@trainingai/shared/health/shadow-readiness/score'
@@ -95,7 +96,7 @@ async function fuelForDay(
 /** Read everything the scorer needs to score every day in [from, to]. */
 async function loadHistory(repo: Repo, userId: string, tz: string, from: string, to: string): Promise<{
   raw: ShadowRawHistory
-  live: Map<string, { score: number | null; model: string | null }>
+  live: Map<string, { score: number | null; model: string | null; illnessFlag: string | null }>
 }> {
   const start = shiftDateStr(from, -LOOKBACK_DAYS)
   const today = todayInTz(tz)
@@ -158,8 +159,8 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
     if (r.weightVsPlan != null) weightVsPlan.set(day, r.weightVsPlan)
   }
 
-  const live = new Map<string, { score: number | null; model: string | null }>()
-  for (const r of derived) live.set(r.day, { score: r.readinessScore, model: readinessModelVersionOf(r.modelVersions) })
+  const live = new Map<string, { score: number | null; model: string | null; illnessFlag: string | null }>()
+  for (const r of derived) live.set(r.day, { score: r.readinessScore, model: readinessModelVersionOf(r.modelVersions), illnessFlag: r.illnessFlag })
 
   return {
     live,
@@ -187,13 +188,53 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
 }
 
 /**
+ * The first day whose stored `readiness_score` is the served one (composite less illness
+ * suppression, #3163). Earlier rows hold the composite itself, and nothing stored tells the two
+ * apart: the flag is set on both and the model version did not change. Until this is set at release
+ * prep to the day the release shipped, every day on a suppressing flag is excluded from the
+ * comparison rather than read as either.
+ */
+export const SERVED_READINESS_STORED_FROM: string | null = null
+
+/** Why a day's live composite is unknown, so {@link daysMoved} leaves it out and counts it. */
+export type LiveCompositeGap = 'clamped' | 'unknown-era'
+
+/** The live side of the shadow comparison, a row's extra fields beyond what the table stores. */
+export interface LiveComparison {
+  /** The stored live score before the illness suppression, or null when it cannot be recovered. */
+  liveComposite: number | null
+  liveGap: LiveCompositeGap | null
+}
+
+/**
+ * The live composite behind a stored (served) readiness: the score plus the suppression for the
+ * flag stored beside it. A score of 0 on a suppressing flag may have been clamped, so the composite
+ * is anywhere from 0 up to the suppression: unknown. So is any suppressed day that may predate #3163.
+ */
+export function liveCompositeOf(
+  day: string, score: number | null, illnessFlag: string | null, servedFrom: string | null = SERVED_READINESS_STORED_FROM,
+): LiveComparison {
+  if (score == null) return { liveComposite: null, liveGap: null }
+  const suppression = illnessFlag != null && Object.prototype.hasOwnProperty.call(READINESS_SUPPRESSION, illnessFlag)
+    ? READINESS_SUPPRESSION[illnessFlag as IllnessFlag] : 0
+  if (suppression === 0) return { liveComposite: score, liveGap: null }
+  if (servedFrom == null || day < servedFrom) return { liveComposite: null, liveGap: 'unknown-era' }
+  if (score === 0) return { liveComposite: null, liveGap: 'clamped' }
+  // The inverse of applyIllnessSuppression for an unclamped score.
+  return { liveComposite: score + suppression, liveGap: null }
+}
+
+/** A scored row with the live composite beside it. Only the table's own columns are stored. */
+export type ShadowRow = ShadowReadinessRecord & LiveComparison
+
+/**
  * Score every day in [from, to] and return the rows, without writing. The live readiness beside
  * each row is the one stored for that day in `oura_daily_derived`, or null when none was.
  */
 export async function computeShadowRows(
   userId: string, tz: string, from: string, to: string, computedBy: ShadowReadinessRecord['computedBy'],
   repoOverride?: Repo,
-): Promise<ShadowReadinessRecord[]> {
+): Promise<ShadowRow[]> {
   const repo = repoOverride ?? await getRepository()
   const { raw, live } = await loadHistory(repo, userId, tz, from, to)
   const prepared = prepareShadowHistory(raw)
@@ -212,6 +253,7 @@ export async function computeShadowRows(
       liveReadiness: l?.score ?? null,
       liveModelVersion: l?.score != null ? l.model : null,
       computedBy,
+      ...liveCompositeOf(date, l?.score ?? null, l?.illnessFlag ?? null),
     }
   })
 }
@@ -219,7 +261,7 @@ export async function computeShadowRows(
 /** Score and store one day. A recompute of the same model version replaces only its own row. */
 export async function runShadowReadinessForDate(
   userId: string, tz: string, date: string, computedBy: ShadowReadinessRecord['computedBy'] = 'daily',
-): Promise<ShadowReadinessRecord> {
+): Promise<ShadowRow> {
   const repo = await getRepository()
   const [row] = await computeShadowRows(userId, tz, date, date, computedBy, repo)
   await repo.upsertShadowReadiness(userId, row)
@@ -227,7 +269,7 @@ export async function runShadowReadinessForDate(
 }
 
 export interface ShadowReplayResult {
-  rows: ShadowReadinessRecord[]
+  rows: ShadowRow[]
   written: number
   dryRun: boolean
 }
@@ -263,24 +305,33 @@ export async function replayShadowReadiness(
 export const DAYS_MOVED_THRESHOLD = 5
 
 export interface DaysMoved {
-  /** Days with both a shadow and a live score. */
+  /** Days with both a shadow score and a live composite. */
   compared: number
   /** Of those, days that differ by at least {@link DAYS_MOVED_THRESHOLD}. */
   moved: number
   medianAbsDiff: number | null
   maxAbsDiff: number | null
+  /** Days with a shadow score left out because the live composite is unknown, by reason. */
+  excluded: Record<LiveCompositeGap, number>
 }
 
-/** The #2356 days-moved measure: how many days the shadow model would move, and by how much. */
-export function daysMoved(rows: readonly { shadowReadiness: number | null; liveReadiness: number | null }[]): DaysMoved {
+/**
+ * The #2356 days-moved measure: how many days the shadow model would move, and by how much. It
+ * compares model to model, against the live composite before the illness suppression, so a
+ * suppressed morning is not counted as moved by the suppression alone.
+ */
+export function daysMoved(rows: readonly (Pick<ShadowRow, 'shadowReadiness' | 'liveComposite'> & { liveGap?: LiveCompositeGap | null })[]): DaysMoved {
+  const excluded: Record<LiveCompositeGap, number> = { clamped: 0, 'unknown-era': 0 }
+  for (const r of rows) if (r.shadowReadiness != null && r.liveGap) excluded[r.liveGap]++
   const diffs = rows
-    .filter(r => r.shadowReadiness != null && r.liveReadiness != null)
-    .map(r => Math.abs(r.shadowReadiness! - r.liveReadiness!))
+    .filter(r => r.shadowReadiness != null && r.liveComposite != null)
+    .map(r => Math.abs(r.shadowReadiness! - r.liveComposite!))
   return {
     compared: diffs.length,
     moved: diffs.filter(d => d >= DAYS_MOVED_THRESHOLD).length,
     medianAbsDiff: median(diffs),
     maxAbsDiff: diffs.length ? Math.max(...diffs) : null,
+    excluded,
   }
 }
 
