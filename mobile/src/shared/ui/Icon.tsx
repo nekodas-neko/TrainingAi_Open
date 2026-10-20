@@ -83,6 +83,7 @@ import Bed from 'lucide-react-native/icons/bed';
 import ChartNoAxesColumn from 'lucide-react-native/icons/chart-no-axes-column';
 import ChartLine from 'lucide-react-native/icons/chart-line';
 import Lock from 'lucide-react-native/icons/lock';
+import Cat from 'lucide-react-native/icons/cat';
 import type { LucideProps } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -174,6 +175,7 @@ const icons = {
   barChart: ChartNoAxesColumn,
   lineChart: ChartLine,
   lock: Lock,
+  cat: Cat,
 };
 
 export type IconName = keyof typeof icons;

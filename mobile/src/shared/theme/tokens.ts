@@ -276,6 +276,7 @@ export const homeCardColors = {
   muscleStatusWidget: '#22c55e',
   hrChartWidget: 'transparent',
   energyBalanceWidget: '#22c55e',
+  collectionWidget: '#fb923c',
 };
 export const domainTones = {
   light: {
