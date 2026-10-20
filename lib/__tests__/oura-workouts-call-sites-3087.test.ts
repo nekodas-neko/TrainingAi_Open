@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const TZ = 'Australia/Brisbane'
 
-const state = vi.hoisted(() => ({ oura: [] as unknown[] }))
+const state = vi.hoisted(() => ({ oura: [] as unknown[], logs: [] as unknown[] }))
 
 vi.mock('@/auth', () => ({
   auth: vi.fn(async () => ({ user: { id: 'u1', timezone: 'Australia/Brisbane', dateOfBirth: '1993-01-01', sex: 'male' } })),
@@ -13,7 +13,7 @@ vi.mock('@/lib/data', () => {
   const repo = {
     listBodyMetrics: async (_u: string, _from: string, to: string) => [{ date: to, weightKg: 80, steps: 9000 }],
     listFoodLogs: async () => [],
-    listActivityLogs: async () => [],
+    listActivityLogs: async () => state.logs,
     listFoodLogsSummary: async () => [],
     getWorkoutSessionsFrom: async () => [],
     getBodyFatCalibration: async () => null,
@@ -51,12 +51,28 @@ async function todayActive() {
 }
 
 describe('Oura workouts at the other call sites (#3087)', () => {
-  beforeEach(() => { state.oura = [] })
+  beforeEach(() => { state.oura = []; state.logs = [] })
 
   it('/api/body-metadata adds today\'s Oura run to today\'s active energy', async () => {
     const without = await todayActive()
     state.oura = [runOn(today)]
     expect(await todayActive()).not.toBe(without)
+  })
+
+  // A log that crosses midnight is dated the day it started, so it is not among today's logs, but its
+  // Oura copy starts after midnight and lands on today.
+  it('/api/body-metadata: last night\'s 23:30-00:30 log keeps its Oura copy out of today', async () => {
+    const midnight = dateStrMidnightInTz(today, TZ).getTime()
+    const without = await todayActive()
+    state.logs = [{
+      id: 'late', userId: 'u1', date: yesterday, activityType: 'run', title: 'run',
+      startTime: '23:30:00', endTime: '00:30:00', durationMin: 60, distanceKm: null, steps: null,
+      caloriesBurned: null, createdAt: new Date(),
+    }]
+    state.oura = [{
+      ...runOn(today), startDatetime: new Date(midnight + 5 * 60_000), endDatetime: new Date(midnight + 25 * 60_000),
+    }]
+    expect(await todayActive()).toBe(without)
   })
 
   it('past-day budgets move for the day of an Oura run', async () => {

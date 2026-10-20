@@ -376,7 +376,8 @@ describe('backfillOuraCloud tombstoneAbsentWorkouts (#3087)', () => {
     oura()
     const { repo, absent } = fakeRepo()
     const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
-    expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-10', keepIds: ['wo-1'] }])
+    // The read's last day is left out: the spec does not say `end_date` is inclusive.
+    expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-09', keepIds: ['wo-1'] }])
     expect(out.ok && out.report.workoutsTombstoned).toBe(1)
   })
 
@@ -384,7 +385,14 @@ describe('backfillOuraCloud tombstoneAbsentWorkouts (#3087)', () => {
     oura(path => (path === 'workout' ? jsonResponse({ data: [], next_token: null }) : null))
     const { repo, absent } = fakeRepo()
     await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
-    expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-10', keepIds: [] }])
+    expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-09', keepIds: [] }])
+  })
+
+  it('a one-day read tombstones nothing: its only day is the one it may not have read', async () => {
+    oura()
+    const { repo, absent } = fakeRepo()
+    await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, from: '2026-10-10', dryRun: false, tombstoneAbsentWorkouts: true })
+    expect(absent).toEqual([])
   })
 
   it('tombstones nothing unless asked, and nothing on a dry run', async () => {

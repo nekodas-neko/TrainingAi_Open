@@ -164,7 +164,10 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   // one `oura_daily` row.
   const docs: OuraDocument[] = []
   // #3087: the workout chunks read whole, with the ids Oura returned for each. A chunk with a
-  // dropped document is left out: the missing workout may be the one that failed the spec.
+  // dropped document is left out: the missing workout may be the one that failed the spec. Each
+  // chunk's last day is left out too: the pinned spec does not say whether `end_date` is inclusive,
+  // and if it is not, that day was never read. It is checked by a later read instead (the reconcile
+  // runs daily over three days, so a day reaches the middle of the window the next morning).
   const workoutsRead: { from: string; to: string; keepIds: string[] }[] = []
   read: for (const type of OURA_DOCUMENT_TYPE_NAMES) {
     if (!isOuraTypeShared(granted, type)) { report.notShared.push(type); continue }
@@ -174,7 +177,9 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
         docs.push(...got.docs)
         report.documents[type] = (report.documents[type] ?? 0) + got.docs.length
         report.dropped += got.dropped
-        if (type === 'workout' && got.dropped === 0) workoutsRead.push({ from, to, keepIds: got.docs.flatMap(d => d.type === 'workout' ? [d.doc.id] : []) })
+        if (type === 'workout' && got.dropped === 0 && daysBetweenDateStrs(from, to) > 0) {
+          workoutsRead.push({ from, to: shiftDateStr(to, -1), keepIds: got.docs.flatMap(d => d.type === 'workout' ? [d.doc.id] : []) })
+        }
       } catch (err) {
         if (err instanceof OuraForbiddenError) { report.forbidden.push(type); continue read }
         if (err instanceof OuraUnauthorizedError) {

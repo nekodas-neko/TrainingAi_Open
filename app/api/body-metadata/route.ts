@@ -239,8 +239,10 @@ export async function GET(req: NextRequest) {
       .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
     activities: [
       ...todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null })),
-      // #3087: Oura's own workouts the app did not log count too.
-      ...await ouraBudgetActivities(repo, userId, today, today, tz, { activityLogs: todayActivityLogs, sessions: todayWorkouts }),
+      // #3087: Oura's own workouts the app did not log count too. Every loaded log is offered for the
+      // overlap check, not only today's: a 23:30-00:30 log is yesterday's, and must still keep out
+      // the Oura copy of it that starts after midnight.
+      ...await ouraBudgetActivities(repo, userId, today, today, tz, { activityLogs, sessions: todayWorkouts }),
     ],
     pedometerSteps: todayMetric?.steps ?? null,
   });
