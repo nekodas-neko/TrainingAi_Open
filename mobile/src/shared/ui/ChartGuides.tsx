@@ -16,8 +16,8 @@ const decorative = {
 } as const;
 
 /** Width of the y-axis column for these labels, grown with the scale text is drawn at. */
-export function yAxisColumnWidth(texts: readonly string[]): number {
-  return yAxisWidth(texts, textScale(PixelRatio.getFontScale()));
+export function yAxisColumnWidth(texts: readonly string[], compact = false): number {
+  return yAxisWidth(texts, textScale(PixelRatio.getFontScale()), compact ? 5 : 7);
 }
 
 /** Faint horizontal gridlines and a dashed target line with its label, drawn over the plot. */
@@ -86,21 +86,29 @@ export function ChartGuides({
 export function YAxisLabels({
   height,
   items,
+  compact = false,
 }: {
   height: number;
   items: readonly { y: number; text: string }[];
+  /** 8 px labels, as the current app's 14-day trend cards draw them, instead of 12 px. */
+  compact?: boolean;
 }) {
   const { theme } = useTheme();
-  const half = theme.typography.caption.lineHeight! / 2;
+  const variant = compact ? 'yAxisTick' : 'caption';
+  const half = theme.typography[variant].lineHeight! / 2;
   return (
     <View
-      style={{ width: yAxisColumnWidth(items.map((item) => item.text)), height }}
+      style={{ width: yAxisColumnWidth(
+          items.map((item) => item.text),
+          compact,
+        ),
+        height }}
       {...decorative}
     >
       {items.map((item, index) => (
         <AppText
           key={index}
-          variant="caption"
+          variant={variant}
           numberOfLines={1}
           style={{
             position: 'absolute',

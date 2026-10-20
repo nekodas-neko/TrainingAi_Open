@@ -1,42 +1,11 @@
 import { standaloneOrLatest } from '@trainingai/shared/health/series-gaps';
-import { niceTicks } from '@trainingai/shared/ui/nice-ticks';
+import { niceTicks, niceScale } from '@trainingai/shared/ui/nice-ticks';
 
 // Pure geometry for the chart components' opt-in axes, gridlines and target line. Kept free of
 // React so it can be unit-tested. `niceTicks` itself lives in `@trainingai/shared/ui/nice-ticks`.
 
 /** Round-number gridline values spanning [lo, hi], about three of them. Shared with the current app (#3041). */
-export { niceTicks };
-
-/**
- * [lo, hi] widened outwards to the round values the gridlines sit on, with those ticks, the way
- * chart.js's linear scale does it (`generateTicks`, bounds 'ticks'): space the ticks for
- * `maxTicks`, and when that gives more spaces than `maxTicks - 1` allows, widen the spacing and
- * round the ends to it. The current app's 14-day cards pass `maxTicksLimit: 4`, so a 35-65 range
- * reads 20/40/60/80, not 30...70. The lowest gridline is then the bottom of the plot. A flat range
- * keeps its one tick and is not widened.
- */
-export function niceScale(
-  lo: number,
-  hi: number,
-  maxTicks = 4,
-): { min: number; max: number; ticks: number[] } {
-  if (hi - lo < 1e-6) return { min: lo, max: hi, ticks: [lo] };
-  const niceNum = (range: number) => {
-    const base = 10 ** Math.floor(Math.log10(range));
-    const fraction = range / base;
-    return (fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10) * base;
-  };
-  const maxSpaces = Math.max(1, maxTicks - 1);
-  let spacing = niceNum((hi - lo) / maxSpaces);
-  const spaces = Math.ceil(hi / spacing - 1e-9) - Math.floor(lo / spacing + 1e-9);
-  if (spaces > maxSpaces) spacing = niceNum((spaces * spacing) / maxSpaces);
-  const round = (v: number) => Math.round(v * 1e6) / 1e6;
-  const min = round(Math.floor(lo / spacing + 1e-9) * spacing);
-  const max = round(Math.ceil(hi / spacing - 1e-9) * spacing);
-  const ticks: number[] = [];
-  for (let v = min; v <= max + 1e-9; v += spacing) ticks.push(round(v));
-  return { min, max, ticks };
-}
+export { niceTicks, niceScale };
 
 /** A reference line a chart can draw, e.g. a daily goal. */
 export type ChartTarget = { value: number; label: string };
@@ -74,10 +43,10 @@ export function tickLabels(ticks: readonly number[]): string[] {
   );
 }
 
-/** Width of the y-axis label column: the longest label at ~7 px a character, floored at 32. */
-export function yAxisWidth(texts: readonly string[], fontScale = 1): number {
+/** Width of the y-axis label column: the longest label at `charWidth` px a character (7 at 12 px type), floored at 32. */
+export function yAxisWidth(texts: readonly string[], fontScale = 1, charWidth = 7): number {
   const longest = Math.max(0, ...texts.map((t) => t.length));
-  return Math.max(32, Math.ceil(longest * 7 * fontScale) + 8);
+  return Math.max(32, Math.ceil(longest * charWidth * fontScale) + 8);
 }
 
 /** The target if it can be drawn (a finite value), else undefined. */

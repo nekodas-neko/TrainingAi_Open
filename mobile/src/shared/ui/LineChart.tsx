@@ -25,6 +25,7 @@ import {
   tickLabels,
   type ChartTarget,
 } from './chartScale';
+import { WEB_TREND_Y_AXIS } from '@trainingai/shared/ui/nice-ticks';
 import { useTheme } from '../theme/ThemeProvider';
 import type { Tone } from '../theme/theme';
 
@@ -161,7 +162,13 @@ export function LineChart({
     target,
   );
   // A caller-fixed domain is kept as given; only a data-derived one is widened to round values.
-  const scale = niceBounds && !domain ? niceScale(dataMin, dataMax) : null;
+  // A dense (14-day) chart takes the current app's trend-card y axis: at most four round ticks, the
+  // plot scaled out to them.
+  const webAxis = denseAxis && (gridlines || yAxis);
+  const scale =
+    (niceBounds || webAxis) && !domain
+      ? niceScale(dataMin, dataMax, webAxis ? WEB_TREND_Y_AXIS.maxTicks : undefined)
+      : null;
   const min = scale?.min ?? dataMin;
   const max = scale?.max ?? dataMax;
   // The viewBox x of the first and last point: inset 12 each side, or the full width when stretched.
@@ -174,7 +181,7 @@ export function LineChart({
   const tickTexts = tickLabels(ticks);
   // The plot sits right of the y-axis column; overlays are absolute so the Svg and the touch
   // responder below keep their existing layout (locationX is relative to the root View).
-  const leftInset = yAxis ? yAxisColumnWidth(tickTexts) : 0;
+  const leftInset = yAxis ? yAxisColumnWidth(tickTexts, webAxis) : 0;
   const plotWidth = Math.max(1, width - leftInset);
   // The viewBox is as tall as the box, so a taller chart fills it instead of being letterboxed.
   // A stretched chart keeps the 320:90 box, which it stretches to fit.
@@ -355,6 +362,7 @@ export function LineChart({
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0 }}>
               <YAxisLabels
                 height={plotHeight}
+                compact={webAxis}
                 items={ticks.map((t, i) => ({ y: toY(t), text: tickTexts[i] }))}
               />
             </View>

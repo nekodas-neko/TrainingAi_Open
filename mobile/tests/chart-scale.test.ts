@@ -19,6 +19,7 @@ import {
   lineSegments,
   lastReadingIndex,
 } from '../src/shared/ui/chartScale.ts';
+import { WEB_TREND_Y_AXIS } from '@trainingai/shared/ui/nice-ticks';
 import { niceTicks as nutritionNiceTicks } from '@trainingai/shared/nutrition/heart-response-view';
 
 test('niceTicks gives round values inside the range', () => {
@@ -236,4 +237,23 @@ test('smoothPath is a cubic through every point, and a straight line for tension
   assert.equal(smoothPath(pts, 0), 'M0,10 L10,0 L20,10');
   assert.equal(smoothPath(pts.slice(0, 2)), 'M0,10 L10,0');
   assert.equal(smoothPath([]), '');
+});
+
+test('the 14-day trend y axis is the current app\'s: 8 px, four ticks, thousands separators', () => {
+  assert.deepEqual(WEB_TREND_Y_AXIS, { fontSize: 8, maxTicks: 4 });
+  // Steps: 0 to 3,000 in four ticks.
+  const steps = niceScale(850, 2900, WEB_TREND_Y_AXIS.maxTicks);
+  assert.deepEqual(steps.ticks, [0, 1000, 2000, 3000]);
+  assert.deepEqual(tickLabels(steps.ticks), ['0', '1,000', '2,000', '3,000']);
+  // Resting HR 48 to 62: four ticks at most, every data value inside the plot.
+  const rhr = niceScale(48, 62, WEB_TREND_Y_AXIS.maxTicks);
+  assert.ok(rhr.ticks.length >= 2 && rhr.ticks.length <= WEB_TREND_Y_AXIS.maxTicks);
+  assert.ok(rhr.min <= 48 && rhr.max >= 62);
+  assert.deepEqual(rhr.ticks, [40, 50, 60, 70]);
+  // A flat series keeps its one tick and is not widened.
+  assert.deepEqual(niceScale(58, 58, WEB_TREND_Y_AXIS.maxTicks), { min: 58, max: 58, ticks: [58] });
+  // No range ever asks for more than four.
+  for (const [lo, hi] of [[0, 7], [3, 3.4], [100, 4500], [-20, 35], [12000, 15500]]) {
+    assert.ok(niceScale(lo, hi, WEB_TREND_Y_AXIS.maxTicks).ticks.length <= 4, `${lo}..${hi}`);
+  }
 });
