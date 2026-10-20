@@ -69,7 +69,7 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-describe('walk summary phase bands (#3188)', () => {
+describe('walk summary phase bands (issue 3188)', () => {
   it('an early save paints no band for a block never reached and ends the current one at the stop', async () => {
     await renderSummary(240)
     const bands = h.chartProps.at(-1)?.phaseBands
