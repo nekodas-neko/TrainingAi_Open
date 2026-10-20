@@ -95,6 +95,7 @@ See the full timezone rules in `CLAUDE.md`.
 | Day-of-week (0–6) in tz | `todayDayOfWeek(tz?)` |
 | Start of week | `startOfWeekInTz(tz?)` |
 | Local midnight `Date` (overflow-safe) | `aestMidnight(y, m, d, tz?)`, `todayMidnightUtc(tz?)` |
+| Start of a "last N days" window: local midnight N calendar days back | `midnightDaysAgoInTz(tz, daysAgo, at?)` — never `now − N×86400000` (#3117) |
 | Shift a date string by N days | `shiftDateStr(dateStr, days)` |
 | Workout kcal from heart rate | `estWorkoutKcalFromHr` (`packages/shared/src/health/workout-energy.ts`) — Keytel et al. 2005, kJ/min → kcal, floored at 0, `null` outside `[HR_MIN_PLAUSIBLE, HR_MAX_PLAUSIBLE]` or on an incomplete profile (Q-421). `computeActiveEnergy` prefers it per session and falls back to the MET tier, which was always Oura's `has_enough_motion === false` branch. `avg_bpm` batch-read via `getAvgBpmBySession`. |
 | Per-session workout kcal | `computeActiveEnergy` (`packages/shared/src/health/daily-energy.ts`) returns `workoutKcalBySession: { id, kcal }[]` — the exact addends of the day's `workoutKcal`, surfaced on `/api/nutrition/energy-balance` under `activeBreakdown` (Q-391). Join on `workoutSessionId` from `/api/day-log`. **Do not compute a second per-session estimate elsewhere** — the day screen's Energy total reads this same route precisely so the two cannot disagree. Unrounded; round at render. |

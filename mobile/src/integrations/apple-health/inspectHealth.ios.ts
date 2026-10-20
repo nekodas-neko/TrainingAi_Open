@@ -1,5 +1,6 @@
 import type { BaseSample, ObjectTypeIdentifier, QuantityTypeIdentifier, UnitForIdentifier } from '@kingstinct/react-native-healthkit';
 import type { HealthInspection, HealthInspectionEntry } from '../../features/health/types';
+import { midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
 
 type QuantityDefinition = {
   key: string;
@@ -65,8 +66,9 @@ function failed(key: string, label: string, error: unknown): HealthInspectionEnt
   return { key, label, status: 'error', sources: [], detail: error instanceof Error ? error.message : 'The query failed. Try again with your phone unlocked.' };
 }
 
-export async function inspectHealth(health: typeof import('@kingstinct/react-native-healthkit'), end: Date): Promise<HealthInspection> {
-  const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+export async function inspectHealth(health: typeof import('@kingstinct/react-native-healthkit'), end: Date, timezone: string): Promise<HealthInspection> {
+  // The last 7 local days in the profile's zone, not end − 7×24h (#3117).
+  const start = midnightDaysAgoInTz(timezone, 7, end);
   const options = { limit: sampleLimit, ascending: false, filter: { date: { startDate: start, endDate: end } } };
   const entries: HealthInspectionEntry[] = [];
   try {
