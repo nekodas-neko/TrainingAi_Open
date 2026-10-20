@@ -149,6 +149,8 @@ export const typography = {
   statUnit: { fontSize: 9, lineHeight: 13.5 },
   // trend-sparkline.tsx: chart.js x ticks at font size 9, so 14 weekday labels fit the plot.
   axisTick: { fontSize: 9, lineHeight: 13.5 },
+  // trend-sparkline.tsx: chart.js y ticks at font size 8, a 14-day card's value labels.
+  yAxisTick: { fontSize: 8, lineHeight: 12 },
   micro: { fontSize: 10, lineHeight: 14, fontWeight: '600' },
   // day-sections.tsx Stat: text-[0.95rem] font-bold leading-none over a text-[8.5px] uppercase
   // tracking-[0.16em] label (Eaten / Burned / Net).
