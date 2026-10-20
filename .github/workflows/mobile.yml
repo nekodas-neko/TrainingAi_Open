@@ -73,3 +73,10 @@ jobs:
       - name: Compile unpublished development APK
         run: ./gradlew :app:assembleDebug --no-daemon
         working-directory: mobile/android
+      # The local modules' JVM unit tests (PipStateTest and any that follow). Every module under
+      # mobile/modules is listed, so a module that adds tests is covered without editing this.
+      - name: Native module unit tests
+        run: |
+          tasks=$(for dir in ../modules/*/android; do echo ":$(basename "$(dirname "$dir")"):testDebugUnitTest"; done)
+          ./gradlew $tasks --no-daemon
+        working-directory: mobile/android
