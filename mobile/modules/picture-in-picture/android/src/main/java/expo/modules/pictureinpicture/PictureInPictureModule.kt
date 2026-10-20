@@ -71,7 +71,9 @@ class PictureInPictureModule : Module() {
 
     Function("setPhase") { next: String, view: Map<String, Any?>? ->
       phase = next
-      window = if (PipPolicy.isActivePhase(next)) PipState.fromMap(view) else null
+      // Kept for any phase: one that cannot open the window can still arrive while it is open,
+      // such as "done" after Next on the last exercise, and the window must not go blank.
+      window = PipState.fromMap(view)
       main.post { windowView?.render(window, System.currentTimeMillis()) }
       val activity = appContext.currentActivity ?: return@Function
       watch(activity)
@@ -98,7 +100,7 @@ class PictureInPictureModule : Module() {
       watched = null
       inPip = false
       main.removeCallbacks(tick)
-      removeWindow()
+      main.post { removeWindow() }
     }
 
     OnActivityEntersForeground {

@@ -101,9 +101,11 @@ describe('Oura Cloud document mapping (#2859)', () => {
     expect(mapOuraDocuments([activity!]).cloudDaily[0]).toMatchObject({ met: null, class5Min: null, inactivityAlerts: null })
   })
 
-  it('writes body metrics from activity, SpO2 and the main sleep', () => {
+  // #3080: HRV and resting HR are set after the write, from the day's main period among every stored
+  // one (`syncOuraMainSleepBodyMetrics`, tested against Postgres), never from one batch's documents.
+  it('writes body metrics from activity and SpO2, and leaves the sleep vitals to the main-period sync', () => {
     const { body } = mapOuraDocuments(all())
-    expect(body).toEqual([{ date: DAY, steps: 9123, activeCalories: 512, spo2Pct: 96.4, hrvMs: 62, restingHeartRate: 47 }])
+    expect(body).toEqual([{ date: DAY, steps: 9123, activeCalories: 512, spo2Pct: 96.4 }])
   })
 
   it('maps a sleep period with every duration in hours and keeps Oura\'s id', () => {
@@ -165,12 +167,13 @@ describe('Oura Cloud document mapping (#2859)', () => {
     expect(out.sleepPeriods.map(p => [p.ouraId, p.sleepType])).toEqual([['gone', 'deleted'], ['rest', 'rest']])
   })
 
-  it('takes the longest long_sleep of a day for HRV and resting HR, never a nap', () => {
-    const nap = parseOuraDocument('sleep', { ...sleepPeriod, id: 'nap', type: 'late_nap', average_hrv: 99, lowest_heart_rate: 40, total_sleep_duration: 99999 })!
-    const night = parseOuraDocument('sleep', sleepPeriod)!
-    const { body, sleep } = mapOuraDocuments([nap, night])
-    expect(sleep.map(s => s.ouraId).sort()).toEqual(['nap', 'sl-1'])
-    expect(body[0]).toMatchObject({ hrvMs: 62, restingHeartRate: 47 })
+  it('lists a period Oura retyped to rest for a tombstone that keeps its type, never as sleep (#3080)', () => {
+    const rest = parseOuraDocument('sleep', { ...sleepPeriod, id: 'r-1', type: 'rest' })!
+    const out = mapOuraDocuments([rest])
+    expect(out.sleep).toEqual([])
+    expect(out.retypedSleepIds).toEqual(['r-1'])
+    expect(out.deletedSleepIds).toEqual([])
+    expect(out.sleepPeriods.map(p => p.sleepType)).toEqual(['rest'])
   })
 
   it('drops a document that is not the spec\'s shape rather than storing half of it', () => {

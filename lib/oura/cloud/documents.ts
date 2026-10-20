@@ -324,6 +324,12 @@ export interface OuraCloudWrites {
   sleep: OuraSleepUpsertRow[]
   /** Oura ids of sleep periods Oura now reports as `deleted`. */
   deletedSleepIds: string[]
+  /**
+   * #3080: Oura ids of periods Oura now types as something that is not sleep (`rest`: the user
+   * rejected it in the Oura app). Their night is tombstoned like a delete, but the period row keeps
+   * Oura's own type.
+   */
+  retypedSleepIds: string[]
   workouts: OuraWorkoutRow[]
   /** #2982: every sleep period as Oura sent it, `rest` and `deleted` included. */
   sleepPeriods: OuraCloudSleepPeriodRow[]
@@ -355,6 +361,7 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
   const body = new Map<string, OuraBodyMetricsRow>()
   const sleep = new Map<string, OuraSleepUpsertRow>()
   const deletedSleepIds: string[] = []
+  const retypedSleepIds: string[] = []
   const workouts = new Map<string, OuraWorkoutRow>()
   const sleepPeriods = new Map<string, OuraCloudSleepPeriodRow>()
   const cloudDaily = new Map<string, OuraCloudDailyRow>()
@@ -376,7 +383,6 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
     return row
   }
   // Main-sleep vitals per day: the longest `long_sleep` wins, so a nap never stands for the night.
-  const mainSleepSec = new Map<string, number>()
 
   for (const { type, doc } of docs) {
     switch (type) {
@@ -460,7 +466,7 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
           ringId: doc.ring_id ?? null,
         })
         if (doc.type === 'deleted') { deletedSleepIds.push(doc.id); break }
-        if (doc.type != null && !SLEEP_TYPES.has(doc.type)) break
+        if (doc.type != null && !SLEEP_TYPES.has(doc.type)) { retypedSleepIds.push(doc.id); break }
         const start = new Date(doc.bedtime_start)
         const end = new Date(doc.bedtime_end)
         if (!(end.getTime() > start.getTime())) break
@@ -484,12 +490,9 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
           respiratoryRate: doc.average_breath ?? null,
           sleepPhase5Min: doc.sleep_phase_5_min ?? null,
         })
-        if (doc.type === 'long_sleep' && (doc.total_sleep_duration ?? 0) > (mainSleepSec.get(doc.day) ?? -1)) {
-          mainSleepSec.set(doc.day, doc.total_sleep_duration ?? 0)
-          const b = bodyDay(doc.day)
-          b.hrvMs = doc.average_hrv ?? undefined
-          b.restingHeartRate = doc.lowest_heart_rate ?? undefined
-        }
+        // #3080: the day's HRV and resting HR are no longer taken here. One document is one period,
+        // and on the webhook path the last event won, not the longest period; they are set from the
+        // day's main period among every stored one, after the write (`syncOuraMainSleepBodyMetrics`).
         break
       }
       case 'workout': {
@@ -525,6 +528,7 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
     body: [...body.values()].filter(r => Object.entries(r).some(([k, v]) => k !== 'date' && v != null)),
     sleep: [...sleep.values()],
     deletedSleepIds,
+    retypedSleepIds,
     workouts: [...workouts.values()],
     sleepPeriods: [...sleepPeriods.values()],
     cloudDaily: [...cloudDaily.values()],

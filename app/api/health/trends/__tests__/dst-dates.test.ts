@@ -10,6 +10,7 @@ vi.mock('@/lib/data', () => ({
     getOuraDailyDerived: async () => [],
     listBodyMetrics: async () => [],
     getWorkoutSessionsFrom: async () => [],
+    listActivityLogs: async () => [],
   }),
 }))
 

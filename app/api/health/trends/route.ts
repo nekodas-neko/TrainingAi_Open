@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { wornHours } from '@trainingai/shared/health/wear-confidence'
 import { aggregateWorkoutDay, type DaySession } from '@trainingai/shared/health/workout-density'
 import { rollupDailyBestHrr, setHrr60Values } from '@trainingai/shared/workout/hrr-trend'
+import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 
 export interface HealthTrendDay {
   date: string            // YYYY-MM-DD
@@ -43,11 +44,13 @@ export async function GET() {
   const from14dIso = shiftDateStr(todayIso, -14)
   const from14dDate = dateStrMidnightInTz(from14dIso, tz)
 
-  const [ouraRows, derivedRows, bodyRows, workoutSessions] = await Promise.all([
+  const [ouraRows, derivedRows, bodyRows, workoutSessions, activityLogs] = await Promise.all([
     repo.getOuraDaily(userId, from14dIso, todayIso),
     repo.getOuraDailyDerived(userId, from14dIso, todayIso),
     repo.listBodyMetrics(userId, from14dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from14dDate),
+    // #3095: indoor (treadmill) steps join each day's count, as on the Steps history beside it.
+    repo.listActivityLogs(userId, from14dIso, todayIso).catch(() => []),
   ])
 
   const ouraByDate = new Map(ouraRows.map(r => [r.date, r]))
@@ -55,6 +58,7 @@ export async function GET() {
   // Oura's own readiness, sleep and activity scores are never ours (scoring doc rule 5, #3000).
   const derivedByDate = new Map(derivedRows.map(r => [r.day, r]))
   const bodyByDate = new Map(bodyRows.map(r => [r.date, r]))
+  const stepsByDate = dayStepCountsByDate(bodyRows, activityLogs)
   const latestWeightKg = bodyRows.find(r => r.weightKg != null)?.weightKg ?? null  // bodyRows is date-descending
 
   const sessionsByDate = new Map<string, DaySession[]>()
@@ -107,7 +111,7 @@ export async function GET() {
       proteinPerKg: body?.proteinG != null && latestWeightKg != null
         ? Math.round((body.proteinG / latestWeightKg) * 10) / 10
         : null,
-      steps: body?.steps ?? null,
+      steps: stepsByDate.get(d) ?? null,
       waterMl: body?.waterMl ?? null,
       temperatureDeviation: oura?.temperatureDeviation ?? null,
     })

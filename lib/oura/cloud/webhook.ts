@@ -151,7 +151,12 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
 
   if (event.event_type === 'delete') {
     if (event.data_type !== 'sleep') return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
-    const tombstoned = await withNightRescore(deps.rescore, userId, () => deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id]))
+    const tombstoned = await withNightRescore(deps.rescore, userId, async () => {
+      const n = await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id])
+      // #3080: the day's HRV and resting HR follow its main period, which may have been this one.
+      await deps.repo.syncOuraMainSleepBodyMetrics(userId, { days: [], ouraIds: [event.object_id] })
+      return n
+    })
     return { result: 'deleted', tombstoned }
   }
 

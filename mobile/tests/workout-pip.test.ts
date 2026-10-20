@@ -144,7 +144,21 @@ test('a running set sends its start, the load and the set colour', () => {
 
 test('the exercise summary shows the placeholder until Preview runs a last-set rest (#3111)', () => {
   const summary = recorded(3, { flow: { stage: 'summary', exerciseId: ids.bench } });
-  assert.deepEqual(pipViewFor(summary), { kind: 'placeholder', exerciseName: 'Bench press' });
+  assert.deepEqual(pipViewFor(summary), {
+    kind: 'placeholder',
+    exerciseName: 'Bench press',
+    hint: true,
+  });
+  // Next on the last exercise ends the workout with the window still open: never blank (#3133).
+  assert.deepEqual(
+    pipViewFor(
+      recorded(3, {
+        sessionName: 'Upper body',
+        flow: { stage: 'review', exerciseId: ids.bench },
+      } as Partial<WorkoutRecord>),
+    ),
+    { kind: 'placeholder', exerciseName: 'Upper body', hint: false },
+  );
   assert.equal(pipViewFor(workout({ flow: { stage: 'warmup', exerciseId: ids.bench } })), null);
 });
 
@@ -265,4 +279,25 @@ test('a window button reaches the journal', async () => {
     ['startSet', ids.workout, ids.bench, ids.set(2)],
     ['advanceExercise', ids.workout],
   ]);
+});
+
+test('the load line always shows during a set, with the current app’s fallbacks (#3133)', () => {
+  const base = recorded(1, { runningSet: { exerciseId: ids.bench, setId: ids.set(2) } });
+  const loadOf = () => timer(pipViewFor(base)).load;
+  base.exercises[0].sets[1] = { ...base.exercises[0].sets[1], weight: '', reps: '' };
+  assert.equal(loadOf(), '60 kg × 8', 'blank weight: the planned weight; blank reps: the plan');
+  base.exercises[0].sets[1] = {
+    ...base.exercises[0].sets[1],
+    plannedWeight: null,
+    planned: null,
+  };
+  base.exercises[0].sets[0] = { ...base.exercises[0].sets[0], weight: '57.5', reps: '9' };
+  assert.equal(loadOf(), '57.5 kg × 9', 'then the first set');
+  base.exercises[0].sets[0] = { ...base.exercises[0].sets[0], weight: '', reps: '' };
+  assert.equal(loadOf(), '60 kg × 10', 'then 60 × 10, as the current app defaults');
+  base.runningSet = { exerciseId: ids.bench, setId: '00000000-0000-4000-8000-000000000999' };
+  assert.notEqual(loadOf(), null, 'a missing running set still shows a load');
+  base.exercises[0].weightUnit = 'lb';
+  base.exercises[0].sets[0] = { ...base.exercises[0].sets[0], weight: '135' };
+  assert.match(loadOf() ?? '', / lb × /);
 });

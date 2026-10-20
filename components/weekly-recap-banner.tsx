@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { SparklesIcon } from "lucide-react";
 import { startOfWeekInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { DismissibleBanner } from "@/components/ui/dismissible-banner";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
@@ -37,7 +38,8 @@ interface DigestResponse {
 // `forceOpen` is gone with the expansion: the weekly reminder now deep-links to `/health/week`
 // itself, so there is no longer a banner state for it to override.
 export function WeeklyRecapBanner() {
-  const weekStart = shiftDateStr(startOfWeekInTz(), -7);
+  // The user's zone, as `/health/week` builds the same `weekly-digest:` key (#3095).
+  const weekStart = shiftDateStr(startOfWeekInTz(useUserTimezone()), -7);
   const dismissKey = DISMISSED_KEY_PREFIX + weekStart;
 
   // `true` until the effect has read localStorage, so a dismissed banner never flashes. The fetch

@@ -11,6 +11,8 @@ const repo = {
     { date: '2026-07-15', hrvMs: 52, restingHeartRate: 48, steps: 9000, weightKg: 82.5, spo2Pct: 96.4 },
   ],
   getOuraDailyDerived: async () => [],
+  // #3095: a treadmill session the ring could not see — its steps join the day's, as on every screen.
+  listActivityLogs: async () => [{ date: '2026-07-15', activityType: 'treadmill', steps: 2000, startTime: '12:00:00' }],
 } as unknown as WorkoutRepository
 
 // `execute` is typed as returning a value or a stream; these tools return a plain value.
@@ -25,6 +27,15 @@ describe('getRecoveryData chat tool', () => {
     ))
     expect(out.bodyMetrics[0]).toMatchObject({ hrvMs: 52, spo2Pct: 96.4 })
   })
+
+  it('sends the day\'s steps the app shows, treadmill included (#3095)', async () => {
+    const tools = buildChatTools(repo, 'u1', 'Australia/Brisbane', '2026-07-16')
+    const out = await plain(tools.getRecoveryData.execute!(
+      { fromDate: '2026-07-10', toDate: '2026-07-16' },
+      { toolCallId: 't1', messages: [] },
+    ))
+    expect(out.bodyMetrics[0].steps).toBe(11_000)
+  })
 })
 
 // #3000 (scoring doc rule 5): Oura's own readiness, sleep and activity scores are never sent to the
@@ -37,6 +48,7 @@ describe("recovery chat tools never send Oura's scores as ours (#3000)", () => {
     listBodyMetrics: async () => [],
     getOuraDailyDerived: async () => derived,
     getWorkoutSessionsFrom: async () => [],
+    listActivityLogs: async () => [],
   }) as unknown as WorkoutRepository
   const ctx = { toolCallId: 't1', messages: [] }
 

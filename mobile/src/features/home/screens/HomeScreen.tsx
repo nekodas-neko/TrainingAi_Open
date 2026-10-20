@@ -47,6 +47,7 @@ import { useAdminPending } from '../data/admin-pending';
 import { HomeBanners } from '../components/HomeBanners';
 import { useAppleImport } from '../../health/HealthProvider';
 import { CoachFab } from '../../coach/components/CoachFab';
+import { logSeedReading } from '@trainingai/shared/health/activity-steps';
 
 export type HomeNavigation = {
   openCoach: () => void;
@@ -348,7 +349,7 @@ export function HomeScreen(navigation: HomeNavigation) {
       {metric && (
         <MetricLogSheet
           field={metric}
-          initial={metric === 'waterMl' ? null : (health.body?.today?.[metric] ?? null)}
+          initial={metric === 'waterMl' ? null : (logSeedReading(metric, health.body?.today) as number | null)}
           onClose={() => setMetric(null)}
         />
       )}

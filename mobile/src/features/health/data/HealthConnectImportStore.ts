@@ -11,7 +11,8 @@ import {
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import type { HealthConnectReader } from '../../../integrations/health-connect/types.ts';
-import { failureNotice } from '../../../core/reporting/index.ts';
+import { failureNotice, reportError } from '../../../core/reporting/index.ts';
+import { HealthConnectPersistence } from './health-connect-persistence.ts';
 import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
 /**
  * Health Connect's own read limit, an instant rule rather than a calendar window: without the
@@ -109,13 +110,15 @@ export class HealthConnectImportStore {
   private running: Promise<void> | null = null;
   private canceled = false;
   private lastAttempt = 0;
+  private persistence: HealthConnectPersistence;
   constructor(
-    private storage: ScopedStorage,
+    storage: ScopedStorage,
     readonly connection: AccountConnection,
     private reader: HealthConnectReader,
     private changed = () => {},
     private now = Date.now,
   ) {
+    this.persistence = new HealthConnectPersistence(storage);
     this.disk = {
       origin: connection.origin,
       userId: connection.userId,
@@ -165,15 +168,18 @@ export class HealthConnectImportStore {
     if (this.initializing) return this.initializing;
     this.initializing = (async () => {
       try {
-        const raw = await this.storage.get('health-connect-import.v1');
+        const raw = await this.persistence.read();
         if (raw) {
-          const saved = diskSchema.parse(JSON.parse(raw));
+          const saved = diskSchema.parse(raw);
           if (
             saved.origin !== this.connection.origin ||
             saved.userId !== this.connection.userId
           )
             throw new Error('Wrong account');
           this.disk = saved;
+          // Moves the old single value across, or clears leftovers; a failure keeps what is saved
+          // readable and the next write retries (#3121).
+          await this.persistence.opened(saved).catch(reportError);
         }
         if (!this.canceled) this.publish({ ready: true });
       } catch (failure) {
@@ -190,7 +196,7 @@ export class HealthConnectImportStore {
   }
   private async write(next: Disk) {
     if (this.canceled) return;
-    await this.storage.set('health-connect-import.v1', JSON.stringify(next));
+    await this.persistence.write(next);
     if (!this.canceled) {
       this.disk = next;
       this.publish();
@@ -404,6 +410,32 @@ export class HealthConnectImportStore {
       skipped: this.disk.skipped + dropped,
     });
   }
+  /**
+   * Drops cached record ids older than any scan can start (#3121): `disk.from`, and without the
+   * history permission 30 days before the first grant, which is as far back as Health Connect
+   * lets a rescan read. A record still queued or held keeps its id, and so does anything during a
+   * scan, whose deletion check reads the cache.
+   */
+  private async prune(hasHistory: boolean) {
+    if (this.disk.scan) return;
+    const grantedAt = Date.parse(this.disk.grantedAt ?? new Date(this.now()).toISOString());
+    const floor = Math.max(
+      Date.parse(this.disk.from),
+      hasHistory ? -Infinity : grantedAt - READ_LIMIT_MS,
+    );
+    const waiting = new Set<string>();
+    for (const item of this.disk.queue)
+      if ('records' in item) for (const row of item.records) waiting.add(row.id);
+    for (const entry of this.disk.blocked)
+      for (const row of entry.batch.records) waiting.add(row.id);
+    const records = Object.fromEntries(
+      Object.entries(this.disk.records).filter(
+        ([id, row]) => Date.parse(row.start) >= floor || waiting.has(id),
+      ),
+    );
+    if (Object.keys(records).length !== Object.keys(this.disk.records).length)
+      await this.write({ ...this.disk, records });
+  }
   run(manual = false): Promise<void> {
     if (this.running) return this.running;
     if (this.canceled || (!manual && this.now() - this.lastAttempt < 300000))
@@ -419,9 +451,11 @@ export class HealthConnectImportStore {
         if (!types.length) throw new Error('No Health Connect read permissions are granted.');
         if (!this.disk.grantedAt)
           await this.write({ ...this.disk, grantedAt: new Date(this.now()).toISOString() });
-        await this.release(types);
-        await this.flush(types);
         const hasHistory = (await this.reader.hasHistoryPermission?.()) ?? false;
+        await this.release(types);
+        // Before the uploads, so an offline run still keeps the cache in bounds.
+        await this.prune(hasHistory);
+        await this.flush(types);
         const permissionKey = [...types].sort().join(',') + (hasHistory ? ':history' : '');
         if (permissionKey !== this.disk.permissionKey)
           await this.write({
