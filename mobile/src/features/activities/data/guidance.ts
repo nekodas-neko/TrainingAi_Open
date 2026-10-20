@@ -91,7 +91,7 @@ export function walkSegments(config: WalkConfig, elapsed: number) {
     distanceKm: null,
     avgCadenceSpm: null,
     steps: null,
-    }));
+  }));
 }
 export function testDuration(protocolId: string) {
   const protocol = getProtocol(protocolId)!;
