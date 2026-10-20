@@ -18,6 +18,7 @@ import { activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-min
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { nightSessions, canonicalNightForDate, type AggregatableSleep } from '@trainingai/shared/health/sleep-night'
 import { isLowWearDay } from '@trainingai/shared/health/wear-confidence'
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { hrr60Candidates, nightlyCandidates } from '@trainingai/shared/inputs/adapters'
 import { resolveSlots, type InputName } from '@trainingai/shared/inputs/cascade'
 import { stepsFloorForAge, type ShadowUnitId } from './model'
@@ -250,12 +251,10 @@ function daytimeStressSeries(raw: ShadowRawHistory): UnitObservation[] {
     const o = obs(r.day, r.stressHighMinutes, 'oura_daily_derived')
     if (o) byDay.set(r.day, o)
   }
-  if (from != null) {
-    for (const w of raw.wear) {
-      if (w.date < from) continue
-      const o = obs(w.date, w.stressHigh == null ? null : w.stressHigh / 60, 'oura_cloud')
-      if (o) byDay.set(w.date, o)
-    }
+  for (const w of raw.wear) {
+    if (ringValueStands(w.date, from)) continue
+    const o = obs(w.date, w.stressHigh == null ? null : w.stressHigh / 60, 'oura_cloud')
+    if (o) byDay.set(w.date, o)
   }
   return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date))
 }

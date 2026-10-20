@@ -1594,6 +1594,9 @@ export const ouraDaily = pgTable('oura_daily', {
   resilienceContributors: jsonb('resilience_contributors'), // { sleep_recovery, daytime_recovery, stress }
 
   // sleep_time endpoint (GET /v2/usercollection/sleep_time) — migration 090
+  // Units differ by row age: the 3 rows written before the re-key hold seconds; every row since
+  // (`sleep_time` via the connector, #3077) holds minutes from the day's local midnight. The one reader,
+  // the readiness payload, gates on `isPreRekey`, so the old rows are never read as minutes.
   recommendedBedtimeStart: integer('recommended_bedtime_start'),
   recommendedBedtimeEnd:   integer('recommended_bedtime_end'),
   sleepTimeStatus:         text('sleep_time_status'),

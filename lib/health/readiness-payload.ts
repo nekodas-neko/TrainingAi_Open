@@ -19,6 +19,7 @@ import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDos
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
@@ -397,7 +398,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.
   const hrProfileP = resolveHrProfile(repo, userId, tz).catch(() => null)
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -416,9 +417,14 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // #2984: Oura's recovery-index contributor, the one input Oura sends no value for. A failure
     // leaves that input missing, which is what it is without the read.
     (async () => repo.getOuraCloudReadinessContributors(userId, from28dIso, todayIso))().catch(() => []),
+    // #3193: a failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
+    (async () => repo.getOuraCloudSwitchDay(userId))().catch(() => null),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
+  // #2998: from the day the user switched to the Oura API, today's ring row is a partial leftover, so
+  // its daytime stress and recovery give way to Oura's. Display and availability only, never a score input.
+  const ringStressToday = ringValueStands(todayIso, switchDay) ? derivedToday : null
   // Latest day with a produced resilience level (today may be too incomplete to resolve one yet).
   const latestResilience = [...derivedTodayRows].reverse().find(r => r.resilienceLevel != null) ?? null
   // LA-158: when there is no level, record what was actually observed rather than leaving the
@@ -963,8 +969,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       // #2423. The two lowest-coverage pillars. Present/absent only, like sleep and activity: neither
       // has contributors, and inventing some so they could say `awaiting_baseline` would be a claim
       // nothing computes. Stress is present when today's high-stress minutes were derived (0 is a
-      // real reading); resilience when any recent day published a level.
-      metricAvailability('daytimeStress', derivedToday?.stressHighMinutes ?? null),
+      // real reading), or from the switch day Oura sent them; resilience when any recent day published a level.
+      metricAvailability('daytimeStress', ringValueStands(todayIso, switchDay)
+        ? derivedToday?.stressHighMinutes ?? null
+        : (cloudDailyLive ? ouraToday.stressHigh ?? null : null)),
       metricAvailability('resilience', latestResilience?.resilienceLevel ?? null),
     ],
     ...(connectedSourcesSummary ? { connectedSources: connectedSourcesSummary } : {}),
@@ -1005,8 +1013,8 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // Cloud seconds ONLY when that row post-dates the re-key. Derived is minutes → convert;
     // response stays seconds (S5). 10c's derived-first coalesce is preserved; item 21 gates
     // only the Cloud fallback.
-    stressHigh:              derivedToday?.stressHighMinutes   != null ? derivedToday.stressHighMinutes   * 60 : (cloudDailyLive ? ouraToday.stressHigh   ?? null : null),
-    recoveryHigh:            derivedToday?.recoveryHighMinutes != null ? derivedToday.recoveryHighMinutes * 60 : (cloudDailyLive ? ouraToday.recoveryHigh ?? null : null),
+    stressHigh:              ringStressToday?.stressHighMinutes   != null ? ringStressToday.stressHighMinutes   * 60 : (cloudDailyLive ? ouraToday.stressHigh   ?? null : null),
+    recoveryHigh:            ringStressToday?.recoveryHighMinutes != null ? ringStressToday.recoveryHighMinutes * 60 : (cloudDailyLive ? ouraToday.recoveryHigh ?? null : null),
     recommendedBedtimeStart: cloudDailyLive ? ouraToday.recommendedBedtimeStart ?? null : null,
     recommendedBedtimeEnd:   cloudDailyLive ? ouraToday.recommendedBedtimeEnd   ?? null : null,
     isLowWearToday:          isLowWearDay(ouraToday?.nonWearTimeSec),
