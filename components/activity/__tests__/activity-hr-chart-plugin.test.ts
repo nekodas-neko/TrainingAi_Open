@@ -80,7 +80,7 @@ describe('phaseBandsPlugin', () => {
 
 describe('phaseBandsFromSegments on an early-saved walk (#3188)', () => {
   // [slow 0-180, fast 180-360, slow 360-540, fast 540-720]
-  const plan = buildIntervalPlan({ sets: 2, fastSec: 180, slowSec: 180, warmupSec: 0, cooldownSec: 0 })
+  const plan = buildIntervalPlan({ sets: 2, fastSec: 180, slowSec: 180, warmupSec: 0, cooldownSec: 0, treadmill: false })
 
   it('paints no band for blocks never reached and ends the current one at the stop', () => {
     const bands = phaseBandsFromSegments(clipSegmentsAt(plan.segments, 240))
