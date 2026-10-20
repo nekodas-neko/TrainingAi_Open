@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OURA_API_BASE } from '../config'
 import { ensureOuraWebhookSubscriptions, RENEW_WITHIN_MS, WANTED_SUBSCRIPTIONS } from '../subscriptions'
+import { OURA_DELETE_TYPES } from '../documents'
 import { startOuraWebhookRenewal } from '../renewal'
 import type { OuraWebhookConfig } from '../webhook'
 import { jsonResponse } from './fixtures'
@@ -68,6 +69,13 @@ describe('Oura webhook subscription renewal (#2859)', () => {
     expect(posts.map(p => `${(p.body as Sub).data_type}:${(p.body as Sub).event_type}`)).toContain('sleep:delete')
     // #3087: a workout deleted in the Oura app is tombstoned, so its delete is subscribed too.
     expect(posts.map(p => `${(p.body as Sub).data_type}:${(p.body as Sub).event_type}`)).toContain('workout:delete')
+  })
+
+  // #3081: a delete is subscribed exactly where the webhook acts on one, so neither can drift alone.
+  it('subscribes to delete for exactly the types the webhook acts on', () => {
+    const deletes = WANTED_SUBSCRIPTIONS.filter(w => w.eventType === 'delete').map(w => w.dataType)
+    expect(deletes).toEqual([...OURA_DELETE_TYPES])
+    expect(deletes).toEqual(['sleep', 'workout'])
   })
 
   it('does nothing on a second run', async () => {
