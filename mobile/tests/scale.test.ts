@@ -37,9 +37,9 @@ import type { ScopedStorage } from '../src/core/storage/LocalStorage.ts';
 
 const hex = (s: string) => Uint8Array.from(s.split('-').map((b) => parseInt(b, 16)));
 // The owner's real captures (see the shared decoder's test).
-const UNSTABLE = hex('10-0B-15-1B-B2-00-00-00-00-00-FD'); // 70.90 kg
-const FINAL = hex('10-0B-15-1B-B7-01-01-F9-01-F7-F5'); // 70.95 kg, 505 / 503 Ω
-const HANDSHAKE = hex('12-0F-15-07-B4-ED-38-C1-A4-38-01-38-00-07-F3');
+const UNSTABLE = hex('10-0B-15-19-78-00-00-00-00-00-C1'); // 65.20 kg
+const FINAL = hex('10-0B-15-19-8C-01-01-E0-01-DE-96'); // 65.40 kg, 480 / 478 Ω
+const HANDSHAKE = hex('12-0F-15-01-02-03-04-05-06-38-01-38-00-07-F3');
 
 function memoryStorage(seed: Record<string, string> = {}): ScopedStorage {
   const values = new Map(Object.entries(seed));
@@ -98,10 +98,10 @@ test('write characteristics are sent as base64 and read back the same', () => {
 });
 
 const reading = (over: Partial<ScaleReading> = {}): ScaleReading => ({
-  rawHex: '100b151bb70101f901f7f5',
-  weightKg: 70.95,
-  impedanceOhmsA: 505,
-  impedanceOhmsB: 503,
+  rawHex: '100b15198c0101e001de96',
+  weightKg: 65.4,
+  impedanceOhmsA: 480,
+  impedanceOhmsB: 478,
   measuredAt: '2026-10-20T01:00:00.000Z',
   ...over,
 });
@@ -121,7 +121,7 @@ test('a weigh-in is saved on the phone first, then sent with the moment it was t
     memoryStorage(),
     connection(async (path, body) => {
       posts.push({ path, body });
-      return { status: 'confirmed', weightKg: 70.95, isAdditionalReadingForDay: false };
+      return { status: 'confirmed', weightKg: 65.4, isAdditionalReadingForDay: false };
     }),
     (outcome) => outcomes.push(outcome.kind),
   );
@@ -142,20 +142,20 @@ test('the outbox keeps readings through an outage, drops only refused ones, and 
     connection(async (_path, body) => {
       const weight = (body as ScaleReading).weightKg;
       if (mode === 'offline') throw new Error('offline');
-      if (mode === 'refuse' && weight === 71) throw new ApiError(400);
+      if (mode === 'refuse' && weight === 61) throw new ApiError(400);
       sent.push(weight);
       return { status: 'confirmed' };
     }),
     (outcome) => outcomes.push(outcome.kind),
   );
-  await outbox.append(reading({ weightKg: 70, rawHex: 'a' }));
-  await outbox.append(reading({ weightKg: 71, rawHex: 'b' }));
-  await outbox.append(reading({ weightKg: 72, rawHex: 'c' }));
+  await outbox.append(reading({ weightKg: 60, rawHex: 'a' }));
+  await outbox.append(reading({ weightKg: 61, rawHex: 'b' }));
+  await outbox.append(reading({ weightKg: 62, rawHex: 'c' }));
   await outbox.sync();
   assert.equal(outbox.pending(), 3, 'nothing is lost to a dead connection');
   mode = 'refuse';
   await outbox.sync();
-  assert.deepEqual(sent, [70, 72]);
+  assert.deepEqual(sent, [60, 62]);
   assert.deepEqual(outcomes, ['verdict', 'rejected', 'verdict']);
   assert.equal(outbox.pending(), 0);
 });
@@ -193,14 +193,14 @@ test('readings survive a restart and are never filed under another account', asy
 });
 
 test('the server’s verdict reads as the current app’s toast does', () => {
-  assert.deepEqual(resultOfVerdict({ status: 'confirmed', weightKg: 70.9 }, 70), {
+  assert.deepEqual(resultOfVerdict({ status: 'confirmed', weightKg: 65.2 }, 60), {
     kind: 'logged',
-    weightKg: 70.9,
+    weightKg: 65.2,
     additional: false,
   });
   assert.deepEqual(
-    resultOfVerdict({ status: 'confirmed', isAdditionalReadingForDay: true }, 70.95),
-    { kind: 'logged', weightKg: 70.95, additional: true },
+    resultOfVerdict({ status: 'confirmed', isAdditionalReadingForDay: true }, 65.4),
+    { kind: 'logged', weightKg: 65.4, additional: true },
   );
   assert.deepEqual(
     resultOfVerdict(
@@ -209,14 +209,14 @@ test('the server’s verdict reads as the current app’s toast does', () => {
         compositionSkipped: true,
         compositionSkippedReason: 'impedance',
       },
-      70.95,
+      65.4,
     ),
-    { kind: 'skipped', weightKg: 70.95, reason: 'impedance' },
+    { kind: 'skipped', weightKg: 65.4, reason: 'impedance' },
   );
   // An older deploy sends no reason; the contact problem is the one the current app has always said.
   assert.equal(
     (
-      resultOfVerdict({ status: 'confirmed', compositionSkipped: true }, 70) as {
+      resultOfVerdict({ status: 'confirmed', compositionSkipped: true }, 60) as {
         reason: string;
       }
     ).reason,
@@ -228,16 +228,16 @@ test('the server’s verdict reads as the current app’s toast does', () => {
     'declined',
   );
 
-  assert.deepEqual(resultText({ kind: 'logged', weightKg: 70.95, additional: true }), {
-    title: '71.0 kg logged',
+  assert.deepEqual(resultText({ kind: 'logged', weightKg: 65.4, additional: true }), {
+    title: '65.4 kg logged',
     description: 'Additional reading today',
   });
   assert.equal(
-    resultText({ kind: 'skipped', weightKg: 70, reason: 'impedance' }).description,
+    resultText({ kind: 'skipped', weightKg: 60, reason: 'impedance' }).description,
     'Body composition skipped — stand barefoot on the plates',
   );
   assert.match(
-    resultText({ kind: 'skipped', weightKg: 70, reason: 'profile' }).description ?? '',
+    resultText({ kind: 'skipped', weightKg: 60, reason: 'profile' }).description ?? '',
     /height, birth date and sex/,
   );
   assert.equal(
@@ -272,9 +272,9 @@ test('the pending lists and today’s readings parse the routes’ answers', () 
         id: 1,
         measuredAt: '2026-10-20T01:00:00.000Z',
         isTrend: true,
-        weightKg: 70.95,
+        weightKg: 65.4,
         bodyFatPct: 20.5,
-        impedanceOhmsA: 505,
+        impedanceOhmsA: 480,
         visceralFatIndex: 4,
       },
     ],
@@ -351,7 +351,7 @@ function fakeScaleBle(options: FakeOptions = {}) {
     log,
     writes,
     scans,
-    see: (id = 'A4:C1', name: string | null = 'QN-Scale', rssi: number | null = -55) =>
+    see: (id = 'C0:FF', name: string | null = 'QN-Scale', rssi: number | null = -55) =>
       onFound?.({ id, name, rssi }),
     scanning: () => onFound !== null,
     failConnects: (count: number) => {
@@ -381,7 +381,7 @@ async function pairedSession(
   const storage = memoryStorage(
     options.noPair
       ? {}
-      : { 'paired-scale.v1': JSON.stringify({ id: 'A4:C1', name: 'QN-Scale' }) },
+      : { 'paired-scale.v1': JSON.stringify({ id: 'C0:FF', name: 'QN-Scale' }) },
   );
   const session = new ScaleSession({
     ble: ble.adapter,
@@ -390,7 +390,7 @@ async function pairedSession(
     timers: clock.timers,
   });
   const posts: ScaleReading[] = [];
-  let verdict: Record<string, unknown> = { status: 'confirmed', weightKg: 70.95 };
+  let verdict: Record<string, unknown> = { status: 'confirmed', weightKg: 65.4 };
   let online = true;
   const outbox = (userId = 'u1') =>
     new ScaleOutbox(
@@ -433,9 +433,9 @@ test('with the Devices screen open the paired scale is listened for, then connec
     false,
     'another scale is ignored',
   );
-  ble.see('A4:C1');
+  ble.see('C0:FF');
   await settle();
-  assert.deepEqual(ble.log, ['scan stopped', 'connect A4:C1']);
+  assert.deepEqual(ble.log, ['scan stopped', 'connect C0:FF']);
   assert.equal(session.getSnapshot().phase, 'connecting');
   // Subscribed first, then the live request, then the speculative stored-readings request.
   assert.deepEqual(ble.writes, [
@@ -458,8 +458,8 @@ test('a weigh-in shows the settling weight, is saved on the phone, filed, and re
   ble.notify(HANDSHAKE);
   ble.notify(UNSTABLE);
   assert.equal(session.getSnapshot().phase, 'weighing');
-  assert.equal(session.getSnapshot().weightKg, 70.9);
-  assert.equal(scaleLinkLabel(session.getSnapshot()), 'Weighing you… 70.9 kg');
+  assert.equal(session.getSnapshot().weightKg, 65.2);
+  assert.equal(scaleLinkLabel(session.getSnapshot()), 'Weighing you… 65.2 kg');
   ble.notify(FINAL);
   await settle();
   await settle();
@@ -467,16 +467,16 @@ test('a weigh-in shows the settling weight, is saved on the phone, filed, and re
   assert.deepEqual(
     { ...posts[0], measuredAt: undefined },
     {
-      rawHex: '100b151bb70101f901f7f5',
-      weightKg: 70.95,
-      impedanceOhmsA: 505,
-      impedanceOhmsB: 503,
+      rawHex: '100b15198c0101e001de96',
+      weightKg: 65.4,
+      impedanceOhmsA: 480,
+      impedanceOhmsB: 478,
       measuredAt: undefined,
     },
   );
   assert.equal(posts[0].measuredAt, new Date(clock.now()).toISOString());
   const state = session.getSnapshot();
-  assert.deepEqual(state.result, { kind: 'logged', weightKg: 70.95, additional: false });
+  assert.deepEqual(state.result, { kind: 'logged', weightKg: 65.4, additional: false });
   assert.equal(state.phase, 'connected');
   assert.equal(state.weightKg, null);
   assert.equal(state.queued, 0);
@@ -509,10 +509,10 @@ test('a replay of the capture just taken does not start a new weigh-in', async (
   ble.notify(FINAL);
   await settle();
   await settle();
-  const replay = hex('10-0B-15-1B-B7-00-00-00-00-00-02'); // 70.95 kg, unsettled
+  const replay = hex('10-0B-15-19-8C-00-00-00-00-00-D5'); // 65.40 kg, unsettled
   ble.notify(replay);
   assert.equal(session.getSnapshot().phase, 'connected', 'nobody stepped on');
-  ble.notify(UNSTABLE); // 70.90: a different weight is someone stepping on
+  ble.notify(UNSTABLE); // 65.20: a different weight is someone stepping on
   assert.equal(session.getSnapshot().phase, 'weighing');
 });
 
@@ -532,7 +532,7 @@ test('the scale dropping its link after a reading is housekeeping, not a failed 
   await clock.advance(60_000);
   assert.deepEqual(session.getSnapshot().result, {
     kind: 'logged',
-    weightKg: 70.95,
+    weightKg: 65.4,
     additional: false,
   });
 });
@@ -576,11 +576,11 @@ test('a link that is connected but never delivers is dropped and retried', async
   session.hold('settings', true);
   ble.see();
   await settle();
-  assert.equal(ble.log.filter((x) => x === 'connect A4:C1').length, 1);
+  assert.equal(ble.log.filter((x) => x === 'connect C0:FF').length, 1);
   await clock.advance(5_000);
   await clock.advance(2_000);
   assert.ok(
-    ble.log.filter((x) => x === 'connect A4:C1').length >= 2,
+    ble.log.filter((x) => x === 'connect C0:FF').length >= 2,
     'it connected again',
   );
 });
@@ -592,7 +592,7 @@ test('a write the scale rejects before it has said anything is a lost link', asy
   ble.see();
   await settle();
   await clock.advance(2_000);
-  assert.ok(ble.log.filter((x) => x === 'connect A4:C1').length >= 2);
+  assert.ok(ble.log.filter((x) => x === 'connect C0:FF').length >= 2);
   assert.notEqual(session.getSnapshot().phase, 'connected');
 });
 
@@ -615,8 +615,8 @@ test('a verdict that needs an answer, and one that was filed, each read as the c
   session.hold('settings', true);
   ble.see();
   await settle();
-  setVerdict({ status: 'pending', weightKg: 80.1 });
-  ble.notify(hex('10-0B-15-1F-51-01-01-F9-01-F7-93'));
+  setVerdict({ status: 'pending', weightKg: 90 });
+  ble.notify(hex('10-0B-15-23-28-01-01-E0-01-DE-3C'));
   await settle();
   await settle();
   assert.equal(posts.length, 1);
