@@ -294,3 +294,103 @@ test('the record-id cache is pruned below the oldest rescan, keeping anything qu
   assert.deepEqual(Object.keys(saved!.records).sort(), ['old-held', 'old-queued', 'recent']);
   assert.equal(saved!.token, 'token-7', 'the change token is untouched by the prune');
 });
+
+// #3143 ─────────────────────────────────────────────────────────────────────────────────────────
+
+// A phone that syncs once a day for 150 days, each day bringing 20 new step records through the
+// change token, against a server that accepts everything.
+async function dailySyncs(days: number, perDay: number) {
+  const f = killable();
+  const clock = { at: now };
+  let n = 0;
+  const reader: HealthConnectReader = {
+    permissions: async () => ['Steps'],
+    history: async () => ({ records: [], pageToken: null, skipped: 0 }),
+    changes: async (_types, token) => ({
+      records: token
+        ? Array.from({ length: perDay }, () => row(`steps-${n++}`, clock.at - 2 * 3_600_000))
+        : [],
+      deleted: [],
+      token: `token-${clock.at}`,
+      expired: false,
+      more: false,
+      skipped: 0,
+    }),
+  };
+  const connection = {
+    origin: 'https://example.com',
+    userId: 'account-one',
+    timezone: 'Australia/Brisbane',
+    get: async () => ({}),
+    post: async (_path: string, body: unknown) => {
+      const batch = body as { rebuild?: boolean; records?: unknown[]; deleted?: unknown[] };
+      if (batch.rebuild)
+        return { measurements: 0, nights: 0, days: 0, heartRate: 0, hrv: null, completedAt: at(clock.at) };
+      return { accepted: batch.records?.length ?? 0, deleted: batch.deleted?.length ?? 0 };
+    },
+  };
+  const store = new HealthConnectImportStore(f.storage, connection, reader, () => {}, () => clock.at);
+  await store.setEnabled(true);
+  for (let day = 0; day < days; day++) {
+    clock.at = now + day * DAY;
+    await store.run(true);
+  }
+  return { f, store, clock };
+}
+
+test('150 daily syncs keep about the rescan window of ids, not every id since the grant', async () => {
+  const { f, store } = await dailySyncs(150, 20);
+  assert.equal(store.getSnapshot().error, null);
+  const { saved } = await open(f.storage);
+  const kept = Object.keys(saved!.records).length;
+  // 3,000 ids were seen; the floor is now − 30 days, so about 30 days of 20 a day remain.
+  assert.ok(kept >= 29 * 20 && kept <= 32 * 20, `kept ${kept} of 3000`);
+  const oldest = Math.min(...Object.values(saved!.records).map((r) => Date.parse(r.start)));
+  assert.ok(oldest >= now + 149 * DAY - 31 * DAY, 'nothing older than the window is left');
+  // And each open now reads about a month of day entries, not five.
+  const dayEntries = [...f.saved.keys()].filter((key) => key.startsWith('health-connect-ids.v1:'));
+  assert.ok(dayEntries.length <= 32, `${dayEntries.length} day entries`);
+});
+
+test('a held id older than the floor survives the prune, and so does a queued one', async () => {
+  const f = killable();
+  const clock = now + 120 * DAY;
+  const heldOld = row('held-old', clock - 90 * DAY, 'Weight');
+  const queuedOld = row('queued-old', clock - 90 * DAY + 60_000);
+  const plainOld = row('plain-old', clock - 90 * DAY + 120_000);
+  const recent = row('recent', clock - DAY);
+  f.saved.set(
+    'health-connect-import.v1',
+    JSON.stringify({
+      ...legacy(),
+      from: at(now - 365 * DAY),
+      grantedAt: at(now - 60 * DAY),
+      token: 'token-9',
+      tokenAt: at(clock - 3_600_000),
+      records: cacheOf([heldOld, queuedOld, plainOld, recent]),
+      queue: [{ records: [queuedOld], deleted: [] }],
+      blocked: [{ batch: { records: [heldOld], deleted: [] }, since: at(clock - DAY) }],
+      scan: null,
+      permissionKey: 'Steps',
+    }),
+  );
+  const reader: HealthConnectReader = {
+    permissions: async () => ['Steps'],
+    history: async () => ({ records: [], pageToken: null, skipped: 0 }),
+    changes: async () => ({ records: [], deleted: [], token: 'token-10', expired: false, more: false, skipped: 0 }),
+  };
+  const connection = {
+    origin: 'https://example.com',
+    userId: 'account-one',
+    timezone: 'Australia/Brisbane',
+    get: async () => ({}),
+    post: async () => {
+      throw new Error('Offline');
+    },
+  };
+  const store = new HealthConnectImportStore(f.storage, connection, reader, () => {}, () => clock);
+  await store.run(true);
+  const { saved } = await open(f.storage);
+  // The floor is now − 30 days, past the grant's: the plain 90-day-old id goes, the others stay.
+  assert.deepEqual(Object.keys(saved!.records).sort(), ['held-old', 'queued-old', 'recent']);
+});
