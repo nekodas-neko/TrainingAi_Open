@@ -1019,7 +1019,7 @@ test('4, 10 and 20 sets keep stable IDs, original prescriptions and unmatched en
   }
 });
 
-test('zero-rest handoffs remain untimed and summary waiting is recorded as next-exercise setup', async (t) => {
+test('style-less handoffs get the 90 s default rest, measured by the anchor, and summary waiting is recorded as next-exercise setup', async (t) => {
   const f = await setup(t);
   f.session.exercises[0].sets.forEach((x) => {
     x.restSeconds = 0;
@@ -1039,7 +1039,7 @@ test('zero-rest handoffs remain untimed and summary waiting is recorded as next-
   await f.controller.startSet(id, exerciseId, first.id);
   f.clock(20_000);
   await f.controller.recordSet(id, exerciseId, first.id);
-  assert.equal(active().rest, null);
+  assert.equal(active().rest!.endsAt - active().rest!.startedAt, 90_000);
   assert.ok(active().restAnchor);
   f.clock(15_000);
   await f.controller.startSet(id, exerciseId, second.id);

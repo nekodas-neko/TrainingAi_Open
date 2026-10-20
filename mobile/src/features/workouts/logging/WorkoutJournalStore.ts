@@ -619,14 +619,12 @@ export class WorkoutJournalStore {
           next.exercises
             .find((x) => x.id === exerciseId)!
             .sets.every((x) => x.completedAt !== null);
-        // The last set's rest falls back to the current app's 90 s when its style sets none;
-        // the workout's rest adjustment applies to both.
-        const lastSetRestSeconds = Math.max(
+        // Every set's rest falls back to the current app's 90 s when its style sets none, then the
+        // workout's rest adjustment applies.
+        restSeconds = Math.max(
           0,
           effectiveRestSec(restSeconds) + workout.restAdjustmentSeconds,
         );
-        restSeconds =
-          restSeconds > 0 ? Math.max(0, restSeconds + workout.restAdjustmentSeconds) : 0;
         return {
           ...next,
           flow: {
@@ -661,7 +659,7 @@ export class WorkoutJournalStore {
                 exerciseId,
                 setId,
                 startedAt: now,
-                endsAt: now + lastSetRestSeconds * 1000,
+                endsAt: now + restSeconds * 1000,
                 lastSet: true as const,
               }
             : restSeconds > 0
