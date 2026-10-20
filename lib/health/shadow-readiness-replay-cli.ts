@@ -37,13 +37,14 @@ async function main(): Promise<void> {
   const result = await replayShadowReadiness(userId, from, to, { tz: arg('tz'), write })
 
   const fmt = (v: number | null) => (v == null ? '  —  ' : v.toFixed(1).padStart(5))
-  console.info('date        shadow  live   diff  sleep heart activ body  stage')
+  console.info('date        shadow  liveC  diff  sleep heart activ body  stage')
   for (const r of result.rows) {
-    const diff = r.shadowReadiness != null && r.liveReadiness != null ? r.shadowReadiness - r.liveReadiness : null
-    console.info(`${r.date}  ${fmt(r.shadowReadiness)}  ${fmt(r.liveReadiness)}  ${fmt(diff)}  ${fmt(r.pillars.sleep)} ${fmt(r.pillars.heart)} ${fmt(r.pillars.activity)} ${fmt(r.pillars.body)}  ${r.maturityStage}`)
+    const diff = r.shadowReadiness != null && r.liveComposite != null ? r.shadowReadiness - r.liveComposite : null
+    console.info(`${r.date}  ${fmt(r.shadowReadiness)}  ${fmt(r.liveComposite)}  ${fmt(diff)}  ${fmt(r.pillars.sleep)} ${fmt(r.pillars.heart)} ${fmt(r.pillars.activity)} ${fmt(r.pillars.body)}  ${r.maturityStage}`)
   }
   const m = daysMoved(result.rows)
-  console.info(`\n${result.rows.length} days scored; ${m.compared} with a live score; ${m.moved} differ by ≥ ${DAYS_MOVED_THRESHOLD} points; median |diff| ${m.medianAbsDiff?.toFixed(1) ?? '—'}, max ${m.maxAbsDiff?.toFixed(1) ?? '—'}.`)
+  console.info(`\n${result.rows.length} days scored; ${m.compared} with a live composite (before illness suppression); ${m.moved} differ by ≥ ${DAYS_MOVED_THRESHOLD} points; median |diff| ${m.medianAbsDiff?.toFixed(1) ?? '—'}, max ${m.maxAbsDiff?.toFixed(1) ?? '—'}.`)
+  console.info(`Left out, live composite unknown: ${m.excluded.clamped} clamped at 0 under an illness flag; ${m.excluded['unknown-era']} on an illness flag that may predate #3163.`)
   console.info(result.dryRun ? 'Dry run: nothing written. Pass --write to store the rows.' : `Wrote ${result.written} rows (computed_by = replay).`)
 }
 
