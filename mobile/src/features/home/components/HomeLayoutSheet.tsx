@@ -12,6 +12,7 @@ import {
 } from '../../../shared/ui';
 import { useHome } from '../data/HomeProvider';
 import {
+  homeCardsPatch,
   homeSections,
   metricLabels,
   sectionLabels,
@@ -90,7 +91,7 @@ export function HomeLayoutSheet({ onClose }: { onClose: () => void }) {
         options={Object.entries(widgetLabels).map(([value, label]) => ({ value, label }))}
         onChange={(homeCards) => {
           if (!busy) {
-            void save({ homeCards });
+            void save(homeCardsPatch(prefs, homeCards));
           }
         }}
       />
