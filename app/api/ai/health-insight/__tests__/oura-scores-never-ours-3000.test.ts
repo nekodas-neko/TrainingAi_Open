@@ -10,15 +10,20 @@ vi.mock('@/auth', () => ({
 
 const DAY = '2026-10-17'
 let derived: Record<string, unknown>[] = []
+// #3176: the ring's rollup rows, the day the user switched to the Oura API, and Oura's own rows.
+let summaries: Record<string, unknown>[] = []
+let switchDay: string | null = null
+let ouraRows: Record<string, unknown>[] | null = null
 
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
-    getOuraDaily: async () => [{
+    getOuraDaily: async () => ouraRows ?? [{
       date: DAY, readinessScore: 91, sleepScore: 87, activityScore: 83, temperatureDeviation: 0.4,
       readinessContributors: { hrv_balance: 13 }, sleepContributors: { deep_sleep: 17 },
     }],
     getOuraDailyDerived: async () => derived,
-    getOuraDailySummary: async () => [],
+    getOuraDailySummary: async () => summaries,
+    getOuraCloudSwitchDay: async () => switchDay,
     listSleepSessions: async () => [],
     listBodyMetrics: async () => [],
     getWorkoutSessionsFrom: async () => [],
@@ -27,18 +32,18 @@ vi.mock('@/lib/data', () => ({
   }),
 }))
 
-const call = async (section: 'sleep' | 'readiness') => {
+const call = async (section: 'sleep' | 'readiness', date = DAY) => {
   const { POST } = await import('../route')
   const res = await POST(new Request('http://localhost/api/ai/health-insight', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ section, date: DAY }),
+    body: JSON.stringify({ section, date }),
   }))
   return ((await res.json()) as { insight?: string }).insight ?? ''
 }
 
 describe("the health insight never presents Oura's scores as ours (#3000)", () => {
-  beforeEach(() => { derived = [] })
+  beforeEach(() => { derived = []; summaries = []; switchDay = null; ouraRows = null })
 
   it("Sleep: Oura's score and contributors exist, ours don't → no score, never Oura's", async () => {
     const text = await call('sleep')
@@ -63,5 +68,29 @@ describe("the health insight never presents Oura's scores as ours (#3000)", () =
     const text = await call('readiness')
     expect(text).toContain("+0.4°C (Oura's reading)")
     expect(text).not.toContain('pre-re-key')
+  })
+
+  // #3176 (the switch-day rule, #2998): the ring's temperature stands only before the switch day.
+  describe('temperature across the switch day (#3176)', () => {
+    const oura = (date: string) => [{ date, temperatureDeviation: 0.4 }]
+
+    it("an Oura-only day after the switch day reads Oura's temperature", async () => {
+      switchDay = '2026-10-18'; ouraRows = oura('2026-10-19')
+      expect(await call('readiness', '2026-10-19')).toContain("+0.4°C (Oura's reading)")
+    })
+
+    it("the switch day: a partial ring row loses to Oura's value", async () => {
+      switchDay = '2026-10-18'; ouraRows = oura('2026-10-18')
+      summaries = [{ date: '2026-10-18', tempDevC: -1.3 }]
+      const text = await call('readiness', '2026-10-18')
+      expect(text).toContain("+0.4°C (Oura's reading)")
+      expect(text).not.toContain('-1.3')
+    })
+
+    it("before the switch day the ring's reading stands", async () => {
+      switchDay = '2026-10-18'; ouraRows = oura('2026-10-17')
+      summaries = [{ date: '2026-10-17', tempDevC: -0.6 }]
+      expect(await call('readiness', '2026-10-17')).toContain('-0.6°C')
+    })
   })
 })

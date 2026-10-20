@@ -9,6 +9,7 @@ import { projectRm, isRmPlateau } from '@trainingai/shared/health/strength-proje
 import { aggregateExerciseHrTrend, summarizeHrByExercise } from '@trainingai/shared/workout/exercise-hr-trend'
 import { computeHrRecoveryProfile } from '@trainingai/shared/health/compute-hr-recovery-profile'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
 import { isBodyweightType, bodyweightRepMax } from '@trainingai/shared/1rm'
 import { todayMidnightUtc, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
@@ -84,19 +85,24 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         toDate: z.string().describe('YYYY-MM-DD inclusive'),
       }),
       execute: async ({ fromDate, toDate }) => {
-        const [oura, sleep, metrics, derived, activities] = await Promise.all([
+        const [oura, sleep, metrics, derived, activities, switchDay] = await Promise.all([
           repo.getOuraDaily(userId, fromDate, toDate),
           repo.listSleepSessions(userId, fromDate, toDate),
           repo.listBodyMetrics(userId, fromDate, toDate),
           repo.getOuraDailyDerived(userId, fromDate, toDate),
           // #3095: indoor (treadmill) steps join each day's count, as on every app surface.
           repo.listActivityLogs(userId, fromDate, toDate).catch(() => []),
+          repo.getOuraCloudSwitchDay(userId),
         ])
         // Readiness, sleep and activity scores are ours (oura_daily_derived). Oura's own scores are
         // never sent as ours (scoring doc rule 5, #3000); its temperature deviation is a reading.
         const readinessMap = liveReadinessByDay(derived)
         const derivedByDate = new Map(derived.map(d => [d.day, d]))
         const stepsByDate = dayStepCountsByDate(metrics, activities)
+        // #2998: from the day the user switched to the Oura API the ring's rollup rows are partial
+        // leftovers, so its stress and resilience stand only before that day; Oura's read from it.
+        const ringDerived = derived.filter(d => ringValueStands(d.day, switchDay))
+        const ringByDate = new Map(ringDerived.map(d => [d.day, d]))
         const tempByDate = new Map(oura.map(r => [r.date, r.temperatureDeviation ?? null]))
         const days = [...new Set([...derivedByDate.keys(), ...tempByDate.keys()])].sort()
         return {
@@ -123,22 +129,22 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           // The app's own (ring) stress first; Oura's `stress_high` for a day it has none (#3077: the
           // ring's rollup stopped when the ring moved to the Oura API). Oura gives minutes only.
           daytimeStress: [
-            ...derived
+            ...ringDerived
               .filter(d => d.daytimeStressScaled != null || d.stressHighMinutes != null)
               .map(d => ({ date: d.day, source: 'own' as const, level: d.daytimeStressScaled ?? null, highMinutes: d.stressHighMinutes ?? null })),
             ...oura
-              .filter(r => r.stressHigh != null && derivedByDate.get(r.date)?.stressHighMinutes == null && derivedByDate.get(r.date)?.daytimeStressScaled == null)
+              .filter(r => r.stressHigh != null && ringByDate.get(r.date)?.stressHighMinutes == null && ringByDate.get(r.date)?.daytimeStressScaled == null)
               .map(r => ({ date: r.date, source: 'oura' as const, level: null, highMinutes: Math.round(r.stressHigh! / 60) })),
           ].sort((a, b) => a.date.localeCompare(b.date)),
           // Own stress-resilience level (1–5) + whole-day training-stress (OTS) — purpose-built
           // signals that were computed and stored but never surfaced to the chat (F9).
-          resilience: derived
+          resilience: ringDerived
             .filter(d => d.resilienceLevel != null)
             .map(d => ({ date: d.day, level: d.resilienceLevel, band: d.resilienceLevel != null ? resilienceLevelToBand(d.resilienceLevel) : null })),
           // #3077: Oura's own resilience level for a day the app has none, as Oura's word: it is not
           // the app's 1–5 scale and is not mapped onto it.
           ouraResilience: oura
-            .filter(r => r.resilienceLevel != null && derivedByDate.get(r.date)?.resilienceLevel == null)
+            .filter(r => r.resilienceLevel != null && ringByDate.get(r.date)?.resilienceLevel == null)
             .map(r => ({ date: r.date, level: r.resilienceLevel })),
           trainingStress: derived
             .filter(d => d.trainingLoadOts != null)

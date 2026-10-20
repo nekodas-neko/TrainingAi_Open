@@ -13,7 +13,7 @@ import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
-import { nightSourceRank } from '@trainingai/shared/health/source-rank'
+import { nightSourceRank, ringValueStands } from '@trainingai/shared/health/source-rank'
 import { isNightWindow } from '@trainingai/shared/health/sleep-night'
 import { getOuraCloudSwitchDay } from './oura-cloud-tokens'
 import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
@@ -745,7 +745,7 @@ function storedNight(
   switchDay: string | null,
 ): { source: string | null; rank: number } {
   const ring = row.ouraId?.startsWith('ble:') === true && !row.manualEntry
-  if (ring && switchDay != null && row.date >= switchDay) return { source: 'oura_ble', rank: -Infinity }
+  if (ring && !ringValueStands(row.date, switchDay)) return { source: 'oura_ble', rank: -Infinity }
   const source = ring ? 'oura_ble' : row.source ?? (row.ouraId != null ? 'oura_cloud' : null)
   return { source, rank: nightSourceRank(source, row.manualEntry) }
 }

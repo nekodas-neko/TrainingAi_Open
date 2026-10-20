@@ -724,9 +724,11 @@ export async function invalidatePulledDomains(domains: SyncedDomains): Promise<v
     const group = PULL_FLAG_GROUPS[flag]
     if (domains[flag] && group) await group()
   }
-  // #3077: a pull carrying Oura-fed rows is how the app learns of new Oura data now that the ring
+  // #3077: a pull carrying Oura rows is how the app learns of new Oura data now that the ring
   // reaches us through the Oura API, not a Bluetooth drain. Tell mounted screens the same way a
   // drain does (`announceOuraSynced`), so walk offers and the home screen's refetch follow either.
+  // `biometrics` is wider than Oura (mood logs and Health Connect rows raise it too), so this also
+  // fires after a check-in; the listeners only refetch and dedupe, and no flag isolates Oura's rows.
   if ((domains.ouraDaily || domains.biometrics) && typeof window !== 'undefined') {
     window.dispatchEvent(new Event(OURA_DATA_CHANGED_EVENT))
   }

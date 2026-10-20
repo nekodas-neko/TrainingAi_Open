@@ -231,6 +231,8 @@ describe('Oura documents with a value the pinned spec does not list (#3081)', ()
     ['workout', 'intensity', 'workout.intensity', (o: ReturnType<typeof mapOuraDocuments>) => o.workouts[0].intensity],
     ['workout', 'source', 'workout.source', (o: ReturnType<typeof mapOuraDocuments>) => o.workouts[0].source],
     ['session', 'type', 'session.type', (o: ReturnType<typeof mapOuraDocuments>) => o.sessions[0].sessionType],
+    ['sleep_time', 'recommendation', 'sleep_time.recommendation', (o: ReturnType<typeof mapOuraDocuments>) => o.daily[0].sleepTimeRecommendation],
+    ['sleep_time', 'status', 'sleep_time.status', (o: ReturnType<typeof mapOuraDocuments>) => o.daily[0].sleepTimeStatus],
     ['session', 'mood', 'session.mood', (o: ReturnType<typeof mapOuraDocuments>) => o.sessions[0].mood],
     ['sleep', 'sleep_analysis_reason', 'sleep.sleep_analysis_reason', (o: ReturnType<typeof mapOuraDocuments>) => o.sleepPeriods[0].sleepAnalysisReason],
     ['sleep', 'sleep_algorithm_version', 'sleep.sleep_algorithm_version', (o: ReturnType<typeof mapOuraDocuments>) => o.sleepPeriods[0].sleepAlgorithmVersion],

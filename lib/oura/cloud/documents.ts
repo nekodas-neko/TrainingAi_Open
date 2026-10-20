@@ -68,6 +68,8 @@ export const OURA_ENUMS = {
   'workout.source': ['manual', 'autodetected', 'confirmed', 'workout_heart_rate', 'live_third_party_heart_rate', 'live_oura_heart_rate'],
   'session.type': ['breathing', 'meditation', 'nap', 'relaxation', 'rest', 'body_status'],
   'session.mood': ['bad', 'worse', 'same', 'good', 'great'],
+  'sleep_time.recommendation': ['improve_efficiency', 'earlier_bedtime', 'later_bedtime', 'earlier_wake_up_time', 'later_wake_up_time', 'follow_optimal_bedtime'],
+  'sleep_time.status': ['not_enough_nights', 'not_enough_recent_nights', 'bad_sleep_quality', 'only_recommended_found', 'optimal_found'],
 } as const satisfies Record<string, readonly string[]>
 export type OuraEnumField = keyof typeof OURA_ENUMS
 
@@ -170,8 +172,7 @@ export const DailyCardiovascularAgeDoc = z.object({
 /**
  * `PublicSleepTime` (#3077): Oura's bedtime recommendation. `optimal_bedtime`'s offsets are seconds
  * from the day's local midnight (`day_tz` is that day's UTC offset), negative before midnight.
- * `recommendation` and `status` are kept as strings, so a value Oura adds after the pinned spec
- * still lands.
+ * `recommendation` and `status` are enums read as strings and checked against `OURA_ENUMS` (#3081).
  */
 export const SleepTimeDoc = z.object({
   id: z.string().min(1),
@@ -181,8 +182,8 @@ export const SleepTimeDoc = z.object({
     start_offset: z.number().int(),
     end_offset: z.number().int(),
   }).nullable().optional(),
-  recommendation: z.string().nullable().optional(),
-  status: z.string().nullable().optional(),
+  recommendation: OptionalLabel,
+  status: OptionalLabel,
 })
 
 /** `PublicVO2Max` */
@@ -530,8 +531,8 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
         Object.assign(day(doc.day), {
           recommendedBedtimeStart: doc.optimal_bedtime ? Math.round(doc.optimal_bedtime.start_offset / 60) : null,
           recommendedBedtimeEnd: doc.optimal_bedtime ? Math.round(doc.optimal_bedtime.end_offset / 60) : null,
-          sleepTimeStatus: doc.status ?? null,
-          sleepTimeRecommendation: doc.recommendation ?? null,
+          sleepTimeStatus: known('sleep_time.status', doc.status),
+          sleepTimeRecommendation: known('sleep_time.recommendation', doc.recommendation),
         })
         break
       case 'sleep': {

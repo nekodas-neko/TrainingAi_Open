@@ -27,7 +27,7 @@ let userId = 'u-0'
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: userId, timezone: 'Australia/Brisbane' } }) }))
 const repo = () => ({
   getOuraDaily, listSleepSessions, listBodyMetrics, getOuraDailyDerived, getOuraDailySummary,
-  getWorkoutSessionsFrom, getUserById, getUserGoals, upsertAiHealthInsight,
+  getWorkoutSessionsFrom, getUserById, getUserGoals, upsertAiHealthInsight, getOuraCloudSwitchDay: async () => null,
 })
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo(), getRepositoryAsync: async () => repo() }))
 vi.mock('ai', () => ({ generateText: (o: unknown) => generateText(o) }))

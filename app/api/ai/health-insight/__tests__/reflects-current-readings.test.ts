@@ -27,6 +27,7 @@ vi.mock('@/lib/data', () => ({
     // Our own sleep score (#3000: the insight reads ours, never Oura's).
     getOuraDailyDerived: async () => [{ day: '2026-08-18', sleepScore: readingsScore, sleepContributors: null }],
     getOuraDailySummary: async () => [],
+    getOuraCloudSwitchDay: async () => null,
     listSleepSessions: async () => [],
     listBodyMetrics: async () => [],
     getWorkoutSessionsFrom: async () => [],

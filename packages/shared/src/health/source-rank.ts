@@ -27,6 +27,16 @@ export const HEALTH_SOURCES = [
 ] as const;
 export type HealthSource = (typeof HEALTH_SOURCES)[number];
 
+/**
+ * #2998: whether the ring's own value still stands for `day`. From the day a user switched to the
+ * Oura API (`getOuraCloudSwitchDay`) the ring's rows are partial leftovers and Oura's whole-day value
+ * is read instead; with no switch the ring stands on every day. The one test for it: the night
+ * ladder (`storedNight`) and every reader that falls back between the two go through it.
+ */
+export function ringValueStands(day: string, switchDay: string | null | undefined): boolean {
+  return switchDay == null || day < switchDay;
+}
+
 /** Ascending precedence. Anything absent here — including `null` on a legacy row — ranks 0. */
 export const SOURCE_RANK: Record<HealthSource, number> = {
   health_connect: 1,

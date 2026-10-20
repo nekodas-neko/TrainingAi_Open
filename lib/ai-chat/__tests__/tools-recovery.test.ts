@@ -11,6 +11,7 @@ const repo = {
     { date: '2026-07-15', hrvMs: 52, restingHeartRate: 48, steps: 9000, weightKg: 82.5, spo2Pct: 96.4 },
   ],
   getOuraDailyDerived: async () => [],
+  getOuraCloudSwitchDay: async () => null,
   // #3095: a treadmill session — its steps join the day's, as on every screen (whether the ring already
   // counts some of them is unknown, pending #3112).
   listActivityLogs: async () => [{ date: '2026-07-15', activityType: 'treadmill', steps: 2000, startTime: '12:00:00' }],
@@ -48,6 +49,7 @@ describe("recovery chat tools never send Oura's scores as ours (#3000)", () => {
     listSleepSessions: async () => [],
     listBodyMetrics: async () => [],
     getOuraDailyDerived: async () => derived,
+    getOuraCloudSwitchDay: async () => null,
     getWorkoutSessionsFrom: async () => [],
     listActivityLogs: async () => [],
   }) as unknown as WorkoutRepository
@@ -76,5 +78,46 @@ describe("recovery chat tools never send Oura's scores as ours (#3000)", () => {
       { day: '2026-10-17', readinessScore: 55, readinessSource: 'ble-derived' },
     ]), 'u1', 'Australia/Brisbane', '2026-10-18')
     expect((await plain(ours.getRecoveryVsPerformance.execute!({ days: 30 }, ctx))).readinessDatesAvailable).toBe(1)
+  })
+})
+
+// #3176 (the switch-day rule, #2998): the ring's stress and resilience stand only before the day the
+// user switched to the Oura API; from it, Oura's are read, even over a partial ring row.
+describe('getRecoveryData stress and resilience across the switch day (#3176)', () => {
+  const ctx = { toolCallId: 't1', messages: [] }
+  const SWITCH = '2026-10-18'
+  const repoWith = (oura: unknown[], derived: unknown[]) => ({
+    getOuraDaily: async () => oura,
+    listSleepSessions: async () => [],
+    listBodyMetrics: async () => [],
+    getOuraDailyDerived: async () => derived,
+    getOuraCloudSwitchDay: async () => SWITCH,
+    listActivityLogs: async () => [],
+  }) as unknown as WorkoutRepository
+  const run = (r: WorkoutRepository) => plain(
+    buildChatTools(r, 'u1', 'Australia/Brisbane', '2026-10-20').getRecoveryData.execute!(
+      { fromDate: '2026-10-15', toDate: '2026-10-20' }, ctx))
+
+  it('an Oura-only day after the switch day falls back to Oura for stress and resilience', async () => {
+    const out = await run(repoWith([{ date: '2026-10-19', stressHigh: 5400, resilienceLevel: 'solid' }], []))
+    expect(out.daytimeStress).toEqual([{ date: '2026-10-19', source: 'oura', level: null, highMinutes: 90 }])
+    expect(out.resilience).toEqual([])
+    expect(out.ouraResilience).toEqual([{ date: '2026-10-19', level: 'solid' }])
+  })
+
+  it('the switch day: a partial ring row loses to Oura\'s value; the day before it, the ring\'s stands', async () => {
+    const out = await run(repoWith(
+      [{ date: SWITCH, stressHigh: 3600, resilienceLevel: 'strong' }, { date: '2026-10-17', stressHigh: 1200, resilienceLevel: 'limited' }],
+      [
+        { day: SWITCH, daytimeStressScaled: -0.2, stressHighMinutes: 7, resilienceLevel: 2 },
+        { day: '2026-10-17', daytimeStressScaled: -0.5, stressHighMinutes: 40, resilienceLevel: 4 },
+      ],
+    ))
+    expect(out.daytimeStress).toEqual([
+      { date: '2026-10-17', source: 'own', level: -0.5, highMinutes: 40 },
+      { date: SWITCH, source: 'oura', level: null, highMinutes: 60 },
+    ])
+    expect(out.resilience).toEqual([{ date: '2026-10-17', level: 4, band: expect.any(String) }])
+    expect(out.ouraResilience).toEqual([{ date: SWITCH, level: 'strong' }])
   })
 })
