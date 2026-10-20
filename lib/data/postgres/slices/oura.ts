@@ -1,4 +1,4 @@
-import { dropSparseHrHours, isDenseHrSpan } from '@trainingai/shared/health/intraday-hr-contributors'
+import { dropSparseHrHours, isDenseHrSpan, DENSITY_GATED_HR_SOURCES } from '@trainingai/shared/health/intraday-hr-contributors'
 import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, type SQL } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { getPool } from '../client'
@@ -1963,23 +1963,28 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
  * with no snapshot, or a snapshot whose `avg_bpm` is null, are simply absent from the map — the
  * caller falls back to the MET estimate for those, which is 36 of the owner's 78 sessions.
  *
- * So is a session whose heart rate was too sparse to average (#3078): the #2437 density rule
- * (`isDenseHrSpan`: two readings at least, no gap over `HR_DENSE_MAX_GAP_MS`) applied to the stored
- * series between the session's start and end, checked here, when the estimate is made, so a snapshot
- * computed before the rule is held to it too. A session past HR retention has no series left to
- * check, so its snapshot stands, as a zone-minutes day past retention does. Every calorie surface
- * reads `avg_bpm` through here, so the gate is in one place.
+ * So is a session whose heart rate was too sparse to average (#3078), but only where #2437 already
+ * holds a source to the density rule: a session whose every in-window reading comes from a
+ * `DENSITY_GATED_HR_SOURCES` source (Health Connect, Apple Health) must pass `isDenseHrSpan` (two
+ * readings at least, no gap over `HR_DENSE_MAX_GAP_MS`) between its start and end. A session with
+ * any reading from the ring's BLE, the strap or Oura Cloud keeps its average, as before: whether
+ * sparse Oura heart rate should fall back to METs is the owner's call (#3114). Checked here, when the
+ * estimate is made, so a snapshot computed before the rule is held to it too. A session with no
+ * in-window reading left (past HR retention, or never any) keeps its snapshot: there is nothing to
+ * check, and #3150 tracks what that means for a gated session once its series is pruned. Every
+ * calorie surface reads `avg_bpm` through here, so the gate is in one place.
  */
 export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: string[]): Promise<Map<string, number>> {
   if (sessionIds.length === 0) return new Map()
-  const retentionFloor = new Date(Date.now() - HR_RETENTION_DAYS * 86_400_000)
+  const gated = sql.join([...DENSITY_GATED_HR_SOURCES].map(g => sql`${g}`), sql`, `)
   const rows = await db
     .select({
       id: s.workoutHrStats.workoutSessionId, avgBpm: s.workoutHrStats.avgBpm, completedAt: s.workoutSessions.completedAt,
-      // The session's own series: how many readings, and the longest gap between consecutive ones.
-      span: sql<{ n: number; max_gap_ms: number | null } | null>`(
-        SELECT json_build_object('n', count(*), 'max_gap_ms', max(g.gap_ms)) FROM (
-          SELECT extract(epoch FROM r.timestamp - lag(r.timestamp) OVER (ORDER BY r.timestamp)) * 1000 AS gap_ms
+      // The session's own series: how many readings, how many from a source the rule does not gate,
+      // and the longest gap between consecutive ones.
+      span: sql<{ n: number; ungated: number; max_gap_ms: number | null } | null>`(
+        SELECT json_build_object('n', count(*), 'ungated', count(*) FILTER (WHERE g.source IS NULL OR g.source NOT IN (${gated})), 'max_gap_ms', max(g.gap_ms)) FROM (
+          SELECT r.source, extract(epoch FROM r.timestamp - lag(r.timestamp) OVER (ORDER BY r.timestamp)) * 1000 AS gap_ms
           FROM ${s.ouraHeartrate} r
           WHERE r.user_id = ${userId}
             AND r.timestamp >= ${s.workoutSessions.startedAt} AND r.timestamp <= ${s.workoutSessions.completedAt}
@@ -1993,8 +1998,10 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
     ))
   const usable = (r: (typeof rows)[number]) => {
     if (r.avgBpm == null || r.completedAt == null) return false
-    if (r.completedAt < retentionFloor) return true
-    return isDenseHrSpan(Number(r.span?.n ?? 0), r.span?.max_gap_ms == null ? null : Number(r.span.max_gap_ms))
+    const n = Number(r.span?.n ?? 0)
+    // Nothing to check, or a source #2437 does not gate: the snapshot stands.
+    if (n === 0 || Number(r.span?.ungated ?? 0) > 0) return true
+    return isDenseHrSpan(n, r.span?.max_gap_ms == null ? null : Number(r.span.max_gap_ms))
   }
   return new Map(rows.filter(usable).map(r => [r.id, r.avgBpm as number]))
 }

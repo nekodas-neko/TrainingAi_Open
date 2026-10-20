@@ -1,6 +1,7 @@
 // #3078: since the switch to the Oura API the ring's heart rate is a 5-minute series at rest, with
 // irregular bursts while awake. Whether Activity's lanes gate it is the owner's call (#3114),
-// so they are pinned UNCHANGED here. The calorie estimate is held to the #2437 rule, and Body
+// so they are pinned UNCHANGED here. The calorie estimate is held to the #2437 rule for the sources
+// #2437 gates (the source scoping is tested against Postgres in oura-late-hr-workouts-3078), and Body
 // Battery's gate is pinned against a complete Oura series.
 import { describe, it, expect } from 'vitest'
 import {

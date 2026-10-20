@@ -174,7 +174,6 @@ export const HR_MIN_PLAUSIBLE = 60
 export const HR_MAX_PLAUSIBLE = 220
 const KJ_PER_KCAL = 4.184
 
-
 export interface HrEnergyInput {
   durationMin: number
   avgBpm: number | null | undefined
