@@ -26,6 +26,7 @@ import { computeWalkSegmentStats, aggregateSegmentsByKind, walkEffortDisplay, ty
 import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
 import type { PhaseBand } from '@/components/activity/activity-hr-chart'
+import { phaseBandsFromSegments } from '@/components/activity/phase-bands-plugin'
 import type { WalkHrSample } from './walk-active'
 import { cadenceFieldsForSave, type CadenceSummary } from '@trainingai/shared/health/cadence'
 import { stepsEstimateIfCovered } from '@/lib/stores/cadence-coverage'
@@ -97,11 +98,12 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   // ephemeral display that used to be thrown away on save).
   // Clipped at the seconds walked (#3132): an early save must not give the block it stopped in a
   // pace over its whole planned time, nor save blocks it never reached.
+  const clippedSegments = useMemo(() => clipSegmentsAt(plan.segments, actualSec), [plan, actualSec])
   const segmentStats = useMemo(
     () => computeWalkSegmentStats({
-      plan: { ...plan, segments: clipSegmentsAt(plan.segments, actualSec) }, startedAtMs, hrSamples: samples, rawPoints, cadenceSeries: cadence?.series ?? null, pacerTallies,
+      plan: { ...plan, segments: clippedSegments }, startedAtMs, hrSamples: samples, rawPoints, cadenceSeries: cadence?.series ?? null, pacerTallies,
     }),
-    [plan, actualSec, startedAtMs, samples, rawPoints, cadence, pacerTallies],
+    [plan, clippedSegments, startedAtMs, samples, rawPoints, cadence, pacerTallies],
   )
 
   // Time-in-zone + Session Load — same shared primitive the regular activity detail view uses
@@ -112,9 +114,9 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
     [samples],
   )
 
-  const phaseBands: PhaseBand[] = plan.segments
-    .filter(seg => seg.kind === 'fast' || seg.kind === 'slow')
-    .map(seg => ({ fromMin: seg.startSec / 60, toMin: seg.endSec / 60, kind: seg.kind as 'fast' | 'slow' }))
+  // The same clipped list as the stats: blocks never reached get no band, and the one the walk
+  // stopped in ends at the stop.
+  const phaseBands: PhaseBand[] = phaseBandsFromSegments(clippedSegments)
 
   // "Your average slow/fast walk" roll-up from the per-segment stats above.
   const kindAgg = useMemo(() => aggregateSegmentsByKind(segmentStats), [segmentStats])

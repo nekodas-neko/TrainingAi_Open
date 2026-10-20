@@ -6,6 +6,15 @@ export interface PhaseBand {
   kind: 'fast' | 'slow'
 }
 
+/** The fast/slow blocks of a plan as chart bands; pass the clipped list so unreached blocks paint none. */
+export function phaseBandsFromSegments(
+  segments: { kind: string; startSec: number; endSec: number }[],
+): PhaseBand[] {
+  return segments
+    .filter(seg => seg.kind === 'fast' || seg.kind === 'slow')
+    .map(seg => ({ fromMin: seg.startSec / 60, toMin: seg.endSec / 60, kind: seg.kind as 'fast' | 'slow' }))
+}
+
 // Custom chart.js plugin instead of a new dependency (no chartjs-plugin-annotation in the repo
 // today) — paints a translucent background rect per phase band behind the HR line. Kept in its
 // own pure (non-JSX) module so the draw logic can be unit tested directly — this repo's vitest
@@ -22,8 +31,10 @@ export const phaseBandsPlugin: Plugin<'line'> = {
     ctx.save()
     ctx.globalAlpha = 0.12
     for (const band of bands) {
-      const xStart = xScale.getPixelForValue(band.fromMin)
-      const xEnd = xScale.getPixelForValue(band.toMin)
+      // The x max is the last HR sample, so a band can reach past the plot; keep it inside.
+      const xStart = Math.max(xScale.getPixelForValue(band.fromMin), chartArea.left)
+      const xEnd = Math.min(xScale.getPixelForValue(band.toMin), chartArea.right)
+      if (xEnd <= xStart) continue
       ctx.fillStyle = band.kind === 'fast' ? opts.fastColor : opts.slowColor
       ctx.fillRect(xStart, chartArea.top, xEnd - xStart, chartArea.bottom - chartArea.top)
     }

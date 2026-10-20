@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { phaseBandsPlugin, type PhaseBand } from '@/components/activity/phase-bands-plugin'
+import { clipSegmentsAt } from '@trainingai/shared/walking/clip-segments'
+import { buildIntervalPlan } from '@/lib/walk/interval-plan'
+import { phaseBandsPlugin, phaseBandsFromSegments, type PhaseBand } from '@/components/activity/phase-bands-plugin'
 
 // Minimal fake chart.js `Chart` — only the surface phaseBandsPlugin's beforeDatasetsDraw reads.
 function fakeChart(bands: PhaseBand[] | undefined) {
@@ -60,5 +62,36 @@ describe('phaseBandsPlugin', () => {
     chart.chartArea = undefined
     phaseBandsPlugin.beforeDatasetsDraw?.(chart, {} as never, {} as never)
     expect(ctx.fillRect).not.toHaveBeenCalled()
+  })
+
+  it('clips a band that runs past the plot to the chart area', () => {
+    // Chart area is x 0..200 at 10px/min; a band to minute 30 would reach x 300.
+    const { chart, ctx } = fakeChart([{ fromMin: 15, toMin: 30, kind: 'slow' }])
+    phaseBandsPlugin.beforeDatasetsDraw?.(chart, {} as never, {} as never)
+    expect(ctx.fillRect).toHaveBeenCalledWith(150, 10, 50, 100)
+  })
+
+  it('draws nothing for a band wholly past the plot', () => {
+    const { chart, ctx } = fakeChart([{ fromMin: 25, toMin: 30, kind: 'fast' }])
+    phaseBandsPlugin.beforeDatasetsDraw?.(chart, {} as never, {} as never)
+    expect(ctx.fillRect).not.toHaveBeenCalled()
+  })
+})
+
+describe('phaseBandsFromSegments on an early-saved walk (#3188)', () => {
+  // [slow 0-180, fast 180-360, slow 360-540, fast 540-720]
+  const plan = buildIntervalPlan({ sets: 2, fastSec: 180, slowSec: 180, warmupSec: 0, cooldownSec: 0 })
+
+  it('paints no band for blocks never reached and ends the current one at the stop', () => {
+    const bands = phaseBandsFromSegments(clipSegmentsAt(plan.segments, 240))
+    expect(bands).toEqual([
+      { fromMin: 0, toMin: 3, kind: 'slow' },
+      { fromMin: 3, toMin: 4, kind: 'fast' },
+    ])
+    expect(Math.max(...bands.map(b => b.toMin))).toBeLessThanOrEqual(240 / 60)
+  })
+
+  it('keeps every band for a walk finished normally', () => {
+    expect(phaseBandsFromSegments(clipSegmentsAt(plan.segments, 720))).toHaveLength(4)
   })
 })

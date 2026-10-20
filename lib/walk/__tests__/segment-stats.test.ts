@@ -3,6 +3,7 @@ import { buildIntervalPlan, type WalkConfig } from '@/lib/walk/interval-plan'
 import { computeWalkSegmentStats, aggregateSegmentsByKind, walkEffortDisplay, type WalkSegmentStat } from '@/lib/walk/segment-stats'
 import { computeTotalDistanceKm, computeAvgPaceSecPerKm } from '@/lib/activity/activity-metrics'
 import type { RoutePoint } from '@/lib/activity/route-encoding'
+import { clipSegmentsAt } from '@trainingai/shared/walking/clip-segments'
 import { ActivityLogBody } from '@trainingai/shared/validation/activity-log'
 
 // 2 sets, no warmup/cooldown → [slow 0-180, fast 180-360, slow 360-540, fast 540-720].
@@ -295,5 +296,30 @@ describe('computeWalkSegmentStats — a near-stationary segment (#3128)', () => 
       startTime: '12:00', durationMin: 8, segments,
     })
     expect(res.success).toBe(true)
+  })
+})
+
+// #3132 / #3188. The summary clips the plan at the seconds walked before computing; this drives
+// computeWalkSegmentStats itself, the function that had the bug, rather than its helpers.
+describe('computeWalkSegmentStats — a walk stopped inside a block (#3188)', () => {
+  const t0 = Date.parse('2026-10-12T12:00:00+10:00')
+  // One 10-minute slow block, then a fast one the walk never reaches.
+  const longPlan = buildIntervalPlan({ sets: 1, slowSec: 600, fastSec: 600, warmupSec: 0, cooldownSec: 0, treadmill: false })
+  // 1.4 m/s due north for the first 3 minutes, then a fix at 5 min.
+  const north = (m: number, sec: number): RoutePoint => ({ lat: -27.47 + m / 111_195, lng: 153.02, t: t0 + sec * 1000 })
+  const rawPoints = [0, 60, 120, 179].map(sec => north(sec * 1.4, sec))
+
+  it('gives the block it stopped in a pace over the seconds walked, and drops the unreached one', () => {
+    const segments = computeWalkSegmentStats({
+      plan: { ...longPlan, segments: clipSegmentsAt(longPlan.segments, 180) },
+      startedAtMs: t0, hrSamples: [], rawPoints, cadenceSeries: null,
+    })
+    expect(segments).toHaveLength(1)
+    expect(segments[0].endSec).toBe(180)
+    const km = computeTotalDistanceKm(rawPoints)
+    expect(segments[0].distanceKm).toBeCloseTo(km, 10)
+    expect(segments[0].avgPaceSecPerKm).toBeCloseTo(computeAvgPaceSecPerKm(km, 180)!, 10)
+    // Over the whole planned 600 s the same distance would read as a pace more than three times slower.
+    expect(segments[0].avgPaceSecPerKm).toBeLessThan(computeAvgPaceSecPerKm(km, 600)! / 3)
   })
 })
