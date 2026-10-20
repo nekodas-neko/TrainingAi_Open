@@ -907,7 +907,9 @@ export async function syncWindow(
       // `onPosted`) re-sent it on every sync until its records aged out of the window, and skipped the
       // heart-rate and interval uploads below each time. Bad records are now refused one by one, so
       // only a payload whose shape is wrong gets here; it is noted and the sync moves on.
-      dailyRefused = true;
+      // #3197: it also marks the window `incomplete`, so a payload that keeps being refused keeps the
+      // rewind marker and every sync stays a rewind (up to 30 days) until one posts clean. That costs
+      // time, not data.
       dailyRefused = true;
       dailyNote = `daily payload refused (sync-health ${res.status})`;
       console.warn(`[health-connect] ${dailyNote}: ${await res.text()}`);
