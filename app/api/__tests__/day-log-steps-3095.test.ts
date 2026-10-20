@@ -43,7 +43,7 @@ async function steps() {
 describe('day screen step count (#3095)', () => {
   beforeEach(() => { repo.steps = 9_000; repo.activityLogs = [] })
 
-  it('adds a treadmill session the ring could not see', async () => {
+  it('adds a treadmill session\'s steps', async () => {
     repo.activityLogs = [activity('treadmill', 3_500)]
     expect(await steps()).toBe(12_500)
   })
