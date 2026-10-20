@@ -38,6 +38,7 @@ export const widgetLabels = {
   muscleStatusWidget: 'Muscle Status',
   hrChartWidget: 'Heart Rate',
   energyBalanceWidget: 'Energy Balance',
+  collectionWidget: 'Collection',
 };
 export const sectionLabels: Record<string, string> = {
   recommendation: 'Recommended Today',

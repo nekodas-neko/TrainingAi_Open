@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { V2_LADDERS as LADDERS, replayCollection, type CollectionState } from '@trainingai/shared/collection/ladder'
-import { nextMerge, nearestMerge, mergeLine, mergeCountLine, totalHeld, FAUCET_NOUN, FAUCET_TITLE } from '../collection-summary'
-import { tierGlyph, ladderGlyphs } from '../collection-sprites'
+import { V2_LADDERS as LADDERS, replayCollection, type CollectionState } from '../ladder'
+import { nextMerge, nearestMerge, mergeLine, mergeCountLine, totalHeld, FAUCET_NOUN, FAUCET_TITLE } from '../summary'
+import { tierGlyph, ladderGlyphs } from '../sprites'
 
 const state = (stock: number[]): CollectionState => ({ stock, duplicateDays: 0, decayEvents: 0 })
 
