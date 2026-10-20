@@ -355,6 +355,14 @@ export function CapacitorNativeInit() {
                   description="Confirm it’s you in Settings › Scale"
                 />
               ), { id: 'scale-weigh-in' });
+            } else if (result.outcome === 'declined') {
+              toast.custom(() => (
+                <ScaleWeighInResultToast
+                  variant="warning"
+                  title={`${formatKg(result.weightKg ?? 0)} — not filed`}
+                  description="It is far from your usual weight, so it was kept out of your trend"
+                />
+              ), { id: 'scale-weigh-in' });
             } else {
               toast.custom(() => (
                 <ScaleWeighInResultToast

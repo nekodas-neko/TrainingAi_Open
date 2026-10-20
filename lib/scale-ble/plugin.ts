@@ -9,8 +9,9 @@ export interface ScaleBleStatus {
  *  in-app toast (capacitor-native-init.tsx) since the OS notification-shade notifications
  *  aren't visible while the app is open. */
 export interface ScaleBleResult {
-  outcome: 'logged' | 'pending' | 'skipped' | 'failed'
+  outcome: 'logged' | 'pending' | 'skipped' | 'declined' | 'failed'
   weightKg?: number
+  /** Event key kept as-is (the native side maps the server's `isAdditionalReadingForDay` onto it). */
   isAdditionalReadingToday?: boolean
 }
 
