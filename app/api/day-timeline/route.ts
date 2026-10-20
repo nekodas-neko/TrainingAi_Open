@@ -81,7 +81,7 @@ export async function GET(req: Request) {
 
   const repo = await getRepository()
 
-  const [sleepRows, ySleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraTags, derivedRows] = await Promise.all([
+  const [sleepRows, ySleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraTags, ouraSessions, derivedRows] = await Promise.all([
     repo.listSleepSessions(userId, date, date),
     repo.listSleepSessions(userId, yesterday, yesterday),
     repo.getWorkoutSessionsFrom(userId, yDayStart),
@@ -90,6 +90,7 @@ export async function GET(req: Request) {
     repo.getOuraWorkouts(userId, { from: yesterday, to: date }),
     repo.listActivityLogs(userId, yesterday, date),
     repo.listOuraTags(userId, yesterday, date),
+    repo.listOuraSessions(userId, yesterday, date),
     repo.getOuraDailyDerived(userId, yesterday, date),
   ])
 
@@ -273,7 +274,28 @@ export async function GET(req: Request) {
   }
 
   // ── Oura tags / sessions / rest-mode ─────────────────────────────────────
-  const TAG_LABEL: Record<string, string> = { rest_mode: 'Rest mode', nap: 'Nap', meditation: 'Meditation', breathing: 'Breathing' }
+  const TAG_LABEL: Record<string, string> = {
+    rest_mode: 'Rest mode', nap: 'Nap', meditation: 'Meditation', breathing: 'Breathing',
+    relaxation: 'Relaxation', rest: 'Rest', body_status: 'Body status',
+  }
+  // #3077: Oura's sessions come from the API's `session` collection now; `oura_tags` has had no
+  // writer since the ring moved to the Oura API. Same event as a tag, so the timeline reads the same.
+  for (const ses of ouraSessions) {
+    const startMs = ses.startDatetime?.getTime()
+    if (startMs == null || !Number.isFinite(startMs)) continue
+    const label = TAG_LABEL[ses.sessionType ?? ''] ?? (ses.sessionType ? ses.sessionType.replace(/_/g, ' ') : 'Session')
+    events.push({
+      type: 'tag',
+      time: fmtTime(new Date(startMs), tz),
+      endTime: ses.endDatetime ? fmtTime(ses.endDatetime, tz) : undefined,
+      timeMs: startMs,
+      title: capitalize(label),
+      subtitle: ses.mood ? `mood: ${ses.mood}` : undefined,
+      icon: 'Tag',
+      day: 'today',  // recomputed below from timeMs
+      tagSource: 'oura_cloud',
+    })
+  }
   for (const t of ouraTags) {
     const startMs = t.startTime?.getTime()
     if (startMs == null || !Number.isFinite(startMs)) continue

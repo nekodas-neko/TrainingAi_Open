@@ -191,7 +191,7 @@ export default function HeartRateDetailPage() {
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">VO₂ Max</p>
                 <p className="text-xl font-bold tabular-nums mt-1">{data.vo2Max}</p>
                 <p className="mt-1 flex items-center justify-center gap-1 text-[9px] text-muted-foreground">
-                  <HistoryIcon className="h-2.5 w-2.5" /> Oura&apos;s estimate{data.cloudVitalsDate && <> · as of {formatDayShort(data.cloudVitalsDate)}</>}
+                  <HistoryIcon className="h-2.5 w-2.5" /> Oura&apos;s estimate{(data.vo2MaxDate ?? data.cloudVitalsDate) && <> · as of {formatDayShort((data.vo2MaxDate ?? data.cloudVitalsDate)!)}</>}
                 </p>
               </div>
             )}
@@ -200,7 +200,7 @@ export default function HeartRateDetailPage() {
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Vascular Age</p>
                 <p className="text-xl font-bold tabular-nums mt-1">{data.vascularAge} <span className="text-xs font-normal text-muted-foreground">yrs</span></p>
                 <p className="mt-1 flex items-center justify-center gap-1 text-[9px] text-muted-foreground">
-                  <HistoryIcon className="h-2.5 w-2.5" /> Oura&apos;s estimate{data.cloudVitalsDate && <> · as of {formatDayShort(data.cloudVitalsDate)}</>}
+                  <HistoryIcon className="h-2.5 w-2.5" /> Oura&apos;s estimate{(data.vascularAgeDate ?? data.cloudVitalsDate) && <> · as of {formatDayShort((data.vascularAgeDate ?? data.cloudVitalsDate)!)}</>}
                 </p>
               </div>
             )}

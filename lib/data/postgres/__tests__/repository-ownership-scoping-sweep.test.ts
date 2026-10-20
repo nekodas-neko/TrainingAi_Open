@@ -374,6 +374,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getRecentSourceFacts', r => r.getRecentSourceFacts(USER_A, FROM_TS)],
     ['getLatestOuraBleMeasuredAt', r => r.getLatestOuraBleMeasuredAt(USER_A)],
     ['listOuraTags', r => r.listOuraTags(USER_A, FROM, TO)],
+    ['listOuraSessions', r => r.listOuraSessions(USER_A, FROM, TO)],
     ['getHrForWindow', r => r.getHrForWindow(USER_A, FROM_TS, TO_TS)],
     ['getObservedHrProfile', r => r.getObservedHrProfile(USER_A, FROM_TS, TO_TS)],
     ['getZoneMinutesRange', r => r.getZoneMinutesRange(USER_A, FROM, TO, TZ, { maxHr: 190, restingHr: 50 }),

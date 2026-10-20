@@ -1,4 +1,5 @@
 import { invalidateCache } from '@/lib/sqlite/cache'
+import { OURA_DATA_CHANGED_EVENT } from '@/lib/oura-data-changed'
 import type { SyncedDomains } from '@/lib/local-store/sync-engine'
 
 /** Legacy sessionStorage seeds read by session-select-content's first-paint effect.
@@ -722,5 +723,11 @@ export async function invalidatePulledDomains(domains: SyncedDomains): Promise<v
   for (const flag of Object.keys(PULL_FLAG_GROUPS) as (keyof SyncedDomains)[]) {
     const group = PULL_FLAG_GROUPS[flag]
     if (domains[flag] && group) await group()
+  }
+  // #3077: a pull carrying Oura-fed rows is how the app learns of new Oura data now that the ring
+  // reaches us through the Oura API, not a Bluetooth drain. Tell mounted screens the same way a
+  // drain does (`announceOuraSynced`), so walk offers and the home screen's refetch follow either.
+  if ((domains.ouraDaily || domains.biometrics) && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(OURA_DATA_CHANGED_EVENT))
   }
 }

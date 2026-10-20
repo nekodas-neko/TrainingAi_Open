@@ -359,8 +359,8 @@ export function HealthDetailScreen({
                 value={state.data?.vo2Max}
                 unit="ml/kg/min"
                 caption={
-                  state.data?.cloudVitalsDate
-                    ? `Oura's estimate · as of ${state.data.cloudVitalsDate}`
+                  (state.data?.vo2MaxDate ?? state.data?.cloudVitalsDate)
+                    ? `Oura's estimate · as of ${state.data?.vo2MaxDate ?? state.data?.cloudVitalsDate}`
                     : "Oura's estimate"
                 }
               />
@@ -369,8 +369,8 @@ export function HealthDetailScreen({
                 value={state.data?.vascularAge}
                 unit="years"
                 caption={
-                  state.data?.cloudVitalsDate
-                    ? `Oura's estimate · as of ${state.data.cloudVitalsDate}`
+                  (state.data?.vascularAgeDate ?? state.data?.cloudVitalsDate)
+                    ? `Oura's estimate · as of ${state.data?.vascularAgeDate ?? state.data?.cloudVitalsDate}`
                     : "Oura's estimate"
                 }
               />
