@@ -244,7 +244,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   const readinessPlausible = ouraDay != null || ownSleepScore != null || bodyMetrics.length > 0
   if (computeReadinessIfMissing && derivedReadiness == null && !daySnapshot && readinessPlausible) {
     try {
-      await buildReadinessPayload(userId, tz)
+      await buildReadinessPayload(userId, tz, ouraCloudFrom)
       // Deliberately re-read rather than using the returned `score`. The builder persists only when
       // it formed a real composite; with thin data it still returns a number, and treating that as
       // an anchor would replace an honest `default`/`sleep` with a confident-looking wrong one.
