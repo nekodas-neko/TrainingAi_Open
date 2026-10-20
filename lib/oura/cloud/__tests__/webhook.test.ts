@@ -94,6 +94,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
         upsertBodyMetrics: async () => {},
         upsertOuraCloudSleep: async (_u, rows) => { writes.sleep += rows.length; return { written: rows.length, skippedOverlap: 0 } },
         tombstoneOuraCloudSleep: async (_u, ids) => { writes.tombstoned.push(...ids); return ids.length },
+        syncOuraMainSleepBodyMetrics: async () => ({ written: 0, cleared: 0 }),
         upsertOuraWorkouts: async (_u, rows) => rows.length,
         upsertOuraCloudHeartrate: async (_u, rows) => rows.length,
         upsertOuraCloudSleepPeriods: async (_u, rows) => rows.length,
@@ -263,6 +264,7 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
       upsertBodyMetrics: async () => {},
       upsertOuraCloudSleep: async () => ({ written: 0, skippedOverlap: 0 }),
       tombstoneOuraCloudSleep: async () => 0,
+      syncOuraMainSleepBodyMetrics: async () => ({ written: 0, cleared: 0 }),
       upsertOuraWorkouts: async () => 0,
       upsertOuraCloudHeartrate: async (_u, rows, tz) => {
         upserts.push({ points: rows.length, tz }); contexts.push(...rows.map(r => r.context ?? null))

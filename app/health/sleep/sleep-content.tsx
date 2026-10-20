@@ -57,14 +57,14 @@ export function SleepContent({ userId }: { userId?: string }) {
   // a night just removed and lacks one just typed. Applied to every reply, not only the first.
   const applyServerRows = useCallback((rows: SleepSessionRow[] | null) => {
     if (!rows) return;
-    void withPendingManualWrites(rows, userId, cutoffDate()).then(r => { setSleepRows(r); setLoaded(true); });
-  }, [userId, cutoffDate]);
+    void withPendingManualWrites(rows, userId, cutoffDate(), tz).then(r => { setSleepRows(r); setLoaded(true); });
+  }, [userId, cutoffDate, tz]);
 
   // After the card saves or removes a night, show it at once from the local store (no network wait
   // on the device); the invalidation the writer fires then refetches the server copy.
   const onNightChanged = useCallback(() => {
-    void withPendingManualWrites(rowsRef.current, userId, cutoffDate()).then(setSleepRows);
-  }, [userId, cutoffDate]);
+    void withPendingManualWrites(rowsRef.current, userId, cutoffDate(), tz).then(setSleepRows);
+  }, [userId, cutoffDate, tz]);
 
   useEffect(() => {
     const cached = readCacheSync<SleepSessionRow[]>("sleep-sessions");
@@ -80,7 +80,7 @@ export function SleepContent({ userId }: { userId?: string }) {
       if (store) {
         const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000);
         store.getSleepSessions(toAestDay(cutoff, tz)).then(localSleep => {
-          if (localSleep.length > 0) setSleepRows(prev => (prev.length > 0 ? prev : localSleepRowsAsNights(localSleep)));
+          if (localSleep.length > 0) setSleepRows(prev => (prev.length > 0 ? prev : localSleepRowsAsNights(localSleep, tz)));
           // The device is the source of truth: an empty local read is an answer, not "not loaded".
           setLoaded(true);
         }).catch(() => {});
