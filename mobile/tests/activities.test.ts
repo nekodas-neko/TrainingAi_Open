@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   ActivityStore,
   confirmedActivity,
+  deadLettered,
   elapsedMs,
   sessionPayload,
 } from '../src/features/activities/data/ActivityStore.ts';
@@ -409,4 +410,130 @@ test('JSONB property ordering cannot strand a guided-walk upload', () => {
     ),
   };
   assert.equal(confirmedActivity(payload, [reversed])?.id, id);
+});
+const second = '10000000-0000-4000-8000-000000000002';
+const record = (rowId: string, startTime: string) => ({
+  id: rowId,
+  date: '2026-10-12',
+  activityType: 'treadmill',
+  title: 'Treadmill',
+  durationMin: 20,
+  startTime,
+  endTime: '12:20',
+});
+// The server refuses `rejectId` with a per-item error (HTTP 200, processed 0) and takes the rest.
+async function rejecting(
+  rejectId: string,
+  error = 'Rejected by the sync schema at payload',
+  retryable = false,
+) {
+  const f = fixture(),
+    accept = f.connection.post;
+  f.online();
+  let refused = 0,
+    down = false;
+  f.connection.post = async (path, body) => {
+    if (down) {
+      throw new Error('Offline');
+    }
+    const change = (body as { mutations: { id: string; domain: string; date: string }[] })
+      .mutations[0];
+    if (change.id !== rejectId) {
+      return accept(path, body);
+    }
+    refused++;
+    return {
+      processed: 0,
+      errors: [{ id: change.id, domain: change.domain, date: change.date, error, retryable }],
+    };
+  };
+  const store = f.create();
+  await store.initialize();
+  await store.saveRecord(record(id, '12:00'));
+  await store.saveRecord(record(second, '12:30'));
+  return { f, store, refused: () => refused, offline: (value: boolean) => (down = value) };
+}
+const pendingIds = (store: ActivityStore) =>
+  store
+    .getSnapshot()
+    .rows.filter((row) => row.pending)
+    .map((row) => row.payload.id);
+test('a rejected first activity does not block the one behind it', async () => {
+  const { store } = await rejecting(id);
+  await store.sync();
+  const rows = store.getSnapshot().rows;
+  assert.equal(rows.find((row) => row.payload.id === id)!.pending, true);
+  assert.equal(rows.find((row) => row.payload.id === id)!.rejected!.attempts, 1);
+  assert.equal(rows.find((row) => row.payload.id === second)?.pending, false);
+  assert.equal(store.getSnapshot().error, null);
+});
+test('a rejection keeps the server error, counts, backs off, and dead-letters after 5', async () => {
+  const { f, store, refused } = await rejecting(id, 'Ownership check failed');
+  await store.sync();
+  const first = () => store.getSnapshot().rows.find((row) => row.payload.id === id)!;
+  assert.equal(first().rejected!.error, 'Ownership check failed');
+  assert.equal(first().rejected!.at, f.now());
+  // Inside the backoff window the row is not tried again.
+  await store.sync();
+  assert.equal(refused(), 1);
+  for (let attempt = 2; attempt <= 5; attempt++) {
+    f.advance(2 * 60 * 60_000);
+    await store.sync();
+    assert.equal(first().rejected!.attempts, attempt);
+  }
+  assert.equal(deadLettered(first()), true);
+  assert.equal(first().rejected!.retryAt, undefined);
+  f.advance(24 * 60 * 60_000);
+  await store.sync();
+  assert.equal(refused(), 5);
+  assert.equal(first().pending, true);
+});
+test('a lost connection is not counted against the row', async () => {
+  const { f, store, offline } = await rejecting(id);
+  await store.sync();
+  assert.equal(store.getSnapshot().rows[0].rejected!.attempts, 1);
+  offline(true);
+  for (let i = 0; i < 3; i++) {
+    f.advance(2 * 60 * 60_000);
+    await store.sync();
+  }
+  assert.equal(store.getSnapshot().rows[0].rejected!.attempts, 1);
+  assert.match(store.getSnapshot().error ?? '', /Saved on this phone/);
+});
+test('the server reporting its own database down is not counted either', async () => {
+  const { store } = await rejecting(id, 'Failed query', true);
+  await store.sync();
+  assert.equal(store.getSnapshot().rows[0].rejected, undefined);
+  assert.equal(store.getSnapshot().rows[0].pending, true);
+  assert.match(store.getSnapshot().error ?? '', /Saved on this phone/);
+});
+test('a later success clears the rejection count', async () => {
+  const { f, store } = await rejecting(id);
+  await store.sync();
+  assert.equal(store.getSnapshot().rows[0].rejected!.attempts, 1);
+  // The server now takes it (an update shipped, or the user edited the activity).
+  const accepting = fixture();
+  accepting.online();
+  f.connection.post = accepting.connection.post;
+  f.connection.get = accepting.connection.get;
+  f.advance(2 * 60 * 60_000);
+  await store.sync();
+  const row = store.getSnapshot().rows.find((r) => r.payload.id === id)!;
+  assert.equal(row.pending, false);
+  assert.equal(row.rejected, undefined);
+});
+test('rejection counts and dead letters survive a restart', async () => {
+  const { f, store } = await rejecting(id);
+  await store.sync();
+  for (let i = 0; i < 4; i++) {
+    f.advance(2 * 60 * 60_000);
+    await store.sync();
+  }
+  const reopened = f.create();
+  await reopened.initialize();
+  const row = reopened.getSnapshot().rows.find((r) => r.payload.id === id)!;
+  assert.equal(row.rejected!.attempts, 5);
+  assert.equal(row.rejected!.error, 'Rejected by the sync schema at payload');
+  assert.equal(deadLettered(row), true);
+  assert.equal(reopened.getSnapshot().rows.find((r) => r.payload.id === second)!.pending, false);
 });
