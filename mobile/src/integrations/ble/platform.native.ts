@@ -1,6 +1,7 @@
 import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 import type { BleManager as Manager, State } from 'react-native-ble-plx';
 import { decodeBase64, encodeBase64 } from './base64';
+import { ScanHub } from './scan-hub';
 import {
   SCALE_MEASUREMENT,
   SCALE_REQUEST,
@@ -32,6 +33,39 @@ function ble() {
   }
   return manager;
 }
+
+// The one scanner, shared by strap pairing and the scale's listen scan (see scan-hub.ts).
+const hub = new ScanHub({
+  start(services, lowLatency, onDevice, onError) {
+    const { ScanMode } = require('react-native-ble-plx') as typeof import('react-native-ble-plx');
+    void ble()
+      .startDeviceScan(
+        services,
+        { allowDuplicates: false, ...(lowLatency ? { scanMode: ScanMode.LowLatency } : {}) },
+        (error, device) => {
+          if (error) {
+            onError(error.message);
+            return;
+          }
+          if (device)
+            onDevice({
+              id: device.id,
+              name: device.name ?? device.localName,
+              rssi: device.rssi,
+              services: device.serviceUUIDs,
+            });
+        },
+      )
+      .catch((error: unknown) => {
+        onError(error instanceof Error ? error.message : 'Scanning failed.');
+      });
+  },
+  stop() {
+    void ble()
+      .stopDeviceScan()
+      .catch(() => {});
+  },
+});
 
 function radioOf(state: State | `${State}`): BleRadio {
   switch (state) {
@@ -83,26 +117,9 @@ export const bleAdapter: BleAdapter = {
       onError('Update TrainingAi Preview to pair a device.');
       return () => {};
     }
-    let stopped = false;
-    void ble()
-      .startDeviceScan([service], { allowDuplicates: false }, (error, device) => {
-        if (stopped) return;
-        if (error) {
-          onError(error.message);
-          return;
-        }
-        if (device)
-          onFound({ id: device.id, name: device.name ?? device.localName, rssi: device.rssi });
-      })
-      .catch((error: unknown) => {
-        if (!stopped) onError(error instanceof Error ? error.message : 'Scanning failed.');
-      });
-    return () => {
-      stopped = true;
-      void ble()
-        .stopDeviceScan()
-        .catch(() => {});
-    };
+    // The scale is reachable for ~19 s after a weigh-in, so it is scanned for at the highest duty
+    // cycle, as the current app does (ScaleBleScanManager and ScaleForegroundScanner).
+    return hub.add(service, onFound, onError, service === SCALE_SERVICE);
   },
   async connect(id, onDisconnected) {
     const manager = ble();
@@ -168,6 +185,10 @@ export const bleAdapter: BleAdapter = {
     // The scale does not advertise while idle and Samsung ignores autoConnect, so this is a direct
     // connect made right after a scan saw it (ScaleGattClient.kt).
     const device = await manager.connectToDevice(id, { timeout: SCALE_CONNECT_TIMEOUT_MS });
+    // The scale's window is short, so ask for the fastest link before discovery, as
+    // ScaleGattClient does. Best effort: there is nothing to do if the radio ignores it.
+    const { ConnectionPriority } = require('react-native-ble-plx') as typeof import('react-native-ble-plx');
+    await manager.requestConnectionPriorityForDevice(id, ConnectionPriority.High).catch(() => {});
     let dropped = false;
     const drop = manager.onDeviceDisconnected(id, () => {
       if (dropped) return;

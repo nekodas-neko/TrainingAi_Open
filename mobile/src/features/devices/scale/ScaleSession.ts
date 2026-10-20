@@ -243,6 +243,11 @@ export class ScaleSession {
   async retry() {
     await this.refreshAccess(false);
     this.updateWanted();
+    // Already listening: start the scan afresh and skip the cool-down, so the button does something.
+    if (this.active && this.current.phase === 'listening') {
+      this.cooldownUntil = 0;
+      this.listen();
+    }
   }
 
   // ---- the weigh-in cycle ----

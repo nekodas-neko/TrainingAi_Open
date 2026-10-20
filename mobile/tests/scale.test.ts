@@ -25,6 +25,7 @@ import {
   scaleWaitingSpec,
   scaleWritePaths,
 } from '../src/features/devices/scale/data.ts';
+import { manualHealthWritePaths } from '../src/features/health/data/manual-write-paths.ts';
 import { ApiError } from '../src/features/account/api/client.ts';
 import type {
   BleAdapter,
@@ -272,15 +273,15 @@ test('the pending lists and today’s readings parse the routes’ answers', () 
         measuredAt: '2026-10-20T01:00:00.000Z',
         isTrend: true,
         weightKg: 70.95,
-        bodyFatPct: 14.2,
+        bodyFatPct: 20.5,
         impedanceOhmsA: 505,
         visceralFatIndex: 4,
       },
     ],
   });
-  assert.equal(today.readings[0].bodyFatPct, 14.2);
+  assert.equal(today.readings[0].bodyFatPct, 20.5);
   // A filed weigh-in refreshes the weight views the current app clears, and the scale's own lists.
-  for (const path of ['/api/scale-ble', '/api/body-metadata', '/api/progress-summary'])
+  for (const path of ['/api/scale-ble', '/api/body-metadata', ...manualHealthWritePaths])
     assert.ok(scaleWritePaths.includes(path), path);
 });
 
@@ -729,4 +730,18 @@ test('weigh-ins queued for one account are not filed as another’s after a swit
   await settle();
   assert.equal(session.getSnapshot().queued, 0, 'u2’s own outbox is empty');
   assert.equal(posts.length, 0, 'u1’s reading was not sent as u2’s');
+});
+
+test('Look for the scale restarts a listen that is already running', async () => {
+  const { session, ble } = await pairedSession();
+  session.hold('settings', true);
+  assert.equal(ble.scans.length, 1);
+  await session.retry();
+  assert.equal(ble.scans.length, 2, 'a fresh scan was started');
+  assert.equal(ble.scanning(), true);
+  assert.equal(
+    ble.log.filter((line) => line === 'scan stopped').length,
+    1,
+    'the old one was stopped',
+  );
 });

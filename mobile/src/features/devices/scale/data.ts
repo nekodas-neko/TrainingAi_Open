@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { manualHealthWritePaths } from '../../health/data/manual-write-paths.ts';
 
 /** One weigh-in waiting for an answer, or already declined (`GET /api/scale-ble/pending`). */
 const waitingSchema = z.object({
@@ -36,20 +37,19 @@ export const scaleTodaySpec = {
 };
 
 /**
- * What a filed weigh-in changes: the groups the current app clears after a weight entry
- * (`invalidateBodyMetricWrite` and `invalidateReadinessInputs` in `lib/cache-groups.ts`), plus the
- * scale's own lists. A weigh-in does not move the steps ladder, so the collection is not here.
+ * What a filed weigh-in changes: everything a manual weight entry expires (`manualHealthWritePaths`,
+ * the list HealthStore's writes use, so the two cannot drift), plus the groups the current app
+ * clears after a weight entry that the local store does not cover itself
+ * (`invalidateBodyMetricWrite` in `lib/cache-groups.ts`), plus the scale's own lists. A weigh-in
+ * arrives from the server rather than through the local store, so `/api/body-metadata` is what
+ * makes the store re-read it.
  */
 export const scaleWritePaths = [
-  '/api/scale-ble',
-  '/api/body-metadata',
-  '/api/nutrition/energy-balance',
-  '/api/progress-summary',
-  '/api/day-log',
-  '/api/health-trends',
-  '/api/health/trends',
-  '/api/hr-profile',
-  '/api/readiness-score',
-  '/api/body-battery',
-  '/api/achievements',
+  ...new Set([
+    ...manualHealthWritePaths,
+    '/api/scale-ble',
+    '/api/body-metadata',
+    '/api/hr-profile',
+    '/api/achievements',
+  ]),
 ];
