@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { msToHHMMInTz, toAestDay } from '@trainingai/shared/date-utils';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
+import { ApiError } from '../../account/api/client.ts';
 import {
   activityPayload,
   activityTypeSchema,
@@ -83,7 +84,12 @@ const savedSchema = z.object({
   rows: z.array(localRow),
   runs: z
     .array(
-      z.object({ date: z.string(), payload: PrescribedRunPatchBody, pending: z.boolean() }),
+      z.object({
+        date: z.string(),
+        payload: PrescribedRunPatchBody,
+        pending: z.boolean(),
+        rejected: rejection.optional(),
+      }),
     )
     .default([]),
   tests: z
@@ -645,7 +651,7 @@ export class ActivityStore {
       !this.current.ready ||
       (!this.current.rows.some((row) => row.pending && !deadLettered(row)) &&
         !this.current.tests.some((row) => row.pending && !deadLettered(row)) &&
-        !this.current.runs.some((row) => row.pending))
+        !this.current.runs.some((row) => row.pending && !deadLettered(row)))
     ) {
       return Promise.resolve();
     }
@@ -677,14 +683,35 @@ export class ActivityStore {
         const row = activityRow ?? this.current.tests.find(ready);
         const domain = activityRow ? 'activity_logs' : 'fitness_tests';
         if (!row) {
-          const run = this.current.runs.find((row) => row.pending);
+          const run = this.current.runs.find(ready);
           if (!run) {
             return;
           }
           if (!this.connection.patch) {
             throw new Error('Run completion is unavailable.');
           }
-          const response = z
+          let response: unknown;
+          try {
+            response = await this.connection.patch(
+              `/api/running-plan/runs/${run.payload.id}`,
+              run.payload,
+            );
+          } catch (failure) {
+            // An answer from the server counts against this run, 404 and 500 included, so one run
+            // cannot hold the ones behind it. A rate limit or a lost connection says nothing about it.
+            if (failure instanceof ApiError && failure.status !== 429) {
+              if (generation !== this.generation) {
+                return;
+              }
+              await this.reject('runs', run, failure.message);
+              continue;
+            }
+            throw failure;
+          }
+          if (generation !== this.generation) {
+            return;
+          }
+          const parsed = z
             .object({
               run: z.object({
                 id: z.string(),
@@ -693,31 +720,61 @@ export class ActivityStore {
                 completedAs: z.string().nullish(),
               }),
             })
-            .parse(
-              await this.connection.patch(
-                `/api/running-plan/runs/${run.payload.id}`,
-                run.payload,
-              ),
-            );
-          if (generation !== this.generation) {
-            return;
-          }
+            .safeParse(response);
           if (
+            !parsed.success ||
             Object.entries(run.payload).some(
               ([key, value]) =>
-                value !== undefined && response.run[key as keyof typeof response.run] !== value,
+                value !== undefined &&
+                parsed.data.run[key as keyof typeof parsed.data.run] !== value,
             )
           ) {
-            throw new Error('Run readback not confirmed.');
+            await this.reject('runs', run, 'Run readback not confirmed.');
+            continue;
           }
           await this.write((data) => ({
             ...data,
             runs: data.runs.map((row) =>
-              row.payload.id === run.payload.id ? { ...row, pending: false } : row,
+              row.payload.id === run.payload.id
+                ? { ...row, pending: false, rejected: undefined }
+                : row,
             ),
           }));
           this.invalidate();
           continue;
+        }
+        let answer: unknown;
+        try {
+          answer = await this.connection.post('/api/sync/push', {
+            mutations: [
+              {
+                id: row.payload.id,
+                domain,
+                date: row.payload.date,
+                payload: row.payload,
+              },
+            ],
+          });
+        } catch (failure) {
+          // A 4xx other than 429 refused the request itself, so it counts against this row, as the
+          // current app does. A 429, a 5xx or a lost connection says nothing about it and retries.
+          if (
+            failure instanceof ApiError &&
+            failure.status >= 400 &&
+            failure.status < 500 &&
+            failure.status !== 429
+          ) {
+            if (generation !== this.generation) {
+              return;
+            }
+            await this.reject(
+              activityRow ? 'rows' : 'tests',
+              row,
+              `push rejected: HTTP ${failure.status}`,
+            );
+            continue;
+          }
+          throw failure;
         }
         const ack = z
           .object({
@@ -732,18 +789,7 @@ export class ActivityStore {
               }),
             ),
           })
-          .parse(
-            await this.connection.post('/api/sync/push', {
-              mutations: [
-                {
-                  id: row.payload.id,
-                  domain,
-                  date: row.payload.date,
-                  payload: row.payload,
-                },
-              ],
-            }),
-          );
+          .parse(answer);
         if (generation !== this.generation) {
           return;
         }
@@ -756,28 +802,7 @@ export class ActivityStore {
           throw new Error(failure.error);
         }
         if (failure) {
-          const attempts = (row.rejected?.attempts ?? 0) + 1;
-          const at = this.now();
-          const rejected: Rejection = {
-            error: failure.error,
-            at,
-            attempts,
-            ...(attempts < MAX_MUTATION_ATTEMPTS
-              ? { retryAt: at + nextRetryDelayMs(attempts) }
-              : {}),
-          };
-          const unchanged = (item: { payload: { id: string } }) =>
-            item.payload.id === row.payload.id &&
-            JSON.stringify(item.payload) === JSON.stringify(row.payload);
-          await this.write((data) => ({
-            ...data,
-            rows: data.rows.map((item) =>
-              activityRow && unchanged(item) ? { ...item, rejected } : item,
-            ),
-            tests: data.tests.map((item) =>
-              !activityRow && unchanged(item) ? { ...item, rejected } : item,
-            ),
-          }));
+          await this.reject(activityRow ? 'rows' : 'tests', row, failure.error);
           continue;
         }
         if (ack.processed !== 1 || ack.errors.length) {
@@ -851,6 +876,31 @@ export class ActivityStore {
         });
       }
     }
+  }
+  // Counts one server refusal against a queued item (an unchanged copy, in case it was edited
+  // meanwhile): backoff until the fifth, then it is dead-lettered and the flush passes it over.
+  private async reject(
+    list: 'rows' | 'tests' | 'runs',
+    row: { payload: { id: string }; rejected?: Rejection },
+    error: string,
+  ) {
+    const attempts = (row.rejected?.attempts ?? 0) + 1;
+    const at = this.now();
+    const rejected: Rejection = {
+      error,
+      at,
+      attempts,
+      ...(attempts < MAX_MUTATION_ATTEMPTS ? { retryAt: at + nextRetryDelayMs(attempts) } : {}),
+    };
+    const unchanged = (item: { payload: { id: string } }) =>
+      item.payload.id === row.payload.id &&
+      JSON.stringify(item.payload) === JSON.stringify(row.payload);
+    await this.write((data) => ({
+      ...data,
+      [list]: (data[list] as { payload: { id: string } }[]).map((item) =>
+        unchanged(item) ? { ...item, rejected } : item,
+      ),
+    }));
   }
   cancel() {
     this.generation++;
