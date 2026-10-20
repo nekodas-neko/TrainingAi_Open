@@ -24,7 +24,7 @@
  *   · **The trend curves see runs only**, filtered before the maths rather than inside it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
+import { shiftDateStr, startOfWeekInTz, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { MIN_RELIABLE_SAMPLES, CORROBORATION, computeObservedHr } from '@trainingai/shared/health/observed-hr'
 
 type Row = Record<string, unknown>
@@ -57,6 +57,15 @@ import { GET as getBests } from '@/app/api/running-bests/route'
 
 const TZ = 'Australia/Brisbane'
 const zeroDay = (day: string): Day => ({ day, seconds: [0, 0, 0, 0, 0] })
+// Week-relative fixtures are derived from the user's week, never hardcoded: a fixed date stops being
+// "this week" the week after it is written, and "N days before today" leaves the week on a Monday or
+// Tuesday. These are the current calendar week's other days (Monday to Sunday, today excluded), so
+// they exist and stay inside the week whatever the weekday. Rows that carry a time start at local
+// midday.
+const otherDaysThisWeek = () => {
+  const today = todayInTz(TZ)
+  return Array.from({ length: 7 }, (_, i) => shiftDateStr(startOfWeekInTz(TZ), i)).filter(d => d !== today)
+}
 const run = (over: Row = {}) => ({
   activityType: 'run', date: '2026-09-01', distanceKm: 5, durationMin: 25,
   avgHeartRate: 150, cadenceSpm: 170, ...over,
@@ -246,7 +255,8 @@ describe('/api/cardio-week', () => {
   // Measuring three days of a week against a seven-day goal always reads as failure.
   it('scales the week goal to the days elapsed', async () => {
     const today = todayInTz(TZ)
-    getZoneMinutesRange.mockResolvedValue([zeroDay('2026-09-07'), zeroDay('2026-09-08'), zeroDay(today)])
+    const [a, b] = otherDaysThisWeek()
+    getZoneMinutesRange.mockResolvedValue([zeroDay(a), zeroDay(b), zeroDay(today)])
     const body = await (await getWeek()).json()
 
     expect(body.steps.weekGoal).toBe(body.steps.todayGoal * 7)
@@ -269,14 +279,38 @@ describe('/api/cardio-week', () => {
     expect((await (await getWeek()).json()).trainedToday).toBe(true)
 
     getDayExerciseNames.mockResolvedValue([])
-    listActivityLogs.mockResolvedValue([run()])
+    // Dated today: the route reads the week's logs (#3095) and credits today's, as the repository
+    // would hand them back.
+    listActivityLogs.mockResolvedValue([run({ date: todayInTz(TZ) })])
     expect((await (await getWeek()).json()).trainedToday).toBe(true)
+  })
+
+  it('a cardio session on an earlier day does not credit today', async () => {
+    listActivityLogs.mockResolvedValue([run({ date: otherDaysThisWeek()[0] })])
+    expect((await (await getWeek()).json()).trainedToday).toBe(false)
+  })
+
+  // #3095: the same builder as Home and the day screen. A treadmill session's steps are added (the
+  // ring misses them); a GPS walk's stored steps are not (the ring already counted them).
+  it('adds a treadmill session\'s steps to today and the week, and never a GPS walk\'s', async () => {
+    const today = todayInTz(TZ)
+    listBodyMetrics.mockResolvedValue([
+      { date: otherDaysThisWeek()[0], steps: 4000 }, { date: today, steps: 6000 },
+    ])
+    listActivityLogs.mockResolvedValue([
+      { activityType: 'treadmill', date: today, steps: 3500, startTime: '12:00:00' },
+      { activityType: 'treadmill', date: otherDaysThisWeek()[0], steps: 2000, startTime: '12:00:00' },
+      { activityType: 'walk', date: today, steps: 4100, distanceKm: 3.2, startTime: '12:00:00' },
+    ])
+    const body = await (await getWeek()).json()
+    expect(body.steps.today).toBe(9500)
+    expect(body.steps.week).toBe(15_500)
   })
 
   it('sums only this week\'s steps and reads today\'s from today\'s row', async () => {
     const today = todayInTz(TZ)
     listBodyMetrics.mockResolvedValue([
-      { date: '2026-09-07', steps: 4000 }, { date: today, steps: 6000 },
+      { date: otherDaysThisWeek()[0], steps: 4000 }, { date: today, steps: 6000 },
     ])
     const body = await (await getWeek()).json()
     expect(body.steps.today).toBe(6000)

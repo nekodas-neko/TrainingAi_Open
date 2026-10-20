@@ -1,4 +1,5 @@
-import { ouraSecondaryPeriods, recordsSleep } from '@trainingai/shared/health/sleep-night';
+import { groupSleepPeriods, aggregateNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night';
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import type { LocalSleepSession } from '@/lib/local-store/types';
 
 export type SleepRow = {
@@ -47,139 +48,107 @@ export type SleepRow = {
   ouraSleepType?: string | null;
 };
 
-// Contiguity threshold for treating two same-date rows as one sleep period. Midnight-split
-// halves (Samsung) are adjacent (gap ≈ 0); evening wind-down, afternoon naps, and stray BLE
-// daytime windows sit hours away from the night. 1h keeps splits together and drops naps.
-const CONTIGUOUS_GAP_MS = 60 * 60 * 1000;
-
-// Reduce a date's rows to just the main sleep period: the longest row plus any row temporally
-// contiguous with the growing window. Distant short fragments are dropped so they can't drag the
-// night's bedtime earlier or its wake-time later (the "7:40 pm bedtime" / "2:59 pm wake" bugs —
-// a 20-min evening rest or afternoon nap Oura/BLE recorded as its own session got unioned in).
-function primaryCluster(list: SleepRow[]): SleepRow[] {
-  const timed = list.filter(r => r.sleepStart && r.sleepEnd);
-  if (timed.length <= 1) return list;
-  const longest = mainRow(timed);
-  let start = new Date(longest.sleepStart!).getTime();
-  let end = new Date(longest.sleepEnd!).getTime();
-  const kept = new Set<SleepRow>([longest]);
-  for (let changed = true; changed; ) {
-    changed = false;
-    for (const r of timed) {
-      if (kept.has(r)) continue;
-      const s = new Date(r.sleepStart!).getTime(), e = new Date(r.sleepEnd!).getTime();
-      if (s <= end + CONTIGUOUS_GAP_MS && e >= start - CONTIGUOUS_GAP_MS) {
-        kept.add(r); start = Math.min(start, s); end = Math.max(end, e); changed = true;
-      }
-    }
-  }
-  // Rows without timestamps can't be placed, so keep them (existing merge handles them).
-  return list.filter(r => kept.has(r) || !r.sleepStart || !r.sleepEnd);
+/** A row as a window the night grouping can read: its times as instants, the row itself carried along. */
+type RowWindow = {
+  row: SleepRow
+  date: string
+  sleepStart: Date
+  sleepEnd: Date
+  durationHours: number | null
+  ouraSleepType: string | null
+  deepSleepHours: number | null
+  remSleepHours: number | null
+  lightSleepHours: number | null
+  awakHours: number | null
+  efficiency: number | null
+  onsetLatencySec: number | null
+  averageHrvMs: number | null
+  avgHeartRate: number | null
+  lowestHeartRate: number | null
+  restlessPeriods: number | null
+  respiratoryRate: number | null
 }
 
 // The night's main period: its longest row by sleep, by window when a row has no duration.
-const span = (r: SleepRow) =>
-  r.sleepStart && r.sleepEnd ? new Date(r.sleepEnd).getTime() - new Date(r.sleepStart).getTime() : 0;
-function mainRow(list: SleepRow[]): SleepRow {
-  return list.reduce((a, b) => ((b.durationHours ?? span(b)) > (a.durationHours ?? span(a)) ? b : a));
+const span = (w: RowWindow) => w.sleepEnd.getTime() - w.sleepStart.getTime()
+function mainWindow(list: RowWindow[]): RowWindow {
+  return list.reduce((a, b) => ((b.durationHours ?? span(b) / 3_600_000) > (a.durationHours ?? span(a) / 3_600_000) ? b : a))
 }
 
-// Merge same-date sleep rows (Samsung Health splits midnight sessions).
-// When exactly one of the rows has an ouraId, the Oura row is authoritative
-// for all duration fields (Oura reports sleep onset, not in-bed time) and the
-// Samsung row only contributes the earliest start / latest end timestamps.
-export function mergeByDate(rows: SleepRow[]) {
-  const byDate = new Map<string, SleepRow[]>();
-  // Q-274: `primaryCluster` picks the LONGEST row, so on a date carrying a nap plus the night the
-  // night already wins. What it cannot fix is a date whose ONLY row is a fragment: with one row it
-  // returns early, and production has a date (2026-08-22) whose sole row is 0.00 h — which the
-  // sleep list rendered as a night of zero hours. A zero-duration row is a bed period the recorder
-  // never resolved into sleep, not a short night, and `computeSleepScore` already returns null for
-  // it. Showing nothing for that date is honest; showing 0.00 h reads as "you slept none".
-  //
-  // The predicate is imported rather than rewritten: `sleep-night.ts` is where "does this row
-  // record any sleep" is decided, and a second copy here is how the two drift.
-  //
-  // #3057: an Oura period beside a `long_sleep` is a nap, never part of the night. The rule is
-  // `ouraSecondaryPeriods`, the same call `groupSleepPeriods` makes for the score.
-  const secondary = ouraSecondaryPeriods(rows);
-  for (const r of rows.filter(r => recordsSleep(r.durationHours) && !secondary.has(r))) {
-    const list = byDate.get(r.date) ?? [];
-    list.push(r);
-    byDate.set(r.date, list);
+/**
+ * The sleep list's nights: for each wake date, the SAME night the Sleep Score scores (#3080).
+ *
+ * The card used to build its own night: same-date rows within 60 minutes of each other, an Oura row
+ * authoritative over a Samsung one, stages summed. The score groups windows within 3 hours across
+ * dates (`groupSleepPeriods`), restamps the wake date from the last window's end, and recomputes
+ * efficiency, awake time and awakenings over the whole night (`aggregateNight`). On any night with
+ * several windows, or one whose stored date disagreed with its local wake day, the card and the score
+ * described different nights. Now the card shows the score's aggregate: the canonical night per date
+ * (`canonicalNightForDate`), its totals, efficiency, awake time, awakenings and vitals.
+ *
+ * What stays the card's own: the row identity (`id`, `ouraId`, `manualEntry`, the remembered
+ * bedtime) comes from the night's main window, and so does the hypnogram, positioned against that
+ * window (`phaseWindowStart`/`phaseWindowEnd`) because a phase string spans only its own period.
+ *
+ * Naps, zero-duration bed periods and a short evening window that opens the next night are left
+ * out, by the same rules the score uses (#3057, Q-274, #2456). An untimed row cannot be placed in a
+ * night at all; it is passed through as it was.
+ */
+export function mergeByDate(rows: SleepRow[], tz: string = DEFAULT_TZ): SleepRow[] {
+  const untimed = rows.filter(r => !r.sleepStart || !r.sleepEnd)
+  const windows: RowWindow[] = rows.filter(r => r.sleepStart && r.sleepEnd).map(r => ({
+    row: r, date: r.date,
+    sleepStart: new Date(r.sleepStart!), sleepEnd: new Date(r.sleepEnd!),
+    durationHours: r.durationHours, ouraSleepType: r.ouraSleepType ?? null,
+    deepSleepHours: r.deepSleepHours, remSleepHours: r.remSleepHours, lightSleepHours: r.lightSleepHours,
+    awakHours: r.awakHours, efficiency: r.efficiency, onsetLatencySec: r.onsetLatencySec,
+    averageHrvMs: r.averageHrvMs, avgHeartRate: r.avgHeartRate, lowestHeartRate: r.lowestHeartRate,
+    restlessPeriods: r.restlessPeriods, respiratoryRate: r.respiratoryRate,
+  }))
+  const periods = groupSleepPeriods(windows, tz).nights
+  const aggregates = periods.map(p => ({ period: p, night: aggregateNight(p) }))
+  const byNight = new Map(aggregates.map(a => [a.night, a.period]))
+  const nights = aggregates.map(a => a.night)
+
+  const results: SleepRow[] = []
+  for (const date of [...new Set(nights.map(n => n.date))]) {
+    const night = canonicalNightForDate(nights, date, tz)
+    const period = night ? byNight.get(night) : undefined
+    if (!night || !period) continue
+    const main = mainWindow(period.windows)
+    // A one-window night is the row itself (`aggregateNight` changes nothing but the wake date).
+    if (period.windows.length === 1) { results.push({ ...main.row, date: night.date }); continue }
+    const first = period.windows[0].row
+    const last = period.windows[period.windows.length - 1].row
+    // Hours are summed in floating point; the card shows them to two places, as it always did.
+    const h = (x: number | null | undefined) => (x == null ? null : +x.toFixed(2))
+    results.push({
+      ...main.row,
+      date: night.date,
+      sleepStart: first.sleepStart,
+      sleepEnd: last.sleepEnd,
+      durationHours: h(night.durationHours),
+      deepSleepHours: h(night.deepSleepHours),
+      remSleepHours: h(night.remSleepHours),
+      lightSleepHours: h(night.lightSleepHours),
+      awakHours: h(night.awakHours),
+      efficiency: night.efficiency ?? null,
+      onsetLatencySec: night.onsetLatencySec ?? null,
+      averageHrvMs: night.averageHrvMs ?? null,
+      avgHeartRate: night.avgHeartRate ?? null,
+      lowestHeartRate: night.lowestHeartRate ?? null,
+      restlessPeriods: night.restlessPeriods ?? null,
+      respiratoryRate: night.respiratoryRate ?? null,
+      // The ribbon is the main window's phase string, which spans only that window; say which, so
+      // the hypnogram can position itself inside the wider night.
+      sleepPhase5Min: main.row.sleepPhase5Min,
+      phaseWindowStart: main.row.sleepPhase5Min ? main.row.sleepStart : null,
+      phaseWindowEnd: main.row.sleepPhase5Min ? main.row.sleepEnd : null,
+    })
   }
-
-  const results: SleepRow[] = [];
-  for (const rawList of byDate.values()) {
-    const list = primaryCluster(rawList);
-    if (list.length === 1) { results.push(list[0]); continue; }
-
-    const ouraRows   = list.filter(r => r.ouraId != null);
-    const samsungRows = list.filter(r => r.ouraId == null);
-
-    // Mixed sources: Oura row is authoritative for duration/quality fields.
-    if (ouraRows.length === 1 && samsungRows.length >= 1) {
-      const authoritative = { ...ouraRows[0] };
-      // The phase string belongs to the Oura row alone — record its own bedtime
-      // window before extending sleepStart/sleepEnd to cover Samsung's wider
-      // in-bed time, so a hypnogram can position itself against the window its
-      // data actually spans rather than the (possibly wider) merged display window.
-      authoritative.phaseWindowStart = ouraRows[0].sleepStart;
-      authoritative.phaseWindowEnd = ouraRows[0].sleepEnd;
-      // Extend start/end to cover all rows (in-bed time from Samsung)
-      for (const r of samsungRows) {
-        if (r.sleepStart && (!authoritative.sleepStart || r.sleepStart < authoritative.sleepStart)) {
-          authoritative.sleepStart = r.sleepStart;
-        }
-        if (r.sleepEnd && (!authoritative.sleepEnd || r.sleepEnd > authoritative.sleepEnd)) {
-          authoritative.sleepEnd = r.sleepEnd;
-        }
-      }
-      results.push(authoritative);
-      continue;
-    }
-
-    // Same source (multiple Samsung splits or multiple Oura sessions): additive merge.
-    // #3057: the main period goes first, so efficiency, onset and the vitals below are its own
-    // and never whichever row the query happened to return first.
-    const main = mainRow(list);
-    const merged = {
-      ...main,
-      phaseWindowStart: main.sleepPhase5Min ? main.sleepStart : null,
-      phaseWindowEnd:   main.sleepPhase5Min ? main.sleepEnd   : null,
-    };
-    const add = (a: number | null, b: number | null) =>
-      a != null && b != null ? +(a + b).toFixed(2) : (a ?? b);
-    for (const r of list.filter(r => r !== main)) {
-      merged.durationHours   = add(merged.durationHours,   r.durationHours);
-      merged.deepSleepHours  = add(merged.deepSleepHours,  r.deepSleepHours);
-      merged.remSleepHours   = add(merged.remSleepHours,   r.remSleepHours);
-      merged.lightSleepHours = add(merged.lightSleepHours, r.lightSleepHours);
-      merged.awakHours       = add(merged.awakHours,       r.awakHours);
-      merged.efficiency      = merged.efficiency      ?? r.efficiency;
-      merged.onsetLatencySec = merged.onsetLatencySec ?? r.onsetLatencySec;
-      merged.averageHrvMs    = merged.averageHrvMs    ?? r.averageHrvMs;
-      merged.avgHeartRate    = merged.avgHeartRate    ?? r.avgHeartRate;
-      merged.lowestHeartRate = merged.lowestHeartRate ?? r.lowestHeartRate;
-      merged.restlessPeriods = merged.restlessPeriods ?? r.restlessPeriods;
-      merged.respiratoryRate = merged.respiratoryRate ?? r.respiratoryRate;
-      // Track which row's phase string ends up kept, so the ribbon can be
-      // positioned against that row's own bedtime window (see above).
-      if (!merged.sleepPhase5Min && r.sleepPhase5Min) {
-        merged.phaseWindowStart = r.sleepStart;
-        merged.phaseWindowEnd = r.sleepEnd;
-      }
-      merged.sleepPhase5Min  = merged.sleepPhase5Min  ?? r.sleepPhase5Min;
-      if (r.sleepStart && (!merged.sleepStart || r.sleepStart < merged.sleepStart)) {
-        merged.sleepStart = r.sleepStart;
-      }
-      if (r.sleepEnd && (!merged.sleepEnd || r.sleepEnd > merged.sleepEnd)) {
-        merged.sleepEnd = r.sleepEnd;
-      }
-    }
-    results.push(merged);
-  }
-  return results;
+  // Newest first, as the route always returned them: every reader takes `[0]` as last night and
+  // `slice(0, n)` as the recent nights (#3106 review). Grouping yields them oldest first.
+  return [...results.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)), ...untimed]
 }
 
 /**
@@ -187,10 +156,9 @@ export function mergeByDate(rows: SleepRow[]) {
  * night, newest first. The cold-open seed for every screen that reads that route.
  *
  * **A date is merged only when every row on it carries its window.** `mergeByDate` is the route's
- * own formula and is right for timed rows: `primaryCluster` drops naps and evening fragments, so
- * only contiguous splits reach the additive merge. Untimed rows defeat that — clustering returns
- * early and the additive merge SUMS a night and its naps into a fabricated 11.5 h night (BF-115's
- * refutation). Rows pulled before SQLite v50 have no window, so a date holding any such row passes
+ * own formula and is right for timed rows: the night grouping (`groupSleepPeriods`, #3080) leaves naps
+ * and evening fragments out and aggregates only a night's own windows. Untimed rows cannot be placed
+ * in a night at all, and summing them is what once fabricated an 11.5 h night (BF-115's refutation). Rows pulled before SQLite v50 have no window, so a date holding any such row passes
  * through raw, exactly as the seed always passed it.
  *
  * **Oura's period type is not on the device (#3057).** The local table has no `sleep_type`, so an Oura
@@ -202,7 +170,7 @@ export function mergeByDate(rows: SleepRow[]) {
  * the store returns oldest first. `sleepTimeRecommendation` and `provisional` are not in the local
  * table — null/absent, which every reader already treats as "cannot tell".
  */
-export function localSleepRowsAsNights(local: readonly LocalSleepSession[]): SleepRow[] {
+export function localSleepRowsAsNights(local: readonly LocalSleepSession[], tz: string = DEFAULT_TZ): SleepRow[] {
   const byDate = new Map<string, SleepRow[]>();
   for (const l of local) {
     const row: SleepRow = {
@@ -222,10 +190,15 @@ export function localSleepRowsAsNights(local: readonly LocalSleepSession[]): Sle
     list.push(row);
     byDate.set(row.date, list);
   }
+  // Timed dates are grouped together, as the score groups them: a night's windows can carry
+  // different stored dates (#3080), so grouping date by date would split it.
+  const timed: SleepRow[] = [];
   const out: SleepRow[] = [];
   for (const list of byDate.values()) {
-    out.push(...(list.every(r => r.sleepStart && r.sleepEnd) ? mergeByDate(list) : list));
+    if (list.every(r => r.sleepStart && r.sleepEnd)) timed.push(...list);
+    else out.push(...list);
   }
+  out.push(...mergeByDate(timed, tz));
   // Array.prototype.sort is stable, so rows sharing an untimed date keep the store's order.
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }

@@ -53,18 +53,35 @@ export type PipView =
       /** The running set's arc colour, as the current app's setColor(currentSet). */
       setColor: string | null;
     }
-  | { kind: 'placeholder'; exerciseName: string };
+  | {
+      kind: 'placeholder';
+      exerciseName: string;
+      /** "Tap Next to continue", only where the window has a Next button. */
+      hint: boolean;
+    };
 
-function load(exercise: WorkoutExercise, set: WorkoutExercise['sets'][number]) {
-  const weight = Number(set.weight.trim().replace(',', '.'));
-  const reps = repsOf(set);
-  const shown =
-    set.weight.trim() && Number.isFinite(weight) ? formatLoadKg(weight, { unit: false }) : '—';
-  return `${shown} ${exercise.weightUnit} × ${reps}`;
+type WorkoutSet = WorkoutExercise['sets'][number];
+const numberIn = (text: string) => {
+  const value = Number(text.trim().replace(',', '.'));
+  return text.trim() && Number.isFinite(value) ? value : null;
+};
+/**
+ * pip-view.tsx's "60 kg × 8": the set's weight, else the exercise's first, else 60, and the same
+ * fallbacks for reps (the plan, the first set, 10), as the current app reads its per-set arrays.
+ * The unit is the exercise's own, so a pound exercise reads "135 lb".
+ */
+function load(exercise: WorkoutExercise, set: WorkoutSet | undefined) {
+  const first = exercise.sets[0];
+  const weight =
+    (set && numberIn(set.weight)) ?? set?.plannedWeight ?? numberIn(first.weight) ?? 60;
+  const reps = set ? repsOf(set, first) : repsOf(first, first);
+  return `${formatLoadKg(weight, { unit: false })} ${exercise.weightUnit} × ${reps}`;
 }
-function repsOf(set: WorkoutExercise['sets'][number]) {
-  const reps = Number(set.reps);
-  return set.reps.trim() && Number.isInteger(reps) ? reps : (set.planned?.reps ?? 10);
+function repsOf(set: WorkoutSet, first?: WorkoutSet) {
+  const reps = numberIn(set.reps);
+  if (reps !== null && Number.isInteger(reps)) return reps;
+  const firstReps = first ? numberIn(first.reps) : null;
+  return set.planned?.reps ?? (firstReps !== null && Number.isInteger(firstReps) ? firstReps : 10);
 }
 function setColor(index: number) {
   const color = categoricalColor(index);
@@ -80,13 +97,17 @@ function setColor(index: number) {
  */
 export function pipViewFor(workout: WorkoutRecord | null): PipView | null {
   const phase = pipPhaseFor(workout);
+  // Next on the last exercise ends the workout while the window may still be open: it shows the
+  // placeholder with the session's name and no Next, never a blank window.
+  if (workout && phase === 'done')
+    return { kind: 'placeholder', exerciseName: workout.sessionName, hint: false };
   if (!workout || !allowsPip(phase)) return null;
   const { exercise } = current(workout);
   if (!exercise) return null;
   // The summary times the last set's rest as a rest, with every set done, as the current app's
   // PipView does; once Next clears it there is nothing to time, so its placeholder (#3111).
   if (phase === 'summary' && !workout.rest) {
-    return { kind: 'placeholder', exerciseName: exercise.name };
+    return { kind: 'placeholder', exerciseName: exercise.name, hint: true };
   }
   const base = {
     exerciseName: exercise.name,
@@ -102,7 +123,7 @@ export function pipViewFor(workout: WorkoutRecord | null): PipView | null {
       restTargetSec: 0,
       restStartMs: null,
       setStartMs: set?.startedAt ?? null,
-      load: set ? load(exercise, set) : null,
+      load: load(exercise, set),
       setColor: setColor(base.currentSet),
     };
   }

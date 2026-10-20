@@ -6,6 +6,7 @@ import {
   DEFAULT_TZ, normalizeDateParamIso, shiftDateStr, dateStrMidnightInTz, toAestDay,
   startOfWeekInTz, weekStartForDay,
 } from '@trainingai/shared/date-utils'
+import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 
 /** How many completed weeks the window covers, the last being the recap week itself.
  *  Five points is "a monthly scale" with four prior weeks to average against — the same
@@ -79,11 +80,13 @@ export async function GET(req: Request) {
   const to = shiftDateStr(weekStart, 6) // the recap week's Sunday, inclusive
   const repo = await getRepository()
 
-  const [metrics, sessions] = await Promise.all([
+  const [metrics, sessions, activities] = await Promise.all([
     repo.listBodyMetrics(userId, from, to),
     // Anchored at the window's own local midnight, never `Date.now() - N × 86_400_000` — an
     // ms-offset window straddles two local days and merges them (CLAUDE.md, six prior copies).
     repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(from, tz)),
+    // #3095: indoor (treadmill) steps join each day's count, as on every other surface.
+    repo.listActivityLogs(userId, from, to).catch(() => []),
   ])
 
   const weekKeys = Array.from({ length: WEEKS }, (_, i) => shiftDateStr(from, i * 7))
@@ -100,8 +103,11 @@ export async function GET(req: Request) {
     const key = weekStartForDay(m.date)
     if (!inWindow.has(key)) continue
     if (m.restingHeartRate != null) push(rhr, key, m.restingHeartRate)
-    if (m.steps != null) push(steps, key, m.steps)
     if (m.weightKg != null) push(weight, key, m.weightKg)
+  }
+  for (const [date, n] of dayStepCountsByDate(metrics, activities)) {
+    const key = weekStartForDay(date)
+    if (inWindow.has(key)) push(steps, key, n)
   }
 
   // Several sessions can share a week, so volume is summed rather than last-write-wins.

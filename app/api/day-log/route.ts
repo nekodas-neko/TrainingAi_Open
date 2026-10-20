@@ -7,6 +7,7 @@ import { toZonedTime } from "date-fns-tz";
 import type { ActivityLog } from "@trainingai/shared/types";
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
+import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 
 export interface DayExercise {
   name: string;
@@ -326,6 +327,9 @@ export async function GET(req: NextRequest) {
   }
 
   const activityLogs = await repo.listActivityLogs(userId, pgDate, pgDate);
+  // #3095: the day's steps are the device's plus the indoor (treadmill) steps it could not see —
+  // the one builder Home and the cardio week use, so the day screen reads the same figure.
+  if (bodyMeta) bodyMeta.steps = dayStepCount(bodyMeta.steps, activityLogs);
 
   // LB-25 — body temperature, from `oura_daily_summary` (the live BLE-derived values), never from
   // `oura_daily.temperature_deviation`: that Cloud column froze at the 2026-07-07 re-key and would

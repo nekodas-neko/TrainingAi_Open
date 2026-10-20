@@ -74,8 +74,13 @@ class PipStateTest {
       read,
     )
     assertEquals(
-      PipWindow("placeholder", "Bench press"),
-      PipState.fromMap(mapOf("kind" to "placeholder", "exerciseName" to "Bench press")),
+      PipWindow("placeholder", "Bench press", hint = true),
+      PipState.fromMap(mapOf("kind" to "placeholder", "exerciseName" to "Bench press", "hint" to true)),
+    )
+    // The workout's end: the placeholder without "Tap Next", whose button is gone (#3133).
+    assertEquals(
+      false,
+      PipState.fromMap(mapOf("kind" to "placeholder", "exerciseName" to "Upper body", "hint" to false))?.hint,
     )
     assertNull(PipState.fromMap(null))
     assertNull(PipState.fromMap(mapOf("kind" to "timer")))

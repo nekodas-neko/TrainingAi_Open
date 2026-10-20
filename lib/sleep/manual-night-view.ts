@@ -1,4 +1,4 @@
-import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import { shiftDateStr, todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import { pendingDeletedIds } from '@trainingai/shared/sync/pending-deletes'
 import { localSleepRowsAsNights } from '@/lib/sleep/merge-sessions'
@@ -73,6 +73,7 @@ export async function withPendingManualWrites<T extends NightRef>(
   rows: readonly T[],
   userId: string | undefined,
   cutoffDate: string,
+  tz: string = DEFAULT_TZ,
 ): Promise<T[]> {
   const store = userId ? getLocalStore(userId) : null
   if (!store || !userId) return [...rows]
@@ -81,7 +82,7 @@ export async function withPendingManualWrites<T extends NightRef>(
       store.getSleepSessions(cutoffDate),
       store.getQueuedMutationsForDomain(userId, 'manual_sleep'),
     ])
-    const localManual = localSleepRowsAsNights(local.filter(l => l.manualEntry)) as unknown as T[]
+    const localManual = localSleepRowsAsNights(local.filter(l => l.manualEntry), tz) as unknown as T[]
     return applyPendingManualWrites(rows, localManual, pendingDeletedIds(queued, 'manual_sleep'))
   } catch {
     return [...rows]
@@ -103,5 +104,5 @@ export async function sleepReplyWithPending<T extends NightRef>(
   tz: string,
 ): Promise<T[]> {
   const rows = Array.isArray(reply) ? (reply as T[]) : []
-  return withPendingManualWrites(rows, userId, shiftDateStr(todayInTz(tz), -PENDING_WINDOW_DAYS))
+  return withPendingManualWrites(rows, userId, shiftDateStr(todayInTz(tz), -PENDING_WINDOW_DAYS), tz)
 }

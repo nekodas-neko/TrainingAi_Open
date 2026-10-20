@@ -30,6 +30,8 @@ data class PipWindow(
   val load: String? = null,
   /** The set's colour, `#rrggbb`, from the shared categorical palette. */
   val setColor: String? = null,
+  /** The placeholder's "Tap Next to continue", shown only where the window has a Next button. */
+  val hint: Boolean = false,
 )
 
 data class PipClock(
@@ -95,6 +97,7 @@ object PipState {
       setStartMs = long("setStartMs"),
       load = map["load"] as? String,
       setColor = (map["setColor"] as? String)?.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) },
+      hint = map["hint"] == true,
     )
   }
 }

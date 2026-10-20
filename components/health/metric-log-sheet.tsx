@@ -12,6 +12,7 @@ import { invalidateBodyMetricWrite } from "@/lib/cache-groups"
 import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate"
 import type { BodyMetaRow } from "@/app/api/body-metadata/route"
 import { metricBoundError } from "@/components/health/metric-bounds"
+import { withIndoorSteps } from '@trainingai/shared/health/activity-steps'
 
 export type LogField = "weightKg" | "steps" | "bodyFat";
 
@@ -114,7 +115,9 @@ export function MetricLogSheet({ logState, userId, onClose, onSaved }: MetricLog
           const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000)
           const fresh = await store.getBodyMetrics(toAestDay(cutoff, tz))
           const todayMeta = fresh.find(r => r.date === date) ?? null
-          onSaved(todayMeta ? {
+          // #3095: the rebuilt row folds today's treadmill steps, as the route's does.
+          const todayActivities = (await store.getActivityLogs(date)).filter(a => !a.deletedAt && a.date === date)
+          onSaved(todayMeta ? withIndoorSteps({
             date:             todayMeta.date,
             weightKg:         todayMeta.weightKg,
             bodyFat:          todayMeta.bodyFatPct,
@@ -144,7 +147,7 @@ export function MetricLogSheet({ logState, userId, onClose, onSaved }: MetricLog
             proteinPct:         todayMeta.proteinPct,
             bmrKcal:            todayMeta.bmrKcal,
             metabolicAge:       todayMeta.metabolicAge,
-          } : null)
+          }, todayActivities) : null)
           savedLocally = true
         } catch (sqliteErr) {
           console.error('Body metric SQLite write failed, falling back to API:', sqliteErr)
