@@ -13,10 +13,33 @@
 // Every upsert is idempotent: the same documents written twice leave the same rows.
 //
 // The BLE raw archive (`oura_raw_samples`, `oura_raw_packed`) is never touched here.
-import type { WorkoutRepository } from '@/lib/data/repository'
+import type { OuraCloudHeartrateWrite, WorkoutRepository } from '@/lib/data/repository'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import type { OuraCloudWrites } from './documents'
 import { reportOuraCloudIssue } from './report'
+
+/**
+ * Re-attributes the completed workouts a heart-rate write overlaps (#3078,
+ * `reattributeWorkoutsHrInWindow`). Every writer of Oura Cloud heart rate takes one, so a workout
+ * whose series landed after it was completed is refreshed whichever path brought the series.
+ */
+export type OuraWorkoutHrReattribute = (userId: string, from: Date, to: Date, tz: string) => Promise<number>
+
+/**
+ * After a heart-rate write: re-attributes the workouts over the span of the points that actually
+ * changed, never over a re-read that changed nothing. A failure is reported under `kind` and never
+ * fails the write it follows.
+ */
+export async function reattributeAfterHeartRate(
+  workoutHr: OuraWorkoutHrReattribute | undefined, userId: string, write: OuraCloudHeartrateWrite, tz: string, kind: string,
+): Promise<void> {
+  if (!workoutHr || write.changed === 0 || !write.changedFrom || !write.changedTo) return
+  try {
+    await workoutHr(userId, write.changedFrom, write.changedTo, tz)
+  } catch (err) {
+    reportOuraCloudIssue(kind, err instanceof Error ? err.message : 'unknown', { userId })
+  }
+}
 
 /** The slice of the repository the writer needs, so tests can hand it a fake. */
 export type OuraCloudWriter = Pick<WorkoutRepository,

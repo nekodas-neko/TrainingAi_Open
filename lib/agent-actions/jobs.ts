@@ -10,6 +10,7 @@ import { rederiveStylelessOneRm } from '@/lib/workout/rederive-styleless-one-rm'
 import { reencodeBodyweightOneRm } from '@/lib/workout/reencode-bodyweight-one-rm'
 import { recomputeHrr1Best } from '@/lib/workout/recompute-hrr1-best'
 import { backfillSetHrr1 } from '@/lib/workout/backfill-set-hrr1'
+import { workoutHrReattributor } from '@/lib/workout/post-completion-hr'
 import type { FinishAgentActionInput } from '@/lib/data/postgres/slices/agent-actions'
 import { ouraOAuthConfig } from '@/lib/oura/cloud/config'
 import { backfillOuraCloud, CONNECT_BACKFILL_DAYS, validBackfillRange, type OuraBackfillResult } from '@/lib/oura/cloud/backfill'
@@ -262,7 +263,7 @@ export const AGENT_JOBS = {
       const from = p.from ? normalizeDateParamIso(p.from) : to && shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1))
       if (!from || !to) return { status: 400, body: { error: 'Invalid date' }, finish: { outcome: 'refused', error: 'invalid date' } }
       if (!validBackfillRange(from, to)) return { status: 400, body: { error: 'invalid_range' }, finish: { outcome: 'refused', error: 'invalid_range' } }
-      const run = backfillOuraCloud({ repo: ctx.repo, config, rescore: ctx.repo }, ctx.userId, {
+      const run = backfillOuraCloud({ repo: ctx.repo, config, rescore: ctx.repo, workoutHr: workoutHrReattributor(ctx.repo) }, ctx.userId, {
         from, to, dryRun: p.dryRun, heartRate: p.heartRate ?? true, tz: ctx.tz,
       })
       const finish = (result: OuraBackfillResult): FinishAgentActionInput => {

@@ -338,7 +338,8 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
       { timestamp: new Date('2026-10-09T23:50:00Z'), bpm: 61 },
       { timestamp: new Date('2026-10-10T00:05:00Z'), bpm: 64 },
     ], 'Australia/Brisbane')
-    expect(n).toBe(1)
+    expect(n.offered).toBe(1)
+    expect(n.changed).toBe(1)
     const rows = (await pool.query(`SELECT timestamp, bpm, source FROM oura_heartrate WHERE user_id = $1 ORDER BY timestamp`, [USER])).rows
     expect(rows.map(r => [r.timestamp.toISOString(), r.bpm, r.source])).toEqual([
       ['2026-10-09T23:50:00.000Z', 61, 'oura_cloud'],
