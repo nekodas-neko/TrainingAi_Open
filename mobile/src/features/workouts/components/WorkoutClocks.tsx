@@ -111,10 +111,14 @@ export function ReadyProgress({
 export function RestCard({
   workout,
   compact = false,
+  controls = true,
   onStartSet,
 }: {
   workout: WorkoutRecord;
   compact?: boolean;
+  // Off for the last set's rest on the exercise summary, which shows only the caption and ring,
+  // as the current app's LastSetRestTimer does (#3111).
+  controls?: boolean;
   onStartSet?: () => void;
 }) {
   const now = useClock();
@@ -167,28 +171,32 @@ export function RestCard({
           {expired ? 'Rest complete · Tap to start' : 'Tap to start early'}
         </AppText>
       )}
-      <AppText variant="micro" tone="muted">
-        Actual rest {formatDuration(Math.max(0, (now - workout.rest.startedAt) / 1000))} ·
-        adjusted target {formatDuration(total)}
-      </AppText>
-      <Stack direction="row">
-        <AppButton
-          title="−30s"
-          variant="surface"
-          disabled={journal.busy || total < 30}
-          onPress={() => {
-            void journal.controller?.adjustRest(workout.id, -30);
-          }}
-        />
-        <AppButton
-          title="+30s"
-          variant="surface"
-          disabled={journal.busy || total > 86370}
-          onPress={() => {
-            void journal.controller?.adjustRest(workout.id, 30);
-          }}
-        />
-      </Stack>
+      {controls && (
+        <>
+          <AppText variant="micro" tone="muted">
+            Actual rest {formatDuration(Math.max(0, (now - workout.rest.startedAt) / 1000))} ·
+            adjusted target {formatDuration(total)}
+          </AppText>
+          <Stack direction="row">
+            <AppButton
+              title="−30s"
+              variant="surface"
+              disabled={journal.busy || total < 30}
+              onPress={() => {
+                void journal.controller?.adjustRest(workout.id, -30);
+              }}
+            />
+            <AppButton
+              title="+30s"
+              variant="surface"
+              disabled={journal.busy || total > 86370}
+              onPress={() => {
+                void journal.controller?.adjustRest(workout.id, 30);
+              }}
+            />
+          </Stack>
+        </>
+      )}
     </Stack>
   );
 }

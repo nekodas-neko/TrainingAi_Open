@@ -1,7 +1,6 @@
 import { walkPlan } from '../../activities/data/guidance.ts';
 import { getProtocol, phasesTotalSec } from '@trainingai/shared/fitness-tests/protocols';
 import type { ActivitySession } from '../../activities/data/ActivityStore.ts';
-import { workoutFlow } from '../../workouts/logging/flow.ts';
 import type { WorkoutRecord } from '../../workouts/logging/workout.ts';
 import type { Alert, PlatformSettings } from './models.ts';
 export function planAlerts(
@@ -15,11 +14,10 @@ export function planAlerts(
   const result: Alert[] = [];
   for (const workout of workouts) {
     // The rest cue's alarm must survive backgrounding (#3062); the Alerts setting adds one when
-    // the cue is off.
+    // the cue is off. The last set's rest on the exercise summary alarms too (#3111).
     if (
       (workout.timers.restCues || (!foreground && settings.restAlerts)) &&
       workout.status === 'active' &&
-      workoutFlow(workout).stage !== 'summary' &&
       workout.rest &&
       workout.rest.endsAt > now
     ) {
@@ -30,7 +28,11 @@ export function planAlerts(
         id: `${scope}:rest:${workout.id}`,
         scope,
         title: 'Rest complete',
-        body: exercise ? `Ready for ${exercise.name}.` : 'Ready for your next set.',
+        body: workout.rest.lastSet
+          ? 'Ready for your next exercise.'
+          : exercise
+            ? `Ready for ${exercise.name}.`
+            : 'Ready for your next set.',
         target: 'workout',
         recordId: workout.id,
         restCueId: `${workout.id}:${workout.rest.startedAt}:${workout.rest.endsAt}`,
