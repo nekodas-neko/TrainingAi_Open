@@ -31,6 +31,8 @@ import {
   ladderModels,
 } from '../src/features/collection/data/view.ts';
 import { catArt, catArtFor } from '../src/features/collection/art/index.ts';
+import { homeWritePaths } from '../src/features/home/data/models.ts';
+import { nutritionPaths } from '../src/features/nutrition/data/models.ts';
 import { buildModule, outFile, stripArt } from '../scripts/cat-art.mjs';
 import { sqliteFixture } from './storage-fixture.ts';
 
@@ -415,4 +417,30 @@ test('the collection screen is the same shape as the answer: z.object with the f
     'health',
     'cardio',
   ]);
+});
+
+test('logging food, or choosing a rest day, re-reads the collection at once', async (t) => {
+  assert.ok(nutritionPaths.includes('/api/collection'));
+  assert.ok(nutritionPaths.includes('/api/achievements'));
+  assert.ok(homeWritePaths('rest').includes('/api/collection'));
+  assert.ok(
+    !homeWritePaths('mood').includes('/api/collection'),
+    'a mood log does not pause decay',
+  );
+  assert.deepEqual(homeWritePaths('preferences'), ['/api/user/preferences']);
+
+  const { open, state } = await setup(t);
+  const resources = open('one');
+  await resources.load(collectionSpec);
+  const before = reads(state);
+  resources.invalidate(nutritionPaths);
+  await resources.refreshVisible();
+  assert.equal(reads(state), before + 1, 'a food write re-reads it');
+  resources.invalidate(homeWritePaths('rest'));
+  await resources.refreshVisible();
+  assert.equal(reads(state), before + 2, 'a rest-day choice re-reads it');
+  resources.invalidate(homeWritePaths('mood'));
+  await resources.refreshVisible();
+  assert.equal(reads(state), before + 2, 'a mood log does not');
+  resources.cancel();
 });

@@ -15,9 +15,20 @@ const rewardWrites = [
   '/api/personal-records',
 ];
 // The collection's allowed rest gap comes from the active schedule, so editing the program changes
-// how fast it decays (the web's invalidateProgramStructure). A chosen rest day or a confirmed early
-// deload also pauses it; those come through Home's own refresh and wait out the five minutes.
+// how fast it decays (the web's invalidateProgramStructure). A chosen rest day also pauses it, and
+// Home's write expires the view itself (`homeWritePaths`).
+//
+// Sleep and step days reach the collection only through the device-health imports, which run about
+// once a minute. Each would cost a replay of all history on the server, so they leave the view to its
+// five-minute lifetime: the same bound the web's cached copy has.
 const programWrites = ['/api/workout-templates', '/api/phase-sets'];
+
+/**
+ * Both reward views, for a write that can change either and is not one of the paths above: a food
+ * log (food streaks, the Health ladder's food points) is the case. The web clears `achievements:` and
+ * `collection` in `invalidateNutritionWrite`; Preview's nutrition store spreads this into its list.
+ */
+export const rewardViewPaths = [achievementsSpec.path, collectionSpec.path];
 
 const touches = (paths: string[], writes: string[]) =>
   paths.some((path) => writes.some((write) => path.startsWith(write)));
