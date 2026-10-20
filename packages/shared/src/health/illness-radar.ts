@@ -55,6 +55,24 @@ export const READINESS_SUPPRESSION: Record<IllnessFlag, number> = {
 
 export type IllnessFlag = 'learning' | 'normal' | 'watch' | 'elevated' | 'fever'
 
+/** The readiness the user is shown: the composite less the radar's suppression, never below 0. */
+export function applyIllnessSuppression(composite: number, suppression: number): number {
+  return suppression > 0 ? Math.max(0, composite - suppression) : composite
+}
+
+/**
+ * #3086: whether a STORED readiness score is what `composite` was served as. Since #3086 the stored
+ * score is the served one, the composite less the suppression for the illness flag stored beside it;
+ * a row written before that holds the composite itself. Both read as a match, so neither era is
+ * reported as drift. An unknown or absent flag suppresses nothing.
+ */
+export function storedReadinessMatches(stored: number, composite: number, storedFlag: string | null | undefined): boolean {
+  if (stored === composite) return true
+  const suppression = storedFlag != null && Object.prototype.hasOwnProperty.call(READINESS_SUPPRESSION, storedFlag)
+    ? READINESS_SUPPRESSION[storedFlag as IllnessFlag] : 0
+  return suppression > 0 && applyIllnessSuppression(composite, suppression) === stored
+}
+
 export type IllnessBiomarkerKey = keyof typeof ILLNESS_WEIGHTS
 
 export interface IllnessInputs {

@@ -78,7 +78,11 @@ export interface PillarAudit {
    * without re-deriving them from the presentation `contributors` above — which are a different
    * shape and would be a second, drifting definition of "what gets stored".
    */
-  persist?: { score: number; contributors: unknown } | null
+  persist?: {
+    score: number; contributors: unknown
+    /** Readiness only (#3086): the illness radar's fields, persisted beside the served score. */
+    illnessFlag?: string | null; illnessScore?: number | null; illnessBiomarkers?: unknown
+  } | null
 }
 
 /** Everything else about the day that plausibly explains how it felt, but isn't a scored pillar. */
