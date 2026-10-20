@@ -2,8 +2,8 @@
 // how they are typed, and that nothing already counted is paid for twice.
 import { describe, it, expect } from 'vitest'
 import { ouraWorkoutActivities, type OuraWorkoutRow } from '../oura-workout-activities'
-import { computeActiveEnergy, stepEnergyKcal } from '../daily-energy'
-import { metIdForOuraActivity } from '../workout-energy'
+import { computeActiveEnergy, stepEnergyKcal, WALKING_CADENCE_SPM } from '../daily-energy'
+import { metIdForOuraActivity, OURA_ON_FOOT_ACTIVITIES } from '../workout-energy'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '../../date-utils'
 
 const TZ = 'Australia/Brisbane'
@@ -39,6 +39,15 @@ describe('ouraWorkoutActivities (#3087)', () => {
     expect(ouraWorkoutActivities([workout('cycling', at(12), at(12, 45), { reviewed: true })], none, TZ)).toEqual([])
   })
 
+  // A log stores clock times, so one that crosses midnight has its end before its start.
+  it('skips a workout inside a logged walk that crosses midnight', () => {
+    const lateWalk = workout('walking', at(23, 40), at(24, 20))
+    const counted = { activityLogs: [{ date: day, startTime: '23:30:00', endTime: '00:30:00' }], sessions: [] }
+    expect(ouraWorkoutActivities([lateWalk], counted, TZ)).toEqual([])
+    const byDuration = { activityLogs: [{ date: day, startTime: '23:30:00', endTime: '00:30:00', durationMin: 60 }], sessions: [] }
+    expect(ouraWorkoutActivities([lateWalk], byDuration, TZ)).toEqual([])
+  })
+
   it('counts a workout that only touches a log end to end', () => {
     const counted = { activityLogs: [{ date: day, startTime: '11:00:00', endTime: '12:00:00' }], sessions: [] }
     expect(ouraWorkoutActivities([workout('cycling', at(12), at(12, 45))], counted, TZ)).toHaveLength(1)
@@ -51,6 +60,10 @@ describe('Oura activity names against the MET table (#3087)', () => {
     expect(metIdForOuraActivity('strengthTraining')).toBe(8)
     expect(metIdForOuraActivity('crossCountrySkiing')).toBe(3)
     expect(metIdForOuraActivity('hiit')).toBe(30)
+  })
+
+  it('names every on-foot Oura activity the way the MET table does', () => {
+    expect(OURA_ON_FOOT_ACTIVITIES.filter(a => metIdForOuraActivity(a) == null)).toEqual([])
   })
 
   it('finds nothing for a name the table does not use', () => {
@@ -68,6 +81,18 @@ describe('Oura workouts in computeActiveEnergy (#3087)', () => {
       activities: [{ activityType: 'americanFootball', ouraActivity: 'americanFootball', durationMin: 60 }],
     })
     expect(r.activityKcal).toBe(0)
+  })
+
+  it('an on-foot Oura activity takes its steps back out at walking cadence', () => {
+    const [tennis] = ouraWorkoutActivities([workout('tennis', at(12), at(12, 40))], none, TZ)
+    const r = computeActiveEnergy({ profile, strengthSessions: [], pedometerSteps: 9_000, activities: [tennis] })
+    expect(r.stepsKcal).toBe(stepEnergyKcal(profile, 9_000 - 40 * WALKING_CADENCE_SPM))
+  })
+
+  it('an Oura ride leaves the step term alone', () => {
+    const [ride] = ouraWorkoutActivities([workout('cycling', at(12), at(12, 40))], none, TZ)
+    const r = computeActiveEnergy({ profile, strengthSessions: [], pedometerSteps: 9_000, activities: [ride] })
+    expect(r.stepsKcal).toBe(stepEnergyKcal(profile, 9_000))
   })
 
   it('an Oura walk takes its steps back out of the passive term, as a logged walk does', () => {

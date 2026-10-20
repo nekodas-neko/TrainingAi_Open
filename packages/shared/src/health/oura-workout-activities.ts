@@ -62,8 +62,15 @@ export function ouraWorkoutActivities(
     // Stored as HH:MM:SS (Postgres time); the parser takes HH:MM.
     const start = localClockTimeToDate(a.date, a.startTime?.slice(0, 5), tz)
     if (!start) continue
-    const end = localClockTimeToDate(a.date, a.endTime?.slice(0, 5), tz)
+    let end = localClockTimeToDate(a.date, a.endTime?.slice(0, 5), tz)
       ?? (a.durationMin != null ? new Date(start.getTime() + a.durationMin * 60_000) : null)
+    // A log that crosses midnight (23:30–00:30) stores an end clock time before its start: it ended
+    // the next day. Dropping it from the check would let the Oura copy of that walk count twice.
+    if (end && end <= start) {
+      end = a.durationMin != null && a.durationMin > 0
+        ? new Date(start.getTime() + a.durationMin * 60_000)
+        : new Date(end.getTime() + 86_400_000)
+    }
     if (end && end > start) windows.push([start.getTime(), end.getTime()])
   }
   for (const s of counted.sessions) {
