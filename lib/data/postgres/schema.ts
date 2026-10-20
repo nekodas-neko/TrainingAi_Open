@@ -2102,6 +2102,7 @@ export const ouraWorkouts = pgTable('oura_workouts', {
   label:          text('label'),     // the user's own name for it (spec `PublicWorkout.label`), migration 202610180038
   reviewed:       boolean('reviewed').notNull().default(false),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt:      timestamp('deleted_at', { withTimezone: true }),   // tombstone: deleted in the Oura app (#3087), migration 202610200123
 })
 
 // Oura enhanced tags, sessions (breathing/meditation/nap moments) and rest-mode
