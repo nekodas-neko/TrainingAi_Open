@@ -387,11 +387,12 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   // Issue 2613: a failed lookup leaves the field out (unknown), never false.
   const connectedSourcesP = (async () => {
-    const [ringSamples, recent] = await Promise.all([
+    const [ringSamples, recent, ouraTokens] = await Promise.all([
       repo.hasOuraBleSamples(userId),
       repo.getRecentSourceFacts(userId, new Date(todayMid.getTime() - CONNECTED_SOURCE_WINDOW_DAYS * 86_400_000)),
+      repo.getOuraCloudTokens(userId),
     ])
-    return connectedSources({ ringSamples, ...recent })
+    return connectedSources({ ringSamples, ...recent, ouraCloudConnected: ouraTokens?.accessToken != null })
   })().catch(() => undefined)
 
   // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.

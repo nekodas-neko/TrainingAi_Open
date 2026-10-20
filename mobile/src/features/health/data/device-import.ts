@@ -5,6 +5,8 @@ export type DeviceImportState = {
   pending: number;
   enabled: boolean;
   skipped: number;
+  /** Health Connect only: records left out as copies of data read first-hand, per type (#3115). */
+  skippedFirstHand?: Record<string, number>;
   completed: {
     measurements: number;
     nights: number;

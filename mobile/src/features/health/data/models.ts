@@ -202,6 +202,7 @@ export const readinessSpec = (date: string) => ({
         })
         .nullish(),
       limited: z.boolean().optional(),
+      connectedSources: z.object({ ouraCloud: z.boolean().optional() }).passthrough().nullish(),
       isLowWearToday: z.boolean().optional(),
       inputsMissing: z.array(z.string()).optional(),
       illnessAdvisory: text,

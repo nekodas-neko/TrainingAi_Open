@@ -257,7 +257,9 @@ export async function importMoreHistory(opts: {
       const startIso = dateStrMidnightInTz(fromDate, opts.tz).toISOString()
       const endIso = dateStrMidnightInTz(shiftDateStr(toDate, 1), opts.tz).toISOString()
       const r = await syncWindow(opened, opts.tz, startIso, endIso, { historyFrom: fromDate })
-      const nothing = r.metrics + r.sessions + r.sleep + r.heartRate + r.intervals === 0
+      // #3115: a window whose only records were skipped Oura copies still holds data, so it is not
+      // the empty past that ends the import.
+      const nothing = r.metrics + r.sessions + r.sleep + r.heartRate + r.intervals === 0 && !r.skippedFirstHand
       return { empty: nothing && !r.failed, failed: r.failed, requests: r.requests, note: r.note }
     },
   })
