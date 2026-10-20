@@ -30,12 +30,11 @@ const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
+const { countHexLiterals } = require('./lib/hex-literals');
 const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
-const HEX = /#[0-9a-fA-F]{3,8}\b/g;
-
-/** The one counting expression, so the working tree and the base branch are measured identically. */
-const countHex = (src) => (src.match(HEX) || []).length;
+/** The one counting rule (scripts/lib/hex-literals.js), so the working tree and the base branch are measured identically. */
+const countHex = countHexLiterals;
 
 // Baseline recorded 2026-08-15 — 471 literals across 95 files. Shrink-only.
 // A file that reaches zero should have its row deleted, so it is held to zero from then on.

@@ -4,6 +4,8 @@
 // colours in code that must, so the ratchet cannot be loosened by accident.
 import { describe, it, expect } from 'vitest'
 import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 const require_ = createRequire(import.meta.url)
 const { stripComments } = require_('../lib/strip-comments.js') as { stripComments: (s: string) => string }
@@ -53,5 +55,25 @@ describe('colours in code still count', () => {
 
   it('counts a colour next to a comment that holds a reference', () => {
     expect(count("const c = '#ff0000' // was #2383")).toBe(1)
+  })
+})
+
+// #3198: the script had kept its own bare regex, so none of the rules above reached the real check
+// and a `describe('… (#3188)')` in a .tsx test failed Custom Rules.
+describe('check-hex-literals uses the shared rule (#3198)', () => {
+  it('counts through scripts/lib/hex-literals.js, not a regex of its own', () => {
+    const src = readFileSync(join(__dirname, '..', 'check-hex-literals.js'), 'utf8')
+    expect(src).toContain("require('./lib/hex-literals')")
+    expect(src).not.toMatch(/src\.match\(HEX\)/)
+  })
+
+  it('does not count an issue number in a title or a comment', () => {
+    expect(count("describe('walk summary phase bands (#3188)', () => {})")).toBe(0)
+    expect(count('// see #3188\nconst a = 1')).toBe(0)
+  })
+
+  it('counts #3188 as a colour value, and a real hex in a title', () => {
+    expect(count("<div style={{ color: '#3188' }} />")).toBe(1)
+    expect(count("describe('tints #abc', () => {})")).toBe(1)
   })
 })
