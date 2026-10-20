@@ -18,6 +18,17 @@ export type StrapLink = {
   disconnect(): Promise<void>;
 };
 
+export type ScaleLink = {
+  /**
+   * Notifications from the scale's measurement characteristic (FFE1), raw bytes. `onFailed` fires
+   * once if the subscription itself fails, which leaves a link that will never deliver a reading.
+   */
+  onMeasurement(listener: (value: Uint8Array) => void, onFailed: () => void): Unsubscribe;
+  /** Writes a command to the scale's request characteristic (FFE3). Rejects if the write fails. */
+  request(command: Uint8Array): Promise<void>;
+  disconnect(): Promise<void>;
+};
+
 export type BleAdapter = {
   /** False when this build has no BLE module (web, or an APK built before it was added). */
   available: boolean;
@@ -25,10 +36,16 @@ export type BleAdapter = {
   onRadioChange(listener: (radio: BleRadio) => void): Unsubscribe;
   /** Android's Nearby devices permission. `request` shows the system prompt when allowed. */
   permission(request: boolean): Promise<BlePermission>;
-  /** Scans for Heart Rate Service advertisers until unsubscribed. */
-  scan(onFound: (device: FoundDevice) => void, onError: (message: string) => void): Unsubscribe;
+  /** Scans for advertisers of `service` (the Heart Rate Service by default) until unsubscribed. */
+  scan(
+    onFound: (device: FoundDevice) => void,
+    onError: (message: string) => void,
+    service?: string,
+  ): Unsubscribe;
   /** Direct connect, never a system bond. `onDisconnected` fires once when the link drops. */
   connect(id: string, onDisconnected: () => void): Promise<StrapLink>;
+  /** Direct connect to the body-composition scale, which sleeps within seconds of a weigh-in. */
+  connectScale(id: string, onDisconnected: () => void): Promise<ScaleLink>;
 };
 
 export const HR_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';

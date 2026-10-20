@@ -22,3 +22,8 @@ export function decodeBase64(value: string | null | undefined): Uint8Array | nul
   }
   return out;
 }
+
+/** The inverse of {@link decodeBase64}: characteristic writes take base64 text. */
+export function encodeBase64(bytes: Uint8Array): string {
+  return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''));
+}

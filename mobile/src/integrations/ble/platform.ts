@@ -6,10 +6,13 @@ export const bleAdapter: BleAdapter = {
   onRadioChange: () => () => {},
   permission: async () => 'denied',
   scan: (_onFound, onError) => {
-    onError('Strap pairing needs the TrainingAi app on your phone.');
+    onError('Pairing needs the TrainingAi app on your phone.');
     return () => {};
   },
   connect: async () => {
     throw new Error('Strap connection needs the TrainingAi app on your phone.');
+  },
+  connectScale: async () => {
+    throw new Error('Scale connection needs the TrainingAi app on your phone.');
   },
 };

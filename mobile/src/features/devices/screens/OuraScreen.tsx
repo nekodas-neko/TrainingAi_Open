@@ -38,6 +38,7 @@ import {
   type OuraStatus,
 } from '../data/oura';
 import { ChestStrapCard } from '../components/ChestStrapCard';
+import { ScaleCard } from '../components/ScaleCard';
 
 const CHECKLIST: { title: string; steps: string; page: OuraSettingsPage; button: string }[] = [
   {
@@ -312,6 +313,7 @@ export function OuraScreen({
             <Notice title="Oura status unavailable" message={statusError} error />
           )}
           <ChestStrapCard />
+          <ScaleCard />
         </Stack>
       </TabPanel>
     </PageLayout>

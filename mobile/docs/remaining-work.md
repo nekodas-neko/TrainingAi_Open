@@ -97,7 +97,7 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 - [ ] Polar/chest-strap pairing and live heart rate. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 
-- [ ] Bluetooth scale connection, composition readings and calibration. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
+- [ ] Bluetooth scale connection, composition readings and calibration: pairing, live weigh-in while the Devices screen is open, the pending and declined lists. Built, device check pending; background capture with the app closed is not built. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 
 - [ ] Colmi and other supported direct-device integrations. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 

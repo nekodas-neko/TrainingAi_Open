@@ -348,6 +348,9 @@ function fakeBle(options: FakeOptions = {}) {
       };
       return link;
     },
+    connectScale: async () => {
+      throw new Error('not a scale');
+    },
   };
   return {
     adapter,
