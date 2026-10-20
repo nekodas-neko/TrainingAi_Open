@@ -38,3 +38,59 @@ export function dropFirstHandCopies<T>(
   const kept = records.filter(r => !isFirstHandCopy(originOf(r), sources))
   return { kept, skipped: records.length - kept.length }
 }
+
+/**
+ * The one cold-start rule, for both phones (#3197): the connection counts as known only when it came
+ * from today's readiness payload. Anything else (nothing cached, the payload cleared by
+ * `invalidateCache('readiness-score')`, yesterday's, a first offline run on a new day) is unknown, and
+ * unknown keeps Oura's copies. Keeping is the safe side: the server ranks `oura_cloud` above Health
+ * Connect (#3154), so a kept copy is outranked, while a wrongly skipped one is data nothing else sends.
+ *
+ * `payloadDate` is the local day the payload was fetched for; Preview loads the payload by today's
+ * date, so it passes `today`.
+ */
+export function knownFirstHandSources(
+  connectedSources: unknown,
+  payloadDate: unknown,
+  today: string,
+): FirstHandSources | null {
+  if (payloadDate !== today) return null
+  if (!connectedSources || typeof connectedSources !== 'object') return null
+  const ouraCloud = (connectedSources as { ouraCloud?: unknown }).ouraCloud
+  return typeof ouraCloud === 'boolean' ? { ouraCloud } : null
+}
+
+/**
+ * The single gate every Health Connect read goes through, so a read type added later cannot upload
+ * a first-hand copy by forgetting to filter (#3197). Counts what it drops per type, and a record seen
+ * twice in one pass (a window's heart rate read again for a workout, a rescan page) counts once.
+ * Make one per sync: its counts are that sync's, not a running total.
+ */
+export class FirstHandFilter<T> {
+  private readonly dropped = new Map<string, Set<unknown>>()
+  private unnamed = 0
+
+  constructor(
+    private readonly sources: FirstHandSources | null | undefined,
+    private readonly originOf: (record: T) => unknown,
+    private readonly idOf: (record: T) => string | undefined = () => undefined,
+  ) {}
+
+  /** False when `record` is a first-hand copy: left out, and counted under `type`. */
+  admit(type: string, record: T): boolean {
+    if (!isFirstHandCopy(this.originOf(record), this.sources)) return true
+    let ids = this.dropped.get(type)
+    if (!ids) this.dropped.set(type, (ids = new Set()))
+    ids.add(this.idOf(record) ?? `#${this.unnamed++}`)
+    return false
+  }
+
+  keep(type: string, records: readonly T[]): T[] {
+    return records.filter(r => this.admit(type, r))
+  }
+
+  /** Records left out so far in this pass, per type; empty when none. */
+  counts(): Record<string, number> {
+    return Object.fromEntries([...this.dropped].map(([type, ids]) => [type, ids.size]))
+  }
+}

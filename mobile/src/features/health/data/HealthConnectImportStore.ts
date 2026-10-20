@@ -15,7 +15,7 @@ import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 import { HealthConnectPersistence } from './health-connect-persistence.ts';
 import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
 import {
-  isFirstHandCopy,
+  FirstHandFilter,
   type FirstHandSources,
 } from '@trainingai/shared/health/health-connect-origin';
 /**
@@ -94,8 +94,12 @@ const diskSchema = z.object({
   scan: scanSchema.nullable(),
   needsRebuild: z.boolean(),
   skipped: z.number(),
-  // Records left out as copies of data the server reads first-hand, per type (#3115).
+  // Records left out as copies of data the server reads first-hand, per type (#3115). The last
+  // sync's, not a running total (#3197).
   skippedFirstHand: z.record(z.string(), z.number()).default({}),
+  // When records were first left out, kept until Oura Cloud reads as disconnected, then rescanned
+  // from here so they are read after all (#3197).
+  firstHandSince: z.string().nullable().default(null),
   completed: completedSchema.nullable(),
 });
 type Disk = z.infer<typeof diskSchema>;
@@ -109,6 +113,12 @@ export const emptyHealthConnectImport = {
   skipped: 0,
   skippedFirstHand: {} as Record<string, number>,
 };
+const newFilter = (sources: FirstHandSources | null) =>
+  new FirstHandFilter<HealthConnectRecord>(
+    sources,
+    (row) => row.sourcePackage,
+    (row) => row.id,
+  );
 export class HealthConnectImportStore {
   private disk: Disk;
   private state = emptyHealthConnectImport;
@@ -118,7 +128,8 @@ export class HealthConnectImportStore {
   private canceled = false;
   private lastAttempt = 0;
   private persistence: HealthConnectPersistence;
-  private firstHand: FirstHandSources | null = null;
+  // One per run, so its counts are that run's (#3197); filters nothing until the run knows the connection.
+  private filter = newFilter(null);
   constructor(
     storage: ScopedStorage,
     readonly connection: AccountConnection,
@@ -150,6 +161,7 @@ export class HealthConnectImportStore {
       needsRebuild: false,
       skipped: 0,
       skippedFirstHand: {},
+      firstHandSince: null,
       completed: null,
     };
   }
@@ -274,13 +286,18 @@ export class HealthConnectImportStore {
     // #3115: with Oura Cloud connected, the Oura app's own records are a second copy of what the
     // server reads from Oura's API. Left out and counted here, after the scan has marked them seen,
     // so a record imported before the connection is never read as deleted.
-    const skippedFirstHand = { ...this.disk.skippedFirstHand };
+    // This is the one gate every record passes to be uploaded: the initial read, each scan page and
+    // each change page all come through here (#3197).
+    let firstHandSince = this.disk.firstHandSince;
     records = [...latest.values()].filter((row) => {
       if (removed.has(row.id)) return false;
-      if (!isFirstHandCopy(row.sourcePackage, this.firstHand)) return true;
-      skippedFirstHand[row.type] = (skippedFirstHand[row.type] ?? 0) + 1;
+      if (this.filter.admit(row.type, row)) return true;
+      // Where a later rescan has to reach back to: the oldest record left out.
+      if (!firstHandSince || Date.parse(row.start) < Date.parse(firstHandSince))
+        firstHandSince = row.start;
       return false;
     });
+    const skippedFirstHand = this.filter.counts();
     deleted = [...removed];
     const cache = { ...this.disk.records };
     for (const row of records) {
@@ -318,6 +335,7 @@ export class HealthConnectImportStore {
       records: cache,
       queue,
       skippedFirstHand,
+      firstHandSince,
       needsRebuild: this.disk.needsRebuild || records.length > 0 || deleted.length > 0,
     });
   }
@@ -497,8 +515,25 @@ export class HealthConnectImportStore {
         const types = await this.reader.permissions();
         if (this.canceled) return;
         if (!types.length) throw new Error('No Health Connect read permissions are granted.');
-        this.firstHand = await this.firstHandSources().catch(() => null);
+        const firstHand = await this.firstHandSources().catch(() => null);
         if (this.canceled) return;
+        // A new filter each run, so its counts are that sync's: a rescan reads records again and
+        // must not count them twice.
+        this.filter = newFilter(firstHand);
+        // Oura Cloud reads as disconnected while records were left out: the change token is past
+        // them, so rescan from when the first was left out. Server-side Oura Cloud rows stay.
+        if (firstHand?.ouraCloud === false && this.disk.firstHandSince) {
+          // Keeps a gap already waiting (an expired token, a permission change): the older start wins.
+          const pending = this.disk.rescanFrom ?? this.disk.tokenAt;
+          const since = this.disk.firstHandSince;
+          await this.write({
+            ...this.disk,
+            token: null,
+            scan: null,
+            rescanFrom: pending && Date.parse(pending) < Date.parse(since) ? pending : since,
+            firstHandSince: null,
+          });
+        }
         if (!this.disk.grantedAt)
           await this.write({ ...this.disk, grantedAt: new Date(this.now()).toISOString() });
         const hasHistory = (await this.reader.hasHistoryPermission?.()) ?? false;

@@ -17,8 +17,7 @@ import {
   requestHealthConnectHistoryPermission,
   hasHealthConnectHistoryPermission,
 } from '../../integrations/health-connect/reader';
-import { readinessSpec } from './data/models';
-import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils';
+import { loadFirstHandSources } from './data/first-hand-sources';
 const noSubscribe = () => () => {};
 export function useDeviceHealthImport(): DeviceImportState {
   const { dataReader } = useAccountContext(),
@@ -46,12 +45,7 @@ export function useDeviceHealthImport(): DeviceImportState {
             undefined,
             // #3115: whether Oura Cloud is connected, from the readiness payload's
             // `connectedSources`, so the Oura app's own records are not imported twice.
-            async () => {
-              if (!resources) return null;
-              const spec = readinessSpec(todayInTz(dataReader.timezone ?? DEFAULT_TZ));
-              await resources.load(spec);
-              return resources.state(spec).data?.connectedSources ?? null;
-            },
+            () => loadFirstHandSources(resources, dataReader.timezone),
           )
         : null,
     [dataReader, storage, resources, invalidate],
