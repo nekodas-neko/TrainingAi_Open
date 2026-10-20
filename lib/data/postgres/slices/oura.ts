@@ -956,35 +956,48 @@ export interface OuraCloudSleepPeriodRow {
 }
 
 /**
- * #3060: a period whose type is new or changed bumps its night's `sleep_sessions.updated_at`, so the
- * delta pull re-sends the row and the device seed gets the type the server's card already uses. The
- * type lives only on this table, so a period written without its sleep row (the sleep upsert bumps
- * the row on its own) would otherwise never reach a device with a changed type. Same type, no bump.
+ * #3060: a period whose type changed bumps its night's `sleep_sessions.updated_at`, so the delta pull
+ * re-sends the row and the device seed gets the type the server's card already uses. The type lives
+ * only on this table, so a period written without its sleep row (the sleep upsert bumps the row on
+ * its own) would otherwise never reach a device with a changed type. Same type, no bump.
+ *
+ * The retype and its bump are one statement (#3148 review). Read-then-write let two writers of one
+ * period interleave so that the stored type changed with no bump after it, leaving a device on the
+ * old type: the per-user lock does not cover a caller without the re-score, and after its wait it
+ * lets the work run anyway. Here the upsert never changes a stored type; the retype is an
+ * `UPDATE … WHERE sleep_type IS DISTINCT FROM` that bumps the nights it changed, so whichever writer
+ * sets the final type is the one that bumps. A new period is inserted untyped and typed by the same
+ * statement, inside one short transaction, so no reader ever sees it untyped.
  */
 export async function upsertOuraCloudSleepPeriods(db: Db, userId: string, rows: OuraCloudSleepPeriodRow[]): Promise<number> {
   if (rows.length === 0) return 0
   const values = collapseOnConflict(rows.map(r => ({ ...r, userId })), r => r.ouraId)
   const t = s.ouraCloudSleepPeriods
-  const stored = new Map((await db.select({ ouraId: t.ouraId, sleepType: t.sleepType }).from(t)
-    .where(and(eq(t.userId, userId), inArray(t.ouraId, values.map(v => v.ouraId)))))
-    .map(r => [r.ouraId, r.sleepType]))
-  const retyped = values.filter(v => !stored.has(v.ouraId) || stored.get(v.ouraId) !== v.sleepType).map(v => v.ouraId)
-  await db.insert(t).values(values)
-    .onConflictDoUpdate({
-      target: [t.userId, t.ouraId],
-      set: {
-        day: sql`excluded.day`, bedtimeStart: sql`excluded.bedtime_start`, bedtimeEnd: sql`excluded.bedtime_end`,
-        sleepType: sql`excluded.sleep_type`, heartRate: sql`excluded.heart_rate`, hrv: sql`excluded.hrv`,
-        sleepPhase30Sec: sql`excluded.sleep_phase_30_sec`, movement30Sec: sql`excluded.movement_30_sec`,
-        sleepAlgorithmVersion: sql`excluded.sleep_algorithm_version`, lowBatteryAlert: sql`excluded.low_battery_alert`,
-        sleepAnalysisReason: sql`excluded.sleep_analysis_reason`, period: sql`excluded.period`, ringId: sql`excluded.ring_id`,
-        updatedAt: sql`now()`,
-      },
-    })
-  if (retyped.length > 0) {
-    await db.update(s.sleepSessions).set({ updatedAt: sql`now()` })
-      .where(and(eq(s.sleepSessions.userId, userId), inArray(s.sleepSessions.ouraId, retyped)))
-  }
+  await db.transaction(async tx => {
+    await tx.insert(t).values(values.map(v => ({ ...v, sleepType: null })))
+      .onConflictDoUpdate({
+        target: [t.userId, t.ouraId],
+        set: {
+          day: sql`excluded.day`, bedtimeStart: sql`excluded.bedtime_start`, bedtimeEnd: sql`excluded.bedtime_end`,
+          heartRate: sql`excluded.heart_rate`, hrv: sql`excluded.hrv`,
+          sleepPhase30Sec: sql`excluded.sleep_phase_30_sec`, movement30Sec: sql`excluded.movement_30_sec`,
+          sleepAlgorithmVersion: sql`excluded.sleep_algorithm_version`, lowBatteryAlert: sql`excluded.low_battery_alert`,
+          sleepAnalysisReason: sql`excluded.sleep_analysis_reason`, period: sql`excluded.period`, ringId: sql`excluded.ring_id`,
+          updatedAt: sql`now()`,
+        },
+      })
+    const incoming = sql.join(values.map(v => sql`(${v.ouraId}::text, ${v.sleepType}::text)`), sql`, `)
+    await tx.execute(sql`
+      WITH incoming (oura_id, sleep_type) AS (VALUES ${incoming}),
+      retyped AS (
+        UPDATE oura_cloud_sleep_periods p SET sleep_type = i.sleep_type
+          FROM incoming i
+         WHERE p.user_id = ${userId} AND p.oura_id = i.oura_id AND p.sleep_type IS DISTINCT FROM i.sleep_type
+        RETURNING p.oura_id
+      )
+      UPDATE sleep_sessions SET updated_at = now()
+       WHERE user_id = ${userId} AND oura_id IN (SELECT oura_id FROM retyped)`)
+  })
   return values.length
 }
 
