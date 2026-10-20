@@ -216,17 +216,17 @@ describe.skipIf(!canRun)('Health Connect ledger and projections', () => {
       JSON.stringify({ hrvBalance: { score: 60, provisional: false, input: 0.3, gap: null, ...(src ? { source: src } : {}) } });
     try {
       await engine.query(
-        `INSERT INTO oura_daily_derived(user_id,day,readiness_source,readiness_score,readiness_contributors) VALUES
-         ($1,$5,'generic-derived',71,$6::jsonb),($2,$5,'generic-derived',72,$7::jsonb),
-         ($3,$5,'generic-derived',73,$8::jsonb),($4,$5,'ble-derived',74,$7::jsonb)`,
+        `INSERT INTO oura_daily_derived(user_id,day,readiness_source,readiness_score,readiness_contributors,illness_flag,illness_score) VALUES
+         ($1,$5,'generic-derived',71,$6::jsonb,'elevated',40),($2,$5,'generic-derived',72,$7::jsonb,'elevated',40),
+         ($3,$5,'generic-derived',73,$8::jsonb,NULL,NULL),($4,$5,'ble-derived',74,$7::jsonb,'elevated',40)`,
         [user, other, third, fourth, day, contributors('oura_cloud'), contributors('health_connect_native'), contributors(null)],
       );
       for (const id of [user, other, third, fourth]) {
         await applyHealthConnectBatch(db, id, { records: [heart], deleted: [] });
         await rebuildHealthConnect(db, id, tz);
       }
-      const rows = await engine.query<{ user_id: string; readiness_score: number | null }>(
-        'SELECT user_id,readiness_score FROM oura_daily_derived WHERE day=$1 AND user_id=ANY($2::uuid[])',
+      const rows = await engine.query<{ user_id: string; readiness_score: number | null; illness_flag: string | null; illness_score: number | null }>(
+        'SELECT user_id,readiness_score,illness_flag,illness_score FROM oura_daily_derived WHERE day=$1 AND user_id=ANY($2::uuid[])',
         [day, [user, other, third, fourth]],
       );
       const byUser = new Map(rows.rows.map((r) => [r.user_id, r.readiness_score]));
@@ -234,6 +234,11 @@ describe.skipIf(!canRun)('Health Connect ledger and projections', () => {
       expect(byUser.get(other)).toBeNull(); // this import's inputs: cleared for recompute
       expect(byUser.get(third)).toBeNull(); // no provenance (before #2984): cleared as before
       expect(byUser.get(fourth)).toBe(74); // ring-derived: never touched
+      // #3163 review: the illness radar's fields go with the readiness they were stored beside.
+      const flags = new Map(rows.rows.map((r) => [r.user_id, [r.illness_flag, r.illness_score]]));
+      expect(flags.get(user)).toEqual(['elevated', 40]);
+      expect(flags.get(other)).toEqual([null, null]);
+      expect(flags.get(fourth)).toEqual(['elevated', 40]);
     } finally {
       await getPool().query('DELETE FROM users WHERE id=ANY($1::uuid[])', [[third, fourth]]);
     }
