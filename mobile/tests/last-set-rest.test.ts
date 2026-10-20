@@ -12,7 +12,7 @@ import { pipPhaseFor, pipViewFor } from '../src/features/workouts/pip/pip.ts';
 import { sqliteFixture } from './storage-fixture.ts';
 import { loggingFixture, programId, exerciseId } from './logging-fixture.ts';
 
-async function setup(t: { after(fn: () => void): void }, styleLess = false) {
+async function setup(t: { after(fn: () => void): void }, styleLess = false, firstStyleLess = false) {
   const db = sqliteFixture();
   t.after(() => db.connection.close());
   const storage = await createLocalStorage(db.database);
@@ -25,6 +25,11 @@ async function setup(t: { after(fn: () => void): void }, styleLess = false) {
     };
     const sets = f.session.exercises[0].sets;
     sets[sets.length - 1] = { ...sets[sets.length - 1], restSeconds: 0 };
+  }
+  if (firstStyleLess) {
+    // The first set's style sets no rest.
+    const sets = f.session.exercises[0].sets;
+    sets[0] = { ...sets[0], restSeconds: 0 };
   }
   const scope = storage.account(f.connection.origin, f.connection.userId);
   let now = Date.UTC(2026, 9, 20, 8);
@@ -176,4 +181,31 @@ test('picture-in-picture shows the summary rest as a rest with every set done, t
     exerciseName: active().sessionName,
     hint: false,
   });
+});
+
+test('a mid-exercise set with no style rest gets the shared 90 s default and its alarm', async (t) => {
+  const f = await setup(t, false, true);
+  const id = (await f.controller.start(f.session, programId, true))!;
+  await f.controller.beginExercises(id);
+  const [first] = f.controller.getSnapshot().data.workouts[0].exercises[0].sets;
+  await f.controller.startSet(id, exerciseId, first.id);
+  f.clock(20_000);
+  await f.controller.recordSet(id, exerciseId, first.id);
+  const workout = f.controller.getSnapshot().data.workouts[0];
+  assert.equal(workout.rest!.endsAt - workout.rest!.startedAt, 90_000);
+  assert.equal(workout.rest!.lastSet, undefined);
+  assert.equal(planAlerts(settings(), [workout], null, f.now())[0]?.title, 'Rest complete');
+});
+
+test('a mid-exercise set with a style rest keeps it', async (t) => {
+  const f = await setup(t);
+  const id = (await f.controller.start(f.session, programId, true))!;
+  await f.controller.beginExercises(id);
+  const [first] = f.controller.getSnapshot().data.workouts[0].exercises[0].sets;
+  await f.controller.startSet(id, exerciseId, first.id);
+  f.clock(20_000);
+  await f.controller.recordSet(id, exerciseId, first.id);
+  const workout = f.controller.getSnapshot().data.workouts[0];
+  assert.equal(workout.rest!.endsAt - workout.rest!.startedAt, first.planned!.restSeconds * 1000);
+  assert.ok(first.planned!.restSeconds > 0);
 });
