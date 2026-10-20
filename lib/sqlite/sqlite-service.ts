@@ -174,16 +174,18 @@ async function reconcileSchema(db: SQLiteDBConnection): Promise<boolean> {
   return ok;
 }
 
-// Whether a caller-managed transaction (beginTransaction/commitTransaction below) is
-// currently open. The plugin's `run()` defaults its own `transaction` param to `true`,
-// which auto-wraps EVERY individual call in its own begin+commit — so a manual
-// BEGIN/[write]/[write]/COMMIT sequence built purely from runSQL calls silently
-// self-commits after the first write, and the final COMMIT then fails with
-// "no current transaction" (confirmed on-device 2026-07-23). Tracking this flag lets
-// runSQL tell the plugin not to auto-wrap while a real outer transaction owns the work,
-// without threading a parameter through every one of the dozens of call sites inside
-// applyDeltaBody/logWorkoutLocally.
-let _inTransaction = false;
+// The plugin's `run()` takes a `transaction` flag that defaults to `true`, which wraps EVERY call
+// in its own begin+commit — so a manual BEGIN/[write]/[write]/COMMIT built from plain runSQL calls
+// self-commits after the first write and the final COMMIT fails "no current transaction"
+// (confirmed on-device 2026-07-23). So a standalone runSQL passes `true`, and a write inside a
+// transaction goes through the body's own `tx.run`, which passes `false`.
+//
+// #2520: this used to be one module-level `_inTransaction` flag that every runSQL read. While a
+// transaction was open, ANY runSQL passed `false` and ran inside it — including an unrelated write
+// from a screen the owner was using (a mood log, a check-in, its outbox row). If the transaction
+// then rolled back (a failing statement in a big pull), that write rolled back with it after its
+// caller had already shown success. A standalone write now takes its own turn in the write queue
+// below, so it can never land inside somebody else's transaction.
 
 /**
  * Block until an in-flight `initSQLite` has finished opening the DB.
@@ -210,7 +212,36 @@ function unavailable(op: string): Error {
   return new Error(`Local store unavailable (${op}) — SQLite is not open`);
 }
 
+// The tail of the write queue. Every transaction and every standalone write chains onto it and
+// replaces it, so they run strictly one after another. It never rejects.
+let _writeTail: Promise<void> = Promise.resolve();
+
+/** Run `fn` after everything queued before it has finished; nothing queued later starts until it has. */
+async function enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = _writeTail;
+  let release!: () => void;
+  _writeTail = new Promise<void>(resolve => { release = resolve; });
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
+/**
+ * A standalone write: committed on its own, never part of anyone's transaction. It waits for an
+ * open or queued transaction to finish first (#2520), then runs with the plugin's auto-wrap.
+ *
+ * NEVER call this from inside a `withTransaction` body — write through the body's `tx.run`. A
+ * body that awaits a standalone write waits for its own transaction to end, which it never does.
+ */
 export async function runSQL(sql: string, values?: unknown[]): Promise<void> {
+  return enqueueWrite(() => runOnPlugin(sql, values, true));
+}
+
+/** One plugin write. `ownTransaction` is the plugin's auto-wrap flag (see the comment above awaitOpen). */
+async function runOnPlugin(sql: string, values: unknown[] | undefined, ownTransaction: boolean): Promise<void> {
   await awaitOpen();
   // On web the plugin is absent and no store is ever handed out, so a stray call is a
   // genuine no-op. On the canonical runtime it is a lost write, and the write sites all
@@ -220,7 +251,7 @@ export async function runSQL(sql: string, values?: unknown[]): Promise<void> {
     return;
   }
   try {
-    await _db.run(sql, values ?? [], !_inTransaction);
+    await _db.run(sql, values ?? [], ownTransaction);
   } catch (err) {
     // Name the failing statement in the error. The Capacitor plugin's bare messages
     // (e.g. "no current transaction") hide WHICH write failed inside a big applyDelta —
@@ -233,8 +264,8 @@ export async function runSQL(sql: string, values?: unknown[]): Promise<void> {
 
 // Real native transaction control (SQLiteDBConnection.beginTransaction/commitTransaction/
 // rollbackTransaction) — NOT literal "BEGIN"/"COMMIT"/"ROLLBACK" SQL text through runSQL,
-// which the plugin's per-call auto-wrap makes unreliable (see the _inTransaction comment
-// above). Private on purpose: callers go through withTransaction below, which serialises them.
+// which the plugin's per-call auto-wrap makes unreliable (see the comment above awaitOpen).
+// Private on purpose: callers go through withTransaction below, which serialises them.
 async function beginTransaction(): Promise<void> {
   await awaitOpen();
   if (!_db) {
@@ -243,7 +274,6 @@ async function beginTransaction(): Promise<void> {
   }
   try {
     await _db.beginTransaction();
-    _inTransaction = true;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`SQL failed [BEGIN]: ${msg}`);
@@ -257,8 +287,6 @@ async function commitTransaction(): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`SQL failed [COMMIT]: ${msg}`);
-  } finally {
-    _inTransaction = false;
   }
 }
 
@@ -269,59 +297,61 @@ async function rollbackTransaction(): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`SQL failed [ROLLBACK]: ${msg}`);
-  } finally {
-    _inTransaction = false;
   }
 }
 
-// The tail of the transaction queue. Each withTransaction call chains onto it and replaces it,
-// so transactions run strictly one after another. It never rejects.
-let _txTail: Promise<void> = Promise.resolve();
+/** The handle a `withTransaction` body writes through. */
+export interface SQLTransaction {
+  /** A write inside this transaction: committed or rolled back with it. */
+  run(sql: string, values?: unknown[]): Promise<void>;
+}
 
 /**
- * Run `fn` as ONE native transaction, after every transaction queued before it has finished.
- * The only way to open a local-store transaction.
+ * Run `fn` as ONE native transaction, after every transaction and standalone write queued before
+ * it has finished. The only way to open a local-store transaction. `fn` writes through `tx.run`.
  *
  * The plugin has one native connection and one transaction slot. Two callers each doing their
  * own begin → writes → commit used to interleave on it (#2386, seen right after a page reload;
  * a sync pull and the nutrition loader's own applyDelta can also overlap): the second BEGIN
  * failed "Already in transaction", its error handler then ROLLED BACK THE FIRST CALLER'S
- * transaction and cleared `_inTransaction`, so the first caller's remaining writes each
- * auto-committed on their own and its COMMIT failed "no current transaction" — half a delta on
- * disk, outside any transaction. Queuing makes that impossible: a BEGIN only runs once the
- * previous transaction has committed or rolled back.
+ * transaction, so the first caller's remaining writes each auto-committed on their own and its
+ * COMMIT failed "no current transaction" — half a delta on disk, outside any transaction.
+ * Queuing makes that impossible: a BEGIN only runs once the previous transaction has committed
+ * or rolled back.
+ *
+ * A standalone runSQL that arrives while the transaction is open waits for it (#2520), so a
+ * rollback takes only the statements written through this transaction's `tx.run`.
  *
  * Rollback runs only for a transaction this call actually began. A failed BEGIN has nothing of
  * ours to roll back, and rolling back anyway is exactly how the old code destroyed someone
  * else's transaction.
  *
- * Not re-entrant: calling withTransaction from inside `fn` waits on itself forever. Nothing
- * nests today (the native slot would have refused a nested BEGIN anyway).
- *
- * What it does NOT cover: a plain runSQL from elsewhere that lands while a transaction is open
- * still runs inside it (runSQL cannot tell the owner's writes from a stranger's). That was
- * true before this change too.
+ * Not re-entrant: calling withTransaction or runSQL from inside `fn` waits on itself forever.
+ * `tx.run` refuses once the transaction has ended, so a write that escapes the body fails loudly
+ * instead of landing outside it.
  */
-export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
-  const previous = _txTail;
-  let release!: () => void;
-  _txTail = new Promise<void>(resolve => { release = resolve; });
-  await previous;
-  try {
+export async function withTransaction<T>(fn: (tx: SQLTransaction) => Promise<T>): Promise<T> {
+  return enqueueWrite(async () => {
     await beginTransaction();
+    let open = true;
+    const tx: SQLTransaction = {
+      run: (sql, values) => open
+        ? runOnPlugin(sql, values, false)
+        : Promise.reject(new Error(`SQL failed [${sql.trim().replace(/\s+/g, ' ').slice(0, 140)}]: its transaction has already ended`)),
+    };
     try {
-      const result = await fn();
+      const result = await fn(tx);
+      open = false;
       await commitTransaction();
       return result;
     } catch (err) {
+      open = false;
       // A failed statement may have auto-aborted the transaction already, so ROLLBACK can
       // itself throw "no current transaction" — never let that mask the real error.
       try { await rollbackTransaction(); } catch { /* already rolled back */ }
       throw err;
     }
-  } finally {
-    release();
-  }
+  });
 }
 
 export async function querySQL<T = Record<string, unknown>>(
@@ -331,6 +361,8 @@ export async function querySQL<T = Record<string, unknown>>(
   await awaitOpen();
   // Reads stay soft: an empty result degrades a screen to its API fallback, where a throw
   // would blank it. The silent-loss hazard is on the write side.
+  // Reads do not wait on the write queue: a screen must not stall behind a long pull, and a read
+  // during an open transaction sees its uncommitted rows (one connection), as it always has.
   if (!_db) return [];
   const result = await _db.query(sql, values ?? []);
   return (result.values ?? []) as T[];
