@@ -251,14 +251,14 @@ type HcSleepRecord = {
 /**
  * #3115: keeps one app's sleep records per night, the way the native app's `sleep-samples.ts` picks
  * one source per moment. Records that overlap, directly or through a chain, form one night; in each,
- * the app with the most staged sleep keeps its records (a session with no stages counts its span),
- * ties going to the earlier package name so the choice is stable. Records of other nights are untouched.
+ * the app with the most staged sleep keeps its records (a session with no stages counts none), ties
+ * going to the earlier package name so the choice is stable. Records of other nights are untouched.
  */
 export function oneAppPerNight<T extends HcSleepRecord>(records: readonly T[]): T[] {
   const span = (r: { startTime: string; endTime: string }) => Date.parse(r.endTime) - Date.parse(r.startTime);
-  const asleep = (r: T) => r.stages?.length
-    ? r.stages.filter(stage => ['deep', 'rem', 'light'].includes(HC_STAGE_TO_SLEEP_STAGE[stage.stage] ?? '')).reduce((sum, stage) => sum + span(stage), 0)
-    : span(r)
+  // Staged time only, as `sleep-samples.ts` counts it: a session with no stages has none, so an app
+  // that writes only a bedtime span never outranks one that measured the night (#3154 review).
+  const staged = (r: T) => (r.stages ?? []).reduce((sum, stage) => sum + Math.max(0, span(stage)), 0)
   const origin = (r: T) => (typeof r.metadata?.dataOrigin === 'string' ? r.metadata.dataOrigin : '')
   const sorted = records
     .filter(r => Number.isFinite(Date.parse(r.startTime)) && Number.isFinite(Date.parse(r.endTime)))
@@ -269,7 +269,7 @@ export function oneAppPerNight<T extends HcSleepRecord>(records: readonly T[]): 
   const close = () => {
     if (!night.length) return
     const totals = new Map<string, number>()
-    for (const r of night) totals.set(origin(r), (totals.get(origin(r)) ?? 0) + asleep(r))
+    for (const r of night) totals.set(origin(r), (totals.get(origin(r)) ?? 0) + staged(r))
     const [winner] = [...totals].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]
     kept.push(...night.filter(r => origin(r) === winner))
     night = []

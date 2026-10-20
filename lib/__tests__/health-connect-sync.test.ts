@@ -198,12 +198,20 @@ describe('oneAppPerNight (#3115)', () => {
 
   it('a night split into two records by one app stays whole, and other nights are untouched', async () => {
     const { oneAppPerNight } = await import('@/lib/health-connect-sync')
-    const a1 = rec('a', '2026-10-10T22:00:00Z', '2026-10-11T02:00:00Z')
-    const a2 = rec('a', '2026-10-11T02:30:00Z', '2026-10-11T06:00:00Z')
-    const b = rec('b', '2026-10-10T23:00:00Z', '2026-10-11T05:00:00Z')
+    const a1 = rec('a', '2026-10-10T22:00:00Z', '2026-10-11T02:00:00Z', [stage('2026-10-10T22:00:00Z', '2026-10-11T02:00:00Z')])
+    const a2 = rec('a', '2026-10-11T02:30:00Z', '2026-10-11T06:00:00Z', [stage('2026-10-11T02:30:00Z', '2026-10-11T06:00:00Z')])
+    const b = rec('b', '2026-10-10T23:00:00Z', '2026-10-11T05:00:00Z', [stage('2026-10-10T23:00:00Z', '2026-10-11T05:00:00Z')])
     const nextNight = rec('b', '2026-10-11T22:00:00Z', '2026-10-12T06:00:00Z')
-    // a: 7.5 h of span; b: 6 h. The overlap chain joins a1, b and a2 into one night.
+    // a: 7.5 h staged; b: 6 h. The overlap chain joins a1, b and a2 into one night.
     expect(oneAppPerNight([b, a2, nextNight, a1])).toEqual([a1, a2, nextNight])
+  })
+
+  it('an app with no stages does not outrank one that staged the night (#3154 review)', async () => {
+    const { oneAppPerNight } = await import('@/lib/health-connect-sync')
+    // A whole-night span with no stages, against a shorter but staged night.
+    const span = rec('a.span', '2026-10-10T21:00:00Z', '2026-10-11T07:00:00Z')
+    const staged = rec('z.staged', '2026-10-10T22:30:00Z', '2026-10-11T05:30:00Z', [stage('2026-10-10T22:40:00Z', '2026-10-11T05:20:00Z')])
+    expect(oneAppPerNight([span, staged])).toEqual([staged])
   })
 
   it('a tie goes to the earlier package name, so the choice is stable', async () => {

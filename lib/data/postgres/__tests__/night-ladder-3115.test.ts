@@ -55,6 +55,12 @@ describe.skipIf(!canRun)('the night ladder for Health Connect and Apple Health (
     expect(tombstoned.rows[0].n).toBe(1)
   })
 
+  it('a shorter fragment from the same source, arriving later, does not replace the night (#3154 review)', async () => {
+    await repo.saveSleepSession(USER, night('2026-10-10T22:00:00Z', '2026-10-11T06:00:00Z', 7.5), 'health_connect')
+    await repo.saveSleepSession(USER, night('2026-10-11T03:00:00Z', '2026-10-11T04:00:00Z', 1), 'health_connect')
+    expect(await live()).toEqual([{ start: '22:00', source: 'health_connect' }])
+  })
+
   it('a night that does not overlap is written alongside', async () => {
     await repo.saveSleepSession(USER, night('2026-10-10T22:00:00Z', '2026-10-11T06:00:00Z', 7.5), 'apple_health')
     await repo.saveSleepSession(USER, { ...night('2026-10-11T22:00:00Z', '2026-10-12T06:00:00Z', 7.5), date: '2026-10-12' }, 'health_connect')
@@ -87,6 +93,16 @@ describe.skipIf(!canRun)('the night ladder for Health Connect and Apple Health (
       `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours)
        VALUES ($1, '2026-10-11', '2026-10-10T22:05:00Z', '2026-10-11T06:00:00Z', 7.3)`,
       [USER])
+    await nativeNight('2026-10-10T22:00:00Z', '2026-10-11T06:00:00Z')
+    expect(await live()).toEqual([{ start: '22:00', source: 'apple_health' }])
+  })
+
+  it('Apple Health through both writers keeps the longer night rather than taking turns', async () => {
+    // The native rebuild's night first (about 8 h), then a shorter `/api/sync-health` cut of it.
+    await nativeNight('2026-10-10T22:00:00Z', '2026-10-11T06:00:00Z')
+    await repo.saveSleepSession(USER, night('2026-10-10T22:30:00Z', '2026-10-11T05:30:00Z', 6.8), 'apple_health')
+    expect(await live()).toEqual([{ start: '22:00', source: 'apple_health' }])
+    // And the rebuild running again keeps it as the one night.
     await nativeNight('2026-10-10T22:00:00Z', '2026-10-11T06:00:00Z')
     expect(await live()).toEqual([{ start: '22:00', source: 'apple_health' }])
   })

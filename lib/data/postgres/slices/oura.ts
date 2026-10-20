@@ -690,58 +690,39 @@ export async function upsertOuraSleep(
 export async function upsertOuraCloudSleep(
   db: Db, userId: string, rows: OuraSleepUpsertRow[],
 ): Promise<{ written: number; skippedOverlap: number; yielded: number }> {
-  let written = 0
-  let skippedOverlap = 0
-  let yielded = 0
-  const switchDay = rows.length > 0 ? await getOuraCloudSwitchDay(db, userId) : null
-  for (const r of rows) {
-    if (!r.ouraId) continue
-    const start = r.sleepStart.toISOString()
-    const end = r.sleepEnd.toISOString()
-    const overlapping = await db.execute<{ id: string; oura_id: string | null; manual_entry: boolean; date: string; source: string | null }>(sql`
-      SELECT o.id, o.oura_id, o.manual_entry, o.date::text AS date, o.source_map->>'duration_hours' AS source
-        FROM sleep_sessions o
-       WHERE o.user_id = ${userId} AND o.deleted_at IS NULL AND NOT o.manual_entry
-         AND o.oura_id IS DISTINCT FROM ${r.ouraId}
-         AND o.sleep_start < ${end}::timestamptz AND o.sleep_end > ${start}::timestamptz`)
-    const holders = overlapping.rows.filter(o => !nightYieldsToOuraCloud({
-      ouraId: o.oura_id, manualEntry: o.manual_entry, date: o.date, source: o.source,
-    }, switchDay))
-    if (holders.length > 0) { skippedOverlap++; continue }
-    if (overlapping.rows.length > 0) {
-      const yielding = await db.update(s.sleepSessions)
-        .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
-        .where(and(eq(s.sleepSessions.userId, userId), isNull(s.sleepSessions.deletedAt), inArray(s.sleepSessions.id, overlapping.rows.map(o => o.id))))
-        .returning({ id: s.sleepSessions.id })
-      yielded += yielding.length
-    }
-    const moved = await db.execute(sql`
-      UPDATE sleep_sessions h
-         SET sleep_start = ${start}::timestamptz, updated_at = NOW()
-       WHERE h.user_id = ${userId} AND h.oura_id = ${r.ouraId} AND NOT h.manual_entry
-         AND h.sleep_start <> ${start}::timestamptz
-         AND NOT EXISTS (SELECT 1 FROM sleep_sessions t WHERE t.user_id = ${userId} AND t.sleep_start = ${start}::timestamptz)`)
-    if ((moved.rowCount ?? 0) === 0) {
-      // #3080: the new start is held by a tombstoned row, so the move above could not happen. The row
-      // still holding the id at its old start gives the id up and is tombstoned there; the upsert
-      // below then revives the tombstone at the new start under the id. Without this, two rows would
-      // hold one Oura id and the write would fail the unique key on every retry.
-      await db.execute(sql`
+  const { kept, skipped, yielded } = await settleNights(db, userId, rows.filter(r => r.ouraId), 'oura_cloud', {
+    ownId: r => r.ouraId,
+    includeSameStart: true,
+    sameSource: 'replace',
+    write: async r => {
+      const start = r.sleepStart.toISOString()
+      const moved = await db.execute(sql`
         UPDATE sleep_sessions h
-           SET oura_id = NULL, deleted_at = COALESCE(h.deleted_at, NOW()), updated_at = NOW()
+           SET sleep_start = ${start}::timestamptz, updated_at = NOW()
          WHERE h.user_id = ${userId} AND h.oura_id = ${r.ouraId} AND NOT h.manual_entry
            AND h.sleep_start <> ${start}::timestamptz
-           AND EXISTS (SELECT 1 FROM sleep_sessions t WHERE t.user_id = ${userId}
-                        AND t.sleep_start = ${start}::timestamptz AND t.deleted_at IS NOT NULL)`)
-    }
-    // The row now at this start is either new or this id's own (moved above, or never moved), so it
-    // takes Oura's latest version whole: end, day and every measured field. Written here, inside the
-    // loop, so a later period in the same batch sees it as an overlap (#3106 review: a batch holding
-    // a stale and a new version of one night used to leave both live).
-    await upsertOuraSleep(db, userId, [r], 'oura_cloud', { replaceOwnCloud: true })
-    written++
-  }
-  return { written, skippedOverlap, yielded }
+           AND NOT EXISTS (SELECT 1 FROM sleep_sessions t WHERE t.user_id = ${userId} AND t.sleep_start = ${start}::timestamptz)`)
+      if ((moved.rowCount ?? 0) === 0) {
+        // #3080: the new start is held by a tombstoned row, so the move above could not happen. The row
+        // still holding the id at its old start gives the id up and is tombstoned there; the upsert
+        // below then revives the tombstone at the new start under the id. Without this, two rows would
+        // hold one Oura id and the write would fail the unique key on every retry.
+        await db.execute(sql`
+          UPDATE sleep_sessions h
+             SET oura_id = NULL, deleted_at = COALESCE(h.deleted_at, NOW()), updated_at = NOW()
+           WHERE h.user_id = ${userId} AND h.oura_id = ${r.ouraId} AND NOT h.manual_entry
+             AND h.sleep_start <> ${start}::timestamptz
+             AND EXISTS (SELECT 1 FROM sleep_sessions t WHERE t.user_id = ${userId}
+                          AND t.sleep_start = ${start}::timestamptz AND t.deleted_at IS NOT NULL)`)
+      }
+      // The row now at this start is either new or this id's own (moved above, or never moved), so it
+      // takes Oura's latest version whole: end, day and every measured field. Written inside the
+      // settle loop, so a later period in the same batch sees it as an overlap (#3106 review: a batch
+      // holding a stale and a new version of one night used to leave both live).
+      await upsertOuraSleep(db, userId, [r], 'oura_cloud', { replaceOwnCloud: true })
+    },
+  })
+  return { written: kept.length, skippedOverlap: skipped, yielded }
 }
 
 /**
@@ -772,44 +753,72 @@ export function nightYieldsToOuraCloud(
   return storedNight(row, switchDay).rank <= nightSourceRank('oura_cloud', false)
 }
 
+export interface SettleNightsOptions<T> {
+  /** Leaves this writer's own rows to it: rows whose `oura_id` starts with this (the native rebuild,
+   *  which tombstones its own stale nights). */
+  ownPrefix?: string
+  /** Leaves the row holding this incoming night's own id to its writer (Oura Cloud's period id). */
+  ownId?: (row: T) => string | null | undefined
+  /** Also settles a row at the very same start, which the writer then revives or replaces (Oura
+   *  Cloud). By default a same-start row is left to the upsert's field-by-field merge. */
+  includeSameStart?: boolean
+  /** When the stored overlapping night is from this same source: `replace` takes the night over
+   *  (Oura re-issues and re-cuts its periods under new ids); `longer` keeps whichever has more sleep,
+   *  so a fragment the same app sends later does not replace the whole night. Default `longer`. */
+  sameSource?: 'replace' | 'longer'
+  /** Called for each kept night before the next is settled, so a later night in the batch sees it. */
+  write?: (row: T) => Promise<void>
+}
+
 /**
- * #3115: the night ladder for the writers below Oura Cloud, `/api/sync-health` (`saveSleepSession`)
- * and the native rebuild. It is the counterpart of `upsertOuraCloudSleep`'s overlap handling.
+ * #3080, #3115: the night ladder, the one helper every night writer goes through: Oura Cloud
+ * (`upsertOuraCloudSleep`), `/api/sync-health` (`saveSleepSession`) and the native rebuild.
  *
- * Each incoming night is kept only if no live night overlapping it outranks it. A tie with a
- * different source keeps the night already stored, so two equal writers (another app's copy through
- * Health Connect, Apple Health) do not take it in turns. A night it outranks, or an earlier cut of
- * the same night from the same source, is tombstoned, never deleted, so one night stays one row:
- * `sleep-night.ts` would sum a second row into the night as another fragment. A row at the same
- * start is not touched here: the upsert merges it field by field. A typed night is left alone, as
- * `upsertOuraCloudSleep` leaves it: `preferDeviceNights` hides it on read. `ownPrefix` leaves the
- * writer's own rows to it (the rebuild tombstones its own stale nights).
+ * Each incoming night is kept only if no live night overlapping it outranks it (`storedNight`). A
+ * tie with a different source keeps the night already stored, so another app's copy of a night we
+ * hold does not take it over. The same source decides by `sameSource`. A night it outranks, or the
+ * same source's night it beats, is tombstoned, never deleted, so one night stays one row:
+ * `sleep-night.ts` would sum a second row into the night as another fragment. A typed night is left
+ * alone: `preferDeviceNights` hides it on read, and shows it again if the device night goes.
  *
- * Callers write each kept night before settling the next, so a batch with two cuts of one night
- * keeps one.
+ * Apple Health through `/api/sync-health` and through the native rebuild share the source
+ * `apple_health`, so between them the same-source rule applies: the longer night stays rather than
+ * the later one, which keeps them from taking a night in turns.
  */
-export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date }>(
-  db: Db, userId: string, rows: T[], source: HealthSource, ownPrefix?: string,
-): Promise<{ kept: T[]; yielded: number }> {
-  if (rows.length === 0) return { kept: [], yielded: 0 }
+export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date; durationHours?: number | null }>(
+  db: Db, userId: string, rows: T[], source: HealthSource, opts: SettleNightsOptions<T> = {},
+): Promise<{ kept: T[]; yielded: number; skipped: number }> {
+  if (rows.length === 0) return { kept: [], yielded: 0, skipped: 0 }
   const incoming = nightSourceRank(source, false)
   const switchDay = await getOuraCloudSwitchDay(db, userId)
+  const hoursOf = (start: Date, end: Date, duration: number | null | undefined) =>
+    duration ?? (end.getTime() - start.getTime()) / 3_600_000
   const kept: T[] = []
   let yielded = 0
+  let skipped = 0
   for (const r of rows) {
     const start = r.sleepStart.toISOString()
-    const overlapping = await db.execute<{ id: string; oura_id: string | null; date: string; source: string | null }>(sql`
-      SELECT o.id, o.oura_id, o.date::text AS date, o.source_map->>'duration_hours' AS source
+    const own = opts.ownId?.(r) ?? null
+    const overlapping = await db.execute<{ id: string; oura_id: string | null; date: string; source: string | null; hours: number }>(sql`
+      SELECT o.id, o.oura_id, o.date::text AS date, o.source_map->>'duration_hours' AS source,
+             COALESCE(o.duration_hours, EXTRACT(EPOCH FROM (o.sleep_end - o.sleep_start)) / 3600)::float8 AS hours
         FROM sleep_sessions o
        WHERE o.user_id = ${userId} AND o.deleted_at IS NULL AND NOT o.manual_entry
-         AND o.sleep_start <> ${start}::timestamptz
          AND o.sleep_start < ${r.sleepEnd.toISOString()}::timestamptz AND o.sleep_end > ${start}::timestamptz
-         ${ownPrefix ? sql`AND (o.oura_id IS NULL OR o.oura_id NOT LIKE ${ownPrefix + '%'})` : sql``}`)
+         ${opts.includeSameStart ? sql`` : sql`AND o.sleep_start <> ${start}::timestamptz`}
+         ${own != null ? sql`AND o.oura_id IS DISTINCT FROM ${own}` : sql``}
+         ${opts.ownPrefix ? sql`AND (o.oura_id IS NULL OR o.oura_id NOT LIKE ${opts.ownPrefix + '%'})` : sql``}`)
     const stored = overlapping.rows.map(o => ({
       id: o.id,
+      hours: Number(o.hours),
       ...storedNight({ ouraId: o.oura_id, manualEntry: false, date: o.date, source: o.source }, switchDay),
     }))
-    if (stored.some(o => o.rank > incoming || (o.rank === incoming && o.source !== source))) continue
+    const mine = hoursOf(r.sleepStart, r.sleepEnd, r.durationHours)
+    const holds = (o: (typeof stored)[number]) =>
+      o.rank > incoming ||
+      (o.rank === incoming && o.source !== source) ||
+      (o.rank === incoming && opts.sameSource !== 'replace' && o.hours > mine)
+    if (stored.some(holds)) { skipped++; continue }
     if (stored.length > 0) {
       const gone = await db.update(s.sleepSessions)
         .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
@@ -817,9 +826,10 @@ export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date 
         .returning({ id: s.sleepSessions.id })
       yielded += gone.length
     }
+    await opts.write?.(r)
     kept.push(r)
   }
-  return { kept, yielded }
+  return { kept, yielded, skipped }
 }
 
 /**

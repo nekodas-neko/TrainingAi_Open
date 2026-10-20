@@ -3146,7 +3146,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // source's copy already stored, and must not come back as a second fragment on the next sync;
     // a lower-ranked overlapping night, or this source's earlier cut of it, is tombstoned.
     const { kept } = await oura.settleNights(this.db, userId, [{
-      sleepStart: session.sleepStart, sleepEnd: session.sleepEnd,
+      sleepStart: session.sleepStart, sleepEnd: session.sleepEnd, durationHours: session.durationHours,
     }], source)
     if (kept.length === 0) return
     await oura.upsertOuraSleep(this.db, userId, [{

@@ -160,9 +160,10 @@ export async function rebuildNativeHealth(
           night,
           sleepStart: new Date(night.sleepStart),
           sleepEnd: new Date(night.sleepEnd),
+          durationHours: night.durationHours,
         })),
       source,
-      prefix,
+      { ownPrefix: prefix },
     );
     const sleep = kept.map(({ night }) => night);
     const starts = sleep.map((night) => new Date(night.sleepStart));
