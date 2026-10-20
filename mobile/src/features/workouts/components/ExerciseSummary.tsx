@@ -6,6 +6,7 @@ import { formatDuration } from '../../../shared/hooks/useClock';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout';
 import { exerciseResult } from '../logging/summary';
 import { formatSetLoad } from '../logging/targets';
+import { RestCard } from './WorkoutClocks';
 
 export function ExerciseSummary({
   workout,
@@ -44,6 +45,7 @@ export function ExerciseSummary({
   const compact = { padding: theme.spacing.md, gap: theme.spacing.sm };
   return (
     <>
+      <RestCard workout={workout} controls={false} />
       <AppText variant="caption" tone="muted">
         Exercise complete. Continue when you are ready; the next exercise opens
         preparation.

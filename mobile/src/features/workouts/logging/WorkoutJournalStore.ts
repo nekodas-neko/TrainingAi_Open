@@ -1,4 +1,5 @@
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
+import { effectiveRestSec } from '@trainingai/shared/workout/rest-target';
 import { pushMutation } from '../../../core/sync/pushMutation.ts';
 import { ApiError } from '../../account/api/client.ts';
 import type { AccountConnection } from '../../account/session.ts';
@@ -618,6 +619,12 @@ export class WorkoutJournalStore {
           next.exercises
             .find((x) => x.id === exerciseId)!
             .sets.every((x) => x.completedAt !== null);
+        // The last set's rest falls back to the current app's 90 s when its style sets none;
+        // the workout's rest adjustment applies to both.
+        const lastSetRestSeconds = Math.max(
+          0,
+          effectiveRestSec(restSeconds) + workout.restAdjustmentSeconds,
+        );
         restSeconds =
           restSeconds > 0 ? Math.max(0, restSeconds + workout.restAdjustmentSeconds) : 0;
         return {
@@ -648,8 +655,16 @@ export class WorkoutJournalStore {
                 )
               : next.exercises,
           restAnchor: summary ? null : { exerciseId, setId, startedAt: now },
-          rest:
-            !summary && restSeconds > 0
+          // The last set still earns its rest, timed on the exercise summary until Next (#3111).
+          rest: summary
+            ? {
+                exerciseId,
+                setId,
+                startedAt: now,
+                endsAt: now + lastSetRestSeconds * 1000,
+                lastSet: true as const,
+              }
+            : restSeconds > 0
               ? { exerciseId, setId, startedAt: now, endsAt: now + restSeconds * 1000 }
               : null,
         };
