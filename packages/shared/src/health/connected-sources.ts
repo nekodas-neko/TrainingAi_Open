@@ -16,6 +16,9 @@
  *    window reads false.
  *  - `healthConnect`: a Health Connect heart-rate row, or a Health Connect movement interval, received
  *    in the same window, i.e. the sync has delivered data recently.
+ *  - `ouraCloud`: the user holds an Oura Cloud OAuth connection (an `oura_tokens` row with an access
+ *    token; a legacy personal-token row reads as none, as in `getOuraCloudSwitchDay`). The phones
+ *    read it to drop the Oura app's own Health Connect copies (#3115, `health-connect-origin.ts`).
  *
  * Booleans only, deliberately: a timestamp in a cached payload goes stale on the device.
  */
@@ -27,6 +30,7 @@ export interface ConnectedSources {
   ring: boolean
   strap: boolean
   healthConnect: boolean
+  ouraCloud: boolean
 }
 
 /** The raw facts `connectedSources` summarises. Each is a plain existence answer. */
@@ -39,6 +43,8 @@ export interface ConnectedSourceFacts {
   healthConnectHeartRate: boolean
   /** A Health Connect movement interval inside the window. */
   healthConnectIntervals: boolean
+  /** An Oura Cloud OAuth connection exists. */
+  ouraCloudConnected: boolean
 }
 
 export function connectedSources(facts: ConnectedSourceFacts): ConnectedSources {
@@ -46,5 +52,6 @@ export function connectedSources(facts: ConnectedSourceFacts): ConnectedSources 
     ring: facts.ringSamples,
     strap: facts.strapHeartRate,
     healthConnect: facts.healthConnectHeartRate || facts.healthConnectIntervals,
+    ouraCloud: facts.ouraCloudConnected,
   }
 }

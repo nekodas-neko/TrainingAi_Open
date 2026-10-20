@@ -35,7 +35,7 @@ describe('LB-113 — every Health Connect entry point is given a timezone', () =
     // `enrichActivityLogs` is called from inside `syncHealthConnect`, not from the component. The
     // entry said "two call sites in one component"; the second is here, and it is the one that would
     // have kept bucketing in Brisbane however carefully the component was fixed.
-    expect(code('lib/health-connect-sync.ts')).toContain('enrichActivityLogs(enrichmentCandidates, tz)')
+    expect(code('lib/health-connect-sync.ts')).toContain('enrichActivityLogs(enrichmentCandidates, tz, firstHand)')
   })
 
   it('no entry point is reached without one — the entry\'s own pass test', () => {

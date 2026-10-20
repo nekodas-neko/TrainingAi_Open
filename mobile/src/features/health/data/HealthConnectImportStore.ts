@@ -14,6 +14,10 @@ import type { HealthConnectReader } from '../../../integrations/health-connect/t
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 import { HealthConnectPersistence } from './health-connect-persistence.ts';
 import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
+import {
+  isFirstHandCopy,
+  type FirstHandSources,
+} from '@trainingai/shared/health/health-connect-origin';
 /**
  * Health Connect's own read limit, an instant rule rather than a calendar window: without the
  * history permission an app reads back to 30 days before its first grant.
@@ -90,6 +94,8 @@ const diskSchema = z.object({
   scan: scanSchema.nullable(),
   needsRebuild: z.boolean(),
   skipped: z.number(),
+  // Records left out as copies of data the server reads first-hand, per type (#3115).
+  skippedFirstHand: z.record(z.string(), z.number()).default({}),
   completed: completedSchema.nullable(),
 });
 type Disk = z.infer<typeof diskSchema>;
@@ -101,6 +107,7 @@ export const emptyHealthConnectImport = {
   enabled: false,
   completed: null as Disk['completed'],
   skipped: 0,
+  skippedFirstHand: {} as Record<string, number>,
 };
 export class HealthConnectImportStore {
   private disk: Disk;
@@ -111,12 +118,15 @@ export class HealthConnectImportStore {
   private canceled = false;
   private lastAttempt = 0;
   private persistence: HealthConnectPersistence;
+  private firstHand: FirstHandSources | null = null;
   constructor(
     storage: ScopedStorage,
     readonly connection: AccountConnection,
     private reader: HealthConnectReader,
     private changed = () => {},
     private now = Date.now,
+    // `connectedSources` from the readiness payload; null when unknown, which filters nothing.
+    private firstHandSources: () => Promise<FirstHandSources | null> = async () => null,
   ) {
     this.persistence = new HealthConnectPersistence(storage);
     this.disk = {
@@ -139,6 +149,7 @@ export class HealthConnectImportStore {
       scan: null,
       needsRebuild: false,
       skipped: 0,
+      skippedFirstHand: {},
       completed: null,
     };
   }
@@ -160,6 +171,7 @@ export class HealthConnectImportStore {
           ? 1
           : 0),
       skipped: this.disk.skipped,
+      skippedFirstHand: this.disk.skippedFirstHand,
       completed: this.disk.completed,
     };
     for (const fn of this.listeners) fn();
@@ -259,7 +271,16 @@ export class HealthConnectImportStore {
         latest.set(row.id, row);
     }
     const removed = new Set(deleted);
-    records = [...latest.values()].filter((row) => !removed.has(row.id));
+    // #3115: with Oura Cloud connected, the Oura app's own records are a second copy of what the
+    // server reads from Oura's API. Left out and counted here, after the scan has marked them seen,
+    // so a record imported before the connection is never read as deleted.
+    const skippedFirstHand = { ...this.disk.skippedFirstHand };
+    records = [...latest.values()].filter((row) => {
+      if (removed.has(row.id)) return false;
+      if (!isFirstHandCopy(row.sourcePackage, this.firstHand)) return true;
+      skippedFirstHand[row.type] = (skippedFirstHand[row.type] ?? 0) + 1;
+      return false;
+    });
     deleted = [...removed];
     const cache = { ...this.disk.records };
     for (const row of records) {
@@ -296,6 +317,7 @@ export class HealthConnectImportStore {
       ...patch,
       records: cache,
       queue,
+      skippedFirstHand,
       needsRebuild: this.disk.needsRebuild || records.length > 0 || deleted.length > 0,
     });
   }
@@ -475,6 +497,8 @@ export class HealthConnectImportStore {
         const types = await this.reader.permissions();
         if (this.canceled) return;
         if (!types.length) throw new Error('No Health Connect read permissions are granted.');
+        this.firstHand = await this.firstHandSources().catch(() => null);
+        if (this.canceled) return;
         if (!this.disk.grantedAt)
           await this.write({ ...this.disk, grantedAt: new Date(this.now()).toISOString() });
         const hasHistory = (await this.reader.hasHistoryPermission?.()) ?? false;

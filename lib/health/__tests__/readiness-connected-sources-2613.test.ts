@@ -21,6 +21,7 @@ const repo = {
   upsertOuraDailySummary: vi.fn(async () => undefined),
   hasOuraBleSamples: vi.fn(async (_u: string) => false),
   getRecentSourceFacts: vi.fn(async (_u: string, _s: Date) => ({ strapHeartRate: false, healthConnectHeartRate: false, healthConnectIntervals: false })),
+  getOuraCloudTokens: vi.fn(async (_u: string) => null as { accessToken: string | null } | null),
 }
 
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo, getRepositoryAsync: async () => repo }))
@@ -34,32 +35,47 @@ beforeEach(() => {
   repo.getRecentSourceFacts.mockReset()
   repo.hasOuraBleSamples.mockResolvedValue(false)
   repo.getRecentSourceFacts.mockResolvedValue({ strapHeartRate: false, healthConnectHeartRate: false, healthConnectIntervals: false })
+  repo.getOuraCloudTokens.mockReset()
+  repo.getOuraCloudTokens.mockResolvedValue(null)
 })
 
 describe('readiness payload connectedSources (issue 2613)', () => {
   it('names a ring-only user', async () => {
     repo.hasOuraBleSamples.mockResolvedValue(true)
-    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: true, strap: false, healthConnect: false })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: true, strap: false, healthConnect: false, ouraCloud: false })
   })
 
   it('names a strap-only user', async () => {
     repo.getRecentSourceFacts.mockResolvedValue({ strapHeartRate: true, healthConnectHeartRate: false, healthConnectIntervals: false })
-    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: true, healthConnect: false })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: true, healthConnect: false, ouraCloud: false })
   })
 
   it('names a Health Connect-only user', async () => {
     repo.getRecentSourceFacts.mockResolvedValue({ strapHeartRate: false, healthConnectHeartRate: false, healthConnectIntervals: true })
-    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: false, healthConnect: true })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: false, healthConnect: true, ouraCloud: false })
   })
 
   it('reports all false for a user with none: a known answer, not unknown', async () => {
-    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: false, healthConnect: false })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: false, healthConnect: false, ouraCloud: false })
+  })
+
+  it('names an Oura Cloud connection, and not a token row without an access token (#3115)', async () => {
+    repo.getOuraCloudTokens.mockResolvedValue({ accessToken: 'sealed' })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources?.ouraCloud).toBe(true)
+    repo.getOuraCloudTokens.mockResolvedValue({ accessToken: null })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources?.ouraCloud).toBe(false)
+  })
+
+  it('omits the field when the Oura Cloud lookup fails, so the phones filter nothing', async () => {
+    repo.getOuraCloudTokens.mockRejectedValueOnce(new Error('db down'))
+    expect('connectedSources' in (await buildReadinessPayload('u1', TZ))).toBe(false)
   })
 
   it('scopes both lookups to the requesting user', async () => {
     await buildReadinessPayload('user-xyz', TZ)
     expect(repo.hasOuraBleSamples).toHaveBeenCalledWith('user-xyz')
     expect(repo.getRecentSourceFacts.mock.calls[0][0]).toBe('user-xyz')
+    expect(repo.getOuraCloudTokens).toHaveBeenCalledWith('user-xyz')
   })
 
   it('omits the field (unknown, not false) when the lookup fails, leaving every other field intact', async () => {
