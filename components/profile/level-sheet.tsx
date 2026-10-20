@@ -9,10 +9,9 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { LEVEL_THRESHOLDS, getLevelLabel, levelProgress } from '@trainingai/shared/achievement-display'
 import type { AchievementResult } from './achievements-grid'
 
-const LEVEL_THRESHOLDS = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5800, 8000]
-const LEVEL_LABELS = ['', 'Novice', 'Novice', 'Beginner', 'Beginner', 'Intermediate', 'Intermediate', 'Advanced', 'Advanced', 'Elite', 'Elite', 'Legend']
 
 interface LevelSheetProps {
   level: number
@@ -24,9 +23,7 @@ interface LevelSheetProps {
 }
 
 export function LevelSheet({ level, xp, currentLevelXp, nextLevelXp, achievements, children }: LevelSheetProps) {
-  const xpProgress = nextLevelXp > currentLevelXp
-    ? Math.min(1, (xp - currentLevelXp) / (nextLevelXp - currentLevelXp))
-    : 1
+  const xpProgress = levelProgress(xp, currentLevelXp, nextLevelXp)
 
   const unlockedAchievements = achievements.filter(a => a.unlocked).sort((a, b) => b.xpReward - a.xpReward)
 
@@ -61,7 +58,7 @@ export function LevelSheet({ level, xp, currentLevelXp, nextLevelXp, achievement
             </div>
             <div className="text-center">
               <p className="text-lg font-bold" style={{ color: "var(--color-brand)" }}>
-                Level {level} · {LEVEL_LABELS[level] ?? 'Legend'}
+                Level {level} · {getLevelLabel(level)}
               </p>
               <p className="text-sm text-muted-foreground">{xp} XP total</p>
             </div>
@@ -114,7 +111,7 @@ export function LevelSheet({ level, xp, currentLevelXp, nextLevelXp, achievement
                       {lvl}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold">{LEVEL_LABELS[lvl] ?? 'Legend'}</p>
+                      <p className="text-sm font-semibold">{getLevelLabel(lvl)}</p>
                       <p className="text-[10px] text-muted-foreground">{threshold.toLocaleString()} XP</p>
                     </div>
                     {isCurrentLevel && (

@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Nothing here: `supportsPictureInPicture` and the config changes belong on MainActivity, which
+       src/integrations/pip/picture-in-picture.cjs sets at prebuild. -->
+</manifest>

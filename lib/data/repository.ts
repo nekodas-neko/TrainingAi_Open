@@ -1538,6 +1538,8 @@ export interface WorkoutRepository {
   tombstoneOuraCloudSleep(userId: string, ouraIds: string[], opts?: { keepPeriodType?: boolean }): Promise<number>
   /** #3080: sets each touched day's HRV and resting HR from its main Oura period, or clears Oura's. */
   syncOuraMainSleepBodyMetrics(userId: string, touched: { days: string[]; ouraIds: string[] }): Promise<{ written: number; cleared: number }>
+  /** #3099: wake dates that hold a tombstoned Oura Cloud sleep row. */
+  listDeletedOuraCloudSleepDates(userId: string, from: string, to: string): Promise<string[]>
   /** #3079: runs `run` as the only Oura sleep write (and its night re-score) for this user, across
    *  requests and replicas. */
   withOuraSleepWriteLock<T>(userId: string, run: () => Promise<T>): Promise<T>

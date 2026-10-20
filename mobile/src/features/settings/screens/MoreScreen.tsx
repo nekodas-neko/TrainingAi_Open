@@ -6,7 +6,6 @@ import { z } from 'zod';
 import {
   AppButton,
   AppText,
-  Badge,
   Card,
   ExpandableCard,
   FeatureRow,
@@ -32,17 +31,13 @@ import { FeedbackSheet } from '../components/FeedbackSheet';
 import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
 import { SignOutSheet } from '../components/SignOutSheet';
 import { memberSinceLabel } from '../data/profile';
-const stats = z
-  .object({
-    lifetimeStats: z.object({
-      sessions: z.number(),
-      totalVolumeKg: z.number(),
-      bestStreak: z.number(),
-      totalSets: z.number(),
-      totalDistanceKm: z.number(),
-    }),
-  })
-  .passthrough();
+import { useRewards } from '../../rewards/data/useRewards';
+import { LevelHeader } from '../../rewards/components/LevelHeader';
+import { AchievementsSection } from '../../rewards/components/AchievementsSection';
+import { TrophyCase } from '../../rewards/components/TrophyCase';
+import { TitleButton } from '../../rewards/components/TitleButton';
+import { SeasonBadges } from '../../rewards/components/SeasonBadges';
+import { seasonsSpec } from '../../rewards/data/models';
 export function MoreScreen({
   openSettings,
   openAccount,
@@ -77,7 +72,8 @@ export function MoreScreen({
     [modal, setModal] = useState<'feedback' | 'delete' | 'signout' | null>(null);
   const profile = useWorkoutResource(profileSpec),
     goals = useWorkoutResource(goalsSpec),
-    history = useWorkoutResource({ path: '/api/achievements', schema: stats, ttl: 300000 });
+    history = useRewards(),
+    seasons = useWorkoutResource(seasonsSpec);
   const user = profile.data?.user;
   const name =
     typeof user?.displayName === 'string'
@@ -107,11 +103,12 @@ export function MoreScreen({
       actions={
         <StatusIndicator
           label="Profile"
-          busy={profile.loading || history.loading}
-          error={profile.error ?? history.error}
+          busy={profile.loading || history.loading || seasons.loading}
+          error={profile.error ?? history.error ?? seasons.error}
           onRetry={() => {
             profile.refresh();
             history.refresh();
+            seasons.refresh();
             goals.refresh();
           }}
         />
@@ -144,6 +141,12 @@ export function MoreScreen({
                   <AppText variant="pageTitle" style={{ textAlign: 'center' }}>
                     {name}
                   </AppText>
+                  <TitleButton
+                    equipped={typeof user?.equippedTitle === 'string' ? user.equippedTitle : null}
+                    unlockedIds={
+                      history.data?.achievements.filter((row) => row.unlocked).map((row) => row.id) ?? []
+                    }
+                  />
                   <AppText
                     variant="caption"
                     tone="muted"
@@ -156,21 +159,15 @@ export function MoreScreen({
                 <FriendCode
                   code={typeof user?.friendCode === 'string' ? user.friendCode : null}
                 />
+                <LevelHeader rewards={history.data} failed={!!history.error} />
               </Stack>
               <ProfileStats
                 lifetime={lifetime}
                 program={program.data}
                 memberSince={memberSince}
               />
-              <Card>
-                <Stack direction="row" align="center">
-                  <Icon name="award" tone="brand" />
-                  <AppText variant="label" style={{ flex: 1 }}>
-                    Trophy case
-                  </AppText>
-                  <Badge label="Coming soon" style={{ alignSelf: 'center' }} />
-                </Stack>
-              </Card>
+              {history.data && <TrophyCase achievements={history.data.achievements} />}
+              <AchievementsSection rewards={history.data} loading={history.loading} />
               <Card padded={false}>
                 <ListRow
                   title="Your Year"
@@ -179,6 +176,7 @@ export function MoreScreen({
                   divider={false}
                 />
               </Card>
+              <SeasonBadges seasons={seasons.data?.seasons ?? []} />
               <ExpandableCard
                 title="My goals"
                 icon="target"

@@ -13,9 +13,10 @@ import {
   Bluetooth, Camera, Cat, Check, CloudDownload, Copy, Dumbbell, Info, LogOut, Scan, Settings, Shield, Sparkles, UserRound,
 } from 'lucide-react'
 import { useSignOutFlow } from './sign-out-flow'
-import type { AchievementResult } from '@/components/profile/achievements-grid'
+import { TIER_BORDER, type AchievementResult } from '@/components/profile/achievements-grid'
 import { EditProfileSheet } from '@/components/profile/edit-profile-sheet'
 import { GoalsSection } from '@/components/profile/goals-section'
+import { getLevelLabel, levelProgress, seasonBadgeTier } from '@trainingai/shared/achievement-display'
 import { LevelSheet } from '@/components/profile/level-sheet'
 import { TITLES } from '@trainingai/shared/types/friends'
 import type { User } from '@trainingai/shared/types/user'
@@ -38,7 +39,6 @@ const AchievementsSection = dynamic(
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
-const LEVEL_LABELS = ['', 'Novice', 'Novice', 'Beginner', 'Beginner', 'Intermediate', 'Intermediate', 'Advanced', 'Advanced', 'Elite', 'Elite', 'Legend']
 
 interface AchievementsData {
   level: number
@@ -194,12 +194,10 @@ export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friend
   const statsKnown = achievementsData != null
   const xp = achievementsData?.xp ?? 0
   const level = achievementsData?.level ?? 1
-  const levelLabel = achievementsData?.levelLabel ?? LEVEL_LABELS[level] ?? 'Novice'
+  const levelLabel = achievementsData?.levelLabel ?? getLevelLabel(level)
   const currentLevelXp = achievementsData?.currentLevelXp ?? 0
   const nextLevelXp = achievementsData?.nextLevelXp ?? 100
-  const xpProgress = nextLevelXp > currentLevelXp
-    ? Math.min(1, (xp - currentLevelXp) / (nextLevelXp - currentLevelXp))
-    : 1
+  const xpProgress = levelProgress(xp, currentLevelXp, nextLevelXp)
   const totalSessions = achievementsData?.lifetimeStats.sessions ?? 0
   const totalVolumeKg = achievementsData?.lifetimeStats.totalVolumeKg ?? 0
   const bestStreak = achievementsData?.lifetimeStats.bestStreak ?? 0
@@ -393,8 +391,8 @@ export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friend
                 key={season.id}
                 className="rounded-xl px-3 py-1.5 text-xs font-semibold border"
                 style={{
-                  borderColor: season.result!.badgeLabel === 'Gold' ? '#f59e0b' : season.result!.badgeLabel === 'Silver' ? '#9ca3af' : '#cd7c2e',
-                  color: season.result!.badgeLabel === 'Gold' ? '#f59e0b' : season.result!.badgeLabel === 'Silver' ? '#9ca3af' : '#cd7c2e',
+                  borderColor: TIER_BORDER[seasonBadgeTier(season.result!.badgeLabel)],
+                  color: TIER_BORDER[seasonBadgeTier(season.result!.badgeLabel)],
                   background: 'var(--muted)',
                 }}
               >

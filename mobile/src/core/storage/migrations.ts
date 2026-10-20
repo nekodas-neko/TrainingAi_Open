@@ -3,6 +3,7 @@ export interface StorageDatabase {
   execAsync(sql: string): Promise<void>;
   runAsync(sql: string, ...params: SqlValue[]): Promise<unknown>;
   getFirstAsync<T>(sql: string, ...params: SqlValue[]): Promise<T | null>;
+  getAllAsync<T>(sql: string, ...params: SqlValue[]): Promise<T[]>;
 }
 
 const migrations = [

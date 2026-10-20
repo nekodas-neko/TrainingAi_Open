@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { TITLES } from "@trainingai/shared/types/friends";
+import { availableTitles } from "@trainingai/shared/achievement-display";
 import { invalidateUserProfile } from "@/lib/cache-groups";
 
 interface TitlePickerSheetProps {
@@ -17,9 +18,7 @@ interface TitlePickerSheetProps {
 export function TitlePickerSheet({ open, onOpenChange, unlockedAchievementIds, currentTitle, onEquip }: TitlePickerSheetProps) {
   const [equipping, setEquipping] = useState<string | null>(null);
 
-  const availableTitles = Object.entries(TITLES).filter(([, def]) =>
-    unlockedAchievementIds.includes(def.unlockedBy)
-  );
+  const available = availableTitles(unlockedAchievementIds).map(([id]) => [id, TITLES[id]] as const);
 
   const handleEquip = async (titleId: string | null) => {
     setEquipping(titleId ?? '__none__');
@@ -70,12 +69,12 @@ export function TitlePickerSheet({ open, onOpenChange, unlockedAchievementIds, c
             </button>
           )}
 
-          {availableTitles.length === 0 ? (
+          {available.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
               Unlock achievements to earn titles
             </p>
           ) : (
-            availableTitles.map(([id, def]) => {
+            available.map(([id, def]) => {
               const isEquipped = currentTitle === id;
               return (
                 <button

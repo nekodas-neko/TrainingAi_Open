@@ -1,6 +1,7 @@
 import type { IntervalPlan, SegmentKind } from './interval-plan'
 import type { RoutePoint } from '@/lib/activity/route-encoding'
-import { computeTotalDistanceKm, computeAvgPaceSecPerKm } from '@/lib/activity/activity-metrics'
+import { computeTotalDistanceKm } from '@/lib/activity/activity-metrics'
+import { averagePaceSecPerKm } from '@trainingai/shared/activity/route-summary'
 import { samplesInWindow } from './segment-window'
 import { formatPace } from '@trainingai/shared/health/vdot'
 import { stepsFromCadenceSeries } from '@trainingai/shared/health/cadence'
@@ -86,8 +87,10 @@ export function computeWalkSegmentStats({
 
     const pointsInWindow = samplesInWindow(rawPoints, p => p.t, fromMs, toMs)
     const distanceKm = pointsInWindow.length >= 2 ? computeTotalDistanceKm(pointsInWindow) : null
+    // Through the one capped rule (#3128): a segment where the walker barely moved, a 2-minute
+    // warm-up over 20 m, is 6,000 s/km, which the save schema rejects, and with it the whole walk.
     const avgPaceSecPerKm = distanceKm != null
-      ? computeAvgPaceSecPerKm(distanceKm, seg.endSec - seg.startSec)
+      ? averagePaceSecPerKm(distanceKm, seg.endSec - seg.startSec) ?? null
       : null
 
     const cadenceInWindow = cadenceSeries

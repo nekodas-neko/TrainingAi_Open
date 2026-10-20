@@ -32,10 +32,10 @@ export const IngestBodySchema = z.object({
   // garbage" as the stringified `75kg` this route already rejects, and it is the value
   // `getMostRecentConfirmedWeightKg` would then serve. `WEIGHT_KG_MIN` is 20.
   //
-  // Safe against the owner's live pipeline, checked rather than assumed: production holds 114
-  // `body_metrics` rows with **zero** at weight 0, zero under 20 kg, zero at body-fat 0 and zero at
-  // steps 0 (min weight 67.55, max 72.8). Tasker omits a field it has no reading for; it does not
-  // send 0, so a floor cannot 400 a real push.
+  // Safe against the owner's live pipeline, checked against production rather than assumed: no
+  // stored `body_metrics` row is 0 or under the floor for weight, and none is 0 for body fat or
+  // steps. Tasker omits a field it has no reading for; it does not send 0, so a floor cannot 400 a
+  // real push.
   weightKg:   ingestNumber(z.number().min(WEIGHT_KG_MIN).max(WEIGHT_KG_MAX)),
   bodyFat:    ingestNumber(z.number().min(0).max(100)),
   steps:      ingestNumber(z.number().int().min(0).max(200_000)),

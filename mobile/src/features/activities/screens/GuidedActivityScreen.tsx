@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { summariseRoute } from '@trainingai/shared/activity/route-summary';
 import { View } from 'react-native';
 import { ageFromDob, toAestDay } from '@trainingai/shared/date-utils';
 import { getProtocol } from '@trainingai/shared/fitness-tests/protocols';
@@ -26,6 +27,8 @@ import { profileSpec, healthDaySpec, healthDaySchema } from '../../health/data/m
 import { baselinesSpec } from '../data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
+import { useRouteRecording } from '../data/useRouteRecording';
+import { gpsProblemText, routeEligible } from '../data/route-recording';
 export function GuidedActivityScreen({
   onBack,
   onSaved,
@@ -41,6 +44,7 @@ export function GuidedActivityScreen({
     action = useWorkoutAction(),
     { theme } = useTheme();
   const baseline = useWorkoutResource(baselinesSpec);
+  const gps = useRouteRecording();
   const day = useWorkoutResource(
     healthDaySpec(
       session?.startMs == null
@@ -61,6 +65,14 @@ export function GuidedActivityScreen({
     setExit(seconds);
   };
   const seconds = session ? Math.floor(elapsedMs(session, now) / 1000) : 0;
+  // The walk's distance as it saves: pace over the walk's elapsed time (`walk-summary.tsx`).
+  const route = useMemo(
+    () =>
+      session?.mode === 'done' && session.endMs !== null && routeEligible(session)
+        ? summariseRoute(activity.route, elapsedMs(session, session.endMs) / 1000)
+        : null,
+    [session?.mode, session?.endMs, session?.type, session?.guidance, activity.route],
+  );
   const walk = guidance?.kind === 'walk' ? walkPlan(guidance.config) : null;
   const protocol = guidance?.kind === 'test' ? getProtocol(guidance.protocol) : null;
   const total = walk?.totalSec ?? (protocol ? testDuration(protocol.id) : 0);
@@ -255,6 +267,20 @@ export function GuidedActivityScreen({
               </AppText>
             </Card>
           )}
+          {gps.eligible &&
+            (gps.distanceKm != null && gps.distanceKm > 0 ? (
+              <AppText variant="caption" tone="muted">
+                {gps.distanceKm.toFixed(2)} km
+                {gps.status === 'lost' ? ` · ${gpsProblemText.lost}` : ''}
+              </AppText>
+            ) : (
+              gps.status !== 'tracking' &&
+              gps.status !== 'paused' && (
+                <AppText variant="micro" tone="muted">
+                  {gpsProblemText[gps.status]}
+                </AppText>
+              )
+            ))}
           {protocol?.captureDistance && (
             <AppText variant="micro" tone="muted">
               Measure the covered distance; enter it on the result screen.
@@ -280,9 +306,11 @@ export function GuidedActivityScreen({
                       ? result?.payload.hrr1Bpm
                       : result?.payload.vo2maxEst
                     )?.toString() ?? null)
-                  : null
+                  : route
+                    ? route.distanceKm.toFixed(2)
+                    : null
               }
-              unit={protocol?.captureHrr ? 'bpm drop' : protocol ? 'mL/kg/min' : undefined}
+              unit={protocol?.captureHrr ? 'bpm drop' : protocol ? 'mL/kg/min' : 'km'}
             />
           </Grid>
           {guidance.kind === 'test' && (

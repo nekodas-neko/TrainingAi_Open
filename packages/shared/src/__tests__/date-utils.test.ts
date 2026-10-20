@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatInTimeZone } from 'date-fns-tz'
-import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz } from '../date-utils'
+import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz, midnightDaysAgoInTz } from '../date-utils'
 
 describe('ageFromDob', () => {
   const today = new Date('2026-07-22T00:00:00Z')
@@ -367,5 +367,27 @@ describe('Q-489 — a calendar day comes from the date string, never from an ms 
     expect(shiftDateStr('2024-03-01', -1)).toBe('2024-02-29')
     expect(shiftDateStr('2026-01-01', -1)).toBe('2025-12-31')
     expect(shiftDateStr('2026-11-01', -7)).toBe('2026-10-25')
+  })
+})
+
+describe('midnightDaysAgoInTz (#3117)', () => {
+  it('is local midnight N calendar days back, not now − N×24h', () => {
+    // 09:30 on 20 Oct in Brisbane (UTC+10).
+    const at = new Date('2026-10-19T23:30:00Z')
+    expect(midnightDaysAgoInTz('Australia/Brisbane', 30, at).toISOString()).toBe('2026-09-19T14:00:00.000Z')
+    expect(midnightDaysAgoInTz('Australia/Brisbane', 0, at).toISOString()).toBe('2026-10-19T14:00:00.000Z')
+  })
+
+  it('takes the zone given, so the same instant starts a different day elsewhere', () => {
+    // 08:30 on 20 Oct in Brisbane, but 23:30 on 19 Oct in London (BST, UTC+1).
+    const at = new Date('2026-10-19T22:30:00Z')
+    expect(midnightDaysAgoInTz('Australia/Brisbane', 0, at).toISOString()).toBe('2026-10-19T14:00:00.000Z')
+    expect(midnightDaysAgoInTz('Europe/London', 0, at).toISOString()).toBe('2026-10-18T23:00:00.000Z')
+  })
+
+  it('crosses a DST change by the calendar: 7 days before Sydney\'s 4 Oct 2026 start is still midnight', () => {
+    const at = new Date('2026-10-05T02:00:00Z') // 13:00 AEDT, 5 Oct
+    // 28 Sept is AEST (UTC+10): midnight is 14:00Z the day before. A 7×24h subtraction would land at 01:00.
+    expect(midnightDaysAgoInTz('Australia/Sydney', 7, at).toISOString()).toBe('2026-09-27T14:00:00.000Z')
   })
 })

@@ -1,6 +1,8 @@
 import { requireOptionalNativeModule } from 'expo';
 import { AppState, Platform } from 'react-native';
+import { inPictureInPicture } from '../feedback/beep';
 import { feedback, restFeedback } from '../feedback/haptics';
+import { restSoundSource } from '../feedback/rest-cue';
 import {
   ALERT_OWNER,
   alertSignature,
@@ -30,12 +32,21 @@ async function sdk() {
     }
     notifications.setNotificationHandler({
       handleNotification: async (notification) => {
-        const foregroundRest =
-          AppState.currentState === 'active' &&
-          notification.request.content.data?.owner === ALERT_OWNER &&
-          notification.request.identifier.includes(':rest:');
+        const ours = notification.request.content.data?.owner === ALERT_OWNER;
+        const rest = ours && notification.request.identifier.includes(':rest:');
+        const foregroundRest = rest && AppState.currentState === 'active';
+        // On screen, the app's own beep is the rest's one sound (#3110): the channel's follows the
+        // ringer and would be a second sound, or the only one and silent on vibrate.
+        const source = restSoundSource(
+          AppState.currentState === 'active'
+            ? 'foreground'
+            : inPictureInPicture()
+              ? 'pip'
+              : 'background',
+          true,
+        );
         return {
-          shouldPlaySound: notification.request.content.data?.owner === ALERT_OWNER,
+          shouldPlaySound: ours && (!rest || source === 'channel'),
           shouldSetBadge: false,
           shouldShowBanner: !foregroundRest,
           shouldShowList: !foregroundRest,

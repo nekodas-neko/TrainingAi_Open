@@ -16,7 +16,7 @@ import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { healthReadPaths } from '../../../core/sync/health-invalidation';
-import { ActivityStore, emptyActivity, sameActivityField } from './ActivityStore';
+import { ActivityStore, emptyActivity, sameActivityValue } from './ActivityStore';
 import { activityHistorySpec } from '../../health/data/models';
 import { overlayCalories } from './models';
 import type { HealthActivity } from '../../health/components/ActivityDetails';
@@ -113,11 +113,7 @@ export function useActivityLogs(remote: HealthActivity[], from: string, to: stri
         return (
           !saved ||
           Object.entries(saved.payload).every(
-            ([key, value]) =>
-              value === undefined ||
-              (key === 'date'
-                ? row.date.replace(/\//g, '-') === value
-                : sameActivityField(row[key], value)),
+            ([key, value]) => value === undefined || sameActivityValue(key, row[key], value),
           )
         );
       })

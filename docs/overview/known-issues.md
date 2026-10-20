@@ -1493,9 +1493,10 @@ archived in **all three** branches, including declined ones, which is the half B
 after: her weigh-ins were being thrown away.
 
 **The 8% is a measurement, not a round number.** Both clusters were already in the database: his 100
-confirmed readings span **70.0–72.8 kg** (worst day-to-day change 2.85 kg), the 6 he has dismissed
-sit at **57.5–58.0 kg**. 8% of ~70 kg is ±5.6 kg — wider than his whole history, and 6.4 kg clear of
-hers. Do not widen it without re-measuring; widening is what BF-58 was filed to stop.
+confirmed readings span **70.0–72.8 kg** (worst day-to-day change 2.85 kg), and the 6 he has
+dismissed form a tight cluster well below his (a household member's weight, so the figures are not
+kept here). 8% of ~70 kg is ±5.6 kg — wider than his whole history, and still clear of hers by a wide
+margin. Do not widen it without re-measuring; widening is what BF-58 was filed to stop.
 
 **The hazard, LA-108 — engine half fixed the same day, the screen is still owed.** The band anchors
 on the last *confirmed* weight and only a confirmed reading re-anchors it, so a genuine change of

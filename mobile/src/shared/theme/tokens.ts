@@ -6,6 +6,8 @@ export const spacing = {
   xxs: 2,
   xs: 4,
   sm: 8,
+  // achievements-grid.tsx: gap-2.5.
+  snug: 10,
   md: 12,
   lg: 16,
   xl: 20,
@@ -336,6 +338,45 @@ export const domainTones = {
 export const friendColors = {
   light: { gold: '#a16207', purple: '#7e22ce' },
   dark: { gold: '#facc15', purple: '#c084fc' },
+};
+// Achievement badges. Dark values are the current app's (bronze/silver/gold tier borders and the
+// category colours in `achievements-grid.tsx`; dark Sleep is 4.15:1 on the dark card, under 4.5);
+// the light ones are darker steps, each at least 4.5:1 on #ffffff. "Workouts" has no entry: it
+// takes the brand colour. Steps is the current app's `--accent-green` (oklch 0.52 / 0.84, hue 145)
+// as sRGB.
+export const rewardColors = {
+  light: {
+    tiers: { bronze: '#9a5a1a', silver: '#6b7280', gold: '#a16207' },
+    categories: {
+      Volume: '#c2410c',
+      Sets: '#0e7490',
+      Streaks: '#b45309',
+      Records: '#7e22ce',
+      Timing: '#be185d',
+      Consistency: '#047857',
+      Nutrition: '#4d7c0f',
+      Sleep: '#4338ca',
+      'Body Metrics': '#0f766e',
+      Steps: '#008300',
+      'Lift Milestones': '#b91c1c',
+    },
+  },
+  dark: {
+    tiers: { bronze: '#cd7c2e', silver: '#9ca3af', gold: '#f59e0b' },
+    categories: {
+      Volume: '#ff6a1a',
+      Sets: '#00d4ff',
+      Streaks: '#f59e0b',
+      Records: '#a855f7',
+      Timing: '#ec4899',
+      Consistency: '#10b981',
+      Nutrition: '#84cc16',
+      Sleep: '#6366f1',
+      'Body Metrics': '#14b8a6',
+      Steps: '#56ee66',
+      'Lift Milestones': '#ef4444',
+    },
+  },
 };
 // Health > Progress. Dark values are the current app's; the light ones are darker steps that keep
 // 10 px text and thin fills readable on a white card (each at least 4.5:1 on #ffffff).

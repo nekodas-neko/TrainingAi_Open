@@ -1,5 +1,6 @@
 'use client'
 
+import { levelProgress } from '@trainingai/shared/achievement-display'
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
@@ -48,9 +49,7 @@ export default function PublicProfilePage() {
   const xp = profile?.xp ?? 0
   const currentLevelXp = profile?.currentLevelXp ?? 0
   const nextLevelXp = profile?.nextLevelXp ?? 100
-  const xpProgress = nextLevelXp > currentLevelXp
-    ? Math.min(1, (xp - currentLevelXp) / (nextLevelXp - currentLevelXp))
-    : 1
+  const xpProgress = levelProgress(xp, currentLevelXp, nextLevelXp)
 
   return (
     <div className="min-h-screen bg-page flex flex-col">

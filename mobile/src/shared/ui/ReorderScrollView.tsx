@@ -1,4 +1,13 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from 'react';
 import { ScrollView, type ScrollViewProps } from 'react-native';
 
 type DragScroll = {
@@ -14,9 +23,18 @@ export function ReorderScrollView({
   onLayout,
   onContentSizeChange,
   scrollEnabled = true,
+  scrollRef,
   ...props
-}: ScrollViewProps) {
+}: ScrollViewProps & { scrollRef?: Ref<ScrollView> }) {
   const view = useRef<ScrollView>(null);
+  const attach = useCallback(
+    (node: ScrollView | null) => {
+      view.current = node;
+      if (typeof scrollRef === 'function') scrollRef(node);
+      else if (scrollRef) scrollRef.current = node;
+    },
+    [scrollRef],
+  );
   const [dragging, setDragging] = useState(false);
   const geometry = useRef({ top: 0, height: 0, content: 0, offset: 0 });
   const drag = useRef<{
@@ -77,7 +95,7 @@ export function ReorderScrollView({
     <Context.Provider value={control}>
       <ScrollView
         {...props}
-        ref={view}
+        ref={attach}
         scrollEnabled={scrollEnabled && !dragging}
         scrollEventThrottle={16}
         onLayout={(event) => {

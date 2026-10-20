@@ -1,7 +1,9 @@
 import { profileSpec } from '../../health/data/models';
 import { treadmillSteps } from '../data/guidance';
 import { GuidedActivityScreen } from './GuidedActivityScreen';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { formatPace, formatPaceValue } from '@trainingai/shared/health/vdot';
+import { summariseRoute } from '@trainingai/shared/activity/route-summary';
 import { View } from 'react-native';
 import {
   AppButton,
@@ -26,6 +28,8 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { z } from 'zod';
 import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { useRouteRecording } from '../data/useRouteRecording';
+import { gpsStatusText, routeEligible } from '../data/route-recording';
 
 function ManualActivityScreen({
   onBack,
@@ -46,6 +50,17 @@ function ManualActivityScreen({
         )
       : null;
   const { theme } = useTheme();
+  const gps = useRouteRecording();
+  // The done screen shows what will be saved: the same builder the save uses. Only built there;
+  // while recording, the live readout comes from `useRouteRecording`.
+  const done = session?.mode === 'done';
+  const route = useMemo(
+    () =>
+      done && routeEligible(session) && session.endMs !== null
+        ? summariseRoute(activity.route, elapsedMs(session, session.endMs) / 1000)
+        : null,
+    [done, session?.type, session?.guidance, session?.endMs, session?.pausedMs, activity.route],
+  );
   const [now, setNow] = useState(Date.now),
     [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null),
@@ -181,7 +196,7 @@ function ManualActivityScreen({
           </View>
           {session.type.isDistanceBased && (
             <AppText variant="caption" tone="muted">
-              Enter distance after finishing. GPS tracking is coming later.
+              Your route, distance and pace will be tracked using GPS while the app is open.
             </AppText>
           )}
           <AppButton
@@ -200,8 +215,47 @@ function ManualActivityScreen({
             {clock}
           </AppText>
           <AppText tone="muted">
-            {session.pauseStartMs === null ? 'Recording' : 'Paused'}
+            {gps.eligible
+              ? gpsStatusText[gps.status]
+              : session.pauseStartMs === null
+                ? 'Recording'
+                : 'Paused'}
           </AppText>
+          {gps.eligible && (
+            <Stack gap="sm" style={{ width: '100%' }}>
+              <Stack direction="row">
+                <MetricTile
+                  figure
+                  label="km"
+                  value={gps.distanceKm == null ? null : gps.distanceKm.toFixed(2)}
+                />
+                <MetricTile
+                  figure
+                  label="pace"
+                  value={gps.paceSecPerKm == null ? null : formatPace(gps.paceSecPerKm)}
+                />
+              </Stack>
+              {session.type.id === 'run' && gps.splits.length > 0 && (
+                <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
+                  {gps.splits
+                    .map((split) => `km ${split.km}: ${formatPaceValue(split.paceSec)}`)
+                    .join('  ')}
+                </AppText>
+              )}
+              {session.type.id === 'run'
+                ? (gps.gainM ?? 0) + (gps.lossM ?? 0) > 0 && (
+                    <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
+                      ↑ {gps.gainM}m · ↓ {gps.lossM}m
+                    </AppText>
+                  )
+                : gps.gainM != null &&
+                  gps.gainM >= 1 && (
+                    <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
+                      {gps.gainM} m up
+                    </AppText>
+                  )}
+            </Stack>
+          )}
           {session.target && (
             <Card>
               <AppText variant="heading">{session.target.label}</AppText>
@@ -210,7 +264,7 @@ function ManualActivityScreen({
                 {session.target.hrLow}–{session.target.hrHigh} bpm target
               </AppText>
               <AppText variant="micro" tone="muted">
-                Live heart rate and GPS tracking are not connected.
+                Live heart rate is not connected.
               </AppText>
             </Card>
           )}
@@ -224,9 +278,39 @@ function ManualActivityScreen({
               value={(Math.round(seconds / 6) / 10).toString()}
               unit="min"
             />
-            <MetricTile label="Distance" value={session.distance || null} unit="km" />
+            <MetricTile
+              label="Distance"
+              value={route ? route.distanceKm.toFixed(2) : session.distance || null}
+              unit="km"
+            />
+            {route?.avgPaceSecPerKm != null && (
+              <MetricTile
+                label="Avg pace"
+                value={formatPaceValue(route.avgPaceSecPerKm)}
+                unit="/km"
+              />
+            )}
           </Grid>
-          {(session.type.isDistanceBased || session.type.id === 'treadmill') && (
+          {route && (
+            <Grid>
+              <MetricTile label="Elevation gain" value={String(route.elevationGainM)} unit="m" />
+              <MetricTile label="Elevation loss" value={String(route.elevationLossM)} unit="m" />
+            </Grid>
+          )}
+          {route && route.splits.length > 0 && (
+            <Card>
+              <AppText variant="eyebrow" tone="muted">
+                Splits
+              </AppText>
+              {route.splits.map((split) => (
+                <Stack key={split.km} direction="row" justify="space-between">
+                  <AppText variant="caption">Km {split.km}</AppText>
+                  <AppText variant="caption">{formatPace(split.paceSec)}</AppText>
+                </Stack>
+              ))}
+            </Card>
+          )}
+          {!route && (session.type.isDistanceBased || session.type.id === 'treadmill') && (
             <TextField
               label="Distance covered (km)"
               value={session.distance}

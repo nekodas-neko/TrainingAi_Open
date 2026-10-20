@@ -1760,19 +1760,20 @@ is a valid state, and no test fails because a table nobody writes to has no rows
 that was otherwise finished.
 
 **The stored values sit above the forms**, because the question the screen has to answer is "did my
-1,325 land, and is the app using it" — a form that saves into silence cannot answer it, and that
+measured rate land, and is the app using it" — a form that saves into silence cannot answer it, and that
 readback is also what makes **BF-42** runnable at all (its verification needs a measurement to
 exist).
 
 ## The number, measured rather than estimated
 
-The entry predicted the gap from the owner's own results before the feature existed. With 1,325 kcal
-and 51.46 kg fat-free mass stored, `calculateBaseline` returns:
+The entry predicted the gap from the owner's own results before the feature existed. With his
+measured RMR and fat-free mass stored, `calculateBaseline` moves from the predicted figures by
+(absolute values left out, because they are his clinical results):
 
-| | Predicted | With the measured test | Δ |
-|---|---|---|---|
-| BMR | 1485 | **1328** | −157 |
-| TDEE | 1782 | **1594** | **−188** |
+| | Δ with the measured test |
+|---|---|
+| BMR | −157 |
+| TDEE | **−188** |
 
 The entry forecast **~188 kcal/day**. That is now a measurement.
 
@@ -1792,10 +1793,11 @@ optional for exactly this reason.
 
 **Mass fields echo themselves in kilograms.** The schema stores grams and bounds them 0..500,000, and
 its own comment names the mistake it cannot catch: "grams entered as kilograms is the likely one".
-The printout reads `Fat 20,547.5 g`; typing `20.5` is inside the bound, saves cleanly, and is wrong
-by a factor of a thousand in the column BF-2's calibration reads. A tighter bound is not the fix —
-the route is right that the real range spans children and adults. Showing `= 20.55 kg` under the
-field is: at 20.5 g it reads `= 0.02 kg`, which is obviously not a person's fat mass.
+The printout prints fat mass in grams; typing the kilogram figure instead is inside the bound, saves
+cleanly, and is wrong by a factor of a thousand in the column BF-2's calibration reads. A tighter
+bound is not the fix — the route is right that the real range spans children and adults. Showing the
+value back in kilograms under the field is: 16,250 g reads `= 16.25 kg`, and 16.25 g reads
+`= 0.02 kg`, which is obviously not a person's fat mass.
 
 **No invalidation group, and that is deliberate.** `lib/cache-groups.ts` is where one would go, and a
 hand-rolled key list at the write site is CI-blocked. Neither key needs one: `cachedFetch` paints the
@@ -1809,10 +1811,11 @@ true.
 `tsc --noEmit` clean · `pnpm check:rules` **Ran 63 of 63** · full suite **524 files / 4773 passed**.
 
 End-to-end against the local database, driven through the UI rather than the API: navigate from
-More, enter the **real** 2026-08-27 values, and assert the columns hold them —
-`measured_rmr` one row at 1325 / 51.46, `dexa_scans` one row at 28.5 % / 20547.5 g /
-`source='manual'`. Real values rather than round fixtures, because a fixture of round numbers would
-not have exercised the grams hazard. Three consecutive green runs.
+More, enter the **real** 2026-08-27 values, and assert the columns hold them — one `measured_rmr`
+row and one `dexa_scans` row with `source='manual'`, each holding what was typed. Real values rather
+than round fixtures at the time, on the reasoning that round numbers would not exercise the grams
+hazard (the spec has since moved to synthetic values typed in grams, #3127). Three consecutive green
+runs.
 
 All four unit guards are **mutation-tested**, and one of them was wrong when first written: the
 caller regex `fetch\(['"]/api/dexa-scans` still matched `/api/dexa-scans-DISABLED`, so the guard
@@ -1827,8 +1830,8 @@ route boundary and asserts the URL now.
 
 - **The device, and specifically the two controls the form is built from.** `<input type="date">` is
   the picker most likely to render differently in Samsung's WebView, and every number field asks for
-  `inputMode="decimal"` because several values are fractional (BMD 1.046, T-score −1.6) — a keypad
-  with no decimal point would make them untypeable. Neither has been seen on the S25. BF-71 stays
+  `inputMode="decimal"` because several values are fractional (BMD, T-score) — a keypad with no
+  decimal point would make them untypeable. Neither has been seen on the S25. BF-71 stays
   queued on that check alone.
 - **Offline.** There is no outbox domain behind either route, so a save with no connection fails
   visibly rather than queueing. That is the standing rule's second branch, chosen deliberately —
@@ -2854,16 +2857,16 @@ third path and was missed: it computed its own Cunningham BMR and never read
 `getLatestMeasuredRmr`. Two screens, two resting rates for one person.
 
 **The owner entered the results on the S25 today**, so this stopped being hypothetical while the
-entry sat in the queue: `measured_rmr` = **1325 kcal at 51.5 kg FFM**, `dexa_scans` = **28.5 %**,
-both dated 2026-08-27 and both confirmed in production.
+entry sat in the queue: one `measured_rmr` row (with its FFM) and one `dexa_scans` row, both dated
+2026-08-27 and both confirmed in production.
 
 ## It was also the floor, which is the half that silences the calibration
 
 `restingBaseKcal` is `Math.max(round(bmr), round(maintenanceKcal − avgActiveKcal))`. The floor's
 comment — *"resting burn can never fall below BMR"* — is sound. The bug is that `bmr` was a
-prediction while a measurement existed. For this owner the prediction is **1481** and the
-measurement **1325**, so the floor sat **156 kcal above** the measured rate and clamped the
-calibrated maintenance up to it. The calibration could not report the truth even when the data said
+prediction while a measurement existed. For this owner the prediction sat well above the
+measurement, so the floor sat above the measured rate and clamped the calibrated maintenance up to
+it. The calibration could not report the truth even when the data said
 so.
 
 `bmr` is now the measurement when there is one, so the base and the floor move together.
@@ -3353,10 +3356,10 @@ read-time correction the DEXA never writes to `body_metrics`, so that edit does 
 ## The consumer that must not be missed, and why it comes for free
 
 `personalRmr` re-scales a measured RMR's Cunningham residual onto **today's** fat-free mass.
-`ffm_kg_at_test` comes from the DEXA (51.46 kg); today's comes from the scale. Feed it the
-uncorrected scale number and the two are from different instruments — 53.56 vs 51.46 kg, which
-re-scales the residual onto **+45 kcal/day** of fat-free mass the owner does not have, permanently
-and from the first day.
+`ffm_kg_at_test` comes from the DEXA; today's comes from the scale. Feed it the uncorrected scale
+number and the two are from different instruments, about two kilograms apart, which re-scales the
+residual onto **+45 kcal/day** of fat-free mass the owner does not have, permanently and from the
+first day.
 
 It needs no patch of its own: `goal-recommendation.ts:178` passes it a `leanMassKg` that
 `bodyComposition()` derived from the body-fat input, so correcting **the input** fixes it by

@@ -1,5 +1,5 @@
 import { median } from '@trainingai/shared/stats'
-import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils'
 
 export interface AcwrSession { startedAt: Date; volumeKg: number }
 export interface AcwrOptions {
@@ -59,7 +59,7 @@ export interface LoadRatioResult {
 
 /** The local midnight `days` whole days before `asOf`'s local day. DST-safe: never `asOf − n×24h`. */
 function localMidnightDaysBefore(asOf: Date, days: number, tz: string): number {
-  return dateStrMidnightInTz(shiftDateStr(toAestDay(asOf, tz), -days), tz).getTime()
+  return midnightDaysAgoInTz(tz, days, asOf).getTime()
 }
 
 /**

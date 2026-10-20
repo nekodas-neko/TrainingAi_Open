@@ -1,5 +1,6 @@
-import { dateStrMidnightInTz, toAestDay } from '@trainingai/shared/date-utils';
+import { dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils';
 import { RetryLater } from '../../../core/sync/HistoryDownload.ts';
+import { NUTRITION_DAYS_KEPT, NutritionPersistence } from './nutrition-persistence.ts';
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at';
 import {
   mealLoggingStatus,
@@ -228,7 +229,6 @@ export const emptyNutrition: NutritionState = {
   denied: false,
   http: [],
 };
-const storageKey = 'nutrition-records.v1';
 function matches(row: unknown, expected: Record<string, unknown>) {
   if (!row || typeof row !== 'object') {
     return false;
@@ -351,6 +351,7 @@ type Collection = keyof typeof coreSpecs;
 function nutritionRefreshError(
   kind: Collection | 'logs' | 'checkin' | 'answers' | 'mealStatuses',
   cause: unknown,
+  olderThanKept = false,
 ) {
   const label = {
     mealTypes: 'meal groups',
@@ -375,6 +376,10 @@ function nutritionRefreshError(
   if (cause instanceof Error && cause.name === 'AbortError') {
     return `Refreshing ${label} timed out. Saved records have been kept.`;
   }
+  // A day older than the window kept on the phone has nothing saved to fall back on.
+  if (olderThanKept) {
+    return `This phone keeps ${label} for the last ${NUTRITION_DAYS_KEPT} days. Check your connection and retry to load this day.`;
+  }
   return `Could not refresh ${label}. Saved records have been kept. Check your connection and retry.`;
 }
 export type { FoodEntry } from './food-values.ts';
@@ -391,6 +396,7 @@ export class NutritionStore {
   private flushing: Promise<void> | null = null;
   private requests = new Map<string, Promise<boolean | undefined>>();
   private failures = new Map<string, unknown>();
+  private persistence: NutritionPersistence;
   private policies = new Map<string, RefreshPolicy>();
   private generation = 0;
   private revision = 0;
@@ -402,7 +408,19 @@ export class NutritionStore {
     private uuid: () => string,
     private changed = () => {},
     private now = Date.now,
-  ) {}
+  ) {
+    this.persistence = new NutritionPersistence(storage, () => this.oldestKept());
+  }
+  // The first day of the window of days kept on this phone.
+  private oldestKept() {
+    return shiftDateStr(
+      toAestDay(
+        new Date(this.now()),
+        this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+      ),
+      -(NUTRITION_DAYS_KEPT - 1),
+    );
+  }
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
     return () => {
@@ -421,13 +439,18 @@ export class NutritionStore {
     const generation = this.generation;
     this.initializing = (async () => {
       try {
-        const raw = await this.storage.get(storageKey);
-        const frame = raw ? savedSchema.parse(JSON.parse(raw)) : null;
+        const raw = await this.persistence.read();
+        const frame = raw ? savedSchema.parse(raw) : null;
         if (
           frame &&
           (frame.origin !== this.connection.origin || frame.userId !== this.connection.userId)
         ) {
           throw new Error('Wrong account.');
+        }
+        // Checked in the same synchronous run that queues the move, so an account cleared after
+        // `cancel()` never gets the old record written back into its scope.
+        if (frame && generation === this.generation) {
+          await this.persistence.opened(frame);
         }
         if (generation === this.generation) {
           this.publish({ ...frame, ready: true });
@@ -455,15 +478,16 @@ export class NutritionStore {
       const patch = change(this.current);
       const next = { ...this.current, ...patch };
       const denialRevision = this.denialRevision;
-      await this.storage.set(
-        storageKey,
-        JSON.stringify({
-          ...next,
-          version: 1,
-          origin: this.connection.origin,
-          userId: this.connection.userId,
-        }),
-      );
+      await this.persistence.write({
+        version: 1,
+        origin: this.connection.origin,
+        userId: this.connection.userId,
+        data: next.data,
+        operations: next.operations,
+        loaded: next.loaded,
+        savedAt: next.savedAt,
+        http: next.http,
+      });
       if (generation === this.generation) {
         this.publish({
           ...patch,
@@ -680,7 +704,7 @@ export class NutritionStore {
             denied: this.current.denied || denied,
             errors: {
               ...this.current.errors,
-              [key]: nutritionRefreshError(kind, cause),
+              [key]: nutritionRefreshError(kind, cause, date < this.oldestKept()),
             },
           });
         }

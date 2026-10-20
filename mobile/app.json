@@ -37,7 +37,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "TrainingAi uses your location to show local weather while the app is open.",
+          "locationWhenInUsePermission": "TrainingAi uses your location to show local weather and to record the route of a walk or run while the app is open.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false
@@ -53,6 +53,7 @@
       "expo-apple-authentication",
       "./src/integrations/auth/private-backups.cjs",
       "./src/integrations/oura/oura-package-visibility.cjs",
+      "./src/integrations/pip/picture-in-picture.cjs",
       "expo-sqlite",
       [
         "react-native-ble-plx",

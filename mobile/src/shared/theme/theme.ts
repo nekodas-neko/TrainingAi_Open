@@ -24,6 +24,7 @@ import {
   effortColors,
   progressColors,
   friendColors,
+  rewardColors,
   trainingColors,
   type TextVariant,
 } from './tokens.ts';
@@ -77,6 +78,7 @@ export type Theme = {
   hrZoneColors: string[];
   progress: typeof progressColors.light;
   friends: typeof friendColors.light;
+  rewards: typeof rewardColors.light;
   training: Omit<typeof trainingColors.light, 'phases'> & {
     phases: Record<'baseline' | keyof typeof trainingColors.light.phases, string>;
   };
@@ -178,6 +180,7 @@ export function createTheme(
       overrides.hrZoneColors ??
       (mode === 'dark' ? HR_ZONE_META.map((zone) => zone.color) : hrZoneColorsLight),
     friends: friendColors[mode],
+    rewards: rewardColors[mode],
     progress: {
       ...progressColors[mode],
       ...overrides.progress,

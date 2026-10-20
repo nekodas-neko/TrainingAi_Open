@@ -202,19 +202,19 @@ test('sleep feedback preserves stored direction and records only corrections as 
   });
 });
 test('clinical fields reject invalid dates and values while preserving signed bone scores and gram units', () => {
-  assert.throws(() => clinicalPayload('rmr', { measuredOn: '2026-02-30', rmrKcal: '1325' }));
+  assert.throws(() => clinicalPayload('rmr', { measuredOn: '2026-02-30', rmrKcal: '1600' }));
   assert.throws(() => clinicalPayload('rmr', { measuredOn: date, rmrKcal: 'Infinity' }));
-  assert.throws(() => clinicalPayload('rmr', { measuredOn: date, rmrKcal: '1325.5' }));
+  assert.throws(() => clinicalPayload('rmr', { measuredOn: date, rmrKcal: '1600.5' }));
   assert.throws(() => clinicalPayload('dexa', { scannedOn: date, pctFat: '101' }));
   const scan = clinicalPayload('dexa', {
     scannedOn: date,
-    pctFat: '28.5',
-    tScore: '-1.6',
-    leanPlusBmcG: '51460.1',
+    pctFat: '20.5',
+    tScore: '-2.5',
+    leanPlusBmcG: '64000.5',
     weightKg: '',
   });
-  assert.equal('tScore' in scan ? scan.tScore : null, -1.6);
-  assert.equal('leanPlusBmcG' in scan ? scan.leanPlusBmcG : null, 51460.1);
+  assert.equal('tScore' in scan ? scan.tScore : null, -2.5);
+  assert.equal('leanPlusBmcG' in scan ? scan.leanPlusBmcG : null, 64000.5);
   assert.equal('weightKg' in scan ? scan.weightKg : undefined, undefined);
 });
 import { dayTimeInstant } from '../src/features/health/data/manual-night.ts';

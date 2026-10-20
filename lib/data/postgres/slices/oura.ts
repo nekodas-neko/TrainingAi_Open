@@ -447,7 +447,7 @@ export async function hasOuraBleSamples(db: Db, userId: string): Promise<boolean
 }
 
 /**
- * The recent-source facts behind `connectedSources` (issue 2613): three existence checks, each a
+ * The recent-source facts behind `connectedSources` (issue 2613): existence checks, each a
  * `LIMIT 1` probe scoped by `user_id` and bounded by `since`. The ring fact is `hasOuraBleSamples`, so it is
  * not repeated here. `oura_heartrate`'s primary key leads `(user_id, timestamp)`, so the window is a
  * range scan on the user's own rows and each check stops at its first match.
@@ -455,14 +455,24 @@ export async function hasOuraBleSamples(db: Db, userId: string): Promise<boolean
 export async function getRecentSourceFacts(db: Db, userId: string, since: Date) {
   const hr = s.ouraHeartrate
   const hc = s.healthConnectIntervals
-  const hrRow = (source: string) => db.select({ one: sql<number>`1` }).from(hr)
-    .where(and(eq(hr.userId, userId), gte(hr.timestamp, since), eq(hr.source, source))).limit(1)
-  const [[strap], [hcHr], [hcInterval]] = await Promise.all([
-    hrRow('chest_strap'),
-    hrRow('health_connect'),
+  const records = s.healthConnectRecords
+  const hrRow = (sources: string[]) => db.select({ one: sql<number>`1` }).from(hr)
+    .where(and(eq(hr.userId, userId), gte(hr.timestamp, since), inArray(hr.source, sources))).limit(1)
+  // #3117: the native app's Health Connect import labels its heart rate `health_connect_native` and
+  // keeps its records in `health_connect_records`; the web app's is `health_connect` and
+  // `health_connect_intervals`. Either one is Health Connect, or a native user reads as unconnected.
+  const [[strap], [hcHr], [hcInterval], [hcRecord]] = await Promise.all([
+    hrRow(['chest_strap']),
+    hrRow(['health_connect', 'health_connect_native']),
     db.select({ one: sql<number>`1` }).from(hc).where(and(eq(hc.userId, userId), gte(hc.startAt, since))).limit(1),
+    db.select({ one: sql<number>`1` }).from(records)
+      .where(and(eq(records.userId, userId), isNull(records.deletedAt), gte(records.startAt, since))).limit(1),
   ])
-  return { strapHeartRate: strap != null, healthConnectHeartRate: hcHr != null, healthConnectIntervals: hcInterval != null }
+  return {
+    strapHeartRate: strap != null,
+    healthConnectHeartRate: hcHr != null,
+    healthConnectIntervals: hcInterval != null || hcRecord != null,
+  }
 }
 
 /**
@@ -827,6 +837,26 @@ export async function clearOuraCloudBodyField(db: Db, userId: string, date: stri
        AND ${sql.raw(col)} IS NOT NULL
      RETURNING 1`)
   return rows.rows.length > 0
+}
+
+/**
+ * #3099. Wake dates in `[from, to]` that hold a TOMBSTONED Oura Cloud sleep row. The night re-score
+ * reads it before a write: a night that appears on a day where Oura deleted one is a delete followed
+ * by a re-create (which can revive the same row), a revision, not an arrival. Only deleted rows count
+ * (#3104 review): a live nap or rest row on the day must not stop a late night from being an arrival.
+ * Ring (`ble:`) and manual rows are not Oura Cloud's and do not count.
+ */
+export async function listDeletedOuraCloudSleepDates(db: Db, userId: string, from: string, to: string): Promise<string[]> {
+  const rows = await db.selectDistinct({ date: s.sleepSessions.date }).from(s.sleepSessions)
+    .where(and(
+      eq(s.sleepSessions.userId, userId),
+      gte(s.sleepSessions.date, from), lte(s.sleepSessions.date, to),
+      isNotNull(s.sleepSessions.deletedAt),
+      isNotNull(s.sleepSessions.ouraId),
+      sql`${s.sleepSessions.ouraId} NOT LIKE 'ble:%'`,
+      eq(s.sleepSessions.manualEntry, false),
+    ))
+  return rows.map(r => r.date)
 }
 
 /**
