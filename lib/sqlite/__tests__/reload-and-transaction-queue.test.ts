@@ -305,6 +305,43 @@ describe('a standalone write never joins an open transaction (#2520)', () => {
     expect(native.committed).toEqual(['INSERT mood', 'PULL row 1'])
   })
 
+  it('warns in development when a transaction body waits on a standalone write of its own (#3162)', async () => {
+    const svc = await freshPage()
+    await svc.initSQLite(UPGRADES)
+    const warn = vi.mocked(console.warn)
+    vi.useFakeTimers()
+    try {
+      // The mistake: runSQL inside the body. It waits for this transaction, which waits for it.
+      void svc.withTransaction(async () => { await svc.runSQL('INSERT nested') })
+      await vi.advanceTimersByTimeAsync(svc.WRITE_QUEUE_STALL_WARN_MS - 1)
+      expect(warn).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0][0])).toMatch(/runSQL \[INSERT nested\].*waiting on itself/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a write that waits out an ordinary pull does not warn', async () => {
+    const svc = await freshPage()
+    await svc.initSQLite(UPGRADES)
+    const warn = vi.mocked(console.warn)
+    vi.useFakeTimers()
+    try {
+      const pull = heldTransaction(svc, false)
+      const write = svc.runSQL('INSERT mood')
+      await vi.advanceTimersByTimeAsync(1_000)
+      pull.finish()
+      await pull.done
+      await write
+      await vi.advanceTimersByTimeAsync(svc.WRITE_QUEUE_STALL_WARN_MS)
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('tx.run refuses after its transaction has ended instead of writing outside it', async () => {
     const svc = await freshPage()
     await svc.initSQLite(UPGRADES)

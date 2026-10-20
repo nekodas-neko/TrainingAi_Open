@@ -27,6 +27,7 @@ import {
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
+import { ouraBudgetActivities } from '@/lib/health/oura-budget-activities'
 
 export interface EnergyBalanceResult {
   date: string
@@ -293,9 +294,14 @@ export async function computeEnergyBalance(
   // `/api/day-log` already exposes `workoutSessionId` per exercise, so the day screen's Training card
   // joins `workoutKcalBySession` on it without keying by session NAME — which is not identity here
   // and breaks outright for two same-named sessions in one day.
+  // #3087: Oura's own workouts the app did not log count too, costed like a logged activity.
+  const budgetActivities = [
+    ...activityLogs,
+    ...await ouraBudgetActivities(repo, userId, windowStart, date, tz, { activityLogs, sessions: workouts }),
+  ]
   const activeEnergyFor = (day: string) => activeEnergyForDay({
     day, dayStartUtc: localMidnightUtc(day, tz), profile: energyProfile,
-    workouts, avgBpmBySession, activities: activityLogs, steps: metricByDate.get(day)?.steps ?? null,
+    workouts, avgBpmBySession, activities: budgetActivities, steps: metricByDate.get(day)?.steps ?? null,
   })
   const activeEnergy = activeEnergyFor(date)
   const activeBreakdown = {

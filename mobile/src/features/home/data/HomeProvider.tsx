@@ -15,6 +15,7 @@ import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { HomeStore, emptyHome } from './HomeStore';
+import { homeWritePaths } from './models';
 
 const Context = createContext<HomeStore | null>(null);
 const noSubscribe = () => () => {};
@@ -31,21 +32,8 @@ export function HomeProvider({ children }: PropsWithChildren) {
             dataReader,
             randomUUID,
             (kind) => {
-              if (kind === 'preferences') {
-                resources?.invalidate(['/api/user/preferences']);
-                return;
-              }
-              resources?.invalidate([
-                '/api/user/preferences',
-                '/api/user/profile',
-                '/api/day-timeline',
-                '/api/mood',
-                '/api/readiness-score',
-                '/api/body-battery',
-                '/api/next-session',
-                '/api/workout-data',
-                '/api/ai-periodization',
-              ]);
+              resources?.invalidate(homeWritePaths(kind));
+              if (kind === 'preferences') return;
               invalidateWorkouts();
               void resources?.refreshVisible();
             },

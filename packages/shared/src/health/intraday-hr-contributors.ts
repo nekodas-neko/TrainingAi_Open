@@ -13,6 +13,13 @@
 // the merged series (`hc-heart-rate-ranked-below-ring.test.ts`), so the owner's days do not move —
 // the measured outcome the decision stated. One implementation for the live payload and the day
 // audit, so the two cannot drift.
+//
+// Oura Cloud is NOT gated, though it is no longer the dense BLE stream the sign-off assumed: since
+// the switch to the API the ring serves 5-minute points at rest and asleep, irregular bursts while
+// awake (in-hour gaps of ~17 minutes are typical), and 5-second points only inside an Oura-app
+// workout. Gating it would drop most of the owner's waking hours and every elevated reading, which
+// reverses the outcome #2437 was signed off on, so how these lanes read an Oura-only day is the
+// owner's call: #3114.
 import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes';
 import {
   computeMovedHours,
@@ -32,6 +39,20 @@ export const DENSITY_GATED_HR_SOURCES: ReadonlySet<string> = new Set([
 ]);
 
 type Row = { timestamp: Date | number; bpm: number; source?: string | null };
+
+/** The density rule on its own: at least two readings, and no gap between consecutive ones longer
+ *  than HR_DENSE_MAX_GAP_MS. Time before the first and after the last is not counted. */
+export function isDenseHrSpan(readings: number, maxGapMs: number | null): boolean {
+  return readings >= 2 && maxGapMs != null && Number.isFinite(maxGapMs) && maxGapMs <= HR_DENSE_MAX_GAP_MS;
+}
+
+/** `isDenseHrSpan` over a list of reading times (epoch ms, any order). */
+export function isDenseHrSeries(times: readonly number[]): boolean {
+  const sorted = [...times].sort((a, b) => a - b);
+  let maxGap = 0;
+  for (let i = 1; i < sorted.length; i++) maxGap = Math.max(maxGap, sorted[i] - sorted[i - 1]);
+  return isDenseHrSpan(sorted.length, sorted.length >= 2 ? maxGap : null);
+}
 
 const ms = (t: Date | number) => (t instanceof Date ? t.getTime() : t);
 
@@ -74,11 +95,7 @@ export function dropSparseHrHours<T extends Row>(
   }
   const sparse = new Set<string>();
   for (const [key, times] of gatedByHour) {
-    const sorted = [...times].sort((a, b) => a - b);
-    const dense =
-      sorted.length >= 2 &&
-      sorted.every((t, i) => i === 0 || t - sorted[i - 1] <= HR_DENSE_MAX_GAP_MS);
-    if (!dense) sparse.add(key);
+    if (!isDenseHrSeries(times)) sparse.add(key);
   }
   return {
     rows: rows.filter((r) => !sparse.has(keyById.get(r) ?? '')),

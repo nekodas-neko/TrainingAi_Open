@@ -411,18 +411,44 @@ export class HealthConnectImportStore {
     });
   }
   /**
-   * Drops cached record ids older than any scan can start (#3121): `disk.from`, and without the
-   * history permission 30 days before the first grant, which is as far back as Health Connect
-   * lets a rescan read. A record still queued or held keeps its id, and so does anything during a
-   * scan, whose deletion check reads the cache.
+   * Where a full rescan starts (#3117). Without the history permission it reads the last 30
+   * days; after a gap (`resumeFrom`: an expired token, or a permission change on a stale one) it
+   * reaches back to the local midnight a week before the last good read instead, but never past
+   * what Health Connect allows, 30 days before the first grant. Never before `disk.from`.
+   */
+  private rescanStart(hasHistory: boolean, resumeFrom: string | null) {
+    const resume = resumeFrom
+      ? midnightDaysAgoInTz(
+          this.connection.timezone ?? DEFAULT_TZ,
+          RESCAN_OVERLAP_DAYS,
+          new Date(resumeFrom),
+        ).getTime()
+      : Infinity;
+    const grantedAt = Date.parse(this.disk.grantedAt ?? new Date(this.now()).toISOString());
+    const floor = hasHistory
+      ? 0
+      : Math.max(grantedAt - READ_LIMIT_MS, Math.min(this.now() - READ_LIMIT_MS, resume));
+    return Math.max(Date.parse(this.disk.from), floor);
+  }
+  /**
+   * Drops cached record ids older than any later rescan can start (#3121, #3143), so the cache
+   * holds about the rescan window rather than everything since the grant. A record still queued
+   * or held keeps its id, and so does anything during a scan, whose deletion check reads the
+   * cache.
    */
   private async prune(hasHistory: boolean) {
     if (this.disk.scan) return;
-    const grantedAt = Date.parse(this.disk.grantedAt ?? new Date(this.now()).toISOString());
-    const floor = Math.max(
-      Date.parse(this.disk.from),
-      hasHistory ? -Infinity : grantedAt - READ_LIMIT_MS,
-    );
+    // #3143: where a rescan would start now. `now` and `tokenAt` only move forward, so while
+    // the history permission stays as it is, a later rescan resuming from the last good read (or
+    // from a gap already waiting) starts no earlier, and the floor advances with each sync
+    // instead of staying at the grant.
+    //
+    // One accepted exception (the Orchestrator's ruling on #3145): granting the history
+    // permission after no-history syncs starts that rescan at `disk.from`, below this floor. A
+    // record older than the floor that was deleted in Health Connect since the last good read is
+    // then not removed on the server. Records it still has are re-uploaded harmlessly (the server
+    // keys on the record id). Keeping every id forever to close that is not worth it.
+    const floor = this.rescanStart(hasHistory, this.disk.rescanFrom ?? this.disk.tokenAt);
     const waiting = new Set<string>();
     for (const item of this.disk.queue)
       if ('records' in item) for (const row of item.records) waiting.add(row.id);
@@ -469,22 +495,7 @@ export class HealthConnectImportStore {
         if (!this.disk.token && !this.disk.scan) {
           const initial = await this.reader.changes(types);
           if (this.canceled) return;
-          // #3117: without the history permission a full rescan reads the last 30 days, as
-          // before. After a gap (an expired token, or a permission change on a stale one) it
-          // reaches back to the local midnight a week before the last good read instead, but
-          // never past what Health Connect allows: 30 days before the first grant.
-          const resume = this.disk.rescanFrom
-            ? midnightDaysAgoInTz(
-                this.connection.timezone ?? DEFAULT_TZ,
-                RESCAN_OVERLAP_DAYS,
-                new Date(this.disk.rescanFrom),
-              ).getTime()
-            : Infinity;
-          const grantedAt = Date.parse(this.disk.grantedAt ?? new Date(this.now()).toISOString());
-          const floor = hasHistory
-            ? 0
-            : Math.max(grantedAt - READ_LIMIT_MS, Math.min(this.now() - READ_LIMIT_MS, resume));
-          const from = new Date(Math.max(Date.parse(this.disk.from), floor)).toISOString();
+          const from = new Date(this.rescanStart(hasHistory, this.disk.rescanFrom)).toISOString();
           await this.write({
             ...this.disk,
             rescanFrom: null,

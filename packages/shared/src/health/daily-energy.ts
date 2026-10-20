@@ -14,7 +14,7 @@
  * subtracts a 1.5-MET resting baseline, so every term here is net active energy above rest —
  * consistent with the sedentary base.
  */
-import { estSessionKcal, estWorkoutKcal, MAX_PLAUSIBLE_SESSION_MIN, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
+import { estSessionKcal, estWorkoutKcal, MAX_PLAUSIBLE_SESSION_MIN, metIdForOuraActivity, OURA_ON_FOOT_ACTIVITIES, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
 
 // All four live in a dependency-free leaf module and are re-exported here, so a caller that needs
 // only a number does not pull in this file's `workout-energy` → `oura-models` → `node:path` /
@@ -67,8 +67,12 @@ export interface ActiveEnergyInput {
    * at `moderate`, exactly as before.
    */
   strengthSessions: { durationMin: number; id?: string; rpe?: number | null; avgBpm?: number | null }[]
-  /** Today's logged activities. `steps` is the row's own stored step count, where it has one. */
-  activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null; steps?: number | null }[]
+  /**
+   * Today's logged activities. `steps` is the row's own stored step count, where it has one.
+   * `ouraActivity` marks an Oura workout (#3087) whose type the app has no name for: it is costed at
+   * that Oura activity's own MET, and earns nothing when the table does not name it.
+   */
+  activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null; steps?: number | null; ouraActivity?: string }[]
   /** Phone-pedometer steps today (body_metrics), excluding treadmill/logged-indoor steps. */
   pedometerSteps: number | null
 }
@@ -142,6 +146,13 @@ function activityDurationMin(a: { activityType: string; durationMin?: number | n
  * than removing steps the pedometer never counted.
  */
 function pedometerStepsInside(a: ActiveEnergyInput['activities'][number]): number {
+  // #3087: an Oura workout on foot that the app has no type for (house work, tennis, …) — its steps
+  // are in Oura's daily count too, taken out at walking cadence over its duration.
+  if (a.ouraActivity != null) {
+    if (!OURA_ON_FOOT_ACTIVITIES.includes(a.ouraActivity)) return 0
+    const dur = activityDurationMin(a)
+    return dur != null && dur > 0 ? dur * WALKING_CADENCE_SPM : 0
+  }
   if (!PEDOMETER_ACTIVITY_TYPES.includes(a.activityType.toLowerCase())) return 0
   if (a.steps != null && a.steps > 0) return a.steps
   if (a.distanceKm != null && a.distanceKm > 0) return a.distanceKm * STEPS_PER_KM
@@ -199,7 +210,9 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
   let activityKcal = 0
   for (const a of input.activities) {
     const dur = activityDurationMin(a)
-    if (dur != null && dur > 0) activityKcal += est(ouraIdForActivityType(a.activityType), dur)
+    if (dur == null || dur <= 0) continue
+    const id = a.ouraActivity != null ? metIdForOuraActivity(a.ouraActivity) : ouraIdForActivityType(a.activityType)
+    if (id != null) activityKcal += est(id, dur)
   }
 
   // Passive steps — from the FIRST step, minus steps already inside logged outdoor activities.

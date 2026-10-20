@@ -9,19 +9,45 @@
 //     point that a ring, strap or manual row already covers is skipped instead of duplicated.
 //   - `oura_workouts` holds only Oura's workouts, keyed by Oura's id.
 //   - `oura_cloud_sleep_periods`, `oura_cloud_daily` and `oura_sessions` (#2982) hold only Oura's
-//     values, read by no screen, so each write replaces what Oura sent before.
+//     values, so each write replaces what Oura sent before. Three columns are read now (#3081):
+//     a period's `sleep_type` decides which periods make a night (#3057), and a day's
+//     `readiness_contributors` (#2984) and `met` with its `class_5_min` wear gate (#2985) are inputs.
+//     The rest is still storage no screen reads.
 // Every upsert is idempotent: the same documents written twice leave the same rows.
 //
 // The BLE raw archive (`oura_raw_samples`, `oura_raw_packed`) is never touched here.
-import type { WorkoutRepository } from '@/lib/data/repository'
+import type { OuraCloudHeartrateWrite, WorkoutRepository } from '@/lib/data/repository'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import type { OuraCloudWrites } from './documents'
 import { reportOuraCloudIssue } from './report'
 
+/**
+ * Re-attributes the completed workouts a heart-rate write overlaps (#3078,
+ * `reattributeWorkoutsHrInWindow`). Every writer of Oura Cloud heart rate takes one, so a workout
+ * whose series landed after it was completed is refreshed whichever path brought the series.
+ */
+export type OuraWorkoutHrReattribute = (userId: string, from: Date, to: Date, tz: string) => Promise<number>
+
+/**
+ * After a heart-rate write: re-attributes the workouts over the span of the points that actually
+ * changed, never over a re-read that changed nothing. A failure is reported under `kind` and never
+ * fails the write it follows.
+ */
+export async function reattributeAfterHeartRate(
+  workoutHr: OuraWorkoutHrReattribute | undefined, userId: string, write: OuraCloudHeartrateWrite, tz: string, kind: string,
+): Promise<void> {
+  if (!workoutHr || write.changed === 0 || !write.changedFrom || !write.changedTo) return
+  try {
+    await workoutHr(userId, write.changedFrom, write.changedTo, tz)
+  } catch (err) {
+    reportOuraCloudIssue(kind, err instanceof Error ? err.message : 'unknown', { userId })
+  }
+}
+
 /** The slice of the repository the writer needs, so tests can hand it a fake. */
 export type OuraCloudWriter = Pick<WorkoutRepository,
   'upsertOuraDaily' | 'upsertBodyMetrics' | 'upsertOuraCloudSleep' | 'tombstoneOuraCloudSleep' | 'syncOuraMainSleepBodyMetrics' |
-  'upsertOuraWorkouts' | 'upsertOuraCloudHeartrate' |
+  'upsertOuraWorkouts' | 'tombstoneOuraWorkouts' | 'tombstoneOuraWorkoutsAbsent' | 'upsertOuraCloudHeartrate' |
   'upsertOuraCloudSleepPeriods' | 'upsertOuraCloudDaily' | 'upsertOuraSessions'>
 
 export interface OuraCloudWriteCounts {
@@ -95,6 +121,14 @@ export async function writeOuraCloudData(
   // #3080: a period a higher-ranked night keeps out is reported, counts only, never silent.
   if (sleep.skippedOverlap > 0) {
     reportOuraCloudIssue('sleep:skipped-overlap', `${sleep.skippedOverlap} Oura sleep period(s) kept out by a higher-ranked night`, { userId })
+  }
+  // #3081: a value Oura added to an enum keeps its document, and is said out loud. Field names and
+  // counts only: the value is in `oura_cloud_sleep_periods.sleep_type` for a sleep type, and the
+  // pinned spec is where a new one is added.
+  const unknown = Object.entries(writes.unknownValues ?? {}).filter(([, n]) => (n ?? 0) > 0)
+  if (unknown.length > 0) {
+    reportOuraCloudIssue('document:unknown-value',
+      `values outside the pinned spec, documents kept: ${unknown.map(([field, n]) => `${field} ×${n}`).join(', ')}`, { userId })
   }
   const workouts = await writer.upsertOuraWorkouts(userId, writes.workouts)
   const cloudDays = await writer.upsertOuraCloudDaily(userId, writes.cloudDaily)

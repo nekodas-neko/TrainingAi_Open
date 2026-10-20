@@ -19,9 +19,9 @@ import { OuraUnavailableError } from './client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { fetchOuraDocument, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthorizedError } from './data'
-import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
+import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DELETE_TYPES, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
-import { writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
+import { reattributeAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import { getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
 
@@ -114,8 +114,8 @@ export type OuraWebhookEvent = z.infer<typeof OuraWebhookEvent>
 export type OuraWebhookOutcome =
   /** The document was read and written. */
   | { result: 'written'; counts: OuraCloudWriteCounts }
-  /** A Cloud sleep period was tombstoned (or there was nothing of ours to tombstone). */
-  | { result: 'deleted'; tombstoned: number }
+  /** A delete was applied: a sleep period or workout tombstoned (0 when we held none). */
+  | { result: 'deleted'; rows: number }
   /** Nothing to do: a data type we do not store, or a delete of a type we keep no tombstone for. */
   | { result: 'ignored'; reason: string }
   /** Nobody here is connected to that Oura account (any more), or their connection cannot be used. */
@@ -134,6 +134,11 @@ export type OuraWebhookDeps = {
   heartRate?: (userId: string) => void
   /** #3079: re-scores a recent night a sleep event changed or deleted (`rescore-nights.ts`). */
   rescore?: NightRescoreRepo
+  /**
+   * #3078: re-attributes completed workouts whose window the heart-rate catch-up just changed
+   * (`workoutHrReattributor`). Without it the catch-up writes heart rate and nothing else.
+   */
+  workoutHr?: OuraWorkoutHrReattribute
 }
 
 function isStoredType(t: string): t is OuraDocumentType {
@@ -150,14 +155,16 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
   if (!userId) return { result: 'unknown_user' }
 
   if (event.event_type === 'delete') {
-    if (event.data_type !== 'sleep') return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
-    const tombstoned = await withNightRescore(deps.rescore, userId, async () => {
+    if (!OURA_DELETE_TYPES.includes(event.data_type)) return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
+    // #3087: a workout deleted in the Oura app stops counting in the energy budget. Kept and marked.
+    if (event.data_type === 'workout') return { result: 'deleted', rows: await deps.repo.tombstoneOuraWorkouts(userId, [event.object_id]) }
+    const rows = await withNightRescore(deps.rescore, userId, async () => {
       const n = await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id])
       // #3080: the day's HRV and resting HR follow its main period, which may have been this one.
       await deps.repo.syncOuraMainSleepBodyMetrics(userId, { days: [], ouraIds: [event.object_id] })
       return n
     })
-    return { result: 'deleted', tombstoned }
+    return { result: 'deleted', rows }
   }
 
   // Oura answers 401 for a type the user did not share, which would read as `reauth` (#2974).
@@ -194,7 +201,7 @@ export function isRetryableOuraError(err: unknown): boolean {
 // stop at the connect backfill. A sleep, daily activity or workout event means the ring has synced,
 // so each one also reads the series from the newest `oura_cloud` point to now. It runs after the
 // answer, never inside it: Oura wants the event answered within 10 s and a heart-rate read is
-// another request set. One sync fans out into several of these events, so a user's catch-up runs
+// another request set. Each read starts `HEART_RATE_OVERLAP_MS` behind that point (#3078). One sync fans out into several of these events, so a user's catch-up runs
 // at most once per `HEART_RATE_MIN_INTERVAL_MS` in this process.
 
 /** The events that start a heart-rate catch-up. */
@@ -207,20 +214,29 @@ export const HEART_RATE_MIN_INTERVAL_MS = 5 * 60 * 1000
  * shorter one can be empty for real: the user's previous sync landed minutes ago.
  */
 export const HEART_RATE_EMPTY_REPORT_MS = 60 * 60 * 1000
+/**
+ * How far behind the newest stored `oura_cloud` point each catch-up starts (#3078). Oura uploads in
+ * batches, often hours late, and a batch can carry points stamped earlier than one already stored
+ * (an awake burst lands after the sleep that followed it); a read starting at the newest point skips
+ * those for good. Re-reading the overlap costs one larger page and the upsert is idempotent.
+ */
+export const HEART_RATE_OVERLAP_MS = 6 * 60 * 60 * 1000
 
 export type OuraHeartRateReader = Pick<WorkoutRepository, 'getLatestOuraCloudHeartrateAt' | 'getUserById'>
 
 /**
- * Reads the user's heart rate from the newest stored `oura_cloud` point (at most a week back) to now,
- * and writes it through `upsertOuraCloudHeartrate` with the user's timezone. Returns points written,
- * or `null` when the user has no usable connection.
+ * Reads the user's heart rate from `HEART_RATE_OVERLAP_MS` behind the newest stored `oura_cloud` point
+ * (at most a week back) to now, and writes it through `upsertOuraCloudHeartrate` with the user's
+ * timezone. When points were new or changed, the completed workouts they overlap are re-attributed
+ * (`deps.workoutHr`, #3078); a failure there is reported and does not fail the read. Returns points
+ * written (offered after the device-row cover filter), or `null` when the user has no usable connection.
  *
  * A read that lands nothing is reported, never silent (#2982: no Oura heart rate had landed and
  * nothing said why): an empty answer over an hour or more, rows that failed the spec's shape, and
  * rows that were read but none written. Reports carry counts and durations, never a reading.
  */
 export async function catchUpOuraCloudHeartRate(
-  deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now(),
+  deps: Pick<OuraWebhookDeps, 'repo' | 'config' | 'workoutHr'>, userId: string, now = Date.now(),
 ): Promise<number | null> {
   const token = await getOuraAccessToken(deps.repo, deps.config, userId)
   if (!token) return null
@@ -228,20 +244,26 @@ export async function catchUpOuraCloudHeartRate(
   const newest = await deps.repo.getLatestOuraCloudHeartrateAt(userId, floor)
   const user = await deps.repo.getUserById(userId)
   const tz = user?.timezone ?? DEFAULT_TZ
-  // From the newest point itself: re-reading it is an idempotent upsert, and a strictly-later start
-  // could drop a point Oura stamped at that same second.
-  const from = newest ?? floor
+  // An overlap behind the newest point, never past the floor: re-reading stored points is an
+  // idempotent upsert, and a start at (or after) the newest point drops a batch Oura stamped earlier.
+  const from = newest ? new Date(Math.max(floor.getTime(), newest.getTime() - HEART_RATE_OVERLAP_MS)) : floor
   const got = await fetchOuraHeartRate(token, from, new Date(now))
   const points = mapHeartRateRows(got.rows)
-  const written = points.length === 0 ? 0 : await deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
-  const hours = Math.round((now - from.getTime()) / 3_600_000)
+  const write = points.length === 0
+    ? { offered: 0, changed: 0, changedFrom: null, changedTo: null }
+    : await deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
+  const written = write.offered
+  await reattributeAfterHeartRate(deps.workoutHr, userId, write, tz, 'webhook-heartrate:workouts')
+  // The span with nothing stored yet: what an empty answer says Oura is missing.
+  const unseenFrom = newest ?? floor
+  const hours = Math.round((now - unseenFrom.getTime()) / 3_600_000)
   // Every read says what happened to it, so a partial loss to the device-row cover filter (plausible
   // points not written) shows in the logs too, not only a total one.
-  console.info(`[oura] heart-rate catch-up from ${from.toISOString()}: ${got.rows.length} read, ${points.length} plausible, ${written} written, ${points.length - written} covered by device rows`)
+  console.info(`[oura] heart-rate catch-up from ${from.toISOString()}: ${got.rows.length} read, ${points.length} plausible, ${written} written (${write.changed} new or changed), ${points.length - written} covered by device rows`)
   if (got.dropped > 0) {
     reportOuraCloudIssue('webhook-heartrate:dropped', `${got.dropped} of ${got.rows.length + got.dropped} rows did not match the spec`, { userId })
   }
-  if (got.rows.length === 0 && got.dropped === 0 && now - from.getTime() >= HEART_RATE_EMPTY_REPORT_MS) {
+  if (got.rows.length === 0 && got.dropped === 0 && now - unseenFrom.getTime() >= HEART_RATE_EMPTY_REPORT_MS) {
     reportOuraCloudIssue('webhook-heartrate:empty', `Oura answered no heart rate for the last ${hours} h (${newest ? 'after a stored point' : 'none stored this week'})`, { userId })
   } else if (got.rows.length > 0 && written === 0) {
     reportOuraCloudIssue('webhook-heartrate:none-written', `${got.rows.length} rows read, ${points.length} plausible, 0 written (all covered by device rows or implausible)`, { userId })
@@ -252,7 +274,7 @@ export async function catchUpOuraCloudHeartRate(
 const heartRateLastRun = new Map<string, number>()
 
 /** Starts `catchUpOuraCloudHeartRate` in the background, throttled per user. Never throws. */
-export function startOuraCloudHeartRateCatchUp(deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now()): void {
+export function startOuraCloudHeartRateCatchUp(deps: Pick<OuraWebhookDeps, 'repo' | 'config' | 'workoutHr'>, userId: string, now = Date.now()): void {
   const last = heartRateLastRun.get(userId)
   if (last !== undefined && now - last < HEART_RATE_MIN_INTERVAL_MS) return
   heartRateLastRun.set(userId, now)

@@ -50,6 +50,7 @@ export function MoreScreen({
   openDevices,
   openAbout,
   openYear,
+  openCollection,
   openFriendProfile,
 }: {
   openSettings: () => void;
@@ -63,6 +64,7 @@ export function MoreScreen({
   openDevices: () => void;
   openAbout: () => void;
   openYear: () => void;
+  openCollection: () => void;
   openFriendProfile: (id: string) => void;
 }) {
   const account = useAccountContext(),
@@ -233,10 +235,11 @@ export function MoreScreen({
                   leading={<Icon name="activity" />}
                   onPress={openDevices}
                 />
-                <FeatureRow
+                <ListRow
                   density="compact"
                   title="Collection"
-                  leading={<Icon name="award" />}
+                  leading={<Icon name="cat" />}
+                  onPress={openCollection}
                   divider={false}
                 />
               </Section>

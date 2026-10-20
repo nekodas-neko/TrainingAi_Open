@@ -59,7 +59,7 @@ function hits(): Hit[] {
 const ALLOWED: { file: string; marker: string; reason: string }[] = [
   { file: 'lib/data/postgres/slices/oura.ts', marker: '.where(and(eq(s.sleepSessions.userId, userId), inArray(s.sleepSessions.ouraId, ouraIds)))',
     reason: 'issue 3080: the wake dates of periods Oura just deleted or retyped, so their day\'s HRV and resting HR can be cleared; the rows are tombstoned by then, and no night is shown from this' },
-  { file: 'lib/data/postgres/slices/oura.ts', marker: '.where(and(eq(s.sleepSessions.userId, userId), inArray(s.sleepSessions.ouraId, retyped)))',
+  { file: 'lib/data/postgres/slices/oura.ts', marker: 'oura_id IN (SELECT oura_id FROM retyped)',
     reason: 'issue 3060: moves only updated_at, so the delta re-sends a night whose Oura period type changed; a removed row is re-sent as the tombstone it already is, and no value a reader sees changes' },
   { file: 'lib/data/postgres/slices/oura.ts', marker: 'gte(s.sleepSessions.date, from), lte(s.sleepSessions.date, to),',
     reason: 'issue 3099: the night re-score asks which days hold a TOMBSTONED Oura Cloud night, so a delete then a re-create reads as a revision; it reads removed rows on purpose and never shows one' },

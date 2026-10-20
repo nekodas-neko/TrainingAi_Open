@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { COLLECTION_TTL } from '@trainingai/shared/cache-ttl'
 import { V2_LADDERS, type CollectionState } from '@trainingai/shared/collection/ladder'
-import { nearestMerge, mergeCountLine, totalHeld, restlessLine, lostLine, type FaucetKey } from '@/components/home/collection-summary'
+import { nearestMerge, mergeCountLine, totalHeld, restlessLine, lostLine, cardDecayLine, type FaucetKey } from '@/components/home/collection-summary'
 import { CollectionPen } from '@/components/home/collection-pen'
 
 export interface CollectionResponse {
@@ -91,12 +91,10 @@ export function CollectionCard() {
       </div>
       {lost ? (
         <p className="mt-2 text-[11px] text-muted-foreground">{lost}</p>
-      ) : decayed > 0 && (
+      ) : cardDecayLine(decayed) && (
         // Stated rather than left to be inferred from a smaller number, which reads as a bug — the
         // reason `decayEvents` is on the state at all.
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          {decayed === 1 ? 'One has' : `${decayed} have`} wandered off over long gaps — the days underneath them still count.
-        </p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{cardDecayLine(decayed)}</p>
       )}
     </div>
   )

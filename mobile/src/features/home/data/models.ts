@@ -38,6 +38,7 @@ export const widgetLabels = {
   muscleStatusWidget: 'Muscle Status',
   hrChartWidget: 'Heart Rate',
   energyBalanceWidget: 'Energy Balance',
+  collectionWidget: 'Collection',
 };
 export const sectionLabels: Record<string, string> = {
   recommendation: 'Recommended Today',
@@ -175,4 +176,24 @@ export function homeStreak(
     today,
     streakRestGapFor(schedule as Parameters<typeof streakRestGapFor>[0]),
   ).current;
+}
+
+/**
+ * The views a Home write expires. A chosen rest day also pauses the collection's decay, so it
+ * expires that view too (the web's invalidateRestDayChoice).
+ */
+export function homeWritePaths(kind: 'mood' | 'rest' | 'goal-review' | 'preferences') {
+  if (kind === 'preferences') return ['/api/user/preferences'];
+  return [
+    '/api/user/preferences',
+    '/api/user/profile',
+    '/api/day-timeline',
+    '/api/mood',
+    '/api/readiness-score',
+    '/api/body-battery',
+    '/api/next-session',
+    '/api/workout-data',
+    '/api/ai-periodization',
+    ...(kind === 'rest' ? ['/api/collection'] : []),
+  ];
 }

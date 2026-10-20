@@ -37,6 +37,7 @@ import {
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useHome } from '../data/HomeProvider';
+import { CollectionCard } from '../../collection/components/CollectionCard';
 import { metricLabels } from '../data/models';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
@@ -161,7 +162,18 @@ type WidgetProps = {
   openReadiness: () => void;
   openTraining?: () => void;
   openMorning?: () => void;
+  openCollection?: () => void;
 };
+function CollectionWidget({ id, openCollection }: WidgetProps) {
+  const { theme } = useTheme();
+  const home = useHome();
+  return (
+    <CollectionCard
+      accent={nativeColor(home.preferences.cardColors?.[id]) ?? theme.homeCards.collectionWidget}
+      openCollection={openCollection ?? (() => {})}
+    />
+  );
+}
 type Extra = {
   goals?: ResourceState<z.infer<typeof goalsSpec.schema>>;
   load?: ResourceState<z.infer<typeof loadSpec.schema>>;
@@ -181,6 +193,7 @@ function ResourceWidget<T>({
 }
 export function HomeWidget(props: WidgetProps) {
   const { today } = useHealthData();
+  if (props.id === 'collectionWidget') return <CollectionWidget {...props} />;
   if (props.id === 'sleepWidget' || props.id === 'stepsWidget')
     return (
       <ResourceWidget

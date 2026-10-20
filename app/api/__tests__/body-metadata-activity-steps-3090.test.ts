@@ -1,6 +1,7 @@
 // #3090: `/api/body-metadata` added every activity row's stored `steps` to the day's step count. Since
 // Q-230 a GPS walk saves strap-cadence steps the ring already counted outdoors, so each one was
-// counted twice. Only indoor activity the ring cannot see (a treadmill walk) folds in now.
+// counted twice. Only indoor activity (a treadmill walk) folds in now; whether the ring already counts
+// some of its steps is unknown, pending #3112.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const TZ = 'Australia/Brisbane'
@@ -72,7 +73,7 @@ describe('#3090 the day step count does not add an outdoor walk the ring already
     expect(body.today?.steps).toBe(RING_STEPS)
   })
 
-  it('a treadmill session still adds its steps, which the ring cannot see', async () => {
+  it('a treadmill session still adds its steps', async () => {
     repo.activityLogs = [activity('treadmill', 3_500, 2.8)]
     const body = await get()
     expect(body.today?.steps).toBe(RING_STEPS + 3_500)
