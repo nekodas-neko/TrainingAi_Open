@@ -5,6 +5,7 @@ import { computeWeightRateKgPerWeek } from '@trainingai/shared/health/long-term-
 import { toAestDay } from '@trainingai/shared/date-utils';
 import { AppText, Card, Disclosure, FeatureRow, Grid } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bodyCardColors } from '../../../shared/theme/tokens';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
 import { goalsSpec, latestMetric, profileSpec, progressSpec } from '../data/models';
@@ -99,10 +100,10 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
               : Math.round(health.body.activeEnergyKcalToday)
           }
           unit="kcal"
-          tone="activity"
+          accent={bodyCardColors.burned}
           caption="From cardio today"
         />
-        <HealthMetricCard compact title="BMI" value={bmi} decimals={1} tone="nutrition">
+        <HealthMetricCard compact title="BMI" value={bmi} decimals={1} accent={bodyCardColors.bmi}>
           {bmiLabel && (
             <AppText variant="caption" tone="muted">
               {bmiLabel}

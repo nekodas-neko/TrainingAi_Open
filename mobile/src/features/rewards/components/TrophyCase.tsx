@@ -7,7 +7,7 @@ import type { Achievement } from '../data/models';
 import { useTrophyCase } from '../data/useRewards';
 import { achievementIcon } from './achievementIcons';
 import { glow } from './glow';
-import { tint } from './tint';
+import { blend } from './tint';
 import { useCategoryColor } from './useCategoryColor';
 
 function Slot({
@@ -67,7 +67,7 @@ function Slot({
           borderRadius: theme.radii.card,
           borderWidth: 1,
           borderColor: color,
-          backgroundColor: tint(color, 0.12),
+          backgroundColor: blend(color, theme.colors.background, 0.12),
           padding: theme.spacing.md,
           transform: [{ scale: pressed ? 0.95 : 1 }],
         },
@@ -116,7 +116,7 @@ function PickerTile({
         borderRadius: theme.radii.control,
         borderWidth: 1,
         borderColor: pinned ? theme.colors.brand : color,
-        backgroundColor: tint(color, 0.1),
+        backgroundColor: blend(color, theme.colors.background, 0.1),
         opacity: pinned ? 0.4 : 1,
         padding: theme.spacing.sm,
       }}

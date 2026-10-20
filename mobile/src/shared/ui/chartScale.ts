@@ -138,7 +138,50 @@ export function coverTicks(ticks: readonly number[], top: number): number[] {
 /** True when `axisLabels` has one entry per point and some are blank: the caller has thinned the axis
  *  and each remaining label belongs under its own point, not spread across the row. */
 export function isPointAlignedAxis(labelCount: number, pointCount: number, labels: readonly string[]) {
-  return labelCount === pointCount && pointCount > 1 && labels.some((label) => label === '');
+  // A thinned axis (blanks between labels) or a label on every point of a dense series (14 days):
+  // each belongs under its own point. A short list of end labels keeps the even spread.
+  return (
+    labelCount === pointCount &&
+    pointCount > 1 &&
+    (pointCount >= DENSE_AXIS_POINTS || labels.some((label) => label === ''))
+  );
+}
+
+/** Labels at or above this many make an axis dense: set at the 9 px tick size the current app's charts use. */
+export const DENSE_AXIS_POINTS = 10;
+
+/**
+ * An SVG path through `points` as chart.js draws a line with `tension`: a cubic through every point
+ * whose control points lean along the line between its neighbours, scaled by how far each neighbour
+ * is. The first and last point have one control point each, so the curve starts and ends on them.
+ * `tension` 0 is a straight polyline. The current app's 14-day charts use 0.4.
+ */
+export function smoothPath(points: readonly { x: number; y: number }[], tension = 0.4): string {
+  if (points.length === 0) return '';
+  const move = `M${points[0].x},${points[0].y}`;
+  if (points.length < 3 || tension === 0) {
+    return points.slice(1).reduce((d, p) => `${d} L${p.x},${p.y}`, move);
+  }
+  const control = points.map((p, i) => {
+    const prev = points[i - 1] ?? p;
+    const next = points[i + 1] ?? p;
+    const d01 = Math.hypot(p.x - prev.x, p.y - prev.y);
+    const d12 = Math.hypot(next.x - p.x, next.y - p.y);
+    const total = d01 + d12;
+    const fa = total ? (tension * d01) / total : 0;
+    const fb = total ? (tension * d12) / total : 0;
+    return {
+      before: { x: p.x - fa * (next.x - prev.x), y: p.y - fa * (next.y - prev.y) },
+      after: { x: p.x + fb * (next.x - prev.x), y: p.y + fb * (next.y - prev.y) },
+    };
+  });
+  let d = move;
+  for (let i = 1; i < points.length; i++) {
+    const a = control[i - 1].after;
+    const b = control[i].before;
+    d += ` C${a.x},${a.y} ${b.x},${b.y} ${points[i].x},${points[i].y}`;
+  }
+  return d;
 }
 
 /** Pixel centre, from the left of the chart view, of the point at `x`. Mirrors LineChart's own

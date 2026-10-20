@@ -21,6 +21,26 @@ export const healthHeroGradients = {
   },
 };
 
+// app/globals.css --page-gradient-*: the page behind a detail screen's hero, which the hero fades into.
+export const healthPageGradients = {
+  sleep: {
+    dark: 'linear-gradient(180deg, #060620 0%, #09082a 18%, #070818 42%, #050614 68%, #040512 100%)',
+    light: 'linear-gradient(180deg, #e8eafb 0%, #eef0fc 18%, #f2f3fd 42%, #f6f7fe 68%, #fafaff 100%)',
+  },
+  readiness: {
+    dark: 'linear-gradient(180deg, #020a18 0%, #040e1e 18%, #030b18 40%, #020810 65%, #010508 100%)',
+    light: 'linear-gradient(180deg, #e3f0ff 0%, #eaf4ff 18%, #eff8ff 40%, #f5fbff 65%, #fafdff 100%)',
+  },
+  activity: {
+    dark: 'linear-gradient(180deg, #0d0a2e 0%, #0e0a25 18%, #0a0720 40%, #080519 65%, #060413 100%)',
+    light: 'linear-gradient(180deg, #ede8fb 0%, #f0ecfc 18%, #f4f0fc 40%, #f8f5fd 65%, #fbf9fe 100%)',
+  },
+  'heart-rate': {
+    dark: 'linear-gradient(180deg, #3d0808 0%, #280505 16%, #1a0303 36%, #100202 62%, #0a0202 100%)',
+    light: 'linear-gradient(180deg, #ffe1e1 0%, #ffe9e9 16%, #fff0f0 36%, #fff6f6 62%, #fffafa 100%)',
+  },
+};
+
 export const healthArtColors: Record<string, string> = {
   lightChip: 'rgba(255,255,255,0.55)',
   darkChip: 'rgba(0,0,0,0.35)',

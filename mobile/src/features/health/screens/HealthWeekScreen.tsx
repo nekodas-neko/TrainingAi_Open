@@ -1,9 +1,11 @@
 import { plural } from '@trainingai/shared/format/plural';
+import { trendRowsFor, TREND_WEEK_TIME_DOMAIN } from '@trainingai/shared/nutrition/day-trends';
 import { weekDelta } from '@trainingai/shared/health/week-delta';
 import {
   AppText,
   Card,
   Grid,
+  Icon,
   BarChart,
   MarkdownText,
   Stack,
@@ -14,9 +16,8 @@ import { WorkoutLayout } from '../../workouts/components/WorkoutLayout';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { digestSpec, monthWindowSpec, metricValue } from '../data/models';
 import { HealthViewReady } from '../components/HealthViewReady';
-import { HealthMetricCard } from '../components/HealthMetricCard';
+import { TrendRowCard } from '../components/TrendRowCard';
 import { WeekMetricTile } from '../components/WeekMetricTile';
-import { HealthResourceHeader } from '../components/HealthResourceHeader';
 import { MuscleVolumeFigure } from '../components/MuscleVolumeFigure';
 import {
   fixedValue,
@@ -58,7 +59,10 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
         {m && (
           <>
             <Card>
-              <AppText variant="heading">Training</AppText>
+              <Stack direction="row" align="center" gap="xs">
+                <Icon name="upper" size={theme.sizes.iconCompact} tone="brand" />
+                <AppText variant="subheading">Training</AppText>
+              </Stack>
               <AppText variant="title">{metricValue(m.training.volumeKg, 'kg')}</AppText>
               <AppText variant="caption" tone="muted">
                 Over {plural(m.training.sessions, 'session', 'sessions')}
@@ -82,7 +86,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                 }))}
               />
             </Card>
-            <AppText variant="heading">Recovery</AppText>
+            <AppText variant="subheading">Recovery</AppText>
             <Grid columns={2} gap="sm">
               {(
                 ['readiness', 'sleepScore', 'sleepHours', 'hrv', 'stressHighMinutes'] as const
@@ -136,7 +140,10 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
             </Grid>
             {!!m.prs.length && (
               <Card>
-                <AppText variant="heading">Personal records</AppText>
+                <Stack direction="row" align="center" gap="xs">
+                  <Icon name="trophy" size={theme.sizes.iconCompact} tone="brand" />
+                  <AppText variant="subheading">Personal records</AppText>
+                </Stack>
                 {m.prs.map((pr) => (
                   <Stack key={pr.exerciseName} direction="row" justify="space-between">
                     <AppText variant="caption" style={{ flex: 1 }}>
@@ -163,53 +170,32 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
   );
 }
 function WeekTrends({ week }: { week: string }) {
-  const { theme } = useTheme();
   const state = useWorkoutResource(monthWindowSpec(week));
   const data = state.data;
+  // The same rows the day review draws, over five weekly points against the four weeks before.
+  const rows = data ? trendRowsFor({ points: data.weeks, priorAverages: data.priorAverages }) : [];
   return (
-    <>
-      <HealthResourceHeader
-        title="Against the last four weeks"
-        state={state}
-        refresh={state.refresh}
-      />
-      {data &&
-        (['restingHeartRate', 'steps', 'sessionVolumeKg', 'weightKg'] as const).flatMap(
-          (key) => {
-            const current = data.weeks.at(-1)?.[key];
-            const baseline = data.priorAverages[key];
-            if (current == null && !data.weeks.some((w) => w[key] != null)) {
-              return [];
-            }
-            const difference = current != null && baseline != null ? current - baseline : null;
-            const unit = key === 'restingHeartRate' ? 'bpm' : key === 'steps' ? '' : 'kg';
-            return [
-              <HealthMetricCard
-                key={key}
-                title={
-                  {
-                    restingHeartRate: 'Resting heart rate',
-                    steps: 'Steps',
-                    sessionVolumeKg: 'Session volume',
-                    weightKg: 'Weight',
-                  }[key]
-                }
-                value={current}
-                unit={unit}
-                decimals={key === 'weightKg' ? 1 : 0}
-                caption={
-                  difference == null
-                    ? 'No comparison available'
-                    : Math.abs(difference) < 0.05
-                      ? 'Level with the last 4 weeks'
-                      : `${metricValue(Math.abs(difference), unit, key === 'weightKg' ? 1 : 0)} ${difference > 0 ? 'above' : 'below'} the last 4 weeks`
-                }
-                points={data.weeks.map((w) => ({ label: w.weekStart, value: w[key] }))}
-                chart={{ color: theme.colors.brand, dots: 'isolated' }}
-              />,
-            ];
-          },
-        )}
-    </>
+    <Stack gap="sm">
+      <Stack direction="row" justify="space-between" align="center">
+        <AppText variant="caption" tone="muted" style={{ fontWeight: '600', flex: 1 }}>
+          Against the last four weeks
+        </AppText>
+        <StatusIndicator
+          label="Four-week comparison"
+          busy={state.loading}
+          error={state.error}
+          onRetry={state.refresh}
+        />
+      </Stack>
+      {rows.map((row) => (
+        <TrendRowCard
+          key={row.spec.key}
+          row={row}
+          timeDomain={TREND_WEEK_TIME_DOMAIN}
+          comparison="the last 4 weeks"
+          absentLabel="No reading this week"
+        />
+      ))}
+    </Stack>
   );
 }

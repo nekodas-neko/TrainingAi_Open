@@ -211,6 +211,7 @@ export function HeartTrendCard({
         height: 88,
         tickCount: 4,
         axisLabels: weekdayAxis(shown.map((day) => day.date)),
+        smooth: true,
       }}
       // The change sits at the top right of the title row, as the current app's does.
       status={

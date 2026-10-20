@@ -48,6 +48,8 @@ export const sizes = {
   // nutrition-action-row.tsx: w-4 h-4 icons.
   iconCompact: 16,
   weightSparkline: 110,
+  // sparkline-chart rows (TrendRowCard in day-trends-section.tsx): <Sparkline width={110} height={30} />.
+  trendSparkline: 30,
   stepsSparkline: 40,
   nutritionRing: 104,
   mealLabel: 189,
@@ -145,6 +147,8 @@ export const typography = {
   factorLabel: { fontSize: 11, lineHeight: 13.75 },
   factorValue: { fontSize: 11, lineHeight: 16.5, fontWeight: '600' },
   statUnit: { fontSize: 9, lineHeight: 13.5 },
+  // trend-sparkline.tsx: chart.js x ticks at font size 9, so 14 weekday labels fit the plot.
+  axisTick: { fontSize: 9, lineHeight: 13.5 },
   micro: { fontSize: 10, lineHeight: 14, fontWeight: '600' },
   // day-sections.tsx Stat: text-[0.95rem] font-bold leading-none over a text-[8.5px] uppercase
   // tracking-[0.16em] label (Eaten / Burned / Net).
@@ -277,6 +281,13 @@ export const homeCardColors = {
   hrChartWidget: 'transparent',
   energyBalanceWidget: '#22c55e',
   collectionWidget: '#fb923c',
+};
+// Health > Body. health-sections.tsx accentCardStyle(...) on each card; the same in both modes.
+export const bodyCardColors = {
+  weight: '#00d4ff',
+  fat: '#f43f5e',
+  burned: '#f97316',
+  bmi: '#a78bfa',
 };
 export const domainTones = {
   light: {

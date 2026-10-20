@@ -4,6 +4,7 @@ import { formatActivityTitle } from '@trainingai/shared/format/activity-title';
 import { plural } from '@trainingai/shared/format/plural';
 import { phaseLabel, lastTrainedLabel } from '@trainingai/shared/ai-periodization/status-labels';
 import { PATTERN_LABEL, movementBalance } from '@trainingai/shared/health/movement-balance';
+import { weekOverWeekChange } from '@trainingai/shared/health/trend-delta';
 import { seriesShape, trimLeadingGaps } from '@trainingai/shared/health/series-gaps';
 
 // What the Health Training cards print, kept out of the components so each rule is tested once.
@@ -95,6 +96,8 @@ export function trendSeries<T extends { date: string }>(
     points: shown.map((row) => ({ label: row.date, value: row.value })),
     axisLabels: shown.map((row) => formatDateDisplay(row.date, 'weekday')),
     missing: seriesShape(shown.map((row) => row.value)).coverage,
+    // Over every day fetched, as the current app's chip is, not only the days drawn.
+    change: weekOverWeekChange(rows.map((row) => row.value)),
   };
 }
 

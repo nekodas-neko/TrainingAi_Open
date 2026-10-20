@@ -12,6 +12,8 @@ import {
   guideSummary,
   yPixel,
   isPointAlignedAxis,
+  smoothPath,
+  DENSE_AXIS_POINTS,
   pointCentreX,
   dotMask,
   lineSegments,
@@ -205,4 +207,33 @@ test('a stretched chart puts its first and last point on the edges', () => {
 test('dotMask "none" draws no dot, not even the latest reading', () => {
   assert.deepEqual(dotMask([1, 2, null, 3], 'none'), [false, false, false, false]);
   assert.deepEqual(dotMask([1, 2, 3], 'isolated'), [false, false, true]);
+});
+
+test('14 weekday labels, one per point, are laid inside the plot with the end ones whole', () => {
+  const labels = Array.from({ length: 14 }, (_, i) => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i % 7]);
+  // No blanks, but a label on every point of a dense series is still point-aligned (#3183).
+  assert.ok(14 >= DENSE_AXIS_POINTS);
+  assert.ok(isPointAlignedAxis(14, 14, labels));
+  const width = 290;
+  const boxes = labels.map((_, i) =>
+    axisLabelBox(pointCentreX(i, 0, 13, width, 88), 40, width),
+  );
+  // Every box, the first and the last included, sits inside the chart's width.
+  boxes.forEach((box) => assert.ok(box.left >= 0 && box.left + 40 <= width));
+  // The last label leans on the right edge and is not pushed past it.
+  assert.equal(boxes[13].alignItems, 'flex-end');
+  assert.equal(boxes[0].alignItems, 'flex-start');
+  // Neighbouring points are further apart than a 9 px three-letter weekday (about 18 px) is wide.
+  assert.ok(pointCentreX(1, 0, 13, width, 88) - pointCentreX(0, 0, 13, width, 88) > 18);
+});
+
+test('smoothPath is a cubic through every point, and a straight line for tension 0 or two points', () => {
+  const pts = [{ x: 0, y: 10 }, { x: 10, y: 0 }, { x: 20, y: 10 }];
+  const d = smoothPath(pts);
+  assert.match(d, /^M0,10 C/);
+  assert.equal(d.match(/C/g)!.length, 2);
+  assert.ok(d.endsWith('20,10'));
+  assert.equal(smoothPath(pts, 0), 'M0,10 L10,0 L20,10');
+  assert.equal(smoothPath(pts.slice(0, 2)), 'M0,10 L10,0');
+  assert.equal(smoothPath([]), '');
 });

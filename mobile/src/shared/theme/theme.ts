@@ -1,5 +1,5 @@
 import type { TextStyle } from 'react-native';
-import { healthArtColors, healthHeroGradients } from './health-heroes';
+import { healthArtColors, healthHeroGradients, healthPageGradients } from './health-heroes';
 import { createBackgroundTheme, type BackgroundTheme } from './backgrounds';
 import { STAGE_COLOR } from '@trainingai/shared/health/hypnogram';
 import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones';
@@ -61,6 +61,7 @@ export type Theme = {
   macros: Record<keyof typeof MACRO_COLORS, string>;
   healthArtColors: Record<string, string>;
   healthHeroGradients: typeof healthHeroGradients;
+  healthPageGradients: typeof healthPageGradients;
   mode: 'light' | 'dark';
   colors: ThemeColors;
   spacing: typeof spacing;
@@ -157,6 +158,7 @@ export function createTheme(
     macros: { ...(mode === 'dark' ? MACRO_COLORS : macroColorsLight), ...overrides.macros },
     healthArtColors: { ...healthArtColors, ...overrides.healthArtColors },
     healthHeroGradients: { ...healthHeroGradients, ...overrides.healthHeroGradients },
+    healthPageGradients,
     mode,
     colors,
     tones,
