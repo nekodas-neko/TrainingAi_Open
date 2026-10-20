@@ -67,6 +67,23 @@ describe.skipIf(!canRun)('Oura late data re-scores its day (#3079)', () => {
     expect(row.activity_score).toBe(60)
   })
 
+  // #3086: the illness radar's fields are stored beside readiness from the same night, so they go
+  // with it, and a day holding only them still counts as changed.
+  it('clears the illness fields with readiness, never with sleep alone', async () => {
+    const illness = { illnessFlag: 'elevated', illnessScore: 70, illnessBiomarkers: { rhr: { z: 2 } } }
+    await repo.upsertOuraDailyDerived(USER, today, { sleepScore: 80, readinessScore: 60, ...illness })
+    const flags = async () => (await pool.query(
+      `SELECT illness_flag, illness_score, illness_biomarkers FROM oura_daily_derived WHERE user_id = $1 AND day = $2`, [USER, today])).rows[0]
+    expect(await repo.clearNightDerivedScores(USER, today, { sleep: true, readiness: false })).toBe(true)
+    expect(await flags()).toEqual({ illness_flag: 'elevated', illness_score: 70, illness_biomarkers: { rhr: { z: 2 } } })
+    expect(await repo.clearNightDerivedScores(USER, today, { sleep: false, readiness: true })).toBe(true)
+    expect(await flags()).toEqual({ illness_flag: null, illness_score: null, illness_biomarkers: null })
+
+    await repo.upsertOuraDailyDerived(USER, today, illness)
+    expect(await repo.clearNightDerivedScores(USER, today, { sleep: false, readiness: true })).toBe(true)
+    expect((await flags()).illness_flag).toBeNull()
+  })
+
   it('releases a readiness anchor and leaves a provisional one alone', async () => {
     const base = { anchor: 72, endValue: 50, dayMin: 40, dayMax: 72, totalCharged: 0, totalDrained: 22, restingHr: 52, hrMax: 180, hrMaxObserved: null, hrSampleCount: 300, modelVersion: 'v7' }
     await repo.upsertBodyBatteryDaily(USER, { ...base, date: today, anchorSource: 'readiness' })

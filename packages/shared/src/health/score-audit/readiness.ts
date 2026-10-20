@@ -7,7 +7,7 @@ import {
 } from '@trainingai/shared/health/readiness-composite'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
 import { scoreBand } from '@trainingai/shared/health/score-band'
-import { computeIllnessRadar, illnessZScores, illnessAdvisory } from '@trainingai/shared/health/illness-radar'
+import { applyIllnessSuppression, computeIllnessRadar, illnessZScores, illnessAdvisory, storedReadinessMatches } from '@trainingai/shared/health/illness-radar'
 import type { OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyRow } from '@/lib/data/repository'
 import { fixedWeightContributors, contributionSum, type ContributorSpec } from './contributors'
 import type { PillarAudit } from './types'
@@ -90,7 +90,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
 
   const compositeScore = composite?.score ?? null
   const displayedScore = compositeScore != null && illness
-    ? Math.max(0, compositeScore - illness.readinessSuppression)
+    ? applyIllnessSuppression(compositeScore, illness.readinessSuppression)
     : compositeScore
 
   const c = composite?.contributors
@@ -162,6 +162,9 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
 
   const contributors = fixedWeightContributors(specs, READINESS_WEIGHTS)
   const storedScore = derived?.readinessScore ?? null
+  // #3086: a stored score is the served one (after the suppression for the flag stored beside it), or
+  // on a row written before #3086 the composite itself; either is "this composite".
+  const isStored = (composite: number) => storedScore != null && storedReadinessMatches(storedScore, composite, derived?.illnessFlag)
 
   // Q-501 — does the STORED score follow from the inputs stored beside it?
   //
@@ -201,7 +204,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
         `${storedScore} — so the MODEL moved since this day was scored, not the inputs.`,
       )
     } else if (
-      rederived.uncheckable.length === 0 && rederived.missing.length === 0 && rederived.score !== storedScore
+      rederived.uncheckable.length === 0 && rederived.missing.length === 0 && !isStored(rederived.score)
     ) {
       // Every contributor reproduces and the total still does not: the WEIGHTS moved, which no
       // per-contributor check can see. Every row scored before #2224 lands here, because it was
@@ -216,7 +219,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       )
     } else if (
       rederived.uncheckable.length === 0 && rederived.missing.length === 0 &&
-      storedScore !== compositeScore && compositeScore != null
+      compositeScore != null && !isStored(compositeScore)
     ) {
       notes.push(
         `The stored score IS reproducible from its own stored inputs (${rederived.score}), so the ` +
@@ -230,10 +233,13 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
   return {
     pillar: 'readiness',
     label: 'Readiness',
-    // What /api/readiness-score persists is `ownComposite.score` — the composite BEFORE the illness
-    // suppression, not the score shown on screen. The backfill must write the same thing or a
+    // What /api/readiness-score persists: since #3086 the score shown on screen, AFTER the illness
+    // suppression, with the radar's fields beside it. The backfill must write the same thing or a
     // recomputed day would silently disagree with a live-computed one.
-    persist: composite ? { score: composite.score, contributors: composite.contributors } : null,
+    persist: composite && displayedScore != null ? {
+      score: displayedScore, contributors: composite.contributors,
+      illnessFlag: illness?.flag ?? null, illnessScore: illness?.score ?? null, illnessBiomarkers: illness?.biomarkers ?? null,
+    } : null,
     score: displayedScore,
     band: displayedScore != null ? scoreBand(displayedScore).label : null,
     source: composite ? 'own-composite (computeReadinessComposite)' : 'no-data (no daily summary for this day)',

@@ -121,6 +121,10 @@ export async function POST(req: NextRequest) {
           await repo.upsertOuraDailyDerived(userId, d, {
             readinessScore: readiness.persist.score,
             readinessContributors: readiness.persist.contributors,
+            // #3086: the served score's explanation, as the live route stores it.
+            illnessFlag: readiness.persist.illnessFlag,
+            illnessScore: readiness.persist.illnessScore,
+            illnessBiomarkers: readiness.persist.illnessBiomarkers,
             readinessSource: 'ble-derived',
             // The point of Q-273's stamp is that a later model change leaves a readable step in the
             // trend rather than an unmarked one. A backfill writes across history in one pass, so an

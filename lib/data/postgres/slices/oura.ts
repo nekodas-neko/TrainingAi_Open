@@ -2833,8 +2833,13 @@ export async function clearNightDerivedScores(
     present.push(isNotNull(s.ouraDailyDerived.sleepScore), isNotNull(s.ouraDailyDerived.sleepContributors))
   }
   if (pillars.readiness) {
-    Object.assign(set, { readinessScore: null, readinessContributors: null })
-    present.push(isNotNull(s.ouraDailyDerived.readinessScore), isNotNull(s.ouraDailyDerived.readinessContributors))
+    // #3086: the illness radar's fields are stored beside readiness from the same night inputs, so
+    // they go with it: a re-scored day must not keep a flag from the night it no longer has.
+    Object.assign(set, { readinessScore: null, readinessContributors: null, illnessFlag: null, illnessScore: null, illnessBiomarkers: null })
+    present.push(
+      isNotNull(s.ouraDailyDerived.readinessScore), isNotNull(s.ouraDailyDerived.readinessContributors),
+      isNotNull(s.ouraDailyDerived.illnessFlag), isNotNull(s.ouraDailyDerived.illnessScore), isNotNull(s.ouraDailyDerived.illnessBiomarkers),
+    )
   }
   if (present.length === 0) return false
   const rows = await db.update(s.ouraDailyDerived)

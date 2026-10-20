@@ -30,7 +30,7 @@ import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-co
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult, type ContributorGap } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
-import { computeIllnessRadar, illnessAdvisory, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
+import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
@@ -681,9 +681,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   // Illness overrides an otherwise-OK readiness: subtract the bounded suppression (0 unless the
   // radar is elevated/fever) from the displayed score before banding and the deload check.
-  if (illness && illness.readinessSuppression > 0) {
-    score = Math.max(0, score - illness.readinessSuppression)
-  }
+  if (illness) score = applyIllnessSuppression(score, illness.readinessSuppression)
 
   const label: ReadinessScoreResponse['label'] = scoreBand(score).label
 
@@ -764,7 +762,14 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Persist our own composite readiness in completed form for later analysis (compute-and-persist).
   // The composite already blends every signal (RHR / HRV / temperature / sleep balance / previous
   // night's sleep score / prev-day activity / recovery index / activity balance), so we record it
-  // whole, exactly as computed here — the stored value can't diverge from what the user sees. The
+  // whole, as served — the stored value can't diverge from what the user sees. #3086: "as served"
+  // means AFTER the illness radar's suppression. It used to store `ownComposite.score`, the number
+  // before it, so on a day the radar read `elevated` or `fever` every reader of the stored value
+  // (trends, the day timeline and log, the verdict, training stress, the coach) saw a readiness
+  // higher than the one shown. The radar's flag, score and biomarkers are stored beside it (#3077's
+  // first item), so a suppressed day stays explainable without a new column: the composite before
+  // the radar is the stored score plus `READINESS_SUPPRESSION[illness_flag]` (unless clamped at 0),
+  // and the contributors are the composite's own, unchanged. The
   // route still computes live for display (read-first is perf-gated and not adopted). Writes only the
   // readiness_* columns (COALESCE upsert) — never the shared source/model_versions, which the upsert
   // replaces wholesale and would clobber body_comp/illness provenance on the same row. Best-effort:
@@ -795,8 +800,16 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // that could already be stale (Q-273).
     // #2984: keyed on the night the inputs are for, which #3079 now requires to be today.
     derivedPersists.push({ day: todayIso, pillar: 'readiness', patch: {
-      readinessScore: ownComposite.score,
+      // `score`, not `ownComposite.score`: on this branch it is the composite less the radar's
+      // suppression, the number `readinessDisplayScore` serves (#3086).
+      readinessScore: score,
       readinessContributors: ownComposite.contributors,
+      // The radar ran on the same night inputs (`illnessNightFields`), whenever the composite did.
+      // Until #3086 only the ring's rollup stored these, so after the switch to the Oura API the
+      // stored flag stopped (#3077). `learning` is stored too, as the rollup did.
+      illnessFlag: illness?.flag,
+      illnessScore: illness?.score,
+      illnessBiomarkers: illness?.biomarkers,
       // Both labels are our own composite and AI surfaces read both (`liveReadinessByDay`, #2992).
       // Where each input came from is on the contributors (`source`); the Health Connect recompute
       // reads that, not this label, to decide which days to clear.
