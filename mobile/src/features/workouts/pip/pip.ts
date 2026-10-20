@@ -104,9 +104,11 @@ export function pipViewFor(workout: WorkoutRecord | null): PipView | null {
   if (!workout || !allowsPip(phase)) return null;
   const { exercise } = current(workout);
   if (!exercise) return null;
-  // Preview's exercise summary runs no last-set rest (#3111), so there is nothing to time: the
-  // current app's placeholder, until that rest exists.
-  if (phase === 'summary') return { kind: 'placeholder', exerciseName: exercise.name, hint: true };
+  // The summary times the last set's rest as a rest, with every set done, as the current app's
+  // PipView does; once Next clears it there is nothing to time, so its placeholder (#3111).
+  if (phase === 'summary' && !workout.rest) {
+    return { kind: 'placeholder', exerciseName: exercise.name, hint: true };
+  }
   const base = {
     exerciseName: exercise.name,
     sets: exercise.sets.length,
@@ -132,7 +134,9 @@ export function pipViewFor(workout: WorkoutRecord | null): PipView | null {
     restTargetSec: workout.rest
       ? Math.max(0, Math.round((workout.rest.endsAt - workout.rest.startedAt) / 1000))
       : 0,
-    restStartMs: workout.restAnchor?.startedAt ?? null,
+    restStartMs: workout.rest?.lastSet
+      ? workout.rest.startedAt
+      : (workout.restAnchor?.startedAt ?? null),
     setStartMs: null,
     load: null,
     setColor: null,

@@ -400,6 +400,8 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'sleep_sessions', column: 'manual_entry',      ddl: `ALTER TABLE sleep_sessions ADD COLUMN manual_entry INTEGER NOT NULL DEFAULT 0` },
   // issue 2606 (v52). A manual night the user removed; NULL on every existing row, which is live.
   { table: 'sleep_sessions', column: 'deleted_at',        ddl: `ALTER TABLE sleep_sessions ADD COLUMN deleted_at TEXT` },
+  // #3060 (v53). Oura's period type; NULL on every existing row until the server re-sends it.
+  { table: 'sleep_sessions', column: 'oura_sleep_type',   ddl: `ALTER TABLE sleep_sessions ADD COLUMN oura_sleep_type TEXT` },
   // oura_daily gains sync_status so the applyDelta pull can clobber-guard a device-authored
   // (BLE rollup) row against a stale server pull — the D4 finding. Default 'synced' (existing
   // rows are server-mirrored); the device-write path that sets 'pending' lands with D2.
@@ -1750,6 +1752,18 @@ export const MIGRATIONS: UpgradeStatement[] = [
     toVersion: 52,
     statements: [
       `ALTER TABLE sleep_sessions ADD COLUMN deleted_at TEXT`,
+    ],
+  },
+  {
+    // #3060. Oura's period type (`long_sleep`, `sleep`, `late_nap`, `rest`), joined into the delta
+    // pull from the server's `oura_cloud_sleep_periods`, so the cold-open seed keeps a nap out of the
+    // night as the server's card does (`ouraSecondaryPeriods`). No Postgres migration: the server
+    // column already exists. Same shape as v52. No backfill: a row pulled before v53 reads NULL, the
+    // rule's "type unknown", which is how the seed read every row until now; the server re-sends it
+    // when the period is retyped, and Restore from cloud fills it (the apply's NULL-type exception).
+    toVersion: 53,
+    statements: [
+      `ALTER TABLE sleep_sessions ADD COLUMN oura_sleep_type TEXT`,
     ],
   },
 ];

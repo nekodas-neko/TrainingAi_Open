@@ -12,7 +12,6 @@ import {
 import { AppState } from 'react-native';
 import { restFeedback } from '../../integrations/feedback/haptics';
 import { armRestEnd, disarmRestEnd } from '../../integrations/feedback/beep';
-import { workoutFlow } from '../workouts/logging/flow';
 import { randomUUID } from 'expo-crypto';
 import { useAccountContext } from '../account/AccountProvider';
 import { useLocalStorage } from '../../core/storage/StorageProvider';
@@ -109,11 +108,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
     };
   }, []);
   const restWorkout = journal.data.workouts.find(
-    (x) =>
-      x.status === 'active' &&
-      x.rest &&
-      x.timers.restCues &&
-      workoutFlow(x).stage !== 'summary',
+    (x) => x.status === 'active' && x.rest && x.timers.restCues,
   );
   const restDeadline = restWorkout?.rest?.endsAt;
   const restCueId = restWorkout?.rest

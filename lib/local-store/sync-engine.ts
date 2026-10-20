@@ -191,6 +191,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     // Issue 2606 — the tombstone of a manual night the user removed. The delta is unfiltered on it
     // (the tombstone channel); absent from an older server's reply, which had no removals to send.
     deletedAt:       r.deletedAt ? toIso(r.deletedAt) : null,
+    // #3060 — Oura's period type (`long_sleep`, `sleep`, `late_nap`, `rest`), so the device seed
+    // applies the same nap rule as the server's card. Null for any other source, and from an older
+    // server's reply, which reads as the rule's "type unknown".
+    ouraSleepType:   (r.ouraSleepType as string) ?? null,
     syncStatus:      'synced' as const,
     updatedAt:       toIso(r.updatedAt),
   } satisfies LocalSleepSession));
