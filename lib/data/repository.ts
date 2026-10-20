@@ -1557,8 +1557,6 @@ export interface WorkoutRepository {
   getOuraCloudMetChangedAt(userId: string, from: string, to: string): Promise<{ date: string; changedAt: Date }[]>
   /** #2982: Oura's sessions (breathing, meditation …) with their series and mood. */
   upsertOuraSessions(userId: string, rows: import('./postgres/slices/oura').OuraSessionRow[]): Promise<number>
-  /** #3081: removes the session Oura reports deleted; rows removed. */
-  deleteOuraSession(userId: string, ouraId: string): Promise<number>
   /** #2895: the newest `oura_cloud` HR point at or after `since`; where the next Cloud HR read starts. */
   getLatestOuraCloudHeartrateAt(userId: string, since: Date): Promise<Date | null>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>

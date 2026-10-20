@@ -1,4 +1,4 @@
-// #3081 — a value Oura adds keeps its document, and a session Oura deletes leaves our tables.
+// #3081 — a value Oura adds keeps its document, and a session delete removes nothing.
 //
 // Against a real Postgres (skips without DATABASE_URL). Oura is not called: documents are built from
 // the spec-shaped fixtures and written through `writeOuraCloudData`, the path the webhook and backfill
@@ -7,7 +7,8 @@
 //     `long_sleep` it never joins the night;
 //   - a workout with a new intensity lands, the value stored as null, and the report carries counts
 //     and field names only, never the value;
-//   - a deleted session is removed for that user, and another account's session with the same id stays.
+//   - a session delete is ignored and the row stays: a delete only ever tombstones, and sessions have
+//     no tombstone yet (#3155 review, #3153).
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FIXTURES, sleepPeriod } from '@/lib/oura/cloud/__tests__/fixtures'
 
@@ -16,27 +17,24 @@ vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => 
 
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-000000003081'
-const OTHER = '00000000-0000-4000-8000-000000013081'
 const NEW = 'a_value_oura_added'
 // `oura_workouts.id` is Oura's id and a global key, so the fixture's id would collide with other suites'.
 const WORKOUT = 'wo-3081'
 
-describe.skipIf(!canRun)('Oura documents with a new value, and session deletes (#3081)', () => {
+describe.skipIf(!canRun)('Oura documents with a new value, and a session delete (#3081)', () => {
   let pool: import('pg').Pool
   let repo: import('@/lib/data/repository').WorkoutRepository
 
   beforeAll(async () => {
     pool = (await import('@/lib/data/postgres/client')).getPool()
     repo = await (await import('@/lib/data')).getRepositoryAsync()
-    for (const [id, email] of [[USER, 'issue-3081@example.com'], [OTHER, 'issue-3081-other@example.com']]) {
-      await pool.query(
-        `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane') ON CONFLICT (id) DO NOTHING`, [id, email])
-    }
+    await pool.query(
+      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane') ON CONFLICT (id) DO NOTHING`, [USER, 'issue-3081@example.com'])
   })
-  afterAll(async () => { if (canRun) await pool.query(`DELETE FROM users WHERE id = ANY($1)`, [[USER, OTHER]]) })
+  afterAll(async () => { if (canRun) await pool.query(`DELETE FROM users WHERE id = $1`, [USER]) })
   beforeEach(async () => {
     for (const t of ['sleep_sessions', 'oura_cloud_sleep_periods', 'body_metrics', 'oura_workouts', 'oura_sessions', 'oura_tokens']) {
-      await pool.query(`DELETE FROM ${t} WHERE user_id = ANY($1)`, [[USER, OTHER]])
+      await pool.query(`DELETE FROM ${t} WHERE user_id = $1`, [USER])
     }
     reportServerError.mockReset()
     const { resetOuraCloudReportThrottle } = await import('@/lib/oura/cloud/report')
@@ -96,9 +94,8 @@ describe.skipIf(!canRun)('Oura documents with a new value, and session deletes (
       .toEqual([{ sleep_analysis_reason: 'background_sleep_analysis' }])
   })
 
-  it("a deleted session leaves this user's table, and another account's session with the same id stays", async () => {
+  it('a session delete removes nothing until sessions have a tombstone (#3153)', async () => {
     await write(USER, { type: 'session', doc: FIXTURES.session })
-    await write(OTHER, { type: 'session', doc: FIXTURES.session })
     const { handleOuraWebhookEvent } = await import('@/lib/oura/cloud/webhook')
     const deps = {
       // The real repository, routing the test's Oura account to USER (a spread would drop its methods).
@@ -106,10 +103,8 @@ describe.skipIf(!canRun)('Oura documents with a new value, and session deletes (
       config: { clientId: 'c', clientSecret: 's', redirectUri: 'https://example.com/cb' },
     }
     const del = { event_type: 'delete' as const, data_type: 'session', object_id: FIXTURES.session.id, user_id: 'oura-3081' }
-    expect(await handleOuraWebhookEvent(deps, del)).toEqual({ result: 'deleted', rows: 1 })
-    // Oura retries a delivery; the second is a no-op.
-    expect(await handleOuraWebhookEvent(deps, del)).toEqual({ result: 'deleted', rows: 0 })
-    const left = (await pool.query(`SELECT user_id FROM oura_sessions WHERE oura_id = $1 AND user_id = ANY($2)`, [FIXTURES.session.id, [USER, OTHER]])).rows
-    expect(left).toEqual([{ user_id: OTHER }])
+    expect(await handleOuraWebhookEvent(deps, del)).toMatchObject({ result: 'ignored' })
+    const left = (await pool.query(`SELECT count(*)::int AS n FROM oura_sessions WHERE user_id = $1 AND oura_id = $2`, [USER, FIXTURES.session.id])).rows[0].n
+    expect(left).toBe(1)
   })
 })

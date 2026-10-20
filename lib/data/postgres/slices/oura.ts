@@ -1120,19 +1120,6 @@ export async function upsertOuraSessions(db: Db, userId: string, rows: OuraSessi
 }
 
 /**
- * #3081: removes the session Oura reports deleted. `oura_sessions` is Oura's own copy, server-only and
- * synced to no device, so the row goes rather than being tombstoned: there is no device to tell, and
- * a tombstone would only keep a session the user removed. Scoped to the user, so another account's
- * id removes nothing. Returns rows removed.
- */
-export async function deleteOuraSession(db: Db, userId: string, ouraId: string): Promise<number> {
-  const removed = await db.delete(s.ouraSessions)
-    .where(and(eq(s.ouraSessions.userId, userId), eq(s.ouraSessions.ouraId, ouraId)))
-    .returning({ ouraId: s.ouraSessions.ouraId })
-  return removed.length
-}
-
-/**
  * Issue 2546. Before the rollup upserts its nights, move each `ble:` id to the start it now has.
  *
  * `oura_id` is unique per user and the rollup derives it from the ring's counter (`ble:<startDs>`),

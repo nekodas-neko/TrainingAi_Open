@@ -73,7 +73,7 @@ describe('Oura webhook subscription renewal (#2859)', () => {
   it('subscribes to delete for exactly the types the webhook acts on', () => {
     const deletes = WANTED_SUBSCRIPTIONS.filter(w => w.eventType === 'delete').map(w => w.dataType)
     expect(deletes).toEqual([...OURA_DELETE_TYPES])
-    expect(deletes).toEqual(['sleep', 'session'])
+    expect(deletes).toEqual(['sleep'])
   })
 
   it('does nothing on a second run', async () => {
