@@ -736,7 +736,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           if (local.length > 0 && !cancelled) {
             // #2414: one row per night, newest first, as the route returns — so the card's
             // find-by-date lands on the night, not on whichever nap the store listed first.
-            setSleepData(localSleepRowsAsNights(local).map(s => ({
+            setSleepData(localSleepRowsAsNights(local, tz).map(s => ({
               date: s.date,
               durationHours: s.durationHours,
               deepSleepHours: s.deepSleepHours,

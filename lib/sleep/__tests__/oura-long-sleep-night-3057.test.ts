@@ -93,11 +93,12 @@ describe('#3057 — an Oura night is its long_sleep period', () => {
       date: '2026-10-19', ouraId: 'oura-ls2', ouraSleepType: 'long_sleep',
       sleepStart: bne('2026-10-19', '01:40'), sleepEnd: bne('2026-10-19', '06:40'), durationHours: 4.6, efficiency: 92,
     })
-    const out = mergeByDate([first, second])
+    const out = mergeByDate([first, second], TZ)
     expect(out).toHaveLength(1)
     expect(out[0].sleepStart).toBe(first.sleepStart)
     expect(out[0].durationHours).toBe(7.4)
-    expect(out[0].efficiency).toBe(92) // the longer period's
+    // #3080: the night's own efficiency, recomputed over the whole night as the score does it.
+    expect(out[0].efficiency).toBe(nightSessions([first, second].map(asSession), TZ)[0].efficiency)
 
     const { nights } = groupSleepPeriods([first, second].map(asSession), TZ)
     expect(nights).toHaveLength(1)
@@ -139,7 +140,7 @@ describe('#3057 — an Oura night is its long_sleep period', () => {
     expect(nights[0].gapHours[0]).toBeCloseTo(105 / 60, 5)
   })
 
-  it('display: a ring night split by a short wake still merges, with the main fragment\'s efficiency whatever the order', () => {
+  it('display: a ring night split by a short wake is the scored night, whatever the order (#3080)', () => {
     const shortFirst = row({
       date: '2026-10-19', ouraId: 'ble:300', sleepStart: bne('2026-10-18', '22:30'), sleepEnd: bne('2026-10-18', '23:30'),
       durationHours: 0.9, awakHours: 0.1, efficiency: 70, onsetLatencySec: 120,
@@ -148,12 +149,18 @@ describe('#3057 — an Oura night is its long_sleep period', () => {
       date: '2026-10-19', ouraId: 'ble:400', sleepStart: bne('2026-10-18', '23:50'), sleepEnd: bne('2026-10-19', '06:30'),
       durationHours: 6.1, awakHours: 0.5, efficiency: 91, onsetLatencySec: 480,
     })
-    const out = mergeByDate([shortFirst, longSecond])
-    expect(out).toHaveLength(1)
-    expect(out[0].sleepStart).toBe(shortFirst.sleepStart) // the ring's grouping is unchanged
-    expect(out[0].durationHours).toBe(7)
-    expect(out[0].awakHours).toBe(0.6)
-    expect(out[0].efficiency).toBe(91)
-    expect(out[0].onsetLatencySec).toBe(480)
+    const scored = nightSessions([shortFirst, longSecond].map(asSession), TZ)[0]
+    for (const order of [[shortFirst, longSecond], [longSecond, shortFirst]]) {
+      const out = mergeByDate(order, TZ)
+      expect(out).toHaveLength(1)
+      expect(out[0].sleepStart).toBe(shortFirst.sleepStart)
+      expect(out[0].durationHours).toBe(7)
+      // The awake time counts the wake-up gap, efficiency is over the whole night, and onset is the
+      // first window's: the score's figures, so the card and the score agree.
+      expect(out[0].awakHours).toBe(+scored.awakHours!.toFixed(2))
+      expect(out[0].efficiency).toBe(scored.efficiency)
+      expect(out[0].onsetLatencySec).toBe(scored.onsetLatencySec)
+      expect(out[0].restlessPeriods).toBe(scored.restlessPeriods)
+    }
   })
 })
