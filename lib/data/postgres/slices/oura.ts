@@ -718,6 +718,26 @@ export async function upsertOuraCloudSleep(
 }
 
 /**
+ * #3099. Wake dates in `[from, to]` that hold a TOMBSTONED Oura Cloud sleep row. The night re-score
+ * reads it before a write: a night that appears on a day where Oura deleted one is a delete followed
+ * by a re-create (which can revive the same row), a revision, not an arrival. Only deleted rows count
+ * (#3104 review): a live nap or rest row on the day must not stop a late night from being an arrival.
+ * Ring (`ble:`) and manual rows are not Oura Cloud's and do not count.
+ */
+export async function listDeletedOuraCloudSleepDates(db: Db, userId: string, from: string, to: string): Promise<string[]> {
+  const rows = await db.selectDistinct({ date: s.sleepSessions.date }).from(s.sleepSessions)
+    .where(and(
+      eq(s.sleepSessions.userId, userId),
+      gte(s.sleepSessions.date, from), lte(s.sleepSessions.date, to),
+      isNotNull(s.sleepSessions.deletedAt),
+      isNotNull(s.sleepSessions.ouraId),
+      sql`${s.sleepSessions.ouraId} NOT LIKE 'ble:%'`,
+      eq(s.sleepSessions.manualEntry, false),
+    ))
+  return rows.map(r => r.date)
+}
+
+/**
  * Tombstones the Cloud sleep periods Oura now reports as deleted (#2859). Only rows with that Oura id
  * for this user: never a manual night or a ring (`ble:`) night. `deleted_at` rides the delta pull, so
  * a phone that already holds the night learns it is gone.

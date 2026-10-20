@@ -28,8 +28,11 @@ function night(date: string, over: Partial<SleepSession> = {}): SleepSession {
   }
 }
 
-function makeRepo(today: string) {
+function makeRepo(today: string, opts: { omit?: string } = {}) {
   let sessions: SleepSession[] = Array.from({ length: 20 }, (_, i) => night(shiftDateStr(today, -19 + i)))
+    .filter(n => n.date !== opts.omit)
+  // Days on which a write removed an Oura row: the tombstones `listDeletedOuraCloudSleepDates` finds.
+  const deletedDates = new Set<string>()
   const derived = new Map<string, Partial<OuraDailyDerivedRow>>()
   const battery = new Map<string, string>()
   const calls = { upserts: [] as { day: string; patch: OuraDailyDerivedPatch }[], cleared: [] as { day: string; pillars: object }[] }
@@ -47,6 +50,7 @@ function makeRepo(today: string) {
       if (row && pillars.readiness) row.readinessScore = null
       return had
     }),
+    listDeletedOuraCloudSleepDates: vi.fn(async (_u: string, from: string, to: string) => [...deletedDates].filter(d => d >= from && d <= to)),
     withOuraSleepWriteLock: vi.fn(async <T,>(_u: string, run: () => Promise<T>) => run()),
     releaseBodyBatteryAnchor: vi.fn(async (_u: string, day: string) => {
       if (battery.get(day) !== 'readiness') return false
@@ -57,7 +61,11 @@ function makeRepo(today: string) {
   return {
     repo: repo as unknown as NightRescoreRepo & typeof repo,
     calls, derived, battery,
-    setSessions: (f: (s: SleepSession[]) => SleepSession[]) => { sessions = f(sessions) },
+    setSessions: (f: (s: SleepSession[]) => SleepSession[]) => {
+      const before = sessions
+      sessions = f(sessions)
+      for (const n of before) if (!sessions.some(x => x.id === n.id)) deletedDates.add(n.date)
+    },
   }
 }
 
@@ -110,8 +118,7 @@ describe('re-scoring a night Oura changed (#3079)', () => {
   })
 
   it('a night that arrives late for today is scored at once, and releases an anchor frozen without it', async () => {
-    const { repo, calls, battery, setSessions } = makeRepo(today)
-    setSessions(s => s.filter(n => n.date !== today))
+    const { repo, calls, battery, setSessions } = makeRepo(today, { omit: today })
     // A readiness from that morning's body metrics alone froze the anchor before the night existed.
     battery.set(today, 'readiness')
 
@@ -120,6 +127,30 @@ describe('re-scoring a night Oura changed (#3079)', () => {
     })
 
     expect(calls.upserts.find(u => u.day === today)?.patch.sleepScore).toEqual(expect.any(Number))
+    expect(battery.get(today)).toBe('default')
+  })
+
+  // #3099: two webhooks, a delete then a re-create, are a revision, not an arrival.
+  it('a delete then a re-create of the night keeps an anchor frozen while it was there', async () => {
+    const { repo, battery, setSessions } = makeRepo(today)
+    battery.set(today, 'readiness')
+
+    await withNightRescore(repo, 'u1', async () => { setSessions(s => s.filter(n => n.date !== today)) })
+    await withNightRescore(repo, 'u1', async () => { setSessions(s => [...s, night(today)]) })
+
+    expect(battery.get(today)).toBe('readiness')
+    expect(repo.releaseBodyBatteryAnchor).not.toHaveBeenCalled()
+  })
+
+  // #3104 review: a live nap on the day is not a deleted night, so a late night still arrives.
+  it('a late night after a nap on the same day is still an arrival, and releases the anchor', async () => {
+    const { repo, battery, setSessions } = makeRepo(today, { omit: today })
+    const mid = dateStrMidnightInTz(today, TZ).getTime()
+    setSessions(s => [...s, night(today, { id: 'nap', ouraId: 'nap', sleepStart: new Date(mid - 10 * HOUR), sleepEnd: new Date(mid - 9.3 * HOUR), durationHours: 0.6 })])
+    battery.set(today, 'readiness')
+
+    await withNightRescore(repo, 'u1', async () => { setSessions(s => [...s, night(today)]) })
+
     expect(battery.get(today)).toBe('default')
   })
 

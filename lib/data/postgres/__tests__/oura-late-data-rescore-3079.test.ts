@@ -229,4 +229,22 @@ describe.skipIf(!canRun)('Oura late data re-scores its day (#3079)', () => {
       other.release()
     }
   })
+
+  // #3099: a day keeps counting as "had an Oura night" after Oura deletes it.
+  it('lists days that hold a tombstoned Oura Cloud night, never a live one, a ring or a manual one', async () => {
+    const d = shiftDateStr(today, -2)
+    const mid = dateStrMidnightInTz(d, TZ).getTime()
+    await repo.upsertOuraCloudSleep(USER, [{ ouraId: `cloud-3099-${d}`, date: d, sleepStart: new Date(mid - HOUR), sleepEnd: new Date(mid + 6 * HOUR), durationHours: 7 }])
+    await repo.tombstoneOuraCloudSleep(USER, [`cloud-3099-${d}`])
+    const ring = shiftDateStr(today, -3)
+    const rmid = dateStrMidnightInTz(ring, TZ).getTime()
+    await pool.query(
+      `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, oura_id, manual_entry)
+       VALUES ($1, $2, $3, $4, 7, $5, false)`, [USER, ring, new Date(rmid - HOUR), new Date(rmid + 6 * HOUR), `ble:3099-${ring}`])
+    // A live Oura nap on another day is not a deleted night (#3104 review).
+    const nap = shiftDateStr(today, -4)
+    const nmid = dateStrMidnightInTz(nap, TZ).getTime()
+    await repo.upsertOuraCloudSleep(USER, [{ ouraId: `nap-3099-${nap}`, date: nap, sleepStart: new Date(nmid + 13 * HOUR), sleepEnd: new Date(nmid + 13.7 * HOUR), durationHours: 0.6 }])
+    expect(await repo.listDeletedOuraCloudSleepDates(USER, shiftDateStr(today, -7), today)).toEqual([d])
+  })
 })
