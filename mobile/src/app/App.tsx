@@ -49,6 +49,7 @@ import { AccountScreen } from '../features/settings/screens/AccountScreen';
 import { AboutScreen } from '../features/settings/screens/AboutScreen';
 import { OuraScreen, takeInitialOuraReturn } from '../features/devices/screens/OuraScreen';
 import { YearReviewScreen } from '../features/settings/screens/YearReviewScreen';
+import { CollectionScreen } from '../features/collection/screens/CollectionScreen';
 
 import { RunningScreen } from '../features/activities/screens/RunningScreen';
 import { WalkScreen } from '../features/activities/screens/WalkScreen';
@@ -252,6 +253,7 @@ function AppShell() {
             selectTab('Health');
             setHealthPanel('training');
           }}
+          openCollection={() => setDetail('collection')}
         />
       </RetainedView>
       <RetainedView
@@ -325,6 +327,7 @@ function AppShell() {
           openDevices={() => setDetail('more-devices')}
           openAbout={() => setDetail('more-about')}
           openYear={() => setDetail('year-review')}
+          openCollection={() => setDetail('collection')}
         />
       </RetainedView>
       {(['general', 'nutrition'] as const).map((scope) => (
@@ -398,6 +401,8 @@ function AppShell() {
         <OuraScreen initialReturn={ouraReturn} onBack={() => setDetail(null)} />
       ) : detail === 'year-review' ? (
         <YearReviewScreen onBack={() => setDetail(null)} />
+      ) : detail === 'collection' ? (
+        <CollectionScreen onBack={() => setDetail(null)} />
       ) : healthDetail ? (
         <HealthDetailScreen
           key={`${healthDetail}:${accountKey}`}

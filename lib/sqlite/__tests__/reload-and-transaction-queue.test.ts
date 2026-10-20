@@ -17,6 +17,11 @@ const native = {
   conns: new Set<string>(),
   inTransaction: false,
   log: [] as string[],
+  // What is on disk. A write that runs while the native transaction slot is open lands in
+  // `uncommitted` whatever its own flag says (the auto-wrap nests inside the open transaction),
+  // and is lost on ROLLBACK, which is the #2520 failure.
+  committed: [] as string[],
+  uncommitted: [] as string[],
 }
 
 const open = vi.fn()
@@ -30,6 +35,8 @@ function fakeDb() {
     query: vi.fn(async () => ({ values: [{ journal_mode: 'wal' }] })),
     run: vi.fn(async (sql: string, _values: unknown[], transaction: boolean) => {
       native.log.push(`run ${sql} tx=${transaction}`)
+      if (sql.startsWith('FAIL')) throw new Error('constraint failed')
+      ;(native.inTransaction ? native.uncommitted : native.committed).push(sql)
     }),
     beginTransaction: vi.fn(async () => {
       if (native.inTransaction) throw new Error('BeginTransaction: Failed in beginTransaction Already in transaction')
@@ -39,11 +46,13 @@ function fakeDb() {
     commitTransaction: vi.fn(async () => {
       if (!native.inTransaction) throw new Error('CommitTransaction: no current transaction')
       native.inTransaction = false
+      native.committed.push(...native.uncommitted.splice(0))
       native.log.push('COMMIT')
     }),
     rollbackTransaction: vi.fn(async () => {
       if (!native.inTransaction) throw new Error('RollbackTransaction: no current transaction')
       native.inTransaction = false
+      native.uncommitted = []
       native.log.push('ROLLBACK')
     }),
   }
@@ -101,6 +110,8 @@ beforeEach(() => {
   native.conns.clear()
   native.inTransaction = false
   native.log = []
+  native.committed = []
+  native.uncommitted = []
   open.mockReset().mockResolvedValue(undefined)
   execute.mockReset().mockResolvedValue(undefined)
   createConnection.mockReset()
@@ -128,7 +139,7 @@ describe('initSQLite after a page reload (#2386)', () => {
     expect(execute.mock.calls.some(c => String(c[0]).includes('user_version'))).toBe(false)
 
     // The old page's abandoned transaction does not block the new page's first one.
-    await svc.withTransaction(() => svc.runSQL('INSERT INTO x VALUES (1)'))
+    await svc.withTransaction(tx => tx.run('INSERT INTO x VALUES (1)'))
     expect(native.log).toEqual(['BEGIN', 'run INSERT INTO x VALUES (1) tx=false', 'COMMIT'])
   })
 
@@ -161,11 +172,11 @@ describe('withTransaction queues local-store transactions (#2386)', () => {
     await svc.initSQLite(UPGRADES)
 
     // Two pulls landing together, each yielding mid-body the way applyDeltaBody does.
-    const a = svc.withTransaction(async () => {
-      await svc.runSQL('A1'); await tick(); await svc.runSQL('A2')
+    const a = svc.withTransaction(async tx => {
+      await tx.run('A1'); await tick(); await tx.run('A2')
     })
-    const b = svc.withTransaction(async () => {
-      await svc.runSQL('B1'); await tick(); await svc.runSQL('B2')
+    const b = svc.withTransaction(async tx => {
+      await tx.run('B1'); await tick(); await tx.run('B2')
     })
     await Promise.all([a, b])
 
@@ -179,10 +190,10 @@ describe('withTransaction queues local-store transactions (#2386)', () => {
     const svc = await freshPage()
     await svc.initSQLite(UPGRADES)
 
-    const a = svc.withTransaction(async () => {
-      await svc.runSQL('A1'); await tick(); throw new Error('disk I/O')
+    const a = svc.withTransaction(async tx => {
+      await tx.run('A1'); await tick(); throw new Error('disk I/O')
     })
-    const b = svc.withTransaction(() => svc.runSQL('B1'))
+    const b = svc.withTransaction(tx => tx.run('B1'))
     await expect(a).rejects.toThrow('disk I/O')
     await b
 
@@ -194,14 +205,14 @@ describe('withTransaction queues local-store transactions (#2386)', () => {
     await svc.initSQLite(UPGRADES)
     native.inTransaction = true   // someone else's transaction is open on the native slot
 
-    await expect(svc.withTransaction(() => svc.runSQL('A1'))).rejects.toThrow(/SQL failed \[BEGIN\]/)
+    await expect(svc.withTransaction(tx => tx.run('A1'))).rejects.toThrow(/SQL failed \[BEGIN\]/)
     expect(native.inTransaction).toBe(true)          // not rolled back from under its owner
     expect(native.log).not.toContain('ROLLBACK')
     expect(native.log.some(l => l.includes('A1'))).toBe(false)
 
     // The queue is released: the next transaction is not stuck behind the failed one.
     native.inTransaction = false
-    await svc.withTransaction(() => svc.runSQL('B1'))
+    await svc.withTransaction(tx => tx.run('B1'))
     expect(native.log).toEqual(['BEGIN', 'run B1 tx=false', 'COMMIT'])
   })
 
@@ -209,5 +220,98 @@ describe('withTransaction queues local-store transactions (#2386)', () => {
     const svc = await freshPage()
     await svc.initSQLite(UPGRADES)
     await expect(svc.withTransaction(async () => 42)).resolves.toBe(42)
+  })
+})
+
+// #2520. While a transaction was open, every runSQL ran inside it, so an unrelated write from a
+// screen (a mood log and its outbox row) was rolled back with a failing pull after its caller had
+// already shown success.
+describe('a standalone write never joins an open transaction (#2520)', () => {
+  const tick = () => new Promise(r => setTimeout(r, 0))
+
+  /** A transaction whose body is held open until `finish` is called, like a long applyDelta. */
+  function heldTransaction(svc: Awaited<ReturnType<typeof freshPage>>, fail: boolean) {
+    let finish!: () => void
+    const gate = new Promise<void>(r => { finish = r })
+    const done = svc.withTransaction(async tx => {
+      await tx.run('PULL row 1')
+      await gate
+      await tx.run(fail ? 'FAIL PULL row 2' : 'PULL row 2')
+    })
+    return { done, finish }
+  }
+
+  it('a write that lands mid-transaction survives that transaction rolling back', async () => {
+    const svc = await freshPage()
+    await svc.initSQLite(UPGRADES)
+
+    const pull = heldTransaction(svc, true)
+    await tick()
+    expect(native.inTransaction).toBe(true)
+
+    // The owner logs a mood while the pull is open.
+    let moodSaved = false
+    const mood = svc.runSQL('INSERT mood').then(() => svc.runSQL('INSERT outbox mood'))
+      .then(() => { moodSaved = true })
+    await tick()
+    expect(moodSaved).toBe(false)   // it waits; it has not run inside the pull
+    expect(native.log.some(l => l.includes('mood'))).toBe(false)
+
+    pull.finish()
+    await expect(pull.done).rejects.toThrow(/SQL failed \[FAIL PULL row 2\]/)
+    await mood
+
+    expect(native.committed).toEqual(['INSERT mood', 'INSERT outbox mood'])   // the pull's row is gone, the mood is not
+    expect(native.log).toEqual([
+      'BEGIN', 'run PULL row 1 tx=false', 'run FAIL PULL row 2 tx=false', 'ROLLBACK',
+      'run INSERT mood tx=true', 'run INSERT outbox mood tx=true',
+    ])
+  })
+
+  it('a committed transaction keeps its own rows and the waiting write runs after its COMMIT', async () => {
+    const svc = await freshPage()
+    await svc.initSQLite(UPGRADES)
+
+    const pull = heldTransaction(svc, false)
+    await tick()
+    const mood = svc.runSQL('INSERT mood')
+    pull.finish()
+    await Promise.all([pull.done, mood])
+
+    expect(native.committed).toEqual(['PULL row 1', 'PULL row 2', 'INSERT mood'])
+    expect(native.log.indexOf('COMMIT')).toBeLessThan(native.log.indexOf('run INSERT mood tx=true'))
+  })
+
+  it('a write queued before a transaction commits before its BEGIN, and is not undone by its rollback', async () => {
+    const svc = await freshPage()
+    await svc.initSQLite(UPGRADES)
+
+    const mood = svc.runSQL('INSERT mood')
+    const pull = svc.withTransaction(async tx => { await tx.run('PULL row 1'); throw new Error('bad delta') })
+    await mood
+    await expect(pull).rejects.toThrow('bad delta')
+
+    expect(native.committed).toEqual(['INSERT mood'])
+    expect(native.log).toEqual(['run INSERT mood tx=true', 'BEGIN', 'run PULL row 1 tx=false', 'ROLLBACK'])
+  })
+
+  it('a failing standalone write does not block the writes behind it', async () => {
+    const svc = await freshPage()
+    await svc.initSQLite(UPGRADES)
+
+    await expect(svc.runSQL('FAIL insert')).rejects.toThrow(/SQL failed \[FAIL insert\]/)
+    await svc.runSQL('INSERT mood')
+    await svc.withTransaction(tx => tx.run('PULL row 1'))
+    expect(native.committed).toEqual(['INSERT mood', 'PULL row 1'])
+  })
+
+  it('tx.run refuses after its transaction has ended instead of writing outside it', async () => {
+    const svc = await freshPage()
+    await svc.initSQLite(UPGRADES)
+
+    let leaked!: { run: (sql: string) => Promise<void> }
+    await svc.withTransaction(async tx => { leaked = tx })
+    await expect(leaked.run('INSERT late')).rejects.toThrow(/transaction has already ended/)
+    expect(native.log.some(l => l.includes('late'))).toBe(false)
   })
 })

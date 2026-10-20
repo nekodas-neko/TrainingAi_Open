@@ -8255,6 +8255,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getWorkoutHrStats(userId: string, sessionId: string) { return oura.getWorkoutHrStats(this.db, userId, sessionId) }
   async getAvgBpmBySession(userId: string, sessionIds: string[]) { return oura.getAvgBpmBySession(this.db, userId, sessionIds) }
   async listSessionsMissingHrStats(userId: string, since: Date, limit: number) { return oura.listSessionsMissingHrStats(this.db, userId, since, limit) }
+  async listCompletedSessionsOverlapping(userId: string, from: Date, to: Date, limit: number) { return oura.listCompletedSessionsOverlapping(this.db, userId, from, to, limit) }
   async getSetDetailsForSession(userId: string, workoutSessionId: string) { return oura.getSetDetailsForSession(this.db, userId, workoutSessionId) }
   async upsertSetHrStats(userId: string, workoutSessionId: string, rows: import('@trainingai/shared/workout/set-hr-stats').SetHrRow[]) { return oura.upsertSetHrStats(this.db, userId, workoutSessionId, rows) }
   async getSetHrStatsForSession(userId: string, workoutSessionId: string) { return oura.getSetHrStatsForSession(this.db, userId, workoutSessionId) }

@@ -14,10 +14,11 @@ const { runSQL, querySQL, beginTransaction, commitTransaction, rollbackTransacti
 vi.mock('@/lib/sqlite/sqlite-service', () => ({
   runSQL,
   querySQL,
-  withTransaction: async <T,>(fn: () => Promise<T>): Promise<T> => {
+  // tx.run is the same runSQL spy, so the call-order assertions below read both kinds of write.
+  withTransaction: async <T,>(fn: (tx: { run: typeof runSQL }) => Promise<T>): Promise<T> => {
     await beginTransaction()
     try {
-      const result = await fn()
+      const result = await fn({ run: runSQL })
       await commitTransaction()
       return result
     } catch (err) {

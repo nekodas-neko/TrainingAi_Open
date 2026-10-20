@@ -62,7 +62,9 @@ export async function reconcileOuraCloud(deps: ReconcileDeps): Promise<Reconcile
     const to = toAestDay(now, tz)
     const from = shiftDateStr(to, -(RECONCILE_DAYS - 1))
     try {
-      const result = await backfill({ repo: deps.repo, config: deps.config, rescore: deps.repo }, userId, {
+      // Loaded here, as `runOuraReconcile` loads `@/lib/data`: this module is reached from the boot timer.
+      const { workoutHrReattributor } = await import('@/lib/workout/post-completion-hr')
+      const result = await backfill({ repo: deps.repo, config: deps.config, rescore: deps.repo, workoutHr: workoutHrReattributor(deps.repo) }, userId, {
         from, to, dryRun: false, heartRate: true, tz,
       })
       const outcome = outcomeOf(result)

@@ -12,7 +12,7 @@ const db = { current: null as DatabaseSync | null }
 vi.mock('@/lib/sqlite/sqlite-service', () => ({
   runSQL: vi.fn(async (sql: string, params: unknown[] = []) => { db.current!.prepare(sql).run(...(params as never[])) }),
   querySQL: vi.fn(async (sql: string, params: unknown[] = []) => db.current!.prepare(sql).all(...(params as never[]))),
-  withTransaction: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  withTransaction: vi.fn(async (fn: (tx: { run: (sql: string, p?: unknown[]) => Promise<void> }) => Promise<unknown>) => fn({ run: (await import('@/lib/sqlite/sqlite-service')).runSQL })),
 }))
 
 import { SQLiteLocalStore } from '../sqlite-backend'
