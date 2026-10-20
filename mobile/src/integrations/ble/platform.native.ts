@@ -1,6 +1,11 @@
 import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 import type { BleManager as Manager, State } from 'react-native-ble-plx';
-import { decodeBase64 } from './base64';
+import { decodeBase64, encodeBase64 } from './base64';
+import {
+  SCALE_MEASUREMENT,
+  SCALE_REQUEST,
+  SCALE_SERVICE,
+} from '@trainingai/shared/devices/scale-protocol';
 import {
   BATTERY_LEVEL,
   BATTERY_SERVICE,
@@ -14,6 +19,9 @@ import {
 } from './types';
 
 const CONNECT_TIMEOUT_MS = 15_000;
+// The scale was seen advertising a moment ago, so a connect that takes longer has missed its window
+// (the current app's `ScaleGattClient.CONNECT_TIMEOUT_MS`).
+const SCALE_CONNECT_TIMEOUT_MS = 5_000;
 // A build made before the module was added has no BlePlx; constructing BleManager there throws.
 const available = !!NativeModules.BlePlx;
 let manager: Manager | null = null;
@@ -70,14 +78,14 @@ export const bleAdapter: BleAdapter = {
     return () => subscription.remove();
   },
   permission,
-  scan(onFound, onError) {
+  scan(onFound, onError, service = HR_SERVICE) {
     if (!available) {
-      onError('Update TrainingAi Preview to pair a strap.');
+      onError('Update TrainingAi Preview to pair a device.');
       return () => {};
     }
     let stopped = false;
     void ble()
-      .startDeviceScan([HR_SERVICE], { allowDuplicates: false }, (error, device) => {
+      .startDeviceScan([service], { allowDuplicates: false }, (error, device) => {
         if (stopped) return;
         if (error) {
           onError(error.message);
@@ -148,6 +156,63 @@ export const bleAdapter: BleAdapter = {
       },
       readBattery: () => read(BATTERY_SERVICE, BATTERY_LEVEL),
       readFirmware: () => read(DEVICE_INFO_SERVICE, FIRMWARE_REVISION),
+      async disconnect() {
+        dropped = true;
+        drop.remove();
+        await manager.cancelDeviceConnection(id).catch(() => {});
+      },
+    };
+  },
+  async connectScale(id, onDisconnected) {
+    const manager = ble();
+    // The scale does not advertise while idle and Samsung ignores autoConnect, so this is a direct
+    // connect made right after a scan saw it (ScaleGattClient.kt).
+    const device = await manager.connectToDevice(id, { timeout: SCALE_CONNECT_TIMEOUT_MS });
+    let dropped = false;
+    const drop = manager.onDeviceDisconnected(id, () => {
+      if (dropped) return;
+      dropped = true;
+      drop.remove();
+      onDisconnected();
+    });
+    try {
+      await device.discoverAllServicesAndCharacteristics();
+    } catch (error) {
+      drop.remove();
+      await manager.cancelDeviceConnection(id).catch(() => {});
+      throw error;
+    }
+    return {
+      onMeasurement(listener, onFailed) {
+        let stopped = false;
+        const subscription = manager.monitorCharacteristicForDevice(
+          id,
+          SCALE_SERVICE,
+          SCALE_MEASUREMENT,
+          (error, characteristic) => {
+            if (stopped) return;
+            if (error) {
+              stopped = true;
+              onFailed();
+              return;
+            }
+            const value = decodeBase64(characteristic?.value);
+            if (value) listener(value);
+          },
+        );
+        return () => {
+          stopped = true;
+          subscription.remove();
+        };
+      },
+      async request(command) {
+        await manager.writeCharacteristicWithResponseForDevice(
+          id,
+          SCALE_SERVICE,
+          SCALE_REQUEST,
+          encodeBase64(command),
+        );
+      },
       async disconnect() {
         dropped = true;
         drop.remove();
