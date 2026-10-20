@@ -522,14 +522,18 @@ export class HealthConnectImportStore {
         this.filter = newFilter(firstHand);
         // Oura Cloud reads as disconnected while records were left out: the change token is past
         // them, so rescan from when the first was left out. Server-side Oura Cloud rows stay.
-        if (firstHand?.ouraCloud === false && this.disk.firstHandSince)
+        if (firstHand?.ouraCloud === false && this.disk.firstHandSince) {
+          // Keeps a gap already waiting (an expired token, a permission change): the older start wins.
+          const pending = this.disk.rescanFrom ?? this.disk.tokenAt;
+          const since = this.disk.firstHandSince;
           await this.write({
             ...this.disk,
             token: null,
             scan: null,
-            rescanFrom: this.disk.firstHandSince,
+            rescanFrom: pending && Date.parse(pending) < Date.parse(since) ? pending : since,
             firstHandSince: null,
           });
+        }
         if (!this.disk.grantedAt)
           await this.write({ ...this.disk, grantedAt: new Date(this.now()).toISOString() });
         const hasHistory = (await this.reader.hasHistoryPermission?.()) ?? false;

@@ -9,6 +9,7 @@ import {
 } from '@trainingai/shared/validation/health-connect-import';
 import type { HealthConnectReader } from '../src/integrations/health-connect/types.ts';
 import { readFileSync } from 'node:fs';
+import { todayInTz } from '@trainingai/shared/date-utils';
 import type { FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
 import { loadFirstHandSources } from '../src/features/health/data/first-hand-sources.ts';
 import { readinessSpec } from '../src/features/health/data/models.ts';
@@ -191,7 +192,7 @@ test('records skipped while connected are read again once Oura Cloud reads as di
   assert.deepEqual(f.store.getSnapshot().skippedFirstHand, {});
 });
 test('the connection is read from today\'s readiness payload by the one cold-start rule', async () => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInTz('UTC');
   const resources = (data: unknown, fail = false) => ({
     load: async () => {
       if (fail) throw new Error('offline');

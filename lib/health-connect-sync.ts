@@ -7,7 +7,7 @@
 
 import type { HealthConnectPlugin } from '@devmaxime/capacitor-health-connect';
 import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trainingai/shared/health/hypnogram';
-import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
+import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, daysBetweenDateStrs, isCalendarDate, todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { capitalize } from '@trainingai/shared/format/capitalize';
 import { FirstHandFilter, knownFirstHandSources, type FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
@@ -370,9 +370,9 @@ export function newFirstHandFilter(sources: FirstHandSources | null): LegacyFirs
 }
 
 /**
- * The only place this file reads records from Health Connect (#3197). Every read goes through the
+ * The only place the current app reads records from Health Connect (#3197). Every read goes through the
  * filter, so a read type added later cannot upload the Oura app's copies by forgetting to call it;
- * `health-connect-origin-filter.test.ts` fails on a second `readRecords` call. The daily aggregates
+ * `health-connect-first-hand-3197.test.ts` fails on a second `readRecords` call in the current app. The daily aggregates
  * (`aggregateRecords`) are not records and cannot be split by app: Health Connect merges them by
  * its own app priority.
  */
@@ -516,6 +516,8 @@ export async function enrichActivityLogs(
 export interface SyncResult {
   metrics: number; sessions: number; sleep: number; heartRate: number; intervals: number;
   note?: string; requests?: number; failed?: boolean;
+  /** #3197: a record read failed or the daily post was refused, so the window may be missing data. */
+  incomplete?: boolean;
   /** #3115: records left out as copies of data read first-hand, per Health Connect type. Counts only. */
   skippedFirstHand?: Record<string, number>;
 }
@@ -534,7 +536,7 @@ export async function cachedFirstHandSources(tz: string = DEFAULT_TZ): Promise<F
     // date to trust and so reads as unknown.
     if (!stored || typeof stored !== 'object' || !('date' in stored) || !('data' in stored)) return null;
     const { date, data } = stored as { date: unknown; data: unknown };
-    return knownFirstHandSources((data as { connectedSources?: unknown } | null)?.connectedSources, date, toLocalDate(new Date().toISOString(), tz));
+    return knownFirstHandSources((data as { connectedSources?: unknown } | null)?.connectedSources, date, todayInTz(tz));
   } catch {
     return null;
   }
@@ -563,7 +565,7 @@ export async function openHealthConnect(): Promise<HealthConnectSession | { note
   return { HealthConnect, canRead: new Set(perms.read) };
 }
 
-/** Earliest window start whose Oura records were skipped, kept until Oura Cloud reads as disconnected. */
+/** Local date of the oldest window whose Oura records were skipped, kept until a rewind sync finishes cleanly. */
 export const SKIPPED_SINCE_KEY = 'ta_hc_first_hand_skipped_since';
 /** The last sync's skip counts: replaced on every sync, so they are that sync's and never a running total. */
 export const LAST_SKIPPED_KEY = 'ta_hc_last_skipped';
@@ -591,28 +593,33 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<SyncRe
   if ('note' in opened) return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: opened.note };
 
   // #3197: records skipped while Oura Cloud was connected are not read again by a 7-day hot sync.
-  // Once the connection reads as gone, the next sync is a cold one (30 days), so they come back.
-  // Server-side Oura Cloud rows stay either way.
+  // Once the connection reads as gone, the next sync reaches back to the oldest skipped day, at most
+  // the cold 30 days (all Health Connect lets us read without the history permission), so they come
+  // back. Server-side Oura Cloud rows stay either way.
   const firstHand = await cachedFirstHandSources(tz);
-  const rewind = firstHand?.ouraCloud === false && localStorage.getItem(SKIPPED_SINCE_KEY) !== null;
+  const todayStr = todayInTz(tz);
+  const skippedSince = localStorage.getItem(SKIPPED_SINCE_KEY);
+  const rewind = firstHand?.ouraCloud === false && skippedSince !== null;
   const lastSync  = localStorage.getItem(LAST_SYNC_KEY);
-  const daysBack  = lastSync && !rewind ? SYNC_DAYS_HOT : SYNC_DAYS_COLD;
+  const rewindDays = skippedSince && isCalendarDate(skippedSince)
+    ? Math.min(SYNC_DAYS_COLD, Math.max(SYNC_DAYS_HOT, daysBetweenDateStrs(skippedSince, todayStr) + 1))
+    : SYNC_DAYS_COLD;
+  const daysBack  = rewind ? rewindDays : lastSync ? SYNC_DAYS_HOT : SYNC_DAYS_COLD;
 
   // Align the query window to the USER's calendar day boundaries. The plugin loops over 24h windows
   // from `startInstant`, so if start isn't a local midnight the windows straddle two calendar days
   // and aggregate steps from both into one bucket. Every bucket below is dated in `tz`, so the
   // midnight has to be `tz`'s, not the device's (#2438).
-  const todayStr = toLocalDate(new Date().toISOString(), tz);
   const { startIso, endIso } = syncWindowIso(todayStr, daysBack, tz);
 
   const result = await syncWindow(opened, tz, startIso, endIso, {
     firstHand,
-    onPosted: () => {
-      localStorage.setItem(LAST_SYNC_KEY, endIso);
-      if (rewind) localStorage.removeItem(SKIPPED_SINCE_KEY);
-    },
+    onPosted: () => localStorage.setItem(LAST_SYNC_KEY, endIso),
   });
-  if (result.skippedFirstHand && localStorage.getItem(SKIPPED_SINCE_KEY) === null) localStorage.setItem(SKIPPED_SINCE_KEY, startIso);
+  // `onPosted` runs before the heart-rate and interval uploads, so the marker is cleared here, once
+  // the whole window has landed. A failed upload or a failed read keeps it for the next sync.
+  if (rewind && !result.failed && !result.incomplete) localStorage.removeItem(SKIPPED_SINCE_KEY);
+  else if (result.skippedFirstHand && skippedSince === null) localStorage.setItem(SKIPPED_SINCE_KEY, toLocalDate(startIso, tz));
   return result;
 }
 
@@ -636,7 +643,9 @@ export async function syncWindow(
   // priority, which already keeps one app per moment.
   const firstHand = opts.firstHand !== undefined ? opts.firstHand : await cachedFirstHandSources(tz);
   const filter = newFirstHandFilter(firstHand);
-  const read = (type: string) => readFiltered(HealthConnect, filter, { start: startIso, end: endIso, type });
+  let readFailed = false;
+  const read = (type: string) => readFiltered(HealthConnect, filter, { start: startIso, end: endIso, type })
+    .catch(err => { readFailed = true; throw err; });
   function bucket(date: string): DailyMetric {
     if (!dayBuckets[date]) dayBuckets[date] = { date };
     return dayBuckets[date];
@@ -876,11 +885,12 @@ export async function syncWindow(
   const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0;
   if (!hasDaily && !heartRateSamples.length && !activityIntervals.length) {
     onPosted?.();
-    return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: 'no data from HC', requests: 0, ...skipped };
+    return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: 'no data from HC', requests: 0, ...(readFailed ? { incomplete: true } : {}), ...skipped };
   }
 
   let enrichmentCandidates: EnrichmentCandidate[] | undefined;
   let dailyNote: string | undefined;
+  let dailyRefused = false;
   let requests = 0;
   if (hasDaily) {
     requests += 1;
@@ -897,6 +907,8 @@ export async function syncWindow(
       // `onPosted`) re-sent it on every sync until its records aged out of the window, and skipped the
       // heart-rate and interval uploads below each time. Bad records are now refused one by one, so
       // only a payload whose shape is wrong gets here; it is noted and the sync moves on.
+      dailyRefused = true;
+      dailyRefused = true;
       dailyNote = `daily payload refused (sync-health ${res.status})`;
       console.warn(`[health-connect] ${dailyNote}: ${await res.text()}`);
     } else {
@@ -922,6 +934,7 @@ export async function syncWindow(
     metrics: dailyMetrics.length, sessions: exerciseSessions.length, sleep: sleepRecords.length,
     heartRate: heartRate.sent, intervals: intervals.sent, requests,
     ...(heartRate.failed || intervals.failed ? { failed: true } : {}),
+    ...(readFailed || dailyRefused ? { incomplete: true } : {}),
     ...(note ? { note } : {}),
     ...skipped,
   };

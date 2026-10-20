@@ -6,14 +6,15 @@ import { join } from 'node:path'
 import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 const cache = vi.hoisted(() => ({ value: null as unknown }))
-const hc = vi.hoisted(() => ({ records: [] as Array<{ type: string; time: string; origin: string; id: string }>, readRecords: vi.fn() }))
+const hc = vi.hoisted(() => ({ records: [] as Array<{ type: string; time: string; origin: string; id: string; samples?: unknown[] }>,
+  failRead: null as string | null, readRecords: vi.fn() }))
 
 vi.mock('@/lib/sqlite/cache', () => ({ readCacheSync: () => cache.value }))
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }))
 vi.mock('@devmaxime/capacitor-health-connect', () => ({
   HealthConnect: {
     checkAvailability: async () => ({ availability: 'Available' }),
-    requestPermissions: async () => ({ read: ['Weight', 'HealthDataHistory'], write: [] }),
+    requestPermissions: async () => ({ read: ['Weight', 'HeartRateSeries', 'HealthDataHistory'], write: [] }),
     getGrantedPermissions: async () => ({ read: ['Weight', 'HealthDataHistory'], write: [] }),
     aggregateRecords: async () => ({ aggregates: [] }),
     readRecords: hc.readRecords,
@@ -38,15 +39,21 @@ const noonOf = (day: string) => dateStrMidnightInTz(day, TZ).getTime() + 12 * 3_
 
 let store: Map<string, string>
 let posts: Array<{ url: string; body: Record<string, unknown> | null }>
+let failHeartRatePost = false
 beforeEach(() => {
+  failHeartRatePost = false
   cache.value = null
   hc.records = []
   hc.readRecords.mockReset()
-  hc.readRecords.mockImplementation(async ({ start, end, type }: { start: string; end: string; type: string }) => ({
-    records: hc.records
-      .filter(r => r.type === type && r.time >= start && r.time < end)
-      .map(r => ({ time: r.time, value: 80, metadata: { id: r.id, dataOrigin: r.origin } })),
-  }))
+  hc.failRead = null
+  hc.readRecords.mockImplementation(async ({ start, end, type }: { start: string; end: string; type: string }) => {
+    if (hc.failRead === type) throw new Error('read failed')
+    return {
+      records: hc.records
+        .filter(r => r.type === type && r.time >= start && r.time < end)
+        .map(r => ({ time: r.time, value: 80, ...(r.samples ? { samples: r.samples } : {}), metadata: { id: r.id, dataOrigin: r.origin } })),
+    }
+  })
   store = new Map()
   vi.stubGlobal('localStorage', {
     getItem: (k: string) => store.get(k) ?? null,
@@ -55,7 +62,9 @@ beforeEach(() => {
   })
   posts = []
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-    posts.push({ url, body: init?.body ? JSON.parse(init.body as string) : null })
+    const body = init?.body ? JSON.parse(init.body as string) : null
+    posts.push({ url, body })
+    if (failHeartRatePost && body && 'heartRateSamples' in body) return { ok: false, status: 500, json: async () => ({}), text: async () => 'boom' }
     return { ok: true, status: 200, json: async () => ({ oldestDate: null, enrichmentCandidates: [] }), text: async () => '' }
   }))
 })
@@ -81,7 +90,7 @@ describe('history import with skipped records (#3115, #3197)', () => {
 describe('rewind after a disconnect (#3197)', () => {
   const firstReadStart = () => (hc.readRecords.mock.calls[0][0] as { start: string }).start
   const daysBackOf = (start: string) => {
-    for (const d of [7, SYNC_DAYS_COLD]) if (syncWindowIso(today(), d, TZ).startIso === start) return d
+    for (let d = 1; d <= 60; d++) if (syncWindowIso(today(), d, TZ).startIso === start) return d
     return null
   }
 
@@ -118,6 +127,52 @@ describe('rewind after a disconnect (#3197)', () => {
     hc.readRecords.mockClear()
     await syncHealthConnect(TZ)
     expect(daysBackOf(firstReadStart())).toBe(7)
+  })
+
+  const hr = (day: string, origin: string) => ({
+    type: 'HeartRateSeries', time: new Date(noonOf(day)).toISOString(), origin, id: `hr-${origin}-${day}`,
+    samples: [{ time: new Date(noonOf(day)).toISOString(), beatsPerMinute: 60 }],
+  })
+
+  it('keeps the marker when the heart-rate upload fails during the rewind, and clears it on a clean one', async () => {
+    hc.records = [weight(shiftDateStr(today(), -3), OURA_APP_PACKAGE), hr(shiftDateStr(today(), -3), SAMSUNG)]
+    connected(true)
+    await syncHealthConnect(TZ)
+    expect(store.has(SKIPPED_SINCE_KEY)).toBe(true)
+
+    connected(false)
+    failHeartRatePost = true
+    const failed = await syncHealthConnect(TZ)
+    expect(failed?.failed).toBe(true)
+    expect(store.has(SKIPPED_SINCE_KEY)).toBe(true)
+
+    failHeartRatePost = false
+    hc.readRecords.mockClear()
+    await syncHealthConnect(TZ)
+    expect(daysBackOf(firstReadStart())).toBeGreaterThan(7 - 1)
+    expect(store.has(SKIPPED_SINCE_KEY)).toBe(false)
+  })
+
+  it('keeps the marker when a Health Connect read fails during the rewind', async () => {
+    hc.records = [weight(shiftDateStr(today(), -3), OURA_APP_PACKAGE)]
+    connected(true)
+    await syncHealthConnect(TZ)
+    connected(false)
+    hc.failRead = 'Weight'
+    const r = await syncHealthConnect(TZ)
+    expect(r?.incomplete).toBe(true)
+    expect(store.has(SKIPPED_SINCE_KEY)).toBe(true)
+  })
+
+  it('reaches back to the marker\'s day, never past the cold window and never under the hot one', async () => {
+    connected(false)
+    store.set(LAST_SYNC_KEY, 'x')
+    for (const [ago, expected] of [[12, 13], [100, SYNC_DAYS_COLD], [2, 7]] as const) {
+      store.set(SKIPPED_SINCE_KEY, shiftDateStr(today(), -ago))
+      hc.readRecords.mockClear()
+      await syncHealthConnect(TZ)
+      expect(daysBackOf(firstReadStart())).toBe(expected)
+    }
   })
 
   it('does not rewind when nothing was ever skipped', async () => {
