@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityEditor } from '../../activities/components/ActivityEditor';
 import { useActivities, useActivityLogs } from '../../activities/data/ActivityProvider';
 import { dayTimeInstant } from '../data/manual-night';
@@ -6,6 +6,14 @@ import { z } from 'zod';
 import { computeHrZones } from '@trainingai/shared/health/hr-zones';
 import { zoneBreakdownFromReadings } from '@trainingai/shared/health/zone-minutes';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
+import { decodeRoute } from '@trainingai/shared/activity/route-encoding';
+import { buildRouteZoneSegments } from '@trainingai/shared/activity/route-hr-zones';
+import {
+  estimateDistanceKmAtTime,
+  pointAtDistanceKm,
+  type LatLng,
+} from '@trainingai/shared/activity/scrub';
+import { RouteMap } from '../../activities/components/RouteMap';
 import {
   AppText,
   AppButton,
@@ -100,6 +108,33 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
           computeHrZones({ maxHr, restingHr }),
         )
       : null;
+  const routePoints = useMemo(
+    () => (log.routePolyline ? decodeRoute(log.routePolyline) : []),
+    [log.routePolyline],
+  );
+  // The current app's scrub: the chart's moment, through the pace series, to a distance along the
+  // route, to a point on it. Without a pace series there is no distance to place, so no marker.
+  const [scrubPoint, setScrubPoint] = useState<LatLng | null>(null);
+  const scrub = (minutes: number) =>
+    setScrubPoint(
+      log.paceSeries?.length
+        ? pointAtDistanceKm(routePoints, estimateDistanceKmAtTime(log.paceSeries, minutes * 60))
+        : null,
+    );
+  const end = log.endTime
+    ? Date.parse(dayTimeInstant(log.date, log.endTime, timezone) ?? '')
+    : null;
+  const zoneSegments =
+    maxHr != null && restingHr != null && readings.length && start != null && !Number.isNaN(start)
+      ? buildRouteZoneSegments({
+          points: routePoints,
+          paceSeries: log.paceSeries ?? [],
+          hrReadings: readings,
+          zones: computeHrZones({ maxHr, restingHr }),
+          startTime: new Date(start).toISOString(),
+          endTime: end != null && !Number.isNaN(end) ? new Date(end).toISOString() : undefined,
+        })
+      : null;
   return (
     <HealthViewReady view="day" requests={[hrProfileSpec, ...(enabled ? [windowSpec] : [])]}>
       <AppText variant="caption" tone="muted">
@@ -150,6 +185,7 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
             label="Recorded heart rate"
             points={points}
             interactive
+            onSelect={routePoints.length > 1 ? scrub : undefined}
             tone="heart"
             series={
               log.paceSeries?.length
@@ -171,6 +207,14 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
             Heart rate · bpm
             {log.paceSeries?.length ? ' · Pace · sec/km (quicker toward the top)' : ''}
           </AppText>
+        </Card>
+      )}
+      {routePoints.length > 1 && (
+        <Card>
+          <AppText variant="eyebrow" tone="muted">
+            Route
+          </AppText>
+          <RouteMap points={routePoints} activePoint={scrubPoint} zoneSegments={zoneSegments} />
         </Card>
       )}
       {zones && zones.totalSec > 0 && (

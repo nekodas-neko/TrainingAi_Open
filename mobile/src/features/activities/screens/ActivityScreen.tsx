@@ -4,6 +4,7 @@ import { GuidedActivityScreen } from './GuidedActivityScreen';
 import { useEffect, useMemo, useState } from 'react';
 import { formatPace, formatPaceValue } from '@trainingai/shared/health/vdot';
 import { summariseRoute } from '@trainingai/shared/activity/route-summary';
+import { decodeRoute } from '@trainingai/shared/activity/route-encoding';
 import { View } from 'react-native';
 import {
   AppButton,
@@ -30,6 +31,7 @@ import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
 import { failureNotice } from '../../../core/reporting/index.ts';
 import { useRouteRecording } from '../data/useRouteRecording';
 import { gpsStatusText, routeEligible } from '../data/route-recording';
+import { RouteMap } from '../components/RouteMap';
 
 function ManualActivityScreen({
   onBack,
@@ -60,6 +62,12 @@ function ManualActivityScreen({
         ? summariseRoute(activity.route, elapsedMs(session, session.endMs) / 1000)
         : null,
     [done, session?.type, session?.guidance, session?.endMs, session?.pausedMs, activity.route],
+  );
+  // The route as it will be saved: the simplified polyline, drawn as the current app's done screen
+  // draws it (#2845).
+  const routePoints = useMemo(
+    () => (route?.routePolyline ? decodeRoute(route.routePolyline) : []),
+    [route?.routePolyline],
   );
   const [now, setNow] = useState(Date.now),
     [busy, setBusy] = useState(false);
@@ -296,6 +304,14 @@ function ManualActivityScreen({
               <MetricTile label="Elevation gain" value={String(route.elevationGainM)} unit="m" />
               <MetricTile label="Elevation loss" value={String(route.elevationLossM)} unit="m" />
             </Grid>
+          )}
+          {routePoints.length > 1 && (
+            <Card>
+              <AppText variant="eyebrow" tone="muted">
+                Route
+              </AppText>
+              <RouteMap points={routePoints} />
+            </Card>
           )}
           {route && route.splits.length > 0 && (
             <Card>
