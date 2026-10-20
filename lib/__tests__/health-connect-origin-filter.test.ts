@@ -9,6 +9,7 @@ vi.mock('@/lib/sqlite/cache', () => ({ readCacheSync: () => cache.value }))
 
 import { syncWindow, HC_SYNC_READ_TYPES } from '../health-connect-sync'
 import { OURA_APP_PACKAGE } from '@trainingai/shared/health/health-connect-origin'
+import { todayInTz } from '@trainingai/shared/date-utils'
 
 const TZ = 'Australia/Brisbane'
 const START = '2026-10-10T14:00:00.000Z'
@@ -95,12 +96,23 @@ describe('Health Connect origin filter, current app (#3115)', () => {
     expect((series('activityIntervals') as { origin?: string }[]).every(i => i.origin === SAMSUNG)).toBe(true)
   })
 
-  it("reads the connection from the cached readiness payload when the caller doesn't pass it", async () => {
-    cache.value = { date: '2026-10-01', data: { connectedSources: { ring: false, strap: false, healthConnect: true, ouraCloud: true } } }
+  it("reads the connection from today's cached readiness payload when the caller doesn't pass it", async () => {
+    const sources = { ring: false, strap: false, healthConnect: true, ouraCloud: true }
+    cache.value = { date: todayInTz(TZ), data: { connectedSources: sources } }
     const r = await syncWindow(session(recordsFrom(OURA_APP_PACKAGE)), TZ, START, END)
     expect(r.skippedFirstHand?.SleepSession).toBe(1)
-    cache.value = null
-    const kept = await syncWindow(session(recordsFrom(OURA_APP_PACKAGE)), TZ, START, END)
-    expect(kept.skippedFirstHand).toBeUndefined()
+  })
+
+  // #3197: one cold-start rule for both apps. Not known today means keep Oura's copies.
+  it.each([
+    ['nothing cached (the mirror was cleared)', null],
+    ["yesterday's payload", { date: '2000-01-01', data: { connectedSources: { ouraCloud: true } } }],
+    ['an older entry stored as the payload itself, with no date', { connectedSources: { ouraCloud: true } }],
+    ['a payload with no connection facts', { date: 'today', data: {} }],
+  ])('keeps the Oura app\'s records when the connection is unknown: %s', async (_name, value) => {
+    cache.value = value && 'date' in value && value.date === 'today' ? { ...value, date: todayInTz(TZ) } : value
+    const r = await syncWindow(session(recordsFrom(OURA_APP_PACKAGE)), TZ, START, END)
+    expect(r.skippedFirstHand).toBeUndefined()
+    expect(r.sleep).toBe(1)
   })
 })

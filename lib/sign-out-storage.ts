@@ -109,6 +109,8 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   ta_workout_reminder_notified_today: 'reminder dedupe', ta_deadletter_notified_v1: 'failed-sync notices shown',
   // Sync cursors and upload queues. A queue left behind would POST under the next account.
   ta_hc_last_sync: 'Health Connect cursor — the next account backfills the window for itself',
+  ta_hc_first_hand_skipped_since: 'Health Connect rewind marker — the next account starts without one',
+  ta_hc_last_skipped: 'last Health Connect sync\'s skip counts — the next account starts without them',
   ...UPLOAD_QUEUE_STORAGE,
   // Everything else that is one person's.
   'chat_history_': 'prefix — coach conversations',

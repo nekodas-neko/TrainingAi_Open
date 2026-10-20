@@ -10,7 +10,7 @@ import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trai
 import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { capitalize } from '@trainingai/shared/format/capitalize';
-import { dropFirstHandCopies, type FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
+import { FirstHandFilter, knownFirstHandSources, type FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -362,6 +362,27 @@ export function hourInTz(iso: string, tz: string): number {
 }
 
 
+/** Health Connect records are filtered by the app that wrote them (#3115). */
+export type LegacyFirstHandFilter = FirstHandFilter<unknown>;
+
+export function newFirstHandFilter(sources: FirstHandSources | null): LegacyFirstHandFilter {
+  return new FirstHandFilter<unknown>(sources, r => metadataOf(r).origin, r => metadataOf(r).recordId);
+}
+
+/**
+ * The only place this file reads records from Health Connect (#3197). Every read goes through the
+ * filter, so a read type added later cannot upload the Oura app's copies by forgetting to call it;
+ * `health-connect-origin-filter.test.ts` fails on a second `readRecords` call. The daily aggregates
+ * (`aggregateRecords`) are not records and cannot be split by app: Health Connect merges them by
+ * its own app priority.
+ */
+async function readFiltered(
+  hc: HealthConnectPlugin, filter: LegacyFirstHandFilter, args: { start: string; end: string; type: string },
+): Promise<unknown[]> {
+  const { records } = await hc.readRecords(args as Parameters<HealthConnectPlugin['readRecords']>[0]);
+  return filter.keep(args.type, records);
+}
+
 // Per-session distance / calories / heart rate, used for both freshly-synced
 // exercise sessions and for enriching activity logs created another way
 // (e.g. manually logged) once Health Connect data for that window lands.
@@ -370,7 +391,7 @@ async function getSessionMetrics(
   canRead: Set<string>,
   start: string,
   end: string,
-  firstHand: FirstHandSources | null = null,
+  filter: LegacyFirstHandFilter,
 ): Promise<{ distanceKm?: number; caloriesBurned?: number; avgHr?: number; maxHr?: number }> {
   const metrics: { distanceKm?: number; caloriesBurned?: number; avgHr?: number; maxHr?: number } = {};
 
@@ -392,11 +413,9 @@ async function getSessionMetrics(
 
   if (canRead.has('HeartRateSeries')) {
     try {
-      const { records } = await hc.readRecords({ start, end, type: 'HeartRateSeries' });
+      const records = await readFiltered(hc, filter, { start, end, type: 'HeartRateSeries' });
       const bpms: number[] = [];
-      // #3115: the window's own HR read is counted where the series is; this one only filters.
-      const { kept } = dropFirstHandCopies(records, r => metadataOf(r).origin, firstHand);
-      for (const r of kept as Array<{ samples?: Array<{ beatsPerMinute: number }> }>) {
+      for (const r of records as Array<{ samples?: Array<{ beatsPerMinute: number }> }>) {
         for (const sample of r.samples ?? []) bpms.push(sample.beatsPerMinute);
       }
       if (bpms.length) {
@@ -472,12 +491,13 @@ export async function enrichActivityLogs(
     write: [],
   });
   const canRead: Set<string> = new Set(perms.read);
+  const filter = newFirstHandFilter(firstHand);
 
   for (const c of candidates) {
     if (!c.startTime || !c.endTime) continue;
     const start = localDateTimeToIso(c.date, c.startTime, tz);
     const end = localDateTimeToIso(c.date, c.endTime, tz, c.endTime <= c.startTime ? 1 : 0);
-    const metrics = await getSessionMetrics(HealthConnect, canRead, start, end, firstHand);
+    const metrics = await getSessionMetrics(HealthConnect, canRead, start, end, filter);
     if (!Object.keys(metrics).length) continue;
 
     try {
@@ -501,18 +521,20 @@ export interface SyncResult {
 }
 
 /**
- * `connectedSources` from the cached readiness payload, any day's: whether Oura Cloud is connected
- * does not change at midnight. `null` when nothing is cached yet, which filters nothing (#3115).
+ * `connectedSources` from today's cached readiness payload, by the one cold-start rule shared with
+ * Preview (`knownFirstHandSources`, #3197): nothing cached, the mirror cleared by
+ * `invalidateCache('readiness-score')`, or a payload from an earlier day is unknown, and unknown
+ * keeps Oura's copies.
  */
-export async function cachedFirstHandSources(): Promise<FirstHandSources | null> {
+export async function cachedFirstHandSources(tz: string = DEFAULT_TZ): Promise<FirstHandSources | null> {
   try {
     const { readCacheSync } = await import('@/lib/sqlite/cache');
     const stored = readCacheSync<unknown>('readiness-score');
-    // `cachedFetchToday` stores `{ date, data }`; an older entry is the payload itself.
-    const payload = stored && typeof stored === 'object' && 'date' in stored && 'data' in stored
-      ? (stored as { data: unknown }).data : stored;
-    const sources = (payload as { connectedSources?: unknown } | null)?.connectedSources;
-    return sources && typeof sources === 'object' ? sources as FirstHandSources : null;
+    // `cachedFetchToday` stores `{ date, data }`; an older entry is the payload itself, which has no
+    // date to trust and so reads as unknown.
+    if (!stored || typeof stored !== 'object' || !('date' in stored) || !('data' in stored)) return null;
+    const { date, data } = stored as { date: unknown; data: unknown };
+    return knownFirstHandSources((data as { connectedSources?: unknown } | null)?.connectedSources, date, toLocalDate(new Date().toISOString(), tz));
   } catch {
     return null;
   }
@@ -541,13 +563,40 @@ export async function openHealthConnect(): Promise<HealthConnectSession | { note
   return { HealthConnect, canRead: new Set(perms.read) };
 }
 
+/** Earliest window start whose Oura records were skipped, kept until Oura Cloud reads as disconnected. */
+export const SKIPPED_SINCE_KEY = 'ta_hc_first_hand_skipped_since';
+/** The last sync's skip counts: replaced on every sync, so they are that sync's and never a running total. */
+export const LAST_SKIPPED_KEY = 'ta_hc_last_skipped';
+
+export function readLastSyncSkipped(): Record<string, number> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LAST_SKIPPED_KEY) ?? 'null') as { counts?: Record<string, number> } | null;
+    return raw?.counts ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** Where a sync reports what it left out: the provider calls this with every result (#3197). */
+export function rememberSyncSkipped(result: SyncResult | null): void {
+  if (!result) return;
+  try {
+    localStorage.setItem(LAST_SKIPPED_KEY, JSON.stringify({ at: new Date().toISOString(), counts: result.skippedFirstHand ?? {} }));
+  } catch { /* storage unavailable: the counts are diagnostics only */ }
+}
+
 export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<SyncResult | null> {
   const opened = await openHealthConnect();
   if (!opened) return null;
   if ('note' in opened) return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: opened.note };
 
+  // #3197: records skipped while Oura Cloud was connected are not read again by a 7-day hot sync.
+  // Once the connection reads as gone, the next sync is a cold one (30 days), so they come back.
+  // Server-side Oura Cloud rows stay either way.
+  const firstHand = await cachedFirstHandSources(tz);
+  const rewind = firstHand?.ouraCloud === false && localStorage.getItem(SKIPPED_SINCE_KEY) !== null;
   const lastSync  = localStorage.getItem(LAST_SYNC_KEY);
-  const daysBack  = lastSync ? SYNC_DAYS_HOT : SYNC_DAYS_COLD;
+  const daysBack  = lastSync && !rewind ? SYNC_DAYS_HOT : SYNC_DAYS_COLD;
 
   // Align the query window to the USER's calendar day boundaries. The plugin loops over 24h windows
   // from `startInstant`, so if start isn't a local midnight the windows straddle two calendar days
@@ -556,7 +605,15 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<SyncRe
   const todayStr = toLocalDate(new Date().toISOString(), tz);
   const { startIso, endIso } = syncWindowIso(todayStr, daysBack, tz);
 
-  return syncWindow(opened, tz, startIso, endIso, { onPosted: () => localStorage.setItem(LAST_SYNC_KEY, endIso) });
+  const result = await syncWindow(opened, tz, startIso, endIso, {
+    firstHand,
+    onPosted: () => {
+      localStorage.setItem(LAST_SYNC_KEY, endIso);
+      if (rewind) localStorage.removeItem(SKIPPED_SINCE_KEY);
+    },
+  });
+  if (result.skippedFirstHand && localStorage.getItem(SKIPPED_SINCE_KEY) === null) localStorage.setItem(SKIPPED_SINCE_KEY, startIso);
+  return result;
 }
 
 /**
@@ -577,13 +634,9 @@ export async function syncWindow(
   // server reads from Oura's API, so they are left out, and counted. The daily aggregates (steps,
   // distance, total calories) cannot be split by app: Health Connect merges them by its own app
   // priority, which already keeps one app per moment.
-  const firstHand = opts.firstHand !== undefined ? opts.firstHand : await cachedFirstHandSources();
-  const skippedFirstHand: Record<string, number> = {};
-  function own<T>(type: string, records: T[]): T[] {
-    const { kept, skipped } = dropFirstHandCopies(records, r => metadataOf(r).origin, firstHand);
-    if (skipped) skippedFirstHand[type] = (skippedFirstHand[type] ?? 0) + skipped;
-    return kept;
-  }
+  const firstHand = opts.firstHand !== undefined ? opts.firstHand : await cachedFirstHandSources(tz);
+  const filter = newFirstHandFilter(firstHand);
+  const read = (type: string) => readFiltered(HealthConnect, filter, { start: startIso, end: endIso, type });
   function bucket(date: string): DailyMetric {
     if (!dayBuckets[date]) dayBuckets[date] = { date };
     return dayBuckets[date];
@@ -634,8 +687,8 @@ export async function syncWindow(
   // ── Weight (latest per day) ───────────────────────────────────────────────
   if (canRead.has('Weight')) {
     try {
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'Weight' });
-      for (const r of own('Weight', records) as Array<{ time: string; value: number }>)
+      const records = await read('Weight');
+      for (const r of records as Array<{ time: string; value: number }>)
         bucket(toLocalDate(r.time, tz)).weightKg = Math.round(r.value * 100) / 100;
     } catch { /* ignore */ }
   }
@@ -643,8 +696,8 @@ export async function syncWindow(
   // ── Body fat % (latest per day) ───────────────────────────────────────────
   if (canRead.has('BodyFat')) {
     try {
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'BodyFat' });
-      for (const r of own('BodyFat', records) as Array<{ time: string; percentage: number }>)
+      const records = await read('BodyFat');
+      for (const r of records as Array<{ time: string; percentage: number }>)
         bucket(toLocalDate(r.time, tz)).bodyFatPct = Math.round(r.percentage * 10) / 10;
     } catch { /* ignore */ }
   }
@@ -652,8 +705,8 @@ export async function syncWindow(
   // ── Nutrition macros (sum per day) ────────────────────────────────────────
   if (canRead.has('Nutrition')) {
     try {
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'Nutrition' });
-      for (const r of own('Nutrition', records) as Array<{
+      const records = await read('Nutrition');
+      for (const r of records as Array<{
         startTime: string; calories?: number;
         proteinG?: number; carbsG?: number; fatG?: number;
       }>) {
@@ -669,8 +722,8 @@ export async function syncWindow(
   // ── Resting heart rate (daily measurement from wearable) ─────────────────
   if (canRead.has('RestingHeartRate')) {
     try {
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'RestingHeartRate' });
-      for (const r of own('RestingHeartRate', records) as Array<{ time: string; beatsPerMinute: number }>) {
+      const records = await read('RestingHeartRate');
+      for (const r of records as Array<{ time: string; beatsPerMinute: number }>) {
         bucket(toLocalDate(r.time, tz)).restingHeartRate = Math.round(r.beatsPerMinute);
       }
     } catch { /* ignore */ }
@@ -679,9 +732,9 @@ export async function syncWindow(
   // ── HRV (mean overnight RMSSD, midnight–8am) ─────────────────────────────
   if (canRead.has('HeartRateVariabilityRmssd')) {
     try {
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'HeartRateVariabilityRmssd' });
+      const records = await read('HeartRateVariabilityRmssd');
       const overnightHrv: Record<string, number[]> = {};
-      for (const r of own('HeartRateVariabilityRmssd', records) as Array<{ time: string; heartRateVariabilityMillis: number }>) {
+      for (const r of records as Array<{ time: string; heartRateVariabilityMillis: number }>) {
         const h = hourInTz(r.time, tz);
         if (h >= 0 && h < 8) {
           const date = toLocalDate(r.time, tz);
@@ -699,9 +752,9 @@ export async function syncWindow(
   // ── SpO2 (daily mean of overnight readings, midnight–8am) ────────────────
   if (canRead.has('OxygenSaturation')) {
     try {
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'OxygenSaturation' });
+      const records = await read('OxygenSaturation');
       const overnightSpo2: Record<string, number[]> = {};
-      for (const r of own('OxygenSaturation', records) as Array<{ time: string; percentage: number }>) {
+      for (const r of records as Array<{ time: string; percentage: number }>) {
         const h = hourInTz(r.time, tz);
         if (h >= 0 && h < 8) {
           const date = toLocalDate(r.time, tz);
@@ -720,10 +773,10 @@ export async function syncWindow(
   const exerciseSessions: ExerciseSession[] = [];
   if (canRead.has('ActivitySession')) {
     try {
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'ActivitySession' });
-      for (const r of own('ActivitySession', records) as Array<{ startTime: string; endTime: string; exerciseType: string; title?: string }>) {
+      const records = await read('ActivitySession');
+      for (const r of records as Array<{ startTime: string; endTime: string; exerciseType: string; title?: string }>) {
         const durationMin = (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 60000;
-        const metrics = await getSessionMetrics(HealthConnect, canRead, r.startTime, r.endTime, firstHand);
+        const metrics = await getSessionMetrics(HealthConnect, canRead, r.startTime, r.endTime, filter);
         exerciseSessions.push({
           date:         toLocalDate(r.startTime, tz),
           title:        r.title?.trim() || exerciseTypeLabel(r.exerciseType),
@@ -740,10 +793,10 @@ export async function syncWindow(
   const sleepRecords: SleepRecord[] = [];
   if (canRead.has('SleepSession')) {
     try {
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'SleepSession' });
+      const records = await read('SleepSession');
       // #3115: one app per night, so Samsung Health's and the Oura app's copies of one night are
       // not sent as two nights that the server would read as two fragments of it.
-      for (const r of oneAppPerNight(own('SleepSession', records as HcSleepRecord[])) as Array<{
+      for (const r of oneAppPerNight(records as HcSleepRecord[]) as Array<{
         startTime: string; endTime: string;
         stages?: Array<{ startTime: string; endTime: string; stage: string }>;
       }>) {
@@ -788,8 +841,8 @@ export async function syncWindow(
   let heartRateSamples: HeartRateSample[] = [];
   if (canRead.has('HeartRateSeries')) {
     try {
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'HeartRateSeries' });
-      heartRateSamples = flattenHeartRateRecords(own('HeartRateSeries', records));
+      const records = await read('HeartRateSeries');
+      heartRateSamples = flattenHeartRateRecords(records);
     } catch (err) {
       console.warn('[health-connect] HeartRateSeries read failed:', err);
     }
@@ -802,8 +855,7 @@ export async function syncWindow(
   const activityIntervals: ActivityInterval[] = [];
   const readIntervals = async (type: 'Steps' | 'ActiveCaloriesBurned' | 'StepsCadenceSeries') => {
     try {
-      const { records: all } = await HealthConnect.readRecords({ start: startIso, end: endIso, type });
-      const records = own(type, all);
+      const records = await read(type);
       activityIntervals.push(...(type === 'StepsCadenceSeries'
         ? flattenCadenceRecords(records)
         : flattenIntervalRecords(type === 'Steps' ? 'steps' : 'active_kcal', records)));
@@ -819,7 +871,8 @@ export async function syncWindow(
   activityIntervals.sort((a, b) => b.startMs - a.startMs);
 
   const dailyMetrics = Object.values(dayBuckets);
-  const skipped = Object.keys(skippedFirstHand).length ? { skippedFirstHand } : {};
+  const counts = filter.counts();
+  const skipped = Object.keys(counts).length ? { skippedFirstHand: counts } : {};
   const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0;
   if (!hasDaily && !heartRateSamples.length && !activityIntervals.length) {
     onPosted?.();

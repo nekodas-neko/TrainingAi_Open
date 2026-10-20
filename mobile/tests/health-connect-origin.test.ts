@@ -8,7 +8,10 @@ import {
   type HealthConnectType,
 } from '@trainingai/shared/validation/health-connect-import';
 import type { HealthConnectReader } from '../src/integrations/health-connect/types.ts';
+import { readFileSync } from 'node:fs';
 import type { FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
+import { loadFirstHandSources } from '../src/features/health/data/first-hand-sources.ts';
+import { readinessSpec } from '../src/features/health/data/models.ts';
 // #3115 part 2: with Oura Cloud connected, Preview does not import the Oura app's own records.
 const now = Date.parse('2026-10-13T05:00:00Z');
 const OURA = 'com.ouraring.oura';
@@ -30,7 +33,11 @@ function row(type: HealthConnectType, sourcePackage: string): HealthConnectRecor
     };
   return { ...base, value: type === 'Weight' ? 80 : 50 };
 }
-function fixture(sources: FirstHandSources | null, rows: HealthConnectRecord[]) {
+function fixture(
+  sources: FirstHandSources | null,
+  rows: HealthConnectRecord[],
+  over: Partial<HealthConnectReader> = {},
+) {
   const saved = new Map<string, string>(),
     remote = new Map<string, HealthConnectRecord>();
   let current = sources;
@@ -49,6 +56,7 @@ function fixture(sources: FirstHandSources | null, rows: HealthConnectRecord[]) 
       more: false,
       skipped: 0,
     }),
+    ...over,
   };
   const connection = {
     origin: 'https://example.com',
@@ -133,4 +141,86 @@ test('a record imported before the connection is not deleted when a later rescan
   await f.store.importHistory('2026-10-01T00:00:00Z');
   assert.equal(f.remote.size, 1);
   assert.deepEqual(f.store.getSnapshot().skippedFirstHand, { SleepSession: 1 });
+});
+test('a record is skipped on every path it can arrive by: first read, scan page and change page', async () => {
+  const oura = healthConnectTypes.map((type) => row(type, OURA));
+  const change = (records: HealthConnectRecord[]) => ({
+    records,
+    deleted: [],
+    token: 'cursor-2',
+    expired: false,
+    more: false,
+    skipped: 0,
+  });
+  // The first read, the scan pages (the fixture's `history`) and the later change pages all return
+  // the Oura rows.
+  const f = fixture({ ouraCloud: true }, oura, { changes: async () => change(oura) });
+  await f.store.setEnabled(true);
+  await f.store.run(true);
+  await f.store.run(true);
+  assert.equal(f.remote.size, 0);
+  // Per sync: the second run counts what it saw, not the first run's too.
+  assert.deepEqual(
+    f.store.getSnapshot().skippedFirstHand,
+    Object.fromEntries(healthConnectTypes.map((type) => [type, 1])),
+  );
+});
+test("counts are per sync: a rescan does not count the same record again", async () => {
+  const f = fixture({ ouraCloud: true }, [row('SleepSession', OURA)]);
+  await f.store.setEnabled(true);
+  await f.store.run(true);
+  await f.store.importHistory('2026-10-01T00:00:00Z');
+  await f.store.importHistory('2026-10-01T00:00:00Z');
+  assert.deepEqual(f.store.getSnapshot().skippedFirstHand, { SleepSession: 1 });
+  // A sync that leaves nothing out reports nothing, not the last sync's count.
+  f.connect({ ouraCloud: false });
+  await f.store.run(true);
+  assert.deepEqual(f.store.getSnapshot().skippedFirstHand, {});
+});
+test('records skipped while connected are read again once Oura Cloud reads as disconnected', async () => {
+  const f = fixture({ ouraCloud: true }, [row('SleepSession', OURA)]);
+  await f.store.setEnabled(true);
+  await f.store.run(true);
+  assert.equal(f.remote.size, 0);
+  // Not known: keeps the skip state and uploads nothing new.
+  f.connect(null);
+  await f.store.run(true);
+  f.connect({ ouraCloud: false });
+  await f.store.run(true);
+  assert.equal(f.remote.size, 1);
+  assert.deepEqual(f.store.getSnapshot().skippedFirstHand, {});
+});
+test('the connection is read from today\'s readiness payload by the one cold-start rule', async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const resources = (data: unknown, fail = false) => ({
+    load: async () => {
+      if (fail) throw new Error('offline');
+    },
+    state: () => ({ data: data as { connectedSources?: unknown } | null }),
+  });
+  assert.deepEqual(
+    await loadFirstHandSources(resources({ connectedSources: { ouraCloud: true } }), 'UTC'),
+    { ouraCloud: true },
+  );
+  assert.deepEqual(
+    await loadFirstHandSources(resources({ connectedSources: { ouraCloud: false } }), 'UTC'),
+    { ouraCloud: false },
+  );
+  // Unknown: no resources, nothing loaded yet, a field that is not a boolean.
+  assert.equal(await loadFirstHandSources(null, 'UTC'), null);
+  assert.equal(await loadFirstHandSources(resources(null), 'UTC'), null);
+  assert.equal(await loadFirstHandSources(resources({}), 'UTC'), null);
+  assert.equal(
+    await loadFirstHandSources(resources({ connectedSources: { ouraCloud: 'yes' } }), 'UTC'),
+    null,
+  );
+  assert.equal(readinessSpec(today).partition, today);
+});
+test('the hook gives the store the connection lookup', () => {
+  const hook = readFileSync(
+    new URL('../src/features/health/useDeviceHealthImport.android.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(hook, /from '\.\/data\/first-hand-sources'/);
+  assert.match(hook, /new HealthConnectImportStore\([\s\S]*?loadFirstHandSources\(resources, dataReader\.timezone\)/);
 });

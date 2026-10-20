@@ -27,10 +27,13 @@ const RECORD_CLASS: Record<string, string> = {
   ActiveCaloriesBurned: 'ActiveCaloriesBurnedRecord', StepsCadenceSeries: 'StepsCadenceRecord',
 }
 
-// Direct `readRecords({ … type: 'X' })` calls, plus the #2462 interval reads, which go through one
+// Every read goes through `readFiltered` (#3197), asked for as `read('X')` inside `syncWindow` or as
+// `readRecords({ … type: 'X' })` directly, plus the #2462 interval reads, which go through one
 // `readIntervals('X')` helper.
 const readTypes = [
   ...[...sync.matchAll(/readRecords\(\{[^}]*type: '(\w+)'/g)].map(m => m[1]),
+  ...[...sync.matchAll(/\bread\('(\w+)'\)/g)].map(m => m[1]),
+  ...[...sync.matchAll(/readFiltered\(\w+, \w+, \{[^}]*type: '(\w+)'/g)].map(m => m[1]),
   ...[...sync.matchAll(/readIntervals\('(\w+)'\)/g)].map(m => m[1]),
 ]
 

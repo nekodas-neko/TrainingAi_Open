@@ -13,8 +13,9 @@ export function HealthConnectProvider() {
   const tz = useUserTimezone();
 
   useEffect(() => {
-    import('@/lib/health-connect-sync').then(({ syncHealthConnect }) => {
-      syncHealthConnect(tz).catch(() => {});
+    import('@/lib/health-connect-sync').then(({ syncHealthConnect, rememberSyncSkipped }) => {
+      // #3197: the result's skip counts are kept, replaced each sync, rather than dropped here.
+      syncHealthConnect(tz).then(rememberSyncSkipped).catch(() => {});
     });
   }, [tz]);
 
