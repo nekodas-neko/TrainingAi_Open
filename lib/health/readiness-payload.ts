@@ -231,9 +231,11 @@ export interface ReadinessScoreResponse {
   hrMax: number | null
   vo2Max: number | null
   vascularAge: number | null
-  // Day of the last Cloud row carrying vo2Max/vascularAge — always pre-re-key.
-  // UI must render these "as of <cloudVitalsDate>", never as today's reading.
+  // Day of the newest Cloud row carrying vo2Max or vascularAge. UI renders these
+  // "as of <day>", never as today's reading: each metric's own day where it has one (#3077).
   cloudVitalsDate: string | null
+  vo2MaxDate?: string | null
+  vascularAgeDate?: string | null
   stressHigh: number | null
   recoveryHigh: number | null
   recommendedBedtimeStart: number | null
@@ -983,6 +985,8 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     vo2Max:                  cloudVitals?.vo2Max                    ?? null,
     vascularAge:             cloudVitals?.vascularAge               ?? null,
     cloudVitalsDate:         cloudVitals?.date                      ?? null,
+    vo2MaxDate:              cloudVitals?.vo2MaxDate                ?? null,
+    vascularAgeDate:         cloudVitals?.vascularAgeDate           ?? null,
     // Derived-when-available (fresh, written by the body-battery read today), else the frozen
     // Cloud seconds ONLY when that row post-dates the re-key. Derived is minutes → convert;
     // response stays seconds (S5). 10c's derived-first coalesce is preserved; item 21 gates

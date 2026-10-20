@@ -40,6 +40,7 @@ const getOuraWorkouts = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getOuraDaily = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listActivityLogs = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listOuraTags = vi.fn(async (..._a: unknown[]) => [] as Row[])
+const listOuraSessions = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getOuraDailyDerived = vi.fn(async (..._a: unknown[]) => [] as Row[])
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
@@ -48,7 +49,7 @@ vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
     listSleepSessions, getWorkoutSessionsFrom, listFoodLogs, listMealTypes,
-    getOuraWorkouts, getOuraDaily, listActivityLogs, listOuraTags, getOuraDailyDerived,
+    getOuraWorkouts, getOuraDaily, listActivityLogs, listOuraTags, listOuraSessions, getOuraDailyDerived,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
@@ -101,6 +102,7 @@ beforeEach(() => {
   getOuraDaily.mockResolvedValue([])
   listActivityLogs.mockResolvedValue([])
   listOuraTags.mockResolvedValue([])
+  listOuraSessions.mockResolvedValue([])
   getOuraDailyDerived.mockResolvedValue([])
 })
 
@@ -363,6 +365,22 @@ describe('/api/day-timeline — tags and ordering', () => {
       { startTime: bne(DAY, '12:00'), endTime: null, tagType: 'nap', customName: 'Afternoon kip', comment: null, mood: null, source: 'oura' },
     ])
     expect((await eventsOf('tag')).map((t: Row) => t.title)).toEqual(['Afternoon kip', 'Stress', 'Rest mode'])
+  })
+
+  // #3077: `oura_tags` has had no writer since the ring moved to the Oura API; its sessions arrive as
+  // Oura's `session` documents, and the timeline shows them the way it showed a tag.
+  it('shows Oura\'s sessions from the API as tag events, with Oura\'s type and mood', async () => {
+    listOuraSessions.mockResolvedValue([
+      { ouraId: 's1', sessionType: 'meditation', mood: 'good', startDatetime: bne(DAY, '12:00'), endDatetime: bne(DAY, '12:10') },
+      { ouraId: 's2', sessionType: 'body_status', mood: null, startDatetime: bne(DAY, '13:00'), endDatetime: null },
+      { ouraId: 's3', sessionType: 'nap', mood: null, startDatetime: null, endDatetime: null },
+    ])
+    const tags = await eventsOf('tag')
+    expect(tags.map((t: Row) => [t.title, t.subtitle, t.tagSource])).toEqual([
+      ['Body status', undefined, 'oura_cloud'],
+      ['Meditation', 'mood: good', 'oura_cloud'],
+    ])
+    expect(listOuraSessions).toHaveBeenCalledWith(expect.any(String), '2026-09-07', DAY)
   })
 
   it('skips a tag with no start time rather than sorting it to the epoch', async () => {

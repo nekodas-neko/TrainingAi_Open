@@ -1473,7 +1473,7 @@ export interface WorkoutRepository {
   /** The app's own derived scores for one local day (`oura_daily_derived`), or null if never
    *  scored. Never reads `oura_daily`'s frozen Cloud columns. One query — safe on a per-day screen. */
   getDerivedScoresForDay(userId: string, day: string): Promise<{ sleepScore: number | null; readinessScore: number | null; activityScore: number | null } | null>
-  getLatestOuraCloudVitals(userId: string): Promise<{ date: string; vo2Max: number | null; vascularAge: number | null } | null>
+  getLatestOuraCloudVitals(userId: string): Promise<{ date: string; vo2Max: number | null; vo2MaxDate: string | null; vascularAge: number | null; vascularAgeDate: string | null } | null>
   /** Newest `measured_at` across the user's BLE raw samples — the ring's freshness truth. */
   getLatestOuraBleMeasuredAt(userId: string): Promise<Date | null>
   /** Has the ring ever reported? Answers "is it connected" without needing a resolvable clock
@@ -1511,6 +1511,8 @@ export interface WorkoutRepository {
   /** Newest first; default 50 rows, at most 500. */
   listAgentActions(filter?: import('./postgres/slices/agent-actions').ListAgentActionsFilter): Promise<import('./postgres/slices/agent-actions').AgentActionRecord[]>
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
+  /** #3077: Oura's sessions on local days `[startDay, endDay]` (`oura_sessions`). */
+  listOuraSessions(userId: string, startDay: string, endDay: string): Promise<{ ouraId: string; sessionType: string | null; mood: string | null; startDatetime: Date | null; endDatetime: Date | null }[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────
   // ── Colmi R09 ring, LEARNING MODE (PS-8) ────────────────────────────────────────────────
@@ -1720,8 +1722,8 @@ export interface OuraDailyRow {
   resilienceLevel?: string | null
   resilienceContributors?: Record<string, number | null> | null
   // sleep_time endpoint (migration 090)
-  recommendedBedtimeStart?: number | null   // minutes from midnight UTC
-  recommendedBedtimeEnd?: number | null     // minutes from midnight UTC
+  recommendedBedtimeStart?: number | null   // minutes from the day's local midnight (negative before it)
+  recommendedBedtimeEnd?: number | null     // minutes from the day's local midnight
   sleepTimeStatus?: string | null
   sleepTimeRecommendation?: string | null
   breathingDisturbanceIndex?: number | null

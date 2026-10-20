@@ -134,6 +134,24 @@ export const DailyCardiovascularAgeDoc = z.object({
   pulse_wave_velocity: NullableNum,
 })
 
+/**
+ * `PublicSleepTime` (#3077): Oura's bedtime recommendation. `optimal_bedtime`'s offsets are seconds
+ * from the day's local midnight (`day_tz` is that day's UTC offset), negative before midnight.
+ * `recommendation` and `status` are kept as strings, so a value Oura adds after the pinned spec
+ * still lands.
+ */
+export const SleepTimeDoc = z.object({
+  id: z.string().min(1),
+  day: Day,
+  optimal_bedtime: z.object({
+    day_tz: z.number().int(),
+    start_offset: z.number().int(),
+    end_offset: z.number().int(),
+  }).nullable().optional(),
+  recommendation: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+})
+
 /** `PublicVO2Max` */
 export const Vo2MaxDoc = z.object({
   id: z.string().min(1),
@@ -225,6 +243,7 @@ export type DailyStressDoc = z.infer<typeof DailyStressDoc>
 export type DailyResilienceDoc = z.infer<typeof DailyResilienceDoc>
 export type DailyCardiovascularAgeDoc = z.infer<typeof DailyCardiovascularAgeDoc>
 export type Vo2MaxDoc = z.infer<typeof Vo2MaxDoc>
+export type SleepTimeDoc = z.infer<typeof SleepTimeDoc>
 export type SleepDoc = z.infer<typeof SleepDoc>
 export type WorkoutDoc = z.infer<typeof WorkoutDoc>
 export type SessionDoc = z.infer<typeof SessionDoc>
@@ -244,6 +263,7 @@ export const OURA_DOCUMENT_TYPES = {
   daily_resilience: { path: 'daily_resilience', schema: DailyResilienceDoc },
   daily_cardiovascular_age: { path: 'daily_cardiovascular_age', schema: DailyCardiovascularAgeDoc },
   vo2_max: { path: 'vO2_max', schema: Vo2MaxDoc },
+  sleep_time: { path: 'sleep_time', schema: SleepTimeDoc },
   sleep: { path: 'sleep', schema: SleepDoc },
   workout: { path: 'workout', schema: WorkoutDoc },
   session: { path: 'session', schema: SessionDoc },
@@ -270,6 +290,8 @@ export const OURA_SCOPE_FOR: Record<OuraDocumentType | 'heartrate', OuraScope> =
   daily_resilience: 'heart_health',
   daily_cardiovascular_age: 'heart_health',
   vo2_max: 'heart_health',
+  // A guess, as for resilience: the spec names no scope for it, and it is a sleep product.
+  sleep_time: 'daily',
   sleep: 'daily',
   workout: 'workout',
   session: 'session',
@@ -290,6 +312,7 @@ export type OuraDocument =
   | { type: 'daily_resilience'; doc: DailyResilienceDoc }
   | { type: 'daily_cardiovascular_age'; doc: DailyCardiovascularAgeDoc }
   | { type: 'vo2_max'; doc: Vo2MaxDoc }
+  | { type: 'sleep_time'; doc: SleepTimeDoc }
   | { type: 'sleep'; doc: SleepDoc }
   | { type: 'workout'; doc: WorkoutDoc }
   | { type: 'session'; doc: SessionDoc }
@@ -447,6 +470,16 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
         break
       case 'vo2_max':
         day(doc.day).vo2Max = doc.vo2_max
+        break
+      case 'sleep_time':
+        // Minutes from the day's local midnight: what `recommended_bedtime_*` holds and the rest-day
+        // card renders as a clock time.
+        Object.assign(day(doc.day), {
+          recommendedBedtimeStart: doc.optimal_bedtime ? Math.round(doc.optimal_bedtime.start_offset / 60) : null,
+          recommendedBedtimeEnd: doc.optimal_bedtime ? Math.round(doc.optimal_bedtime.end_offset / 60) : null,
+          sleepTimeStatus: doc.status ?? null,
+          sleepTimeRecommendation: doc.recommendation ?? null,
+        })
         break
       case 'sleep': {
         sleepPeriods.set(doc.id, {

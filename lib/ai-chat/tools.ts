@@ -78,7 +78,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
     }),
 
     getRecoveryData: tool({
-      description: 'Recovery data per day for a date range: the app\'s own readiness, sleep and activity scores (never Oura\'s own scores), temp deviation, sleep sessions (duration, efficiency, overnight HRV, lowest HR), body metrics (HRV, resting HR, SpO2, steps, weight), the app\'s illness-radar flag, daytime stress (dHRV level −1..+1, negative = stressed; minutes in high stress per day), stress-resilience level (1–5, higher = more resilient) and whole-day training-stress (OTS, with a HIGH flag). Use for recovery, sleep, HRV, SpO2, readiness, resilience, overtraining/training-load and "am I getting sick?" questions.',
+      description: 'Recovery data per day for a date range: the app\'s own readiness, sleep and activity scores (never Oura\'s own scores), temp deviation, sleep sessions (duration, efficiency, overnight HRV, lowest HR), body metrics (HRV, resting HR, SpO2, steps, weight), the app\'s illness-radar flag, daytime stress (dHRV level −1..+1, negative = stressed; minutes in high stress per day; each day says whether it is the app\'s own or Oura\'s, which has minutes only), stress-resilience level (the app\'s own 1–5, higher = more resilient; or Oura\'s own level word: limited, adequate, solid, strong, exceptional) and whole-day training-stress (OTS, with a HIGH flag). Use for recovery, sleep, HRV, SpO2, readiness, resilience, overtraining/training-load and "am I getting sick?" questions.',
       inputSchema: z.object({
         fromDate: z.string().describe('YYYY-MM-DD inclusive'),
         toDate: z.string().describe('YYYY-MM-DD inclusive'),
@@ -120,14 +120,26 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           illnessRadar: derived
             .filter(r => r.illnessFlag != null)
             .map(r => ({ date: r.day, flag: r.illnessFlag, score: r.illnessScore ?? null })),
-          daytimeStress: derived
-            .filter(d => d.daytimeStressScaled != null || d.stressHighMinutes != null)
-            .map(d => ({ date: d.day, level: d.daytimeStressScaled ?? null, highMinutes: d.stressHighMinutes ?? null })),
+          // The app's own (ring) stress first; Oura's `stress_high` for a day it has none (#3077: the
+          // ring's rollup stopped when the ring moved to the Oura API). Oura gives minutes only.
+          daytimeStress: [
+            ...derived
+              .filter(d => d.daytimeStressScaled != null || d.stressHighMinutes != null)
+              .map(d => ({ date: d.day, source: 'own' as const, level: d.daytimeStressScaled ?? null, highMinutes: d.stressHighMinutes ?? null })),
+            ...oura
+              .filter(r => r.stressHigh != null && derivedByDate.get(r.date)?.stressHighMinutes == null && derivedByDate.get(r.date)?.daytimeStressScaled == null)
+              .map(r => ({ date: r.date, source: 'oura' as const, level: null, highMinutes: Math.round(r.stressHigh! / 60) })),
+          ].sort((a, b) => a.date.localeCompare(b.date)),
           // Own stress-resilience level (1–5) + whole-day training-stress (OTS) — purpose-built
           // signals that were computed and stored but never surfaced to the chat (F9).
           resilience: derived
             .filter(d => d.resilienceLevel != null)
             .map(d => ({ date: d.day, level: d.resilienceLevel, band: d.resilienceLevel != null ? resilienceLevelToBand(d.resilienceLevel) : null })),
+          // #3077: Oura's own resilience level for a day the app has none, as Oura's word: it is not
+          // the app's 1–5 scale and is not mapped onto it.
+          ouraResilience: oura
+            .filter(r => r.resilienceLevel != null && derivedByDate.get(r.date)?.resilienceLevel == null)
+            .map(r => ({ date: r.date, level: r.resilienceLevel })),
           trainingStress: derived
             .filter(d => d.trainingLoadOts != null)
             .map(d => ({ date: d.day, ots: d.trainingLoadOts, high: d.trainingLoadHigh ?? null })),

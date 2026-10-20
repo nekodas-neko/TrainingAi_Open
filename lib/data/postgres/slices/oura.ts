@@ -184,22 +184,30 @@ export async function getOuraDaily(db: Db, userId: string, startDate: string, en
   }))
 }
 
-/** The most recent oura_daily row carrying VO₂ max / vascular age — necessarily
- *  pre-re-key (Cloud-only fields, frozen since 2026-07-07). Returned WITH its date
- *  so the UI can stamp "as of <day>" instead of presenting it as current. */
+/** Oura's latest VO₂ max and vascular age, each from the newest oura_daily row that carries IT, with
+ *  its own day, so the UI can stamp "as of <day>" instead of presenting it as current. Oura sends the
+ *  two as separate documents on separate days (#3077): taking one row carrying either hid VO₂ max
+ *  whenever the newest day had only vascular age. `date` is the newer of the two days. */
 export async function getLatestOuraCloudVitals(
   db: Db, userId: string,
-): Promise<{ date: string; vo2Max: number | null; vascularAge: number | null } | null> {
-  const rows = await db
-    .select({ date: s.ouraDaily.date, vo2Max: s.ouraDaily.vo2Max, vascularAge: s.ouraDaily.vascularAge })
-    .from(s.ouraDaily)
-    .where(and(
-      eq(s.ouraDaily.userId, userId),
-      or(isNotNull(s.ouraDaily.vo2Max), isNotNull(s.ouraDaily.vascularAge)),
-    ))
-    .orderBy(desc(s.ouraDaily.date))
-    .limit(1)
-  return rows[0] ?? null
+): Promise<{ date: string; vo2Max: number | null; vo2MaxDate: string | null; vascularAge: number | null; vascularAgeDate: string | null } | null> {
+  const latest = async (col: typeof s.ouraDaily.vo2Max | typeof s.ouraDaily.vascularAge) => {
+    const [row] = await db
+      .select({ date: s.ouraDaily.date, value: col })
+      .from(s.ouraDaily)
+      .where(and(eq(s.ouraDaily.userId, userId), isNotNull(col)))
+      .orderBy(desc(s.ouraDaily.date))
+      .limit(1)
+    return row ?? null
+  }
+  const [vo2, vascular] = await Promise.all([latest(s.ouraDaily.vo2Max), latest(s.ouraDaily.vascularAge)])
+  if (!vo2 && !vascular) return null
+  const dates = [vo2?.date, vascular?.date].filter((d): d is string => d != null).sort()
+  return {
+    date: dates[dates.length - 1],
+    vo2Max: vo2?.value ?? null, vo2MaxDate: vo2?.date ?? null,
+    vascularAge: vascular?.value ?? null, vascularAgeDate: vascular?.date ?? null,
+  }
 }
 
 /**
@@ -1086,6 +1094,18 @@ export interface OuraSessionRow {
   heartRate: s.OuraSampleSeries | null
   heartRateVariability: s.OuraSampleSeries | null
   motionCount: s.OuraSampleSeries | null
+}
+
+/** The user's Oura sessions (meditation, breathing, nap, rest …) on local days `[fromDay, toDay]`, by
+ *  Oura's own `day`, oldest first (#3077: the timeline's source now that `oura_tags` has no writer). */
+export async function listOuraSessions(db: Db, userId: string, fromDay: string, toDay: string) {
+  return db.select({
+    ouraId: s.ouraSessions.ouraId, sessionType: s.ouraSessions.sessionType, mood: s.ouraSessions.mood,
+    startDatetime: s.ouraSessions.startDatetime, endDatetime: s.ouraSessions.endDatetime,
+  })
+    .from(s.ouraSessions)
+    .where(and(eq(s.ouraSessions.userId, userId), gte(s.ouraSessions.day, fromDay), lte(s.ouraSessions.day, toDay)))
+    .orderBy(asc(s.ouraSessions.startDatetime))
 }
 
 export async function upsertOuraSessions(db: Db, userId: string, rows: OuraSessionRow[]): Promise<number> {

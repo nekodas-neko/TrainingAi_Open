@@ -229,6 +229,8 @@ export const readinessSpec = (date: string) => ({
         })
         .nullish(),
       cloudVitalsDate: text,
+      vo2MaxDate: text,
+      vascularAgeDate: text,
       availability: z
         .array(
           z
