@@ -44,6 +44,7 @@ import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 import { useRevalidateOnReturn } from "@/lib/hooks/use-revalidate-on-return";
 import { readLocalWorkoutSessionsDay } from "./local-workout-sessions-day";
 import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile, invalidatePulledDomains } from "@/lib/cache-groups";
+import { OURA_DATA_CHANGED_EVENT } from "@/lib/oura-data-changed";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
 import { getLocalStore } from "@/lib/local-store";
@@ -693,15 +694,15 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   }, [userId, refetchAll]);
 
   // BLE drain settling (syncOuraRing) dispatches this once new data has actually landed in
-  // Postgres — bump refreshTick so the gated mount effects below (readiness, body-battery,
+  // Postgres, and so does a sync pull carrying Oura's rows (#3077) — bump refreshTick so the gated mount effects below (readiness, body-battery,
   // training-load, oura-hr-day) refetch instead of showing pre-sync data indefinitely.
   // Q-91: 'sleep-sessions' is read by this screen too (the home HR chart's sleep-window
   // shading) but isn't one of the refreshTick-gated effects — it was invalidated correctly
   // but nothing ever re-fetched it on this signal, same gap as sleep-content.tsx/health-content.tsx.
   useEffect(() => {
     const onBleSynced = () => setRefreshTick(t => t + 1);
-    window.addEventListener('ta:oura-ble-synced', onBleSynced);
-    return () => window.removeEventListener('ta:oura-ble-synced', onBleSynced);
+    window.addEventListener(OURA_DATA_CHANGED_EVENT, onBleSynced);
+    return () => window.removeEventListener(OURA_DATA_CHANGED_EVENT, onBleSynced);
   }, []);
 
   // Was on the BLE event; the invalidation is wider (`invalidateBiometrics` clears this key too).

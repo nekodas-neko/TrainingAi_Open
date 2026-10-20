@@ -19,7 +19,7 @@ function fakeOura(): typeof fetch {
     daily_readiness: FIXTURES.daily_readiness, daily_sleep: FIXTURES.daily_sleep, daily_activity: FIXTURES.daily_activity,
     daily_spo2: FIXTURES.daily_spo2, daily_stress: FIXTURES.daily_stress, daily_resilience: FIXTURES.daily_resilience,
     daily_cardiovascular_age: FIXTURES.daily_cardiovascular_age, vO2_max: FIXTURES.vo2_max, sleep: FIXTURES.sleep, workout: FIXTURES.workout,
-    session: FIXTURES.session,
+    session: FIXTURES.session, sleep_time: FIXTURES.sleep_time,
   }
   return (async (input: RequestInfo | URL) => {
     const url = new URL(String(input))
@@ -96,6 +96,8 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
       'resting_time_sec', 'avg_met_minutes', 'high_activity_met_minutes', 'medium_activity_met_minutes',
       'low_activity_met_minutes', 'stress_high', 'recovery_high', 'vo2_max', 'vascular_age', 'pulse_wave_velocity',
       'resilience_level', 'resilience_contributors', 'breathing_disturbance_index',
+      // #3077: Oura's sleep_time.
+      'recommended_bedtime_start', 'recommended_bedtime_end', 'sleep_time_status', 'sleep_time_recommendation',
     ]
     for (const c of dailyCols) {
       expect(daily[c], c).not.toBeNull()

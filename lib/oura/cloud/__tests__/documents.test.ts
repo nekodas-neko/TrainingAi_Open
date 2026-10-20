@@ -27,14 +27,16 @@ describe('Oura Cloud document mapping (#2859)', () => {
       'avgMetMinutes', 'highActivityMetMinutes', 'mediumActivityMetMinutes', 'lowActivityMetMinutes',
       'breathingDisturbanceIndex', 'stressHigh', 'recoveryHigh', 'resilienceLevel', 'resilienceContributors',
       'vascularAge', 'pulseWaveVelocity', 'vo2Max',
+      'recommendedBedtimeStart', 'recommendedBedtimeEnd', 'sleepTimeStatus', 'sleepTimeRecommendation',
     ] as const
     for (const k of expected) expect(row[k], k).not.toBeNull()
     for (const k of expected) expect(row[k], k).not.toBeUndefined()
     // Seconds, as the spec says, not minutes.
     expect(row.stressHigh).toBe(5400)
     expect(row.highActivityTimeSec).toBe(1200)
-    // sleep_time is not read in part 2, so its columns stay absent and the merge keeps what is stored.
-    expect(row.recommendedBedtimeStart).toBeUndefined()
+    // #3077: sleep_time's window, in minutes from the day's local midnight (negative = the evening before).
+    expect([row.recommendedBedtimeStart, row.recommendedBedtimeEnd]).toEqual([-105, -60])
+    expect([row.sleepTimeStatus, row.sleepTimeRecommendation]).toEqual(['optimal_found', 'follow_optimal_bedtime'])
   })
 
   // #2895 review, item 7: until #2860 these would replace our own on the Sleep and Activity screens.

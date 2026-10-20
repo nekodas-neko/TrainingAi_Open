@@ -1,6 +1,7 @@
 // lib/oura-ble/sync.ts
 import { getOuraBle, type OuraBlePlugin } from '@/lib/oura-ble/plugin'
 import { invalidateOuraSync } from '@/lib/cache-groups'
+import { OURA_DATA_CHANGED_EVENT } from '@/lib/oura-data-changed'
 import { waitForRollup, type RollupState } from '@/lib/oura-ble/rollup-wait'
 import { maintainOuraRawStore } from '@/lib/oura-ble/raw-store-maintenance'
 
@@ -28,7 +29,7 @@ export async function readRollupState(): Promise<RollupState | null> {
  *  one of them. */
 export async function announceOuraSynced(): Promise<void> {
   await invalidateOuraSync().catch(() => {})
-  window.dispatchEvent(new Event('ta:oura-ble-synced'))
+  window.dispatchEvent(new Event(OURA_DATA_CHANGED_EVENT))
 }
 
 async function afterDrainSettles(plugin: OuraBlePlugin): Promise<void> {

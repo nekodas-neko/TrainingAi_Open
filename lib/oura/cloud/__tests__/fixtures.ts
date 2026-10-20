@@ -42,6 +42,12 @@ export const dailyResilience = {
 export const dailyCardiovascularAge = { id: 'ca-1', day: DAY, vascular_age: 34, pulse_wave_velocity: 6.8 }
 
 export const vo2Max = { id: 'vo-1', day: DAY, timestamp: `${DAY}T06:00:00+10:00`, vo2_max: 47 }
+/** `PublicSleepTime`: a window from 22:15 to 23:00 the night before, as seconds from local midnight. */
+export const sleepTime = {
+  id: 'st-1', day: DAY,
+  optimal_bedtime: { day_tz: 36000, start_offset: -6300, end_offset: -3600 },
+  recommendation: 'follow_optimal_bedtime', status: 'optimal_found',
+}
 
 export const sleepPeriod = {
   id: 'sl-1', day: DAY, type: 'long_sleep', period: 0, low_battery_alert: false,
@@ -86,6 +92,7 @@ export const FIXTURES = {
   daily_resilience: dailyResilience,
   daily_cardiovascular_age: dailyCardiovascularAge,
   vo2_max: vo2Max,
+  sleep_time: sleepTime,
   sleep: sleepPeriod,
   workout,
   session,
