@@ -244,6 +244,10 @@ interface PendingWaiter {
   hadCached: boolean;
 }
 const pendingWaiters = new Map<string, PendingWaiter[]>();
+// #3162. Requests that have already handed their answer (or failure) to their waiters. One can
+// still be in `inFlightRequests` for a moment after that, and a caller that joined it then was
+// queued for a delivery that had already happened: it got neither onData nor onError.
+const servedFlights = new WeakSet<Promise<void>>();
 
 export async function getCached<T>(key: string): Promise<T | null> {
   if (isSQLiteAvailable()) {
@@ -258,6 +262,10 @@ export async function getCached<T>(key: string): Promise<T | null> {
   return lsGet<T>(key);
 }
 
+// The SQLite write below is a standalone `runSQL`, so while a sync pull's transaction is open it
+// waits for that pull to commit (#3151, by design: a cache row must not roll back with someone
+// else's transaction). The session and localStorage mirrors are written first and synchronously,
+// so `readCacheSync` sees the new value at once either way.
 export async function setCached<T>(key: string, data: T, ttlSeconds: number): Promise<void> {
   if (cacheWritesDisabled) return;  // sign-out in progress — see the latch above
   ssWrite(key, data);  // same-session reads (synchronous, before first paint)
@@ -313,6 +321,8 @@ export async function invalidateCache(keyPrefix: string): Promise<void> {
   }
   lsInvalidate(keyPrefix);  // always clear localStorage mirror (now written on APK too)
 
+  // Like setCached's write, this waits for an open sync pull to commit (#3151), and so does the
+  // listeners' refetch below, by design: it must not land before the delete.
   if (isSQLiteAvailable()) {
     try {
       await runSQL('DELETE FROM api_cache WHERE key LIKE ?', [`${keyPrefix}%`]);
@@ -429,7 +439,9 @@ async function cachedFetchCore<T>(
   // does on every render in dev).
   // #2410: not one that was sent before the latest invalidation of this key — it would hand back
   // the answer to a question asked before the write. That one runs on; this call fetches its own.
-  if (inFlightRequests.has(key) && !invalidatedSince(key, inFlightStartSeq.get(key) ?? 0)) {
+  // #3162: and not one that has already served its waiters; this call fetches its own instead.
+  const flight = inFlightRequests.get(key);
+  if (flight && !servedFlights.has(flight) && !invalidatedSince(key, inFlightStartSeq.get(key) ?? 0)) {
     const waiters = pendingWaiters.get(key) ?? [];
     waiters.push({ onData: onData as (data: unknown) => void, onError, onRevalidateError, hadCached: cached !== null });
     pendingWaiters.set(key, waiters);
@@ -445,7 +457,8 @@ async function cachedFetchCore<T>(
   const firstSeq = invalidationSeq;
   // A holder rather than a `let`: the IIFE below reads it after it has been assigned, which no
   // `const` initialiser can express, and a lone late assignment trips `prefer-const`.
-  const self: { promise?: Promise<void> } = {};
+  // `write` is the cache write for this answer, awaited by this call only (see below).
+  const self: { promise?: Promise<void>; write?: Promise<void> } = {};
   const fetchPromise = (async () => {
    for (let attempt = 1; ; attempt++) {
     const startSeq = attempt === 1 ? firstSeq : invalidationSeq;
@@ -514,7 +527,13 @@ async function cachedFetchCore<T>(
       // answer 200 with `degraded: true` and a deterministic readout when the model fails, and
       // storing that under a long TTL would serve the fallback for as long as the real answer
       // would have lived — the recap's is 24h, on a card whose only retry is a refetch.
-      if (!shouldCache || shouldCache(data)) await setCached(key, toStored(data), ttlSeconds);
+      // #3162: NOT awaited here. Since #3151 a standalone write queues behind an open sync
+      // transaction, so awaiting it kept this request in flight for the whole pull, and every
+      // caller that joined it in that time was dropped without an answer. The waiters already
+      // have the data; this call alone waits for the write, after leaving the in-flight map.
+      if (!shouldCache || shouldCache(data)) {
+        self.write = setCached(key, toStored(data), ttlSeconds).catch(() => { /* a cache, not the source of truth */ });
+      }
     } catch {
       // Network-level throw. Offline is not an error (queue + show saved data);
       // only report a genuine failure while online with nothing cached to show.
@@ -546,6 +565,7 @@ async function cachedFetchCore<T>(
       // Not while retrying, and not for a request a newer one has replaced: the waiters it would
       // clear are queued for the newer request's answer.
       if (!retry && inFlightRequests.get(key) === self.promise) pendingWaiters.delete(key);
+      if (!retry && self.promise) servedFlights.add(self.promise);
     }
     if (!retry) return;
    }
@@ -562,6 +582,9 @@ async function cachedFetchCore<T>(
       inFlightStartSeq.delete(key);
     }
   }
+  // Callers still see the cache written when this resolves, as before; only the in-flight slot is
+  // given up first. During an open sync pull this wait lasts until the pull commits, by design.
+  if (self.write) await self.write;
 
   return cached !== null;
 }

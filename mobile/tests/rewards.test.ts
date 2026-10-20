@@ -428,10 +428,12 @@ test('invalidation does not add the reward view twice', () => {
   assert.deepEqual(withRewardState(['/api/streak-data']), [
     '/api/streak-data',
     '/api/achievements',
+    '/api/collection',
   ]);
   assert.deepEqual(withRewardState(['/api/achievements', '/api/personal-records']), [
     '/api/achievements',
     '/api/personal-records',
+    '/api/collection',
   ]);
   assert.deepEqual(withRewardState(['/api/weather']), ['/api/weather']);
 });

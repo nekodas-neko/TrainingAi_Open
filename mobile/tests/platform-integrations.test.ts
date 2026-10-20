@@ -151,6 +151,8 @@ test('a rest alarm fires at its end, follows length changes and is cleared by th
     const [alert] = planAlerts(quiet, [resting()], null, now, foreground);
     assert.deepEqual(alert.trigger, { at: now + 90000 });
     assert.equal(alert.title, 'Rest complete');
+    // The current app's wording: the set after the one just logged (#3142).
+    assert.equal(alert.body, 'Time for set 2');
   }
   const longer = resting();
   longer.rest!.endsAt += 30000;

@@ -62,6 +62,7 @@ export type HomeNavigation = {
   openMore: () => void;
   openPrograms: () => void;
   openStats: () => void;
+  openCollection: () => void;
   openExplanation: (id: string) => void;
 };
 export function HomeScreen(navigation: HomeNavigation) {
@@ -318,6 +319,7 @@ export function HomeScreen(navigation: HomeNavigation) {
                       }
                       openTraining={navigation.openStats}
                       openMorning={() => setModal('morning')}
+                      openCollection={navigation.openCollection}
                     />
                   )}
                 </HomeSection>

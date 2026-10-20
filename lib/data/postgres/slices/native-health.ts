@@ -4,7 +4,7 @@ import { DEFAULT_TZ, shiftDateStr, todayInTz } from '@trainingai/shared/date-uti
 import { projectDeviceHealth } from '@trainingai/shared/health/device-health-projection';
 import { groupSleepPeriods } from '@trainingai/shared/health/sleep-night';
 import { HEALTH_IMPORT_MAX_INTERVAL_DAYS } from '@trainingai/shared/health/import-limits';
-import { HR_RETENTION_DAYS } from './oura';
+import { HR_RETENTION_DAYS, settleNights } from './oura';
 import { initialSourceMap, mergeSet, type SourceColumn } from '../../health-source';
 import type { getDb } from '../client';
 import * as s from '../schema';
@@ -103,7 +103,6 @@ export async function rebuildNativeHealth(
           hrv: null,
         };
     const daily = result.daily.filter((day) => keys.includes(day.date));
-    const sleep = result.sleep.filter((night) => keys.includes(night.date));
     const heart = result.heart.filter((point) =>
       keys.includes(formatInTimeZone(point.timestamp, timezone, 'yyyy-MM-dd')),
     );
@@ -149,6 +148,24 @@ export async function rebuildNativeHealth(
 
     const t = s.sleepSessions;
     const prefix = source === 'apple_health' ? 'apple-health:' : 'health-connect-native:';
+    // #3115: each night follows the night ladder before it is written. One a higher-ranked night
+    // already holds (Oura Cloud, the ring, the legacy Health Connect writer) is not written, and its
+    // own earlier row is tombstoned below with the other nights no longer projected.
+    const { kept } = await settleNights(
+      tx as unknown as Db,
+      userId,
+      result.sleep
+        .filter((night) => keys.includes(night.date))
+        .map((night) => ({
+          night,
+          sleepStart: new Date(night.sleepStart),
+          sleepEnd: new Date(night.sleepEnd),
+          durationHours: night.durationHours,
+        })),
+      source,
+      { ownPrefix: prefix },
+    );
+    const sleep = kept.map(({ night }) => night);
     const starts = sleep.map((night) => new Date(night.sleepStart));
     if (keys.length)
       await tx
