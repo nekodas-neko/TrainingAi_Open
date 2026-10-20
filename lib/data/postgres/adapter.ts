@@ -8225,6 +8225,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listDeletedOuraCloudSleepDates(userId: string, from: string, to: string, tz: string) { return oura.listDeletedOuraCloudSleepDates(this.db, userId, from, to, tz) }
   async withOuraSleepWriteLock<T>(userId: string, run: () => Promise<T>) { return withUserLock(getPool(), `oura-sleep-write:${userId}`, run, { label: 'oura sleep write' }) }
   async upsertOuraWorkouts(userId: string, rows: oura.OuraWorkoutUpsertRow[]) { return oura.upsertOuraWorkouts(this.db, userId, rows) }
+  async tombstoneOuraWorkouts(userId: string, ids: string[]) { return oura.tombstoneOuraWorkouts(this.db, userId, ids) }
+  async tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }) { return oura.tombstoneOuraWorkoutsAbsent(this.db, userId, range) }
   async upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string) { return oura.upsertOuraCloudHeartrate(this.db, userId, rows, tz) }
   async upsertOuraCloudSleepPeriods(userId: string, rows: oura.OuraCloudSleepPeriodRow[]) { return oura.upsertOuraCloudSleepPeriods(this.db, userId, rows) }
   async upsertOuraCloudDaily(userId: string, rows: oura.OuraCloudDailyRow[]) { return oura.upsertOuraCloudDaily(this.db, userId, rows) }

@@ -44,7 +44,7 @@ export async function reattributeAfterHeartRate(
 /** The slice of the repository the writer needs, so tests can hand it a fake. */
 export type OuraCloudWriter = Pick<WorkoutRepository,
   'upsertOuraDaily' | 'upsertBodyMetrics' | 'upsertOuraCloudSleep' | 'tombstoneOuraCloudSleep' | 'syncOuraMainSleepBodyMetrics' |
-  'upsertOuraWorkouts' | 'upsertOuraCloudHeartrate' |
+  'upsertOuraWorkouts' | 'tombstoneOuraWorkouts' | 'tombstoneOuraWorkoutsAbsent' | 'upsertOuraCloudHeartrate' |
   'upsertOuraCloudSleepPeriods' | 'upsertOuraCloudDaily' | 'upsertOuraSessions'>
 
 export interface OuraCloudWriteCounts {

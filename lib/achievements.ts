@@ -10,6 +10,7 @@ import { getRepository } from '@/lib/data'
 import { calorieBudgetsByDay, budgetMetricsStart } from '@trainingai/shared/nutrition/day-budget'
 import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
+import { ouraBudgetActivities } from '@/lib/health/oura-budget-activities'
 
 function computeLevel(xp: number): { level: number; levelLabel: string; currentLevelXp: number; nextLevelXp: number } {
   let level = 1
@@ -81,7 +82,9 @@ export async function pastDayCalorieBudgets(userId: string, tz: string, days: st
       goal: (profile?.fitnessGoal ?? null) as FitnessGoal | null,
       targetWeightKg: goals?.targetWeightKg ?? null,
       ownTargetKcal: ownTargetFromGoals(goals),
-      workouts, avgBpmBySession, activities,
+      workouts, avgBpmBySession,
+      // #3087: Oura's own workouts the app did not log count too.
+      activities: [...activities, ...await ouraBudgetActivities(repo, userId, first, last, tz, { activityLogs: activities, sessions: workouts })],
     })
   } catch {
     return new Map()

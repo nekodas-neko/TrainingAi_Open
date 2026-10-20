@@ -114,7 +114,7 @@ export type OuraWebhookEvent = z.infer<typeof OuraWebhookEvent>
 export type OuraWebhookOutcome =
   /** The document was read and written. */
   | { result: 'written'; counts: OuraCloudWriteCounts }
-  /** A Cloud sleep period was tombstoned (or there was nothing of ours to tombstone). */
+  /** A Cloud sleep period or workout was tombstoned (or there was nothing of ours to tombstone). */
   | { result: 'deleted'; tombstoned: number }
   /** Nothing to do: a data type we do not store, or a delete of a type we keep no tombstone for. */
   | { result: 'ignored'; reason: string }
@@ -155,6 +155,8 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
   if (!userId) return { result: 'unknown_user' }
 
   if (event.event_type === 'delete') {
+    // #3087: a workout deleted in the Oura app stops counting in the energy budget. Kept and marked.
+    if (event.data_type === 'workout') return { result: 'deleted', tombstoned: await deps.repo.tombstoneOuraWorkouts(userId, [event.object_id]) }
     if (event.data_type !== 'sleep') return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
     const tombstoned = await withNightRescore(deps.rescore, userId, async () => {
       const n = await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id])

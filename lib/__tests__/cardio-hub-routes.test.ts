@@ -290,8 +290,9 @@ describe('/api/cardio-week', () => {
     expect((await (await getWeek()).json()).trainedToday).toBe(false)
   })
 
-  // #3095: the same builder as Home and the day screen. A treadmill session's steps are added (the
-  // ring misses them); a GPS walk's stored steps are not (the ring already counted them).
+  // #3095: the same builder as Home and the day screen. A treadmill session's steps are added (whether
+  // the ring already counts some of them is unknown, pending #3112); a GPS walk's stored steps are not
+  // (the ring already counted them).
   it('adds a treadmill session\'s steps to today and the week, and never a GPS walk\'s', async () => {
     const today = todayInTz(TZ)
     listBodyMetrics.mockResolvedValue([
