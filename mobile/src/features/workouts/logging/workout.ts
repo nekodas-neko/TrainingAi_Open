@@ -101,7 +101,11 @@ const workoutSchema = z.object({
   status: z.enum(['active', 'completed', 'discarded']),
   exercises: z.array(exerciseSchema).min(1),
   runningSet: reference.nullable(),
-  rest: reference.extend({ startedAt: timestamp, endsAt: timestamp }).nullable(),
+  // `lastSet`: the rest after an exercise's last set, timed on its summary (#3111). It is never
+  // recorded against the set, as in the current app, where the summary opens as the set is logged.
+  rest: reference
+    .extend({ startedAt: timestamp, endsAt: timestamp, lastSet: z.literal(true).optional() })
+    .nullable(),
   pending: z.array(
     z.object({
       id: z.uuid(),
@@ -459,6 +463,9 @@ export function endRest(
   now: number,
   measured = true,
 ): WorkoutRecord {
+  if (workout.rest?.lastSet) {
+    return { ...workout, rest: null, restAnchor: null };
+  }
   const rest = workout.rest ?? workout.restAnchor;
   if (!rest) {
     return workout;

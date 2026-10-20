@@ -79,6 +79,17 @@ export const scoreStyles = [
   ['band', 'Band'],
   ['underline', 'Underline'],
 ].map(([value, label]) => ({ value, label }));
+// Cards missing from a saved order go in just before Metric Tiles, as the current app does, so a
+// card turned on later never lands below the tiles.
+export function insertBeforeMetricTiles(order: string[], additions: string[]) {
+  const fresh = additions.filter((key) => !order.includes(key));
+  if (!fresh.length) {
+    return order;
+  }
+  const at = order.indexOf('metricTiles');
+  const index = at >= 0 ? at : order.length;
+  return [...order.slice(0, index), ...fresh, ...order.slice(index)];
+}
 export function homeSections(preferences: HomePreferences) {
   const keys = [
     'recommendation',
@@ -87,9 +98,30 @@ export function homeSections(preferences: HomePreferences) {
     ...(preferences.homeCards ?? []).map((key) => `card_${key}`),
     'metricTiles',
   ];
-  return [...new Set([...(preferences.homeSectionOrder ?? []), ...keys])].filter(
+  const saved = [...new Set(preferences.homeSectionOrder ?? [])].filter(
     (key) => keys.includes(key) && key in sectionLabels,
   );
+  if (!saved.length) {
+    return keys.filter((key) => key in sectionLabels);
+  }
+  return insertBeforeMetricTiles(
+    saved,
+    keys.filter((key) => key in sectionLabels),
+  );
+}
+// The preferences to save when the enabled cards change: the cards, and the section order with the
+// turned-off cards dropped and the turned-on ones placed before Metric Tiles (the web saves both).
+export function homeCardsPatch(preferences: HomePreferences, homeCards: string[]) {
+  const current = homeSections(preferences).filter(
+    (key) => !key.startsWith('card_') || homeCards.includes(key.slice(5)),
+  );
+  return {
+    homeCards,
+    homeSectionOrder: insertBeforeMetricTiles(
+      current,
+      homeCards.map((key) => `card_${key}`).filter((key) => key in sectionLabels),
+    ),
+  };
 }
 export function moveHomeSection(order: string[], key: string, direction: -1 | 1) {
   const index = order.indexOf(key);

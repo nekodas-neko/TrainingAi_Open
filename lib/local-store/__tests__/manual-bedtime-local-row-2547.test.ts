@@ -14,7 +14,7 @@ const db = { current: null as DatabaseSync | null }
 vi.mock('@/lib/sqlite/sqlite-service', () => ({
   runSQL: vi.fn(async (sql: string, p: unknown[] = []) => { db.current!.prepare(sql).run(...(p as never[])) }),
   querySQL: vi.fn(async (sql: string, p: unknown[] = []) => db.current!.prepare(sql).all(...(p as never[]))),
-  withTransaction: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  withTransaction: vi.fn(async (fn: (tx: { run: (sql: string, p?: unknown[]) => Promise<void> }) => Promise<unknown>) => fn({ run: (await import('@/lib/sqlite/sqlite-service')).runSQL })),
 }))
 
 import { SQLiteLocalStore } from '../sqlite-backend'
@@ -37,6 +37,7 @@ beforeEach(() => {
       avg_heart_rate REAL, lowest_heart_rate REAL, restless_periods REAL, sleep_score REAL,
       respiratory_rate REAL, sleep_phase_5_min TEXT, time_in_bed_hours REAL, manual_sleep_start TEXT,
       sleep_start TEXT, sleep_end TEXT, awake_hours REAL, manual_entry INTEGER NOT NULL DEFAULT 0, deleted_at TEXT,
+      oura_sleep_type TEXT,
       updated_at TEXT, sync_status TEXT);
     INSERT INTO sleep_sessions (id, date, duration_hours, sleep_start, updated_at, sync_status)
       VALUES ('sl-1', '${NIGHT}', 7.5, '2026-10-05T14:00:00.000Z', '${MEASURED_AT}', 'synced');

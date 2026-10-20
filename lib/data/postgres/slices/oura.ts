@@ -955,10 +955,20 @@ export interface OuraCloudSleepPeriodRow {
   ringId: string | null
 }
 
+/**
+ * #3060: a period whose type is new or changed bumps its night's `sleep_sessions.updated_at`, so the
+ * delta pull re-sends the row and the device seed gets the type the server's card already uses. The
+ * type lives only on this table, so a period written without its sleep row (the sleep upsert bumps
+ * the row on its own) would otherwise never reach a device with a changed type. Same type, no bump.
+ */
 export async function upsertOuraCloudSleepPeriods(db: Db, userId: string, rows: OuraCloudSleepPeriodRow[]): Promise<number> {
   if (rows.length === 0) return 0
   const values = collapseOnConflict(rows.map(r => ({ ...r, userId })), r => r.ouraId)
   const t = s.ouraCloudSleepPeriods
+  const stored = new Map((await db.select({ ouraId: t.ouraId, sleepType: t.sleepType }).from(t)
+    .where(and(eq(t.userId, userId), inArray(t.ouraId, values.map(v => v.ouraId)))))
+    .map(r => [r.ouraId, r.sleepType]))
+  const retyped = values.filter(v => !stored.has(v.ouraId) || stored.get(v.ouraId) !== v.sleepType).map(v => v.ouraId)
   await db.insert(t).values(values)
     .onConflictDoUpdate({
       target: [t.userId, t.ouraId],
@@ -971,6 +981,10 @@ export async function upsertOuraCloudSleepPeriods(db: Db, userId: string, rows: 
         updatedAt: sql`now()`,
       },
     })
+  if (retyped.length > 0) {
+    await db.update(s.sleepSessions).set({ updatedAt: sql`now()` })
+      .where(and(eq(s.sleepSessions.userId, userId), inArray(s.sleepSessions.ouraId, retyped)))
+  }
   return values.length
 }
 
