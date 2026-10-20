@@ -291,6 +291,7 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
       upsertOuraCloudSleepPeriods: async () => 0,
       upsertOuraCloudDaily: async () => 0,
       upsertOuraSessions: async () => 0,
+      deleteOuraSession: async () => 0,
       getLatestOuraCloudHeartrateAt: async (_u, from) => { since = from; return newest },
       getUserById: async () => ({ id: USER, timezone }) as User,
     },
