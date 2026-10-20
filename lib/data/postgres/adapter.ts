@@ -8182,6 +8182,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getAgentAction(id: string) { return agentActions.getAgentAction(this.db, id) }
   async listAgentActions(filter?: agentActions.ListAgentActionsFilter) { return agentActions.listAgentActions(this.db, filter) }
   async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
+  async listOuraSessions(userId: string, startDay: string, endDay: string) { return oura.listOuraSessions(this.db, userId, startDay, endDay) }
   // Colmi R09, learning mode (PS-8). Reads/writes only the colmi_* tables.
   async insertColmiReadings(userId: string, rows: import('./slices/colmi').ColmiReadingInput[]) { return colmi.insertColmiReadings(this.db, userId, rows) }
   async insertColmiRawFrames(userId: string, rows: import('./slices/colmi').ColmiRawFrameInput[]) { return colmi.insertColmiRawFrames(this.db, userId, rows) }

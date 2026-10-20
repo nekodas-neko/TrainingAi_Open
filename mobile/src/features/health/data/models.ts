@@ -229,6 +229,8 @@ export const readinessSpec = (date: string) => ({
         })
         .nullish(),
       cloudVitalsDate: text,
+      vo2MaxDate: text,
+      vascularAgeDate: text,
       availability: z
         .array(
           z
@@ -598,6 +600,8 @@ export const activityHistorySpec = {
           elevationProfile: z
             .array(z.object({ distKm: z.number().finite(), eleM: z.number().finite() }))
             .nullish(),
+          // The recorded route, as the current app's encoded polyline (#2845).
+          routePolyline: z.string().nullish(),
           ...numericFields([
             'caloriesBurned',
             'avgPaceSecPerKm',

@@ -282,7 +282,12 @@ export async function rebuildNativeHealth(
           );
         await tx
           .update(s.ouraDailyDerived)
-          .set({ readinessScore: null, sleepScore: null, activityScore: null })
+          // #3163 review: the illness radar's fields are stored beside readiness from the same inputs
+          // (#3086), so a day cleared for recompute must not keep a flag the next read would not set.
+          .set({
+            readinessScore: null, sleepScore: null, activityScore: null,
+            illnessFlag: null, illnessScore: null, illnessBiomarkers: null,
+          })
           .where(
             and(
               eq(s.ouraDailyDerived.userId, userId),

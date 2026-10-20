@@ -12,8 +12,9 @@
  * - **Sleep Score: recomputed now**, for any changed day in the window. It is a function of the
  *   night and the nights before it, so it is rebuilt by the readiness read's own scorer
  *   (`scoreSleepForDate`, one night window for both). A day left with no night is cleared.
- * - **Readiness, today: cleared.** The readiness read rewrites today on its next read once today's
- *   night exists (it persists on every read), and leaves it empty if the night is gone.
+ * - **Readiness, today: cleared**, with the illness radar's fields stored beside it (#3086). The
+ *   readiness read rewrites today on its next read once today's night exists (it persists on every
+ *   read), and leaves it empty if the night is gone.
  * - **Readiness, a finished day: kept and marked** (`model_versions.readinessNightRevisedAt`). A
  *   finished day's readiness is what it said that morning, built from that morning's activity, load
  *   and illness inputs, which no later read can rebuild. Clearing it would turn a revised value into a

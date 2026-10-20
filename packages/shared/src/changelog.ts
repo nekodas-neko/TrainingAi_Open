@@ -6,6 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.494.0",
+    date: "2026-10-20",
+    changes: [
+      "Workouts Oura recorded that you didn't log now count toward the day's calories burned, and one you delete in the Oura app stops counting. A walk you logged that Oura also recorded counts once, and a saved detected walk's steps are no longer counted twice.",
+      "A treadmill session's steps are added to the day's step count, the same on every screen. Outdoor walks and runs aren't added twice, because the ring already counted them.",
+      "On a night with more than one sleep window, the sleep card shows the whole night, and it opens with the same figures it shows once online. Naps and short Oura periods stay out of the night.",
+      "When Oura sends, revises or deletes a night late, that day's scores are worked out again, and a workout's heart rate fills in when Oura's heart rate arrives after it.",
+      "A run or walk's average pace leaves out the time you were paused, and the Steps achievements appear in the grid.",
+      "Behind the scenes: something you log while a sync is running saves straight away, every screen asking for the same data during a sync gets it, and another app's Health Connect copy of a night already stored is no longer added to it.",
+      "TrainingAi Preview gains XP, levels and achievements, the trophy case, GPS routes, live chest-strap heart rate, picture-in-picture workouts, the collection and your account history offline.",
+    ],
+  },
+  {
     version: "1.493.0",
     date: "2026-10-19",
     changes: [

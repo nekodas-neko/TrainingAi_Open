@@ -10,46 +10,13 @@ function localEditedAt(iso: string | null | undefined): { editedAt?: number } {
   return EditedAtSchema.safeParse(ms).success ? { editedAt: ms } : {}
 }
 
-export interface PushErrorRecord {
-  id?:    string;
-  domain: string;
-  date:   string;
-  error?: string;
-  // Q-475: the server could not write (database down/out of disk), so this says nothing about the
-  // mutation. Absent on an older server, which is why every read of it defaults to false.
-  retryable?: boolean;
-}
-
-export interface ResolvedPushFailure {
-  error:     string;
-  retryable: boolean;
-}
-
-// Map of failed outbox row id -> failure. Prefers exact id matching
-// (new servers); falls back to domain:date for error records missing an id
-// (old servers) — which retains every sibling sharing that key, matching the
-// pre-id behaviour, never worse.
-export function resolveFailedOutboxIds(
-  chunk: Array<{ id: string; domain: string; date: string }>,
-  errors: PushErrorRecord[],
-): Map<string, ResolvedPushFailure> {
-  const asFailure = (e: PushErrorRecord): ResolvedPushFailure =>
-    ({ error: e.error ?? 'sync failed', retryable: e.retryable === true })
-  const failed = new Map<string, ResolvedPushFailure>()
-  const legacyByKey = new Map<string, ResolvedPushFailure>()
-  for (const e of errors) {
-    if (e.id) failed.set(e.id, asFailure(e))
-    else legacyByKey.set(`${e.domain}:${e.date}`, asFailure(e))
-  }
-  if (legacyByKey.size) {
-    for (const m of chunk) {
-      if (failed.has(m.id)) continue
-      const legacy = legacyByKey.get(`${m.domain}:${m.date}`)
-      if (legacy !== undefined) failed.set(m.id, legacy)
-    }
-  }
-  return failed
-}
+export {
+  MAX_MUTATION_ATTEMPTS,
+  nextRetryDelayMs,
+  resolveFailedOutboxIds,
+  type PushErrorRecord,
+  type ResolvedPushFailure,
+} from '@trainingai/shared/sync/push-retry'
 
 // Server Zod schemas declare optional fields `.optional()` (T | undefined); local SQLite
 // rows use real NULLs (T | null) for the same fields. Reusing a local record's object
@@ -60,13 +27,6 @@ export function resolveFailedOutboxIds(
 // they're omitted instead of sent as null; required/always-populated fields are untouched.
 export function omitNullFields<T extends object>(obj: T): Partial<T> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== null)) as Partial<T>
-}
-
-export const MAX_MUTATION_ATTEMPTS = 5
-
-// 30s · 4^(attempts-1), capped at 1h: 30s, 2m, 8m, 32m, then dead-letter.
-export function nextRetryDelayMs(attempts: number): number {
-  return Math.min(30_000 * 4 ** (attempts - 1), 60 * 60_000)
 }
 
 // Whole-queue backoff after a 5xx from /api/sync/push: 30s · 2^(n-1), cap 10m.

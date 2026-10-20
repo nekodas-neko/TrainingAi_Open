@@ -1,4 +1,9 @@
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run';
+import {
+  MAX_MUTATION_ATTEMPTS,
+  nextRetryDelayMs,
+  resolveFailedOutboxIds,
+} from '@trainingai/shared/sync/push-retry';
 import { z } from 'zod';
 import { msToHHMMInTz, toAestDay } from '@trainingai/shared/date-utils';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
@@ -52,7 +57,24 @@ const sessionSchema = z.object({
     .optional(),
 });
 export type ActivitySession = z.infer<typeof sessionSchema>;
-const localRow = z.object({ payload: activityPayload, pending: z.boolean() });
+// What the server said when it refused a row, kept on the row. `attempts` counts server answers
+// only, never a lost connection. A row at MAX_MUTATION_ATTEMPTS is dead-lettered: the flush skips
+// it and it stays here, with the server's words, for a later Retry / Discard screen to read.
+const rejection = z.object({
+  error: z.string(),
+  at: z.number(),
+  attempts: z.number().int().positive(),
+  retryAt: z.number().optional(),
+});
+export type Rejection = z.infer<typeof rejection>;
+export function deadLettered(row: { rejected?: Rejection }) {
+  return (row.rejected?.attempts ?? 0) >= MAX_MUTATION_ATTEMPTS;
+}
+const localRow = z.object({
+  payload: activityPayload,
+  pending: z.boolean(),
+  rejected: rejection.optional(),
+});
 const savedSchema = z.object({
   version: z.literal(1),
   origin: z.string(),
@@ -64,7 +86,15 @@ const savedSchema = z.object({
       z.object({ date: z.string(), payload: PrescribedRunPatchBody, pending: z.boolean() }),
     )
     .default([]),
-  tests: z.array(z.object({ payload: fitnessPayloadSchema, pending: z.boolean() })).default([]),
+  tests: z
+    .array(
+      z.object({
+        payload: fitnessPayloadSchema,
+        pending: z.boolean(),
+        rejected: rejection.optional(),
+      }),
+    )
+    .default([]),
 });
 // The recording's GPS points, kept apart from the main record so a fix every few seconds does not
 // rewrite every saved activity with it. Tied to the recording by its start time, which is set once
@@ -613,8 +643,8 @@ export class ActivityStore {
     }
     if (
       !this.current.ready ||
-      (!this.current.rows.some((row) => row.pending) &&
-        !this.current.tests.some((row) => row.pending) &&
+      (!this.current.rows.some((row) => row.pending && !deadLettered(row)) &&
+        !this.current.tests.some((row) => row.pending && !deadLettered(row)) &&
         !this.current.runs.some((row) => row.pending))
     ) {
       return Promise.resolve();
@@ -637,8 +667,14 @@ export class ActivityStore {
         if (generation !== this.generation) {
           return;
         }
-        const activityRow = this.current.rows.find((row) => row.pending);
-        const row = activityRow ?? this.current.tests.find((row) => row.pending);
+        // A dead-lettered row, or one waiting out its backoff, is passed over so the rows behind
+        // it still upload.
+        const ready = (row: { pending: boolean; rejected?: Rejection }) =>
+          row.pending &&
+          !deadLettered(row) &&
+          (row.rejected?.retryAt === undefined || row.rejected.retryAt <= this.now());
+        const activityRow = this.current.rows.find(ready);
+        const row = activityRow ?? this.current.tests.find(ready);
         const domain = activityRow ? 'activity_logs' : 'fitness_tests';
         if (!row) {
           const run = this.current.runs.find((row) => row.pending);
@@ -684,7 +720,18 @@ export class ActivityStore {
           continue;
         }
         const ack = z
-          .object({ processed: z.literal(1), errors: z.array(z.unknown()).length(0) })
+          .object({
+            processed: z.number(),
+            errors: z.array(
+              z.object({
+                id: z.string().optional(),
+                domain: z.string(),
+                date: z.string(),
+                error: z.string().optional(),
+                retryable: z.boolean().optional(),
+              }),
+            ),
+          })
           .parse(
             await this.connection.post('/api/sync/push', {
               mutations: [
@@ -697,8 +744,44 @@ export class ActivityStore {
               ],
             }),
           );
-        if (!ack || generation !== this.generation) {
+        if (generation !== this.generation) {
           return;
+        }
+        const failure = resolveFailedOutboxIds(
+          [{ id: row.payload.id, domain, date: row.payload.date }],
+          ack.errors,
+        ).get(row.payload.id);
+        if (failure?.retryable) {
+          // The server could not write (its database is down): says nothing about this row.
+          throw new Error(failure.error);
+        }
+        if (failure) {
+          const attempts = (row.rejected?.attempts ?? 0) + 1;
+          const at = this.now();
+          const rejected: Rejection = {
+            error: failure.error,
+            at,
+            attempts,
+            ...(attempts < MAX_MUTATION_ATTEMPTS
+              ? { retryAt: at + nextRetryDelayMs(attempts) }
+              : {}),
+          };
+          const unchanged = (item: { payload: { id: string } }) =>
+            item.payload.id === row.payload.id &&
+            JSON.stringify(item.payload) === JSON.stringify(row.payload);
+          await this.write((data) => ({
+            ...data,
+            rows: data.rows.map((item) =>
+              activityRow && unchanged(item) ? { ...item, rejected } : item,
+            ),
+            tests: data.tests.map((item) =>
+              !activityRow && unchanged(item) ? { ...item, rejected } : item,
+            ),
+          }));
+          continue;
+        }
+        if (ack.processed !== 1 || ack.errors.length) {
+          throw new Error('Upload not confirmed.');
         }
         const response = await this.connection.get(
           domain === 'activity_logs' ? '/api/day-log' : '/api/fitness-tests',
@@ -740,6 +823,7 @@ export class ActivityStore {
                   ...item,
                   payload: { ...item.payload, id: String(confirmed.id) },
                   pending: false,
+                  rejected: undefined,
                 }
               : item,
           ),
@@ -751,7 +835,7 @@ export class ActivityStore {
             !activityRow &&
             item.payload.id === row.payload.id &&
             JSON.stringify(item.payload) === JSON.stringify(row.payload)
-              ? { ...item, pending: false }
+              ? { ...item, pending: false, rejected: undefined }
               : item,
           ),
         }));

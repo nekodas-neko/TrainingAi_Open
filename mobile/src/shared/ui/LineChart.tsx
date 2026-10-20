@@ -51,6 +51,7 @@ export function LineChart({
   series = [],
   markers = [],
   interactive = false,
+  onSelect,
   axisLabels,
   color: accent,
   fillColor,
@@ -84,6 +85,9 @@ export function LineChart({
   }[];
   markers?: readonly { x: number; label: string; color: string }[];
   interactive?: boolean;
+  // Told the x of the point a tap selects, so a screen can follow it elsewhere (the route map's
+  // marker, #2845).
+  onSelect?: (x: number) => void;
   axisLabels?: readonly string[];
   color?: string;
   fillColor?: string;
@@ -201,7 +205,7 @@ export function LineChart({
             ),
           ) *
             (xMax - xMin);
-        setSelection(
+        const selected =
           valid.reduce(
             (closest, p) =>
               Math.abs((p.x ?? points.indexOf(p)) - x) <
@@ -209,8 +213,9 @@ export function LineChart({
                 ? p
                 : closest,
             valid[0],
-          ).x ?? Math.round(x),
-        );
+          ).x ?? Math.round(x);
+        setSelection(selected);
+        onSelect?.(selected);
       }}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       accessibilityLabel={`${label}: ${valid.map((point) => `${point.label}: ${point.value}`).join('; ')}${guides ? guideSummary(min, max, target) : ''}`}

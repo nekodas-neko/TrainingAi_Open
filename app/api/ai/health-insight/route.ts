@@ -87,7 +87,7 @@ export async function POST(req: Request) {
   ])
 
   const todayOura = ouraRows.find(r => r.date === date) ?? ouraRows[ouraRows.length - 1] ?? null
-  const latestSummary = summaries[summaries.length - 1] ?? null
+  const todaySummary = summaries.find(s => s.date === date) ?? null
   // todayOura can fall back to an older row — annotate so the model never reads a stale
   // day's Oura values as "today".
   const staleNote = todayOura && todayOura.date !== date
@@ -123,8 +123,10 @@ export async function POST(req: Request) {
     entries = [
       ...(todayReadiness == null ? [metric('Readiness score', null)] : []),
       `Contributors: ${formatContributors(contributors)}`,
-      latestSummary?.tempDevC != null
-        ? metric('Body temp deviation (vs personal ring baseline)', `${latestSummary.tempDevC > 0 ? '+' : ''}${latestSummary.tempDevC.toFixed(1)}°C`)
+      // The ring's own deviation only for this day (#3077): since the ring moved to the Oura API its
+      // rollup has stopped, and the last ring row would otherwise stand for a week of nights.
+      todaySummary?.tempDevC != null
+        ? metric('Body temp deviation (vs personal ring baseline)', `${todaySummary.tempDevC > 0 ? '+' : ''}${todaySummary.tempDevC.toFixed(1)}°C`)
         : metric('Body temp deviation', todayOura?.temperatureDeviation != null
           ? `${todayOura.temperatureDeviation > 0 ? '+' : ''}${todayOura.temperatureDeviation.toFixed(1)}°C (Oura's reading)`
           : null),

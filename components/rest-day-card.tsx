@@ -13,8 +13,9 @@ interface RestDayCardProps {
 }
 
 // Mirrors the existing bedtime formatting in app/health/health-sections.tsx.
-function formatBedtime(minsFromMidnightUtc: number): string {
-  const mins = ((minsFromMidnightUtc % 1440) + 1440) % 1440;
+// `recommendedBedtimeStart` is minutes from the day's local midnight (Oura's `sleep_time`, #3077).
+function formatBedtime(minsFromLocalMidnight: number): string {
+  const mins = ((minsFromLocalMidnight % 1440) + 1440) % 1440;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
