@@ -15,6 +15,7 @@ import { invalidBodyResponse } from '@/lib/api/route-errors'
 import { bodyRecentFromDay, BODY_RECENT_DAYS } from '@trainingai/shared/health/body-recent-window'
 import { countedIntakeKcal } from '@trainingai/shared/nutrition/counted-intake';
 import { countedEstimatesForRange, sharedEstimateReads } from '@/lib/health/energy-balance-service'
+import { ouraBudgetActivities } from "@/lib/health/oura-budget-activities";
 
 // One day's body metadata.
 const MAX_BODY_BYTES = 16 * 1024
@@ -224,7 +225,11 @@ export async function GET(req: NextRequest) {
       // this route reported a different burn for the same workout than the screen that logged it.
       // Q-421: and `avgBpm` takes precedence over the tier where the strap was worn.
       .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
-    activities: todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null })),
+    activities: [
+      ...todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null })),
+      // #3087: Oura's own workouts the app did not log count too.
+      ...await ouraBudgetActivities(repo, userId, today, today, tz, { activityLogs: todayActivityLogs, sessions: todayWorkouts }),
+    ],
     pedometerSteps: todayMetric?.steps ?? null,
   });
   const activeEnergyKcalToday = activeEnergy.total;

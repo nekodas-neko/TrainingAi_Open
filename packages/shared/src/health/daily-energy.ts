@@ -14,7 +14,7 @@
  * subtracts a 1.5-MET resting baseline, so every term here is net active energy above rest —
  * consistent with the sedentary base.
  */
-import { estSessionKcal, estWorkoutKcal, MAX_PLAUSIBLE_SESSION_MIN, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
+import { estSessionKcal, estWorkoutKcal, MAX_PLAUSIBLE_SESSION_MIN, metIdForOuraActivity, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
 
 // All four live in a dependency-free leaf module and are re-exported here, so a caller that needs
 // only a number does not pull in this file's `workout-energy` → `oura-models` → `node:path` /
@@ -67,8 +67,12 @@ export interface ActiveEnergyInput {
    * at `moderate`, exactly as before.
    */
   strengthSessions: { durationMin: number; id?: string; rpe?: number | null; avgBpm?: number | null }[]
-  /** Today's logged activities. `steps` is the row's own stored step count, where it has one. */
-  activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null; steps?: number | null }[]
+  /**
+   * Today's logged activities. `steps` is the row's own stored step count, where it has one.
+   * `ouraActivity` marks an Oura workout (#3087) whose type the app has no name for: it is costed at
+   * that Oura activity's own MET, and earns nothing when the table does not name it.
+   */
+  activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null; steps?: number | null; ouraActivity?: string }[]
   /** Phone-pedometer steps today (body_metrics), excluding treadmill/logged-indoor steps. */
   pedometerSteps: number | null
 }
@@ -199,7 +203,9 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
   let activityKcal = 0
   for (const a of input.activities) {
     const dur = activityDurationMin(a)
-    if (dur != null && dur > 0) activityKcal += est(ouraIdForActivityType(a.activityType), dur)
+    if (dur == null || dur <= 0) continue
+    const id = a.ouraActivity != null ? metIdForOuraActivity(a.ouraActivity) : ouraIdForActivityType(a.activityType)
+    if (id != null) activityKcal += est(id, dur)
   }
 
   // Passive steps — from the FIRST step, minus steps already inside logged outdoor activities.
