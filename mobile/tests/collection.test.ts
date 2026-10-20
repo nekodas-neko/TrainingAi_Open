@@ -31,6 +31,7 @@ import {
   ladderModels,
 } from '../src/features/collection/data/view.ts';
 import { catArt, catArtFor } from '../src/features/collection/art/index.ts';
+import { manualHealthWritePaths } from '../src/features/health/data/manual-write-paths.ts';
 import { homeWritePaths } from '../src/features/home/data/models.ts';
 import { nutritionPaths } from '../src/features/nutrition/data/models.ts';
 import { buildModule, outFile, stripArt } from '../scripts/cat-art.mjs';
@@ -442,5 +443,8 @@ test('logging food, or choosing a rest day, re-reads the collection at once', as
   resources.invalidate(homeWritePaths('mood'));
   await resources.refreshVisible();
   assert.equal(reads(state), before + 2, 'a mood log does not');
+  resources.invalidate(manualHealthWritePaths);
+  await resources.refreshVisible();
+  assert.equal(reads(state), before + 3, 'a manual night, steps or weight entry does');
   resources.cancel();
 });

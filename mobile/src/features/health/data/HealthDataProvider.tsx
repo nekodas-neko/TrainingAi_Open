@@ -15,6 +15,7 @@ import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { HealthStore, emptyHealthState, overlayBody, overlaySleep } from './HealthStore';
+import { manualHealthWritePaths } from './manual-write-paths';
 import { useAppleSleep } from '../HealthProvider';
 import { mergeAppleSleep } from '../../../integrations/apple-health/sleep-data';
 
@@ -37,21 +38,7 @@ export function HealthDataProvider({ children }: PropsWithChildren) {
             dataReader,
             randomUUID,
             () => {
-              resources?.invalidate([
-                '/api/readiness-score',
-                '/api/body-battery',
-                '/api/health/trends',
-                '/api/health-trends',
-                '/api/nutrition/energy-balance',
-                '/api/progress-summary',
-                '/api/day-log',
-                '/api/day-checkin',
-                '/api/day-timeline',
-                '/api/sleep-verdict',
-                '/api/next-session/prescription',
-                '/api/workout-data',
-                '/api/ai/health-insight',
-              ]);
+              resources?.invalidate(manualHealthWritePaths);
               const day = todayInTz(
                 dataReader.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
               );
