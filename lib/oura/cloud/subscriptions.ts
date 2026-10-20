@@ -10,20 +10,19 @@
 import { z } from 'zod'
 import { OURA_API_BASE, OURA_REQUEST_TIMEOUT_MS } from './config'
 import { OuraUnavailableError } from './client'
-import { OURA_DOCUMENT_TYPE_NAMES, type OuraDocumentType } from './documents'
+import { OURA_DELETE_TYPES, OURA_DOCUMENT_TYPE_NAMES, type OuraDocumentType } from './documents'
 import type { OuraWebhookConfig } from './webhook'
 
 type EventType = 'create' | 'update' | 'delete'
 
 /**
- * What we subscribe to: every stored type on create and update, and `sleep` and `workout` on delete
- * too, the two removals we act on (a tombstone). A deleted workout must stop counting in the energy
- * budget (#3087).
+ * What we subscribe to: every stored type on create and update, and on delete each type whose
+ * removal we act on (`OURA_DELETE_TYPES`, #3081). A delete we act on but do not subscribe to is
+ * a removal we never hear of; one we would only answer `ignored` is not worth Oura's call.
  */
 export const WANTED_SUBSCRIPTIONS: readonly { dataType: OuraDocumentType; eventType: EventType }[] = [
   ...OURA_DOCUMENT_TYPE_NAMES.flatMap(dataType => (['create', 'update'] as const).map(eventType => ({ dataType, eventType }))),
-  { dataType: 'sleep', eventType: 'delete' },
-  { dataType: 'workout', eventType: 'delete' },
+  ...OURA_DELETE_TYPES.map(dataType => ({ dataType, eventType: 'delete' as const })),
 ]
 
 /** Renew a subscription when it has less than this left. The job runs every 12 hours. */

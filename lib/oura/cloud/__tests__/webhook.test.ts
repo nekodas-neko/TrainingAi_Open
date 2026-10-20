@@ -188,14 +188,14 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   })
 
   it('tombstones a deleted sleep period without calling Oura', async () => {
-    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'sleep', object_id: 'sl-1' }))).toEqual({ result: 'deleted', tombstoned: 1 })
+    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'sleep', object_id: 'sl-1' }))).toEqual({ result: 'deleted', rows: 1 })
     expect(writes.tombstoned).toEqual(['sl-1'])
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
   // #3087: a workout deleted in the Oura app must stop counting in the energy budget.
   it('tombstones a deleted workout without calling Oura, and leaves sleep alone', async () => {
-    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'workout', object_id: 'wo-1' }))).toEqual({ result: 'deleted', tombstoned: 1 })
+    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'workout', object_id: 'wo-1' }))).toEqual({ result: 'deleted', rows: 1 })
     expect(writes.workoutsTombstoned).toEqual(['wo-1'])
     expect(writes.tombstoned).toEqual([])
     expect(fetchMock).not.toHaveBeenCalled()
@@ -204,6 +204,17 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   it('a workout delete for an Oura account nobody here holds tombstones nothing', async () => {
     expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'workout', object_id: 'wo-1', user_id: 'someone-else' }))).toEqual({ result: 'unknown_user' })
     expect(writes.workoutsTombstoned).toEqual([])
+  })
+
+  // #3155 review: a delete only ever tombstones. Sessions and daily documents need a tombstone of
+  // their own first (#3153), so until then nothing is removed.
+  it('ignores a delete of a type it does not act on yet (session and daily documents until #3153)', async () => {
+    for (const data_type of ['session', 'daily_readiness', 'daily_activity']) {
+      expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type }))).toMatchObject({ result: 'ignored' })
+    }
+    expect(writes.tombstoned).toEqual([])
+    expect(writes.workoutsTombstoned).toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('ignores a delete of a daily document', async () => {
