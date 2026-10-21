@@ -2057,7 +2057,7 @@ export async function upsertDaytimeHrvModel(db: Db, userId: string, model: {
 
 // ── Per-workout HR summary snapshot (migration 135, review H-3 / Lever W) ─────────
 
-/** Persist a workout's durable HR summary. COALESCE upsert gated on readings_count: a partial early
+/** Persist a workout's durable HR summary. COALESCE upsert (`hrr1_best` excepted) gated on readings_count: a partial early
  *  compute (fewer readings — e.g. a recap opened mid-drain) never clobbers a later fuller one, and a
  *  later compute that gained a value (rr arrived, so workout_hrv_ms goes non-null) fills the gap
  *  without wiping fields it lost. */
@@ -2081,7 +2081,9 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
       set: {
         avgBpm:        sql`COALESCE(excluded.avg_bpm, ${s.workoutHrStats.avgBpm})`,
         peakBpm:       sql`COALESCE(excluded.peak_bpm, ${s.workoutHrStats.peakBpm})`,
-        hrr1Best:      sql`COALESCE(excluded.hrr1_best, ${s.workoutHrStats.hrr1Best})`,
+        // Written as computed, like set_hr_stats.hrr1_bpm (#2457): since #2601 null means "no set had
+        // dense HR", and under COALESCE the nearest-reading value an older rule stored could never clear.
+        hrr1Best:      sql`excluded.hrr1_best`,
         workoutHrvMs:  sql`COALESCE(excluded.workout_hrv_ms, ${s.workoutHrStats.workoutHrvMs})`,
         readingsCount: sql`GREATEST(excluded.readings_count, ${s.workoutHrStats.readingsCount})`,
         source:        sql`COALESCE(excluded.source, ${s.workoutHrStats.source})`,
