@@ -25,6 +25,7 @@ import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/
 import { nightSessions, canonicalLatestNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
+import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
@@ -525,10 +526,9 @@ export async function buildReadinessPayload(
   // movement (steps/active-energy vs goals) + a rolling 7-day strength lane (so a rest day still
   // scores off recent training). Over-exertion past the ACWR optimal band tapers the *displayed*
   // score; readiness reads the PRE-taper goal-completion so load-fatigue isn't double-counted.
-  const latestWeightKg = [...bodyMetrics].reverse().find(m => m.weightKg != null && m.weightKg > 0)?.weightKg ?? null
   const ageYears = ageFromDob(userProfile?.dateOfBirth, todayMid)
   const goals = getDailyGoals({
-    weightKg: latestWeightKg,
+    weightKg: latestWeightKg(bodyMetrics, todayIso),
     heightCm: userProfile?.heightCm ?? null,
     ageYears,
     sex: userProfile?.sex ?? null,

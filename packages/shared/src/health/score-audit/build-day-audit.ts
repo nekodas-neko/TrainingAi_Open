@@ -1,6 +1,7 @@
 import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
+import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
@@ -100,10 +101,9 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0).length - hrvRows.length
 
   // ── Goals + training load, anchored on the audited day ──
-  const latestWeightKg = [...bodyMetrics].reverse().find(m => m.weightKg != null && m.weightKg > 0)?.weightKg ?? null
   const ageYears = ageFromDob(user?.dateOfBirth, dayMid)
   const goalProfile = {
-    weightKg: latestWeightKg,
+    weightKg: latestWeightKg(bodyMetrics, date),
     heightCm: user?.heightCm ?? null,
     ageYears,
     sex: user?.sex ?? null,

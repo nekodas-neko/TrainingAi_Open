@@ -10,6 +10,7 @@ import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-rada
 import { strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
+import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { nightSessions, canonicalNightForDate, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { metric, splitMeasured, type MetricLine } from './metrics'
 import { buildInsightText, type RecentComparison } from './insight-text'
@@ -194,7 +195,7 @@ export async function POST(req: Request) {
     // and day views show) and the same shared strength window, at that day's local midnight.
     const todayBmForActivity = bodyMetrics.find(r => r.date === date) ?? null
     const fallbackGoals = () => getDailyGoals({
-      weightKg: [...bodyMetrics].reverse().find(m => m.weightKg != null && m.weightKg > 0)?.weightKg ?? null,
+      weightKg: latestWeightKg(bodyMetrics, date),
       heightCm: userProfile?.heightCm ?? null,
       ageYears: ageFromDob(userProfile?.dateOfBirth, dateStrMidnightInTz(date, tz)),
       sex: userProfile?.sex ?? null,
