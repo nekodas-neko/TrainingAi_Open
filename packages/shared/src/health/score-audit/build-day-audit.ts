@@ -1,4 +1,4 @@
-import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
@@ -46,7 +46,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
 
   const dayMid = dateStrMidnightInTz(date, tz)
   const nextMid = new Date(dayMid.getTime() + 86_400_000)
-  const fromIso = toAestDay(new Date(dayMid.getTime() - AUDIT_HISTORY_DAYS * 86_400_000), tz)
+  const fromIso = shiftDateStr(date, -AUDIT_HISTORY_DAYS)
   const from7dIso = shiftDateStr(date, -7)
   const yesterdayIso = shiftDateStr(date, -1)
 
@@ -58,7 +58,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     repo.listBodyMetrics(userId, fromIso, date),
     repo.listSleepSessions(userId, fromIso, date),
     // ACWR needs the full chronic window ending at the audited day, not at today.
-    repo.getWorkoutSessionsFrom(userId, new Date(dayMid.getTime() - AUDIT_HISTORY_DAYS * 86_400_000)),
+    repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(fromIso, tz)),
     repo.getOuraDaily(userId, fromIso, date),
     repo.getActiveProgram(userId),
     repo.getHrForWindow(userId, dayMid, nextMid),
