@@ -225,7 +225,7 @@ export async function POST(req: Request) {
         goals: page.activityGoals ?? fallbackGoals(),
       }
     } else {
-      const window = strengthWindowEndingAt(recentSessions, dateStrMidnightInTz(date, tz).getTime())
+      const window = strengthWindowEndingAt(recentSessions, date, tz)
       activity = {
         score: derivedRows.find(r => r.day === date)?.activityScore ?? null,
         steps: todayBmForActivity?.steps ?? null,

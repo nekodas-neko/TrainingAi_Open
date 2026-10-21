@@ -46,7 +46,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   const warnings: string[] = []
 
   const dayMid = dateStrMidnightInTz(date, tz)
-  const nextMid = new Date(dayMid.getTime() + 86_400_000)
+  const nextMid = dateStrMidnightInTz(shiftDateStr(date, 1), tz)
   const fromIso = shiftDateStr(date, -AUDIT_HISTORY_DAYS)
   const from7dIso = shiftDateStr(date, -7)
   const yesterdayIso = shiftDateStr(date, -1)
@@ -135,7 +135,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
       ? 'not enough training history to form an acute:chronic ratio'
       : null
 
-  const sessions7dRows = sessionsUpToDay.filter(ws => new Date(ws.startedAt).getTime() >= dayMid.getTime() - 7 * 86_400_000)
+  const sessions7dRows = sessionsUpToDay.filter(ws => new Date(ws.startedAt).getTime() >= dateStrMidnightInTz(from7dIso, tz).getTime())
   const volume7dKg = sessions7dRows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0)
 
   // ── Zone minutes / moved hours from the audited day's intraday HR ──
@@ -194,7 +194,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
 
   // TN-77(a): the audit shares readiness's defect, so it shares the fix — yesterday's contributor
   // is scored on yesterday's window, not the day being audited.
-  const prevWindow = strengthWindowEndingAt(sessionsUpToDay, dayMid.getTime() - 86_400_000)
+  const prevWindow = strengthWindowEndingAt(sessionsUpToDay, yesterdayIso, tz)
   const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0)
     ? computeActivityScore({
         steps: yesterdayMetrics?.steps ?? null,

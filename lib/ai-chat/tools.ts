@@ -22,7 +22,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
   // User-local midnight, shared by every lookback window below — never Date.now(), which
   // straddles two AEST days depending on time of day (CLAUDE.md Date Arithmetic).
   const todayMid = todayMidnightUtc(tz)
-  const daysAgo = (n: number) => new Date(todayMid.getTime() - n * 86_400_000)
+  const daysAgo = (n: number) => dateStrMidnightInTz(shiftDateStr(todayIso, -n), tz)
 
   // Which exercises are bodyweight. Their stored 1RM is BW_REF-relative — an internal index, not a
   // weight anyone lifted — so it must reach the model as a rep max or it gets quoted at the user as
@@ -471,7 +471,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         // OR-210. The SAME 28-day window and the SAME band builder as the Health card, so the two
         // cannot disagree. This used to return a raw ratio over 56 days and leave the banding to the
         // model, which disagreed with the card on 32 of the owner's last 76 days.
-        const from28d = new Date(todayMid.getTime() - 28 * 86_400_000)
+        const from28d = daysAgo(28)
         const [loads, program] = await Promise.all([
           repo.getSessionLoadsFrom(userId, from28d),
           repo.getActiveProgram(userId),

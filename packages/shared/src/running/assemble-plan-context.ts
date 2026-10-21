@@ -31,13 +31,13 @@ export async function assembleInputs(
   const todayIso = todayInTz(tz)
   const todayMid = todayMidnightUtc(tz)
   const weekStartIso = startOfWeekInTz(tz)
-  const from28dDate = new Date(todayMid.getTime() - 28 * 86_400_000)
+  const from28dDate = dateStrMidnightInTz(shiftDateStr(todayIso, -28), tz)
 
   const [derivedRows, summaries, sessionLoads, recentSessions, sleepSessions, weekRuns, activeProgram] = await Promise.all([
     repo.getOuraDailyDerived(userId, todayIso, todayIso),
     repo.getOuraDailySummary(userId, todayIso, todayIso),
     repo.getSessionLoadsFrom(userId, from28dDate),
-    repo.getWorkoutSessionsFrom(userId, new Date(todayMid.getTime() - 3 * 86_400_000)),
+    repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(shiftDateStr(todayIso, -3), tz)),
     // Last night only — the gate's short-sleep guard is "last night", not the week's best night (E2-5/J-4).
     repo.listSleepSessions(userId, shiftDateStr(todayIso, -1), todayIso),
     repo.getPrescribedRuns(userId, weekStartIso, todayIso),
@@ -69,8 +69,7 @@ export async function assembleInputs(
 
   // ACWR + Foster monotony over the 28-day / 7-day windows.
   const load = computeVolumeAcwr(sessionLoads.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.volume })), todayMid, { tz })
-  const last7 = Array.from({ length: 7 }, (_, i) => new Date(todayMid.getTime() - i * 86_400_000))
-  const loadByDay = new Map(last7.map(d => [toAestDay(d, tz), 0]))
+  const loadByDay = new Map(Array.from({ length: 7 }, (_, i) => [shiftDateStr(todayIso, -i), 0]))
   for (const ws of sessionLoads) {
     const day = toAestDay(ws.startedAt, tz)
     if (loadByDay.has(day)) loadByDay.set(day, (loadByDay.get(day) ?? 0) + ws.volume)
@@ -130,7 +129,7 @@ export async function resolveSnapshot(
   repo: Awaited<ReturnType<typeof getRepository>>, userId: string, tz: string,
 ): Promise<FitnessSnapshot> {
   const todayIso = todayInTz(tz)
-  const from90 = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 90 * 86_400_000), tz)
+  const from90 = shiftDateStr(todayIso, -90)
   const restingWindow = restingHrWindow(todayIso)
   const [user, metrics] = await Promise.all([
     repo.getUserById(userId),

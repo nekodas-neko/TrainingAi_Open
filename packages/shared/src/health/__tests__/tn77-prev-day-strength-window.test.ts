@@ -15,8 +15,11 @@ import { strengthWindowEndingAt } from '../activity-score'
  */
 
 const DAY = 86_400_000
-const TODAY_MID = Date.parse('2026-09-24T14:00:00.000Z')   // Brisbane midnight
+const TZ = 'Australia/Brisbane'
+const TODAY_MID = Date.parse('2026-09-24T14:00:00.000Z')   // Brisbane midnight of 2026-09-25
 const YESTERDAY_MID = TODAY_MID - DAY
+const TODAY = '2026-09-25'
+const YESTERDAY = '2026-09-24'
 
 const session = (atMs: number, volumeKg: number) => ({
   startedAt: new Date(atMs).toISOString(),
@@ -27,14 +30,14 @@ describe("yesterday's strength window excludes today (TN-77a)", () => {
   it("this morning's session does not reach yesterday's window", () => {
     // The defect in one case: a session logged after yesterday ended must not count toward it.
     const sessions = [session(TODAY_MID + 3 * 3600_000, 5000)]
-    expect(strengthWindowEndingAt(sessions, YESTERDAY_MID)).toEqual({ sessions7d: 0, volume7dKg: 0 })
+    expect(strengthWindowEndingAt(sessions, YESTERDAY, TZ)).toEqual({ sessions7d: 0, volume7dKg: 0 })
   })
 
   it("but it DOES count toward today's window", () => {
     // The control: the same session, asked about the right day. If this failed, the helper would be
     // excluding real work rather than fixing an off-by-one.
     const sessions = [session(TODAY_MID + 3 * 3600_000, 5000)]
-    expect(strengthWindowEndingAt(sessions, TODAY_MID)).toEqual({ sessions7d: 1, volume7dKg: 5000 })
+    expect(strengthWindowEndingAt(sessions, TODAY, TZ)).toEqual({ sessions7d: 1, volume7dKg: 5000 })
   })
 
   it('a session on the day itself counts, and volume sums across exercises', () => {
@@ -42,7 +45,7 @@ describe("yesterday's strength window excludes today (TN-77a)", () => {
       startedAt: new Date(YESTERDAY_MID + 9 * 3600_000).toISOString(),
       exercises: [{ volume: 1200 }, { volume: 800 }, { volume: null }],
     }]
-    expect(strengthWindowEndingAt(sessions, YESTERDAY_MID)).toEqual({ sessions7d: 1, volume7dKg: 2000 })
+    expect(strengthWindowEndingAt(sessions, YESTERDAY, TZ)).toEqual({ sessions7d: 1, volume7dKg: 2000 })
   })
 
   it('the window reaches back seven days and no further', () => {
@@ -50,11 +53,11 @@ describe("yesterday's strength window excludes today (TN-77a)", () => {
       session(YESTERDAY_MID - 7 * DAY, 100),          // oldest day still inside
       session(YESTERDAY_MID - 7 * DAY - 1, 999),      // one millisecond too old
     ]
-    expect(strengthWindowEndingAt(sessions, YESTERDAY_MID)).toEqual({ sessions7d: 1, volume7dKg: 100 })
+    expect(strengthWindowEndingAt(sessions, YESTERDAY, TZ)).toEqual({ sessions7d: 1, volume7dKg: 100 })
   })
 
   it('an empty history is zero, not null', () => {
     // The caller gates on `sessions7d > 0`, so a null here would change which days score at all.
-    expect(strengthWindowEndingAt([], YESTERDAY_MID)).toEqual({ sessions7d: 0, volume7dKg: 0 })
+    expect(strengthWindowEndingAt([], YESTERDAY, TZ)).toEqual({ sessions7d: 0, volume7dKg: 0 })
   })
 })
