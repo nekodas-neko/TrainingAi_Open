@@ -222,3 +222,37 @@ describe('recoveryResponse — output carries no claim', () => {
     expect(new Set(text)).toEqual(new Set([SUBSTANCE, 'Retatrutide', 'mg', 'ok', 'before_first_dose']))
   })
 })
+
+// #3077 — a night is judged against the normal of its own device (#2984), so an Oura API night never
+// carries the ring's level offset.
+describe('per-device baselines', () => {
+  const ring = NIGHTS.map(n => ({ ...n, restingHrSource: n.restingHr == null ? null : 'oura_ble', hrvSource: n.hrvMs == null ? null : 'oura_ble' }))
+
+  it('reads the same as before when every night is the ring\'s', () => {
+    const [sub] = recoveryResponse({ doses: DOSES, nights: ring, tz: TZ })
+    const [plain] = recoveryResponse({ doses: DOSES, nights: NIGHTS, tz: TZ })
+    expect(sub.levels[0].rhr).toEqual(plain.levels[0].rhr)
+  })
+
+  it('leaves an Oura night out while that device has no normal of its own, rather than offsetting it against the ring', () => {
+    // Every night after the last dose is Oura's, 20 bpm above the ring's level.
+    const cut = '2026-09-06'
+    const mixed = ring.map(n => (n.date > cut && n.restingHr != null)
+      ? { ...n, restingHr: n.restingHr + 20, restingHrSource: 'oura_cloud' } : n)
+    const [sub] = recoveryResponse({ doses: DOSES, nights: mixed, tz: TZ })
+    const r = ok(sub.levels[0].rhr)
+    // The Oura nights have under RECOVERY_MIN_BASELINE_NIGHTS of their own, so they add no deviation: no +20 leaks in.
+    for (const o of r.offsets) if (o.median != null) expect(Math.abs(o.median)).toBeLessThanOrEqual(3)
+  })
+
+  it('judges an Oura night against Oura\'s own nights once there are enough', () => {
+    const oura = Array.from({ length: 30 }, (_, i) => ({
+      date: shiftDateStr('2026-10-01', i), restingHr: 70 + wobble(i), hrvMs: 40 + wobble(i), restingHrSource: 'oura_cloud', hrvSource: 'oura_cloud',
+    }))
+    const dates = ['2026-10-08', '2026-10-15', '2026-10-22']
+    const [sub] = recoveryResponse({ doses: dates.map(d => dose(d, 1, `${d}T10:00:00Z`)), nights: oura, tz: TZ })
+    const r = ok(sub.levels[0].rhr)
+    expect(r.baseline.median).toBeGreaterThan(65)
+    for (const o of r.offsets) if (o.median != null) expect(Math.abs(o.median)).toBeLessThan(3)
+  })
+})

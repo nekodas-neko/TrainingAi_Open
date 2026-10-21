@@ -14,7 +14,7 @@
  */
 import { getRepository } from '@/lib/data'
 import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
-import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob, shiftDateStr } from '@trainingai/shared/date-utils'
+import { todayInTz, todayMidnightUtc, dateStrMidnightInTz, ageFromDob, shiftDateStr } from '@trainingai/shared/date-utils'
 import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDose } from '@trainingai/shared/health/dose-context'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
@@ -23,9 +23,10 @@ import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { latestRestingHrRow } from '@trainingai/shared/health/latest-resting-hr'
 import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
-import { nightSessions, canonicalLatestNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
+import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
@@ -36,7 +37,7 @@ import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, type Ill
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
-import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields } from '@/lib/health/readiness-night-inputs'
+import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, canonicalNightsByDate, readinessSourceLabel, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
@@ -367,9 +368,8 @@ export async function buildReadinessPayload(
 
   const todayIso    = todayInTz(tz)
   const todayMid    = todayMidnightUtc(tz)
-  const from28dDate = new Date(todayMid.getTime() - 28 * 86_400_000)
-  const from28dIso  = toAestDay(from28dDate, tz)
-  const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
+  const { from28dIso, from7dIso } = readinessWindowStarts(todayIso)
+  const from28dDate = dateStrMidnightInTz(from28dIso, tz)
 
   // Issue 2613: a failed lookup leaves the field out (unknown), never false.
   const connectedSourcesP = (async () => {
@@ -505,10 +505,9 @@ export async function buildReadinessPayload(
   // movement (steps/active-energy vs goals) + a rolling 7-day strength lane (so a rest day still
   // scores off recent training). Over-exertion past the ACWR optimal band tapers the *displayed*
   // score; readiness reads the PRE-taper goal-completion so load-fatigue isn't double-counted.
-  const latestWeightKg = [...bodyMetrics].reverse().find(m => m.weightKg != null && m.weightKg > 0)?.weightKg ?? null
   const ageYears = ageFromDob(userProfile?.dateOfBirth, todayMid)
   const goals = getDailyGoals({
-    weightKg: latestWeightKg,
+    weightKg: latestWeightKg(bodyMetrics, todayIso),
     heightCm: userProfile?.heightCm ?? null,
     ageYears,
     sex: userProfile?.sex ?? null,
@@ -553,7 +552,7 @@ export async function buildReadinessPayload(
   const activityDisplayScore = activityResult?.score ?? null      // tapered → the card / display
 
   // Yesterday's own activity score — feeds the A4 composite's "Prev-Day Activity" contributor.
-  const yesterdayIso = toAestDay(new Date(todayMid.getTime() - 86_400_000), tz)
+  const yesterdayIso = shiftDateStr(todayIso, -1)
   const yesterdayMetrics = bodyMetrics.find(m => m.date === yesterdayIso) ?? null
   // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
   // today's, so on a training day the "previous day" score reacted to this morning's session.
@@ -601,14 +600,11 @@ export async function buildReadinessPayload(
   // of that device's own nights. The composite and the illness radar both read that one result, so
   // they cannot disagree about a night (PS-42).
   const latestSummary = dailySummaries.length > 0 ? dailySummaries[dailySummaries.length - 1] : null
-  const nightByDate = [...new Set(nights.map(n => n.date))]
-    .map(d => canonicalNightForDate(nights, d, tz))
-    .filter((n): n is NonNullable<typeof n> => n != null)
   const night = resolveReadinessNightInputs({
     today: todayIso,
     summaries: dailySummaries,
     bodyMetrics,
-    nights: nightByDate,
+    nights: canonicalNightsByDate(nights, tz),
     ouraDaily: ouraRows,
     ouraCloudContributors,
   })
@@ -810,7 +806,7 @@ export async function buildReadinessPayload(
       // Both labels are our own composite and AI surfaces read both (`liveReadinessByDay`, #2992).
       // Where each input came from is on the contributors (`source`); the Health Connect recompute
       // reads that, not this label, to decide which days to clear.
-      readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
+      readinessSource: readinessSourceLabel(night, latestSummary != null, switchDay),
       modelVersions: { readiness: READINESS_MODEL_VERSION },
       // TN-64(a): the OTHER half of the early-deload gate. The score has always been stored and
       // the ACWR never was, so "the gate never opened" could not be told apart from "the gate was

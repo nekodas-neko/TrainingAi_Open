@@ -6,6 +6,7 @@ import { DEFAULT_TZ, todayInTz, startOfWeekInTz, todayMidnightUtc, toAestDay, ag
 import { resolveHrProfile, hasHrSource } from '@trainingai/shared/health/hr-profile'
 import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
+import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
 import { latestRestingHr } from '@trainingai/shared/health/latest-resting-hr'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
@@ -119,9 +120,8 @@ export async function GET() {
     ? observed.max - observedPrior.max
     : null
 
-  const latestWeightKg = [...lookbackMetrics].reverse().find((m) => m.weightKg != null && m.weightKg > 0)?.weightKg ?? null
   const goals = getDailyGoals({
-    weightKg: latestWeightKg,
+    weightKg: latestWeightKg(lookbackMetrics, today),
     heightCm: user?.heightCm ?? null,
     ageYears,
     sex: user?.sex ?? null,

@@ -1,6 +1,7 @@
-import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
+import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
@@ -9,6 +10,8 @@ import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shar
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { sleepFeelLabel } from '@trainingai/shared/health/sleep-feel-calibration'
+import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { canonicalNightsByDate } from '@/lib/health/readiness-night-inputs'
 import { buildSleepAudit } from './sleep'
 import { buildReadinessAudit } from './readiness'
 import { buildActivityAudit } from './activity'
@@ -44,18 +47,19 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
 
   const dayMid = dateStrMidnightInTz(date, tz)
   const nextMid = new Date(dayMid.getTime() + 86_400_000)
-  const fromIso = toAestDay(new Date(dayMid.getTime() - AUDIT_HISTORY_DAYS * 86_400_000), tz)
+  const fromIso = shiftDateStr(date, -AUDIT_HISTORY_DAYS)
   const from7dIso = shiftDateStr(date, -7)
   const yesterdayIso = shiftDateStr(date, -1)
 
   const [
     bodyMetrics, sleepSessions, workoutSessions, ouraRows, program,
     hrRows, summaries, derivedRows, mood, user, activityLogs, nutrition, morningCheckin, userGoals,
+    ouraCloudContributors, switchDay,
   ] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
     repo.listSleepSessions(userId, fromIso, date),
     // ACWR needs the full chronic window ending at the audited day, not at today.
-    repo.getWorkoutSessionsFrom(userId, new Date(dayMid.getTime() - AUDIT_HISTORY_DAYS * 86_400_000)),
+    repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(fromIso, tz)),
     repo.getOuraDaily(userId, fromIso, date),
     repo.getActiveProgram(userId),
     repo.getHrForWindow(userId, dayMid, nextMid),
@@ -71,6 +75,10 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     repo.getDayCheckin(userId, date, 'morning'),
     // Q-524: the audit must score steps against the same goal the live route does.
     repo.getUserGoals(userId).catch(() => null),
+    // #3077: Oura's recovery-index contributor, the one input Oura sends no value for (as the live score reads it).
+    repo.getOuraCloudReadinessContributors(userId, fromIso, date).catch(() => []),
+    // A failed lookup reads as no switch, so the ring's value stands (as the live payload does).
+    repo.getOuraCloudSwitchDay(userId).catch(() => null),
   ])
 
   // Everything below is scoped to the audited day, never "today".
@@ -100,10 +108,9 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0).length - hrvRows.length
 
   // ── Goals + training load, anchored on the audited day ──
-  const latestWeightKg = [...bodyMetrics].reverse().find(m => m.weightKg != null && m.weightKg > 0)?.weightKg ?? null
   const ageYears = ageFromDob(user?.dateOfBirth, dayMid)
   const goalProfile = {
-    weightKg: latestWeightKg,
+    weightKg: latestWeightKg(bodyMetrics, date),
     heightCm: user?.heightCm ?? null,
     ageYears,
     sex: user?.sex ?? null,
@@ -196,6 +203,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
       })?.preTaperScore ?? null
     : null
 
+  const nightsAll = nightSessions(sleepSessions, tz)
   safe('Readiness', () => buildReadinessAudit({
     date, summary, priorSummary,
     sleepScore: sleep?.score ?? null,
@@ -203,6 +211,13 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     prevDayActivityScore,
     ouraDaily: ouraToday,
     derived: derivedForDay,
+    switchDay,
+    generic: {
+      bodyMetrics,
+      nights: canonicalNightsByDate(nightsAll, tz),
+      ouraDaily: ouraRows,
+      ouraCloudContributors,
+    },
   }))
 
   safe('Activity', () => buildActivityAudit(activityInput))

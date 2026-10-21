@@ -1,5 +1,5 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
+import { todayInTz, shiftDateStr, dateStrMidnightInTz, ageFromDob } from '@trainingai/shared/date-utils'
 import { hrMaxFromAge, zoneMaxFromTests, DEFAULT_RESTING_HR } from '@trainingai/shared/health/hr-zones'
 import { resolveMaxHr, EMPTY_OBSERVED_HR, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
@@ -84,9 +84,10 @@ const RESTING_HR_WINDOW_DAYS = 28
  */
 export async function resolveHrProfile(repo: WorkoutRepository, userId: string, tz: string): Promise<HrProfile> {
   const todayIso = todayInTz(tz)
-  const midnight = todayMidnightUtc(tz)
-  const from28dIso = toAestDay(new Date(midnight.getTime() - RESTING_HR_WINDOW_DAYS * 86_400_000), tz)
-  const observedFrom = new Date(midnight.getTime() - OBSERVED_WINDOW_DAYS * 86_400_000)
+  // Both windows start at a local midnight found by shifting the date string; `midnight − N×86400000`
+  // lands a day off around a clock change in a daylight-saving zone (#3220, as #3218 for readiness).
+  const from28dIso = shiftDateStr(todayIso, -RESTING_HR_WINDOW_DAYS)
+  const observedFrom = dateStrMidnightInTz(shiftDateStr(todayIso, -OBSERVED_WINDOW_DAYS), tz)
   const observedTo = new Date()
 
   // LA-82. All three reads are guarded now, not one of three. Every caller of this resolver — the

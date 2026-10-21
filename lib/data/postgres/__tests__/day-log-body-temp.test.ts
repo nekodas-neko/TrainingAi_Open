@@ -84,19 +84,19 @@ describe.skipIf(!canRun)('day-log body temperature (LB-25)', () => {
   it('gives both numbers when the baseline is centred', async () => {
     // Twelve nights clears `TEMP_CENTRED_MIN_NIGHTS` (10), and a 0.05 mean is inside ±0.15.
     await seedNights(12, 0.05, 36.02)
-    expect(await bodyTemp()).toEqual({ meanC: 36.02, devC: 0.05 })
+    expect(await bodyTemp()).toEqual({ meanC: 36.02, devC: 0.05, source: 'ble' })
   })
 
   it('withholds the deviation, but not the temperature, when the baseline is not centred', async () => {
     // The production shape: every night positive, mean far outside ±0.15.
     await seedNights(12, 0.5, 36.02)
-    expect(await bodyTemp()).toEqual({ meanC: 36.02, devC: null })
+    expect(await bodyTemp()).toEqual({ meanC: 36.02, devC: null, source: 'ble' })
   })
 
   it('withholds it for too few nights to judge, rather than assuming centred', async () => {
     // Nine nights, all perfectly centred — still below the minimum, so the answer is "cannot say".
     await seedNights(9, 0, 36.02)
-    expect(await bodyTemp()).toEqual({ meanC: 36.02, devC: null })
+    expect(await bodyTemp()).toEqual({ meanC: 36.02, devC: null, source: 'ble' })
   })
 
   it('is null when the ring recorded no temperature for the day', async () => {

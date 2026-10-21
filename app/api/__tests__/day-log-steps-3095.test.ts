@@ -20,6 +20,7 @@ vi.mock('@/lib/data', () => ({
     getHrForWindow: async () => [],
     listActivityLogs: async () => repo.activityLogs,
     getOuraDailySummary: async () => [],
+    getOuraCloudSwitchDay: async () => null,
   }),
 }))
 

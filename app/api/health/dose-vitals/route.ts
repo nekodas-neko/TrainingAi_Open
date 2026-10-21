@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
+import { nightVitals } from '@/lib/health/readiness-night-inputs'
 import { DEFAULT_TZ, todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { DOSE_EFFECT_LOOKBACK_DAYS, type DoseEvent } from '@trainingai/shared/health/dose-context'
 
@@ -25,6 +26,9 @@ export interface DoseVitalsNight {
   hrvMs: number | null
   restingHrBaseline: number | null
   hrvBaseline: number | null
+  /** Which device measured each value (`oura_ble` before the switch to the Oura API, then per device). */
+  restingHrSource: string | null
+  hrvSource: string | null
 }
 
 export interface DoseVitalsResponse {
@@ -52,18 +56,23 @@ export async function GET(req: NextRequest) {
 
   try {
     const repo = await getRepository()
-    const [doses, summaries] = await Promise.all([
+    const [doses, summaries, bodyMetrics, switchDay] = await Promise.all([
       repo.listDoseEvents(userId, from, to),
       repo.getOuraDailySummary(userId, from, to),
+      repo.listBodyMetrics(userId, from, to),
+      // A failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
+      repo.getOuraCloudSwitchDay(userId).catch(() => null),
     ])
-    const nights: DoseVitalsNight[] = summaries.map(s => ({
-      date: s.date,
+    const nights: DoseVitalsNight[] = nightVitals({ summaries, bodyMetrics, switchDay, from, to }).map(n => ({
+      date: n.date,
       // The night's LOW, not its mean: the stored baseline tracks the lows (09-06: low 51.7, mean
       // 59.9, baseline 52.9), so a mean would sit ~7 bpm above its own reference every night.
-      restingHr: s.rhrLowBpm,
-      hrvMs: s.hrvAvgMs,
-      restingHrBaseline: fromX8(s.rhrBaseline?.meanX8),
-      hrvBaseline: fromX8(s.hrvBaseline?.meanX8),
+      restingHr: n.restingHr,
+      hrvMs: n.hrvMs,
+      restingHrBaseline: fromX8(n.restingHrBaseline?.meanX8),
+      hrvBaseline: fromX8(n.hrvBaseline?.meanX8),
+      restingHrSource: n.restingHrSource,
+      hrvSource: n.hrvSource,
     }))
     const body: DoseVitalsResponse = { from, to, effectLookbackDays: DOSE_EFFECT_LOOKBACK_DAYS, doses, nights }
     return NextResponse.json(body, { headers: { 'Cache-Control': 'private, no-store' } })
