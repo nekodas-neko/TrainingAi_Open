@@ -52,7 +52,7 @@ import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
 import { useSleepReply } from "@/lib/sleep/use-sleep-reply";
 import { pushMutations, pullDelta, isSyncBackedOff } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
-import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
+import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL, TRAINING_LOAD_TTL } from '@trainingai/shared/cache-ttl';
 import { GoalRecommendationSheet, type GoalRecommendationData } from '@/components/profile/goal-recommendation-sheet'
 import type { User } from '@trainingai/shared/types'
 import { HomeCardWidget } from "@/components/home/home-card-widget";
@@ -796,7 +796,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   useEffect(() => {
     if (activeCardWidgets.includes("acwrWidget")) {
       cachedFetchToday<TrainingLoadResponse>(
-        'training-load', '/api/training-load', TTL_MEDIUM,
+        'training-load', '/api/training-load', TRAINING_LOAD_TTL,
         d => { if (d) setTrainingLoad(d) },
       ).catch(() => {});
     }
