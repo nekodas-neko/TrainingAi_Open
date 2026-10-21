@@ -27,7 +27,7 @@ import { collectStressInputs, buildDayStressSeries, nightHrvMsOf } from './stres
 import { computeResilienceForDay, type DailyIndices } from '@/lib/health/stress-resilience'
 import type { SleepSession } from '@trainingai/shared/types'
 import { sourceRank } from '@trainingai/shared/health/source-rank'
-import { aestMidnight, toAestDay, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
+import { aestMidnight, toAestDay, shiftDateStr, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 import type { RollupIO } from './io'
 import type { ModelRuntime } from '@/lib/oura-models/inference/runtime'
 
@@ -1075,8 +1075,7 @@ export async function runOuraRollup(
 
       const sleepByDate = new Map(sleepRows.map(sr => [sr.date, sr]))
       const dayMinus = (dayStr: string, n: number): string => {
-        const [y, m, d] = dayStr.split('-').map(Number)
-        return toAestDay(new Date(aestMidnight(y, m, d, timezone).getTime() - n * 86_400_000), timezone)
+        return shiftDateStr(dayStr, -n)
       }
 
       // Needs a prior night for the baseline-z contributors (loop starts at i=1), so <2 rows = nothing to do.
