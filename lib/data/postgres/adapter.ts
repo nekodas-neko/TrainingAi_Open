@@ -158,7 +158,9 @@ const BODY_METRICS_SOURCE_COLS: SourceColumn[] = [
   { prop: 'bmrKcal', col: 'bmr_kcal' }, { prop: 'metabolicAge', col: 'metabolic_age' },
 ]
 import { aestMidnight, toAestDay, todayInTz, todayDayOfWeek, todayMidnightUtc, dateStrMidnightInTz, shiftDateStr, DEFAULT_TZ } from '@trainingai/shared/date-utils'
-import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
+import { isPreRekey } from '@/lib/oura/cloud-freshness'
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { loadNightTemperature } from '@/lib/health/night-temperature'
 import { clampWindowStart } from '@trainingai/shared/workout/time-audit'
 import { computeAiDynamicNextSession, TEMP_ALERT_THRESHOLD_C, type AiDynamicInput } from '@trainingai/shared/ai-periodization/ai-dynamic'
 import { computeMuscleRecovery } from '@trainingai/shared/ai-periodization/muscle-recovery'
@@ -2079,7 +2081,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // "yesterday" below silently became "today" and dropped a real row from the range.
       const from14dStr = shiftDateStr(todayIso, -14)
 
-      const [muscleAssignmentsMap, ouraRows, moodLog, recentWorkouts, exerciseLibrary, sleepSessions, bodyMetrics, derivedRows, summaryRows, morningCheckin] = await Promise.all([
+      const [muscleAssignmentsMap, ouraRows, moodLog, recentWorkouts, exerciseLibrary, sleepSessions, bodyMetrics, derivedRows, nightTemp, morningCheckin, switchDay] = await Promise.all([
         this.getExerciseMuscleAssignments(
           sessions.flatMap(s => s.exercises.map(e => e.exerciseName)),
         ),
@@ -2090,25 +2092,28 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         this.listSleepSessions(userId, from14dStr, todayIso),
         this.listBodyMetrics(userId, from14dStr, todayIso),
         this.getOuraDailyDerived(userId, shiftDateStr(todayIso, -1), todayIso),
-        // TN-18 widened this from today-only to the same 28-day window `readiness-payload` reads.
-        // The elevated-temp deload needs the trailing deviations, not just today's, because the
-        // question it must answer first is whether the baseline is centred at all. 28 rows of a
-        // table holding ~106 in production; the cost is nil.
-        this.getOuraDailySummary(userId, shiftDateStr(todayIso, -27), todayIso),
+        // #3077: last night's temperature as readiness v8 takes it, per input and per device — the
+        // ring's summary where it has tonight, else Oura's deviation — with that device's own
+        // baseline length and centring (TN-18). The ring path reads the same 28 nights as before.
+        loadNightTemperature(this, userId, todayIso, timezone),
         this.getDayCheckin(userId, todayIso, 'morning'),
+        // #3077: a failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
+        this.getOuraCloudSwitchDay(userId).catch(() => null),
       ])
 
       const ouraToday = ouraRows[0] ?? null
-      // Still TODAY's row, found by date rather than taken as the first: the window above is a
-      // range now, so `summaryRows[0]` would silently become the OLDEST night — a 28-day-stale
-      // temperature deviation feeding a deload banner.
-      const todaySummary = summaryRows.find(r => r.date === todayIso) ?? null
       const illnessFlag = latestIllnessFromDerived(derivedRows)?.flag ?? null
       // Daytime stress is a same-day signal, so it must read TODAY's row — not
       // derivedRows[0], which is the earliest (yesterday) since the range is
       // [yesterday, today] ASC-sorted. (Illness above intentionally keeps its
       // latest-available fallback.) Mirrors the readiness route's `find(day === todayIso)`.
       const todayDerived = derivedRows.find(r => r.day === todayIso) ?? null
+      // #3077: the ring's daytime stress stands only before the switch day; Oura's `stress_high`
+      // (seconds) is read for a day the ring has none, as the coach and weekly digest do. Input only:
+      // the scorer's stress arm is unwired (TN-34), so no recommendation moves with it.
+      const ringStressMinutes = ringValueStands(todayIso, switchDay) ? todayDerived?.stressHighMinutes ?? null : null
+      const ouraStressMinutes = ouraToday?.stressHigh != null && !isPreRekey(ouraToday.date) ? Math.round(ouraToday.stressHigh / 60) : null
+      const stressHighMinutes = ringStressMinutes ?? ouraStressMinutes
       const history: AiDynamicInput['history'] = recentWsWithName.map(w => ({
         sessionName: w.sessionName ?? '',
         startedAt: w.startedAt,
@@ -2141,19 +2146,20 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // recommendation was actually computed from (W3 §3.2 — the signals read the dead column).
       const liveReadiness = liveReadinessForDay(todayIso, derivedRows)
 
-      // Live temp deviation (from the derived summary), never the frozen Cloud columns (dead
-      // since the 2026-07-07 re-key). Cloud stays an explicit pre-re-key fallback only. Computed
-      // once and reused for both the scoring engine and the signals block below, so the "Why
-      // this?" explain page shows the same numbers the recommendation was actually computed from
-      // (Q-105 — previously only the derived boolean `temperatureAlert` reached the UI).
-      const temperatureDeviation = todaySummary?.tempDevC ?? ouraToday?.temperatureDeviation ?? null
-      // Baseline maturity for the elevated-temp deload gate (≥30 nights). Only our own summary
-      // carries a real accrued baseline; the frozen Cloud fallback reports 0 so it can't fire.
-      const temperatureBaselineDays = todaySummary?.nHistory ?? 0
-      // TN-18. The SAME condition the readiness ladder uses, imported rather than re-derived —
-      // two answers to "is temperature trustworthy" is exactly what produced a 80/100 temperature
-      // contributor and a "Body temp elevated" deload banner for one night.
-      const temperatureTrusted = isTemperatureBaselineCentred(summaryRows.map(r => r.tempDevC))
+      // Last night's deviation as readiness v8 takes it (#3077): the ring's where it has tonight,
+      // else Oura's own. Only TODAY's night counts — a stale night must never feed a deload banner.
+      // Computed once and reused for both the scoring engine and the signals block below, so the
+      // "Why this?" explain page shows the same numbers the recommendation was actually computed
+      // from (Q-105 — previously only the derived boolean `temperatureAlert` reached the UI).
+      const tempTonight = nightTemp.nightDate === todayIso ? nightTemp : null
+      const temperatureDeviation = tempTonight?.deviationC ?? null
+      // Baseline maturity for the elevated-temp deload gate (≥30 nights), counted for the device
+      // the deviation came from: the ring's accrued history, or the earlier post-re-key Oura nights.
+      const temperatureBaselineDays = tempTonight?.baselineNights ?? 0
+      // TN-18. The SAME centring condition the readiness ladder uses, over the same device's
+      // trailing deviations — two answers to "is temperature trustworthy" is exactly what produced
+      // a 80/100 temperature contributor and a "Body temp elevated" deload banner for one night.
+      const temperatureTrusted = tempTonight?.trusted ?? false
 
       const result = computeAiDynamicNextSession({
         sessions,
@@ -2175,7 +2181,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         selfReportedSick: resolveSelfReportedSick(moodLog?.bodyState, morningCheckin?.illnessContext),
         hrvTrend,
         illnessFlag,
-        stressHighMinutes: todayDerived?.stressHighMinutes ?? null,
+        stressHighMinutes,
         timezone,
         ...reminders,
       })
