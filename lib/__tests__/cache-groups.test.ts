@@ -32,6 +32,8 @@ describe('cache group helpers', () => {
       // done-screen per-session payloads + the next-workout preview
       'workout-recap:', 'workout-timing:', 'workout-energy:', 'workout-hr:',
       'next-session-prescription',
+      // #2740: the 28:90 block trend rides this key, so a finished workout must evict it
+      'training-load',
     ]))
   })
 
