@@ -26,9 +26,19 @@ import { baselineZ, type Baseline } from '@trainingai/shared/health/personal-bas
 import { illnessZScores, type IllnessSummaryInput } from '@trainingai/shared/health/illness-radar'
 import type { BaselineContributorKey, ReadinessCompositeInputs } from '@trainingai/shared/health/readiness-composite'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { trailingBaselineZ } from '@/lib/health/score-availability'
 import { canonicalNightForDate, type DatedNight } from '@trainingai/shared/health/sleep-night'
+
+/**
+ * The window start dates readiness and the night-temperature loader both read, shifted on the local
+ * date string so each starts at a local midnight. `now − N×86400000` lands a day off around a clock
+ * change in a daylight-saving zone (#3218), so neither caller may build these any other way.
+ */
+export function readinessWindowStarts(todayIso: string): { from28dIso: string; from7dIso: string } {
+  return { from28dIso: shiftDateStr(todayIso, -28), from7dIso: shiftDateStr(todayIso, -7) }
+}
 
 /** The ring summary's label as an input source. */
 export const RING_SUMMARY_SOURCE = 'oura_ble'

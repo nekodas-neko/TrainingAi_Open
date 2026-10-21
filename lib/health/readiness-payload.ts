@@ -14,7 +14,7 @@
  */
 import { getRepository } from '@/lib/data'
 import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
-import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob, shiftDateStr } from '@trainingai/shared/date-utils'
+import { todayInTz, todayMidnightUtc, dateStrMidnightInTz, ageFromDob, shiftDateStr } from '@trainingai/shared/date-utils'
 import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDose } from '@trainingai/shared/health/dose-context'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
@@ -35,7 +35,7 @@ import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, type Ill
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
-import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, canonicalNightsByDate, readinessSourceLabel } from '@/lib/health/readiness-night-inputs'
+import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, canonicalNightsByDate, readinessSourceLabel, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
@@ -387,9 +387,8 @@ export async function buildReadinessPayload(
 
   const todayIso    = todayInTz(tz)
   const todayMid    = todayMidnightUtc(tz)
-  const from28dDate = new Date(todayMid.getTime() - 28 * 86_400_000)
-  const from28dIso  = toAestDay(from28dDate, tz)
-  const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
+  const { from28dIso, from7dIso } = readinessWindowStarts(todayIso)
+  const from28dDate = dateStrMidnightInTz(from28dIso, tz)
 
   // Issue 2613: a failed lookup leaves the field out (unknown), never false.
   const connectedSourcesP = (async () => {
@@ -573,7 +572,7 @@ export async function buildReadinessPayload(
   const activityDisplayScore = activityResult?.score ?? null      // tapered → the card / display
 
   // Yesterday's own activity score — feeds the A4 composite's "Prev-Day Activity" contributor.
-  const yesterdayIso = toAestDay(new Date(todayMid.getTime() - 86_400_000), tz)
+  const yesterdayIso = shiftDateStr(todayIso, -1)
   const yesterdayMetrics = bodyMetrics.find(m => m.date === yesterdayIso) ?? null
   // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
   // today's, so on a training day the "previous day" score reacted to this morning's session.

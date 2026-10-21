@@ -15,7 +15,7 @@ import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { TEMP_BASELINE_MIN_DAYS } from '@trainingai/shared/ai-periodization/deload-constants'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
-import { resolveReadinessNightInputs, canonicalNightsByDate } from '@/lib/health/readiness-night-inputs'
+import { resolveReadinessNightInputs, canonicalNightsByDate, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
 
 export interface NightTemperature {
   /** The night readiness scores (its wake date), or null when there is no night to read. */
@@ -48,7 +48,7 @@ export async function loadNightTemperature(
   tz: string,
 ): Promise<NightTemperature> {
   // Shifted on the local date string, so each window starts at a local midnight.
-  const from28dIso = shiftDateStr(todayIso, -28)
+  const { from28dIso } = readinessWindowStarts(todayIso)
   const fromCountIso = shiftDateStr(todayIso, -OURA_COUNT_WINDOW_DAYS)
   const [summaries, bodyMetrics, sleepSessions, ouraLong] = await Promise.all([
     repo.getOuraDailySummary(userId, from28dIso, todayIso),
