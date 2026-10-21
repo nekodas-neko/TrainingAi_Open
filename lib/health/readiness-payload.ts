@@ -22,7 +22,7 @@ import { scoreBand } from '@trainingai/shared/health/score-band'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
-import { nightSessions, canonicalLatestNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
@@ -35,7 +35,7 @@ import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, type Ill
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
-import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, readinessSourceLabel } from '@/lib/health/readiness-night-inputs'
+import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, canonicalNightsByDate, readinessSourceLabel } from '@/lib/health/readiness-night-inputs'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
@@ -621,14 +621,11 @@ export async function buildReadinessPayload(
   // of that device's own nights. The composite and the illness radar both read that one result, so
   // they cannot disagree about a night (PS-42).
   const latestSummary = dailySummaries.length > 0 ? dailySummaries[dailySummaries.length - 1] : null
-  const nightByDate = [...new Set(nights.map(n => n.date))]
-    .map(d => canonicalNightForDate(nights, d, tz))
-    .filter((n): n is NonNullable<typeof n> => n != null)
   const night = resolveReadinessNightInputs({
     today: todayIso,
     summaries: dailySummaries,
     bodyMetrics,
-    nights: nightByDate,
+    nights: canonicalNightsByDate(nights, tz),
     ouraDaily: ouraRows,
     ouraCloudContributors,
   })

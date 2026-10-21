@@ -28,6 +28,7 @@ import type { BaselineContributorKey, ReadinessCompositeInputs } from '@training
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { trailingBaselineZ } from '@/lib/health/score-availability'
+import { canonicalNightForDate, type DatedNight } from '@trainingai/shared/health/sleep-night'
 
 /** The ring summary's label as an input source. */
 export const RING_SUMMARY_SOURCE = 'oura_ble'
@@ -92,6 +93,16 @@ export interface ReadinessNightInputs {
 }
 
 const UNKNOWN_SOURCE = 'unknown'
+
+/**
+ * The resolver's `nights`: one canonical night per wake date, from `nightSessions`'s output. Readiness and
+ * `loadNightTemperature` both build it here, so they agree on which night is "tonight" (#3077).
+ */
+export function canonicalNightsByDate<T extends DatedNight>(nights: T[], tz: string): T[] {
+  return [...new Set(nights.map(n => n.date))]
+    .map(d => canonicalNightForDate(nights, d, tz))
+    .filter((n): n is NonNullable<typeof n> => n != null)
+}
 
 function latestDate(dates: (string | null | undefined)[]): string | null {
   let best: string | null = null

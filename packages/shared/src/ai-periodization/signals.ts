@@ -3,7 +3,9 @@ import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr }
 import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-periodization/confidence'
 import { perExerciseRpeDelta, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
-import { latestIllnessFromDerived, illnessZScores, type IllnessFlag } from '@trainingai/shared/health/illness-radar'
+import { latestIllnessFromDerived, type IllnessFlag } from '@trainingai/shared/health/illness-radar'
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { loadNightTemperature } from '@/lib/health/night-temperature'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { sleepDurationTrend, sleepScoreTrend } from '@trainingai/shared/health/sleep-trend'
 import { moodMuscleMatches, normalizeMuscle } from '@trainingai/shared/muscles'
@@ -104,10 +106,10 @@ export interface PrescriptionSignals {
   sleepScoreTrend: number | null
   hrvTrend: number | null
   spo2Trend: number | null
-  // Last night's skin-temperature baseline z-score (oura_daily_summary via the shared
-  // illnessZScores — the live BLE source; oura_daily.temperature_deviation is frozen
-  // Cloud data and must never feed this). Positive = fever-consistent. null until a
-  // temperature baseline exists.
+  // Last night's skin-temperature baseline z-score, readiness v8's own (`loadNightTemperature`):
+  // the ring summary's z where the ring has tonight, else Oura's deviation against earlier Oura
+  // nights (#3077). A pre-re-key Oura value never feeds it. Positive = fever-consistent. null
+  // until that device's temperature baseline exists.
   tempZ: number | null
   // Latest persisted illness-radar reading (oura_daily_derived — last night, or the night
   // before when last night hasn't rolled up yet). null = no data or baseline still learning.
@@ -119,7 +121,8 @@ export interface PrescriptionSignals {
   // signal (F9). null when the model gated (insufficient MET / learning).
   trainingLoadOts: number | null
   trainingLoadHigh: boolean | null
-  // Own stress-resilience level (1–5) for the latest night with a reading (F9). null = no data.
+  // Own stress-resilience level (1–5) for the latest night with a reading (F9). null = no data,
+  // which includes every day from the switch to the Oura API (#3077).
   resilienceLevel: number | null
   confidenceTier: 1 | 2 | 3
   confidence: number
@@ -265,12 +268,10 @@ export async function aggregateSignals(
 
   const volumeTargets = await repo.listVolumeTargets(userId, program.id)
   const exerciseNames = programSession.exercises.map(e => e.exerciseName)
-  // Q-489: shifted on the date string. The `from7d` line below was already correct — it anchors on
-  // `todayMid`, the user's local midnight — and this one was the outlier.
+  // Q-489: shifted on the date string, anchored on `todayMid`, the user's local midnight.
   const yesterday = shiftDateStr(toAestDay(todayMid, tz), -1)
-  const from7d = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
 
-  const [recentSessions, timingRows, muscleAssignmentsMap, equipmentMap, exerciseTypeMap, todayMoodLog, yesterdayMoodLog, allRecentSessions, morningCheckinRow, rm1Histories, timingAudit, derivedRows, dailySummaries] = await Promise.all([
+  const [recentSessions, timingRows, muscleAssignmentsMap, equipmentMap, exerciseTypeMap, todayMoodLog, yesterdayMoodLog, allRecentSessions, morningCheckinRow, rm1Histories, timingAudit, derivedRows, nightTemp, switchDay] = await Promise.all([
     repo.getRecentSessionsOfType(userId, programSessionId, 60),
     repo.getSetTimingRows(userId, exerciseNames),
     repo.getExerciseMuscleAssignments(exerciseNames),
@@ -290,8 +291,11 @@ export async function aggregateSignals(
     repo.getTimingAuditData(userId, 90),
     // Latest persisted illness-radar reading — a decision-layer read of oura_daily_derived (S3).
     repo.getOuraDailyDerived(userId, yesterday, today),
-    // Skin-temp baseline z (live BLE) — same source the readiness/illness surfaces use.
-    repo.getOuraDailySummary(userId, from7d, today),
+    // #3077: last night's temperature z exactly as readiness v8 scores it, per input and per device:
+    // the ring's summary where it has tonight, else Oura's deviation against earlier Oura nights.
+    loadNightTemperature(repo, userId, today, tz),
+    // #3077: a failed lookup reads as no switch, so the ring's rows stand, as before the switch existed.
+    (async () => repo.getOuraCloudSwitchDay(userId))().catch(() => null),
   ])
 
   const timeProfiles = buildTimeProfiles(timingRows)
@@ -563,12 +567,13 @@ export async function aggregateSignals(
   // Today's derived row (OTS is a whole-day signal keyed to today, unlike illness's latest-available).
   const todayDerived = derivedRows.find(r => r.day === today) ?? null
 
-  // Skin-temp z vs the PRIOR night's baseline — the identical pre-update relationship
-  // the readiness route and nightly rollup use, so prescription/readiness/illness can
-  // never disagree about last night's temperature.
-  const latestSummary = dailySummaries.length > 0 ? dailySummaries[dailySummaries.length - 1] : null
-  const priorSummary = dailySummaries.length > 1 ? dailySummaries[dailySummaries.length - 2] : null
-  const tempZ = latestSummary ? illnessZScores(priorSummary, latestSummary).tempZ : null
+  // Skin-temp z from readiness v8's own per-input choice (`loadNightTemperature`), so
+  // prescription/readiness/illness can never disagree about last night's temperature. On a night
+  // the ring scored it is the same prior-baseline z this read from the ring summary before.
+  // Only TODAY's night: the resolver's night is the newest in its 28-day window, and the prompt
+  // maps temp_z >= FEVER_TEMP_Z to a rest day, so a week-old fever must never recommend skipping
+  // today (#3213 review). Same gate as ai_dynamic's temperature alert.
+  const tempZ = nightTemp.nightDate === today ? nightTemp.z : null
 
   // Confidence scoring — one deterministic input set shared by the score and the
   // plain-English reasons list, so they can never disagree about what's missing.
@@ -630,7 +635,11 @@ export async function aggregateSignals(
     externalReadiness: liveReadinessForDay(today, derivedRows),
     trainingLoadOts: todayDerived?.trainingLoadOts ?? null,
     trainingLoadHigh: todayDerived?.trainingLoadHigh ?? null,
-    resilienceLevel: [...derivedRows].reverse().find(r => r.resilienceLevel != null)?.resilienceLevel ?? null,
+    // #3077: the ring's 1-5 level stands only before the switch day; from it the ring's rows are
+    // leftovers, so the level is absent (the prompt says "no data"), as the readiness payload does
+    // (#3206). Oura's resilience word is not mapped onto this scale (owner question #3212).
+    resilienceLevel: [...derivedRows].reverse()
+      .find(r => r.resilienceLevel != null && ringValueStands(r.day, switchDay))?.resilienceLevel ?? null,
     confidenceTier,
     confidence,
     confidenceReasons,

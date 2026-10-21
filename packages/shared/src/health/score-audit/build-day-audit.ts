@@ -9,7 +9,8 @@ import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shar
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { sleepFeelLabel } from '@trainingai/shared/health/sleep-feel-calibration'
-import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
+import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { canonicalNightsByDate } from '@/lib/health/readiness-night-inputs'
 import { buildSleepAudit } from './sleep'
 import { buildReadinessAudit } from './readiness'
 import { buildActivityAudit } from './activity'
@@ -213,9 +214,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     switchDay,
     generic: {
       bodyMetrics,
-      nights: [...new Set(nightsAll.map(n => n.date))]
-        .map(d => canonicalNightForDate(nightsAll, d, tz))
-        .filter((n): n is NonNullable<typeof n> => n != null),
+      nights: canonicalNightsByDate(nightsAll, tz),
       ouraDaily: ouraRows,
       ouraCloudContributors,
     },
