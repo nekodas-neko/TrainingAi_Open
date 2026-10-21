@@ -35,7 +35,7 @@ import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, type Ill
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
-import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields } from '@/lib/health/readiness-night-inputs'
+import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, readinessSourceLabel } from '@/lib/health/readiness-night-inputs'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
@@ -830,7 +830,7 @@ export async function buildReadinessPayload(
       // Both labels are our own composite and AI surfaces read both (`liveReadinessByDay`, #2992).
       // Where each input came from is on the contributors (`source`); the Health Connect recompute
       // reads that, not this label, to decide which days to clear.
-      readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
+      readinessSource: readinessSourceLabel(night, latestSummary != null, switchDay),
       modelVersions: { readiness: READINESS_MODEL_VERSION },
       // TN-64(a): the OTHER half of the early-deload gate. The score has always been stored and
       // the ACWR never was, so "the gate never opened" could not be told apart from "the gate was

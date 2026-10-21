@@ -241,10 +241,53 @@ describe('buildReadinessAudit', () => {
   })
 
   it('reports no-data rather than fabricating a score without a daily summary', () => {
-    const audit = buildReadinessAudit({ ...common, summary: null, priorSummary: null })
+    const audit = buildReadinessAudit({ ...common, sleepScore: null, summary: null, priorSummary: null })
     expect(audit.score).toBeNull()
     expect(audit.contributors).toHaveLength(0)
     expect(audit.gaps.join(' ')).toContain('No oura_daily_summary row')
+  })
+
+  // #3077: after the switch to the Oura API the ring's row for the night is a partial leftover; the
+  // audit explains the score the way the live model makes it, from Oura's per-device values.
+  describe('on a v8 day after the switch (#3077)', () => {
+    const DAY = '2026-10-19'
+    const partial = summary({
+      date: DAY, nHistory: 61, hrvAvgMs: null, rhrLowBpm: null, tempMeanC: null, tempDevC: null,
+      breathAvgRpm: null, sleepDurationHours: null, recoveryIndexHours: null,
+      hrvBaseline: null, rhrBaseline: null, tempBaseline: null, sleepBaseline: null, breathBaseline: null,
+    })
+    const priorNights = Array.from({ length: 20 }, (_, i) => {
+      const d = `2026-09-${String(29 - i).padStart(2, '0')}`
+      return { date: d, hrvMs: 50 + (i % 5), restingHeartRate: 54 + (i % 3), hrvSource: 'oura_cloud', restingHeartRateSource: 'oura_cloud' }
+    })
+    const generic = {
+      bodyMetrics: [...priorNights, { date: DAY, hrvMs: 44, restingHeartRate: 58, hrvSource: 'oura_cloud', restingHeartRateSource: 'oura_cloud' }],
+      nights: [], ouraDaily: [], ouraCloudContributors: [{ date: DAY, readinessContributors: { recovery_index: 70 } }],
+    }
+
+    it('reads resting HR and HRV from Oura, labelled by source, rather than a null ring row', () => {
+      const audit = buildReadinessAudit({ ...common, date: DAY, summary: partial, priorSummary: summary({ date: '2026-10-18' }), generic })
+      const rhr = audit.contributors.find(c => c.key === 'restingHeartRate')!
+      const hrv = audit.contributors.find(c => c.key === 'hrvBalance')!
+      expect(rhr.input.value).toBe(58)
+      expect(rhr.input.source).toContain('oura_cloud')
+      expect(hrv.input.value).toBe(44)
+      expect(rhr.provisional).toBe(false)
+      expect(audit.score).not.toBeNull()
+    })
+
+    it('takes the recovery index from Oura\'s contributor where the ring has no hours', () => {
+      const audit = buildReadinessAudit({ ...common, date: DAY, summary: partial, priorSummary: summary({ date: '2026-10-18' }), generic })
+      expect(audit.contributors.find(c => c.key === 'recoveryIndex')!.input.source).toContain('recovery_index = 70')
+    })
+
+    it('still reads a stored v8 row as this composite', () => {
+      const live = buildReadinessAudit({ ...common, date: DAY, summary: partial, priorSummary: summary({ date: '2026-10-18' }), generic })
+      const derived = { day: DAY, readinessScore: live.persist!.score, readinessContributors: live.persist!.contributors, illnessFlag: live.persist!.illnessFlag, modelVersions: { readiness: 'v8' } } as unknown as OuraDailyDerivedRow
+      const again = buildReadinessAudit({ ...common, date: DAY, summary: partial, priorSummary: summary({ date: '2026-10-18' }), generic, derived })
+      expect(again.storedMatchesRecompute).toBe(true)
+      expect(again.notes.join(' ')).not.toContain('NOT reproducible')
+    })
   })
 
   // #2224. The audit reports the model the app runs, and that model no longer has a check-in term.

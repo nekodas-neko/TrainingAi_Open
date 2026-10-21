@@ -9,6 +9,7 @@ import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shar
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { sleepFeelLabel } from '@trainingai/shared/health/sleep-feel-calibration'
+import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { buildSleepAudit } from './sleep'
 import { buildReadinessAudit } from './readiness'
 import { buildActivityAudit } from './activity'
@@ -51,6 +52,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   const [
     bodyMetrics, sleepSessions, workoutSessions, ouraRows, program,
     hrRows, summaries, derivedRows, mood, user, activityLogs, nutrition, morningCheckin, userGoals,
+    ouraCloudContributors,
   ] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
     repo.listSleepSessions(userId, fromIso, date),
@@ -71,6 +73,8 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     repo.getDayCheckin(userId, date, 'morning'),
     // Q-524: the audit must score steps against the same goal the live route does.
     repo.getUserGoals(userId).catch(() => null),
+    // #3077: Oura's recovery-index contributor, the one input Oura sends no value for (as the live score reads it).
+    repo.getOuraCloudReadinessContributors(userId, fromIso, date).catch(() => []),
   ])
 
   // Everything below is scoped to the audited day, never "today".
@@ -196,6 +200,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
       })?.preTaperScore ?? null
     : null
 
+  const nightsAll = nightSessions(sleepSessions, tz)
   safe('Readiness', () => buildReadinessAudit({
     date, summary, priorSummary,
     sleepScore: sleep?.score ?? null,
@@ -203,6 +208,14 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     prevDayActivityScore,
     ouraDaily: ouraToday,
     derived: derivedForDay,
+    generic: {
+      bodyMetrics,
+      nights: [...new Set(nightsAll.map(n => n.date))]
+        .map(d => canonicalNightForDate(nightsAll, d, tz))
+        .filter((n): n is NonNullable<typeof n> => n != null),
+      ouraDaily: ouraRows,
+      ouraCloudContributors,
+    },
   }))
 
   safe('Activity', () => buildActivityAudit(activityInput))

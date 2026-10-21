@@ -5,10 +5,13 @@ import {
   READINESS_WEIGHTS,
   BASELINE_MIN_NIGHTS,
 } from '@trainingai/shared/health/readiness-composite'
-import { baselineZ } from '@trainingai/shared/health/personal-baseline'
 import { scoreBand } from '@trainingai/shared/health/score-band'
-import { applyIllnessSuppression, computeIllnessRadar, illnessZScores, illnessAdvisory, storedReadinessMatches } from '@trainingai/shared/health/illness-radar'
+import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, storedReadinessMatches } from '@trainingai/shared/health/illness-radar'
 import type { OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyRow } from '@/lib/data/repository'
+import {
+  resolveReadinessNightInputs, compositeNightFields, illnessNightFields,
+  RING_SUMMARY_SOURCE, type NightInputSources, type NightInput, type NightInputKey,
+} from '@/lib/health/readiness-night-inputs'
 import { fixedWeightContributors, contributionSum, type ContributorSpec } from './contributors'
 import type { PillarAudit } from './types'
 
@@ -24,6 +27,11 @@ export interface ReadinessAuditInput {
   prevDayActivityScore: number | null
   ouraDaily: OuraDailyRow | null
   derived: OuraDailyDerivedRow | null
+  /**
+   * #3077: the generic per-device values readiness v8 falls back to when the ring's summary cannot
+   * score an input (Oura Cloud, Health Connect, manual). Left out, the audit sees the ring alone.
+   */
+  generic?: Pick<NightInputSources, 'bodyMetrics' | 'nights' | 'ouraDaily' | 'ouraCloudContributors'>
 }
 
 const r3 = (n: number | null) => (n == null ? null : Math.round(n * 1000) / 1000)
@@ -37,42 +45,79 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
   const gaps: string[] = []
   const notes: string[] = []
 
-  const { rhrZ, hrvZ, tempZ, breathZ } = summary
-    ? illnessZScores(priorSummary, summary)
-    : { rhrZ: null, hrvZ: null, tempZ: null, breathZ: null }
+  // #3077: the same per-input, per-device choice the live score makes (`resolveReadinessNightInputs`),
+  // so the audit explains today's model, not the ring-only v7 path. An audit, not a score: nothing
+  // here is stored.
+  const generic = input.generic ?? { bodyMetrics: [], nights: [], ouraDaily: [], ouraCloudContributors: [] }
+  const night = resolveReadinessNightInputs({
+    today: date,
+    summaries: [priorSummary, summary].filter((r): r is NonNullable<typeof r> => r != null),
+    ...generic,
+  })
+  const { rhrZ, hrvZ, tempZ, breathZ } = illnessNightFields(night)
+  const sleepBalanceZ = night.inputs.sleepBalance?.z ?? null
+  const sourceLabel = (key: NightInputKey, ringColumn: string): string => {
+    const src = night.inputs[key]?.source
+    return src == null || src === RING_SUMMARY_SOURCE ? ringColumn : `${src} (${night.inputs[key]!.nights} earlier nights of its own)`
+  }
+  // The raw reading behind an input's z: the ring's column, or the generic row the z was judged from.
+  const generic$ = night.nightDate
+  const rawValue = (key: NightInputKey): number | null => {
+    const src = night.inputs[key]?.source
+    if (src == null) return null
+    if (src === RING_SUMMARY_SOURCE) {
+      return key === 'restingHeartRate' ? summary?.rhrLowBpm ?? null : key === 'hrvBalance' ? summary?.hrvAvgMs ?? null
+        : key === 'temperature' ? summary?.tempDevC ?? null : key === 'sleepBalance' ? summary?.sleepDurationHours ?? null : null
+    }
+    const m = generic.bodyMetrics.find(r => r.date === generic$)
+    const n = generic.nights.find(r => r.date === generic$)
+    const o = generic.ouraDaily.find(r => r.date === generic$)
+    return key === 'restingHeartRate' ? m?.restingHeartRate ?? null : key === 'hrvBalance' ? m?.hrvMs ?? null
+      : key === 'temperature' ? o?.temperatureDeviation ?? null : key === 'sleepBalance' ? n?.durationHours ?? null : null
+  }
 
-  const sleepBalanceZ = priorSummary?.sleepBaseline && summary?.sleepDurationHours != null
-    ? baselineZ(priorSummary.sleepBaseline, Math.round(summary.sleepDurationHours * 60))
-    : null
+  const latestSummary = summary ?? priorSummary
+  const genericHrvCount = generic.bodyMetrics.filter(m => (m.hrvMs ?? 0) > 0).length
+  const genericRhrCount = generic.bodyMetrics.filter(m => (m.restingHeartRate ?? 0) > 0).length
+  const hasGenericRecoverySignal = sleepScore != null || genericHrvCount >= 2 || genericRhrCount >= 2
+  const genericHistoryDays = new Set([
+    ...generic.bodyMetrics.filter(m => (m.hrvMs ?? 0) > 0 || (m.restingHeartRate ?? 0) > 0).map(m => m.date),
+    ...generic.nights.map(n => n.date),
+  ]).size
+  // As the payload counts it: the newest summary's own count, else the generic nights before tonight.
+  const nHistory = latestSummary?.nHistory ?? Math.max(0, genericHistoryDays - 1)
 
-  const nHistory = summary?.nHistory ?? 0
-
-  const composite = summary ? computeReadinessComposite({
-    rhrZ, hrvZ, tempZ, sleepBalanceZ,
+  const composite = (latestSummary || hasGenericRecoverySignal) ? computeReadinessComposite({
+    ...compositeNightFields(night),
     previousNightScore: sleepScore,
     prevDayActivityScore,
     activityBalanceScore: activityScore,
     nHistory,
-    recoveryIndexHours: summary.recoveryIndexHours,
   }) : null
 
-  const illness = summary
-    ? computeIllnessRadar({ tempZ, rhrZ, hrvZ, breathZ, nHistory })
+  const illness = composite
+    ? computeIllnessRadar(illnessNightFields(night))
     : null
 
-  if (!summary) {
+  if (!composite) {
     gaps.push(
-      `No oura_daily_summary row for ${date} — without it there are no personal baselines, so the ` +
+      `No oura_daily_summary row for ${date} and no other recovery signal — without one there are no personal baselines, so the ` +
       'composite cannot run at all and readiness falls back to the crude sleep+HRV+RHR+load estimate.',
     )
-  } else if (nHistory < BASELINE_MIN_NIGHTS) {
+  } else if (!night.ringSummary) {
+    notes.push(
+      `No ring summary row for ${date}: the inputs come from other devices, each judged against its own earlier nights ` +
+      `(${(Object.entries(night.inputs) as [string, NightInput][]).map(([k, i]) => `${k}: ${i.source}`).join(', ') || 'none'}).`,
+    )
+  }
+  if (composite && nHistory < BASELINE_MIN_NIGHTS) {
     gaps.push(
       `Baselines are still cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights). All four baseline-relative ` +
       `contributors — resting HR, HRV balance, temperature, sleep balance (${pct(BASELINE_RELATIVE_WEIGHT)} of the total weight) — are ` +
       'pinned to a neutral 50, so the score is driven almost entirely by the sleep and activity terms.',
     )
   }
-  if (summary?.recoveryIndexHours == null) gaps.push('No Recovery Index (needs an overnight HR series) — contributor neutral at 50.')
+  if (night.recoveryIndex == null) gaps.push('No Recovery Index (needs an overnight HR series) — contributor neutral at 50.')
   if (sleepScore == null) gaps.push(`No sleep score for the previous night — its ${pct(READINESS_WEIGHTS.previousNight)} weight sits neutral at 50.`)
 
   if (illness && illness.readinessSuppression > 0) {
@@ -98,7 +143,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     {
       key: 'restingHeartRate', label: 'Resting HR vs baseline',
       input: {
-        value: summary?.rhrLowBpm ?? null, unit: 'bpm', source: 'oura_daily_summary.rhr_low_bpm',
+        value: rawValue('restingHeartRate'), unit: 'bpm', source: sourceLabel('restingHeartRate', 'oura_daily_summary.rhr_low_bpm'),
         note: `z = ${r3(rhrZ) ?? '—'} vs the prior night's baseline; lower-is-better.`,
       },
       subScore: c.restingHeartRate.score, provisional: c.restingHeartRate.provisional,
@@ -113,7 +158,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     {
       key: 'hrvBalance', label: 'HRV vs baseline',
       input: {
-        value: summary?.hrvAvgMs ?? null, unit: 'ms rMSSD', source: 'oura_daily_summary.hrv_avg_ms',
+        value: rawValue('hrvBalance'), unit: 'ms rMSSD', source: sourceLabel('hrvBalance', 'oura_daily_summary.hrv_avg_ms'),
         note: `z = ${r3(hrvZ) ?? '—'}; higher-is-better.`,
       },
       subScore: c.hrvBalance.score, provisional: c.hrvBalance.provisional,
@@ -122,7 +167,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     {
       key: 'temperature', label: 'Skin temperature vs baseline',
       input: {
-        value: summary?.tempDevC ?? null, unit: '°C deviation', source: 'oura_daily_summary.temp_dev_c',
+        value: rawValue('temperature'), unit: '°C deviation', source: sourceLabel('temperature', 'oura_daily_summary.temp_dev_c'),
         note: `z = ${r3(tempZ) ?? '—'}; closer-to-baseline-is-better (deviation either way is a fever/illness signal).`,
       },
       subScore: c.temperature.score, provisional: c.temperature.provisional,
@@ -131,7 +176,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     {
       key: 'sleepBalance', label: 'Sleep duration vs baseline',
       input: {
-        value: summary?.sleepDurationHours ?? null, unit: 'h', source: 'oura_daily_summary.sleep_duration_hours',
+        value: rawValue('sleepBalance'), unit: 'h', source: sourceLabel('sleepBalance', 'oura_daily_summary.sleep_duration_hours'),
         note: `z = ${r3(sleepBalanceZ) ?? '—'} vs the prior night's sleep baseline; higher-is-better.`,
       },
       subScore: c.sleepBalance.score, provisional: c.sleepBalance.provisional,
@@ -146,7 +191,10 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     {
       key: 'recoveryIndex', label: 'Recovery index',
       input: {
-        value: summary?.recoveryIndexHours ?? null, unit: 'h', source: 'oura_daily_summary.recovery_index_hours',
+        value: night.recoveryIndex && 'hours' in night.recoveryIndex ? night.recoveryIndex.hours : null, unit: 'h',
+        source: night.recoveryIndex && 'contributor' in night.recoveryIndex
+          ? `oura_cloud readiness contributor recovery_index = ${night.recoveryIndex.contributor} (no hours)`
+          : 'oura_daily_summary.recovery_index_hours',
         note: `Hours from the overnight HR minimum to wake; linear to 100 at ${READINESS_MODEL.recoveryIndexOptimalHours} h. Approximation — always flagged provisional.`,
       },
       subScore: c.recoveryIndex.score, provisional: c.recoveryIndex.provisional,
@@ -291,7 +339,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       source: derived?.readinessSource ?? null,
       rederived,
     },
-    storedMatchesRecompute: storedScore != null && compositeScore != null ? storedScore === compositeScore : null,
+    storedMatchesRecompute: storedScore != null && compositeScore != null ? isStored(compositeScore) : null,
     notes,
   }
 }

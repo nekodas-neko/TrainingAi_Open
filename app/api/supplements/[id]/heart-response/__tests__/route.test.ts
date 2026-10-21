@@ -11,6 +11,8 @@ const OTHER = '22222222-2222-4222-8222-222222222222'
 const h = vi.hoisted(() => ({
   listDoseHistory: vi.fn(),
   getOuraDailySummary: vi.fn(),
+  listBodyMetrics: vi.fn(),
+  getOuraCloudSwitchDay: vi.fn(),
 }))
 vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: '00000000-0000-4000-8000-000000002152', timezone: 'Australia/Brisbane' } })) }))
 vi.mock('@/lib/data', () => ({ getRepository: async () => h }))
@@ -25,6 +27,8 @@ describe('GET /api/supplements/[id]/heart-response (issue 2152)', () => {
   beforeEach(() => {
     h.listDoseHistory.mockReset()
     h.getOuraDailySummary.mockReset()
+    h.listBodyMetrics.mockReset().mockResolvedValue([])
+    h.getOuraCloudSwitchDay.mockReset().mockResolvedValue(null)
   })
 
   it('carries taken_at through, keeps null for the dose logged before the column existed, and filters to this supplement', async () => {
@@ -47,8 +51,27 @@ describe('GET /api/supplements/[id]/heart-response (issue 2152)', () => {
       { supplementId: RETA, supplementName: 'Retatrutide', date: '2026-09-13', amount: 1, unit: 'mg', doseText: null, takenAt: '2026-09-13T00:30:00.000Z' },
     ])
     expect(body.nights).toEqual([
-      { date: '2026-09-14', restingHr: 56.3, hrvMs: 39 },
-      { date: '2026-09-15', restingHr: null, hrvMs: null },
+      { date: '2026-09-14', restingHr: 56.3, hrvMs: 39, restingHrSource: 'oura_ble', hrvSource: 'oura_ble' },
+      { date: '2026-09-15', restingHr: null, hrvMs: null, restingHrSource: null, hrvSource: null },
+    ])
+  })
+
+  // #3077: from the switch day the ring's row is a partial leftover; the night is Oura's own value.
+  it('reads the Oura value, labelled, from the switch day, and leaves earlier nights as they were', async () => {
+    h.listDoseHistory.mockResolvedValue({ logs: [], courses: [] })
+    h.getOuraCloudSwitchDay.mockResolvedValue('2026-10-18')
+    h.getOuraDailySummary.mockResolvedValue([
+      { date: '2026-10-17', rhrLowBpm: 52, hrvAvgMs: 58 },
+      { date: '2026-10-18', rhrLowBpm: null, hrvAvgMs: null },
+    ])
+    h.listBodyMetrics.mockResolvedValue([
+      { date: '2026-10-17', restingHeartRate: 80, hrvMs: 20, hrvSource: 'oura_cloud', restingHeartRateSource: 'oura_cloud' },
+      { date: '2026-10-19', restingHeartRate: 55, hrvMs: 47, hrvSource: 'oura_cloud', restingHeartRateSource: 'oura_cloud' },
+    ])
+    const body = await (await call(RETA)).json()
+    expect(body.nights).toEqual([
+      { date: '2026-10-17', restingHr: 52, hrvMs: 58, restingHrSource: 'oura_ble', hrvSource: 'oura_ble' },
+      { date: '2026-10-19', restingHr: 55, hrvMs: 47, restingHrSource: 'oura_cloud', hrvSource: 'oura_cloud' },
     ])
   })
 

@@ -232,6 +232,9 @@ export interface RecoveryNight {
   date: string
   restingHr: number | null
   hrvMs: number | null
+  /** Which device measured each value, when the route knows. Display only. */
+  restingHrSource?: string | null
+  hrvSource?: string | null
 }
 
 /** A dose-log row plus its time. `date` is the user's local `log_date` and is the dose day. */

@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { nightVitals } from '@/lib/health/readiness-night-inputs'
 import { DEFAULT_TZ, todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import type { RecoveryDose, RecoveryNight } from '@trainingai/shared/nutrition/weight-response'
 
@@ -42,9 +43,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
   try {
     const repo = await getRepository()
-    const [history, summaries] = await Promise.all([
+    const [history, summaries, bodyMetrics, switchDay] = await Promise.all([
       repo.listDoseHistory(userId, from, to),
       repo.getOuraDailySummary(userId, from, to),
+      repo.listBodyMetrics(userId, from, to),
+      // A failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
+      repo.getOuraCloudSwitchDay(userId).catch(() => null),
     ])
     // `listDoseHistory` is already scoped to this user; filtering by the path id only narrows it.
     const doses: RecoveryDose[] = history.logs
@@ -53,7 +57,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         supplementId: l.supplementId, supplementName: l.supplementName, date: l.date,
         amount: l.amount, unit: l.unit, doseText: l.doseText, takenAt: l.takenAt,
       }))
-    const nights: RecoveryNight[] = summaries.map(s => ({ date: s.date, restingHr: s.rhrLowBpm, hrvMs: s.hrvAvgMs }))
+    // The same per-night values and sources as the dose/vitals overlay (`nightVitals`).
+    const nights: RecoveryNight[] = nightVitals({ summaries, bodyMetrics, switchDay, from, to }).map(n => ({
+      date: n.date, restingHr: n.restingHr, hrvMs: n.hrvMs, restingHrSource: n.restingHrSource, hrvSource: n.hrvSource,
+    }))
     const body: HeartResponseInputs = { doses, nights }
     return NextResponse.json(body, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (err) {

@@ -25,6 +25,7 @@
 import { baselineZ, type Baseline } from '@trainingai/shared/health/personal-baseline'
 import { illnessZScores, type IllnessSummaryInput } from '@trainingai/shared/health/illness-radar'
 import type { BaselineContributorKey, ReadinessCompositeInputs } from '@trainingai/shared/health/readiness-composite'
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { trailingBaselineZ } from '@/lib/health/score-availability'
 
@@ -237,4 +238,87 @@ export function illnessNightFields(r: ReadinessNightInputs): {
     breathZ: r.inputs.breathing?.z ?? null,
     nHistory: withZ.length ? Math.min(...withZ.map(i => i.nights)) : 0,
   }
+}
+
+/** One night's resting HR and HRV as the vitals overlays show them, each labelled by its source. */
+export interface NightVital {
+  date: string
+  restingHr: number | null
+  hrvMs: number | null
+  restingHrSource: string | null
+  hrvSource: string | null
+  /** The ring's stored baseline for that night. Null from the switch day: the Oura API sends none. */
+  restingHrBaseline: { meanX8: number } | null
+  hrvBaseline: { meanX8: number } | null
+}
+
+export interface NightVitalsSources {
+  /** `oura_daily_summary` rows (the ring's own rollup). */
+  summaries: readonly {
+    date: string
+    rhrLowBpm: number | null
+    hrvAvgMs: number | null
+    rhrBaseline?: { meanX8: number } | null
+    hrvBaseline?: { meanX8: number } | null
+  }[]
+  /** The same generic rows readiness reads (`hrvSource` / `restingHeartRateSource` say which device). */
+  bodyMetrics: readonly {
+    date: string
+    hrvMs?: number | null
+    restingHeartRate?: number | null
+    hrvSource?: string | null
+    restingHeartRateSource?: string | null
+  }[]
+  switchDay: string | null
+  from: string
+  to: string
+}
+
+/**
+ * Resting HR and HRV per night for the overlays (dose vitals, heart response). Before the switch to
+ * the Oura API the ring summary stands, exactly as before. From the switch day the ring's rows are
+ * partial leftovers (`ringValueStands`), so the night comes from the same generic values readiness
+ * v8 scores (`resolveReadinessNightInputs`), labelled by the device that measured it.
+ */
+export function nightVitals(src: NightVitalsSources): NightVital[] {
+  const out: NightVital[] = []
+  for (const s of src.summaries) {
+    if (s.date < src.from || s.date > src.to || !ringValueStands(s.date, src.switchDay)) continue
+    out.push({
+      date: s.date, restingHr: s.rhrLowBpm, hrvMs: s.hrvAvgMs,
+      restingHrSource: s.rhrLowBpm != null ? RING_SUMMARY_SOURCE : null,
+      hrvSource: s.hrvAvgMs != null ? RING_SUMMARY_SOURCE : null,
+      restingHrBaseline: s.rhrBaseline ?? null, hrvBaseline: s.hrvBaseline ?? null,
+    })
+  }
+  for (const m of src.bodyMetrics) {
+    if (m.date < src.from || m.date > src.to || ringValueStands(m.date, src.switchDay)) continue
+    const rhr = (m.restingHeartRate ?? 0) > 0 ? m.restingHeartRate! : null
+    const hrv = (m.hrvMs ?? 0) > 0 ? m.hrvMs! : null
+    if (rhr == null && hrv == null) continue
+    out.push({
+      date: m.date, restingHr: rhr, hrvMs: hrv,
+      restingHrSource: rhr != null ? m.restingHeartRateSource ?? UNKNOWN_SOURCE : null,
+      hrvSource: hrv != null ? m.hrvSource ?? UNKNOWN_SOURCE : null,
+      restingHrBaseline: null, hrvBaseline: null,
+    })
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/**
+ * The `readiness_source` label stored beside a score: what actually fed it. Before the switch to the
+ * Oura API the ring's summary row is the source whenever one exists. From the switch day the row is a
+ * partial leftover (`ringValueStands`), so the label is the ring's only if one of the night's inputs
+ * really came from it; otherwise the score was built from Oura's and the generic values.
+ */
+export function readinessSourceLabel(
+  night: ReadinessNightInputs,
+  hasSummaryRow: boolean,
+  switchDay: string | null | undefined,
+): 'ble-derived' | 'generic-derived' {
+  if (night.nightDate != null && !ringValueStands(night.nightDate, switchDay)) {
+    return Object.values(night.inputs).some(i => i?.source === RING_SUMMARY_SOURCE) ? 'ble-derived' : 'generic-derived'
+  }
+  return hasSummaryRow ? 'ble-derived' : 'generic-derived'
 }
