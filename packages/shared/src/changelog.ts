@@ -7,7 +7,7 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "1.495.0",
-    date: "2026-10-21",
+    date: "2026-10-22",
     changes: [
       "The features that went quiet when the ring moved to the Oura app read Oura again: workout suggestions and deload alerts use last night's temperature, the supplement heart-response and dose cards show your nights, and the timeline, VO₂ max and the bedtime suggestion are back.",
       "Your running plan's heart-rate zones come from your 28-day average resting heart rate, the same figure your zone minutes are counted with, instead of a reading up to three months old.",
