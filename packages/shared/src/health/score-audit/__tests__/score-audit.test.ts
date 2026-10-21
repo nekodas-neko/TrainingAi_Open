@@ -9,7 +9,7 @@ import { buildActivityAudit } from '../activity'
 import { buildReadinessAudit } from '../readiness'
 import { buildHeartRateAudit } from '../heart-rate'
 import type { SleepSession } from '@trainingai/shared/types/body'
-import type { OuraDailySummaryRow } from '@/lib/data/repository'
+import type { OuraDailySummaryRow, OuraDailyDerivedRow } from '@/lib/data/repository'
 
 const TZ = 'Australia/Brisbane'
 
