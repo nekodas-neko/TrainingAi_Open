@@ -4,7 +4,7 @@ import type { OuraCloudTokenRow, SaveOuraCloudTokensInput } from '@/lib/data/pos
 import { OURA_REVOKE_URL, OURA_TOKEN_URL, type OuraOAuthConfig } from '../config'
 import { decryptOuraToken, encryptOuraToken } from '../token-cipher'
 import {
-  connectOuraAccount, disconnectOuraAccount, getOuraAccessToken, getOuraConnection,
+  confirmOuraTokenRefused, connectOuraAccount, disconnectOuraAccount, getOuraAccessToken, getOuraConnection,
   OuraAccountInUseError, OuraReauthRequiredError, REFRESH_MARGIN_MS, type OuraTokenStore,
 } from '../tokens'
 
@@ -24,7 +24,14 @@ function fakeStore(initial: OuraCloudTokenRow | null = null) {
       row = {
         userId, accessToken: input.accessToken, refreshToken: input.refreshToken, expiresAt: input.expiresAt,
         scope: input.scope, ouraUserId: input.ouraUserId ?? row?.ouraUserId ?? null, updatedAt: new Date(NOW + ++tick),
+        reauthRequiredAt: null,
       }
+    },
+    // As the slice does: only a row not saved since `since`, and an earlier mark is kept.
+    async markOuraCloudReauthRequired(userId, since) {
+      if (!row || row.userId !== userId || row.updatedAt.getTime() > since.getTime()) return false
+      row = { ...row, reauthRequiredAt: row.reauthRequiredAt ?? new Date(NOW) }
+      return true
     },
     async deleteOuraCloudTokens(userId) { const had = row?.userId === userId; row = null; return had },
     async getUserIdByOuraUserId(ouraUserId) { return row && row.ouraUserId === ouraUserId ? row.userId : null },
@@ -38,6 +45,7 @@ function storedRow(access: string, refresh: string, expiresAt: number): OuraClou
     accessToken: encryptOuraToken(access, USER, 'access_token'),
     refreshToken: encryptOuraToken(refresh, USER, 'refresh_token'),
     expiresAt: new Date(expiresAt), scope: 'daily', ouraUserId: 'oura-u1', updatedAt: new Date(NOW - 60_000),
+    reauthRequiredAt: null,
   }
 }
 
@@ -191,6 +199,123 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'invalid_grant' }, 400))
     await expect(getOuraAccessToken(store, CONFIG, USER, () => NOW)).rejects.toBeInstanceOf(OuraReauthRequiredError)
     expect(store.row()).not.toBeNull() // the row is the user's to disconnect, not ours to drop
+  })
+
+  // #3204
+  it('records an invalid_grant on the row, then refuses without asking Oura again', async () => {
+    const store = fakeStore(storedRow('acc-1', 'ref-1', NOW - 1))
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'invalid_grant' }, 400))
+    await expect(getOuraAccessToken(store, CONFIG, USER, () => NOW)).rejects.toBeInstanceOf(OuraReauthRequiredError)
+    expect(store.row()!.reauthRequiredAt).toEqual(new Date(NOW))
+    // The tokens are left as they were: the row is the user's to disconnect.
+    expect(decryptOuraToken(store.row()!.refreshToken, USER, 'refresh_token')).toBe('ref-1')
+
+    fetchMock.mockClear()
+    await expect(getOuraAccessToken(store, CONFIG, USER, () => NOW)).rejects.toBeInstanceOf(OuraReauthRequiredError)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('a new connect clears the mark, and the new grant is used', async () => {
+    const store = fakeStore({ ...storedRow('acc-1', 'ref-1', NOW + 86400_000), reauthRequiredAt: new Date(NOW - 1000) })
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'acc-new', refresh_token: 'ref-new', expires_in: 86400, scope: 'extapi:daily' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'oura-u1' }))
+    await connectOuraAccount(store, CONFIG, USER, 'code-1')
+    expect(store.row()!.reauthRequiredAt).toBeNull()
+    expect(await getOuraAccessToken(store, CONFIG, USER, () => NOW)).toBe('acc-new')
+  })
+
+  it('does not mark a connection saved while the refused refresh was in flight', async () => {
+    const store = fakeStore(storedRow('acc-1', 'ref-1', NOW - 1))
+    fetchMock.mockImplementationOnce(async () => {
+      // A reconnect lands, with a token already near expiry, so it is not taken as a race's winner.
+      await store.saveOuraCloudTokens(USER, {
+        accessToken: encryptOuraToken('acc-new', USER, 'access_token'),
+        refreshToken: encryptOuraToken('ref-new', USER, 'refresh_token'),
+        expiresAt: new Date(NOW + 60_000), scope: 'daily', ouraUserId: 'oura-u1',
+      })
+      return jsonResponse({ error: 'invalid_grant' }, 400)
+    })
+    await expect(getOuraAccessToken(store, CONFIG, USER, () => NOW)).rejects.toBeInstanceOf(OuraReauthRequiredError)
+    // Oura refused `ref-1`; the row holds `ref-new` now, which nobody has tried.
+    expect(store.row()!.reauthRequiredAt).toBeNull()
+  })
+
+  describe('confirmOuraTokenRefused (#3204)', () => {
+    /** Answers personal_info by the token sent, and the token endpoint with `refresh`. */
+    function oura(personalInfo: (token: string) => Response, refresh: () => Response) {
+      fetchMock.mockImplementation(async (input, init) => {
+        if (String(input) === OURA_TOKEN_URL) return refresh()
+        const auth = new Headers(init?.headers).get('Authorization') ?? ''
+        return personalInfo(auth.replace(/^Bearer /, ''))
+      })
+    }
+    const refused = () => new Response('', { status: 401 })
+    const ok = () => jsonResponse({ id: 'oura-u1' })
+    const rotated = () => jsonResponse({ access_token: 'acc-2', refresh_token: 'ref-2', expires_in: 86400 })
+
+    it('is type_refused, with no refresh and no mark, when the token works on personal_info', async () => {
+      const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
+      oura(ok, rotated)
+      expect(await confirmOuraTokenRefused(store, CONFIG, USER, 'acc-1', () => NOW)).toBe('type_refused')
+      expect(store.saves).toHaveLength(0)
+      expect(store.row()!.reauthRequiredAt).toBeNull()
+    })
+
+    it('is refreshed, with no mark, when only the old access token was dead', async () => {
+      const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
+      oura(token => (token === 'acc-2' ? ok() : refused()), rotated)
+      expect(await confirmOuraTokenRefused(store, CONFIG, USER, 'acc-1', () => NOW)).toBe('refreshed')
+      expect(decryptOuraToken(store.row()!.accessToken, USER, 'access_token')).toBe('acc-2')
+      expect(store.row()!.reauthRequiredAt).toBeNull()
+    })
+
+    it('marks the row when the freshly refreshed token is refused too', async () => {
+      const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
+      oura(refused, rotated)
+      expect(await confirmOuraTokenRefused(store, CONFIG, USER, 'acc-1', () => NOW)).toBe('reauth')
+      expect(store.row()!.reauthRequiredAt).toEqual(new Date(NOW))
+    })
+
+    it('marks the row when the refresh ends in invalid_grant', async () => {
+      const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
+      oura(refused, () => jsonResponse({ error: 'invalid_grant' }, 400))
+      expect(await confirmOuraTokenRefused(store, CONFIG, USER, 'acc-1', () => NOW)).toBe('reauth')
+      expect(store.row()!.reauthRequiredAt).toEqual(new Date(NOW))
+    })
+
+    it('tries the token another request stored since, instead of refreshing again', async () => {
+      const store = fakeStore(storedRow('acc-other', 'ref-other', NOW + 86400_000))
+      oura(token => (token === 'acc-other' ? ok() : refused()), rotated)
+      expect(await confirmOuraTokenRefused(store, CONFIG, USER, 'acc-1', () => NOW)).toBe('refreshed')
+      expect(fetchMock.mock.calls.some(c => String(c[0]) === OURA_TOKEN_URL)).toBe(false)
+    })
+
+    it('marks nothing when a connect lands after the fresh token was read', async () => {
+      const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
+      let probes = 0
+      oura(() => {
+        // The second probe is of the refreshed token; a reconnect lands just before Oura answers it.
+        if (++probes === 2) {
+          void store.saveOuraCloudTokens(USER, {
+            accessToken: encryptOuraToken('acc-new', USER, 'access_token'),
+            refreshToken: encryptOuraToken('ref-new', USER, 'refresh_token'),
+            expiresAt: new Date(NOW + 86400_000), scope: 'daily', ouraUserId: 'oura-u1',
+          })
+        }
+        return refused()
+      }, rotated)
+      expect(await confirmOuraTokenRefused(store, CONFIG, USER, 'acc-1', () => NOW)).toBe('reauth')
+      expect(store.row()!.reauthRequiredAt).toBeNull()
+      expect(decryptOuraToken(store.row()!.accessToken, USER, 'access_token')).toBe('acc-new')
+    })
+
+    it('propagates an unreachable Oura and marks nothing', async () => {
+      const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
+      oura(() => new Response('', { status: 503 }), rotated)
+      await expect(confirmOuraTokenRefused(store, CONFIG, USER, 'acc-1', () => NOW)).rejects.toThrow(/503/)
+      expect(store.row()!.reauthRequiredAt).toBeNull()
+    })
   })
 
   it('uses the token another replica just refreshed instead of asking for a reconnect', async () => {
