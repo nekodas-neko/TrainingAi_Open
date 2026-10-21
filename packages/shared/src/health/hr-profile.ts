@@ -2,6 +2,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { todayInTz, shiftDateStr, dateStrMidnightInTz, ageFromDob } from '@trainingai/shared/date-utils'
 import { hrMaxFromAge, zoneMaxFromTests, DEFAULT_RESTING_HR } from '@trainingai/shared/health/hr-zones'
 import { resolveMaxHr, EMPTY_OBSERVED_HR, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
+import { meanRestingHr, restingHrWindow } from '@trainingai/shared/health/resting-hr-mean'
 
 /** Trailing window the observed max/min is corroborated over. */
 export const OBSERVED_WINDOW_DAYS = 90
@@ -49,9 +50,6 @@ export interface HrProfile {
   observedUnread?: boolean
 }
 
-const RESTING_HR_WINDOW_DAYS = 28
-
-
 /**
  * The canonical HR profile — the single resolver for max HR, target anchor and resting HR.
  *
@@ -86,7 +84,7 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
   const todayIso = todayInTz(tz)
   // Both windows start at a local midnight found by shifting the date string; `midnight − N×86400000`
   // lands a day off around a clock change in a daylight-saving zone (#3220, as #3218 for readiness).
-  const from28dIso = shiftDateStr(todayIso, -RESTING_HR_WINDOW_DAYS)
+  const restingWindow = restingHrWindow(todayIso)
   const observedFrom = dateStrMidnightInTz(shiftDateStr(todayIso, -OBSERVED_WINDOW_DAYS), tz)
   const observedTo = new Date()
 
@@ -102,7 +100,7 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
   }
   const [user, bodyMetrics, observed, tests] = await Promise.all([
     repo.getUserById(userId).catch(failed('user')),
-    repo.listBodyMetrics(userId, from28dIso, todayIso).catch(failed('restingHr')),
+    repo.listBodyMetrics(userId, restingWindow.from, restingWindow.to).catch(failed('restingHr')),
     repo.getObservedHrProfile(userId, observedFrom, observedTo).catch((err: unknown) => {
       failed('observed')(err)
       return EMPTY_OBSERVED_HR
@@ -114,10 +112,9 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     }),
   ])
 
-  const rhrRows = (bodyMetrics ?? []).filter(m => m.restingHeartRate != null && m.restingHeartRate > 0)
-  const restingHr = rhrRows.length
-    ? Math.round(rhrRows.reduce((sum, m) => sum + m.restingHeartRate!, 0) / rhrRows.length)
-    : DEFAULT_RESTING_HR
+  // The same mean the running plan's zones are built from (#3216), so the two can't disagree.
+  const measuredRestingHr = meanRestingHr(bodyMetrics ?? [])
+  const restingHr = measuredRestingHr ?? DEFAULT_RESTING_HR
 
   const estimatedMax = hrMaxFromAge(ageFromDob(user?.dateOfBirth, new Date()))
   // #2182: the zone ceiling is the owner's Cooper/age blend when a Cooper test exists (181 today); a
@@ -132,7 +129,7 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     maxHr: resolved.maxUsed,
     targetAnchorMax: observedMax ?? estimatedMax,
     restingHr,
-    restingHrSource: unread.has('restingHr') ? 'unavailable' : rhrRows.length ? 'measured' : 'default',
+    restingHrSource: unread.has('restingHr') ? 'unavailable' : measuredRestingHr != null ? 'measured' : 'default',
     estimatedMax,
     observedMax,
     maxHrSource: resolved.source === 'observed' ? 'observed'
