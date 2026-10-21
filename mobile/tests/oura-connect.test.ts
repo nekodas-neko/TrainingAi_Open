@@ -122,6 +122,11 @@ test('status is parsed strictly, and disconnect calls DELETE', async () => {
   }, calls);
   assert.deepEqual(await readOuraStatus(conn), { connected: true, scope: 'daily', expiresAt: '2026-10-15T00:00:00Z' });
   await assert.rejects(readOuraStatus(connection({ 'GET /api/oura/connection': { connected: 'yes' } })));
+  // #3227: a grant Oura refused comes back not connected, with a field the schema drops.
+  assert.deepEqual(
+    await readOuraStatus(connection({ 'GET /api/oura/connection': { connected: false, scope: null, expiresAt: null, reauthRequired: true } })),
+    { connected: false, scope: null, expiresAt: null },
+  );
   assert.deepEqual(await disconnectOura(conn), { ok: true });
   assert.deepEqual(calls, ['GET /api/oura/connection', 'DELETE /api/oura/connection']);
   const refused = await disconnectOura(connection({ 'DELETE /api/oura/connection': new ApiError(503) }));
