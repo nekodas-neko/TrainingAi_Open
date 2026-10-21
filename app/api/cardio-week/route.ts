@@ -7,6 +7,7 @@ import { resolveHrProfile, hasHrSource } from '@trainingai/shared/health/hr-prof
 import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
+import { latestRestingHr } from '@trainingai/shared/health/latest-resting-hr'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
 import { computeZoneQuota, weekWindow } from '@trainingai/shared/health/zone-quota'
 import { activityStepsForDayCount, dayStepCount } from '@trainingai/shared/health/activity-steps'
@@ -94,7 +95,8 @@ export async function GET() {
   // snapshot supplies the SIZE via weeklyBaseMinutes (spec D-11 — research split, personalised
   // volume). No fitness-test baseline lookup here — Phase 1 only needs a reasonable personalised
   // floor, not the exact running-plan volume; resolveFitnessSnapshot already floors it at 60min.
-  const restingHr = [...lookbackMetrics].reverse().find((m) => m.restingHeartRate != null && m.restingHeartRate > 0)?.restingHeartRate ?? null
+  // #3216: by max date. The rows arrive date DESC, so the old `.reverse().find()` read the oldest.
+  const restingHr = latestRestingHr(lookbackMetrics)
   const ageYears = ageFromDob(user?.dateOfBirth, todayMidnightUtc(tz))
   const fitness = resolveFitnessSnapshot({ age: ageYears, restingHr, baseline: null })
 

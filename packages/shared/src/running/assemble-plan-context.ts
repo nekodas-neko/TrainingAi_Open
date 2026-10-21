@@ -11,6 +11,7 @@ import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snaps
 import { isLowerBodyMuscle } from '@trainingai/shared/running/lower-body'
 import { isPushSession, inferEnvironment } from '@trainingai/shared/running/push-sessions'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
+import { latestRestingHr } from '@trainingai/shared/health/latest-resting-hr'
 import { prescribeNextRun } from '@trainingai/shared/running/prescription'
 import { weekIndexSince } from '@trainingai/shared/running/week-index'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
@@ -134,7 +135,8 @@ export async function resolveSnapshot(
     repo.getUserById(userId),
     repo.listBodyMetrics(userId, from90, todayIso),
   ])
-  const restingHr = [...metrics].reverse().find(m => m.restingHeartRate != null)?.restingHeartRate ?? null
+  // #3216: by max date. The rows arrive date DESC, so the old `.reverse().find()` read the oldest.
+  const restingHr = latestRestingHr(metrics)
   // The cardio-baseline results feed VO₂max / max-HR / threshold-HR when present; guarded
   // so this route works before that sibling ships (falls back to age-based zones).
   let baseline = null
