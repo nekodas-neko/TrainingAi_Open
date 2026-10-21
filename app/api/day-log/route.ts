@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { toZonedTime } from "date-fns-tz";
 import type { ActivityLog } from "@trainingai/shared/types";
@@ -105,6 +107,8 @@ export interface DayBodyTemp {
   meanC: number | null;
   /** Deviation from the rolling baseline, °C. Null while the baseline is uncentred — see TN-6a. */
   devC: number | null;
+  /** Where the figure came from: the ring's own rollup, or Oura's API from the switch day. */
+  source: 'ble' | 'oura_cloud';
 }
 
 export interface DayLogResult {
@@ -357,13 +361,25 @@ export async function GET(req: NextRequest) {
   // silently always null. The helper's own comment in `date-utils.ts` says to use the ISO form for
   // exactly these two consumers.
   const dateIso = date.replace(/\//g, '-');
-  const tempWindow = await repo.getOuraDailySummary(userId, shiftDateStr(dateIso, -27), dateIso);
+  const [tempWindow, switchDay] = await Promise.all([
+    repo.getOuraDailySummary(userId, shiftDateStr(dateIso, -27), dateIso),
+    // A failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
+    repo.getOuraCloudSwitchDay(userId).catch(() => null),
+  ]);
   const daySummary = tempWindow.find(r => r.date === dateIso) ?? null;
   const tempTrusted = isTemperatureBaselineCentred(tempWindow.map(r => r.tempDevC));
-  const bodyTemp: DayBodyTemp | null =
+  let bodyTemp: DayBodyTemp | null =
     daySummary == null || (daySummary.tempMeanC == null && daySummary.tempDevC == null)
       ? null
-      : { meanC: daySummary.tempMeanC ?? null, devC: tempTrusted ? daySummary.tempDevC ?? null : null };
+      : { meanC: daySummary.tempMeanC ?? null, devC: tempTrusted ? daySummary.tempDevC ?? null : null, source: 'ble' };
+  // From the switch day the ring's row is a partial leftover, so the night's deviation is Oura's own
+  // (the value readiness v8 scores for temperature, `resolveReadinessNightInputs`). It is already
+  // relative to Oura's baseline, so the ring-baseline gate above does not apply; Oura sends no mean.
+  if (!ringValueStands(dateIso, switchDay)) {
+    const cloud = (await repo.getOuraDaily(userId, dateIso, dateIso)).find(r => r.date === dateIso);
+    const dev = cloud != null && !isPreRekey(cloud.date) ? cloud.temperatureDeviation ?? null : null;
+    bodyTemp = dev != null ? { meanC: null, devC: dev, source: 'oura_cloud' } : null;
+  }
 
   const result: DayLogResult = { date, exercises, bodyMeta, workoutDurationsById, activityLogs, sleep, scores, hr, bodyTemp };
   return NextResponse.json(result, { headers: { "Cache-Control": "private, no-store" } });

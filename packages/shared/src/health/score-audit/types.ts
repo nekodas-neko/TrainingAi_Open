@@ -82,6 +82,8 @@ export interface PillarAudit {
     score: number; contributors: unknown
     /** Readiness only (#3086): the illness radar's fields, persisted beside the served score. */
     illnessFlag?: string | null; illnessScore?: number | null; illnessBiomarkers?: unknown
+    /** Readiness only (#3077): what actually fed the score, as the live route labels it. */
+    readinessSource?: 'ble-derived' | 'generic-derived'
   } | null
 }
 

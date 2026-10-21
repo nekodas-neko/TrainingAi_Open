@@ -300,7 +300,10 @@ export async function rebuildNativeHealth(
               // cleared as before.
               sql`(${s.ouraDailyDerived.readinessContributors} IS NULL
                 OR NOT jsonb_path_exists(${s.ouraDailyDerived.readinessContributors}, '$.*.source')
-                OR jsonb_path_exists(${s.ouraDailyDerived.readinessContributors}, '$.* ? (@.source == $src)', jsonb_build_object('src', ${source}::text)))`,
+                OR (jsonb_path_exists(${s.ouraDailyDerived.readinessContributors}, '$.* ? (@.source == $src)', jsonb_build_object('src', ${source}::text))
+                  -- #3077: a day any Oura input fed is never cleared, whatever its label. The live read
+                  -- only rewrites the current night, so a cleared past day would be lost, not recomputed.
+                  AND NOT jsonb_path_exists(${s.ouraDailyDerived.readinessContributors}, '$.* ? (@.source == "oura_cloud" || @.source == "oura_ble")')))`,
             ),
           );
       }

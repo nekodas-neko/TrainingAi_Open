@@ -55,7 +55,7 @@ describe.skipIf(!canRun)('GET /api/health/dose-vitals (TN-46)', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.doses).toEqual([{ supplementName: 'Retatrutide', date: dayAgo(3), amount: 1, unit: 'mg' }])
-    expect(body.nights).toEqual([{ date: dayAgo(1), restingHr: 56.3, hrvMs: 39, restingHrBaseline: 52.9, hrvBaseline: 56.1 }])
+    expect(body.nights).toEqual([{ date: dayAgo(1), restingHr: 56.3, hrvMs: 39, restingHrBaseline: 52.9, hrvBaseline: 56.1, restingHrSource: 'oura_ble', hrvSource: 'oura_ble' }])
     expect(body.effectLookbackDays).toBe(5)
   })
 })

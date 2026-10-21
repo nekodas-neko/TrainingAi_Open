@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
             illnessFlag: readiness.persist.illnessFlag,
             illnessScore: readiness.persist.illnessScore,
             illnessBiomarkers: readiness.persist.illnessBiomarkers,
-            readinessSource: 'ble-derived',
+            readinessSource: readiness.persist.readinessSource ?? 'ble-derived',
             // The point of Q-273's stamp is that a later model change leaves a readable step in the
             // trend rather than an unmarked one. A backfill writes across history in one pass, so an
             // unstamped backfilled score is the exact case it was added for — and this route was

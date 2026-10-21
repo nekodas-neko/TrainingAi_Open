@@ -243,4 +243,44 @@ describe.skipIf(!canRun)('Health Connect ledger and projections', () => {
       await getPool().query('DELETE FROM users WHERE id=ANY($1::uuid[])', [[third, fourth]]);
     }
   });
+  it('#3077: a day any Oura input fed is never cleared by an import, whatever its label', async () => {
+    const tz = 'Australia/Brisbane';
+    const day = shiftDateStr(todayInTz(tz), -2);
+    const noon = new Date(dateStrMidnightInTz(day, tz).getTime() + 12 * 3_600_000);
+    const heart: HealthConnectRecord = {
+      ...record,
+      id: 'heart-3077',
+      type: 'HeartRate',
+      value: undefined,
+      start: noon.toISOString(),
+      end: new Date(noon.getTime() + 120_000).toISOString(),
+      points: [{ at: noon.toISOString(), bpm: 66 }],
+    };
+    const a = randomUUID(), b = randomUUID();
+    await engine.query('INSERT INTO users(id,email) VALUES($1,$2),($3,$4)', [a, `${a}@example.invalid`, b, `${b}@example.invalid`]);
+    // After the switch: HRV from the Oura API, sleep from this import. Labelled generic-derived.
+    const mixed = JSON.stringify({
+      hrvBalance: { score: 60, provisional: false, input: 0.3, gap: null, source: 'oura_cloud' },
+      sleepBalance: { score: 55, provisional: false, input: 0.1, gap: null, source: 'health_connect_native' },
+    });
+    const own = JSON.stringify({ sleepBalance: { score: 55, provisional: false, input: 0.1, gap: null, source: 'health_connect_native' } });
+    try {
+      await engine.query(
+        `INSERT INTO oura_daily_derived(user_id,day,readiness_source,readiness_score,readiness_contributors) VALUES
+         ($1,$3,'generic-derived',71,$4::jsonb),($2,$3,'generic-derived',72,$5::jsonb)`,
+        [a, b, day, mixed, own],
+      );
+      for (const id of [a, b]) {
+        await applyHealthConnectBatch(db, id, { records: [heart], deleted: [] });
+        await rebuildHealthConnect(db, id, tz);
+      }
+      const rows = await engine.query<{ user_id: string; readiness_score: number | null }>(
+        'SELECT user_id,readiness_score FROM oura_daily_derived WHERE day=$1 AND user_id=ANY($2::uuid[])', [day, [a, b]]);
+      const byUser = new Map(rows.rows.map((r) => [r.user_id, r.readiness_score]));
+      expect(byUser.get(a)).toBe(71); // an Oura input fed it: kept
+      expect(byUser.get(b)).toBeNull(); // this import alone fed it: cleared for recompute, as before
+    } finally {
+      await getPool().query('DELETE FROM users WHERE id=ANY($1::uuid[])', [[a, b]]);
+    }
+  });
 });
