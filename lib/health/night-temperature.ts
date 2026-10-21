@@ -10,12 +10,12 @@
  * nights. On a night the ring scored, every number here is the one the ring path gave before.
  */
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { toAestDay, shiftDateStr } from '@trainingai/shared/date-utils'
-import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
+import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { TEMP_BASELINE_MIN_DAYS } from '@trainingai/shared/ai-periodization/deload-constants'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
-import { resolveReadinessNightInputs } from '@/lib/health/readiness-night-inputs'
+import { resolveReadinessNightInputs, canonicalNightsByDate } from '@/lib/health/readiness-night-inputs'
 
 export interface NightTemperature {
   /** The night readiness scores (its wake date), or null when there is no night to read. */
@@ -45,11 +45,11 @@ export async function loadNightTemperature(
   repo: Pick<WorkoutRepository, 'getOuraDailySummary' | 'listBodyMetrics' | 'listSleepSessions' | 'getOuraDaily'>,
   userId: string,
   todayIso: string,
-  todayMid: Date,
   tz: string,
 ): Promise<NightTemperature> {
-  const from28dIso = toAestDay(new Date(todayMid.getTime() - 28 * 86_400_000), tz)
-  const fromCountIso = toAestDay(new Date(todayMid.getTime() - OURA_COUNT_WINDOW_DAYS * 86_400_000), tz)
+  // Shifted on the local date string, so each window starts at a local midnight.
+  const from28dIso = shiftDateStr(todayIso, -28)
+  const fromCountIso = shiftDateStr(todayIso, -OURA_COUNT_WINDOW_DAYS)
   const [summaries, bodyMetrics, sleepSessions, ouraLong] = await Promise.all([
     repo.getOuraDailySummary(userId, from28dIso, todayIso),
     repo.listBodyMetrics(userId, from28dIso, todayIso),
@@ -59,15 +59,11 @@ export async function loadNightTemperature(
   const ouraDaily = ouraLong.filter(r => r.date >= from28dIso)
 
   // The same night assembly readiness uses, so the two agree on which night is "tonight".
-  const nights = nightSessions(sleepSessions, tz)
-  const nightByDate = [...new Set(nights.map(n => n.date))]
-    .map(d => canonicalNightForDate(nights, d, tz))
-    .filter((n): n is NonNullable<typeof n> => n != null)
   const night = resolveReadinessNightInputs({
     today: todayIso,
     summaries,
     bodyMetrics,
-    nights: nightByDate,
+    nights: canonicalNightsByDate(nightSessions(sleepSessions, tz), tz),
     ouraDaily,
     // Recovery index only; nothing here reads it.
     ouraCloudContributors: [],

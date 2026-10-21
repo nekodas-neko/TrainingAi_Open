@@ -393,7 +393,7 @@ export function canonicalNightForDate<T extends DatedNight>(
 }
 
 /** The fields the per-date pickers read from an aggregated night. */
-type DatedNight = { date: string; sleepStart: Date; sleepEnd: Date; durationHours?: number | null }
+export type DatedNight = { date: string; sleepStart: Date; sleepEnd: Date; durationHours?: number | null }
 
 /**
  * True when a night can be graded as its date's night: anything except a window shorter than

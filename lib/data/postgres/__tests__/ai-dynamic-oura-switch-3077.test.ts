@@ -116,7 +116,16 @@ describe.skipIf(!canRun)('ai_dynamic temperature and stress follow the switch da
   }
   const lastScorerInput = () => scorerInputs.at(-1)!
 
-  it("before the switch day, the ring's temperature and stress are unchanged", async () => {
+  /**
+   * The ring's leftover row for today, after the switch: its own history is long and centred, but it
+   * carries no temperature tonight. `main` read this row's `nHistory` and centring for Oura's value.
+   */
+  async function seedRingLeftoverToday() {
+    await seedRing(CENTRED, 0.0)
+    await pool.query(`UPDATE oura_daily_summary SET temp_dev_c = NULL WHERE user_id = $1 AND date = $2`, [USER, today])
+  }
+
+  it("before the switch day, the ring's temperature is unchanged", async () => {
     setSwitchDay(day(1))
     await seedRing(CENTRED, 0.519)
     await seedOura(Array.from({ length: 35 }, (_, i) => (i % 2 ? 0.1 : -0.1)), 0.9)
@@ -125,7 +134,6 @@ describe.skipIf(!canRun)('ai_dynamic temperature and stress follow the switch da
     expect(next?.signals?.temperatureBaselineDays).toBe(34)
     expect(next?.signals?.temperatureTrusted).toBe(true)
     expect(next?.temperatureAlert).toBe(true)
-    expect(lastScorerInput().stressHighMinutes).toBe(45)
   })
 
   it("after the switch, an Oura-only night raises the alert on Oura's own baseline", async () => {
@@ -137,23 +145,59 @@ describe.skipIf(!canRun)('ai_dynamic temperature and stress follow the switch da
     expect(next?.signals?.temperatureTrusted).toBe(true)
     expect(next?.temperatureAlert).toBe(true)
     expect(next?.deloadOrRestRecommended).toBe(true)
-    // The ring's leftover 45 gives way to Oura's 3,600 s.
-    expect(lastScorerInput().stressHighMinutes).toBe(60)
   })
 
-  it('after the switch, a young Oura baseline holds the alert back', async () => {
+  // The ring's month of centred history must not mature or centre a young Oura normal. On `main`
+  // this raised the alert: Oura's 0.6 was judged with the ring row's 34 nights and its centring.
+  it("after the switch, a young Oura baseline holds the alert back, whatever the ring's history", async () => {
     setSwitchDay(day(-3))
+    await seedRingLeftoverToday()
     await seedOura(CENTRED, 0.6)
     const next = await repo.getNextSession(USER, TZ)
+    expect(next?.temperatureAlert).toBe(false)
+    expect(next?.signals?.temperatureDeviation).toBeCloseTo(0.6, 5)
     expect(next?.signals?.temperatureBaselineDays).toBe(CENTRED.length)
+  })
+
+  // Same shape, mature but uncentred Oura nights: `main` judged centring on the ring's rows and alerted.
+  it('after the switch, an uncentred Oura baseline suspends the alert (TN-18), whatever the ring\'s centring', async () => {
+    setSwitchDay(day(-3))
+    await seedRingLeftoverToday()
+    await seedOura(Array.from({ length: 35 }, () => 0.45), 0.6)
+    const next = await repo.getNextSession(USER, TZ)
+    expect(next?.temperatureAlert).toBe(false)
+    expect(next?.signals?.temperatureDeviation).toBeCloseTo(0.6, 5)
+    expect(next?.signals?.temperatureTrusted).toBe(false)
+  })
+
+  // Mixed devices with no ring row tonight: ring nights earlier in the window never count toward
+  // Oura's baseline length.
+  it("ring history plus a young Oura night tonight counts only Oura's nights", async () => {
+    setSwitchDay(day(-3))
+    for (let i = 1; i <= 20; i++) {
+      await pool.query(
+        `INSERT INTO oura_daily_summary (user_id, date, temp_dev_c, n_history) VALUES ($1, $2, $3, 34)`,
+        [USER, day(-3 - i), i % 2 ? 0.1 : -0.1],
+      )
+    }
+    await seedOura([0.05, -0.05, 0.02], 0.6)
+    const next = await repo.getNextSession(USER, TZ)
+    expect(next?.signals?.temperatureDeviation).toBeCloseTo(0.6, 5)
+    expect(next?.signals?.temperatureBaselineDays).toBe(3)
     expect(next?.temperatureAlert).toBe(false)
   })
 
-  it('after the switch, an uncentred Oura baseline suspends the alert (TN-18)', async () => {
+  it("stress: before the switch day the ring's minutes stand", async () => {
+    setSwitchDay(day(1))
+    await seedOura([0], 0)
+    await repo.getNextSession(USER, TZ)
+    expect(lastScorerInput().stressHighMinutes).toBe(45)
+  })
+
+  it("stress: from the switch day Oura's stress_high replaces the ring's leftover", async () => {
     setSwitchDay(day(-3))
-    await seedOura(Array.from({ length: 35 }, () => 0.45), 0.6)
-    const next = await repo.getNextSession(USER, TZ)
-    expect(next?.signals?.temperatureTrusted).toBe(false)
-    expect(next?.temperatureAlert).toBe(false)
+    await seedOura([0], 0)
+    await repo.getNextSession(USER, TZ)
+    expect(lastScorerInput().stressHighMinutes).toBe(60)
   })
 })

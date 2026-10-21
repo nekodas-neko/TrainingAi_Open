@@ -2095,7 +2095,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // #3077: last night's temperature as readiness v8 takes it, per input and per device — the
         // ring's summary where it has tonight, else Oura's deviation — with that device's own
         // baseline length and centring (TN-18). The ring path reads the same 28 nights as before.
-        loadNightTemperature(this, userId, todayIso, todayMidnightUtc(timezone), timezone),
+        loadNightTemperature(this, userId, todayIso, timezone),
         this.getDayCheckin(userId, todayIso, 'morning'),
         // #3077: a failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
         this.getOuraCloudSwitchDay(userId).catch(() => null),

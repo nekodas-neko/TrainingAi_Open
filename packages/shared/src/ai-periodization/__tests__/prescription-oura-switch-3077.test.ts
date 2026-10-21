@@ -86,6 +86,24 @@ describe('prescription tempZ follows readiness v8 across the switch (#3077)', ()
     expect(tempZ!).toBeGreaterThan(2)
   })
 
+  // #3213 review: the resolver's night is the newest in its 28-day window. Without the today gate
+  // this gave +7.1, and the prompt maps temp_z >= 2.5 to a rest day: a week-old fever skipping today.
+  it('a week-old hot night with nothing since is absent, never today\'s', async () => {
+    setSwitchDay(day(-26))
+    stored.ouraDaily = [
+      ...Array.from({ length: 20 }, (_, i) => ({ date: day(-26 + i), temperatureDeviation: i % 2 ? 0.1 : -0.1 })),
+      { date: day(-6), temperatureDeviation: 0.8 },
+    ]
+    stored.bodyMetrics = [{ date: day(-6), hrvMs: 50, hrvSource: 'oura_cloud' }]
+    expect((await signals()).tempZ).toBeNull()
+  })
+
+  it('a stale ring summary is no longer read as tonight', async () => {
+    setSwitchDay(day(1))
+    stored.summaries = [ringNight(day(-4), 36.25), ringNight(day(-3), 36.6)]
+    expect((await signals()).tempZ).toBeNull()
+  })
+
   it('after the switch with too few Oura nights, it is absent rather than invented', async () => {
     setSwitchDay(day(-3))
     stored.ouraDaily = [{ date: day(-1), temperatureDeviation: 0 }, { date: today, temperatureDeviation: 0.6 }]
