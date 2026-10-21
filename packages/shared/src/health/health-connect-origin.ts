@@ -54,6 +54,28 @@ export function dropFirstHandCopies<T>(
 }
 
 /**
+ * Whether records left out earlier have to be read again (#3197, #3228 review): the one rewind rule
+ * for both phones. A reader remembers which record types it left out since its marker; they are owed
+ * a re-read once any of those types is no longer delivered first-hand, because nothing else sends
+ * them now. A type still delivered is not: rewinding for it would skip it again and set the marker
+ * again, a 7-to-30-day re-read on every sync under a stable partial grant.
+ *
+ * With no types recorded (a marker written before the types were), it falls back to the connection
+ * being gone: a per-type answer with no type delivered, or, from a server that sends no per-type
+ * answer, `ouraCloud` false. Unknown sources (`null`) never rewind, as before.
+ */
+export function firstHandSkipsLapsed(
+  sources: FirstHandSources | null | undefined,
+  skippedTypes: readonly string[] | null | undefined,
+): boolean {
+  if (!sources) return false
+  if (skippedTypes && skippedTypes.length > 0)
+    return skippedTypes.some(type => !isFirstHandCopy(OURA_APP_PACKAGE, sources, type))
+  if (sources.ouraCloudTypes) return !Object.values(sources.ouraCloudTypes).some(v => v === true)
+  return sources.ouraCloud === false
+}
+
+/**
  * The one cold-start rule, for both phones (#3197): the connection counts as known only when it came
  * from today's readiness payload. Anything else (nothing cached, the payload cleared by
  * `invalidateCache('readiness-score')`, yesterday's, a first offline run on a new day) is unknown, and

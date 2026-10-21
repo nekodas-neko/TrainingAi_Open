@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dropFirstHandCopies, FirstHandFilter, isFirstHandCopy, knownFirstHandSources, OURA_APP_PACKAGE } from '../health-connect-origin'
+import { dropFirstHandCopies, FirstHandFilter, firstHandSkipsLapsed, isFirstHandCopy, knownFirstHandSources, OURA_APP_PACKAGE } from '../health-connect-origin'
 
 describe('isFirstHandCopy (#3115)', () => {
   it("skips the Oura app's records only while Oura Cloud is connected", () => {
@@ -95,5 +95,32 @@ describe('FirstHandFilter (#3197)', () => {
     expect(f.keep('HeartRateSeries', [{ id: 'a', o: OURA_APP_PACKAGE }])).toEqual([])
     expect(f.keep('OxygenSaturation', [{ id: 'b', o: OURA_APP_PACKAGE }])).toHaveLength(1)
     expect(f.counts()).toEqual({ HeartRateSeries: 1 })
+  })
+})
+
+describe('firstHandSkipsLapsed, the one rewind rule (#3228 review)', () => {
+  const partial = { ouraCloud: false, ouraCloudTypes: { SleepSession: true, OxygenSaturation: false } }
+
+  it('owes nothing while every skipped type is still delivered, under a partial grant', () => {
+    expect(firstHandSkipsLapsed(partial, ['SleepSession'])).toBe(false)
+  })
+  it('owes a rewind once a skipped type is no longer delivered', () => {
+    expect(firstHandSkipsLapsed(partial, ['SleepSession', 'OxygenSaturation'])).toBe(true)
+    expect(firstHandSkipsLapsed({ ouraCloud: false, ouraCloudTypes: {} }, ['SleepSession'])).toBe(true)
+  })
+  it('reads an old server\'s boolean for the skipped types', () => {
+    expect(firstHandSkipsLapsed({ ouraCloud: true }, ['SleepSession'])).toBe(false)
+    expect(firstHandSkipsLapsed({ ouraCloud: false }, ['SleepSession'])).toBe(true)
+  })
+  it('without recorded types, owes a rewind only when the connection is gone', () => {
+    expect(firstHandSkipsLapsed(partial, [])).toBe(false)
+    expect(firstHandSkipsLapsed({ ouraCloud: false, ouraCloudTypes: {} }, null)).toBe(true)
+    expect(firstHandSkipsLapsed({ ouraCloud: false, ouraCloudTypes: { SleepSession: false } }, [])).toBe(true)
+    expect(firstHandSkipsLapsed({ ouraCloud: false }, [])).toBe(true)
+    expect(firstHandSkipsLapsed({ ouraCloud: true }, [])).toBe(false)
+  })
+  it('never rewinds on unknown sources', () => {
+    expect(firstHandSkipsLapsed(null, ['SleepSession'])).toBe(false)
+    expect(firstHandSkipsLapsed(undefined, [])).toBe(false)
   })
 })

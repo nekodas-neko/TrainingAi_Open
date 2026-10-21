@@ -142,6 +142,64 @@ test('the per-type answer is read from the payload next to the boolean (#3204)',
     { ouraCloud: false, ouraCloudTypes },
   );
 });
+// #3228 review: a rescan is owed only once a type that was left out stops being delivered. Under a
+// stable partial grant `ouraCloud` is false, and rescanning on it alone looped on every run.
+function counted(sources: FirstHandSources, rows: HealthConnectRecord[]) {
+  let scans = 0;
+  const f = fixture(sources, rows, {
+    history: async (type) => {
+      scans++;
+      return { records: rows.filter((r) => r.type === type), pageToken: null, skipped: 0 };
+    },
+    // Every later run sees the same Oura records again, so they are left out every run.
+    changes: async () => ({ records: rows, deleted: [], token: 'cursor-2', expired: false, more: false, skipped: 0 }),
+  });
+  /** Runs once and says whether the run scanned again. */
+  const rescanned = async () => {
+    const before = scans;
+    await f.store.run(true);
+    return scans > before;
+  };
+  return { ...f, rescanned };
+}
+test('a stable partial grant never rescans, though a delivered type is left out every run (#3228)', async () => {
+  const f = counted({ ouraCloud: false, ouraCloudTypes: { SleepSession: true, Steps: false } }, [row('SleepSession', OURA)]);
+  await f.store.setEnabled(true);
+  await f.rescanned();
+  for (let i = 0; i < 4; i++) assert.equal(await f.rescanned(), false);
+  assert.equal(f.remote.size, 0);
+});
+test('a grant that is gone rescans once, then not again (#3228)', async () => {
+  const f = counted({ ouraCloud: true, ouraCloudTypes: { SleepSession: true } }, [row('SleepSession', OURA)]);
+  await f.store.setEnabled(true);
+  await f.rescanned();
+  f.connect({ ouraCloud: false, ouraCloudTypes: {} });
+  assert.equal(await f.rescanned(), true);
+  assert.equal(f.remote.size, 1);
+  assert.equal(await f.rescanned(), false);
+});
+test('a server with only the boolean rescans once when it reads false, as before (#3228)', async () => {
+  const f = counted({ ouraCloud: true }, [row('SleepSession', OURA)]);
+  await f.store.setEnabled(true);
+  await f.rescanned();
+  f.connect({ ouraCloud: false });
+  assert.equal(await f.rescanned(), true);
+  assert.equal(await f.rescanned(), false);
+});
+test('withdrawing a left-out type rescans once; the types still delivered stay left out (#3228)', async () => {
+  const f = counted({ ouraCloud: false, ouraCloudTypes: { SleepSession: true, Steps: true } }, [
+    row('SleepSession', OURA),
+    row('Steps', OURA),
+  ]);
+  await f.store.setEnabled(true);
+  await f.rescanned();
+  assert.equal(f.remote.size, 0);
+  f.connect({ ouraCloud: false, ouraCloudTypes: { SleepSession: true, Steps: false } });
+  assert.equal(await f.rescanned(), true);
+  assert.deepEqual([...f.remote.values()].map((r) => r.type), ['Steps']);
+  assert.equal(await f.rescanned(), false);
+  assert.equal(await f.rescanned(), false);
+});
 test("another app's records are never skipped", async () => {
   const f = fixture({ ouraCloud: true }, [
     ...healthConnectTypes.map((type) => row(type, 'com.sec.android.app.shealth')),
