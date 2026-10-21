@@ -157,7 +157,7 @@ const BODY_METRICS_SOURCE_COLS: SourceColumn[] = [
   { prop: 'boneMassKg', col: 'bone_mass_kg' }, { prop: 'proteinPct', col: 'protein_pct' },
   { prop: 'bmrKcal', col: 'bmr_kcal' }, { prop: 'metabolicAge', col: 'metabolic_age' },
 ]
-import { aestMidnight, toAestDay, todayInTz, todayDayOfWeek, todayMidnightUtc, dateStrMidnightInTz, shiftDateStr, DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { aestMidnight, toAestDay, todayInTz, todayDayOfWeek, dateStrMidnightInTz, shiftDateStr, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { loadNightTemperature } from '@/lib/health/night-temperature'
@@ -1402,11 +1402,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async getRecentTrainedDays(userId: string, days: number, timezone: string = DEFAULT_TZ): Promise<Record<string, string[]>> {
-    // Use today's local midnight as a fixed anchor and offset by milliseconds —
-    // avoids constructing invalid "YYYY-MM-DD" strings when (day-of-month - days) is negative.
-    const todayMidnight = todayMidnightUtc(timezone)
-    const from = new Date(todayMidnight.getTime() - days * 24 * 60 * 60 * 1000)
-    const to   = new Date(todayMidnight.getTime() + 24 * 60 * 60 * 1000)
+    // Shifted on the date string (which normalises month ends) and turned back into the local
+    // midnight instant, so a clock change inside the window does not move either edge (#3222).
+    const todayStr = todayInTz(timezone)
+    const from = dateStrMidnightInTz(shiftDateStr(todayStr, -days), timezone)
+    const to   = dateStrMidnightInTz(shiftDateStr(todayStr, 1), timezone)
 
     const rows = await this.db.select({
       dateKey: sql<string>`to_char(${s.workoutSessions.startedAt} AT TIME ZONE ${timezone}, 'YYYY/MM/DD')`,
@@ -2236,7 +2236,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
 
     // Build a per-day map of session names done (for rest-day detection)
-    const midnight = todayMidnightUtc(timezone)
     const recentDays = new Map<string, Set<string>>()
     for (const ws of recentWsWithName) {
       const d = toAestDay(ws.startedAt, timezone)
@@ -2255,7 +2254,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     let consecutiveDays = 0
     const currentCycleTypes = new Set<string>()
     for (let i = 1; i <= Math.max(restAfterN, sessions.length) + 1; i++) {
-      const d = toAestDay(new Date(midnight.getTime() - i * 86_400_000), timezone)
+      const d = shiftDateStr(todayInTz(timezone), -i)
       const dayData = recentDays.get(d)
       if (dayData && dayData.size > 0) {
         consecutiveDays++
@@ -7194,7 +7193,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const rows = await this.getOuraRawSamplesForTags(userId, [0x5d, 0x46, 0x69], REFIT_LOOKBACK_DAYS, 'daytime-hrv-refit')
     if (rows.length === 0) return // genuinely no ring data in the window — nothing to say
     const toIso = todayInTz(timezone)
-    const fromIso = toAestDay(new Date(Date.now() - REFIT_LOOKBACK_DAYS * 86_400_000), timezone)
+    const fromIso = shiftDateStr(toIso, -REFIT_LOOKBACK_DAYS)
     // Measured windows only (#2338). A typed-in night reaches this list only when the ring recorded
     // no sleep for it, and labelling the ring's samples inside a remembered window as "nightly" is
     // the Q-519 hazard: awake hours in the training set (docs/reviews/2026-08-26-manual-bedtime-write-audit.md).

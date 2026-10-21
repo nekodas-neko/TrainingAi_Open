@@ -1,5 +1,5 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr } from '@trainingai/shared/date-utils'
+import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-periodization/confidence'
 import { perExerciseRpeDelta, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
@@ -281,7 +281,7 @@ export async function aggregateSignals(
     repo.getMoodLog(userId, yesterday),
     // ACWR needs volume-load across ALL session types, not just this one — a lifter who
     // trains Push/Pull/Legs has their real acute:chronic load spread across all three.
-    repo.getWorkoutSessionsFrom(userId, new Date(todayMid.getTime() - 28 * 86_400_000)),
+    repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(shiftDateStr(today, -28), tz)),
     repo.getDayCheckin(userId, today, 'morning'),
     repo.getExercise1rmHistory(userId, exerciseNames, tz),
     // Learned transition (bar-load) + warmup medians across all session types — the
@@ -522,7 +522,7 @@ export async function aggregateSignals(
 
   // Sleep trends — duration ratio + our-own-sleep-score quality ratio over the same
   // recent-3-vs-baseline windows (lib/health/sleep-trend.ts — One Formula, One Place).
-  const from14d = toAestDay(new Date(todayMid.getTime() - 14 * 86_400_000), tz)
+  const from14d = shiftDateStr(today, -14)
   const sleepSessions = await repo.listSleepSessions(userId, from14d, today)
   const sleepTrend = sleepDurationTrend(sleepSessions, tz)
   const sleepScoreTrendVal = sleepScoreTrend(sleepSessions, tz)

@@ -394,7 +394,7 @@ export async function buildReadinessPayload(
   const connectedSourcesP = (async () => {
     const [ringSamples, recent, ouraTokens] = await Promise.all([
       repo.hasOuraBleSamples(userId),
-      repo.getRecentSourceFacts(userId, new Date(todayMid.getTime() - CONNECTED_SOURCE_WINDOW_DAYS * 86_400_000)),
+      repo.getRecentSourceFacts(userId, dateStrMidnightInTz(shiftDateStr(todayIso, -CONNECTED_SOURCE_WINDOW_DAYS), tz)),
       repo.getOuraCloudTokens(userId),
     ])
     return connectedSources({ ringSamples, ...recent, ouraCloudConnected: ouraTokens?.accessToken != null })
@@ -408,7 +408,7 @@ export async function buildReadinessPayload(
     repo.getWorkoutSessionsFrom(userId, from28dDate),
     repo.getOuraDaily(userId, from28dIso, todayIso),
     repo.getActiveProgram(userId),
-    repo.getHrForWindow(userId, todayMid, new Date(todayMid.getTime() + 86_400_000)),
+    repo.getHrForWindow(userId, todayMid, dateStrMidnightInTz(shiftDateStr(todayIso, 1), tz)),
     repo.getOuraDailySummary(userId, from28dIso, todayIso),
     repo.getOuraDailyDerived(userId, from7dIso, todayIso),
     repo.getLatestOuraCloudVitals(userId),
@@ -536,7 +536,7 @@ export async function buildReadinessPayload(
   })
   // Rolling 7-day strength window (inclusive of today), from local midnight. The shared helper is
   // also what the Activity insight reads for a past day (#2865), so the window is defined once.
-  const { sessions7d, volume7dKg } = strengthWindowEndingAt(recentSessions, todayMid.getTime())
+  const { sessions7d, volume7dKg } = strengthWindowEndingAt(recentSessions, todayIso, tz)
   const strengthSessionToday = recentSessions.some(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime())
   const recentDoseList = recentDoses(doseEvents, todayIso)
   const todayMetrics = bodyMetrics.find(m => m.date === todayIso) ?? null
@@ -576,7 +576,7 @@ export async function buildReadinessPayload(
   const yesterdayMetrics = bodyMetrics.find(m => m.date === yesterdayIso) ?? null
   // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
   // today's, so on a training day the "previous day" score reacted to this morning's session.
-  const prevWindow = strengthWindowEndingAt(recentSessions, todayMid.getTime() - 86_400_000)
+  const prevWindow = strengthWindowEndingAt(recentSessions, yesterdayIso, tz)
   const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0) ? (computeActivityScore({
     steps: yesterdayMetrics?.steps ?? null,
     activeCalories: yesterdayMetrics?.activeCalories ?? null,

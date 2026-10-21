@@ -15,6 +15,7 @@
 
 import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import type { DailyGoals } from '@trainingai/shared/health/daily-goals'
+import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 
 // Lane weights (renormalised over whichever components have data). Daily-movement ≈ 55, strength ≈ 45.
 const W_STEPS         = 18
@@ -170,7 +171,7 @@ export function computeActivityScore(input: ActivityScoreInput): ActivityScoreRe
 }
 
 /**
- * The rolling 7-day strength window for the day ENDING at `dayMidMs` (inclusive of that day).
+ * The rolling 7-day strength window for the local day `dayStr` in `tz` (inclusive of that day).
  *
  * TN-77(a). Readiness's `prevDayActivity` contributor scores *yesterday* by calling
  * `computeActivityScore` a second time — and both call sites passed **today's** `sessions7d` and
@@ -187,11 +188,13 @@ export function computeActivityScore(input: ActivityScoreInput): ActivityScoreRe
  */
 export function strengthWindowEndingAt(
   sessions: { startedAt: string | Date; exercises: { volume?: number | null }[] }[],
-  dayMidMs: number,
+  dayStr: string,
+  tz: string,
 ): { sessions7d: number; volume7dKg: number } {
-  const DAY = 86_400_000
-  const from = dayMidMs - 7 * DAY
-  const to = dayMidMs + DAY               // exclusive: the day's own sessions count, later ones do not
+  // Both edges are shifted on the date string, then turned into instants, so a clock change inside
+  // the window does not move them off the user's local midnight (#3222).
+  const from = dateStrMidnightInTz(shiftDateStr(dayStr, -7), tz).getTime()
+  const to = dateStrMidnightInTz(shiftDateStr(dayStr, 1), tz).getTime() // exclusive: the day's own sessions count, later ones do not
   const rows = sessions.filter(ws => {
     const t = new Date(ws.startedAt).getTime()
     return t >= from && t < to
