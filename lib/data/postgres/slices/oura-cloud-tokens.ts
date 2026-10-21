@@ -7,7 +7,7 @@
 // **This slice never sees a plaintext token.** `access_token` and `refresh_token` go in and come out
 // as `EncryptedOuraToken`, which only `lib/oura/cloud/token-cipher.ts` can make or open. Every method
 // is scoped to the caller's user.
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { toAestDay } from '@trainingai/shared/date-utils'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -23,6 +23,8 @@ export interface OuraCloudTokenRow {
   scope: string | null
   ouraUserId: string | null
   updatedAt: Date
+  /** #3204: when Oura refused the grant; null while none is known. New tokens clear it. */
+  reauthRequiredAt: Date | null
 }
 
 export interface SaveOuraCloudTokensInput {
@@ -41,6 +43,7 @@ export async function getOuraCloudTokens(db: Db, userId: string): Promise<OuraCl
     .select({
       userId: t.userId, accessToken: t.accessToken, refreshToken: t.refreshToken,
       expiresAt: t.expiresAt, scope: t.scope, ouraUserId: t.ouraUserId, updatedAt: t.updatedAt,
+      reauthRequiredAt: t.reauthRequiredAt,
     })
     .from(t)
     .where(eq(t.userId, userId))
@@ -53,17 +56,41 @@ export async function getOuraCloudTokens(db: Db, userId: string): Promise<OuraCl
   }
 }
 
-/** Inserts or replaces the caller's tokens. A unique violation on `oura_user_id` propagates (23505). */
+/**
+ * Inserts or replaces the caller's tokens. A unique violation on `oura_user_id` propagates (23505).
+ * Clears `reauth_required_at` (#3204): Oura has just issued these tokens, on a connect or a refresh,
+ * so the grant is alive again.
+ */
 export async function saveOuraCloudTokens(db: Db, userId: string, input: SaveOuraCloudTokensInput): Promise<void> {
   const values = {
     accessToken: input.accessToken,
     refreshToken: input.refreshToken,
     expiresAt: input.expiresAt,
     scope: input.scope,
+    reauthRequiredAt: null,
     updatedAt: sql`now()`,
     ...(input.ouraUserId !== undefined ? { ouraUserId: input.ouraUserId } : {}),
   }
   await db.insert(t).values({ userId, ...values }).onConflictDoUpdate({ target: t.userId, set: values })
+}
+
+/**
+ * #3204: records that Oura refused the caller's grant, unless the row has been saved since
+ * `unchangedSince` (the `updatedAt` the caller read before asking Oura). A connect or refresh landing
+ * in between holds newer tokens, and marking them would report a working connection as dead. An
+ * earlier mark is kept, so the time says when the feed stopped. `updated_at` is left alone: it is
+ * when tokens were last saved, and the guard above reads it.
+ *
+ * True when the row was marked (or already was); false when there is no row, or it moved on.
+ * Postgres keeps microseconds and a JS `Date` milliseconds, so "not saved since" is "before the next
+ * millisecond".
+ */
+export async function markOuraCloudReauthRequired(db: Db, userId: string, unchangedSince: Date): Promise<boolean> {
+  const marked = await db.update(t)
+    .set({ reauthRequiredAt: sql`COALESCE(${t.reauthRequiredAt}, now())` })
+    .where(and(eq(t.userId, userId), sql`${t.updatedAt} < ${unchangedSince.toISOString()}::timestamptz + interval '1 millisecond'`))
+    .returning({ userId: t.userId })
+  return marked.length > 0
 }
 
 /** True when the caller had a row and it is gone now. */
@@ -87,6 +114,8 @@ export async function getUserIdByOuraUserId(db: Db, ouraUserId: string): Promise
  * the daily reconciliation read. App-level like the webhook subscriptions: one pass covers everyone.
  */
 export async function listOuraCloudConnectedUserIds(db: Db): Promise<string[]> {
+  // A connection marked as needing reauth (#3204) stays listed: its read ends in `reauth`, which the
+  // reconcile reports, and that report is how a dead grant is seen.
   const rows = await db.select({ userId: t.userId }).from(t)
     .where(sql`${t.accessToken} IS NOT NULL AND ${t.personalAccessToken} IS NULL`)
   return rows.map(r => r.userId)

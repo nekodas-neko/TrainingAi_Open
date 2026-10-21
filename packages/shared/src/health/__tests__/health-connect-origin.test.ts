@@ -15,6 +15,29 @@ describe('isFirstHandCopy (#3115)', () => {
   })
 })
 
+describe('isFirstHandCopy per type (#3204)', () => {
+  const sources = { ouraCloud: false, ouraCloudTypes: { SleepSession: true, OxygenSaturation: false } }
+
+  it('skips only a type Oura Cloud delivers', () => {
+    expect(isFirstHandCopy(OURA_APP_PACKAGE, sources, 'SleepSession')).toBe(true)
+    expect(isFirstHandCopy(OURA_APP_PACKAGE, sources, 'OxygenSaturation')).toBe(false)
+  })
+
+  it('keeps a type the answer does not list, and never reads the prototype', () => {
+    expect(isFirstHandCopy(OURA_APP_PACKAGE, sources, 'Weight')).toBe(false)
+    expect(isFirstHandCopy(OURA_APP_PACKAGE, sources, 'constructor')).toBe(false)
+  })
+
+  it('keeps another app\'s record of a delivered type', () => {
+    expect(isFirstHandCopy('com.sec.android.app.shealth', sources, 'SleepSession')).toBe(false)
+  })
+
+  it('falls back to the boolean from a server that sends no per-type answer', () => {
+    expect(isFirstHandCopy(OURA_APP_PACKAGE, { ouraCloud: true }, 'SleepSession')).toBe(true)
+    expect(isFirstHandCopy(OURA_APP_PACKAGE, { ouraCloud: false }, 'SleepSession')).toBe(false)
+  })
+})
+
 describe('dropFirstHandCopies (#3115)', () => {
   const rows = [{ o: OURA_APP_PACKAGE }, { o: 'com.sec.android.app.shealth' }, { o: undefined }, { o: OURA_APP_PACKAGE }]
   it('keeps the rest in order and counts what it dropped', () => {
@@ -38,6 +61,16 @@ describe('knownFirstHandSources, the one cold-start rule (#3197)', () => {
     expect(knownFirstHandSources({}, '2026-10-20', '2026-10-20')).toBeNull()
     expect(knownFirstHandSources({ ouraCloud: 'true' }, '2026-10-20', '2026-10-20')).toBeNull()
   })
+  it('carries the per-type answer, and drops one that is not a map of booleans (#3204)', () => {
+    const types = { SleepSession: true, OxygenSaturation: false }
+    expect(knownFirstHandSources({ ouraCloud: false, ouraCloudTypes: types }, '2026-10-20', '2026-10-20'))
+      .toEqual({ ouraCloud: false, ouraCloudTypes: types })
+    for (const bad of [{ SleepSession: 'yes' }, [true], 'all', null]) {
+      expect(knownFirstHandSources({ ouraCloud: false, ouraCloudTypes: bad }, '2026-10-20', '2026-10-20')).toEqual({ ouraCloud: false })
+    }
+    // Without the boolean the payload is not one we understand, per-type answer or not.
+    expect(knownFirstHandSources({ ouraCloudTypes: types }, '2026-10-20', '2026-10-20')).toBeNull()
+  })
 })
 
 describe('FirstHandFilter (#3197)', () => {
@@ -56,5 +89,11 @@ describe('FirstHandFilter (#3197)', () => {
     expect(f.keep('HeartRateSeries', [oura])).toEqual([])
     f.keep('Steps', [{ o: OURA_APP_PACKAGE }, { o: OURA_APP_PACKAGE }])
     expect(f.counts()).toEqual({ HeartRateSeries: 1, Steps: 2 })
+  })
+  it('drops by the record type it is given, with partial scopes (#3204)', () => {
+    const f = new FirstHandFilter<R>({ ouraCloud: false, ouraCloudTypes: { HeartRateSeries: true, OxygenSaturation: false } }, r => r.o, r => r.id)
+    expect(f.keep('HeartRateSeries', [{ id: 'a', o: OURA_APP_PACKAGE }])).toEqual([])
+    expect(f.keep('OxygenSaturation', [{ id: 'b', o: OURA_APP_PACKAGE }])).toHaveLength(1)
+    expect(f.counts()).toEqual({ HeartRateSeries: 1 })
   })
 })

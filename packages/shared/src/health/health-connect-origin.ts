@@ -18,14 +18,28 @@
  */
 export const OURA_APP_PACKAGE = 'com.ouraring.oura'
 
-/** What the phone knows about first-hand sources: `connectedSources` from `/api/readiness-score`. */
+/**
+ * What the phone knows about first-hand sources: `connectedSources` from `/api/readiness-score`.
+ *
+ * `ouraCloudTypes` (#3204) says, per Health Connect record type, whether Oura Cloud is delivering that
+ * type to the server: the grant is alive and covers it. A server from before #3204 sends only
+ * `ouraCloud`, and the server since sends both, `ouraCloud` true only while every type is delivered,
+ * so an APK that reads only the boolean stays on the safe side.
+ */
 export interface FirstHandSources {
   ouraCloud?: boolean
+  ouraCloudTypes?: Readonly<Record<string, boolean>>
 }
 
-/** True when a record from `origin` (its `metadata.dataOrigin`) is a copy we already read first-hand. */
-export function isFirstHandCopy(origin: unknown, sources: FirstHandSources | null | undefined): boolean {
-  return sources?.ouraCloud === true && origin === OURA_APP_PACKAGE
+/**
+ * True when a record from `origin` (its `metadata.dataOrigin`) is a copy we already read first-hand.
+ * With a record `type` and a per-type answer, only a type Oura Cloud delivers counts, and a type the
+ * answer does not list does not; otherwise the one boolean decides.
+ */
+export function isFirstHandCopy(origin: unknown, sources: FirstHandSources | null | undefined, type?: string): boolean {
+  if (origin !== OURA_APP_PACKAGE || !sources) return false
+  if (type !== undefined && sources.ouraCloudTypes) return sources.ouraCloudTypes[type] === true
+  return sources.ouraCloud === true
 }
 
 /** `records` without first-hand copies, and how many were dropped. */
@@ -56,8 +70,15 @@ export function knownFirstHandSources(
 ): FirstHandSources | null {
   if (payloadDate !== today) return null
   if (!connectedSources || typeof connectedSources !== 'object') return null
-  const ouraCloud = (connectedSources as { ouraCloud?: unknown }).ouraCloud
-  return typeof ouraCloud === 'boolean' ? { ouraCloud } : null
+  const { ouraCloud, ouraCloudTypes } = connectedSources as { ouraCloud?: unknown; ouraCloudTypes?: unknown }
+  if (typeof ouraCloud !== 'boolean') return null
+  // A per-type answer that is not a plain map of booleans is ignored, never half-read: the boolean,
+  // which is true only while every type is delivered, then decides alone.
+  const perType = ouraCloudTypes && typeof ouraCloudTypes === 'object' && !Array.isArray(ouraCloudTypes) &&
+    Object.values(ouraCloudTypes).every(v => typeof v === 'boolean')
+    ? { ...(ouraCloudTypes as Record<string, boolean>) }
+    : undefined
+  return perType ? { ouraCloud, ouraCloudTypes: perType } : { ouraCloud }
 }
 
 /**
@@ -78,7 +99,7 @@ export class FirstHandFilter<T> {
 
   /** False when `record` is a first-hand copy: left out, and counted under `type`. */
   admit(type: string, record: T): boolean {
-    if (!isFirstHandCopy(this.originOf(record), this.sources)) return true
+    if (!isFirstHandCopy(this.originOf(record), this.sources, type)) return true
     let ids = this.dropped.get(type)
     if (!ids) this.dropped.set(type, (ids = new Set()))
     ids.add(this.idOf(record) ?? `#${this.unnamed++}`)

@@ -121,6 +121,27 @@ test("without Oura Cloud, or when it is unknown, the Oura app's records still im
     assert.deepEqual(f.store.getSnapshot().skippedFirstHand, {});
   }
 });
+test('with a per-type answer, only the types Oura Cloud delivers are skipped (#3204)', async () => {
+  const f = fixture(
+    { ouraCloud: false, ouraCloudTypes: { SleepSession: true, HeartRate: true, Steps: false } },
+    healthConnectTypes.map((type) => row(type, OURA)),
+  );
+  await f.store.setEnabled(true);
+  await f.store.run(true);
+  assert.equal(f.remote.size, healthConnectTypes.length - 2);
+  assert.deepEqual(f.store.getSnapshot().skippedFirstHand, { SleepSession: 1, HeartRate: 1 });
+});
+test('the per-type answer is read from the payload next to the boolean (#3204)', async () => {
+  const resources = (data: unknown) => ({
+    load: async () => {},
+    state: () => ({ data: data as { connectedSources?: unknown } | null }),
+  });
+  const ouraCloudTypes = { SleepSession: true, OxygenSaturation: false };
+  assert.deepEqual(
+    await loadFirstHandSources(resources({ connectedSources: { ouraCloud: false, ouraCloudTypes } }), 'UTC'),
+    { ouraCloud: false, ouraCloudTypes },
+  );
+});
 test("another app's records are never skipped", async () => {
   const f = fixture({ ouraCloud: true }, [
     ...healthConnectTypes.map((type) => row(type, 'com.sec.android.app.shealth')),
