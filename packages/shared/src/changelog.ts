@@ -6,6 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.495.0",
+    date: "2026-10-21",
+    changes: [
+      "The features that went quiet when the ring moved to the Oura app read Oura again: workout suggestions and deload alerts use last night's temperature, the supplement heart-response and dose cards show your nights, and the timeline, VO₂ max and the bedtime suggestion are back.",
+      "Your running plan's heart-rate zones come from your 28-day average resting heart rate, the same figure your zone minutes are counted with, instead of a reading up to three months old.",
+      "Activity goals use your latest weigh-in rather than the oldest one in the last four weeks, and the readiness stored for a day is the one you saw, after any illness adjustment.",
+      "After the app update, the scale no longer says \"logged\" for a reading it set aside as someone else's, and \"additional reading today\" shows again.",
+      "Behind the scenes: Oura's own Health Connect copies are skipped while Oura is connected and read again if it disconnects, Health Connect workouts keep their record id, and day windows count calendar days.",
+      "TrainingAi Preview gains the Bluetooth scale, the route map on an activity, the heart-rate recovery card and a 90-second rest when a set has none, and its charts and cards match the current app.",
+    ],
+  },
+  {
     version: "1.494.0",
     date: "2026-10-20",
     changes: [
