@@ -20,6 +20,7 @@ import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { latestRestingHrRow } from '@trainingai/shared/health/latest-resting-hr'
 import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
@@ -351,32 +352,11 @@ export function computeBlendedScore(
   return { score, source }
 }
 
-/**
- * The most recent night's resting HR from a pre-filtered window of body-metric rows (TN-13).
- *
- * **Picked by MAX DATE, not by position.** `bodyMetrics` arrives from the repository with no ordering
- * this module may rely on — which is why it defines its own `asc()` helper before building any
- * series. Taking the last element would read whatever the query happened to return last, and the
- * failure would be invisible: a plausible bpm from the wrong night.
- *
- * The caller passes rows already bounded to the last 7 days, which is what stops a stale reading
- * being presented as last night's. Low-wear days are deliberately NOT excluded, unlike the baseline:
- * this is the reading that was taken rather than a reference average, and dropping it would silently
- * show an older night in its place.
- *
- * Exported for its test — the ordering subtlety is the whole of it, and it cannot be exercised
- * through `buildReadinessPayload` without a database.
- */
-export function latestRestingHrRow<T extends { date: string; restingHeartRate?: number | null }>(
-  rows: readonly T[],
-): T | null {
-  let best: T | null = null
-  for (const r of rows) {
-    if (r.restingHeartRate == null || !(r.restingHeartRate > 0)) continue
-    if (best == null || r.date > best.date) best = r
-  }
-  return best
-}
+// TN-13: the latest night's resting HR, picked by max date. It lives in `packages/shared` now so the
+// running plan and cardio week read it the same way (#3216). The caller passes rows already bounded
+// to the last 7 days, which is what stops a stale reading being presented as last night's; low-wear
+// days are deliberately NOT excluded, unlike the baseline. Re-exported for its existing test.
+export { latestRestingHrRow }
 
 export async function buildReadinessPayload(
   userId: string,

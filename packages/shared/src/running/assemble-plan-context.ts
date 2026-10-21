@@ -11,6 +11,7 @@ import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snaps
 import { isLowerBodyMuscle } from '@trainingai/shared/running/lower-body'
 import { isPushSession, inferEnvironment } from '@trainingai/shared/running/push-sessions'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
+import { meanRestingHr, restingHrWindow } from '@trainingai/shared/health/resting-hr-mean'
 import { prescribeNextRun } from '@trainingai/shared/running/prescription'
 import { weekIndexSince } from '@trainingai/shared/running/week-index'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
@@ -130,11 +131,16 @@ export async function resolveSnapshot(
 ): Promise<FitnessSnapshot> {
   const todayIso = todayInTz(tz)
   const from90 = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 90 * 86_400_000), tz)
+  const restingWindow = restingHrWindow(todayIso)
   const [user, metrics] = await Promise.all([
     repo.getUserById(userId),
-    repo.listBodyMetrics(userId, from90, todayIso),
+    repo.listBodyMetrics(userId, restingWindow.from, restingWindow.to),
   ])
-  const restingHr = [...metrics].reverse().find(m => m.restingHeartRate != null)?.restingHeartRate ?? null
+  // #3216, option A: the 28-day mean, the value `resolveHrProfile` counts zone minutes with, so the
+  // zones a run is prescribed in are the zones its minutes are counted in. This used to read the
+  // OLDEST reading in 90 days (`.reverse().find()` over date-DESC rows). No reading gives null, and
+  // `resolveFitnessSnapshot` then assumes the default of 60, as before.
+  const restingHr = meanRestingHr(metrics)
   // The cardio-baseline results feed VO₂max / max-HR / threshold-HR when present; guarded
   // so this route works before that sibling ships (falls back to age-based zones).
   let baseline = null

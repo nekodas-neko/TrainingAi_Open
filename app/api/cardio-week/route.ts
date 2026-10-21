@@ -8,6 +8,7 @@ import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
+import { meanRestingHr } from '@trainingai/shared/health/resting-hr-mean'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
 import { computeZoneQuota, weekWindow } from '@trainingai/shared/health/zone-quota'
 import { activityStepsForDayCount, dayStepCount } from '@trainingai/shared/health/activity-steps'
@@ -16,15 +17,6 @@ import { activityStepsForDayCount, dayStepCount } from '@trainingai/shared/healt
 // Server-derived read only — no user writes here, so no outbox/local-store domain (spec D-9).
 const OBSERVED_WINDOW_DAYS = 30
 const WEIGHT_LOOKBACK_DAYS = 28
-
-/** Average of measured (non-null, positive) resting-HR readings in a body-metrics window,
- *  or null if none — mirrors resolveHrProfile's method, just re-windowed for the card's
- *  own rolling current/prior comparison rather than that resolver's fixed 28-day window. */
-function avgRestingHr(rows: { restingHeartRate?: number | null }[]): number | null {
-  const vals = rows.filter((r) => r.restingHeartRate != null && r.restingHeartRate > 0).map((r) => r.restingHeartRate!)
-  if (!vals.length) return null
-  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
-}
 
 export async function GET() {
   const session = await auth()
@@ -95,7 +87,9 @@ export async function GET() {
   // snapshot supplies the SIZE via weeklyBaseMinutes (spec D-11 — research split, personalised
   // volume). No fitness-test baseline lookup here — Phase 1 only needs a reasonable personalised
   // floor, not the exact running-plan volume; resolveFitnessSnapshot already floors it at 60min.
-  const restingHr = [...lookbackMetrics].reverse().find((m) => m.restingHeartRate != null && m.restingHeartRate > 0)?.restingHeartRate ?? null
+  // #3216, option A: the profile's 28-day mean, the resting HR this card's zone minutes are counted
+  // with. This used to read the OLDEST reading in 28 days (`.reverse().find()` over date-DESC rows).
+  const restingHr = profile.restingHr
   const ageYears = ageFromDob(user?.dateOfBirth, todayMidnightUtc(tz))
   const fitness = resolveFitnessSnapshot({ age: ageYears, restingHr, baseline: null })
 
@@ -110,8 +104,8 @@ export async function GET() {
   const dailyTargets = targets.perZone.map((t) => ({ zoneId: t.zoneId, minutes: t.minutes / 7 }))
   const dayQuota = computeZoneQuota(dailyTargets, days.filter((d) => d.day === today), { hasHrSource: hrSource })
 
-  const restingHrNow = avgRestingHr(currentRestingMetrics)
-  const restingHrPrior = avgRestingHr(priorRestingMetrics)
+  const restingHrNow = meanRestingHr(currentRestingMetrics)
+  const restingHrPrior = meanRestingHr(priorRestingMetrics)
   const restingHrDeltaBpm = restingHrNow != null && restingHrPrior != null ? restingHrNow - restingHrPrior : null
   const avgHrDeltaBpm = observed.avg != null && observedPrior.avg != null ? observed.avg - observedPrior.avg : null
   const maxHrDeltaBpm = observed.isReliable && observedPrior.isReliable && observed.max != null && observedPrior.max != null
