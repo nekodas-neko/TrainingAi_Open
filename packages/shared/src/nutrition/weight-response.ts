@@ -313,16 +313,25 @@ function metricResponse(
   metric: RecoveryMetric,
   cycles: string[][],
   byDate: Map<string, RecoveryNight>,
-  baseline: RecoveryBaseline | null,
+  baselines: ReadonlyMap<string, RecoveryBaseline>,
 ): MetricRecoveryResponse {
-  const read = (date: string): number | null => {
+  // A reading is judged against the normal of its own device (#2984): the Oura API and the ring sit
+  // at different levels, so a night with no normal of its own is left out rather than offset against
+  // the other device's.
+  const read = (date: string): { value: number; baseline: RecoveryBaseline } | null => {
     const n = byDate.get(date)
     const v = n ? (metric === 'rhr' ? n.restingHr : n.hrvMs) : null
-    return finite(v) ? v : null
+    const baseline = n && finite(v) ? baselines.get(sourceOf(metric, n)) : undefined
+    return baseline && finite(v) ? { value: v, baseline } : null
   }
   const usable = cycles
-    .map(days => days.flatMap((d, offset) => { const value = read(d); return value === null ? [] : [{ offset, value }] }))
+    .map(days => days.flatMap((d, offset) => {
+      const r = read(d)
+      return r === null ? [] : [{ offset, value: r.value - r.baseline.median }]
+    }))
     .filter(readings => readings.length >= RECOVERY_MIN_NIGHTS_PER_CYCLE)
+  // The one baseline reported is the best-founded device's; the deviations above are each against their own.
+  const baseline = [...baselines.values()].sort((a, b) => b.nights - a.nights)[0] ?? null
 
   if (!baseline || usable.length < RECOVERY_MIN_CYCLES) {
     return { state: 'insufficient', cycles: usable.length, neededCycles: RECOVERY_MIN_CYCLES }
@@ -331,7 +340,7 @@ function metricResponse(
   const maxOffset = Math.max(...usable.flatMap(c => c.map(r => r.offset)))
   const offsets: RecoveryOffset[] = []
   for (let offset = 0; offset <= maxOffset; offset++) {
-    const deviations = usable.flatMap(c => c.filter(r => r.offset === offset).map(r => r.value - baseline.median))
+    const deviations = usable.flatMap(c => c.filter(r => r.offset === offset).map(r => r.value))
     const enough = deviations.length >= RECOVERY_MIN_CYCLES_PER_OFFSET
     offsets.push({
       offset,
@@ -342,6 +351,20 @@ function metricResponse(
     })
   }
   return { state: 'ok', cycles: usable.length, baseline, offsets }
+}
+
+const UNKNOWN_DEVICE = 'unknown'
+const sourceOf = (metric: RecoveryMetric, n: RecoveryNight): string =>
+  (metric === 'rhr' ? n.restingHrSource : n.hrvSource) ?? UNKNOWN_DEVICE
+
+/** One baseline per device. Nights that name no device are one group, so a caller without sources is unchanged. */
+function baselinesFor(metric: RecoveryMetric, nights: RecoveryNight[], firstDoseDate: string): Map<string, RecoveryBaseline> {
+  const out = new Map<string, RecoveryBaseline>()
+  for (const src of new Set(nights.map(n => sourceOf(metric, n)))) {
+    const b = baselineFor(metric, nights.filter(n => sourceOf(metric, n) === src), firstDoseDate)
+    if (b) out.set(src, b)
+  }
+  return out
 }
 
 function baselineFor(metric: RecoveryMetric, nights: RecoveryNight[], firstDoseDate: string): RecoveryBaseline | null {
@@ -392,7 +415,7 @@ export function recoveryResponse(input: RecoveryResponseInput): SubstanceRecover
 
   const out: SubstanceRecoveryResponse[] = []
   for (const [supplementId, list] of bySubstance) {
-    const baselines = { rhr: baselineFor('rhr', nights, list[0].date), hrv: baselineFor('hrv', nights, list[0].date) }
+    const baselines = { rhr: baselinesFor('rhr', nights, list[0].date), hrv: baselinesFor('hrv', nights, list[0].date) }
     const groups: { rep: DoseLogEntry; members: { dose: (typeof list)[number]; days: string[] }[] }[] = []
     list.forEach((dose, i) => {
       const gap = i + 1 < list.length ? daysBetweenDateStrs(dose.date, list[i + 1].date) : RECOVERY_MAX_CYCLE_DAYS

@@ -10,7 +10,7 @@ import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, storedRe
 import type { OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyRow } from '@/lib/data/repository'
 import {
   resolveReadinessNightInputs, compositeNightFields, illnessNightFields,
-  RING_SUMMARY_SOURCE, type NightInputSources, type NightInput, type NightInputKey,
+  RING_SUMMARY_SOURCE, readinessSourceLabel, type NightInputSources, type NightInput, type NightInputKey,
 } from '@/lib/health/readiness-night-inputs'
 import { fixedWeightContributors, contributionSum, type ContributorSpec } from './contributors'
 import type { PillarAudit } from './types'
@@ -31,6 +31,8 @@ export interface ReadinessAuditInput {
    * #3077: the generic per-device values readiness v8 falls back to when the ring's summary cannot
    * score an input (Oura Cloud, Health Connect, manual). Left out, the audit sees the ring alone.
    */
+  /** The user's Oura API switch day, for the source label a backfill writes (`readinessSourceLabel`). */
+  switchDay?: string | null
   generic?: Pick<NightInputSources, 'bodyMetrics' | 'nights' | 'ouraDaily' | 'ouraCloudContributors'>
 }
 
@@ -40,7 +42,7 @@ const BASELINE_RELATIVE_WEIGHT = READINESS_WEIGHTS.restingHeartRate + READINESS_
   + READINESS_WEIGHTS.temperature + READINESS_WEIGHTS.sleepBalance
 
 export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
-  const { date, summary, priorSummary, sleepScore, activityScore, prevDayActivityScore, ouraDaily, derived } = input
+  const { switchDay = null, date, summary, priorSummary, sleepScore, activityScore, prevDayActivityScore, ouraDaily, derived } = input
 
   const gaps: string[] = []
   const notes: string[] = []
@@ -87,7 +89,10 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
   // As the payload counts it: the newest summary's own count, else the generic nights before tonight.
   const nHistory = latestSummary?.nHistory ?? Math.max(0, genericHistoryDays - 1)
 
-  const composite = (latestSummary || hasGenericRecoverySignal) ? computeReadinessComposite({
+  // Only the audited night is scored or persisted: with no input of its own the resolver falls back to
+  // the newest earlier night, and a backfill must never write that into this day.
+  const auditedNight = night.nightDate === date
+  const composite = auditedNight && (latestSummary || hasGenericRecoverySignal) ? computeReadinessComposite({
     ...compositeNightFields(night),
     previousNightScore: sleepScore,
     prevDayActivityScore,
@@ -99,7 +104,11 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     ? computeIllnessRadar(illnessNightFields(night))
     : null
 
-  if (!composite) {
+  if (!composite && night.nightDate != null && !auditedNight) {
+    gaps.push(
+      `No recovery input of its own for ${date} (the newest night with one is ${night.nightDate}), so nothing is scored or persisted for it.`,
+    )
+  } else if (!composite) {
     gaps.push(
       `No oura_daily_summary row for ${date} and no other recovery signal — without one there are no personal baselines, so the ` +
       'composite cannot run at all and readiness falls back to the crude sleep+HRV+RHR+load estimate.',
@@ -287,6 +296,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     persist: composite && displayedScore != null ? {
       score: displayedScore, contributors: composite.contributors,
       illnessFlag: illness?.flag ?? null, illnessScore: illness?.score ?? null, illnessBiomarkers: illness?.biomarkers ?? null,
+      readinessSource: readinessSourceLabel(night, latestSummary != null, switchDay),
     } : null,
     score: displayedScore,
     band: displayedScore != null ? scoreBand(displayedScore).label : null,
@@ -339,7 +349,9 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       source: derived?.readinessSource ?? null,
       rederived,
     },
-    storedMatchesRecompute: storedScore != null && compositeScore != null ? isStored(compositeScore) : null,
+    // The recompute's own flag, not the stored one: a stored flag would excuse a drift it caused.
+    storedMatchesRecompute: storedScore != null && compositeScore != null
+      ? storedReadinessMatches(storedScore, compositeScore, illness?.flag) : null,
     notes,
   }
 }
