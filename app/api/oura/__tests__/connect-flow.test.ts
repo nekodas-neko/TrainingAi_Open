@@ -18,7 +18,7 @@ const repo = {
   getUserById: vi.fn(async (id: string) => (id === USER ? user : id === ATTACKER ? { id: ATTACKER, isActive: true } : null)),
   getOuraCloudTokens: vi.fn(async (id: string) => (row?.userId === id ? row : null)),
   saveOuraCloudTokens: vi.fn(async (id: string, input: SaveOuraCloudTokensInput) => {
-    row = { userId: id, accessToken: input.accessToken, refreshToken: input.refreshToken, expiresAt: input.expiresAt, scope: input.scope, ouraUserId: input.ouraUserId ?? null, updatedAt: new Date() }
+    row = { userId: id, accessToken: input.accessToken, refreshToken: input.refreshToken, expiresAt: input.expiresAt, scope: input.scope, ouraUserId: input.ouraUserId ?? null, updatedAt: new Date(), reauthRequiredAt: null }
   }),
   deleteOuraCloudTokens: vi.fn(async (id: string) => { const had = row?.userId === id; row = null; return had }),
 }

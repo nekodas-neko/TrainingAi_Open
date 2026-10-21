@@ -38,7 +38,7 @@ describe('connectedSources (issue 2613)', () => {
   })
 
   it('always carries the boolean, so a phone on the old APK still reads one', () => {
-    for (const ouraCloudTypes of [null, {}, { Steps: true }, { Steps: false }]) {
+    for (const ouraCloudTypes of [null, {}, { Steps: true }, { Steps: false }] as (Record<string, boolean> | null)[]) {
       expect(typeof connectedSources({ ...none, ouraCloudTypes }).ouraCloud).toBe('boolean')
     }
   })
