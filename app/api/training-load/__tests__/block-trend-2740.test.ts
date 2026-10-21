@@ -32,7 +32,7 @@ describe('GET /api/training-load blockTrend', () => {
   })
 
   it('returns the ratio, band and a weekly line for a full history, and stays private, no-store', async () => {
-    getSessionLoadsFrom.mockResolvedValue(every2(-88))
+    getSessionLoadsFrom.mockResolvedValue(every2(-90))
     const res = await GET()
     expect(res.headers.get('Cache-Control')).toBe('private, no-store')
     const body = await res.json()
@@ -48,6 +48,6 @@ describe('GET /api/training-load blockTrend', () => {
   it('answers not_enough_history, not a number, for a month of sessions', async () => {
     getSessionLoadsFrom.mockResolvedValue(every2(-29))
     const body = await (await GET()).json()
-    expect(body.blockTrend).toEqual({ status: 'not_enough_history', ratio: null, band: null, baselineWeeklyKg: null, points: [] })
+    expect(body.blockTrend).toEqual({ status: 'not_enough_history', ratio: null, band: null, baselineWeeklyKg: null, spanDays: expect.any(Number), points: [] })
   })
 })

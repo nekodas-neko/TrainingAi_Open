@@ -1,7 +1,7 @@
 // Issue 2740: the 28:90 block trend with a line to draw. Synthetic sessions only.
 import { describe, it, expect } from 'vitest'
 import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
-import { blockTrendBand, computeBlockTrend, computeBlockTrendSeries, BLOCK_TREND_THRESHOLDS, type AcwrSession } from '../acwr'
+import { blockTrendBand, computeBlockTrend, computeBlockTrendSeries, computeVolumeAcwr, BLOCK_TREND_THRESHOLDS, type AcwrSession } from '../acwr'
 
 const TZ = 'Australia/Brisbane'
 const TODAY = '2026-10-21'
@@ -17,7 +17,7 @@ function history(from: string, to: string, every: number, perDay: number): AcwrS
 /** 62 days of a steady base, then the last 28 days scaled so the 28:90 ratio lands near `target`. */
 function withRecentFactor(factor: number): AcwrSession[] {
   const recentStart = shiftDateStr(TODAY, -27)
-  const base = history(shiftDateStr(TODAY, -89), shiftDateStr(recentStart, -1), 2, 5000)
+  const base = history(shiftDateStr(TODAY, -90), shiftDateStr(recentStart, -1), 2, 5000)
   const recent = history(recentStart, TODAY, 2, 5000 * factor)
   return [...base, ...recent]
 }
@@ -76,7 +76,7 @@ describe('computeBlockTrendSeries', () => {
   describe('sparse history is not a number', () => {
     it('says not_enough_history for a 30-day history', () => {
       const s = computeBlockTrendSeries(history(shiftDateStr(TODAY, -29), TODAY, 2, 5000), TODAY, { tz: TZ })
-      expect(s).toEqual({ status: 'not_enough_history', ratio: null, band: null, baselineWeeklyKg: null, points: [] })
+      expect(s).toEqual({ status: 'not_enough_history', ratio: null, band: null, baselineWeeklyKg: null, spanDays: 29, points: [] })
     })
     it('says not_enough_history for no sessions at all', () => {
       expect(computeBlockTrendSeries([], TODAY, { tz: TZ }).status).toBe('not_enough_history')
@@ -85,5 +85,90 @@ describe('computeBlockTrendSeries', () => {
       const few = [-89, -60, -30, 0].map(n => ({ startedAt: at(shiftDateStr(TODAY, n)), volumeKg: 5000 }))
       expect(computeBlockTrendSeries(few, TODAY, { tz: TZ }).ratio).toBeNull()
     })
+  })
+})
+
+describe('a short history does not start the line in detraining', () => {
+  it('drops the weeks whose 28-day window reaches before the first logged day', () => {
+    const s = computeBlockTrendSeries(history(shiftDateStr(TODAY, -69), TODAY, 2, 5000), TODAY, { tz: TZ })
+    expect(s.status).toBe('ok')
+    expect(s.band).toBe('steady')
+    expect(s.points.length).toBeGreaterThan(0)
+    expect(s.points.length).toBeLessThan(10)
+    for (const p of s.points) {
+      expect(p.ratio, p.date).toBeGreaterThanOrEqual(BLOCK_TREND_THRESHOLDS.detrainingMax)
+      expect(blockTrendBand(p.ratio), p.date).toBe('steady')
+    }
+    expect(s.points.at(-1)!.date).toBe(TODAY)
+  })
+
+  it('keeps every point once the history reaches day -90', () => {
+    expect(computeBlockTrendSeries(history(shiftDateStr(TODAY, -90), TODAY, 2, 5000), TODAY, { tz: TZ }).points).toHaveLength(10)
+  })
+})
+
+describe('the 68-day gate is the shared loadRatio gate, and the span is reported', () => {
+  const sinceDaysAgo = (n: number) => computeBlockTrendSeries(history(shiftDateStr(TODAY, -n), TODAY, 2, 5000), TODAY, { tz: TZ })
+  it('67 days of history is not enough, 68 is a number', () => {
+    const short = sinceDaysAgo(67)
+    expect(short.status).toBe('not_enough_history')
+    expect(short.ratio).toBeNull()
+    expect(short.spanDays).toBe(67)
+    const enough = sinceDaysAgo(68)
+    expect(enough.status).toBe('ok')
+    expect(enough.ratio).not.toBeNull()
+    expect(enough.spanDays).toBe(68)
+  })
+  it('reports the span on a full history too', () => {
+    expect(sinceDaysAgo(89).spanDays).toBe(89)
+  })
+})
+
+describe('local-day boundaries away from Brisbane (America/Los_Angeles, DST ends 2026-11-01)', () => {
+  const LA = 'America/Los_Angeles'
+  const LA_TODAY = '2026-11-02'
+  const clock = (day: string, hh: number, mm: number) => new Date(dateStrMidnightInTz(day, LA).getTime() + (hh * 60 + mm) * 60_000)
+  const base = (): AcwrSession[] => {
+    const out: AcwrSession[] = []
+    for (let i = 0; i <= 80; i += 2) {
+      const day = shiftDateStr(LA_TODAY, -i)
+      out.push({ startedAt: clock(day, i % 4 === 0 ? 23 : 0, i % 4 === 0 ? 59 : 1), volumeKg: 5000 })
+    }
+    return out
+  }
+  const run = (extra: AcwrSession[] = []) => computeBlockTrendSeries([...base(), ...extra], LA_TODAY, { tz: LA })
+
+  it('ends the line on computeBlockTrend with 23:59 and 00:01 sessions across the DST change', () => {
+    const sessions = base()
+    const series = computeBlockTrendSeries(sessions, LA_TODAY, { tz: LA })
+    const direct = computeBlockTrend(sessions, dateStrMidnightInTz(LA_TODAY, LA), { tz: LA })
+    expect(series.status).toBe('ok')
+    expect(series.ratio).toBe(direct.ratio)
+    expect(series.band).toBe(direct.band)
+    expect(series.points.at(-1)!.ratio).toBeCloseTo(direct.ratio!, 10)
+  })
+
+  it('counts a 00:01 session on day -90 and ignores a 23:59 session on day -91', () => {
+    const none = run()
+    const day90 = run([{ startedAt: clock(shiftDateStr(LA_TODAY, -90), 0, 1), volumeKg: 10_000 }])
+    const day91 = run([{ startedAt: clock(shiftDateStr(LA_TODAY, -91), 23, 59), volumeKg: 10_000 }])
+    expect(day90.baselineWeeklyKg).not.toBe(none.baselineWeeklyKg)
+    expect(day90.spanDays).toBe(90)
+    expect(day91.baselineWeeklyKg).toBe(none.baselineWeeklyKg)
+    expect(day91.spanDays).toBe(none.spanDays)
+  })
+})
+
+describe('the 90-day fetch does not move the existing ACWR numbers', () => {
+  it('returns identical 7:28 results for 28-day and 90-day inputs of the same sessions', () => {
+    const all = history(shiftDateStr(TODAY, -120), TODAY, 2, 5000)
+    const mid = dateStrMidnightInTz(TODAY, TZ)
+    const from = (n: number) => dateStrMidnightInTz(shiftDateStr(TODAY, -n), TZ).getTime()
+    const run = (n: number) => computeVolumeAcwr(all.filter(x => x.startedAt.getTime() >= from(n)), mid, { tz: TZ })
+    const a = run(28), b = run(90)
+    for (const k of ['acwr', 'acuteLoadKg', 'chronicWeeklyAvgKg', 'dataSpanWeeks', 'todayVolumeKg', 'typicalSessionVolumeKg'] as const) {
+      expect(b[k], k).toBe(a[k])
+    }
+    expect(a.acwr).not.toBeNull()
   })
 })

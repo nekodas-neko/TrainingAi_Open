@@ -12,8 +12,9 @@ export interface TrainingLoadResponse {
   baselineDaysRemaining?: number
   monotony: number | null
   strain: number | null
-  /** 28:90 block trend: a trend line and an insight only, it gates nothing (#2740). */
-  blockTrend: BlockTrendSeries
+  /** 28:90 block trend: a trend line and an insight only, it gates nothing (#2740). Optional: a payload cached
+   *  before this shipped lacks it. */
+  blockTrend?: BlockTrendSeries
 }
 
 export async function GET() {
@@ -31,8 +32,9 @@ export async function GET() {
   const from90d = dateStrMidnightInTz(shiftDateStr(today, -LOAD_WINDOW_DAYS.block), tz)
   const sessions = await repo.getSessionLoadsFrom(userId, from90d)
 
+  const acwrSessions = sessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.volume }))
   const load = computeVolumeAcwr(
-    sessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.volume })),
+    acwrSessions,
     todayMid,
     { tz },
   )
@@ -56,8 +58,6 @@ export async function GET() {
   return NextResponse.json({
     ...band,
     monotony, strain,
-    blockTrend: computeBlockTrendSeries(
-      sessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.volume })), today, { tz },
-    ),
+    blockTrend: computeBlockTrendSeries(acwrSessions, today, { tz }),
   } satisfies TrainingLoadResponse, { headers: { "Cache-Control": "private, no-store" } })
 }
