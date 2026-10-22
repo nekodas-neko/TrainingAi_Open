@@ -4,6 +4,7 @@ import { formatActivityTitle } from '@trainingai/shared/format/activity-title';
 import { plural } from '@trainingai/shared/format/plural';
 import { phaseLabel, lastTrainedLabel } from '@trainingai/shared/ai-periodization/status-labels';
 import { PATTERN_LABEL, movementBalance } from '@trainingai/shared/health/movement-balance';
+import { GENERIC_TARGET, MAX_TARGET } from '@trainingai/shared/health/volume-band';
 import { weekOverWeekChange } from '@trainingai/shared/health/trend-delta';
 import { seriesShape, trimLeadingGaps } from '@trainingai/shared/health/series-gaps';
 
@@ -39,6 +40,13 @@ export function muscleSetsLabel(sets: number, target: number | null) {
   return target !== null
     ? `${sets} / ${plural(target, 'set', 'sets')}`
     : plural(sets, 'set', 'sets');
+}
+
+/** What the Muscle Volume card says at the right of its title, as weekly-muscle-sets-card.tsx does. */
+export function muscleVolumeCaption(muscles: readonly { target: number | null }[]) {
+  return muscles.some((row) => row.target !== null)
+    ? 'vs your program target'
+    : `Target: ${GENERIC_TARGET}–${MAX_TARGET} sets`;
 }
 
 export function periodizationRow(session: {

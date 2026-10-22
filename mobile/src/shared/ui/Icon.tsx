@@ -77,6 +77,7 @@ import Rocket from 'lucide-react-native/icons/rocket';
 import Star from 'lucide-react-native/icons/star';
 import Calendar from 'lucide-react-native/icons/calendar';
 import CalendarCheck from 'lucide-react-native/icons/calendar-check';
+import CalendarRange from 'lucide-react-native/icons/calendar-range';
 import Leaf from 'lucide-react-native/icons/leaf';
 import CircleCheck from 'lucide-react-native/icons/circle-check';
 import Bed from 'lucide-react-native/icons/bed';
@@ -169,6 +170,7 @@ const icons = {
   star: Star,
   calendarPlain: Calendar,
   calendarCheck: CalendarCheck,
+  calendarRange: CalendarRange,
   leaf: Leaf,
   circleCheck: CircleCheck,
   bed: Bed,
