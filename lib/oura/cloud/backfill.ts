@@ -171,6 +171,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   const docs: OuraDocument[] = []
   // #3087, #3153: the workout and session chunks read whole, with the ids Oura returned for each. A
   // chunk with a dropped document is left out: the missing one may be the one that failed the spec.
+  // So is one cut short by a 404: an empty or partial list would tombstone rows Oura still has.
   // Each chunk's last day is left out too: the pinned spec does not say whether `end_date` is
   // inclusive, and if it is not, that day was never read. It is checked by a later read instead (the
   // reconcile runs daily over three days, so a day reaches the middle of the window the next morning).
@@ -183,7 +184,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
         docs.push(...got.docs)
         report.documents[type] = (report.documents[type] ?? 0) + got.docs.length
         report.dropped += got.dropped
-        if (isAbsentTombstoneType(type) && got.dropped === 0 && daysBetweenDateStrs(from, to) > 0) {
+        if (isAbsentTombstoneType(type) && got.complete && got.dropped === 0 && daysBetweenDateStrs(from, to) > 0) {
           readWhole.push({ type, from, to: shiftDateStr(to, -1), keepIds: got.docs.flatMap(d => d.type === type ? [d.doc.id] : []) })
         }
       } catch (err) {

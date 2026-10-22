@@ -473,3 +473,47 @@ describe('backfillOuraCloud tombstoneAbsent: sessions (#3153)', () => {
     expect(dropped.absentSessions).toEqual([])
   })
 })
+
+// #3153 review: a collection 404 cuts the list short, so it is not a read of the whole day. Swept as
+// whole, an empty or partial list would tombstone every stored row Oura still has.
+describe('backfillOuraCloud tombstoneAbsent: a 404 is not a whole read (#3153)', () => {
+  const savedKey = process.env.OURA_TOKEN_KEY
+  beforeEach(() => {
+    process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    process.env.OURA_TOKEN_KEY = savedKey
+    vi.unstubAllGlobals()
+  })
+  const RANGE = { from: '2026-10-08', to: '2026-10-10', heartRate: false, tz: 'Australia/Brisbane' }
+  const notFound = () => new Response('', { status: 404 })
+
+  for (const type of ['workout', 'session'] as const) {
+    const swept = (f: ReturnType<typeof fakeRepo>) => (type === 'workout' ? f.absent : f.absentSessions)
+
+    it(`a ${type} read that 404s on its first page tombstones nothing`, async () => {
+      oura(path => (path === type ? notFound() : null))
+      const f = fakeRepo()
+      const out = await backfillOuraCloud({ repo: f.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
+      expect(swept(f)).toEqual([])
+      expect(out.ok && (type === 'workout' ? out.report.workoutsTombstoned : out.report.sessionsTombstoned)).toBe(0)
+    })
+
+    it(`a ${type} read that 404s on its second page tombstones nothing`, async () => {
+      let page = 0
+      oura(path => {
+        if (path !== type) return null
+        page++
+        return page === 1 ? jsonResponse({ data: [FIXTURES[type]], next_token: 'p2' }) : notFound()
+      })
+      const f = fakeRepo()
+      const out = await backfillOuraCloud({ repo: f.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
+      expect(page).toBe(2)
+      expect(swept(f)).toEqual([])
+      // What the first page held is still written.
+      expect(out.ok && out.report.documents[type]).toBe(1)
+    })
+  }
+})

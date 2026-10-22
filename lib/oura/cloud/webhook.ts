@@ -160,13 +160,19 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     if (event.data_type === 'workout') return { result: 'deleted', rows: await deps.repo.tombstoneOuraWorkouts(userId, [event.object_id]) }
     // #3153: a session deleted in the Oura app leaves the day timeline. Kept and marked.
     if (event.data_type === 'session') return { result: 'deleted', rows: await deps.repo.tombstoneOuraSessions(userId, [event.object_id]) }
-    const rows = await withNightRescore(deps.rescore, userId, async () => {
-      const n = await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id])
-      // #3080: the day's HRV and resting HR follow its main period, which may have been this one.
-      await deps.repo.syncOuraMainSleepBodyMetrics(userId, { days: [], ouraIds: [event.object_id] })
-      return n
-    })
-    return { result: 'deleted', rows }
+    if (event.data_type === 'sleep') {
+      const rows = await withNightRescore(deps.rescore, userId, async () => {
+        const n = await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id])
+        // #3080: the day's HRV and resting HR follow its main period, which may have been this one.
+        await deps.repo.syncOuraMainSleepBodyMetrics(userId, { days: [], ouraIds: [event.object_id] })
+        return n
+      })
+      return { result: 'deleted', rows }
+    }
+    // A type in OURA_DELETE_TYPES with no branch here: never fall through to another type's
+    // tombstone, which would mark a row by an id that names something else (#3153).
+    reportOuraCloudIssue(`webhook-delete:unhandled-${event.data_type}`, `a ${event.data_type} delete has no tombstone branch; ignored`, { userId })
+    return { result: 'ignored', reason: `delete of ${event.data_type} has no tombstone` }
   }
 
   // Oura answers 401 for a type the user did not share, which would read as `reauth` (#2974).

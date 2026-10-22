@@ -12,6 +12,7 @@ import {
 } from '../webhook'
 import type { User } from '@trainingai/shared/types'
 import { resetOuraCloudReportThrottle } from '../report'
+import { OURA_DELETE_TYPES, type OuraDocumentType } from '../documents'
 import { FIXTURES, jsonResponse, OURA_USER } from './fixtures'
 
 const reportServerError = vi.fn()
@@ -232,6 +233,27 @@ describe('handleOuraWebhookEvent (#2859)', () => {
     expect(writes.workoutsTombstoned).toEqual([])
     expect(writes.sessionsTombstoned).toEqual([])
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  // #3153 review: a type listed in OURA_DELETE_TYPES with no branch of its own must never reach the
+  // sleep tombstone with an id that names something else; it is ignored and reported.
+  it('ignores and reports a tracked delete type that has no tombstone branch', async () => {
+    resetOuraCloudReportThrottle()
+    reportServerError.mockReset()
+    const types = OURA_DELETE_TYPES as OuraDocumentType[]
+    types.push('daily_readiness')
+    try {
+      expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'daily_readiness', object_id: 'rd-1' })))
+        .toMatchObject({ result: 'ignored' })
+    } finally {
+      types.splice(types.indexOf('daily_readiness'), 1)
+    }
+    expect(writes.tombstoned).toEqual([])
+    expect(writes.workoutsTombstoned).toEqual([])
+    expect(writes.sessionsTombstoned).toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalled())
+    expect((reportServerError.mock.calls[0][0] as Error).message).toMatch(/webhook-delete:unhandled-daily_readiness/)
   })
 
   it('ignores a delete of a daily document', async () => {
