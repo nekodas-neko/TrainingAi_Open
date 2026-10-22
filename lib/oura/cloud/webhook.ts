@@ -114,7 +114,7 @@ export type OuraWebhookEvent = z.infer<typeof OuraWebhookEvent>
 export type OuraWebhookOutcome =
   /** The document was read and written. */
   | { result: 'written'; counts: OuraCloudWriteCounts }
-  /** A delete was applied: a sleep period, workout or session tombstoned (0 when we held none). */
+  /** A delete was applied: a sleep period or workout tombstoned (0 when we held none). */
   | { result: 'deleted'; rows: number }
   /** Nothing to do: a data type we do not store, or a delete of a type we keep no tombstone for. */
   | { result: 'ignored'; reason: string }
@@ -158,8 +158,6 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     if (!OURA_DELETE_TYPES.includes(event.data_type)) return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
     // #3087: a workout deleted in the Oura app stops counting in the energy budget. Kept and marked.
     if (event.data_type === 'workout') return { result: 'deleted', rows: await deps.repo.tombstoneOuraWorkouts(userId, [event.object_id]) }
-    // #3153: a session deleted in the Oura app leaves the day timeline. Kept and marked.
-    if (event.data_type === 'session') return { result: 'deleted', rows: await deps.repo.tombstoneOuraSessions(userId, [event.object_id]) }
     const rows = await withNightRescore(deps.rescore, userId, async () => {
       const n = await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id])
       // #3080: the day's HRV and resting HR follow its main period, which may have been this one.

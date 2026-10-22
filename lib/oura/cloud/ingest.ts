@@ -48,7 +48,7 @@ export async function reattributeAfterHeartRate(
 export type OuraCloudWriter = Pick<WorkoutRepository,
   'upsertOuraDaily' | 'upsertBodyMetrics' | 'upsertOuraCloudSleep' | 'tombstoneOuraCloudSleep' | 'syncOuraMainSleepBodyMetrics' |
   'upsertOuraWorkouts' | 'tombstoneOuraWorkouts' | 'tombstoneOuraWorkoutsAbsent' | 'upsertOuraCloudHeartrate' |
-  'upsertOuraCloudSleepPeriods' | 'upsertOuraCloudDaily' | 'upsertOuraSessions' | 'tombstoneOuraSessions' | 'tombstoneOuraSessionsAbsent'>
+  'upsertOuraCloudSleepPeriods' | 'upsertOuraCloudDaily' | 'upsertOuraSessions'>
 
 export interface OuraCloudWriteCounts {
   dailyRows: number

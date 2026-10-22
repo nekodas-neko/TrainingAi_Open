@@ -1,4 +1,4 @@
-// #3081 — a value Oura adds keeps its document, and a session delete removes nothing (it tombstones).
+// #3081 — a value Oura adds keeps its document, and a session delete removes nothing.
 //
 // Against a real Postgres (skips without DATABASE_URL). Oura is not called: documents are built from
 // the spec-shaped fixtures and written through `writeOuraCloudData`, the path the webhook and backfill
@@ -7,8 +7,8 @@
 //     `long_sleep` it never joins the night;
 //   - a workout with a new intensity lands, the value stored as null, and the report carries counts
 //     and field names only, never the value;
-//   - a session delete tombstones the row and it stays: a delete only ever tombstones (#3155 review,
-//     #3153).
+//   - a session delete is ignored and the row stays: a delete only ever tombstones, and sessions have
+//     no tombstone yet (#3155 review, #3153).
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FIXTURES, sleepPeriod } from '@/lib/oura/cloud/__tests__/fixtures'
 
@@ -94,7 +94,7 @@ describe.skipIf(!canRun)('Oura documents with a new value, and a session delete 
       .toEqual([{ sleep_analysis_reason: 'background_sleep_analysis' }])
   })
 
-  it('a session delete tombstones the row and never removes it (#3153)', async () => {
+  it('a session delete removes nothing until sessions have a tombstone (#3153)', async () => {
     await write(USER, { type: 'session', doc: FIXTURES.session })
     const { handleOuraWebhookEvent } = await import('@/lib/oura/cloud/webhook')
     const deps = {
@@ -103,9 +103,8 @@ describe.skipIf(!canRun)('Oura documents with a new value, and a session delete 
       config: { clientId: 'c', clientSecret: 's', redirectUri: 'https://example.com/cb' },
     }
     const del = { event_type: 'delete' as const, data_type: 'session', object_id: FIXTURES.session.id, user_id: 'oura-3081' }
-    expect(await handleOuraWebhookEvent(deps, del)).toEqual({ result: 'deleted', rows: 1 })
-    const left = (await pool.query(`SELECT deleted_at FROM oura_sessions WHERE user_id = $1 AND oura_id = $2`, [USER, FIXTURES.session.id])).rows
-    expect(left).toHaveLength(1)
-    expect(left[0].deleted_at).toBeInstanceOf(Date)
+    expect(await handleOuraWebhookEvent(deps, del)).toMatchObject({ result: 'ignored' })
+    const left = (await pool.query(`SELECT count(*)::int AS n FROM oura_sessions WHERE user_id = $1 AND oura_id = $2`, [USER, FIXTURES.session.id])).rows[0].n
+    expect(left).toBe(1)
   })
 })

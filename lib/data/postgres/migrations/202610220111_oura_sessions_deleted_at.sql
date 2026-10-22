@@ -6,9 +6,13 @@
 -- delete is invisible to a device that has not synced (docs/rules/offline-first-and-storage.md), and
 -- deleting data is the owner's call (#3155 review). Same shape as oura_workouts.deleted_at (#3147).
 --
+-- Ships alone, before the code that writes and reads it (CLAUDE.md: a migration never rides in a
+-- batch with anything else; `ensureSchema` logs a failed migration and serves anyway, so code naming
+-- the column must not land before it). Until that code lands, nothing writes the column and every
+-- row reads as live, which is today's behaviour.
+--
 -- Additive only: one nullable column with no default, a catalog-only change with no rewrite. No
--- row is changed, backfilled or deleted. Until the code that writes it runs, every row reads as live,
--- which is today's behaviour.
+-- row is changed, backfilled or deleted.
 --
 -- Guards: `lock_timeout` so a long reader on oura_sessions makes this give up (and ensureSchema
 -- retry it on the next boot) rather than queue writers behind it; `statement_timeout` as a
