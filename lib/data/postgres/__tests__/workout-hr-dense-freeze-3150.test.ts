@@ -3,7 +3,9 @@
 // Connect-only session stays on METs after its heart rate is gone and a dense one keeps its average.
 //
 // Runs against a real Postgres (DATABASE_URL) and skips without one. Synthetic series only, anchored
-// to local midday 181 days back (past HR_RETENTION_DAYS) or yesterday; the real prune runs.
+// to local midday 181 days back (past HR_RETENTION_DAYS) or yesterday. The real prune runs, but its
+// DELETE is global (every user's heart rate past retention), so it runs inside a transaction that
+// rolls back after the assertions: a local database holding a restored snapshot keeps its history.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { fromZonedTime } from 'date-fns-tz'
 import { sql } from 'drizzle-orm'
@@ -58,33 +60,46 @@ describe.skipIf(!canRun)('the HR prune freezes hr_dense (#3150)', () => {
     [USER, from, to, source, stepMin])
   const hole = (from: Date, to: Date) => pool.query(
     `DELETE FROM oura_heartrate WHERE user_id = $1 AND timestamp > $2 AND timestamp < $3`, [USER, from, to])
-  const onHr = async (ids: string[]) => [...(await repo.getAvgBpmBySession(USER, ids)).keys()].sort()
-  const stored = async (id: string) =>
-    (await pool.query(`SELECT hr_dense FROM workout_hr_stats WHERE workout_session_id = $1`, [id])).rows[0].hr_dense
-  const left = async (start: Date) => Number((await pool.query(
-    `SELECT count(*) FROM oura_heartrate WHERE user_id = $1 AND timestamp >= $2 AND timestamp <= $3`,
-    [USER, start, at(start, 60)])).rows[0].count)
+  type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+  type Exec = typeof db | Tx
+  const ROLLBACK = new Error('rollback')
+  /** Run `fn` in a transaction that is always rolled back: the prune's global DELETE never commits. */
+  const inRollback = async (fn: (tx: Tx) => Promise<void>) => {
+    await expect(db.transaction(async tx => { await fn(tx); throw ROLLBACK })).rejects.toBe(ROLLBACK)
+  }
+  const onHr = async (x: Exec, ids: string[]) => [...(await oura.getAvgBpmBySession(x as typeof db, USER, ids)).keys()].sort()
+  const stored = async (x: Exec, id: string) =>
+    (await x.execute(sql`SELECT hr_dense FROM workout_hr_stats WHERE workout_session_id = ${id}`)).rows[0].hr_dense
+  const left = async (x: Exec, start: Date) => Number((await x.execute(sql`
+    SELECT count(*) AS n FROM oura_heartrate WHERE user_id = ${USER}
+      AND timestamp >= ${start.toISOString()}::timestamptz AND timestamp <= ${at(start, 60).toISOString()}::timestamptz`)).rows[0].n)
 
   it('a session dense at first, then given a 25-minute hole by a late Health Connect sync, stays on METs after the prune', async () => {
     await addSession(ws(1), OLD)
     await series(OLD, at(OLD, 60), 1, 'health_connect')
-    expect(await onHr([ws(1)])).toEqual([ws(1)])
+    expect(await onHr(db, [ws(1)])).toEqual([ws(1)])
     await hole(at(OLD, 20), at(OLD, 45))
-    await oura.pruneHeartrate(db)
-    expect(await left(OLD)).toBe(0)
-    expect(await stored(ws(1))).toBe(false)
-    expect(await onHr([ws(1)])).toEqual([])
+    await inRollback(async tx => {
+      await oura.pruneHeartrate(tx)
+      // The series is gone and the verdict was stored first, in the same transaction.
+      expect(await left(tx, OLD)).toBe(0)
+      expect(await stored(tx, ws(1))).toBe(false)
+      expect(await onHr(tx, [ws(1)])).toEqual([])
+    })
+    expect(await left(db, OLD)).toBeGreaterThan(0) // rolled back
   })
 
   it('a session thin at first, then filled in by a late sync, keeps the HR estimate after the prune', async () => {
     await addSession(ws(2), OLD)
     await series(OLD, at(OLD, 60), 12, 'health_connect')
-    expect(await onHr([ws(2)])).toEqual([])
+    expect(await onHr(db, [ws(2)])).toEqual([])
     await series(OLD, at(OLD, 60), 1, 'health_connect')
-    await oura.pruneHeartrate(db)
-    expect(await left(OLD)).toBe(0)
-    expect(await stored(ws(2))).toBe(true)
-    expect(await onHr([ws(2)])).toEqual([ws(2)])
+    await inRollback(async tx => {
+      await oura.pruneHeartrate(tx)
+      expect(await left(tx, OLD)).toBe(0)
+      expect(await stored(tx, ws(2))).toBe(true)
+      expect(await onHr(tx, [ws(2)])).toEqual([ws(2)])
+    })
   })
 
   it('a ring row in the pad does not change the verdict; one inside the span does', async () => {
@@ -96,9 +111,11 @@ describe.skipIf(!canRun)('the HR prune freezes hr_dense (#3150)', () => {
       await series(at(start, -10), at(start, -1), 1, 'ble') // the warm-up pad, outside the span
     }
     await series(at(OLD2, 30), at(OLD2, 30), 1, 'ble')
-    await oura.pruneHeartrate(db)
-    expect([await stored(ws(3)), await stored(ws(4))]).toEqual([false, true])
-    expect(await onHr([ws(3), ws(4)])).toEqual([ws(4)])
+    await inRollback(async tx => {
+      await oura.pruneHeartrate(tx)
+      expect([await stored(tx, ws(3)), await stored(tx, ws(4))]).toEqual([false, true])
+      expect(await onHr(tx, [ws(3), ws(4)])).toEqual([ws(4)])
+    })
   })
 
   it('the first freeze to reach a session wins, and outranks the part of the series left mid-prune', async () => {
@@ -107,12 +124,13 @@ describe.skipIf(!canRun)('the HR prune freezes hr_dense (#3150)', () => {
     await series(OLD, at(OLD, 30), 12, 'health_connect')
     await series(at(OLD, 31), at(OLD, 60), 1, 'health_connect')
     const cutAt = (d: Date) => sql`${d.toISOString()}::timestamptz`
+    // The freeze alone (no DELETE), so it commits; the test user's own hole stands in for the prune.
     expect(await oura.freezeWorkoutHrDensity(db, cutAt(at(OLD, 10)))).toBe(1)
-    expect(await stored(ws(5))).toBe(false)
+    expect(await stored(db, ws(5))).toBe(false)
     await hole(at(OLD, -1), at(OLD, 30)) // the prune took the first half; what is left is dense
     expect(await oura.freezeWorkoutHrDensity(db, cutAt(at(OLD, 50)))).toBe(0)
-    expect(await stored(ws(5))).toBe(false)
-    expect(await onHr([ws(5)])).toEqual([])
+    expect(await stored(db, ws(5))).toBe(false)
+    expect(await onHr(db, [ws(5)])).toEqual([])
   })
 
   it('leaves a session inside retention alone, and a row with neither series nor verdict keeps its snapshot', async () => {
@@ -120,9 +138,11 @@ describe.skipIf(!canRun)('the HR prune freezes hr_dense (#3150)', () => {
     await addSession(ws(6), RECENT)
     await series(RECENT, at(RECENT, 60), 12, 'health_connect')
     await addSession(ws(7), OLD)
-    await oura.pruneHeartrate(db)
-    expect(await left(RECENT)).toBe(6)
-    expect([await stored(ws(6)), await stored(ws(7))]).toEqual([null, null])
-    expect(await onHr([ws(6), ws(7)])).toEqual([ws(7)]) // ws(6) still judged live: sparse, so METs
+    await inRollback(async tx => {
+      await oura.pruneHeartrate(tx)
+      expect(await left(tx, RECENT)).toBe(6)
+      expect([await stored(tx, ws(6)), await stored(tx, ws(7))]).toEqual([null, null])
+      expect(await onHr(tx, [ws(6), ws(7)])).toEqual([ws(7)]) // ws(6) still judged live: sparse, so METs
+    })
   })
 })

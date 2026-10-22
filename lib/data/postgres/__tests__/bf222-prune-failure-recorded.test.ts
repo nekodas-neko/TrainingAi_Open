@@ -9,7 +9,8 @@ describe('BF-222 prune failures are recorded', () => {
   it('both sensor prunes route their failure through recordPruneFailure', () => {
     const src = readFileSync(join(process.cwd(), 'lib/data/postgres/slices/oura.ts'), 'utf8')
     // The heart-rate DELETE runs inside pruneHeartrate's transaction with the #3150 verdict freeze.
-    expect(src).toMatch(/export async function pruneHeartrate\([^)]*\)[^]*?DELETE FROM oura_heartrate/)
+    const pruneBody = src.match(/export async function pruneHeartrate\([^)]*\)[^{]*\{([^]*?)\n\}\n/)?.[1] ?? ''
+    expect(pruneBody).toMatch(/DELETE FROM oura_heartrate/)
     expect(src).toMatch(/pruneHeartrate\(db\)\.catch\(err => recordPruneFailure\(db, 'oura_heartrate', err\)\)/)
     expect(src).toMatch(/DELETE FROM rr_intervals[^\n]*\.catch\(err => recordPruneFailure\(db, 'rr_intervals', err\)\)/)
     expect(src).not.toMatch(/console\.error\('\[prune\] (oura_heartrate|rr_intervals) failed:'/)

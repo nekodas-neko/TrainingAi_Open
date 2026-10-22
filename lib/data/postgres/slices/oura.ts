@@ -1480,8 +1480,9 @@ async function writeHeartrateRows(
 /** Delete heart rate past `HR_RETENTION_DAYS`, first freezing the calorie gate's verdict for every
  *  workout whose series is about to lose a reading (#3150). One transaction, so a series is never
  *  deleted without its verdict stored; `now()` is the transaction's start, so both statements cut at
- *  the same instant. */
-export async function pruneHeartrate(db: Db): Promise<void> {
+ *  the same instant. Takes a transaction too (it nests as a savepoint), which is how its tests roll
+ *  the global delete back. */
+export async function pruneHeartrate(db: Db | Tx): Promise<void> {
   const cutoff = sql`now() - (${HR_RETENTION_DAYS} || ' days')::interval`
   await db.transaction(async tx => {
     await freezeWorkoutHrDensity(tx, cutoff)
