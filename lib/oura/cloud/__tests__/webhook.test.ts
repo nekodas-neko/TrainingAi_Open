@@ -12,6 +12,7 @@ import {
 } from '../webhook'
 import type { User } from '@trainingai/shared/types'
 import { resetOuraCloudReportThrottle } from '../report'
+import { OURA_DELETE_TYPES, type OuraDocumentType } from '../documents'
 import { FIXTURES, jsonResponse, OURA_USER } from './fixtures'
 
 const reportServerError = vi.fn()
@@ -78,7 +79,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   const fetchMock = vi.fn<typeof fetch>()
   const savedKey = process.env.OURA_TOKEN_KEY
   let row: OuraCloudTokenRow | null
-  const writes = { daily: 0, sleep: 0, sessions: 0, tombstoned: [] as string[], workoutsTombstoned: [] as string[] }
+  const writes = { daily: 0, sleep: 0, sessions: 0, tombstoned: [] as string[], workoutsTombstoned: [] as string[], sessionsTombstoned: [] as string[] }
   const heartRate = vi.fn()
 
   function deps(): OuraWebhookDeps {
@@ -102,6 +103,8 @@ describe('handleOuraWebhookEvent (#2859)', () => {
         upsertOuraCloudSleepPeriods: async (_u, rows) => rows.length,
         upsertOuraCloudDaily: async (_u, rows) => rows.length,
         upsertOuraSessions: async (_u, rows) => { writes.sessions += rows.length; return rows.length },
+        tombstoneOuraSessions: async (_u, ids) => { writes.sessionsTombstoned.push(...ids); return ids.length },
+        tombstoneOuraSessionsAbsent: async () => 0,
         getLatestOuraCloudHeartrateAt: async () => null,
         getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) as User,
       },
@@ -117,7 +120,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health',
       ouraUserId: OURA_USER, updatedAt: new Date(),
     }
-    writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []; writes.workoutsTombstoned = []
+    writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []; writes.workoutsTombstoned = []; writes.sessionsTombstoned = []
     heartRate.mockReset()
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
@@ -206,15 +209,51 @@ describe('handleOuraWebhookEvent (#2859)', () => {
     expect(writes.workoutsTombstoned).toEqual([])
   })
 
-  // #3155 review: a delete only ever tombstones. Sessions and daily documents need a tombstone of
-  // their own first (#3153), so until then nothing is removed.
-  it('ignores a delete of a type it does not act on yet (session and daily documents until #3153)', async () => {
-    for (const data_type of ['session', 'daily_readiness', 'daily_activity']) {
+  // #3153: a session deleted in the Oura app leaves the day timeline.
+  it('tombstones a deleted session without calling Oura, and leaves sleep and workouts alone', async () => {
+    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'session', object_id: 'se-1' }))).toEqual({ result: 'deleted', rows: 1 })
+    expect(writes.sessionsTombstoned).toEqual(['se-1'])
+    expect(writes.tombstoned).toEqual([])
+    expect(writes.workoutsTombstoned).toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('a session delete for an Oura account nobody here holds tombstones nothing', async () => {
+    expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'session', object_id: 'se-1', user_id: 'someone-else' }))).toEqual({ result: 'unknown_user' })
+    expect(writes.sessionsTombstoned).toEqual([])
+  })
+
+  // #3155 review: a delete only ever tombstones. Daily documents need a stored id first (#3153), so
+  // until then nothing is removed.
+  it('ignores a delete of a type it does not act on yet (daily documents until #3153)', async () => {
+    for (const data_type of ['daily_readiness', 'daily_activity']) {
       expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type }))).toMatchObject({ result: 'ignored' })
     }
     expect(writes.tombstoned).toEqual([])
     expect(writes.workoutsTombstoned).toEqual([])
+    expect(writes.sessionsTombstoned).toEqual([])
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  // #3153 review: a type listed in OURA_DELETE_TYPES with no branch of its own must never reach the
+  // sleep tombstone with an id that names something else; it is ignored and reported.
+  it('ignores and reports a tracked delete type that has no tombstone branch', async () => {
+    resetOuraCloudReportThrottle()
+    reportServerError.mockReset()
+    const types = OURA_DELETE_TYPES as OuraDocumentType[]
+    types.push('daily_readiness')
+    try {
+      expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete', data_type: 'daily_readiness', object_id: 'rd-1' })))
+        .toMatchObject({ result: 'ignored' })
+    } finally {
+      types.splice(types.indexOf('daily_readiness'), 1)
+    }
+    expect(writes.tombstoned).toEqual([])
+    expect(writes.workoutsTombstoned).toEqual([])
+    expect(writes.sessionsTombstoned).toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalled())
+    expect((reportServerError.mock.calls[0][0] as Error).message).toMatch(/webhook-delete:unhandled-daily_readiness/)
   })
 
   it('ignores a delete of a daily document', async () => {
@@ -305,6 +344,8 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
       upsertOuraCloudSleepPeriods: async () => 0,
       upsertOuraCloudDaily: async () => 0,
       upsertOuraSessions: async () => 0,
+      tombstoneOuraSessions: async () => 0,
+      tombstoneOuraSessionsAbsent: async () => 0,
       getLatestOuraCloudHeartrateAt: async (_u, from) => { since = from; return newest },
       getUserById: async () => ({ id: USER, timezone }) as User,
     },

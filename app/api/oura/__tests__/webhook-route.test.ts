@@ -32,6 +32,8 @@ const repo = {
   upsertOuraCloudSleepPeriods: vi.fn(async () => 0),
   upsertOuraCloudDaily: vi.fn(async () => 0),
   upsertOuraSessions: vi.fn(async () => 0),
+  tombstoneOuraSessions: vi.fn(async () => 0),
+  tombstoneOuraSessionsAbsent: vi.fn(async () => 0),
 }
 
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...args: unknown[]) => rateLimit(...(args as [])) }))
