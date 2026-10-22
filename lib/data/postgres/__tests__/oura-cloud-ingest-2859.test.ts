@@ -155,7 +155,9 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     expect(day.met).toEqual(FIXTURES.daily_activity.met)
 
     const session = await one(`SELECT * FROM oura_sessions WHERE user_id = $1`)
-    for (const [c, v] of Object.entries(session)) expect(v, c).not.toBeNull()
+    // `deleted_at` is ours, not Oura's: a live session has none (#3153).
+    for (const [c, v] of Object.entries(session)) if (c !== 'deleted_at') expect(v, c).not.toBeNull()
+    expect(session.deleted_at).toBeNull()
     expect(session).toMatchObject({ oura_id: 'se-1', session_type: 'breathing', mood: 'good', motion_count: FIXTURES.session.motion_count })
 
     // Oura's contributors and stress label never reach the columns the screens read.
