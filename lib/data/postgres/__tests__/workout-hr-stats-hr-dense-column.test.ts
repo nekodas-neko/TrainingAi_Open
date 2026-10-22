@@ -40,6 +40,8 @@ describe.skipIf(!canRun)('workout_hr_stats.hr_dense column (#3150)', () => {
   })
 
   it('is NULL on a row written without it, and round-trips true and false through the schema', async () => {
+    // A killed earlier run can leave the row behind: start from none.
+    await pool.query(`DELETE FROM workout_hr_stats WHERE workout_session_id = $1`, [WS])
     await pool.query(
       `INSERT INTO workout_hr_stats (workout_session_id, user_id, avg_bpm, readings_count) VALUES ($1, $2, 120, 60)`,
       [WS, USER])

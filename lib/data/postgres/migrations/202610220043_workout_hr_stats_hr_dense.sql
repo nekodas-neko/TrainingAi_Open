@@ -9,10 +9,16 @@
 -- will read it from then on.
 --
 -- Shipped alone, before the code that writes and reads it (CLAUDE.md: a migration never rides in a
--- batch with anything else; #3147, #3160 and #2983 did the same). `ensureSchema` logs a failed
--- migration and serves anyway, so code that names the column must not land in the same release as
--- the column. Until that code lands nothing writes the column, every row has it NULL, and the gate
--- goes on as today.
+-- batch with anything else; #3147, #3160 and #2983 did the same). Until that code lands nothing
+-- sets the column, every row has it NULL, and the gate goes on as today.
+--
+-- Not entirely inert while it is missing: Drizzle's INSERT names every schema column, sending
+-- `default` for the ones it is not given, so once `schema.ts` names `hr_dense`,
+-- `upsertWorkoutHrStats` names it too. If this migration fails (say its 3 s lock timeout) the boot
+-- still serves (`ensureSchema` logs and goes on), and workout HR snapshot writes fail with 42703
+-- until it applies on a later boot. Reads are unaffected. Accepted: the table is small (one row per
+-- workout), the timeout is unlikely on it, a failed snapshot write is fire-and-forget and recomputed
+-- on the next recap view, and the next boot retries the migration.
 --
 -- Additive only: one nullable column with no default (catalog-only, no rewrite). No existing row is
 -- changed, backfilled or deleted.
@@ -21,7 +27,9 @@
 -- retry it on the next boot) rather than queue writers behind it; `statement_timeout` as a
 -- backstop. Both are SET LOCAL, scoped to this migration's transaction.
 --
--- REVERSE (loses only what later code writes into the column; drop that code first):
+-- REVERSE (loses only what later code writes into the column; drop that code first). The claude_ro
+-- view names the column, so it goes first; the boot rebuild recreates the views (#3246):
+--   DROP VIEW IF EXISTS claude_ro.workout_hr_stats;
 --   ALTER TABLE workout_hr_stats DROP COLUMN hr_dense;
 
 SET LOCAL lock_timeout = '3s';

@@ -1683,8 +1683,12 @@ export const workoutHrStats = pgTable('workout_hr_stats', {
   readingsCount:    integer('readings_count').notNull().default(0),
   source:           text('source'),
   computedAt:       timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
-  // #3150: the #2437 density verdict over the session's own series, so the calorie gate survives
-  // the 180-day HR prune. Null = never judged (rows before the column, or no reading in the span).
+  // #3150: the calorie gate's #2437 density verdict over the session's own series, frozen by the HR
+  // prune just before it deletes that series, so the gate survives the 180-day prune. Null = not
+  // judged: the prune has not reached the session yet, or there was no reading to judge. A frozen
+  // `true` for a source the rule does not gate today stays `true` if that source is gated later
+  // (#3114): the series it would be re-judged on is gone. Drizzle's INSERT names this column
+  // (as `default`), so snapshot writes need the migration applied.
   hrDense:          boolean('hr_dense'),
 })
 
