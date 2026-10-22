@@ -57,19 +57,6 @@ export function isDenseHrSeries(times: readonly number[]): boolean {
 const ms = (t: Date | number) => (t instanceof Date ? t.getTime() : t);
 
 /**
- * The #2437 verdict for one workout's own series (#3150): `null` with no reading to judge, `true`
- * when any reading comes from a source the rule does not gate (that series is never held to it),
- * else `isDenseHrSeries`. Stored on `workout_hr_stats.hr_dense` when the snapshot is computed, so the
- * calorie gate can still answer once the series itself is pruned.
- */
-export function workoutHrDensityVerdict(rows: readonly { timestamp: Date | number; source?: string | null }[]): boolean | null {
-  if (rows.length === 0) return null;
-  if (rows.some((r) => r.source == null || !DENSITY_GATED_HR_SOURCES.has(r.source))) return true;
-  return isDenseHrSeries(rows.map((r) => ms(r.timestamp)));
-}
-
-
-/**
  * The series with every gated source's sparse hours removed, and the local hours (`YYYY-MM-DD`,
  * hour) that lost their only HR. An hour is dense when the gated source has at least two readings in
  * it and no gap between consecutive ones longer than HR_DENSE_MAX_GAP_MS — "across the worn part":

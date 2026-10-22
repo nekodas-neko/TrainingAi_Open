@@ -1880,8 +1880,6 @@ export interface WorkoutHrStatsInput {
   workoutHrvMs: number | null
   readingsCount: number
   source: string | null
-  /** #3150: the #2437 density verdict over the session's own series; null = not judged (old rows, or no reading). */
-  hrDense?: boolean | null
 }
 export interface WorkoutHrStatsRow extends WorkoutHrStatsInput {
   computedAt: Date

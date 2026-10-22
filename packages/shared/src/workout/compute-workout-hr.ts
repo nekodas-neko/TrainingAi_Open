@@ -6,7 +6,6 @@ import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 import { HRR60_BAR_WINDOW_DAYS, personalHrr60Bar, withHrr60Recovery } from './hrr60'
 import { rmssdFromRr } from '@trainingai/shared/health/rmssd'
-import { workoutHrDensityVerdict } from '@trainingai/shared/health/intraday-hr-contributors'
 
 export interface WorkoutHrComputed {
   readings: { timestamp: Date; bpm: number; source: string | null }[]
@@ -14,9 +13,7 @@ export interface WorkoutHrComputed {
   /** Durable per-set HR rows (migration 139) — persisted so per-exercise HR trends survive the prune. */
   setHrRows: SetHrRow[]
   workoutHrvMs: number | null
-  /** `hrDense` is the calorie gate's density verdict over the session's own span, start to end
-   *  without the pad (#3150), persisted so it outlives the 180-day HR prune. */
-  summary: WorkoutHrSummary & { hrDense: boolean | null }
+  summary: WorkoutHrSummary
 }
 
 /** Compute a completed workout's HR readings, per-set recovery stats, rest-window HRV, and the
@@ -66,9 +63,5 @@ export async function computeWorkoutHr(
     .map(r => ({ atMs: r.at.getTime(), rrMs: r.rrMs }))
   const workoutHrvMs = rmssdFromRr(restRr)
 
-  const startMs = ws.startedAt.getTime()
-  const endMs = ws.completedAt.getTime()
-  const hrDense = workoutHrDensityVerdict(readings.filter(r => r.timestamp.getTime() >= startMs && r.timestamp.getTime() <= endMs))
-
-  return { readings, stats, setHrRows, workoutHrvMs, summary: { ...summariseWorkoutHr(readings, stats, workoutHrvMs), hrDense } }
+  return { readings, stats, setHrRows, workoutHrvMs, summary: summariseWorkoutHr(readings, stats, workoutHrvMs) }
 }

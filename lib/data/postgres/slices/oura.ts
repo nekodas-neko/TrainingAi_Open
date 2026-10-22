@@ -2085,9 +2085,6 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
         workoutHrvMs:  sql`COALESCE(excluded.workout_hrv_ms, ${s.workoutHrStats.workoutHrvMs})`,
         readingsCount: sql`GREATEST(excluded.readings_count, ${s.workoutHrStats.readingsCount})`,
         source:        sql`COALESCE(excluded.source, ${s.workoutHrStats.source})`,
-        // #3150: a fuller compute that judges the span replaces the verdict; one with no reading in
-        // the session's own span has nothing to judge, so the earlier verdict stands.
-        hrDense:       sql`COALESCE(excluded.hr_dense, ${s.workoutHrStats.hrDense})`,
         computedAt:    new Date(),
       },
       setWhere: sql`excluded.readings_count >= ${s.workoutHrStats.readingsCount}`,
@@ -2109,10 +2106,9 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
  * any reading from the ring's BLE, the strap or Oura Cloud keeps its average, as before: whether
  * sparse Oura heart rate should fall back to METs is the owner's call (#3114). Checked here, when the
  * estimate is made, so a snapshot computed before the rule is held to it too. A session with no
- * in-window reading left (past HR retention, or never any) falls back to the verdict stored with its
- * snapshot (`hr_dense`, #3150), so a gated sparse session stays on METs after the prune; a snapshot
- * with no verdict (written before the column) keeps its average, as before. Every calorie surface
- * reads `avg_bpm` through here, so the gate is in one place.
+ * in-window reading left (past HR retention, or never any) keeps its snapshot: there is nothing to
+ * check, and #3150 tracks what that means for a gated session once its series is pruned. Every
+ * calorie surface reads `avg_bpm` through here, so the gate is in one place.
  */
 export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: string[]): Promise<Map<string, number>> {
   if (sessionIds.length === 0) return new Map()
@@ -2120,7 +2116,6 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
   const rows = await db
     .select({
       id: s.workoutHrStats.workoutSessionId, avgBpm: s.workoutHrStats.avgBpm, completedAt: s.workoutSessions.completedAt,
-      hrDense: s.workoutHrStats.hrDense,
       // The session's own series: how many readings, how many from a source the rule does not gate,
       // and the longest gap between consecutive ones.
       span: sql<{ n: number; ungated: number; max_gap_ms: number | null } | null>`(
@@ -2140,10 +2135,8 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
   const usable = (r: (typeof rows)[number]) => {
     if (r.avgBpm == null || r.completedAt == null) return false
     const n = Number(r.span?.n ?? 0)
-    // The series is gone: the verdict stored when it was there decides, and none means it stands.
-    if (n === 0) return r.hrDense !== false
-    // A source #2437 does not gate: the snapshot stands.
-    if (Number(r.span?.ungated ?? 0) > 0) return true
+    // Nothing to check, or a source #2437 does not gate: the snapshot stands.
+    if (n === 0 || Number(r.span?.ungated ?? 0) > 0) return true
     return isDenseHrSpan(n, r.span?.max_gap_ms == null ? null : Number(r.span.max_gap_ms))
   }
   return new Map(rows.filter(usable).map(r => [r.id, r.avgBpm as number]))
@@ -2154,7 +2147,7 @@ export async function getWorkoutHrStats(db: Db, userId: string, sessionId: strin
     .select({
       avgBpm: s.workoutHrStats.avgBpm, peakBpm: s.workoutHrStats.peakBpm, hrr1Best: s.workoutHrStats.hrr1Best,
       workoutHrvMs: s.workoutHrStats.workoutHrvMs, readingsCount: s.workoutHrStats.readingsCount,
-      source: s.workoutHrStats.source, hrDense: s.workoutHrStats.hrDense, computedAt: s.workoutHrStats.computedAt,
+      source: s.workoutHrStats.source, computedAt: s.workoutHrStats.computedAt,
     })
     .from(s.workoutHrStats)
     .where(and(eq(s.workoutHrStats.userId, userId), eq(s.workoutHrStats.workoutSessionId, sessionId)))

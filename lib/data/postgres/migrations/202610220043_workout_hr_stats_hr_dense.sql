@@ -4,15 +4,15 @@
 -- estimate when every in-session reading came from Health Connect or Apple Health and the series is
 -- too sparse to average. It judges that from `oura_heartrate`, which is pruned at 180 days; once the
 -- series is gone it has nothing to read and keeps the average, so a sparse gated session's calories
--- would switch from METs to the HR estimate half a year after it was logged. `hr_dense` records the
--- verdict when the snapshot is computed (`computeWorkoutHr`), and the gate reads it once the series
--- has been pruned.
+-- would switch from METs to the HR estimate half a year after it was logged. `hr_dense` will hold
+-- the gate's verdict, frozen by the prune just before it deletes the session's series, and the gate
+-- will read it from then on.
 --
--- Shipped alone (CLAUDE.md: a migration never rides in a batch with anything else), with the code
--- that writes and reads it. NULL means "never judged": every existing row starts NULL, and the gate
--- treats NULL exactly as it does today (the average stands). A row gains a verdict the next time its
--- snapshot is recomputed while its series is still stored. Today no past session is gated, so no
--- past session's calories move.
+-- Shipped alone, before the code that writes and reads it (CLAUDE.md: a migration never rides in a
+-- batch with anything else; #3147, #3160 and #2983 did the same). `ensureSchema` logs a failed
+-- migration and serves anyway, so code that names the column must not land in the same release as
+-- the column. Until that code lands nothing writes the column, every row has it NULL, and the gate
+-- goes on as today.
 --
 -- Additive only: one nullable column with no default (catalog-only, no rewrite). No existing row is
 -- changed, backfilled or deleted.
@@ -21,8 +21,7 @@
 -- retry it on the next boot) rather than queue writers behind it; `statement_timeout` as a
 -- backstop. Both are SET LOCAL, scoped to this migration's transaction.
 --
--- REVERSE (loses only the verdicts written since; the gate then keeps every pruned snapshot's
--- average, as before this change):
+-- REVERSE (loses only what later code writes into the column; drop that code first):
 --   ALTER TABLE workout_hr_stats DROP COLUMN hr_dense;
 
 SET LOCAL lock_timeout = '3s';
