@@ -18,8 +18,14 @@
 -- retry it on the next boot) rather than queue writers behind it; `statement_timeout` as a
 -- backstop. Both are SET LOCAL, scoped to this migration's transaction.
 --
--- REVERSE (loses only the tombstones written into it):
+-- REVERSE (loses only the tombstones written into it). claude_ro.oura_sessions names the column, so
+-- the view goes first, or the DROP COLUMN fails:
+--   DROP VIEW IF EXISTS claude_ro.oura_sessions;
 --   ALTER TABLE oura_sessions DROP COLUMN deleted_at;
+-- The boot rebuild of claude-ro-views.sql recreates the view, once the column is out of schema.ts and
+-- the file is regenerated without it. That rebuild is gated on the file's hash in schema_migrations:
+-- if the regenerated file matches one already recorded (the pre-#3153 views), delete that marker row
+-- so the next boot applies it.
 
 SET LOCAL lock_timeout = '3s';
 SET LOCAL statement_timeout = '30s';
