@@ -16,7 +16,8 @@ import { isAmrap, weightStep } from '../logging/targets';
 import { displayLoad, storedLoad } from '../logging/preferences';
 import { EffortPicker } from './EffortPicker';
 import { VoiceLogButton } from './VoiceLogButton';
-import { voiceSetValues } from '../voice/voice';
+import { applyHeardSet } from '../voice/voice';
+import { useVoiceEngine } from '../voice/useVoiceEngine';
 
 export function SetEntry({
   workout,
@@ -24,15 +25,19 @@ export function SetEntry({
   set,
   index,
   fill = false,
+  voice = true,
 }: {
   workout: WorkoutRecord;
   exercise: WorkoutExercise;
   set: WorkoutSet;
   index: number;
   fill?: boolean;
+  /** Off for a set already recorded: a heard phrase would rewrite saved data with no undo. */
+  voice?: boolean;
 }) {
   const journal = useWorkoutJournal();
   const { theme, textScale } = useTheme();
+  const voiceEngine = useVoiceEngine(voice);
   const [controlsLayout, setControlsLayout] = useState({ width: 0, height: 0 });
   const [assistanceHeight, setAssistanceHeight] = useState(0);
   const minimumRow = Math.max(
@@ -56,10 +61,13 @@ export function SetEntry({
     theme.sizes.loggingControl +
     theme.typography.caption.lineHeight! * textScale +
     theme.spacing.sm +
-    theme.sizes.touchTarget +
-    theme.typography.caption.lineHeight! * textScale +
-    theme.spacing.xs +
-    theme.spacing.md * 3;
+    (voiceEngine
+      ? theme.spacing.md +
+        theme.sizes.touchTarget +
+        theme.spacing.xs +
+        theme.typography.caption.lineHeight! * textScale
+      : 0) +
+    theme.spacing.md * 2;
   const columnStyle =
     columnWidth === undefined
       ? { flex: 1, flexBasis: 0, minWidth: 0 }
@@ -81,15 +89,14 @@ export function SetEntry({
   );
   const step = unit === 'lb' ? 2.5 : weightStep(exercise.equipment);
   const applyVoice = useCallback(
-    (heard: { weight?: number; reps?: number }) => {
-      const { weight, reps } = voiceSetValues(heard, step, unit);
-      if (weight !== undefined) {
-        controller?.updateSet(workout.id, exercise.id, set.id, 'weight', weight);
-      }
-      if (reps !== undefined) {
-        controller?.updateSet(workout.id, exercise.id, set.id, 'reps', reps);
-      }
-    },
+    (heard: { weight?: number; reps?: number }) =>
+      applyHeardSet(
+        controller,
+        { workoutId: workout.id, exerciseId: exercise.id, setId: set.id },
+        heard,
+        step,
+        unit,
+      ),
     [controller, step, unit, workout.id, exercise.id, set.id],
   );
   const units = (
@@ -172,7 +179,9 @@ export function SetEntry({
           </Disclosure>
         </View>
       )}
-      <VoiceLogButton onResult={applyVoice} disabled={journal.busy} />
+      {voiceEngine && (
+        <VoiceLogButton engine={voiceEngine} onResult={applyVoice} disabled={journal.busy} />
+      )}
       <EffortPicker
         set={set}
         disabled={journal.busy}

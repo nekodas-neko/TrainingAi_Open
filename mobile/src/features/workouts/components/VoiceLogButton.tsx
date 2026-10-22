@@ -1,36 +1,33 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { VOICE_LOG_EXAMPLE } from '@trainingai/shared/workout/voice-log';
-import { createSpeechEngine } from '../../../integrations/speech/platform';
 import { AppButton, AppText, Stack } from '../../../shared/ui';
-import { captureSet } from '../voice/voice';
+import { captureSet, type SpeechEngine } from '../voice/voice';
 
 /**
- * Speaks a set into the wheels. It never logs: the user still taps Log Set. Hidden where speech
- * recognition is missing (web, or an app build made before the module existed).
+ * Speaks a set into the wheels. It never logs: the user still taps Log Set. The caller passes an
+ * engine only where speech can run (`useVoiceEngine`), so there is nothing to draw otherwise.
  */
 export function VoiceLogButton({
+  engine,
   onResult,
   disabled = false,
 }: {
-  onResult: (result: { weight?: number; reps?: number }) => void;
+  engine: SpeechEngine;
+  /** False when the values could not be put on the wheels. */
+  onResult: (result: { weight?: number; reps?: number }) => Promise<boolean>;
   disabled?: boolean;
 }) {
-  const engine = useMemo(() => {
-    const created = createSpeechEngine();
-    return created?.available() ? created : null;
-  }, []);
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const mounted = useRef(true);
-  useEffect(
-    () => () => {
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
       mounted.current = false;
-      engine?.stop();
-    },
-    [engine],
-  );
+      engine.stop();
+    };
+  }, [engine]);
   const press = useCallback(async () => {
-    if (!engine) return;
     if (listening) {
       engine.stop();
       return;
@@ -40,10 +37,13 @@ export function VoiceLogButton({
     const outcome = await captureSet(engine);
     if (!mounted.current) return;
     setListening(false);
-    if (outcome.kind === 'set') onResult(outcome);
-    else setError(outcome.message);
+    if (outcome.kind === 'message') {
+      setError(outcome.message);
+      return;
+    }
+    const applied = await onResult(outcome);
+    if (mounted.current && !applied) setError('Could not apply that — try again');
   }, [engine, listening, onResult]);
-  if (!engine) return null;
   return (
     <Stack align="center" gap="xs">
       <AppButton
@@ -54,7 +54,12 @@ export function VoiceLogButton({
         disabled={disabled}
         onPress={() => void press()}
       />
-      <AppText variant="caption" tone={error ? 'danger' : 'muted'} style={{ textAlign: 'center' }}>
+      <AppText
+        variant="caption"
+        tone={error ? 'danger' : 'muted'}
+        numberOfLines={1}
+        style={{ textAlign: 'center' }}
+      >
         {error ?? (listening ? 'Say the weight and reps' : `Say "${VOICE_LOG_EXAMPLE}"`)}
       </AppText>
     </Stack>

@@ -37,8 +37,11 @@ export async function captureSet(engine: SpeechEngine): Promise<VoiceOutcome> {
     if (!transcript) return message('Did not catch that');
     const { weight, reps } = parseVoice(transcript);
     if (weight === undefined && reps === undefined) {
-      return message(`Didn't understand "${transcript}" — try "${VOICE_LOG_EXAMPLE}"`);
+      return message(`Didn't catch that — try "${VOICE_LOG_EXAMPLE}"`);
     }
+    // 0-500 in the spoken unit, the same bounds the wheels and the log schema enforce. The current
+    // app also rounds through mroundStep, whose 5-250 kg bar limits would cap a heavy lb figure
+    // and refuse a light added load; the wheel's own step does the rounding here.
     return { kind: 'set', ...clampVoiceLogResult(weight, reps) };
   } catch (error) {
     if (error instanceof SpeechError) {
@@ -66,4 +69,36 @@ export function voiceSetValues(
     }),
     ...(heard.reps !== undefined && { reps: String(heard.reps) }),
   };
+}
+
+type SetController = {
+  updateSet(
+    workoutId: string,
+    exerciseId: string,
+    setId: string,
+    field: 'weight' | 'reps',
+    value: string,
+  ): Promise<boolean>;
+};
+
+/**
+ * Puts a heard set on the wheels. It only edits the set's fields and never records it. False when
+ * the journal refused an edit (busy), so the caller can say the values were not applied.
+ */
+export async function applyHeardSet(
+  controller: SetController | null | undefined,
+  ids: { workoutId: string; exerciseId: string; setId: string },
+  heard: { weight?: number; reps?: number },
+  step: number,
+  unit: 'kg' | 'lb',
+): Promise<boolean> {
+  if (!controller) return false;
+  const { weight, reps } = voiceSetValues(heard, step, unit);
+  const edits = [
+    weight !== undefined &&
+      controller.updateSet(ids.workoutId, ids.exerciseId, ids.setId, 'weight', weight),
+    reps !== undefined &&
+      controller.updateSet(ids.workoutId, ids.exerciseId, ids.setId, 'reps', reps),
+  ].filter((edit) => edit !== false);
+  return (await Promise.all(edits)).every(Boolean);
 }
