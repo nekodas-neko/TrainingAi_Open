@@ -210,7 +210,7 @@ the code. Do not edit between the markers; CI compares this block with a fresh r
 | `oura_raw_samples` | NATIVE DEVICE STORE + SERVER ARCHIVE | native `raw` | — | excluded (raw-frames) | cascade | native oura_raw.db (raw / clock_anchors) uploads to the server archive; 14-day device window not shipped |
 | `oura_redecode_jobs` | SERVER-ONLY | — | — | excluded (ops) | cascade | server job queue; writer: oura.ts |
 | `oura_rollup_state` | SERVER-ONLY | — | — | excluded (ops) | cascade | server rollup cursor; writer: oura.ts |
-| `oura_sessions` | SERVER-ONLY | — | — | exported | cascade | Oura Cloud connector -> server (#2982); session series and mood, read by no screen |
+| `oura_sessions` | SERVER-ONLY | — | yes | exported | cascade | Oura Cloud connector -> server (#2982); session series and mood; the day timeline reads it (#3077) |
 | `oura_tags` | SERVER-ONLY | — | — | exported | cascade | sensor ingest -> server; writer: none found by static grep (raw SQL / script) |
 | `oura_tokens` | SERVER-ONLY | — | — | excluded (credentials) | cascade | integration secret (Oura Cloud: gone for good); writer: none found by static grep (raw SQL / script) |
 | `oura_workouts` | SERVER-ONLY | — | yes | exported | cascade | sensor ingest -> server; writer: oura.ts |

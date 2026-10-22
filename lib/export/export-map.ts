@@ -49,6 +49,8 @@ export const SOFT_DELETED: Record<string, string> = {
   mood_logs: 'deleted_at',
   // #3087: a workout deleted in the Oura app
   oura_workouts: 'deleted_at',
+  // #3153: a session deleted in the Oura app
+  oura_sessions: 'deleted_at',
   plan_meal_answers: 'deleted_at',
   blood_panels: 'deleted_at',
   prescribed_runs: 'deleted_at',

@@ -2198,6 +2198,8 @@ export const ouraSessions = pgTable('oura_sessions', {
   heartRateVariability: jsonb('heart_rate_variability').$type<OuraSampleSeries>(),
   motionCount:          jsonb('motion_count').$type<OuraSampleSeries>(),
   updatedAt:            timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  /** #3153: set when Oura reports the session deleted; the row is kept, and every reader skips it. */
+  deletedAt:            timestamp('deleted_at', { withTimezone: true }),
 }, t => [
   primaryKey({ columns: [t.userId, t.ouraId] }),
   index('oura_sessions_user_day_idx').on(t.userId, t.day),
