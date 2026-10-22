@@ -77,3 +77,36 @@ test('a compact toggle keeps a 48 px touch target through hitSlop (#2901)', asyn
   assert.match(toggle, /hitSlop=\{\{ top: hit, bottom: hit \}\}/);
   assert.match(toggle, /theme\.sizes\.touchTarget - theme\.sizes\.compactToggle/);
 });
+
+test('More switches views with separate pills, the active one filled (#2902)', async () => {
+  const more = await read('features/settings/screens/MoreScreen.tsx');
+  assert.match(more, /appearance="tabs"/);
+  const control = await read('shared/ui/SegmentedControl.tsx');
+  assert.match(control, /appearance === 'tabs'/);
+  assert.match(control, /backgroundColor: active \? theme\.colors\.text/);
+});
+
+test('More words its rows and actions as the current app does (#2902)', async () => {
+  const more = await read('features/settings/screens/MoreScreen.tsx');
+  assert.match(more, /title="Goals"/);
+  assert.match(more, /Activity level, targets & AI recommendations/);
+  for (const title of ['Report an Issue', 'Edit Profile', 'Sign Out']) {
+    assert.ok(more.includes(`title="${title}"`), title);
+  }
+  assert.match(more, /View →/);
+  assert.match(more, /icon="settings"[\s\S]{0,80}alignSelf: 'flex-start'/, 'a small Edit Profile button with a gear');
+});
+
+test('the setup rows carry the current app’s per-row icons and no dividers (#2902)', async () => {
+  const more = await read('features/settings/screens/MoreScreen.tsx');
+  for (const icon of ['userRound', 'scan', 'bluetooth', 'cat', 'cloudDownload', 'shieldPlain']) {
+    assert.ok(more.includes(`name="${icon}"`), icon);
+  }
+  assert.doesNotMatch(more, /density="compact"[\s\S]{0,200}title="Profile details"/);
+});
+
+test('the friend code is monospace, as in the current app (#2902)', async () => {
+  const code = await read('features/social/components/FriendCode.tsx');
+  assert.match(code, /\bmono\b/);
+  assert.match(await read('shared/ui/AppText.tsx'), /fontFamily: Platform\.select/);
+});

@@ -12,6 +12,7 @@ export function SegmentedControl<T extends string>({
   onChange,
   animated = false,
   position,
+  appearance = 'brand',
 }: {
   label: string;
   options: readonly { label: string; value: T }[];
@@ -19,6 +20,8 @@ export function SegmentedControl<T extends string>({
   onChange: (value: T) => void;
   animated?: boolean;
   position?: Animated.AnimatedInterpolation<number>;
+  /** 'tabs' is the current app's SegmentedTabs: separate pills, the active one filled in text colour. */
+  appearance?: 'brand' | 'tabs';
 }) {
   const { theme } = useTheme();
   const [width, setWidth] = useState(0);
@@ -44,6 +47,46 @@ export function SegmentedControl<T extends string>({
     previousWidth.current = width;
     return () => offset.stopAnimation();
   }, [index, cellWidth, width, animated, reduced, offset, position]);
+  if (appearance === 'tabs') {
+    return (
+      <View accessibilityLabel={label} style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
+        {options.map((option) => {
+          const active = value === option.value;
+          return (
+            <Pressable
+              key={option.value}
+              accessibilityRole="radio"
+              accessibilityLabel={option.label}
+              accessibilityState={{ checked: active }}
+              aria-checked={active}
+              onPress={() => {
+                if (!active) feedback();
+                onChange(option.value);
+              }}
+              style={{
+                flex: 1,
+                minHeight: theme.sizes.touchTarget,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: theme.radii.control,
+                backgroundColor: active ? theme.colors.text : `${theme.colors.raised}80`,
+              }}
+            >
+              <AppText
+                variant="caption"
+                style={{
+                  fontWeight: '600',
+                  color: active ? theme.colors.background : theme.colors.muted,
+                }}
+              >
+                {option.label}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
   return (
     <View
       accessibilityLabel={label}
