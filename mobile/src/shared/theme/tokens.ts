@@ -20,6 +20,9 @@ export const sizes = {
   // The current app floors every button at 48 px (app/globals.css, "Minimum tap target size").
   touchTarget: 48,
   button: 48,
+  // The drawn height of a control that is not a button in the current app (a segmented-control cell).
+  // Its hit area stays touchTarget: the control carries hitSlop for the difference (#3248).
+  control: 40,
   icon: 24,
   iconSmall: 20,
   emphasizedIcon: 28,
@@ -27,7 +30,8 @@ export const sizes = {
   profileAvatar: 96,
   navigation: 80,
   workoutButton: 56,
-  loggingControl: 64,
+  // active-set-card.tsx: the stepper buttons are w-14 h-14 (#3248).
+  loggingControl: 56,
   setProgressCard: 144,
   workoutLift: 24,
   contentWidth: 680,
@@ -55,6 +59,8 @@ export const sizes = {
   mealLabel: 189,
   foodThumbnail: 32,
   healthHero: 260,
+  // Held at 64 on purpose (#3248): the selected value is the 48 px display numeral (56 line height),
+  // and SetEntry floors a row at that plus 8, so a smaller token would change nothing but the stepper.
   wheelRow: 64,
   demonstration: 64,
   summaryWidth: 320,
@@ -64,7 +70,8 @@ export const sizes = {
   // hr-day-chart.tsx and the cardio trend charts are h-40.
   hrChartHeight: 160,
   miniChart: 48,
-  metricValue: 48,
+  // hero line (30) plus 6, so the row that opens a history keeps a 48 hit area through hitSlop (#3248).
+  metricValue: 36,
   compactMetricWidth: 104,
   actionTile: 112,
   weekVolumeChart: 128,

@@ -58,7 +58,9 @@ export function MetricCard({
       style={{
         minHeight: dense
           ? (theme.typography.caption.lineHeight ?? theme.spacing.xl) * 2
-          : theme.sizes.touchTarget,
+          : onLog
+            ? theme.sizes.touchTarget
+            : undefined,
       }}
     >
       <Stack
@@ -100,6 +102,10 @@ export function MetricCard({
         {!dense && header}
         <Pressable
           disabled={!canAct}
+          hitSlop={{
+            top: (theme.sizes.touchTarget - theme.sizes.metricValue) / 2,
+            bottom: (theme.sizes.touchTarget - theme.sizes.metricValue) / 2,
+          }}
           onPress={onOpen ?? onLog}
           onLongPress={canAct ? more : undefined}
           accessibilityActions={
