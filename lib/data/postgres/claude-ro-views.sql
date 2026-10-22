@@ -1916,7 +1916,8 @@ SELECT
   t.workout_hrv_ms,
   t.readings_count,
   t.source,
-  t.computed_at
+  t.computed_at,
+  t.hr_dense
 FROM public.workout_hr_stats t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

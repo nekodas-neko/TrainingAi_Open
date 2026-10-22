@@ -1683,6 +1683,9 @@ export const workoutHrStats = pgTable('workout_hr_stats', {
   readingsCount:    integer('readings_count').notNull().default(0),
   source:           text('source'),
   computedAt:       timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+  // #3150: the #2437 density verdict over the session's own series, so the calorie gate survives
+  // the 180-day HR prune. Null = never judged (rows before the column, or no reading in the span).
+  hrDense:          boolean('hr_dense'),
 })
 
 // Per-SET HR metric snapshot (migration 139, plan 2026-07-21-per-set-hr-metrics). Sibling of
