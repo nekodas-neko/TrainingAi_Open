@@ -1199,14 +1199,18 @@ export interface OuraSessionRow {
 }
 
 /** The user's Oura sessions (meditation, breathing, nap, rest …) on local days `[fromDay, toDay]`, by
- *  Oura's own `day`, oldest first (#3077: the timeline's source now that `oura_tags` has no writer). */
+ *  Oura's own `day`, oldest first (#3077: the timeline's source now that `oura_tags` has no writer).
+ *  A session deleted in the Oura app is tombstoned, and left out (#3153). */
 export async function listOuraSessions(db: Db, userId: string, fromDay: string, toDay: string) {
   return db.select({
     ouraId: s.ouraSessions.ouraId, sessionType: s.ouraSessions.sessionType, mood: s.ouraSessions.mood,
     startDatetime: s.ouraSessions.startDatetime, endDatetime: s.ouraSessions.endDatetime,
   })
     .from(s.ouraSessions)
-    .where(and(eq(s.ouraSessions.userId, userId), gte(s.ouraSessions.day, fromDay), lte(s.ouraSessions.day, toDay)))
+    .where(and(
+      eq(s.ouraSessions.userId, userId), gte(s.ouraSessions.day, fromDay), lte(s.ouraSessions.day, toDay),
+      isNull(s.ouraSessions.deletedAt),
+    ))
     .orderBy(asc(s.ouraSessions.startDatetime))
 }
 
@@ -1222,9 +1226,44 @@ export async function upsertOuraSessions(db: Db, userId: string, rows: OuraSessi
         startDatetime: sql`excluded.start_datetime`, endDatetime: sql`excluded.end_datetime`, mood: sql`excluded.mood`,
         heartRate: sql`excluded.heart_rate`, heartRateVariability: sql`excluded.heart_rate_variability`,
         motionCount: sql`excluded.motion_count`, updatedAt: sql`now()`,
+        // #3153: a session Oura sends again is live again, as a re-sent workout is (#3087).
+        deletedAt: sql`NULL`,
       },
     })
   return values.length
+}
+
+/**
+ * #3153: tombstones sessions the user deleted in the Oura app (a `session` delete event). The row is
+ * kept and marked, never deleted; `listOuraSessions` leaves it out. Only this user's rows. Moves
+ * `updated_at`, so anything pulling by it sees the change. Returns the rows newly tombstoned.
+ */
+export async function tombstoneOuraSessions(db: Db, userId: string, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  const t = s.ouraSessions
+  const rows = await db.update(t)
+    .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
+    .where(and(eq(t.userId, userId), inArray(t.ouraId, ids), isNull(t.deletedAt)))
+    .returning({ ouraId: t.ouraId })
+  return rows.length
+}
+
+/**
+ * #3153: tombstones this user's sessions on `from`..`to` (Oura's `day`) that are not in `keepIds`,
+ * the full list Oura just returned for those days: the catch-up for a missed delete event, the
+ * same sweep as `tombstoneOuraWorkoutsAbsent`. The caller passes only days it read completely.
+ */
+export async function tombstoneOuraSessionsAbsent(
+  db: Db, userId: string, range: { from: string; to: string; keepIds: string[] },
+): Promise<number> {
+  const t = s.ouraSessions
+  const conditions = [eq(t.userId, userId), gte(t.day, range.from), lte(t.day, range.to), isNull(t.deletedAt)]
+  if (range.keepIds.length > 0) conditions.push(sql`${t.ouraId} NOT IN (${sql.join(range.keepIds.map(id => sql`${id}`), sql`, `)})`)
+  const rows = await db.update(t)
+    .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
+    .where(and(...conditions))
+    .returning({ ouraId: t.ouraId })
+  return rows.length
 }
 
 /**
