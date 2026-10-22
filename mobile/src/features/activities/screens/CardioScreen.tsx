@@ -87,10 +87,10 @@ export function CardioScreen({
   const others = day ? day.activities.length - (credited ? 1 : 0) : 0;
   const unmeasured =
     !!day && day.activities.length > 0 && day.activities.every((row) => row.effortMin == null);
-  const latest = latestBaselines([
-    ...(baselines.data?.fitnessTests ?? []),
-    ...activity.tests.map((row) => row.payload),
-  ]);
+  const latest = latestBaselines(
+    baselines.data?.fitnessTests ?? [],
+    activity.tests.map((row) => row.payload),
+  );
   const recommendation = data
     ? recommendSession({
         minutesAvailable: minutes,
