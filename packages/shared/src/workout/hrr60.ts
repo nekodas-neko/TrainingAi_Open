@@ -46,6 +46,13 @@ function nearestWithin(sorted: SourcedReading[], targetMs: number, tolMs: number
  * HRR60 for a set ending at `setEndMs`, or null when the series is not dense enough to measure it.
  * Pure and total: unsorted input, non-finite values and an empty series all give null, never a throw.
  */
+/** The instant a set's rest is measured from: the timed set end, else the time it was logged. The ONE
+ *  anchor — the live writer (`computeSetHrStats`) and the `backfill-set-hrr1` job both read it, so a
+ *  timed set cannot get one HRR60 from the writer and another from the backfill (#3238). */
+export function setRestAnchorMs(setEndMs: number | null | undefined, loggedAt: Date | null | undefined): number | null {
+  return setEndMs ?? loggedAt?.getTime() ?? null
+}
+
 export function deriveHrr60(readings: readonly SourcedReading[], setEndMs: number | null): Hrr60 | null {
   return deriveHrrAt(readings, setEndMs, HRR60_OFFSET_MS)
 }
