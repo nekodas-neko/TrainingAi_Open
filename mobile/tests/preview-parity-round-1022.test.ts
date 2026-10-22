@@ -49,3 +49,31 @@ test('Week in review draws a bare brand icon rather than a tile (#2900)', async 
   const hub = await read('shared/ui/HubCard.tsx');
   assert.match(hub, /iconTile \?/);
 });
+
+test('the strength card is Estimated 1RM with a dumbbell and a small Sets | 1RM toggle on its title row (#2901)', async () => {
+  const panel = await read('features/health/components/ProgressPanel.tsx');
+  assert.match(panel, /title=\{'Estimated 1RM'\}/);
+  assert.match(panel, /icon="workout"/);
+  assert.match(panel, /<CompactToggle[\s\S]{0,80}appearance="tint"/);
+  assert.doesNotMatch(panel, /Strength Progress/);
+});
+
+test('the Goals period toggle shares the title row, and the Trends note is an inset box with an info icon (#2901)', async () => {
+  const panel = await read('features/health/components/ProgressPanel.tsx');
+  assert.match(panel, /<CompactToggle[\s\S]{0,80}appearance="pill"/);
+  assert.doesNotMatch(panel, /SegmentedControl/);
+  assert.match(panel, /<Icon name="info"/);
+  assert.match(panel, /meaningful — keep logging/);
+});
+
+test('the Strength Trend gain is plain coloured text, not a filled pill (#2901)', async () => {
+  const screen = await read('features/progress/StrengthScreen.tsx');
+  assert.doesNotMatch(screen, /label=\{\(exercise\.gainPct/);
+  assert.match(screen, /theme\.progress\.trendUp/);
+});
+
+test('a compact toggle keeps a 48 px touch target through hitSlop (#2901)', async () => {
+  const toggle = await read('shared/ui/CompactToggle.tsx');
+  assert.match(toggle, /hitSlop=\{\{ top: hit, bottom: hit \}\}/);
+  assert.match(toggle, /theme\.sizes\.touchTarget - theme\.sizes\.compactToggle/);
+});

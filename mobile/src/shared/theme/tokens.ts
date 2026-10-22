@@ -70,6 +70,8 @@ export const sizes = {
   weekVolumeChart: 128,
   timelineMarker: 28,
   timelineRow: 72,
+  // The small title-row toggles (strength-progress-card.tsx, goals-progress-card.tsx): py-1 on 10-12 px type.
+  compactToggle: 28,
 };
 // Sizes are the current app's CSS px at its 384 px width, which is 384 dp on the S25 Ultra, so they
 // carry across one for one. Each comment names the class the current app uses for that role, and

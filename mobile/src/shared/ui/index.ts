@@ -58,6 +58,7 @@ export { ColorSwatches, nativeColor } from './ColorSwatches';
 export { ChoiceTiles } from './ChoiceTiles';
 export { MonthCalendar } from './MonthCalendar';
 export { StackedBarChart } from './StackedBarChart';
+export { CompactToggle } from './CompactToggle';
 export { Legend } from './Legend';
 export { Skeleton } from './Skeleton';
 export { RetainedView } from './RetainedView';

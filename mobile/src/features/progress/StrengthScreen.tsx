@@ -111,16 +111,21 @@ export function StrengthScreen({
                       {displayOneRm(exercise.currentRm, exercise.exerciseType).text}
                     </AppText>
                     {exercise.gainPct !== null && (
-                      <Badge
-                        label={(exercise.gainPct > 0 ? '+' : '') + exercise.gainPct + '%'}
-                        tone={
-                          exercise.gainPct > 0
-                            ? 'activity'
-                            : exercise.gainPct < 0
-                              ? 'heart'
-                              : 'recovery'
-                        }
-                      />
+                      <AppText
+                        variant="caption"
+                        style={{
+                          fontWeight: '600',
+                          fontVariant: ['tabular-nums'],
+                          color:
+                            exercise.gainPct > 0
+                              ? theme.progress.trendUp
+                              : exercise.gainPct < 0
+                                ? theme.progress.trendDown
+                                : theme.tones.recovery.foreground,
+                        }}
+                      >
+                        {(exercise.gainPct > 0 ? '+' : '') + exercise.gainPct + '%'}
+                      </AppText>
                     )}
                   </Stack>
                   {projection && (
