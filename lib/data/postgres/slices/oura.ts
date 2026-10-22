@@ -2411,15 +2411,17 @@ export async function getSetHrStatsSince(db: Db, userId: string, since: Date, li
 }
 
 /** Every stored per-set row's HRR60 inputs — the work-list for the `hrr1_bpm` backfill (#2457),
- *  grouped by session by the caller so each session's HR window is fetched once. Oldest first. */
+ *  grouped by session by the caller so each session's HR window is fetched once. Oldest first.
+ *  `setEndMs` is the set log's current `set_end_ms` (#3238), so the backfill anchors as the writer does. */
 export async function listSetHrStatsForHrr1Backfill(db: Db, userId: string) {
   return db
     .select({
       setLogId: s.setHrStats.setLogId, workoutSessionId: s.setHrStats.workoutSessionId,
-      loggedAt: s.setHrStats.loggedAt, hrr1Bpm: s.setHrStats.hrr1Bpm, restAdequate: s.setHrStats.restAdequate,
+      loggedAt: s.setHrStats.loggedAt, setEndMs: s.setLogs.setEndMs, hrr1Bpm: s.setHrStats.hrr1Bpm, restAdequate: s.setHrStats.restAdequate,
       drop30s: s.setHrStats.drop30s, drop60s: s.setHrStats.drop60s, drop90s: s.setHrStats.drop90s, drop120s: s.setHrStats.drop120s,
     })
     .from(s.setHrStats)
+    .innerJoin(s.setLogs, eq(s.setHrStats.setLogId, s.setLogs.id))
     .where(eq(s.setHrStats.userId, userId))
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setLogId))
 }
