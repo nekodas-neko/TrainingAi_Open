@@ -20,12 +20,15 @@ test('the Training headline groups thousands and agrees with the session count',
 test('the training chart writes thousands as 4k / 2k over a bare 0', () => {
   assert.deepEqual([4000, 2000, 0].map(volumeTickLabel), ['4k', '2k', '0']);
   assert.equal(volumeTickLabel(12500), '13k');
+  // A light week keeps plain numbers rather than 0k / 1k / 1k.
+  assert.deepEqual([0, 250, 500, 750].map(volumeTickLabel), ['0', '250', '500', '750']);
+  assert.equal(volumeTickLabel(1000), '1k');
 });
 
 test('the digest flows bullets and headings into one paragraph', () => {
   assert.equal(
     flowDigest('## Week\n- You trained **5** times.\n\n* Sleep held at 7 h.\n• HRV rose.'),
-    'Week You trained **5** times. Sleep held at 7 h. HRV rose.',
+    'You trained **5** times. Sleep held at 7 h. HRV rose.',
   );
   assert.equal(flowDigest('One line.'), 'One line.');
   assert.equal(flowDigest(''), '');

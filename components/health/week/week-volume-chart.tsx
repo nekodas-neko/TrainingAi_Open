@@ -71,7 +71,11 @@ export function WeekVolumeChart({ byDay }: Props) {
           color: resolveColor('var(--muted-foreground)'),
           font: { size: 9 },
           maxTicksLimit: 4,
-          callback: v => `${Math.round(Number(v) / 1000)}k`,
+          // Under 1,000 kg a light week's ticks (250 / 500 / 750) must not round to "0k" / "1k".
+          callback: v => {
+            const n = Number(v)
+            return n === 0 ? '0' : n < 1000 ? String(n) : `${Math.round(n / 1000)}k`
+          },
         },
         grid: { color: resolveColor('var(--border)') },
       },
