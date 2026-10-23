@@ -72,6 +72,8 @@ export const sizes = {
   timelineMarker: 36,
   // home-nutrition-card.tsx: the ring is w-[58px] h-[58px].
   homeNutritionRing: 58,
+  // The same ring's stroke: its mask clears the inner 60% of the radius, so 40% of 29 px.
+  homeNutritionRingStroke: 11.6,
 };
 // Sizes are the current app's CSS px at its 384 px width, which is 384 dp on the S25 Ultra, so they
 // carry across one for one. Each comment names the class the current app uses for that role, and
@@ -152,6 +154,10 @@ export const typography = {
   // home-nutrition-card.tsx: the ring's centre, text-[9px] font-extrabold over a text-[7px] word.
   ringValue: { fontSize: 9, lineHeight: 9, fontWeight: '800' },
   ringWord: { fontSize: 7, lineHeight: 7 },
+  // body-battery-card.tsx: the level and the figure in the header, text-xl leading-none.
+  batteryValue: { fontSize: 20, lineHeight: 20, fontWeight: '700' },
+  // recommendation-card.tsx: the soreness chip, text-[10px] font-semibold leading-none.
+  chipLabel: { fontSize: 10, lineHeight: 10, fontWeight: '600' },
   // trend-sparkline.tsx: chart.js x ticks at font size 9, so 14 weekday labels fit the plot.
   axisTick: { fontSize: 9, lineHeight: 13.5 },
   // trend-sparkline.tsx: chart.js y ticks at font size 8, a 14-day card's value labels.
@@ -198,6 +204,17 @@ export type TextVariant = keyof typeof typography;
 export const statusColors = {
   light: { success: '#177a3c', warning: '#b04e06', danger: '#b91c1c', info: '#1d4ed8' },
   dark: { success: '#22c55e', warning: '#f59e0b', danger: '#ef4444', info: '#60a5fa' },
+};
+// home-day-timeline.tsx TYPE_ICON_COLOR: the 400 steps of indigo, blue, orange and green on a dark
+// card; a light card takes the darker steps so an icon stays readable.
+export const timelineHues = {
+  light: {
+    sleep: '#4338ca',
+    walk: statusColors.light.info,
+    meal: '#c2410c',
+    ready: statusColors.light.success,
+  },
+  dark: { sleep: '#818cf8', walk: '#60a5fa', meal: '#fb923c', ready: '#4ade80' },
 };
 // The muscle map and the good / watch / bad cues. Dark is unchanged. Light takes the status steps
 // for the three signals and a pale grey for an untrained muscle and the head, which were

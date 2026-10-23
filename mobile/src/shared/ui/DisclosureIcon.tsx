@@ -4,7 +4,7 @@ import { Icon } from './Icon';
 import { useReducedMotion } from './useReducedMotion';
 import { useTheme } from '../theme/ThemeProvider';
 
-export function DisclosureIcon({ expanded }: { expanded: boolean }) {
+export function DisclosureIcon({ expanded, size }: { expanded: boolean; size?: number }) {
   const { theme } = useTheme();
   const reduced = useReducedMotion();
   const rotation = useRef(new Animated.Value(expanded ? 1 : 0)).current;
@@ -30,7 +30,7 @@ export function DisclosureIcon({ expanded }: { expanded: boolean }) {
         ],
       }}
     >
-      <Icon name="expand" size={theme.sizes.iconSmall} tone="muted" />
+      <Icon name="expand" size={size ?? theme.sizes.iconSmall} tone="muted" />
     </Animated.View>
   );
 }

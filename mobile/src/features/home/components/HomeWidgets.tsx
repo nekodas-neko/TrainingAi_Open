@@ -137,11 +137,7 @@ export function HomeMetricTiles({
             dense
             centered
             label={metricLabels[key as keyof typeof metricLabels]}
-            value={metricValue(
-              value.value,
-              '',
-              key === 'weightKg' || key === 'distanceKm' ? 1 : 0,
-            )}
+            value={metricValue(value.value, '', key === 'weightKg' || key === 'distanceKm' ? 1 : 0)}
             unit={value.unit}
             icon={value.icon}
             accent={tileColor}
@@ -217,10 +213,7 @@ export function HomeWidget(props: WidgetProps) {
     );
   if (props.id === 'hrChartWidget')
     return (
-      <ResourceWidget
-        spec={hrSpec(today)}
-        render={(hr) => <HomeWidgetBody {...props} hr={hr} />}
-      />
+      <ResourceWidget spec={hrSpec(today)} render={(hr) => <HomeWidgetBody {...props} hr={hr} />} />
     );
   if (props.id === 'nutritionDonut' || props.id === 'energyBalanceWidget')
     return (
@@ -285,7 +278,7 @@ function HomeWidgetBody({
             <SegmentRing
               label="Calories toward today’s budget"
               size={theme.sizes.homeNutritionRing}
-              thickness={theme.sizes.homeNutritionRing * 0.2}
+              thickness={theme.sizes.homeNutritionRingStroke}
               value={total && goal ? total.calories / goal : 0}
               segments={[{ share: 1, color: theme.colors.brand }]}
             >
@@ -303,7 +296,7 @@ function HomeWidgetBody({
                 </AppText>
                 <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
                   {goal === null
-                    ? metricValue(total?.calories, 'kcal')
+                    ? ''
                     : `${Math.round(total?.calories ?? 0).toLocaleString()} / ${Math.round(goal).toLocaleString()} kcal`}
                 </AppText>
               </Stack>
@@ -417,9 +410,7 @@ function HomeWidgetBody({
           <Stack direction="row" align="center">
             <Stack style={{ flex: 1 }} gap="xs">
               {title('Body Weight')}
-              <AppText variant="hero">
-                {metricValue(health.body?.latestWeightKg, 'kg', 1)}
-              </AppText>
+              <AppText variant="hero">{metricValue(health.body?.latestWeightKg, 'kg', 1)}</AppText>
               <AppText variant="micro" tone="muted">
                 Last {days} days
               </AppText>
@@ -554,8 +545,7 @@ function HomeWidgetBody({
   if (id === 'stepsWidget') {
     const weekly = goals?.data?.stepsGoalType === 'weekly';
     const value = weekly ? health.body?.weekToDate?.steps : today?.steps;
-    const goal =
-      goals?.data?.stepsGoal == null ? null : goals.data.stepsGoal * (weekly ? 7 : 1);
+    const goal = goals?.data?.stepsGoal == null ? null : goals.data.stepsGoal * (weekly ? 7 : 1);
     const rows = (health.body?.recent ?? []).slice(0, 7).reverse();
     const max = Math.max(1, ...rows.map((row) => row.steps ?? 0));
     return (
@@ -595,10 +585,7 @@ function HomeWidgetBody({
                   height:
                     row.steps == null
                       ? theme.spacing.xxs
-                      : Math.max(
-                          theme.spacing.xs,
-                          (row.steps / max) * theme.sizes.stepsSparkline,
-                        ),
+                      : Math.max(theme.spacing.xs, (row.steps / max) * theme.sizes.stepsSparkline),
                   borderRadius: theme.radii.small,
                   backgroundColor:
                     row.steps == null
@@ -732,9 +719,7 @@ function HomeWidgetBody({
     );
   }
   if (id === 'muscleStatusWidget') {
-    const fatigued = [...(recovery?.data?.muscles ?? [])]
-      .sort((a, b) => a.pct - b.pct)
-      .slice(0, 6);
+    const fatigued = [...(recovery?.data?.muscles ?? [])].sort((a, b) => a.pct - b.pct).slice(0, 6);
     return (
       <Pressable
         onPress={openTraining}

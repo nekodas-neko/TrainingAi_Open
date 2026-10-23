@@ -51,22 +51,6 @@ export function timelineTimeLabel(event: TimelineEvent, timezone: string) {
   return event.endTime && event.type !== 'wakeup' ? `${start} – ${event.endTime}` : start;
 }
 
-export function timelineSummary(event: TimelineEvent) {
-  const values = timelineMetrics(event, true).map((metric) =>
-    metric.label === 'Readiness'
-      ? `Readiness ${metric.value}`
-      : metric.label === 'Sleep score'
-        ? `Sleep ${metric.value}`
-        : metric.label === 'Sets'
-          ? `${metric.value} sets`
-          : metric.label === 'Exercises'
-            ? `${metric.value} exercises`
-            : metric.value,
-  );
-  if (event.subtitle && event.subtitle !== 'Saved on this phone') values.push(event.subtitle);
-  return values.join(' · ');
-}
-
 export function timelineSleepNight(event: TimelineEvent, nights: readonly SleepRow[]) {
   if (!isSleepEvent(event)) return undefined;
   return (
@@ -105,6 +89,8 @@ export type TimelineCardContent = {
   title: string;
   /** The wake-up card prints its time bold beside the title instead of on a line above. */
   titleTime: boolean;
+  /** Meal, sleep and tag cards space their lines 6 px apart; the others 8 px (space-y-1.5 vs space-y-2). */
+  tight: boolean;
   metrics: TimelineCardMetric[];
 };
 
@@ -114,8 +100,8 @@ const plural = (count: number, one: string, many: string) =>
 /**
  * What one timeline event's card says, per type, as components/home-day-timeline.tsx draws it:
  * WakeupCard, WorkoutCard, WalkCard, MealCard, SleepCard, BedtimeCard and TagCard. Durations keep
- * the shared "1h 03m" form (the current app prints a raw "63 min" on workouts and walks; the owner's
- * 20 Oct check asked for the shared form, see #2903).
+ * the shared "1h 03m" form (docs/module-map.md makes `formatHoursMinutes` the one duration
+ * format; the current app's workout and walk cards use it too).
  */
 export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
   const metrics: TimelineCardMetric[] = [];
@@ -180,7 +166,9 @@ export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
           : event.title === 'Walk'
             ? 'Outdoor walking'
             : title;
-      if (event.distanceKm != null) title += ` / ${event.distanceKm} km`;
+      // One decimal, and nothing for a zero: a sensor can report 0 km on a stationary workout.
+      const km = event.distanceKm == null ? 0 : Math.round(event.distanceKm * 10) / 10;
+      if (km > 0) title += ` / ${km} km`;
       duration();
       if (event.calories != null)
         metrics.push({
@@ -190,5 +178,10 @@ export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
       if (subtitle) metrics.push({ text: subtitle });
     }
   }
-  return { title, titleTime: event.type === 'wakeup', metrics };
+  return {
+    title,
+    titleTime: event.type === 'wakeup',
+    tight: ['meal', 'sleep', 'tag'].includes(event.type),
+    metrics,
+  };
 }

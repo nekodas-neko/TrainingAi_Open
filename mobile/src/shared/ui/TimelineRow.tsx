@@ -1,5 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
+import { scaleAlpha } from '../theme/alpha';
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 import { Stack } from './Stack';
@@ -23,6 +24,7 @@ export function TimelineRow({
   icon,
   color,
   last,
+  tight = false,
   savedLocally = false,
   onPress,
 }: {
@@ -34,6 +36,8 @@ export function TimelineRow({
   icon: IconName;
   color: string;
   last: boolean;
+  /** Meal, sleep and tag cards space their lines 6 px apart, the rest 8 px. */
+  tight?: boolean;
   savedLocally?: boolean;
   onPress: () => void;
 }) {
@@ -85,7 +89,7 @@ export function TimelineRow({
           />
         )}
       </View>
-      <View style={{ flex: 1, minWidth: 0, paddingBottom: last ? 0 : theme.spacing.lg }}>
+      <View style={{ flex: 1, minWidth: 0, paddingBottom: theme.spacing.lg }}>
         {!timeInline && (
           <AppText
             variant="factorLabel"
@@ -102,10 +106,10 @@ export function TimelineRow({
           style={{
             borderRadius: theme.radii.control,
             borderWidth: 1,
-            borderColor: theme.colors.border,
+            borderColor: scaleAlpha(theme.colors.border, 0.6),
             backgroundColor: `${theme.colors.raised}66`,
             padding: theme.spacing.md,
-            gap: theme.spacing.sm,
+            gap: tight ? theme.spacing.xs + theme.spacing.xxs : theme.spacing.sm,
           }}
         >
           <Stack direction="row" align="center" gap="sm">

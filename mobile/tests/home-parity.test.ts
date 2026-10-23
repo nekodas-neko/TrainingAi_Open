@@ -4,9 +4,11 @@ import { timelineCardContent } from '../src/features/home/data/timeline-presenta
 import type { TimelineEvent } from '../src/features/home/data/timeline.ts';
 import {
   SORE_CHIP_COLOR,
+  lastTrainedLabel,
   sessionFacts,
-  soreMusclesLabel,
+  soreChipColor,
 } from '../src/features/home/data/recommendation-presentation.ts';
+import { scaleAlpha } from '../src/shared/theme/alpha.ts';
 import { isBandStyle, scoreChipLabel } from '../src/shared/ui/scoreChipStyle.ts';
 
 const event = (over: Partial<TimelineEvent>): TimelineEvent => ({
@@ -147,8 +149,34 @@ test('the session facts line leaves the length out when the session has none', (
   );
 });
 
-test('the soreness chip names the muscles in the order given', () => {
-  assert.equal(soreMusclesLabel(['Quads', 'Glutes']), 'Quads, Glutes');
-  assert.equal(soreMusclesLabel([]), '');
-  assert.match(SORE_CHIP_COLOR, /^#[0-9a-f]{6}$/);
+test('the last-trained line says Today, Yesterday or the short weekday', () => {
+  assert.equal(lastTrainedLabel('2026-10-23', '2026-10-23'), 'Today');
+  assert.equal(lastTrainedLabel('2026-10-22', '2026-10-23'), 'Yesterday');
+  assert.match(lastTrainedLabel('2026-10-20', '2026-10-23'), /^[A-Z][a-z]{2}$/);
+  assert.equal(lastTrainedLabel(null, '2026-10-23'), '—');
+});
+
+test('the soreness chip is the warning step on a light card, the current orange on a dark one', () => {
+  assert.equal(soreChipColor('light', '#b04e06'), '#b04e06');
+  assert.equal(soreChipColor('dark', '#f59e0b'), SORE_CHIP_COLOR);
+});
+
+test("a zero or missing distance is left out of a walk's title, and a long one is rounded", () => {
+  const walk = (distanceKm?: number) =>
+    timelineCardContent(event({ type: 'walk', title: 'Walk', distanceKm })).title;
+  assert.equal(walk(0), 'Outdoor walking');
+  assert.equal(walk(undefined), 'Outdoor walking');
+  assert.equal(walk(5.2349), 'Outdoor walking / 5.2 km');
+});
+
+test('only meal, sleep and tag cards use the tighter line spacing', () => {
+  const tight = (type: string) => timelineCardContent(event({ type })).tight;
+  assert.deepEqual(['meal', 'sleep', 'tag'].map(tight), [true, true, true]);
+  assert.deepEqual(['workout', 'wakeup', 'walk'].map(tight), [false, false, false]);
+});
+
+test('a token that already carries alpha has it scaled, not replaced', () => {
+  assert.equal(scaleAlpha('#ffffff18', 0.5), '#ffffff0c');
+  assert.equal(scaleAlpha('#e8e8e8', 0.6), '#e8e8e899');
+  assert.equal(scaleAlpha('transparent', 0.6), 'transparent');
 });

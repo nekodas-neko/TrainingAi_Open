@@ -12,7 +12,6 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import {
   AppText,
-  Badge,
   Card,
   DisclosureIcon,
   Grid,
@@ -46,15 +45,17 @@ export function BodyBatteryCard() {
   const [expanded, setExpanded] = useState(false);
   const noData = !data?.hasData;
   const levelLabel = data?.hasData ? data.label : data ? 'No data yet' : 'Waiting for readings';
-  const status =
-    (state.loading && !data) || state.error ? (
-      <StatusIndicator
-        label="Body Battery"
-        busy={state.loading && !data}
-        error={state.error}
-        onRetry={state.refresh}
-      />
-    ) : null;
+  const showStatus = (state.loading && !data) || !!state.error;
+  const levelIcon = data?.hasData
+    ? ((
+        {
+          Charged: 'batteryFull',
+          Good: 'battery',
+          Low: 'batteryLow',
+          Drained: 'batteryWarning',
+        } as const
+      )[data.label] ?? 'battery')
+    : 'signalLow';
   const trend = data?.hasData ? data.trend : null;
   const trendColor =
     trend === 'charging'
@@ -63,7 +64,11 @@ export function BodyBatteryCard() {
         ? theme.status.danger
         : theme.colors.muted;
   return (
-    <Card tone="brand" padded={false} style={{ gap: 0 }}>
+    <Card
+      tone="brand"
+      padded={false}
+      style={{ gap: 0, borderRadius: theme.radii.control, borderColor: theme.colors.border }}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Body Battery"
@@ -87,9 +92,10 @@ export function BodyBatteryCard() {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
           <Icon
-            name="battery"
+            name={levelIcon}
             size={theme.sizes.iconCompact}
             color={noData ? theme.colors.muted : color}
+            style={{ opacity: showStatus ? 0 : 1 }}
           />
           <AppText variant="statLabel" tone="muted" style={{ fontWeight: '600' }}>
             Body Battery
@@ -102,8 +108,25 @@ export function BodyBatteryCard() {
             {levelLabel}
           </AppText>
           <View style={{ flex: 1 }} />
-          {status}
-          {lowData && <Badge label="Limited data" />}
+          {lowData && (
+            <View
+              style={{
+                alignSelf: 'center',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+                borderRadius: theme.radii.pill,
+                backgroundColor: `${theme.colors.raised}b3`,
+                paddingHorizontal: theme.spacing.sm - theme.spacing.xxs,
+                paddingVertical: theme.spacing.xxs,
+              }}
+            >
+              <Icon name="signalLow" size={theme.spacing.md} color={theme.colors.muted} />
+              <AppText variant="statUnit" tone="muted" style={{ fontWeight: '500' }}>
+                Limited data
+              </AppText>
+            </View>
+          )}
           {trend && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xxs }}>
               <Icon
@@ -117,12 +140,12 @@ export function BodyBatteryCard() {
             </View>
           )}
           <AppText
-            variant="weekTileValue"
+            variant="batteryValue"
             style={{ fontVariant: ['tabular-nums'], color: noData ? theme.colors.text : color }}
           >
             {data?.hasData ? metricValue(data.current) : '—'}
           </AppText>
-          <DisclosureIcon expanded={expanded} />
+          <DisclosureIcon expanded={expanded} size={theme.sizes.iconCompact} />
         </View>
         {data && (
           <>
@@ -137,6 +160,18 @@ export function BodyBatteryCard() {
           </>
         )}
       </Pressable>
+      {showStatus && (
+        // Beside the Pressable, never inside it: a button inside a button, and a 48 px indicator
+        // that would grow the 20 px header while it loads or shows an error.
+        <View style={{ position: 'absolute', left: 0, top: 0 }}>
+          <StatusIndicator
+            label="Body Battery"
+            busy={state.loading && !data}
+            error={state.error}
+            onRetry={state.refresh}
+          />
+        </View>
+      )}
       {expanded && (
         <Stack
           gap="md"

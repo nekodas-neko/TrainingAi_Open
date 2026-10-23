@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import {
   AppButton,
   AppText,
@@ -15,12 +15,7 @@ import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { SessionPreview } from '../../workouts/catalog';
-import {
-  SORE_CHIP_COLOR,
-  sessionFacts,
-  soreMusclesLabel,
-} from '../data/recommendation-presentation';
-import { View } from 'react-native';
+import { sessionFacts, soreChipColor } from '../data/recommendation-presentation';
 import { SessionGlyph } from '../../workouts/components/SessionGlyph';
 import { failureNotice } from '../../../core/reporting/index.ts';
 
@@ -117,6 +112,7 @@ export function HomeRecommendation({
     );
   }
   const accent = home.preferences.cardColors?.recommendedToday ?? theme.homeCards.recommendedToday;
+  const soreColor = soreChipColor(theme.mode, theme.status.warning);
   const eyebrowColor = done ? theme.status.success : accent;
   return (
     <Card tone="neutral" accent={done ? theme.status.success : accent} faint={!!done}>
@@ -153,18 +149,14 @@ export function HomeRecommendation({
                 alignItems: 'center',
                 gap: theme.spacing.xs,
                 borderRadius: theme.radii.pill,
-                backgroundColor: `${SORE_CHIP_COLOR}2e`,
+                backgroundColor: `${soreColor}2e`,
                 paddingHorizontal: theme.spacing.sm - theme.spacing.xxs,
                 paddingVertical: theme.spacing.xxs,
               }}
             >
-              <Icon
-                name="alert"
-                size={theme.spacing.sm + theme.spacing.xxs / 2}
-                color={SORE_CHIP_COLOR}
-              />
-              <AppText variant="micro" style={{ color: SORE_CHIP_COLOR, flexShrink: 1 }}>
-                {soreMusclesLabel(home.mood.soreMuscles)}
+              <Icon name="alert" size={theme.spacing.sm + theme.spacing.xxs} color={soreColor} />
+              <AppText variant="chipLabel" style={{ color: soreColor, flexShrink: 1 }}>
+                {home.mood.soreMuscles.join(', ')}
               </AppText>
             </View>
           )}
