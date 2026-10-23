@@ -47,6 +47,8 @@ export const sizes = {
   strengthBar: 6,
   // nutrition-action-row.tsx: w-4 h-4 icons.
   iconCompact: 16,
+  // week-detail-content.tsx: the sparkle before "Your week" is h-3 w-3.
+  iconCaption: 12,
   weightSparkline: 110,
   // sparkline-chart rows (TrendRowCard in day-trends-section.tsx): <Sparkline width={110} height={30} />.
   trendSparkline: 30,
@@ -137,6 +139,15 @@ export const typography = {
     letterSpacing: 0.45,
     textTransform: 'uppercase',
   },
+  // heart-rate/page.tsx "Today so far" tile: text-[10px] uppercase tracking-wider over a text-xl value.
+  tileLabel: {
+    fontSize: 10,
+    lineHeight: 15,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  // week-detail-content.tsx: the centred header title is text-[17px] font-extrabold tracking-tight.
+  headerTitle: { fontSize: 17, lineHeight: 24, fontWeight: '800', letterSpacing: -0.43 },
   statValue: { fontSize: 20, lineHeight: 28, fontWeight: '600' },
   statValueStrong: { fontSize: 24, lineHeight: 32, fontWeight: '700' },
   // week-metric-card.tsx: text-xl font-bold value and a text-[11px] delta under it.
