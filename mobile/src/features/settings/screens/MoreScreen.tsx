@@ -30,7 +30,7 @@ import { ProfileStats } from '../components/ProfileStats';
 import { FeedbackSheet } from '../components/FeedbackSheet';
 import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
 import { SignOutSheet } from '../components/SignOutSheet';
-import { memberSinceLabel } from '../data/profile';
+import { memberSinceLabel, moreCopy } from '../data/profile';
 import { useRewards } from '../../rewards/data/useRewards';
 import { LevelHeader } from '../../rewards/components/LevelHeader';
 import { AchievementsSection } from '../../rewards/components/AchievementsSection';
@@ -126,6 +126,7 @@ export function MoreScreen({
           ]}
           onChange={setTab}
           appearance="tabs"
+          size="xs"
         />
       </Stack>
       <TabPanel>
@@ -173,12 +174,12 @@ export function MoreScreen({
               <AchievementsSection rewards={history.data} loading={history.loading} />
               <Card padded={false}>
                 <ListRow
-                  title="Your Year"
+                  title={moreCopy.year.title}
                   density="snug"
-                  leading={<Icon name="coach" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="coach" tone="muted" size={theme.sizes.iconCompact} />}
                   trailing={
                     <AppText variant="caption" tone="muted">
-                      View →
+                      {moreCopy.year.action}
                     </AppText>
                   }
                   onPress={openYear}
@@ -187,9 +188,9 @@ export function MoreScreen({
               </Card>
               <SeasonBadges seasons={seasons.data?.seasons ?? []} />
               <ExpandableCard
-                title="Goals"
+                title={moreCopy.goals.title}
                 icon="target"
-                subtitle="Activity level, targets & AI recommendations"
+                subtitle={moreCopy.goals.subtitle}
               >
                 <Grid columns={2}>
                   {[
@@ -214,21 +215,21 @@ export function MoreScreen({
                   density="snug"
                   divider={false}
                   title="Profile details"
-                  leading={<Icon name="userRound" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="userRound" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openProfile}
                 />
                 <ListRow
                   density="snug"
                   divider={false}
                   title="Sessions, progression & schedule"
-                  leading={<Icon name="workout" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="workout" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openPrograms}
                 />
                 <ListRow
                   density="snug"
                   divider={false}
                   title="DEXA & RMR results"
-                  leading={<Icon name="scan" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="scan" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openClinical}
                 />
                 <ListRow
@@ -236,7 +237,7 @@ export function MoreScreen({
                   divider={false}
                   title={deviceHealthName}
                   subtitle="Connection, permissions and data sources"
-                  leading={<Icon name="health" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="health" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openAppleHealth}
                 />
                 <ListRow
@@ -244,13 +245,13 @@ export function MoreScreen({
                   divider={false}
                   title="Devices & connections"
                   subtitle="Oura account, heart-rate strap"
-                  leading={<Icon name="bluetooth" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="bluetooth" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openDevices}
                 />
                 <ListRow
                   density="snug"
                   title="Collection"
-                  leading={<Icon name="cat" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="cat" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openCollection}
                   divider={false}
                 />
@@ -260,20 +261,20 @@ export function MoreScreen({
                   density="snug"
                   divider={false}
                   title="Notifications, appearance & home layout"
-                  leading={<Icon name="settings" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="settings" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openSettings}
                 />
                 <ListRow
                   density="snug"
                   divider={false}
                   title="Data & Sync"
-                  leading={<Icon name="cloudDownload" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="cloudDownload" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openData}
                 />
                 <ListRow
                   density="snug"
                   title="About TrainingAi"
-                  leading={<Icon name="info" tone="muted" size={theme.sizes.iconSmall} />}
+                  leading={<Icon name="info" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openAbout}
                   divider={false}
                 />
@@ -281,7 +282,7 @@ export function MoreScreen({
                   <FeatureRow
                     density="snug"
                     title="Admin Console"
-                    leading={<Icon name="shieldPlain" tone="muted" size={theme.sizes.iconSmall} />}
+                    leading={<Icon name="shieldPlain" tone="muted" size={theme.sizes.iconCompact} />}
                     divider={false}
                   />
                 )}
@@ -289,13 +290,13 @@ export function MoreScreen({
               {/* The current app's direct actions (#2902). */}
               <Stack gap="sm">
                 <AppButton
-                  title="Report an Issue"
+                  title={moreCopy.actions.report}
                   icon="report"
                   variant="ghost"
                   onPress={() => setModal('feedback')}
                 />
                 <AppButton
-                  title="Edit Profile"
+                  title={moreCopy.actions.edit}
                   icon="settings"
                   variant="surface"
                   style={{ alignSelf: 'flex-start' }}
@@ -303,7 +304,7 @@ export function MoreScreen({
                 />
                 {account.state.hasSession && (
                   <AppButton
-                    title="Sign Out"
+                    title={moreCopy.actions.signOut}
                     icon="signOut"
                     variant="danger"
                     onPress={() => setModal('signout')}

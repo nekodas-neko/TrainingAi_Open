@@ -1,112 +1,75 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { muscleVolumeCaption } from '../src/features/health/data/training-view.ts';
+import { gainTone } from '@trainingai/shared/health/strength-progress';
+import {
+  muscleLegendItems,
+  muscleVolumeCaption,
+} from '../src/features/health/data/training-view.ts';
+import { gainColor } from '../src/features/health/progressPresentation.ts';
+import { moreCopy } from '../src/features/settings/data/profile.ts';
+import { compactToggleLayout } from '../src/shared/ui/compactToggleLayout.ts';
+import { stackCalendarTitle } from '../src/shared/ui/monthGrid.ts';
+import { sizes, spacing } from '../src/shared/theme/tokens.ts';
 
-// Guards for the remaining Preview differences on #2934, #2900, #2901 and #2902. The components need
-// a device to render, so the source checks read for the pieces each change depends on.
-const read = (path: string) => readFile(new URL(`../src/${path}`, import.meta.url), 'utf8');
+// Behaviour of the pure helpers behind the parity round for #2934, #2900, #2901 and #2902. What a
+// component draws needs a device, so the phone re-check on each issue covers that.
 
-test('the muscle volume card names its scale at the right of the title, as the current app does (#2900)', () => {
+test('the muscle volume card names its scale at the right of the title (#2900)', () => {
   assert.equal(muscleVolumeCaption([{ target: 12 }, { target: null }]), 'vs your program target');
   assert.equal(muscleVolumeCaption([{ target: null }]), 'Target: 10–20 sets');
 });
 
-test('the muscle volume legend sits above the figure with the current app’s four swatches (#2900)', async () => {
-  const figure = await read('features/health/components/MuscleVolumeFigure.tsx');
-  for (const label of ['Under 60%', '60–99%', 'At target', 'Not trained']) {
-    assert.ok(figure.includes(`'${label}'`), label);
+test('the muscle key names the three bands, then Not trained as an outlined square (#2900)', () => {
+  const colors = { bad: 'r', warn: 'a', good: 'g', untrained: 'u' };
+  assert.deepEqual(muscleLegendItems(true, colors), [
+    { label: 'Under 60%', color: 'r', shape: 'square' },
+    { label: '60–99%', color: 'a', shape: 'square' },
+    { label: 'At target', color: 'g', shape: 'square' },
+    { label: 'Not trained', color: 'u', shape: 'square', outlined: true },
+  ]);
+});
+
+test('without targets the key points at the bars instead of naming bands (#2900)', () => {
+  const items = muscleLegendItems(false, { bad: 'r', warn: 'a', good: 'g', untrained: 'u' });
+  assert.deepEqual(
+    items.map((item) => item.label),
+    ['Colours match the bars below', 'Not trained'],
+  );
+  assert.equal(items[0].shape, 'text');
+  assert.equal(items[0].color, undefined);
+});
+
+test('a title-row toggle keeps a full touch target in every cell (#2901)', () => {
+  for (const appearance of ['tint', 'pill'] as const) {
+    assert.equal(compactToggleLayout(sizes, spacing, appearance).cellMinHeight, 48, appearance);
   }
-  assert.ok(figure.indexOf('<Legend') < figure.indexOf('<MuscleMap'));
-  const panel = await read('features/health/components/TrainingPanel.tsx');
-  assert.doesNotMatch(panel, /target scale/, 'no phase subtitle the current app does not draw');
+  assert.equal(compactToggleLayout(sizes, spacing, 'pill').trackPadding, spacing.xxs);
+  assert.equal(compactToggleLayout(sizes, spacing, 'tint').trackPadding, 0);
 });
 
-test('the training calendar title shares a row with the month controls (#2900)', async () => {
-  const card = await read('features/health/components/TrainingCalendarCard.tsx');
-  assert.match(card, /title="Training Calendar"/);
-  const calendar = await read('shared/ui/MonthCalendar.tsx');
-  assert.ok(calendar.indexOf('{title &&') < calendar.indexOf('label="Previous month"'));
+test('a gain reads up, down or flat from the shared rule, and colours from the status tokens (#2901)', () => {
+  assert.deepEqual([5, -2, 0, null, undefined].map(gainTone), ['up', 'down', 'flat', null, null]);
+  const status = { success: 'green', danger: 'red', warning: 'amber' };
+  assert.equal(gainColor(5, status), 'green');
+  assert.equal(gainColor(-2, status), 'red');
+  assert.equal(gainColor(0, status), 'amber');
+  assert.equal(gainColor(null, status), null);
 });
 
-test('AI Periodization draws a tile per session with its icon, and the sparkle in the header (#2900)', async () => {
-  const panel = await read('features/health/components/TrainingPanel.tsx');
-  assert.match(panel, /icon="coach"/);
-  assert.match(panel, /<SessionGlyph/);
-  assert.match(await read('features/health/data/models.ts'), /icon: z\.string\(\)\.nullish\(\)/);
+test('the calendar title moves above its controls once text outgrows the shared row (#2900)', () => {
+  assert.equal(stackCalendarTitle(1), false);
+  assert.equal(stackCalendarTitle(1.1), false);
+  assert.equal(stackCalendarTitle(1.15), true);
+  assert.equal(stackCalendarTitle(1.3), true);
 });
 
-test('Activities This Week has a brand header with the count, and a centred empty line (#2900)', async () => {
-  const panel = await read('features/health/components/TrainingPanel.tsx');
-  assert.match(panel, /color: theme\.colors\.brandText/);
-  assert.match(panel, /textAlign: 'center'[\s\S]{0,60}No activities this week|No activities this week/);
-  assert.match(panel, /<Card padded=\{false\}/);
-});
-
-test('Week in review draws a bare brand icon rather than a tile (#2900)', async () => {
-  const panel = await read('features/health/components/TrainingPanel.tsx');
-  assert.match(panel, /icon="calendarRange"[\s\S]{0,60}iconTile=\{false\}/);
-  const hub = await read('shared/ui/HubCard.tsx');
-  assert.match(hub, /iconTile \?/);
-});
-
-test('the strength card is Estimated 1RM with a dumbbell and a small Sets | 1RM toggle on its title row (#2901)', async () => {
-  const panel = await read('features/health/components/ProgressPanel.tsx');
-  assert.match(panel, /title=\{'Estimated 1RM'\}/);
-  assert.match(panel, /icon="workout"/);
-  assert.match(panel, /<CompactToggle[\s\S]{0,80}appearance="tint"/);
-  assert.doesNotMatch(panel, /Strength Progress/);
-});
-
-test('the Goals period toggle shares the title row, and the Trends note is an inset box with an info icon (#2901)', async () => {
-  const panel = await read('features/health/components/ProgressPanel.tsx');
-  assert.match(panel, /<CompactToggle[\s\S]{0,80}appearance="pill"/);
-  assert.doesNotMatch(panel, /SegmentedControl/);
-  assert.match(panel, /<Icon name="info"/);
-  assert.match(panel, /meaningful — keep logging/);
-});
-
-test('the Strength Trend gain is plain coloured text, not a filled pill (#2901)', async () => {
-  const screen = await read('features/progress/StrengthScreen.tsx');
-  assert.doesNotMatch(screen, /label=\{\(exercise\.gainPct/);
-  assert.match(screen, /theme\.progress\.trendUp/);
-});
-
-test('a compact toggle keeps a 48 px touch target through hitSlop (#2901)', async () => {
-  const toggle = await read('shared/ui/CompactToggle.tsx');
-  assert.match(toggle, /hitSlop=\{\{ top: hit, bottom: hit \}\}/);
-  assert.match(toggle, /theme\.sizes\.touchTarget - theme\.sizes\.compactToggle/);
-});
-
-test('More switches views with separate pills, the active one filled (#2902)', async () => {
-  const more = await read('features/settings/screens/MoreScreen.tsx');
-  assert.match(more, /appearance="tabs"/);
-  const control = await read('shared/ui/SegmentedControl.tsx');
-  assert.match(control, /appearance === 'tabs'/);
-  assert.match(control, /backgroundColor: active \? theme\.colors\.text/);
-});
-
-test('More words its rows and actions as the current app does (#2902)', async () => {
-  const more = await read('features/settings/screens/MoreScreen.tsx');
-  assert.match(more, /title="Goals"/);
-  assert.match(more, /Activity level, targets & AI recommendations/);
-  for (const title of ['Report an Issue', 'Edit Profile', 'Sign Out']) {
-    assert.ok(more.includes(`title="${title}"`), title);
-  }
-  assert.match(more, /View →/);
-  assert.match(more, /icon="settings"[\s\S]{0,80}alignSelf: 'flex-start'/, 'a small Edit Profile button with a gear');
-});
-
-test('the setup rows carry the current app’s per-row icons and no dividers (#2902)', async () => {
-  const more = await read('features/settings/screens/MoreScreen.tsx');
-  for (const icon of ['userRound', 'scan', 'bluetooth', 'cat', 'cloudDownload', 'shieldPlain']) {
-    assert.ok(more.includes(`name="${icon}"`), icon);
-  }
-  assert.doesNotMatch(more, /density="compact"[\s\S]{0,200}title="Profile details"/);
-});
-
-test('the friend code is monospace, as in the current app (#2902)', async () => {
-  const code = await read('features/social/components/FriendCode.tsx');
-  assert.match(code, /\bmono\b/);
-  assert.match(await read('shared/ui/AppText.tsx'), /fontFamily: Platform\.select/);
+test('More words its rows and actions as the current app does (#2902)', () => {
+  assert.equal(moreCopy.goals.title, 'Goals');
+  assert.equal(moreCopy.goals.subtitle, 'Activity level, targets & AI recommendations');
+  assert.equal(moreCopy.year.action, 'View →');
+  assert.deepEqual(moreCopy.actions, {
+    report: 'Report an Issue',
+    edit: 'Edit Profile',
+    signOut: 'Sign Out',
+  });
 });

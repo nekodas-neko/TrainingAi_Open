@@ -14,7 +14,7 @@ export const spacing = {
   xxl: 24,
   xxxl: 32,
 };
-export const radii = { small: 8, control: 12, card: 16, pill: 999 };
+export const radii = { small: 8, control: 12, card: 16, pill: 999, swatch: 2 };
 export const icons = { strokeWidth: 2 };
 export const sizes = {
   // The current app floors every button at 48 px (app/globals.css, "Minimum tap target size").
@@ -70,8 +70,12 @@ export const sizes = {
   weekVolumeChart: 128,
   timelineMarker: 28,
   timelineRow: 72,
-  // The small title-row toggles (strength-progress-card.tsx, goals-progress-card.tsx): py-1 on 10-12 px type.
-  compactToggle: 28,
+  // time-in-zone-card.tsx: the Day | Week | Month tabs sit on the title row at w-40.
+  zonePeriodToggle: 160,
+  // calendar-widget.tsx: the month between the arrows is w-24.
+  calendarMonthLabel: 96,
+  // muscle-heatmap.tsx KeyItem: a w-2.5 h-2.5 rounded-[2px] swatch.
+  legendSwatch: 10,
 };
 // Sizes are the current app's CSS px at its 384 px width, which is 384 dp on the S25 Ultra, so they
 // carry across one for one. Each comment names the class the current app uses for that role, and
