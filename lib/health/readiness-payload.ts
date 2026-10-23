@@ -37,6 +37,7 @@ import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, type Ill
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
+import { ouraCloudDeliveredTypes } from '@/lib/oura/cloud/config'
 import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, canonicalNightsByDate, readinessSourceLabel, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
 
 /**
@@ -378,7 +379,7 @@ export async function buildReadinessPayload(
       repo.getRecentSourceFacts(userId, dateStrMidnightInTz(shiftDateStr(todayIso, -CONNECTED_SOURCE_WINDOW_DAYS), tz)),
       repo.getOuraCloudTokens(userId),
     ])
-    return connectedSources({ ringSamples, ...recent, ouraCloudConnected: ouraTokens?.accessToken != null })
+    return connectedSources({ ringSamples, ...recent, ouraCloudTypes: ouraCloudDeliveredTypes(ouraTokens) })
   })().catch(() => undefined)
 
   // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.
