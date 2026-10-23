@@ -33,7 +33,7 @@ export function PageLayout({
   titleVariant = 'pageTitle',
 }: PropsWithChildren<{
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   actions?: ReactNode;
   header?: ReactNode;
   hideHeader?: boolean;
@@ -91,10 +91,12 @@ export function PageLayout({
             <AppText variant={titleVariant} accessibilityRole="header">
               {title}
             </AppText>
-            {subtitle && (
+            {typeof subtitle === 'string' ? (
               <AppText variant="body" tone="muted">
                 {subtitle}
               </AppText>
+            ) : (
+              subtitle
             )}
           </View>
           {actions && (
