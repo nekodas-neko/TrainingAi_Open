@@ -80,12 +80,9 @@ const ExerciseSessionSchema = z.object({
   caloriesBurned: num(20_000),
   avgHr:          int(300, 20),
   maxHr:          int(300, 20),
-  // #3044. Health Connect's `metadata.id` and `metadata.dataOrigin`. Optional, as an older bundle
-  // sends neither: such a session keeps the `date|HH:MM` rule.
+  // #3044. Health Connect's `metadata.id`. Optional, as an older bundle sends none: such a session
+  // keeps the `date|HH:MM` rule.
   recordId:       z.string().trim().min(1).max(MAX_ID_LEN).optional(),
-  // Checked and not stored: activity_logs has no column for the writing app (#3115 filters by it on
-  // the phone).
-  origin:         z.string().max(MAX_ID_LEN).optional(),
 }).strict();
 const SleepRecordSchema = z.object({
   date:            z.string().regex(DATE_RE),
@@ -170,14 +167,15 @@ const SyncHealthSchema = z.object({
   // window it is importing. Shape only here; whether it is a usable day is judged below, where a bad
   // one is dropped with a note instead of failing the batch.
   historyFrom: z.string().regex(DATE_RE).optional(),
-  // #3044. The local days whose exercise sessions were read in full, sent only when that read
-  // succeeded. A Health Connect session stored inside it whose id is in neither `exerciseSessions`
-  // nor `leftOut` (read, and not sent: #3115) was deleted there, and is tombstoned. Bounds are judged
-  // below (`sweepWindow`).
+  // #3044. The local days whose exercise sessions were read. When `complete` (the read returned
+  // without failing), a Health Connect session stored inside it whose id is in neither
+  // `exerciseSessions` nor `leftOut` (read, and not sent: #3115) was deleted there, and is
+  // tombstoned. Bounds are judged below (`sweepWindow`).
   exerciseWindow: z.object({
-    from:    z.string().regex(DATE_RE),
-    to:      z.string().regex(DATE_RE),
-    leftOut: z.array(z.string().trim().min(1).max(MAX_ID_LEN)).max(MAX_ITEMS).optional(),
+    from:     z.string().regex(DATE_RE),
+    to:       z.string().regex(DATE_RE),
+    complete: z.boolean(),
+    leftOut:  z.array(z.string().trim().min(1).max(MAX_ID_LEN)).max(MAX_ITEMS).optional(),
   }).strict().optional(),
 }).strict();
 
@@ -292,9 +290,10 @@ export async function POST(req: NextRequest) {
   await storeHealthConnectWorkouts(repo, userId, usableSessions, rejected);
 
   // #3044. Deletions. Every id the phone read counts as still there, even a session refused above,
-  // so a bad record is never mistaken for a deleted one.
+  // so a bad record is never mistaken for a deleted one. A read that failed or stopped part-way
+  // says nothing about the sessions it did not reach, so it sweeps nothing.
   let exercisesTombstoned = 0;
-  if (body.exerciseWindow) {
+  if (body.exerciseWindow?.complete) {
     const window = sweepWindow(body.exerciseWindow, today);
     if ('reason' in window) {
       rejected.push(`exerciseWindow ${body.exerciseWindow.from}–${body.exerciseWindow.to}: ${window.reason}`);

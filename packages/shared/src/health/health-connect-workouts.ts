@@ -5,7 +5,7 @@
  * native import, key a session on the record id Health Connect gave it, under one source, so the
  * same record reaching the server from either app lands on one row.
  */
-import { movementWindows, overlaps, type CountedMovement } from './oura-workout-activities'
+import { movementWindows, type CountedMovement } from './oura-workout-activities'
 import type { HealthConnectRecord } from '../validation/health-connect-import'
 import { msToHHMMInTz, toAestDay } from '../date-utils'
 import { capitalize } from '../format/capitalize'
@@ -62,12 +62,25 @@ export function healthConnectSessionAsWorkout(record: HealthConnectRecord, tz: s
 
 type BudgetLog = CountedMovement['activityLogs'][number] & { externalSource?: string | null }
 
+/** How much of the shorter of two windows they must share to be one workout recorded twice. */
+export const SAME_WORKOUT_OVERLAP = 0.5
+
+/** Whether two windows are one workout: they share at least half of the shorter one. A walk that
+ *  ends a minute into a gym session is two workouts, not one. */
+function sameWorkout([aStart, aEnd]: [number, number], [bStart, bEnd]: [number, number]): boolean {
+  const shared = Math.min(aEnd, bEnd) - Math.max(aStart, bStart)
+  return shared > 0 && shared >= SAME_WORKOUT_OVERLAP * Math.min(aEnd - aStart, bEnd - bStart)
+}
+
 /**
- * The activity logs the energy budget costs: every log, less a Health Connect session that
- * overlaps an in-app log or a completed strength session (#3044, 19 Oct). A watch's copy of a walk
- * the owner also recorded in the app, or of a gym session logged here, would otherwise pay the same
- * minutes twice. Matched by time, not id, and whatever the two types: minutes can only be spent
- * once, and two apps often name one workout differently (a walk and a hike).
+ * The activity logs the energy budget costs: every log, less a Health Connect session that is the
+ * same workout as an in-app log or a completed strength session (#3044, 19 Oct): they share at
+ * least half of the shorter window. A watch's copy of a walk the owner also recorded in the app, or
+ * of a gym session logged here, would otherwise pay the same minutes twice. Matched by time, not
+ * id, and whatever the two types: two apps often name one workout differently (a walk and a hike).
+ *
+ * `earlier` is the in-app logs of the day before the range, matched and never returned, so a log
+ * that ran past midnight still counts on the range's first day.
  *
  * Only a log stored with its source is ever dropped. Logs stored before the source was recorded
  * have none and count as in-app, so no past day's energy moves.
@@ -76,12 +89,13 @@ export function budgetActivityLogs<T extends BudgetLog>(
   logs: readonly T[],
   sessions: CountedMovement['sessions'],
   tz: string,
+  earlier: readonly BudgetLog[] = [],
 ): T[] {
   if (!logs.some(l => l.externalSource === HEALTH_CONNECT_SOURCE)) return [...logs]
-  const inApp = movementWindows({ activityLogs: logs.filter(l => l.externalSource == null), sessions }, tz)
+  const inApp = movementWindows({ activityLogs: [...earlier, ...logs].filter(l => l.externalSource == null), sessions }, tz)
   return logs.filter(l => {
     if (l.externalSource !== HEALTH_CONNECT_SOURCE) return true
     const [own] = movementWindows({ activityLogs: [l], sessions: [] }, tz)
-    return !own || !inApp.some(([s, e]) => overlaps(own[0], own[1], s, e))
+    return !own || !inApp.some(w => sameWorkout(own, w))
   })
 }

@@ -57,21 +57,22 @@ beforeEach(() => {
 })
 
 describe('syncHealthConnect exercise sessions (#3044)', () => {
-  it('sends each session with its record id and source, and the whole local days it read', async () => {
+  it('sends each session with its record id, and the whole local days it read', async () => {
     const day = shiftDateStr(today(), -2)
     hc.sessions = [{ id: 'hc-1', origin: SAMSUNG, startTime: midday(day), endTime: midday(day, 40), exerciseType: 'EXERCISE_TYPE_STRENGTH_TRAINING' }]
     await syncHealthConnect(TZ)
     const [daily] = posts
     expect(daily.exerciseSessions).toEqual([expect.objectContaining({
-      recordId: 'hc-1', origin: SAMSUNG, date: day, activityType: 'strength', startTime: '12:00', endTime: '12:40',
+      recordId: 'hc-1', date: day, activityType: 'strength', startTime: '12:00', endTime: '12:40',
     })])
+    expect(daily.exerciseSessions).toEqual([expect.not.objectContaining({ origin: expect.anything() })])
     // A cold sync reads 30 whole local days, ending today.
-    expect(daily.exerciseWindow).toEqual({ from: shiftDateStr(today(), -29), to: today() })
+    expect(daily.exerciseWindow).toEqual({ from: shiftDateStr(today(), -29), to: today(), complete: true })
   })
 
   it('still posts the window when Health Connect has no sessions, so deletions reach the server', async () => {
     await syncHealthConnect(TZ)
-    expect(posts[0]).toMatchObject({ exerciseSessions: [], exerciseWindow: { to: today() } })
+    expect(posts[0]).toMatchObject({ exerciseSessions: [], exerciseWindow: { to: today(), complete: true } })
   })
 
   it('lists a session the Oura filter left out, so the server does not read it as deleted', async () => {
@@ -86,10 +87,10 @@ describe('syncHealthConnect exercise sessions (#3044)', () => {
     expect(posts[0].exerciseWindow).toMatchObject({ leftOut: ['oura-1'] })
   })
 
-  it('sends no window when the read failed, so nothing is swept on a partial read', async () => {
+  it('marks the window incomplete when the read failed, so nothing is swept, and posts nothing for it alone', async () => {
     hc.failRead = true
     await syncHealthConnect(TZ)
-    expect(posts.every(p => !('exerciseWindow' in p))).toBe(true)
+    expect(posts).toEqual([])
   })
 })
 
@@ -98,11 +99,14 @@ describe('exerciseSweepWindow', () => {
   const midnight = (d: string) => dateStrMidnightInTz(d, TZ).toISOString()
 
   it('names the whole local days between two midnights', () => {
-    expect(exerciseSweepWindow(midnight(day()), midnight(today()), TZ)).toEqual({ from: day(), to: shiftDateStr(today(), -1) })
+    expect(exerciseSweepWindow(midnight(day()), midnight(today()), TZ, { complete: true }))
+      .toEqual({ from: day(), to: shiftDateStr(today(), -1), complete: true })
+    expect(exerciseSweepWindow(midnight(day()), midnight(today()), TZ, { complete: false, leftOut: ['x'] }))
+      .toEqual({ from: day(), to: shiftDateStr(today(), -1), complete: false, leftOut: ['x'] })
   })
 
   it('refuses a window that starts or ends inside a day', () => {
-    expect(exerciseSweepWindow(midday(day()), midnight(today()), TZ)).toBeUndefined()
-    expect(exerciseSweepWindow(midnight(day()), midday(today()), TZ)).toBeUndefined()
+    expect(exerciseSweepWindow(midday(day()), midnight(today()), TZ, { complete: true })).toBeUndefined()
+    expect(exerciseSweepWindow(midnight(day()), midday(today()), TZ, { complete: true })).toBeUndefined()
   })
 })

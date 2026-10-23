@@ -30,6 +30,11 @@ export async function requestHealthConnectPermissions() {
   );
   return grantedHealthConnectTypes();
 }
+export async function requestHealthConnectTypes(types: HealthConnectType[]) {
+  const health = await sdk();
+  await health.requestPermission(types.map((recordType) => ({ accessType: 'read', recordType })));
+  return grantedHealthConnectTypes();
+}
 export async function grantedHealthConnectTypes(): Promise<HealthConnectType[]> {
   const permissions = await (await sdk()).getGrantedPermissions();
   return healthConnectTypes.filter((type) =>

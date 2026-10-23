@@ -50,7 +50,7 @@ export interface CountedMovement {
   sessions: readonly { startedAt: Date; completedAt?: Date | null }[]
 }
 
-export const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && bStart < aEnd
+const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && bStart < aEnd
 
 /** The instants each logged activity and completed strength session covers, as `[startMs, endMs]`.
  *  A log with no usable clock time has none. */

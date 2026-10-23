@@ -33,13 +33,13 @@ const day = shiftDateStr(today, -2)
 const session = (over: Record<string, unknown> = {}) => ({
   date: day, title: 'Walk', activityType: 'walk', startTime: '12:00', endTime: '12:40', durationMin: 40, ...over,
 })
-const window = (over: Record<string, unknown> = {}) => ({ from: shiftDateStr(today, -6), to: today, ...over })
+const window = (over: Record<string, unknown> = {}) => ({ from: shiftDateStr(today, -6), to: today, complete: true, ...over })
 
 beforeEach(() => vi.clearAllMocks())
 
 describe('exercise sessions with a record id', () => {
   it('upserts on the record id, not on date and minute', async () => {
-    const { status } = await post({ exerciseSessions: [session({ recordId: 'hc-1', origin: 'com.sec.android.app.shealth' })] })
+    const { status } = await post({ exerciseSessions: [session({ recordId: 'hc-1' })] })
     expect(status).toBe(200)
     expect(repo.upsertHealthConnectActivityLog).toHaveBeenCalledWith('u1', 'hc-1', expect.objectContaining({ date: day, startTime: '12:00', activityType: 'walk' }))
     expect(repo.saveActivityLog).not.toHaveBeenCalled()
@@ -83,7 +83,16 @@ describe('deletions in a fully read window', () => {
     })
   })
 
-  it('an empty read still sweeps: every session in the window was deleted', async () => {
+  it('a read the phone reports as failed or part-way sweeps nothing, however short its list', async () => {
+    const { status } = await post({ exerciseSessions: [session({ recordId: 'kept' })], exerciseWindow: window({ complete: false }) })
+    expect(status).toBe(200)
+    expect(repo.upsertHealthConnectActivityLog).toHaveBeenCalledTimes(1)
+    expect(repo.tombstoneHealthConnectActivityLogs).not.toHaveBeenCalled()
+    await post({ exerciseSessions: [], exerciseWindow: window({ complete: false }) })
+    expect(repo.tombstoneHealthConnectActivityLogs).not.toHaveBeenCalled()
+  })
+
+  it('a complete read with no sessions sweeps the window (the repository spares rows stored in the last 15 minutes)', async () => {
     await post({ exerciseSessions: [], exerciseWindow: window() })
     expect(repo.tombstoneHealthConnectActivityLogs).toHaveBeenCalledWith('u1', expect.objectContaining({ keep: [] }))
   })
@@ -116,12 +125,19 @@ describe('refusals', () => {
 
   it('a malformed window or left-out list is a 400, so nothing is half-applied', async () => {
     for (const bad of [
-      { exerciseWindow: { from: 'last week', to: today } },
+      { exerciseWindow: { from: 'last week', to: today, complete: true } },
+      { exerciseWindow: { from: shiftDateStr(today, -6), to: today } },
       { exerciseWindow: { ...window(), extra: 1 } },
       { exerciseWindow: window({ leftOut: ['x'.repeat(201)] }) },
       { exerciseWindow: window({ leftOut: Array.from({ length: 401 }, (_, i) => `id-${i}`) }) },
     ]) expect((await post(bad)).status).toBe(400)
     expect(repo.tombstoneHealthConnectActivityLogs).not.toHaveBeenCalled()
+  })
+
+  it('the writing app is not taken: a session carrying `origin` has it dropped and reported', async () => {
+    const { json } = await post({ exerciseSessions: [session({ recordId: 'hc-1', origin: 'com.sec.android.app.shealth' })] })
+    expect(json.rejected).toEqual([`exercise ${day}: dropped origin`])
+    expect(repo.upsertHealthConnectActivityLog).toHaveBeenCalledTimes(1)
   })
 
   it('a bad record id is dropped and the session falls back to the date|HH:MM rule', async () => {

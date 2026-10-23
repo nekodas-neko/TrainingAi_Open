@@ -74,9 +74,8 @@ interface ExerciseSession {
   caloriesBurned?: number;
   avgHr?: number;
   maxHr?: number;
-  /** #3044. `metadata.id`, which the server keys the session on, and `metadata.dataOrigin`. */
+  /** #3044. `metadata.id`, which the server keys the session on. */
   recordId?: string;
-  origin?: string;
 }
 
 // Map Health Connect's exerciseType string constants to our activity_types slugs.
@@ -140,11 +139,11 @@ export interface SyncPayload {
    *  window being imported. It tells `/api/sync-health` that heart-rate and interval rows this old
    *  are deliberate, not a broken clock. Absent on every ordinary sync. */
   historyFrom?: string;
-  /** #3044: the local days whose exercise sessions were read in full, sent only when that read
-   *  succeeded. A stored Health Connect session dated inside it whose id is in neither
+  /** #3044: the local days whose exercise sessions were read. When `complete` (the read returned
+   *  without failing), a stored Health Connect session dated inside it whose id is in neither
    *  `exerciseSessions` nor `leftOut` was deleted there. `leftOut` holds the ids of sessions the
    *  phone read and did not send (#3115), so they are not mistaken for deletions. */
-  exerciseWindow?: { from: string; to: string; leftOut?: string[] };
+  exerciseWindow?: { from: string; to: string; complete: boolean; leftOut?: string[] };
 }
 
 /** One intraday heart-rate reading, at the source's own resolution. `at` is epoch ms. */
@@ -478,14 +477,15 @@ export function syncWindowIso(todayStr: string, daysBack: number, tz: string): {
  * history import's windows), so this is a guard, not a trim.
  */
 export function exerciseSweepWindow(
-  startIso: string, endIso: string, tz: string, leftOut: string[] = [],
+  startIso: string, endIso: string, tz: string,
+  { complete, leftOut = [] }: { complete: boolean; leftOut?: string[] },
 ): SyncPayload['exerciseWindow'] {
   const from = toLocalDate(startIso, tz);
   const to = toLocalDate(new Date(Date.parse(endIso) - 1).toISOString(), tz);
   if (dateStrMidnightInTz(from, tz).toISOString() !== new Date(startIso).toISOString()) return undefined;
   if (dateStrMidnightInTz(shiftDateStr(to, 1), tz).toISOString() !== new Date(endIso).toISOString()) return undefined;
   if (to < from) return undefined;
-  return { from, to, ...(leftOut.length ? { leftOut } : {}) };
+  return { from, to, complete, ...(leftOut.length ? { leftOut } : {}) };
 }
 
 /** A session's start and end as the user's wall clock, "HH:MM". Without a zone `msToHHMMInTz` falls
@@ -811,7 +811,7 @@ export async function syncWindow(
       for (const r of records as Array<{ startTime: string; endTime: string; exerciseType: string; title?: string }>) {
         const durationMin = (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 60000;
         const metrics = await getSessionMetrics(HealthConnect, canRead, r.startTime, r.endTime, filter);
-        const { recordId, origin } = metadataOf(r);
+        const { recordId } = metadataOf(r);
         exerciseSessions.push({
           date:         toLocalDate(r.startTime, tz),
           title:        r.title?.trim() || exerciseTypeLabel(r.exerciseType),
@@ -820,13 +820,14 @@ export async function syncWindow(
           durationMin:  Math.round(durationMin * 10) / 10,
           ...metrics,
           ...(recordId ? { recordId } : {}),
-          ...(origin ? { origin } : {}),
         });
       }
-      // Only once every session in the window is in hand: a read that threw part-way says nothing
-      // about the sessions it did not reach.
-      exerciseWindow = exerciseSweepWindow(startIso, endIso, tz, filter.leftOutIds('ActivitySession'));
-    } catch { /* ignore */ }
+      // Complete only once every session in the window is in hand: a read that threw part-way says
+      // nothing about the sessions it did not reach, and the server sweeps nothing for it.
+      exerciseWindow = exerciseSweepWindow(startIso, endIso, tz, { complete: true, leftOut: filter.leftOutIds('ActivitySession') });
+    } catch {
+      exerciseWindow = exerciseSweepWindow(startIso, endIso, tz, { complete: false });
+    }
   }
 
   // ── Sleep sessions ────────────────────────────────────────────────────────
@@ -913,7 +914,7 @@ export async function syncWindow(
   const dailyMetrics = Object.values(dayBuckets);
   const counts = filter.counts();
   const skipped = Object.keys(counts).length ? { skippedFirstHand: counts } : {};
-  const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0 || exerciseWindow != null;
+  const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0 || exerciseWindow?.complete === true;
   if (!hasDaily && !heartRateSamples.length && !activityIntervals.length) {
     onPosted?.();
     return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: 'no data from HC', requests: 0, ...(readFailed ? { incomplete: true } : {}), ...skipped };

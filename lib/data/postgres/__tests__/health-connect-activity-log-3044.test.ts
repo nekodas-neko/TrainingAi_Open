@@ -8,6 +8,7 @@ import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-000000003044'
+const OTHER = '00000000-0000-4000-8000-000000003045'
 const TZ = 'Australia/Brisbane'
 
 describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#3044)', () => {
@@ -31,19 +32,34 @@ describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#
     const { getRepository } = await import('@/lib/data')
     pool = getPool()
     repo = await getRepository()
-    await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', $3)
-       ON CONFLICT (id) DO NOTHING`,
-      [USER, `hc3044-${USER}@example.com`, TZ],
-    )
+    for (const id of [USER, OTHER]) {
+      await pool.query(
+        `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', $3)
+         ON CONFLICT (id) DO NOTHING`,
+        [id, `hc3044-${id}@example.com`, TZ],
+      )
+    }
   })
 
-  beforeEach(async () => { await pool.query(`DELETE FROM activity_logs WHERE user_id = $1`, [USER]) })
+  beforeEach(async () => { await pool.query(`DELETE FROM activity_logs WHERE user_id = ANY($1)`, [[USER, OTHER]]) })
+  // The window sweep spares rows stored or changed in the last 15 minutes, so this backdates them.
+  // `trg_set_updated_at` stamps now() on every update, so it is bypassed for this one statement.
+  const age = async () => {
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(`SET LOCAL session_replication_role = replica`)
+      await client.query(`UPDATE activity_logs SET updated_at = now() - interval '1 hour' WHERE user_id = $1`, [USER])
+      await client.query('COMMIT')
+    } finally {
+      client.release()
+    }
+  }
 
   afterAll(async () => {
     if (!canRun) return
-    await pool.query(`DELETE FROM activity_logs WHERE user_id = $1`, [USER])
-    await pool.query(`DELETE FROM users WHERE id = $1`, [USER])
+    await pool.query(`DELETE FROM activity_logs WHERE user_id = ANY($1)`, [[USER, OTHER]])
+    await pool.query(`DELETE FROM users WHERE id = ANY($1)`, [[USER, OTHER]])
   })
 
   it('stores a session under its record id and source', async () => {
@@ -96,6 +112,7 @@ describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#
     await repo.upsertHealthConnectActivityLog(USER, 'kept', walk({ startTime: '14:00', endTime: '14:30', durationMin: 30 }))
     await repo.upsertHealthConnectActivityLog(USER, 'older', walk({ date: shiftDateStr(today, -20) }))
     await repo.saveActivityLog(USER, { ...walk({ startTime: '15:00', endTime: '15:30', durationMin: 30 }), id: randomUUID() }, { overwrite: true })
+    await age()
 
     const n = await repo.tombstoneHealthConnectActivityLogs(USER, { from: shiftDateStr(today, -6), to: today, keep: ['kept'] })
     expect(n).toBe(1)
@@ -112,9 +129,62 @@ describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#
 
   it('never reaches another user’s row', async () => {
     await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
-    const other = '00000000-0000-4000-8000-000000003045'
-    expect(await repo.tombstoneHealthConnectActivityLogs(other, { ids: ['hc-1'] })).toBe(0)
-    expect(await repo.tombstoneHealthConnectActivityLogs(other, { from: day, to: day, keep: [] })).toBe(0)
+    await age()
+    expect(await repo.tombstoneHealthConnectActivityLogs(OTHER, { ids: ['hc-1'] })).toBe(0)
+    expect(await repo.tombstoneHealthConnectActivityLogs(OTHER, { from: day, to: day, keep: [] })).toBe(0)
     expect((await rows())[0].deleted).toBe(false)
+  })
+
+  it('another user sending the same record id gets a row of their own and never touches this one', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
+    expect(await repo.upsertHealthConnectActivityLog(OTHER, 'hc-1', walk({ startTime: '12:30', durationMin: 10 }))).toBe('inserted')
+    expect(await rows()).toMatchObject([{ external_id: 'hc-1', start_time: '12:00:00', duration_min: 40 }])
+  })
+
+  it('spares a session stored in the last 15 minutes from the window sweep', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'just-stored', walk())
+    expect(await repo.tombstoneHealthConnectActivityLogs(USER, { from: day, to: day, keep: [] })).toBe(0)
+    expect((await rows())[0].deleted).toBe(false)
+  })
+
+  it('a new record at the minute of a swept Health Connect row takes the row over', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'old', walk())
+    await age()
+    await repo.tombstoneHealthConnectActivityLogs(USER, { from: day, to: day, keep: [] })
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'new', walk({ title: 'Walk again', durationMin: 35 }))).toBe('inserted')
+    expect(await rows()).toMatchObject([{ external_id: 'new', title: 'Walk again', duration_min: 35, deleted: false }])
+  })
+
+  it('never takes over an in-app log the owner deleted', async () => {
+    const id = randomUUID()
+    await repo.saveActivityLog(USER, { ...walk(), id, title: 'In-app walk' }, { overwrite: true })
+    await repo.deleteActivityLog(USER, id)
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())).toBe('taken')
+    expect(await rows()).toMatchObject([{ title: 'In-app walk', external_id: null, deleted: true }])
+  })
+
+  it('a re-created record id stays deleted: a tombstone under its own id wins', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
+    await repo.tombstoneHealthConnectActivityLogs(USER, { ids: ['hc-1'] })
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())).toBe('deleted')
+    expect(await rows()).toMatchObject([{ external_id: 'hc-1', deleted: true }])
+  })
+
+  it('an in-app save at a Health Connect row’s minute makes it the in-app log, which a sync then leaves alone', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
+    await repo.saveActivityLog(USER, { ...walk({ durationMin: 25, endTime: '12:25' }), id: randomUUID(), title: 'GPS walk' }, { overwrite: true })
+    expect(await rows()).toMatchObject([{ title: 'GPS walk', duration_min: 25, external_id: null, external_source: null }])
+    // The next sync neither resets it to Health Connect's 40 minutes nor sweeps it.
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())).toBe('taken')
+    await age()
+    await repo.tombstoneHealthConnectActivityLogs(USER, { from: day, to: day, keep: [] })
+    expect(await rows()).toMatchObject([{ title: 'GPS walk', duration_min: 25, deleted: false }])
+  })
+
+  it('an in-app edit of the Health Connect row itself keeps its source', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
+    const { rows: [{ id }] } = await pool.query(`SELECT id FROM activity_logs WHERE user_id = $1`, [USER])
+    await repo.saveActivityLog(USER, { ...walk(), id, title: 'Renamed' }, { overwrite: true })
+    expect(await rows()).toMatchObject([{ title: 'Renamed', external_id: 'hc-1', external_source: 'health_connect' }])
   })
 })

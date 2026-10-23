@@ -40,6 +40,27 @@ describe('budgetActivityLogs', () => {
     expect(budgetActivityLogs([a, b], [], TZ)).toEqual([a, b])
   })
 
+  it('keeps a session that only touches an in-app one: a walk ending a minute into an hour at the gym', () => {
+    const gym = hc('12:00', '13:00', { activityType: 'strength', durationMin: 60 })
+    expect(budgetActivityLogs([log('11:30', '12:01', { durationMin: 31 }), gym], [], TZ)).toContain(gym)
+    // Nor one that a strength session only brushes.
+    expect(budgetActivityLogs([gym], [{ startedAt: at(12, 50), completedAt: at(14) }], TZ)).toEqual([gym])
+  })
+
+  it('counts half of the shorter window shared as the same workout, and less as two', () => {
+    const inApp = log('12:00', '12:40')
+    expect(budgetActivityLogs([inApp, hc('12:20', '13:00')], [], TZ)).toEqual([inApp])
+    expect(budgetActivityLogs([inApp, hc('12:21', '13:01')], [], TZ)).toHaveLength(2)
+  })
+
+  it('matches last night’s in-app log that ran past midnight on the range’s first day', () => {
+    const today = shiftDateStr(day, 1)
+    const copy = hc('00:00', '00:30', { date: today, durationMin: 30 })
+    const lastNight = log('23:30', '00:30', { durationMin: 60 })
+    expect(budgetActivityLogs([copy], [], TZ, [lastNight])).toEqual([])
+    expect(budgetActivityLogs([copy], [], TZ)).toEqual([copy])
+  })
+
   it('leaves logs stored before the source was recorded alone, so no past day moves', () => {
     const legacyWatchCopy = log('12:01', '12:41')
     expect(budgetActivityLogs([log('12:00', '12:40'), legacyWatchCopy], [], TZ)).toHaveLength(2)

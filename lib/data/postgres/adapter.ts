@@ -177,6 +177,8 @@ import {
 // number on the client and a second copy is how two implementations of one metric begin.
 import { LBS_TO_KG } from '@trainingai/shared/workout/units'
 
+/** #3044. How long a Health Connect session is safe from a window sweep after it is stored. */
+const SWEEP_MIN_AGE_MS = 15 * 60_000
 
 interface LbsToKgLogRow {
   id: string
@@ -2718,6 +2720,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             set: {
               ...set,
               deletedAt: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.deletedAt} ELSE NULL END`,
+              // #3044. An in-app save landing on a Health Connect row's minute makes it the in-app
+              // log: without this it kept Health Connect's id, so the next sync rewrote it with
+              // Health Connect's times and the sweep deleted it once that session went. An edit to
+              // the row itself (the same id) keeps its source.
+              externalSource: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.externalSource} ELSE NULL END`,
+              externalId: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.externalId} ELSE NULL END`,
             },
           }).returning()
         : await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
@@ -2961,7 +2969,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // there updates this row instead of adding one at its new start time. Only the fields Health
   // Connect owns are written: the title, type and notes stay as stored, since the owner may have
   // changed them here, and a metric the read left out keeps its stored value. A row deleted here, or
-  // tombstoned because Health Connect deleted it, stays deleted.
+  // tombstoned because Health Connect deleted it, stays deleted under that id. A different record at
+  // the minute of a tombstoned Health Connect row takes the row over (see below).
   async upsertHealthConnectActivityLog(
     userId: string, externalId: string, log: HealthConnectActivityLogInput,
   ): Promise<HealthConnectActivityLogOutcome> {
@@ -2977,19 +2986,35 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ?? (existing && existing.durationMin === log.durationMin ? existing.caloriesBurned : null)
       ?? await this.deriveActivityKcal(userId, existing?.activityType ?? log.activityType, log.durationMin)
     if (!existing) {
-      const [r] = await this.db.insert(s.activityLogs).values({
-        userId, date: log.date, activityType: log.activityType, title: log.title,
+      const fields = {
+        date: log.date, activityType: log.activityType, title: log.title,
         startTime: log.startTime, endTime: log.endTime, durationMin: log.durationMin,
         distanceKm: log.distanceKm ?? null, caloriesBurned,
         avgHr: log.avgHr ?? null, maxHr: log.maxHr ?? null,
         avgPaceSecPerKm: log.distanceKm != null ? averagePaceSecPerKm(log.distanceKm, log.durationMin * 60) ?? null : null,
         externalSource: HEALTH_CONNECT_SOURCE, externalId,
-      })
+      }
+      const [r] = await this.db.insert(s.activityLogs).values({ userId, ...fields })
         // Either index: another row already at this minute (an in-app log, or one an older bundle
         // stored without an id), which keeps it, or a concurrent sync that stored this record first.
         .onConflictDoNothing()
         .returning({ id: s.activityLogs.id })
-      return r ? 'inserted' : 'taken'
+      if (r) return 'inserted'
+      // The `(user, date, start_time)` index covers tombstones. When Health Connect replaces a record
+      // with a new one at the same minute, the sweep tombstones the old row, and the new record could
+      // otherwise never be stored. It takes over that row instead. Only a tombstoned Health Connect
+      // row: a live row keeps its minute, and an in-app log the owner deleted stays deleted.
+      const taken = await this.db.update(s.activityLogs)
+        .set({ ...fields, notes: null, deletedAt: null, updatedAt: new Date() })
+        .where(and(
+          eq(s.activityLogs.userId, userId),
+          eq(s.activityLogs.date, log.date),
+          eq(s.activityLogs.startTime, log.startTime),
+          eq(s.activityLogs.externalSource, HEALTH_CONNECT_SOURCE),
+          isNotNull(s.activityLogs.deletedAt),
+        ))
+        .returning({ id: s.activityLogs.id })
+      return taken.length ? 'inserted' : 'taken'
     }
     const distanceKm = log.distanceKm ?? existing.distanceKm
     const next = {
@@ -3004,10 +3029,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // Every sync re-reads the window, so an unchanged row is left alone: bumping `updated_at` would
     // send it to every device on each pull.
     if (same) return 'unchanged'
+    let updated: { id: string }[]
     try {
-      await this.db.update(s.activityLogs)
+      updated = await this.db.update(s.activityLogs)
         .set({ ...next, updatedAt: new Date() })
-        .where(and(eq(s.activityLogs.id, existing.id), eq(s.activityLogs.userId, userId)))
+        .where(and(eq(s.activityLogs.id, existing.id), eq(s.activityLogs.userId, userId), isNull(s.activityLogs.deletedAt)))
+        .returning({ id: s.activityLogs.id })
     } catch (err) {
       // The new start minute is another row's (the `(user, date, start_time)` index). That row wins
       // and this one keeps its old time until the clash goes away.
@@ -3015,12 +3042,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       if (code === '23505') return 'taken'
       throw err
     }
-    return 'updated'
+    // No row: it was deleted between the read above and this write, and a delete wins.
+    return updated.length ? 'updated' : 'deleted'
   }
 
   // #3044. Tombstones Health Connect sessions that Health Connect no longer has: by record id (a
   // deletion feed), or every stored one dated inside a window that was read in full whose id did not
-  // come back. Never a hard delete, and never a row from any other source.
+  // come back. Never a hard delete, and never a row from any other source. The window sweep leaves
+  // a row stored or changed in the last SWEEP_MIN_AGE_MS alone: a sync that read Health Connect just
+  // before another stored a session must not sweep it.
   async tombstoneHealthConnectActivityLogs(
     userId: string, scope: { ids: readonly string[] } | { from: string; to: string; keep: readonly string[] },
   ): Promise<number> {
@@ -3037,6 +3067,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           : [
               gte(s.activityLogs.date, scope.from),
               lte(s.activityLogs.date, scope.to),
+              lt(s.activityLogs.updatedAt, new Date(Date.now() - SWEEP_MIN_AGE_MS)),
               ...(scope.keep.length ? [notInArray(s.activityLogs.externalId, [...scope.keep])] : []),
             ]),
       ))
