@@ -1629,7 +1629,7 @@ export interface WorkoutRepository {
   getSetHrStatsSince(userId: string, since: Date, limit?: number): Promise<SetHrStatsRow[]>
   listSessionsMissingSetHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   /** #2457 backfill work-list: every stored per-set row's HRR60 inputs, oldest first. */
-  listSetHrStatsForHrr1Backfill(userId: string): Promise<{ setLogId: string; workoutSessionId: string; loggedAt: Date | null; hrr1Bpm: number | null; restAdequate: boolean | null; drop30s: number | null; drop60s: number | null; drop90s: number | null; drop120s: number | null }[]>
+  listSetHrStatsForHrr1Backfill(userId: string): Promise<{ setLogId: string; workoutSessionId: string; loggedAt: Date | null; setEndMs: number | null; hrr1Bpm: number | null; restAdequate: boolean | null; drop30s: number | null; drop60s: number | null; drop90s: number | null; drop120s: number | null }[]>
   /** #2457: set `hrr1_bpm` / `rest_adequate` as given (null clears); all-or-nothing, throws on a count mismatch. */
   writeSetHrr1(userId: string, updates: readonly { setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null; drop30s: number | null; drop60s: number | null; drop90s: number | null; drop120s: number | null }[]): Promise<number>
   getOuraWorkouts(userId: string, opts: { unreviewed?: boolean; from?: string; to?: string; timezone?: string }): Promise<{
