@@ -13,6 +13,7 @@ export function SegmentedControl<T extends string>({
   animated = false,
   position,
   appearance = 'brand',
+  size = 'sm',
 }: {
   label: string;
   options: readonly { label: string; value: T }[];
@@ -20,8 +21,13 @@ export function SegmentedControl<T extends string>({
   onChange: (value: T) => void;
   animated?: boolean;
   position?: Animated.AnimatedInterpolation<number>;
-  /** 'tabs' is the current app's SegmentedTabs: separate pills, the active one filled in text colour. */
+  /**
+   * 'tabs' is the current app's SegmentedTabs: separate pills, the active one filled in text colour.
+   * It ignores `animated` and `position`: the pills swap fill rather than slide a highlight.
+   */
   appearance?: 'brand' | 'tabs';
+  /** 'tabs' only: the web's size sm (14 px type) or xs (12 px). */
+  size?: 'sm' | 'xs';
 }) {
   const { theme } = useTheme();
   const [width, setWidth] = useState(0);
@@ -73,7 +79,7 @@ export function SegmentedControl<T extends string>({
               }}
             >
               <AppText
-                variant="caption"
+                variant={size === 'xs' ? 'caption' : 'subheading'}
                 style={{
                   fontWeight: '600',
                   color: active ? theme.colors.background : theme.colors.muted,

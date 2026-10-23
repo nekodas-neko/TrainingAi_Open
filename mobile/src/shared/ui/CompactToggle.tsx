@@ -2,9 +2,10 @@ import { Pressable, View } from 'react-native';
 import { feedback } from '../../integrations/feedback/haptics';
 import { useTheme } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
+import { compactToggleLayout } from './compactToggleLayout';
 
-// The small two-way toggle at the right of a card's title row (strength-progress-card.tsx and
-// goals-progress-card.tsx). It is drawn small and keeps a full 48 px touch target through hitSlop.
+// The two-way toggle at the right of a card's title row (strength-progress-card.tsx and
+// goals-progress-card.tsx): small type in cells that keep the 48 px touch target.
 //   tint  the active option is washed in `accent`, as the Estimated 1RM card's Sets | 1RM toggle is
 //   pill  the active option is a raised pill on a bordered track, as the Goals card's Today | This Week is
 export function CompactToggle<T extends string>({
@@ -24,7 +25,7 @@ export function CompactToggle<T extends string>({
 }) {
   const { theme } = useTheme();
   const pill = appearance === 'pill';
-  const hit = Math.max(0, (theme.sizes.touchTarget - theme.sizes.compactToggle) / 2);
+  const layout = compactToggleLayout(theme.sizes, theme.spacing, appearance);
   return (
     <View
       accessibilityLabel={label}
@@ -33,7 +34,7 @@ export function CompactToggle<T extends string>({
         backgroundColor: theme.colors.raised,
         borderRadius: pill ? theme.radii.control : theme.radii.small,
         overflow: 'hidden',
-        padding: pill ? theme.spacing.xxs : 0,
+        padding: layout.trackPadding,
         borderWidth: pill ? 1 : 0,
         borderColor: theme.colors.border,
       }}
@@ -47,14 +48,13 @@ export function CompactToggle<T extends string>({
             accessibilityLabel={option.label}
             accessibilityState={{ checked: active }}
             aria-checked={active}
-            hitSlop={{ top: hit, bottom: hit }}
             onPress={() => {
               if (!active) feedback();
               onChange(option.value);
             }}
             style={{
               paddingHorizontal: theme.spacing.snug,
-              minHeight: theme.sizes.compactToggle,
+              minHeight: layout.cellMinHeight,
               justifyContent: 'center',
               borderRadius: pill ? theme.radii.small : 0,
               backgroundColor: !active

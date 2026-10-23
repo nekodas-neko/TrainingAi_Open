@@ -103,8 +103,7 @@ export function HealthScreen({
     >
       <View style={{ paddingHorizontal: theme.spacing.lg }}>
         <SegmentedControl
-          animated
-          position={motion.width > 0 ? motion.position : undefined}
+          appearance="tabs"
           label="Health views"
           options={panels.map((panel) => ({ value: panel.id, label: panel.label }))}
           value={tab}

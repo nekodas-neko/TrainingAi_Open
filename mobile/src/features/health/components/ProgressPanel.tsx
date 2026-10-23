@@ -121,7 +121,7 @@ function TrendsCard() {
         }}
       >
         <Icon name="info" tone="muted" size={14} style={{ marginTop: theme.spacing.xxs }} />
-        <AppText variant="micro" tone="muted" style={{ flex: 1 }}>
+        <AppText variant="micro" tone="muted" style={{ flex: 1, fontWeight: '400' }}>
           Correlations need enough paired data points to be meaningful — keep logging workouts,
           sleep, meals and morning check-ins to unlock each view.
         </AppText>

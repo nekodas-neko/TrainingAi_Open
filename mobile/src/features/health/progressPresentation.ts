@@ -1,3 +1,4 @@
+import { gainTone, type GainTone } from '@trainingai/shared/health/strength-progress';
 import {
   strengthDeltaText,
   strengthGroups,
@@ -62,4 +63,14 @@ export function goalCountText(value: number, goal: number, weekly: boolean): str
   // The raw values, as the current app's GoalProgressBar does: 7.96 of 8 prints "8 / 8" without a tick.
   const done = goal > 0 && value >= goal;
   return `${weekly ? 'This week: ' : ''}${formatCount(value)} / ${formatCount(goal)}${done ? ' ✓' : ''}`;
+}
+
+/** The colour of a strength-trend gain: up green, down red, flat amber, from the status tokens. */
+export function gainColor(
+  gainPct: number | null | undefined,
+  status: { success: string; danger: string; warning: string },
+): string | null {
+  const tone: GainTone | null = gainTone(gainPct);
+  if (tone === null) return null;
+  return { up: status.success, down: status.danger, flat: status.warning }[tone];
 }
