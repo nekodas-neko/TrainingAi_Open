@@ -22,12 +22,12 @@ test('baselines keep the newest result of each protocol, ordered by when each fi
   );
 });
 
-test('two baselines saved on one day keep the order the current app reads them in', () => {
+test('two baselines saved on one day keep the order the server sent them in', () => {
   const server = baselinesSpec.schema.parse({
     fitnessTests: [
-      { id: 'hrr', date: '2026-10-10', testType: 'resting_hrr', hrr1Bpm: 24 },
-      { id: 'six', date: '2026-10-10', testType: '6mwt', vo2maxEst: 30 },
       { id: 'coo', date: '2026-10-12', testType: 'cooper12', vo2maxEst: 33 },
+      { id: 'six', date: '2026-10-10', testType: '6mwt', vo2maxEst: 30 },
+      { id: 'hrr', date: '2026-10-10', testType: 'resting_hrr', hrr1Bpm: 24 },
     ],
   }).fitnessTests;
   assert.deepEqual(
