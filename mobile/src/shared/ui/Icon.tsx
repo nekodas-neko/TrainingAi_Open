@@ -20,6 +20,7 @@ import Brain from 'lucide-react-native/icons/brain';
 import Flame from 'lucide-react-native/icons/flame';
 import Target from 'lucide-react-native/icons/target';
 import Award from 'lucide-react-native/icons/award';
+import Medal from 'lucide-react-native/icons/medal';
 import Bike from 'lucide-react-native/icons/bike';
 import Waves from 'lucide-react-native/icons/waves-horizontal';
 import Users from 'lucide-react-native/icons/users';
@@ -113,6 +114,7 @@ const icons = {
   flame: Flame,
   target: Target,
   award: Award,
+  medal: Medal,
   bike: Bike,
   waves: Waves,
   users: Users,
