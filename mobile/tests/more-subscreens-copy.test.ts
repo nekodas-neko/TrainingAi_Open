@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { feedIconName, leaderIconName } from '../src/features/social/data/feed-icons.ts';
 import {
   HISTORY_WINDOW_DAYS,
   dataSyncCopy,
@@ -26,10 +27,8 @@ test('Data & Sync captions match the current app word for word', () => {
   }
 });
 
-test('the Friends feed uses the current app icons: a trophy for achievements, a trend for PRs', () => {
-  const panel = readFileSync(
-    new URL('../src/features/social/components/FriendsPanel.tsx', import.meta.url),
-    'utf8',
-  );
-  assert.ok(panel.includes("event.type === 'pr' ? 'upper' : 'trophy'"));
+test('Friends icons: trend for a PR, trophy otherwise, medal for first place', () => {
+  assert.equal(feedIconName('pr'), 'upper');
+  assert.equal(feedIconName('achievement'), 'trophy');
+  assert.equal(leaderIconName, 'medal');
 });

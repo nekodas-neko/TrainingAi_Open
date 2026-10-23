@@ -29,6 +29,7 @@ import {
   type Period,
 } from '../data/models';
 import { ManageFriendsSheet } from './ManageFriendsSheet';
+import { feedIconName, leaderIconName } from '../data/feed-icons';
 function relative(iso: string) {
   return timeAgo(iso) ?? 'Date unavailable';
 }
@@ -155,7 +156,7 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                         </Stack>
                         <Stack direction="row" align="center">
                           <Icon
-                            name={event.type === 'pr' ? 'upper' : 'trophy'}
+                            name={feedIconName(event.type)}
                             color={event.type === 'pr' ? theme.friends.purple : theme.friends.gold}
                           />
                           <AppText variant="caption" style={{ flex: 1 }}>
@@ -215,7 +216,7 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                           )}
                         </Stack>
                         <AppText variant="caption">{rankLabel(value, period, metric)}</AppText>
-                        {index === 0 && <Icon name="award" color={theme.friends.gold} />}
+                        {index === 0 && <Icon name={leaderIconName} color={theme.friends.gold} />}
                       </Stack>
                     </Card>
                   </Pressable>
