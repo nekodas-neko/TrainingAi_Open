@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { VOLUME_TARGET_LEGEND, VOLUME_UNTRAINED_LABEL } from '@trainingai/shared/health/volume-band'
 
 /** RV-101, as reshaped by #2554. The heatmap paints two scales into one silhouette: a categorical
  *  role scale (primary / secondary / injured) and a volume scale, chosen by which prop the caller
@@ -32,10 +33,13 @@ describe('RV-101 — the volume colours are readable, and say what they mean', (
     const key = /\{hasActivity && usingVolumes && \(([\s\S]*?)\n {6}\)\}/.exec(SRC)?.[1]
     expect(key, 'the volume key block was not found').toBeTruthy()
     expect(key).not.toMatch(/!compact/)
-    expect(key).toMatch(/Under 60%/)
-    expect(key).toMatch(/60–99%/)
-    expect(key).toMatch(/At target/)
-    expect(key).toMatch(/Not trained/)
+    // The words live once in the shared volume-band file, which the native app prints too.
+    expect(key).toMatch(/VOLUME_TARGET_LEGEND\[0\]/)
+    expect(key).toMatch(/VOLUME_TARGET_LEGEND\[1\]/)
+    expect(key).toMatch(/VOLUME_TARGET_LEGEND\[2\]/)
+    expect(key).toMatch(/VOLUME_UNTRAINED_LABEL/)
+    expect(VOLUME_TARGET_LEGEND.map((band) => band.label)).toEqual(['Under 60%', '60–99%', 'At target'])
+    expect(VOLUME_UNTRAINED_LABEL).toBe('Not trained')
   })
 
   it('the volume call site really does pass compact, which is what makes that gate matter', () => {

@@ -7,9 +7,9 @@ import {
   AppText,
   Card,
   ChipPicker,
+  CompactToggle,
   Icon,
   ProgressBar,
-  SegmentedControl,
   SeriesBarChart,
   Stack,
   StableContent,
@@ -112,10 +112,21 @@ function TrendsCard() {
           </>
         )}
       </StableContent>
-      <AppText variant="micro" tone="muted">
-        Correlations need enough paired data points to be meaningful: keep logging workouts, sleep,
-        meals and morning check-ins to unlock each view.
-      </AppText>
+      <Stack
+        direction="row"
+        align="flex-start"
+        style={{
+          borderRadius: theme.radii.control,
+          backgroundColor: `${theme.colors.raised}80`,
+          padding: theme.spacing.md,
+        }}
+      >
+        <Icon name="info" tone="muted" size={14} style={{ marginTop: theme.spacing.xxs }} />
+        <AppText variant="micro" tone="muted" style={{ flex: 1, fontWeight: '400' }}>
+          Correlations need enough paired data points to be meaningful — keep logging workouts,
+          sleep, meals and morning check-ins to unlock each view.
+        </AppText>
+      </Stack>
       {TREND_VIEW_NOTE[view] && (
         <AppText variant="micro" tone="muted">
           {TREND_VIEW_NOTE[view]}
@@ -202,16 +213,25 @@ function StrengthWorkingCard() {
   const lastSession = lastTrainedSession(exercises);
   return (
     <Card accent={theme.progress.strength}>
-      <HealthResourceHeader title={'Strength Progress'} state={state} refresh={state.refresh} />
-      <SegmentedControl
-        animated
-        label="Strength comparison"
-        options={[
-          { label: 'Sets', value: 'working' },
-          { label: '1RM', value: 'latest' },
-        ]}
-        value={mode}
-        onChange={setMode}
+      <HealthResourceHeader
+        title={'Estimated 1RM'}
+        icon="workout"
+        iconColor={theme.progress.strength}
+        state={state}
+        refresh={state.refresh}
+        trailing={
+          <CompactToggle
+            appearance="tint"
+            accent={theme.progress.strength}
+            label="Strength comparison"
+            options={[
+              { label: 'Sets', value: 'working' },
+              { label: '1RM', value: 'latest' },
+            ]}
+            value={mode}
+            onChange={setMode}
+          />
+        }
       />
 
       {(state.data?.phaseName || lastSession) && (
@@ -337,16 +357,18 @@ function GoalsCard() {
           progress.refresh();
           energy.refresh();
         }}
-      />
-      <SegmentedControl
-        animated
-        label="Goal period"
-        options={[
-          { label: 'Today', value: 'today' },
-          { label: 'This Week', value: 'week' },
-        ]}
-        value={view}
-        onChange={setView}
+        trailing={
+          <CompactToggle
+            appearance="pill"
+            label="Goal period"
+            options={[
+              { label: 'Today', value: 'today' },
+              { label: 'This Week', value: 'week' },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+        }
       />
 
       {visible.map((row) => (

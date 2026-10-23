@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { shortSessionName } from '@trainingai/shared/session-palette';
-import { AppText, Card, Legend, MonthCalendar } from '../../../shared/ui';
+import { Card, Legend, MonthCalendar } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { calendarSpec } from '../../workouts/data/models';
@@ -35,10 +35,8 @@ export function TrainingCalendarCard({ openDay }: { openDay: (date: string) => v
   });
   return (
     <Card>
-      <AppText variant="groupTitle" tone="muted" accessibilityRole="header">
-        Training Calendar
-      </AppText>
       <MonthCalendar
+        title="Training Calendar"
         nativeStyle
         status={
           <ResourceStatus inline label="Calendar records" state={state} refresh={state.refresh} />

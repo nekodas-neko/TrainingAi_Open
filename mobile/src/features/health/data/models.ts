@@ -694,6 +694,7 @@ export const overviewSpec = {
           .object({
             sessionId: z.string(),
             sessionName: z.string(),
+            icon: z.string().nullish(),
             lastTrainedDaysAgo: n,
             state: z
               .object({

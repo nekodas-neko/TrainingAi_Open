@@ -39,6 +39,19 @@ export function volumeVerdict(trainingGoal: string, muscle: string, sets: number
   return { band, ...BANDS[band], mev, mav, mrv }
 }
 
+/**
+ * The key for a body map graded against each muscle's own target, in words: red under 60%, amber
+ * 60–99%, green at or above. Both apps print these, so a retuned band cannot leave one stale.
+ */
+export const VOLUME_TARGET_LEGEND: readonly { tone: VolumeTone; label: string }[] = [
+  { tone: 'bad', label: 'Under 60%' },
+  { tone: 'warn', label: '60–99%' },
+  { tone: 'good', label: 'At target' },
+]
+export const VOLUME_UNTRAINED_LABEL = 'Not trained'
+/** Said in place of the bands when the bars carry their own (goal landmarks or the generic band). */
+export const VOLUME_BARS_KEY_NOTE = 'Colours match the bars below'
+
 /** The generic band's target when nothing supplies one: its 10-set minimum. */
 export const GENERIC_TARGET = 10
 /** Sets at which the generic band (no target, no goal) turns `brand`. */

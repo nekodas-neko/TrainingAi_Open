@@ -1,4 +1,4 @@
-import { Text, type TextProps } from 'react-native';
+import { Platform, Text, type TextProps } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import type { TextVariant } from '../theme/tokens';
 import { MAX_TEXT_SCALE } from '../theme/text-scale';
@@ -6,9 +6,15 @@ import { MAX_TEXT_SCALE } from '../theme/text-scale';
 export function AppText({
   variant = 'body',
   tone = 'text',
+  mono = false,
   style,
   ...props
-}: TextProps & { variant?: TextVariant; tone?: 'text' | 'muted' | 'brand' | 'danger' }) {
+}: TextProps & {
+  variant?: TextVariant;
+  tone?: 'text' | 'muted' | 'brand' | 'danger';
+  /** Monospace, for codes the user reads out or retypes (the web's font-mono). */
+  mono?: boolean;
+}) {
   const { theme, allowFontScaling } = useTheme();
   return (
     <Text
@@ -20,6 +26,7 @@ export function AppText({
       style={[
         theme.typography[variant],
         { color: theme.colors[tone === 'brand' ? 'brandText' : tone] },
+        mono ? { fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) } : undefined,
         style,
       ]}
     />

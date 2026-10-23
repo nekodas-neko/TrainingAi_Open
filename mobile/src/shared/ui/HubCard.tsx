@@ -13,6 +13,7 @@ export function HubCard({
   icon,
   tone = 'brand',
   badge,
+  iconTile = true,
   onPress,
 }: {
   title: string;
@@ -21,6 +22,8 @@ export function HubCard({
   tone?: Tone;
   /** A small label beside the title, e.g. PROGRAM. */
   badge?: string;
+  /** False draws the icon bare, in the brand colour, as the current app's Week in review row does. */
+  iconTile?: boolean;
   onPress?: () => void;
 }) {
   const { theme } = useTheme();
@@ -35,18 +38,22 @@ export function HubCard({
     >
       <Card tone={tone} style={{ padding: theme.spacing.md }}>
         <Stack direction="row" align="center">
-          <View
-            style={{
-              width: theme.sizes.touchTarget,
-              height: theme.sizes.touchTarget,
-              borderRadius: theme.radii.control,
-              backgroundColor: palette.border,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name={icon} color={palette.foreground} />
-          </View>
+          {iconTile ? (
+            <View
+              style={{
+                width: theme.sizes.touchTarget,
+                height: theme.sizes.touchTarget,
+                borderRadius: theme.radii.control,
+                backgroundColor: palette.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name={icon} color={palette.foreground} />
+            </View>
+          ) : (
+            <Icon name={icon} tone="brand" size={theme.sizes.iconSmall} />
+          )}
           <View style={{ flex: 1 }}>
             <Stack direction="row" align="center" justify="space-between">
               <Stack direction="row" align="center" gap="xs" style={{ flexShrink: 1 }}>

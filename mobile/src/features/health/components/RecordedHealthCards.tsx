@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { useState } from 'react';
 import { formatDateDisplay, shiftDateStr } from '@trainingai/shared/date-utils';
@@ -39,16 +40,26 @@ export function TimeInZoneCard() {
   const total = sums.reduce((sum, value) => sum + value, 0);
   return (
     <Card>
-      <HealthResourceHeader title={'Time in Zones'} state={state} refresh={state.refresh} />
-      <SegmentedControl
-        label="Heart-rate zone period"
-        options={[
-          { label: 'Day', value: 'day' },
-          { label: 'Week', value: 'week' },
-          { label: 'Month', value: 'month' },
-        ]}
-        value={window}
-        onChange={setWindow}
+      <HealthResourceHeader
+        title={'Time in Zones'}
+        state={state}
+        refresh={state.refresh}
+        trailing={
+          <View style={{ width: theme.sizes.zonePeriodToggle }}>
+            <SegmentedControl
+              appearance="tabs"
+              size="xs"
+              label="Heart-rate zone period"
+              options={[
+                { label: 'Day', value: 'day' },
+                { label: 'Week', value: 'week' },
+                { label: 'Month', value: 'month' },
+              ]}
+              value={window}
+              onChange={setWindow}
+            />
+          </View>
+        }
       />
 
       {state.data?.profile.maxHrSource === 'cooper-blend' && (

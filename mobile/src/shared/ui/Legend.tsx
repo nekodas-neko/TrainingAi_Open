@@ -12,7 +12,13 @@ export function Legend({
   tinted = false,
   centered = false,
 }: {
-  items: readonly { label: string; color: string }[];
+  /** `shape` square (a key swatch), dot (default) or text (a note with no swatch); `outlined` rings the swatch. */
+  items: readonly {
+    label: string;
+    color?: string;
+    shape?: 'dot' | 'square' | 'text';
+    outlined?: boolean;
+  }[];
   ruled?: boolean;
   tinted?: boolean;
   centered?: boolean;
@@ -38,14 +44,18 @@ export function Legend({
     >
       {items.map((item) => (
         <Stack key={item.label} direction="row" align="center" gap="xs">
-          <View
-            style={{
-              width: dot,
-              height: dot,
-              borderRadius: theme.radii.pill,
-              backgroundColor: item.color,
-            }}
-          />
+          {item.shape !== 'text' && (
+            <View
+              style={{
+                width: item.shape === 'square' ? theme.sizes.legendSwatch : dot,
+                height: item.shape === 'square' ? theme.sizes.legendSwatch : dot,
+                borderRadius: item.shape === 'square' ? theme.radii.swatch : theme.radii.pill,
+                backgroundColor: item.color,
+                borderWidth: item.outlined ? 1 : 0,
+                borderColor: theme.colors.border,
+              }}
+            />
+          )}
           <AppText
             variant="micro"
             tone="muted"
