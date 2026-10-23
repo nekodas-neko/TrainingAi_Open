@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The app's dark theme, green palette (src/shared/theme): surface, text and muted. -->
+  <color name="home_widget_surface">#09160c</color>
+  <color name="home_widget_text">#fafafa</color>
+  <color name="home_widget_muted">#b2b8b3</color>
+</resources>

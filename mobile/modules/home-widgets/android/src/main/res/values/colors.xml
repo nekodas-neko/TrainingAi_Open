@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The app's light theme (src/shared/theme): surface, text and muted. -->
+  <color name="home_widget_surface">#ffffff</color>
+  <color name="home_widget_text">#121212</color>
+  <color name="home_widget_muted">#666666</color>
+</resources>
