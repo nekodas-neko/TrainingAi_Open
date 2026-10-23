@@ -91,13 +91,15 @@ export function PageLayout({
             <AppText variant={titleVariant} accessibilityRole="header">
               {title}
             </AppText>
-            {typeof subtitle === 'string' ? (
-              <AppText variant="body" tone="muted">
-                {subtitle}
-              </AppText>
-            ) : (
-              subtitle
-            )}
+            {subtitle ? (
+              typeof subtitle === 'string' ? (
+                <AppText variant="body" tone="muted">
+                  {subtitle}
+                </AppText>
+              ) : (
+                subtitle
+              )
+            ) : null}
           </View>
           {actions && (
             <Stack direction="row" gap="xs">

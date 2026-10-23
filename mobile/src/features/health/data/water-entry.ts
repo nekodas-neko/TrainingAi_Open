@@ -10,7 +10,7 @@ import {
  */
 export function waterEntry(raw: string): { ml: number | null; error: string | null } {
   if (raw.trim() === '') return { ml: null, error: null };
-  const typed = parseFloat(raw);
+  const typed = Number(raw);
   if (!Number.isFinite(typed)) return { ml: null, error: 'Enter a number' };
   const ml = validWaterMlDeltaOrNull(typed);
   return ml === null || ml < 1

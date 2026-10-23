@@ -22,5 +22,7 @@ test('zero, negative, tiny and over-limit amounts are refused with the range', (
 });
 
 test('text that is not a number is refused', () => {
-  assert.deepEqual(waterEntry('abc'), { ml: null, error: 'Enter a number' });
+  for (const raw of ['abc', '1.2.3', '12abc']) {
+    assert.deepEqual(waterEntry(raw), { ml: null, error: 'Enter a number' }, raw);
+  }
 });
