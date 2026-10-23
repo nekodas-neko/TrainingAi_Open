@@ -24,7 +24,8 @@
 --
 -- REVERSE (loses only what later code writes into the columns; reassign any `strength` rows first):
 --   DROP INDEX IF EXISTS activity_logs_external_idx;
---   ALTER TABLE activity_logs DROP COLUMN external_id, DROP COLUMN external_source;
+--   DROP VIEW IF EXISTS claude_ro.activity_logs; ALTER TABLE activity_logs DROP COLUMN external_id, DROP COLUMN external_source;
+--   (the view selects the columns, so the DROP COLUMN fails without the DROP VIEW; the boot rebuild recreates the view from claude-ro-views.sql)
 --   DELETE FROM activity_types WHERE id = 'strength';
 
 SET LOCAL lock_timeout = '3s';
