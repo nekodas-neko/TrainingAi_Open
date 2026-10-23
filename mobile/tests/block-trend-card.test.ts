@@ -50,14 +50,13 @@ test('each band shows its copy', () => {
   );
 });
 
-test('not enough history shows for the status and for a payload without the field', () => {
-  const noField = blockTrendView(undefined);
+test('not enough history shows for the status; a payload without the field shows nothing', () => {
   const status = blockTrendView(
     parseBlockTrend({ status: 'not_enough_history', ratio: null, band: null, baselineWeeklyKg: null, spanDays: 12, points: [] }),
   );
-  for (const view of [noField, status]) {
-    assert.deepEqual(view, { kind: 'not_enough_history', message: 'Not enough history yet' });
-  }
+  assert.deepEqual(status, { kind: 'not_enough_history', message: 'Not enough history yet' });
+  assert.deepEqual(blockTrendView(undefined), { kind: 'hidden' });
+  assert.deepEqual(blockTrendView(parseBlockTrend({ ...trend('steady'), band: null })), { kind: 'hidden' });
 });
 
 test('"Based on N weeks" shows under 13 weeks and hides at 13 or more', () => {

@@ -48,12 +48,14 @@ export function blockTrendChart(points: BlockTrendData['points']): BlockTrendCha
   };
 }
 
-/** What the Training Load card shows for the 28:90 block trend (undefined = payload without the field). */
+/** What the Training Load card shows for the 28:90 block trend (undefined = payload without the field, null = unrecognised). */
 export function blockTrendView(trend: BlockTrendData | null | undefined): BlockTrendView {
-  if (trend === null) return { kind: 'hidden' };
-  if (trend === undefined || trend.status === 'not_enough_history' || trend.band === null) {
+  // A payload cached before the field shipped says nothing about history, so it shows nothing.
+  if (trend == null) return { kind: 'hidden' };
+  if (trend.status === 'not_enough_history') {
     return { kind: 'not_enough_history', message: BLOCK_TREND_NOT_ENOUGH_HISTORY };
   }
+  if (trend.band === null) return { kind: 'hidden' };
   return {
     kind: 'ok',
     band: trend.band,
