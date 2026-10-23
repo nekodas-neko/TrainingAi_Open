@@ -56,7 +56,8 @@ export function lastTrainedSession(
 export type GoalKey = 'Steps' | 'Calories' | 'Water' | 'Sleep' | 'Workouts';
 
 const roundCount = (n: number) => Math.round(n * 10) / 10;
-const formatCount = (n: number) => roundCount(n).toLocaleString('en-US');
+/** A count with thousands separators, rounded to one decimal; the one grouping formatter Preview uses. */
+export const formatCount = (n: number) => roundCount(n).toLocaleString('en-US');
 
 /** "3,200 / 8,000", "This week: 3 / 4", with a tick once the goal is met. */
 export function goalCountText(value: number, goal: number, weekly: boolean): string {

@@ -22,6 +22,9 @@ import { muscleVolumeCaption } from '../data/training-view';
 import { MuscleVolumeFigure } from '../components/MuscleVolumeFigure';
 import {
   fixedValue,
+  flowDigest,
+  trainingHeadline,
+  volumeTickLabel,
   weekdayInitial,
   weekdayName,
   weekMuscleRows,
@@ -31,11 +34,13 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
   const { theme } = useTheme();
   const state = useWorkoutResource(digestSpec(week));
   const m = state.data?.metrics;
+  const training = m ? trainingHeadline(m.training.volumeKg, m.training.sessions) : null;
   return (
     <WorkoutLayout
       title="Week in review"
       onBack={onBack}
       backLabel="Back to Health"
+      centeredTitle
       actions={
         <StatusIndicator
           label="Weekly review"
@@ -51,24 +56,31 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
       <HealthViewReady view="week" requests={[digestSpec(week), monthWindowSpec(week)]}>
         {state.data?.digest && (
           <Card>
-            <AppText variant="eyebrow" tone="brand">
-              Your week
-            </AppText>
-            <MarkdownText>{state.data.digest}</MarkdownText>
+            <Stack direction="row" align="center" gap="xs">
+              <Icon name="coach" size={theme.sizes.iconCaption} tone="brand" />
+              <AppText variant="eyebrow" tone="brand">
+                Your week
+              </AppText>
+            </Stack>
+            <MarkdownText>{flowDigest(state.data.digest)}</MarkdownText>
           </Card>
         )}
-        {m && (
+        {m && training && (
           <>
             <Card>
               <Stack direction="row" align="center" gap="xs">
                 <Icon name="upper" size={theme.sizes.iconCompact} tone="brand" />
                 <AppText variant="subheading">Training</AppText>
               </Stack>
-              <AppText variant="title">{metricValue(m.training.volumeKg, 'kg')}</AppText>
+              <Stack direction="row" align="baseline" gap="md">
+                <AppText variant="metric" style={{ fontVariant: ['tabular-nums'] }}>
+                  {training.value}
+                </AppText>
+                <AppText variant="caption" tone="muted">
+                  {training.caption}
+                </AppText>
+              </Stack>
               <AppText variant="caption" tone="muted">
-                Over {plural(m.training.sessions, 'session', 'sessions')}
-              </AppText>
-              <AppText variant="micro" tone="muted">
                 {m.training.volumeChangePct == null
                   ? 'First week of data — nothing to compare it against yet'
                   : `${m.training.volumeChangePct >= 0 ? '+' : ''}${Math.round(m.training.volumeChangePct)}% on ${metricValue(m.training.priorVolumeKg, 'kg')} (${plural(m.training.priorSessions ?? 0, 'session', 'sessions')})`}
@@ -79,6 +91,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                 readable
                 yAxis
                 tickCount={4}
+                formatTick={volumeTickLabel}
                 bars={m.training.byDay.map((d) => ({
                   label: weekdayInitial(d.date),
                   accessibleLabel: weekdayName(d.date),
