@@ -20,7 +20,6 @@ import {
   Stack,
   StatusIndicator,
   TextField,
-  Thumbnail,
 } from '../../../shared/ui';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
@@ -30,7 +29,7 @@ import { ingredientAmountLabel, qtyFromInput } from '../data/quantities';
 import { recipeDuplicate, recipeTotals, scanRecipe } from '../data/recipes';
 import { IngredientPicker } from './IngredientPicker';
 import { MealLabelSheet } from './MealLabelSheet';
-import { recipeCountLine } from '../data/display';
+import { SavedMealList } from './SavedMealList';
 import { MacroLine } from './NutritionElements';
 import { aiFailureText } from '../../account/api/client';
 import { readRecipeScan, recipePhotoError } from '../data/scan-response';
@@ -75,7 +74,6 @@ export function RecipesSheet({
   const [remove, setRemove] = useState<SavedMeal[] | null>(null);
   const [selecting, setSelecting] = useState(false);
   const [bulk, setBulk] = useState<string[]>([]);
-  const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bucket, setBucket] = useState(n.view.mealTypes[0]?.id ?? '');
@@ -269,7 +267,6 @@ export function RecipesSheet({
       >
         {!editor ? (
           <>
-            <TextField label="Search my foods" value={search} onChangeText={setSearch} />
             <Stack direction="row">
               <AppButton title="Build a meal" onPress={() => edit()} />
               <AppButton
@@ -298,23 +295,13 @@ export function RecipesSheet({
               </>
             )}
 
-            {n.view.meals
-              .filter((meal) => meal.name.toLowerCase().includes(search.toLowerCase()))
-              .map((meal) => (
-                <Card key={meal.id}>
-                  <ListRow
-                    density="compact"
-                    leading={<Thumbnail uri={meal.imageDataUri} label={meal.name} />}
-                    title={meal.name}
-                    subtitle={recipeCountLine(meal.items.length, meal.servings)}
-                    onPress={() => {
-                      setSelected(meal);
-                      setPortions('1');
-                    }}
-                  />
-                  <MacroLine value={meal.totals} portion={1 / meal.servings} />
-                </Card>
-              ))}
+            <SavedMealList
+              date={date}
+              onOpen={(meal) => {
+                setSelected(meal);
+                setPortions('1');
+              }}
+            />
           </>
         ) : (
           <>
