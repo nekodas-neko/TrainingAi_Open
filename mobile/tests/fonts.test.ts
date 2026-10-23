@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { geistFace, geistFaces, withGeist } from '../src/shared/theme/fonts';
+import { geistFace, geistFaces, resolveWeight, withGeist } from '../src/shared/theme/fonts';
 import { typography } from '../src/shared/theme/tokens';
 
 // Preview draws Geist like the current app. Android picks no weight from one family name, so every
@@ -43,4 +43,13 @@ test('every weight in use maps to its own face, and bold is never synthesised', 
 test('an unmapped weight is kept, not quietly sent to the system font', () => {
   assert.equal(geistFace('300'), undefined);
   assert.equal(withGeist({ fontWeight: '300' }).fontWeight, '300');
+});
+
+test('a nested span without a weight keeps its parent\'s, and its own weight wins', () => {
+  assert.equal(resolveWeight(undefined, '700'), '700');
+  assert.equal(resolveWeight('400', '700'), '400');
+  assert.equal(resolveWeight(undefined, undefined), '400');
+  assert.equal(withGeist({ fontSize: 12 }, '700').fontFamily, geistFaces['700']);
+  assert.equal(withGeist({ fontWeight: '500' }, '700').fontFamily, geistFaces['500']);
+  assert.equal(withGeist({ fontSize: 12 }).fontFamily, geistFaces['400']);
 });

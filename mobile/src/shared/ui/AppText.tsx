@@ -1,8 +1,12 @@
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { createContext, useContext } from 'react';
+import { StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import type { TextVariant } from '../theme/tokens';
 import { MAX_TEXT_SCALE } from '../theme/text-scale';
-import { withGeist } from '../theme/fonts';
+import { resolveWeight, withGeist } from '../theme/fonts';
+
+// The weight of the AppText a span sits in, so a nested one without its own weight keeps it.
+const InheritedWeight = createContext<TextStyle['fontWeight']>(undefined);
 
 export function AppText({
   variant = 'body',
@@ -11,20 +15,22 @@ export function AppText({
   ...props
 }: TextProps & { variant?: TextVariant; tone?: 'text' | 'muted' | 'brand' | 'danger' }) {
   const { theme, allowFontScaling } = useTheme();
+  const inherited = useContext(InheritedWeight);
+  const flat = StyleSheet.flatten([
+    theme.typography[variant],
+    { color: theme.colors[tone === 'brand' ? 'brandText' : tone] },
+    style,
+  ]);
   return (
-    <Text
-      selectable={false}
-      allowFontScaling={allowFontScaling}
-      maxFontSizeMultiplier={MAX_TEXT_SCALE}
-      accessibilityRole={variant === 'title' || variant === 'heading' ? 'header' : undefined}
-      {...props}
-      style={withGeist(
-        StyleSheet.flatten([
-          theme.typography[variant],
-          { color: theme.colors[tone === 'brand' ? 'brandText' : tone] },
-          style,
-        ]),
-      )}
-    />
+    <InheritedWeight.Provider value={resolveWeight(flat.fontWeight, inherited)}>
+      <Text
+        selectable={false}
+        allowFontScaling={allowFontScaling}
+        maxFontSizeMultiplier={MAX_TEXT_SCALE}
+        accessibilityRole={variant === 'title' || variant === 'heading' ? 'header' : undefined}
+        {...props}
+        style={withGeist(flat, inherited)}
+      />
+    </InheritedWeight.Provider>
   );
 }

@@ -21,11 +21,20 @@ export function geistFace(weight: TextStyle['fontWeight']): string | undefined {
   return geistFaces[String(weight) as GeistWeight];
 }
 
+// A nested span without a weight of its own keeps its parent's, as it does in the current app.
+export function resolveWeight(
+  own: TextStyle['fontWeight'],
+  inherited?: TextStyle['fontWeight'],
+): TextStyle['fontWeight'] {
+  return own ?? inherited ?? '400';
+}
+
 // The style a Text or TextInput should draw, given an already flattened style: its family follows the final weight, so an inline
 // override such as `fontWeight: '600'` lands on the right face. A weight with no face is kept
 // as is, so the test below catches it instead of the screen quietly using the system font.
-export function withGeist(style: TextStyle): TextStyle {
+export function withGeist(style: TextStyle, inherited?: TextStyle['fontWeight']): TextStyle {
   const { fontWeight, ...rest } = style;
-  const fontFamily = rest.fontFamily ?? geistFace(fontWeight);
-  return fontFamily ? { ...rest, fontFamily } : { ...rest, fontWeight };
+  const weight = resolveWeight(fontWeight, inherited);
+  const fontFamily = rest.fontFamily ?? geistFace(weight);
+  return fontFamily ? { ...rest, fontFamily } : { ...rest, fontWeight: weight };
 }
