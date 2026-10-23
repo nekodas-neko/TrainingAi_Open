@@ -11,6 +11,7 @@ import { calorieBudgetsByDay, budgetMetricsStart } from '@trainingai/shared/nutr
 import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import { ouraBudgetActivities } from '@/lib/health/oura-budget-activities'
+import { budgetActivityLogs } from '@trainingai/shared/health/health-connect-workouts'
 
 function computeLevel(xp: number): { level: number; levelLabel: string; currentLevelXp: number; nextLevelXp: number } {
   let level = 1
@@ -84,7 +85,8 @@ export async function pastDayCalorieBudgets(userId: string, tz: string, days: st
       ownTargetKcal: ownTargetFromGoals(goals),
       workouts, avgBpmBySession,
       // #3087: Oura's own workouts the app did not log count too.
-      activities: [...activities, ...await ouraBudgetActivities(repo, userId, first, last, tz, { activityLogs: activities, sessions: workouts })],
+      // #3044: a Health Connect session that overlaps an in-app log or session is not paid twice.
+      activities: [...budgetActivityLogs(activities, workouts, tz), ...await ouraBudgetActivities(repo, userId, first, last, tz, { activityLogs: activities, sessions: workouts })],
     })
   } catch {
     return new Map()

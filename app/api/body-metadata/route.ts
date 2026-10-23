@@ -16,6 +16,7 @@ import { bodyRecentFromDay, BODY_RECENT_DAYS } from '@trainingai/shared/health/b
 import { countedIntakeKcal } from '@trainingai/shared/nutrition/counted-intake';
 import { countedEstimatesForRange, sharedEstimateReads } from '@/lib/health/energy-balance-service'
 import { ouraBudgetActivities } from "@/lib/health/oura-budget-activities";
+import { budgetActivityLogs } from "@trainingai/shared/health/health-connect-workouts";
 
 // One day's body metadata.
 const MAX_BODY_BYTES = 16 * 1024
@@ -238,7 +239,9 @@ export async function GET(req: NextRequest) {
       // Q-421: and `avgBpm` takes precedence over the tier where the strap was worn.
       .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
     activities: [
-      ...todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null })),
+      // #3044: a Health Connect session that overlaps an in-app log or session is not paid twice.
+      // Checked against every loaded log, so last night's log that ran past midnight still counts.
+      ...budgetActivityLogs(activityLogs, todayWorkouts, tz).filter(a => a.date === today).map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null })),
       // #3087: Oura's own workouts the app did not log count too. Every loaded log is offered for the
       // overlap check, not only today's: a 23:30-00:30 log is yesterday's, and must still keep out
       // the Oura copy of it that starts after midnight.

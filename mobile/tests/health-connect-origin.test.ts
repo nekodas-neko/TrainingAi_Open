@@ -32,6 +32,7 @@ function row(type: HealthConnectType, sourcePackage: string): HealthConnectRecor
       ...base,
       stages: [{ start: '2026-10-11T22:00:00Z', end: '2026-10-12T06:00:00Z', kind: 'light' }],
     };
+  if (type === 'ExerciseSession') return { ...base, exerciseType: 79 };
   return { ...base, value: type === 'Weight' ? 80 : 50 };
 }
 function fixture(

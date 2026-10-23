@@ -50,13 +50,11 @@ export interface CountedMovement {
   sessions: readonly { startedAt: Date; completedAt?: Date | null }[]
 }
 
-const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && bStart < aEnd
+export const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && bStart < aEnd
 
-export function ouraWorkoutActivities(
-  workouts: readonly OuraWorkoutRow[],
-  counted: CountedMovement,
-  tz: string,
-): OuraBudgetActivity[] {
+/** The instants each logged activity and completed strength session covers, as `[startMs, endMs]`.
+ *  A log with no usable clock time has none. */
+export function movementWindows(counted: CountedMovement, tz: string): [number, number][] {
   const windows: [number, number][] = []
   for (const a of counted.activityLogs) {
     // Stored as HH:MM:SS (Postgres time); the parser takes HH:MM.
@@ -76,6 +74,15 @@ export function ouraWorkoutActivities(
   for (const s of counted.sessions) {
     if (s.completedAt) windows.push([s.startedAt.getTime(), s.completedAt.getTime()])
   }
+  return windows
+}
+
+export function ouraWorkoutActivities(
+  workouts: readonly OuraWorkoutRow[],
+  counted: CountedMovement,
+  tz: string,
+): OuraBudgetActivity[] {
+  const windows = movementWindows(counted, tz)
 
   const out: OuraBudgetActivity[] = []
   for (const w of workouts) {

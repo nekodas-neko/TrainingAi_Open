@@ -28,6 +28,7 @@ import type { FitnessGoal } from '@trainingai/shared/types/user'
 import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { ouraBudgetActivities } from '@/lib/health/oura-budget-activities'
+import { budgetActivityLogs } from '@trainingai/shared/health/health-connect-workouts'
 
 export interface EnergyBalanceResult {
   date: string
@@ -295,8 +296,9 @@ export async function computeEnergyBalance(
   // joins `workoutKcalBySession` on it without keying by session NAME — which is not identity here
   // and breaks outright for two same-named sessions in one day.
   // #3087: Oura's own workouts the app did not log count too, costed like a logged activity.
+  // #3044: a Health Connect session that overlaps an in-app log or session is not paid twice.
   const budgetActivities = [
-    ...activityLogs,
+    ...budgetActivityLogs(activityLogs, workouts, tz),
     ...await ouraBudgetActivities(repo, userId, windowStart, date, tz, { activityLogs, sessions: workouts }),
   ]
   const activeEnergyFor = (day: string) => activeEnergyForDay({
