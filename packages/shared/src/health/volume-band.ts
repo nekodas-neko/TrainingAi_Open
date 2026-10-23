@@ -59,6 +59,11 @@ export const GENERIC_HIGH = 15
 /** The top of the generic band's printed range, and the least a muscle bar's scale reaches. */
 export const MAX_TARGET = 20
 
+/** The caption under the bars when each is graded against a program target. */
+export const TARGET_BARS_CAPTION = 'Vertical line = your weekly target · Green = at or above target'
+/** The caption under the bars on the generic band, spelled from the same constants as its colours. */
+export const GENERIC_BARS_CAPTION = `Vertical line = ${GENERIC_TARGET}-set minimum. Green = ${GENERIC_TARGET}–${GENERIC_HIGH - 1} sets · Blue = ${GENERIC_HIGH}+ sets.`
+
 /** Sets from which `targetBand` calls a week "approaching" the generic target; read off the rule
  *  itself so the legend cannot drift from it. */
 const GENERIC_APPROACHING = Array.from({ length: GENERIC_TARGET }, (_, sets) => sets).find(
