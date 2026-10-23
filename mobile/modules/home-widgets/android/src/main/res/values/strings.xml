@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="home_widget_today_label">Today</string>
+  <string name="home_widget_today_description">Today\'s scores from Home</string>
+  <string name="home_widget_today_title">Today</string>
+  <string name="home_widget_empty">Open TrainingAi to show today\'s scores</string>
+  <string name="home_widget_stale">Open to update</string>
+</resources>

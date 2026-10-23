@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- Merged into the app's manifest. The launcher draws the widget from the snapshot the app
+         last wrote (HomeWidgetsModule.setSnapshot); nothing here calls the server. -->
+    <receiver
+      android:name="expo.modules.homewidgets.TodayWidgetProvider"
+      android:exported="false"
+      android:label="@string/home_widget_today_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/home_widget_today_info" />
+    </receiver>
+  </application>
+</manifest>
