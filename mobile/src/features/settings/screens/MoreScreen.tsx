@@ -30,7 +30,7 @@ import { ProfileStats } from '../components/ProfileStats';
 import { FeedbackSheet } from '../components/FeedbackSheet';
 import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
 import { SignOutSheet } from '../components/SignOutSheet';
-import { memberSinceLabel } from '../data/profile';
+import { memberSinceLabel, moreCopy } from '../data/profile';
 import { useRewards } from '../../rewards/data/useRewards';
 import { LevelHeader } from '../../rewards/components/LevelHeader';
 import { AchievementsSection } from '../../rewards/components/AchievementsSection';
@@ -125,6 +125,8 @@ export function MoreScreen({
             { value: 'friends', label: 'Friends' },
           ]}
           onChange={setTab}
+          appearance="tabs"
+          size="xs"
         />
       </Stack>
       <TabPanel>
@@ -172,17 +174,23 @@ export function MoreScreen({
               <AchievementsSection rewards={history.data} loading={history.loading} />
               <Card padded={false}>
                 <ListRow
-                  title="Your Year"
-                  leading={<Icon name="award" />}
+                  title={moreCopy.year.title}
+                  density="snug"
+                  leading={<Icon name="coach" tone="muted" size={theme.sizes.iconCompact} />}
+                  trailing={
+                    <AppText variant="caption" tone="muted">
+                      {moreCopy.year.action}
+                    </AppText>
+                  }
                   onPress={openYear}
                   divider={false}
                 />
               </Card>
               <SeasonBadges seasons={seasons.data?.seasons ?? []} />
               <ExpandableCard
-                title="My goals"
+                title={moreCopy.goals.title}
                 icon="target"
-                subtitle="Training, health & nutrition targets"
+                subtitle={moreCopy.goals.subtitle}
               >
                 <Grid columns={2}>
                   {[
@@ -204,70 +212,77 @@ export function MoreScreen({
               </ExpandableCard>
               <Section title="Your setup">
                 <ListRow
-                  density="compact"
+                  density="snug"
+                  divider={false}
                   title="Profile details"
-                  leading={<Icon name="info" />}
+                  leading={<Icon name="userRound" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openProfile}
                 />
                 <ListRow
-                  density="compact"
+                  density="snug"
+                  divider={false}
                   title="Sessions, progression & schedule"
-                  leading={<Icon name="workout" />}
+                  leading={<Icon name="workout" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openPrograms}
                 />
                 <ListRow
-                  density="compact"
+                  density="snug"
+                  divider={false}
                   title="DEXA & RMR results"
-                  leading={<Icon name="scale" />}
+                  leading={<Icon name="scan" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openClinical}
                 />
                 <ListRow
-                  density="compact"
+                  density="snug"
+                  divider={false}
                   title={deviceHealthName}
                   subtitle="Connection, permissions and data sources"
-                  leading={<Icon name="health" />}
+                  leading={<Icon name="health" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openAppleHealth}
                 />
                 <ListRow
-                  density="compact"
+                  density="snug"
+                  divider={false}
                   title="Devices & connections"
                   subtitle="Oura account, heart-rate strap"
-                  leading={<Icon name="activity" />}
+                  leading={<Icon name="bluetooth" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openDevices}
                 />
                 <ListRow
-                  density="compact"
+                  density="snug"
                   title="Collection"
-                  leading={<Icon name="cat" />}
+                  leading={<Icon name="cat" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openCollection}
                   divider={false}
                 />
               </Section>
               <Section title="App">
                 <ListRow
-                  density="compact"
+                  density="snug"
+                  divider={false}
                   title="Notifications, appearance & home layout"
-                  leading={<Icon name="settings" />}
+                  leading={<Icon name="settings" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openSettings}
                 />
                 <ListRow
-                  density="compact"
+                  density="snug"
+                  divider={false}
                   title="Data & Sync"
-                  leading={<Icon name="refresh" />}
+                  leading={<Icon name="cloudDownload" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openData}
                 />
                 <ListRow
-                  density="compact"
+                  density="snug"
                   title="About TrainingAi"
-                  leading={<Icon name="info" />}
+                  leading={<Icon name="info" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openAbout}
-                  divider={user?.isAdmin === true}
+                  divider={false}
                 />
                 {user?.isAdmin === true && (
                   <FeatureRow
-                    density="compact"
+                    density="snug"
                     title="Admin Console"
-                    leading={<Icon name="settings" />}
+                    leading={<Icon name="shieldPlain" tone="muted" size={theme.sizes.iconCompact} />}
                     divider={false}
                   />
                 )}
@@ -275,20 +290,21 @@ export function MoreScreen({
               {/* The current app's direct actions (#2902). */}
               <Stack gap="sm">
                 <AppButton
-                  title="Report an issue"
+                  title={moreCopy.actions.report}
                   icon="report"
                   variant="ghost"
                   onPress={() => setModal('feedback')}
                 />
                 <AppButton
-                  title="Edit profile"
-                  icon="edit"
+                  title={moreCopy.actions.edit}
+                  icon="settings"
                   variant="surface"
+                  style={{ alignSelf: 'flex-start' }}
                   onPress={openProfile}
                 />
                 {account.state.hasSession && (
                   <AppButton
-                    title="Sign out"
+                    title={moreCopy.actions.signOut}
                     icon="signOut"
                     variant="danger"
                     onPress={() => setModal('signout')}
