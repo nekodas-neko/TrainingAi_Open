@@ -180,87 +180,90 @@ export function ProgramsScreen({
             />
           ))}
       </Disclosure>
-      <Disclosure compact title="Progression Sets">
-        <ResourceStatus state={styles} refresh={styles.refresh} />
-        <AppButton
-          title="New Progression Set"
-          variant="secondary"
-          onPress={() => setEditor({ kind: 'style', id: null })}
-        />
-        {styles.data?.styles.map((style) => (
-          <Card key={style.id}>
-            <AppText variant="heading">{style.name}</AppText>
-            <AppText variant="caption" tone="muted">
-              {style.sets
-                .map((set) => `${set.reps} reps @ ${set.pct}% · ${set.restSec}s`)
-                .join(' / ')}
-            </AppText>
-            <Stack direction="row">
-              <AppButton
-                title="Edit"
-                variant="surface"
-                onPress={() => setEditor({ kind: 'style', id: style.id })}
-              />
-              <AppButton
-                title="Delete"
-                variant="danger"
-                onPress={() => setDeleting({ kind: 'style', id: style.id, name: style.name })}
-              />
-            </Stack>
-          </Card>
-        ))}
-      </Disclosure>
-      <Disclosure compact title="Phase Sets">
-        <ResourceStatus state={phases} refresh={phases.refresh} />
-        <AppButton
-          title="New Phase Set"
-          variant="secondary"
-          onPress={() => setEditor({ kind: 'phase', id: null })}
-        />
-        {phases.data?.phaseSets.map((phase) => (
-          <Card key={phase.id}>
-            <AppText variant="heading">{phase.name}</AppText>
-            <AppText variant="caption" tone="muted">
-              {phase.phases
-                .map((item) => `${item.name} · ${item.durationCycles} cycles`)
-                .join(' → ')}
-            </AppText>
-            <Stack direction="row">
-              <AppButton
-                title="Edit"
-                variant="surface"
-                onPress={() => setEditor({ kind: 'phase', id: phase.id })}
-              />
-              <AppButton
-                title="Clone"
-                variant="surface"
-                busy={action.busy}
-                onPress={() => {
-                  void action.run(async () => {
-                    await phases.resources?.write(
-                      'POST',
-                      '/api/phase-sets/clone',
-                      {
-                        phaseSetId: phase.id,
-                        programName: `${phase.name} copy`,
-                        includeBaseline: false,
-                        overrides: {},
-                      },
-                      ['/api/phase-sets'],
-                    );
-                    await phases.resources?.load(phaseSetsSpec, true);
-                  });
-                }}
-              />
-              <AppButton
-                title="Delete"
-                variant="danger"
-                disabled={phase.isDefault}
-                onPress={() => setDeleting({ kind: 'phase', id: phase.id, name: phase.name })}
-              />
-            </Stack>
-          </Card>
-        ))}
+      {/* The current app keeps both sets under one "Advanced Settings" card (#2936). */}
+      <Disclosure compact title="Advanced Settings" subtitle="Progression styles, phase sets">
+        <Disclosure compact title="Progression Sets">
+          <ResourceStatus state={styles} refresh={styles.refresh} />
+          <AppButton
+            title="New Progression Set"
+            variant="secondary"
+            onPress={() => setEditor({ kind: 'style', id: null })}
+          />
+          {styles.data?.styles.map((style) => (
+            <Card key={style.id}>
+              <AppText variant="heading">{style.name}</AppText>
+              <AppText variant="caption" tone="muted">
+                {style.sets
+                  .map((set) => `${set.reps} reps @ ${set.pct}% · ${set.restSec}s`)
+                  .join(' / ')}
+              </AppText>
+              <Stack direction="row">
+                <AppButton
+                  title="Edit"
+                  variant="surface"
+                  onPress={() => setEditor({ kind: 'style', id: style.id })}
+                />
+                <AppButton
+                  title="Delete"
+                  variant="danger"
+                  onPress={() => setDeleting({ kind: 'style', id: style.id, name: style.name })}
+                />
+              </Stack>
+            </Card>
+          ))}
+        </Disclosure>
+        <Disclosure compact title="Phase Sets">
+          <ResourceStatus state={phases} refresh={phases.refresh} />
+          <AppButton
+            title="New Phase Set"
+            variant="secondary"
+            onPress={() => setEditor({ kind: 'phase', id: null })}
+          />
+          {phases.data?.phaseSets.map((phase) => (
+            <Card key={phase.id}>
+              <AppText variant="heading">{phase.name}</AppText>
+              <AppText variant="caption" tone="muted">
+                {phase.phases
+                  .map((item) => `${item.name} · ${item.durationCycles} cycles`)
+                  .join(' → ')}
+              </AppText>
+              <Stack direction="row">
+                <AppButton
+                  title="Edit"
+                  variant="surface"
+                  onPress={() => setEditor({ kind: 'phase', id: phase.id })}
+                />
+                <AppButton
+                  title="Clone"
+                  variant="surface"
+                  busy={action.busy}
+                  onPress={() => {
+                    void action.run(async () => {
+                      await phases.resources?.write(
+                        'POST',
+                        '/api/phase-sets/clone',
+                        {
+                          phaseSetId: phase.id,
+                          programName: `${phase.name} copy`,
+                          includeBaseline: false,
+                          overrides: {},
+                        },
+                        ['/api/phase-sets'],
+                      );
+                      await phases.resources?.load(phaseSetsSpec, true);
+                    });
+                  }}
+                />
+                <AppButton
+                  title="Delete"
+                  variant="danger"
+                  disabled={phase.isDefault}
+                  onPress={() => setDeleting({ kind: 'phase', id: phase.id, name: phase.name })}
+                />
+              </Stack>
+            </Card>
+          ))}
+        </Disclosure>
       </Disclosure>
       <Disclosure compact title="Recorded injuries">
         <InjuryManager showSync={false} />
