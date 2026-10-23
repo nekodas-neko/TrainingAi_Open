@@ -32,6 +32,7 @@ function row(type: HealthConnectType, sourcePackage: string): HealthConnectRecor
       ...base,
       stages: [{ start: '2026-10-11T22:00:00Z', end: '2026-10-12T06:00:00Z', kind: 'light' }],
     };
+  if (type === 'ExerciseSession') return { ...base, exerciseType: 79 };
   return { ...base, value: type === 'Weight' ? 80 : 50 };
 }
 function fixture(
@@ -224,4 +225,32 @@ test('the hook gives the store the connection lookup', () => {
   );
   assert.match(hook, /from '\.\/data\/first-hand-sources'/);
   assert.match(hook, /new HealthConnectImportStore\([\s\S]*?loadFirstHandSources\(resources, dataReader\.timezone\)/);
+});
+test('a type an existing install was never asked for is requested once, and a denial is not asked again (#2843)', async () => {
+  const older = healthConnectTypes.filter((type) => type !== 'ExerciseSession');
+  for (const allow of [true, false]) {
+    let granted: HealthConnectType[] = [...older];
+    const asked: HealthConnectType[][] = [];
+    const f = fixture(
+      null,
+      healthConnectTypes.map((type) => row(type, 'com.sec.android.app.shealth')),
+      {
+        permissions: async () => granted,
+        request: async (types) => {
+          asked.push(types);
+          if (!allow) throw new Error('denied');
+          granted = [...granted, ...types];
+          return granted;
+        },
+      },
+    );
+    await f.store.setEnabled(true);
+    await f.store.run(true);
+    await f.store.run(true);
+    assert.deepEqual(asked, [['ExerciseSession']]);
+    // Granted: the session imports. Denied: everything else still does.
+    assert.equal(f.remote.has('ExerciseSession-com.sec.android.app.shealth'), allow);
+    assert.equal(f.remote.size, allow ? healthConnectTypes.length : older.length);
+    assert.equal(f.store.getSnapshot().error, null);
+  }
 });

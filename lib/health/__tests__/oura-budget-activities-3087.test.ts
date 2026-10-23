@@ -1,7 +1,7 @@
 // #3087: the server read behind Oura workouts in the energy budget. It widens Oura's own day key a
 // day each side, keeps only the asked range by local day, and never fails the budget it feeds.
 import { describe, it, expect, vi } from 'vitest'
-import { ouraBudgetActivities } from '../oura-budget-activities'
+import { budgetMovement, ouraBudgetActivities } from '../oura-budget-activities'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
 const TZ = 'Australia/Brisbane'
@@ -50,5 +50,32 @@ describe('ouraBudgetActivities (#3087)', () => {
     failing.mockClear()
     expect(await ouraBudgetActivities({ getOuraWorkouts: async () => [], listActivityLogs: failing }, 'u1', day, day, TZ, none)).toEqual([])
     expect(failing).not.toHaveBeenCalled()
+  })
+})
+
+describe('budgetMovement (#3044)', () => {
+  const log = (startTime: string, endTime: string, over: Record<string, unknown> = {}) => ({
+    id: startTime, userId: 'u1', date: day, activityType: 'walk', title: 'Walk', startTime, endTime, durationMin: 40,
+    createdAt: new Date(), ...over,
+  })
+
+  it('checks Oura against the logs left after a Health Connect copy is dropped', async () => {
+    const inApp = log('12:00:00', '12:40:00')
+    const copy = log('12:15:00', '13:15:00', { externalSource: 'health_connect', durationMin: 60 })
+    // Overlaps only the dropped copy, so it is not a second record of anything still counted.
+    const getOuraWorkouts = async () => [row(at(day, 12, 45), at(day, 13, 15))]
+    const listActivityLogs = vi.fn(async () => [])
+    const out = await budgetMovement({ getOuraWorkouts, listActivityLogs } as never, 'u1', day, day, TZ, { activityLogs: [inApp, copy], sessions: [] })
+    expect(out.logs).toEqual([inApp])
+    expect(out.oura).toHaveLength(1)
+    // The evening before is read once, for both checks.
+    expect(listActivityLogs).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads nothing extra when there is no Health Connect copy to check', async () => {
+    const listActivityLogs = vi.fn(async () => [])
+    const out = await budgetMovement({ getOuraWorkouts: async () => [], listActivityLogs } as never, 'u1', day, day, TZ, { activityLogs: [log('12:00', '12:40')], sessions: [] })
+    expect(out.logs).toHaveLength(1)
+    expect(listActivityLogs).not.toHaveBeenCalled()
   })
 })

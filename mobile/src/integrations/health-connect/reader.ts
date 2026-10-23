@@ -8,6 +8,7 @@ const unavailable = async (): Promise<never> => {
 };
 export const requestHealthConnectPermissions: () => Promise<HealthConnectType[]> = unavailable;
 export const grantedHealthConnectTypes: HealthConnectReader['permissions'] = unavailable;
+export const requestHealthConnectTypes: NonNullable<HealthConnectReader['request']> = unavailable;
 export const readHealthConnectPage: HealthConnectReader['history'] = unavailable;
 export const readHealthConnectChanges: HealthConnectReader['changes'] = unavailable;
 export const openHealthConnectSettings: () => Promise<void> = unavailable;
