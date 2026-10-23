@@ -155,7 +155,7 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                         </Stack>
                         <Stack direction="row" align="center">
                           <Icon
-                            name={event.type === 'pr' ? 'upper' : 'award'}
+                            name={event.type === 'pr' ? 'upper' : 'trophy'}
                             color={event.type === 'pr' ? theme.friends.purple : theme.friends.gold}
                           />
                           <AppText variant="caption" style={{ flex: 1 }}>
