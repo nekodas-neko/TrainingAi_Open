@@ -1,29 +1,43 @@
-import type { PropsWithChildren } from 'react';
-import { View } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
-import { useTheme } from '../theme/ThemeProvider';
+import type { PropsWithChildren } from "react";
+import { View } from "react-native";
+import Svg, { Circle } from "react-native-svg";
+import { useTheme } from "../theme/ThemeProvider";
 export function SegmentRing({
   segments,
   value,
   label,
+  size: requestedSize,
+  thickness,
   children,
 }: PropsWithChildren<{
   segments: { share: number; color: string }[];
   value: number;
   label: string;
+  /** Outer diameter; the Nutrition tab's ring when omitted. */
+  size?: number;
+  /** Stroke width of a ring that is not the Nutrition tab's; the arc then fills the whole box. */
+  thickness?: number;
 }>) {
   const { theme } = useTheme();
-  const size = theme.sizes.nutritionRing;
-  const stroke = theme.spacing.sm + theme.spacing.xxs;
-  const radius = (size - theme.spacing.xl) / 2;
+  const size = requestedSize ?? theme.sizes.nutritionRing;
+  const stroke = thickness ?? theme.spacing.sm + theme.spacing.xxs;
+  const radius =
+    thickness === undefined
+      ? (size - theme.spacing.xl) / 2
+      : (size - thickness) / 2;
   const length = 2 * Math.PI * radius;
   let offset = 0;
   return (
     <View
       accessibilityLabel={label}
-      style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}
+      style={{
+        width: size,
+        height: size,
+        justifyContent: "center",
+        alignItems: "center",
+      }}
     >
-      <Svg width={size} height={size} style={{ position: 'absolute' }}>
+      <Svg width={size} height={size} style={{ position: "absolute" }}>
         <Circle
           cx={size / 2}
           cy={size / 2}
