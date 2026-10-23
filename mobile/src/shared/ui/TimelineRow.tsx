@@ -1,8 +1,8 @@
-import { Pressable, View } from "react-native";
-import { useTheme } from "../theme/ThemeProvider";
-import { AppText } from "./AppText";
-import { Icon, type IconName } from "./Icon";
-import { Stack } from "./Stack";
+import { Pressable, View } from 'react-native';
+import { useTheme } from '../theme/ThemeProvider';
+import { AppText } from './AppText';
+import { Icon, type IconName } from './Icon';
+import { Stack } from './Stack';
 
 export type TimelineRowMetric = {
   icon?: IconName;
@@ -46,19 +46,19 @@ export function TimelineRow({
         time,
         title,
         ...metrics.map((metric) => metric.text),
-        savedLocally ? "Saved on this phone" : null,
+        savedLocally ? 'Saved on this phone' : null,
       ]
         .filter(Boolean)
-        .join(", ")}
+        .join(', ')}
       accessibilityHint="View event details"
       onPress={onPress}
       style={({ pressed }) => ({
-        flexDirection: "row",
+        flexDirection: 'row',
         gap: theme.spacing.md,
         opacity: pressed ? 0.65 : 1,
       })}
     >
-      <View style={{ width: marker + theme.spacing.xs, alignItems: "center" }}>
+      <View style={{ width: marker + theme.spacing.xs, alignItems: 'center' }}>
         <View
           style={{
             width: marker,
@@ -67,8 +67,8 @@ export function TimelineRow({
             borderWidth: 1,
             borderColor: `${color}66`,
             backgroundColor: `${color}33`,
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <Icon name={icon} size={theme.sizes.iconCompact} color={color} />
@@ -85,19 +85,13 @@ export function TimelineRow({
           />
         )}
       </View>
-      <View
-        style={{
-          flex: 1,
-          minWidth: 0,
-          paddingBottom: last ? 0 : theme.spacing.lg,
-        }}
-      >
+      <View style={{ flex: 1, minWidth: 0, paddingBottom: last ? 0 : theme.spacing.lg }}>
         {!timeInline && (
           <AppText
             variant="factorLabel"
             tone="muted"
             style={{
-              fontVariant: ["tabular-nums"],
+              fontVariant: ['tabular-nums'],
               marginBottom: theme.spacing.xs + theme.spacing.xxs,
             }}
           >
@@ -121,17 +115,13 @@ export function TimelineRow({
             {timeInline && (
               <AppText
                 variant="subheading"
-                style={{ fontWeight: "700", fontVariant: ["tabular-nums"] }}
+                style={{ fontWeight: '700', fontVariant: ['tabular-nums'] }}
               >
                 {time}
               </AppText>
             )}
             {savedLocally && (
-              <Icon
-                name="history"
-                size={theme.spacing.md}
-                color={theme.tones.checkin.foreground}
-              />
+              <Icon name="history" size={theme.spacing.md} color={theme.tones.checkin.foreground} />
             )}
           </Stack>
           {metrics.length > 0 && (
@@ -147,8 +137,8 @@ export function TimelineRow({
                   )}
                   <AppText
                     variant="caption"
-                    tone={metric.emphasis ? "text" : "muted"}
-                    style={metric.emphasis ? { fontWeight: "500" } : undefined}
+                    tone={metric.emphasis ? 'text' : 'muted'}
+                    style={metric.emphasis ? { fontWeight: '500' } : undefined}
                   >
                     {metric.text}
                   </AppText>

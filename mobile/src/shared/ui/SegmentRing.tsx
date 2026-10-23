@@ -1,7 +1,7 @@
-import type { PropsWithChildren } from "react";
-import { View } from "react-native";
-import Svg, { Circle } from "react-native-svg";
-import { useTheme } from "../theme/ThemeProvider";
+import type { PropsWithChildren } from 'react';
+import { View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
+import { useTheme } from '../theme/ThemeProvider';
 export function SegmentRing({
   segments,
   value,
@@ -21,23 +21,15 @@ export function SegmentRing({
   const { theme } = useTheme();
   const size = requestedSize ?? theme.sizes.nutritionRing;
   const stroke = thickness ?? theme.spacing.sm + theme.spacing.xxs;
-  const radius =
-    thickness === undefined
-      ? (size - theme.spacing.xl) / 2
-      : (size - thickness) / 2;
+  const radius = thickness === undefined ? (size - theme.spacing.xl) / 2 : (size - thickness) / 2;
   const length = 2 * Math.PI * radius;
   let offset = 0;
   return (
     <View
       accessibilityLabel={label}
-      style={{
-        width: size,
-        height: size,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
+      style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}
     >
-      <Svg width={size} height={size} style={{ position: "absolute" }}>
+      <Svg width={size} height={size} style={{ position: 'absolute' }}>
         <Circle
           cx={size / 2}
           cy={size / 2}

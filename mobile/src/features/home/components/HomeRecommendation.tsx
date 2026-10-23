@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Pressable } from "react-native";
+import { useState } from 'react';
+import { Pressable } from 'react-native';
 import {
   AppButton,
   AppText,
@@ -8,21 +8,21 @@ import {
   Skeleton,
   Stack,
   StatusIndicator,
-} from "../../../shared/ui";
-import { useHome } from "../data/HomeProvider";
-import { useWorkoutContext } from "../../workouts/WorkoutProvider";
-import { useWorkoutJournal } from "../../workouts/logging/WorkoutJournalProvider";
-import { useHealthData } from "../../health/data/HealthDataProvider";
-import { useTheme } from "../../../shared/theme/ThemeProvider";
-import type { SessionPreview } from "../../workouts/catalog";
+} from '../../../shared/ui';
+import { useHome } from '../data/HomeProvider';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
+import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
+import { useHealthData } from '../../health/data/HealthDataProvider';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import type { SessionPreview } from '../../workouts/catalog';
 import {
   SORE_CHIP_COLOR,
   sessionFacts,
   soreMusclesLabel,
-} from "../data/recommendation-presentation";
-import { View } from "react-native";
-import { SessionGlyph } from "../../workouts/components/SessionGlyph";
-import { failureNotice } from "../../../core/reporting/index.ts";
+} from '../data/recommendation-presentation';
+import { View } from 'react-native';
+import { SessionGlyph } from '../../workouts/components/SessionGlyph';
+import { failureNotice } from '../../../core/reporting/index.ts';
 
 export function HomeRecommendation({
   trained,
@@ -46,9 +46,7 @@ export function HomeRecommendation({
   const { theme } = useTheme();
   const [error, setError] = useState<string | null>(null);
   const sessions = catalog?.program?.sessions ?? [];
-  const active = journal.data.workouts.find(
-    (workout) => workout.status === "active",
-  );
+  const active = journal.data.workouts.find((workout) => workout.status === 'active');
   const done = sessions.find((session) => trained.includes(session.name));
   const rec = catalog?.recommendation;
   const session = done ?? sessions.find((value) => value.id === rec?.sessionId);
@@ -58,21 +56,16 @@ export function HomeRecommendation({
       await home.store?.chooseRestDay(today, value);
       setError(null);
     } catch (failure) {
-      setError(
-        failureNotice(
-          "Could not save your rest-day choice. Try again.",
-          failure,
-        ),
-      );
+      setError(failureNotice('Could not save your rest-day choice. Try again.', failure));
     }
   }
   if (
     (home.mood === undefined && !home.errors[`mood:${today}`]) ||
-    (!catalog && status === "loading")
+    (!catalog && status === 'loading')
   ) {
     return (
       <Card style={{ minHeight: theme.sizes.recommendationCard }}>
-        <Skeleton style={{ height: theme.spacing.lg, width: "40%" }} />
+        <Skeleton style={{ height: theme.spacing.lg, width: '40%' }} />
         <Skeleton style={{ flex: 1 }} />
       </Card>
     );
@@ -80,31 +73,20 @@ export function HomeRecommendation({
   if (!home.mood) {
     return (
       <Card tone="checkin">
-        <AppText
-          variant="eyebrow"
-          style={{ color: theme.tones.checkin.foreground }}
-        >
+        <AppText variant="eyebrow" style={{ color: theme.tones.checkin.foreground }}>
           Exercise Readiness
         </AppText>
         <Stack direction="row" align="center">
-          <Icon
-            name="mind"
-            size={theme.sizes.avatar}
-            color={theme.tones.checkin.foreground}
-          />
+          <Icon name="mind" size={theme.sizes.avatar} color={theme.tones.checkin.foreground} />
           <Stack style={{ flex: 1 }} gap="xs">
             <AppText variant="hero">How are you feeling?</AppText>
             <AppText variant="caption" tone="muted">
-              Log soreness & energy — the app lightens loads on sore muscles and
-              can flag a deload or rest day. It tunes today’s session, not your
-              whole plan.
+              Log soreness & energy — the app lightens loads on sore muscles and can flag a deload
+              or rest day. It tunes today’s session, not your whole plan.
             </AppText>
           </Stack>
         </Stack>
-        <AppButton
-          title="Log Readiness · ~15 sec"
-          onPress={() => onReadiness(session)}
-        />
+        <AppButton title="Log Readiness · ~15 sec" onPress={() => onReadiness(session)} />
       </Card>
     );
   }
@@ -116,13 +98,9 @@ export function HomeRecommendation({
           <AppText variant="heading">Rest Day</AppText>
         </Stack>
         <AppText variant="caption" tone="muted">
-          {rec?.reason ?? "A day to recover."}
+          {rec?.reason ?? 'A day to recover.'}
         </AppText>
-        <AppButton
-          title="Train instead"
-          variant="ghost"
-          onPress={() => void rest(false)}
-        />
+        <AppButton title="Train instead" variant="ghost" onPress={() => void rest(false)} />
         <StatusIndicator label="Rest day" error={error} />
       </Card>
     );
@@ -132,32 +110,19 @@ export function HomeRecommendation({
       <Card>
         <AppText variant="heading">Your next session</AppText>
         <AppText tone="muted">
-          {notice ?? "Choose a program to get a workout recommendation."}
+          {notice ?? 'Choose a program to get a workout recommendation.'}
         </AppText>
         <AppButton title="Your programs" onPress={openPrograms} />
       </Card>
     );
   }
-  const accent =
-    home.preferences.cardColors?.recommendedToday ??
-    theme.homeCards.recommendedToday;
+  const accent = home.preferences.cardColors?.recommendedToday ?? theme.homeCards.recommendedToday;
   const eyebrowColor = done ? theme.status.success : accent;
   return (
-    <Card
-      tone="neutral"
-      accent={done ? theme.status.success : accent}
-      faint={!!done}
-    >
+    <Card tone="neutral" accent={done ? theme.status.success : accent} faint={!!done}>
       <Stack direction="row" align="center" justify="space-between">
-        <AppText
-          variant="eyebrow"
-          style={{ color: eyebrowColor, fontWeight: "700" }}
-        >
-          {active
-            ? "Workout in progress"
-            : done
-              ? "Trained Today"
-              : "Recommended Today"}
+        <AppText variant="eyebrow" style={{ color: eyebrowColor, fontWeight: '700' }}>
+          {active ? 'Workout in progress' : done ? 'Trained Today' : 'Recommended Today'}
         </AppText>
         <StatusIndicator label="Workout recommendation" error={error} />
         <Pressable
@@ -167,15 +132,15 @@ export function HomeRecommendation({
           style={{
             minHeight: theme.sizes.touchTarget,
             flexShrink: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "flex-end",
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
             gap: theme.spacing.xs,
           }}
         >
           <AppText variant="heading">
             {
-              { drained: "😴", low: "😑", ok: "😐", good: "😊", pumped: "⚡" }[
+              { drained: '😴', low: '😑', ok: '😐', good: '😊', pumped: '⚡' }[
                 home.mood.energyLevel
               ]
             }
@@ -184,8 +149,8 @@ export function HomeRecommendation({
             <View
               style={{
                 flexShrink: 1,
-                flexDirection: "row",
-                alignItems: "center",
+                flexDirection: 'row',
+                alignItems: 'center',
                 gap: theme.spacing.xs,
                 borderRadius: theme.radii.pill,
                 backgroundColor: `${SORE_CHIP_COLOR}2e`,
@@ -198,10 +163,7 @@ export function HomeRecommendation({
                 size={theme.spacing.sm + theme.spacing.xxs / 2}
                 color={SORE_CHIP_COLOR}
               />
-              <AppText
-                variant="micro"
-                style={{ color: SORE_CHIP_COLOR, flexShrink: 1 }}
-              >
+              <AppText variant="micro" style={{ color: SORE_CHIP_COLOR, flexShrink: 1 }}>
                 {soreMusclesLabel(home.mood.soreMuscles)}
               </AppText>
             </View>
@@ -216,26 +178,20 @@ export function HomeRecommendation({
           color={theme.colors.brand}
         />
         <Stack style={{ flex: 1 }}>
-          <AppText variant="hero">
-            {active?.sessionName ?? session.name}
-          </AppText>
+          <AppText variant="hero">{active?.sessionName ?? session.name}</AppText>
           {!done && (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Why this session?"
               hitSlop={theme.spacing.sm}
               onPress={() => openExplanation(session.id)}
-              style={{ alignSelf: "flex-start" }}
+              style={{ alignSelf: 'flex-start' }}
             >
               <Stack direction="row" align="center" gap="xs">
                 <AppText variant="caption" tone="muted">
                   Why this?
                 </AppText>
-                <Icon
-                  name="forward"
-                  size={theme.sizes.iconSmall}
-                  tone="muted"
-                />
+                <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
               </Stack>
             </Pressable>
           )}
@@ -276,11 +232,7 @@ export function HomeRecommendation({
             paddingVertical: theme.spacing.snug,
           }}
         >
-          <Icon
-            name="circleCheck"
-            size={theme.sizes.iconCompact}
-            color={theme.status.success}
-          />
+          <Icon name="circleCheck" size={theme.sizes.iconCompact} color={theme.status.success} />
           <AppText variant="subheading" style={{ color: theme.status.success }}>
             Completed Today
           </AppText>

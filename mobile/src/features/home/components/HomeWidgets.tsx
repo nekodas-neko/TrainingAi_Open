@@ -1,21 +1,15 @@
-import {
-  balanceProvenance,
-  budgetLine,
-} from "../../nutrition/data/budget-line";
-import { useRecordedIntake } from "../../nutrition/data/useRecordedIntake";
-import { HrDayCard } from "../../health/components/HrDayCard";
-import { verdictSpec } from "../../health/data/checkin";
-import { verdictCopy } from "@trainingai/shared/health/sleep-verdict-copy";
-import { acwrBandByKey } from "@trainingai/shared/ai-periodization/acwr";
-import { recoveryBand } from "@trainingai/shared/health/recovery-band";
-import { nativeColor } from "../../../shared/ui";
-import type { ReactNode } from "react";
-import type { z } from "zod";
-import type {
-  ResourceSpec,
-  ResourceState,
-} from "../../workouts/data/WorkoutResources";
-import { Pressable, View } from "react-native";
+import { balanceProvenance, budgetLine } from '../../nutrition/data/budget-line';
+import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
+import { HrDayCard } from '../../health/components/HrDayCard';
+import { verdictSpec } from '../../health/data/checkin';
+import { verdictCopy } from '@trainingai/shared/health/sleep-verdict-copy';
+import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr';
+import { recoveryBand } from '@trainingai/shared/health/recovery-band';
+import { nativeColor } from '../../../shared/ui';
+import type { ReactNode } from 'react';
+import type { z } from 'zod';
+import type { ResourceSpec, ResourceState } from '../../workouts/data/WorkoutResources';
+import { Pressable, View } from 'react-native';
 import {
   AppText,
   Card,
@@ -27,14 +21,11 @@ import {
   SegmentRing,
   Stack,
   AppButton,
-} from "../../../shared/ui";
-import type { HealthDetail } from "../../health/screens/HealthDetailScreen";
-import { useHealthData } from "../../health/data/HealthDataProvider";
-import {
-  useOuraHandoff,
-  type OuraHandoffStatus,
-} from "../../health/OuraHandoffProvider";
-import { hasLastNight } from "../../health/data/oura-handoff";
+} from '../../../shared/ui';
+import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
+import { useHealthData } from '../../health/data/HealthDataProvider';
+import { useOuraHandoff, type OuraHandoffStatus } from '../../health/OuraHandoffProvider';
+import { hasLastNight } from '../../health/data/oura-handoff';
 import {
   energySpec,
   goalsSpec,
@@ -42,15 +33,15 @@ import {
   loadSpec,
   metricValue,
   recoverySpec,
-} from "../../health/data/models";
-import { useWorkoutResource } from "../../workouts/data/WorkoutDataProvider";
-import { useNutrition } from "../../nutrition/data/NutritionProvider";
-import { useHome } from "../data/HomeProvider";
-import { CollectionCard } from "../../collection/components/CollectionCard";
-import { metricLabels } from "../data/models";
-import { useTheme } from "../../../shared/theme/ThemeProvider";
-import { shiftDateStr, formatTimeOfDay } from "@trainingai/shared/date-utils";
-import { DEFAULT_SLEEP_GOAL_HOURS } from "@trainingai/shared/health/daily-goals";
+} from '../../health/data/models';
+import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
+import { useNutrition } from '../../nutrition/data/NutritionProvider';
+import { useHome } from '../data/HomeProvider';
+import { CollectionCard } from '../../collection/components/CollectionCard';
+import { metricLabels } from '../data/models';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
+import { DEFAULT_SLEEP_GOAL_HOURS } from '@trainingai/shared/health/daily-goals';
 
 /**
  * A macro for Home's tiles and nutrition card. Nothing logged is "—", not "0 g": the totals of an
@@ -71,14 +62,13 @@ export function HomeMetricTiles({
 }: {
   openBody: () => void;
   openNutrition: () => void;
-  log: (field: "weightKg" | "steps" | "waterMl") => void;
+  log: (field: 'weightKg' | 'steps' | 'waterMl') => void;
 }) {
   const health = useHealthData();
   const home = useHome();
   const n = useNutrition();
   const { theme } = useTheme();
-  const today =
-    health.body?.today?.date === health.today ? health.body.today : null;
+  const today = health.body?.today?.date === health.today ? health.body.today : null;
   const energy = useWorkoutResource(energySpec(health.today));
   const resolved = useRecordedIntake(health.today, energy.data?.balance);
   const nutrition = n.view.totals;
@@ -88,66 +78,54 @@ export function HomeMetricTiles({
     {
       value: number | null;
       unit: string;
-      icon: "scale" | "legs" | "flame" | "water" | "nutrition";
-      field?: "weightKg" | "steps" | "waterMl";
+      icon: 'scale' | 'legs' | 'flame' | 'water' | 'nutrition';
+      field?: 'weightKg' | 'steps' | 'waterMl';
       nutrition?: boolean;
     }
   > = {
     weightKg: {
       value: health.body?.latestWeightKg ?? null,
-      unit: "kg",
-      icon: "scale",
-      field: "weightKg",
+      unit: 'kg',
+      icon: 'scale',
+      field: 'weightKg',
     },
-    steps: {
-      value: today?.steps ?? null,
-      unit: "",
-      icon: "legs",
-      field: "steps",
-    },
+    steps: { value: today?.steps ?? null, unit: '', icon: 'legs', field: 'steps' },
     calories: {
       value: resolved.intake ?? today?.calories ?? null,
-      unit: "kcal",
-      icon: "flame",
+      unit: 'kcal',
+      icon: 'flame',
       nutrition: true,
     },
-    distanceKm: { value: today?.distanceKm ?? null, unit: "km", icon: "legs" },
+    distanceKm: { value: today?.distanceKm ?? null, unit: 'km', icon: 'legs' },
     protein: {
       value: recordedMacro(logged, nutrition?.proteinG, today?.protein),
-      unit: "g",
-      icon: "nutrition",
+      unit: 'g',
+      icon: 'nutrition',
       nutrition: true,
     },
     carb: {
       value: recordedMacro(logged, nutrition?.carbsG, today?.carb),
-      unit: "g",
-      icon: "nutrition",
+      unit: 'g',
+      icon: 'nutrition',
       nutrition: true,
     },
     fat: {
       value: recordedMacro(logged, nutrition?.fatG, today?.fat),
-      unit: "g",
-      icon: "nutrition",
+      unit: 'g',
+      icon: 'nutrition',
       nutrition: true,
     },
-    waterIntake: {
-      value: today?.waterMl ?? null,
-      unit: "ml",
-      icon: "water",
-      field: "waterMl",
-    },
+    waterIntake: { value: today?.waterMl ?? null, unit: 'ml', icon: 'water', field: 'waterMl' },
   };
   return (
     <Grid columns={3}>
-      {(
-        home.preferences.homeWidgets ?? ["weightKg", "steps", "calories"]
-      ).flatMap((key) => {
+      {(home.preferences.homeWidgets ?? ['weightKg', 'steps', 'calories']).flatMap((key) => {
         const value = values[key];
         const tileColor =
           nativeColor(home.preferences.pillColors?.[key]) ??
-          (key === "steps"
+          (key === 'steps'
             ? theme.homeCards.streakRight
-            : key === "calories"
+            : key === 'calories'
               ? theme.scores.activity
               : theme.colors.brand);
         if (!value) {
@@ -161,15 +139,13 @@ export function HomeMetricTiles({
             label={metricLabels[key as keyof typeof metricLabels]}
             value={metricValue(
               value.value,
-              "",
-              key === "weightKg" || key === "distanceKm" ? 1 : 0,
+              '',
+              key === 'weightKg' || key === 'distanceKm' ? 1 : 0,
             )}
             unit={value.unit}
             icon={value.icon}
             accent={tileColor}
-            openLabel={
-              value.nutrition ? "View Nutrition" : "View Body measurements"
-            }
+            openLabel={value.nutrition ? 'View Nutrition' : 'View Body measurements'}
             onOpen={value.nutrition ? openNutrition : openBody}
             onLog={value.field ? () => log(value.field!) : undefined}
           />,
@@ -193,10 +169,7 @@ function CollectionWidget({ id, openCollection }: WidgetProps) {
   const home = useHome();
   return (
     <CollectionCard
-      accent={
-        nativeColor(home.preferences.cardColors?.[id]) ??
-        theme.homeCards.collectionWidget
-      }
+      accent={nativeColor(home.preferences.cardColors?.[id]) ?? theme.homeCards.collectionWidget}
       openCollection={openCollection ?? (() => {})}
     />
   );
@@ -205,8 +178,8 @@ type Extra = {
   goals?: ResourceState<z.infer<typeof goalsSpec.schema>>;
   load?: ResourceState<z.infer<typeof loadSpec.schema>>;
   recovery?: ResourceState<z.infer<typeof recoverySpec.schema>>;
-  hr?: ResourceState<z.infer<ReturnType<typeof hrSpec>["schema"]>>;
-  energy?: ResourceState<z.infer<ReturnType<typeof energySpec>["schema"]>>;
+  hr?: ResourceState<z.infer<ReturnType<typeof hrSpec>['schema']>>;
+  energy?: ResourceState<z.infer<ReturnType<typeof energySpec>['schema']>>;
 };
 function ResourceWidget<T>({
   spec,
@@ -220,36 +193,36 @@ function ResourceWidget<T>({
 }
 export function HomeWidget(props: WidgetProps) {
   const { today } = useHealthData();
-  if (props.id === "collectionWidget") return <CollectionWidget {...props} />;
-  if (props.id === "sleepWidget" || props.id === "stepsWidget")
+  if (props.id === 'collectionWidget') return <CollectionWidget {...props} />;
+  if (props.id === 'sleepWidget' || props.id === 'stepsWidget')
     return (
       <ResourceWidget
         spec={goalsSpec}
         render={(goals) => <HomeWidgetBody {...props} goals={goals} />}
       />
     );
-  if (props.id === "acwrWidget")
+  if (props.id === 'acwrWidget')
     return (
       <ResourceWidget
         spec={loadSpec}
         render={(load) => <HomeWidgetBody {...props} load={load} />}
       />
     );
-  if (props.id === "muscleStatusWidget")
+  if (props.id === 'muscleStatusWidget')
     return (
       <ResourceWidget
         spec={recoverySpec}
         render={(recovery) => <HomeWidgetBody {...props} recovery={recovery} />}
       />
     );
-  if (props.id === "hrChartWidget")
+  if (props.id === 'hrChartWidget')
     return (
       <ResourceWidget
         spec={hrSpec(today)}
         render={(hr) => <HomeWidgetBody {...props} hr={hr} />}
       />
     );
-  if (props.id === "nutritionDonut" || props.id === "energyBalanceWidget")
+  if (props.id === 'nutritionDonut' || props.id === 'energyBalanceWidget')
     return (
       <ResourceWidget
         spec={energySpec(today)}
@@ -258,12 +231,12 @@ export function HomeWidget(props: WidgetProps) {
     );
   return <HomeWidgetBody {...props} />;
 }
-const handoffMessages: Record<Exclude<OuraHandoffStatus, "idle">, string> = {
-  syncing: "Syncing last night’s sleep from Oura…",
-  timeout: "Last night’s sleep hasn’t arrived from Oura yet.",
-  not_opened: "Oura didn’t open. Try again in a moment.",
-  not_connected: "Oura isn’t connected, so there’s nothing to sync.",
-  not_installed: "The Oura app isn’t installed on this phone.",
+const handoffMessages: Record<Exclude<OuraHandoffStatus, 'idle'>, string> = {
+  syncing: 'Syncing last night’s sleep from Oura…',
+  timeout: 'Last night’s sleep hasn’t arrived from Oura yet.',
+  not_opened: 'Oura didn’t open. Try again in a moment.',
+  not_connected: 'Oura isn’t connected, so there’s nothing to sync.',
+  not_installed: 'The Oura app isn’t installed on this phone.',
 };
 
 function HomeWidgetBody({
@@ -283,8 +256,7 @@ function HomeWidgetBody({
   const handoff = useOuraHandoff();
   const home = useHome();
   const n = useNutrition();
-  const today =
-    health.body?.today?.date === health.today ? health.body.today : null;
+  const today = health.body?.today?.date === health.today ? health.body.today : null;
   const accent =
     nativeColor(home.preferences.cardColors?.[id]) ??
     theme.homeCards[id as keyof typeof theme.homeCards];
@@ -294,7 +266,7 @@ function HomeWidgetBody({
     </AppText>
   );
   const resolvedIntake = useRecordedIntake(health.today, energy?.data?.balance);
-  if (id === "nutritionDonut") {
+  if (id === 'nutritionDonut') {
     const total =
       n.view.totals && resolvedIntake.intake != null
         ? { ...n.view.totals, calories: resolvedIntake.intake }
@@ -317,55 +289,33 @@ function HomeWidgetBody({
               value={total && goal ? total.calories / goal : 0}
               segments={[{ share: 1, color: theme.colors.brand }]}
             >
-              <AppText
-                variant="ringValue"
-                style={{ fontVariant: ["tabular-nums"] }}
-              >
-                {remaining === null
-                  ? "…"
-                  : Math.abs(Math.round(remaining)).toLocaleString()}
+              <AppText variant="ringValue" style={{ fontVariant: ['tabular-nums'] }}>
+                {remaining === null ? '…' : Math.abs(Math.round(remaining)).toLocaleString()}
               </AppText>
               <AppText variant="ringWord" style={{ opacity: 0.4 }}>
-                {remaining !== null && remaining < 0 ? "over" : "left"}
+                {remaining !== null && remaining < 0 ? 'over' : 'left'}
               </AppText>
             </SegmentRing>
             <Stack style={{ flex: 1, minWidth: 0 }} gap="xs">
-              <Stack
-                direction="row"
-                align="baseline"
-                justify="space-between"
-                gap="sm"
-              >
+              <Stack direction="row" align="baseline" justify="space-between" gap="sm">
                 <AppText variant="cardTitle" tone="muted">
                   Nutrition
                 </AppText>
-                <AppText
-                  variant="caption"
-                  tone="muted"
-                  style={{ flexShrink: 1 }}
-                >
+                <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
                   {goal === null
-                    ? metricValue(total?.calories, "kcal")
+                    ? metricValue(total?.calories, 'kcal')
                     : `${Math.round(total?.calories ?? 0).toLocaleString()} / ${Math.round(goal).toLocaleString()} kcal`}
                 </AppText>
               </Stack>
               <ProgressBar value={total && goal ? total.calories / goal : 0} />
               {provenance && (
-                <AppText
-                  variant="micro"
-                  tone="muted"
-                  style={{ fontWeight: "400" }}
-                >
+                <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
                   {budgetLine(provenance, energy?.data?.balance)}
                 </AppText>
               )}
               <Stack gap="xxs">
-                {(["proteinG", "carbsG", "fatG"] as const).map((key, index) => {
-                  const color = [
-                    theme.macros.protein,
-                    theme.macros.carbs,
-                    theme.macros.fat,
-                  ][index];
+                {(['proteinG', 'carbsG', 'fatG'] as const).map((key, index) => {
+                  const color = [theme.macros.protein, theme.macros.carbs, theme.macros.fat][index];
                   return (
                     <Stack key={key} direction="row" align="center" gap="sm">
                       <View
@@ -376,32 +326,19 @@ function HomeWidgetBody({
                           backgroundColor: color,
                         }}
                       />
-                      <AppText
-                        variant="micro"
-                        tone="muted"
-                        style={{ flex: 1, fontWeight: "400" }}
-                      >
-                        {["Protein", "Carbs", "Fat"][index]}
+                      <AppText variant="micro" tone="muted" style={{ flex: 1, fontWeight: '400' }}>
+                        {['Protein', 'Carbs', 'Fat'][index]}
                       </AppText>
-                      <AppText
-                        variant="micro"
-                        style={{ color, fontWeight: "700" }}
-                      >
+                      <AppText variant="micro" style={{ color, fontWeight: '700' }}>
                         {metricValue(
                           recordedMacro(
                             n.view.logs.length > 0,
                             total?.[key],
                             today?.[
-                              (
-                                {
-                                  proteinG: "protein",
-                                  carbsG: "carb",
-                                  fatG: "fat",
-                                } as const
-                              )[key]
+                              ({ proteinG: 'protein', carbsG: 'carb', fatG: 'fat' } as const)[key]
                             ],
                           ),
-                          "g",
+                          'g',
                           1,
                         )}
                       </AppText>
@@ -415,13 +352,11 @@ function HomeWidgetBody({
       </Pressable>
     );
   }
-  if (id === "energyBalanceWidget") {
+  if (id === 'energyBalanceWidget') {
     const balance = energy?.data?.balance;
     const intake = resolvedIntake.intake;
     const remaining =
-      intake != null && balance?.budgetKcal != null
-        ? balance.budgetKcal - intake
-        : null;
+      intake != null && balance?.budgetKcal != null ? balance.budgetKcal - intake : null;
     return (
       <Pressable
         onPress={openNutrition}
@@ -430,54 +365,42 @@ function HomeWidgetBody({
       >
         <Card accent={accent}>
           <Stack direction="row" justify="space-between">
-            {title("Energy Balance")}
+            {title('Energy Balance')}
             <AppText variant="micro" tone="muted">
               {resolvedIntake.zoneLabel}
             </AppText>
           </Stack>
           <AppText variant="hero">
-            {remaining === null
-              ? "—"
-              : Math.abs(Math.round(remaining)).toLocaleString()}{" "}
+            {remaining === null ? '—' : Math.abs(Math.round(remaining)).toLocaleString()}{' '}
             <AppText variant="caption" tone="muted">
-              kcal{" "}
-              {remaining != null && remaining < 0
-                ? "over target"
-                : "left today"}
+              kcal {remaining != null && remaining < 0 ? 'over target' : 'left today'}
             </AppText>
           </AppText>
           <ProgressBar
-            value={
-              intake != null && balance?.budgetKcal
-                ? intake / balance.budgetKcal
-                : 0
-            }
+            value={intake != null && balance?.budgetKcal ? intake / balance.budgetKcal : 0}
           />
           <AppText variant="micro" tone="muted">
-            {metricValue(intake)} eaten ·{" "}
-            {metricValue(balance?.expenditureKcal)} burned
-            {energy?.data?.maintenance?.source === "calibrated"
+            {metricValue(intake)} eaten · {metricValue(balance?.expenditureKcal)} burned
+            {energy?.data?.maintenance?.source === 'calibrated'
               ? ` · ${Math.round(energy.data.maintenance.kcal).toLocaleString()} maintenance`
-              : ""}
+              : ''}
           </AppText>
           {!balance && energy?.data && (
             <AppText variant="caption" tone="muted">
-              Add your {energy.data.missingProfileFields.join(", ")} in Profile.
+              Add your {energy.data.missingProfileFields.join(', ')} in Profile.
             </AppText>
           )}
         </Card>
       </Pressable>
     );
   }
-  if (id === "weightSparkline") {
+  if (id === 'weightSparkline') {
     const days = home.preferences.weightLookback === 30 ? 30 : 7;
     const from = shiftDateStr(health.today, -(days - 1));
     const points = (
       health.body?.weightTrend ??
       health.body?.recent.flatMap((row) =>
-        row.weightKg == null
-          ? []
-          : [{ date: row.date, weightKg: row.weightKg }],
+        row.weightKg == null ? [] : [{ date: row.date, weightKg: row.weightKg }],
       ) ??
       []
     )
@@ -493,9 +416,9 @@ function HomeWidgetBody({
         <Card accent={accent}>
           <Stack direction="row" align="center">
             <Stack style={{ flex: 1 }} gap="xs">
-              {title("Body Weight")}
+              {title('Body Weight')}
               <AppText variant="hero">
-                {metricValue(health.body?.latestWeightKg, "kg", 1)}
+                {metricValue(health.body?.latestWeightKg, 'kg', 1)}
               </AppText>
               <AppText variant="micro" tone="muted">
                 Last {days} days
@@ -514,44 +437,25 @@ function HomeWidgetBody({
       </Pressable>
     );
   }
-  if (id === "sleepWidget") {
+  if (id === 'sleepWidget') {
     const night = health.sleep.find(
-      (row) =>
-        row.date === health.today ||
-        row.date === shiftDateStr(health.today, -1),
+      (row) => row.date === health.today || row.date === shiftDateStr(health.today, -1),
     );
     // The current app starts at 8 h until a goal is saved, so the goal text and bar are always there.
     const savedGoal = goals?.data?.sleepGoalHours;
-    const goal =
-      savedGoal != null && savedGoal > 0 ? savedGoal : DEFAULT_SLEEP_GOAL_HOURS;
+    const goal = savedGoal != null && savedGoal > 0 ? savedGoal : DEFAULT_SLEEP_GOAL_HOURS;
     const stages = night
       ? [
-          {
-            label: "Deep",
-            hours: night.deepSleepHours,
-            color: theme.sleepStages.deep,
-          },
-          {
-            label: "REM",
-            hours: night.remSleepHours,
-            color: theme.sleepStages.rem,
-          },
-          {
-            label: "Light",
-            hours: night.lightSleepHours,
-            color: theme.sleepStages.light,
-          },
-          {
-            label: "Awake",
-            hours: night.awakHours,
-            color: theme.sleepStages.awake,
-          },
+          { label: 'Deep', hours: night.deepSleepHours, color: theme.sleepStages.deep },
+          { label: 'REM', hours: night.remSleepHours, color: theme.sleepStages.rem },
+          { label: 'Light', hours: night.lightSleepHours, color: theme.sleepStages.light },
+          { label: 'Awake', hours: night.awakHours, color: theme.sleepStages.awake },
         ]
       : [];
     const known = stages.reduce((sum, row) => sum + (row.hours ?? 0), 0);
     const waiting =
-      handoff.status !== "idle" && !hasLastNight(health.sleep, health.today)
-        ? (handoff.status as Exclude<OuraHandoffStatus, "idle">)
+      handoff.status !== 'idle' && !hasLastNight(health.sleep, health.today)
+        ? (handoff.status as Exclude<OuraHandoffStatus, 'idle'>)
         : null;
     return (
       <Stack>
@@ -563,21 +467,19 @@ function HomeWidgetBody({
           <Card accent={accent}>
             <Stack direction="row" justify="space-between">
               <Stack gap="xs" style={{ flex: 1 }}>
-                {title("Sleep")}
+                {title('Sleep')}
                 <AppText variant="hero">
-                  {night?.durationHours == null
-                    ? "—"
-                    : night.durationHours.toFixed(1) + "h"}
+                  {night?.durationHours == null ? '—' : night.durationHours.toFixed(1) + 'h'}
                   {night?.durationHours != null && (
                     <AppText variant="caption" tone="muted">
-                      {" "}
+                      {' '}
                       / {goal}h goal
                     </AppText>
                   )}
                 </AppText>
                 {night?.sleepStart && night.sleepEnd && (
                   <AppText variant="caption" tone="muted">
-                    {formatTimeOfDay(night.sleepStart, health.timezone)} →{" "}
+                    {formatTimeOfDay(night.sleepStart, health.timezone)} →{' '}
                     {formatTimeOfDay(night.sleepEnd, health.timezone)}
                   </AppText>
                 )}
@@ -585,20 +487,17 @@ function HomeWidgetBody({
               <Icon name="moon" color={theme.scores.sleep} />
             </Stack>
             {night?.durationHours != null && (
-              <ProgressBar
-                value={night.durationHours / goal}
-                color={theme.scores.sleep}
-              />
+              <ProgressBar value={night.durationHours / goal} color={theme.scores.sleep} />
             )}
             {known > 0 && (
               <>
                 <View
                   style={{
-                    flexDirection: "row",
+                    flexDirection: 'row',
                     gap: 1,
                     height: theme.spacing.sm,
                     borderRadius: theme.radii.pill,
-                    overflow: "hidden",
+                    overflow: 'hidden',
                   }}
                 >
                   {stages
@@ -612,12 +511,7 @@ function HomeWidgetBody({
                 </View>
                 <Stack direction="row" wrap gap="md">
                   {stages.map((row) => (
-                    <Stack
-                      key={row.label}
-                      direction="row"
-                      align="center"
-                      gap="xs"
-                    >
+                    <Stack key={row.label} direction="row" align="center" gap="xs">
                       <View
                         style={{
                           width: theme.sizes.legendDot,
@@ -629,8 +523,8 @@ function HomeWidgetBody({
                       <AppText variant="caption" tone="muted">
                         {row.label}
                       </AppText>
-                      <AppText variant="caption" style={{ fontWeight: "700" }}>
-                        {row.hours == null ? "—" : row.hours.toFixed(1) + "h"}
+                      <AppText variant="caption" style={{ fontWeight: '700' }}>
+                        {row.hours == null ? '—' : row.hours.toFixed(1) + 'h'}
                       </AppText>
                     </Stack>
                   ))}
@@ -650,41 +544,31 @@ function HomeWidgetBody({
             )}
           </Card>
         </Pressable>
-        {(waiting === "timeout" || waiting === "not_opened") && (
-          <AppButton
-            title="Sync now"
-            variant="ghost"
-            onPress={handoff.syncNow}
-          />
+        {(waiting === 'timeout' || waiting === 'not_opened') && (
+          <AppButton title="Sync now" variant="ghost" onPress={handoff.syncNow} />
         )}
         {openMorning && <HomeSleepFeedback onCorrect={openMorning} />}
       </Stack>
     );
   }
-  if (id === "stepsWidget") {
-    const weekly = goals?.data?.stepsGoalType === "weekly";
+  if (id === 'stepsWidget') {
+    const weekly = goals?.data?.stepsGoalType === 'weekly';
     const value = weekly ? health.body?.weekToDate?.steps : today?.steps;
     const goal =
-      goals?.data?.stepsGoal == null
-        ? null
-        : goals.data.stepsGoal * (weekly ? 7 : 1);
+      goals?.data?.stepsGoal == null ? null : goals.data.stepsGoal * (weekly ? 7 : 1);
     const rows = (health.body?.recent ?? []).slice(0, 7).reverse();
     const max = Math.max(1, ...rows.map((row) => row.steps ?? 0));
     return (
-      <Pressable
-        onPress={openBody}
-        accessibilityRole="button"
-        accessibilityLabel="View steps"
-      >
+      <Pressable onPress={openBody} accessibilityRole="button" accessibilityLabel="View steps">
         <Card accent={accent}>
           <Stack direction="row" justify="space-between">
             <Stack gap="xs">
-              {title(weekly ? "Steps (week)" : "Steps")}
+              {title(weekly ? 'Steps (week)' : 'Steps')}
               <AppText variant="hero">
                 {metricValue(value)}
                 {goal !== null && (
                   <AppText variant="caption" tone="muted">
-                    {" "}
+                    {' '}
                     / {goal.toLocaleString()}
                   </AppText>
                 )}
@@ -705,7 +589,7 @@ function HomeWidgetBody({
             {rows.map((row, index) => (
               <View
                 key={row.date}
-                accessibilityLabel={`${row.date}: ${row.steps ?? "not recorded"} steps`}
+                accessibilityLabel={`${row.date}: ${row.steps ?? 'not recorded'} steps`}
                 style={{
                   flex: 1,
                   height:
@@ -730,7 +614,7 @@ function HomeWidgetBody({
       </Pressable>
     );
   }
-  if (id === "moodWidget") {
+  if (id === 'moodWidget') {
     const feel = health.checkins[health.today]?.sleepQualityFeel;
     return (
       <Pressable
@@ -741,28 +625,28 @@ function HomeWidgetBody({
         <Card accent={accent}>
           <Stack direction="row" align="center" justify="space-between">
             <Stack gap="xs" style={{ flex: 1 }}>
-              {title("Exercise Readiness")}
+              {title('Exercise Readiness')}
               {home.mood ? (
                 <Stack direction="row" align="center">
                   <Icon
-                    name={home.mood.energyLevel === "pumped" ? "power" : "mind"}
+                    name={home.mood.energyLevel === 'pumped' ? 'power' : 'mind'}
                     color={theme.tones.checkin.foreground}
                   />
                   <Stack gap="xxs">
                     <AppText variant="label">
                       {
                         {
-                          drained: "Drained",
-                          low: "Low",
-                          ok: "OK",
-                          good: "Good",
-                          pumped: "Pumped",
+                          drained: 'Drained',
+                          low: 'Low',
+                          ok: 'OK',
+                          good: 'Good',
+                          pumped: 'Pumped',
                         }[home.mood.energyLevel]
                       }
                     </AppText>
                     {home.mood.soreMuscles.length > 0 && (
                       <AppText variant="micro" tone="muted">
-                        Sore: {home.mood.soreMuscles.join(", ")}
+                        Sore: {home.mood.soreMuscles.join(', ')}
                       </AppText>
                     )}
                   </Stack>
@@ -791,7 +675,7 @@ function HomeWidgetBody({
                 <Stack direction="row" align="center">
                   <Icon name="moon" color={theme.scores.sleep} />
                   <AppText variant="label">
-                    {["Terrible", "Poor", "OK", "Good", "Great"][feel - 1]}
+                    {['Terrible', 'Poor', 'OK', 'Good', 'Great'][feel - 1]}
                   </AppText>
                 </Stack>
                 <Stack direction="row" align="center" gap="xxs">
@@ -802,10 +686,7 @@ function HomeWidgetBody({
                         width: theme.spacing.xs,
                         height: theme.spacing.xs,
                         borderRadius: theme.radii.pill,
-                        backgroundColor:
-                          dot <= feel
-                            ? theme.colors.brand
-                            : theme.colors.border,
+                        backgroundColor: dot <= feel ? theme.colors.brand : theme.colors.border,
                       }}
                     />
                   ))}
@@ -823,13 +704,11 @@ function HomeWidgetBody({
       </Pressable>
     );
   }
-  if (id === "acwrWidget") {
+  if (id === 'acwrWidget') {
     const data = load?.data;
     const band =
       data?.acwr != null
-        ? acwrBandByKey(
-            data.interpretation as Parameters<typeof acwrBandByKey>[0],
-          )
+        ? acwrBandByKey(data.interpretation as Parameters<typeof acwrBandByKey>[0])
         : null;
     return (
       <Pressable
@@ -838,11 +717,11 @@ function HomeWidgetBody({
         accessibilityLabel="View training load"
       >
         <Card accent={accent}>
-          {title("ACWR")}
+          {title('ACWR')}
           <Stack direction="row" align="center">
-            <AppText variant="hero">{metricValue(data?.acwr, "", 2)}</AppText>
+            <AppText variant="hero">{metricValue(data?.acwr, '', 2)}</AppText>
             <AppText variant="caption" tone="muted">
-              {band?.label ?? (data ? "Need more data" : "—")}
+              {band?.label ?? (data ? 'Need more data' : '—')}
             </AppText>
           </Stack>
           <AppText variant="micro" tone="muted">
@@ -852,7 +731,7 @@ function HomeWidgetBody({
       </Pressable>
     );
   }
-  if (id === "muscleStatusWidget") {
+  if (id === 'muscleStatusWidget') {
     const fatigued = [...(recovery?.data?.muscles ?? [])]
       .sort((a, b) => a.pct - b.pct)
       .slice(0, 6);
@@ -863,7 +742,7 @@ function HomeWidgetBody({
         accessibilityLabel="View muscle status"
       >
         <Card accent={accent}>
-          {title("Muscle Status")}
+          {title('Muscle Status')}
           {fatigued.length ? (
             fatigued.map((row) => (
               <Stack key={row.muscle} gap="xxs">
@@ -875,10 +754,7 @@ function HomeWidgetBody({
                     {Math.round(row.pct)}%
                   </AppText>
                 </Stack>
-                <ProgressBar
-                  value={row.pct / 100}
-                  color={recoveryBand(row.pct).color}
-                />
+                <ProgressBar value={row.pct / 100} color={recoveryBand(row.pct).color} />
               </Stack>
             ))
           ) : (
@@ -890,7 +766,7 @@ function HomeWidgetBody({
       </Pressable>
     );
   }
-  if (id === "hrChartWidget") {
+  if (id === 'hrChartWidget') {
     return (
       <Pressable
         onPress={openBody}
@@ -898,7 +774,7 @@ function HomeWidgetBody({
         accessibilityLabel="View heart rate chart"
       >
         <Card accent={accent}>
-          {title("Heart Rate · Today")}
+          {title('Heart Rate · Today')}
           <HrDayCard embedded color={accent} />
         </Card>
       </Pressable>
@@ -910,21 +786,13 @@ function HomeSleepFeedback({ onCorrect }: { onCorrect: () => void }) {
   const health = useHealthData();
   const state = useWorkoutResource(verdictSpec(health.today));
   const verdict = state.data?.verdict;
-  if (
-    health.sleep.some(
-      (night) => night.date === health.today && night.localOnly,
-    ) ||
-    !verdict
-  ) {
+  if (health.sleep.some((night) => night.date === health.today && night.localOnly) || !verdict) {
     return null;
   }
   const { line, prominent } = verdictCopy(verdict);
   return (
     <Stack gap="xxs">
-      <AppText
-        variant={prominent ? "caption" : "micro"}
-        tone={prominent ? undefined : "muted"}
-      >
+      <AppText variant={prominent ? 'caption' : 'micro'} tone={prominent ? undefined : 'muted'}>
         {line}
       </AppText>
       <AppButton
@@ -933,9 +801,7 @@ function HomeSleepFeedback({ onCorrect }: { onCorrect: () => void }) {
         onPress={() => {
           // Record the disagreement first and never let a failed record stop the sheet opening;
           // the correction that matters is the value the check-in saves.
-          void health.store
-            ?.respondToVerdict(health.today, "corrected")
-            .catch(() => {});
+          void health.store?.respondToVerdict(health.today, 'corrected').catch(() => {});
           onCorrect();
         }}
       />

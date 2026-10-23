@@ -1,97 +1,73 @@
-import { formatHoursMinutes } from "@trainingai/shared/format/units";
-import { formatTimeOfDay, shiftDateStr } from "@trainingai/shared/date-utils";
-import type { SleepRow } from "../../health/data/models.ts";
-import type { TimelineEvent } from "./timeline.ts";
-import type { IconName } from "../../../shared/ui/Icon.tsx";
+import { formatHoursMinutes } from '@trainingai/shared/format/units';
+import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
+import type { SleepRow } from '../../health/data/models.ts';
+import type { TimelineEvent } from './timeline.ts';
+import type { IconName } from '../../../shared/ui/Icon.tsx';
 
-const SAVED_LOCALLY = "Saved on this phone";
+const SAVED_LOCALLY = 'Saved on this phone';
 
 export function isSleepEvent(event: TimelineEvent) {
-  return ["wakeup", "sleep", "bedtime"].includes(event.type);
+  return ['wakeup', 'sleep', 'bedtime'].includes(event.type);
 }
 
 export function timelineTitle(event: TimelineEvent) {
-  if (event.type !== "meal") return event.title;
+  if (event.type !== 'meal') return event.title;
   return (
-    event.title.replace(
-      /^[\u{1F000}-\u{1FAFF}\u2600-\u27BF\uFE0F\u200D]+\s*/u,
-      "",
-    ) || event.title
+    event.title.replace(/^[\u{1F000}-\u{1FAFF}\u2600-\u27BF\uFE0F\u200D]+\s*/u, '') ||
+    event.title
   );
 }
 
 export function timelineMetrics(event: TimelineEvent, compact = false) {
   const values: { label: string; value: string }[] = [];
-  const bedtime = ["sleep", "bedtime"].includes(event.type);
+  const bedtime = ['sleep', 'bedtime'].includes(event.type);
   if (event.durationMin != null && (!compact || !bedtime))
-    values.push({
-      label: "Duration",
-      value: formatHoursMinutes(event.durationMin),
-    });
-  if (event.sets != null)
-    values.push({ label: "Sets", value: event.sets.toLocaleString() });
+    values.push({ label: 'Duration', value: formatHoursMinutes(event.durationMin) });
+  if (event.sets != null) values.push({ label: 'Sets', value: event.sets.toLocaleString() });
   if (event.exerciseCount != null)
-    values.push({
-      label: "Exercises",
-      value: event.exerciseCount.toLocaleString(),
-    });
+    values.push({ label: 'Exercises', value: event.exerciseCount.toLocaleString() });
   if (event.distanceKm != null)
-    values.push({
-      label: "Distance",
-      value: `${event.distanceKm.toFixed(2)} km`,
-    });
+    values.push({ label: 'Distance', value: `${event.distanceKm.toFixed(2)} km` });
   if (event.calories != null)
     values.push({
-      label: "Calories",
+      label: 'Calories',
       value: `${Math.round(event.calories).toLocaleString()} kcal`,
     });
   if (event.sleepDurationH != null && (!compact || !bedtime)) {
-    values.push({
-      label: "Time asleep",
-      value: formatHoursMinutes(event.sleepDurationH * 60),
-    });
+    values.push({ label: 'Time asleep', value: formatHoursMinutes(event.sleepDurationH * 60) });
   }
-  if ((!compact || event.type === "wakeup") && event.readinessScore != null)
-    values.push({ label: "Readiness", value: String(event.readinessScore) });
-  if ((!compact || event.type === "wakeup") && event.sleepScore != null)
-    values.push({ label: "Sleep score", value: String(event.sleepScore) });
+  if ((!compact || event.type === 'wakeup') && event.readinessScore != null)
+    values.push({ label: 'Readiness', value: String(event.readinessScore) });
+  if ((!compact || event.type === 'wakeup') && event.sleepScore != null)
+    values.push({ label: 'Sleep score', value: String(event.sleepScore) });
   if (!compact && event.latencyMin != null)
-    values.push({
-      label: "Time to fall asleep",
-      value: formatHoursMinutes(event.latencyMin),
-    });
+    values.push({ label: 'Time to fall asleep', value: formatHoursMinutes(event.latencyMin) });
   return values;
 }
 
 /** The line above a row, as the current app prints it: "7:00 am – 8:00 am" for a span, else the start. */
 export function timelineTimeLabel(event: TimelineEvent, timezone: string) {
   const start = formatTimeOfDay(event.timeMs, timezone);
-  return event.endTime && event.type !== "wakeup"
-    ? `${start} – ${event.endTime}`
-    : start;
+  return event.endTime && event.type !== 'wakeup' ? `${start} – ${event.endTime}` : start;
 }
 
 export function timelineSummary(event: TimelineEvent) {
   const values = timelineMetrics(event, true).map((metric) =>
-    metric.label === "Readiness"
+    metric.label === 'Readiness'
       ? `Readiness ${metric.value}`
-      : metric.label === "Sleep score"
+      : metric.label === 'Sleep score'
         ? `Sleep ${metric.value}`
-        : metric.label === "Sets"
+        : metric.label === 'Sets'
           ? `${metric.value} sets`
-          : metric.label === "Exercises"
+          : metric.label === 'Exercises'
             ? `${metric.value} exercises`
             : metric.value,
   );
-  if (event.subtitle && event.subtitle !== "Saved on this phone")
-    values.push(event.subtitle);
-  return values.join(" · ");
+  if (event.subtitle && event.subtitle !== 'Saved on this phone') values.push(event.subtitle);
+  return values.join(' · ');
 }
 
-export function timelineSleepNight(
-  event: TimelineEvent,
-  nights: readonly SleepRow[],
-) {
+export function timelineSleepNight(event: TimelineEvent, nights: readonly SleepRow[]) {
   if (!isSleepEvent(event)) return undefined;
   return (
     nights.find((night) => event.sleepDate && night.date === event.sleepDate) ??
@@ -110,8 +86,7 @@ export function timelineDestinationDate(
   today: string,
   nights: readonly SleepRow[],
 ) {
-  const date =
-    event.date ?? (event.day === "today" ? today : shiftDateStr(today, -1));
+  const date = event.date ?? (event.day === 'today' ? today : shiftDateStr(today, -1));
   return isSleepEvent(event)
     ? (event.sleepDate ?? timelineSleepNight(event, nights)?.date ?? date)
     : date;
@@ -120,7 +95,7 @@ export function timelineDestinationDate(
 export type TimelineCardMetric = {
   icon?: IconName;
   /** Which colour the icon takes: the current app tints the readiness bolt and the sleep moon. */
-  iconTone?: "success" | "sleep";
+  iconTone?: 'success' | 'sleep';
   text: string;
   /** The score figures print in the foreground colour, the rest muted. */
   emphasis?: boolean;
@@ -144,52 +119,40 @@ const plural = (count: number, one: string, many: string) =>
  */
 export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
   const metrics: TimelineCardMetric[] = [];
-  const subtitle =
-    event.subtitle && event.subtitle !== SAVED_LOCALLY ? event.subtitle : null;
+  const subtitle = event.subtitle && event.subtitle !== SAVED_LOCALLY ? event.subtitle : null;
   let title = timelineTitle(event);
   const duration = () => {
     if (event.durationMin != null)
-      metrics.push({
-        icon: "history",
-        text: formatHoursMinutes(event.durationMin),
-      });
+      metrics.push({ icon: 'history', text: formatHoursMinutes(event.durationMin) });
   };
   switch (event.type) {
-    case "wakeup":
+    case 'wakeup':
       if (event.sleepDurationH != null)
-        metrics.push({
-          icon: "bedDouble",
-          text: formatHoursMinutes(event.sleepDurationH * 60),
-        });
+        metrics.push({ icon: 'bedDouble', text: formatHoursMinutes(event.sleepDurationH * 60) });
       if (event.readinessScore != null)
         metrics.push({
-          icon: "power",
-          iconTone: "success",
+          icon: 'power',
+          iconTone: 'success',
           text: String(event.readinessScore),
           emphasis: true,
         });
       if (event.sleepScore != null)
         metrics.push({
-          icon: "moon",
-          iconTone: "sleep",
+          icon: 'moon',
+          iconTone: 'sleep',
           text: String(event.sleepScore),
           emphasis: true,
         });
       break;
-    case "workout":
+    case 'workout':
       duration();
       if (event.sets != null)
-        metrics.push({
-          icon: "workout",
-          text: plural(event.sets, "set", "sets"),
-        });
+        metrics.push({ icon: 'workout', text: plural(event.sets, 'set', 'sets') });
       if (event.exerciseCount != null)
-        metrics.push({
-          text: plural(event.exerciseCount, "exercise", "exercises"),
-        });
+        metrics.push({ text: plural(event.exerciseCount, 'exercise', 'exercises') });
       break;
-    case "meal": {
-      const parts = subtitle?.split(" · ") ?? [];
+    case 'meal': {
+      const parts = subtitle?.split(' · ') ?? [];
       const calories =
         parts.length === 2
           ? parts[0]
@@ -197,35 +160,35 @@ export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
             ? `${Math.round(event.calories).toLocaleString()} kcal`
             : null;
       const window = parts.length === 2 ? parts[1] : parts[0];
-      if (calories) metrics.push({ icon: "flame", text: calories });
+      if (calories) metrics.push({ icon: 'flame', text: calories });
       if (window) metrics.push({ text: window });
       break;
     }
-    case "sleep":
-      if (subtitle) metrics.push({ icon: "history", text: subtitle });
+    case 'sleep':
+      if (subtitle) metrics.push({ icon: 'history', text: subtitle });
       break;
-    case "bedtime":
+    case 'bedtime':
       break;
-    case "tag":
+    case 'tag':
       if (subtitle) metrics.push({ text: subtitle });
       break;
     default: {
       // walk, cardio and anything logged by hand: the current app's WalkCard.
       title =
-        event.title === "Run"
-          ? "Outdoor running"
-          : event.title === "Walk"
-            ? "Outdoor walking"
+        event.title === 'Run'
+          ? 'Outdoor running'
+          : event.title === 'Walk'
+            ? 'Outdoor walking'
             : title;
       if (event.distanceKm != null) title += ` / ${event.distanceKm} km`;
       duration();
       if (event.calories != null)
         metrics.push({
-          icon: "flame",
+          icon: 'flame',
           text: `${Math.round(event.calories).toLocaleString()} kcal`,
         });
       if (subtitle) metrics.push({ text: subtitle });
     }
   }
-  return { title, titleTime: event.type === "wakeup", metrics };
+  return { title, titleTime: event.type === 'wakeup', metrics };
 }
