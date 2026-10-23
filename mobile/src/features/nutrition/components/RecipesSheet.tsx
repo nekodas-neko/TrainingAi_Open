@@ -246,6 +246,7 @@ export function RecipesSheet({
         fullHeight
         title={editor ? (editor === 'new' ? 'Build a meal' : 'Edit meal') : 'My Foods'}
         onClose={onClose}
+        onBack={editor ? () => setEditor(null) : undefined}
         actions={
           <StatusIndicator
             label="Saved meals"

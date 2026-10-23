@@ -26,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText } from './AppText';
 import { IconButton } from './IconButton';
 import { Stack } from './Stack';
+import { sheetBack } from './sheetBack';
 import { useReducedMotion } from './useReducedMotion';
 import { useTheme } from '../theme/ThemeProvider';
 import { feedback } from '../../integrations/feedback/haptics';
@@ -35,6 +36,7 @@ export function Sheet({
   visible,
   title,
   onClose,
+  onBack,
   children,
   actions,
   footer,
@@ -47,6 +49,8 @@ export function Sheet({
   visible: boolean;
   title: string;
   onClose: () => void;
+  /** Android Back steps out of an inner step and keeps the sheet open, instead of dismissing it. */
+  onBack?: () => void;
   actions?: ReactNode;
   footer?: ReactNode;
   fullHeight?: boolean;
@@ -235,7 +239,7 @@ export function Sheet({
         transparent
         animationType="none"
         statusBarTranslucent
-        onRequestClose={() => dismiss()}
+        onRequestClose={sheetBack(onBack, () => dismiss())}
         onShow={() => setModalShown(true)}
         onDismiss={() => dismissed.current?.()}
       >
