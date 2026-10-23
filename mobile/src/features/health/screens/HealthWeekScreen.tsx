@@ -18,7 +18,8 @@ import { digestSpec, monthWindowSpec, metricValue } from '../data/models';
 import { HealthViewReady } from '../components/HealthViewReady';
 import { TrendRowCard } from '../components/TrendRowCard';
 import { WeekMetricTile } from '../components/WeekMetricTile';
-import { MuscleVolumeFigure, muscleVolumeCaption } from '../components/MuscleVolumeFigure';
+import { muscleVolumeCaption } from '../data/training-view';
+import { MuscleVolumeFigure } from '../components/MuscleVolumeFigure';
 import {
   fixedValue,
   weekdayInitial,
@@ -162,7 +163,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                   <AppText variant="heading" style={{ flex: 1 }}>
                     Muscle volume this week
                   </AppText>
-                  <AppText variant="micro" tone="muted">
+                  <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
                     {muscleVolumeCaption(weekMuscleRows(m.muscleSets))}
                   </AppText>
                 </Stack>

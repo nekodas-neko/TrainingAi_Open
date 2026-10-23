@@ -30,6 +30,7 @@ import {
 } from '../data/models';
 import {
   activityRow,
+  muscleVolumeCaption,
   movementRows,
   periodizationRow,
   trendSeries,
@@ -37,7 +38,7 @@ import {
 } from '../data/training-view';
 import { useReadableCueColor } from './RangeBar';
 import { ActivityDetails, type HealthActivity } from './ActivityDetails';
-import { MuscleVolumeFigure, muscleVolumeCaption } from './MuscleVolumeFigure';
+import { MuscleVolumeFigure } from './MuscleVolumeFigure';
 import { TrainingCalendarCard } from './TrainingCalendarCard';
 import { activityIcon, activityTypesSpec } from '../../activities/data/models';
 import { useActivityLogs } from '../../activities/data/ActivityProvider';
@@ -215,48 +216,51 @@ export function TrainingPanel({
           refresh={overview.refresh}
           icon="coach"
         />
-        {overview.data?.sessions.map((session, position) => {
-          const row = periodizationRow(session);
-          return (
-            <TouchSurface
-              key={session.sessionId}
-              accessibilityRole="button"
-              accessibilityLabel={`${session.sessionName}, ${row.label}`}
-              onPress={openPrograms}
-            >
-              <Stack
-                direction="row"
-                align="center"
-                style={{
-                  borderRadius: theme.radii.control,
-                  backgroundColor: `${theme.colors.background}99`,
-                  paddingHorizontal: theme.spacing.md,
-                  paddingVertical: theme.spacing.sm,
-                }}
+        <Stack gap="sm">
+          {overview.data?.sessions.map((session) => {
+            const row = periodizationRow(session);
+            return (
+              <TouchSurface
+                key={session.sessionId}
+                accessibilityRole="button"
+                accessibilityLabel={`${session.sessionName}, ${row.label}`}
+                onPress={openPrograms}
               >
-                <SessionGlyph
-                  icon={session.icon}
-                  position={position}
-                  size={theme.sizes.iconSmall}
-                  color={theme.colors.muted}
-                />
-                <Stack gap="none" style={{ flex: 1, minWidth: 0 }}>
-                  <AppText variant="label" numberOfLines={1}>
-                    {session.sessionName}
-                  </AppText>
-                  <AppText variant="micro" style={{ color: phaseColors[row.phase] }}>
-                    {row.label}
-                  </AppText>
+                <Stack
+                  direction="row"
+                  align="center"
+                  gap="md"
+                  style={{
+                    borderRadius: theme.radii.control,
+                    backgroundColor: `${theme.colors.background}99`,
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                  }}
+                >
+                  <SessionGlyph
+                    icon={session.icon}
+                    position={0}
+                    size={theme.sizes.iconCompact}
+                    color={theme.colors.muted}
+                  />
+                  <Stack gap="none" style={{ flex: 1, minWidth: 0 }}>
+                    <AppText variant="label" numberOfLines={1}>
+                      {session.sessionName}
+                    </AppText>
+                    <AppText variant="micro" style={{ color: phaseColors[row.phase] }}>
+                      {row.label}
+                    </AppText>
+                  </Stack>
+                  {row.recency ? (
+                    <AppText variant="micro" tone="muted">
+                      {row.recency}
+                    </AppText>
+                  ) : null}
                 </Stack>
-                {row.recency ? (
-                  <AppText variant="micro" tone="muted">
-                    {row.recency}
-                  </AppText>
-                ) : null}
-              </Stack>
-            </TouchSurface>
-          );
-        })}
+              </TouchSurface>
+            );
+          })}
+        </Stack>
         {overview.data && !overview.data.sessions.length && (
           <AppText variant="caption" tone="muted">
             No AI dynamic program active
@@ -278,7 +282,7 @@ export function TrainingPanel({
         )}
       </Card>
       <MovementCard />
-      <Card padded={false} style={{ gap: 0 }}>
+      <Card padded={false}>
         <Stack
           direction="row"
           justify="space-between"
@@ -298,7 +302,7 @@ export function TrainingPanel({
             Activities This Week
           </AppText>
           {thisWeek.length > 0 && (
-            <AppText variant="micro" tone="muted">
+            <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
               {plural(thisWeek.length, 'session', 'sessions')}
             </AppText>
           )}

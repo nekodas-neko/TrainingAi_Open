@@ -7,13 +7,11 @@ import {
 } from '@trainingai/shared/health/volume-band';
 import { AppText, Legend, MuscleMap, ProgressBar, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { muscleSetsLabel, muscleVolumeCaption } from '../data/training-view';
+import { muscleLegendItems, muscleSetsLabel } from '../data/training-view';
 
 // The week's muscle volume as the current app draws it: a front and back body map and one bar per
 // muscle, both coloured by the same rule (shared `muscleVolumeColor`) so the map cannot disagree
 // with the bars. Used by Health Training's Muscle Volume card and by Week in review (#2935).
-export { muscleVolumeCaption };
-
 export function MuscleVolumeFigure({
   muscles,
 }: {
@@ -39,23 +37,14 @@ export function MuscleVolumeFigure({
     .map((row) => ({ muscle: row.muscle, color: row.color }));
   return (
     <>
-      {!hasTargets && (
-        <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
-          Colours match the bars below
-        </AppText>
-      )}
       <Legend
         centered
-        items={[
-          ...(hasTargets
-            ? [
-                { label: 'Under 60%', color: palette.bad },
-                { label: '60–99%', color: palette.warn },
-                { label: 'At target', color: palette.good },
-              ]
-            : []),
-          { label: 'Not trained', color: palette.none },
-        ]}
+        items={muscleLegendItems(hasTargets, {
+          bad: palette.bad,
+          warn: palette.warn,
+          good: palette.good,
+          untrained: theme.anatomy.untrained,
+        })}
       />
       <MuscleMap assignments={assignments} />
       {rows.map((row) => (

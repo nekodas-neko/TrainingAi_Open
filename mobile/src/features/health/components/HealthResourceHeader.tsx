@@ -28,7 +28,7 @@ export function HealthResourceHeader({
   return (
     <Stack direction="row" justify="space-between" align="center">
       <Stack direction="row" align="center" gap="xs" style={{ flex: 1, minWidth: 0 }}>
-        {icon && <Icon name={icon} tone="brand" color={iconColor} size={theme.sizes.iconSmall} />}
+        {icon && <Icon name={icon} tone="brand" color={iconColor} size={theme.sizes.iconCompact} />}
         <AppText
           variant="cardTitle"
           tone="muted"
@@ -39,7 +39,7 @@ export function HealthResourceHeader({
         </AppText>
       </Stack>
       {caption && (
-        <AppText variant="micro" tone="muted">
+        <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
           {caption}
         </AppText>
       )}

@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { PixelRatio, Pressable, View } from 'react-native';
 import { AppButton } from './AppButton';
 import { AppText } from './AppText';
 import { IconButton } from './IconButton';
 import { Stack } from './Stack';
-import { monthGrid } from './monthGrid';
+import { monthGrid, stackCalendarTitle } from './monthGrid';
+import { textScale } from '../theme/text-scale';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function MonthCalendar({
@@ -48,56 +49,79 @@ export function MonthCalendar({
     const date = new Date(Date.UTC(year, number - 1 + offset, 1));
     onMonthChange(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`);
   }
+  const monthLabel = new Intl.DateTimeFormat('en-AU', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, number - 1, 1)));
+  const back = (
+    <IconButton
+      icon="back"
+      label="Previous month"
+      onPress={year > 2000 || number > 1 ? () => move(-1) : undefined}
+    />
+  );
+  const forward = (
+    <IconButton
+      icon="forward"
+      label="Next month"
+      onPress={year < 2100 || number < 12 ? () => move(1) : undefined}
+    />
+  );
+  // The current app's w-24 month label between the arrows, 4 px apart.
+  const controls = (
+    <Stack direction="row" align="center" gap="xs" style={{ flexShrink: 0 }}>
+      {back}
+      <AppText
+        variant="calendarDay"
+        numberOfLines={2}
+        style={{
+          width: theme.sizes.calendarMonthLabel,
+          textAlign: 'center',
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {monthLabel}
+      </AppText>
+      {status}
+      {forward}
+    </Stack>
+  );
+  const stacked = !!title && stackCalendarTitle(textScale(PixelRatio.getFontScale()));
   return (
     <Stack>
-      <Stack direction="row" justify="space-between" align="center">
-        {title && (
-          <AppText
-            variant="groupTitle"
-            tone="muted"
-            accessibilityRole="header"
-            numberOfLines={2}
-            style={{ flex: 1, minWidth: 0 }}
-          >
-            {title}
-          </AppText>
-        )}
-        <Stack
-          direction="row"
-          align="center"
-          gap={title ? 'xxs' : 'sm'}
-          style={title ? { flexShrink: 0 } : { flex: 1, minWidth: 0, justifyContent: 'space-between' }}
-        >
-          <IconButton
-            icon="back"
-            label="Previous month"
-            onPress={year > 2000 || number > 1 ? () => move(-1) : undefined}
-          />
-          <Stack direction="row" align="center" gap="none" style={title ? undefined : { flex: 1, minWidth: 0 }}>
+      {title ? (
+        <Stack gap={stacked ? 'xs' : 'none'}>
+          <Stack direction="row" align="center" justify="space-between">
+            <AppText
+              variant="groupTitle"
+              tone="muted"
+              accessibilityRole="header"
+              numberOfLines={2}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              {title}
+            </AppText>
+            {!stacked && controls}
+          </Stack>
+          {stacked && controls}
+        </Stack>
+      ) : (
+        <Stack direction="row" justify="space-between" align="center">
+          {back}
+          <Stack direction="row" align="center" gap="none" style={{ flex: 1, minWidth: 0 }}>
             <AppText
               variant="calendarDay"
               numberOfLines={2}
-              style={{
-                textAlign: 'center',
-                fontVariant: ['tabular-nums'],
-                ...(title ? { minWidth: theme.sizes.touchTarget * 2 } : { flex: 1 }),
-              }}
+              style={{ flex: 1, textAlign: 'center', fontVariant: ['tabular-nums'] }}
             >
-              {new Intl.DateTimeFormat('en-AU', {
-                month: 'long',
-                year: 'numeric',
-                timeZone: 'UTC',
-              }).format(new Date(Date.UTC(year, number - 1, 1)))}
+              {monthLabel}
             </AppText>
             {status}
           </Stack>
-          <IconButton
-            icon="forward"
-            label="Next month"
-            onPress={year < 2100 || number < 12 ? () => move(1) : undefined}
-          />
+          {forward}
         </Stack>
-      </Stack>
+      )}
       <Stack direction="row" style={{ gap: 0 }}>
         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
           <AppText
