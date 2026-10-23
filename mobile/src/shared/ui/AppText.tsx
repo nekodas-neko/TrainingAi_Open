@@ -1,7 +1,8 @@
-import { Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import type { TextVariant } from '../theme/tokens';
 import { MAX_TEXT_SCALE } from '../theme/text-scale';
+import { withGeist } from '../theme/fonts';
 
 export function AppText({
   variant = 'body',
@@ -17,11 +18,13 @@ export function AppText({
       maxFontSizeMultiplier={MAX_TEXT_SCALE}
       accessibilityRole={variant === 'title' || variant === 'heading' ? 'header' : undefined}
       {...props}
-      style={[
-        theme.typography[variant],
-        { color: theme.colors[tone === 'brand' ? 'brandText' : tone] },
-        style,
-      ]}
+      style={withGeist(
+        StyleSheet.flatten([
+          theme.typography[variant],
+          { color: theme.colors[tone === 'brand' ? 'brandText' : tone] },
+          style,
+        ]),
+      )}
     />
   );
 }

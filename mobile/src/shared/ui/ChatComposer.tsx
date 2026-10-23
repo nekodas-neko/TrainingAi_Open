@@ -3,6 +3,7 @@ import { Stack } from './Stack';
 import { IconButton } from './IconButton';
 import { useTheme } from '../theme/ThemeProvider';
 import { MAX_TEXT_SCALE } from '../theme/text-scale';
+import { withGeist } from '../theme/fonts';
 export function ChatComposer({
   value,
   onChange,
@@ -40,7 +41,7 @@ export function ChatComposer({
           borderRadius: theme.radii.control,
           backgroundColor: theme.colors.raised,
           color: theme.colors.text,
-          ...theme.typography.input,
+          ...withGeist(theme.typography.input),
         }}
       />
       <IconButton
