@@ -12,6 +12,7 @@ export type CardChartOptions = Pick<
 >;
 export function HealthMetricCard({
   title,
+  titleNote,
   value,
   valueText,
   unit,
@@ -28,6 +29,8 @@ export function HealthMetricCard({
   compactChart = false,
 }: {
   title: string;
+  /** Set after the title in its own case (a metric's missing days). */
+  titleNote?: string;
   value?: number | null;
   /** Pre-formatted value, for a figure with its own sign or wording. Wins over `value`. */
   valueText?: string;
@@ -49,6 +52,7 @@ export function HealthMetricCard({
   return (
     <MetricCard
       label={title}
+      labelNote={titleNote}
       value={valueText ?? (value === undefined ? undefined : metricValue(value, '', decimals))}
       unit={unit}
       tone={tone}
