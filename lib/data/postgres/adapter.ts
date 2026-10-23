@@ -880,6 +880,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // #2858 — Oura Cloud OAuth tokens, stored encrypted.
   async getOuraCloudTokens(userId: string) { return ouraCloudTokens.getOuraCloudTokens(this.db, userId) }
   async saveOuraCloudTokens(userId: string, input: ouraCloudTokens.SaveOuraCloudTokensInput) { return ouraCloudTokens.saveOuraCloudTokens(this.db, userId, input) }
+  async markOuraCloudReauthRequired(userId: string, unchangedSince: Date) { return ouraCloudTokens.markOuraCloudReauthRequired(this.db, userId, unchangedSince) }
   async deleteOuraCloudTokens(userId: string) { return ouraCloudTokens.deleteOuraCloudTokens(this.db, userId) }
   async getUserIdByOuraUserId(ouraUserId: string) { return ouraCloudTokens.getUserIdByOuraUserId(this.db, ouraUserId) }
   async getOuraCloudSwitchDay(userId: string) { return ouraCloudTokens.getOuraCloudSwitchDay(this.db, userId) }
@@ -2985,7 +2986,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         lte(s.fitnessTests.date, to),
         isNull(s.fitnessTests.deletedAt),
       ))
-      .orderBy(desc(s.fitnessTests.date))
+      // Tests on one day keep the order the sync pull writes them to a device (updated_at ASC), so a
+      // client that reads this list and one that reads its own store tie the same way round.
+      .orderBy(desc(s.fitnessTests.date), asc(s.fitnessTests.updatedAt))
     return rows.map(r => this.rowToFitnessTest(r))
   }
 

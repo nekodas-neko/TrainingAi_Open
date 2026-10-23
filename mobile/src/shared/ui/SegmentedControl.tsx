@@ -12,6 +12,8 @@ export function SegmentedControl<T extends string>({
   onChange,
   animated = false,
   position,
+  appearance = 'brand',
+  size = 'sm',
 }: {
   label: string;
   options: readonly { label: string; value: T }[];
@@ -19,6 +21,13 @@ export function SegmentedControl<T extends string>({
   onChange: (value: T) => void;
   animated?: boolean;
   position?: Animated.AnimatedInterpolation<number>;
+  /**
+   * 'tabs' is the current app's SegmentedTabs: separate pills, the active one filled in text colour.
+   * It ignores `animated` and `position`: the pills swap fill rather than slide a highlight.
+   */
+  appearance?: 'brand' | 'tabs';
+  /** 'tabs' only: the web's size sm (14 px type) or xs (12 px). */
+  size?: 'sm' | 'xs';
 }) {
   const { theme } = useTheme();
   const [width, setWidth] = useState(0);
@@ -44,6 +53,46 @@ export function SegmentedControl<T extends string>({
     previousWidth.current = width;
     return () => offset.stopAnimation();
   }, [index, cellWidth, width, animated, reduced, offset, position]);
+  if (appearance === 'tabs') {
+    return (
+      <View accessibilityLabel={label} style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
+        {options.map((option) => {
+          const active = value === option.value;
+          return (
+            <Pressable
+              key={option.value}
+              accessibilityRole="radio"
+              accessibilityLabel={option.label}
+              accessibilityState={{ checked: active }}
+              aria-checked={active}
+              onPress={() => {
+                if (!active) feedback();
+                onChange(option.value);
+              }}
+              style={{
+                flex: 1,
+                minHeight: theme.sizes.touchTarget,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: theme.radii.control,
+                backgroundColor: active ? theme.colors.text : `${theme.colors.raised}80`,
+              }}
+            >
+              <AppText
+                variant={size === 'xs' ? 'caption' : 'subheading'}
+                style={{
+                  fontWeight: '600',
+                  color: active ? theme.colors.background : theme.colors.muted,
+                }}
+              >
+                {option.label}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
   return (
     <View
       accessibilityLabel={label}
@@ -87,6 +136,10 @@ export function SegmentedControl<T extends string>({
         <Pressable
           key={option.value}
           accessibilityRole="radio"
+          hitSlop={{
+            top: (theme.sizes.touchTarget - theme.sizes.control) / 2,
+            bottom: (theme.sizes.touchTarget - theme.sizes.control) / 2,
+          }}
           accessibilityLabel={option.label}
           accessibilityState={{ checked: value === option.value }}
           aria-checked={value === option.value}
@@ -96,7 +149,7 @@ export function SegmentedControl<T extends string>({
           }}
           style={{
             flex: 1,
-            minHeight: theme.sizes.touchTarget,
+            minHeight: theme.sizes.control,
             padding: theme.spacing.sm,
             alignItems: 'center',
             justifyContent: 'center',

@@ -55,6 +55,14 @@ one, and on a file that differs from what the generator emits, so a forgotten co
 migration from `node scripts/next-schema-number.js`: a UTC minute, `YYYYMMDDHHMM_<what>.sql` (BF-214 ②;
 appliers sort by leading integer). **The owner's id must not appear in the file** (Q-456).
 
+**A migration's REVERSE note for a column on a table with a `claude_ro` view starts with
+`DROP VIEW IF EXISTS claude_ro.<table>;`** (#3246). The generated view lists the column
+explicitly, so a bare `ALTER TABLE <table> DROP COLUMN <col>` fails with `view claude_ro.<table>
+depends on column <col>`, and that is the statement someone pastes during an incident. Write
+`DROP VIEW IF EXISTS claude_ro.<table>; ALTER TABLE <table> DROP COLUMN <col>;` and say the boot
+rebuild recreates the view from `claude-ro-views.sql`. Check the table against that file; tables
+with no view need no `DROP VIEW`.
+
 **⚠ The generator reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (LA-161). The wrong one does not
 fail: it reads the session's dev database, and anything hand-applied there reaches the file. Build a
 scratch database (`CREATE DATABASE` + `node scripts/local-db/migrate.js`) if in doubt.

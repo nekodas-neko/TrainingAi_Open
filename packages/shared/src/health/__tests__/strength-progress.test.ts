@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeBarMetric, strengthDeltaText, strengthGroups, TREND_COLOR } from '../strength-progress'
+import { computeBarMetric, strengthDeltaText, strengthGroups, TREND_COLOR, gainTone } from '../strength-progress'
 import type { ExerciseSummary } from '@/app/api/weights-summary/route'
 
 function makeExercise(overrides: Partial<ExerciseSummary> = {}): ExerciseSummary {
@@ -216,5 +216,11 @@ describe('strengthGroups', () => {
         .map(([session, rows]) => ({ session, rows }))
       expect(strengthGroups(withData, mode)).toEqual(old)
     }
+  })
+})
+
+describe('gainTone', () => {
+  it('reads a gain as up, down or flat, and nothing when there is none', () => {
+    expect([12, -3, 0, null, undefined].map(gainTone)).toEqual(['up', 'down', 'flat', null, null])
   })
 })

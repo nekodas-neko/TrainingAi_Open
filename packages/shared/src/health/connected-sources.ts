@@ -16,9 +16,15 @@
  *    window reads false.
  *  - `healthConnect`: a Health Connect heart-rate row, or a Health Connect movement interval, received
  *    in the same window, i.e. the sync has delivered data recently.
- *  - `ouraCloud`: the user holds an Oura Cloud OAuth connection (an `oura_tokens` row with an access
- *    token; a legacy personal-token row reads as none, as in `getOuraCloudSwitchDay`). The phones
- *    read it to drop the Oura app's own Health Connect copies (#3115, `health-connect-origin.ts`).
+ *  - `ouraCloudTypes` (#3204): per Health Connect record type, whether Oura Cloud is delivering that
+ *    type to the server now: the connection holds tokens, Oura has not refused the grant
+ *    (`oura_tokens.reauth_required_at`), and the grant covers the type's scope
+ *    (`ouraCloudDeliveredTypes`, `lib/oura/cloud/config.ts`). A type not listed is not delivered. The
+ *    phones read it to drop the Oura app's own Health Connect copy of a type only while the server
+ *    gets that type first-hand (#3115, `health-connect-origin.ts`).
+ *  - `ouraCloud`: the same answer as one boolean, for a phone on an APK from before #3204: true only
+ *    while every listed type is delivered, so an old phone, which skips every Oura record on it, never
+ *    skips a type the server is not getting.
  *
  * Booleans only, deliberately: a timestamp in a cached payload goes stale on the device.
  */
@@ -31,6 +37,7 @@ export interface ConnectedSources {
   strap: boolean
   healthConnect: boolean
   ouraCloud: boolean
+  ouraCloudTypes: Record<string, boolean>
 }
 
 /** The raw facts `connectedSources` summarises. Each is a plain existence answer. */
@@ -43,8 +50,9 @@ export interface ConnectedSourceFacts {
   healthConnectHeartRate: boolean
   /** A Health Connect movement interval inside the window. */
   healthConnectIntervals: boolean
-  /** An Oura Cloud OAuth connection exists. */
-  ouraCloudConnected: boolean
+  /** Per Health Connect record type, whether Oura Cloud delivers it (`ouraCloudDeliveredTypes`); null
+   *  without a working connection. */
+  ouraCloudTypes: Readonly<Record<string, boolean>> | null
 }
 
 export function connectedSources(facts: ConnectedSourceFacts): ConnectedSources {
@@ -52,6 +60,7 @@ export function connectedSources(facts: ConnectedSourceFacts): ConnectedSources 
     ring: facts.ringSamples,
     strap: facts.strapHeartRate,
     healthConnect: facts.healthConnectHeartRate || facts.healthConnectIntervals,
-    ouraCloud: facts.ouraCloudConnected,
+    ouraCloud: facts.ouraCloudTypes !== null && Object.values(facts.ouraCloudTypes).every(Boolean),
+    ouraCloudTypes: { ...facts.ouraCloudTypes },
   }
 }

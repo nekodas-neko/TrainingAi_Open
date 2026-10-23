@@ -56,6 +56,8 @@ export function SleepTrendsCard() {
           Sleep trends · last 14 nights
         </AppText>
         <SegmentedControl
+          appearance="tabs"
+          size="xs"
           label="Sleep trend"
           value={view}
           onChange={setView}

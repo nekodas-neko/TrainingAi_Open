@@ -18,14 +18,28 @@
  */
 export const OURA_APP_PACKAGE = 'com.ouraring.oura'
 
-/** What the phone knows about first-hand sources: `connectedSources` from `/api/readiness-score`. */
+/**
+ * What the phone knows about first-hand sources: `connectedSources` from `/api/readiness-score`.
+ *
+ * `ouraCloudTypes` (#3204) says, per Health Connect record type, whether Oura Cloud is delivering that
+ * type to the server: the grant is alive and covers it. A server from before #3204 sends only
+ * `ouraCloud`, and the server since sends both, `ouraCloud` true only while every type is delivered,
+ * so an APK that reads only the boolean stays on the safe side.
+ */
 export interface FirstHandSources {
   ouraCloud?: boolean
+  ouraCloudTypes?: Readonly<Record<string, boolean>>
 }
 
-/** True when a record from `origin` (its `metadata.dataOrigin`) is a copy we already read first-hand. */
-export function isFirstHandCopy(origin: unknown, sources: FirstHandSources | null | undefined): boolean {
-  return sources?.ouraCloud === true && origin === OURA_APP_PACKAGE
+/**
+ * True when a record from `origin` (its `metadata.dataOrigin`) is a copy we already read first-hand.
+ * With a record `type` and a per-type answer, only a type Oura Cloud delivers counts, and a type the
+ * answer does not list does not; otherwise the one boolean decides.
+ */
+export function isFirstHandCopy(origin: unknown, sources: FirstHandSources | null | undefined, type?: string): boolean {
+  if (origin !== OURA_APP_PACKAGE || !sources) return false
+  if (type !== undefined && sources.ouraCloudTypes) return sources.ouraCloudTypes[type] === true
+  return sources.ouraCloud === true
 }
 
 /** `records` without first-hand copies, and how many were dropped. */
@@ -37,6 +51,28 @@ export function dropFirstHandCopies<T>(
   if (sources?.ouraCloud !== true) return { kept: [...records], skipped: 0 }
   const kept = records.filter(r => !isFirstHandCopy(originOf(r), sources))
   return { kept, skipped: records.length - kept.length }
+}
+
+/**
+ * Whether records left out earlier have to be read again (#3197, #3228 review): the one rewind rule
+ * for both phones. A reader remembers which record types it left out since its marker; they are owed
+ * a re-read once any of those types is no longer delivered first-hand, because nothing else sends
+ * them now. A type still delivered is not: rewinding for it would skip it again and set the marker
+ * again, a 7-to-30-day re-read on every sync under a stable partial grant.
+ *
+ * With no types recorded (a marker written before the types were), it falls back to the connection
+ * being gone: a per-type answer with no type delivered, or, from a server that sends no per-type
+ * answer, `ouraCloud` false. Unknown sources (`null`) never rewind, as before.
+ */
+export function firstHandSkipsLapsed(
+  sources: FirstHandSources | null | undefined,
+  skippedTypes: readonly string[] | null | undefined,
+): boolean {
+  if (!sources) return false
+  if (skippedTypes && skippedTypes.length > 0)
+    return skippedTypes.some(type => !isFirstHandCopy(OURA_APP_PACKAGE, sources, type))
+  if (sources.ouraCloudTypes) return !Object.values(sources.ouraCloudTypes).some(v => v === true)
+  return sources.ouraCloud === false
 }
 
 /**
@@ -56,8 +92,15 @@ export function knownFirstHandSources(
 ): FirstHandSources | null {
   if (payloadDate !== today) return null
   if (!connectedSources || typeof connectedSources !== 'object') return null
-  const ouraCloud = (connectedSources as { ouraCloud?: unknown }).ouraCloud
-  return typeof ouraCloud === 'boolean' ? { ouraCloud } : null
+  const { ouraCloud, ouraCloudTypes } = connectedSources as { ouraCloud?: unknown; ouraCloudTypes?: unknown }
+  if (typeof ouraCloud !== 'boolean') return null
+  // A per-type answer that is not a plain map of booleans is ignored, never half-read: the boolean,
+  // which is true only while every type is delivered, then decides alone.
+  const perType = ouraCloudTypes && typeof ouraCloudTypes === 'object' && !Array.isArray(ouraCloudTypes) &&
+    Object.values(ouraCloudTypes).every(v => typeof v === 'boolean')
+    ? { ...(ouraCloudTypes as Record<string, boolean>) }
+    : undefined
+  return perType ? { ouraCloud, ouraCloudTypes: perType } : { ouraCloud }
 }
 
 /**
@@ -78,7 +121,7 @@ export class FirstHandFilter<T> {
 
   /** False when `record` is a first-hand copy: left out, and counted under `type`. */
   admit(type: string, record: T): boolean {
-    if (!isFirstHandCopy(this.originOf(record), this.sources)) return true
+    if (!isFirstHandCopy(this.originOf(record), this.sources, type)) return true
     let ids = this.dropped.get(type)
     if (!ids) this.dropped.set(type, (ids = new Set()))
     ids.add(this.idOf(record) ?? `#${this.unnamed++}`)

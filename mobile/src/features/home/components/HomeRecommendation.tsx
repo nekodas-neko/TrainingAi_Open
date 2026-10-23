@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import {
   AppButton,
   AppText,
-  Badge,
   Card,
   Icon,
   Skeleton,
@@ -16,7 +15,7 @@ import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { SessionPreview } from '../../workouts/catalog';
-import { formatDateDisplay } from '@trainingai/shared/date-utils';
+import { sessionFacts, soreChipColor } from '../data/recommendation-presentation';
 import { SessionGlyph } from '../../workouts/components/SessionGlyph';
 import { failureNotice } from '../../../core/reporting/index.ts';
 
@@ -112,40 +111,55 @@ export function HomeRecommendation({
       </Card>
     );
   }
+  const accent = home.preferences.cardColors?.recommendedToday ?? theme.homeCards.recommendedToday;
+  const soreColor = soreChipColor(theme.mode, theme.status.warning);
+  const eyebrowColor = done ? theme.status.success : accent;
   return (
-    <Card
-      tone={done ? 'activity' : 'brand'}
-      accent={home.preferences.cardColors?.recommendedToday ?? theme.homeCards.recommendedToday}
-    >
+    <Card tone="neutral" accent={done ? theme.status.success : accent} faint={!!done}>
       <Stack direction="row" align="center" justify="space-between">
-        <AppText variant="eyebrow" tone="muted">
+        <AppText variant="eyebrow" style={{ color: eyebrowColor, fontWeight: '700' }}>
           {active ? 'Workout in progress' : done ? 'Trained Today' : 'Recommended Today'}
         </AppText>
         <StatusIndicator label="Workout recommendation" error={error} />
-        {home.mood.soreMuscles.length > 0 && (
-          <Badge
-            label={`${home.mood.soreMuscles.length} sore`}
-            style={{ alignSelf: 'center' }}
-          />
-        )}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Edit exercise readiness"
           onPress={() => onReadiness(session)}
           style={{
-            minWidth: theme.sizes.touchTarget,
             minHeight: theme.sizes.touchTarget,
+            flexShrink: 1,
+            flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-end',
+            gap: theme.spacing.xs,
           }}
         >
-          <AppText variant="hero">
+          <AppText variant="heading">
             {
               { drained: '😴', low: '😑', ok: '😐', good: '😊', pumped: '⚡' }[
                 home.mood.energyLevel
               ]
             }
           </AppText>
+          {home.mood.soreMuscles.length > 0 && (
+            <View
+              style={{
+                flexShrink: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+                borderRadius: theme.radii.pill,
+                backgroundColor: `${soreColor}2e`,
+                paddingHorizontal: theme.spacing.sm - theme.spacing.xxs,
+                paddingVertical: theme.spacing.xxs,
+              }}
+            >
+              <Icon name="alert" size={theme.spacing.sm + theme.spacing.xxs} color={soreColor} />
+              <AppText variant="chipLabel" style={{ color: soreColor, flexShrink: 1 }}>
+                {home.mood.soreMuscles.join(', ')}
+              </AppText>
+            </View>
+          )}
         </Pressable>
       </Stack>
       <Stack direction="row" align="center">
@@ -175,23 +189,19 @@ export function HomeRecommendation({
           )}
         </Stack>
       </Stack>
-      <Stack direction="row" wrap>
-        {session.durationMinutes !== null && (
-          <AppText variant="caption" tone="muted">
-            ~{Math.round(session.durationMinutes)} min
-          </AppText>
-        )}
-        <AppText variant="caption" tone="muted">
-          {session.exercises.length} exercises
-        </AppText>
-        <AppText variant="caption" tone="muted">
-          Last:{' '}
-          {session.lastTrained
-            ? session.lastTrained === today
-              ? 'Today'
-              : formatDateDisplay(session.lastTrained, 'short')
-            : '—'}
-        </AppText>
+      <Stack direction="row" wrap gap="md" align="center">
+        {sessionFacts(session, today).map((fact) => (
+          <Stack key={fact.icon} direction="row" align="center" gap="xs">
+            <Icon
+              name={fact.icon}
+              size={theme.sizes.iconCompact - theme.spacing.xs}
+              color={theme.colors.muted}
+            />
+            <AppText variant="caption" tone="muted">
+              {fact.text}
+            </AppText>
+          </Stack>
+        ))}
       </Stack>
       {session.phaseDetail && (
         <AppText variant="caption" tone="muted">
@@ -201,7 +211,24 @@ export function HomeRecommendation({
       {active ? (
         <AppButton title="Resume Workout" onPress={() => onResume(active.id)} />
       ) : done ? (
-        <Badge label="Completed Today" tone="brand" />
+        <Stack
+          direction="row"
+          align="center"
+          gap="sm"
+          style={{
+            borderRadius: theme.radii.control,
+            borderWidth: 1,
+            borderColor: `${theme.status.success}66`,
+            backgroundColor: `${theme.status.success}1a`,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.snug,
+          }}
+        >
+          <Icon name="circleCheck" size={theme.sizes.iconCompact} color={theme.status.success} />
+          <AppText variant="subheading" style={{ color: theme.status.success }}>
+            Completed Today
+          </AppText>
+        </Stack>
       ) : rec?.deloadOrRestRecommended ? (
         <>
           <AppText variant="caption" tone="muted">

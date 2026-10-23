@@ -30,7 +30,8 @@
 -- REVERSE (only if no row has been tombstoned, or after deciding what a tombstoned night becomes):
 --   DROP INDEX IF EXISTS sleep_sessions_manual_night_key;
 --   CREATE UNIQUE INDEX sleep_sessions_manual_night_key ON sleep_sessions (user_id, date) WHERE manual_entry;
---   ALTER TABLE sleep_sessions DROP COLUMN deleted_at;
+--   DROP VIEW IF EXISTS claude_ro.sleep_sessions; ALTER TABLE sleep_sessions DROP COLUMN deleted_at;
+--   (the view selects the column, so the DROP COLUMN fails without the DROP VIEW; the boot rebuild recreates the view from claude-ro-views.sql)
 --
 -- Verify after release (admin query endpoint):
 --   SELECT indexdef FROM pg_indexes WHERE indexname = 'sleep_sessions_manual_night_key';

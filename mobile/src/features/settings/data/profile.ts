@@ -205,3 +205,10 @@ export function programTile(
   }
   return { label: 'Member since', value: memberSince ?? '—' };
 }
+
+/** What the More tab calls its rows and actions, word for word as the current app's profile tab does. */
+export const moreCopy = {
+  goals: { title: 'Goals', subtitle: 'Activity level, targets & AI recommendations' },
+  year: { title: 'Your Year', action: 'View →' },
+  actions: { report: 'Report an Issue', edit: 'Edit Profile', signOut: 'Sign Out' },
+} as const;
