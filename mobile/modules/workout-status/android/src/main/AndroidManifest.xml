@@ -6,5 +6,8 @@
     <receiver
         android:name="expo.modules.workoutstatus.WorkoutStatusDismissReceiver"
         android:exported="false" />
+    <receiver
+        android:name="expo.modules.workoutstatus.WorkoutStatusRestEndReceiver"
+        android:exported="false" />
   </application>
 </manifest>

@@ -57,7 +57,10 @@ import { BaselinesScreen } from '../features/activities/screens/BaselinesScreen'
 import { CardioScreen } from '../features/activities/screens/CardioScreen';
 import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
 import { AlertNavigation } from '../features/platform/components/AlertNavigation';
-import { WorkoutStatusSync } from '../features/workouts/status/WorkoutStatusSync';
+import {
+  WorkoutStatusAccountGuard,
+  WorkoutStatusSync,
+} from '../features/workouts/status/WorkoutStatusSync';
 import { DynamicBackground } from '../features/weather/components/DynamicBackground';
 import type { BackgroundSection } from '../features/weather/data/background';
 import { errorReporter } from '../core/reporting/index.ts';
@@ -573,6 +576,7 @@ export default function App() {
     <SafeAreaProvider>
       <AccountProvider>
         <ErrorReportConnection />
+        <WorkoutStatusAccountGuard />
         <LocalStorageProvider>
           <AppProvider>
             <AppStartupGate>

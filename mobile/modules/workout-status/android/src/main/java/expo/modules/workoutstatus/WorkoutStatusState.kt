@@ -21,6 +21,8 @@ data class WorkoutStatus(
   val restEndsAt: Long? = null,
   /** Shown when there is no set to name: "Warm-up", "Exercise done". */
   val label: String? = null,
+  /** When the workout began; 0 when unknown. A workout open past MAX_AGE_MS posts nothing. */
+  val startedAt: Long = 0,
 )
 
 data class WorkoutPresentation(
@@ -45,7 +47,8 @@ object WorkoutStatusPresenter {
     val progress = if (named) "Set ${status.nextSet} of ${status.sets}" else null
     val step = listOfNotNull(progress ?: status.label, status.load?.takeIf { named })
     fun line(lead: String?) = (listOfNotNull(lead) + step).joinToString(" · ").ifEmpty { "Workout in progress" }
-    val chip = if (named) "Set ${status.nextSet}/${status.sets}" else null
+    // The chip shows its text only if all of it fits (7 characters), so no "Set" in front.
+    val chip = if (named) "${status.nextSet}/${status.sets}" else null
     // A rest that has ended is not counted down: a countdown chronometer past zero reads "-0:05",
     // which is the wrong thing to show on a notification nobody is updating.
     val counting = status.phase == RESTING && status.restEndsAt != null && status.restEndsAt > nowMs
@@ -90,18 +93,35 @@ object WorkoutStatusPresenter {
       load = (map["load"] as? String)?.takeIf { it.isNotBlank() },
       restEndsAt = (map["restEndsAt"] as? Number)?.toLong(),
       label = (map["label"] as? String)?.takeIf { it.isNotBlank() },
+      startedAt = (map["startedAt"] as? Number)?.toLong() ?: 0,
     )
   }
 }
 
 object WorkoutStatusPolicy {
-  /** Android 16 (API 36) introduced promoted ongoing notifications. */
-  const val PROMOTION_SDK = 36
+  /**
+   * Build.VERSION_CODES_FULL.BAKLAVA_1, Android 16 QPR2. `Notification.Builder.setRequestPromotedOngoing`
+   * and `EXTRA_REQUEST_PROMOTED_ONGOING` first appear in the 36.1 SDK; SDK_INT is 36 on 36.0 and 36.1
+   * alike, so only SDK_INT_FULL tells them apart. The constant is not in the 36.0 stubs we compile against.
+   */
+  const val PROMOTION_SDK_FULL = 3_600_001
 
   /** Asks for promotion only where the OS has it and the user has left Live Updates on. */
-  fun requestsPromotion(sdk: Int, userAllowsPromotion: Boolean) =
-    sdk >= PROMOTION_SDK && userAllowsPromotion
+  fun requestsPromotion(sdkFull: Int, userAllowsPromotion: Boolean) =
+    sdkFull >= PROMOTION_SDK_FULL && userAllowsPromotion
 
   /** A notification the user swiped away stays away for that workout; the next workout posts again. */
   fun mayPost(dismissedWorkoutId: String?, workoutId: String) = dismissedWorkoutId != workoutId
+
+  /** A notification left to itself clears after this; a workout open longer than this posts nothing. */
+  const val MAX_AGE_MS = 6L * 60 * 60 * 1000
+
+  fun isStale(startedAt: Long, nowMs: Long) = startedAt > 0 && nowMs - startedAt > MAX_AGE_MS
+
+  /** When to repost so the notification stops counting down: the rest's end, if it is still ahead. */
+  fun restEndAlarmAt(status: WorkoutStatus, nowMs: Long): Long? =
+    status.restEndsAt?.takeIf { status.phase == WorkoutStatusPresenter.RESTING && it > nowMs }
+
+  /** A tap is honoured once: its nonce (the post time) must be newer than the last one acted on. */
+  fun isFreshOpen(nonce: Long, lastConsumed: Long) = nonce > lastConsumed
 }

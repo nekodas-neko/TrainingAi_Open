@@ -17,6 +17,17 @@ export type WorkoutStatusPayload = {
   restEndsAt: number | null;
   /** Shown when there is no set to name: "Warm-up", "Exercise done". */
   label: string | null;
+  /** When the workout began; a workout open for more than six hours posts nothing. */
+  startedAt: number;
+};
+
+/** What the system did with the notification, read back from it (Kotlin's promotionReport). */
+export type PromotionReport = {
+  posted: boolean;
+  promoted: boolean;
+  /** Build.VERSION.SDK_INT_FULL: 3600000 is Android 16, 3600001 is 16 QPR2; 0 below Android 16. */
+  sdkFull: number;
+  canPostPromoted: boolean;
 };
 
 export type WorkoutStatusModule = {
@@ -24,6 +35,7 @@ export type WorkoutStatusModule = {
   show(status: WorkoutStatusPayload): boolean;
   update(status: WorkoutStatusPayload): boolean;
   clear(): void;
+  promotion(): PromotionReport;
   /** The workout a tap on the notification started the app for, once; null otherwise. */
   takeOpenRequest(): string | null;
   addListener(event: 'onOpen', listener: (event: { workoutId: string }) => void): Subscription;

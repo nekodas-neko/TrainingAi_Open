@@ -1,9 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  clearWorkoutStatus,
   createWorkoutStatusReporter,
+  promotionDiagnostic,
   workoutStatusFor,
 } from '../src/features/workouts/status/workout-status.ts';
+import {
+  accountScopeDecision,
+  routeOpen,
+  shouldAskPermission,
+  startingScope,
+  type AccountScope,
+} from '../src/features/workouts/status/sync-decisions.ts';
+import { scrubText } from '../src/core/reporting/scrub.ts';
 import { workoutStatus as webModule } from '../src/integrations/workout-status/platform.ts';
 import type { WorkoutRecord } from '../src/features/workouts/logging/workout.ts';
 
@@ -222,4 +232,93 @@ test('without the native module (web, iOS, an older build) nothing happens', () 
     reporter.update(null);
     reporter.clear();
   });
+});
+
+test('the payload carries when the workout began, for the six-hour cutoff', () => {
+  assert.equal(workoutStatusFor(workout())?.startedAt, T0);
+});
+
+test('a native module that throws never reaches the workout', () => {
+  const boom = () => {
+    throw new Error('native failure');
+  };
+  const reporter = createWorkoutStatusReporter({ show: boom, update: boom, clear: boom });
+  assert.doesNotThrow(() => {
+    reporter.update(workout());
+    reporter.update(recorded(1));
+    reporter.update(null);
+    reporter.invalidate();
+    reporter.clear();
+  });
+  assert.doesNotThrow(() => clearWorkoutStatus({ clear: boom }));
+});
+
+function scopes(steps: [AccountScopeStatus, string | null][]) {
+  let scope: AccountScope = startingScope;
+  return steps.map(([status, userId]) => {
+    const decision = accountScopeDecision(scope, status, userId);
+    scope = decision.scope;
+    return decision.clear;
+  });
+}
+type AccountScopeStatus = Parameters<typeof accountScopeDecision>[1];
+
+test('signing out clears once, however often the status repeats', () => {
+  assert.deepEqual(
+    scopes([
+      ['signedIn', 'a'],
+      ['signedOut', null],
+      ['signedOut', null],
+      ['signedIn', 'a'],
+      ['signedOut', null],
+    ]),
+    [false, true, false, false, true],
+  );
+});
+
+test('a token refresh, with no reader but still signed in, does not clear', () => {
+  assert.deepEqual(
+    scopes([
+      ['signedIn', 'a'],
+      ['checking', null],
+      ['signedIn', null],
+      ['signedIn', 'a'],
+    ]),
+    [false, false, false, false],
+  );
+});
+
+test('switching to a different account clears the first one at once', () => {
+  assert.deepEqual(
+    scopes([
+      ['signedIn', 'a'],
+      ['signedIn', 'b'],
+      ['signedIn', 'b'],
+    ]),
+    [false, true, false],
+  );
+  assert.deepEqual(scopes([['loading', null], ['signedIn', 'a']]), [false, false]);
+});
+
+test('the permission is asked only where the module exists, for a new workout, once, and while askable', () => {
+  const base = { moduleAvailable: true, startedHere: true, alreadyAsked: false, canAskAgain: true };
+  assert.equal(shouldAskPermission(base), true);
+  assert.equal(shouldAskPermission({ ...base, moduleAvailable: false }), false);
+  assert.equal(shouldAskPermission({ ...base, startedHere: false }), false);
+  assert.equal(shouldAskPermission({ ...base, alreadyAsked: true }), false);
+  assert.equal(shouldAskPermission({ ...base, canAskAgain: false }), false);
+});
+
+test('a tap opens its workout only while it is the active one', () => {
+  assert.equal(routeOpen(ids.workout, ids.workout), 'workout');
+  assert.equal(routeOpen(ids.workout, 'another'), 'tab');
+  assert.equal(routeOpen(null, ids.workout), 'tab');
+});
+
+test('the promotion line names the level in words and survives the reporter scrub', () => {
+  const line = promotionDiagnostic({ posted: true, promoted: true, sdkFull: 3_600_001, canPostPromoted: true });
+  assert.equal(line, 'Workout status promotion: promoted=true posted=true level=baklava-later canpost=true');
+  assert.equal(scrubText(line), line);
+  assert.match(promotionDiagnostic({ posted: true, promoted: false, sdkFull: 3_600_000, canPostPromoted: true }), /level=baklava /);
+  assert.match(promotionDiagnostic({ posted: false, promoted: false, sdkFull: 0, canPostPromoted: false }), /level=older/);
 });

@@ -1,4 +1,8 @@
-import type { WorkoutStatusModule, WorkoutStatusPayload } from '../../../integrations/workout-status/types.ts';
+import type {
+  PromotionReport,
+  WorkoutStatusModule,
+  WorkoutStatusPayload,
+} from '../../../integrations/workout-status/types.ts';
 import { displayLoad } from '../logging/preferences.ts';
 import { pipPhaseFor } from '../pip/pip.ts';
 import { workoutFlow } from '../logging/flow.ts';
@@ -38,6 +42,7 @@ export function workoutStatusFor(workout: WorkoutRecord | null): WorkoutStatusPa
     load: null,
     restEndsAt: null,
     label: null,
+    startedAt: workout.startedAt,
   };
   if (phase === 'idle') return null;
   if (phase === 'pre') return { ...base, phase: 'ready', label: 'Warm-up' };
@@ -69,12 +74,21 @@ export function workoutStatusFor(workout: WorkoutRecord | null): WorkoutStatusPa
   };
 }
 
+/** Never throws: a missing notification must never break the workout that asked for it. */
+function safely(run: () => void) {
+  try {
+    run();
+  } catch {}
+}
+
 /**
  * Keeps the notification in step with the workout. The first call after the journal loads
  * reconciles against whatever an earlier process left behind: a status for the open workout, or a
  * clear when there is none. After that it sends only on change.
  */
-export function createWorkoutStatusReporter(native: Pick<WorkoutStatusModule, 'show' | 'update' | 'clear'> | null) {
+export function createWorkoutStatusReporter(
+  native: Pick<WorkoutStatusModule, 'show' | 'update' | 'clear'> | null,
+) {
   // undefined: not reconciled yet. null: cleared. A string: the last status sent.
   let last: string | null | undefined;
   return {
@@ -84,15 +98,14 @@ export function createWorkoutStatusReporter(native: Pick<WorkoutStatusModule, 's
       if (!status) {
         if (last === null) return;
         last = null;
-        native.clear();
+        safely(() => native.clear());
         return;
       }
       const key = JSON.stringify(status);
       if (key === last) return;
       const first = last === undefined || last === null;
       last = key;
-      if (first) native.show(status);
-      else native.update(status);
+      safely(() => (first ? native.show(status) : native.update(status)));
     },
     /** Forgets what was sent, so the next update posts again (permission granted, app resumed). */
     invalidate() {
@@ -102,7 +115,23 @@ export function createWorkoutStatusReporter(native: Pick<WorkoutStatusModule, 's
     clear() {
       if (!native || last === null) return;
       last = null;
-      native.clear();
+      safely(() => native.clear());
     },
   };
+}
+
+/** Removes the notification whoever posted it, such as an earlier process of the old account. */
+export function clearWorkoutStatus(native: Pick<WorkoutStatusModule, 'clear'> | null) {
+  safely(() => native?.clear());
+}
+
+/**
+ * The one line sent to the error reporter once per app start, so the phone check has ground truth
+ * on whether Android promoted the notification. Booleans and a named platform level only: the
+ * reporter scrubs every digit, and no exercise or weight belongs in it.
+ */
+export function promotionDiagnostic(report: PromotionReport) {
+  const level =
+    report.sdkFull >= 3_600_001 ? 'baklava-later' : report.sdkFull >= 3_600_000 ? 'baklava' : 'older';
+  return `Workout status promotion: promoted=${report.promoted} posted=${report.posted} level=${level} canpost=${report.canPostPromoted}`;
 }

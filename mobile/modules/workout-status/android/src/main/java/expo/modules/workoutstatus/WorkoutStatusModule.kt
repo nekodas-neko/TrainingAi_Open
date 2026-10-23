@@ -6,10 +6,11 @@ import expo.modules.kotlin.modules.ModuleDefinition
 
 // The workout's ongoing notification, promoted to an Android 16 Live Update where the phone and the
 // user's settings allow it (#3249). JS drives it from the journal; this module holds no workout
-// state of its own beyond which workout the user dismissed.
+// state of its own beyond which workout the user dismissed and the last status, kept for the
+// rest-end repost. Nothing here throws into JS: without an app context a call simply does nothing.
 class WorkoutStatusModule : Module() {
-  private val context: Context
-    get() = requireNotNull(appContext.reactContext) { "The app context is not available." }
+  private val context: Context?
+    get() = appContext.reactContext
 
   override fun definition() = ModuleDefinition {
     Name("WorkoutStatus")
@@ -18,25 +19,38 @@ class WorkoutStatusModule : Module() {
     // Both replace the notification in place; the two names keep JS's intent readable.
     Function("show") { status: Map<String, Any?> -> post(status) }
     Function("update") { status: Map<String, Any?> -> post(status) }
-    Function("clear") { WorkoutStatusNotifier.clear(context) }
+    Function("clear") {
+      val ctx = context
+      if (ctx != null) WorkoutStatusNotifier.clear(ctx)
+    }
+
+    // What the system did with it, for the once-per-start diagnostic.
+    Function("promotion") {
+      val ctx = context
+      if (ctx != null) WorkoutStatusNotifier.promotionReport(ctx) else emptyMap<String, Any?>()
+    }
 
     // A tap while the app is running arrives as a new intent; one that started the app is read here.
     OnNewIntent { intent ->
-      intent.getStringExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)?.let { id ->
-        intent.removeExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)
-        sendEvent("onOpen", mapOf("workoutId" to id))
-      }
+      val ctx = context ?: return@OnNewIntent
+      val id = intent.getStringExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)
+      val nonce = intent.getLongExtra(WorkoutStatusNotifier.EXTRA_NONCE, 0)
+      intent.removeExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)
+      WorkoutStatusNotifier.consumeOpen(ctx, id, nonce)?.let { sendEvent("onOpen", mapOf("workoutId" to it)) }
     }
     Function("takeOpenRequest") {
+      val ctx = context ?: return@Function null
       val intent = appContext.currentActivity?.intent ?: return@Function null
       val id = intent.getStringExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)
+      val nonce = intent.getLongExtra(WorkoutStatusNotifier.EXTRA_NONCE, 0)
       intent.removeExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)
-      id
+      WorkoutStatusNotifier.consumeOpen(ctx, id, nonce)
     }
   }
 
   private fun post(status: Map<String, Any?>): Boolean {
+    val ctx = context ?: return false
     val parsed = WorkoutStatusPresenter.fromMap(status) ?: return false
-    return WorkoutStatusNotifier.post(context, parsed, System.currentTimeMillis())
+    return WorkoutStatusNotifier.post(ctx, parsed, System.currentTimeMillis())
   }
 }

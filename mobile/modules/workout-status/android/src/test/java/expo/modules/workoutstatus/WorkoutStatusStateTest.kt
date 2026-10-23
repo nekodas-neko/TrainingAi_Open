@@ -19,7 +19,7 @@ class WorkoutStatusStateTest {
     assertEquals("Bench press", view.title)
     assertEquals("Set 2 of 4 · 80 kg × 8", view.text)
     assertEquals("Upper body", view.subText)
-    assertEquals("Set 2/4", view.shortCriticalText)
+    assertEquals("2/4", view.shortCriticalText)
     assertNull(view.countdownEndsAt)
   }
 
@@ -37,7 +37,7 @@ class WorkoutStatusStateTest {
     val view = WorkoutStatusPresenter.present(over, now)
     assertNull(view.countdownEndsAt)
     assertEquals("Rest over, next · Set 3 of 4 · 80 kg × 8", view.text)
-    assertEquals("Set 3/4", view.shortCriticalText)
+    assertEquals("3/4", view.shortCriticalText)
     assertNull(WorkoutStatusPresenter.present(over.copy(restEndsAt = now), now).countdownEndsAt)
     assertNull(WorkoutStatusPresenter.present(over.copy(restEndsAt = null), now).countdownEndsAt)
   }
@@ -50,7 +50,7 @@ class WorkoutStatusStateTest {
   @Test fun `between sets the next set is named with no timer`() {
     val view = WorkoutStatusPresenter.present(working.copy(phase = "ready", nextSet = 3), now)
     assertEquals("Next · Set 3 of 4 · 80 kg × 8", view.text)
-    assertEquals("Set 3/4", view.shortCriticalText)
+    assertEquals("3/4", view.shortCriticalText)
     assertNull(view.countdownEndsAt)
   }
 
@@ -82,11 +82,11 @@ class WorkoutStatusStateTest {
       mapOf(
         "workoutId" to "w1", "sessionName" to "Upper body", "exerciseName" to "Bench press",
         "phase" to "resting", "nextSet" to 3.0, "sets" to 4.0, "load" to "80 kg × 8",
-        "restEndsAt" to now.toDouble(), "label" to null,
+        "restEndsAt" to now.toDouble(), "label" to null, "startedAt" to (now - 5_000).toDouble(),
       ),
     )
     assertEquals(
-      WorkoutStatus("w1", "Upper body", "Bench press", "resting", 3, 4, "80 kg × 8", now, null),
+      WorkoutStatus("w1", "Upper body", "Bench press", "resting", 3, 4, "80 kg × 8", now, null, now - 5_000),
       read,
     )
     assertNull(WorkoutStatusPresenter.fromMap(null))
@@ -96,16 +96,46 @@ class WorkoutStatusStateTest {
     assertNull(WorkoutStatusPresenter.fromMap(mapOf("workoutId" to "w1", "exerciseName" to "", "phase" to "working")))
   }
 
-  @Test fun `promotion is requested only on Android 16 with Live Updates allowed`() {
-    assertTrue(WorkoutStatusPolicy.requestsPromotion(36, true))
-    assertTrue(WorkoutStatusPolicy.requestsPromotion(37, true))
-    assertFalse(WorkoutStatusPolicy.requestsPromotion(36, false))
-    assertFalse(WorkoutStatusPolicy.requestsPromotion(35, true))
+  @Test fun `the rest's end is judged at the moment it fires`() {
+    val resting = working.copy(phase = "resting", nextSet = 3, restEndsAt = now + 90_000)
+    val firing = WorkoutStatusPresenter.present(resting, now + 90_000)
+    assertNull(firing.countdownEndsAt)
+    assertEquals("Rest over, next · Set 3 of 4 · 80 kg × 8", firing.text)
+    assertEquals("3/4", firing.shortCriticalText)
+    assertEquals(now + 90_000, WorkoutStatusPolicy.restEndAlarmAt(resting, now))
+    assertNull(WorkoutStatusPolicy.restEndAlarmAt(resting, now + 90_000))
+    assertNull(WorkoutStatusPolicy.restEndAlarmAt(resting.copy(phase = "working"), now))
+    assertNull(WorkoutStatusPolicy.restEndAlarmAt(resting.copy(phase = "paused"), now))
+    assertNull(WorkoutStatusPolicy.restEndAlarmAt(resting.copy(restEndsAt = null), now))
+  }
+
+  @Test fun `promotion is requested only on Android 16 QPR2 with Live Updates allowed`() {
+    assertTrue(WorkoutStatusPolicy.requestsPromotion(3_600_001, true))
+    assertTrue(WorkoutStatusPolicy.requestsPromotion(3_700_000, true))
+    assertFalse(WorkoutStatusPolicy.requestsPromotion(3_600_001, false))
+    // 36.0 reports SDK_INT 36 too, but its SDK_INT_FULL is 3_600_000.
+    assertFalse(WorkoutStatusPolicy.requestsPromotion(3_600_000, true))
+    assertFalse(WorkoutStatusPolicy.requestsPromotion(3_500_000, true))
+    assertFalse(WorkoutStatusPolicy.requestsPromotion(0, true))
   }
 
   @Test fun `a dismissed workout stays dismissed and the next one posts`() {
     assertTrue(WorkoutStatusPolicy.mayPost(null, "w1"))
     assertFalse(WorkoutStatusPolicy.mayPost("w1", "w1"))
     assertTrue(WorkoutStatusPolicy.mayPost("w1", "w2"))
+  }
+
+  @Test fun `a workout open for more than six hours posts nothing`() {
+    val six = 6L * 60 * 60 * 1000
+    assertFalse(WorkoutStatusPolicy.isStale(now - six, now))
+    assertTrue(WorkoutStatusPolicy.isStale(now - six - 1, now))
+    assertFalse(WorkoutStatusPolicy.isStale(0, now))
+  }
+
+  @Test fun `a tap is honoured once, and an older one never`() {
+    assertTrue(WorkoutStatusPolicy.isFreshOpen(now, 0))
+    assertFalse(WorkoutStatusPolicy.isFreshOpen(now, now))
+    assertFalse(WorkoutStatusPolicy.isFreshOpen(now - 1, now))
+    assertTrue(WorkoutStatusPolicy.isFreshOpen(now + 1, now))
   }
 }
