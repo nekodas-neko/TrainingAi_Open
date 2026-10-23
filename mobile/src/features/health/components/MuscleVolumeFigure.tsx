@@ -1,8 +1,9 @@
 import { capitalize } from '@trainingai/shared/format/capitalize';
 import {
-  GENERIC_HIGH,
+  GENERIC_BARS_CAPTION,
   GENERIC_TARGET,
   MAX_TARGET,
+  TARGET_BARS_CAPTION,
   muscleVolumeColor,
 } from '@trainingai/shared/health/volume-band';
 import { AppText, Legend, MuscleMap, ProgressBar, Stack } from '../../../shared/ui';
@@ -66,8 +67,8 @@ export function MuscleVolumeFigure({
       ))}
       <AppText variant="micro" tone="muted">
         {hasTargets
-          ? 'Vertical line = your weekly target · Green = at or above target'
-          : `Vertical line = ${GENERIC_TARGET}-set minimum. Green = ${GENERIC_TARGET}–${GENERIC_HIGH - 1} sets · Blue = ${GENERIC_HIGH}+ sets.`}
+          ? TARGET_BARS_CAPTION
+          : GENERIC_BARS_CAPTION}
       </AppText>
     </>
   );
