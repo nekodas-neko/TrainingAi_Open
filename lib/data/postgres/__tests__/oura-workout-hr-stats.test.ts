@@ -75,6 +75,20 @@ describe.skipIf(!canRun)('workout HR stats + rr retention', () => {
     expect(recent.rows[0].n).toBe('1') // only the just-inserted recent beat survives
   })
 
+  it('clears hrr1_best when a fuller recompute finds no dense HR, but not on a thinner one (#2824)', async () => {
+    await pool.query(
+      `INSERT INTO workout_sessions (id, user_id, session_name, started_at, completed_at)
+       VALUES ($1, $2, 'Pull', now() - interval '3 days', now() - interval '3 days' + interval '1 hour')`,
+      [sid(6), TEST_USER_ID],
+    )
+    const base = { avgBpm: 120, peakBpm: 150, workoutHrvMs: null, source: 'ble' }
+    await repo.upsertWorkoutHrStats(TEST_USER_ID, sid(6), { ...base, hrr1Best: 22, readingsCount: 100 })
+    await repo.upsertWorkoutHrStats(TEST_USER_ID, sid(6), { ...base, hrr1Best: null, readingsCount: 40 })
+    expect((await repo.getWorkoutHrStats(TEST_USER_ID, sid(6)))?.hrr1Best).toBe(22)
+    await repo.upsertWorkoutHrStats(TEST_USER_ID, sid(6), { ...base, hrr1Best: null, readingsCount: 100 })
+    expect((await repo.getWorkoutHrStats(TEST_USER_ID, sid(6)))?.hrr1Best).toBeNull()
+  })
+
   it('persists a snapshot and reads it back', async () => {
     await pool.query(
       `INSERT INTO workout_sessions (id, user_id, session_name, started_at, completed_at)
