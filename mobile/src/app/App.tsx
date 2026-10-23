@@ -14,6 +14,7 @@ import { AppProvider } from './providers/AppProvider';
 import { LocalStorageProvider } from './providers/LocalStorageProvider';
 import { AppStartupGate } from './providers/AppStartupGate';
 import { useTheme } from '../shared/theme/ThemeProvider';
+import { useGeistFonts } from '../shared/theme/font-loading';
 import { Screen, Notice } from '../shared/ui';
 import { useHealthContext } from '../features/health/HealthProvider';
 import type { Tab, DetailScreen, MoreDetail } from './navigation/tabs';
@@ -567,6 +568,7 @@ function NativeInteractions() {
   );
 }
 export default function App() {
+  useGeistFonts();
   return (
     <SafeAreaProvider>
       <AccountProvider>
