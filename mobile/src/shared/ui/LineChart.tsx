@@ -71,6 +71,7 @@ export function LineChart({
   niceBounds = false,
   stretch = false,
   smooth = false,
+  zone,
 }: {
   points: readonly { label: string; value: number | null; x?: number }[];
   label: string;
@@ -114,6 +115,8 @@ export function LineChart({
   stretch?: boolean;
   /** Curve the line through its readings (chart.js tension 0.4), as the current app's 14-day charts do. */
   smooth?: boolean;
+  /** A shaded horizontal band between two values, each edge a gridline named in a left column. */
+  zone?: { from: number; to: number; fromLabel: string; toLabel: string };
 }) {
   const { theme } = useTheme();
   const [selection, setSelection] = useState<number | null>(null);
@@ -128,7 +131,7 @@ export function LineChart({
   const axisVariant = compactAxisLabels || denseAxis ? 'axisTick' : labelVariant;
   const plotHeight = height ?? theme.sizes.chartHeight;
   const target = drawableTarget(targetProp);
-  const guides = gridlines || yAxis || target !== undefined;
+  const guides = gridlines || yAxis || zone !== undefined || target !== undefined;
   const valid = points.filter(
     (point): point is typeof point & { value: number } =>
       point.value !== null && Number.isFinite(point.value),
@@ -181,7 +184,13 @@ export function LineChart({
   const tickTexts = tickLabels(ticks);
   // The plot sits right of the y-axis column; overlays are absolute so the Svg and the touch
   // responder below keep their existing layout (locationX is relative to the root View).
-  const leftInset = yAxis ? yAxisColumnWidth(tickTexts, webAxis) : 0;
+  const zoneTicks = zone ? [zone.from, zone.to] : [];
+  const zoneTexts = zone ? [zone.fromLabel, zone.toLabel] : [];
+  const leftInset = zone
+    ? yAxisColumnWidth(zoneTexts)
+    : yAxis
+      ? yAxisColumnWidth(tickTexts, webAxis)
+      : 0;
   const plotWidth = Math.max(1, width - leftInset);
   // The viewBox is as tall as the box, so a taller chart fills it instead of being letterboxed.
   // A stretched chart keeps the 320:90 box, which it stretches to fit.
@@ -241,18 +250,27 @@ export function LineChart({
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       accessibilityLabel={`${label}: ${valid.map((point) => `${point.label}: ${point.value}`).join('; ')}${guides ? guideSummary(min, max, target) : ''}`}
     >
-      {yAxis && width <= 1 ? (
+      {(yAxis || zone) && width <= 1 ? (
         // Held until measured: before layout the plot would be 1 px wide.
         <View style={{ height: plotHeight }} />
       ) : (
         <Svg
           viewBox={`0 0 320 ${vbHeight}`}
-          width={yAxis ? plotWidth : '100%'}
+          width={leftInset ? plotWidth : '100%'}
           height={plotHeight}
           preserveAspectRatio={stretch ? 'none' : undefined}
           style={leftInset ? { marginLeft: leftInset } : undefined}
           pointerEvents="none"
         >
+          {zone && (
+            <Rect
+              x={0}
+              y={yy(zone.to)}
+              width={320}
+              height={Math.max(0, yy(zone.from) - yy(zone.to))}
+              fill={theme.tones.brand.background}
+            />
+          )}
           {bands.map((band, index) => (
             <Rect
               key={`band${index}`}
@@ -355,15 +373,19 @@ export function LineChart({
           <ChartGuides
             height={plotHeight}
             left={leftInset}
-            gridYs={ticks.map(toY)}
+            gridYs={(zone ? [...ticks, ...zoneTicks] : ticks).map(toY)}
             target={target ? { y: toY(target.value), label: target.label } : undefined}
           />
-          {yAxis && (
+          {(yAxis || zone) && (
             <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0 }}>
               <YAxisLabels
                 height={plotHeight}
                 compact={webAxis}
-                items={ticks.map((t, i) => ({ y: toY(t), text: tickTexts[i] }))}
+                items={
+                  zone
+                    ? zoneTicks.map((t, i) => ({ y: toY(t), text: zoneTexts[i] }))
+                    : ticks.map((t, i) => ({ y: toY(t), text: tickTexts[i] }))
+                }
               />
             </View>
           )}
