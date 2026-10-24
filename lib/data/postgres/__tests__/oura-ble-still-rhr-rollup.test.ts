@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
 const canRun = !!process.env.DATABASE_URL
-const TEST_USER_ID = '00000000-0000-4000-8000-00000000ded2'
+const TEST_USER_ID = '00000000-0000-4000-8000-0000005711d2'
 const TZ = 'America/Los_Angeles'
 
 const DS_PER_DAY = 864_000
