@@ -5,7 +5,7 @@ import type {
 } from '../../../integrations/workout-status/types.ts';
 import { displayLoad } from '../logging/preferences.ts';
 import { pipPhaseFor } from '../pip/pip.ts';
-import { workoutFlow } from '../logging/flow.ts';
+import { nextExerciseFlow, workoutFlow } from '../logging/flow.ts';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
 
 // The Android ongoing notification / Live Update (#3249): a view of the active workout, derived
@@ -29,7 +29,10 @@ export function knownLoad(exercise: WorkoutExercise, set: WorkoutSet | undefined
   return weightText ?? (reps !== null ? `${reps} reps` : null);
 }
 
-/** What the notification should say for the workout, or null when there is none open. */
+/**
+ * What the notification and the picture-in-picture window show for the workout, or null when
+ * there is none open. One payload for both, so they can never disagree.
+ */
 export function workoutStatusFor(workout: WorkoutRecord | null): WorkoutStatusPayload | null {
   if (!workout || workout.status !== 'active') return null;
   const phase = pipPhaseFor(workout);
@@ -43,6 +46,11 @@ export function workoutStatusFor(workout: WorkoutRecord | null): WorkoutStatusPa
     restEndsAt: null,
     label: null,
     startedAt: workout.startedAt,
+    setStartedAt: null,
+    restStartedAt: null,
+    setsDone: 0,
+    nextUp: null,
+    hr: null,
   };
   if (phase === 'idle') return null;
   if (phase === 'pre') return { ...base, phase: 'ready', label: 'Warm-up' };
@@ -50,7 +58,12 @@ export function workoutStatusFor(workout: WorkoutRecord | null): WorkoutStatusPa
   const flow = workoutFlow(workout);
   const exercise = workout.exercises.find((x) => x.id === flow.exerciseId);
   if (!exercise) return { ...base, phase: 'ready' };
-  const named = { ...base, exerciseName: exercise.name, sets: exercise.sets.length };
+  const named = {
+    ...base,
+    exerciseName: exercise.name,
+    sets: exercise.sets.length,
+    setsDone: exercise.sets.filter((set) => set.completedAt !== null).length,
+  };
   if (phase === 'set') {
     const index = exercise.sets.findIndex((x) => x.id === workout.runningSet?.setId);
     return {
@@ -58,12 +71,14 @@ export function workoutStatusFor(workout: WorkoutRecord | null): WorkoutStatusPa
       phase: 'working',
       nextSet: index + 1,
       load: knownLoad(exercise, exercise.sets[index]),
+      setStartedAt: exercise.sets[index]?.startedAt ?? null,
     };
   }
   const next = exercise.sets.findIndex((x) => x.completedAt === null);
   // The rest after an exercise's last set is timed on its summary; there is no next set to name.
   const finished = next === -1;
   const resting = workout.rest !== null;
+  const after = phase === 'summary' && !workout.soloExerciseId ? nextExerciseFlow(workout) : null;
   return {
     ...named,
     phase: resting ? 'resting' : 'ready',
@@ -71,6 +86,12 @@ export function workoutStatusFor(workout: WorkoutRecord | null): WorkoutStatusPa
     load: finished ? null : knownLoad(exercise, exercise.sets[next]),
     restEndsAt: workout.rest?.endsAt ?? null,
     label: finished ? 'Exercise done' : null,
+    // With no rest timed, the window counts up from the last set (the current app's rest anchor).
+    restStartedAt: workout.rest?.startedAt ?? workout.restAnchor?.startedAt ?? null,
+    nextUp:
+      after && after.stage !== 'review'
+        ? (workout.exercises.find((x) => x.id === after.exerciseId)?.name ?? null)
+        : null,
   };
 }
 

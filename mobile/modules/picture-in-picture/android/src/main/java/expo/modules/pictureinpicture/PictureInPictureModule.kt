@@ -29,22 +29,17 @@ import expo.modules.kotlin.modules.ModuleDefinition
 // The window's content is a native view (PipWindowView) laid over the app while in PiP. React
 // Native stops applying UI updates while the activity is paused, and an activity in PiP is paused,
 // so a React-drawn window would freeze on its first frame. JS keeps the view's data current through
-// setPhase; a Handler here redraws it every second.
+// setPhase, sending the workout status payload the ongoing notification also reads (#3266); the
+// view's own Chronometers keep its clocks running.
 class PictureInPictureModule : Module() {
   @Volatile private var phase = PipPolicy.IDLE
-  @Volatile private var window: PipWindow? = null
+  @Volatile private var status: PipStatus? = null
+  @Volatile private var setColor: String? = null
   private var windowView: PipWindowView? = null
   private var receiverRegistered = false
   private var watched: OnPictureInPictureModeChangedProvider? = null
   private var inPip = false
   private val main = Handler(Looper.getMainLooper())
-  private val tick = object : Runnable {
-    override fun run() {
-      if (!inPip) return
-      windowView?.render(window, System.currentTimeMillis())
-      main.postDelayed(this, 1_000)
-    }
-  }
 
   private val context: Context
     get() = requireNotNull(appContext.reactContext) { "The app context is not available." }
@@ -69,12 +64,13 @@ class PictureInPictureModule : Module() {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
 
-    Function("setPhase") { next: String, view: Map<String, Any?>? ->
+    Function("setPhase") { next: String, payload: Map<String, Any?>?, color: String? ->
       phase = next
       // Kept for any phase: one that cannot open the window can still arrive while it is open,
       // such as "done" after Next on the last exercise, and the window must not go blank.
-      window = PipState.fromMap(view)
-      main.post { windowView?.render(window, System.currentTimeMillis()) }
+      status = PipPresenter.fromMap(payload)
+      setColor = PipPresenter.color(color)
+      main.post { windowView?.render() }
       val activity = appContext.currentActivity ?: return@Function
       watch(activity)
       activity.runOnUiThread {
@@ -99,7 +95,6 @@ class PictureInPictureModule : Module() {
       watched?.removeOnPictureInPictureModeChangedListener(modeListener)
       watched = null
       inPip = false
-      main.removeCallbacks(tick)
       main.post { removeWindow() }
     }
 
@@ -131,10 +126,8 @@ class PictureInPictureModule : Module() {
     if (active == inPip) return
     inPip = active
     sendEvent("onModeChange", mapOf("active" to active))
-    main.removeCallbacks(tick)
     if (active) {
       showWindow()
-      main.post(tick)
     } else {
       removeWindow()
     }
@@ -143,13 +136,15 @@ class PictureInPictureModule : Module() {
   private fun showWindow() {
     val activity = appContext.currentActivity ?: return
     val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return
-    val view = windowView ?: PipWindowView(activity).also { windowView = it }
+    val view = windowView
+      ?: PipWindowView(activity) { now -> PipPresenter.present(phase, status, setColor, now) }
+        .also { windowView = it }
     if (view.parent !== content) {
       (view.parent as? ViewGroup)?.removeView(view)
       content.addView(view, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
     view.bringToFront()
-    view.render(window, System.currentTimeMillis())
+    view.render()
   }
 
   private fun removeWindow() {

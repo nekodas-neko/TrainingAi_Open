@@ -13,64 +13,105 @@ object PipPolicy {
   fun isActivePhase(phase: String?): Boolean = phase in ACTIVE_PHASES
 }
 
-/** The payload JS sends with the phase (`pipViewFor` in pip.ts). */
-data class PipWindow(
-  /** "timer", or "placeholder" for the exercise summary. */
-  val kind: String,
+/**
+ * The workout status payload (`workoutStatusFor` in workout-status.ts), the same one the ongoing
+ * notification reads (#3266). Only the keys the window draws from are read.
+ */
+data class PipStatus(
+  /** The exercise on screen, or the session's name in the warm-up and the review. */
   val exerciseName: String,
-  /** "rest" or "set". */
-  val phase: String = "rest",
-  /** Sets recorded so far in this exercise. */
-  val currentSet: Int = 0,
+  /** "working", "resting", "ready" or "paused", as the notification reads it. */
+  val phase: String,
   val sets: Int = 0,
-  val restTargetSec: Int = 0,
-  val restStartMs: Long? = null,
-  val setStartMs: Long? = null,
-  /** "60 kg × 8" during a set. */
+  /** Sets recorded so far in this exercise. */
+  val setsDone: Int = 0,
+  /** Only what the plan or the logger knows, or null: the window then shows no load. */
   val load: String? = null,
-  /** The set's colour, `#rrggbb`, from the shared categorical palette. */
-  val setColor: String? = null,
-  /** The placeholder's "Tap Next to continue", shown only where the window has a Next button. */
-  val hint: Boolean = false,
+  val setStartedAt: Long? = null,
+  val restStartedAt: Long? = null,
+  val restEndsAt: Long? = null,
 )
 
-data class PipClock(
-  val seconds: Long,
-  val overTime: Boolean,
-  /** "/ 1:30" before the target, "+0:10" past it, null with no target or during a set. */
-  val target: String?,
-  /** How much of the ring is drawn, 0–1. */
-  val fraction: Float,
-  val label: String,
-)
+/** One frame of the window. Clocks are anchors in wall time; the view's chronometers count. */
+sealed class PipFrame {
+  data class Placeholder(val name: String, val hint: Boolean) : PipFrame()
 
-object PipState {
-  /** pip-view.tsx's clock at one instant. */
-  fun clock(window: PipWindow, nowMs: Long): PipClock {
-    val rest = window.phase == "rest"
-    val restElapsed =
-      if (rest && window.restStartMs != null) maxOf(0L, (nowMs - window.restStartMs) / 1000) else 0L
-    val setElapsed =
-      if (!rest && window.setStartMs != null) maxOf(0L, (nowMs - window.setStartMs) / 1000) else 0L
-    val overTime = rest && window.restTargetSec > 0 && restElapsed >= window.restTargetSec
-    // Rest fills toward its target and stays full; a set grows to a three-minute visual cap.
-    val fraction = if (rest) {
-      if (window.restTargetSec > 0) minOf(restElapsed.toFloat() / window.restTargetSec, 1f) else 0f
-    } else {
-      minOf(setElapsed / 180f, 1f)
-    }
-    val target = when {
-      !rest || window.restTargetSec <= 0 -> null
-      overTime -> "+${formatTime(restElapsed - window.restTargetSec)}"
-      else -> "/ ${formatTime(window.restTargetSec.toLong())}"
-    }
-    val label = when {
-      !rest -> "set ${window.currentSet + 1}/${window.sets}"
-      window.currentSet >= window.sets -> "done"
-      else -> "rest · ${window.currentSet}/${window.sets}"
-    }
-    return PipClock(if (rest) restElapsed else setElapsed, overTime, target, fraction, label)
+  data class Timer(
+    val name: String,
+    val rest: Boolean,
+    /** What the big clock counts up from; null shows 0:00 standing still. */
+    val countsFrom: Long?,
+    /** The rest's target, "/ 1:30", or null with no target or during a set. */
+    val target: String?,
+    /** Past the target: the caption counts up from the rest's end, "+0:10". */
+    val overFrom: Long?,
+    /** How much of the ring is drawn, 0–1. */
+    val fraction: Float,
+    val label: String,
+    /** Shown only during a set, and only when known. */
+    val load: String?,
+    /** The running set's arc colour, `#rrggbb`, or null for the rest colour. */
+    val setColor: String?,
+  ) : PipFrame() {
+    val overTime get() = overFrom != null
   }
+}
+
+object PipPresenter {
+  private const val SET_ARC_SEC = 180f
+
+  /**
+   * pip-view.tsx's window for the workout at one instant. A phase with no timer (the summary once
+   * Next has nothing to time, the workout done, no data yet) shows the placeholder, never a blank
+   * window; "Tap Next" only where the window has a Next button.
+   */
+  fun present(phase: String, status: PipStatus?, setColor: String?, nowMs: Long): PipFrame {
+    if (status == null) return PipFrame.Placeholder("", false)
+    val timed = phase == "set" || phase == "rest" || phase == "complete" ||
+      (phase == "summary" && status.phase == "resting")
+    if (!timed) return PipFrame.Placeholder(status.exerciseName, phase == "summary")
+    if (phase == "set") {
+      val elapsed = seconds(status.setStartedAt, nowMs)
+      return PipFrame.Timer(
+        name = status.exerciseName,
+        rest = false,
+        countsFrom = status.setStartedAt,
+        target = null,
+        overFrom = null,
+        // A set grows to a three-minute visual cap.
+        fraction = minOf(elapsed / SET_ARC_SEC, 1f),
+        label = "set ${status.setsDone + 1}/${status.sets}",
+        load = status.load,
+        setColor = setColor,
+      )
+    }
+    val start = status.restStartedAt
+    val end = status.restEndsAt
+    val targetSec = if (start != null && end != null) maxOf(0L, (end - start) / 1000) else 0L
+    val elapsed = seconds(start, nowMs)
+    val over = targetSec > 0 && elapsed >= targetSec
+    return PipFrame.Timer(
+      name = status.exerciseName,
+      rest = true,
+      countsFrom = start,
+      target = if (targetSec > 0) "/ ${formatTime(targetSec)}" else null,
+      overFrom = if (over) start!! + targetSec * 1000 else null,
+      // Rest fills toward its target and stays full.
+      fraction = if (targetSec > 0) minOf(elapsed.toFloat() / targetSec, 1f) else 0f,
+      label = if (status.setsDone >= status.sets) "done" else "rest · ${status.setsDone}/${status.sets}",
+      load = null,
+      setColor = null,
+    )
+  }
+
+  /** Whole seconds since `fromMs`, never negative; 0 with nothing to count from. */
+  fun seconds(fromMs: Long?, nowMs: Long): Long = if (fromMs == null) 0L else maxOf(0L, (nowMs - fromMs) / 1000)
+
+  /**
+   * A wall-clock instant on the `SystemClock.elapsedRealtime` time base a Chronometer counts on.
+   * Read once per render, so a wall-clock change mid-rest moves the clock only at the next render.
+   */
+  fun elapsedBase(epochMs: Long, nowWallMs: Long, nowElapsedMs: Long): Long = nowElapsedMs - (nowWallMs - epochMs)
 
   /** components/workout/utils.ts formatTime: m:ss, minutes unbounded. */
   fun formatTime(seconds: Long): String {
@@ -79,25 +120,24 @@ object PipState {
   }
 
   /** Reads the JS payload; anything malformed yields null rather than a broken window. */
-  fun fromMap(map: Map<String, Any?>?): PipWindow? {
+  fun fromMap(map: Map<String, Any?>?): PipStatus? {
     if (map == null) return null
-    val kind = map["kind"] as? String ?: return null
     val name = map["exerciseName"] as? String ?: return null
-    if (kind != "timer" && kind != "placeholder") return null
+    val phase = map["phase"] as? String ?: return null
     fun int(key: String) = (map[key] as? Number)?.toInt() ?: 0
     fun long(key: String) = (map[key] as? Number)?.toLong()
-    return PipWindow(
-      kind = kind,
+    return PipStatus(
       exerciseName = name,
-      phase = if (map["phase"] == "set") "set" else "rest",
-      currentSet = int("currentSet"),
+      phase = phase,
       sets = int("sets"),
-      restTargetSec = int("restTargetSec"),
-      restStartMs = long("restStartMs"),
-      setStartMs = long("setStartMs"),
-      load = map["load"] as? String,
-      setColor = (map["setColor"] as? String)?.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) },
-      hint = map["hint"] == true,
+      setsDone = int("setsDone"),
+      load = (map["load"] as? String)?.takeIf { it.isNotBlank() },
+      setStartedAt = long("setStartedAt"),
+      restStartedAt = long("restStartedAt"),
+      restEndsAt = long("restEndsAt"),
     )
   }
+
+  /** The arc colour JS sends; anything Android cannot parse falls back to the rest colour. */
+  fun color(value: Any?): String? = (value as? String)?.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) }
 }
