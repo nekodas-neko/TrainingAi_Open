@@ -4,6 +4,9 @@ export const NATIVE_SESSION_SALT = 'trainingai-native-session'
 // refresh token. The refresh token slides: each use issues a successor good for another 30 days.
 export const NATIVE_ACCESS_TOKEN_MAX_AGE_SECONDS = 24 * 60 * 60
 export const NATIVE_REFRESH_TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
+// A refresh token presented again this soon after it was rotated, whose successor was never used,
+// is taken as a lost response rather than theft (the app timed out, or was suspended mid-call).
+export const NATIVE_REFRESH_REUSE_GRACE_SECONDS = 60
 
 import type { Session } from 'next-auth'
 import type { JWT } from 'next-auth/jwt'

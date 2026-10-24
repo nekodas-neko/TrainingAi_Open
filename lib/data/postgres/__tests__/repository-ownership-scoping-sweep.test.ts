@@ -482,6 +482,11 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       newTokenHash: randomBytes(32).toString('hex') as import('@/lib/auth/refresh-token-hash').RefreshTokenHash,
       expiresAt: new Date(Date.now() + 86_400_000),
     }), v => { expect(v).toBeNull() }],
+    ['regrantNativeRefreshToken', r => r.regrantNativeRefreshToken({
+      userId: USER_A, id: bId('native_refresh_tokens'),
+      newTokenHash: randomBytes(32).toString('hex') as import('@/lib/auth/refresh-token-hash').RefreshTokenHash,
+      expiresAt: new Date(Date.now() + 86_400_000), graceSeconds: 60,
+    }), v => { expect(v).toBeNull() }],
     ['revokeNativeRefreshToken', r => r.revokeNativeRefreshToken(USER_A, bId('native_refresh_tokens'), 'user')],
     ['revokeNativeRefreshTokenFamily', r => r.revokeNativeRefreshTokenFamily(USER_A, bVal('native_refresh_tokens', 'family_id'), 'user')],
     // #2377. No predicate for the sweep to neutralise: the conflict key (user_id, date,

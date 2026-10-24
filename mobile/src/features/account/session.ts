@@ -16,6 +16,11 @@ const TRANSACTION_AGE = 10 * 60 * 1000;
 const RANDOM_RE = /^[A-Za-z0-9_-]{43}$/;
 /** Renew this long before the one-day access token runs out (#2076). */
 const RENEW_BEFORE_SECONDS = 5 * 60;
+/** After a renewal that could not reach the server, wait this long before renewing early again. */
+const RENEW_BACKOFF_MS = 30_000;
+/** How a renewal ended. `transient` holds the error when the server could not be reached or was
+ *  busy; the session is kept and a caller that needed the new token sees that error. */
+type Renewal = { transient?: unknown };
 const nowSeconds = () => Date.now() / 1000;
 type SavedSession = SessionToken & {
   origin: string;
@@ -133,7 +138,8 @@ export class AccountSession {
   private events: { at: string; event: string; httpStatus?: number }[] = [];
   private reader: AccountConnection | null = null;
   private profileRequest: { generation: number; promise: Promise<void> } | null = null;
-  private renewal: Promise<void> | null = null;
+  private renewal: Promise<Renewal> | null = null;
+  private renewBackoffUntil = 0;
   constructor(origin: string, platform: AuthPlatform) {
     this.platform = platform;
     this.client = platform.client ?? 'ios';
@@ -161,7 +167,13 @@ export class AccountSession {
     if (!current || (userId !== undefined && current.userId !== userId)) {
       return null;
     }
-    if (current.refreshToken && current.expiresAt - nowSeconds() < RENEW_BEFORE_SECONDS) {
+    const lapsed = current.expiresAt <= nowSeconds();
+    if (
+      current.refreshToken &&
+      current.expiresAt - nowSeconds() < RENEW_BEFORE_SECONDS &&
+      // Early renewal backs off after a failure; a lapsed token always tries.
+      (lapsed || Date.now() >= this.renewBackoffUntil)
+    ) {
       await this.renew(current.accessToken);
     }
     const session = this.session;
@@ -176,9 +188,16 @@ export class AccountSession {
     }
     return null;
   }
-  /** After a 401 on `stale`: a different, live token to retry with once, or null. */
+  /**
+   * After a 401 on `stale`: a different, live token to retry with once, or null. When renewal could
+   * not reach the server its error is thrown instead, so the caller reports a connection problem
+   * rather than the 401, which would read as a session the server ended.
+   */
   private async renewedToken(stale: string, userId?: string): Promise<string | null> {
-    await this.renew(stale);
+    const { transient } = await this.renew(stale);
+    if (transient !== undefined) {
+      throw transient;
+    }
     const session = this.session;
     return session &&
       (userId === undefined || session.userId === userId) &&
@@ -191,17 +210,17 @@ export class AccountSession {
    * Swap the refresh token for a new pair, once for every caller holding `stale`: concurrent
    * requests share one call, because presenting a refresh token twice revokes the device's sign-in.
    */
-  private renew(stale: string): Promise<void> {
+  private renew(stale: string): Promise<Renewal> {
     const session = this.session;
     if (!session?.refreshToken || session.accessToken !== stale) {
-      return this.renewal ?? Promise.resolve();
+      return this.renewal ?? Promise.resolve({});
     }
     this.renewal ??= this.runRenewal(session).finally(() => {
       this.renewal = null;
     });
     return this.renewal;
   }
-  private async runRenewal(session: SavedSession) {
+  private async runRenewal(session: SavedSession): Promise<Renewal> {
     const presented = session.refreshToken!;
     this.record('renew_started');
     let token: SessionToken;
@@ -216,9 +235,12 @@ export class AccountSession {
         this.session?.refreshToken === presented
       ) {
         await this.signOut('Your session ended. Sign in again.');
+        return {};
       }
-      return;
+      this.renewBackoffUntil = Date.now() + RENEW_BACKOFF_MS;
+      return { transient: error };
     }
+    this.renewBackoffUntil = 0;
     try {
       await this.write(async () => {
         // Signed out, or another sign-in replaced the session, while the call was out.
@@ -237,6 +259,7 @@ export class AccountSession {
     if (this.session?.refreshToken === token.refreshToken) {
       this.publish(this.current.status, this.current.message, this.current.profile);
     }
+    return {};
   }
   get state() {
     return this.current;

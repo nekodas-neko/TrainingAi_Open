@@ -22,7 +22,7 @@ import type {
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
 import type { AccountDeletionResult } from './postgres/slices/account-deletion'
 import type {
-  NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput,
+  NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput, RegrantNativeRefreshTokenInput,
 } from './postgres/slices/native-refresh-tokens'
 import type { RefreshTokenHash } from '@/lib/auth/refresh-token-hash'
 import type { OuraCloudTokenRow, SaveOuraCloudTokensInput } from './postgres/slices/oura-cloud-tokens'
@@ -672,6 +672,9 @@ export interface WorkoutRepository {
   /** Marks a live token rotated and inserts its successor in the same family, atomically. `null`
    *  (nothing written) when it is not the caller's or is already rotated, revoked or expired. */
   rotateNativeRefreshToken(input: RotateNativeRefreshTokenInput): Promise<NativeRefreshToken | null>
+  /** Within the grace after a rotation whose successor is untouched: revokes that successor and
+   *  issues a new one in its place. `null` (nothing written) otherwise. */
+  regrantNativeRefreshToken(input: RegrantNativeRefreshTokenInput): Promise<NativeRefreshToken | null>
   /** True when the caller's token was revoked now; false when not theirs or already revoked. */
   revokeNativeRefreshToken(userId: string, id: string, reason: NativeRefreshTokenRevokedReason): Promise<boolean>
   /** Revokes the caller's not-yet-revoked tokens in one family; returns how many. */

@@ -1,5 +1,6 @@
 import { AI_PAUSED_CODE, AI_PAUSED_MESSAGE, aiPausedMessage } from '@trainingai/shared/ai-paused-notice';
 import { reportError } from '../../../core/reporting/index.ts';
+import { REFRESH_TOKEN_RE } from '@trainingai/shared/auth/refresh-token';
 
 export class ApiError extends Error {
   status: number;
@@ -63,7 +64,7 @@ export type SessionToken = {
   refreshToken?: string;
   refreshExpiresAt?: number;
 };
-export const REFRESH_TOKEN_RE = /^[A-Za-z0-9_-]{43,128}$/;
+export { REFRESH_TOKEN_RE };
 
 /**
  * `renew` is asked for a new access token after a 401 on the token it is given. The request is
@@ -270,12 +271,21 @@ export function createApiClient(
       if (own && !token) {
         throw new Error('Sign in before loading exercise media.');
       }
-      const response = await fetch(url, {
-        credentials: 'omit',
-        redirect: 'error',
-        headers: { Accept: 'image/*', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        signal: AbortSignal.timeout(20_000),
-      });
+      const send = (bearer: string | null) =>
+        fetch(url, {
+          credentials: 'omit',
+          redirect: 'error',
+          headers: { Accept: 'image/*', ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
+          signal: AbortSignal.timeout(20_000),
+        });
+      let response = await send(token);
+      if (response.status === 401 && token && renew) {
+        const fresh = await renew(token);
+        if (fresh && fresh !== token) {
+          await response.body?.cancel().catch(() => {});
+          response = await send(fresh);
+        }
+      }
       if (!response.ok) {
         throw new ApiError(response.status);
       }

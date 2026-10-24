@@ -260,3 +260,57 @@ test('a saved refresh token of the wrong shape is not trusted', async () => {
   assert.equal(f.controller.state.status, 'signedOut');
   assert.equal(f.refreshes().length, 0);
 });
+
+test('a 401 followed by a refresh the server could not serve keeps the session', async () => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedIn');
+  // The server stops accepting the token (clock skew, a rotated secret) and refresh is down.
+  f.valid.delete('access-0');
+  f.server.refresh = async () => json({ error: 'Session refresh is temporarily unavailable' }, 503);
+  await f.controller.refresh();
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.equal(f.controller.state.hasSession, true);
+  assert.doesNotMatch(f.controller.state.message ?? '', /Sign in again/);
+  assert.equal(f.stored().refreshToken, refreshToken(0));
+  const reader = f.controller.dataReader!;
+  await assert.rejects(reader.get('/api/x'), (e: { status?: number }) => e.status === 503);
+  assert.equal(f.controller.state.hasSession, true);
+  assert.equal(f.calls.filter((c) => c.path === '/api/x').length, 1);
+});
+
+test('after a failed early renewal, requests use the live token without refreshing again for a while', async () => {
+  const f = fixture(renewable(120));
+  f.valid.add('access-0');
+  f.server.refresh = async () => {
+    throw new TypeError('Network request failed');
+  };
+  await f.controller.initialize(null);
+  assert.equal(f.refreshes().length, 1);
+  assert.equal(f.controller.state.status, 'signedIn');
+  const reader = f.controller.dataReader!;
+  for (let i = 0; i < 5; i++) {
+    assert.deepEqual(await reader.get('/api/x'), { ok: true, path: '/api/x' });
+  }
+  assert.equal(f.refreshes().length, 1);
+  assert.ok(f.calls.filter((c) => c.path === '/api/x').every((c) => c.authorization === 'Bearer access-0'));
+});
+
+test('exercise media retries once with a renewed token after a 401', async (t) => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  await f.controller.initialize(null);
+  const seen: (string | null)[] = [];
+  t.mock.method(globalThis, 'fetch', async (_input: string | URL | Request, init?: RequestInit) => {
+    const authorization = new Headers(init?.headers).get('authorization');
+    seen.push(authorization);
+    return authorization === 'Bearer access-1'
+      ? new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } })
+      : new Response(null, { status: 401 });
+  });
+  const image = await f.controller.dataReader!.media!('/api/exercise-media/squat.png');
+  assert.match(image, /^data:image\/png;base64,/);
+  assert.deepEqual(seen, ['Bearer access-0', 'Bearer access-1']);
+  assert.equal(f.refreshes().length, 1);
+});

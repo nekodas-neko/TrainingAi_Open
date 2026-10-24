@@ -141,6 +141,62 @@ describe.skipIf(!canRun)('native_refresh_tokens (#2076)', () => {
     expect((await repo.findNativeRefreshTokenByHash(h.token_hash))?.rotatedAt).not.toBeNull()
   })
 
+  it('regrant: within the grace, an unused successor is revoked and replaced in the same family', async () => {
+    const first = await create(USER_A)
+    const second = await repo.rotateNativeRefreshToken({ userId: USER_A, id: first.id, newTokenHash: newHash(), expiresAt: inDays(30) })
+    await raw(`UPDATE native_refresh_tokens SET rotated_at = now() - interval '30 seconds' WHERE id = $1`, [first.id])
+    const regrant = (userId: string) => repo.regrantNativeRefreshToken({ userId, id: first.id, newTokenHash: newHash(), expiresAt: inDays(30), graceSeconds: 60 })
+
+    expect(await regrant(USER_B)).toBeNull()
+    const third = await regrant(USER_A)
+    expect(third).toMatchObject({ familyId: first.familyId, rotatedAt: null, revokedAt: null })
+    const { rows } = await raw(`SELECT id, revoked_reason, replaced_by FROM native_refresh_tokens WHERE family_id = $1`, [first.familyId])
+    expect(rows.find(r => r.id === second!.id)?.revoked_reason).toBe('rotation_reuse')
+    expect(rows.find(r => r.id === first.id)?.replaced_by).toBe(third!.id)
+    expect(rows.find(r => r.id === third!.id)?.revoked_reason).toBeNull()
+  })
+
+  it('regrant: nothing once the successor was used, or after the grace', async () => {
+    const first = await create(USER_A)
+    const second = await repo.rotateNativeRefreshToken({ userId: USER_A, id: first.id, newTokenHash: newHash(), expiresAt: inDays(30) })
+    await repo.rotateNativeRefreshToken({ userId: USER_A, id: second!.id, newTokenHash: newHash(), expiresAt: inDays(30) })
+    const regrant = () => repo.regrantNativeRefreshToken({ userId: USER_A, id: first.id, newTokenHash: newHash(), expiresAt: inDays(30), graceSeconds: 60 })
+    expect(await regrant()).toBeNull()
+
+    const late = await create(USER_A)
+    await repo.rotateNativeRefreshToken({ userId: USER_A, id: late.id, newTokenHash: newHash(), expiresAt: inDays(30) })
+    await raw(`UPDATE native_refresh_tokens SET rotated_at = now() - interval '61 seconds' WHERE id = $1`, [late.id])
+    expect(await repo.regrantNativeRefreshToken({ userId: USER_A, id: late.id, newTokenHash: newHash(), expiresAt: inDays(30), graceSeconds: 60 })).toBeNull()
+    const { rows } = await raw(`SELECT count(*)::int AS n, count(revoked_at)::int AS revoked FROM native_refresh_tokens WHERE family_id IN ($1, $2)`, [first.familyId, late.familyId])
+    expect(rows[0]).toEqual({ n: 5, revoked: 0 })
+  })
+
+  it('a family revoke waits for a rotation in progress, and revokes the successor it adds', async () => {
+    const first = await create(USER_A)
+    const client = await pool.connect()
+    try {
+      // A rotation mid-transaction: it holds the family lock and has inserted a successor that no
+      // other transaction can see yet.
+      await client.query('BEGIN')
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [first.familyId])
+      await client.query(
+        `INSERT INTO native_refresh_tokens (user_id, token_hash, family_id, device_label, expires_at)
+         VALUES ($1, $2, $3, 'x', now() + interval '30 days')`, [USER_A, newHash(), first.familyId],
+      )
+      let settled = false
+      const revoking = repo.revokeNativeRefreshTokenFamily(USER_A, first.familyId, 'rotation_reuse')
+        .then(n => { settled = true; return n })
+      await new Promise(r => setTimeout(r, 300))
+      expect(settled).toBe(false)
+      await client.query('COMMIT')
+      expect(await revoking).toBe(2)
+    } finally {
+      client.release()
+    }
+    const { rows } = await raw(`SELECT count(*)::int AS live FROM native_refresh_tokens WHERE family_id = $1 AND revoked_at IS NULL`, [first.familyId])
+    expect(rows[0].live).toBe(0)
+  })
+
   it('two rotations of the same token at once: exactly one wins', async () => {
     const t = await create(USER_A)
     const results = await Promise.all([1, 2, 3].map(() =>
