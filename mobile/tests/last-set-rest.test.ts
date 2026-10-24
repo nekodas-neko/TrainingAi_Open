@@ -8,7 +8,8 @@ import { finishWorkout, readJournal } from '../src/features/workouts/logging/wor
 import { planAlerts } from '../src/features/platform/data/alert-plan.ts';
 import { platformSchema } from '../src/features/platform/data/models.ts';
 import { workoutActivity } from '../src/features/workouts/logging/activity-summary.ts';
-import { pipPhaseFor, pipViewFor } from '../src/features/workouts/pip/pip.ts';
+import { pipPhaseFor } from '../src/features/workouts/pip/pip.ts';
+import { workoutStatusFor } from '../src/features/workouts/status/workout-status.ts';
 import { sqliteFixture } from './storage-fixture.ts';
 import { loggingFixture, programId, exerciseId } from './logging-fixture.ts';
 
@@ -153,34 +154,22 @@ test('picture-in-picture shows the summary rest as a rest with every set done, t
   const { id, active } = await finishExercise(f);
   const workout = active();
   assert.equal(pipPhaseFor(workout), 'summary');
-  const view = pipViewFor(workout);
-  assert.deepEqual(view, {
-    kind: 'timer',
-    exerciseName: workout.exercises[0].name,
-    sets: 2,
-    currentSet: 2,
-    phase: 'rest',
-    restTargetSec: (workout.rest!.endsAt - workout.rest!.startedAt) / 1000,
-    restStartMs: workout.rest!.startedAt,
-    setStartMs: null,
-    load: null,
-    setColor: null,
-  });
+  const status = workoutStatusFor(workout);
+  assert.deepEqual(
+    [status?.phase, status?.exerciseName, status?.sets, status?.setsDone, status?.load],
+    ['resting', workout.exercises[0].name, 2, 2, null],
+  );
+  assert.deepEqual(
+    [status?.restStartedAt, status?.restEndsAt],
+    [workout.rest!.startedAt, workout.rest!.endsAt],
+  );
   // A summary with no rest left to time keeps the current app's placeholder.
-  assert.deepEqual(pipViewFor({ ...workout, rest: null }), {
-    kind: 'placeholder',
-    exerciseName: workout.exercises[0].name,
-    hint: true,
-  });
+  assert.equal(workoutStatusFor({ ...workout, rest: null })?.phase, 'ready');
   await f.controller.advanceExercise(id);
   // Next leaves the summary (here for the end, the fixture's only exercise done) and the rest view
   // with it: the window keeps the session's placeholder, with no Next.
   assert.equal(pipPhaseFor(active()), 'done');
-  assert.deepEqual(pipViewFor(active()), {
-    kind: 'placeholder',
-    exerciseName: active().sessionName,
-    hint: false,
-  });
+  assert.equal(workoutStatusFor(active())?.exerciseName, active().sessionName);
 });
 
 test('a mid-exercise set with no style rest gets the shared 90 s default and its alarm', async (t) => {

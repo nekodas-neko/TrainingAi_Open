@@ -19,6 +19,17 @@ export type WorkoutStatusPayload = {
   label: string | null;
   /** When the workout began; a workout open for more than six hours posts nothing. */
   startedAt: number;
+  // The rest is read by picture-in-picture (#3266), which draws from this same payload.
+  /** When the running set started; null outside a set or when the set has no start. */
+  setStartedAt: number | null;
+  /** When the current rest began, or the last set ended where no rest is timed. */
+  restStartedAt: number | null;
+  /** Sets recorded so far in this exercise. */
+  setsDone: number;
+  /** The exercise Next moves to, from the exercise summary; null when Next ends the workout. */
+  nextUp: string | null;
+  /** The strap's latest reading. Nothing fills it yet: the window shows no heart rate. */
+  hr: { bpm: number; zoneColor: string; at: number } | null;
 };
 
 /** What the system did with the notification, read back from it (Kotlin's promotionReport). */
