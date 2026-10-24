@@ -11,6 +11,7 @@ import { WorkoutResources } from '../src/features/workouts/data/WorkoutResources
 import { batterySpec, energySpec, goalsSpec, readinessSpec } from '../src/features/health/data/models.ts';
 import { trainingDaySpecs } from '../src/features/home/data/training-days.ts';
 import { recordedIntakeOf } from '../src/features/nutrition/data/recorded-intake.ts';
+import { AccountSession, type AuthPlatform } from '../src/features/account/session.ts';
 
 const today = '2026-10-23';
 const now = new Date('2026-10-23T07:42:00+11:00');
@@ -38,6 +39,7 @@ const energy = nutritionEnergyModel({
   scaledTargets: null,
 });
 const input = (over: Partial<SnapshotInput> = {}): SnapshotInput => ({
+  user: 'user-one',
   date: today,
   now,
   timezone: tz,
@@ -113,6 +115,7 @@ test("Body Battery's headline matches the card's", () => {
 test('the snapshot is version 1 and carries every value already formatted', () => {
   const snapshot = widgetSnapshot(input());
   assert.equal(snapshot.v, 1);
+  assert.equal(snapshot.user, 'user-one');
   assert.equal(snapshot.date, today);
   assert.equal(snapshot.updated, 'Updated 7:42 am');
   assert.deepEqual(snapshot.today.scores.map((s) => [s.label, s.value]), [['Readiness', '78'], ['Resting HR', '52'], ['Sleep', '84'], ['Activity', '61']]);
@@ -236,4 +239,53 @@ test('WidgetSync mounts no hook that loads or refreshes', async () => {
 test('recordedIntakeOf reads the store as it stands: nothing logged is no intake, not zero', () => {
   const empty = { view: { totals: null, logs: [], mealTypes: [], mealStatuses: {} }, operations: [] };
   assert.equal(recordedIntakeOf(empty, today, null).intake, null);
+});
+
+const origin = 'https://example.com';
+function signedIn(saved: Record<string, unknown> | null, failRead = false) {
+  const storage = new Map<string, string>();
+  if (saved) storage.set('fitnessai.session.v1', JSON.stringify({ origin, userId: 'user-one', ...saved }));
+  let cleared = 0;
+  const platform: AuthPlatform = {
+    get: async (key) => {
+      if (failRead) throw new Error('locked');
+      return storage.get(key) ?? null;
+    },
+    set: async (key, value) => void storage.set(key, value),
+    remove: async (key) => void storage.delete(key),
+    random: async () => 'S'.repeat(43),
+    challenge: async () => 'S'.repeat(43),
+    open: async () => ({ type: 'cancel' }),
+    dismiss() {},
+    clearAccountData: () => void cleared++,
+  };
+  return { session: new AccountSession(origin, platform), cleared: () => cleared };
+}
+
+test('signing out clears the widget snapshot', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 200 }));
+  const f = signedIn({ accessToken: 'live', expiresAt: Math.floor(Date.now() / 1000) + 3600 });
+  await f.session.signOut();
+  assert.equal(f.cleared(), 1);
+  await f.session.signOut('Your session expired. Sign in again.');
+  assert.equal(f.cleared(), 2);
+});
+
+test('an expired, missing or unreadable saved session clears it too', async (t) => {
+  t.mock.method(globalThis, 'fetch', () => {
+    throw new Error('Unexpected network request');
+  });
+  for (const f of [signedIn({ accessToken: 'old', expiresAt: 1 }), signedIn(null), signedIn(null, true)]) {
+    await f.session.initialize(null);
+    assert.equal(f.session.state.status, 'signedOut');
+    assert.equal(f.cleared(), 1);
+  }
+});
+
+test('the snapshot is written only for the signed-in account', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/features/widgets/WidgetSync.tsx', import.meta.url), 'utf8');
+  // Signed out renders nothing; each account remounts with its own id stamped on the snapshot.
+  assert.match(source, /return userId \? <AccountWidgetSync key=\{userId\} userId=\{userId\} \/> : null;/);
+  assert.match(source, /user: userId,/);
 });

@@ -10,4 +10,8 @@ internal object WidgetStore {
   fun write(context: Context, json: String) {
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, json).apply()
   }
+
+  fun clear(context: Context) {
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY).apply()
+  }
 }

@@ -52,6 +52,8 @@ export type WidgetNutrition = {
 };
 export type WidgetSnapshot = {
   v: typeof WIDGET_SNAPSHOT_VERSION;
+  /** The signed-in account it was built for; a widget refuses a snapshot for anyone else. */
+  user: string;
   /** The user's local date the snapshot describes. */
   date: string;
   updated: string;
@@ -61,6 +63,7 @@ export type WidgetSnapshot = {
 };
 
 export type SnapshotInput = {
+  user: string;
   date: string;
   now: Date;
   timezone: string;
@@ -75,6 +78,7 @@ export type SnapshotInput = {
 export function widgetSnapshot(input: SnapshotInput): WidgetSnapshot {
   return {
     v: WIDGET_SNAPSHOT_VERSION,
+    user: input.user,
     date: input.date,
     updated: `Updated ${formatTimeOfDay(input.now, input.timezone)}`,
     today: {

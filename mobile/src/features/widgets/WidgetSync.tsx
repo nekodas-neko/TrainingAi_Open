@@ -16,6 +16,7 @@ import { recordedIntakeOf } from '../nutrition/data/recorded-intake';
 import { usePassiveResource } from '../workouts/data/WorkoutDataProvider';
 import { useWorkoutJournal } from '../workouts/logging/WorkoutJournalProvider';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
+import { useAccountContext } from '../account/AccountProvider';
 import { hasContent, snapshotIdentity, widgetSnapshot } from './snapshot';
 
 const DEBOUNCE_MS = 1_000;
@@ -28,8 +29,15 @@ const DEBOUNCE_MS = 1_000;
  * after the numbers settle, only when they changed, and at once when the app goes to the
  * background. Renders nothing; mounted only where the native module exists.
  */
-export const WidgetSync = memo(function WidgetSync() {
-  const snapshot = useWidgetSnapshot();
+export function WidgetSync() {
+  const userId = useAccountContext().dataReader?.userId ?? null;
+  // Nothing is written while signed out (sign-out clears the snapshot, #3279), and a new account
+  // remounts it, so its first snapshot is written even if the numbers happen to match.
+  return userId ? <AccountWidgetSync key={userId} userId={userId} /> : null;
+}
+
+const AccountWidgetSync = memo(function AccountWidgetSync({ userId }: { userId: string }) {
+  const snapshot = useWidgetSnapshot(userId);
   const latest = useRef<{ json: string; identity: string } | null>(null);
   const written = useRef<string | null>(null);
   latest.current = snapshot;
@@ -63,7 +71,7 @@ function write(
 }
 
 /** The snapshot as JSON and its identity; a new object only when a model's output changes. */
-function useWidgetSnapshot() {
+function useWidgetSnapshot(userId: string) {
   const health = useHealthData();
   const today = health.today;
   const home = useHomeState();
@@ -134,6 +142,7 @@ function useWidgetSnapshot() {
   const goalMl = goals.data?.waterGoalMl ?? DEFAULT_WATER_GOAL_ML;
   const identity = useMemo(() => {
     const built = widgetSnapshot({
+      user: userId,
       date: today,
       now: new Date(),
       timezone: workout.timezone,
@@ -144,7 +153,7 @@ function useWidgetSnapshot() {
       water: { ml: waterMl, goalMl },
     });
     return hasContent(built) ? { built, identity: snapshotIdentity(built) } : null;
-  }, [today, workout.timezone, scores, battery.data, recommendation, energy, waterMl, goalMl]);
+  }, [userId, today, workout.timezone, scores, battery.data, recommendation, energy, waterMl, goalMl]);
   // Keyed on the identity string alone: the same numbers keep the same object, so the write
   // effect does not re-run when only the time would change.
   return useMemo(

@@ -17,5 +17,10 @@ class HomeWidgetsModule : Module() {
     Function("writeSnapshot") { json: String ->
       WidgetStore.write(context, json)
     }
+
+    // When no account is signed in any more (AccountSession.clearAccountData).
+    Function("clearSnapshot") {
+      WidgetStore.clear(context)
+    }
   }
 }
