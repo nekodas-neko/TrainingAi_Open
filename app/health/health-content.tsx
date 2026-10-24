@@ -27,7 +27,7 @@ import { useDayRolloverRefresh } from '@/components/shell/local-day-provider';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { runWithConcurrency } from "@/lib/async/run-with-concurrency";
 import { invalidateReadinessInputs, invalidateOuraSync, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite, invalidatePulledDomains } from "@/lib/cache-groups";
-import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, HEALTH_TRENDS_SUMMARY_TTL } from '@trainingai/shared/cache-ttl';
+import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, HEALTH_TRENDS_SUMMARY_TTL, TRAINING_LOAD_TTL } from '@trainingai/shared/cache-ttl';
 import type { HealthTrendsResponse } from "@/app/api/health/trends/route";
 import type { SleepDetailReading } from "@/components/health-metric-sheet";
 import { MetricSheets } from "@/components/health/metric-sheets";
@@ -423,7 +423,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const fetchBodyHealthData = useCallback(async () => {
     await runWithConcurrency([
       () => cachedFetchToday<import('@/app/api/training-load/route').TrainingLoadResponse>(
-        'training-load', '/api/training-load', TTL_MEDIUM,
+        'training-load', '/api/training-load', TRAINING_LOAD_TTL,
         d => { setTrainingLoadFailed(false); if (d && d.interpretation !== 'insufficient_data') setTrainingLoad(d) },
         // LB-176. `trainingLoad` is left null for a SUCCESSFUL `insufficient_data` response as well as
         // for a failure, and the card's "Not enough data yet" is right for the first and wrong for the

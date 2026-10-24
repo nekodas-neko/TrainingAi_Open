@@ -84,7 +84,7 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   // Server-backed preferences (Q-392): re-seeded from the next account's own bag on sign-in.
   ta_ss_widgets: 'Home widgets', ta_ss_cards: 'Home cards', ta_home_section_order: 'Home layout',
   ta_home_hidden_sections: 'Home layout', ta_pill_colors: 'Home colours', ta_card_colors: 'Home colours',
-  ta_score_ring_style: 'Home score ring', ta_weight_lookback: 'weight chart window',
+  ta_score_ring_style: 'Home score ring', ta_weight_lookback: 'weight chart window', ta_weight_band_pct: 'weight-response target band',
   ta_goals_progress_view: 'goals card view', ta_meal_label_style: 'meal label style',
   ta_rest_duration: 'default rest', ta_food_region: 'food database region',
   ta_pref_meal_reminders: 'reminder toggle', ta_pref_health_alerts: 'alert toggle',
@@ -110,6 +110,7 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   // Sync cursors and upload queues. A queue left behind would POST under the next account.
   ta_hc_last_sync: 'Health Connect cursor — the next account backfills the window for itself',
   ta_hc_first_hand_skipped_since: 'Health Connect rewind marker — the next account starts without one',
+  ta_hc_first_hand_skipped_types: 'the types that rewind marker is owed for — goes with it',
   ta_hc_last_skipped: 'last Health Connect sync\'s skip counts — the next account starts without them',
   ...UPLOAD_QUEUE_STORAGE,
   // Everything else that is one person's.

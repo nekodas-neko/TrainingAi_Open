@@ -6,6 +6,7 @@ import { InfoIcon } from "lucide-react";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
 import { accentCardStyle } from "@trainingai/shared/utils";
+import { TREND_VIEW_NOTE } from "@trainingai/shared/health/trend-view-notes";
 import type { TrendsResponse } from "@/app/api/health-trends/route";
 import { RestPrescriptionCard } from "./rest-prescription-card";
 
@@ -138,6 +139,7 @@ export const TrendsSection = memo(function TrendsSection({ userId }: { userId?: 
         <InfoIcon className="h-3.5 w-3.5 text-muted-foreground flex-none mt-0.5" />
         <p className="text-[11px] text-muted-foreground leading-relaxed">
           Correlations need enough paired data points to be meaningful — keep logging workouts, sleep, meals and morning check-ins to unlock each view.
+          {TREND_VIEW_NOTE[view] && <><br />{TREND_VIEW_NOTE[view]}</>}
         </p>
       </div>
     </div>

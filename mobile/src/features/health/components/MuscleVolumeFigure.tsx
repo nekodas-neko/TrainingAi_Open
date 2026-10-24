@@ -41,23 +41,29 @@ export function MuscleVolumeFigure({
         {hasTargets ? 'vs your program target' : `Target: ${GENERIC_TARGET}–${MAX_TARGET} sets`}
       </AppText>
       <MuscleMap assignments={assignments} />
-      {rows.map((row) => (
-        <Stack key={row.muscle} gap="xs">
-          <Stack direction="row" justify="space-between" align="center">
-            <AppText variant="label" style={{ flex: 1 }}>
-              {capitalize(row.muscle)}
-            </AppText>
-            <AppText variant="caption" style={{ color: row.color, fontVariant: ['tabular-nums'] }}>
-              {muscleSetsLabel(row.sets, row.target)}
-            </AppText>
+      {/* weekly-muscle-sets-card.tsx: space-y-2 rows, each a text-xs label, mb-0.5, then an h-2 bar. */}
+      <Stack gap="sm">
+        {rows.map((row) => (
+          <Stack key={row.muscle} gap="xxs">
+            <Stack direction="row" justify="space-between" align="center">
+              <AppText variant="calendarDay" style={{ flex: 1 }}>
+                {capitalize(row.muscle)}
+              </AppText>
+              <AppText
+                variant="caption"
+                style={{ color: row.color, fontWeight: '600', fontVariant: ['tabular-nums'] }}
+              >
+                {muscleSetsLabel(row.sets, row.target)}
+              </AppText>
+            </Stack>
+            <ProgressBar
+              value={row.sets / scale}
+              color={row.color}
+              target={(row.target ?? GENERIC_TARGET) / scale}
+            />
           </Stack>
-          <ProgressBar
-            value={row.sets / scale}
-            color={row.color}
-            target={(row.target ?? GENERIC_TARGET) / scale}
-          />
-        </Stack>
-      ))}
+        ))}
+      </Stack>
       <Legend
         items={
           hasTargets

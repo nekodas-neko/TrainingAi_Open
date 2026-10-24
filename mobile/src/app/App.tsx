@@ -14,6 +14,7 @@ import { AppProvider } from './providers/AppProvider';
 import { LocalStorageProvider } from './providers/LocalStorageProvider';
 import { AppStartupGate } from './providers/AppStartupGate';
 import { useTheme } from '../shared/theme/ThemeProvider';
+import { useGeistFonts } from '../shared/theme/font-loading';
 import { Screen, Notice } from '../shared/ui';
 import { useHealthContext } from '../features/health/HealthProvider';
 import type { Tab, DetailScreen, MoreDetail } from './navigation/tabs';
@@ -57,6 +58,10 @@ import { BaselinesScreen } from '../features/activities/screens/BaselinesScreen'
 import { CardioScreen } from '../features/activities/screens/CardioScreen';
 import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
 import { AlertNavigation } from '../features/platform/components/AlertNavigation';
+import {
+  WorkoutStatusAccountGuard,
+  WorkoutStatusSync,
+} from '../features/workouts/status/WorkoutStatusSync';
 import { DynamicBackground } from '../features/weather/components/DynamicBackground';
 import type { BackgroundSection } from '../features/weather/data/background';
 import { errorReporter } from '../core/reporting/index.ts';
@@ -540,6 +545,7 @@ function AppShell() {
           setDetail('health-week');
         }}
       />
+      <WorkoutStatusSync onWorkout={openWorkout} onWorkoutTab={() => selectTab('Workout')} />
       {!fullScreen && <TabBar selected={tab} onSelect={selectTab} />}
     </SafeAreaView>
   );
@@ -567,10 +573,12 @@ function NativeInteractions() {
   );
 }
 export default function App() {
+  useGeistFonts();
   return (
     <SafeAreaProvider>
       <AccountProvider>
         <ErrorReportConnection />
+        <WorkoutStatusAccountGuard />
         <LocalStorageProvider>
           <AppProvider>
             <AppStartupGate>

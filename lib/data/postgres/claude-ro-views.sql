@@ -1256,6 +1256,7 @@ SELECT
   t.created_at,
   t.updated_at,
   t.oura_user_id,
+  t.reauth_required_at,
   (t.personal_access_token IS NOT NULL) AS has_pat,
   (t.access_token IS NOT NULL) AS has_oauth_access,
   (t.refresh_token IS NOT NULL) AS has_oauth_refresh,

@@ -570,6 +570,7 @@ export function GuidedWorkoutScreen({
           </>
         ) : shownPanel === 'edit' && editSet ? (
           <SetEntry
+            voice={false}
             workout={workout}
             exercise={exercise}
             set={editSet}

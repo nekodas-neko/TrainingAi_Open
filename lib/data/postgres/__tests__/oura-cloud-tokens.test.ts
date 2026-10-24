@@ -64,6 +64,32 @@ describe.skipIf(!canRun)('oura_tokens as the Oura Cloud token store (#2858)', ()
     expect(row?.expiresAt?.toISOString()).toBe('2026-10-16T02:00:00.000Z')
   })
 
+  // #3204
+  it('marks a refused grant only while the row is unchanged, keeps the first time, and a save clears it', async () => {
+    const before = await repo.getOuraCloudTokens(USER_A)
+    expect(before?.reauthRequiredAt).toBeNull()
+    // A save after the caller's read: the row holds other tokens, so it is not marked.
+    const stale = new Date(before!.updatedAt.getTime() - 60_000)
+    expect(await repo.markOuraCloudReauthRequired(USER_A, stale)).toBe(false)
+    expect((await repo.getOuraCloudTokens(USER_A))?.reauthRequiredAt).toBeNull()
+
+    expect(await repo.markOuraCloudReauthRequired(USER_A, before!.updatedAt)).toBe(true)
+    const marked = await repo.getOuraCloudTokens(USER_A)
+    expect(marked?.reauthRequiredAt).toBeInstanceOf(Date)
+    // The tokens and their save time are left as they were.
+    expect(marked?.accessToken).toBe(before?.accessToken)
+    expect(marked?.updatedAt.getTime()).toBe(before!.updatedAt.getTime())
+    await raw(`UPDATE oura_tokens SET reauth_required_at = '2026-10-20T00:00:00Z' WHERE user_id = $1`, [USER_A])
+    expect(await repo.markOuraCloudReauthRequired(USER_A, before!.updatedAt)).toBe(true)
+    expect((await repo.getOuraCloudTokens(USER_A))?.reauthRequiredAt?.toISOString()).toBe('2026-10-20T00:00:00.000Z')
+
+    expect(await repo.markOuraCloudReauthRequired(USER_B, new Date())).toBe(false) // no row, nothing marked
+
+    const t = tokens(USER_A, 'access-3', 'refresh-3')
+    await repo.saveOuraCloudTokens(USER_A, { ...t, expiresAt: new Date('2026-10-17T02:00:00Z'), scope: 'daily', ouraUserId: 'oura-A' })
+    expect((await repo.getOuraCloudTokens(USER_A))?.reauthRequiredAt).toBeNull()
+  })
+
   it('refuses a second user for the same Oura account (23505)', async () => {
     const t = tokens(USER_B, 'b', 'b')
     await expect(repo.saveOuraCloudTokens(USER_B, { ...t, expiresAt: new Date(), scope: null, ouraUserId: 'oura-A' }))
@@ -87,6 +113,7 @@ describe.skipIf(!canRun)('oura_tokens as the Oura Cloud token store (#2858)', ()
     const cols = rows.map(r => r.column_name)
     expect(cols).not.toContain('access_token')
     expect(cols).not.toContain('refresh_token')
+    expect(cols).toContain('reauth_required_at') // #3204: when the feed stopped is not a secret
   })
 
   it('the row goes with the account', async () => {

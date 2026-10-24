@@ -33,6 +33,17 @@ describe('UserPreferencesSchema', () => {
     expect(UserPreferencesSchema.safeParse({ scoreRingStyle: 'x'.repeat(41) }).success).toBe(false)
   })
 
+  it('bounds the weight band: lo below hi, both inside 0.1–2.0 %/wk', () => {
+    const ok = (b: unknown) => UserPreferencesSchema.safeParse({ weightBandPctPerWeek: b }).success
+    expect(ok({ lo: 0.4, hi: 1.2 })).toBe(true)
+    expect(ok({ lo: 1, hi: 1 })).toBe(false)
+    expect(ok({ lo: 1.2, hi: 0.8 })).toBe(false)
+    expect(ok({ lo: 0.05, hi: 1 })).toBe(false)
+    expect(ok({ lo: 0.5, hi: 10 })).toBe(false)
+    expect(ok({ lo: 0.5 })).toBe(false)
+    expect(UserPreferencesSchema.safeParse({}).success).toBe(true)
+  })
+
   it('rejects null — only the PATCH schema accepts it, and only to clear', () => {
     expect(UserPreferencesSchema.safeParse({ scoreRingStyle: null }).success).toBe(false)
   })
