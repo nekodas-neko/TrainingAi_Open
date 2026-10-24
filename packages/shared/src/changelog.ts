@@ -6,6 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.497.0",
+    date: "2026-10-25",
+    changes: [
+      "TrainingAi Preview looks like the current app: Home, Health (Training, Progress, Heart rate, Week in review), Nutrition, Cardio Hub and More match it, the text is set in the same typeface, and controls are back to the current app's size.",
+      "In TrainingAi Preview, an active workout shows on the lock screen and in the notification shade with the exercise, the set and a rest countdown that keeps running with the screen off, and the picture-in-picture window shows the same.",
+      "TrainingAi Preview can log a set by voice, and its Training Load card adds a weekly line showing whether your training block is building or easing.",
+      "In TrainingAi Preview, a sign-in left unfinished clears itself, Back from editing a meal returns to the meal library, and Data & Sync lists any upload the server refused, with Retry and Discard.",
+      "You can set your own weight-response target band on the vial sheet, as a percentage of bodyweight per week.",
+      "The Oura settings show a connection Oura refused as needing a reconnect instead of connected, and the Meals vs sleep card says which meal time it used.",
+      "Behind the scenes: Health Connect workouts are matched by their record id and removed when deleted there, heart-rate recovery is measured from when a set actually ended, and a recompute can clear a stale best.",
+    ],
+  },
+  {
     version: "1.496.0",
     date: "2026-10-25",
     changes: [
