@@ -5,6 +5,7 @@ import {
   resolveFailedOutboxIds,
 } from '@trainingai/shared/sync/push-retry';
 import { z } from 'zod';
+import { deadLettered, discardRow, retryRow, type QueueList } from './sync-health.ts';
 import { msToHHMMInTz, toAestDay } from '@trainingai/shared/date-utils';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
@@ -60,7 +61,7 @@ const sessionSchema = z.object({
 export type ActivitySession = z.infer<typeof sessionSchema>;
 // What the server said when it refused a row, kept on the row. `attempts` counts server answers
 // only, never a lost connection. A row at MAX_MUTATION_ATTEMPTS is dead-lettered: the flush skips
-// it and it stays here, with the server's words, for a later Retry / Discard screen to read.
+// it and it stays here, with the server's words, for the Sync health card's Retry / Discard to read.
 const rejection = z.object({
   error: z.string(),
   at: z.number(),
@@ -68,9 +69,7 @@ const rejection = z.object({
   retryAt: z.number().optional(),
 });
 export type Rejection = z.infer<typeof rejection>;
-export function deadLettered(row: { rejected?: Rejection }) {
-  return (row.rejected?.attempts ?? 0) >= MAX_MUTATION_ATTEMPTS;
-}
+export { deadLettered };
 const localRow = z.object({
   payload: activityPayload,
   pending: z.boolean(),
@@ -916,6 +915,16 @@ export class ActivityStore {
         unchanged(item) ? { ...item, rejected } : item,
       ),
     }));
+  }
+  // Sync health's Retry: forget the refusals on one dead-lettered row and send it again now.
+  async retryRejected(list: QueueList, id: string) {
+    await this.write((data) => retryRow(data, list, id));
+    await this.sync();
+  }
+  // Sync health's Discard: drop one dead-lettered row from this phone's queue only.
+  async discardRejected(list: QueueList, id: string) {
+    await this.write((data) => discardRow(data, list, id));
+    this.invalidate();
   }
   cancel() {
     this.generation++;
