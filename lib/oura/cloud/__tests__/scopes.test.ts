@@ -1,7 +1,7 @@
 // The scopes we ask Oura for, how a stored grant reads, and which scope each collection needs
 // (#3026). The names come from the pinned spec, `openapi-v1.42.json`.
 import { describe, expect, it } from 'vitest'
-import { grantedOuraScopes, OURA_SCOPES } from '../config'
+import { grantedOuraScopes, OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE, OURA_SCOPES, ouraCloudDeliveredTypes } from '../config'
 import { isOuraTypeShared, OURA_SCOPE_FOR } from '../documents'
 
 describe('Oura scopes (#3026)', () => {
@@ -57,5 +57,46 @@ describe('grantedOuraScopes', () => {
     expect(isOuraTypeShared(withHeart, 'daily_resilience')).toBe(true)
     expect(isOuraTypeShared(withHeart, 'daily_cardiovascular_age')).toBe(true)
     expect(isOuraTypeShared(withHeart, 'daily_spo2')).toBe(false)
+  })
+})
+
+// #3204: "connected" per Health Connect record type, for the phones' first-hand filter.
+describe('ouraCloudDeliveredTypes', () => {
+  const row = (scope: string | null, reauthRequiredAt: Date | null = null) => ({ accessToken: 'ciphertext', scope, reauthRequiredAt })
+
+  it('takes each type\'s scope from the collection the server reads it from', () => {
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.SleepSession).toBe(OURA_SCOPE_FOR.sleep)
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.RestingHeartRate).toBe(OURA_SCOPE_FOR.sleep)
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.HeartRateVariabilityRmssd).toBe(OURA_SCOPE_FOR.sleep)
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.Steps).toBe(OURA_SCOPE_FOR.daily_activity)
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.ActiveCaloriesBurned).toBe(OURA_SCOPE_FOR.daily_activity)
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.OxygenSaturation).toBe(OURA_SCOPE_FOR.daily_spo2)
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.HeartRate).toBe(OURA_SCOPE_FOR.heartrate)
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.HeartRateSeries).toBe(OURA_SCOPE_FOR.heartrate)
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.ActivitySession).toBe(OURA_SCOPE_FOR.workout)
+    for (const scope of Object.values(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE)) expect(OURA_SCOPES).toContain(scope)
+  })
+
+  it('is true for every type under a full grant', () => {
+    const all = ouraCloudDeliveredTypes(row('extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health'))!
+    expect(Object.keys(all).sort()).toEqual(Object.keys(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE).sort())
+    expect(Object.values(all).every(Boolean)).toBe(true)
+  })
+
+  it('is false for a type whose scope the user unticked', () => {
+    const partial = ouraCloudDeliveredTypes(row('extapi:personal extapi:daily extapi:workout'))!
+    expect(partial).toMatchObject({ SleepSession: true, Steps: true, ActivitySession: true, OxygenSaturation: false, HeartRate: false, HeartRateSeries: false })
+    // A legacy grant name still counts (#3026).
+    expect(ouraCloudDeliveredTypes(row('extapi:personal extapi:spo2Daily'))!.OxygenSaturation).toBe(true)
+  })
+
+  it('covers every type for a grant with no scope string, as the reads do', () => {
+    expect(Object.values(ouraCloudDeliveredTypes(row(null))!).every(Boolean)).toBe(true)
+  })
+
+  it('is null once Oura refused the grant, and without tokens', () => {
+    expect(ouraCloudDeliveredTypes(row('extapi:daily', new Date('2026-10-21T00:00:00Z')))).toBeNull()
+    expect(ouraCloudDeliveredTypes({ accessToken: null, scope: 'extapi:daily', reauthRequiredAt: null })).toBeNull()
+    expect(ouraCloudDeliveredTypes(null)).toBeNull()
   })
 })

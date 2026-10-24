@@ -12,6 +12,7 @@ import { Stack } from './Stack';
 
 export function MetricCard({
   label,
+  labelNote,
   value,
   unit,
   caption,
@@ -27,6 +28,8 @@ export function MetricCard({
   children,
 }: {
   label: string;
+  /** Quiet text set after the title in its own case, such as "2 days missing". */
+  labelNote?: string;
   value?: string | null;
   unit?: string;
   caption?: string;
@@ -58,7 +61,9 @@ export function MetricCard({
       style={{
         minHeight: dense
           ? (theme.typography.caption.lineHeight ?? theme.spacing.xl) * 2
-          : theme.sizes.touchTarget,
+          : onLog
+            ? theme.sizes.touchTarget
+            : undefined,
       }}
     >
       <Stack
@@ -75,6 +80,16 @@ export function MetricCard({
           numberOfLines={2}
         >
           {label}
+          {!!labelNote && (
+            <AppText
+              variant="caption"
+              tone="muted"
+              style={{ textTransform: 'none', letterSpacing: 0, fontWeight: '400', opacity: 0.7 }}
+            >
+              {'  '}
+              {labelNote}
+            </AppText>
+          )}
         </AppText>
       </Stack>
       {status}
@@ -100,6 +115,10 @@ export function MetricCard({
         {!dense && header}
         <Pressable
           disabled={!canAct}
+          hitSlop={{
+            top: (theme.sizes.touchTarget - theme.sizes.metricValue) / 2,
+            bottom: (theme.sizes.touchTarget - theme.sizes.metricValue) / 2,
+          }}
           onPress={onOpen ?? onLog}
           onLongPress={canAct ? more : undefined}
           accessibilityActions={

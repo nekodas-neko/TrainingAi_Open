@@ -27,6 +27,18 @@ const Key = z.string().max(40)
 /** A colour token or hex, keyed by whatever the surface keys by. */
 const ColorMap = z.record(Key, z.string().max(40))
 
+/**
+ * The reta weight-response target band: a LOSS rate in percent of bodyweight per week, never kg.
+ * The card converts it against the latest weigh-in, so a stored kg figure would quietly mean
+ * something else as the body changes. Bounded because a band with `lo >= hi`, or a ceiling of
+ * 10 %/wk, gives a verdict that is confidently wrong rather than an obvious mistake.
+ */
+export const WEIGHT_BAND_MIN_PCT = 0.1
+export const WEIGHT_BAND_MAX_PCT = 2.0
+const BandPct = z.number().min(WEIGHT_BAND_MIN_PCT).max(WEIGHT_BAND_MAX_PCT)
+export const WeightBandSchema = z.object({ lo: BandPct, hi: BandPct }).strict()
+  .refine(b => b.lo < b.hi, { message: 'lo must be below hi' })
+
 export const UserPreferencesSchema = z.object({
   // ── Home layout and colour ────────────────────────────────────────────────────
   homeWidgets:        z.array(Key).max(20).optional(),
@@ -40,6 +52,7 @@ export const UserPreferencesSchema = z.object({
    *  on purpose, so adding a third window is a one-line change at the read site. */
   weightLookback:     z.number().int().min(1).max(3650).optional(),
   goalsProgressView:  Key.optional(),
+  weightBandPctPerWeek: WeightBandSchema.optional(),
 
   // ── Theme ─────────────────────────────────────────────────────────────────────
   brandTheme:         Key.optional(),
@@ -83,6 +96,7 @@ export const PREFERENCE_STORAGE: Readonly<Record<
   scoreRingStyle:     { key: 'ta_score_ring_style',      encoding: 'string' },
   weightLookback:     { key: 'ta_weight_lookback',       encoding: 'number' },
   goalsProgressView:  { key: 'ta_goals_progress_view',   encoding: 'string' },
+  weightBandPctPerWeek: { key: 'ta_weight_band_pct',     encoding: 'json' },
   brandTheme:         { key: 'ta_brand_theme',           encoding: 'string' },
   brandHue:           { key: 'ta_brand_hue',             encoding: 'number' },
   backgroundSettings: { key: 'ta_background_settings',   encoding: 'json' },

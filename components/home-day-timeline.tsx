@@ -82,7 +82,7 @@ function WorkoutCard({ ev }: { ev: TimelineEvent }) {
         {ev.durationMin != null && (
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            {ev.durationMin} min
+            {formatHoursMinutes(ev.durationMin)}
           </span>
         )}
         {ev.sets != null && (
@@ -110,7 +110,7 @@ function WalkCard({ ev }: { ev: TimelineEvent }) {
         {ev.durationMin != null && (
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            {ev.durationMin} min
+            {formatHoursMinutes(ev.durationMin)}
           </span>
         )}
         {ev.calories != null && (
