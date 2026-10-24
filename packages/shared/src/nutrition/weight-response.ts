@@ -1,6 +1,7 @@
 import { computeWeightRateFit, type WeightPoint } from '@trainingai/shared/health/long-term-goal-progress'
 import { doseDiffers, type DoseLogEntry } from '@trainingai/shared/health/dose-change-caveat'
 import { daysBetweenDateStrs, isCalendarDate, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
+import { WeightBandSchema } from '@trainingai/shared/user/preferences'
 import { iqrBand, median, quantile } from '@trainingai/shared/stats'
 
 /**
@@ -26,6 +27,12 @@ import { iqrBand, median, quantile } from '@trainingai/shared/stats'
 
 /** The band is a LOSS rate as a percentage of bodyweight per week. */
 export const DEFAULT_BAND_PCT_PER_WEEK = { lo: 0.5, hi: 1.0 }
+
+/** A stored or passed band if it is valid, otherwise the default — a bad value never reaches a verdict. */
+export function resolveBand(raw: unknown): { lo: number; hi: number } {
+  const parsed = WeightBandSchema.safeParse(raw)
+  return parsed.success ? parsed.data : DEFAULT_BAND_PCT_PER_WEEK
+}
 
 /**
  * The smallest residual a 0.1 kg scale can produce, in kg.
@@ -109,7 +116,8 @@ function dayVariance(dates: string[]): number | null {
 }
 
 export function weightResponse(input: WeightResponseInput): WeightResponse | null {
-  const { points, bandPctPerWeek = DEFAULT_BAND_PCT_PER_WEEK } = input
+  const { points } = input
+  const bandPctPerWeek = resolveBand(input.bandPctPerWeek)
 
   const fit = computeWeightRateFit(points)
   // `stdErrKgPerWeek` is null below three readings, and an interval is the whole point of this.
