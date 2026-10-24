@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.496.0",
+    date: "2026-10-25",
+    changes: [
+      "When Oura stops sharing a kind of data, or the Oura connection needs signing in again, the app notices and reads that data from Health Connect again instead of waiting for Oura.",
+    ],
+  },
+  {
     version: "1.495.0",
     date: "2026-10-22",
     changes: [
