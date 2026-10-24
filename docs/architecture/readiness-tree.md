@@ -6,7 +6,7 @@
 
 **Shadow engine (#2377):** built and scored daily beside the live readiness, shown nowhere
 (`shadow_readiness`). The model as data is `packages/shared/src/health/shadow-readiness/model.ts`;
-units it cannot build yet (`heart.daytime_rhr`, `activity.block_trend`) are
+units it cannot build yet (`activity.block_trend`) are
 marked `unavailable` there with what each one needs, and drop out with their pillar renormalised.
 
 Read with [`adaptive-scoring.md`](adaptive-scoring.md) (how bands and normals are learned per

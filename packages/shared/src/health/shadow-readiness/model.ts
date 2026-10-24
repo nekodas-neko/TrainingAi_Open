@@ -29,8 +29,10 @@ import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/sh
  * is computed as of the START of each day over the same window the live callers fetch (28 local
  * days before it, plus the day). The acute window was already 7 days here; the chronic window
  * gains one day and its span is measured from the day's start, as live has always done.
+ * Version 4 = version 3 plus `heart.daytime_rhr` scored (issue 2634): the stored median HR of the
+ * day's still, awake minutes. Its 10 Heart points were renormalised over the other units before.
  */
-export const SHADOW_MODEL_VERSION = 3
+export const SHADOW_MODEL_VERSION = 4
 
 // ── Unit ids ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -254,10 +256,6 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
   'heart.daytime_rhr': {
     id: 'heart.daytime_rhr', pillar: 'heart', shape: 'directional', reference: 'learned', weight: 10, daytime: true,
     direction: 'down', isNew: true, minMeaningfulChange: 2,
-    unavailable:
-      'No per-day "resting HR in still daytime periods" is stored. It needs a rollup step that '
-      + 'takes the median HR of still minutes (MET below the active threshold, `medianGated` over '
-      + '`metActiveWindows`) for each completed day and writes it beside the other daily metrics.',
   },
   'heart.hr_recovery': {
     id: 'heart.hr_recovery', pillar: 'heart', shape: 'directional', reference: 'learned', weight: 10, daytime: true,
