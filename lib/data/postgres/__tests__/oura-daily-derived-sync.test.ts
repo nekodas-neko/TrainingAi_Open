@@ -28,6 +28,7 @@ const FULL_PAYLOAD = {
   resilienceLevel: 3, resilienceDailyStress: 1.2, resilienceDailyRestorativeTime: 4.5,
   resilienceDailySleepRecovery: 2.1, resilienceGranular: 3.4, resilienceConfidence: 0.8,
   daytimeStressCoverageMin: 240, chronicStressGranularNights: 27,
+  stillRhrBpm: 64.5, stillRhrCoverageMin: 310,
   bdiDerived: 5.5,
   bodyComp: JSON.stringify({ ffm: 62 }),
 }
