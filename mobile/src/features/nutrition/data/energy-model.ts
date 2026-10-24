@@ -30,12 +30,34 @@ export function nutritionEnergyModel(input: EnergyInput): EnergyModel {
       ? { ...input.totals, calories: input.recordedIntake }
       : (input.totals ?? null);
   const goal = input.budgetKcal ?? input.targetCalories ?? null;
+  // Recorded intake alone is enough for "left": the device's food store may not have loaded yet
+  // while the server's logged figure and the counted plan meals already have.
+  const eaten = total?.calories ?? input.recordedIntake ?? null;
   return {
     total,
     goal,
-    remaining: total && goal != null ? goal - total.calories : null,
+    remaining: eaten != null && goal != null ? goal - eaten : null,
     targets: input.scaledTargets ?? input.targets,
   };
+}
+
+/**
+ * The model for the cards that take the energy balance's budget alone as the goal and never fall
+ * back to the calorie target: Home's donut and energy-balance widget, the Body tab's Energy Balance
+ * and End of Day's totals. The current app's equivalents show nothing (or "kcal" with no
+ * denominator) when there is no budget, so these match it (#3282).
+ */
+export function budgetEnergyModel(input: {
+  totals: Totals | null | undefined;
+  recordedIntake: number | null | undefined;
+  budgetKcal: number | null | undefined;
+}): EnergyModel {
+  return nutritionEnergyModel({
+    ...input,
+    targetCalories: null,
+    targets: {},
+    scaledTargets: null,
+  });
 }
 
 /** The card's figure and its word: "1,240" and "kcal left", or "kcal over". */

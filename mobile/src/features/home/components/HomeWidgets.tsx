@@ -39,7 +39,7 @@ import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useHome } from '../data/HomeProvider';
 import { CollectionCard } from '../../collection/components/CollectionCard';
 import { metricLabels } from '../data/models';
-import { nutritionEnergyModel } from '../../nutrition/data/energy-model';
+import { budgetEnergyModel } from '../../nutrition/data/energy-model';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { DEFAULT_SLEEP_GOAL_HOURS } from '@trainingai/shared/health/daily-goals';
@@ -262,13 +262,10 @@ function HomeWidgetBody({
   const resolvedIntake = useRecordedIntake(health.today, energy?.data?.balance);
   if (id === 'nutritionDonut') {
     // The Nutrition card's arithmetic; this card has always taken the budget alone as its goal.
-    const { total, goal, remaining } = nutritionEnergyModel({
+    const { total, goal, remaining } = budgetEnergyModel({
       totals: n.view.totals,
       recordedIntake: resolvedIntake.intake,
       budgetKcal: energy?.data?.balance?.budgetKcal,
-      targetCalories: null,
-      targets: {},
-      scaledTargets: null,
     });
     const provenance = balanceProvenance(energy?.data?.balance);
     return (
@@ -352,8 +349,11 @@ function HomeWidgetBody({
   if (id === 'energyBalanceWidget') {
     const balance = energy?.data?.balance;
     const intake = resolvedIntake.intake;
-    const remaining =
-      intake != null && balance?.budgetKcal != null ? balance.budgetKcal - intake : null;
+    const { remaining } = budgetEnergyModel({
+      totals: n.view.totals,
+      recordedIntake: intake,
+      budgetKcal: balance?.budgetKcal,
+    });
     return (
       <Pressable
         onPress={openNutrition}
