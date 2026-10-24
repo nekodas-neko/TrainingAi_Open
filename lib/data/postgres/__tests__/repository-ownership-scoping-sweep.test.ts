@@ -328,6 +328,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['listRestDays', r => r.listRestDays(USER_A, FROM, TO)],
     // #2076. B's token is live (not rotated, not revoked, expiring in a month).
     ['listActiveNativeRefreshTokens', r => r.listActiveNativeRefreshTokens(USER_A)],
+    ['findNativeRefreshTokenById', r => r.findNativeRefreshTokenById(USER_A, bId('native_refresh_tokens'))],
     // PRs and estimates
     ['getExerciseEstimates', r => r.getExerciseEstimates(USER_A)],
     ['listRecentPersonalRecords', r => r.listRecentPersonalRecords(USER_A, FROM_TS, TO_TS)],

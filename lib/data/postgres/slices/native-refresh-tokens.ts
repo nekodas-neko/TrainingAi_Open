@@ -102,6 +102,13 @@ export async function findNativeRefreshTokenByHash(db: Db, tokenHash: RefreshTok
   return row ? toToken(row) : null
 }
 
+/** The caller's row by id, whatever its state. A native access token names the row it was issued
+ *  with, so the bearer check can refuse it once that row's family is revoked. */
+export async function findNativeRefreshTokenById(db: Db, userId: string, id: string): Promise<NativeRefreshToken | null> {
+  const [row] = await db.select(COLUMNS).from(t).where(and(eq(t.id, id), eq(t.userId, userId))).limit(1)
+  return row ? toToken(row) : null
+}
+
 /**
  * Exchange a live token for its successor in one transaction: mark the old row rotated (and used),
  * insert the new one in the same family and device, and link the old row to it. Returns the new row,

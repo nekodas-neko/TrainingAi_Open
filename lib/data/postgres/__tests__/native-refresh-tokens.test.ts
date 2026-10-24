@@ -68,6 +68,16 @@ describe.skipIf(!canRun)('native_refresh_tokens (#2076)', () => {
     expect((await create(USER_A)).familyId).not.toBe(made.familyId)
   })
 
+  it('finds a row by id only for its own user, in any state, without the hash', async () => {
+    const made = await create(USER_A)
+    expect(await repo.findNativeRefreshTokenById(USER_A, made.id)).toEqual(made)
+    expect(await repo.findNativeRefreshTokenById(USER_B, made.id)).toBeNull()
+    await repo.revokeNativeRefreshToken(USER_A, made.id, 'user')
+    const revoked = await repo.findNativeRefreshTokenById(USER_A, made.id)
+    expect(revoked?.revokedReason).toBe('user')
+    expect(revoked).not.toHaveProperty('tokenHash')
+  })
+
   it('stores the hash exactly as given, and refuses a second row with the same hash', async () => {
     const tokenHash = newHash()
     const made = await create(USER_A, { tokenHash })

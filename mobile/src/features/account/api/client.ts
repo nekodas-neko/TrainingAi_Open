@@ -56,12 +56,24 @@ export type AccountProfile = {
   timezone: string | null;
   signInProviders: ('apple' | 'google')[];
 };
-export type SessionToken = { accessToken: string; expiresAt: number };
+export type SessionToken = {
+  accessToken: string;
+  expiresAt: number;
+  /** Absent on sessions saved before #2076; those last until `expiresAt` and cannot renew. */
+  refreshToken?: string;
+  refreshExpiresAt?: number;
+};
+export const REFRESH_TOKEN_RE = /^[A-Za-z0-9_-]{43,128}$/;
 
+/**
+ * `renew` is asked for a new access token after a 401 on the token it is given. The request is
+ * sent again once with what it returns; null, the same token or a second 401 ends it.
+ */
 export function createApiClient(
   baseUrl: string,
   getToken: () => Promise<string | null>,
   fetcher?: typeof fetch,
+  renew?: (stale: string) => Promise<string | null>,
 ) {
   const base = backendOrigin(baseUrl);
   async function request(
@@ -102,24 +114,33 @@ export function createApiClient(
       if (query) {
         url.search = new URLSearchParams(query).toString();
       }
-      const response = await (fetcher ?? fetch)(url, {
-        method,
-        credentials: 'omit',
-        cache: 'no-store',
-        redirect: 'error',
-        headers: {
-          Accept:
-            path === '/api/session-explain/insight'
-              ? 'text/plain'
-              : format === 'ndjson'
-                ? 'application/x-ndjson'
-                : 'application/json',
-          ...(body ? { 'Content-Type': 'application/json' } : {}),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      });
+      const send = (bearer: string | null) =>
+        (fetcher ?? fetch)(url, {
+          method,
+          credentials: 'omit',
+          cache: 'no-store',
+          redirect: 'error',
+          headers: {
+            Accept:
+              path === '/api/session-explain/insight'
+                ? 'text/plain'
+                : format === 'ndjson'
+                  ? 'application/x-ndjson'
+                  : 'application/json',
+            ...(body ? { 'Content-Type': 'application/json' } : {}),
+            ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        });
+      let response = await send(token);
+      if (response.status === 401 && token && renew) {
+        const fresh = await renew(token);
+        if (fresh && fresh !== token) {
+          await response.body?.cancel().catch(() => {});
+          response = await send(fresh);
+        }
+      }
       if (!response.ok) {
         let code: string | undefined;
         let value: { error?: unknown } | null = null;
@@ -183,18 +204,27 @@ export function createApiClient(
       if (!token) {
         throw new Error('Sign in before contacting TrainingAi.');
       }
-      const response = await (fetcher ?? fetch)(new URL('/api/coach', base), {
-        method: 'POST',
-        credentials: 'omit',
-        redirect: 'error',
-        headers: {
-          Accept: 'text/event-stream',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-        signal,
-      });
+      const send = (bearer: string) =>
+        (fetcher ?? fetch)(new URL('/api/coach', base), {
+          method: 'POST',
+          credentials: 'omit',
+          redirect: 'error',
+          headers: {
+            Accept: 'text/event-stream',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${bearer}`,
+          },
+          body: JSON.stringify(body),
+          signal,
+        });
+      let response = await send(token);
+      if (response.status === 401 && renew) {
+        const fresh = await renew(token);
+        if (fresh && fresh !== token) {
+          await response.body?.cancel().catch(() => {});
+          response = await send(fresh);
+        }
+      }
       if (!response.ok) {
         throw failedRequest('/api/coach', response.status, await response.json().catch(() => null));
       }
@@ -274,6 +304,20 @@ export function createApiClient(
         responseType: 'token',
       })) as Record<string, unknown> | null;
       return sessionResponse(value);
+    },
+    /** Unauthenticated: the refresh token is the credential (#2076). */
+    async refreshSession(refreshToken: string): Promise<SessionToken> {
+      const value = (await request(
+        '/api/auth/native-session/refresh',
+        'POST',
+        { refreshToken },
+        false,
+      )) as Record<string, unknown> | null;
+      const token = sessionResponse(value);
+      if (!token.refreshToken) {
+        throw new Error('Invalid session response.');
+      }
+      return token;
     },
     async beginApple(link = false) {
       const value = (await request('/api/auth/apple/begin', 'POST', { link }, link)) as {
@@ -356,5 +400,21 @@ function sessionResponse(value: Record<string, unknown> | null): SessionToken {
   ) {
     throw new Error('Invalid session response.');
   }
-  return { accessToken: value.accessToken, expiresAt: value.expiresAt };
+  if (value.refreshToken === undefined) {
+    return { accessToken: value.accessToken, expiresAt: value.expiresAt };
+  }
+  if (
+    typeof value.refreshToken !== 'string' ||
+    !REFRESH_TOKEN_RE.test(value.refreshToken) ||
+    typeof value.refreshExpiresAt !== 'number' ||
+    !Number.isSafeInteger(value.refreshExpiresAt)
+  ) {
+    throw new Error('Invalid session response.');
+  }
+  return {
+    accessToken: value.accessToken,
+    expiresAt: value.expiresAt,
+    refreshToken: value.refreshToken,
+    refreshExpiresAt: value.refreshExpiresAt,
+  };
 }

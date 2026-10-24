@@ -660,13 +660,15 @@ export interface WorkoutRepository {
   usersWithData(userIds: readonly string[]): Promise<Set<string>>
 
   // ── Native app refresh tokens (#2076) ─────────────────────────────────────
-  // `native_refresh_tokens`. Only a hash is stored and no method returns one. Nothing calls these
-  // until the token flow (PR b). Every method but the hash lookup is scoped to `userId`.
+  // `native_refresh_tokens`. Only a hash is stored and no method returns one. Every method but the
+  // hash lookup is scoped to `userId`.
   /** A sign-in on a device: a new token in a new family. */
   createNativeRefreshToken(input: CreateNativeRefreshTokenInput): Promise<NativeRefreshToken>
   /** The row a presented token's hash names, in any state (rotated, revoked, expired). The one
    *  unscoped lookup: a presented token is how the server learns which user is asking. */
   findNativeRefreshTokenByHash(tokenHash: RefreshTokenHash): Promise<NativeRefreshToken | null>
+  /** The caller's row by id, in any state. A native access token names the row it was issued with. */
+  findNativeRefreshTokenById(userId: string, id: string): Promise<NativeRefreshToken | null>
   /** Marks a live token rotated and inserts its successor in the same family, atomically. `null`
    *  (nothing written) when it is not the caller's or is already rotated, revoked or expired. */
   rotateNativeRefreshToken(input: RotateNativeRefreshTokenInput): Promise<NativeRefreshToken | null>
