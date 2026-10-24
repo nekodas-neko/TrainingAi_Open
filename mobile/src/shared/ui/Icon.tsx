@@ -58,6 +58,8 @@ import MapPin from 'lucide-react-native/icons/map-pin';
 import CalendarDays from 'lucide-react-native/icons/calendar-days';
 import Weight from 'lucide-react-native/icons/weight';
 import Undo2 from 'lucide-react-native/icons/undo-2';
+import Mic from 'lucide-react-native/icons/mic';
+import MicOff from 'lucide-react-native/icons/mic-off';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import GripVertical from 'lucide-react-native/icons/grip-vertical';
 import Sunrise from 'lucide-react-native/icons/sunrise';
@@ -156,6 +158,8 @@ const icons = {
   calendar: CalendarDays,
   weight: Weight,
   undo: Undo2,
+  mic: Mic,
+  micOff: MicOff,
   shield: ShieldCheck,
   sunrise: Sunrise,
   sun: Sun,

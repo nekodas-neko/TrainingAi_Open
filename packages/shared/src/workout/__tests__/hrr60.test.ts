@@ -1,7 +1,8 @@
 // #2457 / #2299 v2: HRR60 exists only where the series is dense enough to see the minute after a set.
 import { describe, it, expect } from 'vitest'
-import { deriveHrr60, deriveHrrAt, personalHrr60Bar, restAdequateFromHrr60, withHrr60Recovery, HRR60_BAR_MIN_SETS } from '../hrr60'
-import { planHrr1Backfill, summariseHrr1Changes } from '../hrr1-backfill'
+import { deriveHrr60, deriveHrrAt, personalHrr60Bar, restAdequateFromHrr60, withHrr60Recovery, setRestAnchorMs, HRR60_BAR_MIN_SETS } from '../hrr60'
+import { planHrr1Backfill, summariseHrr1Changes, measureHrr60 } from '../hrr1-backfill'
+import { computeSetHrStats, type RichSetMarker } from '../set-hr-stats'
 
 const END = 1_000_000
 type R = { timestamp: Date; bpm: number; source?: string | null }
@@ -70,7 +71,7 @@ describe('restAdequateFromHrr60', () => {
 describe('planHrr1Backfill', () => {
   const NO_DROPS = { drop30s: null, drop60s: null, drop90s: null, drop120s: null }
   const row = (id: string, offsetMs: number, before: { hrr1Bpm: number | null; restAdequate: boolean | null; drop30s?: number | null; drop60s?: number | null }) =>
-    ({ setLogId: id, loggedAt: new Date(END + offsetMs), ...NO_DROPS, ...before })
+    ({ setLogId: id, loggedAt: new Date(END + offsetMs), setEndMs: null, ...NO_DROPS, ...before })
 
   it('fills a measurable row, clears a stale ring verdict, and leaves a settled row alone', () => {
     const readings = [...strap(), at(600_000, 90, 'ble'), at(900_000, 85, 'ble')]
@@ -91,7 +92,7 @@ describe('planHrr1Backfill', () => {
   })
 
   it('a row with no logged_at is re-measured as null', () => {
-    const changes = planHrr1Backfill([{ setLogId: 'x', loggedAt: null, hrr1Bpm: null, restAdequate: true, ...NO_DROPS }], strap())
+    const changes = planHrr1Backfill([{ setLogId: 'x', loggedAt: null, setEndMs: null, hrr1Bpm: null, restAdequate: true, ...NO_DROPS }], strap())
     expect(changes[0].after).toEqual({ hrr1Bpm: null, restAdequate: null, ...NO_DROPS })
   })
 
@@ -154,5 +155,38 @@ describe('withHrr60Recovery — the live recap (#2299 step 2)', () => {
     const readings = [...strap(), at(600_000, 110, 'ble'), at(660_000, 107, 'ble')]
     expect(withHrr60Recovery(stats, readings, 10).map(s => [s.hrr1, s.adequate])).toEqual([[60, true], [null, null]])
     expect(withHrr60Recovery(stats, readings, 61)[0].adequate).toBe(false)
+  })
+})
+
+// #3238: the backfill and the live writer anchor a set's rest on the same instant.
+describe('backfill and live writer share the set-end anchor (#3238)', () => {
+  const NO_DROPS = { drop30s: null, drop60s: null, drop90s: null, drop120s: null }
+  const marker = (setEndMs: number | null, loggedAtMs: number): RichSetMarker => ({
+    setLogId: 's', exerciseLogId: 'e', exerciseId: 'x', exerciseName: 'Squat', phaseType: 'peak', setNumber: 1,
+    intensityPct: 80, plannedPct: 80, plannedReps: 5, restTakenSec: 90, plannedRestSec: 90,
+    setStartMs: setEndMs == null ? null : setEndMs - 30_000, setEndMs, loggedAt: new Date(loggedAtMs),
+  })
+  const live = (m: RichSetMarker) => computeSetHrStats(strap(), [m], { maxHr: 190, restingHr: 60 })[0].hrr1Bpm
+  const backfill = (m: RichSetMarker) => {
+    const stored = { setLogId: m.setLogId, loggedAt: m.loggedAt, setEndMs: m.setEndMs, hrr1Bpm: null, restAdequate: null, ...NO_DROPS }
+    return { measured: measureHrr60(stored, strap()), planned: planHrr1Backfill([stored], strap())[0]?.after.hrr1Bpm ?? null }
+  }
+
+  it('timed set whose set_end_ms differs from logged_at: same hrr1_bpm from both', () => {
+    const m = marker(END, END + 20_000) // the strap series is only dense from the real set end
+    expect(live(m)).toBe(60)
+    expect(backfill(m)).toEqual({ measured: 60, planned: 60 })
+  })
+
+  it('untimed set: both fall back to logged_at', () => {
+    const m = marker(null, END)
+    expect(live(m)).toBe(60)
+    expect(backfill(m)).toEqual({ measured: 60, planned: 60 })
+  })
+
+  it('setRestAnchorMs prefers the timed end, then logged_at, then null', () => {
+    expect(setRestAnchorMs(5, new Date(9))).toBe(5)
+    expect(setRestAnchorMs(null, new Date(9))).toBe(9)
+    expect(setRestAnchorMs(undefined, null)).toBeNull()
   })
 })

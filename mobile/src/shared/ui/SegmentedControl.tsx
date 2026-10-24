@@ -136,6 +136,10 @@ export function SegmentedControl<T extends string>({
         <Pressable
           key={option.value}
           accessibilityRole="radio"
+          hitSlop={{
+            top: (theme.sizes.touchTarget - theme.sizes.control) / 2,
+            bottom: (theme.sizes.touchTarget - theme.sizes.control) / 2,
+          }}
           accessibilityLabel={option.label}
           accessibilityState={{ checked: value === option.value }}
           aria-checked={value === option.value}
@@ -145,7 +149,7 @@ export function SegmentedControl<T extends string>({
           }}
           style={{
             flex: 1,
-            minHeight: theme.sizes.touchTarget,
+            minHeight: theme.sizes.control,
             padding: theme.spacing.sm,
             alignItems: 'center',
             justifyContent: 'center',

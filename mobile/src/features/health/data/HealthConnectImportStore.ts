@@ -16,6 +16,7 @@ import { HealthConnectPersistence } from './health-connect-persistence.ts';
 import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils';
 import {
   FirstHandFilter,
+  firstHandSkipsLapsed,
   type FirstHandSources,
 } from '@trainingai/shared/health/health-connect-origin';
 /**
@@ -97,9 +98,12 @@ const diskSchema = z.object({
   // Records left out as copies of data the server reads first-hand, per type (#3115). The last
   // sync's, not a running total (#3197).
   skippedFirstHand: z.record(z.string(), z.number()).default({}),
-  // When records were first left out, kept until Oura Cloud reads as disconnected, then rescanned
-  // from here so they are read after all (#3197).
+  // When records were first left out, kept until a type left out is no longer delivered first-hand,
+  // then rescanned from here so they are read after all (#3197).
   firstHandSince: z.string().nullable().default(null),
+  // The types left out since then (#3228 review): a rescan is owed only once one of them is no
+  // longer delivered. Empty on a disk from before it, which falls back to "the connection is gone".
+  firstHandTypes: z.array(z.string()).default([]),
   completed: completedSchema.nullable(),
 });
 type Disk = z.infer<typeof diskSchema>;
@@ -162,6 +166,7 @@ export class HealthConnectImportStore {
       skipped: 0,
       skippedFirstHand: {},
       firstHandSince: null,
+      firstHandTypes: [],
       completed: null,
     };
   }
@@ -289,12 +294,14 @@ export class HealthConnectImportStore {
     // This is the one gate every record passes to be uploaded: the initial read, each scan page and
     // each change page all come through here (#3197).
     let firstHandSince = this.disk.firstHandSince;
+    const firstHandTypes = new Set(this.disk.firstHandTypes);
     records = [...latest.values()].filter((row) => {
       if (removed.has(row.id)) return false;
       if (this.filter.admit(row.type, row)) return true;
-      // Where a later rescan has to reach back to: the oldest record left out.
+      // Where a later rescan has to reach back to: the oldest record left out, and its types.
       if (!firstHandSince || Date.parse(row.start) < Date.parse(firstHandSince))
         firstHandSince = row.start;
+      firstHandTypes.add(row.type);
       return false;
     });
     const skippedFirstHand = this.filter.counts();
@@ -336,6 +343,7 @@ export class HealthConnectImportStore {
       queue,
       skippedFirstHand,
       firstHandSince,
+      firstHandTypes: [...firstHandTypes],
       needsRebuild: this.disk.needsRebuild || records.length > 0 || deleted.length > 0,
     });
   }
@@ -520,9 +528,11 @@ export class HealthConnectImportStore {
         // A new filter each run, so its counts are that sync's: a rescan reads records again and
         // must not count them twice.
         this.filter = newFilter(firstHand);
-        // Oura Cloud reads as disconnected while records were left out: the change token is past
-        // them, so rescan from when the first was left out. Server-side Oura Cloud rows stay.
-        if (firstHand?.ouraCloud === false && this.disk.firstHandSince) {
+        // A type left out is no longer delivered first-hand: the change token is past those
+        // records, so rescan from when the first was left out. Not while every type left out is
+        // still delivered (#3228 review): the rescan would leave them out again and re-arm this,
+        // every run. Server-side Oura Cloud rows stay.
+        if (this.disk.firstHandSince && firstHandSkipsLapsed(firstHand, this.disk.firstHandTypes)) {
           // Keeps a gap already waiting (an expired token, a permission change): the older start wins.
           const pending = this.disk.rescanFrom ?? this.disk.tokenAt;
           const since = this.disk.firstHandSince;
@@ -532,6 +542,7 @@ export class HealthConnectImportStore {
             scan: null,
             rescanFrom: pending && Date.parse(pending) < Date.parse(since) ? pending : since,
             firstHandSince: null,
+            firstHandTypes: [],
           });
         }
         if (!this.disk.grantedAt)

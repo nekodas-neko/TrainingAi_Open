@@ -77,7 +77,7 @@ describe('/api/oura/webhook (#2859)', () => {
       userId: USER,
       accessToken: encryptOuraToken('acc', USER, 'access_token'),
       refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-      expiresAt: new Date(Date.now() + 86_400_000), scope: 'daily', ouraUserId: OURA_USER, updatedAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000), scope: 'daily', ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null,
     }
     written.length = 0
     rateLimit.mockReturnValue(true)

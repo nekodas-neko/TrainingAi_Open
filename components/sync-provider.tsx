@@ -23,7 +23,7 @@ import { hydrateGoalSeeds, type GoalSeedValues } from '@/lib/home/home-prefs';
 import { hydrateUserPreferences } from '@/lib/user/preferences-sync';
 import type { UserPreferences } from '@trainingai/shared/user/preferences';
 import { invalidatePulledDomains } from '@/lib/cache-groups';
-import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, NUTRITION_FOOD_LOGS_TTL, TRAINING_STRESS_TTL } from '@trainingai/shared/cache-ttl';
+import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, NUTRITION_FOOD_LOGS_TTL, TRAINING_STRESS_TTL, TRAINING_LOAD_TTL } from '@trainingai/shared/cache-ttl';
 import { getStepOrchestrator } from '@/lib/oura-ble/step-orchestrator';
 import { getContinuousCapture, isContinuousCaptureEnabled } from '@/lib/oura-ble/continuous-capture';
 import { getOuraBle } from '@/lib/oura-ble/plugin';
@@ -76,7 +76,7 @@ const CACHE_TASKS: CacheTask[] = [
   { key: 'training-stress',         url: '/api/training-stress',            ttl: TRAINING_STRESS_TTL, today: true },
   // Health tab
   { key: 'sleep-sessions',          url: '/api/sleep-sessions',             ttl: TTL_MEDIUM },
-  { key: 'training-load',           url: '/api/training-load',              ttl: TTL_MEDIUM, today: true },
+  { key: 'training-load',           url: '/api/training-load',              ttl: TRAINING_LOAD_TTL, today: true },
   { key: 'muscle-recovery',         url: '/api/muscle-recovery',            ttl: MUSCLE_RECOVERY_TTL },
   // Nutrition tab
   { key: 'nutrition-meal-types',    url: '/api/nutrition/meal-types',       ttl: TTL_LONG   },

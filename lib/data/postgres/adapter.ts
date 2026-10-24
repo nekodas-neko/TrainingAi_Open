@@ -880,6 +880,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // #2858 — Oura Cloud OAuth tokens, stored encrypted.
   async getOuraCloudTokens(userId: string) { return ouraCloudTokens.getOuraCloudTokens(this.db, userId) }
   async saveOuraCloudTokens(userId: string, input: ouraCloudTokens.SaveOuraCloudTokensInput) { return ouraCloudTokens.saveOuraCloudTokens(this.db, userId, input) }
+  async markOuraCloudReauthRequired(userId: string, unchangedSince: Date) { return ouraCloudTokens.markOuraCloudReauthRequired(this.db, userId, unchangedSince) }
   async deleteOuraCloudTokens(userId: string) { return ouraCloudTokens.deleteOuraCloudTokens(this.db, userId) }
   async getUserIdByOuraUserId(ouraUserId: string) { return ouraCloudTokens.getUserIdByOuraUserId(this.db, ouraUserId) }
   async getOuraCloudSwitchDay(userId: string) { return ouraCloudTokens.getOuraCloudSwitchDay(this.db, userId) }
