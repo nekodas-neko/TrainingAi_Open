@@ -704,6 +704,8 @@ export async function upsertOuraCloudSleep(
     includeSameStart: true,
     sameSource: 'replace',
     write: async r => {
+      // #2210: read before anything below moves or replaces the night.
+      const before = await readLiveCloudNight(db, userId, r.ouraId!)
       const start = r.sleepStart.toISOString()
       const moved = await db.execute(sql`
         UPDATE sleep_sessions h
@@ -729,9 +731,64 @@ export async function upsertOuraCloudSleep(
       // settle loop, so a later period in the same batch sees it as an overlap (#3106 review: a batch
       // holding a stale and a new version of one night used to leave both live).
       await upsertOuraSleep(db, userId, [r], 'oura_cloud', { replaceOwnCloud: true })
+      if (before) await recordSleepRevision(db, userId, before)
     },
   })
   return { written: kept.length, skippedOverlap: skipped, yielded }
+}
+
+// ── #2210: a night Oura revised is recorded, not just replaced ─────────────────────────────────
+// The fields that make a night what it is. Not Oura's own `sleep_score` (never ours, and Oura
+// re-scores without changing the night; `rescore-nights.ts` leaves it out of its fingerprint too),
+// and not ids, stamps or provenance.
+const SLEEP_REVISION_FIELDS = [
+  'date', 'sleepStart', 'sleepEnd', 'durationHours', 'deepSleepHours', 'remSleepHours', 'lightSleepHours',
+  'awakHours', 'efficiency', 'onsetLatencySec', 'averageHrvMs', 'avgHeartRate', 'lowestHeartRate',
+  'restlessPeriods', 'respiratoryRate', 'sleepPhase5Min', 'timeInBedHours',
+] as const
+
+type SleepRevisionFields = Pick<typeof s.sleepSessions.$inferSelect, typeof SLEEP_REVISION_FIELDS[number]>
+export type StoredCloudNight = SleepRevisionFields & { id: string; ouraId: string | null }
+
+const revisionValue = (v: unknown) => (v instanceof Date ? v.toISOString() : v ?? null)
+
+/** The fields whose value differs between two reads of one night, as `{ field: { old, new } }`; null when none do. */
+export function sleepRevisionChanges(before: SleepRevisionFields, after: SleepRevisionFields): Record<string, { old: unknown; new: unknown }> | null {
+  const out: Record<string, { old: unknown; new: unknown }> = {}
+  for (const f of SLEEP_REVISION_FIELDS) {
+    const o = revisionValue(before[f]), n = revisionValue(after[f])
+    if (o !== n) out[f] = { old: o, new: n }
+  }
+  return Object.keys(out).length > 0 ? out : null
+}
+
+/** The live, non-manual night holding this Oura Cloud id, or null (a first write, or a tombstoned night coming back). */
+async function readLiveCloudNight(db: Db, userId: string, ouraId: string): Promise<StoredCloudNight | null> {
+  const t = s.sleepSessions
+  const [row] = await db.select().from(t)
+    .where(and(eq(t.userId, userId), eq(t.ouraId, ouraId), isNull(t.deletedAt), eq(t.manualEntry, false)))
+    .limit(1)
+  return row ?? null
+}
+
+/**
+ * After a replace: reads the night again and, if any tracked value differs from `before`, appends one
+ * `sleep_session_revisions` row. A re-delivery with the same values records nothing. A failure is
+ * logged and never fails the sleep write it follows.
+ */
+async function recordSleepRevision(db: Db, userId: string, before: StoredCloudNight): Promise<void> {
+  try {
+    const t = s.sleepSessions
+    const [after] = await db.select().from(t).where(and(eq(t.id, before.id), isNull(t.deletedAt))).limit(1)
+    if (!after) return
+    const changes = sleepRevisionChanges(before, after)
+    if (!changes) return
+    await db.insert(s.sleepSessionRevisions).values({
+      userId, sleepSessionId: after.id, ouraId: after.ouraId, day: after.date, source: 'oura_cloud', changes,
+    })
+  } catch (err) {
+    console.error('[oura-sleep-revisions] could not record a revision:', err)
+  }
 }
 
 /**
