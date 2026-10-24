@@ -77,6 +77,13 @@
           "cameraPermission": "TrainingAi uses the camera to photograph food.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "TrainingAi uses the microphone when you tap Voice to log a set by speaking.",
+          "speechRecognitionPermission": "TrainingAi turns what you say into a set's weight and reps."
+        }
       ]
     ],
     "extra": {

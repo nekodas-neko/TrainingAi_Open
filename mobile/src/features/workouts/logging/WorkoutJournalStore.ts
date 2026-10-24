@@ -362,8 +362,8 @@ export class WorkoutJournalStore {
     setId: string,
     field: 'weight' | 'reps',
     value: string,
-  ) => {
-    void this.edit((data) =>
+  ) =>
+    this.edit((data) =>
       replaceWorkout(data, workoutId, (workout) =>
         replaceSet(workout, exerciseId, setId, (set) => ({
           ...set,
@@ -371,7 +371,6 @@ export class WorkoutJournalStore {
         })),
       ),
     );
-  };
 
   private async edit(update: (data: WorkoutJournal) => WorkoutJournal): Promise<boolean> {
     if (!this.current.ready || this.current.busy) {
