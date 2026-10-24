@@ -8,7 +8,7 @@ import { cn } from "@trainingai/shared/utils";
 import { FIELD_LABEL, FIELD_UNIT, type PatchChange } from "@/lib/coach/patch";
 import { GOAL_LOCAL_STORAGE_KEYS } from "@/lib/coach/domains/goals";
 import { clearCalorieGoalSeeds } from "@/lib/home/home-prefs";
-import { invalidateCoachHistory, invalidateGoalRecommendations } from "@/lib/cache-groups";
+import { invalidateCoachChange } from "@/lib/cache-groups";
 import type { ChangePreviewArgs } from "@/lib/coach/widgets";
 import type { Consequence, Drift } from "@/lib/coach/consequences";
 
@@ -112,12 +112,10 @@ export function ChangePreview({ args, onApplied, onCancel, onStale, disabled }: 
         return;
       }
       writeGoalsThrough(args.patch, acceptedIds);
-      // Same omission Q-240 found on the Profile editor, on a third surface: the DB write landed
-      // but `user-goals` kept serving its pre-change entry, so Health showed the old goal for up to
-      // its TTL after Coach said the change was applied.
-      if (args.patch.domain === "user_goals") invalidateGoalRecommendations().catch(() => {});
-      // An applied change becomes a row in the Coach history list.
-      invalidateCoachHistory().catch(() => {});
+      // The route's own invalidation runs on the server and reaches no cache, so the client
+      // clears what the domain touched: `user-goals` for a goal (Q-240), the programme caches for
+      // a swap, and the Coach history list for every applied change.
+      invalidateCoachChange(args.patch.domain).catch(() => {});
       onApplied?.(data.summary ?? "Change applied");
     } catch {
       setError("Could not reach the server");
