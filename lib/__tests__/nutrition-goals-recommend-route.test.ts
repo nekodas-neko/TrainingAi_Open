@@ -1,13 +1,9 @@
 /**
- * PS-39 — `/api/nutrition-goals/recommend`, one of the routes #956 found was believed tested and
- * was not (the scan matched a substring, and nothing imported this route).
+ * PS-39, then #3286 — `/api/nutrition-goals/recommend`.
  *
- * The property worth pinning is the one the AI rules state and this route is the sharpest case of:
- * **no number the model reports may reach the user as fact.** Everything it returns passes through
- * `clampRecommendation` first, carbohydrate is not even read from it, and every clamp says so in
- * `dataQualityNote` rather than silently rewriting the answer. A model that returns 400 kcal must
- * not produce a 400 kcal goal, and a route that stopped clamping would look completely healthy from
- * the outside — the response shape is identical either way.
+ * RV-66 took every number from the model; #3286 took the explanation and the activity-level call,
+ * so the route makes no model call at all. The `ai` module is mocked and the AI instrument throws:
+ * a case that reached either would fail rather than quietly spend a request on the owner's key.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { calculateBaseline } from '@trainingai/shared/nutrition/goal-recommendation'
@@ -19,9 +15,6 @@ const getUserById = vi.fn(async (_id: string) => user())
 const listBodyMetrics = vi.fn(async (_u: string, _f: string, _t: string) => [
   { id: 'b1', date: '2026-09-08', weightKg: 80 },
 ] as Row[])
-const listSleepSessions = vi.fn(async () => [] as Row[])
-const listMoodLogs = vi.fn(async () => [] as Row[])
-const listDayCheckins = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getWorkoutSessionsFrom = vi.fn(async () => [] as Row[])
 const listRecentPersonalRecords = vi.fn(async () => [] as Row[])
 const getUserGoals = vi.fn(async () => ({
@@ -31,15 +24,14 @@ const getUserGoals = vi.fn(async () => ({
 } as Row))
 const getNutritionTargets = vi.fn(async () => ({ userId: 'u-1', calories: 2100, proteinG: 150, carbsG: 200, fatG: 60 }) as Row | null)
 const getActiveProgram = vi.fn(async () => null as Row | null)
-const getExerciseTypes = vi.fn(async (_n: string[]) => ({}) as Record<string, string>)
 const getBodyFatCalibration = vi.fn(async (_u: string) => null as Row | null)
 const getLatestMeasuredRmr = vi.fn(async (_u: string) => null as Row | null)
 const listProgramPhases = vi.fn(async () => [] as Row[])
 const countSessionsSinceStart = vi.fn(async () => 0)
 const createGoalRecommendation = vi.fn(async (_u: string, _d: Row) => ({ id: 'rec-1' }))
-/** Loosely typed on purpose: the model returns arbitrary JSON and the schema is what narrows it,
- *  so a case handing back an out-of-range number has to be expressible here. */
-const generateObject = vi.fn(async (_o: unknown) => ({ object: aiObject() as Record<string, unknown> }))
+/** The route must never call this; every case below can assert it. */
+const generateObject = vi.fn(async (_o: unknown) => ({ object: {} }))
+const aiModel = vi.fn(() => { throw new Error('the route must not ask for a model') })
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
@@ -47,17 +39,17 @@ vi.mock('@/lib/data', () => {
   // Built inside the factory's returned function, not its body: `vi.mock` is hoisted above the
   // `const` declarations above and reading them at factory-evaluation time is a TDZ error.
   const repo = async () => ({
-    getUserById, listBodyMetrics, listSleepSessions, listMoodLogs, listDayCheckins, getWorkoutSessionsFrom,
+    getUserById, listBodyMetrics, getWorkoutSessionsFrom,
     listRecentPersonalRecords, getUserGoals, getNutritionTargets, getActiveProgram,
-    getExerciseTypes, getBodyFatCalibration, getLatestMeasuredRmr, listProgramPhases,
+    getBodyFatCalibration, getLatestMeasuredRmr, listProgramPhases,
     countSessionsSinceStart, createGoalRecommendation,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
 vi.mock('ai', () => ({ generateObject: (o: unknown) => generateObject(o) }))
 vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
-  loggedGenerateObject: async (_m: unknown, run: () => Promise<unknown>) => run(),
+  aiModel: () => aiModel(),
+  loggedGenerateObject: async () => { throw new Error('the route must not log a model call') },
 }))
 
 import { POST as recommend } from '@/app/api/nutrition-goals/recommend/route'
@@ -66,14 +58,6 @@ const user = (over: Row = {}) => ({
   id: 'u-1', heightCm: 180, dateOfBirth: '1996-01-01', sex: 'male',
   activityLevel: 'moderate', fitnessGoal: 'maintain', timezone: 'Australia/Brisbane',
   weightGoalKg: undefined, ...over,
-})
-
-/** A model answer that needs no clamping, so a case can move exactly one number. */
-const aiObject = (over: Row = {}) => ({
-  recommendedStepsGoal: 10000, recommendedCalories: 2100, recommendedProteinG: 150,
-  recommendedCarbsG: 200, recommendedFatG: 60, recommendedWaterMl: 2800,
-  recommendedActivityLevel: null, reasoning: 'Hold steady.', insights: 'Sleep is stable.',
-  dataQualityNote: '', ...over,
 })
 
 /** The baseline the route computes for the default fixture — imported, not re-derived, because
@@ -99,13 +83,12 @@ const freshUser = (over: { timezone?: string } = {}) => {
 
 beforeEach(() => {
   for (const m of [getUserById, listBodyMetrics, getUserGoals, getNutritionTargets, getActiveProgram,
-    getBodyFatCalibration, getLatestMeasuredRmr, createGoalRecommendation, generateObject]) m.mockClear()
+    getBodyFatCalibration, getLatestMeasuredRmr, createGoalRecommendation, generateObject, aiModel]) m.mockClear()
   listBodyMetrics.mockResolvedValue([{ id: 'b1', date: '2026-09-08', weightKg: 80 }])
   getActiveProgram.mockResolvedValue(null)
   getBodyFatCalibration.mockResolvedValue(null)
   getLatestMeasuredRmr.mockResolvedValue(null)
   createGoalRecommendation.mockResolvedValue({ id: 'rec-1' })
-  generateObject.mockResolvedValue({ object: aiObject() })
   freshUser()
 })
 
@@ -139,137 +122,106 @@ describe('POST /api/nutrition-goals/recommend — refusals', () => {
     expect(await res.json()).toEqual({ error: 'profile_incomplete', missing: ['dateOfBirth'] })
   })
 
-  it('answers no_weight_data without spending a model call', async () => {
+  it('answers no_weight_data', async () => {
     listBodyMetrics.mockResolvedValue([{ id: 'b1', date: '2026-09-08', steps: 8000 }])
     const res = await post()
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'no_weight_data' })
-    expect(generateObject).not.toHaveBeenCalled()
   })
 
   it('refuses an oversized body', async () => {
     const res = await post({ source: 'x'.repeat(8 * 1024) })
     expect(res.status).toBe(413)
-    expect(generateObject).not.toHaveBeenCalled()
   })
 
   it('rate-limits the sixth call in the window', async () => {
     for (let i = 0; i < 5; i++) expect((await post()).status).toBe(200)
     const res = await post()
     expect(res.status).toBe(429)
-    expect(generateObject).toHaveBeenCalledTimes(5)
+    expect(createGoalRecommendation).toHaveBeenCalledTimes(5)
   })
 })
 
-describe('POST /api/nutrition-goals/recommend — the model never sets a number', () => {
-  // RV-66 changed HOW this holds, and strengthened it. These cases used to feed the model an
-  // out-of-range number and assert `clampRecommendation` bounded it — the model's figure reached
-  // the route and was corrected. It no longer reaches the route at all: the six numeric fields are
-  // gone from the response schema and the recommendation IS `calculateBaseline`.
-  //
-  // So every case below hands back the old model shape anyway, via `aiObject`, and asserts the
-  // response is the baseline regardless. That is the same property this block was always for,
-  // proved one layer earlier, and it is why the fixtures still carry absurd values: a schema is
-  // exactly the kind of thing a later edit re-adds "for completeness".
-  //
-  // The clamp still runs — on the baseline, where it is a safety floor rather than a guard against
-  // a guess. For this fixture (80 kg, maintain) it is a complete no-op; the case where it is not is
-  // pinned in `app/api/nutrition-goals/recommend/__tests__/rv66-baseline-is-the-recommendation.test.ts`.
-  it('ignores a starvation calorie figure outright, rather than clamping it up', async () => {
-    generateObject.mockResolvedValue({ object: aiObject({ recommendedCalories: 400 }) })
+describe('POST /api/nutrition-goals/recommend — rule-based, no model (#3286)', () => {
+  it('makes no model call on a normal run', async () => {
     const res = await post()
-    const body = await res.json()
-
-    expect(body.recommended.calories).toBe(baseline().calories)
-    // Nothing was corrected, so nothing is noted — the old behaviour announced a clamp here.
-    expect(body.dataQualityNote).toBe('')
-    // The stored row carries the computed number too: a client is not the only reader.
-    expect(persisted().recommendedCalories).toBe(baseline().calories)
+    expect(res.status).toBe(200)
+    expect(generateObject).not.toHaveBeenCalled()
+    expect(aiModel).not.toHaveBeenCalled()
   })
 
-  it('ignores an absurd calorie figure the same way', async () => {
-    generateObject.mockResolvedValue({ object: aiObject({ recommendedCalories: 9000 }) })
+  it('serves the computed baseline, stored and returned alike', async () => {
     const body = await (await post()).json()
-    expect(body.recommended.calories).toBe(baseline().calories)
+    const base = baseline()
+    expect(body.recommended).toMatchObject({
+      calories: base.calories, proteinG: base.proteinG, carbsG: base.carbsG,
+      fatG: base.fatG, waterMl: base.waterMl, stepsGoal: base.stepsGoal, activityLevel: null,
+    })
+    expect(persisted().recommendedCalories).toBe(base.calories)
   })
 
-  it('ignores the model’s protein in both directions', async () => {
-    generateObject.mockResolvedValue({ object: aiObject({ recommendedProteinG: 12 }) })
-    expect((await (await post()).json()).recommended.proteinG).toBe(baseline().proteinG)
+  it('writes the explanation from the baseline\'s own figures', async () => {
+    const body = await (await post()).json()
+    const base = baseline()
+    expect(body.reasoning).toContain(`${base.calories.toLocaleString('en-US')} kcal`)
+    expect(body.reasoning).toContain(`${base.proteinG} g protein`)
+    expect(body.reasoning).toContain('maintaining weight')
+    expect(body.insights).toContain('0 workout sessions in the last 14 days.')
+    expect(persisted().reasoning).toBe(body.reasoning)
+    expect(persisted().insights).toBe(body.insights)
+  })
+
+  it('notes thin data when fewer than three days carry body metrics, and stays quiet otherwise', async () => {
+    const thin = await (await post()).json()   // the default fixture has one weigh-in
+    expect(thin.dataQualityNote).toBe('Only 1 of the last 14 days have logged body metrics, so the trend above is thin.')
 
     freshUser()
-    generateObject.mockResolvedValue({ object: aiObject({ recommendedProteinG: 900 }) })
-    expect((await (await post()).json()).recommended.proteinG).toBe(baseline().proteinG)
+    listBodyMetrics.mockResolvedValue([
+      { id: 'b3', date: '2026-09-08', weightKg: 80 },
+      { id: 'b2', date: '2026-09-07', weightKg: 80.4 },
+      { id: 'b1', date: '2026-09-06', weightKg: 80.8 },
+    ])
+    const full = await (await post()).json()
+    expect(full.dataQualityNote).toBe('')
+    expect(full.reasoning).toContain('your weight changed -0.8 kg')
   })
 
-  it('ignores the model’s water and steps', async () => {
-    generateObject.mockResolvedValue({ object: aiObject({ recommendedWaterMl: 200, recommendedStepsGoal: 90000 }) })
-    const body = await (await post()).json()
-
-    expect(body.recommended.waterMl).toBe(baseline().waterMl)
-    expect(body.recommended.stepsGoal).toBe(baseline().stepsGoal)
-    expect(body.dataQualityNote).toBe('')
-  })
-
-  it('never uses the carbohydrate figure the model returned — carbs are the calorie remainder', async () => {
-    generateObject.mockResolvedValue({ object: aiObject({ recommendedCarbsG: 5 }) })
-    const body = await (await post()).json()
-    const { calories, proteinG, fatG } = body.recommended
-    expect(body.recommended.carbsG).toBe(Math.round((calories - proteinG * 4 - fatG * 9) / 4))
-    expect(body.recommended.carbsG).not.toBe(5)
-  })
-
-  it('keeps the model prose, which is now the only thing it contributes', async () => {
-    generateObject.mockResolvedValue({ object: aiObject({ recommendedCalories: 9000, dataQualityNote: 'Only two days logged.' }) })
-    const body = await (await post()).json()
-
-    expect(body.dataQualityNote).toBe('Only two days logged.')
-    expect(body.reasoning).toBe('Hold steady.')
-  })
-
-  // The sharpest case in the file: the model's 2,100 is entirely plausible, sits inside every clamp
-  // band, and is still not the answer. Under the old design it passed straight through.
-  it('returns the baseline even when the model’s figure was perfectly reasonable', async () => {
-    const body = await (await post()).json()
-
-    expect(body.recommended.calories).toBe(baseline().calories)
-    expect(body.recommended.calories).not.toBe(2100)   // what `aiObject` asked for
-    expect(body.recommended.proteinG).toBe(baseline().proteinG)
-    expect(body.recommended.proteinG).not.toBe(150)
-    expect(body.dataQualityNote).toBe('')
-  })
-
-  it('recomputes the baseline on a suggested activity level, and calories still do not move (Q-401)', async () => {
-    // Two things at once, and they are easy to confuse. Since Q-401 the baseline is BMR × sedentary
-    // everywhere, so the suggested level cannot move CALORIES — that is the Q-401 invariant this
-    // case has always guarded. But steps and water are activity lookups, so they DO move, and under
-    // RV-66 they move to the table's value for the new level rather than to anything the model said.
-    generateObject.mockResolvedValue({ object: aiObject({ recommendedActivityLevel: 'extra_active', recommendedCalories: 9000, recommendedStepsGoal: 90000 }) })
-    const onExtraActive = calculateBaseline({
+  it('suggests a higher activity level when the log clearly outgrows the stated one, and recomputes through the formula', async () => {
+    getUserById.mockResolvedValue(user({ id: sessionUser!.id, activityLevel: 'light' }) as never)
+    getWorkoutSessionsFrom.mockResolvedValue(Array.from({ length: 8 }, (_, i) => ({ id: `w${i}` })))
+    const onModerate = calculateBaseline({
       weightKg: 80, heightCm: 180, ageYears: 30, sex: 'male',
-      activityLevel: 'extra_active', fitnessGoal: 'maintain',
-      bodyFatPct: undefined, measuredRmr: null,
+      activityLevel: 'moderate', fitnessGoal: 'maintain', bodyFatPct: undefined, measuredRmr: null,
     })
     const body = await (await post()).json()
 
-    expect(body.recommended.calories).toBe(baseline().calories)
-    expect(onExtraActive.calories).toBe(baseline().calories)   // the Q-401 invariant, stated
-    expect(body.recommended.stepsGoal).toBe(onExtraActive.stepsGoal)
-    expect(body.recommended.waterMl).toBe(onExtraActive.waterMl)
-    expect(body.recommended.activityLevel).toBe('extra_active')
-    expect(persisted().recommendedActivityLevel).toBe('extra_active')
+    expect(body.recommended.activityLevel).toBe('moderate')
+    expect(body.recommended.stepsGoal).toBe(onModerate.stepsGoal)
+    expect(body.recommended.waterMl).toBe(onModerate.waterMl)
+    // Q-401: the level cannot move calories, only the steps and water lookups.
+    expect(body.recommended.calories).toBe(onModerate.calories)
+    expect(body.reasoning).toContain('8 sessions in 14 days')
+    expect(persisted().recommendedActivityLevel).toBe('moderate')
+  })
+
+  it('keeps the stated level when training is below the threshold', async () => {
+    getUserById.mockResolvedValue(user({ id: sessionUser!.id, activityLevel: 'light' }) as never)
+    getWorkoutSessionsFrom.mockResolvedValue(Array.from({ length: 7 }, (_, i) => ({ id: `w${i}` })))
+    const body = await (await post()).json()
+    expect(body.recommended.activityLevel).toBeNull()
+  })
+
+  // `CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500 for `lose_weight`; the clamp still floors it.
+  it('keeps the calorie floor and says so in the data-quality note', async () => {
+    getUserById.mockResolvedValue(user({ id: sessionUser!.id, fitnessGoal: 'lose_weight', heightCm: 150 }) as never)
+    listBodyMetrics.mockResolvedValue([{ id: 'b1', date: '2026-09-08', weightKg: 50 }])
+    const body = await (await post()).json()
+    expect(body.recommended.calories).toBeGreaterThanOrEqual(1200)
+    expect(generateObject).not.toHaveBeenCalled()
   })
 })
 
 describe('POST /api/nutrition-goals/recommend — failure and context', () => {
-  it('answers recommendation_failed rather than a raw 500 when the model throws, and stores nothing', async () => {
-    generateObject.mockRejectedValue(new Error('model down'))
-    const res = await post()
-    expect(res.status).toBe(500)
-    expect(await res.json()).toEqual({ error: 'recommendation_failed' })
-    expect(createGoalRecommendation).not.toHaveBeenCalled()
-  })
-
   it('answers recommendation_failed when the write fails, so no half-stored recommendation is claimed', async () => {
     createGoalRecommendation.mockRejectedValue(new Error('deadlock'))
     const res = await post()
@@ -328,7 +280,6 @@ describe('POST /api/nutrition-goals/recommend — failure and context', () => {
       activityLevel: 'moderate', fitnessGoal: 'maintain',
       bodyFatPct: undefined, measuredRmr: null,
     }).proteinG
-    generateObject.mockResolvedValue({ object: aiObject({ recommendedProteinG: 900 }) })
     const got = (await (await post()).json()).recommended.proteinG
 
     expect(got).toBe(proteinFor(82))
@@ -342,37 +293,5 @@ describe('POST /api/nutrition-goals/recommend — failure and context', () => {
     expect(body.current.stepsGoal).toBe(9000)
     expect(body.current.activityLevel).toBe('moderate')
     expect(body.id).toBe('rec-1')
-  })
-})
-
-// LB-182: the prompt is told how he said he slept — but only on mornings he actually rated it.
-describe('POST /api/nutrition-goals/recommend — the sleep self-report reaches the prompt honestly', () => {
-  const promptSent = () => (generateObject.mock.calls[0][0] as { prompt: string }).prompt
-  const checkin = (logDate: string, sleepQualityFeel: number, touched: boolean) => ({
-    logDate, perceivedRecovery: 3, perceivedRecoveryTouched: false, sleepQualityFeel, sleepQualityFeelTouched: touched,
-  })
-
-  it('includes the mornings he rated, with the scale direction named, and asks for the morning phase', async () => {
-    listDayCheckins.mockResolvedValueOnce([checkin('2026-09-07', 4, true), checkin('2026-09-05', 1, true)])
-    await post()
-    expect(listDayCheckins.mock.calls.at(-1)?.[3]).toBe('morning')
-    const prompt = promptSent()
-    expect(prompt).toContain('1 = slept great, 5 = slept terribly')
-    expect(prompt).toMatch(/2026-09-05: 1\n2026-09-07: 4/)
-  })
-
-  it('never reports the untouched neutral seed as something he said', async () => {
-    listDayCheckins.mockResolvedValueOnce([checkin('2026-09-07', 3, false), checkin('2026-09-06', 3, false)])
-    await post()
-    const prompt = promptSent()
-    expect(prompt).not.toContain('2026-09-07: 3')
-    expect(prompt).toContain('He did not rate or correct how he slept on any morning in this window.')
-  })
-
-  it('still recommends when the check-in read fails', async () => {
-    listDayCheckins.mockRejectedValueOnce(new Error('db blip'))
-    const res = await post()
-    expect(res.status).toBe(200)
-    expect(promptSent()).toContain('He did not rate or correct how he slept')
   })
 })

@@ -1,24 +1,11 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { describePersonalRecord } from '@trainingai/shared/1rm'
-import { generateObject } from 'ai'
-import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
-import { aiPausedResponse } from '@/lib/ai/provider-paused'
-import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
-import { ACTIVITY_LEVELS } from '@trainingai/shared/types/user'
-import { calculateBaseline, clampRecommendation, type BaselineResult } from '@trainingai/shared/nutrition/goal-recommendation'
+import { calculateBaseline, clampRecommendation } from '@trainingai/shared/nutrition/goal-recommendation'
+import { buildGoalExplanation, suggestActivityLevel } from '@trainingai/shared/nutrition/goal-recommendation-text'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
-import { answeredMorningScales } from '@trainingai/shared/health/self-report'
-import type { DayCheckin } from '@trainingai/shared/types/day-checkin'
-import type { BodyMetrics, SleepSession, MoodLog } from '@trainingai/shared/types'
-import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
-import type { UserGoals } from '@/lib/data/repository'
-import type { ProgramPhaseType } from '@trainingai/shared/types/program'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 
@@ -26,162 +13,10 @@ import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibratio
 const MAX_BODY_BYTES = 4 * 1024
 
 /**
- * RV-66 — the model no longer returns any of the numbers.
- *
- * It used to return its own `recommendedCalories`/`ProteinG`/`CarbsG`/`FatG`/`WaterMl`/`StepsGoal`
- * beside a `calculateBaseline(...)` that had already computed every one of them from
- * Katch-McArdle/Mifflin, a measured RMR, goal offsets and lean-mass protein dosing — and those
- * invented numbers were both shown to the user as fact and written into their goals on Apply.
- * CLAUDE.md forbids exactly that, twice over: *no LLM self-reported number may gate an automatic
- * action or be shown to the user as fact.*
- *
- * `clampRecommendation` did not save it, because it is a safety band rather than a derivation.
- * Measured against the owner's applied 2026-09-14 recommendation: baseline 1,410 kcal / 115 g
- * protein / 39 g fat / 10,000 steps against a stored-and-applied 1,618 / 150 / 55 / **5,000**, and
- * the clamp altered none of it. `STEP_GOAL_BY_ACTIVITY` can only ever return 7,000 / 8,500 / 10,000
- * / 12,000, so a 5,000 step goal is not a value the formula can produce at all — the model halved
- * it and the sheet wrote it in.
- *
- * `recommendedActivityLevel` STAYS, and is the one thing here that should be a judgement: it is a
- * category, not a number, and the figures that follow from it are recomputed in code below. The
- * model choosing "your logged frequency says `active`, not `light`" is the question it is actually
- * equipped to answer.
+ * RV-66 took every number away from the model; #3286 took the rest. The explanation and the one
+ * activity-level judgement are rule-based (`goal-recommendation-text.ts`), so this route makes no
+ * model call and a provider outage can no longer discard the baseline it had already computed.
  */
-const recommendationSchema = z.object({
-  recommendedActivityLevel: z.enum(ACTIVITY_LEVELS).nullable(),
-  reasoning: z.string(),
-  insights: z.string(),
-  dataQualityNote: z.string(),
-})
-
-interface ContextInput {
-  sex: string
-  ageYears: number
-  heightCm: number
-  weightGoalKg?: number
-  activityLevel: string
-  fitnessGoal: string
-  latestWeight: number
-  baseline: BaselineResult
-  userGoals: UserGoals
-  nutritionTargets: NutritionTargets | null
-  bodyMetrics: BodyMetrics[]
-  sleepSessions: SleepSession[]
-  moodLogs: MoodLog[]
-  /** Morning check-ins in the window. Only the scales he actually answered reach the prompt (LB-182). */
-  morningCheckins: DayCheckin[]
-  workoutSessionCount: number
-  personalRecords: { exerciseName: string; estimated1rm: number; achievedAt: Date }[]
-  /** name -> exercise_type, so a bodyweight record isn't quoted as kilograms (Q-19b). */
-  exerciseTypes: Record<string, string>
-  programName: string | null
-  phaseInfo: {
-    name: string
-    phaseType: ProgramPhaseType
-    cycleInPhase: number
-    totalPhaseCycles: number
-    primaryStyleName?: string
-  } | null
-}
-
-function buildContext(c: ContextInput, tz: string): string {
-  const weighIns = c.bodyMetrics.filter(m => m.weightKg != null).sort((a, b) => a.date.localeCompare(b.date))
-  const weightDelta = weighIns.length >= 2
-    ? weighIns[weighIns.length - 1].weightKg! - weighIns[0].weightKg!
-    : null
-
-  const stepsValues = c.bodyMetrics.filter(m => m.steps != null).map(m => m.steps!)
-  const avgSteps = stepsValues.length > 0
-    ? Math.round(stepsValues.reduce((a, b) => a + b, 0) / stepsValues.length)
-    : null
-
-  const rhrValues = c.bodyMetrics.filter(m => m.restingHeartRate != null).map(m => m.restingHeartRate!)
-  const avgRhr = rhrValues.length > 0
-    ? Math.round(rhrValues.reduce((a, b) => a + b, 0) / rhrValues.length)
-    : null
-
-  const hrvValues = c.bodyMetrics.filter(m => m.hrvMs != null).map(m => m.hrvMs!)
-  const avgHrv = hrvValues.length > 0
-    ? Math.round(hrvValues.reduce((a, b) => a + b, 0) / hrvValues.length)
-    : null
-
-  const daysWithData = new Set(c.bodyMetrics.map(m => m.date)).size
-
-  // Nights, not rows (Q-76) — keying a Map by date lets a same-day nap overwrite the real night, so
-  // the model gets told "0.1 h sleep" beside a normal energy rating and learns nothing true.
-  const sleepByDate = new Map(nightSessions(c.sleepSessions, tz).map(sess => [sess.date, sess]))
-  const sleepMoodPairs = c.moodLogs
-    .filter(m => sleepByDate.get(m.logDate)?.durationHours != null)
-    // The self-reported sleep-quality field is deliberately absent here (TN-66) — and it is named in
-    // prose rather than written out, because the test that keeps it absent greps this file and a
-    // literal in a comment reads exactly like a literal in the prompt.
-    // `mood_logs.sleep_quality` is NOT NULL and
-    // the check-in stopped collecting it on 2026-06-25, so the write path's `'ok'` default has been
-    // the stored value on every row since — 93 of 108. Putting it here handed the model three months
-    // of a constant dressed as an observation, beside a genuinely measured `Xh sleep`. That is the
-    // hazard the Q-76 comment above is about, one field over: it learns nothing true, and worse, it
-    // learns that this person's sleep never varies.
-    .map(m => `${m.logDate}: ${sleepByDate.get(m.logDate)!.durationHours!.toFixed(1)}h sleep, energy=${m.energyLevel}`)
-
-  // LB-182: what he SAID about each night, beside the measured duration above. Through
-  // `answeredMorningScales` and never the raw column: the sheet stores a neutral seed for a scale he
-  // did not touch, and telling the model he rated a night he never rated is the TN-66 defect again,
-  // in prose. The scale runs BACKWARDS (1 = slept great, 5 = terrible), so the line says so.
-  const sleepFeelLines = c.morningCheckins
-    .map(ci => ({ date: ci.logDate, feel: answeredMorningScales(ci).sleepQualityFeel }))
-    .filter((r): r is { date: string; feel: number } => r.feel != null)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map(r => `${r.date}: ${r.feel}`)
-
-  const bfReadings = c.bodyMetrics.filter(m => m.bodyFatPct != null).sort((a, b) => a.date.localeCompare(b.date))
-  const latestBf = bfReadings.length > 0 ? bfReadings[bfReadings.length - 1].bodyFatPct! : null
-  const bfDelta = bfReadings.length >= 2 ? latestBf! - bfReadings[0].bodyFatPct! : null
-
-  const prLines = c.personalRecords.map(pr =>
-    `${describePersonalRecord(pr.exerciseName, pr.estimated1rm, c.exerciseTypes[pr.exerciseName])} on ${toAestDay(pr.achievedAt, tz)}`)
-
-  const programLine = c.programName == null
-    ? 'No active training program.'
-    : `Active program: "${c.programName}"${c.phaseInfo ? `, currently in phase "${c.phaseInfo.name}" (type: ${c.phaseInfo.phaseType}, cycle ${c.phaseInfo.cycleInPhase}/${c.phaseInfo.totalPhaseCycles}${c.phaseInfo.primaryStyleName ? `, progression style: ${c.phaseInfo.primaryStyleName}` : ''})` : ''}.`
-
-  const lines: (string | null)[] = [
-    `Profile: sex=${c.sex}, age=${c.ageYears}, height=${c.heightCm}cm, current weight=${c.latestWeight}kg${c.weightGoalKg ? `, goal weight=${c.weightGoalKg}kg` : ''}.`,
-    `Current activity level: ${c.activityLevel}. Fitness goal: ${c.fitnessGoal}.`,
-    programLine,
-    // LB-50. The activity level used to be named inside this parenthesis, which read as though the
-    // TDEE had been computed FOR it. It was not, and has not been since Q-401 deleted
-    // `ACTIVITY_MULTIPLIERS`: `calculateBaseline` computes `tdee = bmr * SEDENTARY_MULTIPLIER`
-    // unconditionally, so a self-report cannot double-count against the measured movement the model
-    // is given separately below. The level still reaches `waterMl` and `stepsGoal`, and nothing
-    // else. Telling the model the baseline was activity-scaled invites it to adjust for a
-    // multiplier that is not in the number.
-    c.baseline.leanMassKg != null
-      ? `Baseline (Katch-McArdle, lean mass ${c.baseline.leanMassKg}kg): BMR ${c.baseline.bmr} kcal, TDEE ${c.baseline.tdee} kcal, baseline calorie target ${c.baseline.calories} kcal, protein ${c.baseline.proteinG}g (dosed per kg lean mass), carbs ${c.baseline.carbsG}g, fat ${c.baseline.fatG}g, water ${c.baseline.waterMl}ml, steps goal ${c.baseline.stepsGoal}.`
-      : `Baseline (Mifflin-St Jeor): BMR ${c.baseline.bmr} kcal, TDEE ${c.baseline.tdee} kcal, baseline calorie target ${c.baseline.calories} kcal, protein ${c.baseline.proteinG}g, carbs ${c.baseline.carbsG}g, fat ${c.baseline.fatG}g, water ${c.baseline.waterMl}ml, steps goal ${c.baseline.stepsGoal}.`,
-    // Said plainly rather than left for the model to infer from the absence above: it is told the
-    // activity level on its own line, and it is told the measured steps and active calories, so
-    // without this it could still assume the TDEE embeds one of them.
-    `The TDEE above is BMR x 1.2 (sedentary) and is NOT scaled by the stated activity level — real movement is given separately as steps and active calories. Do not add an activity multiplier to it; the activity level affects only the water and steps goals.`,
-    `Current goals: steps ${c.userGoals.stepsGoal ?? 'unset'} (${c.userGoals.stepsGoalType ?? 'daily'}), calories ${c.userGoals.calorieGoal ?? 'unset'} (${c.userGoals.calorieGoalType ?? 'daily'}), water ${c.userGoals.waterGoalMl ?? 'unset'}ml (${c.userGoals.waterGoalType ?? 'daily'}).`,
-    `Current nutrition targets: ${c.nutritionTargets ? `${c.nutritionTargets.calories ?? '—'} kcal, protein ${c.nutritionTargets.proteinG ?? '—'}g, carbs ${c.nutritionTargets.carbsG ?? '—'}g, fat ${c.nutritionTargets.fatG ?? '—'}g` : 'none set'}.`,
-    `14-day data completeness: ${daysWithData}/14 days with logged body metrics.`,
-    weightDelta != null ? `Weight change over the last 14 days: ${weightDelta >= 0 ? '+' : ''}${weightDelta.toFixed(1)}kg.` : 'Not enough weigh-ins to compute a weight trend.',
-    latestBf != null
-      ? `Body fat: latest ${latestBf.toFixed(1)}%${bfDelta != null ? ` (change over last 14 days: ${bfDelta >= 0 ? '+' : ''}${bfDelta.toFixed(1)}pp)` : ''}.`
-      : 'No body fat % logged.',
-    avgSteps != null ? `Average daily steps: ${avgSteps}.` : 'No step data logged.',
-    avgRhr != null ? `Average resting heart rate: ${avgRhr} bpm.` : null,
-    avgHrv != null ? `Average HRV: ${avgHrv} ms.` : null,
-    `Workout sessions in the last 14 days: ${c.workoutSessionCount}.`,
-    sleepMoodPairs.length > 0 ? `Sleep/mood data points:\n${sleepMoodPairs.join('\n')}` : 'No paired sleep+mood data in this window.',
-    sleepFeelLines.length > 0
-      ? `How he said he slept, on the mornings he rated it (1 = slept great, 5 = slept terribly):\n${sleepFeelLines.join('\n')}`
-      : 'He did not rate or correct how he slept on any morning in this window.',
-    prLines.length > 0 ? `Personal records achieved in this window:\n${prLines.join('\n')}` : 'No new personal records in this window.',
-  ]
-
-  return lines.filter((l): l is string => l != null).join('\n')
-}
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -219,22 +54,14 @@ export async function POST(req: Request) {
   const windowStart = new Date(todayMidnightUtc(tz).getTime() - 14 * 86_400_000)
   const fromIso = toAestDay(windowStart, tz)
 
-  const [bodyMetrics, sleepSessions, moodLogs, morningCheckins, workoutSessions, personalRecords, userGoals, nutritionTargets, program] = await Promise.all([
+  const [bodyMetrics, workoutSessions, personalRecords, userGoals, nutritionTargets, program] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, todayIso),
-    repo.listSleepSessions(userId, fromIso, todayIso),
-    repo.listMoodLogs(userId, fromIso, todayIso),
-    // A self-report is context, not a requirement: a failed read leaves the line out rather than
-    // failing the recommendation.
-    (async () => repo.listDayCheckins(userId, fromIso, todayIso, 'morning'))().catch(() => [] as DayCheckin[]),
     repo.getWorkoutSessionsFrom(userId, windowStart),
     repo.listRecentPersonalRecords(userId, windowStart, new Date()),
     repo.getUserGoals(userId),
     repo.getNutritionTargets(userId),
     repo.getActiveProgram(userId),
   ])
-  const exerciseTypes = await repo
-    .getExerciseTypes(personalRecords.map(pr => pr.exerciseName))
-    .catch(() => ({} as Record<string, string>))
 
   const latestWeight = bodyMetrics.find(m => m.weightKg != null)?.weightKg
   if (latestWeight == null) {
@@ -253,7 +80,7 @@ export async function POST(req: Request) {
     bodyFatCalibration,
   )?.pct ?? undefined
 
-  let phaseInfo: ContextInput['phaseInfo'] = null
+  let phaseInfo: { name: string; phaseType: string } | null = null
   if (program && program.phaseMode === 'automatic' && program.sessionsPerCycle && program.sessionsPerCycle >= 1) {
     const [phases, sessionsCount] = await Promise.all([
       repo.listProgramPhases(userId, program.id),
@@ -264,9 +91,6 @@ export async function POST(req: Request) {
       phaseInfo = {
         name: result.phase.name,
         phaseType: result.phase.phaseType,
-        cycleInPhase: result.cycleInPhase,
-        totalPhaseCycles: result.totalPhaseCycles,
-        primaryStyleName: result.phase.primaryStyleName,
       }
     }
   }
@@ -292,93 +116,58 @@ export async function POST(req: Request) {
     measuredRmr,
   })
 
-  const context = buildContext({
-    sex: user.sex!,
-    ageYears,
-    heightCm: user.heightCm!,
-    weightGoalKg: user.weightGoalKg,
-    activityLevel: user.activityLevel!,
-    fitnessGoal: user.fitnessGoal!,
-    latestWeight,
-    baseline,
-    userGoals,
-    nutritionTargets,
-    bodyMetrics,
-    sleepSessions,
-    moodLogs,
-    morningCheckins,
-    workoutSessionCount: workoutSessions.length,
-    personalRecords,
-    exerciseTypes,
-    programName: program?.name ?? null,
-    phaseInfo,
-  }, tz)
+  const suggestedLevel = suggestActivityLevel(user.activityLevel!, workoutSessions.length)
 
-  let ai: z.infer<typeof recommendationSchema>
-  let clamped: ReturnType<typeof clampRecommendation>
+  // The recommendation IS the baseline, recomputed when the sessions logged clearly outgrow the
+  // stated activity level; that level reaches the numbers only through the formula.
+  const clampBaseline = suggestedLevel
+    ? calculateBaseline({
+      weightKg: latestWeight,
+      heightCm: user.heightCm!,
+      ageYears,
+      sex: user.sex!,
+      activityLevel: suggestedLevel,
+      fitnessGoal: user.fitnessGoal!,
+      bodyFatPct: latestBodyFatPct,
+      measuredRmr,
+    })
+    : baseline
+
+  const weighIns = bodyMetrics.filter(m => m.weightKg != null).sort((a, b) => a.date.localeCompare(b.date))
+  const bfReadings = bodyMetrics.filter(m => m.bodyFatPct != null).sort((a, b) => a.date.localeCompare(b.date))
+  const stepsValues = bodyMetrics.filter(m => m.steps != null).map(m => m.steps!)
+  const explanation = buildGoalExplanation({
+    baseline: clampBaseline,
+    measuredRmr: measuredRmr != null,
+    fitnessGoal: user.fitnessGoal!,
+    activityLevel: user.activityLevel!,
+    suggestedLevel,
+    workoutSessionCount: workoutSessions.length,
+    weightDeltaKg: weighIns.length >= 2 ? weighIns[weighIns.length - 1].weightKg! - weighIns[0].weightKg! : null,
+    bodyFatLatestPct: bfReadings.length > 0 ? bfReadings[bfReadings.length - 1].bodyFatPct! : null,
+    bodyFatDeltaPp: bfReadings.length >= 2 ? bfReadings[bfReadings.length - 1].bodyFatPct! - bfReadings[0].bodyFatPct! : null,
+    avgSteps: stepsValues.length > 0 ? stepsValues.reduce((a, b) => a + b, 0) / stepsValues.length : null,
+    daysWithData: new Set(bodyMetrics.map(m => m.date)).size,
+    personalRecordCount: personalRecords.length,
+    phase: phaseInfo ? { name: phaseInfo.name, phaseType: phaseInfo.phaseType } : null,
+  })
+
+  // `clampRecommendation` stays: `CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500 for `lose_weight`, and
+  // on a small enough BMR that can put the baseline's own calorie figure under the `max(1200, bmr)`
+  // floor. It is a no-op on a safe baseline, and says so in `dataQualityNote` when it is not.
+  const clamped = clampRecommendation({
+    recommendedStepsGoal: clampBaseline.stepsGoal,
+    recommendedCalories: clampBaseline.calories,
+    recommendedProteinG: clampBaseline.proteinG,
+    recommendedCarbsG: clampBaseline.carbsG,
+    recommendedFatG: clampBaseline.fatG,
+    recommendedWaterMl: clampBaseline.waterMl,
+    recommendedActivityLevel: suggestedLevel,
+    dataQualityNote: explanation.dataQualityNote,
+  }, clampBaseline, latestWeight)
+
   let rec: { id: string }
   try {
-    // F7: route the retry policy through the shared helper (maxRetries: 0 on the SDK
-    // call) like every other AI route — one place for backoff + reportServerError,
-    // instead of the SDK's default retry that also skips observability.
-    const result = await loggedGenerateObject(
-      { section: 'nutrition-goals-recommend', userId, fingerprint: context },
-      signal => generateObject({
-      model: aiModel(),
-      schema: recommendationSchema,
-      maxRetries: 0,
-      abortSignal: signal,
-      prompt: `You are a sports nutrition and training coach. The DAILY targets below have already been calculated from this person's measurements. Your job is to EXPLAIN them and to judge one thing: whether their stated activity level still matches how much they actually train.
-
-${context}
-
-Instructions:
-- You do NOT set the numbers. Steps, calories, protein, carbs, fat and water are computed from measured body composition, a measured or predicted resting rate, and the goal offset. Never state a target that differs from the baseline figures above, and never suggest the person aim for a different number.
-- "reasoning": explain what the baseline figures are built from and what in the recent trend supports or complicates them. Quote the figures exactly as given if you mention them.
-- Only suggest a different "recommendedActivityLevel" if the logged workout frequency clearly doesn't match the current activity level (e.g. 4+ sessions/week while set to "sedentary" or "light"). Otherwise set it to null. This is the ONE number-affecting judgement you make, and the targets are recalculated from it — so say plainly in "reasoning" why the logged frequency justifies the change.
-- "insights": look for sleep-duration vs mood/energy patterns and mention any personal records achieved in this window. If body fat % data is available, factor it alongside the weight trend (e.g. weight stable but body fat dropping suggests recomposition). If there's too little data (fewer than 3 days logged), say so explicitly instead of guessing — do not fabricate trends.
-- If the active program is currently in a "deload" or "testing" phase, expect reduced training volume, intensity, and possibly step counts — do not interpret this as a declining trend or sign of reduced effort.
-- Program phase is context for your explanation, not a reason to propose different targets: a deload week explains lower output, it does not change what the calculated intake should be.
-- "dataQualityNote": briefly note if the inputs were sparse enough that the trend commentary is thin, otherwise return an empty string.
-
-${PROSE_FIELD_GUARDS}`,
-    }))
-    ai = result.object
-
-    let clampBaseline = baseline
-    if (ai.recommendedActivityLevel && ai.recommendedActivityLevel !== user.activityLevel) {
-      clampBaseline = calculateBaseline({
-        weightKg: latestWeight,
-        heightCm: user.heightCm!,
-        ageYears,
-        sex: user.sex!,
-        activityLevel: ai.recommendedActivityLevel,
-        fitnessGoal: user.fitnessGoal!,
-        bodyFatPct: latestBodyFatPct,
-        measuredRmr,
-      })
-    }
-
-    // The recommendation IS the baseline — recomputed above when the model proposes a different
-    // activity level, which is the only way its judgement reaches a number, and it reaches it
-    // through the formula rather than around it.
-    //
-    // `clampRecommendation` is kept even though it can no longer be protecting against a model
-    // guess, because it is not only that: `CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500 for
-    // `lose_weight`, and on a small enough BMR that can put the baseline's own calorie figure under
-    // the `max(1200, bmr)` floor. It is a no-op on a baseline that is already safe, and when it is
-    // not a no-op it says so in `dataQualityNote`.
-    clamped = clampRecommendation({
-      recommendedStepsGoal: clampBaseline.stepsGoal,
-      recommendedCalories: clampBaseline.calories,
-      recommendedProteinG: clampBaseline.proteinG,
-      recommendedCarbsG: clampBaseline.carbsG,
-      recommendedFatG: clampBaseline.fatG,
-      recommendedWaterMl: clampBaseline.waterMl,
-      recommendedActivityLevel: ai.recommendedActivityLevel,
-      dataQualityNote: ai.dataQualityNote,
-    }, clampBaseline, latestWeight)
-
     rec = await repo.createGoalRecommendation(userId, {
       source,
       recommendedStepsGoal: clamped.recommendedStepsGoal,
@@ -388,15 +177,13 @@ ${PROSE_FIELD_GUARDS}`,
       recommendedFatG: clamped.recommendedFatG,
       recommendedWaterMl: clamped.recommendedWaterMl,
       recommendedActivityLevel: clamped.recommendedActivityLevel,
-      reasoning: ai.reasoning,
-      insights: ai.insights,
+      reasoning: explanation.reasoning,
+      insights: explanation.insights,
       dataQualityNote: clamped.dataQualityNote,
     })
-  } catch (err) {
-    // Covers NoObjectGeneratedError (Gemini output failed schema validation) and any
-    // DB error from createGoalRecommendation — no row is persisted and the rate-limit
-    // slot is still consumed, so report failure clearly rather than throwing a raw 500.
-    return aiPausedResponse(err) ?? NextResponse.json({ error: 'recommendation_failed' }, { status: 500 })
+  } catch {
+    // No row is persisted when the write fails, so report that rather than a raw 500.
+    return NextResponse.json({ error: 'recommendation_failed' }, { status: 500 })
   }
 
   return NextResponse.json({
@@ -422,8 +209,8 @@ ${PROSE_FIELD_GUARDS}`,
       waterMl: clamped.recommendedWaterMl,
       activityLevel: clamped.recommendedActivityLevel,
     },
-    reasoning: ai.reasoning,
-    insights: ai.insights,
+    reasoning: explanation.reasoning,
+    insights: explanation.insights,
     dataQualityNote: clamped.dataQualityNote,
   })
 }
