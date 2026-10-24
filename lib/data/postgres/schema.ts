@@ -2090,6 +2090,11 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
 
   bdiDerived: doublePrecision('bdi_derived'),
 
+  /** #2634: median HR of the day's still minutes (MET under the active threshold), and the minutes
+   *  behind it. NULL means not computed or too thin to trust, never zero. */
+  stillRhrBpm:         doublePrecision('still_rhr_bpm'),
+  stillRhrCoverageMin: integer('still_rhr_coverage_min'),
+
   bodyComp:    jsonb('body_comp'),
 
   computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
