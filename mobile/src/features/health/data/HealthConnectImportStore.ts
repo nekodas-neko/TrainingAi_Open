@@ -101,6 +101,9 @@ const diskSchema = z.object({
   // When records were first left out, kept until a type left out is no longer delivered first-hand,
   // then rescanned from here so they are read after all (#3197).
   firstHandSince: z.string().nullable().default(null),
+  // Types already asked for once, so a type added later (ExerciseSession, #2843) is requested on an
+  // existing install, and a denial is not asked again on every sync.
+  requested: z.array(z.string()).default([]),
   // The types left out since then (#3228 review): a rescan is owed only once one of them is no
   // longer delivered. Empty on a disk from before it, which falls back to "the connection is gone".
   firstHandTypes: z.array(z.string()).default([]),
@@ -166,6 +169,7 @@ export class HealthConnectImportStore {
       skipped: 0,
       skippedFirstHand: {},
       firstHandSince: null,
+      requested: [],
       firstHandTypes: [],
       completed: null,
     };
@@ -520,9 +524,20 @@ export class HealthConnectImportStore {
       if (!this.state.ready || !this.disk.enabled || this.canceled) return;
       this.publish({ busy: true, error: null });
       try {
-        const types = await this.reader.permissions();
+        let types = await this.reader.permissions();
         if (this.canceled) return;
         if (!types.length) throw new Error('No Health Connect read permissions are granted.');
+        // A type this install has never been asked for, once. Recorded before asking, so a denial,
+        // a dismissed sheet or a crash is not asked again; the sync carries on with what is granted.
+        const unasked = healthConnectTypes.filter(
+          (type) => !types.includes(type) && !this.disk.requested.includes(type),
+        );
+        if (unasked.length && this.reader.request) {
+          await this.write({ ...this.disk, requested: [...this.disk.requested, ...unasked] });
+          const granted = await this.reader.request(unasked).catch(() => null);
+          if (this.canceled) return;
+          if (granted?.length) types = granted;
+        }
         const firstHand = await this.firstHandSources().catch(() => null);
         if (this.canceled) return;
         // A new filter each run, so its counts are that sync's: a rescan reads records again and

@@ -111,7 +111,6 @@ export function knownFirstHandSources(
  */
 export class FirstHandFilter<T> {
   private readonly dropped = new Map<string, Set<unknown>>()
-  private unnamed = 0
 
   constructor(
     private readonly sources: FirstHandSources | null | undefined,
@@ -124,12 +123,19 @@ export class FirstHandFilter<T> {
     if (!isFirstHandCopy(this.originOf(record), this.sources, type)) return true
     let ids = this.dropped.get(type)
     if (!ids) this.dropped.set(type, (ids = new Set()))
-    ids.add(this.idOf(record) ?? `#${this.unnamed++}`)
+    // A record with no id still counts, once each.
+    ids.add(this.idOf(record) ?? Symbol())
     return false
   }
 
   keep(type: string, records: readonly T[]): T[] {
     return records.filter(r => this.admit(type, r))
+  }
+
+  /** The record ids left out so far under `type`, for a caller that must not read their absence
+   *  as a deletion (#3044). Records with no id are counted but not listed. */
+  leftOutIds(type: string): string[] {
+    return [...(this.dropped.get(type) ?? [])].filter((id): id is string => typeof id === 'string')
   }
 
   /** Records left out so far in this pass, per type; empty when none. */

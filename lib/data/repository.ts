@@ -342,6 +342,24 @@ export type BloodPanelInput = Omit<BloodPanel, 'id'> & { id?: string }
 // says every domain type derives from it so the two cannot drift; this one had not.
 export type MutationDomain = SyncedMutationDomain
 
+/** #3044. One Health Connect exercise session, already validated and dated in the user's zone. */
+export interface HealthConnectActivityLogInput {
+  date: string
+  activityType: string
+  title: string
+  startTime: string
+  endTime: string
+  durationMin: number
+  distanceKm?: number
+  caloriesBurned?: number
+  avgHr?: number
+  maxHr?: number
+}
+
+/** `taken`: another row holds the session's start minute, so this one was not stored or moved.
+ *  `deleted`: the row is tombstoned and stays so. */
+export type HealthConnectActivityLogOutcome = 'inserted' | 'updated' | 'unchanged' | 'taken' | 'deleted'
+
 export interface FitnessTest {
   id: string
   userId: string
@@ -830,6 +848,11 @@ export interface WorkoutRepository {
   updateActivityLogMetrics(userId: string, id: string, patch: { distanceKm?: number; caloriesBurned?: number; avgHr?: number; maxHr?: number }): Promise<void>
   /** `false` when the (id, user) pair matched no row — absent or not yours (Q-556). */
   deleteActivityLog(userId: string, id: string): Promise<boolean>
+  /** #3044. Insert or update the session Health Connect calls `externalId`; see the adapter. */
+  upsertHealthConnectActivityLog(userId: string, externalId: string, log: HealthConnectActivityLogInput): Promise<HealthConnectActivityLogOutcome>
+  /** #3044. Tombstone Health Connect sessions by record id, or every one dated `from`–`to` whose id
+   *  is not in `keep`. Returns how many rows it tombstoned. */
+  tombstoneHealthConnectActivityLogs(userId: string, scope: { ids: readonly string[] } | { from: string; to: string; keep: readonly string[] }): Promise<number>
   saveFitnessTest(userId: string, test: Omit<FitnessTest, 'userId'>): Promise<FitnessTest>
   listFitnessTests(userId: string, from: string, to: string): Promise<FitnessTest[]>
   deleteFitnessTest(userId: string, id: string): Promise<void>

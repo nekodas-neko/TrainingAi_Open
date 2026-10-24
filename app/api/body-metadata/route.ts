@@ -15,7 +15,7 @@ import { invalidBodyResponse } from '@/lib/api/route-errors'
 import { bodyRecentFromDay, BODY_RECENT_DAYS } from '@trainingai/shared/health/body-recent-window'
 import { countedIntakeKcal } from '@trainingai/shared/nutrition/counted-intake';
 import { countedEstimatesForRange, sharedEstimateReads } from '@/lib/health/energy-balance-service'
-import { ouraBudgetActivities } from "@/lib/health/oura-budget-activities";
+import { budgetMovement } from "@/lib/health/oura-budget-activities";
 
 // One day's body metadata.
 const MAX_BODY_BYTES = 16 * 1024
@@ -229,6 +229,11 @@ export async function GET(req: NextRequest) {
     .getAvgBpmBySession(userId, todayWorkouts.filter(w => w.completedAt != null).map(w => w.id))
     .catch(() => new Map<string, number>());
 
+  // #3044: a Health Connect copy of an in-app workout is not paid twice, and #3087: Oura's own
+  // workouts the app did not log count too. Every loaded log is offered for both checks, not only
+  // today's: a 23:30-00:30 log is yesterday's, and must still keep out a copy of it that starts after
+  // midnight.
+  const movement = await budgetMovement(repo, userId, today, today, tz, { activityLogs, sessions: todayWorkouts });
   const activeEnergy = computeActiveEnergy({
     profile: { ageYears, weightKg: bodyWeightForEnergy, sex: userSex },
     strengthSessions: todayWorkouts
@@ -238,11 +243,8 @@ export async function GET(req: NextRequest) {
       // Q-421: and `avgBpm` takes precedence over the tier where the strap was worn.
       .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
     activities: [
-      ...todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null })),
-      // #3087: Oura's own workouts the app did not log count too. Every loaded log is offered for the
-      // overlap check, not only today's: a 23:30-00:30 log is yesterday's, and must still keep out
-      // the Oura copy of it that starts after midnight.
-      ...await ouraBudgetActivities(repo, userId, today, today, tz, { activityLogs, sessions: todayWorkouts }),
+      ...movement.logs.filter(a => a.date === today).map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null })),
+      ...movement.oura,
     ],
     pedometerSteps: todayMetric?.steps ?? null,
   });
@@ -279,10 +281,6 @@ export async function GET(req: NextRequest) {
       fat:      Math.round(totals.fat      * 10) / 10,
     };
   }
-
-  const calsBurnedToday = todayActivityLogs.length > 0
-    ? todayActivityLogs.reduce((sum, s) => sum + (s.caloriesBurned ?? 0), 0)
-    : null;
 
   // Fold today's activity steps into the today row (surface them even when there's
   // no body_metrics row yet for the day). `deviceSteps` keeps the unfolded count for the Log value
@@ -332,7 +330,7 @@ export async function GET(req: NextRequest) {
   // food/activity totals that must never be served stale — do not "fix" to SWR.
   return NextResponse.json(
     {
-      today: todayRow, recent, weekToDate, calsBurnedToday, activeEnergyKcalToday,
+      today: todayRow, recent, weekToDate, activeEnergyKcalToday,
       latestWeightKg, latestWeightDate, weightTrend,
       ...(includeOverview ? { measuredOverview: weightHistoryFailed ? null : weightHistory.map(m => toRow(m, bodyFatCalibration)) } : {}),
       // The owner asked to be shown the offset, not just its effect. `pairCount` is what says how
