@@ -5,7 +5,6 @@ import {
   BODY_BATTERY_EXPLAINER,
   BODY_BATTERY_PROVISIONAL_SUFFIX,
   BODY_BATTERY_SPARSE_DAY,
-  BODY_BATTERY_TREND_LABEL,
   bodyBatteryAnchorSuffix,
 } from '@trainingai/shared/health/body-battery-copy';
 import { useState } from 'react';
@@ -24,6 +23,7 @@ import {
 } from '../../../shared/ui';
 import { useHealthData } from '../data/HealthDataProvider';
 import { batterySpec, metricValue } from '../data/models';
+import { batterySummary } from '../data/battery-summary';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { StressDayCard } from './StressDayCard';
 import { layoutMotion } from '../../../shared/ui/layoutMotion';
@@ -44,7 +44,8 @@ export function BodyBatteryCard() {
   const reduced = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
   const noData = !data?.hasData;
-  const levelLabel = data?.hasData ? data.label : data ? 'No data yet' : 'Waiting for readings';
+  const summary = batterySummary(data);
+  const { levelLabel, trend } = summary;
   const showStatus = (state.loading && !data) || !!state.error;
   const levelIcon = data?.hasData
     ? ((
@@ -56,7 +57,6 @@ export function BodyBatteryCard() {
         } as const
       )[data.label] ?? 'battery')
     : 'signalLow';
-  const trend = data?.hasData ? data.trend : null;
   const trendColor =
     trend === 'charging'
       ? theme.status.success
@@ -73,7 +73,7 @@ export function BodyBatteryCard() {
         accessibilityRole="button"
         accessibilityLabel="Body Battery"
         accessibilityValue={{
-          text: [data?.hasData ? metricValue(data.current) : undefined, levelLabel]
+          text: [summary.value, levelLabel]
             .filter(Boolean)
             .join(', '),
         }}
@@ -135,7 +135,7 @@ export function BodyBatteryCard() {
                 color={trendColor}
               />
               <AppText variant="micro" style={{ color: trendColor }}>
-                {BODY_BATTERY_TREND_LABEL[trend]}
+                {summary.trendLabel}
               </AppText>
             </View>
           )}
@@ -143,7 +143,7 @@ export function BodyBatteryCard() {
             variant="batteryValue"
             style={{ fontVariant: ['tabular-nums'], color: noData ? theme.colors.text : color }}
           >
-            {data?.hasData ? metricValue(data.current) : '—'}
+            {summary.value ?? '—'}
           </AppText>
           <DisclosureIcon expanded={expanded} size={theme.sizes.iconCompact} />
         </View>
