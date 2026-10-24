@@ -1,13 +1,14 @@
 import { capitalize } from '@trainingai/shared/format/capitalize';
 import {
-  GENERIC_LEGEND,
+  GENERIC_BARS_CAPTION,
   GENERIC_TARGET,
   MAX_TARGET,
+  TARGET_BARS_CAPTION,
   muscleVolumeColor,
 } from '@trainingai/shared/health/volume-band';
 import { AppText, Legend, MuscleMap, ProgressBar, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { muscleSetsLabel } from '../data/training-view';
+import { muscleLegendItems, muscleSetsLabel } from '../data/training-view';
 
 // The week's muscle volume as the current app draws it: a front and back body map and one bar per
 // muscle, both coloured by the same rule (shared `muscleVolumeColor`) so the map cannot disagree
@@ -37,9 +38,15 @@ export function MuscleVolumeFigure({
     .map((row) => ({ muscle: row.muscle, color: row.color }));
   return (
     <>
-      <AppText variant="caption" tone="muted" style={{ textAlign: 'right' }}>
-        {hasTargets ? 'vs your program target' : `Target: ${GENERIC_TARGET}–${MAX_TARGET} sets`}
-      </AppText>
+      <Legend
+        centered
+        items={muscleLegendItems(hasTargets, {
+          bad: palette.bad,
+          warn: palette.warn,
+          good: palette.good,
+          untrained: theme.anatomy.untrained,
+        })}
+      />
       <MuscleMap assignments={assignments} />
       {/* weekly-muscle-sets-card.tsx: space-y-2 rows, each a text-xs label, mb-0.5, then an h-2 bar. */}
       <Stack gap="sm">
@@ -64,21 +71,10 @@ export function MuscleVolumeFigure({
           </Stack>
         ))}
       </Stack>
-      <Legend
-        items={
-          hasTargets
-            ? [
-                { label: 'At or above target', color: palette.good },
-                { label: '60% or more', color: palette.warn },
-                { label: 'Under 60%', color: palette.bad },
-              ]
-            : GENERIC_LEGEND.map((item) => ({ label: item.label, color: palette[item.tone] }))
-        }
-      />
-      <AppText variant="caption" tone="muted">
+      <AppText variant="micro" tone="muted">
         {hasTargets
-          ? 'Vertical line = your weekly target'
-          : `Vertical line = ${GENERIC_TARGET}-set minimum`}
+          ? TARGET_BARS_CAPTION
+          : GENERIC_BARS_CAPTION}
       </AppText>
     </>
   );

@@ -55,6 +55,7 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
       <Stack direction="row" align="center">
         <Stack style={{ flex: 1 }}>
           <SegmentedControl
+            appearance="tabs"
             label="Friends views"
             value={view}
             onChange={setView}
@@ -95,6 +96,8 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
           {view === 'leaderboard' && (
             <>
               <SegmentedControl
+                appearance="tabs"
+                size="xs"
                 label="Leaderboard period"
                 value={period}
                 onChange={(value) => setPeriod(value as Period)}
@@ -104,6 +107,8 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                 ]}
               />
               <SegmentedControl
+                appearance="tabs"
+                size="xs"
                 label="Leaderboard metric"
                 value={metric}
                 onChange={(value) => setMetric(value as Metric)}

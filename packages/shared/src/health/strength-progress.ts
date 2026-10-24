@@ -30,6 +30,17 @@ const RED = '#f87171'
 /** The colour of a better / worse change beside a bar. `same` has no entry: it prints nothing. */
 export const TREND_COLOR = { up: GREEN, down: RED } as const
 
+export type GainTone = 'up' | 'down' | 'flat'
+
+/**
+ * Which way a strength-trend gain reads: up, down, or flat at exactly 0. Null when there is no gain
+ * to show. Each app maps the tone to its own green / red / amber, so the three cannot drift apart.
+ */
+export function gainTone(gainPct: number | null | undefined): GainTone | null {
+  if (gainPct == null) return null
+  return gainPct > 0 ? 'up' : gainPct < 0 ? 'down' : 'flat'
+}
+
 /**
  * "+3 reps" for a bodyweight exercise, "-2.5 kg" for a loaded one; null when nothing changed or
  * there is no previous reading to change from. The unit follows `deltaUnit`, so a bodyweight 1RM
