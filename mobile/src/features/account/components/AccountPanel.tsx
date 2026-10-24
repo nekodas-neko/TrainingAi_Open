@@ -53,9 +53,10 @@ export function AccountPanel() {
               {account.state.message}
             </AppText>
           )}
-          {account.state.status === 'signedOut' && (
+          {(account.state.status === 'signedOut' ||
+            (account.state.status === 'signingIn' && account.state.attemptStale)) && (
             <>
-              {account.appleAvailable && (
+              {account.state.status === 'signedOut' && account.appleAvailable && (
                 <AppleSignInButton
                   onPress={() => {
                     void account.signInWithApple();
