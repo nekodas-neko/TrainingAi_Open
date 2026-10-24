@@ -16,7 +16,7 @@ import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { SessionPreview } from '../../workouts/catalog';
-import { formatDateDisplay } from '@trainingai/shared/date-utils';
+import { homeRecommendationModel } from '../data/recommendation-model';
 import { SessionGlyph } from '../../workouts/components/SessionGlyph';
 import { failureNotice } from '../../../core/reporting/index.ts';
 
@@ -41,12 +41,17 @@ export function HomeRecommendation({
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
   const [error, setError] = useState<string | null>(null);
-  const sessions = catalog?.program?.sessions ?? [];
-  const active = journal.data.workouts.find((workout) => workout.status === 'active');
-  const done = sessions.find((session) => trained.includes(session.name));
   const rec = catalog?.recommendation;
-  const session = done ?? sessions.find((value) => value.id === rec?.sessionId);
-  const resting = home.restDays[today] ?? rec?.isRestDay ?? false;
+  const model = homeRecommendationModel({
+    catalog,
+    catalogLoading: status === 'loading',
+    trained,
+    active: journal.data.workouts.find((workout) => workout.status === 'active'),
+    restChoice: home.restDays[today],
+    mood: home.mood,
+    moodFailed: !!home.errors[`mood:${today}`],
+    today,
+  });
   async function rest(value: boolean) {
     try {
       await home.store?.chooseRestDay(today, value);
@@ -55,10 +60,7 @@ export function HomeRecommendation({
       setError(failureNotice('Could not save your rest-day choice. Try again.', failure));
     }
   }
-  if (
-    (home.mood === undefined && !home.errors[`mood:${today}`]) ||
-    (!catalog && status === 'loading')
-  ) {
+  if (model.kind === 'loading') {
     return (
       <Card style={{ minHeight: theme.sizes.recommendationCard }}>
         <Skeleton style={{ height: theme.spacing.lg, width: '40%' }} />
@@ -66,7 +68,8 @@ export function HomeRecommendation({
       </Card>
     );
   }
-  if (!home.mood) {
+  if (model.kind === 'checkin' || !home.mood) {
+    const session = model.kind === 'checkin' ? model.session : undefined;
     return (
       <Card tone="checkin">
         <AppText variant="eyebrow" style={{ color: theme.tones.checkin.foreground }}>
@@ -86,7 +89,7 @@ export function HomeRecommendation({
       </Card>
     );
   }
-  if (resting && !done && !active) {
+  if (model.kind === 'rest') {
     return (
       <Card tone="sleep">
         <Stack direction="row" align="center">
@@ -94,14 +97,14 @@ export function HomeRecommendation({
           <AppText variant="heading">Rest Day</AppText>
         </Stack>
         <AppText variant="caption" tone="muted">
-          {rec?.reason ?? 'A day to recover.'}
+          {model.reason}
         </AppText>
         <AppButton title="Train instead" variant="ghost" onPress={() => void rest(false)} />
         <StatusIndicator label="Rest day" error={error} />
       </Card>
     );
   }
-  if (!session) {
+  if (model.kind === 'none') {
     return (
       <Card>
         <AppText variant="heading">Your next session</AppText>
@@ -112,6 +115,8 @@ export function HomeRecommendation({
       </Card>
     );
   }
+  const { session } = model;
+  const done = model.state === 'done';
   return (
     <Card
       tone={done ? 'activity' : 'brand'}
@@ -119,7 +124,7 @@ export function HomeRecommendation({
     >
       <Stack direction="row" align="center" justify="space-between">
         <AppText variant="eyebrow" tone="muted">
-          {active ? 'Workout in progress' : done ? 'Trained Today' : 'Recommended Today'}
+          {model.eyebrow}
         </AppText>
         <StatusIndicator label="Workout recommendation" error={error} />
         {home.mood.soreMuscles.length > 0 && (
@@ -156,7 +161,7 @@ export function HomeRecommendation({
           color={theme.colors.brand}
         />
         <Stack style={{ flex: 1 }}>
-          <AppText variant="hero">{active?.sessionName ?? session.name}</AppText>
+          <AppText variant="hero">{model.name}</AppText>
           {!done && (
             <Pressable
               accessibilityRole="button"
@@ -176,33 +181,22 @@ export function HomeRecommendation({
         </Stack>
       </Stack>
       <Stack direction="row" wrap>
-        {session.durationMinutes !== null && (
-          <AppText variant="caption" tone="muted">
-            ~{Math.round(session.durationMinutes)} min
+        {model.meta.map((line) => (
+          <AppText key={line} variant="caption" tone="muted">
+            {line}
           </AppText>
-        )}
-        <AppText variant="caption" tone="muted">
-          {session.exercises.length} exercises
-        </AppText>
-        <AppText variant="caption" tone="muted">
-          Last:{' '}
-          {session.lastTrained
-            ? session.lastTrained === today
-              ? 'Today'
-              : formatDateDisplay(session.lastTrained, 'short')
-            : '—'}
-        </AppText>
+        ))}
       </Stack>
       {session.phaseDetail && (
         <AppText variant="caption" tone="muted">
           {session.phaseDetail}
         </AppText>
       )}
-      {active ? (
-        <AppButton title="Resume Workout" onPress={() => onResume(active.id)} />
-      ) : done ? (
+      {model.action === 'resume' && model.activeId ? (
+        <AppButton title="Resume Workout" onPress={() => onResume(model.activeId!)} />
+      ) : model.action === 'completed' ? (
         <Badge label="Completed Today" tone="brand" />
-      ) : rec?.deloadOrRestRecommended ? (
+      ) : model.action === 'deload' && rec ? (
         <>
           <AppText variant="caption" tone="muted">
             {rec.reason}

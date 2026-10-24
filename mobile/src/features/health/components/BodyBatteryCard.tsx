@@ -5,7 +5,6 @@ import {
   BODY_BATTERY_EXPLAINER,
   BODY_BATTERY_PROVISIONAL_SUFFIX,
   BODY_BATTERY_SPARSE_DAY,
-  BODY_BATTERY_TREND_LABEL,
   bodyBatteryAnchorSuffix,
 } from '@trainingai/shared/health/body-battery-copy';
 import { View } from 'react-native';
@@ -22,6 +21,7 @@ import {
 } from '../../../shared/ui';
 import { useHealthData } from '../data/HealthDataProvider';
 import { batterySpec, metricValue } from '../data/models';
+import { batterySummary } from '../data/battery-summary';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { StressDayCard } from './StressDayCard';
 import { batteryColor } from '../../../shared/battery-color';
@@ -43,16 +43,10 @@ export function BodyBatteryCard() {
   return (
     <ExpandableCard
       title="Body Battery"
-      subtitle={
-        data?.hasData
-          ? `${data.label} · ${BODY_BATTERY_TREND_LABEL[data.trend]}`
-          : data
-            ? 'No data yet'
-            : 'Waiting for readings'
-      }
+      subtitle={batterySummary(data).subtitle}
       icon="battery"
       tone="brand"
-      value={data?.hasData ? metricValue(data.current) : undefined}
+      value={batterySummary(data).value}
       status={
         (state.loading && !data) || state.error ? (
           <StatusIndicator
