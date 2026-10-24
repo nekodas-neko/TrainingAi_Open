@@ -103,4 +103,28 @@ describe.skipIf(!canRun)('Oura sleep revisions are recorded (#2210)', () => {
     expect(rows[0].day).toBe(DAY)
     expect(rows[0].changes.sleepStart).toEqual({ old: '2026-10-10T05:30:00.000Z', new: '2026-10-10T00:00:00.000Z' })
   })
+
+  // The start-move path: Oura keeps the id and moves the start, the row is moved in place and replaced
+  // (`replaceOwnCloud`), not tombstoned and re-inserted, so the revision belongs to the original row id.
+  it('records a moved start against the same sleep_session_id, with no second row for the id', async () => {
+    await writeSleep(la)
+    const before = (await pool.query(`SELECT id FROM sleep_sessions WHERE user_id = $1 AND oura_id = 'sl-1'`, [USER])).rows
+    expect(before).toHaveLength(1)
+
+    await writeSleep({ ...la, bedtime_start: '2026-10-09T17:00:00-07:00' })
+
+    const rows = (await pool.query(
+      `SELECT sleep_session_id, changes FROM sleep_session_revisions WHERE user_id = $1`, [USER])).rows
+    expect(rows).toHaveLength(1)
+    expect(rows[0].sleep_session_id).toBe(before[0].id)
+    expect(rows[0].changes.sleepStart).toBeDefined()
+
+    const after = (await pool.query(
+      `SELECT id, sleep_start, deleted_at FROM sleep_sessions WHERE user_id = $1 AND oura_id = 'sl-1'`, [USER])).rows
+    expect(after).toHaveLength(1)
+    expect(after[0].id).toBe(before[0].id)
+    expect(after[0].deleted_at).toBeNull()
+    expect(after[0].sleep_start.toISOString()).toBe('2026-10-10T00:00:00.000Z')
+    expect((await pool.query(`SELECT count(*)::int AS n FROM sleep_sessions WHERE user_id = $1 AND deleted_at IS NOT NULL`, [USER])).rows[0].n).toBe(0)
+  })
 })

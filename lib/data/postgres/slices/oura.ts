@@ -8,6 +8,7 @@ import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-
 import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
 import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/shared/date-utils'
 import { shouldPrune } from '../retention-throttle'
+import { errorLog } from '@trainingai/shared/logger'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
 import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
@@ -787,7 +788,7 @@ async function recordSleepRevision(db: Db, userId: string, before: StoredCloudNi
       userId, sleepSessionId: after.id, ouraId: after.ouraId, day: after.date, source: 'oura_cloud', changes,
     })
   } catch (err) {
-    console.error('[oura-sleep-revisions] could not record a revision:', err)
+    errorLog('[oura-sleep-revisions] could not record a revision:', err instanceof Error ? err.message : String(err))
   }
 }
 
