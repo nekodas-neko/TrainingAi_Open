@@ -1622,6 +1622,9 @@ export const ouraHeartrate = pgTable('oura_heartrate', {
   // `workout`, `live`, `session`; spec `PublicHeartRateSource`). `source` above stays our provenance,
   // which the source ladder ranks on.
   context:   text('context'),
+  // #3194 (migration 202610240144) — the Health Connect app (package id) that wrote the row, from
+  // `metadata.dataOrigin`. Nothing writes it yet; NULL for every existing row.
+  dataOrigin: text('data_origin'),
   // migration 130 (Phase-2 B1) — cursor for the dedicated Track-B timeseries backup sync.
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ name: 'oura_heartrate_pkey', columns: [t.userId, t.timestamp] })])
