@@ -5,11 +5,7 @@ import { ChevronRightIcon, MessageSquareIcon, WandSparklesIcon } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
-import {
-  invalidateCoachHistory,
-  invalidateProgramStructure,
-  invalidateGoalRecommendations,
-} from "@/lib/cache-groups";
+import { invalidateCoachChange } from "@/lib/cache-groups";
 import { COACH_HISTORY_TTL } from "@trainingai/shared/cache-ttl";
 
 interface ThreadSummary {
@@ -71,17 +67,13 @@ export function CoachHistory({ onOpenThread, onNewConversation, tz }: CoachHisto
       }
       // The row re-styles itself struck-through the moment this lands, which is the feedback.
       setChanges(cs => cs.map(c => (c.id === id ? { ...c, undoneAt: new Date().toISOString() } : c)));
-      // **The route's own `invalidateProgramStructure()` runs on the SERVER, where `lib/cache-groups`
-      // reaches localStorage/sessionStorage and the on-device SQLite cache — i.e. nothing.** Without
-      // these three the programme the undo just restored keeps painting from cache for a full TTL,
-      // which is this repo's most-repeated bug class. Undo is rare and does not know which of the
-      // five domains it reversed (the history payload carries only a summary), so it clears the
-      // superset: the cost is a refetch, and the alternative is stale training data.
-      await Promise.all([
-        invalidateProgramStructure(),
-        invalidateGoalRecommendations(),
-        invalidateCoachHistory(),
-      ]).catch(() => {});
+      // **The undo route runs on the SERVER, where `lib/cache-groups` reaches localStorage/
+      // sessionStorage and the on-device SQLite cache — i.e. nothing.** Without this the programme
+      // the undo just restored keeps painting from cache for a full TTL, which is this repo's
+      // most-repeated bug class. Undo does not know which domain it reversed (the history payload
+      // carries only a summary), so with no domain given the group clears the superset: the cost is
+      // a refetch, and the alternative is stale training data.
+      await invalidateCoachChange().catch(() => {});
     } catch {
       setRefusal(r => ({ ...r, [id]: "Could not reach the server" }));
     } finally {

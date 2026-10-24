@@ -7,7 +7,7 @@ import { FIELD_LABEL, FIELD_UNIT } from "@/lib/coach/patch";
 import type { NumberDialArgs } from "@/lib/coach/widgets";
 import { GOAL_LOCAL_STORAGE_KEYS } from "@/lib/coach/domains/goals";
 import { clearCalorieGoalSeeds } from "@/lib/home/home-prefs";
-import { invalidateCoachHistory, invalidateGoalRecommendations } from "@/lib/cache-groups";
+import { invalidateCoachChange } from "@/lib/cache-groups";
 
 interface NumberDialProps {
   args: NumberDialArgs;
@@ -70,10 +70,9 @@ export function NumberDial({ args, onApplied, onCancel }: NumberDialProps) {
         }
       }
       // The goal is in the database now; without this, Health keeps rendering the previous one
-      // from the `user-goals` cache for up to its TTL (the Q-240 omission, third surface).
-      if (args.patch.domain === "user_goals") invalidateGoalRecommendations().catch(() => {});
-      // An applied change becomes a row in the Coach history list.
-      invalidateCoachHistory().catch(() => {});
+      // from the `user-goals` cache for up to its TTL (the Q-240 omission, third surface). The
+      // route's own invalidation runs on the server and reaches no cache.
+      invalidateCoachChange(args.patch.domain).catch(() => {});
       onApplied?.(data.summary ?? "Change applied");
     } catch {
       setError("Could not reach the server");
