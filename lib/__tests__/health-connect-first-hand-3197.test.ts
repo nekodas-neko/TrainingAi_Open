@@ -23,7 +23,7 @@ vi.mock('@devmaxime/capacitor-health-connect', () => ({
 
 import {
   syncHealthConnect, syncWindowIso, rememberSyncSkipped, readLastSyncSkipped,
-  LAST_SYNC_KEY, SKIPPED_SINCE_KEY, SYNC_DAYS_COLD,
+  LAST_SYNC_KEY, SKIPPED_SINCE_KEY, SKIPPED_TYPES_KEY, SYNC_DAYS_COLD,
 } from '../health-connect-sync'
 import { importMoreHistory, coldSyncOldestDay } from '../health-connect-history-import'
 import { OURA_APP_PACKAGE } from '@trainingai/shared/health/health-connect-origin'
@@ -34,6 +34,11 @@ const SAMSUNG = 'com.sec.android.app.shealth'
 const today = () => todayInTz(TZ)
 const connected = (ouraCloud: boolean) => {
   cache.value = { date: today(), data: { connectedSources: { ring: false, strap: false, healthConnect: true, ouraCloud } } }
+}
+/** A server since #3204: the per-type answer, and the boolean true only while every type is delivered. */
+const connectedTypes = (ouraCloudTypes: Record<string, boolean>) => {
+  const ouraCloud = Object.keys(ouraCloudTypes).length > 0 && Object.values(ouraCloudTypes).every(Boolean)
+  cache.value = { date: today(), data: { connectedSources: { ring: false, strap: false, healthConnect: true, ouraCloud, ouraCloudTypes } } }
 }
 const noonOf = (day: string) => dateStrMidnightInTz(day, TZ).getTime() + 12 * 3_600_000
 
@@ -173,6 +178,72 @@ describe('rewind after a disconnect (#3197)', () => {
       await syncHealthConnect(TZ)
       expect(daysBackOf(firstReadStart())).toBe(expected)
     }
+  })
+
+  // #3228 review: under a partial grant `ouraCloud` is false while some types are still delivered.
+  // Only a skipped type that stops being delivered is owed a rewind.
+  describe('by the types that were skipped', () => {
+    const syncDays = async () => {
+      hc.readRecords.mockClear()
+      await syncHealthConnect(TZ)
+      return daysBackOf(firstReadStart())
+    }
+
+    it('never rewinds under a stable partial grant, though a delivered type is skipped every sync', async () => {
+      hc.records = [hr(shiftDateStr(today(), -2), OURA_APP_PACKAGE), hr(shiftDateStr(today(), -1), OURA_APP_PACKAGE)]
+      connectedTypes({ HeartRateSeries: true, OxygenSaturation: false })
+      for (let i = 0; i < 5; i++) {
+        const days = await syncDays()
+        if (i > 0) expect(days).toBe(7)
+        expect(store.has(SKIPPED_SINCE_KEY)).toBe(true)
+      }
+      expect(JSON.parse(store.get(SKIPPED_TYPES_KEY)!)).toEqual(['HeartRateSeries'])
+    })
+
+    it('rewinds once when the grant is gone, then not again', async () => {
+      hc.records = [hr(shiftDateStr(today(), -20), OURA_APP_PACKAGE)]
+      connectedTypes({ HeartRateSeries: true })
+      await syncDays()
+      connectedTypes({})
+      expect(await syncDays()).toBe(SYNC_DAYS_COLD)
+      expect(store.has(SKIPPED_SINCE_KEY)).toBe(false)
+      expect(store.has(SKIPPED_TYPES_KEY)).toBe(false)
+      expect(await syncDays()).toBe(7)
+    })
+
+    it('rewinds once, as before, for a server that sends only the boolean', async () => {
+      hc.records = [hr(shiftDateStr(today(), -20), OURA_APP_PACKAGE)]
+      connected(true)
+      await syncDays()
+      connected(false)
+      expect(await syncDays()).toBe(SYNC_DAYS_COLD)
+      expect(await syncDays()).toBe(7)
+    })
+
+    it('rewinds once when a skipped type is withdrawn, keeping a marker for the types still delivered', async () => {
+      hc.records = [hr(shiftDateStr(today(), -10), OURA_APP_PACKAGE), weight(shiftDateStr(today(), -10), OURA_APP_PACKAGE)]
+      connectedTypes({ HeartRateSeries: true, Weight: true })
+      await syncDays()
+      expect(JSON.parse(store.get(SKIPPED_TYPES_KEY)!).sort()).toEqual(['HeartRateSeries', 'Weight'])
+
+      connectedTypes({ HeartRateSeries: true, Weight: false })
+      posts = []
+      expect(await syncDays()).toBe(SYNC_DAYS_COLD)
+      expect(syncPosts()[0].body).toMatchObject({ dailyMetrics: [expect.objectContaining({ weightKg: 80 })] })
+      // Heart rate was skipped again in the rewind: it is what the new marker is owed for.
+      expect(JSON.parse(store.get(SKIPPED_TYPES_KEY)!)).toEqual(['HeartRateSeries'])
+      expect(await syncDays()).toBe(7)
+      expect(await syncDays()).toBe(7)
+    })
+
+    it('falls back to "the connection is gone" for a marker written before the types were', async () => {
+      store.set(LAST_SYNC_KEY, 'x')
+      store.set(SKIPPED_SINCE_KEY, shiftDateStr(today(), -12))
+      connectedTypes({ HeartRateSeries: true, OxygenSaturation: false })
+      expect(await syncDays()).toBe(7)
+      connectedTypes({})
+      expect(await syncDays()).toBe(13)
+    })
   })
 
   it('does not rewind when nothing was ever skipped', async () => {

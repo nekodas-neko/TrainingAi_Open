@@ -701,6 +701,9 @@ export interface WorkoutRepository {
   /** Inserts or replaces the caller's tokens. Rejects with SQLSTATE 23505 when another user already
    *  holds `ouraUserId`. */
   saveOuraCloudTokens(userId: string, input: SaveOuraCloudTokensInput): Promise<void>
+  /** #3204: marks the caller's grant as refused by Oura, unless the row was saved after
+   *  `unchangedSince`. True when marked (or already marked); false when there is no row or it moved on. */
+  markOuraCloudReauthRequired(userId: string, unchangedSince: Date): Promise<boolean>
   /** True when the caller's row existed and is deleted now. */
   deleteOuraCloudTokens(userId: string): Promise<boolean>
   /** #2859: the user an Oura account is connected to, for routing a webhook event. Null if none. */
@@ -1649,7 +1652,7 @@ export interface WorkoutRepository {
   getSetHrStatsSince(userId: string, since: Date, limit?: number): Promise<SetHrStatsRow[]>
   listSessionsMissingSetHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   /** #2457 backfill work-list: every stored per-set row's HRR60 inputs, oldest first. */
-  listSetHrStatsForHrr1Backfill(userId: string): Promise<{ setLogId: string; workoutSessionId: string; loggedAt: Date | null; hrr1Bpm: number | null; restAdequate: boolean | null; drop30s: number | null; drop60s: number | null; drop90s: number | null; drop120s: number | null }[]>
+  listSetHrStatsForHrr1Backfill(userId: string): Promise<{ setLogId: string; workoutSessionId: string; loggedAt: Date | null; setEndMs: number | null; hrr1Bpm: number | null; restAdequate: boolean | null; drop30s: number | null; drop60s: number | null; drop90s: number | null; drop120s: number | null }[]>
   /** #2457: set `hrr1_bpm` / `rest_adequate` as given (null clears); all-or-nothing, throws on a count mismatch. */
   writeSetHrr1(userId: string, updates: readonly { setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null; drop30s: number | null; drop60s: number | null; drop90s: number | null; drop120s: number | null }[]): Promise<number>
   getOuraWorkouts(userId: string, opts: { unreviewed?: boolean; from?: string; to?: string; timezone?: string }): Promise<{

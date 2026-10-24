@@ -1540,6 +1540,8 @@ export const ouraTokens = pgTable('oura_tokens', {
   scope:               text('scope'),
   ouraUserId:          text('oura_user_id').unique(),  // Oura's own user ID — used for webhook lookup
   webhookSigningKey:   text('webhook_signing_key'),    // HMAC key from Oura webhook subscription response
+  // #3204: when Oura refused the grant (`invalid_grant`, or a fresh token refused). Cleared by new tokens.
+  reauthRequiredAt:    timestamp('reauth_required_at', { withTimezone: true }),
   createdAt:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

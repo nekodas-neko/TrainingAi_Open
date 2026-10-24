@@ -5,6 +5,7 @@ import { Icon, type IconName } from './Icon';
 import { Stack } from './Stack';
 import { useTheme } from '../theme/ThemeProvider';
 import { MAX_TEXT_SCALE } from '../theme/text-scale';
+import { withGeist } from '../theme/fonts';
 import type { TextVariant } from '../theme/tokens';
 
 export function TextField({
@@ -56,7 +57,7 @@ export function TextField({
               backgroundColor: theme.colors.raised,
               paddingHorizontal: theme.spacing.md,
               paddingVertical: theme.spacing.sm,
-              ...theme.typography[variant],
+              ...withGeist(theme.typography[variant]),
               ...(leadingIcon ? { paddingLeft: theme.spacing.md + theme.sizes.iconSmall + theme.spacing.sm } : {}),
             },
             style,

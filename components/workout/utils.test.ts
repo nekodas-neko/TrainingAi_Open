@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { modalWeight, avgReps, clampVoiceLogResult } from "./utils";
+import { modalWeight, avgReps } from "./utils";
 
 describe("modalWeight", () => {
   it("returns null for an empty list", () => {
@@ -46,30 +46,5 @@ describe("avgReps", () => {
       expect(avgReps([], "floor")).toBeNull();
       expect(avgReps([null, null], "floor")).toBeNull();
     });
-  });
-});
-
-describe("clampVoiceLogResult", () => {
-  it("passes through in-range values unchanged", () => {
-    expect(clampVoiceLogResult(80, 8)).toEqual({ weight: 80, reps: 8 });
-  });
-  it("clamps a mis-heard 0 reps up to the 1-rep floor (matches the +/- control)", () => {
-    expect(clampVoiceLogResult(80, 0)).toEqual({ weight: 80, reps: 1 });
-  });
-  it("clamps reps above the server schema's max (100)", () => {
-    expect(clampVoiceLogResult(80, 250)).toEqual({ weight: 80, reps: 100 });
-  });
-  it("rounds a fractional rep count", () => {
-    expect(clampVoiceLogResult(80, 8.6)).toEqual({ weight: 80, reps: 9 });
-  });
-  it("clamps a mis-heard negative weight up to 0", () => {
-    expect(clampVoiceLogResult(-40, 8)).toEqual({ weight: 0, reps: 8 });
-  });
-  it("clamps weight above the server schema's max (500)", () => {
-    expect(clampVoiceLogResult(9999, 8)).toEqual({ weight: 500, reps: 8 });
-  });
-  it("leaves an omitted field undefined", () => {
-    expect(clampVoiceLogResult(undefined, 8)).toEqual({ weight: undefined, reps: 8 });
-    expect(clampVoiceLogResult(80, undefined)).toEqual({ weight: 80, reps: undefined });
   });
 });

@@ -10,7 +10,7 @@ import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trai
 import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, daysBetweenDateStrs, isCalendarDate, todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { capitalize } from '@trainingai/shared/format/capitalize';
-import { FirstHandFilter, knownFirstHandSources, type FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
+import { FirstHandFilter, firstHandSkipsLapsed, knownFirstHandSources, type FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -591,6 +591,17 @@ export async function openHealthConnect(): Promise<HealthConnectSession | { note
 
 /** Local date of the oldest window whose Oura records were skipped, kept until a rewind sync finishes cleanly. */
 export const SKIPPED_SINCE_KEY = 'ta_hc_first_hand_skipped_since';
+/** The record types skipped since that date, as a JSON array (#3228 review): what a rewind is owed for. */
+export const SKIPPED_TYPES_KEY = 'ta_hc_first_hand_skipped_types';
+
+function readSkippedTypes(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SKIPPED_TYPES_KEY) ?? 'null') as unknown;
+    return Array.isArray(raw) ? raw.filter((t): t is string => typeof t === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 /** The last sync's skip counts: replaced on every sync, so they are that sync's and never a running total. */
 export const LAST_SKIPPED_KEY = 'ta_hc_last_skipped';
 
@@ -611,19 +622,26 @@ export function rememberSyncSkipped(result: SyncResult | null): void {
   } catch { /* storage unavailable: the counts are diagnostics only */ }
 }
 
+function writeSkipMarker(since: string, types: string[]): void {
+  localStorage.setItem(SKIPPED_SINCE_KEY, since);
+  localStorage.setItem(SKIPPED_TYPES_KEY, JSON.stringify(types));
+}
+
 export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<SyncResult | null> {
   const opened = await openHealthConnect();
   if (!opened) return null;
   if ('note' in opened) return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: opened.note };
 
-  // #3197: records skipped while Oura Cloud was connected are not read again by a 7-day hot sync.
-  // Once the connection reads as gone, the next sync reaches back to the oldest skipped day, at most
-  // the cold 30 days (all Health Connect lets us read without the history permission), so they come
-  // back. Server-side Oura Cloud rows stay either way.
+  // #3197: records skipped while Oura Cloud delivered their type are not read again by a 7-day hot
+  // sync. Once a skipped type is no longer delivered (#3228 review: not merely "some type is not",
+  // which under a partial grant rewound every other sync), the next sync reaches back to the oldest
+  // skipped day, at most the cold 30 days (all Health Connect lets us read without the history
+  // permission), so they come back. Server-side Oura Cloud rows stay either way.
   const firstHand = await cachedFirstHandSources(tz);
   const todayStr = todayInTz(tz);
   const skippedSince = localStorage.getItem(SKIPPED_SINCE_KEY);
-  const rewind = firstHand?.ouraCloud === false && skippedSince !== null;
+  const skippedTypes = readSkippedTypes();
+  const rewind = skippedSince !== null && firstHandSkipsLapsed(firstHand, skippedTypes);
   const lastSync  = localStorage.getItem(LAST_SYNC_KEY);
   const rewindDays = skippedSince && isCalendarDate(skippedSince)
     ? Math.min(SYNC_DAYS_COLD, Math.max(SYNC_DAYS_HOT, daysBetweenDateStrs(skippedSince, todayStr) + 1))
@@ -641,9 +659,18 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<SyncRe
     onPosted: () => localStorage.setItem(LAST_SYNC_KEY, endIso),
   });
   // `onPosted` runs before the heart-rate and interval uploads, so the marker is cleared here, once
-  // the whole window has landed. A failed upload or a failed read keeps it for the next sync.
-  if (rewind && !result.failed && !result.incomplete) localStorage.removeItem(SKIPPED_SINCE_KEY);
-  else if (result.skippedFirstHand && skippedSince === null) localStorage.setItem(SKIPPED_SINCE_KEY, toLocalDate(startIso, tz));
+  // the whole window has landed. A failed upload or a failed read keeps it for the next sync. A clean
+  // rewind still skips the types that are delivered, so what it left out becomes the new marker.
+  const skippedNow = Object.keys(result.skippedFirstHand ?? {});
+  if (rewind && !result.failed && !result.incomplete) {
+    if (skippedNow.length) writeSkipMarker(toLocalDate(startIso, tz), skippedNow);
+    else {
+      localStorage.removeItem(SKIPPED_SINCE_KEY);
+      localStorage.removeItem(SKIPPED_TYPES_KEY);
+    }
+  } else if (skippedNow.length) {
+    writeSkipMarker(skippedSince ?? toLocalDate(startIso, tz), [...new Set([...skippedTypes, ...skippedNow])]);
+  }
   return result;
 }
 

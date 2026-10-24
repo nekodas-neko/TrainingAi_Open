@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 import type { WeightPoint } from '@trainingai/shared/health/long-term-goal-progress'
-import { weightResponse, formatRange, responseState, DEFAULT_BAND_PCT_PER_WEEK } from '../weight-response'
+import { weightResponse, formatRange, responseState, resolveBand, DEFAULT_BAND_PCT_PER_WEEK } from '../weight-response'
 
 /**
  * OR-102b ④. The property under test is not the arithmetic — that is LB-67's `computeWeightRateFit`
@@ -113,6 +113,22 @@ describe('weightResponse — the band is a percentage of bodyweight', () => {
     expect(narrow!.verdict).toBe('too_fast')
     expect(wide!.bandHiKgPerWeek).toBeCloseTo(narrow!.bandHiKgPerWeek * 2, 5)
     expect(wide!.verdict).not.toBe('too_fast')
+  })
+
+  it('uses the band it is passed, in kg against the same bodyweight', () => {
+    const points = series(30, 100, 0.5, jitter(0.2))
+    const r = weightResponse({ points, bodyweightKg: 80, bandPctPerWeek: { lo: 0.25, hi: 0.75 } })
+    expect(r!.bandLoKgPerWeek).toBeCloseTo(0.2, 5)
+    expect(r!.bandHiKgPerWeek).toBeCloseTo(0.6, 5)
+  })
+
+  it('falls back to the default for a band that is missing or invalid', () => {
+    expect(resolveBand(undefined)).toEqual(DEFAULT_BAND_PCT_PER_WEEK)
+    expect(resolveBand({ lo: 1, hi: 0.5 })).toEqual(DEFAULT_BAND_PCT_PER_WEEK)
+    expect(resolveBand({ lo: 0.5, hi: 10 })).toEqual(DEFAULT_BAND_PCT_PER_WEEK)
+    const points = series(30, 100, 0.5, jitter(0.2))
+    expect(weightResponse({ points, bandPctPerWeek: { lo: 1, hi: 0.5 } })!.bandHiKgPerWeek)
+      .toBeCloseTo(weightResponse({ points })!.bandHiKgPerWeek, 5)
   })
 
   it('is null rather than dividing by a bodyweight of zero', () => {

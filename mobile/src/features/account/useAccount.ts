@@ -40,6 +40,7 @@ export function useAccount() {
       hasSession: false,
       expiresAt: null,
       message: null,
+      attemptStale: false,
     },
   );
   useEffect(() => {
@@ -71,6 +72,8 @@ export function useAccount() {
         controller.state.status === 'signedIn'
       ) {
         void controller.refresh();
+      } else if (value === 'active') {
+        controller.returnedToForeground();
       }
     });
     return () => {
