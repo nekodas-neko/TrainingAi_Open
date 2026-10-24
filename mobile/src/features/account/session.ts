@@ -67,6 +67,11 @@ export type AuthPlatform = {
     state: string,
   ): Promise<{ identityToken: string; state: string | null; name?: string }>;
   dismiss(): void;
+  /**
+   * Removes what the phone keeps for an account outside the session, such as the home-screen
+   * widget snapshot (#3279). Called whenever no account is signed in any more.
+   */
+  clearAccountData?(): void;
 };
 
 export function parseAuthCallback(
@@ -321,6 +326,7 @@ export class AccountSession {
       ) {
         this.session = raw as SavedSession;
       } else {
+        this.clearAccountData();
         await this.write(() => this.platform.remove(SESSION_KEY));
       }
       const pending: unknown = savedPending ? JSON.parse(savedPending) : null;
@@ -353,6 +359,7 @@ export class AccountSession {
       }
       this.session = null;
       this.pending = null;
+      this.clearAccountData();
       this.publish(
         'signedOut',
         failureNotice(
@@ -637,6 +644,11 @@ export class AccountSession {
       }
     }
   }
+  private clearAccountData() {
+    try {
+      this.platform.clearAccountData?.();
+    } catch {}
+  }
   async signOut(message: string | null = null) {
     const previous = this.session;
     const generation = ++this.generation;
@@ -650,6 +662,7 @@ export class AccountSession {
     try {
       this.platform.dismiss();
     } catch {}
+    this.clearAccountData();
     try {
       await this.write(async () => {
         await this.platform.remove(SESSION_KEY);

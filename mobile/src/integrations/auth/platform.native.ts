@@ -3,6 +3,7 @@ import { isRunningInExpoGo, requireOptionalNativeModule } from 'expo';
 import { Platform } from 'react-native';
 import { MOBILE_CALLBACKS } from '../../features/account/session';
 import type { AuthPlatform, MobileClient } from '../../features/account/session';
+import { homeWidgets } from '../widgets/platform';
 
 const applicationId =
   Platform.OS === 'android'
@@ -104,6 +105,9 @@ export const authPlatform: AuthPlatform = {
   },
   async open(url) {
     return (await import('expo-web-browser')).openAuthSessionAsync(url, callback);
+  },
+  clearAccountData() {
+    homeWidgets?.clearSnapshot();
   },
   dismiss() {
     const browser = requireOptionalNativeModule<{ dismissAuthSession(): void }>(
