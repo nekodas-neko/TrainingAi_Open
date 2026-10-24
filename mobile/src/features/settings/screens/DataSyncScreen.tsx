@@ -1,5 +1,6 @@
 import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
+import { SyncHealthCard } from '../components/SyncHealthCard';
 import {
   AppButton,
   AppText,
@@ -65,6 +66,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
     >
       <TabPanel>
         <Stack style={{ paddingHorizontal: theme.spacing.lg }}>
+          <SyncHealthCard />
           <Card>
             <AppText variant="subheading">{dataSyncCopy.sync.title}</AppText>
             <AppText variant="caption" tone="muted">
