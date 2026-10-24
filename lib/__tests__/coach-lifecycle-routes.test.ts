@@ -41,7 +41,6 @@ const listThreads = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listAppliedChanges = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const saveThread = vi.fn(async (..._a: unknown[]) => 'thread-1')
 const loadThread = vi.fn(async (..._a: unknown[]) => null as Row[] | null)
-const invalidateProgramStructure = vi.fn(async () => undefined)
 
 /** What the undo route's two inline queries return, in order: the change row, then the
  *  trained-since row. `undefined` is "no row", which is what the route branches on. */
@@ -76,7 +75,6 @@ vi.mock('@/lib/coach/threads', () => ({
   saveThread: (...a: unknown[]) => saveThread(...a),
   loadThread: (...a: unknown[]) => loadThread(...a),
 }))
-vi.mock('@/lib/cache-groups', () => ({ invalidateProgramStructure: () => invalidateProgramStructure() }))
 
 import { POST as postApply } from '@/app/api/coach/apply/route'
 import { POST as postUndo } from '@/app/api/coach/apply/[id]/undo/route'
@@ -193,7 +191,6 @@ describe('/api/coach/apply', () => {
     expect(userId).toBe(sessionUser!.id)
     expect(given).toMatchObject({ targetId: TARGET })
     expect(accepted).toEqual(['c1'])
-    expect(invalidateProgramStructure).toHaveBeenCalled()
   })
 
   // A patch of two with one accepted: the whole patch reaches the engine as the record, and only
@@ -218,7 +215,6 @@ describe('/api/coach/apply', () => {
 
     expect(res.status).toBe(409)
     expect((await res.json()).drift).toEqual([{ field: 'exerciseName', now: 'Squat' }])
-    expect(invalidateProgramStructure).not.toHaveBeenCalled()
   })
 
   it('maps the engine\'s other refusals to their own statuses', async () => {
@@ -263,7 +259,6 @@ describe('/api/coach/apply', () => {
     const res = await apply(body())
     expect(res.status).toBe(500)
     expect(await res.json()).toEqual({ error: 'Apply failed' })
-    expect(invalidateProgramStructure).not.toHaveBeenCalled()
   })
 
   it('rate-limits the twenty-first apply in the minute', async () => {
@@ -307,7 +302,6 @@ describe('/api/coach/apply/[id]/undo', () => {
     expect(res.status).toBe(409)
     expect((await res.json()).error).toContain("trained since this change")
     expect(undoCoachChange).not.toHaveBeenCalled()
-    expect(invalidateProgramStructure).not.toHaveBeenCalled()
   })
 
   it('undoes and invalidates when nothing has been trained since', async () => {
@@ -317,7 +311,6 @@ describe('/api/coach/apply/[id]/undo', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ summary: 'Reverted' })
     expect(undoCoachChange).toHaveBeenCalledWith(expect.anything(), sessionUser!.id, CHANGE)
-    expect(invalidateProgramStructure).toHaveBeenCalled()
   })
 
   // Q-468: a later change written over this one. Same 409 as apply, and the message says what to
@@ -329,7 +322,6 @@ describe('/api/coach/apply/[id]/undo', () => {
     const res = await undo(CHANGE)
     expect(res.status).toBe(409)
     expect((await res.json()).error).toContain('undo the later change first')
-    expect(invalidateProgramStructure).not.toHaveBeenCalled()
   })
 
   it('maps the engine\'s remaining refusals without inventing a reason', async () => {

@@ -41,10 +41,15 @@ describe('Q-165 — converted reads seed from cache, and their keys are invalida
     // A saved conversation and an applied change are the only two things that add a row.
     for (const file of [
       'app/coach/coach-content.tsx',        // thread save
+    ]) {
+      expect(read(file), file).toContain('invalidateCoachHistory')
+    }
+    // The apply widgets reach the same key through `invalidateCoachChange`, which always includes it.
+    for (const file of [
       'components/coach/change-preview.tsx', // apply, multi-change
       'components/coach/number-dial.tsx',    // apply, single tier-1 value
     ]) {
-      expect(read(file), file).toContain('invalidateCoachHistory')
+      expect(read(file), file).toContain('invalidateCoachChange')
     }
   })
 
