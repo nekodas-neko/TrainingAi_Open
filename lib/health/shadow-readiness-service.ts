@@ -190,12 +190,17 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
 /**
  * The first day whose stored `readiness_score` is the served one (composite less illness
  * suppression, #3163). Earlier rows hold the composite itself, and nothing stored tells the two
- * apart: the flag is set on both and the model version did not change. Set at 1.495.0's release prep
- * to the day after its planned deploy (21 Oct), so the deploy day itself, half old and half new, is
- * excluded with everything before it. If that deploy slips, move this to the day after the actual one;
- * earlier than that would read an old row as served.
+ * apart: the flag is set on both and the model version did not change. It must be the day after
+ * 1.495.0 actually deployed, so the deploy day itself, half old and half new, is excluded with
+ * everything before it; earlier than that would read an old row as served.
+ *
+ * Null until that deploy has happened: every suppressed day then reads as 'unknown-era' and is left
+ * out of the comparison, which is wrong only by omission. The deploy kept slipping (21, then 22 Oct,
+ * then waiting on keys), and the releases after it are queued on main behind it, so the date is set
+ * in the first release after 1.495.0 is live rather than guessed here. Setting it late is safe: rows
+ * stored from that day on are already the served score, whichever release reads them.
  */
-export const SERVED_READINESS_STORED_FROM: string | null = '2026-10-22'
+export const SERVED_READINESS_STORED_FROM: string | null = null
 
 /** Why a day's live composite is unknown, so {@link daysMoved} leaves it out and counts it. */
 export type LiveCompositeGap = 'clamped' | 'unknown-era'
