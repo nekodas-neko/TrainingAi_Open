@@ -1157,7 +1157,8 @@ SELECT
   t.bpm,
   t.source,
   t.updated_at,
-  t.context
+  t.context,
+  t.data_origin
 FROM public.oura_heartrate t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
