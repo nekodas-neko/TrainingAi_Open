@@ -21,7 +21,7 @@ export type WidgetScore = {
   qualified: boolean;
 };
 export type WidgetBattery = {
-  /** "64" and "Good · Charging", as Home's Body Battery card shows them. */
+  /** "64" and "Good · Charging": the level, label and trend Home's Body Battery card shows. */
   value: string;
   label: string;
   /** 0–100, for the bar. */
@@ -106,7 +106,7 @@ function battery(data: SnapshotInput['battery']): WidgetBattery | null {
   const summary = batterySummary(data);
   return {
     value: summary.value ?? '—',
-    label: summary.subtitle,
+    label: [summary.levelLabel, summary.trendLabel].filter(Boolean).join(' · '),
     level: Math.max(0, Math.min(100, Math.round(data.current))),
     band: bodyBatteryBand(data.label as BodyBatteryLabel),
   };
@@ -118,7 +118,7 @@ function next(model: RecommendationModel): WidgetNext | null {
       return {
         eyebrow: model.eyebrow,
         name: model.name,
-        meta: model.meta.join(' · '),
+        meta: model.facts.map((fact) => fact.text).join(' · '),
         sessionId: model.session.id,
         restDay: false,
       };

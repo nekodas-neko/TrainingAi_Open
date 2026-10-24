@@ -8,14 +8,16 @@ type Battery = {
   trend: keyof typeof BODY_BATTERY_TREND_LABEL;
 };
 
-/** Body Battery's headline, as Home's card shows it: "64" and "Good · Charging". */
+/**
+ * Body Battery's headline as Home's card shows it: the level ("64"), its label ("Good", or why
+ * there is none) and the trend ("Charging"). The card and the widget snapshot both read this.
+ */
 export function batterySummary(data: Battery | null | undefined) {
+  const trend = data?.hasData ? data.trend : null;
   return {
     value: data?.hasData ? metricValue(data.current) : undefined,
-    subtitle: data?.hasData
-      ? `${data.label} · ${BODY_BATTERY_TREND_LABEL[data.trend]}`
-      : data
-        ? 'No data yet'
-        : 'Waiting for readings',
+    levelLabel: data?.hasData ? data.label : data ? 'No data yet' : 'Waiting for readings',
+    trend,
+    trendLabel: trend ? BODY_BATTERY_TREND_LABEL[trend] : null,
   };
 }

@@ -30,6 +30,7 @@ export function HomeScores({ onOpen }: { onOpen: (detail: HealthDetail) => void 
     >
       <ScoreChip
         label={readiness.label}
+        shortLabel={readiness.shortLabel}
         first
         value={readiness.value}
         icon="power"
@@ -41,6 +42,7 @@ export function HomeScores({ onOpen }: { onOpen: (detail: HealthDetail) => void 
       />
       <ScoreChip
         label={heart.label}
+        shortLabel={heart.shortLabel}
         value={heart.value}
         icon="cardio"
         tone="heart"
@@ -50,6 +52,7 @@ export function HomeScores({ onOpen }: { onOpen: (detail: HealthDetail) => void 
       />
       <ScoreChip
         label={sleep.label}
+        shortLabel={sleep.shortLabel}
         value={sleep.value}
         display={sleep.display}
         icon="moon"
@@ -61,6 +64,7 @@ export function HomeScores({ onOpen }: { onOpen: (detail: HealthDetail) => void 
       />
       <ScoreChip
         label={activity.label}
+        shortLabel={activity.shortLabel}
         value={activity.value}
         icon="flame"
         tone="activity"

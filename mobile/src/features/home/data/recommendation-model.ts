@@ -1,5 +1,5 @@
-import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import type { SessionPreview, WorkoutCatalog } from '../../workouts/catalog.ts';
+import { sessionFacts, type SessionFact } from './recommendation-presentation.ts';
 
 // Which state Home's recommendation card is in and what it says. The card and the home-screen
 // widget snapshot both read this, so they never pick a different session or word it differently.
@@ -30,8 +30,8 @@ export type RecommendationModel =
       state: 'active' | 'done' | 'recommended';
       eyebrow: string;
       name: string;
-      /** "~55 min", "6 exercises" and "Last: 18 Oct", in the card's order; length only when known. */
-      meta: string[];
+      /** sessionFacts(): "~55 min", "6 exercises", "Last: Yesterday", in the card's order. */
+      facts: SessionFact[];
       action: 'resume' | 'completed' | 'deload' | 'start';
       activeId: string | null;
     };
@@ -49,22 +49,13 @@ export function homeRecommendationModel(input: RecommendationInput): Recommendat
   if (!input.mood) return { kind: 'checkin', session };
   if (resting && !done && !active) return { kind: 'rest', reason: rec?.reason ?? 'A day to recover.' };
   if (!session) return { kind: 'none' };
-  const last = session.lastTrained
-    ? session.lastTrained === today
-      ? 'Today'
-      : formatDateDisplay(session.lastTrained, 'short')
-    : '—';
   return {
     kind: 'session',
     session,
     state: active ? 'active' : done ? 'done' : 'recommended',
     eyebrow: active ? 'Workout in progress' : done ? 'Trained Today' : 'Recommended Today',
     name: active?.sessionName ?? session.name,
-    meta: [
-      ...(session.durationMinutes !== null ? [`~${Math.round(session.durationMinutes)} min`] : []),
-      `${session.exercises.length} exercises`,
-      `Last: ${last}`,
-    ],
+    facts: sessionFacts(session, today),
     action: active ? 'resume' : done ? 'completed' : rec?.deloadOrRestRecommended ? 'deload' : 'start',
     activeId: active?.id ?? null,
   };

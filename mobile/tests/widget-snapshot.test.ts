@@ -7,6 +7,10 @@ import { nutritionEnergyModel, remainingText } from '../src/features/nutrition/d
 import { batterySummary } from '../src/features/health/data/battery-summary.ts';
 import { hasContent, snapshotIdentity, widgetSnapshot, type SnapshotInput } from '../src/features/widgets/snapshot.ts';
 import { workoutFixture } from './workout-fixture.ts';
+import { WorkoutResources } from '../src/features/workouts/data/WorkoutResources.ts';
+import { batterySpec, energySpec, goalsSpec, readinessSpec } from '../src/features/health/data/models.ts';
+import { trainingDaySpecs } from '../src/features/home/data/training-days.ts';
+import { recordedIntakeOf } from '../src/features/nutrition/data/recorded-intake.ts';
 
 const today = '2026-10-23';
 const now = new Date('2026-10-23T07:42:00+11:00');
@@ -69,8 +73,7 @@ test("Home's recommendation states, in the card's order of precedence", () => {
   assert.equal(model.eyebrow, 'Recommended Today');
   assert.equal(model.name, 'Upper body');
   assert.equal(model.action, 'start');
-  assert.equal(model.meta.at(-1), 'Last: —');
-  assert.equal(model.meta.at(-2), '1 exercises');
+  assert.deepEqual(model.facts.map((fact) => fact.text).slice(-2), ['1 exercises', 'Last: —']);
 
   const done = homeRecommendationModel(recInput({ trained: ['Upper body'], restChoice: true }));
   assert.equal(done.kind === 'session' && [done.eyebrow, done.action].join(), 'Trained Today,completed');
@@ -98,9 +101,13 @@ test("kcal left follows the energy card: budget over target, recorded intake ove
 });
 
 test("Body Battery's headline matches the card's", () => {
-  assert.deepEqual(batterySummary({ hasData: true, current: 64, label: 'Good', trend: 'charging' }), { value: '64', subtitle: 'Good · Charging' });
-  assert.deepEqual(batterySummary({ hasData: false, current: null, label: 'Good', trend: 'steady' }), { value: undefined, subtitle: 'No data yet' });
-  assert.equal(batterySummary(null).subtitle, 'Waiting for readings');
+  assert.deepEqual(batterySummary({ hasData: true, current: 64, label: 'Good', trend: 'charging' }), {
+    value: '64', levelLabel: 'Good', trend: 'charging', trendLabel: 'Charging',
+  });
+  assert.deepEqual(batterySummary({ hasData: false, current: null, label: 'Good', trend: 'steady' }), {
+    value: undefined, levelLabel: 'No data yet', trend: null, trendLabel: null,
+  });
+  assert.equal(batterySummary(null).levelLabel, 'Waiting for readings');
 });
 
 test('the snapshot is version 1 and carries every value already formatted', () => {
@@ -114,7 +121,7 @@ test('the snapshot is version 1 and carries every value already formatted', () =
   const model = homeRecommendationModel(recInput());
   assert.ok(model.kind === 'session');
   assert.deepEqual(snapshot.next, {
-    eyebrow: 'Recommended Today', name: 'Upper body', meta: model.meta.join(' · '), sessionId: 'session-one', restDay: false,
+    eyebrow: 'Recommended Today', name: 'Upper body', meta: model.facts.map((fact) => fact.text).join(' · '), sessionId: 'session-one', restDay: false,
   });
   assert.deepEqual(snapshot.nutrition?.kcal, { value: '1,240', label: 'kcal left' });
   assert.deepEqual(snapshot.nutrition?.macros.map((m) => m.left), ['62 g left', '118 g left', '24 g left']);
@@ -156,4 +163,77 @@ test('only a change of numbers is a new snapshot, and an empty one is never writ
   assert.notEqual(snapshotIdentity(a), snapshotIdentity(widgetSnapshot(input({ water: { ml: 1500, goalMl: 2500 } }))));
   assert.equal(hasContent(a), true);
   assert.equal(hasContent(widgetSnapshot(input({ scores: null, recommendation: { kind: 'loading' } }))), false);
+});
+
+test('the band-style short labels come from the same chip model', () => {
+  const chips = homeScoreChips({ restingHr: 50 }, [], today);
+  assert.deepEqual(chips.map((c) => c.shortLabel), ['Ready', 'Rest HR', 'Sleep', 'Move']);
+  assert.equal(homeScoreChips({}, [], today)[1]!.shortLabel, 'HR');
+});
+
+test("the session's facts are #3258's sessionFacts, so the widget says Yesterday as Home does", () => {
+  const sessions = catalog.program!.sessions.map((s) => ({ ...s, lastTrained: '2026-10-22' }));
+  const model = homeRecommendationModel(recInput({ catalog: { ...catalog, program: { ...catalog.program!, sessions } } }));
+  assert.ok(model.kind === 'session');
+  assert.equal(model.facts.at(-1)!.text, 'Last: Yesterday');
+});
+
+function recordingResources() {
+  const calls: string[] = [];
+  const disk = new Map<string, string>();
+  const resources = new WorkoutResources(
+    {
+      get: async (key: string) => disk.get(key) ?? null,
+      set: async (key: string, value: string) => void disk.set(key, value),
+      remove: async (key: string) => void disk.delete(key),
+    },
+    {
+      origin: 'https://example.com',
+      userId: 'one',
+      timezone: tz,
+      get: async (path: string) => {
+        calls.push(path);
+        return { readinessDisplayScore: 78 };
+      },
+      post: async () => {
+        throw new Error('offline');
+      },
+    } as never,
+    () => 1000,
+    () => 'id',
+  );
+  return { resources, calls };
+}
+
+test("WidgetSync's reads request nothing: a resource nobody loaded stays empty, so the last snapshot holds", async () => {
+  const { resources, calls } = recordingResources();
+  const specs = [readinessSpec(today), batterySpec(today), goalsSpec, energySpec(today), ...Object.values(trainingDaySpecs(today))];
+  for (const spec of specs) assert.equal(resources.state(spec as never).data, null);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(calls, []);
+  const snapshot = widgetSnapshot(input({ scores: null, battery: null, recommendation: { kind: 'loading' } }));
+  assert.equal(hasContent(snapshot), false);
+
+  // Once Home has loaded a resource, the same passive read sees it, still without a request of its own.
+  await resources.load(readinessSpec(today));
+  const before = calls.length;
+  assert.equal(resources.state(readinessSpec(today)).data?.readinessDisplayScore, 78);
+  assert.equal(calls.length, before);
+});
+
+test('WidgetSync mounts no hook that loads or refreshes', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/features/widgets/WidgetSync.tsx', import.meta.url), 'utf8');
+  for (const fetching of ['useWorkoutResource(', 'useRecordedIntake(', 'useHome(', 'useTrainingDays(', '.refresh(', '.load(', 'fetch(']) {
+    assert.equal(source.includes(fetching), false, fetching);
+  }
+  const provider = await readFile(new URL('../src/features/workouts/data/WorkoutDataProvider.tsx', import.meta.url), 'utf8');
+  const passive = provider.slice(provider.indexOf('export function usePassiveResource'), provider.indexOf('export function useWorkoutResource<'));
+  assert.match(passive, /resources\?\.state\(spec\)/);
+  assert.doesNotMatch(passive, /load\(|useEffect/);
+});
+
+test('recordedIntakeOf reads the store as it stands: nothing logged is no intake, not zero', () => {
+  const empty = { view: { totals: null, logs: [], mealTypes: [], mealStatuses: {} }, operations: [] };
+  assert.equal(recordedIntakeOf(empty, today, null).intake, null);
 });

@@ -20,6 +20,8 @@ export type ScoreKey = 'readiness' | 'heart' | 'sleep' | 'activity';
 export type ScoreChipModel = {
   key: ScoreKey;
   label: string;
+  /** The band styles' small-capital name ("Move" for Activity); scoreChipLabel picks which shows. */
+  shortLabel: string;
   value: number | null;
   /** Shown instead of the rounded value: the night's hours when there is no sleep score. */
   display?: string;
@@ -39,18 +41,21 @@ export function homeScoreChips(
     {
       key: 'readiness',
       label: 'Readiness',
+      shortLabel: 'Ready',
       value: data?.readinessDisplayScore ?? null,
       qualified: Boolean(data?.limited || data?.isLowWearToday),
     },
     {
       key: 'heart',
       label: resting ? 'Resting HR' : 'Heart Rate',
+      shortLabel: resting ? 'Rest HR' : 'HR',
       value: data?.restingHrLastNight ?? data?.restingHr ?? data?.hrCurrent ?? null,
       qualified: false,
     },
     {
       key: 'sleep',
       label: duration != null ? 'Sleep (h)' : 'Sleep',
+      shortLabel: 'Sleep',
       value: data?.sleepScore ?? null,
       ...(duration != null ? { display: duration.toFixed(1) } : {}),
       qualified: Boolean(
@@ -61,6 +66,7 @@ export function homeScoreChips(
     {
       key: 'activity',
       label: 'Activity',
+      shortLabel: 'Move',
       value: data?.activityScore ?? null,
       qualified: false,
     },

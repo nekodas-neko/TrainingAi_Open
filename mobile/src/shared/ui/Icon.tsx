@@ -1,6 +1,12 @@
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import ExternalLink from 'lucide-react-native/icons/external-link';
 import Clock from 'lucide-react-native/icons/clock';
+import SignalLow from 'lucide-react-native/icons/signal-low';
+import BatteryFull from 'lucide-react-native/icons/battery-full';
+import BatteryLow from 'lucide-react-native/icons/battery-low';
+import BatteryWarning from 'lucide-react-native/icons/battery-warning';
+import BedDouble from 'lucide-react-native/icons/bed-double';
+import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
 import ChevronLeft from 'lucide-react-native/icons/chevron-left';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import ChevronDown from 'lucide-react-native/icons/chevron-down';
@@ -176,6 +182,12 @@ const icons = {
   lineChart: ChartLine,
   lock: Lock,
   cat: Cat,
+  bedDouble: BedDouble,
+  alert: TriangleAlert,
+  signalLow: SignalLow,
+  batteryFull: BatteryFull,
+  batteryLow: BatteryLow,
+  batteryWarning: BatteryWarning,
 };
 
 export type IconName = keyof typeof icons;
