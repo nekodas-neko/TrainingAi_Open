@@ -309,6 +309,8 @@ describe('startOuraConnectBackfill reporting', () => {
     listDeletedOuraCloudSleepDates: async () => [],
     listSleepSessions: async () => [], getOuraDailyDerived: async () => [],
     upsertOuraDailyDerived: async () => {}, clearNightDerivedScores: async () => false, releaseBodyBatteryAnchor: async () => false,
+    // #2634: the connect backfill also refreshes the still-period resting HR from the same store.
+    getOuraCloudActivitySeries: async () => [], getOuraHeartrateBySource: async () => [],
   }
   const saved: Record<string, string | undefined> = {}
   const ENV = { OURA_CLIENT_ID: 'cid', OURA_CLIENT_SECRET: 'cs', OURA_REDIRECT_URI: 'http://localhost:3000/api/oura/callback', OURA_TOKEN_KEY: 'k'.repeat(48) }

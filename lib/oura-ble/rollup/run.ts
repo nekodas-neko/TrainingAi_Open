@@ -27,8 +27,7 @@ import { collectStressInputs, buildDayStressSeries, nightHrvMsOf } from './stres
 import { computeResilienceForDay, type DailyIndices } from '@/lib/health/stress-resilience'
 import type { SleepSession } from '@trainingai/shared/types'
 import { sourceRank } from '@trainingai/shared/health/source-rank'
-import { aestMidnight, toAestDay, shiftDateStr, secondsSinceLocalMidnight, todayInTz, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
-import { stillDaytimeRhr, MET_MINUTE_MS } from '@trainingai/shared/health/still-rhr'
+import { aestMidnight, toAestDay, shiftDateStr, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 import type { RollupIO } from './io'
 import type { ModelRuntime } from '@/lib/oura-models/inference/runtime'
 
@@ -1280,40 +1279,6 @@ export async function runOuraRollup(
     })
   }
   }
-
-  // Still-period resting HR (#2634): per COMPLETED local day, the median HR of the minutes the ring
-  // measured as still (MET under the active threshold) and awake, with the minutes behind it. Own
-  // step, COALESCE upsert of only the two still_rhr_* columns. A day whose still minutes fall short of
-  // the floor writes nothing, so a thin pass never replaces a fuller earlier value and never stores a
-  // 0. Today is skipped (not complete), and so is the window's first day when the read cutoff cut it
-  // (the same partial-day trap as the wear step, PS-30).
-  await step('still_rhr', async () => {
-    const todayLocal = todayInTz(timezone)
-    const cutoffMs = rollupCutoffDs != null ? toDate(rollupCutoffDs).getTime() : null
-    const toMs = (ds: number) => toDate(ds).getTime()
-    const inputs = collectStressInputs(rollupRows, toMs)
-    // collectStressInputs stamps every value of a frame with the frame's time; the MET grid needs
-    // each value on its own minute (what metExclusionWindows does for the night).
-    const met: { tsMs: number; value: number }[] = []
-    for (const r of metRows) {
-      const t = toMs(Number(r.ds))
-      if (!Number.isFinite(t)) continue
-      numArr(r.decoded, 'met').forEach((value, i) => met.push({ tsMs: t + i * MET_MINUTE_MS, value }))
-    }
-    const days = new Set<string>()
-    for (const h of inputs.hr) days.add(toAestDay(new Date(h.tsMs), timezone))
-    const wanted = [...days].filter(d => d < todayLocal).sort()
-    if (wanted.length === 0) return
-    const sleepSpan = await io.readSleepWindows(shiftDateStr(wanted[0], -1), shiftDateStr(wanted[wanted.length - 1], 1))
-    const sleepWindows = sleepSpan.map(w => ({ startMs: w.sleepStart.getTime(), endMs: w.sleepEnd.getTime() }))
-    for (const day of wanted) {
-      const dayStartMs = dateStrMidnightInTz(day, timezone).getTime()
-      const dayEndMs = dateStrMidnightInTz(shiftDateStr(day, 1), timezone).getTime()
-      if (cutoffMs != null && dayStartMs < cutoffMs) continue
-      const still = stillDaytimeRhr({ hr: inputs.hr, met, sleepWindows, dayStartMs, dayEndMs })
-      if (still) await io.upsertDailyDerived(day, { stillRhrBpm: still.bpm, stillRhrCoverageMin: still.coverageMin })
-    }
-  })
 
   // Body composition (Sub-plan F §7.1): persist the completed-form fat/lean/BMR snapshot from
   // the user's logged weight+body-fat. Not BLE-derived — its own step so a failure here can't

@@ -20,6 +20,7 @@ import type { OuraCloudHeartrateWrite, WorkoutRepository } from '@/lib/data/repo
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import type { OuraCloudWrites } from './documents'
 import { reportOuraCloudIssue } from './report'
+import { stillRhrDaysBetween, stillRhrDaysForDocuments, type StillRhrRefresh } from './still-rhr'
 
 /**
  * Re-attributes the completed workouts a heart-rate write overlaps (#3078,
@@ -42,6 +43,17 @@ export async function reattributeAfterHeartRate(
   } catch (err) {
     reportOuraCloudIssue(kind, err instanceof Error ? err.message : 'unknown', { userId })
   }
+}
+
+/**
+ * After a heart-rate write: refreshes the still-period resting HR of the completed days the changed
+ * points fall on (#2634). Never throws, and does nothing for a re-read that changed nothing.
+ */
+export async function refreshStillRhrAfterHeartRate(
+  stillRhr: StillRhrRefresh | undefined, userId: string, write: OuraCloudHeartrateWrite, tz: string,
+): Promise<void> {
+  if (!stillRhr || write.changed === 0 || !write.changedFrom || !write.changedTo) return
+  await stillRhr(userId, stillRhrDaysBetween(write.changedFrom, write.changedTo, tz))
 }
 
 /** The slice of the repository the writer needs, so tests can hand it a fake. */
@@ -87,12 +99,14 @@ export function plannedCounts(writes: OuraCloudWrites): OuraCloudWriteCounts {
 /**
  * Writes one batch of mapped documents. The heart-rate series goes through `upsertOuraCloudHeartrate` directly.
  *
+ * `stillRhr` (#2634): with it, a batch carrying a day's MET series refreshes that day's still-period
+ * resting HR once the rows are in.
  * `rescore` (#3079): with it, a sleep write that changes, adds or removes a recent night re-scores
  * that night's day (`rescore-nights.ts`). Production passes the repository; tests that only count
  * writes leave it out.
  */
 export async function writeOuraCloudData(
-  writer: OuraCloudWriter, userId: string, writes: OuraCloudWrites, rescore?: NightRescoreRepo,
+  writer: OuraCloudWriter, userId: string, writes: OuraCloudWrites, rescore?: NightRescoreRepo, stillRhr?: StillRhrRefresh,
 ): Promise<OuraCloudWriteCounts> {
   await writer.upsertOuraDaily(userId, writes.daily, 'oura_cloud')
   await writer.upsertBodyMetrics(userId, writes.body, 'oura_cloud')
@@ -133,6 +147,8 @@ export async function writeOuraCloudData(
   const workouts = await writer.upsertOuraWorkouts(userId, writes.workouts)
   const cloudDays = await writer.upsertOuraCloudDaily(userId, writes.cloudDaily)
   const sessions = await writer.upsertOuraSessions(userId, writes.sessions)
+  // #2634: a day's activity document is what makes its still-period resting HR computable.
+  if (stillRhr) await stillRhr(userId, stillRhrDaysForDocuments(writes.cloudDaily))
   return {
     dailyRows: writes.daily.length,
     bodyRows: writes.body.length,
