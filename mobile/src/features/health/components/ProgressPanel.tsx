@@ -24,6 +24,7 @@ import {
   progressSpec,
   weightsSpec,
 } from '../data/models';
+import { TREND_VIEW_NOTE } from '@trainingai/shared/health/trend-view-notes';
 import { HealthMetricCard } from './HealthMetricCard';
 import { RestPrescriptionSummary } from './RestPrescriptionSummary';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -115,6 +116,11 @@ function TrendsCard() {
         Correlations need enough paired data points to be meaningful: keep logging workouts, sleep,
         meals and morning check-ins to unlock each view.
       </AppText>
+      {TREND_VIEW_NOTE[view] && (
+        <AppText variant="micro" tone="muted">
+          {TREND_VIEW_NOTE[view]}
+        </AppText>
+      )}
     </Card>
   );
 }

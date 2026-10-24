@@ -2,7 +2,7 @@
 // the native transcript and the web one — both sources feed it — so a wrong result here is a
 // wrong logged set on either runtime.
 import { describe, it, expect } from 'vitest'
-import { parseVoice } from '@/components/workout/utils'
+import { parseVoice, clampVoiceLogResult, VOICE_LOG_EXAMPLE } from '../workout/voice-log'
 
 describe('parseVoice', () => {
   it('reads weight-then-reps with a spoken unit', () => {
@@ -63,5 +63,50 @@ describe('parseVoice', () => {
   it('will not guess which slot a lone bare number belongs to', () => {
     // "60" is as plausibly six-and-a-bit reps as sixty kilos; the caller's message asks again.
     expect(parseVoice('60')).toEqual({})
+  })
+})
+
+describe('parseVoice — phrasings the recogniser returns', () => {
+  it('ignores case, since recognisers capitalise unpredictably', () => {
+    expect(parseVoice('80 KG 5 Reps')).toEqual({ weight: 80, reps: 5 })
+  })
+
+  it('reads plural units', () => {
+    expect(parseVoice('80 kgs for 5 reps')).toEqual({ weight: 80, reps: 5 })
+    expect(parseVoice('5 repetitions at 82.5 kilograms')).toEqual({ weight: 82.5, reps: 5 })
+  })
+
+  it('leaves spelled-out numbers unread rather than guessing', () => {
+    // The Android recogniser normally returns digits; if it does not, the caller says what to say.
+    expect(parseVoice('eighty kilos for eight')).toEqual({})
+  })
+
+  it('accepts its own example phrase', () => {
+    expect(parseVoice(VOICE_LOG_EXAMPLE)).toEqual({ weight: 60, reps: 6 })
+  })
+})
+
+describe('clampVoiceLogResult', () => {
+  it('passes through in-range values unchanged', () => {
+    expect(clampVoiceLogResult(80, 8)).toEqual({ weight: 80, reps: 8 })
+  })
+  it('clamps a mis-heard 0 reps up to the 1-rep floor (matches the +/- control)', () => {
+    expect(clampVoiceLogResult(80, 0)).toEqual({ weight: 80, reps: 1 })
+  })
+  it("clamps reps above the server schema's max (100)", () => {
+    expect(clampVoiceLogResult(80, 250)).toEqual({ weight: 80, reps: 100 })
+  })
+  it('rounds a fractional rep count', () => {
+    expect(clampVoiceLogResult(80, 8.6)).toEqual({ weight: 80, reps: 9 })
+  })
+  it('clamps a mis-heard negative weight up to 0', () => {
+    expect(clampVoiceLogResult(-40, 8)).toEqual({ weight: 0, reps: 8 })
+  })
+  it("clamps weight above the server schema's max (500)", () => {
+    expect(clampVoiceLogResult(9999, 8)).toEqual({ weight: 500, reps: 8 })
+  })
+  it('leaves an omitted field undefined', () => {
+    expect(clampVoiceLogResult(undefined, 8)).toEqual({ weight: undefined, reps: 8 })
+    expect(clampVoiceLogResult(80, undefined)).toEqual({ weight: 80, reps: undefined })
   })
 })

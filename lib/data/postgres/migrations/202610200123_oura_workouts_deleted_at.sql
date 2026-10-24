@@ -18,7 +18,8 @@
 -- backstop. Both are SET LOCAL, scoped to this migration's transaction.
 --
 -- REVERSE (loses only the tombstones written into it):
---   ALTER TABLE oura_workouts DROP COLUMN deleted_at;
+--   DROP VIEW IF EXISTS claude_ro.oura_workouts; ALTER TABLE oura_workouts DROP COLUMN deleted_at;
+--   (the view selects the column, so the DROP COLUMN fails without the DROP VIEW; the boot rebuild recreates the view from claude-ro-views.sql)
 
 SET LOCAL lock_timeout = '3s';
 SET LOCAL statement_timeout = '30s';
