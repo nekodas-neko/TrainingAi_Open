@@ -8,9 +8,9 @@ import type { User } from '@trainingai/shared/types'
  *
  * There is no second formula here: this assembles the same `BaselineInput` that
  * `/api/nutrition-goals/recommend` assembles server-side and calls the same `calculateBaseline`,
- * so a Recommended value and the number the AI sheet was given as its starting point cannot
- * disagree. The AI pass still exists — it *adjusts* this baseline — which is why the two buttons
- * make different promises and both stay.
+ * so a Recommended value and the number the recommendation sheet shows cannot disagree. The
+ * sheet adds a written explanation and may move the activity level (#3286, rule-based, no model),
+ * which is why the two buttons make different promises and both stay.
  *
  * `measuredRmr` matters more than its optionality suggests: `calculateBaseline` routes it through
  * `personalRmr` (BF-33), the same resting rate the daily energy model uses. Omitting it here would
