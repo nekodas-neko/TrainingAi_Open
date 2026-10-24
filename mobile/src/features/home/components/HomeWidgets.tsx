@@ -137,11 +137,7 @@ export function HomeMetricTiles({
             dense
             centered
             label={metricLabels[key as keyof typeof metricLabels]}
-            value={metricValue(
-              value.value,
-              '',
-              key === 'weightKg' || key === 'distanceKm' ? 1 : 0,
-            )}
+            value={metricValue(value.value, '', key === 'weightKg' || key === 'distanceKm' ? 1 : 0)}
             unit={value.unit}
             icon={value.icon}
             accent={tileColor}
@@ -217,10 +213,7 @@ export function HomeWidget(props: WidgetProps) {
     );
   if (props.id === 'hrChartWidget')
     return (
-      <ResourceWidget
-        spec={hrSpec(today)}
-        render={(hr) => <HomeWidgetBody {...props} hr={hr} />}
-      />
+      <ResourceWidget spec={hrSpec(today)} render={(hr) => <HomeWidgetBody {...props} hr={hr} />} />
     );
   if (props.id === 'nutritionDonut' || props.id === 'energyBalanceWidget')
     return (
@@ -281,61 +274,71 @@ function HomeWidgetBody({
         accessibilityLabel="View Nutrition"
       >
         <Card accent={accent}>
-          <Stack direction="row" align="center">
+          <Stack direction="row" align="center" gap="lg">
             <SegmentRing
               label="Calories toward today’s budget"
+              size={theme.sizes.homeNutritionRing}
+              thickness={theme.sizes.homeNutritionRingStroke}
               value={total && goal ? total.calories / goal : 0}
               segments={[{ share: 1, color: theme.colors.brand }]}
             >
-              <AppText variant="heading">
-                {remaining === null ? '—' : Math.abs(Math.round(remaining)).toLocaleString()}
+              <AppText variant="ringValue" style={{ fontVariant: ['tabular-nums'] }}>
+                {remaining === null ? '…' : Math.abs(Math.round(remaining)).toLocaleString()}
               </AppText>
-              <AppText variant="micro" tone="muted">
+              <AppText variant="ringWord" style={{ opacity: 0.4 }}>
                 {remaining !== null && remaining < 0 ? 'over' : 'left'}
               </AppText>
             </SegmentRing>
-            <Stack style={{ flex: 1 }} gap="xs">
-              {title('Nutrition · Today')}
-              <AppText variant="caption">
-                {metricValue(total?.calories, 'kcal')}
-                {goal === null ? '' : ` / ${Math.round(goal).toLocaleString()}`}
-              </AppText>
+            <Stack style={{ flex: 1, minWidth: 0 }} gap="xs">
+              <Stack direction="row" align="baseline" justify="space-between" gap="sm">
+                <AppText variant="cardTitle" tone="muted">
+                  Nutrition
+                </AppText>
+                <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
+                  {goal === null
+                    ? ''
+                    : `${Math.round(total?.calories ?? 0).toLocaleString()} / ${Math.round(goal).toLocaleString()} kcal`}
+                </AppText>
+              </Stack>
               <ProgressBar value={total && goal ? total.calories / goal : 0} />
               {provenance && (
-                <AppText variant="micro" tone="muted">
+                <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
                   {budgetLine(provenance, energy?.data?.balance)}
                 </AppText>
               )}
-              {(['proteinG', 'carbsG', 'fatG'] as const).map((key, index) => (
-                <Stack key={key} direction="row" align="center" gap="xs">
-                  <View
-                    style={{
-                      width: theme.spacing.xs,
-                      height: theme.spacing.xs,
-                      borderRadius: theme.radii.pill,
-                      backgroundColor: [
-                        theme.macros.protein,
-                        theme.macros.carbs,
-                        theme.macros.fat,
-                      ][index],
-                    }}
-                  />
-                  <AppText variant="micro" tone="muted" style={{ flex: 1 }}>
-                    {['Protein', 'Carbs', 'Fat'][index]}
-                  </AppText>
-                  <AppText variant="micro">
-                    {metricValue(
-                      recordedMacro(
-                        n.view.logs.length > 0,
-                        total?.[key],
-                        today?.[({ proteinG: 'protein', carbsG: 'carb', fatG: 'fat' } as const)[key]],
-                      ),
-                      'g',
-                      1,
-                    )}
-                  </AppText>
-                </Stack>
-              ))}
+              <Stack gap="xxs">
+                {(['proteinG', 'carbsG', 'fatG'] as const).map((key, index) => {
+                  const color = [theme.macros.protein, theme.macros.carbs, theme.macros.fat][index];
+                  return (
+                    <Stack key={key} direction="row" align="center" gap="sm">
+                      <View
+                        style={{
+                          width: theme.sizes.legendDot,
+                          height: theme.sizes.legendDot,
+                          borderRadius: theme.radii.pill,
+                          backgroundColor: color,
+                        }}
+                      />
+                      <AppText variant="micro" tone="muted" style={{ flex: 1, fontWeight: '400' }}>
+                        {['Protein', 'Carbs', 'Fat'][index]}
+                      </AppText>
+                      <AppText variant="micro" style={{ color, fontWeight: '700' }}>
+                        {metricValue(
+                          recordedMacro(
+                            n.view.logs.length > 0,
+                            total?.[key],
+                            today?.[
+                              ({ proteinG: 'protein', carbsG: 'carb', fatG: 'fat' } as const)[key]
+                            ],
+                          ),
+                          'g',
+                          1,
+                        )}
+                      </AppText>
+                    </Stack>
+                  );
+                })}
+              </Stack>
             </Stack>
           </Stack>
         </Card>
@@ -407,9 +410,7 @@ function HomeWidgetBody({
           <Stack direction="row" align="center">
             <Stack style={{ flex: 1 }} gap="xs">
               {title('Body Weight')}
-              <AppText variant="hero">
-                {metricValue(health.body?.latestWeightKg, 'kg', 1)}
-              </AppText>
+              <AppText variant="hero">{metricValue(health.body?.latestWeightKg, 'kg', 1)}</AppText>
               <AppText variant="micro" tone="muted">
                 Last {days} days
               </AppText>
@@ -481,35 +482,39 @@ function HomeWidgetBody({
             )}
             {known > 0 && (
               <>
-                <Stack direction="row" gap="xxs">
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    gap: 1,
+                    height: theme.spacing.sm,
+                    borderRadius: theme.radii.pill,
+                    overflow: 'hidden',
+                  }}
+                >
                   {stages
                     .filter((row) => (row.hours ?? 0) > 0)
                     .map((row) => (
                       <View
                         key={row.label}
-                        style={{
-                          flex: row.hours!,
-                          height: theme.spacing.sm,
-                          backgroundColor: row.color,
-                        }}
+                        style={{ flex: row.hours!, backgroundColor: row.color }}
                       />
                     ))}
-                </Stack>
-                <Stack direction="row" wrap gap="sm">
+                </View>
+                <Stack direction="row" wrap gap="md">
                   {stages.map((row) => (
-                    <Stack key={row.label} direction="row" align="center" gap="xxs">
+                    <Stack key={row.label} direction="row" align="center" gap="xs">
                       <View
                         style={{
-                          width: theme.spacing.xs,
-                          height: theme.spacing.xs,
+                          width: theme.sizes.legendDot,
+                          height: theme.sizes.legendDot,
                           backgroundColor: row.color,
                           borderRadius: theme.radii.pill,
                         }}
                       />
-                      <AppText variant="micro" tone="muted">
+                      <AppText variant="caption" tone="muted">
                         {row.label}
                       </AppText>
-                      <AppText variant="micro">
+                      <AppText variant="caption" style={{ fontWeight: '700' }}>
                         {row.hours == null ? '—' : row.hours.toFixed(1) + 'h'}
                       </AppText>
                     </Stack>
@@ -540,8 +545,7 @@ function HomeWidgetBody({
   if (id === 'stepsWidget') {
     const weekly = goals?.data?.stepsGoalType === 'weekly';
     const value = weekly ? health.body?.weekToDate?.steps : today?.steps;
-    const goal =
-      goals?.data?.stepsGoal == null ? null : goals.data.stepsGoal * (weekly ? 7 : 1);
+    const goal = goals?.data?.stepsGoal == null ? null : goals.data.stepsGoal * (weekly ? 7 : 1);
     const rows = (health.body?.recent ?? []).slice(0, 7).reverse();
     const max = Math.max(1, ...rows.map((row) => row.steps ?? 0));
     return (
@@ -581,10 +585,7 @@ function HomeWidgetBody({
                   height:
                     row.steps == null
                       ? theme.spacing.xxs
-                      : Math.max(
-                          theme.spacing.xs,
-                          (row.steps / max) * theme.sizes.stepsSparkline,
-                        ),
+                      : Math.max(theme.spacing.xs, (row.steps / max) * theme.sizes.stepsSparkline),
                   borderRadius: theme.radii.small,
                   backgroundColor:
                     row.steps == null
@@ -718,9 +719,7 @@ function HomeWidgetBody({
     );
   }
   if (id === 'muscleStatusWidget') {
-    const fatigued = [...(recovery?.data?.muscles ?? [])]
-      .sort((a, b) => a.pct - b.pct)
-      .slice(0, 6);
+    const fatigued = [...(recovery?.data?.muscles ?? [])].sort((a, b) => a.pct - b.pct).slice(0, 6);
     return (
       <Pressable
         onPress={openTraining}

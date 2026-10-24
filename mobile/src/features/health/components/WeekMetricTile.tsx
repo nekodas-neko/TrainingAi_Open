@@ -5,7 +5,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 /**
  * One Recovery tile of Week in review: label, value, delta, and a sparkline with a dot on every
- * day. The current app's week-metric-card.tsx is p-3, with the sparkline h-10 under a mt-2; the
+ * day, curved as the current app's tension-0.3 line is. The current app's week-metric-card.tsx is p-3, with the sparkline h-10 under a mt-2; the
  * shared metric card's 48 px header and value rows made these tiles about twice as tall.
  */
 export function WeekMetricTile({
@@ -44,6 +44,7 @@ export function WeekMetricTile({
         dots="all"
         dotRadius={dotRadius}
         gaps="connect"
+        smooth
       />
     </View>
   );

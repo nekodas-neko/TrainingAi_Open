@@ -158,7 +158,10 @@ export function ObservedHeartCard() {
   return (
     <Card>
       <HealthResourceHeader
-        title={'Heart-rate profile · Last 90 days'}
+        title="Heart-rate profile"
+        icon="cardio"
+        iconColor={theme.colors.text}
+        caption="last 90 days"
         state={state}
         refresh={state.refresh}
       />
@@ -186,7 +189,15 @@ export function ObservedHeartCard() {
               stat
             />
           </Grid>
-          <Stack gap="xs">
+          {/* observed-hr-card.tsx: border-t border-border pt-3 above the notes. */}
+          <Stack
+            gap="xs"
+            style={{
+              borderTopWidth: 1,
+              borderTopColor: theme.colors.border,
+              paddingTop: theme.spacing.md,
+            }}
+          >
             <AppText variant="caption" tone="muted">
               Working max{' '}
               <AppText variant="caption">{metricValue(profile.workingMax, 'bpm')}</AppText> (
