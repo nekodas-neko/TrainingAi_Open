@@ -19,6 +19,8 @@ import {
   resultText,
   scaleBlocker,
   scaleLinkLabel,
+  loggedBannerText,
+  weighingBannerText,
 } from '../src/features/devices/scale/labels.ts';
 import {
   scaleTodaySpec,
@@ -744,4 +746,34 @@ test('Look for the scale restarts a listen that is already running', async () =>
     1,
     'the old one was stopped',
   );
+});
+
+test('the app-wide hold keeps the link on any screen and lets go only when every hold is released', async () => {
+  const { session, ble } = await pairedSession();
+  session.hold('app', true);
+  assert.equal(ble.scanning(), true, 'Preview open on any screen listens for the scale');
+  session.hold('settings', true);
+  session.hold('settings', false);
+  assert.equal(ble.scanning(), true, 'leaving Devices keeps the app hold');
+  session.hold('app', false);
+  assert.equal(ble.scanning(), false, 'backgrounded, nothing scans');
+});
+
+test('the banner words match the current app: weighing with the reading, then the logged weight', () => {
+  assert.equal(
+    weighingBannerText({ phase: 'weighing', weightKg: 65.2 } as never),
+    'Weighing you… 65.2 kg',
+  );
+  assert.equal(weighingBannerText({ phase: 'connected', weightKg: null } as never), null);
+  assert.equal(
+    loggedBannerText({ kind: 'logged', weightKg: 65.2, additional: false }),
+    '65.2 kg logged',
+  );
+  assert.equal(
+    loggedBannerText({ kind: 'skipped', weightKg: 65.2, reason: 'impedance' }),
+    '65.2 kg logged',
+  );
+  assert.equal(loggedBannerText({ kind: 'pending', weightKg: 90 }), null);
+  assert.equal(loggedBannerText({ kind: 'failed' }), null);
+  assert.equal(loggedBannerText(null), null);
 });

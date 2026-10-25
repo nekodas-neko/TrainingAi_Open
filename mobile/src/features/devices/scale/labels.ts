@@ -97,6 +97,18 @@ export function scaleBlocker(
   return null;
 }
 
+/** The in-app banner's words while someone is on the scale, or null. */
+export function weighingBannerText(state: ScaleState): string | null {
+  return state.phase === 'weighing' ? scaleLinkLabel(state) : null;
+}
+
+/** The banner's words once a weigh-in is filed; null for outcomes that are answered on the Devices screen. */
+export function loggedBannerText(result: WeighResult | null): string | null {
+  return result?.kind === 'logged' || result?.kind === 'skipped'
+    ? `${formatKg(result.weightKg)} logged`
+    : null;
+}
+
 /** One line on the scale's link, as the pairing card words it. */
 export function scaleLinkLabel(state: ScaleState): string {
   switch (state.phase) {
