@@ -778,7 +778,7 @@ export interface WorkoutRepository {
   /** Q-473 — true when this call stamped `completed_at`, false when it was already stamped (a
    *  concurrent request or an outbox replay won). Callers derive idempotence from this, never from
    *  a read taken before the write. */
-  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<boolean>
+  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date, pausedSec?: number): Promise<boolean>
   /** Q-460 — true when a row was updated. Zero rows means no such session for this user, which is
    *  an error here (unlike `setWorkoutSessionWarmupEnd`, where zero rows means "already set"). */
   setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<boolean>

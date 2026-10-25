@@ -9,7 +9,7 @@
 
 import { shiftDateStr, ageFromDob, dateStrMidnightInTz } from '../date-utils'
 import { computeActiveEnergy, stepEnergyKcal, STEP_BASE_CREDIT, type ActiveEnergyResult } from '../health/daily-energy'
-import type { Sex } from '../health/workout-energy'
+import { sessionActiveMin, type Sex } from '../health/workout-energy'
 import { mifflinStJeorBmr } from './goal-recommendation'
 import { personalRmr, bodyComposition, type BodyComposition } from '../health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '../health/body-fat-calibration'
@@ -150,6 +150,7 @@ export interface BudgetWorkout {
   startedAt: Date
   completedAt?: Date | null
   sessionRpe?: number | null
+  pausedSec?: number | null
 }
 
 export interface BudgetActivity {
@@ -182,7 +183,7 @@ export function activeEnergyForDay(input: {
       // `id` threads through so `workoutKcalBySession` can come back keyed by the session (Q-391).
       .map(ws => ({
         id: ws.id,
-        durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000,
+        durationMin: sessionActiveMin(ws.startedAt, ws.completedAt!, ws.pausedSec),
         rpe: ws.sessionRpe ?? null,
         avgBpm: input.avgBpmBySession.get(ws.id) ?? null,
       })),

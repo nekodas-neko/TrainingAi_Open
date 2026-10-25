@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Handler
@@ -21,10 +22,14 @@ import androidx.core.util.Consumer
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
-// Picture-in-picture for an active workout (#3064), ported from the current app's MainActivity:
-// the same 3:4 window, entered from onUserLeaveHint, and the same buttons per phase. JS reports
-// the phase whenever the workout screen changes it and sends "idle" when the screen closes, so
-// leaving the app with no workout open never shrinks it into a window (#2908).
+// Picture-in-picture for an active workout (#3064, #3266). JS reports the phase whenever the workout
+// screen changes it and sends "idle" when the screen closes, so leaving the app with no workout open
+// never shrinks it into a window (#2908). The window changes with the workout (the phase card): a
+// 3:4 card while a set runs, a square for a rest or a pause, each with its own three buttons.
+//
+// While a set, a rest or a pause is on, the system enters the window itself (auto-enter), shrinking
+// the screen into it from the on-screen card (the source rect JS reports). The other active phases
+// still enter from onUserLeaveHint, as before.
 //
 // The window's content is a native view (PipWindowView) laid over the app while in PiP. React
 // Native stops applying UI updates while the activity is paused, and an activity in PiP is paused,
@@ -35,6 +40,8 @@ class PictureInPictureModule : Module() {
   @Volatile private var phase = PipPolicy.IDLE
   @Volatile private var status: PipStatus? = null
   @Volatile private var setColor: String? = null
+  // Where the on-screen set card or rest ring is, in window pixels: the window shrinks out of it.
+  @Volatile private var sourceRect: Rect? = null
   private var windowView: PipWindowView? = null
   private var receiverRegistered = false
   private var watched: OnPictureInPictureModeChangedProvider? = null
@@ -73,10 +80,18 @@ class PictureInPictureModule : Module() {
       main.post { runCatching { windowView?.render() } }
       val activity = appContext.currentActivity ?: return@Function
       watch(activity)
-      activity.runOnUiThread {
-        // Keeps the buttons of an open window in step with the workout, as AndroidPip.updatePhase did.
-        params(activity, next)?.let { runCatching { activity.setPictureInPictureParams(it) } }
-      }
+      pushParams(activity)
+    }
+
+    // The on-screen card the window shrinks out of, in dp from the window's top left, or nulls for
+    // none. JS reports it on layout; it only shapes the animation, so a stale one is harmless.
+    Function("setSourceRect") { left: Double?, top: Double?, right: Double?, bottom: Double? ->
+      val density = context.resources.displayMetrics.density
+      sourceRect = if (left == null || top == null || right == null || bottom == null) null else
+        Rect((left * density).toInt(), (top * density).toInt(), (right * density).toInt(), (bottom * density).toInt())
+          .takeIf { it.width() > 0 && it.height() > 0 }
+      val activity = appContext.currentActivity ?: return@Function
+      pushParams(activity)
     }
 
     OnCreate {
@@ -152,41 +167,73 @@ class PictureInPictureModule : Module() {
     windowView = null
   }
 
-  private fun params(activity: Activity, phase: String): PictureInPictureParams? {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
-    return PictureInPictureParams.Builder()
-      .setAspectRatio(Rational(3, 4))
-      .setActions(actions(activity, phase))
-      .build()
+  /** Keeps the shape, buttons and auto-enter of the window in step with the workout. */
+  private fun pushParams(activity: Activity) {
+    val current = phase
+    activity.runOnUiThread {
+      params(activity, current)?.let { runCatching { activity.setPictureInPictureParams(it) } }
+    }
   }
 
-  // MainActivity.buildActions: at most three visible (the Android and Samsung limit).
+  private fun params(activity: Activity, phase: String): PictureInPictureParams? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+    val (width, height) = PipPolicy.aspect(phase)
+    val builder = PictureInPictureParams.Builder()
+      .setAspectRatio(Rational(width, height))
+      .setActions(actions(activity, phase))
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      // The system enters on its own only while a set, a rest or a pause is on (#3266). The window
+      // is not video, so it crossfades between shapes rather than resizing in place.
+      builder.setAutoEnterEnabled(PipPolicy.autoEnters(phase))
+      builder.setSeamlessResizeEnabled(false)
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      PipPresenter.title(status)?.let { builder.setTitle(it) }
+      PipPresenter.subtitle(phase, status)?.let { builder.setSubtitle(it) }
+    }
+    sourceRect?.let { builder.setSourceRectHint(it) }
+    return builder.build()
+  }
+
+  // The buttons per phase come from PipPresenter.buttons: at most three, the Android and Samsung limit.
   private fun actions(activity: Activity, phase: String): List<RemoteAction> {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return emptyList()
-    fun action(name: String, icon: Int, label: String, code: Int): RemoteAction {
+    return PipPresenter.buttons(phase, status).mapNotNull { button ->
+      val name = INTENTS[button.action] ?: return@mapNotNull null
       val intent = Intent(name).setPackage(activity.packageName)
       val pending = PendingIntent.getBroadcast(
-        activity, code, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        activity,
+        INTENTS.keys.indexOf(button.action) + 1,
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
       )
-      return RemoteAction(Icon.createWithResource(activity, icon), label, label, pending)
+      RemoteAction(Icon.createWithResource(activity, icon(button.icon)), button.label, button.label, pending)
     }
-    return when (phase) {
-      "set" -> listOf(
-        action(REPS_DOWN, R.drawable.pip_minus, "Reps -", 1),
-        action(REPS_UP, R.drawable.pip_plus, "Reps +", 3),
-        action(LOG, R.drawable.pip_log, "Log", 2),
-      )
-      "rest" -> listOf(action(LOG, R.drawable.pip_start, "Start Set", 2))
-      "complete" -> listOf(action(LOG, R.drawable.pip_log, "Complete", 2))
-      "summary" -> listOf(action(LOG, R.drawable.pip_start, "Next", 2))
-      else -> emptyList()
-    }
+  }
+
+  private fun icon(key: String) = when (key) {
+    "minus" -> R.drawable.pip_minus
+    "plus" -> R.drawable.pip_plus
+    "plus30" -> R.drawable.pip_plus30
+    "start" -> R.drawable.pip_start
+    "pause" -> R.drawable.pip_pause
+    "resume" -> R.drawable.pip_resume
+    else -> R.drawable.pip_log
   }
 
   companion object {
     private const val REPS_DOWN = "com.trainingai.pip.REPS_DOWN"
     private const val REPS_UP = "com.trainingai.pip.REPS_UP"
     private const val LOG = "com.trainingai.pip.LOG"
-    private val ACTIONS = mapOf(REPS_DOWN to "repsDown", REPS_UP to "repsUp", LOG to "log")
+    private const val REST_PLUS = "com.trainingai.pip.REST_PLUS"
+    private const val PAUSE = "com.trainingai.pip.PAUSE"
+    private const val RESUME = "com.trainingai.pip.RESUME"
+
+    // The action JS is told, by the intent that carries it.
+    private val INTENTS = linkedMapOf(
+      "repsDown" to REPS_DOWN, "repsUp" to REPS_UP, "log" to LOG,
+      "restPlus" to REST_PLUS, "pause" to PAUSE, "resume" to RESUME,
+    )
+    private val ACTIONS = INTENTS.entries.associate { (action, intent) -> intent to action }
   }
 }

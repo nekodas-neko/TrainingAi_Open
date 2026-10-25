@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { errorLog } from '@trainingai/shared/logger'
-import { estSessionKcal, isKnownActivity, DEFAULT_ACTIVITY_ID, type Sex } from '@trainingai/shared/health/workout-energy'
+import { estSessionKcal, sessionActiveMin, isKnownActivity, DEFAULT_ACTIVITY_ID, type Sex } from '@trainingai/shared/health/workout-energy'
 import { reportServerError } from '@/lib/observability'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { ageFromDob } from '@trainingai/shared/date-utils'
@@ -39,7 +39,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       durParam != null && Number.isFinite(Number(durParam)) && Number(durParam) > 0
         ? Number(durParam)
         : ws.completedAt
-          ? (ws.completedAt.getTime() - ws.startedAt.getTime()) / 60_000
+          ? sessionActiveMin(ws.startedAt, ws.completedAt, ws.pausedSec)
           : null
 
     // Q-330: the LATEST weight, not `getBodyMetricsBaseline`, which orders `asc(date)` and so returns
