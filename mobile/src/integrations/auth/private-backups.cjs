@@ -6,6 +6,8 @@ const exclusions = [
   ['sharedpref', 'oura_ble.xml'],
   ['sharedpref', 'SecureStore'],
   ['sharedpref', 'SecureStore.xml'],
+  ['sharedpref', 'trainingai_home_widgets.xml'],
+  ['sharedpref', 'workout-status.xml'],
 ];
 const xml = exclusions
   .map(([domain, path]) => `    <exclude domain="${domain}" path="${path}" />`)
@@ -34,3 +36,4 @@ module.exports = function withPrivateBackups(config) {
     },
   ]);
 };
+module.exports.exclusions = exclusions;

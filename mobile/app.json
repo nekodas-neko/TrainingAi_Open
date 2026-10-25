@@ -87,8 +87,7 @@
         "expo-image-picker",
         {
           "photosPermission": "TrainingAi uses photos you choose to identify food and save recipe thumbnails.",
-          "cameraPermission": "TrainingAi uses the camera to photograph food.",
-          "microphonePermission": false
+          "cameraPermission": "TrainingAi uses the camera to photograph food."
         }
       ],
       [

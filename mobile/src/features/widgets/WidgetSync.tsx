@@ -42,6 +42,9 @@ const AccountWidgetSync = memo(function AccountWidgetSync({ userId }: { userId: 
   const written = useRef<string | null>(null);
   latest.current = snapshot;
 
+  // Sign-out blocks writes until an account's sync is mounted again (#3279).
+  useEffect(() => homeWidgets?.resume(), []);
+
   useEffect(() => {
     if (!snapshot || snapshot.identity === written.current) return;
     const timer = setTimeout(() => write(latest.current, written), DEBOUNCE_MS);
