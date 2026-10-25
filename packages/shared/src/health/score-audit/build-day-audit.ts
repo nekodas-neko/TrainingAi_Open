@@ -1,4 +1,4 @@
-import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, ageFromDob, todayInTz } from '@trainingai/shared/date-utils'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
@@ -6,6 +6,7 @@ import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
+import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -143,10 +144,15 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   let zoneMinutes: number | null = null
   let moveHours: number | null = null
   let moveGoal: number | null = null
-  if (baselineRhr != null && hrRows.length > 0) {
+  // #3114: Oura's per-minute MET decides the move lane (its activity day starts at 4 a.m., hence the day before).
+  const metGrid = ouraCloudMetGrid(
+    await (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(date, -1), date))().catch(() => []),
+    dayMid.getTime(), nextMid.getTime(),
+  )
+  if (baselineRhr != null && (hrRows.length > 0 || metGrid.metsPerMinute.some(m => m != null))) {
     // #2182: the same ceiling as the live score (the HR profile's), so the audit cannot disagree.
     const maxHr = (await resolveHrProfile(repo, userId, tz).catch(() => null))?.maxHr ?? hrMaxFromAge(ageYears)
-    const c = intradayHrContributors({ hrRows, maxHr, restingHr: baselineRhr, tz, dateIso: date })
+    const c = intradayHrContributors({ hrRows, maxHr, restingHr: baselineRhr, tz, dateIso: date, metGrid, dayIsOver: date < todayInTz(tz) })
     zoneMinutes = c.zoneMinutes
     moveHours = c.moveHours
     moveGoal = c.moveHoursGoal

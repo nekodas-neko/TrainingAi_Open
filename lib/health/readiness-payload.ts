@@ -30,6 +30,7 @@ import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
+import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult, type ContributorGap } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
@@ -384,6 +385,8 @@ export async function buildReadinessPayload(
 
   // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.
   const hrProfileP = resolveHrProfile(repo, userId, tz).catch(() => null)
+  // #3114: Oura's per-minute MET decides the move lane. Its activity day starts at 4 a.m., hence the day before.
+  const cloudActivityP = (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
   const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
@@ -525,13 +528,15 @@ export async function buildReadinessPayload(
   // Zone-minutes + move-every-hour, from the SAME intraday HR series already fetched above for
   // hrCurrent/hrMin/hrMax/hrAvg (todayHrRows) — this doesn't need any new data pipeline, only a
   // resting-HR + max-HR profile to derive zones from (same Karvonen basis Body Battery already uses).
-  // #2437: a sparse Health Connect hour is missing, not low (`intradayHrContributors`).
+  // #2437: a sparse Health Connect hour is missing, not low (`intradayHrContributors`). #3114: so is a
+  // sparse Oura stretch, and Oura's MET, not its heart rate, says whether an hour moved.
   let zoneMinutesToday: number | null = null
   let movedHoursToday: number | null = null
   let moveGoalToday: number | null = null
-  if (baselineRhr != null && todayHrRows.length > 0) {
+  const metGridToday = ouraCloudMetGrid(await cloudActivityP, todayMid.getTime(), dateStrMidnightInTz(shiftDateStr(todayIso, 1), tz).getTime())
+  if (baselineRhr != null && (todayHrRows.length > 0 || metGridToday.metsPerMinute.some(m => m != null))) {
     const maxHr = (await hrProfileP)?.maxHr ?? hrMaxFromAge(ageYears)
-    const c = intradayHrContributors({ hrRows: todayHrRows, maxHr, restingHr: baselineRhr, tz, dateIso: todayIso })
+    const c = intradayHrContributors({ hrRows: todayHrRows, maxHr, restingHr: baselineRhr, tz, dateIso: todayIso, metGrid: metGridToday })
     zoneMinutesToday = c.zoneMinutes
     movedHoursToday = c.moveHours
     moveGoalToday = c.moveHoursGoal

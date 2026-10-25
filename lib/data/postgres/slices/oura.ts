@@ -1881,7 +1881,7 @@ export async function computeDayZoneSeconds(
 ): Promise<[number, number, number, number, number] | null> {
   const from = fromZonedTime(`${day}T00:00:00`, tz)
   const to = fromZonedTime(`${day}T23:59:59`, tz)
-  // #2437: a sparse Health Connect hour is missing, the same rule the Activity score applies.
+  // #2437, #3114: a sparse Health Connect hour or Oura stretch is missing, the same rule the Activity score applies.
   const rows = dropSparseHrHours(await getHrForWindow(db, userId, from, to), tz).rows
   if (rows.length === 0) return null
   const readings: HrReading[] = rows.map(r => ({
@@ -2103,10 +2103,10 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
  *
  * So is a session whose heart rate was too sparse to average (#3078), but only where #2437 already
  * holds a source to the density rule: a session whose every in-window reading comes from a
- * `DENSITY_GATED_HR_SOURCES` source (Health Connect, Apple Health) must pass `isDenseHrSpan` (two
- * readings at least, no gap over `HR_DENSE_MAX_GAP_MS`) between its start and end. A session with
- * any reading from the ring's BLE, the strap or Oura Cloud keeps its average, as before: whether
- * sparse Oura heart rate should fall back to METs is the owner's call (#3114). Checked here, when the
+ * `DENSITY_GATED_HR_SOURCES` source (Health Connect, Apple Health, Oura Cloud; #3114) must pass
+ * `isDenseHrSpan` (two readings at least, no gap over `HR_DENSE_MAX_GAP_MS`) between its start and
+ * end, so an Oura-app workout's 5-second series keeps its average and scattered readings fall back
+ * to METs. A session with any reading from the ring's BLE or the strap keeps its average, as before. Checked here, when the
  * estimate is made, so a snapshot computed before the rule is held to it too. A session with no
  * in-window reading left (past HR retention, or never any) keeps its snapshot: there is nothing to
  * check, and #3150 tracks what that means for a gated session once its series is pruned. Every
