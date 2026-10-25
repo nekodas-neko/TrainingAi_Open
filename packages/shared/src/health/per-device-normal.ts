@@ -21,7 +21,11 @@
  * A leaf module: imports nothing, so a client bundle may take it.
  */
 
-const UNKNOWN_SOURCE = 'unknown'
+/** The group a reading with no stored source belongs to. */
+export const UNKNOWN_DEVICE = 'unknown'
+
+/** A stored source as a device key. */
+export const deviceOf = (source: string | null | undefined): string => source ?? UNKNOWN_DEVICE
 
 export interface DeviceReading {
   /** Local date, `YYYY-MM-DD`. Orders readings; the newest names the device in use. */
@@ -37,6 +41,11 @@ export interface DeviceNormalOptions {
   aggregate?: 'mean' | 'median'
   /** Only the newest N readings of the device go into its normal. Default: all given. */
   window?: number
+  /**
+   * The device to learn for, when the caller knows it (the night being scored names its own). Default:
+   * the source of the newest reading.
+   */
+  device?: string
 }
 
 export interface DeviceNormal {
@@ -55,7 +64,7 @@ export interface DeviceNormal {
   carriedOver: { source: string; nights: number; value: number } | null
 }
 
-const sourceOf = (r: { source?: string | null }) => r.source ?? UNKNOWN_SOURCE
+const sourceOf = (r: { source?: string | null }) => deviceOf(r.source)
 
 function combine(values: number[], how: 'mean' | 'median'): number {
   if (how === 'mean') return values.reduce((a, b) => a + b, 0) / values.length
@@ -92,12 +101,12 @@ export function currentDeviceReadings<T extends DeviceReading>(readings: readonl
 export function perDeviceNormal(readings: readonly DeviceReading[], opts: DeviceNormalOptions): DeviceNormal {
   const how = opts.aggregate ?? 'mean'
   const rows = usable(readings)
-  if (rows.length === 0) return { source: null, nights: 0, value: null, provisional: null, carriedOver: null }
+  if (rows.length === 0) return { source: opts.device ?? null, nights: 0, value: null, provisional: null, carriedOver: null }
 
-  const device = sourceOf(rows[rows.length - 1])
+  const device = opts.device ?? sourceOf(rows[rows.length - 1])
   const own = rows.filter(r => sourceOf(r) === device)
   const windowed = opts.window != null ? own.slice(-opts.window) : own
-  const provisional = combine(windowed.map(r => r.value), how)
+  const provisional = windowed.length ? combine(windowed.map(r => r.value), how) : null
 
   // The other devices, most recently measured first; the first that is mature on its own carries over.
   const lastSeen = new Map<string, string>()

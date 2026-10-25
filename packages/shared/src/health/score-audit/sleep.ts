@@ -1,4 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz'
+import { deviceOf } from '../per-device-normal'
 import {
   computeSleepScore,
   sleepScoreBaselines,
@@ -58,14 +59,16 @@ export function buildSleepAudit(input: SleepAuditInput): PillarAudit {
 
   // Personal overnight-HRV baseline — trailing mean of the PRIOR nights only, so the night being
   // scored never contributes to the bar it's judged against. Same rule the readiness route applies.
-  const baselines = sleepScoreBaselines(prior, tz)
+  const baselines = sleepScoreBaselines(prior, tz, night ?? undefined)
   const hrvBaselineMs = baselines.hrvBaselineMs
   const priorHrv = prior
     .filter(s => (s.durationHours ?? 0) >= MAIN_SLEEP_MIN_HOURS)
+    // #3001: only the nights of the device that measured this one count toward its HRV normal.
+    .filter(s => !night || deviceOf(s.hrvSource) === deviceOf(night.hrvSource))
     .map(s => s.averageHrvMs).filter((v): v is number => v != null && v > 0)
   if (hrvBaselineMs == null) {
     gaps.push(
-      `Overnight-HRV contributor excluded: only ${priorHrv.length} prior night(s) carry an HRV reading, ` +
+      `Overnight-HRV contributor excluded: only ${priorHrv.length} prior night(s) from this night's device carry an HRV reading, ` +
       `${SLEEP_HRV_BASELINE_MIN_NIGHTS} needed. Its ${SLEEP_WEIGHTS.hrv} weight redistributes across the rest.`,
     )
   }

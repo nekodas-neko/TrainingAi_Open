@@ -219,7 +219,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   // early-morning fallback anchor can't disagree with the score the Health screen shows later.
   const ownSleepScore = daySleep
     ? computeSleepScore(daySleep, tz, sleepScoreBaselines(
-        nights.filter(s => s.sleepEnd.getTime() < daySleep.sleepEnd.getTime()), tz,
+        nights.filter(s => s.sleepEnd.getTime() < daySleep.sleepEnd.getTime()), tz, daySleep,
       ))?.score ?? null
     : null
   // The precedence itself is unchanged; what changed is that a readiness anchor, once today has

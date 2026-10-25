@@ -53,6 +53,14 @@ describe('perDeviceNormal (#3001)', () => {
     expect(perDeviceNormal([], { minNights: 7 })).toEqual({ source: null, nights: 0, value: null, provisional: null, carriedOver: null })
   })
 
+  it('learns for the device a caller names, whatever the newest reading says', () => {
+    const rows = [...run(1, 8, 50, 'a'), ...run(9, 2, 60, 'b')]
+    expect(perDeviceNormal(rows, { minNights: 7, device: 'a' })).toMatchObject({ source: 'a', nights: 8, value: 50 })
+    const none = perDeviceNormal(rows, { minNights: 7, device: 'c' })
+    expect(none).toMatchObject({ source: 'c', nights: 0, value: null, provisional: null })
+    expect(none.carriedOver).toMatchObject({ source: 'a', value: 50 })
+  })
+
   it('names the device in use and returns only its rows', () => {
     const rows = [...run(1, 3, 50, 'a'), ...run(4, 2, 60, 'b')]
     expect(currentDevice(rows)).toBe('b')

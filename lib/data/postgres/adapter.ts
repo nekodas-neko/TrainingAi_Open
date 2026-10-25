@@ -3555,6 +3555,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       manualEntry:     r.manualEntry,
       durationSource:  r.manualEntry ? 'manual' : r.sourceMap?.duration_hours ?? undefined,
       respiratoryRateSource: r.manualEntry ? 'manual' : r.sourceMap?.respiratory_rate ?? undefined,
+      hrvSource:       r.manualEntry ? 'manual' : r.sourceMap?.average_hrv_ms ?? undefined,
+      avgHeartRateSource: r.manualEntry ? 'manual' : r.sourceMap?.avg_heart_rate ?? undefined,
       ouraSleepType:   r.ouraSleepType   ?? null,
     }))
   }
