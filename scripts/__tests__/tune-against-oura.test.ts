@@ -63,7 +63,7 @@ function fixture(days: number, seed = 1): TuneInput {
       heartPillar: 70, activityPillar: 75, bodyPillar: 80,
       units: {
         'sleep.duration': { score: 90 }, 'sleep.efficiency': { score: contrib.efficiency },
-        'activity.yesterday_movement': { score: 80, daytimeThrough: shiftDateStr(d, -1) },
+        'activity.yesterday_load': { score: 80, daytimeThrough: shiftDateStr(d, -1) },
       },
     })
   }
@@ -204,7 +204,7 @@ describe('buildTuneReport', () => {
     expect(activity.days.every(p => p.ourDate === shiftDateStr(p.ouraDate, 1))).toBe(true)
     expect(activity.dropped).toEqual({ 'no shadow row of ours': 1 })
 
-    input.shadow.find(s => s.date === shiftDateStr(FROM, 5))!.units!['activity.yesterday_movement'].daytimeThrough = shiftDateStr(FROM, 2)
+    input.shadow.find(s => s.date === shiftDateStr(FROM, 5))!.units!['activity.yesterday_load'].daytimeThrough = shiftDateStr(FROM, 2)
     expect(buildTuneReport(input).comparisons[4].dropped['our Activity pillar did not read that day']).toBe(1)
   })
 
@@ -215,5 +215,43 @@ describe('buildTuneReport', () => {
     expect(report.shadowVersion).toBe(3)
     expect(report.shadowOtherVersions).toBe(1)
     expect(report.comparisons[0].summary.meanDiff).toBeCloseTo(4, 9)
+  })
+})
+
+describe('#2826: against how the owner felt', () => {
+  const RATINGS = ['drained', 'low', 'ok', 'good', 'pumped'] as const
+  /** Readiness rises with the energy rating, so the rank correlation is perfect. */
+  const feelFixture = (days: number) => {
+    const input = fixture(days)
+    input.feel = input.shadow.map((s, i) => ({ date: s.date, energyLevel: RATINGS[i % 5] }))
+    input.shadow.forEach((s, i) => { s.shadowReadiness = 50 + (i % 5) * 10 })
+    return input
+  }
+
+  it('correlates shadow readiness with the same day\'s energy rating', () => {
+    const feel = buildTuneReport(feelFixture(20)).feel
+    expect(feel.ratedDays).toBe(20)
+    expect(feel.distinctRatings).toBe(5)
+    const readiness = feel.correlations.find(c => c.label === 'Shadow readiness')!
+    expect(readiness.n).toBe(20)
+    expect(readiness.rho).toBeCloseTo(1, 6)
+  })
+
+  it('says a check is not yet meaningful under 14 rated days, or with one answer on every day', () => {
+    expect(formatTuneReport(buildTuneReport(feelFixture(10))).join('\n')).toContain(`not yet meaningful: a check needs ${MIN_FIT_DAYS} rated days`)
+    const flat = feelFixture(20)
+    flat.feel = flat.feel!.map(f => ({ ...f, energyLevel: 'ok' }))
+    expect(buildTuneReport(flat).feel.distinctRatings).toBe(1)
+    expect(formatTuneReport(buildTuneReport(flat)).join('\n')).toContain('more than one distinct answer')
+  })
+
+  it('skips an answer that is not a rating, and a day outside the range', () => {
+    const input = feelFixture(20)
+    input.feel!.push({ date: '2020-01-01', energyLevel: 'pumped' }, { date: input.feel![0].date, energyLevel: 'whatever' })
+    expect(buildTuneReport(input).feel.ratedDays).toBe(20)
+  })
+
+  it('reads as empty when no ratings were read', () => {
+    expect(buildTuneReport(fixture(20)).feel).toMatchObject({ ratedDays: 0, distinctRatings: 0 })
   })
 })
