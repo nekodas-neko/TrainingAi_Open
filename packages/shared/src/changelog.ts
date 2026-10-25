@@ -6,6 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.498.0",
+    date: "2026-10-25",
+    changes: [
+      "TrainingAi Preview no longer closes when you open Home during a workout, the lock-screen workout keeps updating while the app is in the background, and Voice can ask for the microphone.",
+      "After you apply or undo a Coach change, the programme, the next session and the workout card show it straight away.",
+      "The daily digest, a session's explanation and the nutrition goal explanation appear straight away, written from your own figures without an AI call.",
+      "Body composition updates from each weigh-in again since the ring moved to the Oura app, and a deleted reading no longer feeds it.",
+      "TrainingAi Preview shows the same kcal left on Home, Body and End of Day.",
+      "Behind the scenes: an empty Health Connect read no longer removes your imported workouts, and the heart-rate recovery backfill keeps a valid drop on a session's last set.",
+    ],
+  },
+  {
     version: "1.497.0",
     date: "2026-10-25",
     changes: [
