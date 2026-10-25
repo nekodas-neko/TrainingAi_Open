@@ -46,10 +46,16 @@ describe('buildDailyDigestText (#3286)', () => {
 
   it('writes daily, weekly-with-pace and weekly-met steps', () => {
     expect(buildDailyDigestText({ ...none(), steps: { today: 7500, dailyGoal: 9000 } })).toContain('Steps: 7,500 of 9,000.')
-    expect(buildDailyDigestText({ ...none(), steps: { today: 7500, weeklyTarget: 63000, pacePerDay: 8200 } }))
+    expect(buildDailyDigestText({ ...none(), steps: { today: 7500, weeklyTarget: 63000, pacePerDay: 8200, daysLeft: 3 } }))
       .toContain('about 8,200 a day for the rest of the week reaches your 63,000 weekly goal')
-    expect(buildDailyDigestText({ ...none(), steps: { today: 7500, weeklyTarget: 63000, pacePerDay: 0 } }))
+    expect(buildDailyDigestText({ ...none(), steps: { today: 7500, weeklyTarget: 63000, pacePerDay: 0, daysLeft: 3 } }))
       .toContain('your 63,000 weekly goal is already met')
+  })
+
+  it('on Sunday, with no days left, states the shortfall instead of a daily pace', () => {
+    const text = buildDailyDigestText({ ...none(), steps: { today: 6000, weeklyTarget: 63000, pacePerDay: 4100, daysLeft: 0 } })
+    expect(text).toContain('Steps: 6,000 today, 4,100 short of your 63,000 weekly goal, which ends today.')
+    expect(text).not.toContain('rest of the week')
   })
 
   it('writes the check-in with either or both parts', () => {

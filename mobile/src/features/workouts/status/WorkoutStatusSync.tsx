@@ -115,10 +115,15 @@ export function WorkoutStatusSync({
     };
   }, [journal.ready, activeId, reporter]);
 
-  // A permission or Live Updates switch changed in system settings takes effect on return.
+  // A permission or Live Updates switch changed in system settings takes effect on return. Leaving
+  // the app sends the latest state at once: a change made just before Home is still waiting on the
+  // debounce above, and no timer fires while the app is away.
   useEffect(() => {
     const listener = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') return;
+      if (state !== 'active') {
+        if (journal.ready) reporter.update(latest.current);
+        return;
+      }
       reporter.invalidate();
       if (journal.ready) reporter.update(latest.current);
     });

@@ -268,6 +268,9 @@ function HomeWidgetBody({
       budgetKcal: energy?.data?.balance?.budgetKcal,
     });
     const provenance = balanceProvenance(energy?.data?.balance);
+    // The ring, bar and caption read the same eaten figure as "left": before the food store loads,
+    // the model counts the recorded intake, and `total` is still null.
+    const eaten = goal !== null && remaining !== null ? goal - remaining : null;
     return (
       <Pressable
         onPress={openNutrition}
@@ -280,7 +283,7 @@ function HomeWidgetBody({
               label="Calories toward today’s budget"
               size={theme.sizes.homeNutritionRing}
               thickness={theme.sizes.homeNutritionRingStroke}
-              value={total && goal ? total.calories / goal : 0}
+              value={eaten !== null && goal ? eaten / goal : 0}
               segments={[{ share: 1, color: theme.colors.brand }]}
             >
               <AppText variant="ringValue" style={{ fontVariant: ['tabular-nums'] }}>
@@ -298,10 +301,10 @@ function HomeWidgetBody({
                 <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
                   {goal === null
                     ? ''
-                    : `${Math.round(total?.calories ?? 0).toLocaleString()} / ${Math.round(goal).toLocaleString()} kcal`}
+                    : `${Math.round(eaten ?? 0).toLocaleString()} / ${Math.round(goal).toLocaleString()} kcal`}
                 </AppText>
               </Stack>
-              <ProgressBar value={total && goal ? total.calories / goal : 0} />
+              <ProgressBar value={eaten !== null && goal ? eaten / goal : 0} />
               {provenance && (
                 <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
                   {budgetLine(provenance, energy?.data?.balance)}

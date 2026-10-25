@@ -24,7 +24,8 @@ export interface DigestFacts {
     /** True when `loggedDays` is under the shared coverage floor. */
     sparse: boolean
   } | null
-  steps: { today: number; dailyGoal: number } | { today: number; weeklyTarget: number; pacePerDay: number } | null
+  // `daysLeft` excludes today; on Sunday it is 0 and `pacePerDay` is the whole remainder.
+  steps: { today: number; dailyGoal: number } | { today: number; weeklyTarget: number; pacePerDay: number; daysLeft: number } | null
   checkin: { tiredness: number | null; soreMuscles: string[] } | null
   phase: { name: string; cycleInPhase: number; totalPhaseCycles: number } | null
 }
@@ -78,9 +79,11 @@ export function buildDailyDigestText(f: DigestFacts): string {
   if (f.steps) {
     out.push('dailyGoal' in f.steps
       ? `Steps: ${n0(f.steps.today)} of ${n0(f.steps.dailyGoal)}.`
-      : f.steps.pacePerDay > 0
-        ? `Steps: ${n0(f.steps.today)} today; about ${n0(f.steps.pacePerDay)} a day for the rest of the week reaches your ${n0(f.steps.weeklyTarget)} weekly goal.`
-        : `Steps: ${n0(f.steps.today)} today, and your ${n0(f.steps.weeklyTarget)} weekly goal is already met.`)
+      : f.steps.pacePerDay <= 0
+        ? `Steps: ${n0(f.steps.today)} today, and your ${n0(f.steps.weeklyTarget)} weekly goal is already met.`
+        : f.steps.daysLeft > 0
+          ? `Steps: ${n0(f.steps.today)} today; about ${n0(f.steps.pacePerDay)} a day for the rest of the week reaches your ${n0(f.steps.weeklyTarget)} weekly goal.`
+          : `Steps: ${n0(f.steps.today)} today, ${n0(f.steps.pacePerDay)} short of your ${n0(f.steps.weeklyTarget)} weekly goal, which ends today.`)
   }
 
   if (f.checkin) {

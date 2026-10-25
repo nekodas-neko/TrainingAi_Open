@@ -158,6 +158,22 @@ it('#2843: an exercise session becomes an activity log keyed on its record id, a
   expect(mocks.tombstone).toHaveBeenCalledWith(userId, { ids: ['hc-old'] });
 });
 
+it('a replacement session at the same minute is stored after the old one is tombstoned, so it can take the row over', async () => {
+  const start = new Date(Date.now() - 3 * 86400000);
+  start.setUTCHours(2, 0, 0, 0);
+  const end = new Date(start.getTime() + 30 * 60000);
+  const replacement = {
+    id: 'hc-new', type: 'ExerciseSession', exerciseType: 79, sourcePackage: 'com.test', recordingMethod: 2,
+    start: start.toISOString(), end: end.toISOString(), modifiedAt: end.toISOString(),
+  };
+  mocks.apply.mockResolvedValue({ accepted: 1, deleted: 1 });
+  const response = await POST(request({ records: [replacement], deleted: ['hc-old'] }));
+  expect(response.status).toBe(200);
+  expect(mocks.tombstone).toHaveBeenCalledWith(userId, { ids: ['hc-old'] });
+  expect(mocks.upsert).toHaveBeenCalledWith(userId, 'hc-new', expect.anything());
+  expect(mocks.tombstone.mock.invocationCallOrder[0]).toBeLessThan(mocks.upsert.mock.invocationCallOrder[0]);
+});
+
 it('#2843: a session refused as an activity is noted, not counted against the stored batch', async () => {
   const start = new Date(Date.now() - 10 * 86400000);
   start.setUTCHours(2, 0, 0, 0);

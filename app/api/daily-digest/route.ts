@@ -19,8 +19,10 @@ export async function POST(_req: Request) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // No request body is read: the digest is rebuilt from the day's own figures every time, so the
-  // old `{ force }` flag (which skipped a cache that no longer exists) is ignored.
-  if (!rateLimit(`${userId}:daily-digest`, 3, 60_000)) {
+  // old `{ force }` flag (which skipped a cache that no longer exists) is ignored. With no cache in
+  // front of it, every open of the End of Day card reaches this limit, and no model call sits behind
+  // it any more, so the limit only guards the database reads.
+  if (!rateLimit(`${userId}:daily-digest`, 20, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
@@ -110,7 +112,7 @@ export async function POST(_req: Request) {
       const todayDow = parseInt(formatInTimeZone(new Date(), tz, 'i'), 10) // 1=Mon..7=Sun
       const daysLeft = 7 - todayDow
       const pace = stepsPaceToWeeklyGoal(weeklyTarget, stepsThisWeek, daysLeft)
-      facts.steps = { today: todaySteps, weeklyTarget, pacePerDay: pace }
+      facts.steps = { today: todaySteps, weeklyTarget, pacePerDay: pace, daysLeft }
     } else {
       facts.steps = { today: todaySteps, dailyGoal: userGoals.stepsGoal }
     }
