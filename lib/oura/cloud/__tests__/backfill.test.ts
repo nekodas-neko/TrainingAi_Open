@@ -25,6 +25,7 @@ const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout
 function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
   const calls: string[] = []
   const absent: { from: string; to: string; keepIds: string[] }[] = []
+  const absentSessions: { from: string; to: string; keepIds: string[] }[] = []
   const row: OuraCloudTokenRow | null = connected ? {
     userId: USER,
     accessToken: encryptOuraToken('acc', USER, 'access_token'),
@@ -49,8 +50,10 @@ function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
     upsertOuraCloudSleepPeriods: async (_u, rows) => { calls.push(`periods:${rows.length}`); return rows.length },
     upsertOuraCloudDaily: async (_u, rows) => { calls.push(`cloudDaily:${rows.length}`); return rows.length },
     upsertOuraSessions: async (_u, rows) => { calls.push(`sessions:${rows.length}`); return rows.length },
+    tombstoneOuraSessions: async (_u, ids) => ids.length,
+    tombstoneOuraSessionsAbsent: async (_u, range) => { absentSessions.push(range); return 1 },
   }
-  return { repo, calls, absent }
+  return { repo, calls, absent, absentSessions }
 }
 
 /** Answers every collection with its one fixture, and heart rate with two points. */
@@ -379,7 +382,7 @@ describe('startOuraConnectBackfill reporting', () => {
 
 // #3087: a workout deleted in the Oura app whose delete event was missed. The daily reconcile asks
 // the read to tombstone a stored workout gone from Oura's list for a day it read whole.
-describe('backfillOuraCloud tombstoneAbsentWorkouts (#3087)', () => {
+describe('backfillOuraCloud tombstoneAbsent: workouts (#3087)', () => {
   const savedKey = process.env.OURA_TOKEN_KEY
   beforeEach(() => {
     process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
@@ -395,7 +398,7 @@ describe('backfillOuraCloud tombstoneAbsentWorkouts (#3087)', () => {
   it('hands each workout chunk it read, with the ids Oura returned, to the tombstone', async () => {
     oura()
     const { repo, absent } = fakeRepo()
-    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
     // The read's last day is left out: the spec does not say `end_date` is inclusive.
     expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-09', keepIds: ['wo-1'] }])
     expect(out.ok && out.report.workoutsTombstoned).toBe(1)
@@ -404,14 +407,14 @@ describe('backfillOuraCloud tombstoneAbsentWorkouts (#3087)', () => {
   it('an empty day list keeps nothing, so every stored workout on those days goes', async () => {
     oura(path => (path === 'workout' ? jsonResponse({ data: [], next_token: null }) : null))
     const { repo, absent } = fakeRepo()
-    await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
     expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-09', keepIds: [] }])
   })
 
   it('a one-day read tombstones nothing: its only day is the one it may not have read', async () => {
     oura()
     const { repo, absent } = fakeRepo()
-    await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, from: '2026-10-10', dryRun: false, tombstoneAbsentWorkouts: true })
+    await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, from: '2026-10-10', dryRun: false, tombstoneAbsent: true })
     expect(absent).toEqual([])
   })
 
@@ -421,7 +424,7 @@ describe('backfillOuraCloud tombstoneAbsentWorkouts (#3087)', () => {
     await backfillOuraCloud({ repo: plain.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false })
     expect(plain.absent).toEqual([])
     const dry = fakeRepo()
-    const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsentWorkouts: true })
+    const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsent: true })
     expect(dry.absent).toEqual([])
     expect(out.ok && out.report.workoutsTombstoned).toBe(0)
   })
@@ -430,19 +433,107 @@ describe('backfillOuraCloud tombstoneAbsentWorkouts (#3087)', () => {
   it('skips a chunk with a document that failed the spec, and a workout read Oura refused', async () => {
     oura(path => (path === 'workout' ? jsonResponse({ data: [{ id: 'wo-bad' }], next_token: null }) : null))
     const dropped = fakeRepo()
-    await backfillOuraCloud({ repo: dropped.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    await backfillOuraCloud({ repo: dropped.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
     expect(dropped.absent).toEqual([])
 
     fetchMock.mockReset()
     oura(path => (path === 'workout' ? new Response('', { status: 403 }) : null))
     const refused = fakeRepo()
-    await backfillOuraCloud({ repo: refused.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    await backfillOuraCloud({ repo: refused.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
     expect(refused.absent).toEqual([])
 
     const notShared = fakeRepo(true, 'extapi:personal extapi:daily extapi:heartrate extapi:session')
     fetchMock.mockReset()
     oura()
-    await backfillOuraCloud({ repo: notShared.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsentWorkouts: true })
+    await backfillOuraCloud({ repo: notShared.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
     expect(notShared.absent).toEqual([])
   })
+})
+
+// #3153: a session deleted in the Oura app whose delete event was missed. The same sweep as
+// workouts: no second copy of the mechanism, so these check only what is the session's own.
+describe('backfillOuraCloud tombstoneAbsent: sessions (#3153)', () => {
+  const savedKey = process.env.OURA_TOKEN_KEY
+  beforeEach(() => {
+    process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    process.env.OURA_TOKEN_KEY = savedKey
+    vi.unstubAllGlobals()
+  })
+  const RANGE = { from: '2026-10-08', to: '2026-10-10', heartRate: false, tz: 'Australia/Brisbane' }
+
+  it('hands each session chunk it read, with the ids Oura returned, to the session tombstone only', async () => {
+    oura()
+    const { repo, absent, absentSessions } = fakeRepo()
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
+    expect(absentSessions).toEqual([{ from: '2026-10-08', to: '2026-10-09', keepIds: [FIXTURES.session.id] }])
+    // Each type's ids go to its own table: a session id never keeps a workout, nor the reverse.
+    expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-09', keepIds: ['wo-1'] }])
+    expect(out.ok && out.report.sessionsTombstoned).toBe(1)
+    expect(out.ok && out.report.workoutsTombstoned).toBe(1)
+  })
+
+  it('tombstones no session unless asked, on a dry run, or from a chunk not read whole', async () => {
+    oura()
+    const plain = fakeRepo()
+    await backfillOuraCloud({ repo: plain.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false })
+    expect(plain.absentSessions).toEqual([])
+    const dry = fakeRepo()
+    const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsent: true })
+    expect(dry.absentSessions).toEqual([])
+    expect(out.ok && out.report.sessionsTombstoned).toBe(0)
+
+    fetchMock.mockReset()
+    oura(path => (path === 'session' ? jsonResponse({ data: [{ id: 'se-bad' }], next_token: null }) : null))
+    const dropped = fakeRepo()
+    await backfillOuraCloud({ repo: dropped.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
+    expect(dropped.absentSessions).toEqual([])
+  })
+})
+
+// #3153 review: a collection 404 cuts the list short, so it is not a read of the whole day. Swept as
+// whole, an empty or partial list would tombstone every stored row Oura still has.
+describe('backfillOuraCloud tombstoneAbsent: a 404 is not a whole read (#3153)', () => {
+  const savedKey = process.env.OURA_TOKEN_KEY
+  beforeEach(() => {
+    process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    process.env.OURA_TOKEN_KEY = savedKey
+    vi.unstubAllGlobals()
+  })
+  const RANGE = { from: '2026-10-08', to: '2026-10-10', heartRate: false, tz: 'Australia/Brisbane' }
+  const notFound = () => new Response('', { status: 404 })
+
+  for (const type of ['workout', 'session'] as const) {
+    const swept = (f: ReturnType<typeof fakeRepo>) => (type === 'workout' ? f.absent : f.absentSessions)
+
+    it(`a ${type} read that 404s on its first page tombstones nothing`, async () => {
+      oura(path => (path === type ? notFound() : null))
+      const f = fakeRepo()
+      const out = await backfillOuraCloud({ repo: f.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
+      expect(swept(f)).toEqual([])
+      expect(out.ok && (type === 'workout' ? out.report.workoutsTombstoned : out.report.sessionsTombstoned)).toBe(0)
+    })
+
+    it(`a ${type} read that 404s on its second page tombstones nothing`, async () => {
+      let page = 0
+      oura(path => {
+        if (path !== type) return null
+        page++
+        return page === 1 ? jsonResponse({ data: [FIXTURES[type]], next_token: 'p2' }) : notFound()
+      })
+      const f = fakeRepo()
+      const out = await backfillOuraCloud({ repo: f.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
+      expect(page).toBe(2)
+      expect(swept(f)).toEqual([])
+      // What the first page held is still written.
+      expect(out.ok && out.report.documents[type]).toBe(1)
+    })
+  }
 })

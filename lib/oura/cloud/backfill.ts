@@ -42,11 +42,11 @@ export interface OuraBackfillOptions {
   /** The user's timezone: day boundaries for the heart-rate window. */
   tz: string
   /**
-   * #3087: tombstone a stored workout on a day whose workouts were read completely when Oura's list
-   * for that day no longer has it: the catch-up for a missed `workout` delete event. The daily
-   * reconcile sets it.
+   * #3087, #3153: tombstone a stored workout or session on a day whose list of that type was read
+   * completely when Oura's list for that day no longer has it: the catch-up for a missed `workout`
+   * or `session` delete event. The daily reconcile sets it.
    */
-  tombstoneAbsentWorkouts?: boolean
+  tombstoneAbsent?: boolean
 }
 
 export interface OuraBackfillReport {
@@ -61,6 +61,8 @@ export interface OuraBackfillReport {
   counts: OuraCloudWriteCounts
   /** #3087: stored workouts tombstoned because Oura's list for their day no longer has them. */
   workoutsTombstoned: number
+  /** #3153: stored sessions tombstoned the same way. */
+  sessionsTombstoned: number
   /** Types Oura refused (403: membership or consent), and why the run stopped early, if it did. */
   forbidden: string[]
   /**
@@ -107,6 +109,10 @@ export function validBackfillRange(from: string, to: string): boolean {
   return Number.isFinite(span) && span >= 0 && span < MAX_BACKFILL_DAYS
 }
 
+/** The types whose rows the reconcile tombstones when a whole read of their day no longer lists them. */
+type AbsentTombstoneType = 'workout' | 'session'
+const isAbsentTombstoneType = (t: OuraDocumentType): t is AbsentTombstoneType => t === 'workout' || t === 'session'
+
 export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, opts: OuraBackfillOptions): Promise<OuraBackfillResult> {
   if (!validBackfillRange(opts.from, opts.to)) return { ok: false, error: 'invalid_range' }
   let token: string | null
@@ -120,7 +126,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   const granted = await getOuraGrantedScopes(deps.repo, userId)
 
   const report: OuraBackfillReport = {
-    dryRun: opts.dryRun, from: opts.from, to: opts.to, documents: {}, dropped: 0, counts: NO_WRITES, workoutsTombstoned: 0, forbidden: [], notShared: [], refusedDespiteGrant: [], stoppedEarly: null,
+    dryRun: opts.dryRun, from: opts.from, to: opts.to, documents: {}, dropped: 0, counts: NO_WRITES, workoutsTombstoned: 0, sessionsTombstoned: 0, forbidden: [], notShared: [], refusedDespiteGrant: [], stoppedEarly: null,
   }
   // Oura's 429 carries a Retry-After. A short one is waited out and the same request made again; a
   // long or missing one stops the run, and the stop is reported (`startOuraConnectBackfill`).
@@ -168,12 +174,13 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   // Documents: read every type, then write once, so one day's readiness, sleep and activity land as
   // one `oura_daily` row.
   const docs: OuraDocument[] = []
-  // #3087: the workout chunks read whole, with the ids Oura returned for each. A chunk with a
-  // dropped document is left out: the missing workout may be the one that failed the spec. Each
-  // chunk's last day is left out too: the pinned spec does not say whether `end_date` is inclusive,
-  // and if it is not, that day was never read. It is checked by a later read instead (the reconcile
-  // runs daily over three days, so a day reaches the middle of the window the next morning).
-  const workoutsRead: { from: string; to: string; keepIds: string[] }[] = []
+  // #3087, #3153: the workout and session chunks read whole, with the ids Oura returned for each. A
+  // chunk with a dropped document is left out: the missing one may be the one that failed the spec.
+  // So is one cut short by a 404: an empty or partial list would tombstone rows Oura still has.
+  // Each chunk's last day is left out too: the pinned spec does not say whether `end_date` is
+  // inclusive, and if it is not, that day was never read. It is checked by a later read instead (the
+  // reconcile runs daily over three days, so a day reaches the middle of the window the next morning).
+  const readWhole: { type: AbsentTombstoneType; from: string; to: string; keepIds: string[] }[] = []
   read: for (const type of OURA_DOCUMENT_TYPE_NAMES) {
     if (!isOuraTypeShared(granted, type)) { report.notShared.push(type); continue }
     for (const [from, to] of chunks(opts.from, opts.to, DOC_CHUNK_DAYS)) {
@@ -182,8 +189,8 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
         docs.push(...got.docs)
         report.documents[type] = (report.documents[type] ?? 0) + got.docs.length
         report.dropped += got.dropped
-        if (type === 'workout' && got.dropped === 0 && daysBetweenDateStrs(from, to) > 0) {
-          workoutsRead.push({ from, to: shiftDateStr(to, -1), keepIds: got.docs.flatMap(d => d.type === 'workout' ? [d.doc.id] : []) })
+        if (isAbsentTombstoneType(type) && got.complete && got.dropped === 0 && daysBetweenDateStrs(from, to) > 0) {
+          readWhole.push({ type, from, to: shiftDateStr(to, -1), keepIds: got.docs.flatMap(d => d.type === type ? [d.doc.id] : []) })
         }
       } catch (err) {
         if (err instanceof OuraForbiddenError) { report.forbidden.push(type); continue read }
@@ -206,8 +213,11 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   }
   const writes = mapOuraDocuments(docs)
   report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes, deps.rescore)
-  if (opts.tombstoneAbsentWorkouts && !opts.dryRun) {
-    for (const range of workoutsRead) report.workoutsTombstoned += await deps.repo.tombstoneOuraWorkoutsAbsent(userId, range)
+  if (opts.tombstoneAbsent && !opts.dryRun) {
+    for (const { type, ...range } of readWhole) {
+      if (type === 'workout') report.workoutsTombstoned += await deps.repo.tombstoneOuraWorkoutsAbsent(userId, range)
+      else report.sessionsTombstoned += await deps.repo.tombstoneOuraSessionsAbsent(userId, range)
+    }
   }
 
   if (opts.heartRate && !report.stoppedEarly && !isOuraTypeShared(granted, 'heartrate')) report.notShared.push('heartrate')
