@@ -112,6 +112,8 @@ export async function POST(req: NextRequest) {
           await repo.upsertOuraDailyDerived(userId, d, {
             sleepScore: sleep.persist.score,
             sleepContributors: sleep.persist.contributors,
+            // #2237: which calibration scored it, by the night's wake date, as the live route stamps.
+            ...(sleep.persist.modelVersion ? { modelVersions: { sleep: sleep.persist.modelVersion } } : {}),
           })
         }
       }

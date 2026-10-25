@@ -80,6 +80,8 @@ export interface PillarAudit {
    */
   persist?: {
     score: number; contributors: unknown
+    /** Sleep only (#2237): which calibration scored it, for `model_versions.sleep`. */
+    modelVersion?: string
     /** Readiness only (#3086): the illness radar's fields, persisted beside the served score. */
     illnessFlag?: string | null; illnessScore?: number | null; illnessBiomarkers?: unknown
     /** Readiness only (#3077): what actually fed the score, as the live route labels it. */
