@@ -1,6 +1,7 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import { View } from 'react-native';
 import { AppText, IconButton, PageLayout, Stack } from '../../../shared/ui';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { SessionTimer } from './WorkoutClocks';
 import type { WorkoutRecord } from '../logging/workout';
 
@@ -19,6 +20,7 @@ export function WorkoutLayout({
   contentDisabled = false,
   reorderable = false,
   fillBottom = false,
+  centeredTitle = false,
   children,
 }: PropsWithChildren<{
   title: string;
@@ -35,7 +37,10 @@ export function WorkoutLayout({
   contentDisabled?: boolean;
   reorderable?: boolean;
   fillBottom?: boolean;
+  /** The title centred between the back button and the actions, with no rule under the header. */
+  centeredTitle?: boolean;
 }>) {
+  const { theme } = useTheme();
   return (
     <PageLayout
       title={title}
@@ -43,15 +48,16 @@ export function WorkoutLayout({
       scroll
       reorderable={reorderable}
       fillBottom={fillBottom}
+      landing={centeredTitle}
       footer={footer}
       header={
         <Stack direction="row" align="center" gap="sm">
           {onBack && <IconButton icon={backIcon} label={backLabel} onPress={onBack} />}
           <View style={{ flex: 1, minWidth: 0 }}>
             <AppText
-              variant={ring ? 'caption' : 'heading'}
+              variant={centeredTitle ? 'headerTitle' : ring ? 'caption' : 'heading'}
               numberOfLines={1}
-              style={{ textAlign: ring ? 'center' : 'left' }}
+              style={{ textAlign: ring || centeredTitle ? 'center' : 'left' }}
             >
               {title}
             </AppText>
@@ -72,7 +78,12 @@ export function WorkoutLayout({
             )}
           </View>
           {titleAction}
-          {actions}
+          {centeredTitle ? (
+            // Holds the back button's width on the right so the title stays centred.
+            <View style={{ minWidth: theme.sizes.touchTarget, alignItems: 'flex-end' }}>{actions}</View>
+          ) : (
+            actions
+          )}
           {workout && <SessionTimer workout={workout} ring={ring} />}
         </Stack>
       }

@@ -18,6 +18,7 @@ const labels = {
   Steps: 'Steps',
   ActiveCaloriesBurned: 'Active energy',
   Weight: 'Body weight',
+  ExerciseSession: 'Workouts',
 };
 // The profile's zone, passed by HealthProvider; DEFAULT_TZ only when there is no profile yet,
 // never the device's zone (#3117).
@@ -124,6 +125,12 @@ export async function readHealthSnapshot(timezone = DEFAULT_TZ): Promise<HealthS
     Weight: {
       value: latest('Weight') ? `${latest('Weight')!.value!.toFixed(1)} kg` : null,
       source: latest('Weight')?.sourcePackage,
+    },
+    ExerciseSession: {
+      value: records.some((row) => row.type === 'ExerciseSession')
+        ? `${records.filter((row) => row.type === 'ExerciseSession').length} this week`
+        : null,
+      source: latest('ExerciseSession')?.sourcePackage,
     },
   };
   return {

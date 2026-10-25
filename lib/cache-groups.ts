@@ -1,6 +1,7 @@
 import { invalidateCache } from '@/lib/sqlite/cache'
 import { OURA_DATA_CHANGED_EVENT } from '@/lib/oura-data-changed'
 import type { SyncedDomains } from '@/lib/local-store/sync-engine'
+import type { CoachPatchDomain } from '@trainingai/shared/coach/patch'
 
 /** Legacy sessionStorage seeds read by session-select-content's first-paint effect.
  *  They live outside the TTL cache, so every group that invalidates workout-data:meta
@@ -441,6 +442,25 @@ export async function invalidateUserProfile(): Promise<void> {
  *  history list the Coach screen paints from its cache seed. */
 export async function invalidateCoachHistory(): Promise<void> {
   await invalidateCache('coach-history')
+}
+
+/** A Coach change was applied, or undone. The apply/undo routes run on the server, where this
+ *  module reaches no cache, so every client site that gets an OK back calls this.
+ *  Pass the patch's domain on apply; leave it out on undo, which does not know which domain it
+ *  reversed (the history payload carries only a summary) and so clears the superset. */
+export async function invalidateCoachChange(domain?: CoachPatchDomain): Promise<void> {
+  const programme = domain === undefined || domain === 'session_exercise' || domain === 'injury'
+    || domain === 'program_phase' || domain === 'early_deload'
+  const goals = domain === undefined || domain === 'user_goals' || domain === 'nutrition_targets'
+  // The injury domain logs an injury, which the Health tab's list and the workout screen's notice
+  // read from `injuries`; `invalidateProgramStructure` doesn't clear that key.
+  const injury = domain === undefined || domain === 'injury'
+  await Promise.all([
+    programme ? invalidateProgramStructure() : undefined,
+    goals ? invalidateGoalRecommendations() : undefined,
+    injury ? invalidateInjuryWrites() : undefined,
+    invalidateCoachHistory(),
+  ])
 }
 
 /** Oura PAT/OAuth token connected or disconnected. */

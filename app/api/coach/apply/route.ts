@@ -5,7 +5,6 @@ import { getDb, ensureSchema } from '@/lib/data/postgres/client'
 import { rateLimit } from '@/lib/rate-limit'
 import { CoachPatchSchema, hasUniqueChangeIds } from '@/lib/coach/patch'
 import { applyCoachPatch } from '@/lib/coach/apply'
-import { invalidateProgramStructure } from '@/lib/cache-groups'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { errorLog } from '@trainingai/shared/logger'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -68,7 +67,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: result.detail }, { status: 400 })
     }
 
-    await invalidateProgramStructure()
+    // No cache invalidation here: the client cache groups are a no-op on the server. The client sites
+    // that get this OK clear the caches through `invalidateCoachChange`.
     return NextResponse.json({ changeId: result.changeId, summary: result.summary })
   } catch (error) {
     errorLog(error, 'API /coach/apply')

@@ -275,6 +275,35 @@ test('change writes reject mixed domains and unknown accepted IDs before contact
   assert.equal((await actions.apply(patch, ['steps']))?.summary, 'Steps goal updated');
   assert.ok(changes.flat().includes('/api/user/goals'));
 });
+const programmePaths = [
+  '/api/workout-data',
+  '/api/workout-templates',
+  '/api/next-session',
+  '/api/phase-sets',
+  '/api/program-week',
+  '/api/progression-styles',
+  '/api/muscle-recovery',
+  '/api/collection',
+  '/api/ai-periodization/session/',
+];
+test('applying and undoing a swap each invalidate the programme resources', async () => {
+  const f = fixture(),
+    changes: string[][] = [];
+  f.resources.subscribeInvalidation((paths) => changes.push(paths));
+  const actions = new CoachActions(f.resources, () => {});
+  const patch = CoachPatchSchema.parse({
+    domain: 'session_exercise',
+    targetId: id(7),
+    changes: [{ id: 'swap', field: 'exerciseName', from: 'Deadlift', to: 'RDL' }],
+  });
+  await actions.apply(patch, ['swap']);
+  const applied = changes.flat();
+  for (const path of programmePaths) assert.ok(applied.some((p) => path.startsWith(p)), path);
+  changes.length = 0;
+  assert.equal(await actions.undo(id(90)), true);
+  const undone = changes.flat();
+  for (const path of programmePaths) assert.ok(undone.some((p) => path.startsWith(p)), path);
+});
 test('pending local target changes block a coach write without misreporting a network error', async () => {
   const f = fixture(),
     actions = new CoachActions(

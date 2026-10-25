@@ -21,6 +21,8 @@ export function healthConnectIntervals(
       deviceName: row.deviceManufacturer,
       deviceModel: row.deviceModel,
     };
+    // Stored as activity logs (`healthConnectSessionAsWorkout`), not as a day's measurements.
+    if (row.type === 'ExerciseSession') return [];
     if (row.type === 'HeartRate')
       return (row.points ?? []).map((point, index) => ({
         ...base,

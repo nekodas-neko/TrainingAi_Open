@@ -3,6 +3,9 @@ export async function alertPermission(request = false) {
   if (request) throw new Error('Notifications require the native app.');
   return false;
 }
+export async function alertPermissionAskable() {
+  return false;
+}
 export const nativeAlerts = {
   list: async () => [],
   cancel: async (_id: string) => {},

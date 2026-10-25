@@ -9,9 +9,9 @@ import {
   Badge,
   Grid,
   IconButton,
-  MetricTile,
   Notice,
   ScoreRing,
+  Stack,
   StatusIndicator,
   HealthDetailLayout,
 } from '../../../shared/ui';
@@ -36,6 +36,7 @@ import {
   HeartProgress,
   HeartHeroValue,
   HeartTrendCard,
+  TodayTile,
 } from '../components/HeartDetails';
 import { TREND_EMPTY } from '@trainingai/shared/health/trend-empty-copy';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -170,19 +171,21 @@ export function HealthDetailScreen({
       <HealthViewReady view={detail}>
         {detail === 'heart-rate' ? (
           <>
-            <AppText variant="eyebrow" tone="muted">
-              Today so far
-            </AppText>
-            <Grid columns={2}>
-              {(['hrCurrent', 'hrMin', 'hrAvg', 'hrMax'] as const).map((key, index) => (
-                <MetricTile
-                  key={key}
-                  label={['Current', 'Min', 'Average', 'Max'][index]}
-                  value={metricValue(state.data?.[key], 'bpm')}
-                  tone="heart"
-                />
-              ))}
-            </Grid>
+            <Stack gap="sm">
+              <AppText variant="tileLabel" tone="muted">
+                Today so far
+              </AppText>
+              <Grid columns={2}>
+                {(['hrCurrent', 'hrMin', 'hrAvg', 'hrMax'] as const).map((key, index) => (
+                  <TodayTile
+                    key={key}
+                    label={['Current', 'Min', 'Average', 'Max'][index]}
+                    value={state.data?.[key]}
+                    unit="bpm"
+                  />
+                ))}
+              </Grid>
+            </Stack>
             <ObservedHeartCard />
             <HeartFactors data={state.data} />
             <HrDayCard title="24h Heart Rate" />

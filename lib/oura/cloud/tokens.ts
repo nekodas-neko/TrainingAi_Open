@@ -128,18 +128,25 @@ export interface OuraConnection {
   connected: boolean
   scope: string | null
   expiresAt: string | null
+  /** Present (and `true`) only when Oura refused the grant (#3204): the user has to connect again. */
+  reauthRequired?: true
 }
 
-/** Connected means both tokens are stored and open under this key, not merely that a row exists. */
+/**
+ * Connected means both tokens are stored and open under this key, not merely that a row exists, and
+ * that Oura has not refused the grant (#3227). A refused grant reads as not connected with
+ * `reauthRequired`, so the existing screens offer "Connect" again; a connect clears the mark.
+ */
 export async function getOuraConnection(store: OuraTokenStore, userId: string): Promise<OuraConnection> {
   const row = await store.getOuraCloudTokens(userId)
-  const usable = !!row &&
+  const stored = !!row &&
     decryptOuraToken(row.accessToken, userId, 'access_token') !== null &&
     decryptOuraToken(row.refreshToken, userId, 'refresh_token') !== null
+  if (stored && row.reauthRequiredAt) return { connected: false, scope: null, expiresAt: null, reauthRequired: true }
   return {
-    connected: usable,
-    scope: usable ? row.scope : null,
-    expiresAt: usable ? row.expiresAt?.toISOString() ?? null : null,
+    connected: stored,
+    scope: stored ? row.scope : null,
+    expiresAt: stored ? row.expiresAt?.toISOString() ?? null : null,
   }
 }
 

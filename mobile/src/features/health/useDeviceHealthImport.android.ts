@@ -12,6 +12,7 @@ import {
 } from './data/HealthConnectImportStore';
 import {
   grantedHealthConnectTypes,
+  requestHealthConnectTypes,
   readHealthConnectPage,
   readHealthConnectChanges,
   requestHealthConnectHistoryPermission,
@@ -32,6 +33,7 @@ export function useDeviceHealthImport(): DeviceImportState {
             dataReader,
             {
               permissions: grantedHealthConnectTypes,
+              request: requestHealthConnectTypes,
               history: readHealthConnectPage,
               changes: readHealthConnectChanges,
               historyPermission: requestHealthConnectHistoryPermission,

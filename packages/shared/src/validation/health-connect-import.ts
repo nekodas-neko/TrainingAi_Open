@@ -8,6 +8,8 @@ export const healthConnectTypes = [
   'Steps',
   'ActiveCaloriesBurned',
   'Weight',
+  // #3044, #2843: stored as activity logs keyed on the record id, not projected into the day.
+  'ExerciseSession',
 ] as const;
 export type HealthConnectType = (typeof healthConnectTypes)[number];
 const at = z.string().datetime({ offset: true });
@@ -32,6 +34,9 @@ export const healthConnectRecord = z
     deviceModel: z.string().max(200).optional(),
     deviceManufacturer: z.string().max(200).optional(),
     value: z.number().finite().nonnegative().max(MAX_RECORD_VALUE).optional(),
+    // ExerciseSession only: Health Connect's integer `ExerciseType`, and the writing app's title.
+    exerciseType: z.number().int().min(0).max(1000).optional(),
+    title: z.string().max(500).optional(),
     points: z
       .array(z.object({ at, bpm: z.number().finite().min(20).max(300) }).strict())
       .max(20000)
@@ -63,6 +68,9 @@ export const healthConnectRecord = z
       (row.type === 'Steps' && !Number.isInteger(row.value)) ||
       (row.type === 'HeartRate' && (!row.points || row.value !== undefined || row.stages)) ||
       (row.type === 'SleepSession' && (!row.stages || row.value !== undefined || row.points)) ||
+      (row.type === 'ExerciseSession' &&
+        (row.exerciseType === undefined || row.value !== undefined || row.points || row.stages)) ||
+      (row.type !== 'ExerciseSession' && (row.exerciseType !== undefined || row.title !== undefined)) ||
       (max !== undefined && (row.points || row.stages)) ||
       row.points?.some((point) => Date.parse(point.at) < start || Date.parse(point.at) > end) ||
       row.stages?.some(

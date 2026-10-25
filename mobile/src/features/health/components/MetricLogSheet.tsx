@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ZodError } from 'zod';
 import { AppButton, Grid, Notice, Sheet, TextField } from '../../../shared/ui';
 import { useHealthData } from '../data/HealthDataProvider';
+import { waterEntry } from '../data/water-entry';
 export type LogMetric = 'weightKg' | 'bodyFat' | 'steps' | 'waterMl';
 export const logLabels: Record<LogMetric, string> = {
   weightKg: 'Body Weight',
@@ -22,6 +23,7 @@ export function MetricLogSheet({
   const [value, setValue] = useState(initial === null ? '' : String(initial));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const water = field === 'waterMl' ? waterEntry(value) : null;
   const unit =
     field === 'weightKg'
       ? 'kg'
@@ -93,10 +95,13 @@ export function MetricLogSheet({
         onChangeText={setValue}
         keyboardType="decimal-pad"
       />
+      {water?.error && <Notice title="Check the amount" message={water.error} error />}
       {error && <Notice title="Could not save" message={error} error />}
       <AppButton
-        title="Save"
-        disabled={!health.ready || !health.store || !value.trim()}
+        title={field === 'waterMl' ? 'Log' : 'Save'}
+        disabled={
+          !health.ready || !health.store || !value.trim() || (water !== null && water.ml === null)
+        }
         busy={busy}
         onPress={() => {
           void save();

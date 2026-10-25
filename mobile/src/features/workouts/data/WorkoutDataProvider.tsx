@@ -81,14 +81,19 @@ export function useTrainingSync() {
   );
   return { ...state, store: resources?.changes ?? null };
 }
-export function useWorkoutResource<T>(spec: ResourceSpec<T>, enabled = true) {
+/** What is already loaded for `spec`, kept current; it never loads or requests anything itself. */
+export function usePassiveResource<T>(spec: ResourceSpec<T>) {
   const resources = useWorkoutResources();
-  const key = resourceKey(spec);
-  const state = useSyncExternalStore(
+  return useSyncExternalStore(
     resources?.subscribe ?? noSubscribe,
     () => resources?.state(spec) ?? emptyResource<T>(),
     () => emptyResource<T>(),
   );
+}
+export function useWorkoutResource<T>(spec: ResourceSpec<T>, enabled = true) {
+  const resources = useWorkoutResources();
+  const key = resourceKey(spec);
+  const state = usePassiveResource(spec);
   useEffect(() => {
     void resources?.load(spec, false, !enabled);
   }, [resources, key, enabled]);

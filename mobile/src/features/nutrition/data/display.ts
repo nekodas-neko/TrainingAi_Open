@@ -1,4 +1,5 @@
 import { plural } from "@trainingai/shared/format/plural";
+import { budgetEnergyModel } from "./energy-model";
 
 const thousands = (value: number) => Math.round(value).toLocaleString();
 
@@ -35,16 +36,19 @@ export function signedKcal(netKcal: number) {
 export function dayTotalFigures(input: {
   loggedKcal: number;
   intake: number | null;
-  remaining: number | null;
   budget: number | null;
 }) {
   const calories = input.intake ?? input.loggedKcal;
   const budget = input.budget != null && input.budget > 0 ? input.budget : null;
+  const { remaining } = budgetEnergyModel({
+    totals: { calories: input.loggedKcal, proteinG: 0, carbsG: 0, fatG: 0 },
+    recordedIntake: input.intake,
+    budgetKcal: budget,
+  });
   return {
     calories,
     budget,
-    remaining:
-      budget == null ? null : Math.max(0, input.remaining ?? budget - calories),
+    remaining: remaining == null ? null : Math.max(0, remaining),
     fraction: budget == null ? null : calories / budget,
   };
 }

@@ -19,6 +19,7 @@ import { healthReadPaths } from '../../../core/sync/health-invalidation';
 import { ActivityStore, emptyActivity, sameActivityValue } from './ActivityStore';
 import { activityHistorySpec } from '../../health/data/models';
 import { overlayCalories } from './models';
+import { failedItems, waitingCount } from './sync-health';
 import type { HealthActivity } from '../../health/components/ActivityDetails';
 
 const Context = createContext<ActivityStore | null>(null);
@@ -92,10 +93,9 @@ export function useActivities() {
   return {
     ...state,
     store,
-    pending:
-      state.rows.filter((row) => row.pending).length +
-      state.tests.filter((row) => row.pending).length +
-      state.runs.filter((row) => row.pending).length,
+    // A dead-lettered row is not waiting to upload; Sync health lists it apart.
+    pending: waitingCount(state),
+    failed: failedItems(state),
   };
 }
 export function useActivityLogs(remote: HealthActivity[], from: string, to: string) {
