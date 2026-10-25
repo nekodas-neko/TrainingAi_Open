@@ -34,9 +34,19 @@ describe('invalidateCoachChange', () => {
     },
   )
 
+  it('an applied injury change also clears the injury list the Health tab and workout screen read', async () => {
+    await invalidateCoachChange('injury')
+    expect(invalidated).toContain('injuries')
+  })
+
+  it.each(['session_exercise', 'user_goals'] as const)('an applied %s change leaves the injury list', async domain => {
+    await invalidateCoachChange(domain)
+    expect(invalidated).not.toContain('injuries')
+  })
+
   it('an undo, which does not know the domain, clears the superset', async () => {
     await invalidateCoachChange()
-    expect(invalidated).toEqual(expect.arrayContaining([...PROGRAMME_KEYS, 'user-goals', 'coach-history']))
+    expect(invalidated).toEqual(expect.arrayContaining([...PROGRAMME_KEYS, 'user-goals', 'injuries', 'coach-history']))
   })
 })
 

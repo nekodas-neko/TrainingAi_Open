@@ -49,6 +49,8 @@ export const SOFT_DELETED: Record<string, string> = {
   mood_logs: 'deleted_at',
   // #3087: a workout deleted in the Oura app
   oura_workouts: 'deleted_at',
+  // #3153: a session deleted in the Oura app
+  oura_sessions: 'deleted_at',
   plan_meal_answers: 'deleted_at',
   blood_panels: 'deleted_at',
   prescribed_runs: 'deleted_at',
@@ -121,6 +123,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   session_periodization: { kind: 'user_id' },
   set_hr_stats: { kind: 'user_id' },
   shadow_readiness: { kind: 'user_id' },
+  sleep_session_revisions: { kind: 'user_id' },
   sleep_sessions: { kind: 'user_id' },
   sleep_verdicts: { kind: 'user_id' },
   step_live_windows: { kind: 'user_id' },

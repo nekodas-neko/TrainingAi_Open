@@ -217,7 +217,24 @@ describe('POST /api/nutrition-goals/recommend — rule-based, no model (#3286)',
     listBodyMetrics.mockResolvedValue([{ id: 'b1', date: '2026-09-08', weightKg: 50 }])
     const body = await (await post()).json()
     expect(body.recommended.calories).toBeGreaterThanOrEqual(1200)
+    expect(body.dataQualityNote).toContain(`Calories adjusted to safe minimum (${body.recommended.calories}).`)
+    expect(persisted().dataQualityNote).toBe(body.dataQualityNote)
     expect(generateObject).not.toHaveBeenCalled()
+  })
+
+  // A cut clamps for nearly every user (bmr x 1.2 - 500 < bmr below a BMR of 2,500), so the text
+  // has to quote the clamped figures: the ones beside it and the ones Apply writes.
+  it('quotes the clamped figures in the explanation, not the pre-clamp baseline', async () => {
+    getUserById.mockResolvedValue(user({ id: sessionUser!.id, fitnessGoal: 'lose_weight' }) as never)
+    const body = await (await post()).json()
+    const pre = calculateBaseline({
+      weightKg: 80, heightCm: 180, ageYears: 30, sex: 'male',
+      activityLevel: 'moderate', fitnessGoal: 'lose_weight', bodyFatPct: undefined, measuredRmr: null,
+    })
+    expect(body.recommended.calories).toBeGreaterThan(pre.calories)
+    expect(body.reasoning).toContain(`that gives ${body.recommended.calories.toLocaleString('en-US')} kcal`)
+    expect(body.reasoning).toContain(`${body.recommended.carbsG.toLocaleString('en-US')} g carbs`)
+    expect(body.reasoning).not.toContain(`${pre.calories.toLocaleString('en-US')} kcal`)
   })
 })
 

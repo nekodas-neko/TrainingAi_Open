@@ -452,9 +452,13 @@ export async function invalidateCoachChange(domain?: CoachPatchDomain): Promise<
   const programme = domain === undefined || domain === 'session_exercise' || domain === 'injury'
     || domain === 'program_phase' || domain === 'early_deload'
   const goals = domain === undefined || domain === 'user_goals' || domain === 'nutrition_targets'
+  // The injury domain logs an injury, which the Health tab's list and the workout screen's notice
+  // read from `injuries`; `invalidateProgramStructure` doesn't clear that key.
+  const injury = domain === undefined || domain === 'injury'
   await Promise.all([
     programme ? invalidateProgramStructure() : undefined,
     goals ? invalidateGoalRecommendations() : undefined,
+    injury ? invalidateInjuryWrites() : undefined,
     invalidateCoachHistory(),
   ])
 }

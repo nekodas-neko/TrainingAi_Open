@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
+import { reportServerError } from '@/lib/observability'
 import { DEFAULT_TZ, todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
 import { calculateBaseline, clampRecommendation } from '@trainingai/shared/nutrition/goal-recommendation'
 import { buildGoalExplanation, suggestActivityLevel } from '@trainingai/shared/nutrition/goal-recommendation-text'
@@ -133,11 +134,34 @@ export async function POST(req: Request) {
     })
     : baseline
 
+  // `clampRecommendation` stays: `CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500 for `lose_weight`, and
+  // `bmr x 1.2 - 500` sits under the `max(1200, bmr)` floor for any BMR under 2,500, so a cut
+  // nearly always clamps. It runs before the explanation so the figures the text quotes are the
+  // ones served and applied; the explanation's own note is joined to the clamp's below.
+  const clamped = clampRecommendation({
+    recommendedStepsGoal: clampBaseline.stepsGoal,
+    recommendedCalories: clampBaseline.calories,
+    recommendedProteinG: clampBaseline.proteinG,
+    recommendedCarbsG: clampBaseline.carbsG,
+    recommendedFatG: clampBaseline.fatG,
+    recommendedWaterMl: clampBaseline.waterMl,
+    recommendedActivityLevel: suggestedLevel,
+    dataQualityNote: '',
+  }, clampBaseline, latestWeight)
+
   const weighIns = bodyMetrics.filter(m => m.weightKg != null).sort((a, b) => a.date.localeCompare(b.date))
   const bfReadings = bodyMetrics.filter(m => m.bodyFatPct != null).sort((a, b) => a.date.localeCompare(b.date))
   const stepsValues = bodyMetrics.filter(m => m.steps != null).map(m => m.steps!)
   const explanation = buildGoalExplanation({
-    baseline: clampBaseline,
+    baseline: {
+      ...clampBaseline,
+      calories: clamped.recommendedCalories,
+      proteinG: clamped.recommendedProteinG,
+      carbsG: clamped.recommendedCarbsG,
+      fatG: clamped.recommendedFatG,
+      waterMl: clamped.recommendedWaterMl,
+      stepsGoal: clamped.recommendedStepsGoal,
+    },
     measuredRmr: measuredRmr != null,
     fitnessGoal: user.fitnessGoal!,
     activityLevel: user.activityLevel!,
@@ -151,20 +175,7 @@ export async function POST(req: Request) {
     personalRecordCount: personalRecords.length,
     phase: phaseInfo ? { name: phaseInfo.name, phaseType: phaseInfo.phaseType } : null,
   })
-
-  // `clampRecommendation` stays: `CALORIE_ADJUSTMENT_BY_GOAL` subtracts 500 for `lose_weight`, and
-  // on a small enough BMR that can put the baseline's own calorie figure under the `max(1200, bmr)`
-  // floor. It is a no-op on a safe baseline, and says so in `dataQualityNote` when it is not.
-  const clamped = clampRecommendation({
-    recommendedStepsGoal: clampBaseline.stepsGoal,
-    recommendedCalories: clampBaseline.calories,
-    recommendedProteinG: clampBaseline.proteinG,
-    recommendedCarbsG: clampBaseline.carbsG,
-    recommendedFatG: clampBaseline.fatG,
-    recommendedWaterMl: clampBaseline.waterMl,
-    recommendedActivityLevel: suggestedLevel,
-    dataQualityNote: explanation.dataQualityNote,
-  }, clampBaseline, latestWeight)
+  const dataQualityNote = [explanation.dataQualityNote, clamped.dataQualityNote].filter(n => n.length > 0).join(' ')
 
   let rec: { id: string }
   try {
@@ -179,10 +190,11 @@ export async function POST(req: Request) {
       recommendedActivityLevel: clamped.recommendedActivityLevel,
       reasoning: explanation.reasoning,
       insights: explanation.insights,
-      dataQualityNote: clamped.dataQualityNote,
+      dataQualityNote,
     })
-  } catch {
+  } catch (error) {
     // No row is persisted when the write fails, so report that rather than a raw 500.
+    reportServerError(error, { userId, url: '/api/nutrition-goals/recommend' })
     return NextResponse.json({ error: 'recommendation_failed' }, { status: 500 })
   }
 
@@ -211,6 +223,6 @@ export async function POST(req: Request) {
     },
     reasoning: explanation.reasoning,
     insights: explanation.insights,
-    dataQualityNote: clamped.dataQualityNote,
+    dataQualityNote,
   })
 }
