@@ -275,7 +275,9 @@ export function buildUserPrompt(
       : `  Training stress (OTS): no data`,
     signals.resilienceLevel != null
       ? `  Stress resilience level: ${signals.resilienceLevel}/5 (higher = more resilient lately)`
-      : `  Stress resilience: no data`,
+      : signals.resilienceOura
+        ? `  Stress resilience (Oura's own level, not a 1-5 score): ${signals.resilienceOura}`
+        : `  Stress resilience: no data`,
     signals.morningCheckin
       ? `  Morning check-in (1=best, 5=worst): recovery ${signals.morningCheckin.perceivedRecovery ?? '—'}, ` +
         `sleep feel ${signals.morningCheckin.sleepQualityFeel ?? '—'}, soreness ${signals.morningCheckin.restingSoreness ?? '—'}` +
