@@ -85,10 +85,11 @@ describe('the prose guards reach every route that writes prose (Q-292, PS-32, RV
   it('finds the routes at all — a scan that matches nothing would pass silently', () => {
     // Floors, not targets: they exist so a scan that silently matches nothing cannot pass. The prose
     // floor was 7 until RV-200 deleted `running-plan/explain`, 6 until RV-201 did the same to
-    // `ai/health-insight`, and 5 until RV-201's second half took `weekly-digest` — each one a model
-    // rewording facts its own handler had already computed. Lower one when a route genuinely goes;
+    // `ai/health-insight`, and 5 until RV-201's second half took `weekly-digest`, and 4 until #3286 did the same to
+    // `daily-digest` and `session-explain/insight` — each one a model rewording facts its own handler
+    // had already computed. Lower one when a route genuinely goes;
     // never raise it to paper over a route that stopped matching.
-    expect(proseRoutes.length).toBeGreaterThanOrEqual(4)
+    expect(proseRoutes.length).toBeGreaterThanOrEqual(2)
     expect(objectRoutes.length).toBeGreaterThanOrEqual(6)
   })
 

@@ -88,7 +88,14 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       repo: {
         getUserIdByOuraUserId: async id => (id === OURA_USER && row ? USER : null),
         getOuraCloudTokens: async id => (row && id === row.userId ? row : null),
-        saveOuraCloudTokens: async () => {},
+        saveOuraCloudTokens: async (_u, input) => {
+          row = { ...row!, ...input, reauthRequiredAt: null, updatedAt: new Date(row!.updatedAt.getTime() + 1) }
+        },
+        markOuraCloudReauthRequired: async (_u, since) => {
+          if (!row || row.updatedAt.getTime() > since.getTime()) return false
+          row = { ...row, reauthRequiredAt: row.reauthRequiredAt ?? new Date() }
+          return true
+        },
         deleteOuraCloudTokens: async () => true,
         upsertOuraDaily: async (_u, rows) => { writes.daily += rows.length },
         upsertBodyMetrics: async () => {},
@@ -115,7 +122,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       accessToken: encryptOuraToken('acc', USER, 'access_token'),
       refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
       expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health',
-      ouraUserId: OURA_USER, updatedAt: new Date(),
+      ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null,
     }
     writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []; writes.workoutsTombstoned = []
     heartRate.mockReset()
@@ -229,11 +236,67 @@ describe('handleOuraWebhookEvent (#2859)', () => {
     expect(writes.daily).toBe(0)
   })
 
-  it('answers reauth on a refused token and forbidden on a 403, so Oura does not retry', async () => {
-    fetchMock.mockResolvedValueOnce(new Response('', { status: 401 }))
-    expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'reauth' })
+  /** Answers by URL: the document read, `personal_info` (by the token sent) and the token endpoint. */
+  function oura(answers: { doc: () => Response; personalInfo: (token: string) => Response; refresh?: () => Response }) {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = String(input)
+      if (url === OURA_TOKEN_URL) return answers.refresh?.() ?? jsonResponse({ error: 'invalid_grant' }, 400)
+      if (url.endsWith('/personal_info')) {
+        const auth = new Headers(init?.headers).get('Authorization') ?? ''
+        return answers.personalInfo(auth.replace(/^Bearer /, ''))
+      }
+      return answers.doc()
+    })
+  }
+  const refused = () => new Response('', { status: 401 })
+
+  it('answers forbidden on a 403, so Oura does not retry, and records nothing', async () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 403 }))
     expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'forbidden' })
+    expect(row!.reauthRequiredAt).toBeNull()
+  })
+
+  // #3204: a 401 alone does not prove the grant is gone; the scope-free personal_info read decides.
+  it('records the grant as refused when the token, and the refresh, are refused', async () => {
+    oura({ doc: refused, personalInfo: refused })
+    expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'reauth' })
+    expect(row!.reauthRequiredAt).toBeInstanceOf(Date)
+    // Once recorded, the grant is not sent to Oura again.
+    fetchMock.mockClear()
+    expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'reauth' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('records the grant as refused when a freshly refreshed token is refused too', async () => {
+    oura({
+      doc: refused, personalInfo: refused,
+      refresh: () => jsonResponse({ access_token: 'acc-2', refresh_token: 'ref-2', expires_in: 86400 }),
+    })
+    expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'reauth' })
+    expect(row!.reauthRequiredAt).toBeInstanceOf(Date)
+  })
+
+  it('records nothing when the token works on personal_info: the type was refused, not the grant', async () => {
+    oura({ doc: refused, personalInfo: () => jsonResponse({ id: OURA_USER }) })
+    expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'forbidden' })
+    expect(row!.reauthRequiredAt).toBeNull()
+    expect(fetchMock.mock.calls.some(c => String(c[0]) === OURA_TOKEN_URL)).toBe(false)
+  })
+
+  it('asks Oura to retry, and records nothing, when a refresh brings a token that works', async () => {
+    oura({
+      doc: refused,
+      personalInfo: token => (token === 'acc-2' ? jsonResponse({ id: OURA_USER }) : refused()),
+      refresh: () => jsonResponse({ access_token: 'acc-2', refresh_token: 'ref-2', expires_in: 86400 }),
+    })
+    await expect(handleOuraWebhookEvent(deps(), event())).rejects.toBeInstanceOf(OuraUnavailableError)
+    expect(row!.reauthRequiredAt).toBeNull()
+  })
+
+  it('records nothing when Oura cannot be reached to check the refusal', async () => {
+    oura({ doc: refused, personalInfo: () => new Response('', { status: 503 }) })
+    await expect(handleOuraWebhookEvent(deps(), event())).rejects.toBeInstanceOf(OuraUnavailableError)
+    expect(row!.reauthRequiredAt).toBeNull()
   })
 
   it('throws OuraUnavailableError on a 429 or 5xx, so the route asks Oura to retry', async () => {
@@ -248,6 +311,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'invalid_grant' }, 400))
     expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'reauth' })
     expect(String(fetchMock.mock.calls[0][0])).toBe(OURA_TOKEN_URL)
+    expect(row!.reauthRequiredAt).toBeInstanceOf(Date) // #3204
   })
 
   // #2895 review, item 3: Oura has no heart-rate webhook, so these events start a catch-up.
@@ -284,9 +348,10 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
         userId: USER,
         accessToken: encryptOuraToken('acc', USER, 'access_token'),
         refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-        expiresAt: new Date(Date.now() + 86_400_000), scope: 'heartrate', ouraUserId: OURA_USER, updatedAt: new Date(),
+        expiresAt: new Date(Date.now() + 86_400_000), scope: 'heartrate', ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null,
       }),
       saveOuraCloudTokens: async () => {},
+        markOuraCloudReauthRequired: async () => true,
       deleteOuraCloudTokens: async () => true,
       upsertOuraDaily: async () => {},
       upsertBodyMetrics: async () => {},
@@ -439,7 +504,9 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
   })
 
   it('reports a refused heart-rate catch-up (401 or 403) instead of swallowing it', async () => {
-    fetchMock.mockImplementation(async () => new Response('', { status: 401 }))
+    fetchMock.mockImplementation(async input => String(input) === OURA_TOKEN_URL
+      ? jsonResponse({ error: 'invalid_grant' }, 400)
+      : new Response('', { status: 401 }))
     startOuraCloudHeartRateCatchUp(deps(), USER, now)
     await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(1))
     expect(reported()[0]).toMatch(/webhook-heartrate:refused: the heart-rate read was refused: Oura answered 401/)

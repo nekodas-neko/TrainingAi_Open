@@ -22,7 +22,9 @@
 --
 -- Replay-safe (CI truncates schema_migrations and re-runs everything): ADD COLUMN IF NOT EXISTS.
 --
--- REVERSE (loses only the edit stamps, no workout data): ALTER TABLE exercise_logs DROP COLUMN client_edited_at;
+-- REVERSE (loses only the edit stamps, no workout data):
+--   DROP VIEW IF EXISTS claude_ro.exercise_logs; ALTER TABLE exercise_logs DROP COLUMN client_edited_at;
+--   (the view selects the column, so the DROP COLUMN fails without the DROP VIEW; the boot rebuild recreates the view from claude-ro-views.sql)
 
 SET LOCAL lock_timeout = '3s';
 SET LOCAL statement_timeout = '30s';

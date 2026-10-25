@@ -2,10 +2,11 @@ import { View } from 'react-native';
 import { formatDayShort } from '@trainingai/shared/date-utils';
 import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr';
 import { rangeStats } from '@trainingai/shared/health/range-stats';
-import { AppButton, AppText, Card, Disclosure, Grid, Stack } from '../../../shared/ui';
+import { AppButton, AppText, Card, Disclosure, Grid, LineChart, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
+import { blockTrendView, type BlockTrendView } from '../data/block-trend-view';
 import { loadSpec, metricValue, readinessSpec, type BodyRow } from '../data/models';
 import { hrvBaselineDeviationPct } from '@trainingai/shared/health/hrv-baseline';
 import { acwrZoneLabel, hrvBaselineBand, latestReading, type Cue } from '../data/body-view';
@@ -244,6 +245,43 @@ function MonotonyMeter({ monotony, strain }: { monotony: number; strain: number 
 }
 
 /**
+ * The 28:90 block trend under the ACWR: a weekly line against the shaded steady band, one insight
+ * line and, while the data covers under 3 months, how much it rests on (#2740).
+ */
+function BlockTrend({ view, loaded }: { view: BlockTrendView; loaded: boolean }) {
+  if (!loaded || view.kind === 'hidden') return null;
+  if (view.kind === 'not_enough_history') {
+    return (
+      <AppText variant="caption" tone="muted">
+        {view.message}
+      </AppText>
+    );
+  }
+  return (
+    <Stack gap="sm">
+      {view.chart && (
+        <LineChart
+          label="Block trend, last 4 weeks against your 3-month norm"
+          points={view.chart.points}
+          axisLabels={view.chart.axisLabels}
+          domain={view.chart.domain}
+          zone={view.chart.zone}
+          gaps="connect"
+          dots="none"
+          readable
+        />
+      )}
+      <AppText variant="body">{view.copy}</AppText>
+      {view.basis && (
+        <AppText variant="caption" tone="muted">
+          {view.basis}
+        </AppText>
+      )}
+    </Stack>
+  );
+}
+
+/**
  * Training Load (ACWR): the ratio in its zone colour with the zone wording, and behind a toggle the
  * monotony and strain, the stress line and the explainer. Acute and chronic load are not shown,
  * as in the current app.
@@ -298,6 +336,7 @@ export function TrainingLoadCard() {
           )}
         </Stack>
       )}
+      <BlockTrend view={blockTrendView(load.data?.blockTrend)} loaded={!!load.data} />
       <Disclosure title="Details">
         {baselining && (
           <AppText variant="caption" tone="muted">

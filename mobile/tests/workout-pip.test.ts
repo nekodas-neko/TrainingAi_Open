@@ -5,9 +5,9 @@ import {
   allowsPip,
   pipCommand,
   pipPhaseFor,
-  pipViewFor,
-  type PipView,
+  pipSetColor,
 } from '../src/features/workouts/pip/pip.ts';
+import { workoutStatusFor } from '../src/features/workouts/status/workout-status.ts';
 import type { WorkoutRecord } from '../src/features/workouts/logging/workout.ts';
 
 const require = createRequire(import.meta.url);
@@ -66,9 +66,10 @@ function recorded(count: number, extra: Partial<WorkoutRecord> = {}) {
   );
   return base;
 }
-const timer = (view: PipView | null) => {
-  assert.equal(view?.kind, 'timer');
-  return view as Extract<PipView, { kind: 'timer' }>;
+const statusOf = (value: WorkoutRecord) => {
+  const status = workoutStatusFor(value);
+  assert.ok(status);
+  return status;
 };
 
 test('only an active workout past its warm-up opens the window (#2908)', () => {
@@ -92,36 +93,36 @@ test('only an active workout past its warm-up opens the window (#2908)', () => {
   );
 });
 
-test('resting sends the rest anchor, its target and the sets done', () => {
-  const view = timer(
-    pipViewFor(
-      recorded(2, {
-        restAnchor: { exerciseId: ids.bench, setId: ids.set(2), startedAt: T0 + 90_000 },
-        rest: {
-          exerciseId: ids.bench,
-          setId: ids.set(2),
-          startedAt: T0 + 90_000,
-          endsAt: T0 + 180_000,
-        },
-      }),
-    ),
+test('resting sends the rest start, its end and the sets done, from the shared status (#3266)', () => {
+  const status = statusOf(
+    recorded(2, {
+      restAnchor: { exerciseId: ids.bench, setId: ids.set(2), startedAt: T0 + 90_000 },
+      rest: {
+        exerciseId: ids.bench,
+        setId: ids.set(2),
+        startedAt: T0 + 90_000,
+        endsAt: T0 + 180_000,
+      },
+    }),
   );
-  assert.deepEqual(view, {
-    kind: 'timer',
-    exerciseName: 'Bench press',
-    phase: 'rest',
-    currentSet: 2,
-    sets: 3,
-    restTargetSec: 90,
-    restStartMs: T0 + 90_000,
-    setStartMs: null,
-    load: null,
-    setColor: null,
-  });
-  assert.equal(timer(pipViewFor(recorded(1))).restTargetSec, 0, 'no rest timer: no target');
+  assert.deepEqual(
+    [status.phase, status.exerciseName, status.setsDone, status.sets],
+    ['resting', 'Bench press', 2, 3],
+  );
+  assert.deepEqual(
+    [status.restStartedAt, status.restEndsAt, status.setStartedAt, status.hr],
+    [T0 + 90_000, T0 + 180_000, null, null],
+  );
+  assert.equal(pipSetColor(recorded(2)), null, 'only a set has an arc colour');
+  // No rest timed: the window counts up from the last set with no target.
+  const anchored = statusOf(
+    recorded(1, { restAnchor: { exerciseId: ids.bench, setId: ids.set(1), startedAt: T0 + 30_000 } }),
+  );
+  assert.deepEqual([anchored.restStartedAt, anchored.restEndsAt], [T0 + 30_000, null]);
+  assert.deepEqual([statusOf(recorded(1)).restStartedAt, statusOf(recorded(1)).restEndsAt], [null, null]);
 });
 
-test('a running set sends its start, the load and the set colour', () => {
+test('a running set sends its start, the known load and the set colour', () => {
   const base = recorded(1, { runningSet: { exerciseId: ids.bench, setId: ids.set(2) } });
   base.exercises[0].sets[1] = {
     ...base.exercises[0].sets[1],
@@ -129,43 +130,47 @@ test('a running set sends its start, the load and the set colour', () => {
     weight: '62.5',
     reps: '6',
   };
-  const view = timer(pipViewFor(base));
+  const status = statusOf(base);
   assert.deepEqual(
-    [view.phase, view.currentSet, view.setStartMs, view.load, view.setColor],
-    ['set', 1, T0 + 100_000, '62.5 kg × 6', '#a78bfa'],
+    [status.phase, status.setsDone, status.setStartedAt, status.load, pipSetColor(base)],
+    ['working', 1, T0 + 100_000, '62.5 kg × 6', '#a78bfa'],
   );
   // Past the six-colour table the shared palette turns oklch, which Android cannot parse.
   const many = recorded(7, { runningSet: { exerciseId: ids.bench, setId: ids.set(1) } });
   many.exercises[0].sets = [...Array(8)].map((_, i) =>
     i < 7 ? { ...set(i + 1), completedAt: T0 + i } : set(i + 1),
   );
-  assert.match(timer(pipViewFor(many)).setColor ?? '', /^#[\da-f]{6}$/i);
+  assert.match(pipSetColor(many) ?? '', /^#[\da-f]{6}$/i);
 });
 
-test('the exercise summary shows the placeholder until Preview runs a last-set rest (#3111)', () => {
-  const summary = recorded(3, { flow: { stage: 'summary', exerciseId: ids.bench } });
-  assert.deepEqual(pipViewFor(summary), {
-    kind: 'placeholder',
-    exerciseName: 'Bench press',
-    hint: true,
-  });
-  // Next on the last exercise ends the workout with the window still open: never blank (#3133).
+test('the exercise summary names what Next moves to, and the review the session (#3111, #3133)', () => {
+  const summary = statusOf(recorded(3, { flow: { stage: 'summary', exerciseId: ids.bench } }));
   assert.deepEqual(
-    pipViewFor(
-      recorded(3, {
-        sessionName: 'Upper body',
-        flow: { stage: 'review', exerciseId: ids.bench },
-      } as Partial<WorkoutRecord>),
-    ),
-    { kind: 'placeholder', exerciseName: 'Upper body', hint: false },
+    [summary.phase, summary.exerciseName, summary.label, summary.nextUp],
+    ['ready', 'Bench press', 'Exercise done', 'Barbell row'],
   );
-  assert.equal(pipViewFor(workout({ flow: { stage: 'warmup', exerciseId: ids.bench } })), null);
+  const solo = statusOf(
+    recorded(3, {
+      flow: { stage: 'summary', exerciseId: ids.bench },
+      soloExerciseId: ids.bench,
+    } as Partial<WorkoutRecord>),
+  );
+  assert.equal(solo.nextUp, null, 'a solo exercise goes back to the session, not on');
+  // Next on the last exercise ends the workout with the window still open: never blank (#3133).
+  const review = statusOf(
+    recorded(3, {
+      sessionName: 'Upper body',
+      flow: { stage: 'review', exerciseId: ids.bench },
+    } as Partial<WorkoutRecord>),
+  );
+  assert.deepEqual([review.exerciseName, review.nextUp], ['Upper body', null]);
+  assert.equal(pipPhaseFor(workout({ flow: { stage: 'warmup', exerciseId: ids.bench } })), 'pre');
 });
 
 test('the workout screen reports changes only, and idle once it closes (#2908)', async () => {
   const { createPipReporter } = await import('../src/features/workouts/pip/usePictureInPicture.ts');
   const sent: [string, unknown][] = [];
-  const reporter = createPipReporter({ setPhase: (phase, view) => void sent.push([phase, view]) });
+  const reporter = createPipReporter({ setPhase: (phase, status) => void sent.push([phase, status]) });
   reporter.update(recorded(1));
   reporter.update(recorded(1));
   reporter.update(recorded(1, { runningSet: { exerciseId: ids.bench, setId: ids.set(2) } }));
@@ -174,15 +179,15 @@ test('the workout screen reports changes only, and idle once it closes (#2908)',
     ['rest', 'set'],
     'a re-render with nothing new sends nothing',
   );
-  assert.equal((sent[0][1] as { kind: string }).kind, 'timer');
+  assert.equal((sent[0][1] as { phase: string }).phase, 'ready');
   reporter.close();
   reporter.close();
   reporter.update(recorded(2));
   assert.deepEqual(sent.slice(2), [['idle', null]]);
-  // A warm-up or a finished workout reports a phase that never opens the window, with no view.
-  const later = createPipReporter({ setPhase: (phase, view) => void sent.push([phase, view]) });
+  // A warm-up reports a phase that never opens the window.
+  const later = createPipReporter({ setPhase: (phase, status) => void sent.push([phase, status]) });
   later.update(workout({ flow: { stage: 'warmup', exerciseId: ids.bench } }));
-  assert.deepEqual(sent.at(-1), ['pre', null]);
+  assert.equal(sent.at(-1)?.[0], 'pre');
   // Without the module (iOS, an older build) nothing is called and nothing throws.
   createPipReporter(null).update(recorded(1));
 });
@@ -281,9 +286,9 @@ test('a window button reaches the journal', async () => {
   ]);
 });
 
-test('the load line always shows during a set, with the current app’s fallbacks (#3133)', () => {
+test('an unknown load shows nothing, never an invented 60 kg × 10 (#3266)', () => {
   const base = recorded(1, { runningSet: { exerciseId: ids.bench, setId: ids.set(2) } });
-  const loadOf = () => timer(pipViewFor(base)).load;
+  const loadOf = () => statusOf(base).load;
   base.exercises[0].sets[1] = { ...base.exercises[0].sets[1], weight: '', reps: '' };
   assert.equal(loadOf(), '60 kg × 8', 'blank weight: the planned weight; blank reps: the plan');
   base.exercises[0].sets[1] = {
@@ -292,16 +297,11 @@ test('the load line always shows during a set, with the current app’s fallback
     planned: null,
   };
   base.exercises[0].sets[0] = { ...base.exercises[0].sets[0], weight: '57.5', reps: '9' };
-  assert.equal(loadOf(), '57.5 kg × 9', 'then the first set');
-  base.exercises[0].sets[0] = { ...base.exercises[0].sets[0], weight: '', reps: '' };
-  assert.equal(loadOf(), '60 kg × 10', 'then 60 × 10, as the current app defaults');
+  assert.equal(loadOf(), null, 'another set’s values are not this set’s');
   base.runningSet = { exerciseId: ids.bench, setId: '00000000-0000-4000-8000-000000000999' };
-  assert.notEqual(loadOf(), null, 'a missing running set still shows a load');
+  assert.equal(loadOf(), null, 'a missing running set shows no load');
+  base.runningSet = { exerciseId: ids.bench, setId: ids.set(2) };
   base.exercises[0].weightUnit = 'lb';
-  base.exercises[0].sets[0] = { ...base.exercises[0].sets[0], weight: '135' };
-  assert.match(loadOf() ?? '', / lb × /);
-  base.exercises[0].sets[0] = { ...base.exercises[0].sets[0], weight: '7.5', reps: '8' };
+  base.exercises[0].sets[1] = { ...base.exercises[0].sets[1], weight: '7.5', reps: '8' };
   assert.equal(loadOf(), '16.53 lb × 8', 'a pound exercise shows the kg weight converted, as the wheel');
-  base.exercises[0].weightUnit = 'kg';
-  assert.equal(loadOf(), '7.5 kg × 8', 'a kg exercise is unchanged');
 });

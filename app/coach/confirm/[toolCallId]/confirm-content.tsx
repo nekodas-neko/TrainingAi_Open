@@ -6,6 +6,7 @@ import { AlertTriangleIcon, CheckIcon, ChevronLeftIcon, ClockIcon, Loader2Icon }
 import { Button } from "@/components/ui/button";
 import { FIELD_LABEL } from "@/lib/coach/patch";
 import type { Consequence, Drift } from "@/lib/coach/consequences";
+import { invalidateCoachChange } from "@/lib/cache-groups";
 import { readPendingChange, clearPendingChange, type PendingChange } from "@/lib/coach/pending-change";
 
 /** How long the button must be held. Long enough to be a decision, short enough not to be a fight. */
@@ -105,6 +106,9 @@ export function ConfirmContent({ toolCallId }: { toolCallId: string }) {
         setError(data.error ?? "Could not apply the change");
         return;
       }
+      // Tier 3 is the programme itself (cycle length, phase set), which workout-data, next-session
+      // and the prescription seeds all derive from. The route clears nothing on the client.
+      invalidateCoachChange(pending.patch.domain).catch(() => {});
       clearPendingChange(toolCallId);
       router.back();
     } catch {

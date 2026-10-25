@@ -21,7 +21,7 @@ const repo = {
   upsertOuraDailySummary: vi.fn(async () => undefined),
   hasOuraBleSamples: vi.fn(async (_u: string) => false),
   getRecentSourceFacts: vi.fn(async (_u: string, _s: Date) => ({ strapHeartRate: false, healthConnectHeartRate: false, healthConnectIntervals: false })),
-  getOuraCloudTokens: vi.fn(async (_u: string) => null as { accessToken: string | null } | null),
+  getOuraCloudTokens: vi.fn(async (_u: string) => null as { accessToken: string | null; scope?: string | null; reauthRequiredAt?: Date | null } | null),
 }
 
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo, getRepositoryAsync: async () => repo }))
@@ -42,21 +42,21 @@ beforeEach(() => {
 describe('readiness payload connectedSources (issue 2613)', () => {
   it('names a ring-only user', async () => {
     repo.hasOuraBleSamples.mockResolvedValue(true)
-    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: true, strap: false, healthConnect: false, ouraCloud: false })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: true, strap: false, healthConnect: false, ouraCloud: false, ouraCloudTypes: {} })
   })
 
   it('names a strap-only user', async () => {
     repo.getRecentSourceFacts.mockResolvedValue({ strapHeartRate: true, healthConnectHeartRate: false, healthConnectIntervals: false })
-    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: true, healthConnect: false, ouraCloud: false })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: true, healthConnect: false, ouraCloud: false, ouraCloudTypes: {} })
   })
 
   it('names a Health Connect-only user', async () => {
     repo.getRecentSourceFacts.mockResolvedValue({ strapHeartRate: false, healthConnectHeartRate: false, healthConnectIntervals: true })
-    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: false, healthConnect: true, ouraCloud: false })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: false, healthConnect: true, ouraCloud: false, ouraCloudTypes: {} })
   })
 
   it('reports all false for a user with none: a known answer, not unknown', async () => {
-    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: false, healthConnect: false, ouraCloud: false })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toEqual({ ring: false, strap: false, healthConnect: false, ouraCloud: false, ouraCloudTypes: {} })
   })
 
   it('names an Oura Cloud connection, and not a token row without an access token (#3115)', async () => {
@@ -64,6 +64,24 @@ describe('readiness payload connectedSources (issue 2613)', () => {
     expect((await buildReadinessPayload('u1', TZ)).connectedSources?.ouraCloud).toBe(true)
     repo.getOuraCloudTokens.mockResolvedValue({ accessToken: null })
     expect((await buildReadinessPayload('u1', TZ)).connectedSources?.ouraCloud).toBe(false)
+  })
+
+  // #3204: per data type, and not at all once Oura has refused the grant.
+  it('reports Oura Cloud per type from the grant, keeping the old boolean for old phones', async () => {
+    repo.getOuraCloudTokens.mockResolvedValue({ accessToken: 'sealed', scope: 'extapi:personal extapi:daily', reauthRequiredAt: null })
+    const partial = (await buildReadinessPayload('u1', TZ)).connectedSources
+    expect(partial?.ouraCloudTypes).toMatchObject({ SleepSession: true, Steps: true, HeartRate: false, OxygenSaturation: false, ActivitySession: false })
+    expect(partial?.ouraCloud).toBe(false)
+
+    repo.getOuraCloudTokens.mockResolvedValue({ accessToken: 'sealed', scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health', reauthRequiredAt: null })
+    const full = (await buildReadinessPayload('u1', TZ)).connectedSources
+    expect(Object.values(full?.ouraCloudTypes ?? {}).every(Boolean)).toBe(true)
+    expect(full?.ouraCloud).toBe(true)
+  })
+
+  it('reports nothing delivered once Oura has refused the grant', async () => {
+    repo.getOuraCloudTokens.mockResolvedValue({ accessToken: 'sealed', scope: null, reauthRequiredAt: new Date('2026-10-21T00:00:00Z') })
+    expect((await buildReadinessPayload('u1', TZ)).connectedSources).toMatchObject({ ouraCloud: false, ouraCloudTypes: {} })
   })
 
   it('omits the field when the Oura Cloud lookup fails, so the phones filter nothing', async () => {

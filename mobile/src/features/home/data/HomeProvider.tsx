@@ -73,6 +73,17 @@ export function HomeStoreProvider({
   return <Context.Provider value={store}>{children}</Context.Provider>;
 }
 export function useHome() {
+  const home = useHomeState();
+  const { store } = home;
+  const { today } = useHealthData();
+  useEffect(() => {
+    void store?.refresh('preferences', today);
+    void store?.refresh('mood', today);
+  }, [store, today]);
+  return home;
+}
+/** Home's saved state, kept current; unlike useHome it refreshes nothing. */
+export function useHomeState() {
   const store = useContext(Context);
   const { today } = useHealthData();
   const state = useSyncExternalStore(
@@ -80,10 +91,6 @@ export function useHome() {
     store?.getSnapshot ?? (() => emptyHome),
     () => emptyHome,
   );
-  useEffect(() => {
-    void store?.refresh('preferences', today);
-    void store?.refresh('mood', today);
-  }, [store, today]);
   return {
     ...state,
     store,
