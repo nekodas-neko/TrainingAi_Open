@@ -1225,7 +1225,8 @@ SELECT
   t.heart_rate,
   t.heart_rate_variability,
   t.motion_count,
-  t.updated_at
+  t.updated_at,
+  t.deleted_at
 FROM public.oura_sessions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
