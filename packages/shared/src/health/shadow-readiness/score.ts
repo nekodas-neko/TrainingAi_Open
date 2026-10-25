@@ -68,6 +68,12 @@ export interface UnitObservation {
   rung?: UnitProvenance['rung']
   /** Menstrual-cycle phase on that day, when tracked (edge case #9). */
   phase?: string | null
+  /**
+   * The smallest change worth reading as real, in THIS observation's units, when they are not the
+   * unit's own (#3001: Oura's recovery-index contributor is a 0-100 sub-score on a unit whose ring
+   * value is hours). Overrides the unit's `minMeaningfulChange` for the normal it is scored against.
+   */
+  minMeaningfulChange?: number
 }
 
 export interface UnitInput {
@@ -221,7 +227,7 @@ interface Normal {
  * window holds too few days to say.
  */
 function learnedNormal(def: UnitDef, today: UnitObservation, history: UnitObservation[]): Normal | null {
-  const mmc = def.minMeaningfulChange ?? 0
+  const mmc = today.minMeaningfulChange ?? def.minMeaningfulChange ?? 0
   const flags: string[] = []
   let capAtProvisional = false
 
