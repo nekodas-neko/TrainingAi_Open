@@ -129,7 +129,11 @@ it is scored on a fixed band around the plan's pace, with no Level.
   since #2984 the nightly HRV, resting HR and sleep series carry the device that measured them, and
   temperature and breathing take Oura's own value where the ring summary has none for the night. An
   `oura_cloud` night is judged against `oura_cloud` nights, never the ring's. Live readiness follows
-  the same rule (`lib/health/readiness-night-inputs.ts`).
+  the same rule (`lib/health/readiness-night-inputs.ts`). The remaining personal normals follow it
+  too (#3001, `health/per-device-normal.ts`): the Sleep Score's HRV, HR, schedule and awake-fraction
+  normals, the resting HR behind HR zones and Body Battery, the displayed baselines, the planner's HRV
+  trend, and the shadow model's overnight settling. While the device in use has too few nights a score
+  leaves the input out; a number that must exist (zones, Body Battery) holds the previous device's.
 
 ### 2.3 Worked examples
 
