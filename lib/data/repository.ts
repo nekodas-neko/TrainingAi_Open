@@ -357,8 +357,9 @@ export interface HealthConnectActivityLogInput {
 }
 
 /** `taken`: another row holds the session's start minute, so this one was not stored or moved.
- *  `deleted`: the row is tombstoned and stays so. */
-export type HealthConnectActivityLogOutcome = 'inserted' | 'updated' | 'unchanged' | 'taken' | 'deleted'
+ *  `deleted`: the row is tombstoned and stays so (the owner deleted it, #3309).
+ *  `revived`: the row had been swept and its id came back, so it is live again. */
+export type HealthConnectActivityLogOutcome = 'inserted' | 'updated' | 'unchanged' | 'taken' | 'deleted' | 'revived'
 
 export interface FitnessTest {
   id: string

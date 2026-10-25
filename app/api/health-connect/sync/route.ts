@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
       });
     if (deleted.size)
       await repo.tombstoneHealthConnectActivityLogs(userId, { ids: [...deleted] });
-    await storeHealthConnectWorkouts(repo, userId, workouts, workoutNotes);
-    return NextResponse.json({ ...result, deferred, rejected: batch!.rejected, workoutNotes });
+    const { revived: exercisesRevived } = await storeHealthConnectWorkouts(repo, userId, workouts, workoutNotes);
+    return NextResponse.json({ ...result, deferred, rejected: batch!.rejected, workoutNotes, exercisesRevived });
   } catch (error) {
     reportServerError(error, { userId, url: '/api/health-connect/sync' });
     return NextResponse.json({ error: 'Could not sync health records' }, { status: 500 });
