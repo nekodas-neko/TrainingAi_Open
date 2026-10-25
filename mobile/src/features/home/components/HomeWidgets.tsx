@@ -37,6 +37,7 @@ import {
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useHome } from '../data/HomeProvider';
+import { ReadinessPromptCard } from './ReadinessPromptCard';
 import { CollectionCard } from '../../collection/components/CollectionCard';
 import { metricLabels } from '../data/models';
 import { budgetEnergyModel } from '../../nutrition/data/energy-model';
@@ -610,7 +611,7 @@ function HomeWidgetBody({
   }
   if (id === 'moodWidget') {
     const feel = health.checkins[health.today]?.sleepQualityFeel;
-    return (
+    const logged = (
       <Pressable
         onPress={openReadiness}
         accessibilityRole="button"
@@ -697,6 +698,7 @@ function HomeWidgetBody({
         </Card>
       </Pressable>
     );
+    return <ReadinessPromptCard openReadiness={openReadiness} logged={logged} />;
   }
   if (id === 'acwrWidget') {
     const data = load?.data;

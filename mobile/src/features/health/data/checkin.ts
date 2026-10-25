@@ -46,3 +46,22 @@ export const verdictSpec = (date: string) => ({
       .nullable(),
   }),
 });
+export const readinessVerdictSpec = (date: string) => ({
+  path: '/api/readiness-verdict',
+  query: { date },
+  ttl: 300_000,
+  schema: z.object({
+    verdict: z
+      .object({
+        date: z.string(),
+        verdict: z.enum(['poor', 'normal', 'good']),
+        score: z.number().finite(),
+        band: z.object({ median: z.number(), low: z.number(), high: z.number() }),
+        baselineDays: z.number(),
+        modelVersion: z.number(),
+        responseState: z.enum(['none', 'rated', 'dismissed']),
+      })
+      .passthrough()
+      .nullable(),
+  }).passthrough(),
+});
