@@ -7178,6 +7178,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.ouraBleBatteryPoll.userId, userId),
         gte(s.ouraBleBatteryPoll.measuredAt, from),
         lte(s.ouraBleBatteryPoll.measuredAt, to),
+        // Bluetooth polls only (#3069): Oura Cloud readings share the table and read through getRingBatteryReadings.
+        sql`${s.ouraBleBatteryPoll.source} IS DISTINCT FROM ${oura.OURA_CLOUD_BATTERY_SOURCE}`,
       ))
       .orderBy(asc(s.ouraBleBatteryPoll.measuredAt))
     return rows.map(r => ({ tsMs: r.measuredAt.getTime(), percent: r.percent, charging: r.charging }))
@@ -8424,6 +8426,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraCloudActivitySeries(userId: string, from: string, to: string) { return oura.getOuraCloudActivitySeries(this.db, userId, from, to) }
   async getOuraCloudMetChangedAt(userId: string, from: string, to: string) { return oura.getOuraCloudMetChangedAt(this.db, userId, from, to) }
   async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }
+  async getLatestOuraCloudBatteryAt(userId: string, since: Date) { return oura.getLatestOuraCloudBatteryAt(this.db, userId, since) }
+  async insertOuraCloudBatteryReadings(userId: string, readings: { measuredAt: Date; percent: number; charging: boolean | null }[]) { return oura.insertOuraCloudBatteryReadings(this.db, userId, readings) }
+  async getRingBatteryReadings(userId: string, from: Date, to: Date) { return oura.getRingBatteryReadings(this.db, userId, from, to) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
   async dropZoneMinutesFrom(userId: string, fromDay: string, tz: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay, tz) }

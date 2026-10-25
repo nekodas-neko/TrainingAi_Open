@@ -56,4 +56,28 @@ describe.skipIf(!canRun)('oura battery-poll persistence', () => {
     const polls = await repo.getOuraBatteryPolls(TEST_USER_ID, future, farFuture)
     expect(polls.length).toBe(0)
   })
+
+  // #3069: Oura Cloud readings share the table, labelled by source.
+  it('stores Oura Cloud readings once, keeps them out of the Bluetooth read, and reads both together', async () => {
+    const t0 = new Date('2026-09-01T01:00:00Z')
+    const reading = (min: number, percent: number, charging: boolean | null) => ({ measuredAt: new Date(t0.getTime() + min * 60_000), percent, charging })
+    expect(await repo.insertOuraCloudBatteryReadings(TEST_USER_ID, [reading(0, 80, false), reading(15, 79, null), reading(15, 79, null)])).toBe(2)
+    // A re-read overlapping the stored span adds only what is new.
+    expect(await repo.insertOuraCloudBatteryReadings(TEST_USER_ID, [reading(15, 79, null), reading(30, 100, true)])).toBe(1)
+
+    const from = new Date('2026-08-31T00:00:00Z'), to = new Date('2026-09-02T00:00:00Z')
+    expect(await repo.getOuraBatteryPolls(TEST_USER_ID, from, to)).toEqual([])
+    const all = await repo.getRingBatteryReadings(TEST_USER_ID, from, to)
+    expect(all.map(r => [r.percent, r.charging])).toEqual([[80, false], [79, null], [100, true]])
+    expect((await repo.getLatestOuraCloudBatteryAt(TEST_USER_ID, from))?.getTime()).toBe(t0.getTime() + 30 * 60_000)
+    expect(await repo.getLatestOuraCloudBatteryAt(TEST_USER_ID, to)).toBeNull()
+
+    const { rows } = await pool.query(`SELECT DISTINCT source FROM oura_ble_battery_poll WHERE user_id = $1 AND measured_at < $2`, [TEST_USER_ID, to])
+    expect(rows).toEqual([{ source: 'oura_cloud' }])
+  })
+
+  it('leaves Bluetooth polls with no source', async () => {
+    const { rows } = await pool.query(`SELECT DISTINCT source FROM oura_ble_battery_poll WHERE user_id = $1 AND measured_at > now() - interval '1 day'`, [TEST_USER_ID])
+    expect(rows).toEqual([{ source: null }])
+  })
 })

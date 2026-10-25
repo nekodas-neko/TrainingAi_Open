@@ -1601,6 +1601,12 @@ export interface WorkoutRepository {
   tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }): Promise<number>
   /** #2895: the newest `oura_cloud` HR point at or after `since`; where the next Cloud HR read starts. */
   getLatestOuraCloudHeartrateAt(userId: string, since: Date): Promise<Date | null>
+  /** #3069: the newest `oura_cloud` ring-battery reading at or after `since`; where the next Cloud read starts. */
+  getLatestOuraCloudBatteryAt(userId: string, since: Date): Promise<Date | null>
+  /** #3069: Oura Cloud battery readings into `oura_ble_battery_poll` as source `oura_cloud`; a stored instant is skipped. Returns rows inserted. */
+  insertOuraCloudBatteryReadings(userId: string, readings: { measuredAt: Date; percent: number; charging: boolean | null }[]): Promise<number>
+  /** #3069: every ring-battery reading in a window, Bluetooth and Oura Cloud together, oldest first. */
+  getRingBatteryReadings(userId: string, from: Date, to: Date): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
   /** A platform aggregator's (Health Connect's) HR series into the shared HR table. Never displaces
    *  a device row at the same timestamp; device rows win at read time (#2168). `tz` dates the

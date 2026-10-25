@@ -1534,6 +1534,66 @@ export async function getLatestOuraCloudHeartrateAt(db: Db, userId: string, sinc
   return row?.timestamp ?? null
 }
 
+/** The `source` of a battery row read from Oura Cloud's `ring_battery_level` (#3069). A Bluetooth poll has none. */
+export const OURA_CLOUD_BATTERY_SOURCE = 'oura_cloud'
+
+/** The newest `oura_cloud` battery reading at or after `since`; where the next read starts. */
+export async function getLatestOuraCloudBatteryAt(db: Db, userId: string, since: Date): Promise<Date | null> {
+  const [row] = await db.select({ measuredAt: s.ouraBleBatteryPoll.measuredAt }).from(s.ouraBleBatteryPoll)
+    .where(and(
+      eq(s.ouraBleBatteryPoll.userId, userId),
+      gte(s.ouraBleBatteryPoll.measuredAt, since),
+      eq(s.ouraBleBatteryPoll.source, OURA_CLOUD_BATTERY_SOURCE),
+    ))
+    .orderBy(desc(s.ouraBleBatteryPoll.measuredAt))
+    .limit(1)
+  return row?.measuredAt ?? null
+}
+
+/**
+ * Stores Oura Cloud battery readings beside the Bluetooth polls. The table has no unique key on the
+ * reading, so a re-read is made idempotent here: a reading whose instant is already stored for this
+ * user as `oura_cloud` is skipped. Returns the rows inserted.
+ */
+export async function insertOuraCloudBatteryReadings(
+  db: Db, userId: string, readings: { measuredAt: Date; percent: number; charging: boolean | null }[],
+): Promise<number> {
+  if (readings.length === 0) return 0
+  const times = readings.map(r => r.measuredAt.getTime())
+  const have = await db.select({ measuredAt: s.ouraBleBatteryPoll.measuredAt }).from(s.ouraBleBatteryPoll)
+    .where(and(
+      eq(s.ouraBleBatteryPoll.userId, userId),
+      eq(s.ouraBleBatteryPoll.source, OURA_CLOUD_BATTERY_SOURCE),
+      gte(s.ouraBleBatteryPoll.measuredAt, new Date(Math.min(...times))),
+      lte(s.ouraBleBatteryPoll.measuredAt, new Date(Math.max(...times))),
+    ))
+  const stored = new Set(have.map(r => r.measuredAt.getTime()))
+  const seen = new Set<number>()
+  const fresh = readings.filter(r => {
+    const t = r.measuredAt.getTime()
+    if (stored.has(t) || seen.has(t)) return false
+    seen.add(t)
+    return true
+  })
+  for (let i = 0; i < fresh.length; i += 1000) {
+    await db.insert(s.ouraBleBatteryPoll).values(fresh.slice(i, i + 1000).map(r => ({
+      userId, measuredAt: r.measuredAt, percent: r.percent, charging: r.charging, source: OURA_CLOUD_BATTERY_SOURCE,
+    })))
+  }
+  return fresh.length
+}
+
+/** Every battery reading in a window, Bluetooth and Oura Cloud together, oldest first. */
+export async function getRingBatteryReadings(
+  db: Db, userId: string, from: Date, to: Date,
+): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>> {
+  const rows = await db.select({ measuredAt: s.ouraBleBatteryPoll.measuredAt, percent: s.ouraBleBatteryPoll.percent, charging: s.ouraBleBatteryPoll.charging })
+    .from(s.ouraBleBatteryPoll)
+    .where(and(eq(s.ouraBleBatteryPoll.userId, userId), gte(s.ouraBleBatteryPoll.measuredAt, from), lte(s.ouraBleBatteryPoll.measuredAt, to)))
+    .orderBy(asc(s.ouraBleBatteryPoll.measuredAt))
+  return rows.map(r => ({ tsMs: r.measuredAt.getTime(), percent: r.percent, charging: r.charging }))
+}
+
 /** Writes the rows; returns the timestamps actually inserted or changed (a row the `setWhere` arm
  *  leaves alone is not returned), so a caller can tell new heart rate from a re-read (#3078). */
 async function writeHeartrateRows(

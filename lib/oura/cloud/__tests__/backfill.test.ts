@@ -84,6 +84,36 @@ describe('backfillOuraCloud (#2859)', () => {
     vi.unstubAllGlobals()
   })
 
+  // #3069: the ring's battery is read per 7 days beside the heart rate, only when asked for.
+  it('reads ring_battery_level into the battery store only when ringBattery is set, and not on a dry run', async () => {
+    const rows = [{ timestamp: '2026-10-05T01:00:00+00:00', timestamp_unix: 1, level: 70, charging: false, in_charger: false }]
+    oura(path => (path === 'ring_battery_level' ? jsonResponse({ data: rows, next_token: null }) : null))
+    const stored: number[] = []
+    const { repo } = fakeRepo()
+    const withBattery: OuraBackfillDeps['repo'] = { ...repo, getLatestOuraCloudBatteryAt: async () => null, insertOuraCloudBatteryReadings: async (_u, r) => { stored.push(r.length); return r.length } }
+    const reads = () => fetchMock.mock.calls.filter(c => String(c[0]).includes('ring_battery_level')).length
+
+    await backfillOuraCloud({ repo: withBattery, config: CONFIG }, USER, { ...OPTS, dryRun: false })
+    expect(reads()).toBe(0)
+
+    const out = await backfillOuraCloud({ repo: withBattery, config: CONFIG }, USER, { ...OPTS, dryRun: false, ringBattery: true })
+    expect(reads()).toBe(2) // 12 days = two 7-day requests
+    expect(stored).toEqual([1, 1])
+    expect(out.ok && out.report.documents.ring_battery).toBe(2)
+
+    stored.length = 0
+    await backfillOuraCloud({ repo: withBattery, config: CONFIG }, USER, { ...OPTS, ringBattery: true, dryRun: true })
+    expect(stored).toEqual([])
+  })
+
+  it('skips ring_battery_level without a request when the grant does not cover it', async () => {
+    oura()
+    const { repo } = fakeRepo(true, 'extapi:personal extapi:heartrate')
+    const out = await backfillOuraCloud({ repo: { ...repo, getLatestOuraCloudBatteryAt: async () => null, insertOuraCloudBatteryReadings: async () => 0 }, config: CONFIG }, USER, { ...OPTS, dryRun: false, ringBattery: true })
+    expect(fetchMock.mock.calls.some(c => String(c[0]).includes('ring_battery_level'))).toBe(false)
+    expect(out.ok && out.report.notShared).toContain('ring_battery')
+  })
+
   it('reads every type over the range and writes once', async () => {
     oura()
     const { repo, calls } = fakeRepo()

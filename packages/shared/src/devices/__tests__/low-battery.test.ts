@@ -21,4 +21,11 @@ describe('decideLowBatteryAlert', () => {
   it('never alerts while charging, and re-arms', () => {
     expect(decideLowBatteryAlert(10, true, true)).toEqual({ notify: false, fired: false })
   })
+
+  it('takes the owner\'s own level, with the same 5-point band to re-arm', () => {
+    expect(decideLowBatteryAlert(19, false, false, 20)).toEqual({ notify: true, fired: true })
+    expect(decideLowBatteryAlert(20, false, false, 20)).toEqual({ notify: false, fired: false })
+    expect(decideLowBatteryAlert(24, false, true, 20)).toEqual({ notify: false, fired: true })
+    expect(decideLowBatteryAlert(25, false, true, 20)).toEqual({ notify: false, fired: false })
+  })
 })
