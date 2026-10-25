@@ -224,6 +224,33 @@ test('each ladder row lists its stock by tier, the provisional Rogue, the roster
   );
 });
 
+test('the chain carries each tier’s numeral and the merge cost on the link into it, read from the ladder', () => {
+  for (const row of ladderModels(serverCollections())) {
+    const ladder = V2_LADDERS[row.faucet];
+    assert.deepEqual(
+      row.tiers.map((t) => t.cost),
+      ladder.tiers.map((t) => t.mergeCost),
+    );
+    assert.deepEqual(
+      row.tiers.map((t) => t.numeral),
+      ['I', 'II', 'III', 'IV', 'V', 'VI'],
+    );
+  }
+  assert.deepEqual(
+    ladderModel('workout', serverCollections()).tiers.map((t) => t.cost),
+    [0, 5, 4, 5, 3, 3],
+  );
+});
+
+test('the roster names the day each cat arrived and never the cats it was merged from', () => {
+  const row = ladderModel('workout', serverCollections());
+  const merged = (serverCollections().workout.cats ?? []).filter((cat) => cat.from.length > 0);
+  assert.ok(merged.length > 0, 'the fixture merges, so there is a lineage to leave out');
+  assert.ok(row.roster.every((cat) => /^\d{1,2} [A-Z][a-z]{2}$/.test(cat.detail)));
+  assert.ok(row.roster.every((cat) => !cat.detail.includes('from')));
+  assert.equal(row.total, row.roster.length + row.more);
+});
+
 test('a long roster lists twenty and counts the rest; held and decay read singular and plural', () => {
   const cats = Array.from({ length: 27 }, (_, i) => ({
     id: `c${i}`,
@@ -242,6 +269,7 @@ test('a long roster lists twenty and counts the rest; held and decay read singul
   const row = ladderModel('workout', collections);
   assert.equal(row.roster.length, 20);
   assert.equal(row.more, 7);
+  assert.equal(row.total, 27);
   assert.equal(row.held, '27 held');
   assert.equal(row.decay, 'One has wandered off during long gaps.');
   const one = ladderModel('workout', {
