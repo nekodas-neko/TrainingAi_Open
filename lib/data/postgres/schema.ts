@@ -52,6 +52,8 @@ export const users = pgTable('users', {
   targetBfPct:      doublePrecision('target_bf_pct'),
   friendCode:       text('friend_code').unique(),
   equippedTitle:    text('equipped_title'),
+  /** Achievement ids the user pinned to their trophy case, in pin order; null = none pinned (friends then see the top three by XP). */
+  trophyPins:       text('trophy_pins').array(),
   activityLevel:    text('activity_level'),
   fitnessGoal:      text('fitness_goal'),
   lastGoalReviewAt: timestamp('last_goal_review_at', { withTimezone: true }),
