@@ -309,6 +309,37 @@ export const hrSpec = (date: string) => ({
     })
     .passthrough(),
 });
+export type BlockTrendData = {
+  status: 'ok' | 'not_enough_history';
+  band: 'detraining' | 'steady' | 'building' | null;
+  ratio: number | null;
+  spanDays: number;
+  points: { date: string; ratio: number }[];
+};
+const blockTrendSchema = z.object({
+  status: z.enum(['ok', 'not_enough_history']),
+  band: z.enum(['detraining', 'steady', 'building']).nullish(),
+  ratio: n,
+  spanDays: z.number().finite().catch(0),
+  points: z
+    .array(z.unknown())
+    .catch([])
+    .transform((raw) =>
+      raw.flatMap((p) => {
+        const r = z.object({ date: z.string(), ratio: z.number().finite() }).safeParse(p);
+        return r.success ? [r.data] : [];
+      }),
+    ),
+});
+/** undefined: the payload has no block trend (old cache). null: present but unrecognised, so not shown. */
+export function parseBlockTrend(raw: unknown): BlockTrendData | null | undefined {
+  if (raw === undefined) return undefined;
+  const r = blockTrendSchema.safeParse(raw);
+  if (!r.success) return null;
+  const { status, band, ratio, spanDays, points } = r.data;
+  if (status === 'ok' && (band == null || ratio == null)) return null;
+  return { status, band: band ?? null, ratio, spanDays, points };
+}
 export const loadSpec = {
   path: '/api/training-load',
   ttl: 300_000,
@@ -320,6 +351,8 @@ export const loadSpec = {
     strain: n,
     interpretation: z.string(),
     baselineDaysRemaining: n,
+    // Optional: payloads cached before the field shipped lack it.
+    blockTrend: z.unknown().transform(parseBlockTrend),
   }),
 };
 export const muscleSetsSpec = {
@@ -661,6 +694,7 @@ export const overviewSpec = {
           .object({
             sessionId: z.string(),
             sessionName: z.string(),
+            icon: z.string().nullish(),
             lastTrainedDaysAgo: n,
             state: z
               .object({

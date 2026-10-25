@@ -10,7 +10,7 @@ import { getRepository } from '@/lib/data'
 import { calorieBudgetsByDay, budgetMetricsStart } from '@trainingai/shared/nutrition/day-budget'
 import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
-import { ouraBudgetActivities } from '@/lib/health/oura-budget-activities'
+import { budgetMovement } from '@/lib/health/oura-budget-activities'
 
 function computeLevel(xp: number): { level: number; levelLabel: string; currentLevelXp: number; nextLevelXp: number } {
   let level = 1
@@ -70,6 +70,9 @@ export async function pastDayCalorieBudgets(userId: string, tz: string, days: st
       repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(first, tz)),
       repo.listActivityLogs(userId, first, last),
     ])
+    // #3087: Oura's own workouts the app did not log count too.
+    // #3044: a Health Connect copy of an in-app workout is not paid twice.
+    const movement = await budgetMovement(repo, userId, first, last, tz, { activityLogs: activities, sessions: workouts })
     const avgBpmBySession = await repo
       .getAvgBpmBySession(userId, workouts.filter(w => w.completedAt != null).map(w => w.id))
       .catch(() => new Map<string, number>())
@@ -83,8 +86,7 @@ export async function pastDayCalorieBudgets(userId: string, tz: string, days: st
       targetWeightKg: goals?.targetWeightKg ?? null,
       ownTargetKcal: ownTargetFromGoals(goals),
       workouts, avgBpmBySession,
-      // #3087: Oura's own workouts the app did not log count too.
-      activities: [...activities, ...await ouraBudgetActivities(repo, userId, first, last, tz, { activityLogs: activities, sessions: workouts })],
+      activities: [...movement.logs, ...movement.oura],
     })
   } catch {
     return new Map()

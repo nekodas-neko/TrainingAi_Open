@@ -30,11 +30,12 @@ function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
     userId: USER,
     accessToken: encryptOuraToken('acc', USER, 'access_token'),
     refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-    expiresAt: new Date(Date.now() + 86_400_000), scope, ouraUserId: 'o', updatedAt: new Date(),
+    expiresAt: new Date(Date.now() + 86_400_000), scope, ouraUserId: 'o', updatedAt: new Date(), reauthRequiredAt: null,
   } : null
   const repo: OuraBackfillDeps['repo'] = {
     getOuraCloudTokens: async () => row,
     saveOuraCloudTokens: async () => {},
+    markOuraCloudReauthRequired: async () => { calls.push('marked'); return true },
     deleteOuraCloudTokens: async () => true,
     getUserIdByOuraUserId: async () => (connected ? USER : null),
     upsertOuraDaily: async (_u, rows) => { calls.push(`daily:${rows.length}`) },
@@ -178,14 +179,33 @@ describe('backfillOuraCloud (#2859)', () => {
   })
 
   it('still stops on a 401 for a type the grant covers when the token itself is refused', async () => {
-    oura(path => (path === 'sleep' || path === 'personal_info' ? new Response('', { status: 401 }) : null))
+    oura(path => {
+      if (path === '/oauth/token') return jsonResponse({ error: 'invalid_grant' }, 400)
+      return path === 'sleep' || path === 'personal_info' ? new Response('', { status: 401 }) : null
+    })
     const { repo, calls } = fakeRepo()
     const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
     expect(out.ok && out.report.stoppedEarly).toMatch(/connect again/)
+    // #3204: the refresh Oura refused is recorded, so the connection stops reading as connected.
+    expect(calls).toContain('marked')
     expect(out.ok && out.report.notShared).toEqual([])
     expect(out.ok && out.report.refusedDespiteGrant).toEqual([])
     expect(out.ok && out.report.documents.workout).toBeUndefined()
     expect(calls.some(c => c.startsWith('hr:'))).toBe(false)
+  })
+
+  // #3204: the old access token alone was dead. The run holds it, so it stops, and records nothing.
+  it('stops without recording anything when a refresh brings a token that works', async () => {
+    let refreshed = false
+    oura(path => {
+      if (path === '/oauth/token') { refreshed = true; return jsonResponse({ access_token: 'acc-2', refresh_token: 'ref-2', expires_in: 86400 }) }
+      if (path === 'personal_info') return refreshed ? jsonResponse({ id: 'o', age: 40 }) : new Response('', { status: 401 })
+      return path === 'sleep' ? new Response('', { status: 401 }) : null
+    })
+    const { repo, calls } = fakeRepo()
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
+    expect(out.ok && out.report.stoppedEarly).toMatch(/a fresh one is stored/)
+    expect(calls).not.toContain('marked')
   })
 
   // #2975 review: the spec names no scope for stress, so `daily` is a guess. If Oura gates it

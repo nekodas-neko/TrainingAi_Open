@@ -21,6 +21,7 @@ import { ResourceStatus } from '../workouts/components/ResourceStatus';
 import { useWorkoutResource } from '../workouts/data/WorkoutDataProvider';
 import { recordsSpec, strengthSpec, weeklySpec, librarySpec } from '../workouts/data/models';
 import { ExerciseHistory } from '../workouts/components/ExerciseHistory';
+import { gainColor } from '../health/progressPresentation';
 import { WeeklyTrainingCard } from './WeeklyTrainingCard';
 
 export function StrengthScreen({
@@ -111,16 +112,16 @@ export function StrengthScreen({
                       {displayOneRm(exercise.currentRm, exercise.exerciseType).text}
                     </AppText>
                     {exercise.gainPct !== null && (
-                      <Badge
-                        label={(exercise.gainPct > 0 ? '+' : '') + exercise.gainPct + '%'}
-                        tone={
-                          exercise.gainPct > 0
-                            ? 'activity'
-                            : exercise.gainPct < 0
-                              ? 'heart'
-                              : 'recovery'
-                        }
-                      />
+                      <AppText
+                        variant="caption"
+                        style={{
+                          fontWeight: '600',
+                          fontVariant: ['tabular-nums'],
+                          color: gainColor(exercise.gainPct, theme.status) ?? theme.colors.muted,
+                        }}
+                      >
+                        {(exercise.gainPct > 0 ? '+' : '') + exercise.gainPct + '%'}
+                      </AppText>
                     )}
                   </Stack>
                   {projection && (

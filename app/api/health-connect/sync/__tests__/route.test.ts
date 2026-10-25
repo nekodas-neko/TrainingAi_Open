@@ -5,12 +5,19 @@ const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
   rebuild: vi.fn(),
   report: vi.fn(),
+  upsert: vi.fn(),
+  tombstone: vi.fn(),
 }));
 vi.mock('@/auth', () => ({ auth: mocks.auth }));
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
     applyHealthConnectBatch: mocks.apply,
     rebuildHealthConnect: mocks.rebuild,
+    upsertHealthConnectActivityLog: mocks.upsert,
+    tombstoneHealthConnectActivityLogs: mocks.tombstone,
+    listActivityTypes: async () => ['walk', 'strength', 'other'].map((id) => ({ id })),
+    listActivityLogs: async () => [],
+    saveActivityLog: vi.fn(),
   }),
 }));
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }));
@@ -121,4 +128,70 @@ it('#2828 N3: one out-of-range record is refused with its reason and the good on
     { records: [good], deleted: ['gone'] },
     'Australia/Brisbane',
   );
+});
+
+it('#2843: an exercise session becomes an activity log keyed on its record id, and a deletion tombstones it', async () => {
+  // Local midday a few days back, so the session's day is never on a window edge.
+  const start = new Date(Date.now() - 3 * 86400000);
+  start.setUTCHours(2, 0, 0, 0); // 12:00 in Brisbane
+  const end = new Date(start.getTime() + 45 * 60000);
+  const session = {
+    id: 'hc-gym',
+    type: 'ExerciseSession',
+    exerciseType: 70,
+    title: 'Gym',
+    sourcePackage: 'com.sec.android.app.shealth',
+    recordingMethod: 2,
+    start: start.toISOString(),
+    end: end.toISOString(),
+    modifiedAt: end.toISOString(),
+  };
+  mocks.apply.mockResolvedValue({ accepted: 1, deleted: 1 });
+  const response = await POST(request({ records: [session], deleted: ['hc-old'] }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ accepted: 1, deleted: 1, rejected: [], workoutNotes: [] });
+  expect(mocks.upsert).toHaveBeenCalledWith(
+    userId,
+    'hc-gym',
+    expect.objectContaining({ activityType: 'strength', title: 'Gym', startTime: '12:00', endTime: '12:45', durationMin: 45 }),
+  );
+  expect(mocks.tombstone).toHaveBeenCalledWith(userId, { ids: ['hc-old'] });
+});
+
+it('a replacement session at the same minute is stored after the old one is tombstoned, so it can take the row over', async () => {
+  const start = new Date(Date.now() - 3 * 86400000);
+  start.setUTCHours(2, 0, 0, 0);
+  const end = new Date(start.getTime() + 30 * 60000);
+  const replacement = {
+    id: 'hc-new', type: 'ExerciseSession', exerciseType: 79, sourcePackage: 'com.test', recordingMethod: 2,
+    start: start.toISOString(), end: end.toISOString(), modifiedAt: end.toISOString(),
+  };
+  mocks.apply.mockResolvedValue({ accepted: 1, deleted: 1 });
+  const response = await POST(request({ records: [replacement], deleted: ['hc-old'] }));
+  expect(response.status).toBe(200);
+  expect(mocks.tombstone).toHaveBeenCalledWith(userId, { ids: ['hc-old'] });
+  expect(mocks.upsert).toHaveBeenCalledWith(userId, 'hc-new', expect.anything());
+  expect(mocks.tombstone.mock.invocationCallOrder[0]).toBeLessThan(mocks.upsert.mock.invocationCallOrder[0]);
+});
+
+it('#2843: a session refused as an activity is noted, not counted against the stored batch', async () => {
+  const start = new Date(Date.now() - 10 * 86400000);
+  start.setUTCHours(2, 0, 0, 0);
+  // Inside a record's seven-day limit, and far past any plausible workout.
+  const end = new Date(start.getTime() + 6 * 86400000);
+  mocks.apply.mockResolvedValue({ accepted: 1, deleted: 0 });
+  const response = await POST(
+    request({
+      records: [{
+        id: 'hc-long', type: 'ExerciseSession', exerciseType: 79, sourcePackage: 'com.test', recordingMethod: 2,
+        start: start.toISOString(), end: end.toISOString(), modifiedAt: start.toISOString(),
+      }],
+      deleted: [],
+    }),
+  );
+  const json = await response.json();
+  expect(json.rejected).toEqual([]);
+  expect(json.workoutNotes).toEqual([expect.stringMatching(/^exercise /)]);
+  expect(mocks.upsert).not.toHaveBeenCalled();
+  expect(mocks.tombstone).not.toHaveBeenCalled();
 });

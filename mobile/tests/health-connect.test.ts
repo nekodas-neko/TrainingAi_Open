@@ -276,6 +276,30 @@ test('native record conversion preserves Android source/method/units and rejects
     null,
   );
 });
+test('an exercise session keeps its id, type and title, and stays out of the day projection (#2843)', () => {
+  const metadata = {
+    id: 'walk-1',
+    dataOrigin: 'com.sec.android.app.shealth',
+    lastModifiedTime: record.modifiedAt,
+  };
+  const raw = {
+    metadata,
+    startTime: record.start,
+    endTime: record.end,
+    exerciseType: 79,
+    title: 'Lunch walk',
+  };
+  const parsed = normalizeHealthConnectRecord(raw, 'ExerciseSession');
+  assert.equal(parsed?.id, 'walk-1');
+  assert.equal(parsed?.exerciseType, 79);
+  assert.equal(parsed?.title, 'Lunch walk');
+  assert.equal(parsed?.value, undefined);
+  assert.equal(
+    normalizeHealthConnectRecord({ ...raw, exerciseType: undefined }, 'ExerciseSession'),
+    null,
+  );
+  assert.deepEqual(projectHealthConnect([parsed!], 'Australia/Brisbane').daily, []);
+});
 test('source overlap is not double counted and RMSSD never enters the SDNN lane', () => {
   const result = projectHealthConnect(
     [

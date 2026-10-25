@@ -2,6 +2,9 @@ import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
 import type { SleepRow } from '../../health/data/models.ts';
 import type { TimelineEvent } from './timeline.ts';
+import type { IconName } from '../../../shared/ui/Icon.tsx';
+
+const SAVED_LOCALLY = 'Saved on this phone';
 
 export function isSleepEvent(event: TimelineEvent) {
   return ['wakeup', 'sleep', 'bedtime'].includes(event.type);
@@ -48,22 +51,6 @@ export function timelineTimeLabel(event: TimelineEvent, timezone: string) {
   return event.endTime && event.type !== 'wakeup' ? `${start} – ${event.endTime}` : start;
 }
 
-export function timelineSummary(event: TimelineEvent) {
-  const values = timelineMetrics(event, true).map((metric) =>
-    metric.label === 'Readiness'
-      ? `Readiness ${metric.value}`
-      : metric.label === 'Sleep score'
-        ? `Sleep ${metric.value}`
-        : metric.label === 'Sets'
-          ? `${metric.value} sets`
-          : metric.label === 'Exercises'
-            ? `${metric.value} exercises`
-            : metric.value,
-  );
-  if (event.subtitle && event.subtitle !== 'Saved on this phone') values.push(event.subtitle);
-  return values.join(' · ');
-}
-
 export function timelineSleepNight(event: TimelineEvent, nights: readonly SleepRow[]) {
   if (!isSleepEvent(event)) return undefined;
   return (
@@ -87,4 +74,114 @@ export function timelineDestinationDate(
   return isSleepEvent(event)
     ? (event.sleepDate ?? timelineSleepNight(event, nights)?.date ?? date)
     : date;
+}
+
+export type TimelineCardMetric = {
+  icon?: IconName;
+  /** Which colour the icon takes: the current app tints the readiness bolt and the sleep moon. */
+  iconTone?: 'success' | 'sleep';
+  text: string;
+  /** The score figures print in the foreground colour, the rest muted. */
+  emphasis?: boolean;
+};
+
+export type TimelineCardContent = {
+  title: string;
+  /** The wake-up card prints its time bold beside the title instead of on a line above. */
+  titleTime: boolean;
+  /** Meal, sleep and tag cards space their lines 6 px apart; the others 8 px (space-y-1.5 vs space-y-2). */
+  tight: boolean;
+  metrics: TimelineCardMetric[];
+};
+
+const plural = (count: number, one: string, many: string) =>
+  `${count.toLocaleString()} ${count === 1 ? one : many}`;
+
+/**
+ * What one timeline event's card says, per type, as components/home-day-timeline.tsx draws it:
+ * WakeupCard, WorkoutCard, WalkCard, MealCard, SleepCard, BedtimeCard and TagCard. Durations keep
+ * the shared "1h 03m" form (docs/module-map.md makes `formatHoursMinutes` the one duration
+ * format; the current app's workout and walk cards use it too).
+ */
+export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
+  const metrics: TimelineCardMetric[] = [];
+  const subtitle = event.subtitle && event.subtitle !== SAVED_LOCALLY ? event.subtitle : null;
+  let title = timelineTitle(event);
+  const duration = () => {
+    if (event.durationMin != null)
+      metrics.push({ icon: 'history', text: formatHoursMinutes(event.durationMin) });
+  };
+  switch (event.type) {
+    case 'wakeup':
+      if (event.sleepDurationH != null)
+        metrics.push({ icon: 'bedDouble', text: formatHoursMinutes(event.sleepDurationH * 60) });
+      if (event.readinessScore != null)
+        metrics.push({
+          icon: 'power',
+          iconTone: 'success',
+          text: String(event.readinessScore),
+          emphasis: true,
+        });
+      if (event.sleepScore != null)
+        metrics.push({
+          icon: 'moon',
+          iconTone: 'sleep',
+          text: String(event.sleepScore),
+          emphasis: true,
+        });
+      break;
+    case 'workout':
+      duration();
+      if (event.sets != null)
+        metrics.push({ icon: 'workout', text: plural(event.sets, 'set', 'sets') });
+      if (event.exerciseCount != null)
+        metrics.push({ text: plural(event.exerciseCount, 'exercise', 'exercises') });
+      break;
+    case 'meal': {
+      const parts = subtitle?.split(' · ') ?? [];
+      const calories =
+        parts.length === 2
+          ? parts[0]
+          : event.calories != null
+            ? `${Math.round(event.calories).toLocaleString()} kcal`
+            : null;
+      const window = parts.length === 2 ? parts[1] : parts[0];
+      if (calories) metrics.push({ icon: 'flame', text: calories });
+      if (window) metrics.push({ text: window });
+      break;
+    }
+    case 'sleep':
+      if (subtitle) metrics.push({ icon: 'history', text: subtitle });
+      break;
+    case 'bedtime':
+      break;
+    case 'tag':
+      if (subtitle) metrics.push({ text: subtitle });
+      break;
+    default: {
+      // walk, cardio and anything logged by hand: the current app's WalkCard.
+      title =
+        event.title === 'Run'
+          ? 'Outdoor running'
+          : event.title === 'Walk'
+            ? 'Outdoor walking'
+            : title;
+      // One decimal, and nothing for a zero: a sensor can report 0 km on a stationary workout.
+      const km = event.distanceKm == null ? 0 : Math.round(event.distanceKm * 10) / 10;
+      if (km > 0) title += ` / ${km} km`;
+      duration();
+      if (event.calories != null)
+        metrics.push({
+          icon: 'flame',
+          text: `${Math.round(event.calories).toLocaleString()} kcal`,
+        });
+      if (subtitle) metrics.push({ text: subtitle });
+    }
+  }
+  return {
+    title,
+    titleTime: event.type === 'wakeup',
+    tight: ['meal', 'sleep', 'tag'].includes(event.type),
+    metrics,
+  };
 }

@@ -28,7 +28,7 @@ import { localTimeline } from '../src/features/home/data/timeline.ts';
 import {
   timelineDestinationDate,
   timelineMetrics,
-  timelineSummary,
+  timelineCardContent,
   timelineTimeLabel,
   timelineTitle,
 } from '../src/features/home/data/timeline-presentation.ts';
@@ -38,6 +38,8 @@ import { loggingFixture } from './logging-fixture.ts';
 import { createWorkout } from '../src/features/workouts/logging/workout.ts';
 
 const day = '2026-10-12';
+const cardTexts = (event: Parameters<typeof timelineCardContent>[0]) =>
+  timelineCardContent(event).metrics.map((metric) => metric.text);
 
 test('timeline keeps zero measurements and leaves absent values unknown', () => {
   const event = timelineEventSchema.parse({
@@ -50,8 +52,8 @@ test('timeline keeps zero measurements and leaves absent values unknown', () => 
   });
   assert.equal(timelineTitle(event), 'Breakfast');
   assert.equal(event.title, '🍳 Breakfast');
-  assert.equal(timelineSummary(event), '0 kcal');
-  assert.equal(timelineSummary({ ...event, calories: undefined }), '');
+  assert.deepEqual(cardTexts(event), ['0 kcal']);
+  assert.deepEqual(cardTexts({ ...event, calories: undefined }), []);
   assert.equal(timelineTitle({ ...event, type: 'workout' }), '🍳 Breakfast');
 });
 
@@ -64,8 +66,8 @@ test('the timeline summary does not repeat the start time the row already shows'
     timeMs: 0,
     day: 'today',
   });
-  assert.equal(timelineSummary(event), '');
-  assert.equal(timelineSummary({ ...event, endTime: undefined }), '');
+  assert.deepEqual(cardTexts(event), []);
+  assert.deepEqual(cardTexts({ ...event, endTime: undefined }), []);
 });
 
 test('a timeline row prints its span above the title, and a wake-up its start only', () => {
@@ -104,9 +106,9 @@ test('sleep duration appears once on the timeline but remains available in bedti
     sleepDurationH: 7 + 1 / 6,
     subtitle: 'Apple Health',
   });
-  assert.equal(timelineSummary(event), 'Apple Health');
-  assert.equal(timelineSummary({ ...event, durationMin: 435 }), 'Apple Health');
-  assert.equal(timelineSummary({ ...event, type: 'wakeup' }), '7h 10m · Apple Health');
+  assert.deepEqual(cardTexts(event), ['Apple Health']);
+  assert.deepEqual(cardTexts({ ...event, durationMin: 435 }), ['Apple Health']);
+  assert.deepEqual(cardTexts({ ...event, type: 'wakeup' }), ['7h 10m']);
   assert.equal(
     timelineMetrics(event).find((row) => row.label === 'Time asleep')?.value,
     '7h 10m',
@@ -691,7 +693,7 @@ test('wake-up rows carry both scores and activities carry their time range', () 
     readinessScore: 82,
     sleepScore: 77,
   });
-  assert.equal(timelineSummary(wake), '7h 30m · Readiness 82 · Sleep 77');
+  assert.deepEqual(cardTexts(wake), ['7h 30m', '82', '77']);
   const walk = timelineEventSchema.parse({
     type: 'walk',
     title: 'Walk',
@@ -701,7 +703,7 @@ test('wake-up rows carry both scores and activities carry their time range', () 
     day: 'today',
     durationMin: 38,
   });
-  assert.equal(timelineSummary(walk), '38m');
+  assert.deepEqual(cardTexts(walk), ['38m']);
 });
 
 test('the avatar badge counts signups only, the More-tab dot signups plus feedback', () => {

@@ -1,3 +1,4 @@
+import { formatCount } from '../progressPresentation';
 import { rankedContributors } from '@trainingai/shared/health/contributor-ranking';
 
 // Week in review wording and figures, kept out of the screen so they can be tested (#2935).
@@ -57,4 +58,30 @@ export function weakestFactor(
   );
   const [worst] = rankedContributors(measured);
   return factors.find((f) => f.key === worst?.[0])?.label ?? null;
+}
+
+// The Training card's headline pair (week-detail-content.tsx): the big figure, and "kg over N
+// sessions" beside it on the same line.
+export function trainingHeadline(volumeKg: number, sessions: number) {
+  return {
+    value: formatCount(Math.round(volumeKg)),
+    caption: `kg over ${sessions} session${sessions === 1 ? '' : 's'}`,
+  };
+}
+
+// The training chart's y labels (week-volume-chart.tsx): thousands of kg, "4k" / "2k", with the
+// baseline a bare "0". Under 1,000 the number stays as it is, so 250 / 500 / 750 are not "0k" / "1k".
+export function volumeTickLabel(value: number) {
+  return value === 0 ? '0' : value < 1000 ? String(value) : `${Math.round(value / 1000)}k`;
+}
+
+// "Your week" as the current app flows it: the digest's lines (bullets included) run together as one
+// paragraph rather than one line each.
+export function flowDigest(digest: string) {
+  return digest
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*#{1,6}\s/.test(line))
+    .map((line) => line.replace(/^\s*[-*•]\s+/, '').trim())
+    .filter(Boolean)
+    .join(' ');
 }

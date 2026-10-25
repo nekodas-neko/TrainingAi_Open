@@ -83,6 +83,12 @@ export async function alertPermission(request = false) {
     permission.ios?.status === notifications.IosAuthorizationStatus.PROVISIONAL
   );
 }
+/** False once Android will no longer show the prompt, so a denial is not asked about again. */
+export async function alertPermissionAskable() {
+  if (!alertsAvailable()) return false;
+  const notifications = await sdk();
+  return (await notifications.getPermissionsAsync()).canAskAgain !== false;
+}
 export const nativeAlerts = {
   async list() {
     if (!alertsAvailable()) return [];

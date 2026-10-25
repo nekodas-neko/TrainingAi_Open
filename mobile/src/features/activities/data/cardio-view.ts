@@ -10,10 +10,19 @@ export type HeartHealthDay = NonNullable<
   z.infer<ReturnType<typeof runningPlanSpec>['schema']>['heartHealth']
 >['days'][number];
 
-/** The newest result of each fitness protocol, in the order the current app lists them. */
-export function latestBaselines(tests: readonly FitnessTest[]): FitnessTest[] {
+/**
+ * The newest result of each fitness protocol, in the order the current app lists them: by the date
+ * each protocol first appears. `tests` is the server's list (newest day first, same-day tests in the
+ * order they were written, as the current app's own store reads them) and `local` the tests saved on
+ * this phone and not yet in it; the stable date sort keeps same-day ties as they arrive.
+ */
+export function latestBaselines(
+  tests: readonly FitnessTest[],
+  local: readonly FitnessTest[] = [],
+): FitnessTest[] {
   const latest: Record<string, FitnessTest> = {};
-  for (const row of [...tests].sort((a, b) => a.date.localeCompare(b.date))) {
+  const oldestFirst = [...tests, ...local];
+  for (const row of oldestFirst.sort((a, b) => a.date.localeCompare(b.date))) {
     latest[row.testType] = row;
   }
   return Object.values(latest);

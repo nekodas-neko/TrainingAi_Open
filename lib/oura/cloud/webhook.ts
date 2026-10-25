@@ -23,7 +23,7 @@ import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DELETE_TYPES
 import { reportOuraCloudIssue } from './report'
 import { reattributeAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
-import { getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
+import { confirmOuraTokenRefused, getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraRefusalVerdict, type OuraTokenStore } from './tokens'
 
 /** The webhook settings, from the environment. `null` when any is missing: the route answers 503. */
 export interface OuraWebhookConfig {
@@ -179,8 +179,9 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
   const granted = await getOuraGrantedScopes(deps.repo, userId)
   if (!isOuraTypeShared(granted, event.data_type)) return { result: 'ignored', reason: `${event.data_type} is not shared` }
 
+  let token: string | null = null
   try {
-    const token = await getOuraAccessToken(deps.repo, deps.config, userId)
+    token = await getOuraAccessToken(deps.repo, deps.config, userId)
     if (!token) return { result: 'unknown_user' }
     const doc = await fetchOuraDocument(token, event.data_type, event.object_id)
     if (!doc) return { result: 'not_found' }
@@ -192,10 +193,21 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     }
     return { result: 'written', counts }
   } catch (err) {
-    if (err instanceof OuraReauthRequiredError || err instanceof OuraUnauthorizedError) return { result: 'reauth' }
+    if (err instanceof OuraReauthRequiredError) return { result: 'reauth' }
+    if (err instanceof OuraUnauthorizedError && token) return afterRefusal(await confirmOuraTokenRefused(deps.repo, deps.config, userId, token))
     if (err instanceof OuraForbiddenError) return { result: 'forbidden' }
     throw err
   }
+}
+
+/**
+ * #3204: a 401 on a type the grant covers, once `confirmOuraTokenRefused` has said what it meant. A
+ * fresh token stored now is worth Oura's retry, which reads the document with it.
+ */
+function afterRefusal(verdict: OuraRefusalVerdict): OuraWebhookOutcome {
+  if (verdict === 'type_refused') return { result: 'forbidden' }
+  if (verdict === 'refreshed') throw new OuraUnavailableError('Oura refused an access token that a refresh has replaced; retry')
+  return { result: 'reauth' }
 }
 
 /** True for a failure worth Oura's retry (Oura unreachable, slow or rate limiting us); the route answers 503. */
@@ -255,7 +267,18 @@ export async function catchUpOuraCloudHeartRate(
   // An overlap behind the newest point, never past the floor: re-reading stored points is an
   // idempotent upsert, and a start at (or after) the newest point drops a batch Oura stamped earlier.
   const from = newest ? new Date(Math.max(floor.getTime(), newest.getTime() - HEART_RATE_OVERLAP_MS)) : floor
-  const got = await fetchOuraHeartRate(token, from, new Date(now))
+  let got: Awaited<ReturnType<typeof fetchOuraHeartRate>>
+  try {
+    got = await fetchOuraHeartRate(token, from, new Date(now))
+  } catch (err) {
+    // #3204: a dead grant is recorded. The read stays refused either way; the next event reads again.
+    // A check that fails is reported on its own, and the refusal is still what this read ends in.
+    if (err instanceof OuraUnauthorizedError) {
+      await confirmOuraTokenRefused(deps.repo, deps.config, userId, token).catch((checkErr: unknown) =>
+        reportOuraCloudIssue('webhook-heartrate:refusal-check', checkErr instanceof Error ? checkErr.message : 'unknown', { userId }))
+    }
+    throw err
+  }
   const points = mapHeartRateRows(got.rows)
   const write = points.length === 0
     ? { offered: 0, changed: 0, changedFrom: null, changedTo: null }

@@ -97,9 +97,10 @@
 //     `ScaleBleService.kt`), and `health-connect-ingest` (Tasker). The APK does not update with a
 //     Railway deploy, so an old build can send a field a new schema does not name.
 //   * 1 third-party SDK wire format — `coach` (`DefaultChatTransport`).
-//   * 12 `generateObject` RESPONSE schemas — builder-chat 2, exercises/generate 1,
-//     generate-program 2, meal-plans/generate 2, meal-plans/generate/meal 2, nutrition/scan 2,
-//     nutrition-goals/recommend 1. These constrain the model's output, not a client's input.
+//   * 11 `generateObject` RESPONSE schemas — builder-chat 2, exercises/generate 1,
+//     generate-program 2, meal-plans/generate 2, meal-plans/generate/meal 2, nutrition/scan 2
+//     (nutrition-goals/recommend left with its model call, #3286). These constrain the model's
+//     output, not a client's input.
 //
 // So the remaining count is a floor, not a debt. **The ratchet stays** — it is the mechanism that
 // keeps a NEW non-strict request schema out, which is what Q-464 was actually for.
@@ -133,7 +134,6 @@ const BASELINE = {
   // Q-495 moved this schema out of the route so it could be unit-tested; the exemption moves with
   // it, for the same reason as before — the Tasker payload's exact shape is not in this repo.
   'packages/shared/src/validation/health-connect-ingest.ts': 1,
-  'app/api/nutrition-goals/recommend/route.ts': 1,
   'app/api/nutrition/meal-plans/generate/meal/route.ts': 2,
   'app/api/nutrition/meal-plans/generate/route.ts': 2,
   // BF-11b split the single-meal fields out into `CandidateSchema` so the route can return one

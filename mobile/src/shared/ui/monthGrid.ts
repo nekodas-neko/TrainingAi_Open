@@ -7,3 +7,14 @@ export function monthGrid(month: string) {
   const cells = Math.ceil((first + count) / 7) * 7;
   return { first, count, cells, rows: cells / 7 };
 }
+
+/**
+ * The title and the month controls share a row until text grows past this: at 384 px the controls
+ * (two 48 px arrows, the w-24 month and the status slot) leave the title about 78 px, which holds
+ * "TRAINING" and "CALENDAR" on two lines only up to about this scale.
+ */
+export const STACK_CALENDAR_TITLE_ABOVE = 1.1;
+
+export function stackCalendarTitle(scale: number): boolean {
+  return scale > STACK_CALENDAR_TITLE_ABOVE;
+}

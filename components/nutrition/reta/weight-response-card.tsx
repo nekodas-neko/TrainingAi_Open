@@ -5,7 +5,8 @@ import { getLocalStore } from "@/lib/local-store";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import type { WeightPoint } from "@trainingai/shared/health/long-term-goal-progress";
-import { weightResponse, formatRange, responseState, type ResponseVerdict } from "@trainingai/shared/nutrition/weight-response";
+import { weightResponse, formatRange, responseState, resolveBand, type ResponseVerdict } from "@trainingai/shared/nutrition/weight-response";
+import { PREFERENCE_STORAGE } from "@trainingai/shared/user/preferences";
 
 /**
  * Weight response over the current vial (OR-102b ④).
@@ -35,6 +36,16 @@ const TONE: Record<ResponseVerdict, { chip: string; label: string }> = {
 
 const UNDECIDED = 'bg-muted text-muted-foreground border-border'
 
+/** The owner's saved band, seeded into localStorage from the server; the default when absent or invalid. */
+function storedBand() {
+  try {
+    const raw = localStorage.getItem(PREFERENCE_STORAGE.weightBandPctPerWeek.key);
+    return resolveBand(raw ? JSON.parse(raw) : undefined);
+  } catch {
+    return resolveBand(undefined);
+  }
+}
+
 export function WeightResponseCard({ userId, sinceDate }: { userId?: string; sinceDate?: string | null }) {
   const [points, setPoints] = useState<WeightPoint[] | null>(null);
 
@@ -62,7 +73,7 @@ export function WeightResponseCard({ userId, sinceDate }: { userId?: string; sin
   if (!sinceDate) return null;
 
   const windowed = (points ?? []).filter(p => p.date >= sinceDate);
-  const result = weightResponse({ points: windowed });
+  const result = weightResponse({ points: windowed, bandPctPerWeek: storedBand() });
   const tone = result?.verdict ? TONE[result.verdict] : null;
   // LB-99. These were one label, and the two states are opposites: `undecided` means there ARE
   // enough weigh-ins and the interval straddles the band. Saying "not enough" there contradicts the
