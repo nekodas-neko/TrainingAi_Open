@@ -1,3 +1,3 @@
-import type { HomeWidgets } from './types';
+import type { GuardedHomeWidgets } from './guarded';
 
-export const homeWidgets: HomeWidgets | null = null;
+export const homeWidgets: GuardedHomeWidgets | null = null;
