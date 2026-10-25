@@ -15,6 +15,7 @@ import { withUserLock } from './user-lock'
 import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
+import { errorLog } from '@trainingai/shared/logger'
 import { buildBodyFatCalibration } from '@/lib/health/body-fat-calibration-build'
 import { mergePreferences, type UserPreferences } from '@trainingai/shared/user/preferences'
 import * as s from './schema'
@@ -2340,11 +2341,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const dates = Array.from(new Set(metrics.filter(m => m.weightKg != null || m.bodyFatPct != null).map(m => m.date)))
       const fromDay = source === 'oura_cloud' ? await oura.getLatestBodyCompDay(this.db, userId) : null
       if (dates.length === 0 && !fromDay) return
-      const calibration = await this.getBodyFatCalibration(userId).catch(() => null)
-      if (dates.length > 0) await oura.persistBodyCompFromMetrics(this.db, userId, calibration, { dates })
-      if (fromDay) await oura.persistBodyCompFromMetrics(this.db, userId, calibration, { fromDay })
+      // Read at most once, and only if a pass has a row to persist. A failed read skips the refresh
+      // (below) rather than persisting an uncorrected snapshot over a corrected one.
+      let calibration: Promise<BodyFatCalibration | null> | undefined
+      const loadCalibration = () => (calibration ??= this.getBodyFatCalibration(userId))
+      if (dates.length > 0) await oura.persistBodyCompFromMetrics(this.db, userId, loadCalibration, { dates })
+      if (fromDay) await oura.persistBodyCompFromMetrics(this.db, userId, loadCalibration, { fromDay })
     } catch (err) {
-      console.error('[body-comp] refresh failed', err)
+      errorLog(err, '[body-comp] refresh failed')
     }
   }
 
@@ -8443,6 +8447,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraTimeseriesDelta(userId: string, opts: { heartrate?: oura.TimeseriesCursor | null; bucket?: oura.TimeseriesCursor | null; budget?: number }) { return oura.getOuraTimeseriesDelta(userId, opts) }
   async getOuraDailyDerived(userId: string, from: string, to: string) { return oura.getOuraDailyDerived(this.db, userId, from, to) }
   async persistBodyCompFromMetrics(userId: string) {
-    return oura.persistBodyCompFromMetrics(this.db, userId, await this.getBodyFatCalibration(userId).catch(() => null))
+    return oura.persistBodyCompFromMetrics(this.db, userId, () => this.getBodyFatCalibration(userId))
   }
 }

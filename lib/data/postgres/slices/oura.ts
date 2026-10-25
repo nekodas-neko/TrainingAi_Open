@@ -3115,8 +3115,10 @@ export async function persistBodyCompFromMetrics(
   db: Db,
   userId: string,
   // Required, not defaulted: a default here would be a silent no-op — the backfill would run,
-  // report a write count, and quietly persist uncorrected snapshots. Both callers must decide.
-  bodyFatCalibration: BodyFatCalibration | null,
+  // report a write count, and quietly persist uncorrected snapshots. Every caller must decide.
+  // A loader, called once and only when there are rows to persist, so a run with nothing to write
+  // skips its queries. A throw propagates: a failed read must not persist uncorrected snapshots.
+  loadBodyFatCalibration: () => Promise<BodyFatCalibration | null>,
   // Omitted: every logged day (the ring rollup, the admin backfill). `dates` narrows to the days a
   // write just touched; `fromDay` to a day onward, which is how a run catches up on days missed.
   scope?: { dates?: string[]; fromDay?: string },
@@ -3130,9 +3132,12 @@ export async function persistBodyCompFromMetrics(
       sourceMap: s.bodyMetrics.sourceMap,
     })
     .from(s.bodyMetrics)
-    .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNotNull(s.bodyMetrics.bodyFatPct),
+    .where(and(eq(s.bodyMetrics.userId, userId), isNull(s.bodyMetrics.deletedAt),
+      isNotNull(s.bodyMetrics.weightKg), isNotNull(s.bodyMetrics.bodyFatPct),
       scope?.dates ? inArray(s.bodyMetrics.date, scope.dates) : undefined,
       scope?.fromDay ? gte(s.bodyMetrics.date, scope.fromDay) : undefined))
+  if (rows.length === 0) return 0
+  const bodyFatCalibration = await loadBodyFatCalibration()
   let written = 0
   for (const r of rows) {
     // BF-2: per row, not per user — the calibration belongs to one instrument, and this backfill
