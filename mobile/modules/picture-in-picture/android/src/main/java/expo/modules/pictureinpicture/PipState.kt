@@ -141,3 +141,50 @@ object PipPresenter {
   /** The arc colour JS sends; anything Android cannot parse falls back to the rest colour. */
   fun color(value: Any?): String? = (value as? String)?.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) }
 }
+
+/** A Chronometer as the window drives it. Each call may tick, and a tick renders the window. */
+interface PipClock {
+  fun start()
+  fun stop()
+  fun setBase(base: Long)
+}
+
+/**
+ * Keeps the window's clocks from re-entering it. A Chronometer dispatches its tick before it records
+ * that it is running, so a start() from inside a tick starts it again, ticks again and overflows the
+ * stack; and setBase() ticks too. So each clock is started once and its base set only when it
+ * moves, and a render reached from inside a render is skipped.
+ */
+class PipClockGate(private val slackMs: Long = 250L) {
+  private val started = HashSet<PipClock>()
+  private val bases = HashMap<PipClock, Long>()
+  private var rendering = false
+
+  fun render(draw: () -> Unit) {
+    if (rendering) return
+    rendering = true
+    try {
+      draw()
+    } finally {
+      rendering = false
+    }
+  }
+
+  /** Counts `clock` from `base`, or stops it with null. True when the base was set. */
+  fun count(clock: PipClock, base: Long?): Boolean {
+    if (base == null) {
+      started.remove(clock)
+      bases.remove(clock)
+      clock.stop()
+      return false
+    }
+    val current = bases[clock]
+    val moved = current == null || kotlin.math.abs(current - base) > slackMs
+    if (moved) {
+      bases[clock] = base
+      clock.setBase(base)
+    }
+    if (started.add(clock)) clock.start()
+    return moved
+  }
+}

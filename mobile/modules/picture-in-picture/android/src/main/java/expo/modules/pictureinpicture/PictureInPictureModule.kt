@@ -70,7 +70,7 @@ class PictureInPictureModule : Module() {
       // such as "done" after Next on the last exercise, and the window must not go blank.
       status = PipPresenter.fromMap(payload)
       setColor = PipPresenter.color(color)
-      main.post { windowView?.render() }
+      main.post { runCatching { windowView?.render() } }
       val activity = appContext.currentActivity ?: return@Function
       watch(activity)
       activity.runOnUiThread {
@@ -126,11 +126,10 @@ class PictureInPictureModule : Module() {
     if (active == inPip) return
     inPip = active
     sendEvent("onModeChange", mapOf("active" to active))
-    if (active) {
-      showWindow()
-    } else {
-      removeWindow()
-    }
+    // Called from the activity's own callbacks: a failure drawing the window must never take down
+    // the workout behind it, so it leaves the window without our view rather than crashing.
+    runCatching { if (active) showWindow() else removeWindow() }
+      .onFailure { runCatching { removeWindow() } }
   }
 
   private fun showWindow() {
