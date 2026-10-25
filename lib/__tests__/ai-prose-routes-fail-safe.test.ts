@@ -1,30 +1,24 @@
 /**
- * PS-39 — two AI prose routes, both believed tested and neither actually was (#956).
+ * PS-39 — `session-explain/insight`, once believed tested and not (#956), and since #3286 a route
+ * with no model: the "Why this session" text is built from the scorer's figures.
  *
- * They share the property worth pinning: **the model is never load-bearing, and its failure must not
- * leak.** Each has a live incident behind that:
- *
- *   · `session-explain/insight` once returned `errorLog`'s output as the response body — which is
- *     `[ERROR]: ${error}` — so a driver error published **the whole failing statement, every column
- *     of `workout_sessions`, to the client** (Q-483). Reached by a malformed id (22P02).
- *   · `running-plan/explain` used to be the second case here. **RV-200 deleted that route**: the
- *     card already renders the deterministic rationale, so the model was only rewording text the
- *     user could already see, and the fail-safe it needed disappeared with the call.
+ *   · It once returned `errorLog`'s output as the response body — which is `[ERROR]: ${error}` — so
+ *     a driver error published **the whole failing statement, every column of `workout_sessions`,
+ *     to the client** (Q-483). Reached by a malformed id (22P02).
+ *   · `running-plan/explain` was the second case; **RV-200 deleted that route**.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const getNextSession = vi.fn(async (_userId: string, _tz: string) => ({}) as Record<string, unknown>)
-const upsertAiHealthInsight = vi.fn(async () => undefined)
-const readFreshInsight = vi.fn(async (_repo: unknown, _u: string, _s: string, _d: string, _h: string) => null as string | null)
 const loggedStreamText = vi.fn((_meta: unknown, _opts: unknown) => ({ textStream: (async function* () { yield 'why' })() }))
-const generateText = vi.fn(async (_opts: unknown) => ({ text: '  a warm sentence  ' }))
+const generateText = vi.fn(async (_opts: unknown) => ({ text: 'must not be used' }))
 const reportServerError = vi.fn()
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
 vi.mock('@/lib/data', () => ({
-  getRepository: async () => ({ getNextSession, upsertAiHealthInsight }),
-  getRepositoryAsync: async () => ({ getNextSession, upsertAiHealthInsight }),
+  getRepository: async () => ({ getNextSession }),
+  getRepositoryAsync: async () => ({ getNextSession }),
 }))
 vi.mock('@/lib/ai/instrument', () => ({
   aiModel: () => ({}),
@@ -32,22 +26,6 @@ vi.mock('@/lib/ai/instrument', () => ({
   loggedGenerateText: async (_m: unknown, run: () => Promise<{ text: string }>) => run(),
 }))
 vi.mock('ai', () => ({ generateText: (o: unknown) => generateText(o) }))
-vi.mock('@/lib/ai/stream', () => ({
-  textStreamResponse: (stream: AsyncIterable<string>) =>
-    new Response(new ReadableStream({
-      async start(c) { for await (const s of stream) c.enqueue(new TextEncoder().encode(s)); c.close() },
-    }), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }),
-}))
-vi.mock('@/lib/ai/insight-cache', () => ({
-  // Content-derived, not length-derived. A length stub cannot tell a readiness of 80 from 42 —
-  // same number of characters — so the "a moved signal changes the key" case could never fail.
-  hashInsightContext: (p: string) => {
-    let h = 5381
-    for (let i = 0; i < p.length; i++) h = ((h * 33) ^ p.charCodeAt(i)) >>> 0
-    return `h:${h.toString(16)}`
-  },
-  readFreshInsight: (r: unknown, u: string, s: string, d: string, h: string) => readFreshInsight(r, u, s, d, h),
-}))
 vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 
 import { GET as sessionExplain } from '@/app/api/session-explain/insight/route'
@@ -68,11 +46,8 @@ const freshUser = () => { sessionUser = { id: `u-${++seq}`, timezone: 'Australia
 
 
 beforeEach(() => {
-  for (const m of [getNextSession, upsertAiHealthInsight, readFreshInsight, loggedStreamText, generateText, reportServerError]) m.mockClear()
+  for (const m of [getNextSession, loggedStreamText, generateText, reportServerError]) m.mockClear()
   getNextSession.mockResolvedValue(recommendation())
-  readFreshInsight.mockResolvedValue(null)
-  loggedStreamText.mockImplementation(() => ({ textStream: (async function* () { yield 'why' })() }))
-  generateText.mockResolvedValue({ text: '  a warm sentence  ' })
   freshUser()
 })
 
@@ -104,26 +79,32 @@ describe('GET /api/session-explain/insight', () => {
     expect(loggedStreamText).not.toHaveBeenCalled()
   })
 
-  it('serves a fresh cached narrative without calling the model', async () => {
-    readFreshInsight.mockResolvedValue('cached because the signals have not moved')
+  it('writes the explanation from the scorer\'s figures, as plain text, with no model call', async () => {
     const res = await sessionExplain()
-    expect(await res.text()).toBe('cached because the signals have not moved')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toBe('text/plain; charset=utf-8')
+    const text = await res.text()
+    expect(text).toContain('Upper was chosen for today')
+    expect(text).toContain('muscle recovery at 70%')
+    expect(text).toContain('Your readiness is 80')
     expect(loggedStreamText).not.toHaveBeenCalled()
+    expect(generateText).not.toHaveBeenCalled()
   })
 
   it('recomputes the recommendation rather than trusting a sessionId param (Q-293)', async () => {
-    // The fast path that read the cached narrative from `sessionId` alone could not know whether
-    // the signals it describes still hold — and signals moving during the day is this route's whole
-    // subject. `getNextSession` builds the context, so the cache hash depends on it.
-    await sessionExplain()
+    // Signals move during the day and this route explains why today's session was chosen, so the
+    // text follows `getNextSession` on every call. A moved signal must change the text.
+    const first = await (await sessionExplain()).text()
     expect(getNextSession).toHaveBeenCalledWith(expect.any(String), 'Australia/Brisbane')
-    const hash = readFreshInsight.mock.calls[0][4]
 
-    // A moved signal must produce a different hash, or a stale narrative would be served as fresh.
-    readFreshInsight.mockClear()
     getNextSession.mockResolvedValue({ ...recommendation(), signals: { ...recommendation().signals, ouraReadiness: 42 } })
-    await sessionExplain()
-    expect(readFreshInsight.mock.calls[0][4]).not.toBe(hash)
+    const second = await (await sessionExplain()).text()
+    expect(second).not.toBe(first)
+    expect(second).toContain('Your readiness is 42')
+  })
+
+  it('keeps its rate limit', async () => {
+    for (let i = 0; i < 120; i++) expect((await sessionExplain()).status).toBe(200)
+    expect((await sessionExplain()).status).toBe(429)
   })
 })
-

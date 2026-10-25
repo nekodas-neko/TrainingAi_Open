@@ -75,7 +75,7 @@
     "oura_raw_samples": {"class":"NATIVE DEVICE STORE + SERVER ARCHIVE","note":"native oura_raw.db (raw / clock_anchors) uploads to the server archive; 14-day device window not shipped"},
     "oura_redecode_jobs": {"class":"SERVER-ONLY","note":"server job queue; writer: oura.ts"},
     "oura_rollup_state": {"class":"SERVER-ONLY","note":"server rollup cursor; writer: oura.ts"},
-    "oura_sessions": {"class":"SERVER-ONLY","note":"Oura Cloud connector -> server (#2982); session series and mood, read by no screen"},
+    "oura_sessions": {"class":"SERVER-ONLY","note":"Oura Cloud connector -> server (#2982); session series and mood; the day timeline reads it (#3077)"},
     "oura_tags": {"class":"SERVER-ONLY","note":"sensor ingest -> server; writer: none found by static grep (raw SQL / script)"},
     "oura_tokens": {"class":"SERVER-ONLY","note":"integration secret (Oura Cloud: gone for good); writer: none found by static grep (raw SQL / script)"},
     "oura_workouts": {"class":"SERVER-ONLY","note":"sensor ingest -> server; writer: oura.ts"},

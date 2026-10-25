@@ -13,6 +13,10 @@ export type MobileClient = keyof typeof MOBILE_CALLBACKS;
 const SESSION_KEY = 'fitnessai.session.v1';
 const PENDING_KEY = 'fitnessai.pending.v1';
 const TRANSACTION_AGE = 10 * 60 * 1000;
+/** How long a browser sign-in may sit without a callback before a new tap replaces it. */
+export const STUCK_ATTEMPT_GRACE = 90 * 1000;
+/** How long to wait for the callback after the app returns to the foreground mid sign-in. */
+export const FOREGROUND_CALLBACK_WAIT = 2 * 1000;
 const RANDOM_RE = /^[A-Za-z0-9_-]{43}$/;
 type SavedSession = SessionToken & {
   origin: string;
@@ -41,6 +45,8 @@ export type AccountState = {
   hasSession: boolean;
   expiresAt: number | null;
   message: string | null;
+  /** A browser sign-in has waited past the grace period, so the sign-in button may replace it. */
+  attemptStale: boolean;
 };
 /**
  * "Retry account check" is for a saved session whose account could not be read: no profile yet, or
@@ -67,6 +73,11 @@ export type AuthPlatform = {
     state: string,
   ): Promise<{ identityToken: string; state: string | null; name?: string }>;
   dismiss(): void;
+  /**
+   * Removes what the phone keeps for an account outside the session, such as the home-screen
+   * widget snapshot (#3279). Called whenever no account is signed in any more.
+   */
+  clearAccountData?(): void;
 };
 
 export function parseAuthCallback(
@@ -114,6 +125,8 @@ export class AccountSession {
   private pending: Pending | null = null;
   private generation = 0;
   private browserTimeout: ReturnType<typeof setTimeout> | null = null;
+  private staleTimeout: ReturnType<typeof setTimeout> | null = null;
+  private returnTimeout: ReturnType<typeof setTimeout> | null = null;
   private writes: Promise<unknown> = Promise.resolve();
   private listeners = new Set<(state: AccountState) => void>();
   private current: AccountState = {
@@ -122,6 +135,7 @@ export class AccountSession {
     hasSession: false,
     expiresAt: null,
     message: null,
+    attemptStale: false,
   };
   private api: ReturnType<typeof createApiClient>;
   private platform: AuthPlatform;
@@ -269,8 +283,20 @@ export class AccountSession {
       profile,
       hasSession: this.session !== null,
       expiresAt: this.session?.expiresAt ?? null,
+      attemptStale: status === 'signingIn' && this.stale,
     };
     this.listeners.forEach((listener) => listener(this.current));
+  }
+  private get stale() {
+    return this.pending !== null && Date.now() - this.pending.createdAt >= STUCK_ATTEMPT_GRACE;
+  }
+  private clearAttemptTimers() {
+    for (const key of ['browserTimeout', 'staleTimeout', 'returnTimeout'] as const) {
+      if (this[key]) {
+        clearTimeout(this[key]);
+        this[key] = null;
+      }
+    }
   }
   private write(operation: () => Promise<unknown>) {
     const result = this.writes.then(operation);
@@ -321,6 +347,7 @@ export class AccountSession {
       ) {
         this.session = raw as SavedSession;
       } else {
+        this.clearAccountData();
         await this.write(() => this.platform.remove(SESSION_KEY));
       }
       const pending: unknown = savedPending ? JSON.parse(savedPending) : null;
@@ -353,6 +380,7 @@ export class AccountSession {
       }
       this.session = null;
       this.pending = null;
+      this.clearAccountData();
       this.publish(
         'signedOut',
         failureNotice(
@@ -441,6 +469,12 @@ export class AccountSession {
   }
   async signIn() {
     this.record('browser_requested');
+    if (this.current.status === 'signingIn' && !this.session && this.stale) {
+      // The browser never reported back: drop the old attempt (its verifier and state die with it,
+      // so a late callback for it fails the state check) and fall through to a fresh one.
+      this.record('attempt_replaced');
+      await this.cancel(null);
+    }
     if (this.current.status !== 'signedOut' || this.session) {
       return;
     }
@@ -465,6 +499,11 @@ export class AccountSession {
       this.browserTimeout = setTimeout(() => {
         void this.cancel('Sign-in expired. Start again.');
       }, TRANSACTION_AGE);
+      this.staleTimeout = setTimeout(() => {
+        if (this.pending === pending && this.current.status === 'signingIn') {
+          this.publish('signingIn');
+        }
+      }, STUCK_ATTEMPT_GRACE);
       const url = new URL('/mobile-signin/begin', this.origin);
       url.search = new URLSearchParams({ client: this.client, challenge, state }).toString();
       const result = await this.platform.open(url.toString());
@@ -509,10 +548,7 @@ export class AccountSession {
       return;
     }
     this.pending = null;
-    if (this.browserTimeout) {
-      clearTimeout(this.browserTimeout);
-      this.browserTimeout = null;
-    }
+    this.clearAttemptTimers();
     const generation = ++this.generation;
     this.publish('checking');
     try {
@@ -610,13 +646,24 @@ export class AccountSession {
       }
     }
   }
-  async cancel(message = 'Sign-in cancelled.') {
+  /** The app came back to the foreground; an attempt still waiting after a short moment is dead. */
+  returnedToForeground() {
+    const pending = this.pending;
+    if (this.current.status !== 'signingIn' || !pending || this.returnTimeout) {
+      return;
+    }
+    this.returnTimeout = setTimeout(() => {
+      this.returnTimeout = null;
+      if (this.pending === pending && this.current.status === 'signingIn') {
+        this.record('attempt_cleared_on_return');
+        void this.cancel("Sign-in didn't finish. Try again.");
+      }
+    }, FOREGROUND_CALLBACK_WAIT);
+  }
+  async cancel(message: string | null = 'Sign-in cancelled.') {
     const generation = ++this.generation;
     this.pending = null;
-    if (this.browserTimeout) {
-      clearTimeout(this.browserTimeout);
-      this.browserTimeout = null;
-    }
+    this.clearAttemptTimers();
     try {
       this.platform.dismiss();
     } catch {}
@@ -637,19 +684,22 @@ export class AccountSession {
       }
     }
   }
+  private clearAccountData() {
+    try {
+      this.platform.clearAccountData?.();
+    } catch {}
+  }
   async signOut(message: string | null = null) {
     const previous = this.session;
     const generation = ++this.generation;
     this.session = null;
     this.pending = null;
-    if (this.browserTimeout) {
-      clearTimeout(this.browserTimeout);
-      this.browserTimeout = null;
-    }
+    this.clearAttemptTimers();
     this.publish('checking');
     try {
       this.platform.dismiss();
     } catch {}
+    this.clearAccountData();
     try {
       await this.write(async () => {
         await this.platform.remove(SESSION_KEY);

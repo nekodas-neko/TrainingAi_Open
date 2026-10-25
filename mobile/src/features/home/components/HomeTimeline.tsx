@@ -1,5 +1,6 @@
 import { useActivities } from '../../activities/data/ActivityProvider';
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
+import { View } from 'react-native';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
 import { dayTimeInstant } from '../../health/data/manual-night';
 import {
@@ -11,18 +12,19 @@ import {
   TimelineRow,
   type IconName,
 } from '../../../shared/ui';
-import type { Tone } from '../../../shared/theme/theme';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { scaleAlpha } from '../../../shared/theme/alpha';
+import { timelineHues } from '../../../shared/theme/tokens';
 import { localTimeline, timelineSchema, type TimelineEvent } from '../data/timeline';
 import {
   isSleepEvent,
   timelineDestinationDate,
+  timelineCardContent,
   timelineSleepNight,
-  timelineSummary,
   timelineTimeLabel,
   timelineTitle,
 } from '../data/timeline-presentation';
@@ -60,11 +62,7 @@ export function HomeTimeline({
   );
   for (const row of activity.rows) {
     const log = row.payload;
-    if (
-      !row.pending ||
-      !log.startTime ||
-      ![today, shiftDateStr(today, -1)].includes(log.date)
-    ) {
+    if (!row.pending || !log.startTime || ![today, shiftDateStr(today, -1)].includes(log.date)) {
       continue;
     }
     const timeMs = Date.parse(dayTimeInstant(log.date, log.startTime, health.timezone) ?? '');
@@ -91,9 +89,7 @@ export function HomeTimeline({
     });
   }
   for (const date of [today, shiftDateStr(today, -1)]) {
-    const operations = n.operations.filter(
-      (op) => op.domain === 'food_logs' && op.date === date,
-    );
+    const operations = n.operations.filter((op) => op.domain === 'food_logs' && op.date === date);
     if (!operations.length || !n.data.days[date]) {
       continue;
     }
@@ -120,8 +116,7 @@ export function HomeTimeline({
           (event) =>
             !(
               event.type === 'meal' &&
-              (event.date ?? (event.day === 'today' ? today : shiftDateStr(today, -1))) ===
-                date &&
+              (event.date ?? (event.day === 'today' ? today : shiftDateStr(today, -1))) === date &&
               event.title.endsWith(meal.name)
             ),
         );
@@ -170,66 +165,99 @@ export function HomeTimeline({
     else if (isSleepEvent(event)) openSleep(date);
     else openDay(date);
   }
-  function appearance(event: TimelineEvent): { icon: IconName; tone: Tone; color?: string } {
+  const hues = timelineHues[theme.mode];
+  function appearance(event: TimelineEvent): { icon: IconName; color: string } {
     if (isSleepEvent(event))
-      return {
-        icon: event.type === 'wakeup' ? 'sunrise' : 'moon',
-        tone: 'sleep',
-        color: theme.scores.sleep,
-      };
-    if (event.type === 'meal')
-      return { icon: 'nutrition', tone: 'checkin', color: theme.scores.activity };
-    if (event.type === 'workout') return { icon: 'workout', tone: 'brand' };
-    if (event.type === 'walk') return { icon: 'legs', tone: 'activity' };
-    if (event.type === 'cardio') return { icon: 'cardio', tone: 'recovery' };
-    return { icon: event.type === 'tag' ? 'info' : 'activity', tone: 'neutral' };
+      return { icon: event.type === 'wakeup' ? 'sunrise' : 'moon', color: hues.sleep };
+    if (event.type === 'meal') return { icon: 'nutrition', color: hues.meal };
+    if (event.type === 'workout') return { icon: 'workout', color: theme.colors.brand };
+    if (event.type === 'walk') return { icon: 'legs', color: hues.walk };
+    if (event.type === 'cardio') return { icon: 'cardio', color: theme.tones.recovery.foreground };
+    return { icon: event.type === 'tag' ? 'info' : 'activity', color: theme.colors.muted };
   }
+  const iconColors = { success: hues.ready, sleep: hues.sleep };
+  // The current app lists the events in one run, with a rule where yesterday's begin, and only when
+  // today has events above it (home-day-timeline.tsx firstYesterdayIdx).
+  const firstYesterday = events.findIndex((event) => event.day === 'yesterday');
   return (
     <Stack gap="md">
-      <Stack direction="row" align="center" justify="space-between">
-        <AppText variant="heading">Timeline</AppText>
-        <StatusIndicator
-          label="Timeline"
-          error={state.error}
-          onRetry={state.refresh}
-          busy={state.loading && !state.data}
-        />
+      <View>
+        <AppText
+          variant="groupTitle"
+          tone="muted"
+          accessibilityRole="header"
+          style={{ letterSpacing: 0.6 }}
+        >
+          Today's Timeline
+        </AppText>
+        {/* Drawn over the header's end, so the 48 px indicator never grows the 16 px title line. */}
+        <View
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '50%',
+            transform: [{ translateY: -theme.sizes.touchTarget / 2 }],
+          }}
+        >
+          <StatusIndicator
+            label="Timeline"
+            error={state.error}
+            onRetry={state.refresh}
+            busy={state.loading && !state.data}
+          />
+        </View>
+      </View>
+      <Stack gap="none">
+        {events.map((event, index) => {
+          const card = timelineCardContent(event);
+          return (
+            <Fragment key={event.type + ':' + event.timeMs + ':' + index}>
+              {index === firstYesterday && firstYesterday > 0 && (
+                <Stack
+                  direction="row"
+                  align="center"
+                  gap="md"
+                  style={{ marginTop: theme.spacing.sm, marginBottom: theme.spacing.md }}
+                >
+                  <AppText variant="groupTitle" style={{ fontWeight: '700', letterSpacing: 0.6 }}>
+                    Yesterday
+                  </AppText>
+                  <View
+                    style={{
+                      flex: 1,
+                      height: 1,
+                      backgroundColor: scaleAlpha(theme.colors.border, 0.6),
+                    }}
+                  />
+                </Stack>
+              )}
+              <TimelineRow
+                time={timelineTimeLabel(event, health.timezone)}
+                timeInline={card.titleTime}
+                title={card.title}
+                metrics={card.metrics.map((metric) => ({
+                  icon: metric.icon,
+                  iconColor: metric.iconTone ? iconColors[metric.iconTone] : undefined,
+                  text: metric.text,
+                  emphasis: metric.emphasis,
+                }))}
+                savedLocally={event.subtitle === 'Saved on this phone'}
+                {...appearance(event)}
+                last={index === events.length - 1}
+                tight={card.tight}
+                onPress={() => {
+                  pendingNavigation.current = null;
+                  setClosing(false);
+                  setSelected({
+                    ...event,
+                    date: event.date ?? (event.day === 'today' ? today : shiftDateStr(today, -1)),
+                  });
+                }}
+              />
+            </Fragment>
+          );
+        })}
       </Stack>
-      {(['today', 'yesterday'] as const).map((day) => {
-        const rows = events.filter((event) => event.day === day);
-        if (!rows.length) return null;
-        return (
-          <Stack key={day} gap="xs">
-            <AppText variant="eyebrow" tone="muted">
-              {day === 'today' ? 'Today' : 'Yesterday'}
-            </AppText>
-            <Stack gap="none">
-              {rows.map((event, index) => (
-                <TimelineRow
-                  key={event.type + ':' + event.timeMs + ':' + index}
-                  time={timelineTimeLabel(event, health.timezone)}
-                  timeInline={event.type === 'wakeup'}
-                  title={timelineTitle(event)}
-                  summary={timelineSummary(event)}
-                  savedLocally={event.subtitle === 'Saved on this phone'}
-                  {...appearance(event)}
-                  first={index === 0}
-                  last={index === rows.length - 1}
-                  onPress={() => {
-                    pendingNavigation.current = null;
-                    setClosing(false);
-                    setSelected({
-                      ...event,
-                      date:
-                        event.date ?? (event.day === 'today' ? today : shiftDateStr(today, -1)),
-                    });
-                  }}
-                />
-              ))}
-            </Stack>
-          </Stack>
-        );
-      })}
       <Sheet
         visible={selected !== null && !closing}
         title={selected ? timelineTitle(selected) : 'Event details'}

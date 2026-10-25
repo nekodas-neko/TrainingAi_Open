@@ -19,6 +19,9 @@ export const STEPS_DECODER_CONSTANTS_TTL = TTL_LONG;
 export const BODY_BATTERY_TTL = TTL_SHORT;
 // running-plan next-run prescription — changes intra-day as runs are logged.
 export const RUNNING_PLAN_TTL = TTL_SHORT;
+// training-load (ACWR, monotony, 28:90 block trend): one key, fetched at the sync warm list, Health and
+// session-select. A workout write evicts it (invalidateWorkoutSummaries), so TTL only bounds a ring sync.
+export const TRAINING_LOAD_TTL = TTL_MEDIUM;
 // training-stress (OTS): a whole-day rolling metric shown on the done-screen + health card.
 export const TRAINING_STRESS_TTL = TTL_MEDIUM;
 // zone-minutes daily rollups — today is partial (re-derived server-side), past days are cached.

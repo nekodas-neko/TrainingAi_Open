@@ -1,4 +1,4 @@
-import { DEFAULT_TZ } from '@trainingai/shared/date-utils';
+import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getRepository } from '@/lib/data';
@@ -6,6 +6,9 @@ import { rateLimit } from '@/lib/rate-limit';
 import { readJsonLimited } from '@trainingai/shared/http/request-guards';
 import { splitHealthConnectBatch } from '@trainingai/shared/validation/health-connect-import';
 import { reportServerError } from '@/lib/observability';
+import { healthConnectSessionAsWorkout } from '@trainingai/shared/health/health-connect-workouts';
+import { ingestDayRejection } from '@trainingai/shared/validation/ingest-clock';
+import { storeHealthConnectWorkouts } from '@/lib/health/health-connect-workouts';
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -40,12 +43,35 @@ export async function POST(request: NextRequest) {
   const valid = batch
     ? { ...batch.batch, records: batch.batch.records.filter((row) => !deferred.includes(row.id)) }
     : null;
+  const timezone = session.user.timezone ?? DEFAULT_TZ;
   try {
     const repo = await getRepository();
-    const result = rebuild
-      ? await repo.rebuildHealthConnect(userId, session.user.timezone ?? DEFAULT_TZ)
-      : await repo.applyHealthConnectBatch(userId, valid!, session.user.timezone ?? DEFAULT_TZ);
-    return NextResponse.json(rebuild ? result : { ...result, deferred, rejected: batch!.rejected });
+    if (rebuild) return NextResponse.json(await repo.rebuildHealthConnect(userId, timezone));
+    const result = await repo.applyHealthConnectBatch(userId, valid!, timezone);
+    // #2843, #3044: exercise sessions become activity logs keyed on their record id, through the
+    // same path as the current app's (`/api/sync-health`), and a deletion tombstones the log. The
+    // records themselves are stored above whatever happens here, so a session refused as an activity
+    // is noted, not counted in `rejected` (which the phone settles against the batch).
+    //
+    // Deletions go first, the same order as `/api/sync-health`'s sweep (#3316): when Health Connect
+    // replaces a session with a new record at the same start minute, the old row is tombstoned before
+    // the new one is stored, so the new one takes it over instead of being refused as `taken`. A
+    // session listed as deleted in the same batch is not stored again.
+    const workoutNotes: string[] = [];
+    const today = todayInTz(timezone);
+    const deleted = new Set(valid!.deleted);
+    const workouts = valid!.records
+      .filter((row) => row.type === 'ExerciseSession' && !deleted.has(row.id))
+      .map((row) => healthConnectSessionAsWorkout(row, timezone))
+      .filter((s) => {
+        const reason = ingestDayRejection(s.date, today);
+        if (reason) workoutNotes.push(`exercise ${s.date} ${s.startTime}: ${reason}`);
+        return !reason;
+      });
+    if (deleted.size)
+      await repo.tombstoneHealthConnectActivityLogs(userId, { ids: [...deleted] });
+    await storeHealthConnectWorkouts(repo, userId, workouts, workoutNotes);
+    return NextResponse.json({ ...result, deferred, rejected: batch!.rejected, workoutNotes });
   } catch (error) {
     reportServerError(error, { userId, url: '/api/health-connect/sync' });
     return NextResponse.json({ error: 'Could not sync health records' }, { status: 500 });

@@ -27,7 +27,7 @@ import {
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { ouraBudgetActivities } from '@/lib/health/oura-budget-activities'
+import { budgetMovement } from '@/lib/health/oura-budget-activities'
 
 export interface EnergyBalanceResult {
   date: string
@@ -295,10 +295,9 @@ export async function computeEnergyBalance(
   // joins `workoutKcalBySession` on it without keying by session NAME — which is not identity here
   // and breaks outright for two same-named sessions in one day.
   // #3087: Oura's own workouts the app did not log count too, costed like a logged activity.
-  const budgetActivities = [
-    ...activityLogs,
-    ...await ouraBudgetActivities(repo, userId, windowStart, date, tz, { activityLogs, sessions: workouts }),
-  ]
+  // #3044: a Health Connect copy of an in-app workout is not paid twice.
+  const movement = await budgetMovement(repo, userId, windowStart, date, tz, { activityLogs, sessions: workouts })
+  const budgetActivities = [...movement.logs, ...movement.oura]
   const activeEnergyFor = (day: string) => activeEnergyForDay({
     day, dayStartUtc: localMidnightUtc(day, tz), profile: energyProfile,
     workouts, avgBpmBySession, activities: budgetActivities, steps: metricByDate.get(day)?.steps ?? null,

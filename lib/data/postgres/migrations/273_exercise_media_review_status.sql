@@ -18,7 +18,8 @@
 -- CHECK constraint is the enum; a text column with a constraint rather than a Postgres enum type,
 -- matching the rest of this schema (`gender`, `stepsGoalType`, `dayType` are all text + app-level
 -- validation) and avoiding the ALTER TYPE dance when a fourth verdict is wanted.
--- Reversible by `ALTER TABLE exercise_media DROP COLUMN review_status, DROP COLUMN reviewed_at`.
+-- Reversible by `DROP VIEW IF EXISTS claude_ro.exercise_media; ALTER TABLE exercise_media DROP COLUMN review_status, DROP COLUMN reviewed_at`
+-- (the view selects both columns, so the DROP COLUMN fails without the DROP VIEW; the boot rebuild recreates the view from claude-ro-views.sql).
 
 ALTER TABLE exercise_media
   ADD COLUMN IF NOT EXISTS review_status text NOT NULL DEFAULT 'unreviewed';

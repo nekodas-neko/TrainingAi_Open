@@ -37,7 +37,8 @@ SELECT
   t.elevation_profile,
   t.segments,
   t.external_source,
-  t.external_id
+  t.external_id,
+  t.deleted_reason
 FROM public.activity_logs t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1086,7 +1087,9 @@ SELECT
   t.acwr,
   t.training_load_grid_len,
   t.training_load_valid_min,
-  t.training_load_evaluated_at
+  t.training_load_evaluated_at,
+  t.still_rhr_bpm,
+  t.still_rhr_coverage_min
 FROM public.oura_daily_derived t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1225,7 +1228,8 @@ SELECT
   t.heart_rate,
   t.heart_rate_variability,
   t.motion_count,
-  t.updated_at
+  t.updated_at,
+  t.deleted_at
 FROM public.oura_sessions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1930,7 +1934,8 @@ SELECT
   t.workout_hrv_ms,
   t.readings_count,
   t.source,
-  t.computed_at
+  t.computed_at,
+  t.hr_dense
 FROM public.workout_hr_stats t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

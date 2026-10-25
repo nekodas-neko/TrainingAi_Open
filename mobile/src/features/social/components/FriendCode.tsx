@@ -16,6 +16,7 @@ export function FriendCode({ code }: { code: string | null | undefined }) {
     <Stack direction="row" align="center" justify="center" gap="xs">
       <AppText
         selectable
+        mono
         variant="caption"
         tone="muted"
         accessibilityLabel={`Your friend code: ${code ?? 'unavailable'}`}

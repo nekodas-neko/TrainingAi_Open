@@ -19,6 +19,7 @@ import { ContributorDetails } from './ContributorCard';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { hrProfileSpec, readinessSpec, metricValue } from '../data/models';
 import { weekdayAxis } from '../data/body-view';
+import { trendCardTitle } from '../data/heart-view';
 import { HealthMetricCard } from './HealthMetricCard';
 import { useReadableCueColor } from './RangeBar';
 import type { z } from 'zod';
@@ -41,12 +42,9 @@ export function HeartHeroValue({ bpm }: { bpm: number | null }) {
   const zoneColor = grade ? (theme.hrZoneColors[grade.id - 1] ?? zones?.[0].color) : undefined;
   return (
     <Stack align="center">
-      <Icon name="health" />
-      <AppText variant="title">
-        {metricValue(bpm)}{' '}
-        <AppText variant="label" tone="muted">
-          bpm
-        </AppText>
+      <Icon name="health" color={zoneColor} />
+      <AppText variant="title" style={zoneColor ? { color: zoneColor } : undefined}>
+        {metricValue(bpm)}
       </AppText>
       {grade && theme.mode === 'light' ? (
         // Light draws the zone as a pill: the zone colour alone on the hero's pink gradient read as
@@ -66,11 +64,52 @@ export function HeartHeroValue({ bpm }: { bpm: number | null }) {
           </AppText>
         </View>
       ) : (
-        <AppText variant="caption" style={grade ? { color: zoneColor } : undefined}>
-          {grade?.name ?? 'Current heart rate'}
-        </AppText>
+        !!grade && (
+          <AppText variant="eyebrow" style={{ color: zoneColor }}>
+            {grade.name}
+          </AppText>
+        )
       )}
+      {/* heart-rate/page.tsx: the unit and the word under the number, "bpm current". */}
+      <AppText variant="body" tone="muted">
+        bpm current
+      </AppText>
     </Stack>
+  );
+}
+/**
+ * One "Today so far" tile (heart-rate/page.tsx): a near-black outlined box, label over value with the
+ * unit set after it, all centred. It is not the toned MetricTile, whose fill reads as brown.
+ */
+export function TodayTile({ label, value, unit }: { label: string; value: number | null | undefined; unit: string }) {
+  const { theme } = useTheme();
+  const has = typeof value === 'number';
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${label}: ${has ? `${value} ${unit}` : 'no reading'}`}
+      style={{
+        alignItems: 'center',
+        padding: theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.radii.control,
+        backgroundColor: `${theme.colors.background}99`,
+      }}
+    >
+      <AppText variant="tileLabel" tone="muted">
+        {label}
+      </AppText>
+      <AppText variant="weekTileValue" style={{ marginTop: theme.spacing.xs, fontVariant: ['tabular-nums'] }}>
+        {metricValue(value)}
+        {has && (
+          <AppText variant="caption" tone="muted">
+            {' '}
+            {unit}
+          </AppText>
+        )}
+      </AppText>
+    </View>
   );
 }
 export function HeartFactors({
@@ -178,12 +217,18 @@ export function HeartTrendCard({
   color: string;
   emptyText: string;
 }) {
+  const { theme } = useTheme();
   const cueColor = useReadableCueColor();
   const shown = trimLeadingGaps(days, (day) => day.value);
   if (!shown) {
     return (
-      <HealthMetricCard title={title} caption="Last 14 days">
-        <AppText variant="caption" tone="muted">
+      <HealthMetricCard title={trendCardTitle(title)}>
+        {/* EmptyState: the reason, centred, with py-2 around it. */}
+        <AppText
+          variant="body"
+          tone="muted"
+          style={{ textAlign: 'center', paddingVertical: theme.spacing.sm }}
+        >
           {emptyText}
         </AppText>
       </HealthMetricCard>
@@ -193,8 +238,8 @@ export function HeartTrendCard({
   const change = weekOverWeekChange(days.map((day) => day.value));
   return (
     <HealthMetricCard
-      title={title}
-      caption={`Last 14 days${missing ? ` · ${missing}` : ''}`}
+      title={trendCardTitle(title)}
+      titleNote={missing || undefined}
       points={shown.map((day, index) => ({
         label: day.date,
         value: day.value,

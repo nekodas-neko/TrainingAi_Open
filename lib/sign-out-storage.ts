@@ -84,7 +84,7 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   // Server-backed preferences (Q-392): re-seeded from the next account's own bag on sign-in.
   ta_ss_widgets: 'Home widgets', ta_ss_cards: 'Home cards', ta_home_section_order: 'Home layout',
   ta_home_hidden_sections: 'Home layout', ta_pill_colors: 'Home colours', ta_card_colors: 'Home colours',
-  ta_score_ring_style: 'Home score ring', ta_weight_lookback: 'weight chart window',
+  ta_score_ring_style: 'Home score ring', ta_weight_lookback: 'weight chart window', ta_weight_band_pct: 'weight-response target band',
   ta_goals_progress_view: 'goals card view', ta_meal_label_style: 'meal label style',
   ta_rest_duration: 'default rest', ta_food_region: 'food database region',
   ta_pref_meal_reminders: 'reminder toggle', ta_pref_health_alerts: 'alert toggle',

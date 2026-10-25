@@ -33,6 +33,7 @@ const mobileConfig = ({ config }) => {
         'android.permission.health.READ_STEPS',
         'android.permission.health.READ_ACTIVE_CALORIES_BURNED',
         'android.permission.health.READ_WEIGHT',
+        'android.permission.health.READ_EXERCISE',
         'android.permission.health.READ_HEALTH_DATA_HISTORY',
       ],
       intentFilters: [

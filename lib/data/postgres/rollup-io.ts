@@ -103,9 +103,8 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
     refitDaytimeHrvModel: timezone => deps.refitDaytimeHrvModel(userId, timezone),
     persistBodyComp: async () => {
       // The rollup rewrites every day's snapshot, so it has to carry the same correction the live
-      // reads do — otherwise a rollup pass silently reverts them to uncorrected.
-      const calibration = await deps.getBodyFatCalibration(userId).catch(() => null)
-      await oura.persistBodyCompFromMetrics(db, userId, calibration)
+      // reads do — otherwise a rollup pass silently reverts them to uncorrected. A failed calibration read fails the step instead of persisting uncorrected.
+      await oura.persistBodyCompFromMetrics(db, userId, () => deps.getBodyFatCalibration(userId))
     },
   }
 }

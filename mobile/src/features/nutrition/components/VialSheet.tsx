@@ -14,6 +14,7 @@ import {
   ListRow,
   Sheet,
   Stack,
+  NumericStepper,
   StatusIndicator,
   TextField,
 } from '../../../shared/ui';
@@ -29,7 +30,18 @@ import { heartCardView } from '@trainingai/shared/nutrition/heart-response-view'
 import { type Supplement } from '../data/models';
 import { openedOnProblem } from '@trainingai/shared/nutrition/vial-date';
 import { concentrationWorking, doseWorking, planDose } from '@trainingai/shared/nutrition/vial-plan';
-import { formatRange, recoveryResponse, weightResponse } from '@trainingai/shared/nutrition/weight-response';
+import {
+  DEFAULT_BAND_PCT_PER_WEEK,
+  formatRange,
+  recoveryResponse,
+  resolveBand,
+  weightResponse,
+} from '@trainingai/shared/nutrition/weight-response';
+import {
+  WEIGHT_BAND_MAX_PCT,
+  WEIGHT_BAND_MIN_PCT,
+  WeightBandSchema,
+} from '@trainingai/shared/user/preferences';
 import { failureNotice } from '../../../core/reporting/index.ts';
 const vialSchema = z
   .object({
@@ -365,6 +377,36 @@ function VialResponses({
   const n = useNutrition();
   const health = useHealthData();
   const { theme } = useTheme();
+  const resources = useWorkoutResources();
+  const prefs = useWorkoutResource({
+    path: '/api/user/preferences',
+    ttl: 300000,
+    schema: z.object({ weightBandPctPerWeek: z.unknown().optional() }).passthrough(),
+  });
+  const band = resolveBand(prefs.data?.weightBandPctPerWeek);
+  const isDefault = band.lo === DEFAULT_BAND_PCT_PER_WEEK.lo && band.hi === DEFAULT_BAND_PCT_PER_WEEK.hi;
+  const [editBand, setEditBand] = useState<{ lo: string; hi: string } | null>(null);
+  const [bandError, setBandError] = useState<string | null>(null);
+  async function saveBand(next: { lo: number; hi: number } | null) {
+    if (!resources) {
+      return;
+    }
+    try {
+      await resources.write(
+        'PATCH',
+        '/api/user/preferences',
+        { weightBandPctPerWeek: next },
+        ['/api/user/preferences'],
+      );
+      setEditBand(null);
+      setBandError(null);
+      prefs.refresh();
+    } catch (failure) {
+      setBandError(failureNotice('Could not save the band.', failure));
+    }
+  }
+  const draftBand = editBand ? { lo: Number(editBand.lo), hi: Number(editBand.hi) } : null;
+  const draftValid = WeightBandSchema.safeParse(draftBand).success;
   const heart = useWorkoutResource({
     path: `/api/supplements/${supplement.id}/heart-response`,
     ttl: 300000,
@@ -374,6 +416,7 @@ function VialResponses({
     points: (health.body?.weightTrend ?? health.body?.recent ?? []).filter(
       (p) => since && p.date >= since,
     ),
+    bandPctPerWeek: band,
   });
   const views = useMemo(
     () =>
@@ -417,7 +460,56 @@ function VialResponses({
             crossing a boundary is not called either way.
           </AppText>
         )}
+        <ListRow
+          title="Target band"
+          subtitle={`${band.lo}–${band.hi} %/wk${isDefault ? ' (default)' : ''}`}
+          onPress={() => setEditBand({ lo: String(band.lo), hi: String(band.hi) })}
+        />
       </Card>
+      <Sheet visible={editBand !== null} title="Target band" onClose={() => setEditBand(null)}>
+        {editBand && (
+          <>
+            <AppText variant="caption" tone="muted">
+              Weight loss per week as a percent of your bodyweight, from {WEIGHT_BAND_MIN_PCT} to{' '}
+              {WEIGHT_BAND_MAX_PCT}. The lower end must be under the upper.
+            </AppText>
+            <Stack direction="row" gap="sm">
+              <NumericStepper
+                label="Lower (%/wk)"
+                value={editBand.lo}
+                step={0.1}
+                min={WEIGHT_BAND_MIN_PCT}
+                max={WEIGHT_BAND_MAX_PCT}
+                onChange={(lo) => setEditBand({ ...editBand, lo })}
+              />
+              <NumericStepper
+                label="Upper (%/wk)"
+                value={editBand.hi}
+                step={0.1}
+                min={WEIGHT_BAND_MIN_PCT}
+                max={WEIGHT_BAND_MAX_PCT}
+                onChange={(hi) => setEditBand({ ...editBand, hi })}
+              />
+            </Stack>
+            {!draftValid && (
+              <AppText variant="caption" tone="danger">
+                Use values from {WEIGHT_BAND_MIN_PCT} to {WEIGHT_BAND_MAX_PCT}, lower under upper.
+              </AppText>
+            )}
+            {bandError && (
+              <AppText variant="caption" tone="danger">
+                {bandError}
+              </AppText>
+            )}
+            <AppButton
+              title="Save"
+              disabled={!draftValid}
+              onPress={() => void saveBand(draftBand)}
+            />
+            <AppButton title="Reset to default" variant="ghost" onPress={() => void saveBand(null)} />
+          </>
+        )}
+      </Sheet>
       <Card>
         <Stack direction="row" justify="space-between">
           <AppText variant="subheading">Heart after a dose</AppText>

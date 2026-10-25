@@ -339,6 +339,30 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  // #3227: a grant Oura refused must not read as connected, or the screen hides "Connect".
+  it('reports a grant Oura refused as not connected, with reauthRequired', async () => {
+    const store = fakeStore({ ...storedRow('acc-1', 'ref-1', NOW + 86400_000), reauthRequiredAt: new Date(NOW - 1000) })
+    expect(await getOuraConnection(store, USER)).toEqual({ connected: false, scope: null, expiresAt: null, reauthRequired: true })
+  })
+
+  it('leaves an unmarked connection as it was, with no reauthRequired field', async () => {
+    const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
+    const connection = await getOuraConnection(store, USER)
+    expect(connection).toEqual({ connected: true, scope: 'daily', expiresAt: new Date(NOW + 86400_000).toISOString() })
+    expect('reauthRequired' in connection).toBe(false)
+  })
+
+  it('reads as connected again once a reconnect clears the mark', async () => {
+    const store = fakeStore({ ...storedRow('acc-1', 'ref-1', NOW + 86400_000), reauthRequiredAt: new Date(NOW - 1000) })
+    expect((await getOuraConnection(store, USER)).connected).toBe(false)
+    await store.saveOuraCloudTokens(USER, {
+      accessToken: encryptOuraToken('acc-2', USER, 'access_token'),
+      refreshToken: encryptOuraToken('ref-2', USER, 'refresh_token'),
+      expiresAt: new Date(NOW + 86400_000), scope: 'daily', ouraUserId: 'oura-u1',
+    })
+    expect(await getOuraConnection(store, USER)).toMatchObject({ connected: true, scope: 'daily' })
+  })
+
   it('disconnect revokes at Oura and deletes the row', async () => {
     const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 200 }))

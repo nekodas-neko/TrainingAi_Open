@@ -135,7 +135,9 @@ describe('every AI route answers a billing failure with the paused notice', () =
   const routes = walk(path.join(ROOT, 'app/api')).filter(p => /loggedGenerate(Object|Text)|loggedStreamText|withAiLogging/.test(readFileSync(p, 'utf8')))
 
   it('finds the AI routes', () => {
-    expect(routes.length).toBeGreaterThanOrEqual(10)
+    // 10 until #3286 took the model out of `daily-digest` and `session-explain/insight`. Lower it
+    // when a route genuinely goes; never raise it to paper over one that stopped matching.
+    expect(routes.length).toBeGreaterThanOrEqual(8)
   })
 
   it.each(routes.map(p => [path.relative(ROOT, p), p]))('%s', (_rel, p) => {

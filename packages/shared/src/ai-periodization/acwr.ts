@@ -1,5 +1,5 @@
 import { median } from '@trainingai/shared/stats'
-import { DEFAULT_TZ, midnightDaysAgoInTz } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, dateStrMidnightInTz, midnightDaysAgoInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 
 export interface AcwrSession { startedAt: Date; volumeKg: number }
 export interface AcwrOptions {
@@ -161,6 +161,11 @@ export function blockTrendBand(ratio: number): BlockTrendBand {
   return 'steady'
 }
 
+/** The 28:90 call of `loadRatio`, shared by the headline and the series so the pair is stated once. */
+function blockTrendLoadRatio(sessions: AcwrSession[], todayMid: Date, tz?: string): LoadRatioResult {
+  return loadRatio(sessions, LOAD_WINDOW_DAYS.chronic, LOAD_WINDOW_DAYS.block, todayMid, { tz })
+}
+
 export interface BlockTrendResult { ratio: number | null; band: BlockTrendBand | null }
 
 /**
@@ -169,8 +174,66 @@ export interface BlockTrendResult { ratio: number | null; band: BlockTrendBand |
  * gate or prescription reads it yet. Callers pass at least the 90-day window's sessions.
  */
 export function computeBlockTrend(sessions: AcwrSession[], todayMid: Date, opts: { tz?: string } = {}): BlockTrendResult {
-  const { ratio } = loadRatio(sessions, LOAD_WINDOW_DAYS.chronic, LOAD_WINDOW_DAYS.block, todayMid, { tz: opts.tz })
+  const { ratio } = blockTrendLoadRatio(sessions, todayMid, opts.tz)
   return { ratio, band: ratio == null ? null : blockTrendBand(ratio) }
+}
+
+/** One point of the block-trend line: the 28:90 ratio as of `date`, against today's 90-day baseline. */
+export interface BlockTrendPoint { date: string; ratio: number }
+
+export interface BlockTrendSeries {
+  /** `not_enough_history` when any `loadRatio` gate fails (data span, session count, trivial base). */
+  status: 'ok' | 'not_enough_history'
+  ratio: number | null
+  band: BlockTrendBand | null
+  /** The 90-day weekly-average load the ratio divides by, kg/week. Null when there is no ratio. */
+  baselineWeeklyKg: number | null
+  /** The real data span the ratio rests on, in whole days (`loadRatio`'s `spanDays`), so a card can say what it is based on. */
+  spanDays: number
+  /** Oldest first, one per week ending today; the last point is the headline ratio. Empty without a ratio.
+   *  A week whose 28-day window starts before the first day with data is left out, not counted as zero. */
+  points: BlockTrendPoint[]
+}
+
+/** Weekly steps back a full 28-day window still fits inside the 90-day fetch: 0 to 9. */
+const BLOCK_TREND_POINT_COUNT = 10
+
+/**
+ * The 28:90 block trend with a line to draw. The line is the rolling 28-day weekly average on each
+ * of the last ten week-ends, divided by TODAY's 90-day baseline. That is the one trend a 90-day fetch
+ * can state honestly: a true ratio-as-of-last-month would need the 90 days before last month too.
+ * The last point is exactly the headline ratio. Weekly, not daily: a 28-day window moves slowly, so
+ * seven days apart is already smooth, and ten points is what a 384 px card can draw legibly.
+ *
+ * `today` is the local date string; every window is built on it, never on `now − n×24h`.
+ */
+export function computeBlockTrendSeries(sessions: AcwrSession[], today: string, opts: { tz?: string } = {}): BlockTrendSeries {
+  const tz = opts.tz ?? DEFAULT_TZ
+  const todayMid = dateStrMidnightInTz(today, tz)
+  const r = blockTrendLoadRatio(sessions, todayMid, tz)
+  if (r.ratio == null) return { status: 'not_enough_history', ratio: null, band: null, baselineWeeklyKg: null, spanDays: r.spanDays, points: [] }
+
+  const loadByDay = new Map<string, number>()
+  let firstDay: string | null = null
+  for (const s of r.sessions) {
+    const d = toAestDay(s.startedAt, tz)
+    loadByDay.set(d, (loadByDay.get(d) ?? 0) + s.volumeKg)
+    if (firstDay == null || d < firstDay) firstDay = d
+  }
+  const windowLoad = (end: string): number => {
+    let sum = 0
+    for (let i = 0; i < LOAD_WINDOW_DAYS.chronic; i++) sum += loadByDay.get(shiftDateStr(end, -i)) ?? 0
+    return sum
+  }
+  const points: BlockTrendPoint[] = []
+  for (let k = BLOCK_TREND_POINT_COUNT - 1; k >= 0; k--) {
+    const date = shiftDateStr(today, -7 * k)
+    // A window that reaches back before the first logged day would count the missing days as rest.
+    if (firstDay != null && shiftDateStr(date, -(LOAD_WINDOW_DAYS.chronic - 1)) < firstDay) continue
+    const weeklyAvg = windowLoad(date) / (LOAD_WINDOW_DAYS.chronic / 7)
+    points.push({ date, ratio: weeklyAvg / r.longWeeklyAvgKg })
+  }
+  return { status: 'ok', ratio: r.ratio, band: blockTrendBand(r.ratio), baselineWeeklyKg: r.longWeeklyAvgKg, spanDays: r.spanDays, points }
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { dateStrMidnightInTz, shiftDateStr, toAestDateStr, toAestDay } from '@trainingai/shared/date-utils'
-import { measureHrr60, planHrr1Backfill, summariseHrr1Changes, type Hrr1Change } from '@trainingai/shared/workout/hrr1-backfill'
-import { HRR60_ANCHOR_TOL_MS, HRR60_BAR_WINDOW_DAYS, personalHrr60Bar } from '@trainingai/shared/workout/hrr60'
+import { HRR1_MAX_OFFSET_MS, measureHrr60, planHrr1Backfill, summariseHrr1Changes, type Hrr1Change } from '@trainingai/shared/workout/hrr1-backfill'
+import { HRR60_ANCHOR_TOL_MS, HRR60_BAR_WINDOW_DAYS, personalHrr60Bar, setRestAnchorMs } from '@trainingai/shared/workout/hrr60'
 
 /**
  * Re-measure every stored `set_hr_stats` row's `hrr1_bpm`, `rest_adequate` and drop curve from dense
@@ -11,8 +11,9 @@ import { HRR60_ANCHOR_TOL_MS, HRR60_BAR_WINDOW_DAYS, personalHrr60Bar } from '@t
  *
  * It overwrites stored values, null included: a verified snapshot first (docs/admin-actions.md).
  */
-/** How much series is fetched past the last set end in a session: the +60 s anchor and its tolerance. */
-const WINDOW_TAIL_MS = 60_000 + HRR60_ANCHOR_TOL_MS
+/** How much series is fetched past the last set end in a session: the largest drop offset and its
+ *  anchor tolerance, so the last set's 90 s and 120 s drops can be re-derived. */
+const WINDOW_TAIL_MS = HRR1_MAX_OFFSET_MS + HRR60_ANCHOR_TOL_MS
 const SAMPLE_LIMIT = 50
 
 export async function backfillSetHrr1(args: {
@@ -37,7 +38,7 @@ export async function backfillSetHrr1(args: {
   const hrr60ByTime: { atMs: number; bpm: number }[] = []
   let noSeries = 0
   for (const [sessionId, sessionRows] of bySession) {
-    const ends = sessionRows.map(r => r.loggedAt?.getTime()).filter((t): t is number => t != null)
+    const ends = sessionRows.map(r => setRestAnchorMs(r.setEndMs, r.loggedAt)).filter((t): t is number => t != null)
     const readings = ends.length
       ? await repo.getHrForWindow(
         userId,
@@ -50,7 +51,8 @@ export async function backfillSetHrr1(args: {
     if (ends.length) sessionStartMs.set(sessionId, Math.min(...ends))
     for (const r of sessionRows) {
       const bpm = measureHrr60(r, readings)
-      if (bpm != null && r.loggedAt) hrr60ByTime.push({ atMs: r.loggedAt.getTime(), bpm })
+      const anchorMs = setRestAnchorMs(r.setEndMs, r.loggedAt)
+      if (bpm != null && anchorMs != null) hrr60ByTime.push({ atMs: anchorMs, bpm })
     }
   }
   const barForSession = (sessionId: string): number => {
