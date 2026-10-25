@@ -155,6 +155,16 @@ describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#
     expect(await rows()).toMatchObject([{ external_id: 'new', title: 'Walk again', duration_min: 35, deleted: false }])
   })
 
+  it('a takeover keeps the notes the owner wrote on the replaced row', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'old', walk())
+    await pool.query(`UPDATE activity_logs SET notes = 'felt good' WHERE user_id = $1`, [USER])
+    await age()
+    await repo.tombstoneHealthConnectActivityLogs(USER, { from: day, to: day, keep: [] })
+    await repo.upsertHealthConnectActivityLog(USER, 'new', walk({ title: 'Walk again' }))
+    const { rows: [r] } = await pool.query(`SELECT notes, title FROM activity_logs WHERE user_id = $1`, [USER])
+    expect(r).toEqual({ notes: 'felt good', title: 'Walk again' })
+  })
+
   it('never takes over an in-app log the owner deleted', async () => {
     const id = randomUUID()
     await repo.saveActivityLog(USER, { ...walk(), id, title: 'In-app walk' }, { overwrite: true })
