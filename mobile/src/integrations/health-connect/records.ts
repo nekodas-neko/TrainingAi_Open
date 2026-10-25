@@ -30,7 +30,9 @@ export function normalizeHealthConnectRecord(raw: unknown, type?: HealthConnectT
           ? object(row.energy).inKilocalories
           : kind === 'HeartRateVariabilityRmssd'
             ? row.heartRateVariabilityMillis
-            : row.beatsPerMinute;
+            : kind === 'ExerciseSession'
+              ? undefined
+              : row.beatsPerMinute;
   const parsed = healthConnectRecord.safeParse({
     id: metadata.id,
     type: kind,
@@ -62,7 +64,14 @@ export function normalizeHealthConnectRecord(raw: unknown, type?: HealthConnectT
               };
             }),
           }
-        : { value }),
+        : kind === 'ExerciseSession'
+          ? {
+              exerciseType: row.exerciseType,
+              ...(typeof row.title === 'string' && row.title.trim()
+                ? { title: row.title.slice(0, 500) }
+                : {}),
+            }
+          : { value }),
   });
   return parsed.success ? parsed.data : null;
 }

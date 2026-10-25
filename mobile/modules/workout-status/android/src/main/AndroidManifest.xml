@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- A non-runtime permission: granted at install, and the user's own switch for it is Settings >
+       Notifications > Live Updates. Without it the notification is an ordinary ongoing one. -->
+  <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+  <application>
+    <receiver
+        android:name="expo.modules.workoutstatus.WorkoutStatusDismissReceiver"
+        android:exported="false" />
+    <receiver
+        android:name="expo.modules.workoutstatus.WorkoutStatusRestEndReceiver"
+        android:exported="false" />
+  </application>
+</manifest>

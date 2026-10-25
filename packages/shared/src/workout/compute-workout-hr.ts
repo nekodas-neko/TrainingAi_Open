@@ -63,5 +63,13 @@ export async function computeWorkoutHr(
     .map(r => ({ atMs: r.at.getTime(), rrMs: r.rrMs }))
   const workoutHrvMs = rmssdFromRr(restRr)
 
-  return { readings, stats, setHrRows, workoutHrvMs, summary: summariseWorkoutHr(readings, stats, workoutHrvMs) }
+  // The session's best HRR60 is the max of the set rows being stored with it (#2601), not of the
+  // recap stats, so the two columns can't disagree whatever inputs each side was built from.
+  const setHrr60s = setHrRows.map(r => r.hrr1Bpm).filter((h): h is number => h != null)
+  const summary = {
+    ...summariseWorkoutHr(readings, stats, workoutHrvMs),
+    hrr1Best: setHrr60s.length ? Math.max(...setHrr60s) : null,
+  }
+
+  return { readings, stats, setHrRows, workoutHrvMs, summary }
 }

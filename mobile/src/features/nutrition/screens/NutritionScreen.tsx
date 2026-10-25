@@ -225,6 +225,37 @@ export function NutritionScreen({
       landing
       title="Nutrition"
       titleVariant="nutritionTitle"
+      subtitle={
+        <Stack direction="row" align="center" gap="xxs">
+          <View {...swipe.panHandlers}>
+            <AppText variant="body" tone="muted">
+              {date === n.today
+                ? 'Today'
+                : date === shiftDateStr(n.today, -1)
+                  ? 'Yesterday'
+                  : formatDateDisplay(date, 'long')}
+            </AppText>
+          </View>
+          {/* The 48 dp hit areas overlap the title's gap so the band stays as tall as the text. */}
+          <Stack
+            direction="row"
+            gap="none"
+            style={{ marginVertical: -(theme.sizes.touchTarget - theme.spacing.xl) / 2 }}
+          >
+            <IconButton
+              icon="back"
+              label="Previous day"
+              onPress={() => setDate(shiftDateStr(date, -1))}
+            />
+            <IconButton
+              icon="forward"
+              label="Next day"
+              disabled={date >= n.today}
+              onPress={() => setDate(shiftDateStr(date, 1))}
+            />
+          </Stack>
+        </Stack>
+      }
       actions={
         <>
           <NutritionStatus date={date} />
@@ -236,31 +267,6 @@ export function NutritionScreen({
         </>
       }
     >
-      <Stack direction="row" align="center" style={{ paddingHorizontal: theme.spacing.lg }}>
-        <IconButton
-          icon="back"
-          label="Previous day"
-          onPress={() => setDate(shiftDateStr(date, -1))}
-        />
-        <View
-          style={{ flex: 1, minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}
-          {...swipe.panHandlers}
-        >
-          <AppText variant="heading" style={{ textAlign: 'center' }}>
-            {date === n.today
-              ? 'Today'
-              : date === shiftDateStr(n.today, -1)
-                ? 'Yesterday'
-                : formatDateDisplay(date, 'long')}
-          </AppText>
-        </View>
-        <IconButton
-          icon="forward"
-          label="Next day"
-          disabled={date >= n.today}
-          onPress={() => setDate(shiftDateStr(date, 1))}
-        />
-      </Stack>
       <View style={{ flex: 1, paddingHorizontal: theme.spacing.lg }}>
         <TabPanel
           key={date}

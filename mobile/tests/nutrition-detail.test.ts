@@ -11,6 +11,10 @@ import {
 import { deleteSupplement } from "../src/features/nutrition/data/supplement-delete.ts";
 import { stageValue } from "../src/features/health/data/stage-value.ts";
 import { recordedIntake } from "../src/features/nutrition/data/recorded-intake.ts";
+import {
+  budgetEnergyModel,
+  nutritionEnergyModel,
+} from "../src/features/nutrition/data/energy-model.ts";
 
 test("a food line skips a missing brand and groups thousands", () => {
   assert.equal(foodLine(null, 125, 80), "125 g · 80 kcal");
@@ -53,7 +57,6 @@ test("End of Day uses the counted intake, not just logged food", () => {
   const f = dayTotalFigures({
     loggedKcal: 1000,
     intake: counted.intake,
-    remaining: counted.remaining,
     budget: 2000,
   });
   assert.equal(counted.intake, 1600);
@@ -66,7 +69,6 @@ test("End of Day falls back to logged food and shows no denominator without a bu
   const f = dayTotalFigures({
     loggedKcal: 900,
     intake: null,
-    remaining: null,
     budget: null,
   });
   assert.deepEqual(f, {
@@ -79,7 +81,6 @@ test("End of Day falls back to logged food and shows no denominator without a bu
     dayTotalFigures({
       loggedKcal: 2500,
       intake: 2500,
-      remaining: -500,
       budget: 2000,
     }).remaining,
     0,
@@ -125,4 +126,62 @@ test("deleting a supplement clears its edit draft, and a failed delete keeps it"
     ),
   );
   assert.deepEqual(failed, []);
+});
+
+// #3282: every "kcal left" is worked out by the energy model. The current app's equivalents take
+// the energy balance's budget alone: with none, they show nothing (or "kcal" with no denominator),
+// never the typed calorie target.
+const totals = (calories: number) => ({ calories, proteinG: 0, carbsG: 0, fatG: 0 });
+
+test("budgetEnergyModel: left against the budget, recorded intake over the logged total", () => {
+  assert.equal(
+    budgetEnergyModel({ totals: totals(1000), recordedIntake: 1600, budgetKcal: 2000 }).remaining,
+    400,
+  );
+  assert.equal(
+    budgetEnergyModel({ totals: totals(1000), recordedIntake: null, budgetKcal: 2000 }).remaining,
+    1000,
+  );
+  assert.equal(
+    budgetEnergyModel({ totals: totals(0), recordedIntake: 2500, budgetKcal: 2000 }).remaining,
+    -500,
+  );
+});
+
+test("budgetEnergyModel: no budget means no figure, with or without intake", () => {
+  const none = budgetEnergyModel({ totals: totals(900), recordedIntake: 900, budgetKcal: null });
+  assert.equal(none.goal, null);
+  assert.equal(none.remaining, null);
+});
+
+test("budgetEnergyModel: recorded intake missing, the figure waits; the server's counts before the store loads", () => {
+  assert.equal(
+    budgetEnergyModel({ totals: null, recordedIntake: null, budgetKcal: 2000 }).remaining,
+    null,
+  );
+  assert.equal(
+    budgetEnergyModel({ totals: null, recordedIntake: 600, budgetKcal: 2000 }).remaining,
+    1400,
+  );
+});
+
+test("the card calls pin parity: no fallback to the calorie target, End of Day clamps at zero", () => {
+  // A card that fell back would show 1,100 left here.
+  const withTarget = nutritionEnergyModel({
+    totals: totals(900),
+    recordedIntake: 900,
+    budgetKcal: null,
+    targetCalories: 2000,
+    targets: {},
+    scaledTargets: null,
+  });
+  assert.equal(withTarget.remaining, 1100);
+  assert.equal(
+    budgetEnergyModel({ totals: totals(900), recordedIntake: 900, budgetKcal: null }).remaining,
+    null,
+  );
+  assert.equal(dayTotalFigures({ loggedKcal: 900, intake: 900, budget: null }).remaining, null);
+  assert.equal(dayTotalFigures({ loggedKcal: 2500, intake: 2500, budget: 2000 }).remaining, 0);
+  assert.equal(dayTotalFigures({ loggedKcal: 900, intake: null, budget: 2000 }).remaining, 1100);
+  assert.equal(dayTotalFigures({ loggedKcal: 900, intake: 900, budget: 0 }).budget, null);
 });

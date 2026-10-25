@@ -63,7 +63,12 @@ const series = (field: string) => posted.flatMap(b => (b[field] as unknown[] | u
 describe('Health Connect origin filter, current app (#3115)', () => {
   it('skips every type the Oura app wrote while Oura Cloud is connected, and counts each', async () => {
     const r = await syncWindow(session(recordsFrom(OURA_APP_PACKAGE)), TZ, START, END, { firstHand: { ouraCloud: true } })
-    expect(posted).toEqual([])
+    // No record is sent. The one post is #3044's sweep window, naming the skipped session so the
+    // server does not read it as deleted.
+    expect(posted).toEqual([{
+      dailyMetrics: [], exerciseSessions: [], sleepRecords: [],
+      exerciseWindow: expect.objectContaining({ leftOut: [expect.any(String)] }),
+    }])
     expect(r.skippedFirstHand).toEqual(Object.fromEntries(READ_TYPES.map(t => [t, 1])))
     expect(r).toMatchObject({ metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0 })
   })

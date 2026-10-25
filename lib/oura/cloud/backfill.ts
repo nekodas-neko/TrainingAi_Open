@@ -12,14 +12,14 @@
 //   - from the agent key's `oura-cloud-backfill` job, with a dry run first.
 import { dateStrMidnightInTz, daysBetweenDateStrs, DEFAULT_TZ, isCalendarDate, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { fetchOuraUserId, OuraUnavailableError } from './client'
+import { OuraUnavailableError } from './client'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
 import { fetchOuraDocuments, fetchOuraHeartRate, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType } from './documents'
 import { NO_WRITES, plannedCounts, reattributeAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import { reportOuraCloudIssue } from './report'
 import type { NightRescoreRepo } from '@/lib/health/rescore-nights'
-import { getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
+import { confirmOuraTokenRefused, getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraRefusalVerdict, type OuraTokenStore } from './tokens'
 
 /** How far back a new connection reads. Inside the 180-day heart-rate retention. */
 export const CONNECT_BACKFILL_DAYS = 90
@@ -138,24 +138,29 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
       }
     }
   }
-  const stop = (err: unknown): boolean => {
-    if (err instanceof OuraUnauthorizedError) { report.stoppedEarly = 'Oura refused the access token; the user has to connect again'; return true }
+  // A 401 on a type the grant covers is either a dead token or a wrong guess in `OURA_SCOPE_FOR`.
+  // `confirmOuraTokenRefused` tells them apart with a `personal_info` read, which needs no scope, and
+  // records a dead grant (#3204); its answer holds for the rest of the run.
+  let verdict: Promise<OuraRefusalVerdict> | null = null
+  const refusal = (): Promise<OuraRefusalVerdict> => {
+    verdict ??= confirmOuraTokenRefused(deps.repo, deps.config, userId, token)
+    return verdict
+  }
+  const stop = (err: unknown, why?: OuraRefusalVerdict): boolean => {
+    if (err instanceof OuraUnauthorizedError) {
+      // This run holds the refused token, so it stops either way; a fresh one serves the next run.
+      report.stoppedEarly = why === 'refreshed'
+        ? 'Oura refused the access token; a fresh one is stored for the next run'
+        : 'Oura refused the access token; the user has to connect again'
+      return true
+    }
     if (err instanceof OuraUnavailableError) { report.stoppedEarly = err.message; return true }
     return false
   }
-  // A 401 on a type the grant covers is either a dead token or a wrong guess in `OURA_SCOPE_FOR`. One
-  // `personal_info` read, which needs no scope, tells them apart; its answer holds for the rest of the run.
-  let tokenAlive: Promise<boolean> | null = null
-  const tokenWorks = (): Promise<boolean> => {
-    tokenAlive ??= fetchOuraUserId(token).then(() => true, (err: unknown) => {
-      if (err instanceof OuraUnavailableError && err.status === 401) return false
-      throw err
-    })
-    return tokenAlive
-  }
-  /** After a 401 on `type`: true to skip it and carry on, false to stop (`stop` then says why). */
-  const refusedTypeOnly = async (type: string): Promise<boolean> => {
-    if (!(await tokenWorks())) return false
+  /** After a 401 on `type`: true to skip it and carry on, else why to stop. */
+  const refusedTypeOnly = async (type: string): Promise<true | OuraRefusalVerdict> => {
+    const why = await refusal()
+    if (why !== 'type_refused') return why
     report.refusedDespiteGrant.push(type)
     return true
   }
@@ -183,12 +188,16 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
       } catch (err) {
         if (err instanceof OuraForbiddenError) { report.forbidden.push(type); continue read }
         if (err instanceof OuraUnauthorizedError) {
+          let why: true | OuraRefusalVerdict
           try {
-            if (await refusedTypeOnly(type)) continue read
+            why = await refusedTypeOnly(type)
           } catch (probeErr) {
             if (stop(probeErr)) break read
             throw probeErr
           }
+          if (why === true) continue read
+          stop(err, why)
+          break read
         }
         if (stop(err)) break read
         throw err
@@ -219,12 +228,15 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
       } catch (err) {
         if (err instanceof OuraForbiddenError) { report.forbidden.push('heartrate'); break }
         if (err instanceof OuraUnauthorizedError) {
+          let why: true | OuraRefusalVerdict
           try {
-            if (await refusedTypeOnly('heartrate')) break
+            why = await refusedTypeOnly('heartrate')
           } catch (probeErr) {
             if (stop(probeErr)) break
             throw probeErr
           }
+          if (why !== true) stop(err, why)
+          break
         }
         if (stop(err)) break
         throw err

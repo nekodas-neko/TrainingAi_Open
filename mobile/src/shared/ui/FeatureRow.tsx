@@ -15,7 +15,7 @@ export function FeatureRow({
   onPress?: () => void;
   leading?: ReactNode;
   divider?: boolean;
-  density?: 'normal' | 'compact';
+  density?: 'normal' | 'snug' | 'compact';
 }) {
   return (
     <ListRow

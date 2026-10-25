@@ -48,6 +48,8 @@ export function AiInsightCard({ sessionId }: { sessionId: string }) {
         if (!cancelled && finalClean && !finalError) {
           void setCached(cacheKey(sessionId), finalClean, TTL_LONG)
         }
+      } catch {
+        // Offline or aborted: keep whatever the cache seeded and fall through to the empty state.
       } finally {
         if (!cancelled) setLoading(false)
       }

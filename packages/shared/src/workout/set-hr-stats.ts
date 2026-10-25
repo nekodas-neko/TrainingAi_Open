@@ -11,7 +11,7 @@
 // IMPORTANT framing: the rest-adequacy signal is CARDIOVASCULAR recovery only. It says nothing about
 // CNS / neuromuscular readiness — every surface that shows it must label it as such.
 import { analyseHrRecovery, nearestBpm, type HrReading, type SetMarker } from './hr-analysis'
-import { deriveHrr60, deriveHrrAt, restAdequateFromHrr60 } from './hrr60'
+import { deriveHrr60, deriveHrrAt, restAdequateFromHrr60, setRestAnchorMs } from './hrr60'
 
 /** A logged set with the identity + prescription dimensions needed to snapshot and later trend it. */
 export interface RichSetMarker {
@@ -171,7 +171,7 @@ export function computeSetHrStats(
 
   return sets.map((set, i): SetHrRow => {
     const leg = legacy[i]
-    const endMs = set.setEndMs ?? set.loggedAt?.getTime() ?? null
+    const endMs = setRestAnchorMs(set.setEndMs, set.loggedAt)
     const startMs = set.setStartMs ?? null
 
     // Peak/avg over the TRUE working-set window when we have both bounds; else fall back to the

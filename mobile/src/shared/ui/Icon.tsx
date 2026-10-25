@@ -1,6 +1,12 @@
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import ExternalLink from 'lucide-react-native/icons/external-link';
 import Clock from 'lucide-react-native/icons/clock';
+import SignalLow from 'lucide-react-native/icons/signal-low';
+import BatteryFull from 'lucide-react-native/icons/battery-full';
+import BatteryLow from 'lucide-react-native/icons/battery-low';
+import BatteryWarning from 'lucide-react-native/icons/battery-warning';
+import BedDouble from 'lucide-react-native/icons/bed-double';
+import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
 import ChevronLeft from 'lucide-react-native/icons/chevron-left';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import ChevronDown from 'lucide-react-native/icons/chevron-down';
@@ -20,6 +26,7 @@ import Brain from 'lucide-react-native/icons/brain';
 import Flame from 'lucide-react-native/icons/flame';
 import Target from 'lucide-react-native/icons/target';
 import Award from 'lucide-react-native/icons/award';
+import Medal from 'lucide-react-native/icons/medal';
 import Bike from 'lucide-react-native/icons/bike';
 import Waves from 'lucide-react-native/icons/waves-horizontal';
 import Users from 'lucide-react-native/icons/users';
@@ -58,6 +65,8 @@ import MapPin from 'lucide-react-native/icons/map-pin';
 import CalendarDays from 'lucide-react-native/icons/calendar-days';
 import Weight from 'lucide-react-native/icons/weight';
 import Undo2 from 'lucide-react-native/icons/undo-2';
+import Mic from 'lucide-react-native/icons/mic';
+import MicOff from 'lucide-react-native/icons/mic-off';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import GripVertical from 'lucide-react-native/icons/grip-vertical';
 import Sunrise from 'lucide-react-native/icons/sunrise';
@@ -77,6 +86,11 @@ import Rocket from 'lucide-react-native/icons/rocket';
 import Star from 'lucide-react-native/icons/star';
 import Calendar from 'lucide-react-native/icons/calendar';
 import CalendarCheck from 'lucide-react-native/icons/calendar-check';
+import UserRound from 'lucide-react-native/icons/user-round';
+import Scan from 'lucide-react-native/icons/scan';
+import Bluetooth from 'lucide-react-native/icons/bluetooth';
+import CloudDownload from 'lucide-react-native/icons/cloud-download';
+import CalendarRange from 'lucide-react-native/icons/calendar-range';
 import Leaf from 'lucide-react-native/icons/leaf';
 import CircleCheck from 'lucide-react-native/icons/circle-check';
 import Bed from 'lucide-react-native/icons/bed';
@@ -113,6 +127,7 @@ const icons = {
   flame: Flame,
   target: Target,
   award: Award,
+  medal: Medal,
   bike: Bike,
   waves: Waves,
   users: Users,
@@ -151,6 +166,8 @@ const icons = {
   calendar: CalendarDays,
   weight: Weight,
   undo: Undo2,
+  mic: Mic,
+  micOff: MicOff,
   shield: ShieldCheck,
   sunrise: Sunrise,
   sun: Sun,
@@ -169,6 +186,11 @@ const icons = {
   star: Star,
   calendarPlain: Calendar,
   calendarCheck: CalendarCheck,
+  calendarRange: CalendarRange,
+  userRound: UserRound,
+  scan: Scan,
+  bluetooth: Bluetooth,
+  cloudDownload: CloudDownload,
   leaf: Leaf,
   circleCheck: CircleCheck,
   bed: Bed,
@@ -176,6 +198,12 @@ const icons = {
   lineChart: ChartLine,
   lock: Lock,
   cat: Cat,
+  bedDouble: BedDouble,
+  alert: TriangleAlert,
+  signalLow: SignalLow,
+  batteryFull: BatteryFull,
+  batteryLow: BatteryLow,
+  batteryWarning: BatteryWarning,
 };
 
 export type IconName = keyof typeof icons;

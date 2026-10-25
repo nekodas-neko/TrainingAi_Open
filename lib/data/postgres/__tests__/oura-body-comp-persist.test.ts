@@ -66,4 +66,31 @@ describe.skipIf(!canRun)('persistBodyCompFromMetrics — completed-form body_com
     const again = await repo.getOuraDailyDerived(TEST_USER_ID, '2026-07-01', '2026-07-31')
     expect(again.length).toBe(2)
   })
+  describe('without the ring rollup (#bug: stopped when the ring moved to the Oura API)', () => {
+    const snap = async (day: string) =>
+      (await repo.getOuraDailyDerived(TEST_USER_ID, day, day))[0]?.bodyComp as { weight_kg: number; body_fat_pct: number } | undefined
+
+    it('a weigh-in with body fat writes its snapshot with no BLE data present', async () => {
+      await repo.upsertBodyMetrics(TEST_USER_ID, [{ date: '2026-08-01', weightKg: 78, bodyFatPct: 18 }], 'manual')
+      expect(await snap('2026-08-01')).toMatchObject({ weight_kg: 78, body_fat_pct: 18, fat_mass_kg: 14 })
+    })
+
+    it('a day with no weigh-in leaves the last snapshot and writes none for itself', async () => {
+      await repo.upsertBodyMetrics(TEST_USER_ID, [{ date: '2026-08-02', restingHeartRate: 55 }], 'oura_cloud')
+      expect(await snap('2026-08-01')).toMatchObject({ weight_kg: 78 })
+      expect(await snap('2026-08-02')).toBeUndefined()
+    })
+
+    it('the Oura Cloud write catches up weigh-ins logged since the last snapshot', async () => {
+      // Rows stored without going through the write path, as when nothing ran after 17 Oct.
+      await pool.query(
+        `INSERT INTO body_metrics (user_id, date, weight_kg, body_fat_pct) VALUES ($1, '2026-08-03', 77.5, 18), ($1, '2026-08-04', 77, 17.5)`,
+        [TEST_USER_ID],
+      )
+      expect(await snap('2026-08-03')).toBeUndefined()
+      await repo.upsertBodyMetrics(TEST_USER_ID, [{ date: '2026-08-05', restingHeartRate: 54 }], 'oura_cloud')
+      expect(await snap('2026-08-03')).toMatchObject({ weight_kg: 77.5 })
+      expect(await snap('2026-08-04')).toMatchObject({ weight_kg: 77 })
+    })
+  })
 })

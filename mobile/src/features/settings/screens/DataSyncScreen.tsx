@@ -1,5 +1,6 @@
 import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
+import { SyncHealthCard } from '../components/SyncHealthCard';
 import {
   AppButton,
   AppText,
@@ -20,10 +21,8 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils';
 import { HISTORY_DOWNLOAD_DAYS } from '../data/history-domains';
+import { HISTORY_WINDOW_DAYS, dataSyncCopy, importCaption } from '../data/data-sync-copy';
 import { useHistoryDownload } from '../data/HistoryDownloadProvider';
-// The shortest "how far back" choice is the current app's 30-day import window
-// (`HISTORY_WINDOW_DAYS` in `lib/health-connect-history-import.ts`).
-const HISTORY_WINDOW_DAYS = 30;
 export function DataSyncScreen({ onBack }: { onBack: () => void }) {
   const actions = useNativeDataActions(),
     account = useAccountContext(),
@@ -67,10 +66,11 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
     >
       <TabPanel>
         <Stack style={{ paddingHorizontal: theme.spacing.lg }}>
+          <SyncHealthCard />
           <Card>
-            <AppText variant="subheading">Sync now</AppText>
+            <AppText variant="subheading">{dataSyncCopy.sync.title}</AppText>
             <AppText variant="caption" tone="muted">
-              Pull latest data from server
+              {dataSyncCopy.sync.caption}
             </AppText>
             <AppText>
               {actions.pending
@@ -85,10 +85,12 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
             />
           </Card>
           <Card>
-            <AppText variant="subheading">Restore from cloud</AppText>
+            <AppText variant="subheading">{dataSyncCopy.restore.title}</AppText>
             <AppText variant="caption" tone="muted">
-              Saves your history to this phone so it opens offline. Your unsent changes and
-              unfinished workouts are kept.
+              {dataSyncCopy.restore.caption}
+            </AppText>
+            <AppText variant="caption" tone="muted">
+              {dataSyncCopy.restore.detail}
             </AppText>
             <Picker
               label="How far back to restore"
@@ -176,7 +178,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="subheading">Import more history</AppText>
             <AppText variant="caption" tone="muted">
-              Pull older {deviceHealthName} data, {HISTORY_WINDOW_DAYS} days at a time
+              {importCaption(deviceHealthName)}
             </AppText>
             <Picker
               label="How far back to read"
@@ -212,9 +214,9 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
             />
           </Card>
           <Card>
-            <AppText variant="subheading">Export my data</AppText>
+            <AppText variant="subheading">{dataSyncCopy.exportData.title}</AppText>
             <AppText variant="caption" tone="muted">
-              Download everything as a single file
+              {dataSyncCopy.exportData.caption}
             </AppText>
             <AppButton
               title="Export my data"
