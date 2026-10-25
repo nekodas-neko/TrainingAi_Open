@@ -69,3 +69,29 @@ export function recordedIntake(input: {
         : (b?.zoneLabel ?? null),
   };
 }
+
+/** recordedIntake from what the nutrition store holds for `date` (useNutrition's view and queue). */
+export function recordedIntakeOf(
+  n: {
+    view: {
+      totals?: { calories: number } | null;
+      logs: readonly { mealTypeId: string }[];
+      mealTypes: readonly { id: string }[];
+      mealStatuses: Record<string, string>;
+    };
+    operations: readonly { date: string; domain: string }[];
+  },
+  date: string,
+  balance: IntakeBalance | null | undefined,
+) {
+  return recordedIntake({
+    calories: n.view.totals?.calories ?? null,
+    hasLogs: n.view.logs.length > 0,
+    loggedMealTypeIds: n.view.logs.map((x) => x.mealTypeId),
+    pending: n.operations.some((x) => x.date === date && x.domain === 'food_logs'),
+    allSkipped:
+      n.view.mealTypes.length > 0 &&
+      n.view.mealTypes.every((x) => n.view.mealStatuses[x.id] === 'skipped'),
+    balance,
+  });
+}

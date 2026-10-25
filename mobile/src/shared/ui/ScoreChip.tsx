@@ -5,10 +5,12 @@ import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 import { Stack } from './Stack';
 import { useTheme } from '../theme/ThemeProvider';
+import { isBandStyle, scoreChipLabel } from './scoreChipStyle';
 import type { Tone } from '../theme/theme';
 
 export function ScoreChip({
   label,
+  shortLabel,
   value,
   icon,
   tone,
@@ -20,6 +22,8 @@ export function ScoreChip({
   first = false,
 }: {
   label: string;
+  /** The band styles' small-capital name for the score ("Move" for Activity). */
+  shortLabel?: string;
   value: number | null;
   icon: IconName;
   tone: Tone;
@@ -48,13 +52,14 @@ export function ScoreChip({
   const tile = style === 'squircle' || style === 'frosted';
   const pill = style === 'pill';
   const rail = style === 'rail' || style === 'duorail';
-  const band = style === 'band' || style === 'underline';
+  const band = isBandStyle(style);
   const minimal = ['footnote', 'nolabel', 'accentrule', 'divider'].includes(style);
   const framed = ['default', 'openring', 'perforated', 'accentring'].includes(style);
+  const shown = scoreChipLabel(style, label, shortLabel);
   const labelView = (
     <Stack direction="row" align="center" gap="xxs">
-      <AppText variant="micro" tone="muted" numberOfLines={1}>
-        {label}
+      <AppText variant={shown.capitals ? 'figureLabel' : 'micro'} tone="muted" numberOfLines={1}>
+        {shown.text}
       </AppText>
       {qualified && <Icon name="info" size={theme.spacing.md} tone="muted" />}
     </Stack>

@@ -28,6 +28,49 @@ export const OURA_API_BASE = 'https://api.ouraring.com'
 export const OURA_SCOPES = ['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health'] as const
 export type OuraScope = (typeof OURA_SCOPES)[number]
 
+/**
+ * #3204: the scope that brings each Health Connect record type to the server from Oura Cloud, for the
+ * phones' rule that the Oura app's own Health Connect copy of a type is skipped only while Oura Cloud
+ * delivers that type (`ouraCloudDeliveredTypes`, `health-connect-origin.ts`). Keys are the record type
+ * names both phone readers pass to `FirstHandFilter`: the current app's (`HeartRateSeries`,
+ * `ActivitySession`, `OxygenSaturation`) and Preview's (`healthConnectTypes`). Each scope is the one
+ * `OURA_SCOPE_FOR` gives the collection the server reads the type from:
+ *   - sleep, resting heart rate and HRV come from `sleep` (`daily`; #3080 sets the day's resting HR
+ *     and HRV from the main sleep period);
+ *   - steps and active calories from `daily_activity` (`daily`);
+ *   - SpO2 from `daily_spo2` (`spo2`), heart rate from the series (`heartrate`), and exercise from
+ *     `workout` (`workout`).
+ * A type left out (weight, body fat, nutrition, cadence, total calories) is not something Oura Cloud
+ * sends us, so the Oura app's copy of it is always kept.
+ */
+export const OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE: Readonly<Record<string, OuraScope>> = {
+  SleepSession: 'daily',
+  RestingHeartRate: 'daily',
+  HeartRateVariabilityRmssd: 'daily',
+  Steps: 'daily',
+  ActiveCaloriesBurned: 'daily',
+  OxygenSaturation: 'spo2',
+  HeartRate: 'heartrate',
+  HeartRateSeries: 'heartrate',
+  ActivitySession: 'workout',
+}
+
+/**
+ * #3204: for each type in `OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE`, whether Oura Cloud is delivering it
+ * to the server now: the connection has tokens, Oura has not refused the grant (`reauthRequiredAt`),
+ * and the grant covers the type's scope. A grant with no scope string (`grantedOuraScopes` → null)
+ * covers everything, as it does for the reads themselves. `null` when there is no usable connection,
+ * so every type reads as not delivered.
+ */
+export function ouraCloudDeliveredTypes(
+  row: { accessToken: unknown; scope: string | null; reauthRequiredAt: Date | null } | null,
+): Record<string, boolean> | null {
+  if (!row || row.accessToken == null || row.reauthRequiredAt != null) return null
+  const granted = grantedOuraScopes(row.scope)
+  return Object.fromEntries(Object.entries(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE)
+    .map(([type, scope]) => [type, granted === null || granted.has(scope)]))
+}
+
 /** Old scope names a stored grant may still carry, by the name we use now. */
 const LEGACY_SCOPE_NAMES: Readonly<Record<string, OuraScope>> = { spo2Daily: 'spo2' }
 

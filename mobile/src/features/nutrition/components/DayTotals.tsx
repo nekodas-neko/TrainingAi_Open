@@ -34,7 +34,6 @@ export function DayTotals({
   const { calories, budget, remaining, fraction } = dayTotalFigures({
     loggedKcal: totals.calories,
     intake: resolved.intake,
-    remaining: resolved.remaining,
     budget: data?.balance?.budgetKcal ?? null,
   });
   const colors = {

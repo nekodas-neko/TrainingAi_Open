@@ -37,7 +37,8 @@ SELECT
   t.elevation_profile,
   t.segments,
   t.external_source,
-  t.external_id
+  t.external_id,
+  t.deleted_reason
 FROM public.activity_logs t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1086,7 +1087,9 @@ SELECT
   t.acwr,
   t.training_load_grid_len,
   t.training_load_valid_min,
-  t.training_load_evaluated_at
+  t.training_load_evaluated_at,
+  t.still_rhr_bpm,
+  t.still_rhr_coverage_min
 FROM public.oura_daily_derived t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1225,7 +1228,8 @@ SELECT
   t.heart_rate,
   t.heart_rate_variability,
   t.motion_count,
-  t.updated_at
+  t.updated_at,
+  t.deleted_at
 FROM public.oura_sessions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1256,6 +1260,7 @@ SELECT
   t.created_at,
   t.updated_at,
   t.oura_user_id,
+  t.reauth_required_at,
   (t.personal_access_token IS NOT NULL) AS has_pat,
   (t.access_token IS NOT NULL) AS has_oauth_access,
   (t.refresh_token IS NOT NULL) AS has_oauth_refresh,
@@ -1694,6 +1699,19 @@ SELECT
   t.computed_by,
   t.computed_at
 FROM public.shadow_readiness t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.sleep_session_revisions AS
+SELECT
+  t.id,
+  t.user_id,
+  t.sleep_session_id,
+  t.oura_id,
+  t.day,
+  t.revised_at,
+  t.source,
+  t.changes
+FROM public.sleep_session_revisions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
 CREATE VIEW claude_ro.sleep_sessions AS

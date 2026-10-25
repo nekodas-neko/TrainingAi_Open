@@ -12,7 +12,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOTS = ['app', 'components', 'lib']
-const INVALIDATOR = 'invalidateGoalRecommendations'
+// The Coach apply widgets reach the same group through `invalidateCoachChange`, which clears it for
+// the goal domains (see `coach-apply-cache.test.ts`).
+const INVALIDATORS = ['invalidateGoalRecommendations', 'invalidateCoachChange']
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -60,6 +62,7 @@ describe('every client goal writer invalidates the goal caches (Q-240)', () => {
   })
 
   it.each(writers)('%s calls invalidateGoalRecommendations', file => {
-    expect(readFileSync(file, 'utf8')).toContain(INVALIDATOR)
+    const src = readFileSync(file, 'utf8')
+    expect(INVALIDATORS.some(name => src.includes(name))).toBe(true)
   })
 })

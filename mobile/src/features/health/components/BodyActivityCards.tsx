@@ -25,6 +25,8 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { balanceProvenance, budgetLine } from '../../nutrition/data/budget-line';
+import { budgetEnergyModel } from '../../nutrition/data/energy-model';
+import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { useHealthData } from '../data/HealthDataProvider';
 import { energySpec, goalsSpec, trendsSpec } from '../data/models';
@@ -57,7 +59,12 @@ export function EnergyBalanceCard() {
     intake.intake !== null && budget !== null
       ? barProgress({ intakeKcal: intake.intake, budgetKcal: budget })
       : null;
-  const remaining = intake.remaining;
+  const totals = useNutrition(today).view.totals;
+  const { remaining } = budgetEnergyModel({
+    totals,
+    recordedIntake: intake.intake,
+    budgetKcal: budget,
+  });
   return (
     <Card>
       <HealthResourceHeader title="Energy Balance" state={energy} refresh={energy.refresh} />

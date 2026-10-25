@@ -425,6 +425,10 @@ export const activityLogs = pgTable('activity_logs', {
   // session logged in the app.
   externalSource:  text('external_source'),
   externalId:      text('external_id'),
+  // #3309 (migration 202610250602): why `deleted_at` was set, 'app' (the owner deleted it) or
+  // 'health_connect_sweep' (Health Connect stopped returning it). NULL on a live row and on every
+  // tombstone from before the column, which reads as 'app'. Only a sweep tombstone is revived.
+  deletedReason:   text('deleted_reason').$type<'app' | 'health_connect_sweep'>(),
   routePolyline:   text('route_polyline'),
   splits:          jsonb('splits').$type<{ km: number; paceSec: number }[]>(),
   bestEfforts:     jsonb('best_efforts').$type<Record<string, number>>(),
@@ -1540,6 +1544,8 @@ export const ouraTokens = pgTable('oura_tokens', {
   scope:               text('scope'),
   ouraUserId:          text('oura_user_id').unique(),  // Oura's own user ID — used for webhook lookup
   webhookSigningKey:   text('webhook_signing_key'),    // HMAC key from Oura webhook subscription response
+  // #3204: when Oura refused the grant (`invalid_grant`, or a fresh token refused). Cleared by new tokens.
+  reauthRequiredAt:    timestamp('reauth_required_at', { withTimezone: true }),
   createdAt:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -2095,6 +2101,11 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
 
   bdiDerived: doublePrecision('bdi_derived'),
 
+  /** #2634: median HR of the day's still minutes (MET under the active threshold), and the minutes
+   *  behind it. NULL means not computed or too thin to trust, never zero. */
+  stillRhrBpm:         doublePrecision('still_rhr_bpm'),
+  stillRhrCoverageMin: integer('still_rhr_coverage_min'),
+
   bodyComp:    jsonb('body_comp'),
 
   computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
@@ -2205,9 +2216,28 @@ export const ouraSessions = pgTable('oura_sessions', {
   heartRateVariability: jsonb('heart_rate_variability').$type<OuraSampleSeries>(),
   motionCount:          jsonb('motion_count').$type<OuraSampleSeries>(),
   updatedAt:            timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  /** #3153: set when Oura reports the session deleted; the row is kept, and readers are to skip it. */
+  deletedAt:            timestamp('deleted_at', { withTimezone: true }),
 }, t => [
   primaryKey({ columns: [t.userId, t.ouraId] }),
   index('oura_sessions_user_day_idx').on(t.userId, t.day),
+])
+
+/** #2210 (migration 202610242133) — one row each time Oura revised a night we already stored:
+ *  `changes` holds only the fields that differ, as `{ field: { old, new } }` named as the
+ *  `sleep_sessions` columns are. Append-only; `day` is the wake date after the revision. */
+export const sleepSessionRevisions = pgTable('sleep_session_revisions', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sleepSessionId: uuid('sleep_session_id').notNull().references(() => sleepSessions.id, { onDelete: 'cascade' }),
+  ouraId:         text('oura_id'),
+  day:            date('day', { mode: 'string' }).notNull(),
+  revisedAt:      timestamp('revised_at', { withTimezone: true }).notNull().defaultNow(),
+  source:         text('source').notNull(),
+  changes:        jsonb('changes').$type<Record<string, { old: unknown; new: unknown }>>().notNull(),
+}, t => [
+  index('sleep_session_revisions_user_day_idx').on(t.userId, t.day, t.revisedAt),
+  index('sleep_session_revisions_session_idx').on(t.sleepSessionId),
 ])
 
 export const bodyBatteryDaily = pgTable('body_battery_daily', {

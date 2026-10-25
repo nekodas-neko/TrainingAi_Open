@@ -1,12 +1,11 @@
 import { CATEGORICAL_PALETTE, categoricalColor } from '@trainingai/shared/chart-colors';
 import { workoutFlow } from '../logging/flow.ts';
-import { displayLoad } from '../logging/preferences.ts';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
 
 // Picture-in-picture for the workout screen (#3064), ported from the current app:
-// lib/workout/pip-phase.ts (the phase reported to the shell), components/workout/pip-view.tsx (what
-// the window shows, drawn natively by modules/picture-in-picture) and the PiP buttons wired in
-// components/workout-screen.tsx.
+// lib/workout/pip-phase.ts (the phase reported to the shell) and the PiP buttons wired in
+// components/workout-screen.tsx. What the window shows is the workout status payload, drawn natively
+// by modules/picture-in-picture.
 
 /** Only the four active phases open the window on leave; the shell starts in, and returns to, idle. */
 export type PipPhase = 'idle' | 'pre' | 'set' | 'rest' | 'complete' | 'summary' | 'done';
@@ -36,112 +35,32 @@ export function pipPhaseFor(workout: WorkoutRecord | null): PipPhase {
   return done(exercise) >= exercise.sets.length ? 'complete' : 'rest';
 }
 
-export type PipView =
-  | {
-      kind: 'timer';
-      exerciseName: string;
-      phase: 'rest' | 'set';
-      /** Sets recorded so far: "rest · 2/4" after two, "set 3/4" while the third runs. */
-      currentSet: number;
-      sets: number;
-      /** The rest's target in seconds; 0 when the set had none. */
-      restTargetSec: number;
-      restStartMs: number | null;
-      setStartMs: number | null;
-      /** "60 kg × 8" during a set. */
-      load: string | null;
-      /** The running set's arc colour, as the current app's setColor(currentSet). */
-      setColor: string | null;
-    }
-  | {
-      kind: 'placeholder';
-      exerciseName: string;
-      /** "Tap Next to continue", only where the window has a Next button. */
-      hint: boolean;
-    };
-
 type WorkoutSet = WorkoutExercise['sets'][number];
 const numberIn = (text: string) => {
   const value = Number(text.trim().replace(',', '.'));
   return text.trim() && Number.isFinite(value) ? value : null;
 };
-/**
- * pip-view.tsx's "60 kg × 8": the set's weight, else the exercise's first, else 60, and the same
- * fallbacks for reps (the plan, the first set, 10), as the current app reads its per-set arrays.
- * The weight is kg; it is shown in the exercise's own unit through the set wheel's `displayLoad`,
- * so a 7.5 kg set on a pound exercise reads "16.53 lb".
- */
-function load(exercise: WorkoutExercise, set: WorkoutSet | undefined) {
-  const first = exercise.sets[0];
-  const weight =
-    (set && numberIn(set.weight)) ?? set?.plannedWeight ?? numberIn(first.weight) ?? 60;
-  const reps = set ? repsOf(set, first) : repsOf(first, first);
-  return `${displayLoad(weight, exercise.weightUnit)} ${exercise.weightUnit} × ${reps}`;
-}
 function repsOf(set: WorkoutSet, first?: WorkoutSet) {
   const reps = numberIn(set.reps);
   if (reps !== null && Number.isInteger(reps)) return reps;
   const firstReps = first ? numberIn(first.reps) : null;
   return set.planned?.reps ?? (firstReps !== null && Number.isInteger(firstReps) ? firstReps : 10);
 }
-function setColor(index: number) {
-  const color = categoricalColor(index);
+
+/**
+ * The running set's arc colour, as the current app's setColor(currentSet); null outside a set.
+ * Everything else the window draws comes from the workout status payload (workoutStatusFor), the
+ * same one the notification reads (#3266).
+ */
+export function pipSetColor(workout: WorkoutRecord | null): string | null {
+  if (!workout || pipPhaseFor(workout) !== 'set') return null;
+  const { exercise } = current(workout);
+  if (!exercise) return null;
+  const color = categoricalColor(done(exercise));
   // Past the six-colour table the palette is oklch, which Android cannot parse.
   return /^#[\da-f]{6}$/i.test(color)
     ? color
-    : CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length];
-}
-
-/**
- * What the window draws, as the current app's PipView. The native module draws it (React cannot
- * repaint in PiP) and keeps the clock running from these anchors.
- */
-export function pipViewFor(workout: WorkoutRecord | null): PipView | null {
-  const phase = pipPhaseFor(workout);
-  // Next on the last exercise ends the workout while the window may still be open: it shows the
-  // placeholder with the session's name and no Next, never a blank window.
-  if (workout && phase === 'done')
-    return { kind: 'placeholder', exerciseName: workout.sessionName, hint: false };
-  if (!workout || !allowsPip(phase)) return null;
-  const { exercise } = current(workout);
-  if (!exercise) return null;
-  // The summary times the last set's rest as a rest, with every set done, as the current app's
-  // PipView does; once Next clears it there is nothing to time, so its placeholder (#3111).
-  if (phase === 'summary' && !workout.rest) {
-    return { kind: 'placeholder', exerciseName: exercise.name, hint: true };
-  }
-  const base = {
-    exerciseName: exercise.name,
-    sets: exercise.sets.length,
-    currentSet: done(exercise),
-  };
-  if (phase === 'set') {
-    const set = exercise.sets.find((x) => x.id === workout.runningSet?.setId);
-    return {
-      kind: 'timer',
-      ...base,
-      phase: 'set',
-      restTargetSec: 0,
-      restStartMs: null,
-      setStartMs: set?.startedAt ?? null,
-      load: load(exercise, set),
-      setColor: setColor(base.currentSet),
-    };
-  }
-  return {
-    kind: 'timer',
-    ...base,
-    phase: 'rest',
-    restTargetSec: workout.rest
-      ? Math.max(0, Math.round((workout.rest.endsAt - workout.rest.startedAt) / 1000))
-      : 0,
-    restStartMs: workout.rest?.lastSet
-      ? workout.rest.startedAt
-      : (workout.restAnchor?.startedAt ?? null),
-    setStartMs: null,
-    load: null,
-    setColor: null,
-  };
+    : CATEGORICAL_PALETTE[done(exercise) % CATEGORICAL_PALETTE.length];
 }
 
 export type PipCommand =

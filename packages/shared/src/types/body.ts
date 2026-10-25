@@ -102,6 +102,10 @@ export interface ActivityLog {
     pacerAdherence?: number | null
     pacerTicks?: { green: number; amber: number; red: number; stopped: number } | null
   }[]
+  /** #3044. Set when the session was imported from another app, e.g. `health_connect`; absent for a
+   *  session logged in the app. Read-only provenance: the energy budget prefers an in-app log over
+   *  an imported one that overlaps it (`budgetActivityLogs`). */
+  externalSource?: string
   createdAt: Date
 }
 

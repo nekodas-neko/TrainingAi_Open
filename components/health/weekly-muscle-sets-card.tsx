@@ -11,7 +11,7 @@ import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { GENERIC_TARGET, muscleVolumeColor, volumeVerdict } from "@/components/health/volume-band";
 import { TTL_LONG } from "@trainingai/shared/cache-ttl";
 import { ProgressFill } from '@/components/ui/progress-fill'
-import { GENERIC_HIGH, MAX_TARGET } from "@trainingai/shared/health/volume-band";
+import { GENERIC_BARS_CAPTION, MAX_TARGET, TARGET_BARS_CAPTION } from "@trainingai/shared/health/volume-band";
 import { capitalize } from "@trainingai/shared/format/capitalize";
 
 const MIN_TARGET = GENERIC_TARGET;
@@ -183,13 +183,13 @@ export const WeeklyMuscleSetsCard = memo(function WeeklyMuscleSetsCard({ muscles
 
       <p className="text-[10px] text-muted-foreground mt-3">
         {hasTargets
-          ? "Vertical line = your weekly target · Green = at or above target"
+          ? TARGET_BARS_CAPTION
           : useLandmarks
             // The legend has to move with the bands. Left as-is it would keep describing a 10-set
             // minimum while the bars were coloured against per-muscle, goal-scaled landmarks —
             // a caption that disagrees with the chart above it is worse than no caption.
             ? "Lines = MEV (minimum effective) and MRV (maximum recoverable), scaled to your training goal."
-            : `Vertical line = ${MIN_TARGET}-set minimum. Green = ${MIN_TARGET}–${GENERIC_HIGH - 1} sets · Blue = ${GENERIC_HIGH}+ sets.`}
+            : GENERIC_BARS_CAPTION}
       </p>
     </div>
   );

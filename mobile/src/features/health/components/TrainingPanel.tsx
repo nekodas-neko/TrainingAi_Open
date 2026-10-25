@@ -12,12 +12,14 @@ import {
   ProgressBar,
   Sheet,
   Stack,
+  TouchSurface,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { weeklySpec } from '../../workouts/data/models';
 import { WeeklyTrainingCard } from '../../progress/WeeklyTrainingCard';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
+import { SessionGlyph } from '../../workouts/components/SessionGlyph';
 import { useHealthData } from '../data/HealthDataProvider';
 import {
   activityHistorySpec,
@@ -28,6 +30,7 @@ import {
 } from '../data/models';
 import {
   activityRow,
+  muscleVolumeCaption,
   movementRows,
   periodizationRow,
   trendSeries,
@@ -189,8 +192,9 @@ export function TrainingPanel({
       <HubCard
         title="Week in review"
         subtitle="Last week's training, recovery and records"
-        icon="calendar"
+        icon="calendarRange"
         tone="neutral"
+        iconTile={false}
         onPress={() => openWeek(shiftDateStr(weekStartForDay(today), -7))}
       />
       {weekly.data && (
@@ -210,27 +214,53 @@ export function TrainingPanel({
           title={'AI Periodization'}
           state={overview}
           refresh={overview.refresh}
+          icon="coach"
         />
-
-        {overview.data?.sessions.map((session) => {
-          const row = periodizationRow(session);
-          return (
-            <ListRow
-              key={session.sessionId}
-              title={session.sessionName}
-              subtitle={row.label}
-              subtitleColor={phaseColors[row.phase]}
-              trailing={
-                row.recency ? (
-                  <AppText variant="caption" tone="muted">
-                    {row.recency}
-                  </AppText>
-                ) : undefined
-              }
-              onPress={openPrograms}
-            />
-          );
-        })}
+        <Stack gap="sm">
+          {overview.data?.sessions.map((session) => {
+            const row = periodizationRow(session);
+            return (
+              <TouchSurface
+                key={session.sessionId}
+                accessibilityRole="button"
+                accessibilityLabel={`${session.sessionName}, ${row.label}`}
+                onPress={openPrograms}
+              >
+                <Stack
+                  direction="row"
+                  align="center"
+                  gap="md"
+                  style={{
+                    borderRadius: theme.radii.control,
+                    backgroundColor: `${theme.colors.background}99`,
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                  }}
+                >
+                  <SessionGlyph
+                    icon={session.icon}
+                    position={0}
+                    size={theme.sizes.iconCompact}
+                    color={theme.colors.muted}
+                  />
+                  <Stack gap="none" style={{ flex: 1, minWidth: 0 }}>
+                    <AppText variant="label" numberOfLines={1}>
+                      {session.sessionName}
+                    </AppText>
+                    <AppText variant="micro" style={{ color: phaseColors[row.phase] }}>
+                      {row.label}
+                    </AppText>
+                  </Stack>
+                  {row.recency ? (
+                    <AppText variant="micro" tone="muted">
+                      {row.recency}
+                    </AppText>
+                  ) : null}
+                </Stack>
+              </TouchSurface>
+            );
+          })}
+        </Stack>
         {overview.data && !overview.data.sessions.length && (
           <AppText variant="caption" tone="muted">
             No AI dynamic program active
@@ -242,13 +272,8 @@ export function TrainingPanel({
           title={'Muscle Volume This Week'}
           state={muscles}
           refresh={muscles.refresh}
+          caption={muscles.data?.muscles.length ? muscleVolumeCaption(muscles.data.muscles) : undefined}
         />
-
-        {muscles.data?.phase?.dominant && (
-          <AppText variant="caption" tone="muted">
-            {muscles.data.phase.dominant} · target scale {muscles.data.phase.scale}
-          </AppText>
-        )}
         {!!muscles.data?.muscles.length && <MuscleVolumeFigure muscles={muscles.data.muscles} />}
         {muscles.data && !muscles.data.muscles.length && (
           <AppText variant="caption" tone="muted">
@@ -257,18 +282,38 @@ export function TrainingPanel({
         )}
       </Card>
       <MovementCard />
-      <Card>
-        <HealthResourceHeader
-          title={'Activities This Week'}
-          state={activity}
-          refresh={activity.refresh}
-        />
-        {thisWeek.length > 0 && (
-          <AppText variant="caption" tone="muted">
-            {plural(thisWeek.length, 'session', 'sessions')}
+      <Card padded={false}>
+        <Stack
+          direction="row"
+          justify="space-between"
+          align="center"
+          style={{
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+            borderBottomWidth: 1,
+            borderColor: theme.colors.border,
+          }}
+        >
+          <AppText
+            variant="cardTitle"
+            accessibilityRole="header"
+            style={{ flex: 1, color: theme.colors.brandText }}
+          >
+            Activities This Week
           </AppText>
-        )}
-        {thisWeek.map((log) => {
+          {thisWeek.length > 0 && (
+            <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
+              {plural(thisWeek.length, 'session', 'sessions')}
+            </AppText>
+          )}
+          <ResourceStatus
+            inline
+            label="Activities This Week"
+            state={activity}
+            refresh={activity.refresh}
+          />
+        </Stack>
+        {thisWeek.map((log, index) => {
           const row = activityRow(log);
           const icon = activityTypes.data?.activityTypes.find(
             (type) => type.id === log.activityType,
@@ -278,6 +323,7 @@ export function TrainingPanel({
               key={log.id}
               title={row.title}
               subtitle={row.subtitle}
+              divider={index < thisWeek.length - 1}
               leading={<Icon name={activityIcon(icon ?? '')} tone="muted" />}
               trailing={
                 row.facts.length ? (
@@ -295,7 +341,11 @@ export function TrainingPanel({
           );
         })}
         {activity.data && !thisWeek.length && (
-          <AppText variant="caption" tone="muted">
+          <AppText
+            variant="caption"
+            tone="muted"
+            style={{ textAlign: 'center', padding: theme.spacing.lg }}
+          >
             No activities this week
           </AppText>
         )}

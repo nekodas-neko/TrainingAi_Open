@@ -6,16 +6,22 @@ export function SegmentRing({
   segments,
   value,
   label,
+  size: requestedSize,
+  thickness,
   children,
 }: PropsWithChildren<{
   segments: { share: number; color: string }[];
   value: number;
   label: string;
+  /** Outer diameter; the Nutrition tab's ring when omitted. */
+  size?: number;
+  /** Stroke width of a ring that is not the Nutrition tab's; the arc then fills the whole box. */
+  thickness?: number;
 }>) {
   const { theme } = useTheme();
-  const size = theme.sizes.nutritionRing;
-  const stroke = theme.spacing.sm + theme.spacing.xxs;
-  const radius = (size - theme.spacing.xl) / 2;
+  const size = requestedSize ?? theme.sizes.nutritionRing;
+  const stroke = thickness ?? theme.spacing.sm + theme.spacing.xxs;
+  const radius = thickness === undefined ? (size - theme.spacing.xl) / 2 : (size - thickness) / 2;
   const length = 2 * Math.PI * radius;
   let offset = 0;
   return (

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  GENERIC_BARS_CAPTION,
   GENERIC_HIGH,
   GENERIC_LEGEND,
   GENERIC_TARGET,
@@ -62,5 +63,13 @@ describe('the generic band legend', () => {
     expect(colour(GENERIC_TARGET - 1)).toBe(expected[toneOf('6–9 sets')])
     expect(colour(6)).toBe(expected[toneOf('6–9 sets')])
     expect(colour(5)).toBe(expected[toneOf('Under 6')])
+  })
+})
+
+describe('the generic band caption', () => {
+  it('names the same thresholds the colours turn at', () => {
+    expect(GENERIC_BARS_CAPTION).toContain(`${GENERIC_TARGET}-set minimum`)
+    expect(GENERIC_BARS_CAPTION).toContain(`${GENERIC_TARGET}–${GENERIC_HIGH - 1} sets`)
+    expect(GENERIC_BARS_CAPTION).toContain(`${GENERIC_HIGH}+ sets`)
   })
 })

@@ -9,12 +9,13 @@ import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES }
 import { normalizeEmail } from '@trainingai/shared/validation/email'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
-import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
+import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
 import { withUserLock } from './user-lock'
 import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
+import { errorLog } from '@trainingai/shared/logger'
 import { buildBodyFatCalibration } from '@/lib/health/body-fat-calibration-build'
 import { mergePreferences, type UserPreferences } from '@trainingai/shared/user/preferences'
 import * as s from './schema'
@@ -72,8 +73,9 @@ import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { averagePaceSecPerKm } from '@trainingai/shared/activity/route-summary'
+import { HEALTH_CONNECT_SOURCE } from '@trainingai/shared/health/health-connect-workouts'
 import { describeZodFailure } from './push-error-detail'
-import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite, DetectionEventWrite } from '../repository'
+import type { WorkoutRepository, HealthConnectActivityLogInput, HealthConnectActivityLogOutcome, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite, DetectionEventWrite } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
@@ -176,6 +178,8 @@ import {
 // number on the client and a second copy is how two implementations of one metric begin.
 import { LBS_TO_KG } from '@trainingai/shared/workout/units'
 
+/** #3044. How long a Health Connect session is safe from a window sweep after it is stored. */
+const SWEEP_MIN_AGE_MS = 15 * 60_000
 
 interface LbsToKgLogRow {
   id: string
@@ -880,6 +884,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // #2858 — Oura Cloud OAuth tokens, stored encrypted.
   async getOuraCloudTokens(userId: string) { return ouraCloudTokens.getOuraCloudTokens(this.db, userId) }
   async saveOuraCloudTokens(userId: string, input: ouraCloudTokens.SaveOuraCloudTokensInput) { return ouraCloudTokens.saveOuraCloudTokens(this.db, userId, input) }
+  async markOuraCloudReauthRequired(userId: string, unchangedSince: Date) { return ouraCloudTokens.markOuraCloudReauthRequired(this.db, userId, unchangedSince) }
   async deleteOuraCloudTokens(userId: string) { return ouraCloudTokens.deleteOuraCloudTokens(this.db, userId) }
   async getUserIdByOuraUserId(ouraUserId: string) { return ouraCloudTokens.getUserIdByOuraUserId(this.db, ouraUserId) }
   async getOuraCloudSwitchDay(userId: string) { return ouraCloudTokens.getOuraCloudSwitchDay(this.db, userId) }
@@ -2317,6 +2322,34 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         target: [s.bodyMetrics.userId, s.bodyMetrics.date],
         set: mergeSet('body_metrics', BODY_METRICS_SOURCE_COLS, source, { ouraCloudFrom }),
       })
+    await this.refreshBodyComp(userId, metrics, source)
+  }
+
+  /**
+   * Keeps `oura_daily_derived.body_comp` current without the ring rollup, which only runs when
+   * Bluetooth data is uploaded and so stopped on 17 Oct when the ring moved to the Oura API.
+   * Two triggers, one implementation (`persistBodyCompFromMetrics`):
+   *  - a write that carries a weight or body fat re-derives those days, from the stored row, so a
+   *    ranked merge that kept an older value is reflected;
+   *  - the Oura Cloud ingest, the daily path that still runs, also catches up every day from the
+   *    last snapshot on, so days missed while nothing ran fill in. A day with no weigh-in writes
+   *    nothing, so the last snapshot stands.
+   * Never throws: the weigh-in is already saved, and a snapshot failure must not fail its write.
+   */
+  private async refreshBodyComp(userId: string, metrics: { date: string; weightKg?: number | null; bodyFatPct?: number | null }[], source: HealthSource): Promise<void> {
+    try {
+      const dates = Array.from(new Set(metrics.filter(m => m.weightKg != null || m.bodyFatPct != null).map(m => m.date)))
+      const fromDay = source === 'oura_cloud' ? await oura.getLatestBodyCompDay(this.db, userId) : null
+      if (dates.length === 0 && !fromDay) return
+      // Read at most once, and only if a pass has a row to persist. A failed read skips the refresh
+      // (below) rather than persisting an uncorrected snapshot over a corrected one.
+      let calibration: Promise<BodyFatCalibration | null> | undefined
+      const loadCalibration = () => (calibration ??= this.getBodyFatCalibration(userId))
+      if (dates.length > 0) await oura.persistBodyCompFromMetrics(this.db, userId, loadCalibration, { dates })
+      if (fromDay) await oura.persistBodyCompFromMetrics(this.db, userId, loadCalibration, { fromDay })
+    } catch (err) {
+      errorLog(err, '[body-comp] refresh failed')
+    }
   }
 
   /**
@@ -2717,6 +2750,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             set: {
               ...set,
               deletedAt: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.deletedAt} ELSE NULL END`,
+              // #3044. An in-app save landing on a Health Connect row's minute makes it the in-app
+              // log: without this it kept Health Connect's id, so the next sync rewrote it with
+              // Health Connect's times and the sweep deleted it once that session went. An edit to
+              // the row itself (the same id) keeps its source.
+              externalSource: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.externalSource} ELSE NULL END`,
+              externalId: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.externalId} ELSE NULL END`,
             },
           }).returning()
         : await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
@@ -2770,6 +2809,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       cadenceSeries: r.cadenceSeries ?? undefined,
       cadenceSource: r.cadenceSource ?? undefined,
       segments: r.segments ?? undefined,
+      ...(r.externalSource ? { externalSource: r.externalSource } : {}),
       createdAt: r.createdAt,
     }
   }
@@ -2955,6 +2995,117 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.length > 0
   }
 
+  // #3044. A Health Connect session keyed on the record id Health Connect gave it, so an edit made
+  // there updates this row instead of adding one at its new start time. Only the fields Health
+  // Connect owns are written: the title, type and notes stay as stored, since the owner may have
+  // changed them here, and a metric the read left out keeps its stored value. A row deleted here, or
+  // tombstoned because Health Connect deleted it, stays deleted under that id. A different record at
+  // the minute of a tombstoned Health Connect row takes the row over (see below).
+  async upsertHealthConnectActivityLog(
+    userId: string, externalId: string, log: HealthConnectActivityLogInput,
+  ): Promise<HealthConnectActivityLogOutcome> {
+    const [existing] = await this.db.select().from(s.activityLogs)
+      .where(and(
+        eq(s.activityLogs.userId, userId),
+        eq(s.activityLogs.externalSource, HEALTH_CONNECT_SOURCE),
+        eq(s.activityLogs.externalId, externalId),
+      ))
+      .limit(1)
+    if (existing?.deletedAt) return 'deleted'
+    const caloriesBurned = log.caloriesBurned
+      ?? (existing && existing.durationMin === log.durationMin ? existing.caloriesBurned : null)
+      ?? await this.deriveActivityKcal(userId, existing?.activityType ?? log.activityType, log.durationMin)
+    if (!existing) {
+      const fields = {
+        date: log.date, activityType: log.activityType, title: log.title,
+        startTime: log.startTime, endTime: log.endTime, durationMin: log.durationMin,
+        distanceKm: log.distanceKm ?? null, caloriesBurned,
+        avgHr: log.avgHr ?? null, maxHr: log.maxHr ?? null,
+        avgPaceSecPerKm: log.distanceKm != null ? averagePaceSecPerKm(log.distanceKm, log.durationMin * 60) ?? null : null,
+        externalSource: HEALTH_CONNECT_SOURCE, externalId,
+      }
+      const [r] = await this.db.insert(s.activityLogs).values({ userId, ...fields })
+        // Either index: another row already at this minute (an in-app log, or one an older bundle
+        // stored without an id), which keeps it, or a concurrent sync that stored this record first.
+        .onConflictDoNothing()
+        .returning({ id: s.activityLogs.id })
+      if (r) return 'inserted'
+      // The `(user, date, start_time)` index covers tombstones. When Health Connect replaces a record
+      // with a new one at the same minute, the sweep tombstones the old row, and the new record could
+      // otherwise never be stored. It takes over that row instead. Only a tombstoned Health Connect
+      // row: a live row keeps its minute, and an in-app log the owner deleted stays deleted. The
+      // row's notes stay, since they are the owner's.
+      const taken = await this.db.update(s.activityLogs)
+        .set({ ...fields, deletedAt: null, updatedAt: new Date() })
+        .where(and(
+          eq(s.activityLogs.userId, userId),
+          eq(s.activityLogs.date, log.date),
+          eq(s.activityLogs.startTime, log.startTime),
+          eq(s.activityLogs.externalSource, HEALTH_CONNECT_SOURCE),
+          isNotNull(s.activityLogs.deletedAt),
+        ))
+        .returning({ id: s.activityLogs.id })
+      return taken.length ? 'inserted' : 'taken'
+    }
+    const distanceKm = log.distanceKm ?? existing.distanceKm
+    const next = {
+      date: log.date, startTime: log.startTime, endTime: log.endTime, durationMin: log.durationMin,
+      distanceKm, caloriesBurned,
+      avgHr: log.avgHr ?? existing.avgHr, maxHr: log.maxHr ?? existing.maxHr,
+      avgPaceSecPerKm: distanceKm != null ? averagePaceSecPerKm(distanceKm, log.durationMin * 60) ?? null : existing.avgPaceSecPerKm,
+    }
+    // Postgres returns `time` as HH:MM:SS; the wire sends HH:MM.
+    const same = (Object.keys(next) as (keyof typeof next)[]).every(k =>
+      k === 'startTime' || k === 'endTime' ? existing[k]?.slice(0, 5) === next[k] : existing[k] === next[k])
+    // Every sync re-reads the window, so an unchanged row is left alone: bumping `updated_at` would
+    // send it to every device on each pull.
+    if (same) return 'unchanged'
+    let updated: { id: string }[]
+    try {
+      updated = await this.db.update(s.activityLogs)
+        .set({ ...next, updatedAt: new Date() })
+        .where(and(eq(s.activityLogs.id, existing.id), eq(s.activityLogs.userId, userId), isNull(s.activityLogs.deletedAt)))
+        .returning({ id: s.activityLogs.id })
+    } catch (err) {
+      // The new start minute is another row's (the `(user, date, start_time)` index). That row wins
+      // and this one keeps its old time until the clash goes away.
+      const code = (err as { code?: string }).code ?? (err as { cause?: { code?: string } }).cause?.code
+      if (code === '23505') return 'taken'
+      throw err
+    }
+    // No row: it was deleted between the read above and this write, and a delete wins.
+    return updated.length ? 'updated' : 'deleted'
+  }
+
+  // #3044. Tombstones Health Connect sessions that Health Connect no longer has: by record id (a
+  // deletion feed), or every stored one dated inside a window that was read in full whose id did not
+  // come back. Never a hard delete, and never a row from any other source. The window sweep leaves
+  // a row stored or changed in the last SWEEP_MIN_AGE_MS alone: a sync that read Health Connect just
+  // before another stored a session must not sweep it.
+  async tombstoneHealthConnectActivityLogs(
+    userId: string, scope: { ids: readonly string[] } | { from: string; to: string; keep: readonly string[] },
+  ): Promise<number> {
+    if ('ids' in scope && scope.ids.length === 0) return 0
+    const rows = await this.db.update(s.activityLogs)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(
+        eq(s.activityLogs.userId, userId),
+        eq(s.activityLogs.externalSource, HEALTH_CONNECT_SOURCE),
+        isNotNull(s.activityLogs.externalId),
+        isNull(s.activityLogs.deletedAt),
+        ...('ids' in scope
+          ? [inArray(s.activityLogs.externalId, [...scope.ids])]
+          : [
+              gte(s.activityLogs.date, scope.from),
+              lte(s.activityLogs.date, scope.to),
+              lt(s.activityLogs.updatedAt, new Date(Date.now() - SWEEP_MIN_AGE_MS)),
+              ...(scope.keep.length ? [notInArray(s.activityLogs.externalId, [...scope.keep])] : []),
+            ]),
+      ))
+      .returning({ id: s.activityLogs.id })
+    return rows.length
+  }
+
   async saveFitnessTest(userId: string, test: Omit<FitnessTest, 'userId'>): Promise<FitnessTest> {
     const values = {
       id: test.id, userId, testType: test.testType, date: test.date,
@@ -2985,7 +3136,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         lte(s.fitnessTests.date, to),
         isNull(s.fitnessTests.deletedAt),
       ))
-      .orderBy(desc(s.fitnessTests.date))
+      // Tests on one day keep the order the sync pull writes them to a device (updated_at ASC), so a
+      // client that reads this list and one that reads its own store tie the same way round.
+      .orderBy(desc(s.fitnessTests.date), asc(s.fitnessTests.updatedAt))
     return rows.map(r => this.rowToFitnessTest(r))
   }
 
@@ -8294,6 +8447,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraTimeseriesDelta(userId: string, opts: { heartrate?: oura.TimeseriesCursor | null; bucket?: oura.TimeseriesCursor | null; budget?: number }) { return oura.getOuraTimeseriesDelta(userId, opts) }
   async getOuraDailyDerived(userId: string, from: string, to: string) { return oura.getOuraDailyDerived(this.db, userId, from, to) }
   async persistBodyCompFromMetrics(userId: string) {
-    return oura.persistBodyCompFromMetrics(this.db, userId, await this.getBodyFatCalibration(userId).catch(() => null))
+    return oura.persistBodyCompFromMetrics(this.db, userId, () => this.getBodyFatCalibration(userId))
   }
 }

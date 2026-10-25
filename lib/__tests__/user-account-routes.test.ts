@@ -247,6 +247,20 @@ describe('/api/user/preferences', () => {
   it('rejects a value the schema bounds', async () => {
     expect((await prefsPatch({ weightLookback: 99999 })).status).toBe(400)
   })
+  it('merges the weight band as the one field, and rejects a bad band without writing', async () => {
+    await prefsPatch({ weightBandPctPerWeek: { lo: 0.4, hi: 1.2 } })
+    expect(updateUserPreferences).toHaveBeenCalledWith(me(), { weightBandPctPerWeek: { lo: 0.4, hi: 1.2 } })
+
+    updateUserPreferences.mockClear()
+    for (const bad of [{ lo: 1.2, hi: 0.4 }, { lo: 0.5, hi: 10 }, { lo: 0.5, hi: 1, extra: 1 }]) {
+      expect((await prefsPatch({ weightBandPctPerWeek: bad })).status).toBe(400)
+    }
+    expect(updateUserPreferences).not.toHaveBeenCalled()
+
+    await prefsPatch({ weightBandPctPerWeek: null })
+    expect(updateUserPreferences.mock.calls[0][1]).toEqual({ weightBandPctPerWeek: null })
+  })
+
   it('forwards an explicit null to clear a key, and nothing at all when the body is empty', async () => {
     await prefsPatch({ scoreRingStyle: null })
     expect(updateUserPreferences.mock.calls[0][1]).toEqual({ scoreRingStyle: null })

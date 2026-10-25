@@ -1,8 +1,8 @@
 // The historical fill for `set_hr_stats.hrr1_bpm` (#2457): which stored rows change, and to what.
 // Pure — the admin route (`app/api/admin/backfill-set-hrr1`) fetches, this decides, the repo writes.
 //
-// Each row is re-measured with `deriveHrr60` against the merged HR series around its `logged_at`
-// (the set end the row was computed from), and both `hrr1_bpm` and `rest_adequate` are set to what
+// Each row is re-measured with `deriveHrr60` against the merged HR series around its set end — the timed
+// `set_end_ms` where the set has one, else `logged_at`, the same anchor the live writer uses (#3238), and both `hrr1_bpm` and `rest_adequate` are set to what
 // the writer produces today — null included. That is the point: the older nearest-reading rule left
 // ring verdicts and shortcut-era `true`s that the COALESCE upsert could never clear.
 //
@@ -10,7 +10,7 @@
 // dense rule can see that offset (`deriveHrrAt`), and takes the dense value; one it cannot see goes to
 // null. A null stays null — whether that offset was inside the set's rest window was decided when
 // the row was written, and is not re-decided here. #2299 step 2's personal bar decides the verdict.
-import { deriveHrr60, deriveHrrAt, restAdequateFromHrr60 } from './hrr60'
+import { deriveHrr60, deriveHrrAt, restAdequateFromHrr60, setRestAnchorMs } from './hrr60'
 import type { HrReading } from './hr-analysis'
 
 export interface StoredDrops {
@@ -23,6 +23,8 @@ export interface StoredDrops {
 export interface StoredHrr1Row extends StoredDrops {
   setLogId: string
   loggedAt: Date | null
+  /** `set_logs.set_end_ms` — the timed set end, null on an untimed set. */
+  setEndMs: number | null
   hrr1Bpm: number | null
   restAdequate: boolean | null
 }
@@ -38,9 +40,13 @@ export interface Hrr1Change {
 
 const DROP_OFFSETS = [['drop30s', 30_000], ['drop60s', 60_000], ['drop90s', 90_000], ['drop120s', 120_000]] as const
 
+/** How far past a set's end the backfill reads: the largest drop offset, so a stored drop is never
+ *  re-derived from a series cut short before it. */
+export const HRR1_MAX_OFFSET_MS = Math.max(...DROP_OFFSETS.map(([, ms]) => ms))
+
 /** A row's HRR60 from the series, before any verdict — what the personal bar is fitted on. */
-export function measureHrr60(row: Pick<StoredHrr1Row, 'loggedAt'>, readings: readonly (HrReading & { source?: string | null })[]): number | null {
-  return deriveHrr60(readings, row.loggedAt?.getTime() ?? null)?.bpm ?? null
+export function measureHrr60(row: Pick<StoredHrr1Row, 'loggedAt' | 'setEndMs'>, readings: readonly (HrReading & { source?: string | null })[]): number | null {
+  return deriveHrr60(readings, setRestAnchorMs(row.setEndMs, row.loggedAt))?.bpm ?? null
 }
 
 /** The rows whose stored HRR60, verdict or drop curve differ from a fresh measurement. `barBpmFor`
@@ -51,8 +57,11 @@ export function planHrr1Backfill(
   barBpmFor?: (row: StoredHrr1Row) => number,
 ): Hrr1Change[] {
   const out: Hrr1Change[] = []
+  // No readings is a missing series, not a measurement of nothing: re-deriving from it would null
+  // every stored value, and once a session's HR is pruned that would wipe the durable snapshot.
+  if (readings.length === 0) return out
   for (const r of rows) {
-    const endMs = r.loggedAt?.getTime() ?? null
+    const endMs = setRestAnchorMs(r.setEndMs, r.loggedAt)
     const hrr1Bpm = measureHrr60(r, readings)
     const after: Hrr1Values = {
       hrr1Bpm,
