@@ -1087,7 +1087,9 @@ SELECT
   t.acwr,
   t.training_load_grid_len,
   t.training_load_valid_min,
-  t.training_load_evaluated_at
+  t.training_load_evaluated_at,
+  t.still_rhr_bpm,
+  t.still_rhr_coverage_min
 FROM public.oura_daily_derived t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
