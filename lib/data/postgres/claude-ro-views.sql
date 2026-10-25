@@ -1699,6 +1699,19 @@ SELECT
 FROM public.shadow_readiness t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.sleep_session_revisions AS
+SELECT
+  t.id,
+  t.user_id,
+  t.sleep_session_id,
+  t.oura_id,
+  t.day,
+  t.revised_at,
+  t.source,
+  t.changes
+FROM public.sleep_session_revisions t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.sleep_sessions AS
 SELECT
   t.id,

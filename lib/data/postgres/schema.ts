@@ -2218,6 +2218,23 @@ export const ouraSessions = pgTable('oura_sessions', {
   index('oura_sessions_user_day_idx').on(t.userId, t.day),
 ])
 
+/** #2210 (migration 202610242133) — one row each time Oura revised a night we already stored:
+ *  `changes` holds only the fields that differ, as `{ field: { old, new } }` named as the
+ *  `sleep_sessions` columns are. Append-only; `day` is the wake date after the revision. */
+export const sleepSessionRevisions = pgTable('sleep_session_revisions', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sleepSessionId: uuid('sleep_session_id').notNull().references(() => sleepSessions.id, { onDelete: 'cascade' }),
+  ouraId:         text('oura_id'),
+  day:            date('day', { mode: 'string' }).notNull(),
+  revisedAt:      timestamp('revised_at', { withTimezone: true }).notNull().defaultNow(),
+  source:         text('source').notNull(),
+  changes:        jsonb('changes').$type<Record<string, { old: unknown; new: unknown }>>().notNull(),
+}, t => [
+  index('sleep_session_revisions_user_day_idx').on(t.userId, t.day, t.revisedAt),
+  index('sleep_session_revisions_session_idx').on(t.sleepSessionId),
+])
+
 export const bodyBatteryDaily = pgTable('body_battery_daily', {
   id:            uuid('id').primaryKey().defaultRandom(),
   userId:        uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
