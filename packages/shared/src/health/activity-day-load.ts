@@ -14,7 +14,7 @@ const HISTORY_DAYS = 28
 
 type ActivityDayRepo = Pick<WorkoutRepository,
   'listBodyMetrics' | 'getOuraDaily' | 'getWorkoutSessionsFrom' | 'getHrForWindow' | 'getActiveProgram'
-  | 'getUserById' | 'getUserGoals'>
+  | 'getUserById' | 'getUserGoals' | 'listActivityLogs'>
 
 export interface LoadActivityDayOptions {
   /** The HR profile's ceiling, when the caller has already resolved it (once, not per day). Null is a
@@ -29,7 +29,7 @@ export async function loadActivityDay(
   const dayMid = dateStrMidnightInTz(date, tz)
   const nextMid = dateStrMidnightInTz(shiftDateStr(date, 1), tz)
   const fromIso = shiftDateStr(date, -HISTORY_DAYS)
-  const [bodyMetrics, ouraRows, sessions, hrRows, program, user, userGoals, hrProfile] = await Promise.all([
+  const [bodyMetrics, ouraRows, sessions, hrRows, program, user, userGoals, activityLogs, hrProfile] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
     repo.getOuraDaily(userId, fromIso, date),
     repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(fromIso, tz)),
@@ -37,6 +37,8 @@ export async function loadActivityDay(
     repo.getActiveProgram(userId),
     repo.getUserById(userId),
     repo.getUserGoals(userId).catch(() => null),
+    // The day's treadmill steps join its step count (#3134).
+    repo.listActivityLogs(userId, date, date),
     // #2182: the same zone ceiling the live score uses.
     options.maxHr !== undefined
       ? Promise.resolve({ maxHr: options.maxHr })
@@ -53,6 +55,7 @@ export async function loadActivityDay(
     program,
     user,
     stepsGoal: userGoals?.stepsGoal ?? null,
+    activityLogs,
   })
 }
 

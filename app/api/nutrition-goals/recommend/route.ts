@@ -9,6 +9,7 @@ import { buildGoalExplanation, suggestActivityLevel } from '@trainingai/shared/n
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
+import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 
 // An optional source marker; the body is normally absent.
 const MAX_BODY_BYTES = 4 * 1024
@@ -55,13 +56,16 @@ export async function POST(req: Request) {
   const windowStart = new Date(todayMidnightUtc(tz).getTime() - 14 * 86_400_000)
   const fromIso = toAestDay(windowStart, tz)
 
-  const [bodyMetrics, workoutSessions, personalRecords, userGoals, nutritionTargets, program] = await Promise.all([
+  const [bodyMetrics, workoutSessions, personalRecords, userGoals, nutritionTargets, program, activityLogs] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, windowStart),
     repo.listRecentPersonalRecords(userId, windowStart, new Date()),
     repo.getUserGoals(userId),
     repo.getNutritionTargets(userId),
     repo.getActiveProgram(userId),
+    // #3134: a treadmill session's steps join that day's count, as on every screen. A failed read costs
+    // those steps only.
+    repo.listActivityLogs(userId, fromIso, todayIso).catch(() => []),
   ])
 
   const latestWeight = bodyMetrics.find(m => m.weightKg != null)?.weightKg
@@ -151,7 +155,7 @@ export async function POST(req: Request) {
 
   const weighIns = bodyMetrics.filter(m => m.weightKg != null).sort((a, b) => a.date.localeCompare(b.date))
   const bfReadings = bodyMetrics.filter(m => m.bodyFatPct != null).sort((a, b) => a.date.localeCompare(b.date))
-  const stepsValues = bodyMetrics.filter(m => m.steps != null).map(m => m.steps!)
+  const stepsValues = [...dayStepCountsByDate(bodyMetrics, activityLogs).values()]
   const explanation = buildGoalExplanation({
     baseline: {
       ...clampBaseline,

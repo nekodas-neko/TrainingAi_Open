@@ -21,6 +21,8 @@ export interface ActivityFixture {
   sessions: FixtureSession[]
   derived: FixtureDerived[]
   program: Record<string, unknown> | null
+  /** Logged activities, for the treadmill steps that join a day's count (#3134). */
+  activityLogs?: { date: string; activityType: string; steps?: number | null }[]
 }
 
 /** A repository over the fixture. Upserts land in `fixture.derived` with the real COALESCE rule. */
@@ -51,6 +53,8 @@ export function fixtureRepo(fx: ActivityFixture) {
     getLatestOuraCloudVitals: vi.fn(async () => null),
     getUserById: vi.fn(async () => ({ dateOfBirth: '1990-01-01', sex: 'male', heightCm: 180, activityLevel: 'moderate' })),
     getUserGoals: vi.fn(async () => ({ stepsGoal: null })),
+    listActivityLogs: vi.fn(async (_u: string, from: string, to: string) =>
+      (fx.activityLogs ?? []).filter(a => a.date >= from && a.date <= to)),
     listDoseEvents: vi.fn(async () => [] as unknown[]),
     listProgramPhases: vi.fn(async () => [] as unknown[]),
     countSessionsSinceStart: vi.fn(async () => 0),

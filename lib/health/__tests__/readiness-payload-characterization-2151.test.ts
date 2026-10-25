@@ -30,6 +30,7 @@ const repo = {
   getMoodLog: vi.fn(async (_u: string, _d: string) => null),
   getUserById: vi.fn(async (_u: string) => ({ timezone: TZ, dateOfBirth: '1990-01-01', sex: 'male', heightCm: 180 })),
   getUserGoals: vi.fn(async (_u: string) => ({ stepsGoal: null })),
+  listActivityLogs: vi.fn(async () => [] as unknown[]),
   upsertOuraDailyDerived: vi.fn(async () => undefined),
   upsertOuraDailySummary: vi.fn(async () => undefined),
 }

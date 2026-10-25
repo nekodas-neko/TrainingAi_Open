@@ -24,6 +24,7 @@ const getUserGoals = vi.fn(async () => ({
 } as Row))
 const getNutritionTargets = vi.fn(async () => ({ userId: 'u-1', calories: 2100, proteinG: 150, carbsG: 200, fatG: 60 }) as Row | null)
 const getActiveProgram = vi.fn(async () => null as Row | null)
+const listActivityLogs = vi.fn(async (_u: string, _f: string, _t: string) => [] as Row[])
 const getBodyFatCalibration = vi.fn(async (_u: string) => null as Row | null)
 const getLatestMeasuredRmr = vi.fn(async (_u: string) => null as Row | null)
 const listProgramPhases = vi.fn(async () => [] as Row[])
@@ -40,7 +41,7 @@ vi.mock('@/lib/data', () => {
   // `const` declarations above and reading them at factory-evaluation time is a TDZ error.
   const repo = async () => ({
     getUserById, listBodyMetrics, getWorkoutSessionsFrom,
-    listRecentPersonalRecords, getUserGoals, getNutritionTargets, getActiveProgram,
+    listRecentPersonalRecords, getUserGoals, getNutritionTargets, getActiveProgram, listActivityLogs,
     getBodyFatCalibration, getLatestMeasuredRmr, listProgramPhases,
     countSessionsSinceStart, createGoalRecommendation,
   })
@@ -82,7 +83,7 @@ const freshUser = (over: { timezone?: string } = {}) => {
 }
 
 beforeEach(() => {
-  for (const m of [getUserById, listBodyMetrics, getUserGoals, getNutritionTargets, getActiveProgram,
+  for (const m of [getUserById, listBodyMetrics, listActivityLogs, getUserGoals, getNutritionTargets, getActiveProgram,
     getBodyFatCalibration, getLatestMeasuredRmr, createGoalRecommendation, generateObject, aiModel]) m.mockClear()
   listBodyMetrics.mockResolvedValue([{ id: 'b1', date: '2026-09-08', weightKg: 80 }])
   getActiveProgram.mockResolvedValue(null)
@@ -310,5 +311,19 @@ describe('POST /api/nutrition-goals/recommend — failure and context', () => {
     expect(body.current.stepsGoal).toBe(9000)
     expect(body.current.activityLevel).toBe('moderate')
     expect(body.id).toBe('rec-1')
+  })
+})
+
+describe('POST /api/nutrition-goals/recommend — the steps it quotes (#3134)', () => {
+  it("averages the day step count, a treadmill session's steps included", async () => {
+    listBodyMetrics.mockResolvedValue([
+      { id: 'b1', date: '2026-09-08', weightKg: 80, steps: 6000 },
+      { id: 'b2', date: '2026-09-09', weightKg: 80, steps: 8000 },
+    ])
+    listActivityLogs.mockResolvedValue([{ date: '2026-09-08', activityType: 'treadmill', steps: 4000 }])
+    const res = await post()
+    expect(res.status).toBe(200)
+    // (6000 + 4000 + 8000) / 2, not the device-only 7,000.
+    expect(JSON.stringify(createGoalRecommendation.mock.calls)).toContain('Average daily steps: 9,000.')
   })
 })
