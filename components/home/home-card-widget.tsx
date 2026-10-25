@@ -29,7 +29,7 @@ const CollectionCard = dynamic(() => import('@/components/home/collection-card')
 // Type-only, so the cycle with `home-prefs` (which imports `CardSectionKey` back from here) is
 // erased at compile time and never exists at runtime.
 import type { CardWidgetKey } from '@/lib/home/home-prefs'
-import { formatKg } from '@trainingai/shared/format/units'
+import { formatHoursMinutes, formatKg } from '@trainingai/shared/format/units'
 import { SleepVerdictNote } from '@/components/home/sleep-verdict-note'
 import { sleepWindowLabel } from '@/components/home/sleep-window-label'
 
@@ -164,7 +164,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
             <div className="flex items-start justify-between mb-2">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--accent-purple)" }}>Sleep</p>
-                <p className="text-2xl font-bold tabular-nums leading-tight">{hrs != null ? `${hrs.toFixed(1)}h` : "—"}{hrs != null && <span className="text-sm font-normal text-muted-foreground ml-1">/ {sleepGoal}h goal</span>}</p>
+                <p className="text-2xl font-bold tabular-nums leading-tight">{hrs != null ? formatHoursMinutes(hrs * 60) : "—"}{hrs != null && <span className="text-sm font-normal text-muted-foreground ml-1">/ {sleepGoal}h goal</span>}</p>
                 {windowLabel && <p className="text-xs text-muted-foreground tabular-nums">{windowLabel}</p>}
               </div>
               <Moon className="h-6 w-6 flex-none" style={{ color: "var(--accent-purple)" }} />
