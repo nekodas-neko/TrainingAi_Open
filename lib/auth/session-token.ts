@@ -7,7 +7,7 @@ export async function sessionTokenFrom(headers: Headers): Promise<JWT | null> {
   if (bearer && process.env.AUTH_SECRET) {
     try {
       const native = await decode({ token: bearer, secret: process.env.AUTH_SECRET, salt: NATIVE_SESSION_SALT })
-      if (typeof native?.nativeSessionKey === 'string') return native
+      if (typeof native?.nativeTokenId === 'string' || typeof native?.nativeSessionKey === 'string') return native
     } catch {}
   }
   return getToken({
