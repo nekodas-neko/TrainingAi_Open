@@ -1,3 +1,8 @@
+import {
+  TEMPERATURE_DEVIATION_LABEL,
+  TEMPERATURE_DEVIATION_NOTE,
+  ouraTemperatureDeviationRow,
+} from '@trainingai/shared/format/temperature-deviation';
 import { useMemo, useState } from 'react';
 import { PanResponder, Pressable, View } from 'react-native';
 import {
@@ -224,6 +229,7 @@ export function DayReadThrough({
       : []),
     { label: formatMinutesOfDay(p.minute), x: p.minute, value: p.bpm },
   ]);
+  const tempDeviation = ouraTemperatureDeviationRow(data.bodyTemp);
   return (
     <>
       {!!data.exercises.length && (
@@ -238,6 +244,21 @@ export function DayReadThrough({
       <ActivityDay logs={data.activityLogs} date={date} />
       <EnergyDay date={date} energy={energy.data} hr={data.hr} />
       {data.sleep && <SleepNight compact night={{ ...data.sleep, date }} />}
+      {tempDeviation && (
+        <Card>
+          <KeyValueGrid
+            rows={[
+              {
+                label: TEMPERATURE_DEVIATION_LABEL,
+                value: tempDeviation.value,
+              },
+            ]}
+          />
+          <AppText variant="caption" tone="muted">
+            {TEMPERATURE_DEVIATION_NOTE}
+          </AppText>
+        </Card>
+      )}
       {data.bodyTemp?.meanC != null && (
         <Card>
           <KeyValueGrid
