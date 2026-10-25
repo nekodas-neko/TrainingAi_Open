@@ -76,7 +76,7 @@ export async function POST(req: Request) {
   // The workout list only feeds a past day's 7-day strength window (`strengthWindowEndingAt`), so
   // it starts a day before that window — the slack covers a DST day in the 7 × 24 h span.
   const since7 = shiftDateStr(date, -7)
-  const sessionsFrom = dateStrMidnightInTz(shiftDateStr(date, -8), tz)
+  const sessionsFrom = dateStrMidnightInTz(shiftDateStr(date, -7), tz)
   const [ouraRows, sleepRows, bodyMetrics, derivedRows, summaries, recentSessions, userProfile, userGoals, switchDay] = await Promise.all([
     repo.getOuraDaily(userId, since7, date),
     repo.listSleepSessions(userId, since7, date),
