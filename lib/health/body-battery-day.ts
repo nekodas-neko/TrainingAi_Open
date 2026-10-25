@@ -6,7 +6,7 @@ import { hrMaxFromAge, hrReserve } from '@trainingai/shared/health/hr-zones'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { resolveBatteryHrMax, batteryConfidence, HR_PEAK_WINDOW_DAYS, type BatteryConfidence } from '@trainingai/shared/health/body-battery-inputs'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
-import type { BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
+import { bodyBatteryLabelFor, type BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
 import { nightSessions, nightWokenFrom } from '@trainingai/shared/health/sleep-night'
 import { walkBodyBattery, restThresholdFromOffset } from '@trainingai/shared/health/body-battery-walk'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
@@ -119,13 +119,6 @@ const STRESS_DRAIN_RATE = 0.020 // battery points per minute at a full (100%) be
 // `oura-stress` (#2985): the stress drain can come from Oura's `stress_high`, and Oura's scores no
 // longer anchor the day.
 export const BODY_BATTERY_MODEL_VERSION = `v7:rest+${WAKING_REST_OFFSET_BPM}bpm:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule:oura-stress`
-
-function labelFor(v: number): BodyBatteryResponse['label'] {
-  if (v >= 75) return 'Charged'
-  if (v >= 50) return 'Good'
-  if (v >= 25) return 'Low'
-  return 'Drained'
-}
 
 export interface BodyBatteryDayInput {
   repo: WorkoutRepository
@@ -425,7 +418,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
 
   const response: BodyBatteryResponse = {
     current,
-    label: labelFor(current),
+    label: bodyBatteryLabelFor(current),
     trend,
     anchor: Math.round(anchor),
     anchorSource,

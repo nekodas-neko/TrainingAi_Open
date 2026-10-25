@@ -180,6 +180,11 @@ export const typography = {
   ringWord: { fontSize: 7, lineHeight: 7 },
   // body-battery-card.tsx: the level and the figure in the header, text-xl leading-none.
   batteryValue: { fontSize: 20, lineHeight: 20, fontWeight: '700' },
+  // Home's Energy hero number (#2989), from the approved mockups at 384 px
+  // (docs/design/2026-10-18-energy-pillar-round3.html: Full 72, Compact 50, Slim 34).
+  energyFull: { fontSize: 72, lineHeight: 76, fontWeight: '700', letterSpacing: -2.5 },
+  energyCompact: { fontSize: 50, lineHeight: 52, fontWeight: '700', letterSpacing: -1.75 },
+  energySlim: { fontSize: 34, lineHeight: 36, fontWeight: '700', letterSpacing: -1.2 },
   // recommendation-card.tsx: the soreness chip, text-[10px] font-semibold leading-none.
   chipLabel: { fontSize: 10, lineHeight: 10, fontWeight: '600' },
   // trend-sparkline.tsx: chart.js x ticks at font size 9, so 14 weekday labels fit the plot.

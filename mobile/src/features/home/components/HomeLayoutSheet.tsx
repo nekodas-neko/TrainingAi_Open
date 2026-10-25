@@ -19,6 +19,7 @@ import {
   widgetLabels,
   scoreStyles,
 } from '../data/models';
+import { energyHeroSize, energyHeroSizeOptions } from '../data/energy-hero';
 import { failureNotice } from '../../../core/reporting/index.ts';
 
 export function HomeLayoutSheet({ onClose }: { onClose: () => void }) {
@@ -110,6 +111,12 @@ export function HomeLayoutSheet({ onClose }: { onClose: () => void }) {
         value={prefs.scoreRingStyle ?? 'default'}
         options={scoreStyles}
         onChange={(scoreRingStyle) => void save({ scoreRingStyle })}
+      />
+      <Picker
+        label="Energy size"
+        value={energyHeroSize(prefs.energyHeroSize)}
+        options={energyHeroSizeOptions}
+        onChange={(value) => void save({ energyHeroSize: value })}
       />
       <Picker
         label="Weight trend"

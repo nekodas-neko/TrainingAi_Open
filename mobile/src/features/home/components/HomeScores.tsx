@@ -6,12 +6,17 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
 import { useHome } from '../data/HomeProvider';
 import { homeScoreChips } from '../data/score-chips';
+/**
+ * The three pillars beside Energy (#2989), in the user's ring style. Readiness no longer has a
+ * chip: Energy opens at the readiness score and the hero is where it is read. A ScoreChip shrinks
+ * itself to the width it is given, so Compact's narrower column needs no second layout.
+ */
 export function HomeScores({ onOpen }: { onOpen: (detail: HealthDetail) => void }) {
   const { theme } = useTheme();
   const health = useHealthData();
   const home = useHome();
   const { data } = useWorkoutResource(readinessSpec(health.today));
-  const [readiness, heart, sleep, activity] = homeScoreChips(data, health.sleep, health.today);
+  const [, heart, sleep, activity] = homeScoreChips(data, health.sleep, health.today);
   return (
     <Stack
       direction="row"
@@ -29,20 +34,9 @@ export function HomeScores({ onOpen }: { onOpen: (detail: HealthDetail) => void 
       }
     >
       <ScoreChip
-        label={readiness.label}
-        shortLabel={readiness.shortLabel}
-        first
-        value={readiness.value}
-        icon="power"
-        tone="recovery"
-        color={theme.scores.readiness}
-        qualified={readiness.qualified}
-        style={home.preferences.scoreRingStyle}
-        onPress={() => onOpen('readiness')}
-      />
-      <ScoreChip
         label={heart.label}
         shortLabel={heart.shortLabel}
+        first
         value={heart.value}
         icon="cardio"
         tone="heart"
