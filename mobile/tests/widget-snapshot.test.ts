@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { buildCatalog } from '../src/features/workouts/catalog.ts';
 import { homeScoreChips } from '../src/features/home/data/score-chips.ts';
 import { homeRecommendationModel, type RecommendationInput } from '../src/features/home/data/recommendation-model.ts';
-import { nutritionEnergyModel, remainingText } from '../src/features/nutrition/data/energy-model.ts';
+import { budgetEnergyModel, nutritionEnergyModel, remainingText } from '../src/features/nutrition/data/energy-model.ts';
 import { batterySummary } from '../src/features/health/data/battery-summary.ts';
 import { hasContent, snapshotIdentity, widgetSnapshot, type SnapshotInput } from '../src/features/widgets/snapshot.ts';
 import { workoutFixture } from './workout-fixture.ts';
@@ -38,6 +38,7 @@ const energy = nutritionEnergyModel({
   targets: { proteinG: 160, carbsG: 250, fatG: 70 },
   scaledTargets: null,
 });
+const budget = budgetEnergyModel({ totals: { calories: 1260, proteinG: 98, carbsG: 132, fatG: 46 }, recordedIntake: null, budgetKcal: 2500 });
 const input = (over: Partial<SnapshotInput> = {}): SnapshotInput => ({
   user: 'user-one',
   date: today,
@@ -47,6 +48,7 @@ const input = (over: Partial<SnapshotInput> = {}): SnapshotInput => ({
   battery: { hasData: true, current: 64, label: 'Good', trend: 'charging' },
   recommendation: homeRecommendationModel(recInput()),
   energy,
+  budget,
   water: { ml: 1250, goalMl: 2500 },
   ...over,
 });
@@ -83,7 +85,7 @@ test("Home's recommendation states, in the card's order of precedence", () => {
   assert.equal(active.kind === 'session' && [active.eyebrow, active.name, active.action, active.activeId].join(), 'Workout in progress,Upper body (edited),resume,w1');
 });
 
-test("kcal left follows the energy card: budget over target, recorded intake over the logged total", () => {
+test("kcal left follows Home's nutrition card: the budget alone, recorded intake over the logged total", () => {
   assert.equal(energy.goal, 2500);
   assert.equal(energy.remaining, 1240);
   assert.deepEqual(remainingText(1240), { value: '1,240', label: 'kcal left' });
@@ -124,11 +126,19 @@ test('the snapshot is version 1 and carries every value already formatted', () =
   const model = homeRecommendationModel(recInput());
   assert.ok(model.kind === 'session');
   assert.deepEqual(snapshot.next, {
-    eyebrow: 'Recommended Today', name: 'Upper body', meta: model.facts.map((fact) => fact.text).join(' · '), sessionId: 'session-one', restDay: false,
+    eyebrow: 'Recommended Today', name: 'Upper body', meta: model.facts.map((fact) => fact.text).join(' · '), sessionId: 'session-one', startable: true, restDay: false,
   });
   assert.deepEqual(snapshot.nutrition?.kcal, { value: '1,240', label: 'kcal left' });
   assert.deepEqual(snapshot.nutrition?.macros.map((m) => m.left), ['62 g left', '118 g left', '24 g left']);
-  assert.deepEqual(snapshot.nutrition?.water, { text: '1.3L', goal: 'Goal: 2.5L', fraction: 0.5 });
+  assert.deepEqual(snapshot.nutrition?.water.steps.slice(0, 3), [
+    { text: '1.3L', fraction: 0.5 },
+    { text: '1.5L', fraction: 0.6 },
+    { text: '1.8L', fraction: 0.7 },
+  ]);
+  assert.deepEqual(
+    [snapshot.nutrition?.water.text, snapshot.nutrition?.water.goal, snapshot.nutrition?.water.fraction, snapshot.nutrition?.water.tapMl],
+    ['1.3L', 'Goal: 2.5L', 0.5, 250],
+  );
   assert.equal('collection' in snapshot, false);
   // The widget parses JSON: everything survives the round trip.
   assert.deepEqual(JSON.parse(JSON.stringify(snapshot)), snapshot);
@@ -140,6 +150,7 @@ test('missing data stays missing in the snapshot rather than turning into zero',
       scores: homeScoreChips({}, [], today),
       battery: { hasData: false, current: null, label: 'Good', trend: 'steady' },
       energy: nutritionEnergyModel({ totals: null, recordedIntake: null, budgetKcal: null, targetCalories: null, targets: {}, scaledTargets: null }),
+      budget: budgetEnergyModel({ totals: null, recordedIntake: null, budgetKcal: null }),
       water: { ml: null, goalMl: 2500 },
     }),
   );
@@ -147,12 +158,14 @@ test('missing data stays missing in the snapshot rather than turning into zero',
   assert.equal(snapshot.today.battery, null);
   assert.equal(snapshot.nutrition?.kcal, null);
   assert.ok(snapshot.nutrition?.macros.every((m) => m.left === null && m.fraction === null));
-  assert.deepEqual(snapshot.nutrition?.water, { text: '—', goal: 'Goal: 2.5L', fraction: null });
+  assert.deepEqual(snapshot.nutrition?.water.steps[0], { text: '—', fraction: null });
+  // Taps made before any water was logged count from nothing.
+  assert.deepEqual(snapshot.nutrition?.water.steps[2], { text: '500ml', fraction: 0.2 });
 });
 
 test('rest day and check-in cards reach the snapshot without a session to open', () => {
   assert.deepEqual(widgetSnapshot(input({ recommendation: homeRecommendationModel(recInput({ restChoice: true })) })).next, {
-    eyebrow: 'Rest Day', name: 'Rest Day', meta: 'Next up: Upper body', sessionId: null, restDay: true,
+    eyebrow: 'Rest Day', name: 'Rest Day', meta: 'Next up: Upper body', sessionId: null, startable: false, restDay: true,
   });
   assert.equal(widgetSnapshot(input({ recommendation: homeRecommendationModel(recInput({ mood: null })) })).next?.sessionId, null);
   assert.equal(widgetSnapshot(input({ recommendation: { kind: 'loading' } })).next, null);

@@ -64,6 +64,7 @@ import {
 } from '../features/workouts/status/WorkoutStatusSync';
 import { DynamicBackground } from '../features/weather/components/DynamicBackground';
 import type { BackgroundSection } from '../features/weather/data/background';
+import { useWidgetLaunch } from '../features/widgets/useWidgetLaunch';
 import { errorReporter } from '../core/reporting/index.ts';
 import { installErrorReporting } from '../core/reporting/install';
 
@@ -166,6 +167,13 @@ function AppShell() {
     setSessionId(id);
     setDetail('workout-session');
   }
+  // A tap on a home-screen widget (#3268); dropped while signed out.
+  useWidgetLaunch(!!dataReader, (target) => {
+    if (target.kind === 'session') {
+      setHealthDetail(null);
+      openSession(target.id);
+    } else selectTab(target.kind === 'home' ? 'Home' : target.kind === 'workout' ? 'Workout' : 'Nutrition');
+  });
   function openSettings() {
     setTab('More');
     setDetail('settings');
