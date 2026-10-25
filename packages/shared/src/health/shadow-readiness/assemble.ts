@@ -47,7 +47,9 @@ export interface ShadowRawHistory {
   /** `oura_daily` rows: wear time for low-wear exclusion, Oura's own temperature deviation (#2984)
    *  and its `stress_high` in seconds (#2985). */
   wear: readonly { date: string; nonWearTimeSec?: number | null; temperatureDeviation?: number | null; stressHigh?: number | null }[]
-  derived: readonly { day: string; stressHighMinutes: number | null }[]
+  /** `oura_daily_derived`: high-stress minutes, and (#2634) the still-period resting HR, which the
+   *  rollup stores only when its coverage cleared the floor, so a value here is already trusted. */
+  derived: readonly { day: string; stressHighMinutes: number | null; stillRhrBpm?: number | null }[]
   /** The local day the user switched to the Oura API (`getOuraCloudSwitchDay`), or null. */
   ouraCloudFrom?: string | null
   /** Strength sessions with their total volume. */
@@ -221,6 +223,7 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     // Hours only: Oura's recovery-index contributor is a 0–100 sub-score, not hours, so it is not
     // mixed into this unit's hours normal. The live composite takes it where no hours exist.
     'heart.overnight_settling': compact(summaries.map(s => obs(s.date, s.recoveryIndexHours, RING_SUMMARY_SRC))),
+    'heart.daytime_rhr': compact(raw.derived.map(r => obs(r.day, r.stillRhrBpm, 'oura_daily_derived'))).sort((x, y) => x.date.localeCompare(y.date)),
     'heart.hr_recovery': [...hrrByDay.entries()].sort(([a], [b]) => a.localeCompare(b))
       .map(([d, e]) => ({ date: d, value: median(e.values)!, source: e.source, rung: 'derived' as const })),
     // #2825: steps and SpO2 carry their device (`source_map`) too; a row from before provenance

@@ -268,7 +268,7 @@ describe('shadow readiness — structural rules', () => {
     expect(r.pillarDetail.heart.scored).toEqual({ 'heart.overnight_hrv': 0.538, 'heart.overnight_rhr': 0.462 })
     expect(r.pillarDetail.heart.dropped).toMatchObject({
       'heart.overnight_settling': 'missing',
-      'heart.daytime_rhr': 'unavailable',
+      'heart.daytime_rhr': 'missing',
       'heart.hr_recovery': 'missing',
     })
     // Only Heart scored, so readiness is Heart and Heart carries all the weight.

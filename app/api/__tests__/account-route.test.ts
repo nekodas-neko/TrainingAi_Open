@@ -4,8 +4,9 @@
 // Each refusal case is built so that only the guard it names can refuse it: the cross-account case
 // carries the correct phrase, so a missing `.strict()` would let it through rather than fail it for
 // the phrase instead.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import { encryptOuraToken } from '@/lib/oura/cloud/token-cipher'
 
 // A fresh id per case: the limiter is real and keyed by user, so a shared id would carry one case's
 // attempts into the next.
@@ -14,7 +15,10 @@ const authMock = vi.fn(async () => (sessionUser ? { user: { id: sessionUser } } 
 vi.mock('@/auth', () => ({ auth: () => authMock() }))
 
 const deleteAccount = vi.fn()
-const repo = { deleteAccount }
+// The Oura token store `disconnectOuraAccount` reads (#2892); no row unless a case stores one.
+const getOuraCloudTokens = vi.fn()
+const deleteOuraCloudTokens = vi.fn()
+const repo = { deleteAccount, getOuraCloudTokens, deleteOuraCloudTokens }
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo, getRepositoryAsync: async () => repo }))
 
 const reportServerError = vi.fn()
@@ -42,6 +46,8 @@ describe('DELETE /api/account (#2120)', () => {
   beforeEach(() => {
     sessionUser = crypto.randomUUID()
     deleteAccount.mockReset().mockResolvedValue(DELETED)
+    getOuraCloudTokens.mockReset().mockResolvedValue(null)
+    deleteOuraCloudTokens.mockReset().mockResolvedValue(true)
     reportServerError.mockReset()
   })
 
@@ -118,5 +124,76 @@ describe('DELETE /api/account (#2120)', () => {
     const res = await del({ confirm: 'DELETE' }, 'authjs.session-token=a')
     expect(res.status).toBe(404)
     expect(res.headers.getSetCookie()).toEqual([])
+  })
+
+  describe('the Oura grant (#2892)', () => {
+    const ACCESS = 'access-token-value-that-must-not-be-logged'
+    const savedKey = process.env.OURA_TOKEN_KEY
+    const fetchMock = vi.fn()
+
+    beforeEach(() => {
+      process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
+      fetchMock.mockReset().mockResolvedValue(new Response('{}', { status: 200 }))
+      vi.stubGlobal('fetch', fetchMock)
+    })
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      if (savedKey === undefined) delete process.env.OURA_TOKEN_KEY
+      else process.env.OURA_TOKEN_KEY = savedKey
+    })
+
+    function connected() {
+      getOuraCloudTokens.mockResolvedValue({
+        accessToken: encryptOuraToken(ACCESS, sessionUser, 'access_token'),
+        refreshToken: encryptOuraToken('refresh-token-value', sessionUser, 'refresh_token'),
+        expiresAt: new Date(Date.now() + 3_600_000),
+        scope: 'daily',
+      })
+    }
+
+    it('revokes a connected user\'s grant once, then deletes the account', async () => {
+      connected()
+      const res = await del({ confirm: 'DELETE' })
+      expect(res.status).toBe(200)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(String(fetchMock.mock.calls[0][0])).toContain('/oauth/revoke')
+      expect(fetchMock.mock.invocationCallOrder[0]).toBeLessThan(deleteAccount.mock.invocationCallOrder[0])
+      expect(deleteAccount).toHaveBeenCalledWith(sessionUser)
+    })
+
+    it('still deletes when Oura cannot be reached', async () => {
+      connected()
+      fetchMock.mockRejectedValue(new TypeError('fetch failed'))
+      const res = await del({ confirm: 'DELETE' })
+      expect(res.status).toBe(200)
+      expect(deleteAccount).toHaveBeenCalledTimes(1)
+    })
+
+    it('still deletes when Oura answers with an error', async () => {
+      connected()
+      fetchMock.mockResolvedValue(new Response('nope', { status: 500 }))
+      const res = await del({ confirm: 'DELETE' })
+      expect(res.status).toBe(200)
+      expect(deleteAccount).toHaveBeenCalledTimes(1)
+    })
+
+    it('still deletes when the token store throws, and logs no token', async () => {
+      connected()
+      deleteOuraCloudTokens.mockRejectedValue(new Error('connection terminated'))
+      const logged = vi.mocked(console.error).mock.calls.length
+      const res = await del({ confirm: 'DELETE' })
+      expect(res.status).toBe(200)
+      expect(deleteAccount).toHaveBeenCalledTimes(1)
+      expect(reportServerError).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ userId: sessionUser }))
+      const lines = vi.mocked(console.error).mock.calls.slice(logged).flat().map(String).join(' ')
+      expect(lines).not.toContain(ACCESS)
+    })
+
+    it('makes no call to Oura for a user with no grant', async () => {
+      const res = await del({ confirm: 'DELETE' })
+      expect(res.status).toBe(200)
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(deleteAccount).toHaveBeenCalledTimes(1)
+    })
   })
 })

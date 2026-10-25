@@ -28,7 +28,7 @@ const temp = (excess: number): UnitInput => ({ today: night(excess), history: hi
 
 describe('version 4: points, the shared budget and yesterday as load', () => {
   it('is version 4', () => {
-    expect(SHADOW_MODEL_VERSION).toBe(4)
+    expect(SHADOW_MODEL_VERSION).toBe(5)
   })
 
   it('HRV and resting HR share one 13-point budget (was 19.5)', () => {

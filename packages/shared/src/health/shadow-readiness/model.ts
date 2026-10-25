@@ -29,7 +29,9 @@ import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/sh
  * is computed as of the START of each day over the same window the live callers fetch (28 local
  * days before it, plus the day). The acute window was already 7 days here; the chronic window
  * gains one day and its span is measured from the day's start, as live has always done.
- * Version 4 = the owner's 26 Oct approvals (#2826, #2833, #2832):
+ * Version 4 = version 3 plus `heart.daytime_rhr` scored (issue 2634): the stored median HR of the
+ * day's still, awake minutes. Its 10 Heart points were renormalised over the other units before.
+ * Version 5 = the owner's 26 Oct approvals (#2826, #2833, #2832):
  *  - pillar totals float: a unit carries absolute `points`, and a pillar is worth what its units sum to;
  *  - overnight HRV and resting HR are one pattern with one 13-point budget (was 19.5);
  *  - yesterday's activity is scored as load (`activity.yesterday_load`, steady around the person's
@@ -38,7 +40,7 @@ import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/sh
  *    one) and a reliability factor (a patchy score counts less); missing data stays at zero weight;
  *  - a graded readiness ceiling: the lowest cap among the red flags limits the final number.
  */
-export const SHADOW_MODEL_VERSION = 4
+export const SHADOW_MODEL_VERSION = 5
 
 // ── Unit ids ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -273,10 +275,6 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
   'heart.daytime_rhr': {
     id: 'heart.daytime_rhr', pillar: 'heart', shape: 'directional', reference: 'learned', points: 3, daytime: true,
     direction: 'down', isNew: true, minMeaningfulChange: 2,
-    unavailable:
-      'No per-day "resting HR in still daytime periods" is stored. It needs a rollup step that '
-      + 'takes the median HR of still minutes (MET below the active threshold, `medianGated` over '
-      + '`metActiveWindows`) for each completed day and writes it beside the other daily metrics.',
   },
   'heart.hr_recovery': {
     id: 'heart.hr_recovery', pillar: 'heart', shape: 'directional', reference: 'learned', points: 3, daytime: true,

@@ -1,4 +1,5 @@
 import { createHash } from 'crypto'
+import { REFRESH_TOKEN_RE } from '@trainingai/shared/auth/refresh-token'
 
 // #2076. The one way a native-app refresh token becomes the value stored in
 // `native_refresh_tokens.token_hash`. The token itself is never stored: the server hands it to the
@@ -16,8 +17,7 @@ import { createHash } from 'crypto'
  *  method that takes this type cannot be handed the raw token by mistake. */
 export type RefreshTokenHash = string & { readonly __brand: 'RefreshTokenHash' }
 
-/** base64url, 43–128 characters: 43 is 32 random bytes (256 bits), the shortest token accepted. */
-export const REFRESH_TOKEN_RE = /^[A-Za-z0-9_-]{43,128}$/
+export { REFRESH_TOKEN_RE }
 const HASH_RE = /^[0-9a-f]{64}$/
 
 /** The stored form of a presented refresh token, or `null` when the input is not shaped like one
