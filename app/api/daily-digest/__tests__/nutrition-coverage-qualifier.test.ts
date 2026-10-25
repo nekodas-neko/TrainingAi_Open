@@ -2,31 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { todayInTz } from '@trainingai/shared/date-utils'
 
 // Q-303: the digest was giving corrective nutrition advice ("focus on bumping that protein")
-// off a single logged day drawn from a mostly-unlogged fortnight. These tests capture the actual
-// prompt sent to the model and assert the sparse-coverage line and instruction are (or are not)
-// present, rather than testing the pure date math in isolation — the bug was in what reaches the
-// model, and a unit test on a helper function cannot see that.
+// off a single logged day drawn from a mostly-unlogged fortnight. Since #3286 the digest is a
+// template with no model, so these read the text the route returns: the sparse-coverage sentence
+// is (or is not) there, and no advice is.
 
 const USER_ID = '00000000-0000-4000-8000-000000000420'
 const TODAY = todayInTz('Australia/Brisbane')
 
-let captured = ''
 let foodLogsSummaryWindow: { from: string; to: string } | null = null
 
 vi.mock('@/auth', () => ({
   auth: vi.fn(async () => ({ user: { id: USER_ID, timezone: 'Australia/Brisbane' } })),
 }))
-vi.mock('ai', () => ({
-  generateText: vi.fn(async (args: { prompt: string }) => {
-    captured = args.prompt
-    return { text: 'stub digest' }
-  }),
-}))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
-vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
-  loggedGenerateText: async (_meta: unknown, run: () => Promise<{ text: string }>) => run(),
-}))
 
 let loggedDaysInWindow = 0
 
@@ -57,42 +45,41 @@ vi.mock('@/lib/data', () => ({
   }),
 }))
 
+const digestOf = async () => {
+  const { POST } = await import('../route')
+  const res = await POST(new Request('http://localhost/api/daily-digest', { method: 'POST' }))
+  expect(res.status).toBe(200)
+  return (await res.json() as { digest: string }).digest
+}
+
 describe('daily digest — nutrition coverage qualifier (Q-303)', () => {
   beforeEach(() => {
-    captured = ''
     foodLogsSummaryWindow = null
     vi.resetModules()
   })
 
-  it('flags sparse coverage and instructs the model not to give corrective nutrition advice', async () => {
+  it('states sparse coverage and gives no corrective advice', async () => {
     loggedDaysInWindow = 4
-    const { POST } = await import('../route')
-    const res = await POST(new Request('http://localhost/api/daily-digest', { method: 'POST' }))
-    expect(res.status).toBe(200)
-    expect(captured).toBeTruthy()
-    expect(captured).toContain('Nutrition logging coverage: 4 of 14 days logged in the last two weeks (sparse)')
-    expect(captured).toMatch(/do not give corrective advice/)
+    const digest = await digestOf()
+    expect(digest).toContain('Only 4 of the last 14 days have food logged')
+    expect(digest).not.toMatch(/should|try to|aim|eat more|eat less/i)
     // The window queried is a 14-day trailing window ending today, not some other span.
     expect(foodLogsSummaryWindow?.to).toBe(TODAY)
   })
 
   it('says nothing about coverage when logging is not sparse', async () => {
     loggedDaysInWindow = 12
-    const { POST } = await import('../route')
-    const res = await POST(new Request('http://localhost/api/daily-digest', { method: 'POST' }))
-    expect(res.status).toBe(200)
-    expect(captured).toBeTruthy()
-    expect(captured).not.toContain('Nutrition logging coverage')
-    expect(captured).not.toContain('(sparse)')
+    const digest = await digestOf()
+    expect(digest).toContain('You have eaten')
+    expect(digest).not.toContain('days have food logged')
   })
 
-  it('still reports today\'s real numbers alongside the sparse-coverage flag', async () => {
+  it('still reports today\'s real numbers alongside the sparse-coverage sentence', async () => {
     loggedDaysInWindow = 2
-    const { POST } = await import('../route')
-    await POST(new Request('http://localhost/api/daily-digest', { method: 'POST' }))
+    const digest = await digestOf()
     // #2071: the denominator is the day's budget, never the typed goal (2,200 here). This fixture has
     // no weight on file, so there is no budget and the digest says so rather than quoting the goal.
-    expect(captured).toContain('Nutrition today: 1800/? kcal, 90g/150g protein')
-    expect(captured).not.toContain('/2200 kcal')
+    expect(digest).toContain('You have eaten 1,800 kcal and 90 g of 150 g protein.')
+    expect(digest).not.toContain('2,200')
   })
 })

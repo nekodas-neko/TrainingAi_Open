@@ -46,7 +46,9 @@
 --
 -- REVERSE (loses only what the connector wrote into them):
 --   DROP TABLE oura_cloud_sleep_periods; DROP TABLE oura_cloud_daily; DROP TABLE oura_sessions;
---   ALTER TABLE oura_heartrate DROP COLUMN context; ALTER TABLE oura_workouts DROP COLUMN label;
+--   DROP VIEW IF EXISTS claude_ro.oura_heartrate; ALTER TABLE oura_heartrate DROP COLUMN context;
+--   DROP VIEW IF EXISTS claude_ro.oura_workouts; ALTER TABLE oura_workouts DROP COLUMN label;
+--   (those views select the columns, so each DROP COLUMN fails without its DROP VIEW; the boot rebuild recreates the view from claude-ro-views.sql)
 
 SET LOCAL lock_timeout = '3s';
 SET LOCAL statement_timeout = '30s';

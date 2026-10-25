@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { useState } from 'react';
 import { formatDateDisplay, shiftDateStr } from '@trainingai/shared/date-utils';
@@ -39,16 +40,26 @@ export function TimeInZoneCard() {
   const total = sums.reduce((sum, value) => sum + value, 0);
   return (
     <Card>
-      <HealthResourceHeader title={'Time in Zones'} state={state} refresh={state.refresh} />
-      <SegmentedControl
-        label="Heart-rate zone period"
-        options={[
-          { label: 'Day', value: 'day' },
-          { label: 'Week', value: 'week' },
-          { label: 'Month', value: 'month' },
-        ]}
-        value={window}
-        onChange={setWindow}
+      <HealthResourceHeader
+        title={'Time in Zones'}
+        state={state}
+        refresh={state.refresh}
+        trailing={
+          <View style={{ width: theme.sizes.zonePeriodToggle }}>
+            <SegmentedControl
+              appearance="tabs"
+              size="xs"
+              label="Heart-rate zone period"
+              options={[
+                { label: 'Day', value: 'day' },
+                { label: 'Week', value: 'week' },
+                { label: 'Month', value: 'month' },
+              ]}
+              value={window}
+              onChange={setWindow}
+            />
+          </View>
+        }
       />
 
       {state.data?.profile.maxHrSource === 'cooper-blend' && (
@@ -147,7 +158,10 @@ export function ObservedHeartCard() {
   return (
     <Card>
       <HealthResourceHeader
-        title={'Heart-rate profile · Last 90 days'}
+        title="Heart-rate profile"
+        icon="cardio"
+        iconColor={theme.colors.text}
+        caption="last 90 days"
         state={state}
         refresh={state.refresh}
       />
@@ -175,7 +189,15 @@ export function ObservedHeartCard() {
               stat
             />
           </Grid>
-          <Stack gap="xs">
+          {/* observed-hr-card.tsx: border-t border-border pt-3 above the notes. */}
+          <Stack
+            gap="xs"
+            style={{
+              borderTopWidth: 1,
+              borderTopColor: theme.colors.border,
+              paddingTop: theme.spacing.md,
+            }}
+          >
             <AppText variant="caption" tone="muted">
               Working max{' '}
               <AppText variant="caption">{metricValue(profile.workingMax, 'bpm')}</AppText> (

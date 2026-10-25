@@ -12,6 +12,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { HR_UPLOAD_CHUNK, INTERVAL_UPLOAD_CHUNK, SYNC_DAYS_COLD, type ActivityInterval } from '@/lib/health-connect-sync'
 import { historyDayRejection, importPastToleranceStartMs } from '@/lib/health-connect-history-import'
 import type { HealthConnectIntervalRow } from '@/lib/data/repository'
+import { storeHealthConnectWorkouts, sweepWindow } from '@/lib/health/health-connect-workouts'
 
 // Three arrays of at most MAX_ITEMS (400) rows of bounded numbers — about 300 KB at the schema's
 // own limit — plus MAX_HR_SAMPLES heart-rate points of ~30 bytes each, another ~300 KB. 1 MB is
@@ -79,6 +80,9 @@ const ExerciseSessionSchema = z.object({
   caloriesBurned: num(20_000),
   avgHr:          int(300, 20),
   maxHr:          int(300, 20),
+  // #3044. Health Connect's `metadata.id`. Optional, as an older bundle sends none: such a session
+  // keeps the `date|HH:MM` rule.
+  recordId:       z.string().trim().min(1).max(MAX_ID_LEN).optional(),
 }).strict();
 const SleepRecordSchema = z.object({
   date:            z.string().regex(DATE_RE),
@@ -163,6 +167,16 @@ const SyncHealthSchema = z.object({
   // window it is importing. Shape only here; whether it is a usable day is judged below, where a bad
   // one is dropped with a note instead of failing the batch.
   historyFrom: z.string().regex(DATE_RE).optional(),
+  // #3044. The local days whose exercise sessions were read. When `complete` (the read returned
+  // without failing), a Health Connect session stored inside it whose id is in neither
+  // `exerciseSessions` nor `leftOut` (read, and not sent: #3115) was deleted there, and is
+  // tombstoned. Bounds are judged below (`sweepWindow`).
+  exerciseWindow: z.object({
+    from:     z.string().regex(DATE_RE),
+    to:       z.string().regex(DATE_RE),
+    complete: z.boolean(),
+    leftOut:  z.array(z.string().trim().min(1).max(MAX_ID_LEN)).max(MAX_ITEMS).optional(),
+  }).strict().optional(),
 }).strict();
 
 /**
@@ -267,49 +281,42 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Exercise sessions (deduplicate on date+startTime) ─────────────────────
+  // ── Exercise sessions (keyed on the record id; date+startTime without one) ─
   const usableSessions = usableRecords(body.exerciseSessions, ExerciseSessionSchema, 'exercise', rejected).filter(s => {
     const reason = unusableDay(s.date);
     if (reason) rejected.push(`exercise ${s.date} ${s.startTime}: ${reason}`);
     return !reason;
   });
-  if (usableSessions.length) {
-    // Filtered BEFORE this, because the range query below is keyed on the first and last date —
-    // an unusable one poisons the lookup as surely as it poisons the write.
-    const dates = [...new Set(usableSessions.map(s => s.date))].sort();
-    const existing = await repo.listActivityLogs(userId, dates[0], dates[dates.length - 1]);
-    const existingKeys = new Set(existing.map(s => `${s.date}|${s.startTime}`));
-
-    // Q-25: `activity_type` is a FK. The client maps Health Connect's exercise types to our slugs
-    // and falls back to 'other', but that mapping is a *client-side* table — it drifts the moment
-    // a type is renamed or deleted here, and an unknown slug threw out of the route, losing the
-    // whole flush including the records that were fine. Resolved server-side against the real
-    // table instead: an unrecognised type degrades to 'other' rather than dropping a real session,
-    // and only degrades to a skip if 'other' itself is missing.
-    const knownTypes = new Set((await repo.listActivityTypes()).map(t => t.id));
-    const FALLBACK_ACTIVITY_TYPE = 'other';
-
-    for (const s of usableSessions) {
-      if (existingKeys.has(`${s.date}|${s.startTime}`)) continue;
-      const reason = activityImplausibleReason(s);
-      if (reason) { rejected.push(`exercise ${s.date} ${s.startTime}: ${reason}`); continue; }
-      let activityType = s.activityType;
-      if (!knownTypes.has(activityType)) {
-        if (!knownTypes.has(FALLBACK_ACTIVITY_TYPE)) {
-          rejected.push(`exercise ${s.date} ${s.startTime}: unknown activityType "${activityType}"`);
-          continue;
-        }
-        rejected.push(`exercise ${s.date} ${s.startTime}: unknown activityType "${activityType}", stored as "${FALLBACK_ACTIVITY_TYPE}"`);
-        activityType = FALLBACK_ACTIVITY_TYPE;
+  // #3044. Deletions. Every id the phone read counts as still there, even a session refused above,
+  // so a bad record is never mistaken for a deleted one. A read that failed or stopped part-way
+  // says nothing about the sessions it did not reach, so it sweeps nothing. It runs before the
+  // store so a record that replaced another at the same minute finds that row tombstoned and takes
+  // it over in this request, not the next.
+  let exercisesTombstoned = 0;
+  if (body.exerciseWindow?.complete) {
+    const window = sweepWindow(body.exerciseWindow, today);
+    if ('reason' in window) {
+      rejected.push(`exerciseWindow ${body.exerciseWindow.from}–${body.exerciseWindow.to}: ${window.reason}`);
+    } else if (body.source !== 'health_connect') {
+      rejected.push('exerciseWindow: ignored — only Health Connect sessions are swept');
+    } else {
+      const keep = [...(body.exerciseSessions ?? []).flatMap(raw => {
+        const id = (raw as { recordId?: unknown } | null)?.recordId;
+        return typeof id === 'string' && id.trim() ? [id.trim()] : [];
+      }), ...(body.exerciseWindow.leftOut ?? [])];
+      if (keep.length === 0) {
+        // A read that returned nothing is what a new phone, cleared Health Connect data or a
+        // restore still catching up looks like, and sweeping on it would tombstone every stored
+        // session in the window. Nothing is swept; a genuine last-session delete waits for the next
+        // read that has one.
+        rejected.push('exerciseWindow: no sessions came back, so none were swept')
+      } else {
+        exercisesTombstoned = await repo.tombstoneHealthConnectActivityLogs(userId, { ...window, keep });
       }
-      await repo.saveActivityLog(userId, {
-        date: s.date, activityType, title: s.title,
-        startTime: s.startTime, endTime: s.endTime,
-        durationMin: s.durationMin, distanceKm: s.distanceKm,
-        caloriesBurned: s.caloriesBurned, avgHr: s.avgHr, maxHr: s.maxHr,
-      });
     }
   }
+
+  await storeHealthConnectWorkouts(repo, userId, usableSessions, rejected);
 
   // ── Sleep sessions (dedup handled by UNIQUE(user_id, sleep_start)) ────────
   const sleepRecords = usableRecords(body.sleepRecords, SleepRecordSchema, 'sleep', rejected);
@@ -408,5 +415,5 @@ export async function POST(req: NextRequest) {
     .filter(a => a.avgHr == null && a.distanceKm == null && a.caloriesBurned == null && a.startTime && a.endTime)
     .map(a => ({ id: a.id, date: a.date, startTime: a.startTime, endTime: a.endTime }));
 
-  return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateAccepted, intervalsAccepted });
+  return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateAccepted, intervalsAccepted, exercisesTombstoned });
 }

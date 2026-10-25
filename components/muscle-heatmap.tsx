@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { Slug, ExtendedBodyPart } from "react-muscle-highlighter";
 import { normalizeMuscle } from "@trainingai/shared/muscles";
 import { muscleVolumeColor } from "@/components/health/volume-band";
+import { VOLUME_TARGET_LEGEND, VOLUME_UNTRAINED_LABEL, VOLUME_BARS_KEY_NOTE } from "@trainingai/shared/health/volume-band";
 
 const Body = dynamic(() => import("react-muscle-highlighter").then((m) => ({ default: m.default })), {
   ssr: false,
@@ -178,14 +179,14 @@ export const MuscleHeatmap = memo(function MuscleHeatmap({ muscleNames, assignme
           <span className="flex items-center gap-2.5 flex-wrap justify-center" aria-hidden="true">
             {volumeKey === "target" ? (
               <>
-                <KeyItem fill="var(--destructive)" label="Under 60%" />
-                <KeyItem fill="var(--accent-amber)" label="60–99%" />
-                <KeyItem fill="var(--accent-green)" label="At target" />
+                <KeyItem fill="var(--destructive)" label={VOLUME_TARGET_LEGEND[0].label} />
+                <KeyItem fill="var(--accent-amber)" label={VOLUME_TARGET_LEGEND[1].label} />
+                <KeyItem fill="var(--accent-green)" label={VOLUME_TARGET_LEGEND[2].label} />
               </>
             ) : (
-              <span>Colours match the bars below</span>
+              <span>{VOLUME_BARS_KEY_NOTE}</span>
             )}
-            <KeyItem fill={UNTRAINED_FILL} label="Not trained" outlined />
+            <KeyItem fill={UNTRAINED_FILL} label={VOLUME_UNTRAINED_LABEL} outlined />
             {!!injuredMuscles?.length && <KeyItem fill="transparent" label="Injured" ring />}
           </span>
         </div>

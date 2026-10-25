@@ -30,23 +30,11 @@ let storedCalories = 1660
 /** `users.calorie_goal_type`: 'own' flags `storedCalories` as the user's OWN target (issue 2622). */
 let storedType: 'daily' | 'weekly' | 'own' | null = 'daily'
 let targetWeightKg: number | null = 60
-let digestPrompt = ''
 
 vi.mock('@/auth', () => ({
   auth: vi.fn(async () => ({ user: { id: USER_ID, timezone: 'Australia/Brisbane' } })),
 }))
-vi.mock('ai', async (orig) => ({
-  ...(await orig<typeof import('ai')>()),
-  generateText: vi.fn(async (args: { prompt: string }) => {
-    digestPrompt = args.prompt
-    return { text: 'stub digest' }
-  }),
-}))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
-vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
-  loggedGenerateText: async (_meta: unknown, run: () => Promise<{ text: string }>) => run(),
-}))
 
 const repo = {
   // energy balance
@@ -96,10 +84,10 @@ async function budgetsBySurface() {
   const energy = await tools.getEnergyBalance.execute!({ date: null }, opts) as { dailyBudgetKcal: number; kcalLeftToHitTarget: number }
   const day = await tools.getNutritionDay.execute!({ date: null }, opts) as { targets: { calories: number }; remainingKcal: number }
 
-  digestPrompt = ''
   const { POST } = await import('@/app/api/daily-digest/route')
-  await POST(new Request('http://localhost/api/daily-digest', { method: 'POST', body: '{"force":true}' }))
-  const digest = Number(/Nutrition today: \d+\/(\d+) kcal/.exec(digestPrompt)?.[1])
+  const digestRes = await POST(new Request('http://localhost/api/daily-digest', { method: 'POST' }))
+  const { digest: digestText } = await digestRes.json() as { digest: string }
+  const digest = Number(/of your ([\d,]+) kcal budget/.exec(digestText)?.[1]?.replace(/,/g, ''))
 
   // What every client surface computes from the payload (Nutrition, Home ×2, log-food sheet,
   // end-of-day review, Health goals, weekly chart).

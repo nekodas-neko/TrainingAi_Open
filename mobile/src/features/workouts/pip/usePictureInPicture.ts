@@ -3,7 +3,8 @@ import { pictureInPicture } from '../../../integrations/pip/platform';
 import type { PictureInPicture } from '../../../integrations/pip/types';
 import type { WorkoutJournalStore } from '../logging/WorkoutJournalStore';
 import type { WorkoutRecord } from '../logging/workout';
-import { pipCommand, pipPhaseFor, pipViewFor, type PipAction } from './pip';
+import { workoutStatusFor } from '../status/workout-status';
+import { pipCommand, pipPhaseFor, pipSetColor, type PipAction } from './pip';
 
 /**
  * Tells the module what the workout screen shows. Sends only on change, and "idle" once closed:
@@ -16,16 +17,17 @@ export function createPipReporter(native: Pick<PictureInPicture, 'setPhase'> | n
     update(workout: WorkoutRecord) {
       if (closed || !native) return;
       const phase = pipPhaseFor(workout);
-      const view = pipViewFor(workout);
-      const key = JSON.stringify([phase, view]);
+      const status = workoutStatusFor(workout);
+      const setColor = pipSetColor(workout);
+      const key = JSON.stringify([phase, status, setColor]);
       if (key === last) return;
       last = key;
-      native.setPhase(phase, view);
+      native.setPhase(phase, status, setColor);
     },
     close() {
       if (closed) return;
       closed = true;
-      native?.setPhase('idle', null);
+      native?.setPhase('idle', null, null);
     },
   };
 }

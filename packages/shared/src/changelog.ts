@@ -6,6 +6,45 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.499.0",
+    date: "2026-10-26",
+    changes: [
+      "Behind the scenes: the database gets room to record when Oura revises a night, a daytime resting heart rate, sessions deleted in the Oura app, whether a workout's heart rate was dense enough to trust, and why a workout was deleted. Nothing you see changes until the next release uses them.",
+    ],
+  },
+  {
+    version: "1.498.0",
+    date: "2026-10-25",
+    changes: [
+      "TrainingAi Preview no longer closes when you open Home during a workout, the lock-screen workout keeps updating while the app is in the background, and Voice can ask for the microphone.",
+      "After you apply or undo a Coach change, the programme, the next session and the workout card show it straight away.",
+      "The daily digest, a session's explanation and the nutrition goal explanation appear straight away, written from your own figures without an AI call.",
+      "Body composition updates from each weigh-in again since the ring moved to the Oura app, and a deleted reading no longer feeds it.",
+      "TrainingAi Preview shows the same kcal left on Home, Body and End of Day.",
+      "Behind the scenes: an empty Health Connect read no longer removes your imported workouts, and the heart-rate recovery backfill keeps a valid drop on a session's last set.",
+    ],
+  },
+  {
+    version: "1.497.0",
+    date: "2026-10-25",
+    changes: [
+      "TrainingAi Preview looks like the current app: Home, Health (Training, Progress, Heart rate, Week in review), Nutrition, Cardio Hub and More match it, the text is set in the same typeface, and controls are back to the current app's size.",
+      "In TrainingAi Preview, an active workout shows on the lock screen and in the notification shade with the exercise, the set and a rest countdown that keeps running with the screen off, and the picture-in-picture window shows the same.",
+      "TrainingAi Preview can log a set by voice, and its Training Load card adds a weekly line showing whether your training block is building or easing.",
+      "In TrainingAi Preview, a sign-in left unfinished clears itself, Back from editing a meal returns to the meal library, and Data & Sync lists any upload the server refused, with Retry and Discard.",
+      "You can set your own weight-response target band on the vial sheet, as a percentage of bodyweight per week.",
+      "The Oura settings show a connection Oura refused as needing a reconnect instead of connected, and the Meals vs sleep card says which meal time it used.",
+      "Behind the scenes: Health Connect workouts are matched by their record id and removed when deleted there, heart-rate recovery is measured from when a set actually ended, and a recompute can clear a stale best.",
+    ],
+  },
+  {
+    version: "1.496.0",
+    date: "2026-10-25",
+    changes: [
+      "When Oura stops sharing a kind of data, or the Oura connection needs signing in again, the app notices and reads that data from Health Connect again instead of waiting for Oura.",
+    ],
+  },
+  {
     version: "1.495.0",
     date: "2026-10-22",
     changes: [

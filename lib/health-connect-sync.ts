@@ -10,7 +10,7 @@ import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trai
 import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, daysBetweenDateStrs, isCalendarDate, todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { capitalize } from '@trainingai/shared/format/capitalize';
-import { FirstHandFilter, knownFirstHandSources, type FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
+import { FirstHandFilter, firstHandSkipsLapsed, knownFirstHandSources, type FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -74,6 +74,8 @@ interface ExerciseSession {
   caloriesBurned?: number;
   avgHr?: number;
   maxHr?: number;
+  /** #3044. `metadata.id`, which the server keys the session on. */
+  recordId?: string;
 }
 
 // Map Health Connect's exerciseType string constants to our activity_types slugs.
@@ -92,8 +94,7 @@ const EXERCISE_TYPE_TO_ACTIVITY_TYPE: Record<string, string> = {
   EXERCISE_TYPE_STRETCHING: 'stretch',
   EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING: 'hiit',
   // #2828 N6. A watch's gym session, which as 'other' was costed at the generic 6.0 MET cardio rate
-  // rather than strength training's. The `strength` row in `activity_types` comes with its own
-  // migration; until it lands `/api/sync-health` stores these as 'other', exactly as before.
+  // rather than strength training's (`strength` in `activity_types`, #3160).
   EXERCISE_TYPE_STRENGTH_TRAINING: 'strength',
   EXERCISE_TYPE_WEIGHTLIFTING: 'strength',
   EXERCISE_TYPE_CALISTHENICS: 'strength',
@@ -138,6 +139,11 @@ export interface SyncPayload {
    *  window being imported. It tells `/api/sync-health` that heart-rate and interval rows this old
    *  are deliberate, not a broken clock. Absent on every ordinary sync. */
   historyFrom?: string;
+  /** #3044: the local days whose exercise sessions were read. When `complete` (the read returned
+   *  without failing), a stored Health Connect session dated inside it whose id is in neither
+   *  `exerciseSessions` nor `leftOut` was deleted there. `leftOut` holds the ids of sessions the
+   *  phone read and did not send (#3115), so they are not mistaken for deletions. */
+  exerciseWindow?: { from: string; to: string; complete: boolean; leftOut?: string[] };
 }
 
 /** One intraday heart-rate reading, at the source's own resolution. `at` is epoch ms. */
@@ -464,6 +470,24 @@ export function syncWindowIso(todayStr: string, daysBack: number, tz: string): {
   };
 }
 
+/**
+ * #3044. The local days `[startIso, endIso)` covers in full, for the server's deletion sweep, or
+ * undefined when it does not begin and end on the user's midnights: a part-read day would read
+ * the sessions outside the window as deleted. Both callers read whole days (`syncWindowIso`, the
+ * history import's windows), so this is a guard, not a trim.
+ */
+export function exerciseSweepWindow(
+  startIso: string, endIso: string, tz: string,
+  { complete, leftOut = [] }: { complete: boolean; leftOut?: string[] },
+): SyncPayload['exerciseWindow'] {
+  const from = toLocalDate(startIso, tz);
+  const to = toLocalDate(new Date(Date.parse(endIso) - 1).toISOString(), tz);
+  if (dateStrMidnightInTz(from, tz).toISOString() !== new Date(startIso).toISOString()) return undefined;
+  if (dateStrMidnightInTz(shiftDateStr(to, 1), tz).toISOString() !== new Date(endIso).toISOString()) return undefined;
+  if (to < from) return undefined;
+  return { from, to, complete, ...(leftOut.length ? { leftOut } : {}) };
+}
+
 /** A session's start and end as the user's wall clock, "HH:MM". Without a zone `msToHHMMInTz` falls
  *  back to Brisbane, which stored every non-Brisbane user's sessions with the wrong clock (#2438). */
 export function sessionClockTimes(startIso: string, endIso: string, tz: string): { startTime: string; endTime: string } {
@@ -567,6 +591,17 @@ export async function openHealthConnect(): Promise<HealthConnectSession | { note
 
 /** Local date of the oldest window whose Oura records were skipped, kept until a rewind sync finishes cleanly. */
 export const SKIPPED_SINCE_KEY = 'ta_hc_first_hand_skipped_since';
+/** The record types skipped since that date, as a JSON array (#3228 review): what a rewind is owed for. */
+export const SKIPPED_TYPES_KEY = 'ta_hc_first_hand_skipped_types';
+
+function readSkippedTypes(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SKIPPED_TYPES_KEY) ?? 'null') as unknown;
+    return Array.isArray(raw) ? raw.filter((t): t is string => typeof t === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 /** The last sync's skip counts: replaced on every sync, so they are that sync's and never a running total. */
 export const LAST_SKIPPED_KEY = 'ta_hc_last_skipped';
 
@@ -587,19 +622,26 @@ export function rememberSyncSkipped(result: SyncResult | null): void {
   } catch { /* storage unavailable: the counts are diagnostics only */ }
 }
 
+function writeSkipMarker(since: string, types: string[]): void {
+  localStorage.setItem(SKIPPED_SINCE_KEY, since);
+  localStorage.setItem(SKIPPED_TYPES_KEY, JSON.stringify(types));
+}
+
 export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<SyncResult | null> {
   const opened = await openHealthConnect();
   if (!opened) return null;
   if ('note' in opened) return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: opened.note };
 
-  // #3197: records skipped while Oura Cloud was connected are not read again by a 7-day hot sync.
-  // Once the connection reads as gone, the next sync reaches back to the oldest skipped day, at most
-  // the cold 30 days (all Health Connect lets us read without the history permission), so they come
-  // back. Server-side Oura Cloud rows stay either way.
+  // #3197: records skipped while Oura Cloud delivered their type are not read again by a 7-day hot
+  // sync. Once a skipped type is no longer delivered (#3228 review: not merely "some type is not",
+  // which under a partial grant rewound every other sync), the next sync reaches back to the oldest
+  // skipped day, at most the cold 30 days (all Health Connect lets us read without the history
+  // permission), so they come back. Server-side Oura Cloud rows stay either way.
   const firstHand = await cachedFirstHandSources(tz);
   const todayStr = todayInTz(tz);
   const skippedSince = localStorage.getItem(SKIPPED_SINCE_KEY);
-  const rewind = firstHand?.ouraCloud === false && skippedSince !== null;
+  const skippedTypes = readSkippedTypes();
+  const rewind = skippedSince !== null && firstHandSkipsLapsed(firstHand, skippedTypes);
   const lastSync  = localStorage.getItem(LAST_SYNC_KEY);
   const rewindDays = skippedSince && isCalendarDate(skippedSince)
     ? Math.min(SYNC_DAYS_COLD, Math.max(SYNC_DAYS_HOT, daysBetweenDateStrs(skippedSince, todayStr) + 1))
@@ -617,9 +659,18 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<SyncRe
     onPosted: () => localStorage.setItem(LAST_SYNC_KEY, endIso),
   });
   // `onPosted` runs before the heart-rate and interval uploads, so the marker is cleared here, once
-  // the whole window has landed. A failed upload or a failed read keeps it for the next sync.
-  if (rewind && !result.failed && !result.incomplete) localStorage.removeItem(SKIPPED_SINCE_KEY);
-  else if (result.skippedFirstHand && skippedSince === null) localStorage.setItem(SKIPPED_SINCE_KEY, toLocalDate(startIso, tz));
+  // the whole window has landed. A failed upload or a failed read keeps it for the next sync. A clean
+  // rewind still skips the types that are delivered, so what it left out becomes the new marker.
+  const skippedNow = Object.keys(result.skippedFirstHand ?? {});
+  if (rewind && !result.failed && !result.incomplete) {
+    if (skippedNow.length) writeSkipMarker(toLocalDate(startIso, tz), skippedNow);
+    else {
+      localStorage.removeItem(SKIPPED_SINCE_KEY);
+      localStorage.removeItem(SKIPPED_TYPES_KEY);
+    }
+  } else if (skippedNow.length) {
+    writeSkipMarker(skippedSince ?? toLocalDate(startIso, tz), [...new Set([...skippedTypes, ...skippedNow])]);
+  }
   return result;
 }
 
@@ -780,12 +831,14 @@ export async function syncWindow(
 
   // ── Exercise sessions ─────────────────────────────────────────────────────
   const exerciseSessions: ExerciseSession[] = [];
+  let exerciseWindow: SyncPayload['exerciseWindow'];
   if (canRead.has('ActivitySession')) {
     try {
       const records = await read('ActivitySession');
       for (const r of records as Array<{ startTime: string; endTime: string; exerciseType: string; title?: string }>) {
         const durationMin = (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 60000;
         const metrics = await getSessionMetrics(HealthConnect, canRead, r.startTime, r.endTime, filter);
+        const { recordId } = metadataOf(r);
         exerciseSessions.push({
           date:         toLocalDate(r.startTime, tz),
           title:        r.title?.trim() || exerciseTypeLabel(r.exerciseType),
@@ -793,9 +846,15 @@ export async function syncWindow(
           ...sessionClockTimes(r.startTime, r.endTime, tz),
           durationMin:  Math.round(durationMin * 10) / 10,
           ...metrics,
+          ...(recordId ? { recordId } : {}),
         });
       }
-    } catch { /* ignore */ }
+      // Complete only once every session in the window is in hand: a read that threw part-way says
+      // nothing about the sessions it did not reach, and the server sweeps nothing for it.
+      exerciseWindow = exerciseSweepWindow(startIso, endIso, tz, { complete: true, leftOut: filter.leftOutIds('ActivitySession') });
+    } catch {
+      exerciseWindow = exerciseSweepWindow(startIso, endIso, tz, { complete: false });
+    }
   }
 
   // ── Sleep sessions ────────────────────────────────────────────────────────
@@ -882,7 +941,7 @@ export async function syncWindow(
   const dailyMetrics = Object.values(dayBuckets);
   const counts = filter.counts();
   const skipped = Object.keys(counts).length ? { skippedFirstHand: counts } : {};
-  const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0;
+  const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0 || exerciseWindow?.complete === true;
   if (!hasDaily && !heartRateSamples.length && !activityIntervals.length) {
     onPosted?.();
     return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: 'no data from HC', requests: 0, ...(readFailed ? { incomplete: true } : {}), ...skipped };
@@ -897,7 +956,11 @@ export async function syncWindow(
     const res = await fetch('/api/sync-health', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dailyMetrics, exerciseSessions, sleepRecords, ...(historyFrom ? { historyFrom } : {}) } satisfies SyncPayload),
+      body: JSON.stringify({
+        dailyMetrics, exerciseSessions, sleepRecords,
+        ...(historyFrom ? { historyFrom } : {}),
+        ...(exerciseWindow ? { exerciseWindow } : {}),
+      } satisfies SyncPayload),
     });
 
     if (res.ok) {

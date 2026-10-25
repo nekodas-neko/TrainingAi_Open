@@ -12,9 +12,11 @@ const USER_ID = '00000000-0000-4000-8000-000000000066'
 
 // The owner's real profile on 2026-09-14, the day a recommendation was generated and applied.
 let fitnessGoal = 'recomp'
+let activityLevel = 'moderate'
+let sessionCount = 0
 const USER = {
   id: USER_ID, dateOfBirth: '1993-01-01', heightCm: 158, sex: 'male',
-  activityLevel: 'moderate', timezone: 'Australia/Brisbane',
+  get activityLevel() { return activityLevel }, timezone: 'Australia/Brisbane',
   get fitnessGoal() { return fitnessGoal },
 }
 const WEIGHT_KG = 70.35
@@ -27,35 +29,23 @@ const MODEL_NUMBERS = {
   recommendedCarbsG: 131, recommendedFatG: 55, recommendedWaterMl: 2600,
 }
 
-let modelObject: Record<string, unknown> = {}
 let created: Record<string, unknown> | null = null
 
 vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: USER })) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
-vi.mock('ai', async (orig) => ({
-  ...(await orig<Record<string, unknown>>()),
-  generateObject: vi.fn(async () => ({ object: modelObject })),
-}))
-vi.mock('@/lib/ai/instrument', () => ({
-  aiModel: () => ({}),
-  loggedGenerateObject: async (_m: unknown, run: () => Promise<unknown>) => run(),
-}))
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
     getUserById: async () => USER,
     getUserGoals: async () => ({ stepsGoal: 8000, stepsGoalType: 'manual', calorieGoal: 2000, calorieGoalType: 'manual', waterGoalMl: 2500, waterGoalType: 'manual' }),
     getNutritionTargets: async () => ({ calories: 2000, proteinG: 150, carbsG: 200, fatG: 60 }),
     listBodyMetrics: async () => [{ date: '2026-09-14', weightKg: WEIGHT_KG, bodyFatPct: BODY_FAT_PCT, bodyFatSource: 'scale' }],
-    listSleepSessions: async () => [],
-    listMoodLogs: async () => [],
-    getWorkoutSessionsFrom: async () => [],
+    getWorkoutSessionsFrom: async () => Array.from({ length: sessionCount }, (_, i) => ({ id: `w${i}` })),
     listRecentPersonalRecords: async () => [],
     getActiveProgram: async () => null,
     listProgramPhases: async () => [],
     countSessionsSinceStart: async () => 0,
     getLatestMeasuredRmr: async () => MEASURED_RMR,
     getBodyFatCalibration: async () => null,
-    getExerciseTypes: async () => ({}),
     createGoalRecommendation: async (_u: string, row: Record<string, unknown>) => { created = row; return { id: 'rec-1' } },
   }),
 }))
@@ -76,7 +66,8 @@ const call = async () => {
 beforeEach(() => {
   created = null
   fitnessGoal = 'recomp'
-  modelObject = { recommendedActivityLevel: null, reasoning: 'r', insights: 'i', dataQualityNote: '' }
+  activityLevel = 'moderate'
+  sessionCount = 0
 })
 
 describe('/api/nutrition-goals/recommend', () => {
@@ -101,19 +92,6 @@ describe('/api/nutrition-goals/recommend', () => {
     expect(body.recommended.stepsGoal).not.toBe(MODEL_NUMBERS.recommendedStepsGoal)
   })
 
-  it('ignores numeric fields even when the model volunteers them', async () => {
-    // The load-bearing case: a model that keeps emitting its old shape must not be able to reach
-    // the response. Dropping the fields from the schema is what makes this true, and a schema is
-    // exactly the kind of thing a later edit re-adds "for completeness".
-    modelObject = { ...modelObject, ...MODEL_NUMBERS }
-    const base = baselineFor('moderate')
-    const { body } = await call()
-
-    expect(body.recommended.stepsGoal).toBe(base.stepsGoal)
-    expect(body.recommended.calories).toBe(base.calories)
-    expect(body.recommended.proteinG).toBe(base.proteinG)
-  })
-
   it('persists the baseline figures, since the sheet applies what was stored', async () => {
     const base = baselineFor('moderate')
     await call()
@@ -125,20 +103,20 @@ describe('/api/nutrition-goals/recommend', () => {
     })
   })
 
-  it('recomputes every figure from a suggested activity level, rather than taking the model\'s word for the result', async () => {
-    // The one judgement the model still makes is a CATEGORY. The numbers that follow are the
-    // formula's, evaluated on the new level — which is why `active` has to move steps to its own
-    // table value rather than to anything the model says.
-    modelObject = { ...modelObject, recommendedActivityLevel: 'active', ...MODEL_NUMBERS }
-    const onActive = baselineFor('active')
+  it('recomputes every figure from a suggested activity level, through the formula', async () => {
+    // The one judgement the old model made was a CATEGORY; it is now a threshold on logged
+    // sessions. The numbers that follow are the formula's, evaluated on the new level: 8 sessions in
+    // 14 days against a stated 'light' moves steps and water to the 'moderate' table values.
+    activityLevel = 'light'
+    sessionCount = 8
     const onModerate = baselineFor('moderate')
-    expect(onActive.stepsGoal).not.toBe(onModerate.stepsGoal)  // the fixture would be vacuous otherwise
+    expect(onModerate.stepsGoal).not.toBe(baselineFor('light').stepsGoal)  // vacuous otherwise
 
     const { body } = await call()
 
-    expect(body.recommended.activityLevel).toBe('active')
-    expect(body.recommended.stepsGoal).toBe(onActive.stepsGoal)
-    expect(body.recommended.waterMl).toBe(onActive.waterMl)
+    expect(body.recommended.activityLevel).toBe('moderate')
+    expect(body.recommended.stepsGoal).toBe(onModerate.stepsGoal)
+    expect(body.recommended.waterMl).toBe(onModerate.waterMl)
   })
 
   // This is the case that makes keeping `clampRecommendation` load-bearing rather than tidy, and it

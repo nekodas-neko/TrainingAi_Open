@@ -7,7 +7,6 @@ import { HomeScores } from '../components/HomeScores';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils';
-import { shiftDateStr } from '@trainingai/shared/date-utils';
 import type { Program } from '@trainingai/shared/types/program';
 import {
   AppButton,
@@ -21,7 +20,8 @@ import {
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHome } from '../data/HomeProvider';
-import { homeSections, sectionLabels, trainingDays } from '../data/models';
+import { homeSections, sectionLabels } from '../data/models';
+import { useTrainingDays } from '../data/useTrainingDays';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { readinessSpec, profileSpec } from '../../health/data/models';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
@@ -33,7 +33,7 @@ import {
   useWorkoutResource,
   useWorkoutResources,
 } from '../../workouts/data/WorkoutDataProvider';
-import { calendarSpec, programSpec, streakDataSpec } from '../../workouts/data/models';
+import { programSpec } from '../../workouts/data/models';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
 import type { SessionPreview } from '../../workouts/catalog';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
@@ -79,13 +79,7 @@ export function HomeScreen(navigation: HomeNavigation) {
   const readiness = useWorkoutResource(readinessSpec(health.today));
   const profile = useWorkoutResource(profileSpec);
   const programs = useWorkoutResource(programSpec);
-  const [year, month] = health.today.split('-').map(Number);
-  const previous = shiftDateStr(health.today.slice(0, 7) + '-01', -1)
-    .split('-')
-    .map(Number);
-  const calendar = useWorkoutResource(calendarSpec(year, month));
-  const lastCalendar = useWorkoutResource(calendarSpec(previous[0], previous[1]));
-  const streakData = useWorkoutResource(streakDataSpec);
+  const { days, calendar, lastCalendar, streakData } = useTrainingDays(health.today);
   const [manual, setManual] = useState(false);
   const [editing, setEditing] = useState(false);
   const undo = useUndo();
@@ -126,10 +120,6 @@ export function HomeScreen(navigation: HomeNavigation) {
     setSelectedSession(session);
     setModal('readiness');
   }
-  const days = trainingDays(
-    [streakData.data?.trainedDays, lastCalendar.data?.trainedDays, calendar.data?.trainedDays],
-    journal.data.workouts,
-  );
   const program = programs.data?.programs.find((p) => p.id === workout.catalog?.program?.id);
   const schedule = program?.schedule ?? null;
   const target = program ? getScheduledSessionsPerWeek(program as Program) : null;

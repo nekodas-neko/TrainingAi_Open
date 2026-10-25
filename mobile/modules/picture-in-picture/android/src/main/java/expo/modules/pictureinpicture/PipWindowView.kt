@@ -8,11 +8,13 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
+import android.os.SystemClock
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.animation.LinearInterpolator
+import android.widget.Chronometer
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -23,18 +25,34 @@ import android.widget.TextView
 // bold mono clock, and 9 dp uppercase captions. Text is sized in dp, not sp: the current app's CSS
 // pixels ignore the system font scale, and the fixed ring has no room for a larger clock.
 // Preview bundles no Geist Mono, so the clock is the system mono face with tabular figures.
-class PipWindowView(context: Context) : FrameLayout(context) {
+//
+// The clocks are Chronometers on the elapsed-realtime base, so the platform counts them with no JS
+// and no tick of ours. Each second the big clock's own tick asks `frameAt` for a fresh frame, which
+// moves the ring and turns a rest over at its target (#3266).
+class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) : FrameLayout(context) {
   private val density = resources.displayMetrics.density
   private fun dp(value: Float) = (value * density).toInt()
 
   private val ring = RingView(context)
   // tracking-widest (0.1 em) on the name; tracking-wide (0.025 em) inside the ring.
   private val name = caption(9f, FAINT, WIDEST)
-  private val time = text(32f, Color.WHITE, bold = true).apply {
+  private val time = clock(32f, Color.WHITE).apply {
     typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
     fontFeatureSettings = "tnum"
+    // The second has ticked: redraw what depends on it.
+    setOnChronometerTickListener {
+      format(it)
+      render()
+    }
   }
-  private val target = caption(9f, TARGET, WIDE)
+  private val target = clock(9f, TARGET).apply {
+    isAllCaps = true
+    letterSpacing = WIDE
+    maxLines = 1
+  }
+  private val gate = PipClockGate()
+  private val timeClock = clockOf(time)
+  private val targetClock = clockOf(target)
   private val label = caption(9f, FAINT, WIDE)
   private val load = text(14f, LOAD, bold = true).apply { fontFeatureSettings = "tnum" }
   private val timer = column(dp(4f)).apply {
@@ -72,39 +90,75 @@ class PipWindowView(context: Context) : FrameLayout(context) {
     addView(placeholder, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
   }
 
-  fun render(window: PipWindow?, nowMs: Long) {
-    // Without a timer to show (the summary, the workout done, or no data yet) the window shows the
-    // placeholder rather than going blank. "Tap Next" only where the window has a Next button.
-    if (window == null || window.kind == "placeholder") {
+  /** Draws the workout as it is now. A render reached from a clock's tick inside one is skipped. */
+  fun render() = gate.render { redraw() }
+
+  private fun redraw() {
+    val frame = frameAt(System.currentTimeMillis())
+    if (frame !is PipFrame.Timer) {
+      val shown = frame as PipFrame.Placeholder
       timer.visibility = GONE
       placeholder.visibility = VISIBLE
-      doneName.text = window?.exerciseName ?: ""
-      doneName.visibility = if (doneName.text.isEmpty()) GONE else VISIBLE
-      hint.visibility = if (window?.hint == true) VISIBLE else GONE
+      doneName.text = shown.name
+      doneName.visibility = if (shown.name.isEmpty()) GONE else VISIBLE
+      hint.visibility = if (shown.hint) VISIBLE else GONE
+      count(time, null)
+      count(target, null)
       setPulse(false)
       return
     }
     placeholder.visibility = GONE
     timer.visibility = VISIBLE
-    val clock = PipState.clock(window, nowMs)
-    name.text = window.exerciseName
-    name.visibility = if (window.exerciseName.isEmpty()) GONE else VISIBLE
-    time.text = PipState.formatTime(clock.seconds)
-    time.setTextColor(if (clock.overTime) OVER else Color.WHITE)
-    target.text = clock.target ?: ""
-    target.visibility = if (clock.target == null) GONE else VISIBLE
-    target.setTextColor(if (clock.overTime) OVER else TARGET)
-    label.text = clock.label
-    load.text = window.load ?: ""
-    load.visibility = if (window.phase == "set") VISIBLE else GONE
-    ring.fraction = clock.fraction
+    name.text = frame.name
+    name.visibility = if (frame.name.isEmpty()) GONE else VISIBLE
+    count(time, frame.countsFrom)
+    time.setTextColor(if (frame.overTime) OVER else Color.WHITE)
+    // Before the target the caption is the target itself; past it, the overrun counting up. The
+    // caption is shown before its clock is counted: the gate starts a clock once, and a Chronometer
+    // started while hidden doesn't run.
+    target.visibility = if (frame.target == null) GONE else VISIBLE
+    count(target, frame.overFrom)
+    if (frame.overFrom == null) target.text = frame.target ?: ""
+    target.setTextColor(if (frame.overTime) OVER else TARGET)
+    label.text = frame.label
+    // No load is known: the line stays empty rather than showing a made-up one.
+    load.text = frame.load ?: ""
+    load.visibility = if (!frame.rest && frame.load != null) VISIBLE else GONE
+    ring.fraction = frame.fraction
     ring.color = when {
-      window.phase != "rest" -> window.setColor?.let(Color::parseColor) ?: REST
-      clock.overTime -> OVER
+      !frame.rest -> frame.setColor?.let(Color::parseColor) ?: REST
+      frame.overTime -> OVER
       else -> REST
     }
     ring.invalidate()
-    setPulse(window.phase == "set")
+    setPulse(!frame.rest)
+  }
+
+  /** Counts `view` up from `fromMs`, or stops it; PipClockGate keeps either from re-entering. */
+  private fun count(view: Chronometer, fromMs: Long?) {
+    val clock = if (view === time) timeClock else targetClock
+    if (fromMs == null) {
+      gate.count(clock, null)
+      // Nothing to count from stands at 0:00; the caption's own text is set by render.
+      view.text = if (view === target) "" else "0:00"
+      return
+    }
+    val base = PipPresenter.elapsedBase(fromMs, System.currentTimeMillis(), SystemClock.elapsedRealtime())
+    // setBase writes the platform's "00:48" after its tick; put the window's own format back.
+    if (gate.count(clock, base)) format(view)
+  }
+
+  private fun clockOf(view: Chronometer) = object : PipClock {
+    override fun start() = view.start()
+    override fun stop() = view.stop()
+    override fun setBase(base: Long) {
+      view.base = base
+    }
+  }
+
+  private fun format(view: Chronometer) {
+    val seconds = (SystemClock.elapsedRealtime() - view.base) / 1000
+    view.text = (if (view === target) "+" else "") + PipPresenter.formatTime(seconds)
   }
 
   override fun onDetachedFromWindow() {
@@ -154,6 +208,16 @@ class PipWindowView(context: Context) : FrameLayout(context) {
     gravity = Gravity.CENTER
     includeFontPadding = false
     if (bold) setTypeface(typeface, Typeface.BOLD)
+  }
+
+  // A Chronometer formats as "00:48"; the window reads "0:48", as the current app's formatTime.
+  private fun clock(size: Float, color: Int) = Chronometer(context).apply {
+    setTextSize(TypedValue.COMPLEX_UNIT_DIP, size)
+    setTextColor(color)
+    gravity = Gravity.CENTER
+    includeFontPadding = false
+    text = "0:00"
+    setOnChronometerTickListener { format(it) }
   }
 
   private fun caption(size: Float, color: Int, tracking: Float) = text(size, color).apply {

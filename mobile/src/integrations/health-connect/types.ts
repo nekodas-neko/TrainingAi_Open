@@ -4,6 +4,8 @@ import type {
 } from '@trainingai/shared/validation/health-connect-import';
 export type HealthConnectReader = {
   permissions(): Promise<HealthConnectType[]>;
+  /** Asks for these read permissions and returns every type granted afterwards. */
+  request?(types: HealthConnectType[]): Promise<HealthConnectType[]>;
   historyPermission?(): Promise<void>;
   hasHistoryPermission?(): Promise<boolean>;
   history(

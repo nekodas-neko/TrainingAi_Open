@@ -5,7 +5,6 @@ import { getDb, ensureSchema } from '@/lib/data/postgres/client'
 import * as s from '@/lib/data/postgres/schema'
 import { rateLimit } from '@/lib/rate-limit'
 import { undoCoachChange } from '@/lib/coach/apply'
-import { invalidateProgramStructure } from '@/lib/cache-groups'
 import { errorLog } from '@trainingai/shared/logger'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 
@@ -69,7 +68,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: detail }, { status: 400 })
     }
 
-    await invalidateProgramStructure()
+    // No cache invalidation here: the client cache groups are a no-op on the server. The client sites
+    // that get this OK clear the caches through `invalidateCoachChange`.
     return NextResponse.json({ summary: result.summary })
   } catch (error) {
     errorLog(error, 'API /coach/apply/undo')

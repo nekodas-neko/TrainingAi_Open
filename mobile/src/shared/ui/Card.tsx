@@ -10,9 +10,16 @@ export function Card({
   padded = true,
   style,
   accent,
+  faint = false,
   children,
   ...props
-}: ViewProps & { tone?: Tone; padded?: boolean; accent?: string }) {
+}: ViewProps & {
+  tone?: Tone;
+  padded?: boolean;
+  accent?: string;
+  /** A nearly flat accent: the wash at 6% to 2% and the border at 25% (a finished workout's card). */
+  faint?: boolean;
+}) {
   const { theme } = useTheme();
   const gradientId = useId().replace(/:/g, '');
   const palette = theme.tones[tone];
@@ -39,7 +46,8 @@ export function Card({
                 color === 'transparent'
                   ? 'transparent'
                   : `${theme.colors.raised}${theme.mode === 'light' ? 'e0' : '99'}`,
-              borderColor: color === 'transparent' ? theme.colors.border : `${color}66`,
+              borderColor:
+                color === 'transparent' ? theme.colors.border : faint ? `${color}40` : `${color}66`,
             }
           : undefined,
         style,
@@ -50,8 +58,15 @@ export function Card({
           <Svg width="100%" height="100%">
             <Defs>
               <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0" stopColor={color} stopOpacity="0.3" />
-                <Stop offset="1" stopColor={color} stopOpacity="0.12" />
+                {faint
+                  ? [
+                      <Stop key="from" offset="0" stopColor={color} stopOpacity="0.06" />,
+                      <Stop key="to" offset="1" stopColor={color} stopOpacity="0.02" />,
+                    ]
+                  : [
+                      <Stop key="from" offset="0" stopColor={color} stopOpacity="0.3" />,
+                      <Stop key="to" offset="1" stopColor={color} stopOpacity="0.12" />,
+                    ]}
               </LinearGradient>
             </Defs>
             <Rect width="100%" height="100%" fill={`url(#${gradientId})`} />

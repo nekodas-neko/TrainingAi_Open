@@ -5,6 +5,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { StrengthTrendEntry } from "@/app/api/strength-trend/route";
 import { Sparkline } from "@/components/ui/sparkline";
 import { projectRm, isRmPlateau } from "@trainingai/shared/health/strength-projection";
+import { gainTone } from "@trainingai/shared/health/strength-progress";
 import { displayOneRm, displayOneRmSeries, oneRmUnit } from "@trainingai/shared/1rm";
 
 interface Props {
@@ -12,11 +13,11 @@ interface Props {
   loading: boolean;
 }
 
+const GAIN_COLOR = { up: "#22c55e", down: "#ef4444", flat: "#f59e0b" } as const;
+
 function gainColor(gainPct: number | null): string {
-  if (gainPct == null) return "var(--color-muted-foreground)";
-  if (gainPct > 0) return "#22c55e";
-  if (gainPct < 0) return "#ef4444";
-  return "#f59e0b";
+  const tone = gainTone(gainPct);
+  return tone ? GAIN_COLOR[tone] : "var(--color-muted-foreground)";
 }
 
 export const StrengthTrendCard = memo(function StrengthTrendCard({ exercises, loading }: Props) {

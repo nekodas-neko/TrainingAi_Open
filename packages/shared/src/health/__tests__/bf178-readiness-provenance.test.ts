@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { groupSignals } from '@trainingai/shared/session-explain/group-signals'
 import type { SessionExplainData } from '@trainingai/shared/session-explain/build-explain-data'
@@ -65,17 +63,19 @@ describe('BF-178 — the readiness signal is ours, and must not be credited to O
     expect(text).not.toContain('Oura')
   })
 
-  it('never calls it Oura in the session-explain prompt, and never says "not connected"', () => {
-    // A source scan rather than a route test on purpose: the failure this guards is a string in a
-    // template literal that reaches the user only as generated prose ("Despite your Oura readiness
-    // of 46"). Rendering the route to catch that would need a live model call. "not connected" goes
-    // with it — it implies a third-party device that could be disconnected, when the value is ours
-    // and is simply absent.
-    const src = readFileSync(
-      join(__dirname, '../../../../../app/api/session-explain/insight/route.ts'), 'utf8',
-    )
-    expect(src).toContain('- Readiness: ${sig.ouraReadiness')
-    expect(src).not.toContain('Oura readiness')
-    expect(src).not.toContain('not connected')
+  it('never calls it Oura in the session-explain text, and never says "not connected"', async () => {
+    // Rendered rather than source-scanned since #3286: the text is a template now, so the check can
+    // run it. "not connected" is out too — it implies a third-party device that could be
+    // disconnected, when the value is ours and is simply absent.
+    const { buildSessionInsightText } = await import('../../session-explain/insight-text')
+    const wc = { recovery: { score: 70, weight: 0.5 }, balance: { score: 60, weight: 0.3 }, freshness: { score: 80, weight: 0.2 } }
+    const base = { sessionName: 'Upper', weightedComponents: wc }
+    const withData = buildSessionInsightText({ ...base, signals: { ouraReadiness: 46, sleepTrend: null, hrvTrend: null, energyLevel: null, soreMuscles: [] } })
+    const without = buildSessionInsightText({ ...base, signals: { ouraReadiness: null, sleepTrend: null, hrvTrend: null, energyLevel: null, soreMuscles: [] } })
+    for (const text of [withData, without]) {
+      expect(text).not.toContain('Oura')
+      expect(text).not.toContain('not connected')
+    }
+    expect(withData).toContain('Your readiness is 46')
   })
 })

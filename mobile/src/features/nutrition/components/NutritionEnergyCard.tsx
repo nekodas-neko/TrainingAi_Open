@@ -20,6 +20,7 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { balanceProvenance, budgetLine } from '../data/budget-line';
 import { useNutrition } from '../data/NutritionProvider';
 import { macroShares } from '@trainingai/shared/nutrition/macro-energy';
+import { nutritionEnergyModel, remainingText } from '../data/energy-model';
 export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: () => void }) {
   const n = useNutrition(date);
   const [info, setInfo] = useState(false);
@@ -28,18 +29,19 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
   const data = state.data?.date === date ? state.data : null;
   const b = data?.balance;
   const resolved = useRecordedIntake(date, b);
-  const total =
-    n.view.totals && resolved.intake != null
-      ? { ...n.view.totals, calories: resolved.intake }
-      : n.view.totals;
-  const goal = b?.budgetKcal ?? n.view.targets.calories ?? null;
+  const scaled = data?.macroTargets;
+  const { total, goal, remaining, targets } = nutritionEnergyModel({
+    totals: n.view.totals,
+    recordedIntake: resolved.intake,
+    budgetKcal: b?.budgetKcal,
+    targetCalories: n.view.targets.calories,
+    targets: n.view.targets,
+    scaledTargets: scaled?.scaled,
+  });
   const pending = n.operations.some((op) => op.date === date && op.domain === 'food_logs');
-  const remaining = total && goal != null ? goal - total.calories : null;
   const shares = total ? macroShares(total) : { protein: 0, carbs: 0, fat: 0 };
   const colors = [theme.macros.protein, theme.macros.carbs, theme.macros.fat];
   const fraction = total && goal && goal > 0 ? Math.min(1, total.calories / goal) : 0;
-  const scaled = data?.macroTargets;
-  const targets = scaled?.scaled ?? n.view.targets;
   const provenance = balanceProvenance(b);
   // The band's own colour, always with its label beside it (colour is never the only signal).
   const zone =
@@ -74,10 +76,10 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
             ) : (
               <>
                 <AppText variant="remainingValue" style={{ fontVariant: ['tabular-nums'] }}>
-                  {Math.round(Math.abs(remaining)).toLocaleString()}
+                  {remainingText(remaining).value}
                 </AppText>
                 <AppText variant="caption" tone="muted" style={{ flex: 1 }}>
-                  kcal {remaining < 0 ? 'over' : 'left'}
+                  {remainingText(remaining).label}
                 </AppText>
               </>
             )}
