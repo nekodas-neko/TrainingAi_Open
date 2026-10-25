@@ -92,13 +92,28 @@ describe('deletions in a fully read window', () => {
     expect(repo.tombstoneHealthConnectActivityLogs).not.toHaveBeenCalled()
   })
 
-  it('a complete read with no sessions sweeps the window (the repository spares rows stored in the last 15 minutes)', async () => {
-    await post({ exerciseSessions: [], exerciseWindow: window() })
-    expect(repo.tombstoneHealthConnectActivityLogs).toHaveBeenCalledWith('u1', expect.objectContaining({ keep: [] }))
+  it('an empty read sweeps nothing and says so: a new phone or cleared Health Connect looks the same', async () => {
+    const { json } = await post({ exerciseSessions: [], exerciseWindow: window() })
+    expect(repo.tombstoneHealthConnectActivityLogs).not.toHaveBeenCalled()
+    expect(json.rejected).toEqual([expect.stringMatching(/no sessions came back/)])
+  })
+
+  it('sweeps before it stores, so a record that replaced another at the same minute lands in one request', async () => {
+    const order: string[] = []
+    repo.tombstoneHealthConnectActivityLogs.mockImplementationOnce(async () => { order.push('sweep'); return 1 })
+    repo.upsertHealthConnectActivityLog.mockImplementationOnce(async () => { order.push('store'); return 'inserted' })
+    await post({ exerciseSessions: [session({ recordId: 'new' })], exerciseWindow: window() })
+    expect(order).toEqual(['sweep', 'store'])
+  })
+
+  it('reports a session another row already holds the minute of', async () => {
+    repo.upsertHealthConnectActivityLog.mockImplementationOnce(async () => 'taken')
+    const { json } = await post({ exerciseSessions: [session({ recordId: 'hc-1' })] })
+    expect(json.rejected).toEqual([expect.stringMatching(/already holds this start time/)])
   })
 
   it('takes either date separator', async () => {
-    await post({ exerciseWindow: window({ from: shiftDateStr(today, -6).replace(/-/g, '/') }) })
+    await post({ exerciseSessions: [session({ recordId: 'hc-1' })], exerciseWindow: window({ from: shiftDateStr(today, -6).replace(/-/g, '/') }) })
     expect(repo.tombstoneHealthConnectActivityLogs).toHaveBeenCalledWith('u1', expect.objectContaining({ from: shiftDateStr(today, -6) }))
   })
 

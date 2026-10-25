@@ -3029,9 +3029,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // The `(user, date, start_time)` index covers tombstones. When Health Connect replaces a record
       // with a new one at the same minute, the sweep tombstones the old row, and the new record could
       // otherwise never be stored. It takes over that row instead. Only a tombstoned Health Connect
-      // row: a live row keeps its minute, and an in-app log the owner deleted stays deleted.
+      // row: a live row keeps its minute, and an in-app log the owner deleted stays deleted. The
+      // row's notes stay, since they are the owner's.
       const taken = await this.db.update(s.activityLogs)
-        .set({ ...fields, notes: null, deletedAt: null, updatedAt: new Date() })
+        .set({ ...fields, deletedAt: null, updatedAt: new Date() })
         .where(and(
           eq(s.activityLogs.userId, userId),
           eq(s.activityLogs.date, log.date),

@@ -287,11 +287,11 @@ export async function POST(req: NextRequest) {
     if (reason) rejected.push(`exercise ${s.date} ${s.startTime}: ${reason}`);
     return !reason;
   });
-  await storeHealthConnectWorkouts(repo, userId, usableSessions, rejected);
-
   // #3044. Deletions. Every id the phone read counts as still there, even a session refused above,
   // so a bad record is never mistaken for a deleted one. A read that failed or stopped part-way
-  // says nothing about the sessions it did not reach, so it sweeps nothing.
+  // says nothing about the sessions it did not reach, so it sweeps nothing. It runs before the
+  // store so a record that replaced another at the same minute finds that row tombstoned and takes
+  // it over in this request, not the next.
   let exercisesTombstoned = 0;
   if (body.exerciseWindow?.complete) {
     const window = sweepWindow(body.exerciseWindow, today);
@@ -304,9 +304,19 @@ export async function POST(req: NextRequest) {
         const id = (raw as { recordId?: unknown } | null)?.recordId;
         return typeof id === 'string' && id.trim() ? [id.trim()] : [];
       }), ...(body.exerciseWindow.leftOut ?? [])];
-      exercisesTombstoned = await repo.tombstoneHealthConnectActivityLogs(userId, { ...window, keep });
+      if (keep.length === 0) {
+        // A read that returned nothing is what a new phone, cleared Health Connect data or a
+        // restore still catching up looks like, and sweeping on it would tombstone every stored
+        // session in the window. Nothing is swept; a genuine last-session delete waits for the next
+        // read that has one.
+        rejected.push('exerciseWindow: no sessions came back, so none were swept')
+      } else {
+        exercisesTombstoned = await repo.tombstoneHealthConnectActivityLogs(userId, { ...window, keep });
+      }
     }
   }
+
+  await storeHealthConnectWorkouts(repo, userId, usableSessions, rejected);
 
   // ── Sleep sessions (dedup handled by UNIQUE(user_id, sleep_start)) ────────
   const sleepRecords = usableRecords(body.sleepRecords, SleepRecordSchema, 'sleep', rejected);

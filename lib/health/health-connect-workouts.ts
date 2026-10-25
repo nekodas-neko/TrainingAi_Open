@@ -72,8 +72,10 @@ export async function storeHealthConnectWorkouts(
       durationMin: s.durationMin, distanceKm: s.distanceKm,
       caloriesBurned: s.caloriesBurned, avgHr: s.avgHr, maxHr: s.maxHr,
     }
-    if (s.recordId) await repo.upsertHealthConnectActivityLog(userId, s.recordId, log)
-    else await repo.saveActivityLog(userId, log)
+    if (s.recordId) {
+      const outcome = await repo.upsertHealthConnectActivityLog(userId, s.recordId, log)
+      if (outcome === 'taken') rejected.push(`exercise ${s.date} ${s.startTime}: another session already holds this start time`)
+    } else await repo.saveActivityLog(userId, log)
   }
 }
 
