@@ -3117,7 +3117,11 @@ export async function persistBodyCompFromMetrics(
   // Required, not defaulted: a default here would be a silent no-op — the backfill would run,
   // report a write count, and quietly persist uncorrected snapshots. Both callers must decide.
   bodyFatCalibration: BodyFatCalibration | null,
+  // Omitted: every logged day (the ring rollup, the admin backfill). `dates` narrows to the days a
+  // write just touched; `fromDay` to a day onward, which is how a run catches up on days missed.
+  scope?: { dates?: string[]; fromDay?: string },
 ): Promise<number> {
+  if (scope?.dates && scope.dates.length === 0) return 0
   const rows = await db
     .select({
       date: s.bodyMetrics.date,
@@ -3126,7 +3130,9 @@ export async function persistBodyCompFromMetrics(
       sourceMap: s.bodyMetrics.sourceMap,
     })
     .from(s.bodyMetrics)
-    .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNotNull(s.bodyMetrics.bodyFatPct)))
+    .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNotNull(s.bodyMetrics.bodyFatPct),
+      scope?.dates ? inArray(s.bodyMetrics.date, scope.dates) : undefined,
+      scope?.fromDay ? gte(s.bodyMetrics.date, scope.fromDay) : undefined))
   let written = 0
   for (const r of rows) {
     // BF-2: per row, not per user — the calibration belongs to one instrument, and this backfill
@@ -3142,6 +3148,17 @@ export async function persistBodyCompFromMetrics(
     written++
   }
   return written
+}
+
+/** The latest day holding a body-composition snapshot, or null before the first. */
+export async function getLatestBodyCompDay(db: Db, userId: string): Promise<string | null> {
+  const rows = await db
+    .select({ day: s.ouraDailyDerived.day })
+    .from(s.ouraDailyDerived)
+    .where(and(eq(s.ouraDailyDerived.userId, userId), isNotNull(s.ouraDailyDerived.bodyComp)))
+    .orderBy(desc(s.ouraDailyDerived.day))
+    .limit(1)
+  return rows[0]?.day ?? null
 }
 
 /**

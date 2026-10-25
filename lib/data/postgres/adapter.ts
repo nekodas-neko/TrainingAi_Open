@@ -2321,6 +2321,31 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         target: [s.bodyMetrics.userId, s.bodyMetrics.date],
         set: mergeSet('body_metrics', BODY_METRICS_SOURCE_COLS, source, { ouraCloudFrom }),
       })
+    await this.refreshBodyComp(userId, metrics, source)
+  }
+
+  /**
+   * Keeps `oura_daily_derived.body_comp` current without the ring rollup, which only runs when
+   * Bluetooth data is uploaded and so stopped on 17 Oct when the ring moved to the Oura API.
+   * Two triggers, one implementation (`persistBodyCompFromMetrics`):
+   *  - a write that carries a weight or body fat re-derives those days, from the stored row, so a
+   *    ranked merge that kept an older value is reflected;
+   *  - the Oura Cloud ingest, the daily path that still runs, also catches up every day from the
+   *    last snapshot on, so days missed while nothing ran fill in. A day with no weigh-in writes
+   *    nothing, so the last snapshot stands.
+   * Never throws: the weigh-in is already saved, and a snapshot failure must not fail its write.
+   */
+  private async refreshBodyComp(userId: string, metrics: { date: string; weightKg?: number | null; bodyFatPct?: number | null }[], source: HealthSource): Promise<void> {
+    try {
+      const dates = Array.from(new Set(metrics.filter(m => m.weightKg != null || m.bodyFatPct != null).map(m => m.date)))
+      const fromDay = source === 'oura_cloud' ? await oura.getLatestBodyCompDay(this.db, userId) : null
+      if (dates.length === 0 && !fromDay) return
+      const calibration = await this.getBodyFatCalibration(userId).catch(() => null)
+      if (dates.length > 0) await oura.persistBodyCompFromMetrics(this.db, userId, calibration, { dates })
+      if (fromDay) await oura.persistBodyCompFromMetrics(this.db, userId, calibration, { fromDay })
+    } catch (err) {
+      console.error('[body-comp] refresh failed', err)
+    }
   }
 
   /**
