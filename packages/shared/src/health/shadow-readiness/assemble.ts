@@ -21,7 +21,7 @@ import { isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { hrr60Candidates, nightlyCandidates } from '@trainingai/shared/inputs/adapters'
 import { resolveSlots, type InputName } from '@trainingai/shared/inputs/cascade'
-import { stepsFloorForAge, type ShadowUnitId } from './model'
+import type { ShadowUnitId } from './model'
 import { scoreFuel, type FuelParts, type ShadowContext, type ShadowScoreInput, type UnitInput, type UnitObservation } from './score'
 
 /** What the service reads, for a range of readiness days plus their lookback. */
@@ -92,6 +92,9 @@ export function deepRemSharePct(n: Pick<AggregatableSleep, 'deepSleepHours' | 'r
 /** The ring summary's label. Kept as the table name it has always carried, so the ring's existing
  *  normals do not restart; only a different device's values get a different label. */
 const RING_SUMMARY_SRC = 'oura_daily_summary'
+
+/** Night sources whose sleep stages are our own estimate rather than a device's measurement (#2833). */
+const STAGER_SOURCES: ReadonlySet<string> = new Set(['oura_ble'])
 
 function obs(date: string, value: number | null | undefined, source: string, rung: UnitObservation['rung'] = null): UnitObservation | null {
   return value == null || !Number.isFinite(value) ? null : { date, value, source, rung }
@@ -207,7 +210,10 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
   const series: PreparedShadowHistory['series'] = {
     'sleep.duration': duration,
     'sleep.efficiency': compact(nightList.map(([d, n]) => obs(d, n.efficiency, sleepSrc(n)))),
-    'sleep.deep_rem_share': compact(nightList.map(([d, n]) => obs(d, deepRemSharePct(n), sleepSrc(n)))),
+    // Stage amounts from the ring's Bluetooth rollup come from our own heuristic stager, not a
+    // measurement (`sleep-staging.ts`), so they count less than Oura's (#2833).
+    'sleep.deep_rem_share': compact(nightList.map(([d, n]) =>
+      obs(d, deepRemSharePct(n), sleepSrc(n), STAGER_SOURCES.has(sleepSrc(n)) ? 'estimated' : null))),
     'sleep.latency': compact(nightList.map(([d, n]) => obs(d, n.onsetLatencySec == null ? null : n.onsetLatencySec / 60, sleepSrc(n)))),
     'sleep.timing': compact(nightList.map(([d, n]) =>
       obs(d, minutesFromNoon(new Date((n.sleepStart.getTime() + n.sleepEnd.getTime()) / 2).toISOString(), tz), sleepSrc(n)))),
@@ -222,7 +228,8 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
       .map(([d, e]) => ({ date: d, value: median(e.values)!, source: e.source, rung: 'derived' as const })),
     // #2825: steps and SpO2 carry their device (`source_map`) too; a row from before provenance
     // keeps the table label.
-    'activity.yesterday_movement': compact(metrics.map(m => obs(m.date, m.steps, m.stepsSource ?? 'body_metrics'))),
+    // Yesterday's steps as a load on today (#2826), judged against the person's own normal day.
+    'activity.yesterday_load': compact(metrics.map(m => obs(m.date, m.steps, m.stepsSource ?? 'body_metrics'))),
     'activity.zone_minutes_week': zoneWeek,
     'activity.training_load': trainingLoad,
     'body.temperature': perInput(d => summaryByDate.get(d)?.tempDevC, ouraTemperature),
@@ -289,7 +296,6 @@ export function assembleShadowInputs(prepared: PreparedShadowHistory, date: stri
     }
     const history = today ? all.filter(o => o.date < today!.date) : []
     const input: UnitInput = { today, history }
-    if (id === 'activity.yesterday_movement') input.band = { lo: stepsFloorForAge(prepared.raw.ageYears) }
     if (id === 'activity.zone_minutes_week' && !prepared.raw.zoneSeconds) input.note = 'Nothing records this person\'s heart rate, so zone minutes are missing, not zero.'
     units[id] = input
   }

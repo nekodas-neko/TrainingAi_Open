@@ -31,8 +31,16 @@ import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/sh
  * gains one day and its span is measured from the day's start, as live has always done.
  * Version 4 = version 3 plus `heart.daytime_rhr` scored (issue 2634): the stored median HR of the
  * day's still, awake minutes. Its 10 Heart points were renormalised over the other units before.
+ * Version 5 = the owner's 26 Oct approvals (#2826, #2833, #2832):
+ *  - pillar totals float: a unit carries absolute `points`, and a pillar is worth what its units sum to;
+ *  - overnight HRV and resting HR are one pattern with one 13-point budget (was 19.5);
+ *  - yesterday's activity is scored as load (`activity.yesterday_load`, steady around the person's
+ *    own normal), not as achievement of a step target; `activity.yesterday_movement` is retired;
+ *  - a unit's weight is scaled by a quality factor (an estimated value counts less than a measured
+ *    one) and a reliability factor (a patchy score counts less); missing data stays at zero weight;
+ *  - a graded readiness ceiling: the lowest cap among the red flags limits the final number.
  */
-export const SHADOW_MODEL_VERSION = 4
+export const SHADOW_MODEL_VERSION = 5
 
 // ── Unit ids ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -54,6 +62,7 @@ export const SHADOW_UNIT_IDS = [
   'heart.daytime_rhr',
   'heart.hr_recovery',
   'activity.yesterday_movement',
+  'activity.yesterday_load',
   'activity.zone_minutes_week',
   'activity.training_load',
   'activity.block_trend',
@@ -100,8 +109,16 @@ export interface UnitDef {
   pillar: ShadowReadinessPillar
   shape: UnitShape
   reference: ReferenceKind
-  /** Weight inside the pillar, #2356 as written. Renormalised over the units that scored. */
-  weight: number
+  /** Points possible in readiness (#2833: pillar totals float, so a pillar is worth the sum of its
+   *  units' points). Inside the pillar the units that scored share it by these points; a unit that
+   *  dropped out hands its share to the rest. At the #2356 weights this is `weight × pillar ÷ 100`. */
+  points: number
+  /** Units that share one budget and count as one pattern: when only some of them scored, those
+   *  carry the whole budget between them. See {@link SHARED_BUDGETS}. */
+  sharedBudget?: SharedBudgetId
+  /** `event` = the unit only has a value after something happens (a training day), so a missing day
+   *  is not patchiness and the reliability factor does not apply. Default `daily`. */
+  cadence?: 'daily' | 'event'
   /** For directional units, which way is good. */
   direction?: 'up' | 'down'
   /** Directional/steady units only: the Level yardstick that grades the person's normal. Absent =
@@ -186,21 +203,21 @@ const WEIGHT_OUTER_KG_PER_WEEK = (OUTER_KCAL * 7) / KCAL_PER_KG
 export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
   // ── Sleep: duration 30 · efficiency 20 · sleep balance 15 · timing/consistency 15 · deep+REM 10 · latency 10
   'sleep.duration': {
-    id: 'sleep.duration', pillar: 'sleep', shape: 'sweet_spot', reference: 'guarded', weight: 30, daytime: false,
+    id: 'sleep.duration', pillar: 'sleep', shape: 'sweet_spot', reference: 'guarded', points: 9, daytime: false,
     // 7–9 h (AASM/SRS consensus, component-references [1]). MODEL spans: 5½ h every night scores 40
     // (the tree's example), 4½ h scores 0; above 9 h falls more slowly, 12 h is 0.
     band: { lo: 7, hi: 9, belowSpan: 2.5, aboveSpan: 3 },
     minMeaningfulChange: 0.5,
   },
   'sleep.efficiency': {
-    id: 'sleep.efficiency', pillar: 'sleep', shape: 'directional', reference: 'learned', weight: 20, daytime: false,
+    id: 'sleep.efficiency', pillar: 'sleep', shape: 'directional', reference: 'learned', points: 6, daytime: false,
     direction: 'up',
     // NSF: ≥ 85 % is good (component-references [2]) → 85 % ≈ 70, 95 % ≈ 100.
     level: [[75, 40], [85, 70], [95, 100]],
     minMeaningfulChange: 2,
   },
   'sleep.deep_rem_share': {
-    id: 'sleep.deep_rem_share', pillar: 'sleep', shape: 'steady', reference: 'learned', weight: 10, daytime: false,
+    id: 'sleep.deep_rem_share', pillar: 'sleep', shape: 'steady', reference: 'learned', points: 3, daytime: false,
     // Deep + REM minutes over total sleep, in percent, against the person's own rolling 30-day normal.
     // No fixed band and no Level: component-references.md finds no consensus on stage amounts and
     // recommends the personal baseline only (decision on issue 2635, Orchestrator, 2026-10-07).
@@ -209,7 +226,7 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
     minMeaningfulChange: 2,
   },
   'sleep.latency': {
-    id: 'sleep.latency', pillar: 'sleep', shape: 'sweet_spot', reference: 'constant', weight: 10, daytime: false,
+    id: 'sleep.latency', pillar: 'sleep', shape: 'sweet_spot', reference: 'constant', points: 3, daytime: false,
     // Minutes. NSF: ≤ 30 min is good, ≤ 15 min clearest (component-references [2], [2b]); falling
     // asleep instantly is a sign of debt (tree). MODEL band 10–20 min, the top of today's Sleep Score
     // latency curve; 0 min scores 50 (as that curve does), 30 min ≈ 70, 53 min is 0.
@@ -217,13 +234,13 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
     minMeaningfulChange: 5,
   },
   'sleep.timing': {
-    id: 'sleep.timing', pillar: 'sleep', shape: 'steady', reference: 'learned', weight: 15, daytime: false,
+    id: 'sleep.timing', pillar: 'sleep', shape: 'steady', reference: 'learned', points: 4.5, daytime: false,
     // Mid-sleep, minutes from local noon, against the person's usual. No Level (MODEL): regularity
     // has outcome evidence (component-references [3]) but no yardstick for a single night.
     minMeaningfulChange: 20,
   },
   'sleep.balance': {
-    id: 'sleep.balance', pillar: 'sleep', shape: 'sweet_spot', reference: 'guarded', weight: 15, daytime: false,
+    id: 'sleep.balance', pillar: 'sleep', shape: 'sweet_spot', reference: 'guarded', points: 4.5, daytime: false,
     // The mean of the last 7 nights against the same guarded 7–9 h band as duration: a week below
     // it is debt; a week far above it falls too.
     band: { lo: 7, hi: 9, belowSpan: 2.5, aboveSpan: 3 },
@@ -232,7 +249,8 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
 
   // ── Heart: overnight HRV 35 · overnight resting HR 30 · overnight settling 15 · daytime resting HR 10 · HR recovery 10
   'heart.overnight_hrv': {
-    id: 'heart.overnight_hrv', pillar: 'heart', shape: 'directional', reference: 'learned', weight: 35, daytime: false,
+    id: 'heart.overnight_hrv', pillar: 'heart', shape: 'directional', reference: 'learned', points: 7, daytime: false,
+    sharedBudget: 'heart.overnight_pattern',
     direction: 'up',
     // Edge case #3: highly genetic, so Level spans only 60–90. Population short-term rMSSD spans
     // roughly 19–75 ms (Nunan 2010, component-references [4]).
@@ -240,26 +258,27 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
     minMeaningfulChange: 3,
   },
   'heart.overnight_rhr': {
-    id: 'heart.overnight_rhr', pillar: 'heart', shape: 'directional', reference: 'learned', weight: 30, daytime: false,
+    id: 'heart.overnight_rhr', pillar: 'heart', shape: 'directional', reference: 'learned', points: 6, daytime: false,
+    sharedBudget: 'heart.overnight_pattern',
     direction: 'down',
     // Edge case #3: Level 60–90. MODEL anchors 50 bpm → 90, 80 bpm → 60.
     level: [[50, 90], [80, 60]],
     minMeaningfulChange: 2,
   },
   'heart.overnight_settling': {
-    id: 'heart.overnight_settling', pillar: 'heart', shape: 'directional', reference: 'learned', weight: 15, daytime: false,
+    id: 'heart.overnight_settling', pillar: 'heart', shape: 'directional', reference: 'learned', points: 4.5, daytime: false,
     direction: 'up',
     // Recovery index, hours from the overnight HR minimum to wake. No published norm
     // (component-references), so no Level: learned only.
     minMeaningfulChange: 0.25,
   },
   'heart.daytime_rhr': {
-    id: 'heart.daytime_rhr', pillar: 'heart', shape: 'directional', reference: 'learned', weight: 10, daytime: true,
+    id: 'heart.daytime_rhr', pillar: 'heart', shape: 'directional', reference: 'learned', points: 3, daytime: true,
     direction: 'down', isNew: true, minMeaningfulChange: 2,
   },
   'heart.hr_recovery': {
-    id: 'heart.hr_recovery', pillar: 'heart', shape: 'directional', reference: 'learned', weight: 10, daytime: true,
-    direction: 'up', isNew: true,
+    id: 'heart.hr_recovery', pillar: 'heart', shape: 'directional', reference: 'learned', points: 3, daytime: true,
+    direction: 'up', isNew: true, cadence: 'event',
     // HRR60 between sets, median of the most recent training day in the last week. No yardstick
     // for between-set recovery, so no Level.
     minMeaningfulChange: 3,
@@ -267,26 +286,34 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
 
   // ── Activity: yesterday's movement 35 · training load 7:28 30 · zone minutes (week) 20 · block trend 28:90 15
   'activity.yesterday_movement': {
-    id: 'activity.yesterday_movement', pillar: 'activity', shape: 'sweet_spot', reference: 'guarded', weight: 35, daytime: true,
-    // Steps. The lower edge is the research plateau (Paluch 2022, component-references [6]): 8,000
-    // under 60, 6,000 from 60 (see `stepsFloorForAge`). There is no published upper edge, so the
-    // upper edge is learned: the person's own 90th percentile, never below 1.5× the floor. MODEL
-    // spans: 0 steps is 0; two floors' worth above the upper edge is 0.
-    band: { lo: 8000, hi: Number.POSITIVE_INFINITY, belowSpan: 8000, aboveSpan: 16000 },
+    id: 'activity.yesterday_movement', pillar: 'activity', shape: 'sweet_spot', reference: 'guarded', points: 0, daytime: true,
+    unavailable:
+      'Retired in model version 4: yesterday\'s activity is scored as load, not as a step target reached '
+      + '(`activity.yesterday_load`, #2826). The id stays so rows from versions 1–3 remain readable.',
+  },
+  'activity.yesterday_load': {
+    id: 'activity.yesterday_load', pillar: 'activity', shape: 'steady', reference: 'learned', points: 7, daytime: true,
+    // Steps yesterday, as a LOAD on today's recovery rather than an achievement (owner, 26 Oct, #2826):
+    // 100 at the person's own normal day, falling as yesterday drifts either way, so a very big day
+    // costs and a very idle one costs too. No Level: there is no published yardstick for a day's load.
+    // MODEL: 1,500 steps is the smallest change that means anything (about a fifth of a typical day).
+    // The alternative put to the owner, a cost only (more steps always scores lower), would have
+    // rewarded a day on the sofa.
+    minMeaningfulChange: 1500,
   },
   'activity.zone_minutes_week': {
-    id: 'activity.zone_minutes_week', pillar: 'activity', shape: 'sweet_spot', reference: 'constant', weight: 20, daytime: true,
+    id: 'activity.zone_minutes_week', pillar: 'activity', shape: 'sweet_spot', reference: 'constant', points: 4, daytime: true,
     // WHO 150–300 moderate-equivalent minutes a week, vigorous counted double (component-references
     // [7]; `activeMinutesFromZoneSeconds`). MODEL spans: 0 is 0; 900 is 0.
     band: { lo: 150, hi: 300, belowSpan: 150, aboveSpan: 600 },
   },
   'activity.training_load': {
-    id: 'activity.training_load', pillar: 'activity', shape: 'sweet_spot', reference: 'constant', weight: 30, daytime: true,
+    id: 'activity.training_load', pillar: 'activity', shape: 'sweet_spot', reference: 'constant', points: 6, daytime: true,
     // ACWR 7:28 inside 0.8–1.3 = 100 (#2194, `ACWR_THRESHOLDS`). MODEL spans: 0 is 0, 1.8 is 0.
     band: { lo: ACWR_THRESHOLDS.lowMax, hi: ACWR_THRESHOLDS.optimalMax, belowSpan: ACWR_THRESHOLDS.lowMax, aboveSpan: 0.5 },
   },
   'activity.block_trend': {
-    id: 'activity.block_trend', pillar: 'activity', shape: 'sweet_spot', reference: 'constant', weight: 15, daytime: true,
+    id: 'activity.block_trend', pillar: 'activity', shape: 'sweet_spot', reference: 'constant', points: 3, daytime: true,
     unavailable:
       'The 28:90 ratio and its band are #2340, still open: the tuning proposal that sets the band '
       + 'has not been written, and no shared function computes a 28:90 ratio. Needs #2340.',
@@ -294,26 +321,26 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
 
   // ── Body: temperature 25 · breathing rate 20 · fuel 20 · SpO₂ 15 · daytime stress 10 · weight vs plan 10
   'body.temperature': {
-    id: 'body.temperature', pillar: 'body', shape: 'steady', reference: 'learned', weight: 25, daytime: false,
+    id: 'body.temperature', pillar: 'body', shape: 'steady', reference: 'learned', points: 5, daytime: false,
     minMeaningfulChange: 0.15,
   },
   'body.breathing_rate': {
-    id: 'body.breathing_rate', pillar: 'body', shape: 'steady', reference: 'learned', weight: 20, daytime: false,
+    id: 'body.breathing_rate', pillar: 'body', shape: 'steady', reference: 'learned', points: 4, daytime: false,
     // MODEL: half a breath a minute.
     minMeaningfulChange: 0.5,
   },
   'body.fuel': {
-    id: 'body.fuel', pillar: 'body', shape: 'sweet_spot', reference: 'constant', weight: 20, daytime: true,
+    id: 'body.fuel', pillar: 'body', shape: 'sweet_spot', reference: 'constant', points: 4, daytime: true,
     // Scored by `scoreFuel` from its three parts (energy balance, protein, hydration); see FUEL_BANDS.
   },
   'body.spo2': {
-    id: 'body.spo2', pillar: 'body', shape: 'sweet_spot', reference: 'constant', weight: 15, daytime: true,
+    id: 'body.spo2', pillar: 'body', shape: 'sweet_spot', reference: 'constant', points: 3, daytime: true,
     // Fine at ≥ 95 % (tree), falls below. MODEL: 85 % is 0. Daytime because the ring's SpO₂ is
     // stored per calendar day, so today's row is still filling.
     band: { lo: 95, hi: 100, belowSpan: 10, aboveSpan: null },
   },
   'body.weight_vs_plan': {
-    id: 'body.weight_vs_plan', pillar: 'body', shape: 'steady', reference: 'constant', weight: 10, daytime: true,
+    id: 'body.weight_vs_plan', pillar: 'body', shape: 'steady', reference: 'constant', points: 2, daytime: true,
     // kg/week against the goal's planned pace. In band within the calorie budget's on-target band
     // expressed as weight; its outer band scores 50.
     band: {
@@ -323,7 +350,7 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
     },
   },
   'body.daytime_stress': {
-    id: 'body.daytime_stress', pillar: 'body', shape: 'directional', reference: 'learned', weight: 10, daytime: true,
+    id: 'body.daytime_stress', pillar: 'body', shape: 'directional', reference: 'learned', points: 2, daytime: true,
     direction: 'down',
     // Minutes of high stress. MODEL: ten minutes.
     minMeaningfulChange: 10,
@@ -353,15 +380,103 @@ export function stepsFloorForAge(ageYears: number | null): number {
 
 // ── Pillar weights ───────────────────────────────────────────────────────────────────────────────
 
-/** #2356 pillar weights, as written: Sleep 30 · Heart 30 · Activity 20 · Body 20. */
-export const PILLAR_WEIGHTS: Record<ShadowReadinessPillar, number> = {
-  sleep: 30,
-  heart: 30,
-  activity: 20,
-  body: 20,
+export const SHADOW_PILLARS: readonly ShadowReadinessPillar[] = ['sleep', 'heart', 'activity', 'body']
+
+/**
+ * Pillar totals float (#2833): a pillar is worth the points of the units inside it, so a unit added,
+ * shared or cut moves its own pillar and nothing else. At version 3 these were fixed at Sleep 30 ·
+ * Heart 30 · Activity 20 · Body 20; version 4 gives Sleep 30 · Heart 23.5 · Activity 20 · Body 20,
+ * the Heart difference being the 6.5 points the HRV + resting HR pattern gave up.
+ */
+export const PILLAR_POINTS: Record<ShadowReadinessPillar, number> = Object.fromEntries(
+  SHADOW_PILLARS.map(p => [p, SHADOW_UNIT_IDS.filter(id => UNIT_DEFS[id].pillar === p).reduce((sum, id) => sum + UNIT_DEFS[id].points, 0)]),
+) as Record<ShadowReadinessPillar, number>
+
+export type SharedBudgetId = 'heart.overnight_pattern'
+
+/**
+ * Units that read one underlying signal share a fixed budget (#2826): overnight HRV and resting HR
+ * move together on the owner's history, so together they are worth 13 points, not 19.5. If only one
+ * of them scored that night it carries all 13; the split between two is by their `points`.
+ */
+export const SHARED_BUDGETS: Record<SharedBudgetId, number> = {
+  'heart.overnight_pattern': 13,
 }
 
-export const SHADOW_PILLARS: readonly ShadowReadinessPillar[] = ['sleep', 'heart', 'activity', 'body']
+// ── Quality and reliability (#2833) ──────────────────────────────────────────────────────────────
+
+/** MODEL. A unit's weight is multiplied by the factor for how its value was obtained, so an
+ *  estimated value counts less than a measured one. `provided` and `derived` are measurements; an
+ *  `estimated` value is a model's guess (the phone's own sleep stager, a night typed in by hand). A
+ *  unit that does not say how it was obtained is taken as measured. Missing is still zero weight. */
+export const QUALITY_FACTOR: Record<'provided' | 'derived' | 'estimated', number> = {
+  provided: 1,
+  derived: 1,
+  estimated: 0.5,
+}
+
+/** MODEL. Reliability looks at the 14 days before the scored value: a unit present on at least 70 %
+ *  of them ("most nights") counts in full; below that its weight scales with how often it showed up,
+ *  never below a quarter, so a patchy score is not erased by one bad fortnight. */
+export const RELIABILITY_WINDOW_DAYS = 14
+export const RELIABILITY_FULL_COVERAGE = 0.7
+export const RELIABILITY_MIN_FACTOR = 0.25
+/** Fewer days than this since the unit first appeared and there is nothing to judge it by: factor 1.
+ *  A new unit is already at half weight (`NEW_UNIT_WEIGHT_FACTOR`). */
+export const RELIABILITY_MIN_EXPECTED_DAYS = 7
+
+// ── The ceiling (#2832) ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * The graded readiness ceiling, owner-approved 26 Oct (#2832). Readiness is the lower of the
+ * weighted sum and the lowest cap among the red flags that fired. Scoring is untouched; only the
+ * final number is limited, so a cap means the same with 10 metrics or 50. Each number is named
+ * here and nowhere else.
+ */
+export const CEILING = {
+  /** °C above the person's normal → cap, linear between the points, flat at the last one. Below the
+   *  first point there is no cap. */
+  temperature: [[0.3, 80], [0.5, 60], [0.7, 40]] as Yardstick,
+  /** Illness signs (the live radar's `elevated` or `fever` flag over temperature, breathing and ONE
+   *  heart signal) cap at this. */
+  illness: 60,
+  /** An overnight HRV score at or below this… */
+  hrvScoreAtOrBelow: 20,
+  /** …caps at this. */
+  hrvCap: 60,
+  /** Sleep of at most this many hours… */
+  sleepHoursAtOrBelow: 5.5,
+  /** …caps at this. */
+  sleepCap: 60,
+  /** A training-load ratio (ACWR 7:28) of at least this… */
+  loadRatioAtOrAbove: 1.6,
+  /** …caps at this. */
+  loadCap: 65,
+} as const
+
+export type CeilingId = 'temperature' | 'illness' | 'hrv_crash' | 'short_sleep' | 'load_ratio'
+
+/** One red flag that fired, and the cap it sets. */
+export interface CeilingCap {
+  id: CeilingId
+  cap: number
+  /** Plain words for what fired, with the number that fired it. */
+  why: string
+}
+
+/** The ceiling on a day, stored beside the pillar detail (`pillar_detail.ceiling`). */
+export interface ShadowCeiling {
+  /** The lowest cap that fired, or null when none did. */
+  cap: number | null
+  /** Every flag that fired. */
+  caps: CeilingCap[]
+  /** Readiness before the ceiling; null when readiness is. */
+  uncapped: number | null
+  /** True when the cap was below the weighted sum and so lowered readiness. */
+  applied: boolean
+  /** Caps that would have been checked but waited for a cycle-aware normal (#2832). */
+  waitingOnCycle: boolean
+}
 
 /** #2356: "A new unit starts at half weight until it has 30 valid days." */
 export const NEW_UNIT_WEIGHT_FACTOR = 0.5
@@ -393,11 +508,18 @@ export interface UnitProvenance {
 export interface ShadowUnitResult {
   /** 0–100, or null when the unit dropped out. */
   score: number | null
+  /** The robust spread the day was judged by (one "step"), or null without a normal. */
+  spread: number | null
+  /** Quality factor (1 measured, less for an estimate) and reliability factor (1 when present most
+   *  days). Both 1 when the unit dropped out. */
+  quality: number
+  reliability: number
   /** How good the person's normal is, 0–100, or null (no Level for this unit, or not computable). */
   level: number | null
   /** Today against the normal, in points, or null while learning. score = clamp(level + day). */
   day: number | null
-  /** Weight inside the pillar after the new-unit halving, before renormalisation. 0 when dropped. */
+  /** Points weight inside the pillar after the shared budget, the new-unit halving and the quality
+   *  and reliability factors, before renormalisation. 0 when dropped. */
   weight: number
   /** This unit's own maturity: 0–13 valid days learning, 14–29 provisional, 30+ settled. */
   stage: ShadowReadinessStage
@@ -422,6 +544,11 @@ export interface ShadowPillarDetail {
   /** The pillar's weight in readiness after renormalisation over the pillars that scored. 0 when
    *  the pillar did not score. */
   effectiveWeight: number
+  /** What the pillar is worth before any factor: the sum of its units' points (it floats). */
+  points: number
+  /** Points-weighted mean quality × reliability of the units that scored; the pillar's points are
+   *  multiplied by it. 1 for a pillar of measured, steady units; 0 when the pillar did not score. */
+  confidence: number
   /** Units that scored, each with its share of the pillar after renormalisation. */
   scored: Record<string, number>
   /** Units that dropped out, with why. The pillar renormalised over the rest and says so. */
