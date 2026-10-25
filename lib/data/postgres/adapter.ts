@@ -2332,14 +2332,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *  - a write that carries a weight or body fat re-derives those days, from the stored row, so a
    *    ranked merge that kept an older value is reflected;
    *  - the Oura Cloud ingest, the daily path that still runs, also catches up every day from the
-   *    last snapshot on, so days missed while nothing ran fill in. A day with no weigh-in writes
+   *    last snapshot on (the days after it), so days missed while nothing ran fill in. A day with no weigh-in writes
    *    nothing, so the last snapshot stands.
    * Never throws: the weigh-in is already saved, and a snapshot failure must not fail its write.
    */
   private async refreshBodyComp(userId: string, metrics: { date: string; weightKg?: number | null; bodyFatPct?: number | null }[], source: HealthSource): Promise<void> {
     try {
       const dates = Array.from(new Set(metrics.filter(m => m.weightKg != null || m.bodyFatPct != null).map(m => m.date)))
-      const fromDay = source === 'oura_cloud' ? await oura.getLatestBodyCompDay(this.db, userId) : null
+      // The catch-up starts the day AFTER the last snapshot: re-deriving that day itself changed
+      // nothing but its `updated_at`, and ran the calibration queries, on every Oura Cloud write.
+      // A weigh-in on that day arrives through `dates` above, which is how it is still refreshed.
+      const latestSnapshotDay = source === 'oura_cloud' ? await oura.getLatestBodyCompDay(this.db, userId) : null
+      const fromDay = latestSnapshotDay ? shiftDateStr(latestSnapshotDay, 1) : null
       if (dates.length === 0 && !fromDay) return
       // Read at most once, and only if a pass has a row to persist. A failed read skips the refresh
       // (below) rather than persisting an uncorrected snapshot over a corrected one.
