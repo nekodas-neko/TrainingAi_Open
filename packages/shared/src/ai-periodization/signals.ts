@@ -10,7 +10,7 @@ import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { sleepDurationTrend, sleepScoreTrend } from '@trainingai/shared/health/sleep-trend'
 import { moodMuscleMatches, normalizeMuscle } from '@trainingai/shared/muscles'
 import { sessionsRemainingThisWeek } from '@trainingai/shared/schedule-utils'
-import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
+import { volumeLandmarks, weeklyVolumeTarget, trainedWeekPhases } from '@trainingai/shared/ai-periodization/volume-targets'
 import { isRmPlateau } from '@trainingai/shared/health/strength-projection'
 import { oneRmTrendStatus } from '@trainingai/shared/1rm'
 import { workingBudgetMin, planningBudgetMin } from '@trainingai/shared/workout/duration-model'
@@ -479,9 +479,24 @@ export async function aggregateSignals(
   // exercise-library labels, so those are normalized where they are read below.
   const weeklyLogged = await repo.getWeeklySetsByMuscleGroup(userId, program.id, weekStart, weekEnd, tz)
 
+  // #3287: the target the Training card prints (`weeklyVolumeTarget`), not the stored
+  // `targetSetsPerWeek`. The stored rows only say which muscles this program trains. The week's phase
+  // mix is the card's (the phases of the sessions trained since the week began) plus the session
+  // being prescribed, since the card has nothing to add for a session that has not happened yet.
+  const periodization = await repo.listSessionPeriodizationForProgram(userId, program.id).catch(() => [])
+  const phaseBySession = new Map(periodization.map(p => [p.programSessionId, p.phase as string]))
+  const weekStartMs = dateStrMidnightInTz(weekStart, tz).getTime()
+  const weekPhases = [
+    ...trainedWeekPhases(
+      allRecentSessions.filter(ws => ws.startedAt.getTime() >= weekStartMs).map(ws => ws.sessionId),
+      phaseBySession,
+    ),
+    state.phase,
+  ]
   const weeklyTargets: Record<string, number> = {}
   for (const vt of volumeTargets) {
-    weeklyTargets[normalizeMuscle(vt.muscleGroup)] = vt.targetSetsPerWeek
+    const muscle = normalizeMuscle(vt.muscleGroup)
+    weeklyTargets[muscle] = weeklyVolumeTarget(program.trainingGoal, muscle, weekPhases)
   }
 
   const volumeBudgetPerMuscleGroup: Record<string, number> = {}
