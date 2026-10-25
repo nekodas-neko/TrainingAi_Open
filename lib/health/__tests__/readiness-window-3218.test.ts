@@ -1,7 +1,7 @@
 // #3218: readiness and the night-temperature loader read one 28-day window, built on the local date
 // string. The old payload form (`midnight − N×86400000`) lands a day off around a clock change.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { shiftDateStr, toAestDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
+import { shiftDateStr, toAestDay, dateStrMidnightInTz, todayInTz } from '@trainingai/shared/date-utils'
 
 const repo = {
   listBodyMetrics: vi.fn(async () => [] as unknown[]),
@@ -82,9 +82,9 @@ describe('payload and loader read the same window', () => {
   ])('%s', async (tz, now) => {
     vi.setSystemTime(new Date(now))
     await buildReadinessPayload('u1', tz)
-    // The HR profile (a zone ceiling, not a readiness input) makes its own listBodyMetrics read, so
-    // pick the payload's by the window `to` and the night-inputs `from`.
-    const todayIso = (repo.listBodyMetrics.mock.calls as unknown as string[][])[0][2]
+    // The HR profile and the Activity finalise make listBodyMetrics reads of their own, so take the
+    // date from the clock and look for the payload's window among the calls.
+    const todayIso = todayInTz(tz)
     const expected = shiftDateStr(todayIso, -28)
     const payloadCalls = (repo.listBodyMetrics.mock.calls as unknown as string[][]).map(c => c[1])
 
@@ -96,6 +96,7 @@ describe('payload and loader read the same window', () => {
     expect(payloadCalls).toContain(loaderFrom)
     expect(readinessWindowStarts(todayIso).from28dIso).toBe(loaderFrom)
     // getWorkoutSessionsFrom shares the window start, at that day's local midnight.
-    expect(repo.getWorkoutSessionsFrom.mock.calls[0]).toEqual(['u1', dateStrMidnightInTz(expected, tz)])
+    // (The Activity finalise reads sessions too, from its own days, so look for the payload's call.)
+    expect(repo.getWorkoutSessionsFrom.mock.calls).toContainEqual(['u1', dateStrMidnightInTz(expected, tz)])
   })
 })

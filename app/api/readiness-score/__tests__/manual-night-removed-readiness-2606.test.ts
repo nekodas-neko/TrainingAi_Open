@@ -30,6 +30,18 @@ describe.skipIf(!canRun)('readiness after a typed night is removed (issue 2606)'
     expect(res.status).toBe(200)
     return res.text()
   }
+  // #2435: the first read of a day finalises the finished days' Activity scores, the older ones
+  // behind the read, and each finalised day is a stored row the resilience bookkeeping counts as
+  // seen. Wait for all seven to land so a comparison is about sleep and nothing else.
+  const settleActivityFinalise = async (userId: string) => {
+    for (let i = 0; i < 100; i++) {
+      const { rows: [r] } = await pool.query(
+        `SELECT count(*)::int AS n FROM oura_daily_derived WHERE user_id = $1 AND activity_contributors ? 'finalisedAt'`, [userId])
+      if (r.n === 7) return
+      await new Promise(res => setTimeout(res, 50))
+    }
+    throw new Error('the Activity finalise did not settle')
+  }
   const manual = async (method: 'POST' | 'DELETE', body: unknown) => {
     const route = await import('@/app/api/sleep-sessions/manual/route')
     const res = await route[method](new Request('http://localhost/api/sleep-sessions/manual', {
@@ -80,6 +92,8 @@ describe.skipIf(!canRun)('readiness after a typed night is removed (issue 2606)'
 
   it('no device: the sleep component appears with the typed night and the score returns when it is removed', async () => {
     asUser(NO_DEVICE)
+    await readiness()
+    await settleActivityFinalise(NO_DEVICE)
     const before = JSON.parse(await readiness())
     expect(before.sleepScore).toBeNull()
 
@@ -170,9 +184,11 @@ describe.skipIf(!canRun)('readiness after a typed night is removed (issue 2606)'
 
   it('with a ring: entering and removing the shadowed typed night never moves the score', async () => {
     asUser(WITH_RING)
-    // The first call persists today's own bookkeeping (the resilience model counts the day as seen);
-    // the baseline is the second, so the comparison is about sleep and nothing else.
+    // The first call persists today's own bookkeeping (the resilience model counts the day as seen)
+    // and finalises the finished days' Activity scores; the baseline is the second, so the
+    // comparison is about sleep and nothing else.
     await readiness()
+    await settleActivityFinalise(WITH_RING)
     const before = await readiness()
     expect(JSON.parse(before).sleepScore).not.toBeNull()
 
