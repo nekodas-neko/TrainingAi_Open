@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { perDeviceNormal, currentDevice, currentDeviceReadings, normalOrCarriedOver, type DeviceReading } from '../per-device-normal'
+import { perDeviceNormal, currentDevice, currentDeviceReadings, normalOrCarriedOver, rowsOfDeviceInUse, type DeviceReading } from '../per-device-normal'
 
 const day = (i: number) => `2026-10-${String(i).padStart(2, '0')}`
 const run = (from: number, n: number, value: number, source: string | null): DeviceReading[] =>
@@ -65,5 +65,21 @@ describe('perDeviceNormal (#3001)', () => {
     const rows = [...run(1, 3, 50, 'a'), ...run(4, 2, 60, 'b')]
     expect(currentDevice(rows)).toBe('b')
     expect(currentDeviceReadings(rows).map(r => r.date)).toEqual([day(4), day(5)])
+  })
+})
+
+describe('rowsOfDeviceInUse (#3001)', () => {
+  const body = (i: number, hrvMs: number | null, hrvSource?: string) => ({ date: day(i), hrvMs, hrvSource })
+  const pick = (rows: ReturnType<typeof body>[]) => rowsOfDeviceInUse(rows, r => r.hrvMs, r => r.hrvSource).map(r => r.date)
+
+  it('keeps only the newest reading’s device, so a trend never spans the switch', () => {
+    const rows = [body(1, 45, 'oura_ble'), body(2, 45, 'oura_ble'), body(3, 70, 'oura_cloud'), body(4, 72, 'oura_cloud')]
+    expect(pick(rows)).toEqual([day(3), day(4)])
+  })
+
+  it('leaves unsorted input in the order given, ignores empty and non-positive readings', () => {
+    const rows = [body(4, 72, 'b'), body(1, 45, 'a'), body(5, 0, 'a'), body(3, null, 'a'), body(2, 70, 'b')]
+    expect(pick(rows)).toEqual([day(4), day(2)])
+    expect(pick([])).toEqual([])
   })
 })

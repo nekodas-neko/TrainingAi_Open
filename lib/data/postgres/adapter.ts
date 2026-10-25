@@ -40,6 +40,7 @@ import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
 import { computeStepsByDay } from '@/lib/oura-ble/step-day-buckets'
 import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
+import { rowsOfDeviceInUse } from '@trainingai/shared/health/per-device-normal'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
@@ -2132,7 +2133,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
       // HRV trend: ratio of recent 3 days vs older baseline
       let hrvTrend: number | null = null
-      const hrvRows = bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0)
+      // #3001: both stretches from the device in use, so Oura's HRV is never compared with the ring's.
+      const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource)
       if (hrvRows.length >= 4) {
         const sorted = [...hrvRows].sort((a, b) => b.date.localeCompare(a.date))
         const recent3 = sorted.slice(0, 3)

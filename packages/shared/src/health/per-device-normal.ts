@@ -137,3 +137,19 @@ export function perDeviceNormal(readings: readonly DeviceReading[], opts: Device
 export function normalOrCarriedOver(n: DeviceNormal): number | null {
   return n.value ?? n.carriedOver?.value ?? n.provisional
 }
+
+/**
+ * The rows whose `value` is a usable number and whose device is the one in use (the source of the
+ * newest such row), in the order given. For a caller built on a recent-versus-older comparison, which
+ * must compare two stretches of one device's nights and never one stretch of the ring with one of Oura.
+ */
+export function rowsOfDeviceInUse<T extends { date: string }>(
+  rows: readonly T[],
+  value: (row: T) => number | null | undefined,
+  source: (row: T) => string | null | undefined,
+): T[] {
+  const positive = (r: T) => { const v = value(r); return v != null && Number.isFinite(v) && v > 0 ? v : null }
+  const device = currentDevice(rows.map(r => ({ date: r.date, value: positive(r), source: source(r) })))
+  if (device == null) return []
+  return rows.filter(r => positive(r) != null && deviceOf(source(r)) === device)
+}

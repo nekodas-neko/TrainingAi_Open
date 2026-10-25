@@ -17,6 +17,7 @@ import { workingBudgetMin, planningBudgetMin } from '@trainingai/shared/workout/
 import { buildTimeProfiles, type ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
 import { robustAvgSetDurationsByExercise, buildMeasuredTimeBudget, resolveTransitionSec } from '@trainingai/shared/workout/time-audit'
 import { excludeLowWearDays, toOuraByDate } from '@trainingai/shared/health/wear-confidence'
+import { rowsOfDeviceInUse } from '@trainingai/shared/health/per-device-normal'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import type { FigureSignals, FigureSignalExercise } from '@trainingai/shared/ai-periodization/prescription-figures'
 
@@ -534,7 +535,8 @@ export async function aggregateSignals(
   // like. The recent-3 window is left unfiltered — it reflects current status.
   let hrvTrend: number | null = null
   const bodyMetrics = await repo.listBodyMetrics(userId, from14d, today)
-  const hrvRows = bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0)
+  // #3001: both stretches from the device in use, so Oura's HRV is never compared with the ring's.
+  const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource)
   if (hrvRows.length >= 4) {
     const sorted = [...hrvRows].sort((a, b) => b.date.localeCompare(a.date))
     const recent3 = sorted.slice(0, 3)
