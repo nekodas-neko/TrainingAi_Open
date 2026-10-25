@@ -425,6 +425,10 @@ export const activityLogs = pgTable('activity_logs', {
   // session logged in the app.
   externalSource:  text('external_source'),
   externalId:      text('external_id'),
+  // #3309 (migration 202610250602): why `deleted_at` was set, 'app' (the owner deleted it) or
+  // 'health_connect_sweep' (Health Connect stopped returning it). NULL on a live row and on every
+  // tombstone from before the column, which reads as 'app'. Only a sweep tombstone is revived.
+  deletedReason:   text('deleted_reason').$type<'app' | 'health_connect_sweep'>(),
   routePolyline:   text('route_polyline'),
   splits:          jsonb('splits').$type<{ km: number; paceSec: number }[]>(),
   bestEfforts:     jsonb('best_efforts').$type<Record<string, number>>(),

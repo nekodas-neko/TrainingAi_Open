@@ -37,7 +37,8 @@ SELECT
   t.elevation_profile,
   t.segments,
   t.external_source,
-  t.external_id
+  t.external_id,
+  t.deleted_reason
 FROM public.activity_logs t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
