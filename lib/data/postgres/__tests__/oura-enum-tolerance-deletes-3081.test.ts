@@ -71,7 +71,8 @@ describe.skipIf(!canRun)('Oura documents with a new value, and a session delete 
     expect(night.windows.map(w => w.ouraId)).toEqual(['sl-1'])
     // HRV and resting HR come from the main period only.
     const vitals = (await pool.query(`SELECT hrv_ms FROM body_metrics WHERE user_id = $1 AND date = $2`, [USER, sleepPeriod.day])).rows[0]
-    expect(vitals?.hrv_ms).toBe(sleepPeriod.average_hrv)
+    // #3075: the main period's HRV is the median of its series ([48, 61]), not Oura's average.
+    expect(vitals?.hrv_ms).toBe(54.5)
   })
 
   it('a workout with a new intensity lands with it as null, and the report carries counts only', async () => {
