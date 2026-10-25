@@ -13,6 +13,7 @@ import {
   routeOpen,
   shouldAskPermission,
   startingScope,
+  statusDelay,
 } from './sync-decisions';
 import {
   clearWorkoutStatus,
@@ -36,10 +37,10 @@ export function WorkoutStatusAccountGuard() {
   const userId = dataReader?.userId ?? null;
   const scope = useRef(startingScope);
   useEffect(() => {
-    const decision = accountScopeDecision(scope.current, state.status, userId);
+    const decision = accountScopeDecision(scope.current, state.status, userId, state.hasSession);
     scope.current = decision.scope;
     if (decision.clear) clearWorkoutStatus(workoutStatus);
-  }, [state.status, userId]);
+  }, [state.status, state.hasSession, userId]);
   return null;
 }
 
@@ -65,18 +66,21 @@ export function WorkoutStatusSync({
   latest.current = active;
 
   // The first update after the journal loads is the reconcile and goes at once; later ones wait
-  // for the burst to settle.
+  // for the burst to settle, except away from the app, where no timer would fire.
   const reconciled = useRef(false);
   useEffect(() => {
     if (!journal.ready) return;
-    const timer = setTimeout(
-      () => {
-        reconciled.current = true;
-        reporter.update(active);
-        if (active) checkPromotionOnce();
-      },
-      reconciled.current ? DEBOUNCE_MS : 0,
-    );
+    const send = () => {
+      reconciled.current = true;
+      reporter.update(active);
+      if (active) checkPromotionOnce();
+    };
+    const delay = statusDelay(AppState.currentState, reconciled.current, DEBOUNCE_MS);
+    if (delay === null) {
+      send();
+      return;
+    }
+    const timer = setTimeout(send, delay);
     return () => clearTimeout(timer);
   }, [journal.ready, active, reporter]);
 

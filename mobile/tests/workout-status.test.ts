@@ -8,6 +8,7 @@ import {
 } from '../src/features/workouts/status/workout-status.ts';
 import {
   accountScopeDecision,
+  statusDelay,
   routeOpen,
   shouldAskPermission,
   startingScope,
@@ -321,4 +322,28 @@ test('the promotion line names the level in words and survives the reporter scru
   assert.equal(scrubText(line), line);
   assert.match(promotionDiagnostic({ posted: true, promoted: false, sdkFull: 3_600_000, canPostPromoted: true }), /level=baklava /);
   assert.match(promotionDiagnostic({ posted: false, promoted: false, sdkFull: 0, canPostPromoted: false }), /level=older/);
+});
+
+test('a sign-out whose secure storage failed still clears the old workout', () => {
+  let scope: AccountScope = startingScope;
+  const step = (status: AccountScopeStatus, userId: string | null, hasSession: boolean) => {
+    const decision = accountScopeDecision(scope, status, userId, hasSession);
+    scope = decision.scope;
+    return decision.clear;
+  };
+  assert.equal(step('signedIn', 'a', true), false);
+  assert.equal(step('checking', null, false), false);
+  assert.equal(step('storageError', null, false), true, 'the session is gone: signed out');
+  assert.equal(step('storageError', null, false), false, 'once');
+  // A storage error with the session still held (an interrupted sign-in) is no sign-out.
+  scope = startingScope;
+  assert.equal(step('signedIn', 'a', true), false);
+  assert.equal(step('storageError', null, true), false);
+});
+
+test('away from the app a journal change goes to the notification at once (#3266)', () => {
+  assert.equal(statusDelay('background', true, 250), null, 'no timer fires in the background');
+  assert.equal(statusDelay('inactive', false, 250), null);
+  assert.equal(statusDelay('active', false, 250), 0, 'the reconcile goes at once');
+  assert.equal(statusDelay('active', true, 250), 250, 'in the app a burst still settles first');
 });

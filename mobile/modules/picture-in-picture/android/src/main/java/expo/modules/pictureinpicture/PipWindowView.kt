@@ -50,6 +50,9 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     letterSpacing = WIDE
     maxLines = 1
   }
+  private val gate = PipClockGate()
+  private val timeClock = clockOf(time)
+  private val targetClock = clockOf(target)
   private val label = caption(9f, FAINT, WIDE)
   private val load = text(14f, LOAD, bold = true).apply { fontFeatureSettings = "tnum" }
   private val timer = column(dp(4f)).apply {
@@ -87,8 +90,10 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     addView(placeholder, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
   }
 
-  /** Draws the workout as it is now. */
-  fun render() {
+  /** Draws the workout as it is now. A render reached from a clock's tick inside one is skipped. */
+  fun render() = gate.render { redraw() }
+
+  private fun redraw() {
     val frame = frameAt(System.currentTimeMillis())
     if (frame !is PipFrame.Timer) {
       val shown = frame as PipFrame.Placeholder
@@ -127,27 +132,26 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     setPulse(!frame.rest)
   }
 
-  /**
-   * Counts `view` up from `fromMs`, or stops it. The base is set only when it moves, since setting
-   * it fires a tick, and a tick renders.
-   */
+  /** Counts `view` up from `fromMs`, or stops it; PipClockGate keeps either from re-entering. */
   private fun count(view: Chronometer, fromMs: Long?) {
+    val clock = if (view === time) timeClock else targetClock
     if (fromMs == null) {
-      view.stop()
-      view.tag = null
+      gate.count(clock, null)
       // Nothing to count from stands at 0:00; the caption's own text is set by render.
       view.text = if (view === target) "" else "0:00"
       return
     }
     val base = PipPresenter.elapsedBase(fromMs, System.currentTimeMillis(), SystemClock.elapsedRealtime())
-    val current = view.tag as? Long
-    if (current == null || kotlin.math.abs(current - base) > BASE_SLACK_MS) {
-      view.tag = base
+    // setBase writes the platform's "00:48" after its tick; put the window's own format back.
+    if (gate.count(clock, base)) format(view)
+  }
+
+  private fun clockOf(view: Chronometer) = object : PipClock {
+    override fun start() = view.start()
+    override fun stop() = view.stop()
+    override fun setBase(base: Long) {
       view.base = base
-      // setBase writes the platform's "00:48" after its tick; put the window's own format back.
-      format(view)
     }
-    view.start()
   }
 
   private fun format(view: Chronometer) {
@@ -258,8 +262,6 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
 
   companion object {
     private const val SIZE = 144f
-    /** Reading the two clocks a moment apart moves the base by a millisecond or so, not a second. */
-    private const val BASE_SLACK_MS = 250L
     private const val WIDEST = 0.1f
     private const val WIDE = 0.025f
     private val REST = Color.parseColor("#94a3b8")
