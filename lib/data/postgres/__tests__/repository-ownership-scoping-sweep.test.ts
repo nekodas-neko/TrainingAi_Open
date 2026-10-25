@@ -298,8 +298,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getExercise1rmHistory', r => r.getExercise1rmHistory(USER_A, [bVal('exercise_logs', 'exercise_name')], TZ),
       v => { expect(leaked(v)).toEqual([]); expect(Object.values(v as object).flat()).toEqual([]) }],
     ['getSessionExercise1rms', r => r.getSessionExercise1rms(USER_A, bId('workout_sessions'))],
-    ['getWorkoutSensorProbe', r => r.getWorkoutSensorProbe(USER_A, bId('workout_sessions'))],
-    ['getWorkoutSensorProbe (latest)', r => r.getWorkoutSensorProbe(USER_A)],
     // day keys and body metrics
     ['listStepDayKeys', r => r.listStepDayKeys(USER_A, FROM, TO)],
     ['listSleepDayKeys', r => r.listSleepDayKeys(USER_A, FROM, TO)],
@@ -343,7 +341,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['listDexaScans', r => r.listDexaScans(USER_A)],
     ['getLatestMeasuredRmr', r => r.getLatestMeasuredRmr(USER_A)],
     ['listMeasuredRmr', r => r.listMeasuredRmr(USER_A)],
-    ['getAppLoadReport', r => r.getAppLoadReport(USER_A, 3650)],
     // sync
     ['getSyncDelta', r => r.getSyncDelta(USER_A, new Date(0)), v => {
       expect(leaked(v)).toEqual([])
@@ -359,7 +356,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getOuraClockAnchor', r => r.getOuraClockAnchor(USER_A)],
     ['getOuraClockAnchors', r => r.getOuraClockAnchors(USER_A)],
     ['getOuraClockOffsets', r => r.getOuraClockOffsets(USER_A)],
-    ['getOuraHeartrateBySource', r => r.getOuraHeartrateBySource(USER_A, bVal('oura_heartrate', 'source'), FROM_TS, TO_TS)],
     ['getOuraDaytimeStressBuckets', r => r.getOuraDaytimeStressBuckets(USER_A, FROM_TS, TO_TS)],
     ['getLatestStrapStatus', r => r.getLatestStrapStatus(USER_A)],
     ['listStrapStatus', r => r.listStrapStatus(USER_A, FROM_TS, 50)],
@@ -400,7 +396,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getDerivedScoresForDay', r => r.getDerivedScoresForDay(USER_A, D)],
     ['getOuraRollupState', r => r.getOuraRollupState(USER_A)],
     ['countPackableBuckets', r => r.countPackableBuckets(USER_A)],
-    ['previewStepsBackfill', r => r.previewStepsBackfill(USER_A, TZ)],
     // supplements
     ['listSupplementVials', r => r.listSupplementVials(USER_A, bId('supplements'))],
     ['currentSupplementVial', r => r.currentSupplementVial(USER_A, bId('supplements'))],
@@ -512,8 +507,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['markOuraWorkoutReviewed', r => r.markOuraWorkoutReviewed(USER_A, bId('oura_workouts'))],
     ['markHrSynced', r => r.markHrSynced(USER_A, bId('workout_sessions'))],
     ['writeSetHrr1', r => r.writeSetHrr1(USER_A, [{ setLogId: bId('set_logs'), hrr1Bpm: 99, restAdequate: true, drop30s: null, drop60s: null, drop90s: null, drop120s: null }])],
-    ['nullHistoricalDecoded', r => r.nullHistoricalDecoded(USER_A),
-      v => { expect(v).toEqual({ nulled: 0, remaining: 0 }) }],
     ['packOuraRawBuckets', r => r.packOuraRawBuckets(USER_A)],
     ['persistBodyCompFromMetrics', r => r.persistBodyCompFromMetrics(USER_A), v => { expect(v).toBe(0) }],
     ['deleteMealPlan', r => r.deleteMealPlan(bId('meal_plans'), USER_A)],
@@ -830,13 +823,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       expect(await snapshotB()).toBe(before)
     })
 
-    it('getWorkoutSensorProbe counts only the caller\'s own ring samples in its window', async () => {
-      // A's session spans AT; B has an accel chunk and a heart-rate sample at AT.
-      const probe = await repo.getWorkoutSensorProbe(USER_A, a.workoutSession)
-      expect(probe).not.toBeNull()
-      expect({ chunks: probe!.accel.chunks, hr: probe!.hrSamples }).toEqual({ chunks: 0, hr: 0 })
-    })
-
     it('listSessionsMissingHrStats does not date the caller\'s ring history from another user\'s', async () => {
       // A has no heart-rate rows at all, so no session of A's can be "after the first reading".
       expect(await repo.listSessionsMissingHrStats(USER_A, FROM_TS, 50)).toEqual([])
@@ -1047,31 +1033,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       } finally {
         await pool.query(`DELETE FROM body_metrics WHERE id = ANY($1::uuid[])`, [metrics])
         await pool.query(`DELETE FROM dexa_scans WHERE id = ANY($1::uuid[])`, [scans])
-      }
-    })
-
-    it('previewStepsBackfill builds step days only from the caller\'s own windows and stored days', async () => {
-      // A: a clock anchor at noon 08-25 and a 600-step live window there, no stored day — one row
-      // to preview. B: a live window one ring-day earlier (a second row if windows are read
-      // unscoped) and a manual 08-25 day (outranks the ring, so the row vanishes if days are).
-      const anchorUtc = new Date('2026-08-25T02:00:00Z')
-      const ds = 1_000_000
-      const anchor = (await pool.query(
-        `INSERT INTO oura_ble_clock_anchors (user_id, anchor_ds, anchor_utc, epoch) VALUES ($1, $2, $3, 0) RETURNING id`,
-        [USER_A, ds, anchorUtc])).rows[0].id
-      const windows = (await pool.query(
-        `INSERT INTO step_live_windows (user_id, start_ds, end_ds, steps) VALUES ($1, $3, $4, 600), ($2, $5, $6, 600) RETURNING id`,
-        [USER_A, USER_B, ds, ds + 6000, ds - 864_000, ds - 864_000 + 6000])).rows.map(r => r.id)
-      const day = (await pool.query(
-        `INSERT INTO body_metrics (user_id, date, steps, source_map) VALUES ($1, '2026-08-25', 9000, $2) RETURNING id`,
-        [USER_B, JSON.stringify({ steps: 'manual' })])).rows[0].id
-      try {
-        expect(await repo.previewStepsBackfill(USER_A, TZ))
-          .toEqual([{ date: '2026-08-25', oldSteps: 0, oldSource: null, newSteps: 600 }])
-      } finally {
-        await pool.query(`DELETE FROM body_metrics WHERE id = $1`, [day])
-        await pool.query(`DELETE FROM step_live_windows WHERE id = ANY($1::bigint[])`, [windows])
-        await pool.query(`DELETE FROM oura_ble_clock_anchors WHERE id = $1`, [anchor])
       }
     })
 

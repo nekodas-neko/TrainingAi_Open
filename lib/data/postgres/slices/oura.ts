@@ -2992,43 +2992,6 @@ export async function getOuraStorageStats(db: Db): Promise<import('../../reposit
   }
 }
 
-// Culling Lever 1b — one-off backfill nulling the `decoded` JSONB on rows written before Lever 1a
-// (which stops writing it going forward). DATA-DROPPING → admin-triggered only, never auto-run on
-// deploy/migration; the owner presses this deliberately, watching the G-2 footprint numbers drop.
-// body_hex is never touched (archival, untouched by definition) — every nulled row's decode path
-// already falls back to body_hex (proven in Lever 1a). No age cutoff: every row still carrying
-// `decoded` predates Lever 1a and is unconditionally safe to null.
-// Batched (500 rows/UPDATE, matching redecodeOuraRawSamples's page size) so no single statement can
-// exceed the pool's 15s statement_timeout — each batch commits independently (no wrapping
-// transaction), so a killed/interrupted run just leaves fewer rows remaining, never rolled back.
-// `maxRows` still bounds one call (owner explicitly asked for "all at once" — defaults high enough
-// to clear any realistic single-user backlog in one press, while keeping a finite ceiling rather
-// than a literal unbounded loop).
-export async function nullHistoricalDecoded(
-  db: Db, userId: string, maxRows = 1_000_000,
-): Promise<{ nulled: number; remaining: number }> {
-  const BATCH = 500
-  let nulled = 0
-  while (nulled < maxRows) {
-    const page = await db
-      .select({ id: s.ouraRawSamples.id })
-      .from(s.ouraRawSamples)
-      .where(and(eq(s.ouraRawSamples.userId, userId), isNotNull(s.ouraRawSamples.decoded)))
-      .orderBy(asc(s.ouraRawSamples.id))
-      .limit(Math.min(BATCH, maxRows - nulled))
-    if (page.length === 0) break
-    await db.update(s.ouraRawSamples)
-      .set({ decoded: null })
-      .where(inArray(s.ouraRawSamples.id, page.map(r => r.id)))
-    nulled += page.length
-  }
-  const [{ remaining }] = await db
-    .select({ remaining: sql<number>`count(*)::int` })
-    .from(s.ouraRawSamples)
-    .where(and(eq(s.ouraRawSamples.userId, userId), isNotNull(s.ouraRawSamples.decoded)))
-  return { nulled, remaining }
-}
-
 // Culling Lever 1c — physically reclaim the disk that Lever 1b freed only logically. Nulling the
 // `decoded` column (Lever 1b) writes new tuples and leaves the old JSONB-carrying ones as dead
 // tuples; autovacuum reclaims that space for internal reuse but never shrinks the table file

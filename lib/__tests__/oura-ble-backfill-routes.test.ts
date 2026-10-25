@@ -1,13 +1,14 @@
 /**
- * PS-39 — the three Oura-BLE backfill levers: `oura-ble/samples/redecode`,
- * `oura-ble/samples/step-backfill-preview` and `oura-ble/backfill-hr-stats`.
+ * PS-39 — the Oura-BLE backfill levers: `oura-ble/samples/redecode` and
+ * `oura-ble/backfill-hr-stats`. (`step-backfill-preview` and redecode's `allowStepsDecrease` option
+ * were retired in #2862.)
  *
- * All three re-derive stored data rather than draining the ring again, which is only possible
+ * Both re-derive stored data rather than draining the ring again, which is only possible
  * because `oura_raw_samples.body_hex` is the archival source of truth on the server — the ring's
  * history buffer is finite and its cursor only moves forward, so a decoder fixed later can back-fill
- * by re-reading stored hex and no other way. None of these routes may mutate that hex, and none does.
+ * by re-reading stored hex and no other way. Neither route may mutate that hex, and neither does.
  *
- * What each decides:
+ * What they decide:
  *
  *   · **`?dump=1` writes nothing and skips the full-history pass.** The full path re-decodes every
  *     stored sample and re-aggregates all history; on real data it exceeds the gateway timeout, and
@@ -20,8 +21,6 @@
  *     both phases are re-runnable, and a raw 500 reads as "redecode failed" while hiding the cause.
  *   · **`status` is derived, never stored** — from `finishedAt`, `error`, and the per-phase errors
  *     inside `result`, so there is no second field that can disagree with the timestamps.
- *   · **The step preview writes nothing.** It exists so the scope of the destructive
- *     `?allowStepsDecrease=1` rewrite can be read before it is fired.
  *   · **`backfill-hr-stats` persists a zero-reading snapshot on purpose**, so `computed_at` records
  *     the attempt — and it does not mark the session done, because the lister is coverage-aware.
  *
@@ -60,8 +59,6 @@ const finishRedecodeJob = vi.fn(async (..._a: unknown[]) => undefined)
 const getRedecodeJob = vi.fn(async (..._a: unknown[]) => null as Row | null)
 const getLatestRedecodeJob = vi.fn(async (_u: string) => null as Row | null)
 
-const previewStepsBackfill = vi.fn(async (..._a: unknown[]) => [] as { oldSteps: number; newSteps: number }[])
-
 const listSessionsMissingHrStats = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const upsertWorkoutHrStats = vi.fn(async (..._a: unknown[]) => undefined)
 const computeWorkoutHr = vi.fn(async (..._a: unknown[]) => null as Row | null)
@@ -88,7 +85,6 @@ vi.mock('@/lib/data', () => {
     finishRedecodeJob: (...a: unknown[]) => finishRedecodeJob(...a),
     getRedecodeJob: (...a: unknown[]) => getRedecodeJob(...a),
     getLatestRedecodeJob: (u: string) => getLatestRedecodeJob(u),
-    previewStepsBackfill: (...a: unknown[]) => previewStepsBackfill(...a),
     listSessionsMissingHrStats: (...a: unknown[]) => listSessionsMissingHrStats(...a),
     upsertWorkoutHrStats: (...a: unknown[]) => upsertWorkoutHrStats(...a),
   })
@@ -96,7 +92,6 @@ vi.mock('@/lib/data', () => {
 })
 
 import { POST as redecodePost, GET as redecodeGet } from '@/app/api/oura-ble/samples/redecode/route'
-import { GET as previewGet } from '@/app/api/oura-ble/samples/step-backfill-preview/route'
 import { POST as hrBackfillPost } from '@/app/api/oura-ble/backfill-hr-stats/route'
 
 const redecodeReq = (qs = '') =>
@@ -116,7 +111,7 @@ const settle = () => new Promise(r => setTimeout(r, 0))
 beforeEach(() => {
   for (const m of [getUserById, rateLimit, reportServerError, reportRollupStepErrors, runRedecodeOffLoop, runStressBackfillOffLoop,
                    reapStaleRedecodeJobs, startRedecodeJob, finishRedecodeJob, getRedecodeJob,
-                   getLatestRedecodeJob, previewStepsBackfill, listSessionsMissingHrStats,
+                   getLatestRedecodeJob, listSessionsMissingHrStats,
                    upsertWorkoutHrStats, computeWorkoutHr]) m.mockClear()
   rateLimit.mockReturnValue(true)
   getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
@@ -137,7 +132,6 @@ beforeEach(() => {
   })
   getRedecodeJob.mockResolvedValue(null)
   getLatestRedecodeJob.mockResolvedValue(null)
-  previewStepsBackfill.mockResolvedValue([])
   listSessionsMissingHrStats.mockResolvedValue([])
   computeWorkoutHr.mockResolvedValue(null)
   sessionUser = { id: 'u-1', isAdmin: true }
@@ -145,11 +139,10 @@ beforeEach(() => {
 
 afterEach(() => { vi.useRealTimers() })
 
-describe('the admin gate on all three levers', () => {
+describe('the admin gate on both levers', () => {
   const ALL: [string, () => Promise<Response>][] = [
     ['redecode POST', () => redecodeReq()],
     ['redecode GET', () => pollReq()],
-    ['step preview GET', () => previewGet()],
     ['hr backfill POST', () => hrReq()],
     ['stress backfill POST', () => redecodeReq('?stressBackfill=1&async=1')],
   ]
@@ -180,18 +173,15 @@ describe('the admin gate on all three levers', () => {
   })
 
   it('rate-limits each at its own allowance, the rewrites hardest', async () => {
-    // The three numbers are deliberately different and encode how expensive each is: a full-history
-    // rewrite is 4, the HR backfill 6, the read-only preview 10. A single shared number would lose
-    // that, so each is asserted rather than "some limit exists".
+    // The two numbers are deliberately different and encode how expensive each is: a full-history
+    // rewrite is 4, the HR backfill 6. A single shared number would lose that, so each is asserted
+    // rather than "some limit exists".
     rateLimit.mockReturnValue(false)
     expect((await redecodeReq()).status).toBe(429)
     expect(rateLimit.mock.calls[0].slice(1)).toEqual([4, 60_000])
     rateLimit.mockClear(); rateLimit.mockReturnValue(false)
     expect((await hrReq()).status).toBe(429)
     expect(rateLimit.mock.calls[0].slice(1)).toEqual([6, 60_000])
-    rateLimit.mockClear(); rateLimit.mockReturnValue(false)
-    expect((await previewGet()).status).toBe(429)
-    expect(rateLimit.mock.calls[0].slice(1)).toEqual([10, 60_000])
     expect(runRedecodeOffLoop).not.toHaveBeenCalled()
   })
 })
@@ -210,22 +200,19 @@ describe('POST /api/oura-ble/samples/redecode', () => {
     expect(reapStaleRedecodeJobs).not.toHaveBeenCalled()
   })
 
-  it('refuses the step-backfill flag on that path too, rather than honouring it', async () => {
+  it('still refuses a request that is not a job when it carries the retired step-backfill flag', async () => {
     const res = await redecodeReq('?allowStepsDecrease=1&date=2026-03-01')
     expect(res.status).toBe(400)
     expect(runRedecodeOffLoop).not.toHaveBeenCalled()
     expect(startRedecodeJob).not.toHaveBeenCalled()
   })
 
-  it('treats any value other than 1 as off, for all three flags', async () => {
+  it('treats any value other than 1 as off, for both flags', async () => {
     // `?dump=true` is NOT the dump, so it is a bare full-history request and is refused; `?async=yes`
     // likewise. Only the literal 1 opens a mode.
     expect((await redecodeReq('?dump=true')).status).toBe(400)
     expect((await redecodeReq('?async=yes')).status).toBe(400)
     expect(runRedecodeOffLoop).not.toHaveBeenCalled()
-    await redecodeReq('?async=1&allowStepsDecrease=yes')
-    expect(startRedecodeJob).toHaveBeenCalledWith('u-1', expect.objectContaining({ allowStepsDecrease: false }))
-    await settle()
   })
 
   it('?dump=1 writes nothing and does NOT ask for the full-history pass', async () => {
@@ -247,13 +234,10 @@ describe('POST /api/oura-ble/samples/redecode', () => {
     expect(runRedecodeOffLoop.mock.calls[0][1]).toBe('Europe/Berlin')
   })
 
-  it('passes ?date and ?allowStepsDecrease through to the full pass', async () => {
-    // Two independent params: a request setting only one could not tell which the route forwarded.
+  it('passes ?date through to the full pass, and ignores the retired ?allowStepsDecrease', async () => {
     await redecodeReq('?async=1&date=2026-03-01&allowStepsDecrease=1')
     await settle()
-    expect(runRedecodeOffLoop.mock.calls[0][2]).toEqual({
-      debugDate: '2026-03-01', fullHistory: true, allowStepsDecrease: true,
-    })
+    expect(runRedecodeOffLoop.mock.calls[0][2]).toEqual({ debugDate: '2026-03-01', fullHistory: true })
   })
 })
 
@@ -275,57 +259,42 @@ describe('POST /api/oura-ble/samples/redecode?async=1', () => {
     // sample — the operation whose own comment names it as the event-loop starvation that took
     // production down. The response still carries the running job's id so the caller can poll it.
     startRedecodeJob.mockResolvedValue({
-      job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { allowStepsDecrease: true } },
+      job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { fullHistory: true } },
       alreadyRunning: true,
       refused: false,
     })
     const body = await (await redecodeReq('?async=1')).json()
-    // The joiner is told what it is following: here a step backfill, which a plain press may follow.
-    expect(body).toMatchObject({ jobId: 77, status: 'running', alreadyRunning: true, kind: 'step-backfill' })
+    // The joiner is told what it is following.
+    expect(body).toMatchObject({ jobId: 77, status: 'running', alreadyRunning: true, kind: 'redecode' })
     expect(runRedecodeOffLoop).not.toHaveBeenCalled()
   })
 
-  // Issue 2383. A step backfill used to follow a running plain redecode, so the correction never ran
-  // and the console said "Backfill applied". It is refused now: 409, nothing started, nothing to poll.
-  it('refuses a step backfill with 409 while a plain redecode holds the slot', async () => {
+  // A plain redecode never follows a stress-bucket backfill, which writes none of what it writes.
+  it('refuses a plain redecode with 409 while a stress backfill holds the slot', async () => {
     startRedecodeJob.mockResolvedValue({
-      job: { id: 41, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { allowStepsDecrease: false } },
+      job: { id: 41, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { fullHistory: true, stressBackfill: true, dryRun: false } },
       alreadyRunning: true,
       refused: true,
     })
-    const res = await redecodeReq('?async=1&allowStepsDecrease=1')
+    const res = await redecodeReq('?async=1')
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body).toMatchObject({
-      refused: true, runningJobId: 41, runningKind: 'redecode', requestedKind: 'step-backfill',
+      refused: true, runningJobId: 41, runningKind: 'stress-backfill', requestedKind: 'redecode',
     })
-    expect(body.error).toMatch(/already running.*wait for it to finish, then run the backfill/i)
-    // No job id: the caller must not poll the plain run as though it were its own.
+    expect(body.error).toMatch(/different full-history job.*wait for it to finish, then run the redecode/i)
+    // No job id: the caller must not poll the stress run as though it were its own.
     expect(body.jobId).toBeUndefined()
     expect(res.headers.get('Cache-Control')).toBe('private, no-store')
     expect(runRedecodeOffLoop).not.toHaveBeenCalled()
     expect(finishRedecodeJob).not.toHaveBeenCalled()
   })
 
-  it('reports the kind of a job it starts', async () => {
-    startRedecodeJob.mockResolvedValue({
-      job: { id: 78, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { allowStepsDecrease: true } },
-      alreadyRunning: false,
-      refused: false,
-    })
-    const body = await (await redecodeReq('?async=1&allowStepsDecrease=1')).json()
-    expect(body).toMatchObject({ jobId: 78, alreadyRunning: false, kind: 'step-backfill' })
-    expect(startRedecodeJob).toHaveBeenCalledWith('u-1', expect.objectContaining({ allowStepsDecrease: true }))
-    await settle()
-  })
-
   it('stores the options on the job row, with an absent date as null', async () => {
     // The job row is the only record of what a run was asked to do, so `undefined` — which would
     // vanish through JSON — becomes an explicit null.
     await redecodeReq('?async=1')
-    expect(startRedecodeJob).toHaveBeenCalledWith('u-1', {
-      debugDate: null, fullHistory: true, allowStepsDecrease: false,
-    })
+    expect(startRedecodeJob).toHaveBeenCalledWith('u-1', { debugDate: null, fullHistory: true })
     await settle()
   })
 
@@ -420,60 +389,20 @@ describe('GET /api/oura-ble/samples/redecode — polling', () => {
     }
   })
 
-  it('reports the kind from the job row, so the backfill screen can tell whose run finished', async () => {
-    // Issue 2383. The step-backfill screen says "Backfill applied" only for a 'step-backfill' kind.
+  it('reports the kind from the job row, and a result payload cannot shadow it', async () => {
     const finishedAt = new Date('2026-09-09T04:05:00Z')
-    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true, allowStepsDecrease: false }, result: {} })
+    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true }, result: {} })
     expect((await (await pollReq()).json()).job.kind).toBe('redecode')
+    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true }, result: { kind: 'stress-backfill' } })
+    expect((await (await pollReq()).json()).job.kind).toBe('redecode')
+    // A row stored before the step backfill was retired (#2862) is a plain redecode now.
     getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true, allowStepsDecrease: true }, result: {} })
-    expect((await (await pollReq()).json()).job.kind).toBe('step-backfill')
-    // A result payload cannot shadow it.
-    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true }, result: { kind: 'step-backfill' } })
     expect((await (await pollReq()).json()).job.kind).toBe('redecode')
   })
 
   it('reaps stale jobs on the poll too, so a dead run cannot hold the slot forever', async () => {
     await pollReq()
     expect(reapStaleRedecodeJobs).toHaveBeenCalledWith('u-1')
-  })
-})
-
-describe('GET /api/oura-ble/samples/step-backfill-preview', () => {
-  it('totals the old and new counts separately, and writes nothing', async () => {
-    // The two sums must disagree, and so must the two columns within a row — with equal values
-    // nothing distinguishes "sum the old" from "sum the new", which is the entire point of a
-    // preview whose job is to show that the numbers CHANGE.
-    previewStepsBackfill.mockResolvedValue([
-      { oldSteps: 12_000, newSteps: 8_400 },
-      { oldSteps: 9_000, newSteps: 7_100 },
-    ])
-    const body = await (await previewGet()).json()
-    expect(body.affectedDays).toBe(2)
-    expect(body.totalOldSteps).toBe(21_000)
-    expect(body.totalNewSteps).toBe(15_500)
-    expect(body.rows).toHaveLength(2)
-    expect(previewStepsBackfill).toHaveBeenCalledWith('u-1', 'Australia/Brisbane')
-  })
-
-  it('reports nothing to change as zeros rather than an error', async () => {
-    const body = await (await previewGet()).json()
-    expect(body).toEqual({ affectedDays: 0, totalOldSteps: 0, totalNewSteps: 0, rows: [] })
-  })
-
-  it('uses the caller’s timezone, because the day boundary decides which day a step lands on', async () => {
-    sessionUser = { id: 'u-1', isAdmin: true, timezone: 'Europe/Berlin' }
-    await previewGet()
-    expect(previewStepsBackfill).toHaveBeenCalledWith('u-1', 'Europe/Berlin')
-  })
-
-  it('files a failure as a fault and answers 500', async () => {
-    previewStepsBackfill.mockRejectedValue(new Error('statement timeout'))
-    const res = await previewGet()
-    expect(res.status).toBe(500)
-    expect(await res.json()).toEqual({ error: 'Preview failed' })
-    expect(reportServerError).toHaveBeenCalledWith(expect.any(Error), {
-      userId: 'u-1', url: '/api/oura-ble/samples/step-backfill-preview',
-    })
   })
 })
 

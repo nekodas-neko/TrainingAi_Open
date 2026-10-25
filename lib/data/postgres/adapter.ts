@@ -8,7 +8,6 @@ import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { normalizeEmail } from '@trainingai/shared/validation/email'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
-import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
 import { withUserLock } from './user-lock'
@@ -37,8 +36,6 @@ import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName,
 export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
 import { classifyClockRegression, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
-import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
-import { computeStepsByDay } from '@/lib/oura-ble/step-day-buckets'
 import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
@@ -132,7 +129,7 @@ import * as hcHistory from './slices/health-connect-history-import'
 import * as shadowReadinessSlice from './slices/shadow-readiness'
 import * as nativeRefreshTokens from './slices/native-refresh-tokens'
 import * as ouraCloudTokens from './slices/oura-cloud-tokens'
-import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
+import { mergeSet, initialSourceMap, HEALTH_SOURCES, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
   PeriodizationPhase,
   AiPrescription,
@@ -6589,41 +6586,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
   }
 
-  /**
-   * p50/p95 per route over `days`, split cold vs warm.
-   *
-   * The split is the whole report. Every merge is a Railway deploy and the service worker's cache
-   * name is stamped from the deploy SHA, so a day with 80 merges invalidates the device's shell 80
-   * times — a percentile pooling cold and warm loads measures release cadence rather than the app.
-   *
-   * `percentile_cont` rather than an ordered fetch in JS: the whole point is to avoid pulling a
-   * fortnight of per-navigation rows into the process to sort them. `worstMs` rides along because a
-   * p95 hides the load the user actually complained about.
-   */
-  async getAppLoadReport(userId: string, days: number) {
-    const rows = await this.db.execute(sql`
-      SELECT route,
-             cold,
-             count(*)::int AS samples,
-             percentile_cont(0.5)  WITHIN GROUP (ORDER BY total_ms)::int AS p50_ms,
-             percentile_cont(0.95) WITHIN GROUP (ORDER BY total_ms)::int AS p95_ms,
-             max(total_ms)::int AS worst_ms
-        FROM app_load_metrics
-       WHERE user_id = ${userId}::uuid
-         AND created_at > now() - make_interval(days => ${days})
-       GROUP BY route, cold
-       ORDER BY p95_ms DESC
-    `)
-    return (rows.rows as Record<string, unknown>[]).map(r => ({
-      route: String(r.route),
-      cold: Boolean(r.cold),
-      samples: Number(r.samples),
-      p50Ms: Number(r.p50_ms),
-      p95Ms: Number(r.p95_ms),
-      worstMs: Number(r.worst_ms),
-    }))
-  }
-
   async insertErrorEvent(event: { userId: string | null; source: 'client' | 'server'; message: string; stack?: string | null; url?: string | null; userAgent?: string | null }): Promise<void> {
     await this.db.insert(s.errorEvents).values({
       userId: event.userId,
@@ -6835,67 +6797,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return oura.getOuraClockOffsets(this.db, userId)
   }
 
-  async getWorkoutSensorProbe(userId: string, sessionId?: string): Promise<import('../repository').WorkoutSensorProbe | null> {
-    const [ws] = await this.db
-      .select({ id: s.workoutSessions.id, startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt })
-      .from(s.workoutSessions)
-      .where(and(
-        eq(s.workoutSessions.userId, userId),
-        isNotNull(s.workoutSessions.completedAt),
-        ...(sessionId ? [eq(s.workoutSessions.id, sessionId)] : []),
-      ))
-      .orderBy(desc(s.workoutSessions.completedAt))
-      .limit(1)
-    if (!ws || !ws.completedAt) return null
-    const start = ws.startedAt
-    const end = ws.completedAt
-    const windowSec = (end.getTime() - start.getTime()) / 1000
-    const durationMin = Math.round((windowSec / 60) * 10) / 10
-
-    const chunks = await this.db
-      .select({ n: s.ouraAccelChunks.n, sampleRate: s.ouraAccelChunks.sampleRate, steps: s.ouraAccelChunks.steps })
-      .from(s.ouraAccelChunks)
-      .where(and(eq(s.ouraAccelChunks.userId, userId), gte(s.ouraAccelChunks.startedAt, start), lte(s.ouraAccelChunks.startedAt, end)))
-    const accelSamples = chunks.reduce((a, c) => a + c.n, 0)
-    const accelSteps = chunks.reduce((a, c) => a + c.steps, 0)
-    const accelSeconds = chunks.reduce((a, c) => a + (c.sampleRate > 0 ? c.n / c.sampleRate : 0), 0)
-    const coveragePct = windowSec > 0 ? Math.round((accelSeconds / windowSec) * 1000) / 10 : null
-
-    const [hrRow] = await this.db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(s.ouraHeartrate)
-      .where(and(eq(s.ouraHeartrate.userId, userId), gte(s.ouraHeartrate.timestamp, start), lte(s.ouraHeartrate.timestamp, end)))
-    const hrSamples = hrRow?.c ?? 0
-
-    let rawByTag: { tag: string; count: number }[] = []
-    // RV-182 ②: the offsets, not the anchor log — this path only converts timestamps.
-    const clock = await this.getOuraClockOffsets(userId)
-    const probeEpoch = clock.epoch
-    const probeFromDs = probeEpoch == null ? null : msToDs(start.getTime(), clock, probeEpoch)
-    const probeToDs = probeEpoch == null ? null : msToDs(end.getTime(), clock, probeEpoch)
-    if (probeFromDs != null && probeToDs != null) {
-      const startDs = Math.floor(probeFromDs)
-      const endDs = Math.ceil(probeToDs)
-      const rows = await readRawFrames(this.db, userId, { startDs, endDs, caller: 'workout-sensor-probe' })
-      const counts = new Map<number, number>()
-      for (const r of rows) counts.set(r.tag, (counts.get(r.tag) ?? 0) + 1)
-      rawByTag = [...counts.entries()]
-        .map(([tag, count]) => ({ tag: '0x' + tag.toString(16), count }))
-        .sort((a, b) => b.count - a.count)
-    }
-
-    return {
-      sessionId: ws.id,
-      windowStart: start.toISOString(),
-      windowEnd: end.toISOString(),
-      durationMin,
-      accel: { chunks: chunks.length, samples: accelSamples, steps: accelSteps, coveragePct },
-      hrSamples,
-      rawByTag,
-      hasAnchor: probeEpoch != null,
-    }
-  }
-
   /** How far the BLE rollup's derivation has reached, in wall-clock time.
    *
    *  The watermark is `anchor.anchorDs` written by a run that COMPLETED, which is what makes it
@@ -6916,69 +6817,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async getOuraRollupState(userId: string): Promise<{ lastRolledDs: number; epoch: number } | null> {
     return oura.getOuraRollupState(this.db, userId)
-  }
-
-  async getDaytimeTagCoverage(userId: string, tz: string, days: number): Promise<import('../repository').DaytimeTagCoverage> {
-    // Tags that drive the daytime-signal model builds (plus HRV/IBI/SpO₂ for reference). The gate
-    // is whether temp/MET/motion/steps show up during daytime hours or only cluster around sleep.
-    const TAG_LABELS: Record<number, string> = {
-      0x50: 'MET', 0x46: 'Temp', 0x69: 'Temp', 0x72: 'Motion', 0x7e: 'Steps', 0x7f: 'Steps',
-      0x5d: 'HRV', 0x80: 'IBI', 0x60: 'IBI', 0x8b: 'SpO₂',
-      // PPG (0x81) + bioimpedance (0x87 metadata, 0x88 raw) — the gate on the cva /
-      // halite / atlas model builds. We decode+store these tags but the probe omitted
-      // them, so "unreachable over BLE" was never actually measured. Included so an
-      // on-device census (after SetFeatureMode CVA_PPG) can confirm whether they stream.
-      0x81: 'PPG', 0x87: 'BioZ meta', 0x88: 'BioZ raw',
-    }
-    const daytimeHours: [number, number] = [9, 21]
-    const clampedDays = Math.max(1, Math.min(30, Math.floor(days) || 7))
-    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
-    const epoch = clock.epoch
-    if (epoch == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
-
-    const nowMs = Date.now()
-    const fromMs = nowMs - clampedDays * 86_400_000
-    const fromDs = msToDs(fromMs, clock, epoch)
-    const toDs = msToDs(nowMs, clock, epoch)
-    if (fromDs == null || toDs == null) return { hasAnchor: false, days: clampedDays, tz, daytimeHours, tags: [] }
-    const startDs = Math.floor(fromDs)
-    const endDs = Math.ceil(toDs)
-    const tagsOfInterest = Object.keys(TAG_LABELS).map(Number)
-
-    const rows = await readRawFrames(this.db, userId, { tags: tagsOfInterest, startDs, endDs, caller: 'daytime-tag-coverage' })
-
-    const perTag = new Map<number, number[]>() // tag → 24-bucket hour histogram
-    for (const r of rows) {
-      const hist = perTag.get(r.tag) ?? new Array(24).fill(0)
-      const tsMs = dsToMs(Number(r.ds), clock, epoch)
-      if (tsMs == null) continue
-      const hour = Number(formatInTimeZone(new Date(tsMs), tz, 'H'))
-      if (hour >= 0 && hour < 24) { hist[hour]++; perTag.set(r.tag, hist) }
-    }
-
-    const [dStart, dEnd] = daytimeHours
-    const tags = [...perTag.entries()]
-      .map(([tag, byHour]) => {
-        const total = byHour.reduce((a, b) => a + b, 0)
-        const daytime = byHour.reduce((a, c, h) => a + (h >= dStart && h < dEnd ? c : 0), 0)
-        return { tag: '0x' + tag.toString(16).padStart(2, '0'), label: TAG_LABELS[tag], total, daytime, night: total - daytime, byHour }
-      })
-      .sort((a, b) => b.total - a.total)
-    return { hasAnchor: true, days: clampedDays, tz, daytimeHours, tags }
-  }
-
-  async getOuraHeartrateBySource(userId: string, source: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number }[]> {
-    const rows = await this.db
-      .select({ timestamp: s.ouraHeartrate.timestamp, bpm: s.ouraHeartrate.bpm })
-      .from(s.ouraHeartrate)
-      .where(and(
-        eq(s.ouraHeartrate.userId, userId),
-        eq(s.ouraHeartrate.source, source),
-        gte(s.ouraHeartrate.timestamp, from),
-        lte(s.ouraHeartrate.timestamp, to),
-      ))
-      .orderBy(asc(s.ouraHeartrate.timestamp))
-    return rows
   }
 
   /** The stored daytime-stress buckets, for the device-comparison endpoint (PS-15). Read-only, and
@@ -7038,40 +6876,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       }
     }
     return { temp, met, still, motion }
-  }
-
-  async getOuraBatteryEvents(userId: string, from: Date, to: Date): Promise<Array<{
-    tsMs: number
-    kind: 'battery_level_changed' | 'charging_time'
-    batteryPct: number | null
-    voltageMv: number | null
-    chargingTimeSec: number | null
-  }>> {
-    const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
-    const epoch = clock.epoch
-    if (epoch == null) return []
-    const fromDs = msToDs(from.getTime(), clock, epoch)
-    const toDs = msToDs(to.getTime(), clock, epoch)
-    if (fromDs == null || toDs == null) return []
-    const startDs = Math.floor(fromDs)
-    const endDs = Math.ceil(toDs)
-    const rows = await readRawFrames(this.db, userId, { tags: [0x61], startDs, endDs, caller: 'oura-battery-events' })
-    const out: Array<{ tsMs: number; kind: 'battery_level_changed' | 'charging_time'; batteryPct: number | null; voltageMv: number | null; chargingTimeSec: number | null }> = []
-    for (const r of rows) {
-      const decoded = (r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)) as Record<string, unknown> | null
-      const kind = decoded?.kind
-      if (kind !== 'battery_level_changed' && kind !== 'charging_time') continue
-      const tsMs = dsToMs(Number(r.ds), clock, epoch)
-      if (tsMs == null) continue
-      out.push({
-        tsMs,
-        kind,
-        batteryPct: typeof decoded!.battery_pct === 'number' ? decoded!.battery_pct : null,
-        voltageMv: typeof decoded!.voltage_mv === 'number' ? decoded!.voltage_mv : null,
-        chargingTimeSec: typeof decoded!.charging_time === 'number' ? decoded!.charging_time : null,
-      })
-    }
-    return out
   }
 
   async insertOuraBatteryPoll(userId: string, percent: number, charging: boolean | null): Promise<void> {
@@ -7410,55 +7214,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       readStressBucketKeys: () => oura.listDaytimeStressBucketKeys(this.db, userId),
       addStressBuckets: rows => oura.addMissingDaytimeStressBuckets(this.db, userId, rows),
     }, timezone, opts)
-  }
-
-  // Read-only dry-run for the D0 historical step backfill (`allowStepsDecrease`). Mirrors the
-  // steps rollup step's query/pipeline/merge logic exactly (unbounded — full history, no
-  // rollupCutoffDs), but never writes. A day is only reported if it would ACTUALLY change: the
-  // stored steps value differs AND its current sourceMap rank is <= oura_ble's — the identical
-  // condition `mergeSet` applies on the real write, so a `manual` day is correctly never listed.
-  async previewStepsBackfill(userId: string, timezone: string): Promise<import('../repository').StepsBackfillPreviewRow[]> {
-    const anchors = await this.getOuraClockAnchors(userId)
-    if (anchors.length === 0) return []
-    const [stepFrameRows, motionFrameRows, liveWindowRows] = await Promise.all([
-      readRawFrames(this.db, userId, { tags: [...STEP_FEATURE_TAGS], caller: 'steps-backfill-preview' }),
-      readRawFrames(this.db, userId, { tags: [STEP_MOTION_TAG], caller: 'steps-backfill-preview' }),
-      this.db
-        .select({ startDs: s.stepLiveWindows.startDs, endDs: s.stepLiveWindows.endDs, steps: s.stepLiveWindows.steps })
-        .from(s.stepLiveWindows)
-        .where(eq(s.stepLiveWindows.userId, userId)),
-    ])
-
-    // Same bucketing + merge the rollup uses — see lib/oura-ble/step-day-buckets.ts. This is a
-    // read-only DRY RUN of the write, so it must not have its own copy: the owner authorises a
-    // destructive backfill from these numbers.
-    ensureServerOuraConstants()
-    const stepsByDay = await computeStepsByDay({
-      runtime: nodeModelRuntime,
-      stepFrames: stepFrameRows,
-      motionFrames: motionFrameRows,
-      liveWindows: liveWindowRows,
-      anchors,
-      timezone,
-    })
-    const days = new Set(stepsByDay.keys())
-    if (days.size === 0) return []
-
-    const existing = await this.db
-      .select({ date: s.bodyMetrics.date, steps: s.bodyMetrics.steps, sourceMap: s.bodyMetrics.sourceMap })
-      .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), inArray(s.bodyMetrics.date, Array.from(days))))
-    const existingByDay = new Map(existing.map(r => [r.date, r]))
-
-    const rows: import('../repository').StepsBackfillPreviewRow[] = []
-    for (const [day, newSteps] of stepsByDay) {
-      const ex = existingByDay.get(day)
-      const oldSteps = ex?.steps ?? 0
-      const oldSource = (ex?.sourceMap as Record<string, string> | null)?.steps ?? null
-      const wouldChange = newSteps !== oldSteps && sourceRank(oldSource) <= sourceRank('oura_ble')
-      if (wouldChange) rows.push({ date: day, oldSteps, oldSource, newSteps })
-    }
-    return rows.sort((a, b) => b.date.localeCompare(a.date))
   }
 
   async upsertStepLiveWindow(
@@ -8439,7 +8194,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraDailyDerived(userId: string, day: string, patch: import('../repository').OuraDailyDerivedPatch) { return oura.upsertOuraDailyDerived(this.db, userId, day, patch) }
   async clearNightDerivedScores(userId: string, day: string, pillars: { sleep: boolean; readiness: boolean }) { return oura.clearNightDerivedScores(this.db, userId, day, pillars) }
   async getOuraStorageStats() { return oura.getOuraStorageStats(this.db) }
-  async nullHistoricalDecoded(userId: string, maxRows?: number) { return oura.nullHistoricalDecoded(this.db, userId, maxRows) }
   async vacuumOuraRawSamples() { return oura.vacuumOuraRawSamples() }
   async vacuumTableFull(table: import('./slices/oura').VacuumFullTable) { return oura.vacuumTableFull(table) }
   async packOuraRawBuckets(userId: string, maxBuckets?: number) { return packOuraRawBuckets(this.db, userId, maxBuckets) }

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { readAiPausedMessage } from "@/lib/ai-paused-notice";
 import {
-  Plus, Pencil, Trash2, X, Check, Loader2, Search, Download, Play,
+  Plus, Pencil, Trash2, X, Check, Loader2, Search, Download,
   RefreshCw, Square, Upload, ImageIcon, Sparkles, CheckCircle2, XCircle, ClipboardCheck,
 } from "lucide-react";
 import { AddExerciseSheet } from "@/components/exercises/add-exercise-sheet";
@@ -424,21 +424,6 @@ export default function ExerciseManager() {
     toast.success(`Mirrored ${matched}/${pending.length}${noMatch ? ` (${noMatch} no match)` : ""}`);
   }
 
-  async function generateAll() {
-    const pending = exercises.filter(ex => !media[ex.name.toLowerCase()]?.gifUrl);
-    if (!pending.length) { toast.info("All exercises already have GIFs"); return; }
-    abortRef.current = false;
-    setProgress({ done: 0, total: pending.length, label: "AI generating" });
-    for (let i = 0; i < pending.length; i++) {
-      if (abortRef.current) break;
-      await generateOne(pending[i].name);
-      setProgress({ done: i + 1, total: pending.length, label: "AI generating" });
-      if (i < pending.length - 1) await new Promise(r => setTimeout(r, 1500));
-    }
-    setProgress(null);
-    toast.success("Done generating exercise media");
-  }
-
   async function uploadReference(file: File) {
     setUploadingRef(true);
     try {
@@ -532,9 +517,6 @@ export default function ExerciseManager() {
           <div className="flex gap-1.5 shrink-0">
             <Button size="sm" variant="outline" className="h-8 text-xs gap-1" disabled={busy} onClick={mirrorAll}>
               <Download className="w-3 h-3" /> Mirror all
-            </Button>
-            <Button size="sm" variant="outline" className="h-8 text-xs gap-1" disabled={busy} onClick={generateAll}>
-              <Play className="w-3 h-3" /> AI all
             </Button>
           </div>
         </div>

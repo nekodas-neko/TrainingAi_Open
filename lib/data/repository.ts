@@ -1265,11 +1265,6 @@ export interface WorkoutRepository {
     userId: string; route: string; totalMs: number; cold: boolean
     responseStartMs?: number | null; domContentMs?: number | null; buildId?: string | null
   }): Promise<void>
-  /** BF-19 — p50/p95 per route, split cold/warm. The split is load-bearing: every deploy rewrites
-   *  the service-worker cache, so a pooled percentile measures release cadence, not the app. */
-  getAppLoadReport(userId: string, days: number): Promise<{
-    route: string; cold: boolean; samples: number; p50Ms: number; p95Ms: number; worstMs: number
-  }[]>
   insertErrorEvent(event: { userId: string | null; source: 'client' | 'server'; message: string; stack?: string | null; url?: string | null; userAgent?: string | null }): Promise<void>
   listErrorEvents(limit: number): Promise<{ id: string; source: string; message: string; stack: string | null; url: string | null; userAgent: string | null; createdAt: string; userEmail: string | null }[]>
 
@@ -1292,16 +1287,6 @@ export interface WorkoutRepository {
   /** TN-56: raw frames by tag and ring-clock range, across both tiers (hot and packed). Read-only,
    *  for the admin replay; the rollup reads through its own IO. */
   readOuraRawFrames(userId: string, q: import('./postgres/slices/oura-raw-frames').RawFrameQuery): Promise<import('./postgres/slices/oura-raw-frames').RawFrameRow[]>
-  /** Phase-B feasibility probe: what motion/HR the ring captured during one workout's window
-   *  (accel-chunk coverage, HR count, raw tags present) — tells us whether the neural energy
-   *  model's inputs are capturable during waking workouts. Read-only diagnostic. */
-  getWorkoutSensorProbe(userId: string, sessionId?: string): Promise<WorkoutSensorProbe | null>
-  /** Per-tag hour-of-day coverage of raw BLE samples over the last `days`, for confirming whether
-   *  the ring streams daytime motion/temp/MET when worn-idle. Read-only admin probe. */
-  getDaytimeTagCoverage(userId: string, tz: string, days: number): Promise<DaytimeTagCoverage>
-  /** oura_heartrate rows in a wall-clock window, filtered by source ('ble' = ring, 'chest_strap' =
-   *  Polar H10). D6 comparison-harness read — both sources already land in this one table. */
-  getOuraHeartrateBySource(userId: string, source: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number }[]>
   /** Stored daytime-stress buckets, for the device-comparison endpoint (PS-15). */
   getOuraDaytimeStressBuckets(userId: string, from: Date, to: Date): Promise<{ bucketMid: Date; level: number }[]>
   /** Daytime skin-temperature (0x46/0x69 → temps_c) and MET (0x50 → met) samples in a wall-clock
@@ -1314,15 +1299,6 @@ export interface WorkoutRepository {
     /** #2781: the ring's `0x47` motion events, each with its low-intensity value (rung 2a of `MET/min`). */
     motion: { tsMs: number; lowIntensity: number }[]
   }>
-  /** Decoded 0x61 battery telemetry (level changes + charging-time) in a wall-clock window,
-   *  anchored via the ring clock. Empty when the ring has no clock anchor. Read-only. */
-  getOuraBatteryEvents(userId: string, from: Date, to: Date): Promise<Array<{
-    tsMs: number
-    kind: 'battery_level_changed' | 'charging_time'
-    batteryPct: number | null
-    voltageMv: number | null
-    chargingTimeSec: number | null
-  }>>
   /** Persist one live keepalive battery poll (migration 133) — fine-grained drain telemetry
    *  captured only while the app holds the BLE link. measured_at is server-stamped. */
   insertOuraBatteryPoll(userId: string, percent: number, charging: boolean | null): Promise<void>
@@ -1365,10 +1341,6 @@ export interface WorkoutRepository {
    *  changes a bucket, skips days that already have buckets), one transaction that rolls back unless
    *  rows written equal rows planned. `dryRun: true` computes and returns the plan, writing nothing. */
   backfillDaytimeStressBuckets(userId: string, timezone: string, opts: { dryRun: boolean }): Promise<import('@/lib/oura-ble/stress-backfill').StressBackfillReport>
-  // Read-only dry-run for the D0 historical step backfill — no write performed. Returns every day
-  // whose stored steps would actually change if `allowStepsDecrease` ran, computed the same way
-  // (same pipeline, same sourceMap rank protection), so the owner can review before firing it.
-  previewStepsBackfill(userId: string, timezone: string): Promise<StepsBackfillPreviewRow[]>
   /** Latest ring-clock anchor for the user (one row per epoch; newest wins). Used to
    *  convert wall-clock time to ring deciseconds for callers with no ring ds of their
    *  own (e.g. the accel-only live step tester). */
@@ -1696,7 +1668,6 @@ export interface WorkoutRepository {
   /** #3079: nulls a day's stored sleep and/or readiness scores when their night changed or went. */
   clearNightDerivedScores(userId: string, day: string, pillars: { sleep: boolean; readiness: boolean }): Promise<boolean>
   getOuraStorageStats(): Promise<OuraStorageStats>
-  nullHistoricalDecoded(userId: string, maxRows?: number): Promise<{ nulled: number; remaining: number }>
   vacuumOuraRawSamples(): Promise<{ beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number }>
   /** Q-315 — `VACUUM FULL` on an allowlisted table. The name is interpolated into the statement
    *  (VACUUM takes no bind parameter), so the allowlist is the safety boundary, not validation. */
