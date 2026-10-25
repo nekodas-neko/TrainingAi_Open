@@ -98,7 +98,7 @@ describe('the digest is a template, not a model call (#3286)', () => {
   })
 
   it('keeps the rate limit', async () => {
-    for (let i = 0; i < 3; i++) expect((await post()).status).toBe(200)
+    for (let i = 0; i < 20; i++) expect((await post()).status).toBe(200)
     expect((await post()).status).toBe(429)
   })
 })

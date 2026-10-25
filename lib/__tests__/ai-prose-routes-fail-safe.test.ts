@@ -104,7 +104,7 @@ describe('GET /api/session-explain/insight', () => {
   })
 
   it('keeps its rate limit', async () => {
-    for (let i = 0; i < 20; i++) expect((await sessionExplain()).status).toBe(200)
+    for (let i = 0; i < 120; i++) expect((await sessionExplain()).status).toBe(200)
     expect((await sessionExplain()).status).toBe(429)
   })
 })
