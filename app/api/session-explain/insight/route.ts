@@ -13,7 +13,9 @@ export async function GET() {
     const userId = session?.user?.id
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!rateLimit(`session-explain:${userId}`, 20, 60 * 60 * 1000)) {
+    // Every open of "Why this session" reaches this now that the text is a template with no cache
+    // in front of it; the limit only guards the database reads.
+    if (!rateLimit(`session-explain:${userId}`, 120, 60 * 60 * 1000)) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
 

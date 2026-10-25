@@ -113,10 +113,12 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     name.visibility = if (frame.name.isEmpty()) GONE else VISIBLE
     count(time, frame.countsFrom)
     time.setTextColor(if (frame.overTime) OVER else Color.WHITE)
-    // Before the target the caption is the target itself; past it, the overrun counting up.
+    // Before the target the caption is the target itself; past it, the overrun counting up. The
+    // caption is shown before its clock is counted: the gate starts a clock once, and a Chronometer
+    // started while hidden doesn't run.
+    target.visibility = if (frame.target == null) GONE else VISIBLE
     count(target, frame.overFrom)
     if (frame.overFrom == null) target.text = frame.target ?: ""
-    target.visibility = if (frame.target == null) GONE else VISIBLE
     target.setTextColor(if (frame.overTime) OVER else TARGET)
     label.text = frame.label
     // No load is known: the line stays empty rather than showing a made-up one.
