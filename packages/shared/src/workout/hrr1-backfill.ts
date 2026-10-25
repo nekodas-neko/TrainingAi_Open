@@ -40,6 +40,10 @@ export interface Hrr1Change {
 
 const DROP_OFFSETS = [['drop30s', 30_000], ['drop60s', 60_000], ['drop90s', 90_000], ['drop120s', 120_000]] as const
 
+/** How far past a set's end the backfill reads: the largest drop offset, so a stored drop is never
+ *  re-derived from a series cut short before it. */
+export const HRR1_MAX_OFFSET_MS = Math.max(...DROP_OFFSETS.map(([, ms]) => ms))
+
 /** A row's HRR60 from the series, before any verdict — what the personal bar is fitted on. */
 export function measureHrr60(row: Pick<StoredHrr1Row, 'loggedAt' | 'setEndMs'>, readings: readonly (HrReading & { source?: string | null })[]): number | null {
   return deriveHrr60(readings, setRestAnchorMs(row.setEndMs, row.loggedAt))?.bpm ?? null
@@ -53,6 +57,9 @@ export function planHrr1Backfill(
   barBpmFor?: (row: StoredHrr1Row) => number,
 ): Hrr1Change[] {
   const out: Hrr1Change[] = []
+  // No readings is a missing series, not a measurement of nothing: re-deriving from it would null
+  // every stored value, and once a session's HR is pruned that would wipe the durable snapshot.
+  if (readings.length === 0) return out
   for (const r of rows) {
     const endMs = setRestAnchorMs(r.setEndMs, r.loggedAt)
     const hrr1Bpm = measureHrr60(r, readings)
