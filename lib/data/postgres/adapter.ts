@@ -4837,6 +4837,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async removeFriend(friendshipId: string, userId: string) { return social.removeFriend(this.db, friendshipId, userId) }
   async getFriendIds(userId: string) { return social.getFriendIds(this.db, userId) }
   async updateEquippedTitle(userId: string, titleId: string | null) { return social.updateEquippedTitle(this.db, userId, titleId) }
+  async getTrophyPins(userId: string) { return social.getTrophyPins(this.db, userId) }
+  async updateTrophyPins(userId: string, pins: string[] | null) { return social.updateTrophyPins(this.db, userId, pins) }
   async listSeasonsWithResults(userId: string) { return social.listSeasonsWithResults(this.db, userId) }
 
   // ── AI Health Insights ────────────────────────────────────────────────────

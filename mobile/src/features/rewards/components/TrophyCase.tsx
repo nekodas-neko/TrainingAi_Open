@@ -142,7 +142,7 @@ function PickerTile({
   );
 }
 
-/** More › Profile › Trophy Case: three slots for achievements to show off, chosen on this phone. */
+/** More › Profile › Trophy Case: three slots for achievements to show off, saved on the account and shown to friends. */
 export function TrophyCase({ achievements }: { achievements: Achievement[] }) {
   const { theme } = useTheme();
   const { pinned, pin, unpin } = useTrophyCase();

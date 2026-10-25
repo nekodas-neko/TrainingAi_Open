@@ -11,10 +11,11 @@ import { equipTitle } from './titles';
 import { markSeen, readSeen } from './seen';
 import {
   cachedTrophyCase,
-  readTrophyCase,
+  carryOverTrophyCase,
   rememberTrophyCase,
+  saveTrophyPins,
   trophyCacheKey,
-  writeTrophyCase,
+  trophyPinsSpec,
 } from './trophy';
 import { WorkoutXpTracker } from './xp';
 
@@ -57,37 +58,41 @@ export function useSeenAchievements() {
   return { seen, mark };
 }
 
-/** The achievements pinned in this account's trophy case on this phone; null until first read. */
+/** The achievements pinned in this account's trophy case, which friends see too; null until first read. */
 export function useTrophyCase() {
   const scoped = useAccountStorage();
   const connection = useAccountContext().dataReader;
+  const { data, resources } = useWorkoutResource(trophyPinsSpec);
   const key = connection ? trophyCacheKey(connection.origin, connection.userId) : null;
-  const [pinned, setPinned] = useState<string[] | null>(() =>
-    key ? (cachedTrophyCase(key) ?? null) : null,
-  );
+  const [settled, setSettled] = useState(false);
+  const account = data ? (data.pins ?? []) : null;
+  useEffect(() => {
+    setSettled(false);
+  }, [key]);
   useEffect(() => {
     let live = true;
-    setPinned(key ? (cachedTrophyCase(key) ?? null) : null);
-    if (scoped && key) {
-      void readTrophyCase(scoped).then((ids) => {
-        if (!live) return;
-        rememberTrophyCase(key, ids);
-        setPinned(ids);
-      });
+    if (key && resources && scoped && data) {
+      void carryOverTrophyCase(resources, scoped)
+        .catch(() => {})
+        .then(() => live && setSettled(true));
     }
     return () => {
       live = false;
     };
-  }, [scoped, key]);
+    // Once per account: a later edit changes `data`, and the old list is gone by then.
+  }, [key, resources, scoped, data !== null]);
+  const pinned = settled ? account : key ? (cachedTrophyCase(key) ?? null) : null;
+  useEffect(() => {
+    if (key && settled && account) {
+      rememberTrophyCase(key, account);
+    }
+  }, [key, settled, data]);
   const change = useCallback(
     (next: (pinned: readonly string[]) => string[]) => {
-      if (!scoped || !key || !pinned) return;
-      const value = next(pinned);
-      rememberTrophyCase(key, value);
-      setPinned(value);
-      void writeTrophyCase(scoped, value).catch(() => {});
+      if (!resources || !pinned) return;
+      void saveTrophyPins(resources, next(pinned));
     },
-    [scoped, key, pinned],
+    [resources, pinned],
   );
   return {
     pinned,
