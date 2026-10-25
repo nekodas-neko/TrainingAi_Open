@@ -179,3 +179,16 @@ it('#2843: a session refused as an activity is noted, not counted against the st
   expect(mocks.upsert).not.toHaveBeenCalled();
   expect(mocks.tombstone).not.toHaveBeenCalled();
 });
+it('#3309: a swept session whose id came back is reported as revived', async () => {
+  const start = new Date(Date.now() - 3 * 86400000);
+  start.setUTCHours(2, 0, 0, 0);
+  const end = new Date(start.getTime() + 45 * 60000);
+  mocks.apply.mockResolvedValue({ accepted: 1, deleted: 0 });
+  mocks.upsert.mockResolvedValue('revived');
+  const response = await POST(request({
+    records: [{ id: 'hc-gym', type: 'ExerciseSession', exerciseType: 70, title: 'Gym', sourcePackage: 'com.sec.android.app.shealth', recordingMethod: 2, start: start.toISOString(), end: end.toISOString(), modifiedAt: end.toISOString() }],
+    deleted: [],
+  }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ exercisesRevived: 1, workoutNotes: [] });
+});
