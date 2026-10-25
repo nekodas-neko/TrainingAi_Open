@@ -240,6 +240,8 @@ export const workoutSessions = pgTable('workout_sessions', {
   /** DEAD — never written, never read. See the block comment above; do not start using it. */
   unusedProgramSessionId: uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
   sessionRpe:        integer('session_rpe'),
+  /** #3266: whole seconds the workout was paused; NULL means never paused, the same as 0. */
+  pausedSec:         integer('paused_sec'),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),
 })
