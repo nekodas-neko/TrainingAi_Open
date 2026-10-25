@@ -876,7 +876,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // #2076 — native app refresh tokens. Only a hash is stored and no method returns one.
   async createNativeRefreshToken(input: nativeRefreshTokens.CreateNativeRefreshTokenInput) { return nativeRefreshTokens.createNativeRefreshToken(this.db, input) }
   async findNativeRefreshTokenByHash(tokenHash: import('@/lib/auth/refresh-token-hash').RefreshTokenHash) { return nativeRefreshTokens.findNativeRefreshTokenByHash(this.db, tokenHash) }
+  async findNativeRefreshTokenById(userId: string, id: string) { return nativeRefreshTokens.findNativeRefreshTokenById(this.db, userId, id) }
   async rotateNativeRefreshToken(input: nativeRefreshTokens.RotateNativeRefreshTokenInput) { return nativeRefreshTokens.rotateNativeRefreshToken(this.db, input) }
+  async regrantNativeRefreshToken(input: nativeRefreshTokens.RegrantNativeRefreshTokenInput) { return nativeRefreshTokens.regrantNativeRefreshToken(this.db, input) }
   async revokeNativeRefreshToken(userId: string, id: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshToken(this.db, userId, id, reason) }
   async revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshTokenFamily(this.db, userId, familyId, reason) }
   async listActiveNativeRefreshTokens(userId: string) { return nativeRefreshTokens.listActiveNativeRefreshTokens(this.db, userId) }

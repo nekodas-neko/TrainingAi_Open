@@ -2,17 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(), verify: vi.fn(), issue: vi.fn(), rateLimit: vi.fn(() => true),
+  auth: vi.fn(), verify: vi.fn(), issue: vi.fn(), family: vi.fn(), rateLimit: vi.fn(() => true),
   repository: {
     createAppleAuthAttempt: vi.fn(), getAppleAuthAttempt: vi.fn(), consumeAppleAuthAttempt: vi.fn(),
     getUserByProvider: vi.fn(), linkIdentity: vi.fn(), getUserById: vi.fn(), createProviderUser: vi.fn(),
+    revokeNativeRefreshTokenFamily: vi.fn(),
   },
 }))
 vi.mock('@/auth', () => ({ auth: mocks.auth }))
 vi.mock('@/lib/data', () => ({ getRepository: async () => mocks.repository }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: mocks.rateLimit }))
 vi.mock('@/lib/auth/apple', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/auth/apple')>(), verifyAppleIdentityToken: mocks.verify }))
-vi.mock('@/lib/auth/mobile/session', () => ({ issueNativeSession: mocks.issue }))
+vi.mock('@/lib/auth/mobile/session', () => ({ issueNativeSession: mocks.issue, presentedNativeFamily: mocks.family }))
 import { POST as begin } from '@/app/api/auth/apple/begin/route'
 import { POST as complete } from '@/app/api/auth/apple/complete/route'
 import { IdentityConflict } from '@/lib/auth/identity'
@@ -94,6 +95,15 @@ describe('native Apple endpoints', () => {
     expect(mocks.issue).not.toHaveBeenCalled()
     expect((await finish()).status).toBe(200)
     expect(mocks.repository.linkIdentity).toHaveBeenCalledWith(user.id, 'apple', 'apple-subject', undefined)
+  })
+  it('linking ends the native sign-in it replaces; a plain sign-in revokes nothing', async () => {
+    mocks.family.mockResolvedValue('old-family')
+    expect((await finish()).status).toBe(200)
+    expect(mocks.repository.revokeNativeRefreshTokenFamily).not.toHaveBeenCalled()
+    mocks.repository.getAppleAuthAttempt.mockResolvedValue({ ...attempt, userId: user.id })
+    expect((await finish()).status).toBe(200)
+    expect(mocks.family).toHaveBeenCalledWith(expect.any(Headers), user.id)
+    expect(mocks.repository.revokeNativeRefreshTokenFamily).toHaveBeenCalledWith(user.id, 'old-family', 'sign_out')
   })
   it('rejects malformed input, rate limits attempts, and preserves transient failure status', async () => {
     expect((await send(complete, { attemptId, identityToken: 'proof', userId: user.id })).status).toBe(400)
