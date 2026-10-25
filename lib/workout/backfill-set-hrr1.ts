@@ -1,6 +1,6 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { dateStrMidnightInTz, shiftDateStr, toAestDateStr, toAestDay } from '@trainingai/shared/date-utils'
-import { measureHrr60, planHrr1Backfill, summariseHrr1Changes, type Hrr1Change } from '@trainingai/shared/workout/hrr1-backfill'
+import { HRR1_MAX_OFFSET_MS, measureHrr60, planHrr1Backfill, summariseHrr1Changes, type Hrr1Change } from '@trainingai/shared/workout/hrr1-backfill'
 import { HRR60_ANCHOR_TOL_MS, HRR60_BAR_WINDOW_DAYS, personalHrr60Bar, setRestAnchorMs } from '@trainingai/shared/workout/hrr60'
 
 /**
@@ -11,8 +11,9 @@ import { HRR60_ANCHOR_TOL_MS, HRR60_BAR_WINDOW_DAYS, personalHrr60Bar, setRestAn
  *
  * It overwrites stored values, null included: a verified snapshot first (docs/admin-actions.md).
  */
-/** How much series is fetched past the last set end in a session: the +60 s anchor and its tolerance. */
-const WINDOW_TAIL_MS = 60_000 + HRR60_ANCHOR_TOL_MS
+/** How much series is fetched past the last set end in a session: the largest drop offset and its
+ *  anchor tolerance, so the last set's 90 s and 120 s drops can be re-derived. */
+const WINDOW_TAIL_MS = HRR1_MAX_OFFSET_MS + HRR60_ANCHOR_TOL_MS
 const SAMPLE_LIMIT = 50
 
 export async function backfillSetHrr1(args: {

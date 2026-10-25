@@ -190,3 +190,10 @@ describe('backfill and live writer share the set-end anchor (#3238)', () => {
     expect(setRestAnchorMs(undefined, null)).toBeNull()
   })
 })
+
+describe('planHrr1Backfill with no readings', () => {
+  it('changes nothing: a missing series does not clear stored values', () => {
+    const stored = { setLogId: 'x', loggedAt: new Date(END), setEndMs: END, hrr1Bpm: 60, restAdequate: true, drop30s: 30, drop60s: 60, drop90s: 90, drop120s: 120 }
+    expect(planHrr1Backfill([stored], [])).toEqual([])
+  })
+})
