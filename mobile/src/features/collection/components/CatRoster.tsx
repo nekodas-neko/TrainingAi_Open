@@ -49,11 +49,11 @@ export function CatRoster({
           accessibilityRole="button"
           accessibilityLabel={open ? 'Hide cats' : `Show all ${total} cats`}
           accessibilityState={{ expanded: open }}
-          hitSlop={theme.spacing.sm}
           onPress={toggle}
           style={({ pressed }) => ({
+            minHeight: theme.sizes.touchTarget,
+            justifyContent: 'center',
             paddingHorizontal: theme.spacing.md,
-            paddingVertical: theme.spacing.sm - theme.spacing.xxs,
             borderRadius: theme.radii.pill,
             backgroundColor: theme.colors.raised,
             opacity: pressed ? 0.7 : 1,

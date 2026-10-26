@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import { View } from 'react-native';
 import { AppText } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { scaleAlpha } from '../../../shared/theme/alpha';
 import type { FaucetKey } from '@trainingai/shared/collection/summary';
 import type { LadderModel } from '../data/view';
 import { CatSprite } from './CatSprite';
@@ -20,7 +21,7 @@ export function TierChain({
 }) {
   const { theme } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
       {tiers.map((tier, i) => (
         <Fragment key={i}>
           {i > 0 && (
@@ -32,8 +33,11 @@ export function TierChain({
                 minWidth: 0,
                 alignItems: 'center',
                 gap: theme.spacing.xxs,
-                // Lifts the link to the sprites' midline, clear of the count and numeral under them.
-                marginBottom: theme.spacing.xxxl - theme.spacing.xs,
+                // As tall as the sprites, with the line's centre on their midline and the cost
+                // just above it, clear of the count and numeral under them.
+                height: theme.sizes.chainSprite,
+                justifyContent: 'flex-end',
+                paddingBottom: (theme.sizes.chainSprite - theme.spacing.xxs) / 2,
               }}
             >
               <AppText variant="micro" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
@@ -44,7 +48,8 @@ export function TierChain({
                   alignSelf: 'stretch',
                   height: theme.spacing.xxs,
                   borderRadius: theme.radii.swatch,
-                  backgroundColor: theme.colors.track,
+                  // The track is near the card colour in dark; muted at 35% shows in both modes.
+                  backgroundColor: scaleAlpha(theme.colors.muted, 0.35),
                 }}
               />
             </View>
