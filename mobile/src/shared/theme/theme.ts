@@ -128,7 +128,7 @@ export function createTheme(
     text: mode === 'dark' ? '#fafafa' : '#121212',
     muted: mode === 'dark' ? '#b2b8b3' : '#666666',
     border: mode === 'dark' ? '#ffffff18' : '#e8e8e8',
-    danger: mode === 'dark' ? '#ff8d86' : '#c62828',
+    danger: statusColors[mode].danger,
     disabled: mode === 'dark' ? '#809084' : '#717a73',
     scrim: '#00000088',
     onSignal: '#000000',

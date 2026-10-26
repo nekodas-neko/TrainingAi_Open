@@ -80,18 +80,19 @@ test('light progress tracks, gridlines and the coach button are visible and not 
 });
 
 // The dark theme is the shipped look; #3019 changes Light only.
+// #2148: the good / warning / bad colours are the current app's bright tokens; everything else stays.
 test('dark theme colour tokens are unchanged', () => {
   const theme = createTheme('dark', 'green');
   assert.deepEqual(theme.status, {
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
+    success: '#56ee66',
+    warning: '#efaf00',
+    danger: '#ff6467',
     info: '#60a5fa',
   });
   assert.deepEqual(theme.anatomy, {
-    main: '#22c55e',
-    secondary: '#f59e0b',
-    injured: '#ef4444',
+    main: '#56ee66',
+    secondary: '#efaf00',
+    injured: '#ff6467',
     untrained: '#3f3f3f',
     head: '#bebebe',
     outline: 'rgba(128,128,128,0.3)',
@@ -109,7 +110,7 @@ test('dark theme colour tokens are unchanged', () => {
   assert.equal(theme.colors.track, theme.colors.brandSurface);
   assert.equal(theme.colors.grid, '#ffffff18');
   assert.deepEqual(theme.coachFab, { background: '#fafafa', foreground: theme.colors.background });
-  assert.equal(theme.colors.danger, '#ff8d86');
+  assert.equal(theme.colors.danger, theme.status.danger);
   for (const brand of brands) {
     const dark = createTheme('dark', brand);
     assert.equal(dark.colors.track, palettes[brand].dark.brandSurface);
@@ -137,4 +138,17 @@ test('the Body Battery good colour reaches 4.5:1 on every card colour in both th
       }
     }
   }
+});
+
+// #2148: the shared band modules hand back the web tokens; native paints the status colours instead.
+test('bandColor maps the web band tokens to the theme status colours and leaves other colours alone', async () => {
+  const { bandColor, statusColors } = await import('../src/shared/theme/tokens');
+  for (const mode of ['light', 'dark'] as const) {
+    const s = statusColors[mode];
+    assert.equal(bandColor('var(--accent-green)', s), s.success);
+    assert.equal(bandColor('var(--accent-amber)', s), s.warning);
+    assert.equal(bandColor('var(--destructive)', s), s.danger);
+  }
+  assert.equal(bandColor('#f97316', statusColors.dark), '#f97316');
+  assert.equal(bandColor(undefined, statusColors.dark), undefined);
 });

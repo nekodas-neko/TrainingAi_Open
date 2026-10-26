@@ -1,5 +1,4 @@
 import type { TextStyle } from 'react-native';
-import { TREND_COLOR } from '@trainingai/shared/health/strength-progress';
 
 export const spacing = {
   none: 0,
@@ -246,13 +245,29 @@ export const typography = {
 } satisfies Record<string, TextStyle>;
 export type Space = keyof typeof spacing;
 export type TextVariant = keyof typeof typography;
-// The four status colours. Dark values are the ones the app has always drawn (Tailwind 500 steps);
-// the light ones are darker steps that reach 4.5:1 for text on every light card background
-// (tests/light-contrast.test.ts). `info` is the cool step for a state that is neither good nor bad.
+// The four status colours. The first three are the current app's good / warning / bad tokens
+// (`--accent-green`, `--accent-amber`, `--destructive` in app/globals.css) as sRGB, so a band reads
+// the same in both apps (#2148). The light ones are darker steps that reach 4.5:1 for text on every
+// light card background (tests/light-contrast.test.ts); the web's light tokens miss that on the
+// tinted cards, so light keeps its own step. `info` is the cool step for a state that is neither good nor bad.
 export const statusColors = {
   light: { success: '#177a3c', warning: '#b04e06', danger: '#b91c1c', info: '#1d4ed8' },
-  dark: { success: '#22c55e', warning: '#f59e0b', danger: '#ef4444', info: '#60a5fa' },
+  dark: { success: '#56ee66', warning: '#efaf00', danger: '#ff6467', info: '#60a5fa' },
 };
+// The shared band modules (`acwr.ts`, `calorie-balance.ts`, `strength-progress.ts`, `score-band.ts`)
+// return the web tokens as `var(--…)`, which React Native cannot paint. This maps them to the status
+// colours for the theme in use and passes any other colour through untouched.
+const BAND_TOKEN = {
+  'var(--accent-green)': 'success',
+  'var(--accent-amber)': 'warning',
+  'var(--destructive)': 'danger',
+} as const;
+export function bandColor(color: string, status: typeof statusColors.dark): string;
+export function bandColor(color: string | undefined, status: typeof statusColors.dark): string | undefined;
+export function bandColor(color: string | undefined, status: typeof statusColors.dark) {
+  const key = color ? BAND_TOKEN[color as keyof typeof BAND_TOKEN] : undefined;
+  return key ? status[key] : color;
+}
 // home-day-timeline.tsx TYPE_ICON_COLOR: the 400 steps of indigo, blue, orange and green on a dark
 // card; a light card takes the darker steps so an icon stays readable.
 export const timelineHues = {
@@ -277,9 +292,9 @@ export const anatomyColors = {
     outline: 'rgba(128,128,128,0.3)',
   },
   dark: {
-    main: '#22c55e',
-    secondary: '#f59e0b',
-    injured: '#ef4444',
+    main: statusColors.dark.success,
+    secondary: statusColors.dark.warning,
+    injured: statusColors.dark.danger,
     untrained: '#3f3f3f',
     head: '#bebebe',
     outline: 'rgba(128,128,128,0.3)',
@@ -473,8 +488,8 @@ export const rewardColors = {
 export const progressColors = {
   light: {
     strength: '#7e22ce',
-    trendUp: '#166534',
-    trendDown: '#b91c1c',
+    trendUp: statusColors.light.success,
+    trendDown: statusColors.light.danger,
     // trends-section.tsx accentCardStyle('#8b5cf6'): the Trends card's tint.
     trends: '#8b5cf6',
     goals: {
@@ -487,8 +502,8 @@ export const progressColors = {
   },
   dark: {
     strength: '#bf5fff',
-    trendUp: TREND_COLOR.up,
-    trendDown: TREND_COLOR.down,
+    trendUp: statusColors.dark.success,
+    trendDown: statusColors.dark.danger,
     trends: '#8b5cf6',
     goals: {
       Steps: '#22c55e',

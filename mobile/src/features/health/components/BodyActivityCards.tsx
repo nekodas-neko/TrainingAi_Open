@@ -22,6 +22,7 @@ import {
   StableContent,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bandColor } from '../../../shared/theme/tokens';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { balanceProvenance, budgetLine } from '../../nutrition/data/budget-line';
@@ -44,6 +45,7 @@ const signed = (value: number) => `${value >= 0 ? '+' : ''}${Math.round(value).t
  * Eaten, Burned and Net tiles, the maintenance estimate and an explanation behind a toggle.
  */
 export function EnergyBalanceCard() {
+  const { theme } = useTheme();
   const { today } = useHealthData();
   const energy = useWorkoutResource(energySpec(today));
   const balance = energy.data?.balance ?? null;
@@ -81,7 +83,7 @@ export function EnergyBalanceCard() {
               {intake.zoneLabel && (
                 <AppText
                   variant="label"
-                  style={zone ? { color: zone.color } : undefined}
+                  style={zone ? { color: bandColor(zone.color, theme.status) } : undefined}
                   tone={zone ? undefined : 'muted'}
                 >
                   {intake.zoneLabel} so far
