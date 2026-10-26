@@ -7,7 +7,8 @@
 --     this user, whatever came of it (a document Oura no longer has still proves the subscription is
 --     delivering).
 --   - `last_data_at`: the last time an Oura document or heart-rate batch was written for this
---     user, from a webhook, a backfill or the daily reconciliation.
+--     user, from a webhook or a backfill. The daily reconciliation re-reads days already stored,
+--     so it does not move it.
 -- Both are NULL for every existing row, which the screens read as "nothing received yet".
 --
 -- Shipped alone (CLAUDE.md: a migration never rides in a batch with anything else). The code that

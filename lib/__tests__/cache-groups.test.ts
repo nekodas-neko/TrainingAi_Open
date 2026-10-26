@@ -98,6 +98,11 @@ describe('cache group helpers', () => {
     ]))
   })
 
+  it('invalidateActivityWrites clears readiness-score, the Activity screen\'s cache of the treadmill-step score and gauge (#3351)', async () => {
+    await invalidateActivityWrites()
+    expect(invalidated).toContain('readiness-score')
+  })
+
   it('invalidateBodyMetricWrite clears body-metadata, progress-summary, day-log:, health-trends-summary, and the achievements prefix (W1)', async () => {
     await invalidateBodyMetricWrite()
     expect(invalidated).toEqual(expect.arrayContaining([

@@ -35,6 +35,7 @@ const repo = {
   getObservedHrProfile: vi.fn(async () => EMPTY_OBSERVED_HR),
   listFitnessTests: vi.fn(async () => [] as unknown[]),
   getOuraCloudMetChangedAt: vi.fn(async () => [] as unknown[]),
+  listActivityLogs: vi.fn(async () => [] as unknown[]),
   upsertOuraDailyDerived: vi.fn(async () => undefined),
   upsertOuraDailySummary: vi.fn(async () => undefined),
 }

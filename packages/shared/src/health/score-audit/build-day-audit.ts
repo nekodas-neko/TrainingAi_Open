@@ -1,4 +1,5 @@
 import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
+import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { finalisedPreTaper } from '@trainingai/shared/health/activity-day'
@@ -50,7 +51,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
 
   const [
     bodyMetrics, sleepSessions, workoutSessions, ouraRows,
-    hrRows, summaries, derivedRows, mood, user, activityLogs, nutrition, morningCheckin, userGoals,
+    hrRows, summaries, derivedRows, mood, user, activityLogsTwoDays, nutrition, morningCheckin, userGoals,
     ouraCloudContributors, switchDay,
   ] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
@@ -63,7 +64,8 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     repo.getOuraDailyDerived(userId, fromIso, date),
     repo.getMoodLog(userId, date),
     repo.getUserById(userId),
-    repo.listActivityLogs(userId, date, date),
+    // The audited day and the one before it: yesterday's treadmill steps feed the prev-day contributor (#3134).
+    repo.listActivityLogs(userId, yesterdayIso, date),
     repo.listFoodLogsSummary(userId, date, date),
     // The morning check-in's own sleep rating. Deliberately NOT a scoring input (owner decision,
     // finding Q-16) — it sits in the audit context so "what the model said" and "what it felt
@@ -78,6 +80,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   ])
 
   // Everything below is scoped to the audited day, never "today".
+  const activityLogs = activityLogsTwoDays.filter(a => a.date === date)
   const sessionsUpToDay = workoutSessions.filter(ws => new Date(ws.startedAt).getTime() < nextMid.getTime())
   const ouraByDate = toOuraByDate(ouraRows)
   const ouraToday = ouraRows.find(r => r.date === date) ?? null
@@ -148,7 +151,8 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
 
   const activityInput = {
     date, goals, goalProfile,
-    steps: dayMetrics?.steps ?? null,
+    // The score's own step count, treadmill steps included (#3134).
+    steps: signals.steps,
     activeCalories: dayMetrics?.activeCalories ?? null,
     zoneMinutes: signals.zoneMinutes, moveHours: signals.moveHours, moveHoursGoal: signals.moveHoursGoal,
     strengthSessionToday: signals.strengthSessionToday,
@@ -162,9 +166,10 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   // TN-77(a): the audit shares readiness's defect, so it shares the fix — yesterday's contributor
   // is scored on yesterday's window, not the day being audited.
   const prevWindow = strengthWindowEndingAt(sessionsUpToDay, yesterdayIso, tz)
-  const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0)
+  const yesterdaySteps = dayStepCount(yesterdayMetrics?.steps, activityLogsTwoDays.filter(a => a.date === yesterdayIso))
+  const prevDayActivityScore = (yesterdayMetrics || yesterdaySteps != null || prevWindow.sessions7d > 0)
     ? computeActivityScore({
-        steps: yesterdayMetrics?.steps ?? null,
+        steps: yesterdaySteps,
         activeCalories: yesterdayMetrics?.activeCalories ?? null,
         sessions7d: prevWindow.sessions7d, volume7dKg: prevWindow.volume7dKg, goals,
       })?.preTaperScore ?? null
