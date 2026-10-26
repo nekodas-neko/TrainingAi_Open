@@ -22,7 +22,7 @@ import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { latestRestingHrRow } from '@trainingai/shared/health/latest-resting-hr'
-import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
+import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
@@ -838,7 +838,7 @@ export async function buildReadinessPayload(
       sleepContributors: ownSleepContributors,
       // #3079: which model scored it, so a change of model or of what makes the night is a readable
       // step in the history. Its own key in the shared map; the upsert merges it with `||`.
-      modelVersions: { sleep: SLEEP_SCORE_MODEL_VERSION },
+      modelVersions: { sleep: sleepScoreResult.modelVersion },
     } })
   }
 
