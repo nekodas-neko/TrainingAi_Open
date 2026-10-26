@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { resolveClaudeRoOwner } from '../claude-ro-owner'
 import { judgeProtectedTarget } from '@/lib/admin-owner'
+import { userWriteLockKey } from '../user-write-barrier'
 
 type Db = ReturnType<typeof getDb>
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
@@ -284,6 +285,14 @@ async function erase(db: Db, userId: string, opts: EraseOpts): Promise<AccountDe
     // write that references this user wait for the outcome: an FK insert takes KEY SHARE on the
     // users row, which FOR UPDATE blocks. When this commits, those writes fail on the FK rather
     // than recreating rows for an account that no longer exists.
+    // #3369 (e): a reset waits for the covered writes already in flight and holds off new ones until
+    // it commits (`user-write-barrier.ts`). Before the row lock, so a waiter never holds a row the
+    // writer needs. lock_timeout turns an unexpectedly long write into an error, not a hang.
+    if (opts.keepAccount) {
+      await tx.execute(sql`SET LOCAL lock_timeout = '15s'`)
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${userWriteLockKey(userId)}, 0))`)
+      await tx.execute(sql`SET LOCAL lock_timeout = 0`)
+    }
     // With an admin guard the acting admin's row is locked in the same statement, in id order (two
     // admins acting on each other cannot deadlock), so it is judged as it is at commit time.
     const lockIds = opts.guard && opts.guard.actingAdminId !== userId ? [userId, opts.guard.actingAdminId] : [userId]
