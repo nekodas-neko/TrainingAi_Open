@@ -828,6 +828,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.length > 0
   }
 
+  async setUserAdmin(userId: string, isAdmin: boolean): Promise<boolean> {
+    const rows = await this.db.update(s.users).set({ isAdmin })
+      .where(eq(s.users.id, userId)).returning({ id: s.users.id })
+    return rows.length > 0
+  }
+
   async getUserById(userId: string): Promise<User | null> {
     const [r] = await this.db.select().from(s.users).where(eq(s.users.id, userId)).limit(1)
     return r ? this.rowToUser(r) : null

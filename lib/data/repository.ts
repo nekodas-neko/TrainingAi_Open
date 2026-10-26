@@ -663,6 +663,8 @@ export interface WorkoutRepository {
   /** True when a user row matched. RV-48 — false is a no-op the route answers 404 for. */
   activateUser(userId: string): Promise<boolean>
   deactivateUser(userId: string): Promise<boolean>
+  /** Sets `users.is_admin`. True when a user row matched, so the route can answer 404 for an unknown id. */
+  setUserAdmin(userId: string, isAdmin: boolean): Promise<boolean>
   getUserById(userId: string): Promise<User | null>
   getUserByOAuthSub(oauthSub: string): Promise<User | null>
   getUserByProvider(provider: AuthProvider, subject: string): Promise<User | null>

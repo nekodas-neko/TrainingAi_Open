@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
 // A user id and a one-word action. 4 KB is generous.
@@ -15,11 +16,16 @@ import { reportServerError } from '@/lib/observability'
  * admin can undo it, so the signed-in admin is refused before anything is written. Because the
  * acting admin can never remove themselves, these two routes also cannot leave zero active admins.
  */
-function refuseSelf(targetUserId: string, sessionUserId: string, verb: 'delete' | 'deactivate') {
+function refuseSelf(targetUserId: string, sessionUserId: string, verb: 'delete' | 'deactivate' | 'remove admin from') {
   return targetUserId === sessionUserId
     ? NextResponse.json({ error: `Cannot ${verb} yourself` }, { status: 400 })
     : null
 }
+
+const patchSchema = z.object({
+  userId: z.string(),
+  action: z.enum(['activate', 'deactivate', 'grant-admin', 'revoke-admin']),
+}).strict()
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -61,10 +67,9 @@ export async function PATCH(req: NextRequest) {
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
-  const { userId, action } = (read.body ?? {}) as { userId?: unknown; action?: unknown }
-  if (typeof userId !== 'string' || typeof action !== 'string' || !['activate', 'deactivate'].includes(action)) {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
-  }
+  const parsed = patchSchema.safeParse(read.body)
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  const { userId, action } = parsed.data
   // RV-47: `users.id` is a uuid, so a malformed one reached the driver as a 22P02 and answered 500
   // with an empty body, filing the failing UPDATE statement into `error_events` as a server fault.
   const badId = invalidUuidResponse(userId)
@@ -75,12 +80,18 @@ export async function PATCH(req: NextRequest) {
     if (self) return self
   }
 
+  // An admin can't remove their own admin, so there is always at least one. Granting yourself is a no-op.
+  if (action === 'revoke-admin') {
+    const self = refuseSelf(userId, session.user.id, 'remove admin from')
+    if (self) return self
+  }
+
   const repo = await getRepository()
   // RV-48: an id that matched no user answered `200 {"ok":true}`, the same response a real
-  // activation gives.
-  const changed = action === 'activate'
-    ? await repo.activateUser(userId)
-    : await repo.deactivateUser(userId)
+  // activation gives. The row count decides every action, grant and revoke included.
+  const changed = action === 'activate' ? await repo.activateUser(userId)
+    : action === 'deactivate' ? await repo.deactivateUser(userId)
+    : await repo.setUserAdmin(userId, action === 'grant-admin')
   if (!changed) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
 }
