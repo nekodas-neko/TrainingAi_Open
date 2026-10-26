@@ -132,6 +132,12 @@ export async function rotateNativeSession(rawRefreshToken: string): Promise<Nati
   }
   const user = await repo.getUserById(stored.userId);
   if (!user?.isActive) return { ok: false, reason: 'invalid' };
+  // #3369, defence in depth: an admin reset deletes the account's refresh tokens, so none from before
+  // it should exist. If one does (a row written by a request that raced the reset), it must not mint
+  // a fresh `signedInAt` and so carry a pre-reset device back in.
+  if (user.sessionsValidFrom && stored.createdAt.getTime() < user.sessionsValidFrom.getTime()) {
+    return { ok: false, reason: 'invalid' };
+  }
   const next = newRefreshToken();
   if (stored.rotatedAt) {
     const regranted = await repo.regrantNativeRefreshToken({

@@ -35,6 +35,7 @@ export const authConfig = {
       if (user?.id) token.userId = user.id
       // #3369: `user` is only present at sign-in, so this is stamped once and survives every re-issue.
       if (user) token.signedInAt = nowSeconds()
+      if (user && typeof user.dataEpoch === "number") token.dataEpoch = user.dataEpoch
       if (typeof user?.isActive === "boolean") token.isActive = user.isActive
       if (typeof user?.isAdmin === "boolean") token.isAdmin = user.isAdmin
       if (user?.timezone) token.timezone = user.timezone

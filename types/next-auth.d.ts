@@ -23,6 +23,8 @@ declare module "next-auth" {
     }
   }
   interface User {
+    /** #3369: the account's data epoch (whole seconds of its last admin reset, 0 never) at sign-in. */
+    dataEpoch?: number
     mobileState?: string
     isActive?: boolean
     isAdmin?: boolean
@@ -45,6 +47,8 @@ declare module "next-auth/jwt" {
     isActiveCheckedAt?: number
     /** #3369: stamped once at sign-in and carried through every re-issue of the token. */
     signedInAt?: number
+    /** #3369: the account's data epoch when this sign-in happened. A write must come from a device that has seen it. */
+    dataEpoch?: number
     isAdmin?: boolean
     timezone?: string
     sex?: string | null
