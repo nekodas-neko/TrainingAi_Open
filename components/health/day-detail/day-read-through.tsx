@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { dateStrMidnightInTz } from '@trainingai/shared/date-utils'
+import { ouraTemperatureDeviationRow } from '@trainingai/shared/format/temperature-deviation'
 import { EnergyTimelineChart } from '@/components/health/energy-timeline-chart'
 import {
   TrainingSection, ActivitySection, EnergySection, SleepSection, BodySection, DayHrTrace, SectionLabel,
@@ -175,6 +176,18 @@ function HrRange({ points }: { points: DayLogResult['hr'] }) {
  * absolute skin temperature is a measurement, not a derivation from the bad baseline.
  */
 function BodyTempRow({ temp }: { temp: DayLogResult['bodyTemp'] }) {
+  const ouraRow = ouraTemperatureDeviationRow(temp)
+  if (ouraRow) {
+    return (
+      <div className="flex flex-col items-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3">
+        <span className="text-[11px] text-muted-foreground">
+          {ouraRow.label}{' '}
+          <span className="text-[15px] font-bold tabular-nums text-foreground">{ouraRow.value}</span>
+        </span>
+        <span className="text-[10px] text-muted-foreground/80">{ouraRow.note}</span>
+      </div>
+    )
+  }
   if (!temp || temp.meanC == null) return null
   return (
     <div className="flex items-baseline justify-center gap-6 rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3">
