@@ -13,7 +13,7 @@ import {
   nearestMerge,
   nextMerge,
   restlessLine,
-  rosterDetail,
+  shortDay,
   totalHeld,
   type FaucetKey,
 } from '@trainingai/shared/collection/summary';
@@ -74,14 +74,17 @@ export interface LadderModel {
   /** Marked provisional on its own row (the owner marked the Rogue's numbers provisional). */
   provisional: boolean;
   held: string;
-  tiers: { name: string; count: number }[];
+  /** `cost` is what it takes of the tier below to make one of this tier; 0 for the bottom tier. */
+  tiers: { name: string; numeral: string; count: number; cost: number }[];
   merge: string | null;
   roster: { id: string; tier: number; name: string; tierName: string; detail: string }[];
   more: number;
+  /** Every cat held, the N in "Show all N": the roster rows plus those past the cap. */
+  total: number;
   decay: string | null;
 }
 
-/** One row of the collection screen: the stock by tier, the next merge, every named cat, the decay line. */
+/** One row of the collection screen: the tier chain, the next merge, the named cats behind a tap, the decay line. */
 export function ladderModel(faucet: FaucetKey, collections: Collections): LadderModel {
   const ladder = V2_LADDERS[faucet];
   const state = collections[faucet];
@@ -94,7 +97,10 @@ export function ladderModel(faucet: FaucetKey, collections: Collections): Ladder
     held: heldLabel(totalHeld(state)),
     tiers: ladder.tiers.map((tier, i) => ({
       name: capitalize(tier.name),
+      // Tier names end in their numeral ("Tank III"); the chain has room for only that.
+      numeral: tier.name.split(' ').pop() ?? '',
       count: state.stock[i] ?? 0,
+      cost: tier.mergeCost,
     })),
     merge: next ? mergeLine(next) : null,
     roster: cats.slice(0, ROSTER_SHOWN).map((cat) => ({
@@ -102,9 +108,11 @@ export function ladderModel(faucet: FaucetKey, collections: Collections): Ladder
       tier: cat.tier,
       name: cat.name,
       tierName: capitalize(ladder.tiers[cat.tier]?.name ?? ''),
-      detail: rosterDetail(cat),
+      // The day it arrived. What it was merged from is left out: those cats no longer exist (#2088).
+      detail: shortDay(cat.born),
     })),
     more: Math.max(0, cats.length - ROSTER_SHOWN),
+    total: cats.length,
     decay: decayLine(state.decayEvents),
   };
 }
