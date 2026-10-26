@@ -272,10 +272,26 @@ export async function GET(req: NextRequest) {
   // never blank the rest of the day, so they settle rather than reject.
   const dayMid = dateStrMidnightInTz(pgDate, tz);
   const nextMid = dateStrMidnightInTz(shiftDateStr(pgDate, 1), tz);
-  const [sleepRes, scoresRes, hrRes] = await Promise.allSettled([
-    repo.listSleepSessions(userId, pgDate, pgDate),
-    repo.getDerivedScoresForDay(userId, pgDate),
-    repo.getHrForWindow(userId, dayMid, nextMid),
+
+  // #2435: today's Activity score is no longer stored (a day is stored once it has ended), so for
+  // today it is scored live, by the same function the Activity screen uses. Without this the Move
+  // cell would be blank all day. It runs inside this batch (#3388), sharing the day's HR read with
+  // the trace below instead of fetching it a second time.
+  const hrRead = repo.getHrForWindow(userId, dayMid, nextMid);
+  const liveRead = pgDate === todayInTz(tz)
+    ? loadActivityDay(repo, userId, tz, pgDate, { hrRows: hrRead }).then(d => d.result?.score ?? null).catch(e => {
+        // A failed live score falls back to the stored value, but must leave an error_events row.
+        reportServerError(e, { userId, url: '/api/day-log' })
+        return null
+      })
+    : Promise.resolve(null);
+  const [[sleepRes, scoresRes, hrRes], liveActivity] = await Promise.all([
+    Promise.allSettled([
+      repo.listSleepSessions(userId, pgDate, pgDate),
+      repo.getDerivedScoresForDay(userId, pgDate),
+      hrRead,
+    ]),
+    liveRead,
   ]);
 
   // Q-274: this was `sleepRes.value[0]`. `listSleepSessions` orders by DATE only, so within a date
@@ -312,16 +328,6 @@ export async function GET(req: NextRequest) {
       }
     : null;
 
-  // #2435: today's Activity score is no longer stored (a day is stored once it has ended), so for
-  // today it is scored live, by the same function the Activity screen uses. Without this the Move
-  // cell would be blank all day.
-  const liveActivity = pgDate === todayInTz(tz)
-    ? await loadActivityDay(repo, userId, tz, pgDate).then(d => d.result?.score ?? null).catch(e => {
-        // A failed live score falls back to the stored value, but must leave an error_events row.
-        reportServerError(e, { userId, url: '/api/day-log' })
-        return null
-      })
-    : null;
   const scores: DayScores | null = derived || liveActivity != null
     ? {
         readiness: derived?.readinessScore ?? null,
