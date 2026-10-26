@@ -21,7 +21,7 @@ abstract class BaseWidgetProvider : AppWidgetProvider() {
 
   override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
     val snapshot = WidgetSnapshot.parse(WidgetStore.read(context))
-    val stale = snapshot != null && WidgetSnapshot.isStale(snapshot, WidgetRender.localToday())
+    val stale = snapshot != null && WidgetSnapshot.isStale(snapshot, WidgetSnapshot.today(snapshot))
     for (id in appWidgetIds) {
       val height = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
       manager.updateAppWidget(id, render(context, snapshot, stale, height))
