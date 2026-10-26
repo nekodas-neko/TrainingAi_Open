@@ -7,6 +7,7 @@ import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { activityFinalisedAt } from '@trainingai/shared/health/activity-day'
 import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 import { resolveHrProfile, maxHrIsUnread } from '@trainingai/shared/health/hr-profile'
+import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 import { monthFixture, fixtureRepo, type ActivityFixture } from './fixtures/activity-day-fixtures'
 
 let repo: ReturnType<typeof fixtureRepo>
@@ -83,6 +84,29 @@ describe('a read that fails is never stored as a finished day’s final score', 
     }
     expect(maxHrIsUnread(null)).toBe(true)
   })
+
+  it('flags an unreadable age even when a Cooper test or an observed max names the ceiling (#3392)', async () => {
+    const cooper = { testType: 'cooper12', date: '2026-09-14', maxHr: 175 }
+    const withCooper = (failUser: boolean) => {
+      const f = monthFixture(TODAY, TZ)
+      f.failReads = failUser ? { user: true } : undefined
+      return { ...fixtureRepo(f), listFitnessTests: vi.fn(async () => [cooper]) } as never
+    }
+    const ok = await resolveHrProfile(withCooper(false), 'u1', TZ)
+    expect(ok.maxHrSource).toBe('cooper-blend')
+    expect(maxHrIsUnread(ok)).toBe(false)
+    const failed = await resolveHrProfile(withCooper(true), 'u1', TZ)
+    expect(failed.maxHrSource).toBe('cooper-blend')
+    expect(maxHrIsUnread(failed)).toBe(true)
+
+    const f = monthFixture(TODAY, TZ)
+    f.failReads = { user: true }
+    const observed = { ...EMPTY_OBSERVED_HR, isReliable: true, max: 200, sampleCount: 50 }
+    const obsRepo = { ...fixtureRepo(f), getObservedHrProfile: vi.fn(async () => observed) } as never
+    const viaObserved = await resolveHrProfile(obsRepo, 'u1', TZ)
+    expect(viaObserved.maxHrSource).toBe('observed')
+    expect(maxHrIsUnread(viaObserved)).toBe(true)
+  })
 })
 
 describe('Oura MET that arrives after the stamp (#3079)', () => {
@@ -149,10 +173,19 @@ describe('parallel reads share one background finalise pass', () => {
     const second = vi.fn(async () => undefined)
     expect(runBackgroundFinalise('guard-user', second)).toBe(false)
     expect(runBackgroundFinalise('other-user', async () => undefined)).toBe(true)
+    await drain() // `pass` starts a microtask later (#3392)
     release(); await drain()
     expect(runBackgroundFinalise('guard-user', second)).toBe(true)
     await drain()
     expect(second).toHaveBeenCalledTimes(1)
+  })
+
+  it('a pass that throws synchronously still frees the guard (#3392)', async () => {
+    const syncThrow = (() => { throw new Error('sync boom') }) as unknown as () => Promise<void>
+    expect(runBackgroundFinalise('sync-throwing-user', syncThrow)).toBe(true)
+    await drain()
+    expect(reportServerError).toHaveBeenCalled()
+    expect(runBackgroundFinalise('sync-throwing-user', async () => undefined)).toBe(true)
   })
 
   it('a pass that throws still frees the guard', async () => {
