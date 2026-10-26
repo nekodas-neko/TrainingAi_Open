@@ -92,5 +92,20 @@ describe.skipIf(!canRun)('persistBodyCompFromMetrics — completed-form body_com
       expect(await snap('2026-08-03')).toMatchObject({ weight_kg: 77.5 })
       expect(await snap('2026-08-04')).toMatchObject({ weight_kg: 77 })
     })
+
+    it('a repeat Oura Cloud write leaves the latest snapshot untouched', async () => {
+      const stamp = async () => (await pool.query(
+        `SELECT updated_at FROM oura_daily_derived WHERE user_id = $1 AND day = '2026-08-04'`, [TEST_USER_ID],
+      )).rows[0].updated_at.getTime()
+      const before = await stamp()
+      await new Promise(r => setTimeout(r, 20))
+      await repo.upsertBodyMetrics(TEST_USER_ID, [{ date: '2026-08-06', restingHeartRate: 53 }], 'oura_cloud')
+      expect(await stamp()).toBe(before)
+    })
+
+    it('an explicit weigh-in on the latest snapshot day still refreshes it', async () => {
+      await repo.upsertBodyMetrics(TEST_USER_ID, [{ date: '2026-08-04', weightKg: 76.5, bodyFatPct: 17.5 }], 'manual')
+      expect(await snap('2026-08-04')).toMatchObject({ weight_kg: 76.5 })
+    })
   })
 })

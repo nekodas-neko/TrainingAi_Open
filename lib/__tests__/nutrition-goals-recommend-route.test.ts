@@ -7,7 +7,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { calculateBaseline } from '@trainingai/shared/nutrition/goal-recommendation'
-import { todayInTz, toAestDay } from '@trainingai/shared/date-utils'
+import { todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
+import { RECOMMENDATION_WINDOW_DAYS } from '@trainingai/shared/nutrition/goal-recommendation-text'
 
 type Row = Record<string, unknown>
 
@@ -15,7 +16,7 @@ const getUserById = vi.fn(async (_id: string) => user())
 const listBodyMetrics = vi.fn(async (_u: string, _f: string, _t: string) => [
   { id: 'b1', date: '2026-09-08', weightKg: 80 },
 ] as Row[])
-const getWorkoutSessionsFrom = vi.fn(async () => [] as Row[])
+const getWorkoutSessionsFrom = vi.fn(async (_u: string, _from: Date) => [] as Row[])
 const listRecentPersonalRecords = vi.fn(async () => [] as Row[])
 const getUserGoals = vi.fn(async () => ({
   stepsGoal: 9000, stepsGoalType: 'daily', sleepGoalHours: 8, calorieGoal: null,
@@ -264,21 +265,22 @@ describe('POST /api/nutrition-goals/recommend — failure and context', () => {
     expect(persisted().source).toBe('on_demand')
   })
 
-  it('keys the 14-day window to the user timezone, not the server one', async () => {
+  it('keys the 14-day window (today and the 13 days before it) to the user timezone, not the server one', async () => {
     // Two fixed-offset zones 26 hours apart, so their local dates differ whatever the clock says —
     // a pair that only usually differs turns this into a test that only usually tests anything.
     const windowStartFor = async (timezone: string) => {
-      freshUser({ timezone }); listBodyMetrics.mockClear()
+      freshUser({ timezone }); listBodyMetrics.mockClear(); getWorkoutSessionsFrom.mockClear()
       await post()
-      return listBodyMetrics.mock.calls[0][1]
+      // The sessions and records are read from that day's local midnight, matching the body-metric day.
+      const day = listBodyMetrics.mock.calls[0][1]
+      expect(getWorkoutSessionsFrom.mock.calls[0][1]).toEqual(dateStrMidnightInTz(day, timezone))
+      return day
     }
     const ahead = await windowStartFor('Etc/GMT-14')
     const behind = await windowStartFor('Etc/GMT+12')
     expect(ahead).not.toBe(behind)
     for (const [tz, got] of [['Etc/GMT-14', ahead], ['Etc/GMT+12', behind]] as const) {
-      const [y, m, d] = todayInTz(tz).split('-').map(Number)
-      const expected = toAestDay(new Date(Date.UTC(y, m - 1, d) - 14 * 86_400_000), 'UTC')
-      expect(got).toBe(expected)
+      expect(got).toBe(shiftDateStr(todayInTz(tz), -(RECOMMENDATION_WINDOW_DAYS - 1)))
     }
   })
 

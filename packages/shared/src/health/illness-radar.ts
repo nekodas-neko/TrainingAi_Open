@@ -31,11 +31,15 @@ export const ILLNESS_WEIGHTS = {
 } as const
 
 /** A one-sided z of this magnitude counts as a full (100) illness signal for that
- *  biomarker; smaller deviations scale linearly. z≈3 ≈ a 3-sigma move from baseline. */
+ *  biomarker; smaller deviations scale linearly. z = 3 is a 3σ move from baseline — literally since
+ *  #2158, when `baselineZ` started dividing by a standard deviation. Before that it divided by the
+ *  mean absolute deviation and 3 was ~2.4σ. */
 export const ILLNESS_Z_FULL = 3
 
 /** Skin-temp z at/above this is treated as fever (the `temp_dev > temp_dev_baseline`
- *  analog — we work in baseline-z space, not absolute °C). */
+ *  analog — we work in baseline-z space, not absolute °C). In standard deviations since #2158, which is
+ *  the fever-threshold fix Q-506's owner condition (2026-09-18) asked for before the temperature
+ *  re-derive (#2370): it was ~2.0σ on the old scale, it is 2.5σ now. */
 export const FEVER_TEMP_Z = 2.5
 
 /** illness_score thresholds for the graded, non-fever flags. */
@@ -76,7 +80,7 @@ export function storedReadinessMatches(stored: number, composite: number, stored
 export type IllnessBiomarkerKey = keyof typeof ILLNESS_WEIGHTS
 
 export interface IllnessInputs {
-  /** (sample − baselineMean)/baselineDev of last night's skin temperature. Up = fever-consistent. */
+  /** `baselineZ` of last night's skin temperature, in standard deviations. Up = fever-consistent. */
   tempZ: number | null
   /** Same, for resting HR. Up = illness-consistent. */
   rhrZ: number | null

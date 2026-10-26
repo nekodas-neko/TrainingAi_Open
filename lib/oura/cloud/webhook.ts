@@ -21,7 +21,8 @@ import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { fetchOuraDocument, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthorizedError } from './data'
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DELETE_TYPES, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
-import { reattributeAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
+import { reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
+import type { StillRhrRefresh } from './still-rhr'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import { confirmOuraTokenRefused, getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraRefusalVerdict, type OuraTokenStore } from './tokens'
 
@@ -114,7 +115,7 @@ export type OuraWebhookEvent = z.infer<typeof OuraWebhookEvent>
 export type OuraWebhookOutcome =
   /** The document was read and written. */
   | { result: 'written'; counts: OuraCloudWriteCounts }
-  /** A delete was applied: a sleep period or workout tombstoned (0 when we held none). */
+  /** A delete was applied: a sleep period, workout or session tombstoned (0 when we held none). */
   | { result: 'deleted'; rows: number }
   /** Nothing to do: a data type we do not store, or a delete of a type we keep no tombstone for. */
   | { result: 'ignored'; reason: string }
@@ -139,6 +140,8 @@ export type OuraWebhookDeps = {
    * (`workoutHrReattributor`). Without it the catch-up writes heart rate and nothing else.
    */
   workoutHr?: OuraWorkoutHrReattribute
+  /** #2634: refreshes the still-period resting HR of the days a write could change (`stillRhrRefresher`). */
+  stillRhr?: StillRhrRefresh
 }
 
 function isStoredType(t: string): t is OuraDocumentType {
@@ -158,13 +161,21 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     if (!OURA_DELETE_TYPES.includes(event.data_type)) return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
     // #3087: a workout deleted in the Oura app stops counting in the energy budget. Kept and marked.
     if (event.data_type === 'workout') return { result: 'deleted', rows: await deps.repo.tombstoneOuraWorkouts(userId, [event.object_id]) }
-    const rows = await withNightRescore(deps.rescore, userId, async () => {
-      const n = await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id])
-      // #3080: the day's HRV and resting HR follow its main period, which may have been this one.
-      await deps.repo.syncOuraMainSleepBodyMetrics(userId, { days: [], ouraIds: [event.object_id] })
-      return n
-    })
-    return { result: 'deleted', rows }
+    // #3153: a session deleted in the Oura app leaves the day timeline. Kept and marked.
+    if (event.data_type === 'session') return { result: 'deleted', rows: await deps.repo.tombstoneOuraSessions(userId, [event.object_id]) }
+    if (event.data_type === 'sleep') {
+      const rows = await withNightRescore(deps.rescore, userId, async () => {
+        const n = await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id])
+        // #3080: the day's HRV and resting HR follow its main period, which may have been this one.
+        await deps.repo.syncOuraMainSleepBodyMetrics(userId, { days: [], ouraIds: [event.object_id] })
+        return n
+      })
+      return { result: 'deleted', rows }
+    }
+    // A type in OURA_DELETE_TYPES with no branch here: never fall through to another type's
+    // tombstone, which would mark a row by an id that names something else (#3153).
+    reportOuraCloudIssue(`webhook-delete:unhandled-${event.data_type}`, `a ${event.data_type} delete has no tombstone branch; ignored`, { userId })
+    return { result: 'ignored', reason: `delete of ${event.data_type} has no tombstone` }
   }
 
   // Oura answers 401 for a type the user did not share, which would read as `reauth` (#2974).
@@ -177,7 +188,7 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     if (!token) return { result: 'unknown_user' }
     const doc = await fetchOuraDocument(token, event.data_type, event.object_id)
     if (!doc) return { result: 'not_found' }
-    const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]), deps.rescore)
+    const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]), deps.rescore, deps.stillRhr)
     if (HEART_RATE_TRIGGERS.has(event.data_type)) {
       if (isOuraTypeShared(granted, 'heartrate')) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
       // The user's choice on Oura's consent page, not a failure: logged, never reported (as the backfill does).
@@ -248,7 +259,7 @@ export type OuraHeartRateReader = Pick<WorkoutRepository, 'getLatestOuraCloudHea
  * rows that were read but none written. Reports carry counts and durations, never a reading.
  */
 export async function catchUpOuraCloudHeartRate(
-  deps: Pick<OuraWebhookDeps, 'repo' | 'config' | 'workoutHr'>, userId: string, now = Date.now(),
+  deps: Pick<OuraWebhookDeps, 'repo' | 'config' | 'workoutHr' | 'stillRhr'>, userId: string, now = Date.now(),
 ): Promise<number | null> {
   const token = await getOuraAccessToken(deps.repo, deps.config, userId)
   if (!token) return null
@@ -277,6 +288,7 @@ export async function catchUpOuraCloudHeartRate(
     : await deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
   const written = write.offered
   await reattributeAfterHeartRate(deps.workoutHr, userId, write, tz, 'webhook-heartrate:workouts')
+  await refreshStillRhrAfterHeartRate(deps.stillRhr, userId, write, tz)
   // The span with nothing stored yet: what an empty answer says Oura is missing.
   const unseenFrom = newest ?? floor
   const hours = Math.round((now - unseenFrom.getTime()) / 3_600_000)
@@ -297,7 +309,7 @@ export async function catchUpOuraCloudHeartRate(
 const heartRateLastRun = new Map<string, number>()
 
 /** Starts `catchUpOuraCloudHeartRate` in the background, throttled per user. Never throws. */
-export function startOuraCloudHeartRateCatchUp(deps: Pick<OuraWebhookDeps, 'repo' | 'config' | 'workoutHr'>, userId: string, now = Date.now()): void {
+export function startOuraCloudHeartRateCatchUp(deps: Pick<OuraWebhookDeps, 'repo' | 'config' | 'workoutHr' | 'stillRhr'>, userId: string, now = Date.now()): void {
   const last = heartRateLastRun.get(userId)
   if (last !== undefined && now - last < HEART_RATE_MIN_INTERVAL_MS) return
   heartRateLastRun.set(userId, now)

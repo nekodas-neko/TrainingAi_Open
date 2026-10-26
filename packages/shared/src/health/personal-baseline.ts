@@ -92,6 +92,8 @@ export const DEV_WARMUP_NIGHTS = 64
  * `DEV_WARMUP_NIGHTS` on, the vendor update runs untouched. The mean is the vendor's throughout.
  * Measured on synthetic nightly series at each metric's real spread, the next night's mean |z| is
  * ~1.0 from night 8. MET, whose ×10 sample unit is ~0.9σ, lands a little under 1 instead of at 2.
+ * (Those |z| figures are on the deviation scale `baselineZ` used then; since #2158 it divides by
+ * `MAD_TO_SD` times the dev, so the same calibrated baseline reads √(2/π) ≈ 0.8, a true normal's.)
  */
 export function seedOrUpdateBaseline(baseline: Baseline | null, sample: number, ageDays: number): Baseline {
   if (baseline == null) return { meanX8: sample << 3, devX8: 0 }
@@ -112,15 +114,41 @@ export function baselineMean(b: Baseline): number {
   return b.meanX8 / 8
 }
 
-/** Abs-deviation in real units. */
+/** Abs-deviation in real units. This is the EMA's own state — a mean absolute deviation, not a
+ *  standard deviation. Divide by {@link baselineSd}, never by this. */
 export function baselineDeviation(b: Baseline): number {
   return b.devX8 / 8
 }
 
-/** Normalized deviation of `sample` from the baseline mean. `null` until the
- *  deviation has accumulated (matches ecore: a fresh/single-sample baseline has no
- *  usable spread yet). */
+/**
+ * σ / (mean absolute deviation) for normally distributed data: E|x − μ| = σ·√(2/π), so σ = √(π/2)·MAD
+ * ≈ 1.2533·MAD.
+ *
+ * #2158. The fold keeps a mean absolute deviation (the vendor's update is an EMA of |sample − mean|),
+ * and `baselineZ` used to divide by it directly. Every z built on it ran ~1.25× hot even on a perfect
+ * baseline, so the composite's ±1.5σ knee (`Z_POINTS_PER_UNIT`) was reached at ±1.2σ and the illness
+ * radar's "3σ" full signal at 2.4σ. The owner chose on 2026-09-18 to put the baseline contributors on
+ * one honest scale; this constant is that scale.
+ *
+ * **One constant, not a trailing true sd.** The issue offered both. The constant fixes the systematic
+ * part for every baseline folded with the dev warm-up (#2159): a young one's dev reads ~0.83–0.9σ and a
+ * settled one ~0.78σ, so σ̂ lands within ~13% of σ at every age. That is every Oura Cloud and Health
+ * Connect normal (cold-folded per device, #2984) and any cold replay. It leaves a residual on the ring's
+ * stored HRV and sleep baselines, which were folded from a zero dev before #2159 and still read ~0.6σ:
+ * those want a re-derive of the stored baselines, which is a data rewrite and not this change.
+ */
+export const MAD_TO_SD = Math.sqrt(Math.PI / 2)
+
+/** The baseline's standard-deviation estimate in real units — the denominator of every z. */
+export function baselineSd(b: Baseline): number {
+  return baselineDeviation(b) * MAD_TO_SD
+}
+
+/** Normalized deviation of `sample` from the baseline mean, in standard deviations (#2158). `null`
+ *  until the deviation has accumulated (matches ecore: a fresh/single-sample baseline has no usable
+ *  spread yet). The only place a baseline z is formed: readiness, the illness radar and the generic
+ *  per-device normals all read it, so all of them are on the same scale. */
 export function baselineZ(b: Baseline, sample: number): number | null {
   if (b.devX8 === 0) return null
-  return (sample - baselineMean(b)) / baselineDeviation(b)
+  return (sample - baselineMean(b)) / baselineSd(b)
 }

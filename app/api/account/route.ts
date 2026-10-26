@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit, settleRateLimitFlushes } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
+import { disconnectOuraAccount } from '@/lib/oura/cloud/tokens'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { ACCOUNT_DELETION_PHRASE } from '@trainingai/shared/user/account-deletion'
 
@@ -21,6 +22,21 @@ const SESSION_COOKIE = /^(__Secure-)?authjs\.session-token(\.\d+)?$/
 const CANONICAL_SESSION_COOKIE = process.env.NODE_ENV === 'production'
   ? '__Secure-authjs.session-token'
   : 'authjs.session-token'
+
+/**
+ * #2892 — the delete removes the stored Oura tokens through the `users` cascade, but the grant at
+ * Oura stays, and TrainingAI would keep showing in the user's connected apps. Revoke it first.
+ * Best effort and never in the delete's way: whatever goes wrong here is logged and the delete
+ * carries on. Only the error is reported, never a token.
+ */
+async function revokeOuraGrantBestEffort(repo: Awaited<ReturnType<typeof getRepository>>, userId: string, url: string) {
+  try {
+    await disconnectOuraAccount(repo, userId)
+  } catch (err) {
+    console.error('[account] Oura revoke failed, deleting anyway', err instanceof Error ? err.name : 'unknown')
+    reportServerError(err, { userId, url })
+  }
+}
 
 /**
  * #2120 — delete the signed-in user's own account, immediately and irreversibly.
@@ -64,6 +80,7 @@ export async function DELETE(req: NextRequest) {
   let result
   try {
     const repo = await getRepository()
+    await revokeOuraGrantBestEffort(repo, userId, req.nextUrl.pathname)
     result = await repo.deleteAccount(userId)
   } catch (err) {
     console.error('[account] deletion failed', err)
