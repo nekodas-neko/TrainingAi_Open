@@ -13,7 +13,7 @@ import { dataEpochOf } from '@/lib/auth/session-cutoff'
  * cut-off already refuses a stale sign-in; this covers the phone that signs in again afterwards
  * with the old rows still in its local store.
  */
-export async function GET(req?: Request) {
+export async function GET(req: Request) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -30,7 +30,7 @@ export async function GET(req?: Request) {
     // call every bearer session "fresh". It is left out, which a reader treats as "cannot tell"
     // (`lib/local-store/device-owner.ts`: an unreadable answer keeps the store closed). The native
     // app reads only `epoch`; the owner gate runs only for the cookie sessions of the web/APK shell.
-    if (req?.headers.get('authorization')?.toLowerCase().startsWith('bearer ')) {
+    if (req.headers.get('authorization')?.toLowerCase().startsWith('bearer ')) {
       return NextResponse.json({ epoch }, { headers })
     }
     // `signedInAt` is null for a session that began before the build that stamps it: the device uses
