@@ -95,3 +95,28 @@ The `pg` Pool in `lib/data/postgres/client.ts` MUST keep its `pool.on('error', �
 **Accepted risk — TLS `rejectUnauthorized: false` (SEC-I6):** the prod SSL config is encrypted-but-unauthenticated TLS to Postgres. This is deliberate and is Railway's standard pattern (its managed Postgres uses self-signed certs, so certificate verification would fail). The app↔DB link is on Railway's private network. Do **not** cargo-cult this setting into any other outbound connection (external APIs, webhooks) — it belongs only on this Railway-internal DB link. If Railway ever exposes the instance CA, pin it via `ssl.ca` and flip `rejectUnauthorized` back on.
 
 ---
+
+## A reset, a deletion or a different account must not let old rows come back (#3369)
+
+The stores are offline-first, so an admin's reset of a user's data is undone by the next upload from
+any device that still holds the old rows. The guarantees, and where each lives:
+
+- **Every write carries the device's data epoch, and the server refuses a stale one with 409.**
+  `middleware.ts` (via `lib/auth/data-epoch-gate.ts`) is the one place; no route is edited and a new
+  route is covered. The account's epoch rides in the session token (`userClaims` → `dataEpoch`); the
+  device's rides in `X-Data-Epoch` (Preview) or the `ta_data_epoch` cookie (the Capacitor app, whose
+  Kotlin ring service forwards the WebView's cookies). Reads, `/api/auth/*` and `DELETE /api/account`
+  are never gated. `fetch` is wrapped once at the root (`lib/data-epoch-fetch.ts`): a 409 wipes and reloads.
+- **A device records which user id owns its local store** (`lib/local-store/device-owner.ts`;
+  Preview: `src/features/account/device-record.ts`). Signing in as a different id wipes before any read or sync.
+  `getLocalStore` answers null while another account's rows are there. This is what covers delete then re-signup.
+- **A covered write holds off a reset and a reset holds off a covered write**
+  (`lib/data/postgres/user-write-barrier.ts`, an advisory lock). The sync push and the ring-sample
+  ingest use it; the other upload paths rely on the 409 gate alone.
+- **A new upload path needs nothing to be covered by the gate**, but a new queue of unsent writes must
+  be wiped by `clearAccountStorage` (web) or live under the account scope (Preview), the same census as sign-out.
+- **The phone's `oura_raw.db` is deliberately NOT wiped** by a reset, a sign-out or an account change.
+  Nothing re-uploads its old rows (only newly drained batches are POSTed), and clearing it resets the
+  ring cursor to 0, which would re-drain and re-upload the ring's whole buffer, i.e. bring pre-reset
+  history back. Its cursor is tied to the ring's BLE key and pairing, which no wipe may touch.
+  Not covered: ring events recorded before a reset that the phone had not yet drained still arrive afterwards.
