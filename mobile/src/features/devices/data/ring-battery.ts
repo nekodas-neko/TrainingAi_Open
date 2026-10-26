@@ -26,6 +26,15 @@ export function parseRingAlert(raw: string | null): RingAlertSettings {
   }
 }
 
+/**
+ * The saved alert with its open spell closed, for when the phone changes hands: the new owner's
+ * first low reading must alert. The level and the on/off the person chose are kept. Null when
+ * nothing was saved.
+ */
+export function clearRingAlertFired(raw: string | null): string | null {
+  return raw === null ? null : JSON.stringify({ ...parseRingAlert(raw), fired: false });
+}
+
 /** Whether this reading starts a low spell, and the settings to save: at most once per spell. */
 export function checkRingAlert(
   settings: RingAlertSettings,

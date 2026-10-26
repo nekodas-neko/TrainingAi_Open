@@ -129,6 +129,27 @@ any device that still holds the old rows. The guarantees, and where each lives:
   wiped; the signed-in account's scope and outbox stay, and it is not signed out (#3396). Queued
   localStorage uploads count as data; cached responses do not. An empty
   user id is never recorded as an owner.
+- **Preview does not push the previous owner's unsent writes before an account change (#3435).** The
+  web pushes first because the signed-in account's cookie still works when the wipe runs. Preview
+  cannot. It holds one session slot: sign-out removes the saved session from secure storage, and a
+  sign-out the person chose also revokes its tokens on the server, so by the time another account
+  signs in nobody holds a credential that could send the previous owner's queue (`HistoryOutbox`, the
+  journal, the strap and scale outboxes, the Health Connect queue). Signing in as anyone but the
+  recorded owner (`reconcileDevice`, `device-record.ts`) then wipes every account scope. **What is
+  lost:** whatever that previous owner had logged on this phone and not yet synced when they signed
+  out, and it is lost at the new account's sign-in, not at sign-out. Their synced data is on the
+  server and returns on their next sign-in. Nothing is lost when the same account signs back in, and
+  a phone with no record only loses other accounts' scopes that were already orphans. No push is
+  invented for this: it would need a flush before sign-out clears the session, which is a separate
+  feature and not a change to the wipe. Until that exists, the wipe stays, because the scopes it
+  removes belong to a person who is not the one holding the phone.
+- **Device-scoped state that describes the previous owner is reset when the owner changes.** The wipe
+  leaves the `device` scope alone, so state in it that means "this person's situation" outlives the
+  account. `reconcileDevice` calls `ownerChanged` after a wipe for a different owner (and after
+  clearing other accounts on a recordless phone), and Preview uses it to set the ring battery alert's
+  `fired` flag back to false so the next account's first low reading alerts. The level and the on/off
+  the person chose are kept. It is best effort; a failure never blocks the sign-in. A same-owner
+  reset does not call it. Any new device-scoped key with such a flag joins that hook.
 - **A wipe that fails opens nothing.** The epoch record, and the cookie the server's gate reads, are
   written only after every clear (each SQLite table, the cache) succeeded. A partial wipe keeps the
   gate closed and the next launch wipes again; the clears raise instead of being swallowed.

@@ -66,12 +66,24 @@ export type DeviceDeps = {
   holdsOtherAccounts?(origin: string, userId: string): Promise<boolean>;
   /** Wipes every account scope except `keepUserId`'s. Required wherever `holdsOtherAccounts` is. */
   wipeOthers?(origin: string, keepUserId: string): Promise<void>;
+  /**
+   * The phone's owner changed. Device-scoped state that describes the previous owner's situation
+   * (the ring battery alert's "already fired") is reset here; settings the person chose stay.
+   * Best effort: a failure never blocks the sign-in.
+   */
+  ownerChanged?(): Promise<void>;
 };
 
 export type DeviceReconcile = {
   outcome: 'ok' | 'wiped';
   record: DeviceRecord;
 };
+
+async function ownerChanged(deps: DeviceDeps) {
+  try {
+    await deps.ownerChanged?.();
+  } catch {}
+}
 
 /**
  * Settle this phone against the server's epoch for the account that is signing in. Wipes first and
@@ -95,6 +107,7 @@ export async function reconcileDevice(
   if (record !== null && !sameOwner) {
     // The recorded owner is someone else: all of it goes, orphans of older accounts included.
     await deps.wipe(origin, null);
+    await ownerChanged(deps);
     wiped = true;
   } else {
     if (record === null && (await deps.holdsOtherAccounts?.(origin, userId)) === true) {
@@ -102,6 +115,7 @@ export async function reconcileDevice(
       // account's own scope and its unsent writes are not touched (#3396), and the session stays.
       if (!deps.wipeOthers) throw new Error('Cannot wipe other accounts without a way to keep this one.');
       await deps.wipeOthers(origin, userId);
+      await ownerChanged(deps);
     }
     if (sameOwner || serverEpoch > 0) {
       // Behind a reset (or a phone with no record that meets one): this account's scope goes.

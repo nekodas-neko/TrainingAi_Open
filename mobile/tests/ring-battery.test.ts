@@ -4,6 +4,7 @@ import {
   DEFAULT_RING_ALERT,
   checkRingAlert,
   chargeTimeText,
+  clearRingAlertFired,
   daysLeftText,
   drainChart,
   parseRingAlert,
@@ -82,4 +83,13 @@ test('the battery resource reads the server’s answer and tolerates a missing s
   assert.equal(parsed.latest?.percent, 64);
   assert.deepEqual(parsed.series, []);
   assert.equal(ringBatterySpec.schema.parse({ latest: null }).latest, null);
+});
+
+test('closing the open spell for a new owner keeps the chosen level and switch (#3435)', () => {
+  const saved = JSON.stringify({ enabled: false, level: 30, fired: true });
+  assert.deepEqual(JSON.parse(clearRingAlertFired(saved)!), { enabled: false, level: 30, fired: false });
+  assert.equal(clearRingAlertFired(null), null);
+  // The next account's first low reading alerts again.
+  const settings = parseRingAlert(clearRingAlertFired(JSON.stringify({ ...DEFAULT_RING_ALERT, fired: true })));
+  assert.equal(checkRingAlert(settings, reading(10)).notify, true);
 });
