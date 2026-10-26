@@ -117,6 +117,33 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
     expect((await PATCH(patch({ userId: OTHER, action: 'revoke-admin' }) as never)).status).toBe(403)
   })
 
+  it('an owner setting that names no user switches nothing off: a non-owner still cannot deactivate the real owner', async () => {
+    vi.stubEnv('CLAUDE_RO_OWNER_USER_ID', UNKNOWN)
+    const { PATCH } = await import('@/app/api/admin/users/route')
+    expect((await PATCH(patch({ userId: OWNER, action: 'deactivate' }) as never)).status).toBe(403)
+    const stillActive = (await pool.query<{ is_active: boolean }>('SELECT is_active FROM users WHERE id = $1', [OWNER])).rows[0]?.is_active
+    expect(stillActive).toBe(true)
+  })
+
+  it('an owner setting that names a non-admin counts as unresolved', async () => {
+    vi.stubEnv('CLAUDE_RO_OWNER_USER_ID', PLAIN)
+    await pool.query('UPDATE users SET is_admin = true WHERE id = $1', [OTHER])
+    const { PATCH } = await import('@/app/api/admin/users/route')
+    expect((await PATCH(patch({ userId: OWNER, action: 'deactivate' }) as never)).status).toBe(403)
+    expect((await PATCH(patch({ userId: OTHER, action: 'deactivate' }) as never)).status).toBe(403)
+    expect(await isAdmin(OTHER)).toBe(true)
+  })
+
+  it('an upper-case copy of your own id is still you: no self deactivation or self revoke', async () => {
+    asUser(OWNER)
+    const { PATCH } = await import('@/app/api/admin/users/route')
+    for (const action of ['deactivate', 'revoke-admin']) {
+      expect((await PATCH(patch({ userId: OWNER.toUpperCase(), action }) as never)).status).toBe(400)
+    }
+    const row = (await pool.query<{ is_active: boolean; is_admin: boolean }>('SELECT is_active, is_admin FROM users WHERE id = $1', [OWNER])).rows[0]
+    expect(row).toEqual({ is_active: true, is_admin: true })
+  })
+
   it('a non-owner admin cannot deactivate the owner; the owner can deactivate a non-owner admin', async () => {
     const { PATCH } = await import('@/app/api/admin/users/route')
     expect((await PATCH(patch({ userId: OWNER, action: 'deactivate' }) as never)).status).toBe(403)
