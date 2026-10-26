@@ -13,7 +13,7 @@
   <color name="home_widget_carbs">#3b82f6</color>
   <color name="home_widget_fat">#f97316</color>
   <color name="home_widget_water">#38bdf8</color>
-  <color name="home_widget_good">#22c55e</color>
+  <color name="home_widget_good">#56ee66</color>
   <color name="home_widget_low">#fbbf24</color>
-  <color name="home_widget_drained">#ef4444</color>
+  <color name="home_widget_drained">#ff6467</color>
 </resources>
