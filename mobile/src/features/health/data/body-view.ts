@@ -28,6 +28,11 @@ export function sleepWokeEnd(row: SleepRow): string | null {
   return wokeTime(row) ?? actualSleepWindow(row)?.end ?? row.sleepEnd ?? null;
 }
 
+/** The time the Sleep trend plots for a night: the raw bedtime, or the time you woke. */
+export function sleepTrendAt(row: SleepRow, view: 'bedtime' | 'wake'): string | null {
+  return view === 'bedtime' ? row.sleepStart : sleepWokeEnd(row);
+}
+
 /** The bed to wake range. Start is the raw bedtime and the end is the time you woke. */
 export function sleepTimeRange(row: SleepRow | undefined, timezone: string): string | null {
   if (!row?.sleepStart || !row.sleepEnd) return null;

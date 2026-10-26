@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
 import { activeElapsedMs, type WorkoutRecord } from '../../workouts/logging/workout.ts';
+import { sleepWokeEnd } from '../../health/data/body-view.ts';
 import type { SleepRow } from '../../health/data/models.ts';
 export const timelineEventSchema = z
   .object({
@@ -36,7 +37,18 @@ export function localTimeline(
   today: string,
   timezone: string,
 ) {
-  const rows = [...events];
+  // #3426: the server's "Woke up" is the session's recorded window end. Show the time that night's
+  // sleep ended, as the night header and Home do (#3415). The night is the one whose recorded end
+  // the event carries, so a nap on the same day is never picked.
+  const rows = events.map((row) => {
+    if (row.type !== 'wakeup') return row;
+    const night = sleep.find((n) => n.sleepEnd != null && Date.parse(n.sleepEnd) === row.timeMs);
+    const woke = night ? sleepWokeEnd(night) : null;
+    const timeMs = woke ? Date.parse(woke) : NaN;
+    return Number.isFinite(timeMs) && timeMs !== row.timeMs
+      ? { ...row, timeMs, time: formatTimeOfDay(timeMs, timezone) }
+      : row;
+  });
   const yesterday = shiftDateStr(today, -1);
   const group = (date: string) =>
     date === today ? ('today' as const) : ('yesterday' as const);
@@ -81,7 +93,7 @@ export function localTimeline(
     (row) => row.localOnly && (row.date === today || row.date === yesterday),
   )) {
     for (const [type, title, at] of [
-      ['wakeup', 'Woke up', night.sleepEnd],
+      ['wakeup', 'Woke up', sleepWokeEnd(night)],
       ['sleep', 'Fell asleep', night.sleepStart],
     ] as const) {
       if (!at) {

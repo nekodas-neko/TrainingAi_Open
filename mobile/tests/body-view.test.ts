@@ -9,6 +9,7 @@ import {
   signedRate,
   sleepChips,
   sleepTimeRange,
+  sleepTrendAt,
   sleepWokeEnd,
   titleCaseWords,
   waterGoalText,
@@ -188,4 +189,16 @@ test('the ring resources accept the server payloads', () => {
     }).latest?.percent,
     71,
   );
+});
+
+test('the wake trend plots the time you woke and the bedtime trend the raw bedtime (#3426)', () => {
+  const inBed = night({
+    sleepStart: '2026-10-16T12:00:00.000Z',
+    sleepEnd: '2026-10-16T20:23:00.000Z',
+    phaseWindowStart: '2026-10-16T12:00:00.000Z',
+    phaseWindowEnd: '2026-10-16T20:23:00.000Z',
+    sleepPhase5Min: '4' + '2'.repeat(96) + '4444',
+  });
+  assert.equal(sleepTrendAt(inBed, 'wake'), '2026-10-16T20:05:00.000Z');
+  assert.equal(sleepTrendAt(inBed, 'bedtime'), '2026-10-16T12:00:00.000Z');
 });
