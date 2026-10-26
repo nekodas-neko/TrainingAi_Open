@@ -841,3 +841,21 @@ for (const status of [401, 403]) {
     assert.doesNotMatch(state.error ?? '', /kept on this phone only/);
   });
 }
+
+test('the timeline Woke up event is the time you woke, not the recorded window end (#3426)', () => {
+  const night = sleepSchema.parse({
+    date: '2026-10-17',
+    localOnly: true,
+    sleepStart: '2026-10-16T12:00:00.000Z',
+    sleepEnd: '2026-10-16T20:23:00.000Z',
+    phaseWindowStart: '2026-10-16T12:00:00.000Z',
+    phaseWindowEnd: '2026-10-16T20:23:00.000Z',
+    sleepPhase5Min: '4' + '2'.repeat(96) + '4444',
+  });
+  const events = localTimeline([], [], [night], '2026-10-17', 'Australia/Brisbane');
+  const woke = events.find((event) => event.type === 'wakeup');
+  assert.equal(woke?.timeMs, Date.parse('2026-10-16T20:05:00.000Z'));
+  assert.equal(woke?.time.replace(/\s/g, ' '), '6:05 am');
+  // Still after falling asleep, so the day's order does not change.
+  assert.deepEqual(events.map((event) => event.type), ['wakeup', 'sleep']);
+});

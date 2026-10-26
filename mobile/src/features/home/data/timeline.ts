@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
 import { activeElapsedMs, type WorkoutRecord } from '../../workouts/logging/workout.ts';
+import { sleepWokeEnd } from '../../health/data/body-view.ts';
 import type { SleepRow } from '../../health/data/models.ts';
 export const timelineEventSchema = z
   .object({
@@ -81,7 +82,7 @@ export function localTimeline(
     (row) => row.localOnly && (row.date === today || row.date === yesterday),
   )) {
     for (const [type, title, at] of [
-      ['wakeup', 'Woke up', night.sleepEnd],
+      ['wakeup', 'Woke up', sleepWokeEnd(night)],
       ['sleep', 'Fell asleep', night.sleepStart],
     ] as const) {
       if (!at) {
