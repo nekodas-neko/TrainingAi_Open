@@ -29,6 +29,10 @@ function accountScope(origin: string, accountId: string) {
 export class LocalStorage {
   private database: StorageDatabase;
   private operations: Promise<unknown> = Promise.resolve();
+  // One object per scope, so `device()` and `account()` hand back the same storage every time. A
+  // component that keys an effect on it would otherwise re-run that effect on every render (#3366's
+  // battery card re-read its saved alert, parsed a fresh object and re-rendered without end).
+  private scopes = new Map<string, ScopedStorage>();
 
   constructor(database: StorageDatabase) {
     this.database = database;
@@ -93,6 +97,15 @@ export class LocalStorage {
   }
 
   private scope(scope: string): ScopedStorage {
+    let storage = this.scopes.get(scope);
+    if (!storage) {
+      storage = this.build(scope);
+      this.scopes.set(scope, storage);
+    }
+    return storage;
+  }
+
+  private build(scope: string): ScopedStorage {
     return {
       get: (key) =>
         this.run(async () => {

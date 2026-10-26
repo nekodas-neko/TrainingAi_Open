@@ -157,3 +157,21 @@ test('clearOtherAccounts removes every other account\'s data and keeps this acco
   assert.equal(await storage.account('https://other.example', 'u1').get('k'), null);
   assert.equal(await storage.holdsOtherAccounts(origin, 'u1'), false);
 });
+
+// #3366: a component that keys an effect on the scoped storage re-ran it on every render while
+// each call built a new object; the battery card then read, parsed and re-rendered without end.
+test('device() and account() hand back the same storage object every time', async () => {
+  const fixture = sqliteFixture(':memory:');
+  try {
+    const storage = await createLocalStorage(fixture.database);
+    assert.equal(storage.device(), storage.device());
+    const origin = 'https://example.com';
+    assert.equal(storage.account(origin, 'u1'), storage.account(origin, 'u1'));
+    assert.notEqual(storage.account(origin, 'u1'), storage.account(origin, 'u2'));
+    assert.notEqual(storage.account(origin, 'u1'), storage.device());
+    await storage.device().set('k', 'v');
+    assert.equal(await storage.device().get('k'), 'v');
+  } finally {
+    fixture.connection.close();
+  }
+});
