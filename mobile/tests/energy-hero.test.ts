@@ -5,88 +5,11 @@ import {
   TIDE,
   angleAt,
   arcPath,
-  energyHero,
   energyHeroSize,
   notch,
   polar,
 } from '../src/features/home/data/energy-hero.ts';
-import { homeScoreChips } from '../src/features/home/data/score-chips.ts';
-
-const battery = (over: Partial<Parameters<typeof energyHero>[0] & object> = {}) => ({
-  hasData: true,
-  current: 46,
-  anchor: 76,
-  anchorSource: 'sleep' as const,
-  anchorProvisional: false,
-  series: [
-    { t: 1, v: 76 },
-    { t: 2, v: 60 },
-    { t: 3, v: 46 },
-  ],
-  ...over,
-});
-
-test('the hero shows the live level with the morning mark and how far it has fallen', () => {
-  const hero = energyHero(battery());
-  assert.ok(hero.hasData);
-  assert.equal(hero.level, 46);
-  assert.equal(hero.morning, 76);
-  assert.equal(hero.drained, 30);
-  assert.equal(hero.label, 'Low');
-  assert.equal(hero.sub, 'woke at 76 · drained 30');
-  assert.equal(hero.origin, 'set from sleep');
-});
-
-test('the number never rises: a recharge leaves it at the day\'s low', () => {
-  const hero = energyHero(
-    battery({
-      current: 58,
-      series: [
-        { t: 1, v: 76 },
-        { t: 2, v: 40 },
-        { t: 3, v: 58 },
-      ],
-    }),
-  );
-  assert.ok(hero.hasData);
-  assert.equal(hero.level, 40);
-  assert.equal(hero.label, 'Low');
-});
-
-test('the number never sits above the morning mark', () => {
-  const hero = energyHero(battery({ anchor: 70, current: 82, series: [{ t: 1, v: 82 }] }));
-  assert.ok(hero.hasData);
-  assert.equal(hero.level, 70);
-  assert.equal(hero.drained, 0);
-  assert.equal(hero.sub, 'woke at 70');
-});
-
-test('the band comes from the number on screen, at its edges', () => {
-  const label = (current: number) => {
-    const hero = energyHero(battery({ anchor: 100, current, series: [] }));
-    return hero.hasData ? hero.label : null;
-  };
-  assert.equal(label(75), 'Charged');
-  assert.equal(label(74), 'Good');
-  assert.equal(label(50), 'Good');
-  assert.equal(label(49), 'Low');
-  assert.equal(label(25), 'Low');
-  assert.equal(label(24), 'Drained');
-});
-
-test('a provisional morning figure says so, and no data draws nothing', () => {
-  const hero = energyHero(battery({ anchorSource: 'readiness', anchorProvisional: true }));
-  assert.ok(hero.hasData);
-  assert.match(hero.origin, /^set from readiness · provisional/);
-  assert.deepEqual(energyHero(battery({ hasData: false })), { hasData: false });
-  assert.deepEqual(energyHero(null), { hasData: false });
-});
-
-test('limited data is flagged', () => {
-  const hero = energyHero(battery({ confidence: { sufficient: false } }));
-  assert.ok(hero.hasData);
-  assert.equal(hero.limited, true);
-});
+import { chipFigure, homePillars, homeScoreChips } from '../src/features/home/data/score-chips.ts';
 
 test('the size setting falls back to Full for anything unknown', () => {
   assert.equal(energyHeroSize(undefined), 'full');
@@ -119,8 +42,30 @@ test('a full tide ring is drawn as an arc that stops just short of closing', () 
   assert.ok(path.startsWith(`M ${top.x} ${top.y}`));
 });
 
-test('the heart chip carries its unit so a bpm figure never reads as a score', () => {
-  const chips = homeScoreChips({ restingHr: 54 }, [], '2026-10-26');
-  assert.equal(chips.find((chip) => chip.key === 'heart')?.unit, 'bpm');
-  assert.equal(chips.find((chip) => chip.key === 'sleep')?.unit, undefined);
+const today = '2026-10-26';
+
+test('the pillars come in one order for every layout: Sleep, Heart, Activity', () => {
+  const pillars = homePillars({ restingHr: 54, sleepScore: 80, activityScore: 61 }, [], today);
+  assert.deepEqual(pillars.map((chip) => chip.key), ['sleep', 'heart', 'activity']);
+});
+
+test('the heart figure carries bpm wherever it is drawn, so it never reads as a score', () => {
+  const heart = homePillars({ restingHr: 54 }, [], today).find((chip) => chip.key === 'heart')!;
+  assert.deepEqual(chipFigure(heart), { text: '54', unit: 'bpm' });
+  // No reading: a dash, with no unit hanging off it.
+  const none = homePillars({}, [], today).find((chip) => chip.key === 'heart')!;
+  assert.deepEqual(chipFigure(none), { text: '—' });
+});
+
+test("Slim's sleep-hours fallback carries its h; a sleep score carries no unit", () => {
+  const night = [{ date: today, durationHours: 7.4 }];
+  const hours = homePillars({ hrCurrent: 61 }, night, today)[0]!;
+  assert.deepEqual(chipFigure(hours), { text: '7.4', unit: 'h' });
+  const scored = homePillars({ sleepScore: 84 }, night, today)[0]!;
+  assert.deepEqual(chipFigure(scored), { text: '84' });
+});
+
+test('the widget still reads the full four-chip model', () => {
+  const chips = homeScoreChips({ restingHr: 54 }, [], today);
+  assert.deepEqual(chips.map((chip) => chip.key), ['readiness', 'heart', 'sleep', 'activity']);
 });

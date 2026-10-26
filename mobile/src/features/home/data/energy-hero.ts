@@ -1,15 +1,7 @@
-import {
-  bodyBatteryLabelFor,
-  type BodyBatteryLabel,
-} from '@trainingai/shared/health/body-battery-band';
-import {
-  BODY_BATTERY_PROVISIONAL_SUFFIX,
-  bodyBatteryAnchorSuffix,
-} from '@trainingai/shared/health/body-battery-copy';
-
-// Home's Energy hero (#2989): Body Battery's figure, drawn big. The number is Body Battery's own,
-// no new calculation (docs/module-map.md, "Body Battery, one day"); the weights and past days come
-// later through a tuning proposal.
+// Home's Energy hero (#2989): the size setting and the gauge geometry. The number itself, and the
+// rule for which Body Battery figure it shows, are `energyHero` in
+// packages/shared/src/health/body-battery-energy.ts; the weights and past days come later through
+// a tuning proposal.
 
 export const ENERGY_HERO_SIZES = ['full', 'compact', 'slim'] as const;
 export type EnergyHeroSize = (typeof ENERGY_HERO_SIZES)[number];
@@ -23,62 +15,7 @@ export function energyHeroSize(value: string | undefined): EnergyHeroSize {
   return ENERGY_HERO_SIZES.find((size) => size === value) ?? DEFAULT_ENERGY_HERO_SIZE;
 }
 
-type Battery = {
-  hasData: boolean;
-  current: number;
-  anchor: number;
-  anchorSource: 'readiness' | 'sleep' | 'default';
-  anchorProvisional: boolean;
-  series: { t: number; v: number }[];
-  confidence?: { sufficient: boolean } | null;
-};
-
-export type EnergyHero =
-  | { hasData: false }
-  | {
-      hasData: true;
-      /** The number: the lowest the day has been, never above the morning mark. */
-      level: number;
-      /** Where the day opened, kept as the notch on the gauge. */
-      morning: number;
-      drained: number;
-      label: BodyBatteryLabel;
-      /** "woke at 76", plus how far it has fallen. */
-      sub: string;
-      /** Where the morning figure came from, for the line beside the title. */
-      origin: string;
-      limited: boolean;
-    };
-
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
-
-/**
- * The hero's number is drawn only going down (owner, 26 Oct). Body Battery itself charges at rest,
- * so the level shown is the lowest the day has reached, never the live reading when that has
- * climbed back; the detail panel still draws the real curve. The band is looked up from that
- * number, so the label always agrees with what is on screen.
- */
-export function energyHero(data: Battery | null | undefined): EnergyHero {
-  if (!data?.hasData) {
-    return { hasData: false };
-  }
-  const morning = Math.round(clamp(data.anchor));
-  const low = Math.min(data.anchor, data.current, ...data.series.map((point) => point.v));
-  const level = Math.min(morning, Math.round(clamp(low)));
-  const drained = morning - level;
-  return {
-    hasData: true,
-    level,
-    morning,
-    drained,
-    label: bodyBatteryLabelFor(level),
-    sub: drained > 0 ? `woke at ${morning} · drained ${drained}` : `woke at ${morning}`,
-    origin:
-      `set${bodyBatteryAnchorSuffix(data.anchorSource)}` +
-      (data.anchorProvisional ? BODY_BATTERY_PROVISIONAL_SUFFIX : ''),
-    limited: !!data.confidence && !data.confidence.sufficient,
-  };
-}
 
 // ── Gauge geometry ─────────────────────────────────────────────────────────────────────────────
 // Angles are degrees clockwise from 3 o'clock, y pointing down, as in SVG.

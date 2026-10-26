@@ -25,7 +25,7 @@ export type ScoreChipModel = {
   value: number | null;
   /** Shown instead of the rounded value: the night's hours when there is no sleep score. */
   display?: string;
-  /** What the figure counts when it is not a score: the heart chip is a bpm reading. */
+  /** What the figure counts when it is not a score: bpm for the heart chip, h for sleep hours. */
   unit?: string;
   /** Drawn with Home's info mark: the score rests on limited data. */
   qualified: boolean;
@@ -60,7 +60,7 @@ export function homeScoreChips(
       label: duration != null ? 'Sleep (h)' : 'Sleep',
       shortLabel: 'Sleep',
       value: data?.sleepScore ?? null,
-      ...(duration != null ? { display: duration.toFixed(1) } : {}),
+      ...(duration != null ? { display: duration.toFixed(1), unit: 'h' } : {}),
       qualified: Boolean(
         sleep.find((row) => row.date === today)?.provisional ||
           (data?.sleepScoreCoverage != null && data.sleepScoreCoverage.level !== 'full'),
@@ -79,4 +79,24 @@ export function homeScoreChips(
 /** The text a chip shows: ScoreChip's own rule, a dash for no value. */
 export function chipText(chip: ScoreChipModel): string {
   return chip.display ?? (chip.value === null ? '—' : String(Math.round(chip.value)));
+}
+
+/** The text and unit a chip shows, in every layout: a figure that is not a score always has its unit. */
+export function chipFigure(chip: ScoreChipModel): { text: string; unit?: string } {
+  return chip.unit && (chip.value !== null || chip.display != null)
+    ? { text: chipText(chip), unit: chip.unit }
+    : { text: chipText(chip) };
+}
+
+/**
+ * The pillars beside the Energy hero (#2989), in the one order every layout draws them: Sleep,
+ * Heart, Activity. Readiness has no chip there; Energy opens at it.
+ */
+export function homePillars(
+  data: Readiness | null | undefined,
+  sleep: readonly Night[],
+  today: string,
+): ScoreChipModel[] {
+  const [, heart, sleepChip, activity] = homeScoreChips(data, sleep, today);
+  return [sleepChip!, heart!, activity!];
 }

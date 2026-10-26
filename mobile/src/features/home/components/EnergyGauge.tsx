@@ -48,8 +48,8 @@ export function EnergyGauge({
   const center = size / 2;
   const radius = center - stroke / 2 - gaugeMargin(size);
   const brand = theme.colors.brand;
-  // The dark mockups draw the track as white at 11%; light uses the theme's own track.
-  const trackColor = theme.mode === 'dark' ? 'rgba(255,255,255,0.11)' : theme.colors.track;
+  // White at 11% in dark, as the mockups draw it; the light track in light.
+  const trackColor = theme.colors.glassTrack;
   const mark = theme.colors.text;
   const track = arcPath(arc, center, radius, 0, 100);
   const fill = level === null ? null : arcPath(arc, center, radius, 0, level);

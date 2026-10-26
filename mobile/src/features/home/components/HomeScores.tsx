@@ -6,7 +6,7 @@ import { readinessSpec } from '../../health/data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
 import { useHome } from '../data/HomeProvider';
-import { homeScoreChips } from '../data/score-chips';
+import { homePillars } from '../data/score-chips';
 /**
  * The three pillars beside Energy (#2989), in the user's ring style. Readiness no longer has a
  * chip: Energy opens at the readiness score and the hero is where it is read. A ScoreChip shrinks
@@ -24,45 +24,32 @@ export function HomeScores({
   const health = useHealthData();
   const home = useHome();
   const { data } = useWorkoutResource(readinessSpec(health.today));
-  const [, heart, sleep, activity] = homeScoreChips(data, health.sleep, health.today);
-  const chips = [
+  const [sleep, heart, activity] = homePillars(data, health.sleep, health.today);
+  const style = home.preferences.scoreRingStyle;
+  const pillars = [
+    { chip: sleep, icon: 'moon', tone: 'sleep', color: theme.scores.sleep, detail: 'sleep' },
+    { chip: heart, icon: 'cardio', tone: 'heart', color: theme.scores.heart, detail: 'heart-rate' },
+    { chip: activity, icon: 'flame', tone: 'activity', color: theme.scores.activity, detail: 'activity' },
+  ] as const;
+  // `first` marks the chip with no hairline on its left: the first of a row, or of each grid row.
+  const chips = pillars.map(({ chip, icon, tone, color, detail }, index) => (
     <ScoreChip
-      key="0"
-      label={heart.label}
-      shortLabel={heart.shortLabel}
-      first
-      value={heart.value}
-      icon="cardio"
-      tone="heart"
-      color={theme.scores.heart}
-      style={home.preferences.scoreRingStyle}
-      onPress={() => onOpen('heart-rate')}
-    />,
-    <ScoreChip
-      key="1"
-      label={sleep.label}
-      shortLabel={sleep.shortLabel}
-      value={sleep.value}
-      display={sleep.display}
-      icon="moon"
-      tone="sleep"
-      color={theme.scores.sleep}
-      style={home.preferences.scoreRingStyle}
-      qualified={sleep.qualified}
-      onPress={() => onOpen('sleep')}
-    />,
-    <ScoreChip
-      key="2"
-      label={activity.label}
-      shortLabel={activity.shortLabel}
-      value={activity.value}
-      icon="flame"
-      tone="activity"
-      color={theme.scores.activity}
-      style={home.preferences.scoreRingStyle}
-      onPress={() => onOpen('activity')}
-    />,
-  ];
+      key={chip.key}
+      label={chip.label}
+      shortLabel={chip.shortLabel}
+      first={grid ? index % 2 === 0 : index === 0}
+      value={chip.value}
+      display={chip.display}
+      unit={chip.unit}
+      icon={icon}
+      tone={tone}
+      color={color}
+      style={style}
+      qualified={chip.qualified}
+      diameter={grid ? theme.sizes.scoreChipCompact : undefined}
+      onPress={() => onOpen(detail)}
+    />
+  ));
   if (grid) {
     // The fourth cell stays empty until a fourth score exists.
     const rows = [chips.slice(0, 2), chips.slice(2)];

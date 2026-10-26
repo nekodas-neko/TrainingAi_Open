@@ -13,29 +13,23 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWeather } from '../../weather/WeatherProvider';
 import { backgroundScene } from '../../weather/data/background';
 import { useHome } from '../data/HomeProvider';
-import { energyHero, energyHeroSize, type EnergyHeroSize } from '../data/energy-hero';
-import { chipText, homeScoreChips } from '../data/score-chips';
+import { energyHero } from '@trainingai/shared/health/body-battery-energy';
+import { energyHeroSize, type EnergyHeroSize } from '../data/energy-hero';
+import { chipFigure, homePillars } from '../data/score-chips';
 import { EnergyGauge } from './EnergyGauge';
 import { HomeScores } from './HomeScores';
 
 // Home's hero (#2989): Energy, drawn live from Body Battery, replacing the Readiness chip and the
 // Body Battery card. Sizes follow the approved mockups at 384 px: Full (D1 / R1), Compact (D3 /
 // R4) and Slim (D4 / R8).
-// The glass behind the band and the framed sizes: the mockups' dark glass over the dark wallpaper,
-// white glass in light (D7).
-const GLASS = { dark: 'rgba(12,14,20,0.42)', light: 'rgba(255,255,255,0.7)' } as const;
-const GLASS_LINE = 'rgba(255,255,255,0.14)';
+const SLIM_ICON = { sleep: 'moon', heart: 'cardio', activity: 'flame', readiness: 'power' } as const;
 const GAUGE = {
   full: { size: 244, stroke: 15, number: 'energyFull' },
   compact: { size: 168, stroke: 12, number: 'energyCompact' },
   slim: { size: 112, stroke: 9, number: 'energySlim' },
 } as const satisfies Record<EnergyHeroSize, { size: number; stroke: number; number: string }>;
 // A lift for the white number over the dark wallpaper; the dark number in light mode needs none.
-const NUMBER_SHADOW = {
-  textShadowColor: 'rgba(0,0,0,0.45)',
-  textShadowRadius: 12,
-  textShadowOffset: { width: 0, height: 1 },
-};
+const NUMBER_SHADOW = { textShadowRadius: 12, textShadowOffset: { width: 0, height: 1 } };
 
 export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void }) {
   const { theme } = useTheme();
@@ -51,7 +45,10 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
   const onWallpaper = backgroundScene(weather.settings, 'home', null, null) !== null;
   const hero = energyHero(state.data);
   const geometry = GAUGE[size];
-  const glass = GLASS[theme.mode];
+  // Behind the band and sub-text in Full: the wallpaper's glass over the dial; over the tide's water
+  // the page colour at 90%, which keeps the muted text above 4.5:1 on every accent in light.
+  const glass = theme.colors.glass;
+  const backing = onWallpaper ? glass : `${theme.colors.background}e6`;
   const color = hero.hasData
     ? batteryColor(hero.label, {
         colors: theme.colors,
@@ -66,11 +63,7 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
     : state.data
       ? 'No data yet'
       : 'Waiting for readings';
-  const [, heart, sleep, activity] = homeScoreChips(
-    readiness.data,
-    health.sleep,
-    health.today,
-  );
+  const pillars = homePillars(readiness.data, health.sleep, health.today);
   const eyebrow = (
     <Stack direction="row" align="center" gap="xs">
       <Icon
@@ -87,18 +80,19 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
   );
   const band = hero.hasData ? (
     <View
-      style={{
-        alignSelf: size === 'full' ? 'center' : 'flex-start',
-        paddingHorizontal: theme.spacing.sm,
-        paddingVertical: theme.spacing.xxs,
-        borderRadius: theme.radii.pill,
-        backgroundColor: onWallpaper ? glass : `${theme.colors.background}b8`,
-      }}
+      style={
+        size === 'full'
+          ? { alignSelf: 'center' }
+          : {
+              alignSelf: 'flex-start',
+              paddingHorizontal: theme.spacing.sm,
+              paddingVertical: theme.spacing.xxs,
+              borderRadius: theme.radii.pill,
+              backgroundColor: onWallpaper ? glass : `${theme.colors.background}b8`,
+            }
+      }
     >
-      <AppText
-        variant="statLabel"
-        style={{ color, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 }}
-      >
+      <AppText variant="energyBand" style={{ color }}>
         {hero.label}
       </AppText>
     </View>
@@ -113,7 +107,7 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
       variant={geometry.number}
       style={[
         { fontVariant: ['tabular-nums'], color: theme.colors.text },
-        theme.mode === 'dark' && NUMBER_SHADOW,
+        theme.mode === 'dark' && { ...NUMBER_SHADOW, textShadowColor: theme.colors.scrim },
       ]}
     >
       {number}
@@ -129,7 +123,17 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
     >
       {bigNumber}
       {size === 'full' && (
-        <View style={{ alignItems: 'center', gap: theme.spacing.xxs, marginTop: theme.spacing.xs }}>
+        <View
+          style={{
+            alignItems: 'center',
+            gap: theme.spacing.xxs,
+            marginTop: theme.spacing.xs,
+            paddingHorizontal: theme.spacing.sm,
+            paddingVertical: theme.spacing.xs,
+            borderRadius: theme.radii.card,
+            backgroundColor: backing,
+          }}
+        >
           {band}
           {subText}
         </View>
@@ -201,21 +205,24 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
             {subText}
             {limited}
             <Stack direction="row" gap="md">
-              {[
-                { chip: sleep, icon: 'moon' as const, color: theme.scores.sleep },
-                { chip: heart, icon: 'cardio' as const, color: theme.scores.heart },
-                { chip: activity, icon: 'flame' as const, color: theme.scores.activity },
-              ].map(({ chip, icon, color: tint }) => (
-                <Stack key={chip.key} direction="row" align="center" gap="xxs">
-                  <Icon name={icon} size={theme.sizes.iconCompact} color={tint} />
-                  <AppText variant="label">{chipText(chip)}</AppText>
-                  {chip.unit && (
-                    <AppText variant="micro" tone="muted">
-                      {chip.unit}
-                    </AppText>
-                  )}
-                </Stack>
-              ))}
+              {pillars.map((chip) => {
+                const figure = chipFigure(chip);
+                return (
+                  <Stack key={chip.key} direction="row" align="center" gap="xxs">
+                    <Icon
+                      name={SLIM_ICON[chip.key]}
+                      size={theme.sizes.iconCompact}
+                      color={theme.scores[chip.key as 'sleep' | 'heart' | 'activity']}
+                    />
+                    <AppText variant="label">{figure.text}</AppText>
+                    {figure.unit && (
+                      <AppText variant="micro" tone="muted">
+                        {figure.unit}
+                      </AppText>
+                    )}
+                  </Stack>
+                );
+              })}
             </Stack>
           </Stack>
         </Stack>
@@ -230,7 +237,7 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
             ? {
                 borderRadius: theme.radii.card,
                 borderWidth: 1,
-                borderColor: onWallpaper && theme.mode === 'dark' ? GLASS_LINE : theme.colors.border,
+                borderColor: onWallpaper ? theme.colors.glassBorder : theme.colors.border,
                 backgroundColor: onWallpaper ? glass : theme.colors.raised,
                 padding: theme.spacing.sm,
               }

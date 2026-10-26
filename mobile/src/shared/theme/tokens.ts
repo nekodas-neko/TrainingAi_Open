@@ -38,6 +38,9 @@ export const sizes = {
   timerRing: 180,
   scoreRing: 128,
   scoreChip: 114,
+  // Home's Compact Energy (D3 / R4): the 2 x 2 pillar block's circles, so the block stays within the
+  // mockup's height.
+  scoreChipCompact: 56,
   recommendationCard: 200,
   weekDay: 32,
   // calendar-widget.tsx: the day digit sits in an h-7 w-7 circle.
@@ -192,6 +195,15 @@ export const typography = {
   energyFull: { fontSize: 72, lineHeight: 76, fontWeight: '700', letterSpacing: -2.5 },
   energyCompact: { fontSize: 50, lineHeight: 52, fontWeight: '700', letterSpacing: -1.75 },
   energySlim: { fontSize: 34, lineHeight: 36, fontWeight: '700', letterSpacing: -1.2 },
+  // The band word under the number (Charged / Good / Low / Drained): the mockups' .bchip, 10.5 px
+  // bold uppercase at .06em.
+  energyBand: {
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: '700',
+    letterSpacing: 0.63,
+    textTransform: 'uppercase',
+  },
   // recommendation-card.tsx: the soreness chip, text-[10px] font-semibold leading-none.
   chipLabel: { fontSize: 10, lineHeight: 10, fontWeight: '600' },
   // trend-sparkline.tsx: chart.js x ticks at font size 9, so 14 weekday labels fit the plot.
