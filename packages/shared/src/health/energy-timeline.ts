@@ -32,10 +32,11 @@
  * energy went, not a measurement of it.
  */
 
+import { wallClockMinuteReader } from '@trainingai/shared/date-utils'
 import { countedIntakeKcal, countedEstimateTotal, type CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
 
 /**
- * One bucket of the day's HR trace — `minute` from local midnight, `bpm` the bucket's MEAN.
+ * One bucket of the day's HR trace — `minute` the local wall-clock minute, `bpm` the bucket's MEAN.
  * This is `/api/day-log`'s `hr` payload verbatim (15-minute buckets, mean bpm), so the screen
  * already holds it and no extra request is needed.
  */
@@ -53,6 +54,9 @@ export interface IntakeEvent {
 export interface EnergyTimelineInput {
   /** Local-midnight instant of the day being drawn, in the user's timezone. */
   dayStartMs: number
+  /** The user's timezone. With it a meal lands on the clock hour it was eaten in, matching `hr`'s
+   *  wall-clock minutes, on a 23- or 25-hour day too (#3428). Without it, minutes elapsed from `dayStartMs`. */
+  tz?: string
   /** Resting heart rate, from `/api/hr-profile`. Buckets at or below it carry no active weight. */
   restingHr: number
   /** The day's resting/BMR term. Spread flat across the 24 hours. */
@@ -121,7 +125,7 @@ const MINUTES_PER_DAY = 24 * 60
  * dropped — dropping it would break the reconciliation the whole design rests on.
  */
 export function buildEnergyTimeline(
-  { dayStartMs, restingHr, restingBaseKcal, activeKcal, hr, intake, estimates = [], intakeMealTypeIds, bucketMinutes = 60 }: EnergyTimelineInput,
+  { dayStartMs, tz, restingHr, restingBaseKcal, activeKcal, hr, intake, estimates = [], intakeMealTypeIds, bucketMinutes = 60 }: EnergyTimelineInput,
 ): EnergyTimeline {
   const width = bucketMinutes > 0 ? bucketMinutes : 60
   const count = Math.ceil(MINUTES_PER_DAY / width)
@@ -130,8 +134,9 @@ export function buildEnergyTimeline(
   const readings = new Array<number>(count).fill(0)
   const intakeKcal = new Array<number>(count).fill(0)
 
+  const minuteOf = tz ? wallClockMinuteReader(dayStartMs, tz) : (atMs: number) => Math.floor((atMs - dayStartMs) / 60_000)
   const indexFor = (atMs: number): number | null => {
-    const min = Math.floor((atMs - dayStartMs) / 60_000)
+    const min = minuteOf(atMs)
     if (min < 0 || min >= MINUTES_PER_DAY) return null
     return Math.floor(min / width)
   }
