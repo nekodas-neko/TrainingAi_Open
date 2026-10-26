@@ -21,6 +21,7 @@ import { PlatformStore } from './data/PlatformStore';
 import { CalendarStore } from './data/CalendarStore';
 import { AlertScheduler } from './data/AlertScheduler';
 import { planAlerts } from './data/alert-plan';
+import { useMealEstimateReminders } from '../meal-plans/useMealEstimateReminders';
 import {
   nativeAlerts,
   alertPermission,
@@ -47,6 +48,11 @@ export function PlatformProvider({ children }: PropsWithChildren) {
   const [alertError, setAlertError] = useState<string | null>(null);
   const [opened, setOpened] = useState<Record<string, unknown> | null>(null);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  // Null while the day's meals cannot be known yet: the last answer stands, so a reminder already
+  // on screen is not cancelled by an app start that has not loaded its meals.
+  const mealReminders = useMealEstimateReminders();
+  const lastMealReminders = useRef<NonNullable<typeof mealReminders>>([]);
+  if (mealReminders) lastMealReminders.current = mealReminders;
   const requestedRestPermission = useRef<string | null>(null);
   const mounted = useRef(false);
   useEffect(() => {
@@ -164,6 +170,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
             activity.session,
             Date.now(),
             foreground,
+            lastMealReminders.current,
           ),
         )
       : '[]';

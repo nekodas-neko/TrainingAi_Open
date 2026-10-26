@@ -5,18 +5,27 @@ import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { useAccountContext } from '../../account/AccountProvider';
 import type { Tab } from '../../../app/navigation/tabs';
+import { estimateActionFrom, type EstimateAction } from '../../meal-plans/data/estimated-meals';
 export function AlertNavigation({
   onWorkout,
   onWalk,
   onTab,
   onReview,
   onWeek,
+  onMealEstimate,
 }: {
   onWorkout: (id: string) => void;
   onWalk: () => void;
   onTab: (tab: Tab) => void;
   onReview: () => void;
   onWeek: (week: string) => void;
+  /** A meal reminder's action, or a tap on it, for one plan meal (#2123). */
+  onMealEstimate: (request: {
+    id: string;
+    planMealId: string;
+    date: string;
+    action: EstimateAction;
+  }) => void;
 }) {
   const { opened, state } = usePlatformIntegrations();
   const journal = useWorkoutJournal(),
@@ -44,7 +53,18 @@ export function AlertNavigation({
     } else if (opened.target === 'walk') {
       if (activity.session?.id === opened.recordId) onWalk();
       else onTab('Workout');
-    } else if (opened.target === 'nutrition') onTab('Nutrition');
+    } else if (opened.target === 'nutrition') {
+      const meal = opened.mealEstimate as { planMealId?: unknown; date?: unknown } | null;
+      if (typeof meal?.planMealId === 'string' && typeof meal.date === 'string') {
+        onMealEstimate({
+          id: String(opened.responseId),
+          planMealId: meal.planMealId,
+          date: meal.date,
+          action: estimateActionFrom(opened.actionIdentifier),
+        });
+      }
+      onTab('Nutrition');
+    }
     else if (opened.target === 'review') onReview();
     else if (opened.target === 'week') {
       const today = todayInTz(
@@ -65,6 +85,7 @@ export function AlertNavigation({
     onTab,
     onReview,
     onWeek,
+    onMealEstimate,
   ]);
   return null;
 }

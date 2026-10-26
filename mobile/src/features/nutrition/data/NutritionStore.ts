@@ -743,6 +743,12 @@ export class NutritionStore {
     date: string,
     mealTypeId: string,
     group?: { savedMealId?: string; name?: string },
+    /**
+     * An estimated plan meal this log answers (#2123). Its estimate is cleared in the same write as
+     * the food, so a device that goes offline between the two never keeps an estimate beside the
+     * meal that replaced it.
+     */
+    clearEstimateFor?: string,
   ) {
     const mealType = this.current.data.mealTypes.find((mt) => mt.id === mealTypeId);
     if (!mealType) {
@@ -801,6 +807,13 @@ export class NutritionStore {
           mealGroupId: groupId,
           mealGroupName: group?.name ?? null,
         },
+      });
+    }
+    if (clearEstimateFor) {
+      changes.push({
+        domain: 'plan_meal_answers',
+        date,
+        payload: { planMealId: clearEstimateFor, logDate: date, deleted: true },
       });
     }
     await this.enqueue(changes, knownFoods);

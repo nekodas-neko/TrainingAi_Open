@@ -2,6 +2,7 @@ import { walkPlan } from '../../activities/data/guidance.ts';
 import { getProtocol, phasesTotalSec } from '@trainingai/shared/fitness-tests/protocols';
 import type { ActivitySession } from '../../activities/data/ActivityStore.ts';
 import type { WorkoutRecord } from '../../workouts/logging/workout.ts';
+import { reminderText, type MealEstimateReminder } from '../../meal-plans/data/estimated-meals.ts';
 import type { Alert, PlatformSettings } from './models.ts';
 export function planAlerts(
   settings: PlatformSettings,
@@ -9,6 +10,7 @@ export function planAlerts(
   activity: ActivitySession | null,
   now = Date.now(),
   foreground = false,
+  mealReminders: MealEstimateReminder[] = [],
 ): Alert[] {
   const scope = settings.scope;
   const result: Alert[] = [];
@@ -143,6 +145,19 @@ export function planAlerts(
         trigger: { hour, minute, ...(weekday !== undefined ? { weekday } : {}) },
       });
     }
+  }
+  // Asked once the meal's slot is over. A reminder whose time has passed stays in the plan while it
+  // is unanswered, so the scheduler keeps the one on screen instead of cancelling it.
+  for (const reminder of mealReminders) {
+    result.push({
+      id: `${scope}:meal-estimate:${reminder.date}:${reminder.planMealId}`,
+      scope,
+      ...reminderText(reminder),
+      target: 'nutrition',
+      recordId: reminder.planMealId,
+      mealEstimate: { planMealId: reminder.planMealId, date: reminder.date },
+      trigger: { at: reminder.at },
+    });
   }
   return result;
 }

@@ -40,6 +40,7 @@ import { ActiveMealPlan, MealPlansSheet } from '../../meal-plans/components/Meal
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { EndOfDaySheet } from '../components/EndOfDaySheet';
 import { FoodLogger } from '../components/FoodLogger';
+import type { EstimateRequest } from '../../meal-plans/data/estimated-meals';
 import { FoodLoggingComplete } from '../components/FoodLoggingComplete';
 import { MealSectionHeader } from '../components/MealSectionHeader';
 import { MacroLine, NutritionStatus, foodAmount } from '../components/NutritionElements';
@@ -63,11 +64,14 @@ export function NutritionScreen({
   openSettings,
   reviewRequest = 0,
   dateRequest,
+  estimateRequest,
 }: {
   openCoach?: () => void;
   openSettings: () => void;
   reviewRequest?: number;
   dateRequest?: { date: string; count: number };
+  /** A reminder's action on an estimated meal (#2123); shown on its own day. */
+  estimateRequest?: (EstimateRequest & { date: string }) | null;
 }) {
   const n0 = useNutrition();
   const [date, setDate] = useState(n0.today);
@@ -89,6 +93,14 @@ export function NutritionScreen({
       setModal(null);
     }
   }, [dateRequest]);
+  const handledEstimate = useRef<string | null>(null);
+  useEffect(() => {
+    if (estimateRequest && handledEstimate.current !== estimateRequest.id) {
+      handledEstimate.current = estimateRequest.id;
+      setDate(estimateRequest.date);
+      setModal(null);
+    }
+  }, [estimateRequest]);
   useEffect(() => {
     if (reviewRequest > handledReview.current) {
       handledReview.current = reviewRequest;
@@ -97,6 +109,7 @@ export function NutritionScreen({
     }
   }, [reviewRequest, n0.today]);
   const [logger, setLogger] = useState<string | null>(null);
+  const [loggerTab, setLoggerTab] = useState<'search' | undefined>();
   const [library, setLibrary] = useState(false);
   const [edit, setEdit] = useState<FoodLog | null>(null);
   const [quantity, setQuantity] = useState('1');
@@ -343,6 +356,12 @@ export function NutritionScreen({
                   />
                   <ActiveMealPlan
                     date={date}
+                    estimateRequest={estimateRequest?.date === date ? estimateRequest : null}
+                    onLogFood={(mealTypeId, tab) => {
+                      setLibrary(false);
+                      setLoggerTab(tab);
+                      setLogger(mealTypeId);
+                    }}
                     onManage={(plan) => {
                       setPlanSeed(plan ?? null);
                       setSetupPlan(false);
@@ -487,7 +506,11 @@ export function NutritionScreen({
           date={date}
           mealTypeId={logger}
           library={library}
-          onClose={() => setLogger(null)}
+          initialTab={loggerTab}
+          onClose={() => {
+            setLogger(null);
+            setLoggerTab(undefined);
+          }}
           onRecipes={(meal) => {
             setRecipeSelected(meal ?? null);
             setLogger(null);

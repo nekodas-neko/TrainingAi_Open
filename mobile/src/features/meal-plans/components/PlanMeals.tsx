@@ -1,11 +1,14 @@
 import { plannedMealRecorded } from '../data/recorded-meals';
+import { logPlanMeal as logPlan } from '../data/log-plan-meal';
+import { EstimatedMeals } from './EstimatedMeals';
+import type { EstimateRequest } from '../data/estimated-meals';
+import { knownTrainingDay, nextSessionSpec } from '../data/next-session';
 import {
   daysBetweenDateStrs,
   secondsSinceLocalMidnight,
   toAestDay,
 } from '@trainingai/shared/date-utils';
 import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time';
-import { mealTypeForHour } from '@trainingai/shared/nutrition/meal-type-for-time';
 import type { MealType } from '@trainingai/shared/types/nutrition';
 import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
@@ -31,39 +34,13 @@ import {
 type Nutrition = ReturnType<typeof useNutrition>;
 type Meal = MealPlan['variants'][number]['meals'][number];
 export async function logPlanMeal(n: Nutrition, m: Meal, date: string, _plan?: MealPlan) {
-  if (!n.store) {
-    throw new Error('Connect your account.');
-  }
-  const hour = m.suggestedTime
-    ? Number(m.suggestedTime.split(':')[0])
-    : Math.floor(secondsSinceLocalMidnight(n.timezone) / 3600);
-  const bucket =
-    m.mealTypeId ?? mealTypeForHour(n.view.mealTypes as unknown as MealType[], hour);
-  if (!bucket) {
-    throw new Error('Create a meal group first.');
-  }
-  if (!m.ingredients.length) {
-    throw new Error(
-      'This older plan has no ingredients to log. Log your actual food, or replace this meal first.',
-    );
-  }
-  await n.store.logFoods(
-    ingredientItems(m.ingredients, 1, randomUUID).flatMap((item) =>
-      item.food
-        ? [
-            {
-              ...item.food,
-              id: undefined,
-              source: 'ai',
-              quantityMultiplier: item.quantityMultiplier,
-            },
-          ]
-        : [],
-    ),
-    date,
-    bucket,
-    { name: m.name, savedMealId: m.savedMealId ?? undefined },
-  );
+  // Logging a meal whose estimate is on the books ends that estimate with it (#2123).
+  const estimated =
+    n.date === date &&
+    n.view.answers.some((a) => a.planMealId === m.id && a.answer === 'estimated');
+  await logPlan(n, m, date, randomUUID, {
+    clearEstimateFor: estimated ? m.id : undefined,
+  });
 }
 export async function savePlanMeal(n: Nutrition, m: Meal) {
   if (!n.store || !m.id || !m.ingredients.length) {
@@ -100,43 +77,30 @@ export function ActiveMealPlan({
   onManage,
   onSetup,
   onStepByStep,
+  onLogFood,
+  estimateRequest,
 }: {
   date: string;
   onManage: (plan?: MealPlan) => void;
   onSetup: (plan?: MealPlan) => void;
   /** The stepper, offered beside the coach conversation when there is no plan yet. */
   onStepByStep?: () => void;
+  /** Opens the food logger on a meal group, for "Add extras" and "Search all foods" (#2123). */
+  onLogFood?: (mealTypeId: string, tab?: 'search') => void;
+  /** A reminder's action or tap on an estimated meal, to answer or open its sheet (#2123). */
+  estimateRequest?: EstimateRequest | null;
 }) {
   const n = useNutrition(date);
   const resources = useWorkoutResources();
   const state = useWorkoutResource(planSpec);
   const energy = useWorkoutResource(energySpec(date));
-  const rec = useWorkoutResource(
-    {
-      path: '/api/next-session',
-      ttl: 300000,
-      schema: z
-        .object({
-          isRestDay: z.boolean(),
-          session: z.object({ id: z.string() }).passthrough().nullish(),
-        })
-        .passthrough(),
-    },
-    date === n.today,
-  );
+  const rec = useWorkoutResource(nextSessionSpec, date === n.today);
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const guard = useRef(false);
   const plan = state.data?.plans.find((p) => p.id === state.data?.activePlanId);
-  const knownTraining =
-    date !== n.today || !rec.data
-      ? undefined
-      : rec.data.isRestDay
-        ? false
-        : rec.data.session
-          ? true
-          : undefined;
+  const knownTraining = date !== n.today ? undefined : knownTrainingDay(rec.data);
   const variant =
     plan?.variants.find((v) => v.dayType === 'all') ??
     plan?.variants.find((v) => v.dayType === (knownTraining ? 'training' : 'rest')) ??
@@ -217,6 +181,16 @@ export function ActiveMealPlan({
             />
           </Stack>
         </Card>
+      )}
+      {plan && variant && onLogFood && (
+        <EstimatedMeals
+          date={date}
+          n={n}
+          meals={variant.meals}
+          recorded={logged}
+          request={estimateRequest}
+          onLogFood={onLogFood}
+        />
       )}
       <Card>
         {plan && variant ? (

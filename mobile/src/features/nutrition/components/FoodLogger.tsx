@@ -117,12 +117,15 @@ export function FoodLogger({
   onClose,
   onRecipes,
   library = false,
+  initialTab,
 }: {
   date: string;
   mealTypeId?: string;
   onClose: () => void;
   onRecipes: (meal?: SavedMeal) => void;
   library?: boolean;
+  /** Opens on this tab instead of the saved one (#2123: "Search all foods"). */
+  initialTab?: 'search';
 }) {
   const n = useNutrition(date);
   const resources = useWorkoutResources();
@@ -134,7 +137,7 @@ export function FoodLogger({
   const draft = useWorkoutDraft(loggerKey, draftSchema, {
     ...initial,
     mealTypeId: mealTypeId ?? n.view.mealTypes[0]?.id ?? '',
-    tab: library ? 'meals' : 'recent',
+    tab: initialTab ?? (library ? 'meals' : 'recent'),
   });
   const d = draft.value;
   const latestDraft = useRef({ value: d, setValue: draft.setValue });
@@ -146,6 +149,12 @@ export function FoodLogger({
       latest.setValue({ ...latest.value, mealTypeId });
     }
   }, [draft.ready, mealTypeId]);
+  useEffect(() => {
+    const latest = latestDraft.current;
+    if (draft.ready && initialTab && latest.value.tab !== initialTab) {
+      latest.setValue({ ...latest.value, tab: initialTab });
+    }
+  }, [draft.ready, initialTab]);
   const update = (patch: Partial<typeof d>) => draft.setValue({ ...d, ...patch });
   const [busy, setBusy] = useState(false);
   const [captureStage, setCaptureStage] = useState<string | null>(null);
