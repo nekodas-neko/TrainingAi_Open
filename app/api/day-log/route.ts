@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
-import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz, shiftDateStr, todayInTz } from "@trainingai/shared/date-utils";
+import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz, shiftDateStr, todayInTz, wallClockMinuteReader } from "@trainingai/shared/date-utils";
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
@@ -87,7 +87,8 @@ export interface DayScores {
 
 /** One bucket of the day's HR trace. Deliberately coarse — see DAY_HR_BUCKET_MIN. */
 export interface DayHrPoint {
-  /** Minutes past local midnight at the START of the bucket. */
+  /** Local wall-clock minute of the day (0–1439) at the START of the bucket. On a 25-hour day the
+   *  repeated hour's readings share one bucket (their mean); a 23-hour day has none for its missing hour. */
   minute: number;
   bpm: number;
 }
@@ -341,8 +342,11 @@ export async function GET(req: NextRequest) {
   const hr: DayHrPoint[] = [];
   if (hrRes.status === "fulfilled" && hrRes.value.length > 0) {
     const sums = new Map<number, { total: number; n: number }>();
+    const wallMinute = wallClockMinuteReader(dayMid.getTime(), tz);
     for (const row of hrRes.value) {
-      const mins = Math.floor((row.timestamp.getTime() - dayMid.getTime()) / 60_000);
+      // The clock-face minute, not minutes elapsed: on a 23- or 25-hour day the two part ways by an
+      // hour after the change, and the trace (and its x-axis) read the clock (#3428).
+      const mins = wallMinute(row.timestamp.getTime());
       if (mins < 0 || mins >= 1440) continue;
       const bucket = Math.floor(mins / DAY_HR_BUCKET_MIN) * DAY_HR_BUCKET_MIN;
       const cur = sums.get(bucket) ?? { total: 0, n: 0 };

@@ -104,6 +104,7 @@ export function DayReadThrough({
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
           <EnergyTimelineChart
             dayStartMs={dateStrMidnightInTz(date, tz).getTime()}
+            tz={tz}
             restingHr={restingHr}
             restingBaseKcal={energy.balance.restingBaseKcal}
             activeKcal={energy.balance.activeKcal}
