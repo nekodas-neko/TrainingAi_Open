@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.500.0",
+    date: "2026-10-26",
+    changes: [
+      "Each day's Activity score is now worked out once the day is over and then kept, so a past day no longer changes with when you last opened the app, and readiness reads yesterday's finished score. The strength part counts the last 7 days, not 8.",
+      "On Oura days, the Activity score counts the hours you moved from Oura's own minute-by-minute activity, and zone minutes come only from heart rate dense enough to trust.",
+      "Your night's HRV is worked out from Oura's 5-minute readings, the way the ring's was, and your sleep score and personal normals learn from the device you wear, so ring nights and Oura nights are no longer mixed.",
+      "Readiness measures how far each reading is from your normal on a steadier scale, and the workout prescription budgets sets against the same weekly target the Training card shows.",
+      "Sleep stages read in hours and minutes everywhere, the morning check-in no longer asks how you compare with normal, and the Day screen shows Oura's temperature difference.",
+      "A workout Health Connect removed by mistake comes back when it reappears, a session you delete in the Oura app disappears here too, and deleting your account also disconnects Oura.",
+      "TrainingAi Preview: Energy leads Home, a weigh-in shows as a banner on any screen, the route map shows map tiles when online, three home-screen widgets (Today, Next workout with Train instead, Nutrition and water), the collection as a tier chain, the readiness question only on unusual days, and Preview stays signed in by renewing its sign-in.",
+      "Behind the scenes: a daytime resting heart rate and Oura's revisions to a night are recorded, the shadow readiness model moves to version 5, unused admin probes are retired, and a day's Activity score is never stored from a read that failed.",
+    ],
+  },
+  {
     version: "1.499.0",
     date: "2026-10-26",
     changes: [
