@@ -70,6 +70,10 @@ const verdictResponseSchema = z.object({
   date: z.string(),
   state: z.enum(['acknowledged', 'corrected']),
 });
+const readinessResponseSchema = z.object({
+  date: z.string(),
+  state: z.enum(['rated', 'dismissed']),
+});
 const savedSchema = z.object({
   version: z.literal(1),
   origin: z.string(),
@@ -82,6 +86,7 @@ const savedSchema = z.object({
   operations: z.array(operationSchema),
   checkins: z.record(z.string(), checkinSchema.nullable()).default({}),
   verdictResponses: z.array(verdictResponseSchema).default([]),
+  readinessResponses: z.array(readinessResponseSchema).default([]),
 });
 export type HealthState = {
   ready: boolean;
@@ -99,6 +104,7 @@ export type HealthState = {
   stale: boolean;
   checkins: Record<string, z.infer<typeof checkinSchema> | null>;
   verdictResponses: z.infer<typeof verdictResponseSchema>[];
+  readinessResponses: z.infer<typeof readinessResponseSchema>[];
 };
 export const emptyHealthState: HealthState = {
   ready: false,
@@ -116,6 +122,7 @@ export const emptyHealthState: HealthState = {
   stale: false,
   checkins: {},
   verdictResponses: [],
+  readinessResponses: [],
 };
 const key = 'health-records.v1';
 export class HealthStore {
@@ -283,6 +290,23 @@ export class HealthStore {
     await this.write((current) => ({
       verdictResponses: [
         ...current.verdictResponses.filter((r) => r.date !== date),
+        { date, state },
+      ],
+    }));
+    void this.sync();
+  }
+  /**
+   * Records that the owner answered or skipped the readiness question, queued like a sleep
+   * verdict response so a tap made offline is sent later. It records that the question was
+   * answered, never that the score was right; the answer itself is the check-in's `vsNormal`.
+   */
+  async respondToReadiness(date: string, state: 'rated' | 'dismissed') {
+    if (this.canceled || !this.current.ready || this.current.denied) {
+      throw new Error('Check your account before answering the readiness question.');
+    }
+    await this.write((current) => ({
+      readinessResponses: [
+        ...current.readinessResponses.filter((r) => r.date !== date),
         { date, state },
       ],
     }));
@@ -545,6 +569,17 @@ export class HealthStore {
           }
           await this.write((state) => ({
             verdictResponses: state.verdictResponses.filter((r) => r !== response),
+          }));
+          this.invalidate();
+        }
+        while (generation === this.generation && this.current.readinessResponses.length) {
+          const response = this.current.readinessResponses[0];
+          await this.connection.post('/api/readiness-verdict', response);
+          if (generation !== this.generation) {
+            return;
+          }
+          await this.write((state) => ({
+            readinessResponses: state.readinessResponses.filter((r) => r !== response),
           }));
           this.invalidate();
         }
