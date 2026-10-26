@@ -164,7 +164,10 @@ describe('POST /api/admin/db-query — audit log', () => {
 describe('POST /api/admin/db-query — scoped user (#2119)', () => {
   const auditRows = () => auditInsert.mock.calls.filter(c => String(c[0]).includes('INSERT INTO db_query_log'))
   // The scoped pre-insert binds (sql, ip, user); the owner/refusal insert binds eight values, user last.
-  const scopedUserOf = (row: unknown[]) => (row[1] as unknown[])[row[1]!.length === 3 ? 2 : 7]
+  const scopedUserOf = (row: unknown[]) => {
+    const params = row[1] as unknown[]
+    return params[params.length === 3 ? 2 : 7]
+  }
 
   it('an owner query is unchanged: no scope is passed and none is logged', async () => {
     expect((await post('SELECT 1', withToken(SECRET))).status).toBe(200)
