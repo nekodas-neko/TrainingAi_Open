@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { createApiClient } from '../src/features/account/api/client.ts';
 import {
   actionFailure,
   emailMatches,
