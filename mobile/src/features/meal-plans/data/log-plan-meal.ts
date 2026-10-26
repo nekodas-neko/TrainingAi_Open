@@ -43,19 +43,24 @@ export async function logPlanMeal(
       'This older plan has no ingredients to log. Log your actual food, or replace this meal first.',
     );
   }
+  const foods = ingredientItems(m.ingredients, 1, uuid).flatMap((item) =>
+    item.food
+      ? [
+          {
+            ...item.food,
+            id: undefined,
+            source: 'ai',
+            quantityMultiplier: item.quantityMultiplier,
+          },
+        ]
+      : [],
+  );
+  // Nothing to write would still clear the estimate, and the meal would vanish unlogged.
+  if (!foods.length) {
+    throw new Error('This meal has no ingredient weights to log. Log your actual food instead.');
+  }
   await n.store.logFoods(
-    ingredientItems(m.ingredients, 1, uuid).flatMap((item) =>
-      item.food
-        ? [
-            {
-              ...item.food,
-              id: undefined,
-              source: 'ai',
-              quantityMultiplier: item.quantityMultiplier,
-            },
-          ]
-        : [],
-    ),
+    foods,
     date,
     bucket,
     { name: m.name, savedMealId: m.savedMealId ?? undefined },

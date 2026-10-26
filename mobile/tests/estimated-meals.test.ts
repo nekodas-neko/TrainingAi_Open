@@ -7,6 +7,7 @@ import {
   estimateReminders,
   estimatedMeals,
   planPickerMeals,
+  reminderTarget,
   reminderText,
   type PlanMeal,
 } from '../src/features/meal-plans/data/estimated-meals.ts';
@@ -146,4 +147,15 @@ test('planAlerts schedules a meal reminder that carries the answer actions\' dat
   const again = planAlerts(settings, [], null, Date.parse('2026-10-26T01:00:00Z'), true, [reminder]);
   assert.equal(alertSignature(again[0]), alertSignature(alert));
   assert.deepEqual(planAlerts(settings, [], null, 0, false), []);
+});
+
+test('a reminder for a meal the plan has not loaded yet has no target, so it can be answered later', () => {
+  const lunch = meal('m1');
+  const otherVariant = [meal('m9')];
+  // Cold start on a split plan: the variant loaded so far does not hold the reminded meal.
+  assert.equal(reminderTarget('m1', otherVariant, types as never), null);
+  assert.equal(reminderTarget('m1', [], types as never), null);
+  const target = reminderTarget('m1', [...otherVariant, lunch], types as never);
+  assert.equal(target?.meal.id, 'm1');
+  assert.equal(target?.mealTypeId, LUNCH_TYPE);
 });

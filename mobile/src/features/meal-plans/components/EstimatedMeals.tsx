@@ -13,6 +13,7 @@ import {
   assumedLine,
   estimatedMeals,
   planPickerMeals,
+  reminderTarget,
   type EstimateRequest,
   type EstimatedMeal,
   type PlanMeal,
@@ -103,10 +104,12 @@ export function EstimatedMeals({
   useEffect(() => {
     if (!request || handled.current === request.id || !n.store || !meals.length || !dataReady)
       return;
+    // Not claimed until the meal is found: on a cold start it can be missing until the plan has
+    // loaded, and the effect has to run again for it.
+    const target = reminderTarget(request.planMealId, meals, n.view.mealTypes as unknown as MealType[]);
+    if (!target) return;
+    const { meal, mealTypeId } = target;
     handled.current = request.id;
-    const meal = meals.find((m) => m.id === request.planMealId);
-    const mealTypeId = meal ? planMealTypeId(meal, n.view.mealTypes as unknown as MealType[]) : null;
-    if (!meal?.id || !mealTypeId) return;
     const answer = n.view.answers.find((a) => a.planMealId === meal.id);
     const unanswered =
       (!answer || answer.answer === 'estimated') &&

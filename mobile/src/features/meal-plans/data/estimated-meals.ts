@@ -1,5 +1,5 @@
 import { localClockTimeToDate } from '@trainingai/shared/date-utils';
-import { slotCloseHour } from '@trainingai/shared/nutrition/meal-estimate';
+import { countedEstimates, slotCloseHour } from '@trainingai/shared/nutrition/meal-estimate';
 import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time';
 import type { MealType } from '@trainingai/shared/types/nutrition';
 import type { MealPlan } from '../../nutrition/data/models.ts';
@@ -39,22 +39,41 @@ export function estimatedMeals(input: {
   logs: readonly LogLike[];
   mealTypes: readonly TypeLike[];
 }): EstimatedMeal[] {
-  const logged = new Set(input.logs.map((log) => log.mealTypeId));
-  const out: EstimatedMeal[] = [];
-  for (const meal of input.meals) {
-    if (!meal.id) continue;
-    const kcal = estimateKcal(input.answers.find((a) => a.planMealId === meal.id));
-    const mealTypeId = planMealTypeId(meal, types(input.mealTypes));
-    if (kcal === null || !mealTypeId || logged.has(mealTypeId)) continue;
-    const type = input.mealTypes.find((t) => t.id === mealTypeId);
-    out.push({
-      meal: { ...meal, id: meal.id },
-      mealTypeId,
-      mealTypeName: type?.name ?? meal.name,
-      kcal,
-    });
-  }
-  return out;
+  const counted = new Map(
+    countedEstimates({
+      answers: input.answers.map((a) => ({
+        planMealId: a.planMealId,
+        answer: a.answer ?? '',
+        estCalories: typeof a.estCalories === 'number' ? a.estCalories : null,
+      })),
+      planMeals: input.meals.flatMap((m) =>
+        m.id ? [{ id: m.id, mealTypeId: m.mealTypeId ?? null, suggestedTime: m.suggestedTime ?? null }] : [],
+      ),
+      mealTypes: types(input.mealTypes),
+      loggedMealTypeIds: new Set(input.logs.map((log) => log.mealTypeId)),
+    }).map((c) => [c.planMealId, c] as const),
+  );
+  // Plan order, one row per meal.
+  return input.meals.flatMap((meal) => {
+    const hit = meal.id ? counted.get(meal.id) : undefined;
+    if (!meal.id || !hit) return [];
+    const type = input.mealTypes.find((t) => t.id === hit.mealTypeId);
+    return [
+      {
+        meal: { ...meal, id: meal.id },
+        mealTypeId: hit.mealTypeId,
+        mealTypeName: type?.name ?? meal.name,
+        kcal: Math.round(hit.kcal),
+      },
+    ];
+  });
+}
+
+/** The plan meal a reminder is about and its meal group, or null while the plan does not hold it. */
+export function reminderTarget(planMealId: string, meals: readonly PlanMeal[], mealTypes: readonly MealType[]) {
+  const meal = meals.find((m) => m.id === planMealId);
+  const mealTypeId = meal ? planMealTypeId(meal, mealTypes as MealType[]) : null;
+  return meal?.id && mealTypeId ? { meal: { ...meal, id: meal.id }, mealTypeId } : null;
 }
 
 /** The line that keeps the assumption visible wherever an estimated meal appears. */

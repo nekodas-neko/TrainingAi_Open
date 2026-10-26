@@ -3,6 +3,7 @@ import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals';
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
 import { foodLine } from '../data/display';
+import { openingDraft } from '../data/opening-draft';
 import { randomUUID } from 'expo-crypto';
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
@@ -143,18 +144,13 @@ export function FoodLogger({
   const latestDraft = useRef({ value: d, setValue: draft.setValue });
   latestDraft.current = { value: d, setValue: draft.setValue };
   const energy = useWorkoutResource(energySpec(date), d.step === 'assign');
+  // One write for both: two effects each spreading the same stale snapshot overwrite each other.
   useEffect(() => {
     const latest = latestDraft.current;
-    if (draft.ready && mealTypeId && latest.value.mealTypeId !== mealTypeId) {
-      latest.setValue({ ...latest.value, mealTypeId });
-    }
-  }, [draft.ready, mealTypeId]);
-  useEffect(() => {
-    const latest = latestDraft.current;
-    if (draft.ready && initialTab && latest.value.tab !== initialTab) {
-      latest.setValue({ ...latest.value, tab: initialTab });
-    }
-  }, [draft.ready, initialTab]);
+    if (!draft.ready) return;
+    const next = openingDraft(latest.value, { mealTypeId, tab: initialTab });
+    if (next) latest.setValue(next);
+  }, [draft.ready, mealTypeId, initialTab]);
   const update = (patch: Partial<typeof d>) => draft.setValue({ ...d, ...patch });
   const [busy, setBusy] = useState(false);
   const [captureStage, setCaptureStage] = useState<string | null>(null);

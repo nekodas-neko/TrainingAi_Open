@@ -10,6 +10,7 @@ import {
   slotOf,
   type Slot,
 } from '../src/features/meal-plans/data/resolve-estimate.ts';
+import { logPlanMeal } from '../src/features/meal-plans/data/log-plan-meal.ts';
 import { estimatedMeals, type PlanMeal } from '../src/features/meal-plans/data/estimated-meals.ts';
 
 const date = '2026-10-26';
@@ -239,4 +240,24 @@ test('without an account nothing is written', async () => {
   await assert.rejects(ateAssumed(none, slot, date, uuid), /Connect your account/);
   await assert.rejects(skipAssumed(none, slot, date), /Connect your account/);
   await assert.rejects(ateUsualFood(none, slot, wrap, date), /Connect your account/);
+});
+
+test('a plan meal whose ingredients all weigh nothing throws instead of clearing the estimate', async () => {
+  const calls: unknown[][] = [];
+  const empty = { ...bowl, ingredients: [{ ...ingredient('Water'), weightG: 0 }] } as PlanMeal;
+  await assert.rejects(
+    logPlanMeal(
+      {
+        store: { logFoods: async (...args: unknown[]) => void calls.push(args) } as never,
+        timezone: 'Australia/Sydney',
+        view: { mealTypes: [lunch] },
+      },
+      empty,
+      date,
+      uuid,
+      { mealTypeId: lunch.id, clearEstimateFor: bowl.id },
+    ),
+    /no ingredient weights/,
+  );
+  assert.deepEqual(calls, []);
 });
