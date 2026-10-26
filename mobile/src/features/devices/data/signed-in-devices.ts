@@ -19,6 +19,13 @@ export async function readSignedInDevices(connection: AccountConnection): Promis
   return listSchema.parse(await connection.get('/api/auth/native-session/devices')).devices;
 }
 
+/** This device first (the approved mockup), then the rest, newest sign-in first. */
+export function orderDevices(devices: readonly SignedInDevice[]): SignedInDevice[] {
+  return [...devices].sort(
+    (a, b) => Number(b.current) - Number(a.current) || Date.parse(b.signedInAt) - Date.parse(a.signedInAt),
+  );
+}
+
 /** Signs another device out on its next request. This device is refused by the server. */
 export async function revokeSignedInDevice(connection: AccountConnection, id: string) {
   await connection.post('/api/auth/native-session/devices/revoke', { id });

@@ -6,6 +6,7 @@ import type { AccountConnection, AuthPlatform } from '../src/features/account/se
 import {
   devicesMessage,
   lastUsedLabel,
+  orderDevices,
   readSignedInDevices,
   revokeSignedInDevice,
   signedInLabel,
@@ -136,4 +137,22 @@ test('sign-in asks the platform for the device and still signs in when it cannot
     if (sent.deviceLabel) assert.deepEqual([sent.deviceLabel, sent.deviceId], ['Samsung SM-S938B', 'abcDEF_123-xyz45']);
     else assert.equal('deviceId' in sent, false);
   }
+});
+
+test('This device is listed first, then the others newest sign-in first', () => {
+  const device = (id: string, signedInAt: string, current = false) => ({
+    id,
+    label: id,
+    signedInAt,
+    lastUsedAt: signedInAt,
+    current,
+  });
+  const list = [
+    device('old', '2026-09-01T00:00:00.000Z'),
+    device('here', '2026-08-01T00:00:00.000Z', true),
+    device('new', '2026-10-20T00:00:00.000Z'),
+    device('mid', '2026-10-01T00:00:00.000Z'),
+  ];
+  assert.deepEqual(orderDevices(list).map((d) => d.id), ['here', 'new', 'mid', 'old']);
+  assert.deepEqual(list.map((d) => d.id), ['old', 'here', 'new', 'mid']);
 });

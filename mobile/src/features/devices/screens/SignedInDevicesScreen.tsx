@@ -17,6 +17,7 @@ import { useAccountContext } from '../../account/AccountProvider';
 import {
   devicesMessage,
   lastUsedLabel,
+  orderDevices,
   readSignedInDevices,
   revokeSignedInDevice,
   signedInLabel,
@@ -87,7 +88,7 @@ export function SignedInDevicesScreen({ onBack }: { onBack: () => void }) {
             />
           )}
           {revokeError && <Notice title="Not signed out" message={revokeError} error />}
-          {devices?.map((device) => (
+          {devices && orderDevices(devices).map((device) => (
             <Card key={device.id}>
               <Stack direction="row" align="center">
                 <AppText variant="heading" style={{ flex: 1 }}>
