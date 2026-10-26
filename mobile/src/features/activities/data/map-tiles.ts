@@ -43,7 +43,7 @@ export async function loadTile(tile: MapTile, signal?: AbortSignal): Promise<str
       signal,
     });
     if (!isPng(await part.bytes())) throw new Error('not a PNG');
-    part.move(file);
+    await part.move(file);
     downloading = null;
     prune(directory);
     return file.uri;
