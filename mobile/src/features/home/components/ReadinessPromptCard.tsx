@@ -130,7 +130,12 @@ export function ReadinessPromptCard({
             accessibilityLabel="Skip the readiness question"
             disabled={busy}
             onPress={() => void answer(null)}
-            style={{ minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}
+            style={{
+              minHeight: theme.sizes.touchTarget,
+              minWidth: theme.sizes.touchTarget,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
             <AppText variant="caption" tone="muted">
               Not now

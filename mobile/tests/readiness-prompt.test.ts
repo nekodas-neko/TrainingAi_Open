@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import {
   feelCheckin,
@@ -7,6 +8,7 @@ import {
   type ReadinessVerdictData,
 } from '../src/features/home/data/readiness-prompt.ts';
 import { carriedVsNormal, morningSchema } from '../src/features/health/data/checkin.ts';
+import { manualHealthWritePaths } from '../src/features/health/data/manual-write-paths.ts';
 
 const verdict = (
   over: Partial<ReadinessVerdictData> & Pick<ReadinessVerdictData, 'verdict' | 'score'>,
@@ -123,4 +125,23 @@ test('the morning sheet carries a Home answer through its save instead of cleari
     vsNormal: 'same',
     vsNormalTouched: false,
   });
+});
+
+test('the morning sheet saves through carriedVsNormal, never a cleared answer', async () => {
+  // #3334 made the sheet write vsNormal: null on every save, which wiped a Home answer the next
+  // time the sheet was saved. The helper is tested above; this pins that the sheet uses it.
+  const sheet = await readFile(
+    new URL('../src/features/health/components/MorningCheckinSheet.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(sheet, /\.\.\.carriedVsNormal\(row\)/);
+  assert.doesNotMatch(sheet, /vsNormal:\s*null/);
+  assert.doesNotMatch(sheet, /vsNormalTouched:\s*false/);
+});
+
+test('an uploaded readiness answer expires the cached verdict, so a skip stays skipped', () => {
+  // HealthStore calls back with these paths once the answer's POST lands; a verdict cached from
+  // before it still says responseState 'none' and would ask again.
+  assert.ok(manualHealthWritePaths.includes('/api/readiness-verdict'));
+  assert.ok(manualHealthWritePaths.includes('/api/sleep-verdict'));
 });

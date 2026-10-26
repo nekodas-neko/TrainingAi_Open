@@ -1,6 +1,8 @@
 // What a manual night, steps or weight entry expires (HealthStore's saveNight, removeNight and
 // logMetric call back once their write is queued; imports do not). `/api/collection` is there
-// because those entries feed the Health ladder, as the web's sleep and body writes expire it.
+// because those entries feed the Health ladder, as the web's sleep and body writes expire it. The
+// store also calls back once a sleep or readiness answer has uploaded, so both verdict reads are
+// here: a cached verdict fetched before the answer would ask the question again.
 export const manualHealthWritePaths = [
   '/api/readiness-score',
   '/api/body-battery',
@@ -12,6 +14,7 @@ export const manualHealthWritePaths = [
   '/api/day-checkin',
   '/api/day-timeline',
   '/api/sleep-verdict',
+  '/api/readiness-verdict',
   '/api/next-session/prescription',
   '/api/workout-data',
   '/api/ai/health-insight',
