@@ -129,19 +129,21 @@ any device that still holds the old rows. The guarantees, and where each lives:
   wiped; the signed-in account's scope and outbox stay, and it is not signed out (#3396). Queued
   localStorage uploads count as data; cached responses do not. An empty
   user id is never recorded as an owner.
-- **Preview does not push the previous owner's unsent writes before an account change (#3435).** The
-  web pushes first because the signed-in account's cookie still works when the wipe runs. Preview
-  cannot. It holds one session slot: sign-out removes the saved session from secure storage, and a
+- **Neither app pushes the previous owner's unsent writes before an account change (#3435).** The web
+  wipes straight away on a known different owner (`resolveStoreOwnerMismatch` → `wipeAndClaim`); its
+  push-before-wipe (`pushOwnOutboxBeforeWipe`, on a recordless device) only drains the signed-in
+  account's own entries. Preview holds one session slot: sign-out removes the saved session from secure storage, and a
   sign-out the person chose also revokes its tokens on the server, so by the time another account
   signs in nobody holds a credential that could send the previous owner's queue (`HistoryOutbox`, the
   journal, the strap and scale outboxes, the Health Connect queue). Signing in as anyone but the
   recorded owner (`reconcileDevice`, `device-record.ts`) then wipes every account scope. **What is
   lost:** whatever that previous owner had logged on this phone and not yet synced when they signed
   out, and it is lost at the new account's sign-in, not at sign-out. Their synced data is on the
-  server and returns on their next sign-in. Nothing is lost when the same account signs back in, and
-  a phone with no record only loses other accounts' scopes that were already orphans. No push is
-  invented for this: it would need a flush before sign-out clears the session, which is a separate
-  feature and not a change to the wipe. Until that exists, the wipe stays, because the scopes it
+  server and returns on their next sign-in. Nothing is lost when the same account signs back in with
+  no admin reset since (after a reset that account's own scope is wiped too). A phone with no record
+  loses every other account's scope, since it cannot tell which are orphans. No push is invented for
+  this in either app: it would need a flush before sign-out clears the session, which is a new
+  feature, not parity with the web, and not a change to the wipe. Until that exists, the wipe stays, because the scopes it
   removes belong to a person who is not the one holding the phone.
 - **Device-scoped state that describes the previous owner is reset when the owner changes.** The wipe
   leaves the `device` scope alone, so state in it that means "this person's situation" outlives the
