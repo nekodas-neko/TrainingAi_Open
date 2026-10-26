@@ -1176,6 +1176,10 @@ export interface WorkoutRepository {
   removeFriend(friendshipId: string, userId: string): Promise<void>
   getFriendIds(userId: string): Promise<string[]>
   updateEquippedTitle(userId: string, titleId: string | null): Promise<void>
+  /** The pinned trophy ids saved on the account; null when nothing is pinned. */
+  getTrophyPins(userId: string): Promise<string[] | null>
+  /** Save the pinned trophy ids (null clears them). False when the user row does not exist. */
+  updateTrophyPins(userId: string, pins: string[] | null): Promise<boolean>
 
   // ── Seasons ────────────────────────────────────────────────────────────────
   listSeasonsWithResults(userId: string): Promise<Season[]>

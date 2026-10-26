@@ -11,10 +11,12 @@ import { equipTitle } from './titles';
 import { markSeen, readSeen } from './seen';
 import {
   cachedTrophyCase,
-  readTrophyCase,
+  carryOverTrophyCase,
+  readFreshTrophyPins,
   rememberTrophyCase,
+  saveTrophyPins,
   trophyCacheKey,
-  writeTrophyCase,
+  trophyPinsSpec,
 } from './trophy';
 import { WorkoutXpTracker } from './xp';
 
@@ -57,40 +59,60 @@ export function useSeenAchievements() {
   return { seen, mark };
 }
 
-/** The achievements pinned in this account's trophy case on this phone; null until first read. */
-export function useTrophyCase() {
+/** The achievements pinned in this account's trophy case, which friends see too; null until first read. */
+export function useTrophyCase(unlockedIds: readonly string[]) {
   const scoped = useAccountStorage();
   const connection = useAccountContext().dataReader;
+  const { data, resources } = useWorkoutResource(trophyPinsSpec);
   const key = connection ? trophyCacheKey(connection.origin, connection.userId) : null;
-  const [pinned, setPinned] = useState<string[] | null>(() =>
-    key ? (cachedTrophyCase(key) ?? null) : null,
-  );
+  const [settled, setSettled] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  // A string, so the carry-over effect re-runs when the set changes and not on every render.
+  const unlockedKey = unlockedIds.join(',');
+  const account = data ? (data.pins ?? []) : null;
+  useEffect(() => {
+    setSettled(false);
+  }, [key]);
+  // The carry-over waits for the server's own answer: `data` may be the copy this phone saved, older
+  // than a change made on another device. A failed read leaves the old list for the next load.
   useEffect(() => {
     let live = true;
-    setPinned(key ? (cachedTrophyCase(key) ?? null) : null);
-    if (scoped && key) {
-      void readTrophyCase(scoped).then((ids) => {
-        if (!live) return;
-        rememberTrophyCase(key, ids);
-        setPinned(ids);
-      });
+    if (key && resources && scoped && data && connection) {
+      void readFreshTrophyPins(connection)
+        .then((fresh) =>
+          carryOverTrophyCase(
+            resources,
+            scoped,
+            new Set(unlockedKey.split(',').filter(Boolean)),
+            fresh,
+          ),
+        )
+        .catch(() => {})
+        .then(() => live && setSettled(true));
     }
     return () => {
       live = false;
     };
-  }, [scoped, key]);
+    // Once per account: a later edit changes `data`, and the old list is gone by then.
+  }, [key, resources, scoped, data !== null, unlockedKey]);
+  const pinned = settled ? account : key ? (cachedTrophyCase(key) ?? null) : null;
+  useEffect(() => {
+    if (key && settled && account) {
+      rememberTrophyCase(key, account);
+    }
+  }, [key, settled, data]);
   const change = useCallback(
     (next: (pinned: readonly string[]) => string[]) => {
-      if (!scoped || !key || !pinned) return;
-      const value = next(pinned);
-      rememberTrophyCase(key, value);
-      setPinned(value);
-      void writeTrophyCase(scoped, value).catch(() => {});
+      if (!resources || !pinned) return;
+      setSaveFailed(false);
+      void saveTrophyPins(resources, next(pinned)).then((saved) => setSaveFailed(saved !== 'saved'));
     },
-    [scoped, key, pinned],
+    [resources, pinned],
   );
   return {
     pinned,
+    /** The last save did not reach the account, so the view went back to what it held. */
+    saveFailed,
     pin: (id: string) => change((now) => pinTrophy(now, id)),
     unpin: (id: string) => change((now) => unpinTrophy(now, id)),
   };
