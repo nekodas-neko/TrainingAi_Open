@@ -84,3 +84,15 @@ test('empty successful friend mutations are acknowledged without requiring JSON'
   assert.equal(await client.delete('/api/friends/10000000-0000-4000-8000-000000000001',undefined),undefined);
   assert.equal(await client.patch('/api/friends/10000000-0000-4000-8000-000000000001',{action:'decline'}),undefined);
 });
+test('data epoch: a server without the route has never reset the account, other failures still throw', async t => {
+  const client = createApiClient('https://example.com', async () => 'test-session');
+  t.mock.method(globalThis, 'fetch', async () =>
+    new Response('{"epoch":1793000000}', { headers: { 'content-type': 'application/json' } }));
+  assert.equal(await client.dataEpoch(), 1793000000);
+  t.mock.restoreAll();
+  t.mock.method(globalThis, 'fetch', async () => new Response('<html/>', { status: 404, headers: { 'content-type': 'text/html' } }));
+  assert.equal(await client.dataEpoch(), 0);
+  t.mock.restoreAll();
+  t.mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 503, headers: { 'content-type': 'application/json' } }));
+  await assert.rejects(client.dataEpoch(), error => error instanceof ApiError && error.status === 503);
+});

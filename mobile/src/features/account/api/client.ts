@@ -380,7 +380,16 @@ export function createApiClient(
     },
     /** The moment an admin last reset this account, in whole seconds (0 when never). */
     async dataEpoch(): Promise<number> {
-      const value = (await request('/api/account/data-epoch', 'GET')) as { epoch?: unknown } | null;
+      let value: { epoch?: unknown } | null;
+      try {
+        value = (await request('/api/account/data-epoch', 'GET')) as { epoch?: unknown } | null;
+      } catch (error) {
+        // A server from before #3369 has no such route, and the route ships with the only thing that
+        // can reset an account, so that server has never reset it: nothing to wipe. A Preview build
+        // installed ahead of the server update then still signs in. Any other failure still throws.
+        if (error instanceof ApiError && error.status === 404) return 0;
+        throw error;
+      }
       if (typeof value?.epoch !== 'number' || !Number.isSafeInteger(value.epoch) || value.epoch < 0) {
         throw new Error('Invalid data epoch response.');
       }
