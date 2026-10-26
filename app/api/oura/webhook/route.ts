@@ -9,6 +9,7 @@ import { ouraOAuthConfig } from '@/lib/oura/cloud/config'
 import { hasOuraTokenKey } from '@/lib/oura/cloud/token-cipher'
 import { reportOuraCloudIssue } from '@/lib/oura/cloud/report'
 import { workoutHrReattributor } from '@/lib/workout/post-completion-hr'
+import { stillRhrRefresher } from '@/lib/oura/cloud/still-rhr'
 import {
   OuraWebhookEvent, handleOuraWebhookEvent, isOurVerificationToken, isRetryableOuraError, ouraWebhookConfig, verifyOuraSignature,
 } from '@/lib/oura/cloud/webhook'
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
     const outcome = await handleOuraWebhookEvent({
       repo, config: config.oauth, rescore: repo,
       workoutHr: workoutHrReattributor(repo),
+      stillRhr: stillRhrRefresher(repo),
     }, event.data)
     // Only the outcome's name goes back; no user id, no health data.
     return json({ received: true, result: outcome.result })

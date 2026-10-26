@@ -9,7 +9,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { verifyAppleIdentityToken } from '@/lib/auth/apple'
 import { appleResponse } from '@/lib/auth/apple-response'
 import { IdentityConflict } from '@/lib/auth/identity'
-import { issueNativeSession } from '@/lib/auth/mobile/session'
+import { issueNativeSession, presentedNativeFamily } from '@/lib/auth/mobile/session'
 
 const CompleteSchema = z.object({
   attemptId: z.string().uuid(), identityToken: z.string().min(1).max(8192), name: z.string().trim().min(1).max(100).optional(),
@@ -64,7 +64,14 @@ export async function POST(req: NextRequest) {
     if (!user?.isActive) {
       return appleResponse({ error: 'account_pending' }, 403)
     }
-    return appleResponse(await issueNativeSession(user))
+    const issued = await issueNativeSession(user)
+    if (attempt.userId) {
+      // Linking signs the app in again: end the sign-in the request came from, so the device does
+      // not keep two live families.
+      const replaced = await presentedNativeFamily(req.headers, user.id)
+      if (replaced) await repository.revokeNativeRefreshTokenFamily(user.id, replaced, 'sign_out')
+    }
+    return appleResponse(issued)
   } catch (error) {
     const cause = error instanceof Error ? error.cause as { code?: string } | undefined : undefined
     if (error instanceof IdentityConflict || cause?.code === '23505') {

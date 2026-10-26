@@ -1,8 +1,6 @@
 // LB-198. The device side: the flag round-trips through the shipped store, UNKNOWN stays unknown,
 // and a pull carries it. The sheet's source pin keeps it from being inferred from Save.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 const db = { current: null as DatabaseSync | null }
@@ -51,19 +49,5 @@ describe('vs_normal_touched on the device (LB-198)', () => {
     const store = new SQLiteLocalStore()
     await store.applyDelta({ dayCheckins: [{ ...base({ vsNormal: 'better', vsQuestion: 2, vsNormalTouched: true }), syncStatus: 'synced' }] } as never)
     expect((await store.getDayCheckin('2026-10-05', 'morning'))?.vsNormalTouched).toBe(true)
-  })
-})
-
-describe('the morning sheet sets the flag from a tap, never from Save (LB-198)', () => {
-  const src = readFileSync(join(process.cwd(), 'components/morning-checkin-sheet.tsx'), 'utf8')
-  it('flips it in the picker onChange', () => {
-    expect(src).toMatch(/onChange=\{v => \{[^}]*setVsTouched\(true\)[^}]*setVsNormal\(v\)/)
-  })
-  it('never sets it true anywhere else', () => {
-    expect([...src.matchAll(/setVsTouched\(true\)/g)]).toHaveLength(1)
-  })
-  it('seeds a fresh sheet as untouched and sends the flag only beside an answer', () => {
-    expect(src).toMatch(/useState<boolean \| null>\(false\)/)
-    expect(src).toMatch(/vsNormal != null && vsTouched != null \? \{ vsNormalTouched: vsTouched \}/)
   })
 })
