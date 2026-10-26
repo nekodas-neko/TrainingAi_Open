@@ -118,3 +118,28 @@ describe('no plan or cardio-week reader uses a single night (#3216)', () => {
     expect(src).not.toMatch(/reverse\(\)\.find\([^)]*restingHeartRate/)
   })
 })
+
+// #3001: the zones' resting HR is the mean of the device that measured the newest night.
+describe('meanRestingHr per device (#3001)', () => {
+  const day = (i: number) => `2026-10-${String(i).padStart(2, '0')}`
+  const nights = (from: number, n: number, bpm: number, source: string) =>
+    Array.from({ length: n }, (_, i) => ({ date: day(from + i), restingHeartRate: bpm, restingHeartRateSource: source }))
+
+  it('holds the ring’s mean while Oura has fewer than 14 nights, not a pooled one', () => {
+    const rows = [...nights(1, 14, 52, 'oura_ble'), ...nights(15, 5, 58, 'oura_cloud')]
+    expect(meanRestingHr(rows)).toBe(52)       // pooled would be 54
+  })
+
+  it('moves to Oura’s own mean once Oura has 14 nights', () => {
+    const rows = [...nights(1, 14, 52, 'oura_ble'), ...nights(15, 14, 58, 'oura_cloud')]
+    expect(meanRestingHr(rows)).toBe(58)
+  })
+
+  it('still gives a first-time user a mean from the few nights they have', () => {
+    expect(meanRestingHr(nights(1, 3, 61, 'oura_cloud'))).toBe(61)
+  })
+
+  it('reads rows that name no device as one device, as before', () => {
+    expect(meanRestingHr([{ restingHeartRate: 50 }, { restingHeartRate: 60 }, { restingHeartRate: 0 }])).toBe(55)
+  })
+})

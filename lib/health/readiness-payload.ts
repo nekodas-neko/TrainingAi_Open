@@ -22,11 +22,12 @@ import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { latestRestingHrRow } from '@trainingai/shared/health/latest-resting-hr'
+import { rowsOfDeviceInUse } from '@trainingai/shared/health/per-device-normal'
 import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
-import { scoreActivityForDay, restingHrBaseline, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
+import { scoreActivityForDay, restingHrBaseline, carriedOverRestingHr, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
 import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
 import { staleFinishedDays } from '@trainingai/shared/health/finished-day-recheck'
 import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
@@ -470,8 +471,13 @@ export async function buildReadinessPayload(
     ? Math.round((sleepScore100 / 100) * 40)
     : sleepHours != null ? Math.min(40, Math.round((sleepHours / 8) * 40)) : 0
 
-  const hrvRows       = excludeLowWearDays(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), ouraByDate)
-  const recentHrvRows = bodyMetrics.filter(m => m.date >= from7dIso && m.hrvMs != null && m.hrvMs > 0)
+  // #3001: the displayed baselines and the 7-day means are of the device that measured the newest
+  // night. Oura's HRV and the ring's differ by definition, so an Oura week judged against a baseline
+  // pooled with ring nights shows a change in the person that is a change of ruler. Until that device
+  // has the 5 nights a baseline needs, the baseline reads as not yet known rather than the other device's.
+  const hrvOnDevice   = rowsOfDeviceInUse(bodyMetrics, m => m.hrvMs, m => m.hrvSource)
+  const hrvRows       = excludeLowWearDays(hrvOnDevice, ouraByDate)
+  const recentHrvRows = hrvOnDevice.filter(m => m.date >= from7dIso)
   const baselineHrv   = hrvRows.length >= 5
     ? hrvRows.reduce((s, m) => s + m.hrvMs!, 0) / hrvRows.length
     : null
@@ -482,7 +488,9 @@ export async function buildReadinessPayload(
     ? Math.max(0, Math.min(30, Math.round(30 * (recentHrv / baselineHrv))))
     : 0
 
-  const recentRhrRows = bodyMetrics.filter(m => m.date >= from7dIso && m.restingHeartRate != null && m.restingHeartRate > 0)
+  // The 7-day mean and the baseline are of the device in use; `restingHrBaseline` picks the same rows.
+  const recentRhrRows = rowsOfDeviceInUse(bodyMetrics, m => m.restingHeartRate, m => m.restingHeartRateSource)
+    .filter(m => m.date >= from7dIso)
   const baselineRhr   = restingHrBaseline(bodyMetrics, ouraByDate)
   const recentRhr = recentRhrRows.length
     ? recentRhrRows.reduce((s, m) => s + m.restingHeartRate!, 0) / recentRhrRows.length
@@ -503,6 +511,9 @@ export async function buildReadinessPayload(
     tz,
     bodyMetrics,
     restingHrBaseline: baselineRhr,
+    // #3001: after a device switch the baseline is null for the first nights; the zone lane then reads
+    // the profile's resting HR, which is the previous device's mean, as the HR zones already do.
+    restingHrCarriedOver: baselineRhr == null && carriedOverRestingHr(bodyMetrics) != null ? hrProfile?.restingHr ?? null : null,
     hrRows: todayHrRows,
     metGrid: ouraCloudMetGrid(await cloudActivityP, todayMid.getTime(), tomorrowMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,

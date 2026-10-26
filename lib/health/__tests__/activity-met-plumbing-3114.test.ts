@@ -114,4 +114,14 @@ describe('a MET read that fails (#3114)', () => {
     expect(payload.activitySignals).toBeTruthy()
     expect(payload.activitySignals!.moveHours).toBeNull()
   })
+
+  it('still scores today through the loader (the day log), losing only the move lane', async () => {
+    const f = metOnly()
+    f.cloudActivityFails = true
+    repo = fixtureRepo(f)
+    const today = await loadActivityDay(typedRepo(), 'u1', TZ, TODAY)
+    expect(today.result).toBeTruthy()
+    expect(today.signals.moveHours).toBeNull()
+    await expect(loadActivityDay(typedRepo(), 'u1', TZ, YESTERDAY)).rejects.toThrow(/oura_cloud_daily read failed/)
+  })
 })

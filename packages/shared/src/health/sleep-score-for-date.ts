@@ -24,7 +24,7 @@ export function scoreSleepForDate(sessions: readonly SleepSession[], date: strin
   const night = canonicalNightForDate(nights, date, tz)
   if (!night) return null
   const result = computeSleepScore(night, tz, sleepScoreBaselines(
-    nights.filter(n => n.sleepEnd.getTime() < night.sleepEnd.getTime()), tz,
+    nights.filter(n => n.sleepEnd.getTime() < night.sleepEnd.getTime()), tz, night,
   ))
   return result ? { night, result } : null
 }
