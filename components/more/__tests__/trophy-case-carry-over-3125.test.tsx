@@ -100,6 +100,15 @@ describe('editing while the account pins are unknown', () => {
     expect(editButton()).toBeDefined()
   })
 
+  it('shows the freshly read pins, not empty slots, when nothing is cached', async () => {
+    cached = null
+    get = { status: 200, body: { pins: ['b'] } }
+    await mount()
+    expect(editButton()).toBeDefined()
+    // Three slots, one filled: an edit starts from the account's pins, never from an empty case.
+    expect(host.textContent!.split('Empty').length - 1).toBe(2)
+  })
+
   it('offers the edit from the cached pins while the fresh read is failing', async () => {
     cached = { pins: ['b'] }
     get = 'network'

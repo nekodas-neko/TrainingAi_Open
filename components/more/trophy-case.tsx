@@ -104,6 +104,13 @@ function OwnTrophyCase({ achievements, readOnly }: { achievements: AchievementRe
     return () => { alive = false; };
   }, []);
 
+  // Edit opens as soon as either read is in (`known` below), so the fresh read fills the case when
+  // the cached one has failed or not landed yet; otherwise Edit would start from three empty slots and
+  // a save would overwrite the account's real pins.
+  useEffect(() => {
+    if (confirmed && !account) setPinnedIds(confirmed.pins ?? []);
+  }, [confirmed, account]);
+
   // The list this browser kept before pins lived on the account moves over once, and only after that
   // fresh read says the account has none; a cached `{ pins: null }` is not that.
   const carried = useRef(false);
