@@ -33,6 +33,7 @@ import { staleFinishedDays, metLookbackFrom } from '@trainingai/shared/health/fi
 import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, runBackgroundFinalise, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
 import { type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveHrProfile, maxHrIsUnread } from '@trainingai/shared/health/hr-profile'
+import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult, type ContributorGap } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
@@ -392,7 +393,7 @@ export async function buildReadinessPayload(
   // #3114: Oura's per-minute MET decides the move lane (its activity day starts at 4 a.m., hence the
   // day before). Today's live read may go without it; a finalised day may not (`loadActivityDay`).
   const cloudActivityP = (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay, stepActivityLogs] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -413,6 +414,9 @@ export async function buildReadinessPayload(
     (async () => repo.getOuraCloudReadinessContributors(userId, from28dIso, todayIso))().catch(() => []),
     // #3193: a failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
     (async () => knownSwitchDay !== undefined ? knownSwitchDay : repo.getOuraCloudSwitchDay(userId))().catch(() => null),
+    // #3134: today's and yesterday's treadmill steps join the device count in the Activity score. A failed
+    // read costs those steps only, so the score is served on the device count, as before this read existed.
+    (async () => repo.listActivityLogs(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => []),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -521,6 +525,7 @@ export async function buildReadinessPayload(
     program,
     user: userProfile,
     stepsGoal: userGoals?.stepsGoal ?? null,
+    activityLogs: stepActivityLogs,
   })
   const { result: activityResult, goals, load, acwr } = activityToday
   const { sessions7d, volume7dKg } = activityToday.signals
@@ -535,8 +540,9 @@ export async function buildReadinessPayload(
   // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
   // today's, so on a training day the "previous day" score reacted to this morning's session.
   const prevWindow = strengthWindowEndingAt(recentSessions, yesterdayIso, tz)
-  const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0) ? (computeActivityScore({
-    steps: yesterdayMetrics?.steps ?? null,
+  const yesterdaySteps = dayStepCount(yesterdayMetrics?.steps, stepActivityLogs.filter(a => a.date === yesterdayIso))
+  const prevDayActivityScore = (yesterdayMetrics || yesterdaySteps != null || prevWindow.sessions7d > 0) ? (computeActivityScore({
+    steps: yesterdaySteps,
     activeCalories: yesterdayMetrics?.activeCalories ?? null,
     sessions7d: prevWindow.sessions7d,
     volume7dKg: prevWindow.volume7dKg,
