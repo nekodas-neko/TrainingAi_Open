@@ -6312,6 +6312,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // so it could not see a gap on this side. Found 2026-09-04 while adding trainingLoadGate.
             daytimeStressCoverageMin:      int(p.daytimeStressCoverageMin),
             chronicStressGranularNights:   int(p.chronicStressGranularNights),
+            stillRhrBpm:                   num(p.stillRhrBpm),
+            stillRhrCoverageMin:           int(p.stillRhrCoverageMin),
             bdiDerived:            num(p.bdiDerived),
             bodyComp:              json(p.bodyComp),
           })

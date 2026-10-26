@@ -1897,6 +1897,10 @@ export interface OuraDailyDerivedRow {
   /** Q-510. NULL = not evaluated (a contributor was missing), never zero coverage. */
   daytimeStressCoverageMin: number | null
   chronicStressGranularNights: number | null
+  /** #2634. Median HR of the day's still daytime minutes, and the minutes behind it. NULL = not
+   *  computed or too thin, never zero. Server-only: absent from the device mirror. */
+  stillRhrBpm: number | null
+  stillRhrCoverageMin: number | null
   bdiDerived: number | null
   bodyComp: unknown | null
 }

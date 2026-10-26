@@ -136,3 +136,18 @@ describe('prescription resilience stands only before the switch day (#3077)', ()
     expect((await signals()).resilienceLevel).toBe(4)
   })
 })
+
+describe("Oura's own resilience word reaches the prescription, unmapped (#3169)", () => {
+  it('is offered from the switch day while the 1-5 level stays absent', async () => {
+    setSwitchDay(day(-1))
+    stored.derived = [{ day: today, resilienceLevel: 3 }]
+    stored.ouraDaily = [{ date: day(-1), resilienceLevel: 'adequate' }, { date: today, resilienceLevel: 'solid' }]
+    const s = await signals()
+    expect(s.resilienceLevel).toBeNull()
+    expect(s.resilienceOura).toBe('solid')
+  })
+
+  it('is null when Oura sent none', async () => {
+    expect((await signals()).resilienceOura).toBeNull()
+  })
+})

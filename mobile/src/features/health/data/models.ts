@@ -729,7 +729,7 @@ export const healthDaySchema = z
     hr: z
       .array(z.object({ minute: z.number().finite(), bpm: z.number().finite() }))
       .default([]),
-    bodyTemp: z.object({ meanC: n, devC: n }).nullish(),
+    bodyTemp: z.object({ meanC: n, devC: n, source: z.string().nullish() }).nullish(),
     activityLogs: activityHistorySpec.schema.shape.activityLogs.default([]),
   })
   .passthrough();
