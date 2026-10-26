@@ -50,7 +50,7 @@ export const SetsGrid = memo(function SetsGrid({
               style={{ background: "color-mix(in oklch, var(--accent-green) 7%, transparent)", border: "1px solid color-mix(in oklch, var(--accent-green) 16%, transparent)" }}
             >
               <div className="flex items-center justify-between">
-                <span className="text-green-500 text-[10px] font-bold">{i + 1}✓</span>
+                <span className="text-accent-green text-[10px] font-bold">{i + 1}✓</span>
                 {lap !== undefined && (
                   <span className="text-[9px] text-muted-foreground tabular-nums">{formatTime(lap)}</span>
                 )}

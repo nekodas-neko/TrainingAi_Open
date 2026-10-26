@@ -501,7 +501,7 @@ export default function ExerciseManager() {
     <div className="space-y-4">
       {/* Storage warning */}
       {!storageConfigured && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-800 dark:text-amber-200">
+        <div className="rounded-xl border border-accent-amber/30 bg-accent-amber/10 p-3 text-xs text-accent-amber">
           <b>S3 not configured</b> — GIFs stored as data URLs in Postgres. Add{" "}
           <code>AWS_ENDPOINT_URL</code>, <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code> to enable bucket storage.
         </div>
@@ -657,7 +657,7 @@ export default function ExerciseManager() {
                       {isGenerating
                         ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
                         : hasS3Gif
-                          ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                          ? <CheckCircle2 className="w-3.5 h-3.5 text-accent-green" />
                           : <XCircle className="w-3.5 h-3.5 text-muted-foreground/70" />
                       }
                     </div>

@@ -169,6 +169,36 @@ export function wallClockMinuteReader(dayStartMs: number, tz = DEFAULT_TZ): (atM
   }
 }
 
+/** The wall-clock minutes a day's clock jumps over: `[fromMin, toMin)` never reads on the clock. */
+export interface ClockSkip { fromMin: number; toMin: number }
+
+/**
+ * The hour the clock skips on a spring-forward day (02:00 → 03:00 reads `{ fromMin: 120, toMin: 180 }`),
+ * or null on any other day. A series on `wallClockMinuteReader` minutes jumps by that much across the
+ * transition though no time passed, so a "no data for N minutes" test must close the skip first
+ * (`closeClockSkip`). A fall-back day needs nothing: its minutes only step backward, never a false gap.
+ * `dayStartMs` is the day's local midnight.
+ */
+export function clockSkipOnDay(dayStartMs: number, tz = DEFAULT_TZ): ClockSkip | null {
+  const startOffset = utcOffsetMin(dayStartMs, tz)
+  if (utcOffsetMin(dayStartMs + 86_400_000, tz) === startOffset) return null
+  const STEP = 900_000 // transitions fall on a quarter hour
+  const before = startOffset
+  for (let t = dayStartMs + STEP; t <= dayStartMs + 26 * 3_600_000; t += STEP) {
+    const offset = utcOffsetMin(t, tz)
+    if (offset !== before) {
+      if (offset < before) return null
+      return { fromMin: Math.floor((t - dayStartMs) / 60_000) + (before - startOffset), toMin: Math.floor((t - dayStartMs) / 60_000) + (offset - startOffset) }
+    }
+  }
+  return null
+}
+
+/** A wall-clock minute with the skipped hour taken out, so a difference of two is the time elapsed. */
+export function closeClockSkip(minute: number, skip: ClockSkip | null | undefined): number {
+  return skip && minute >= skip.toMin ? minute - (skip.toMin - skip.fromMin) : minute
+}
+
 /** The instant a local wall-clock "HH:MM" on `dateStr` names in `tz` (so DST-correct), or null when
  *  `hhmm` is not a time of day. The inverse of `msToHHMMInTz` for a known date. */
 export function localClockTimeToDate(dateStr: string, hhmm: string | null | undefined, tz = DEFAULT_TZ): Date | null {

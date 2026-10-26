@@ -175,10 +175,20 @@ short while. Run through this after every reset, before telling the tester it is
 1. **Look for new Oura rows a few minutes after the reset.** A webhook, a catch-up or the backfill
    that starts on connect may already hold an access token when the reset commits, and can land rows
    seconds later. The reset revokes the Oura grant, so no new work starts, but work already in flight
-   is not stopped. A few minutes after, read the account's newest `oura_cloud` rows. The `claude_ro`
-   views are scoped to the owner's rows only, so for the owner's own account use them, and for a
-   tester's account ask the owner to run the one-off query. Anything dated after the reset's
-   `agent_action_log` row (`admin-reset-user-data`) is work that outran it. Run **Reset data** again
+   is not stopped. A few minutes after, read the newest `updated_at` of the account's rows in the four
+   tables the Oura Cloud read writes: `oura_cloud_daily`, `oura_cloud_sleep_periods`, `oura_sessions`
+   and `oura_heartrate`. The `claude_ro` views are scoped to the owner's rows only, so for the owner's
+   own account use them, and for a tester's account ask the owner to run the one-off query. Anything
+   dated after the reset's `agent_action_log` row (`admin-reset-user-data`) is work that outran it:
+
+   ```sql
+   SELECT 'oura_cloud_daily' AS tbl, max(updated_at) AS newest FROM claude_ro.oura_cloud_daily
+   UNION ALL SELECT 'oura_cloud_sleep_periods', max(updated_at) FROM claude_ro.oura_cloud_sleep_periods
+   UNION ALL SELECT 'oura_sessions', max(updated_at) FROM claude_ro.oura_sessions
+   UNION ALL SELECT 'oura_heartrate', max(updated_at) FROM claude_ro.oura_heartrate;
+   ```
+
+   (For a tester, run the same against `public.<table>` with `WHERE user_id = '<their id>'`.) Run **Reset data** again
    and re-check; the grant is already revoked, so nothing new starts.
 2. **The tester must be on a build that sends `X-Data-Epoch`.** Preview builds from before the
    data-epoch change (#3369) never send it. For an account that has been reset, the middleware answers

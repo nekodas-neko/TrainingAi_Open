@@ -51,8 +51,8 @@ interface Props {
 }
 
 const CONFIDENCE_CONFIG: Record<string, { pct: number; bar: string; text: string; label: string }> = {
-  high:   { pct: 90, bar: 'bg-green-500',  text: 'text-green-500',  label: '90%' },
-  medium: { pct: 60, bar: 'bg-amber-400',  text: 'text-amber-400',  label: '60%' },
+  high:   { pct: 90, bar: 'bg-accent-green',  text: 'text-accent-green',  label: '90%' },
+  medium: { pct: 60, bar: 'bg-accent-amber',  text: 'text-accent-amber',  label: '60%' },
   low:    { pct: 30, bar: 'bg-orange-500', text: 'text-orange-500', label: '30%' },
 }
 

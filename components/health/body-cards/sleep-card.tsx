@@ -91,7 +91,7 @@ export function SleepCard({ recentSleep, nightLabel, computedSleepScore, sleepSc
         // computed score; a stored fallback has no coverage to report.
         const note = computedSleepScore != null ? sleepCoverageNote(sleepScoreCoverage) : null;
         return note ? (
-          <p className={`text-[9px] mb-1 ${note.strong ? "text-amber-400" : "text-muted-foreground"}`}>{note.text}</p>
+          <p className={`text-[9px] mb-1 ${note.strong ? "text-accent-amber" : "text-muted-foreground"}`}>{note.text}</p>
         ) : null;
       })()}
       {recentSleep ? (

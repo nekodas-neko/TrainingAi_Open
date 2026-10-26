@@ -91,12 +91,12 @@ export function BackgroundLocationCard() {
       <button
         type="button"
         onClick={openLocationSettings}
-        className="w-full rounded-2xl bg-muted/40 border border-amber-500/30 overflow-hidden flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/60 transition"
+        className="w-full rounded-2xl bg-muted/40 border border-accent-amber/30 overflow-hidden flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/60 transition"
       >
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-500/15">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-accent-amber/15">
           {!granted
-            ? <MapPinOff className="h-4 w-4 text-amber-500" />
-            : <TriangleAlert className="h-4 w-4 text-amber-500" />}
+            ? <MapPinOff className="h-4 w-4 text-accent-amber" />
+            : <TriangleAlert className="h-4 w-4 text-accent-amber" />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold">{title}</p>
