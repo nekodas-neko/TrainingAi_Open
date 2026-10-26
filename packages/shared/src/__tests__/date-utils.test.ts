@@ -296,6 +296,22 @@ describe('user-local week window boundaries (AEST)', () => {
   })
 })
 
+describe('dateStrMidnightInTz in far-east zones and across a daylight-saving change (#3445)', () => {
+  // A noon-UTC probe is already the next day at UTC+12..+14.
+  it('is the start of the named day in Pacific/Auckland (UTC+13 in summer)', () => {
+    expect(dateStrMidnightInTz('2026-12-15', 'Pacific/Auckland').toISOString()).toBe('2026-12-14T11:00:00.000Z')
+  })
+
+  it('is the start of the named day in Pacific/Kiritimati (UTC+14)', () => {
+    expect(dateStrMidnightInTz('2026-12-15', 'Pacific/Kiritimati').toISOString()).toBe('2026-12-14T10:00:00.000Z')
+  })
+
+  it('bounds the 23 h spring-forward day in Sydney', () => {
+    const ms = dateStrMidnightInTz('2026-10-05', 'Australia/Sydney').getTime() - dateStrMidnightInTz('2026-10-04', 'Australia/Sydney').getTime()
+    expect(ms).toBe(23 * 3_600_000)
+  })
+})
+
 describe('dayKeyInTz (Q-163)', () => {
   // The calendar-day key the week strip, the streak card and the local-history fill all bucket by.
   // It existed as two copies hardcoded to DEFAULT_TZ, so a user outside Brisbane saw another zone's
@@ -389,21 +405,5 @@ describe('midnightDaysAgoInTz (#3117)', () => {
     const at = new Date('2026-10-05T02:00:00Z') // 13:00 AEDT, 5 Oct
     // 28 Sept is AEST (UTC+10): midnight is 14:00Z the day before. A 7×24h subtraction would land at 01:00.
     expect(midnightDaysAgoInTz('Australia/Sydney', 7, at).toISOString()).toBe('2026-09-27T14:00:00.000Z')
-  })
-})
-
-describe('dateStrMidnightInTz in far-east zones and across a daylight-saving change (#3445)', () => {
-  // A noon-UTC probe is already the next day at UTC+12..+14.
-  it('is the start of the named day in Pacific/Auckland (UTC+13 in summer)', () => {
-    expect(dateStrMidnightInTz('2026-12-15', 'Pacific/Auckland').toISOString()).toBe('2026-12-14T11:00:00.000Z')
-  })
-
-  it('is the start of the named day in Pacific/Kiritimati (UTC+14)', () => {
-    expect(dateStrMidnightInTz('2026-12-15', 'Pacific/Kiritimati').toISOString()).toBe('2026-12-14T10:00:00.000Z')
-  })
-
-  it('bounds the 23 h spring-forward day in Sydney', () => {
-    const ms = dateStrMidnightInTz('2026-10-05', 'Australia/Sydney').getTime() - dateStrMidnightInTz('2026-10-04', 'Australia/Sydney').getTime()
-    expect(ms).toBe(23 * 3_600_000)
   })
 })
