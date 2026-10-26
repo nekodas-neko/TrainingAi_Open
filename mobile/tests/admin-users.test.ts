@@ -119,10 +119,16 @@ test('each refusal reads as a sentence and never shows the response text', () =>
     }
     assert.equal(said.size, 4);
   }
-  assert.match(wipeFailure('reset', { status: 403 }), /Another admin's account, or the owner's/);
+  assert.match(wipeFailure('reset', { status: 403 }), /another admin's or the owner's, or the server's owner setting/);
   assert.match(wipeFailure('erase', { status: 429 }), /Too many/);
   assert.match(wipeFailure('erase', { status: 404 }), /no longer exists/);
-  assert.match(wipeFailure('reset', new Error('x')), /could not be reset/);
+  assert.match(wipeFailure('reset', { status: 500 }), /could not be reset\. Nothing was removed/);
+  // A timeout or gateway error may have committed on the server: never claim nothing was removed.
+  for (const failure of [new Error('aborted'), { status: 502 }, { status: 504 }]) {
+    const text = wipeFailure('reset', failure);
+    assert.match(text, /not known whether anything was removed/);
+    assert.ok(!text.includes('Nothing was removed'));
+  }
 });
 
 test('performWipe: refreshes the lists, signs out only after your own reset', async () => {
@@ -149,4 +155,19 @@ test('performWipe: refreshes the lists, signs out only after your own reset', as
   });
   assert.equal(failed.error, true);
   assert.equal(signOuts, 1);
+});
+
+test('an admin reset or delete gets the long client timeout, so a heavy wipe is not cut off', async (t) => {
+  const delays: number[] = [];
+  t.mock.method(globalThis, 'setTimeout', ((fn: () => void, ms: number) => {
+    delays.push(ms);
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout);
+  t.mock.method(globalThis, 'fetch', async () =>
+    new Response('{}', { headers: { 'content-type': 'application/json' } }));
+  const client = createApiClient('https://example.com', async () => 'session');
+  await client.post('/api/admin/users/reset-data', { userId: 'u1', confirmEmail: 'a@b.co' });
+  await client.delete('/api/admin/users', { userId: 'u1', confirmEmail: 'a@b.co' });
+  await client.get('/api/admin/users');
+  assert.deepEqual(delays, [130_000, 130_000, 15_000]);
 });

@@ -203,11 +203,15 @@ export function wipeFailure(kind: WipeKind, failure: unknown): string {
   const status = (failure as { status?: unknown } | null)?.status;
   const nothing = 'Nothing was removed.';
   if (status === 403)
-    return "Another admin's account, or the owner's, cannot be reset or deleted from here. Nothing was removed.";
+    return "This account can't be reset or deleted from here: it is another admin's or the owner's, or the server's owner setting is missing. Nothing was removed.";
   if (status === 409) return `The account changed while you were confirming. Refresh and try again. ${nothing}`;
   if (status === 429) return `Too many resets and deletions this hour. Try again later. ${nothing}`;
   if (status === 404) return `That user no longer exists. ${nothing}`;
   if (status === 400) return `That email does not match this account. ${nothing}`;
+  // No answer (a timeout, a dropped connection) or a gateway error: the server may still have
+  // committed, so don't say nothing was removed.
+  if (typeof status !== 'number' || status >= 502)
+    return 'The request did not finish, so it is not known whether anything was removed. Refresh the list before trying again.';
   return kind === 'reset'
     ? `The data could not be reset. ${nothing}`
     : `The account could not be deleted. ${nothing}`;
