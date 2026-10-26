@@ -19,6 +19,7 @@ import { getPool } from '@/lib/data/postgres/client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 import { backfillOuraCloud, type OuraBackfillResult } from './backfill'
+import { stillRhrRefresher } from './still-rhr'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
 import { reportOuraCloudIssue } from './report'
 import { withSessionLock } from './renewal'
@@ -66,7 +67,7 @@ export async function reconcileOuraCloud(deps: ReconcileDeps): Promise<Reconcile
     try {
       // Loaded here, as `runOuraReconcile` loads `@/lib/data`: this module is reached from the boot timer.
       const { workoutHrReattributor } = await import('@/lib/workout/post-completion-hr')
-      const result = await backfill({ repo: deps.repo, config: deps.config, rescore: deps.repo, workoutHr: workoutHrReattributor(deps.repo) }, userId, {
+      const result = await backfill({ repo: deps.repo, config: deps.config, rescore: deps.repo, workoutHr: workoutHrReattributor(deps.repo), stillRhr: stillRhrRefresher(deps.repo) }, userId, {
         from, to, dryRun: false, heartRate: true, tz, tombstoneAbsent: true,
       })
       const outcome = outcomeOf(result)

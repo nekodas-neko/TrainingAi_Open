@@ -16,7 +16,8 @@ import { OuraUnavailableError } from './client'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
 import { fetchOuraDocuments, fetchOuraHeartRate, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType } from './documents'
-import { NO_WRITES, plannedCounts, reattributeAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
+import { NO_WRITES, plannedCounts, reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
+import { stillRhrRefresher, type StillRhrRefresh } from './still-rhr'
 import { reportOuraCloudIssue } from './report'
 import type { NightRescoreRepo } from '@/lib/health/rescore-nights'
 import { confirmOuraTokenRefused, getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraRefusalVerdict, type OuraTokenStore } from './tokens'
@@ -88,6 +89,8 @@ export type OuraBackfillDeps = {
   rescore?: NightRescoreRepo
   /** #3078: re-attributes the workouts each heart-rate chunk changed (`workoutHrReattributor`). */
   workoutHr?: OuraWorkoutHrReattribute
+  /** #2634: refreshes the still-period resting HR of the days each write could change (`stillRhrRefresher`). */
+  stillRhr?: StillRhrRefresh
 }
 
 export type OuraBackfillResult =
@@ -212,7 +215,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
     }
   }
   const writes = mapOuraDocuments(docs)
-  report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes, deps.rescore)
+  report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes, deps.rescore, deps.stillRhr)
   if (opts.tombstoneAbsent && !opts.dryRun) {
     for (const { type, ...range } of readWhole) {
       if (type === 'workout') report.workoutsTombstoned += await deps.repo.tombstoneOuraWorkoutsAbsent(userId, range)
@@ -233,6 +236,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
           const write = await deps.repo.upsertOuraCloudHeartrate(userId, points, opts.tz)
           written = write.offered
           await reattributeAfterHeartRate(deps.workoutHr, userId, write, opts.tz, 'backfill-heartrate:workouts')
+          await refreshStillRhrAfterHeartRate(deps.stillRhr, userId, write, opts.tz)
         }
         report.counts = { ...report.counts, heartRatePoints: report.counts.heartRatePoints + written }
       } catch (err) {
@@ -298,7 +302,7 @@ export function startOuraConnectBackfill(userId: string): void {
       const tz = user?.timezone ?? DEFAULT_TZ
       const to = todayInTz(tz)
       const { workoutHrReattributor } = await import('@/lib/workout/post-completion-hr')
-      const result = await backfillOuraCloud({ repo, config, rescore: repo, workoutHr: workoutHrReattributor(repo) }, userId, {
+      const result = await backfillOuraCloud({ repo, config, rescore: repo, workoutHr: workoutHrReattributor(repo), stillRhr: stillRhrRefresher(repo) }, userId, {
         from: shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1)), to, dryRun: false, heartRate: true, tz,
       })
       // A connect whose history did not arrive is otherwise invisible: the account reads connected.
