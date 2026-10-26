@@ -33,8 +33,8 @@ describe('calibrationProgress', () => {
 })
 
 describe('markedDayNote', () => {
-  it('says the marked day counts from tomorrow, or from the day after for a past day', () => {
+  it('says today counts from tomorrow, and a past day keeps the plain sentence', () => {
     expect(markedDayNote(true)).toBe('This day counts toward your maintenance estimate from tomorrow')
-    expect(markedDayNote(false)).toBe('This day counts toward your maintenance estimate from the day after')
+    expect(markedDayNote(false)).toBe('This day counts toward your maintenance estimate')
   })
 })
