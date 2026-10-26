@@ -1,7 +1,7 @@
 // The history read (#2859) with Oura mocked at `fetch` and a fake repository: ranges, a dry run,
-import { shiftDateStr } from '@trainingai/shared/date-utils'
 // and how it stops. The Postgres half (idempotency, provenance) is
 // `lib/data/postgres/__tests__/oura-cloud-ingest-2859.test.ts`.
+import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OuraCloudTokenRow } from '@/lib/data/postgres/slices/oura-cloud-tokens'
 import { OURA_API_BASE, type OuraOAuthConfig } from '../config'
@@ -461,6 +461,17 @@ describe('backfillOuraCloud tombstoneAbsent: workouts (#3087)', () => {
     for (let d = range.from; d < range.to; d = shiftDateStr(d, 1)) if (!swept.has(d)) missed.push(d)
     expect(missed).toEqual([])
     expect(swept.has(range.to)).toBe(false)
+  })
+
+  // #3445: the tombstone keeps what Oura returned for the chunk, not what was new to the report. A
+  // workout on the day two chunks share comes back twice and is counted once, but each chunk's sweep
+  // still has to keep it, or the second chunk would tombstone a stored workout Oura still lists.
+  it('keeps a workout on a shared day in every chunk that returned it', async () => {
+    oura()
+    const { repo, absent } = fakeRepo()
+    await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, from: '2026-07-14', to: '2026-10-11', dryRun: false, tombstoneAbsent: true })
+    expect(absent.length).toBeGreaterThan(1)
+    expect(absent.map(r => r.keepIds)).toEqual(absent.map(() => ['wo-1']))
   })
 
   it('counts a document on the day two chunks share once', async () => {

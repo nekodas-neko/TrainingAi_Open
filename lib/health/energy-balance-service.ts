@@ -6,8 +6,7 @@ import { countedEstimates } from '@trainingai/shared/nutrition/meal-estimate'
 import { countedIntakeKcal, countedEstimateTotal, type CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
 import { unrecordedMealEstimatesAllowed } from '@trainingai/shared/nutrition/meal-logging-status'
 import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
-import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
+import { shiftDateStr, ageFromDob, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { stepEnergyKcal, SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT } from '@trainingai/shared/health/daily-energy'
 import { type Sex } from '@trainingai/shared/health/workout-energy'
 import {
@@ -134,10 +133,8 @@ export interface EnergyBalanceResult {
 }
 
 /** UTC instant of local midnight for a `YYYY-MM-DD` day in `tz`. */
-function localMidnightUtc(date: string, tz: string): Date {
-  const zoned = toZonedTime(new Date(`${date}T12:00:00Z`), tz)
-  zoned.setHours(0, 0, 0, 0)
-  return fromZonedTime(zoned, tz)
+export function localMidnightUtc(date: string, tz: string): Date {
+  return dateStrMidnightInTz(date, tz)
 }
 
 /**
