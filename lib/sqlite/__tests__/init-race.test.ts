@@ -158,4 +158,43 @@ describe('querySQLOpen', () => {
     await init
     await expect(read).resolves.toEqual([{ x: 1 }])
   })
+
+  // #3456: `_db` is assigned at createConnection, before `open()` has finished, so a wait that keys
+  // on `_db` lets a read through to an unopened connection.
+  it('does not run a read before open() resolves, even once the connection object exists', async () => {
+    const svc = await freshService()
+    query.mockClear()
+    query.mockResolvedValue({ values: [{ x: 1 }] })
+    let releaseOpen: () => void = () => {}
+    const opened = new Promise<void>(res => { releaseOpen = res })
+    open.mockImplementation(() => opened)
+    const init = svc.initSQLite([])
+    await new Promise(r => setTimeout(r, 20)) // createConnection has resolved; open() has not
+    const read = svc.querySQL('SELECT 1 AS x')
+    await new Promise(r => setTimeout(r, 20))
+    expect(query).not.toHaveBeenCalled()
+    releaseOpen()
+    await init
+    await expect(read).resolves.toEqual([{ x: 1 }])
+  })
+
+  it('does not poll for init once it has begun', async () => {
+    const svc = await freshService()
+    query.mockResolvedValue({ values: [{ x: 1 }] })
+    let releaseOpen: () => void = () => {}
+    const opened = new Promise<void>(res => { releaseOpen = res })
+    open.mockImplementation(() => opened)
+    const init = svc.initSQLite([])
+    await new Promise(r => setTimeout(r, 20))
+    const timers = vi.spyOn(globalThis, 'setTimeout')
+    try {
+      const read = svc.querySQLOpen('SELECT 1 AS x')
+      releaseOpen()
+      await init
+      await expect(read).resolves.toEqual([{ x: 1 }])
+      expect(timers).not.toHaveBeenCalled()
+    } finally {
+      timers.mockRestore()
+    }
+  })
 })

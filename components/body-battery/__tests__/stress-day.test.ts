@@ -75,3 +75,41 @@ describe('how much of the day was actually measured', () => {
     expect(coveredMinutes(segments)).toBe(60 + 30);
   });
 });
+
+describe('daylight-saving days in Sydney', () => {
+  const SYD = 'Australia/Sydney';
+  // 2026-10-04 spring forward: 02:00 AEST (UTC+10) becomes 03:00 AEDT (UTC+11).
+  const aest = (d: number, hh: number, mm: number) => Date.UTC(2026, 9, d, hh, mm) - 10 * 3600_000;
+  const aedt = (d: number, hh: number, mm: number) => Date.UTC(2026, 9, d, hh, mm) - 11 * 3600_000;
+
+  it('keeps one line across the skipped hour: 01:55 → 03:00 is five minutes, not 65', () => {
+    const segments = toSegments(
+      [{ t: aest(4, 1, 55), level: -0.1 }, { t: aedt(4, 3, 0), level: -0.2 }, { t: aedt(4, 3, 30), level: -0.3 }],
+      SYD,
+    );
+    expect(segments).toHaveLength(1);
+    expect(segments[0].map(p => p.x)).toEqual([115, 180, 210]);
+  });
+
+  it('keeps one line where wall-clock minutes read 100 apart but only 40 passed: 01:40 → 03:20', () => {
+    // 100 > GAP_MINUTES on the clock face, 40 in real time. This is the case the old code split.
+    expect(toSegments([{ t: aest(4, 1, 40), level: -0.1 }, { t: aedt(4, 3, 20), level: -0.2 }], SYD)).toHaveLength(1);
+  });
+
+  it('still splits a real 90-minute gap on that day', () => {
+    expect(toSegments([{ t: aedt(4, 10, 0), level: -0.1 }, { t: aedt(4, 11, 30), level: -0.2 }], SYD)).toHaveLength(2);
+  });
+
+  it('splits where the skipped hour hides a real gap: 01:00 → 03:30 is 90 minutes of silence', () => {
+    expect(toSegments([{ t: aest(4, 1, 0), level: -0.1 }, { t: aedt(4, 3, 30), level: -0.2 }], SYD)).toHaveLength(2);
+  });
+
+  it('keeps one line over the repeated hour on 2027-04-04, in real time order', () => {
+    // 03:00 AEDT (UTC+11) falls back to 02:00 AEST (UTC+10): 02:10 happens twice.
+    const first = Date.UTC(2027, 3, 3, 15, 10); // 02:10 AEDT
+    const second = Date.UTC(2027, 3, 3, 16, 10); // 02:10 AEST, an hour later
+    const segments = toSegments([{ t: second, level: -0.2 }, { t: first, level: -0.1 }], SYD);
+    expect(segments).toHaveLength(1);
+    expect(segments[0].map(p => p.level)).toEqual([-0.1, -0.2]);
+  });
+});

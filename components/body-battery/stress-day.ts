@@ -75,18 +75,22 @@ export function minutesIntoDay(t: number, tz: string): number {
  */
 export function toSegments(buckets: StressBucket[], tz: string): StressSegment[] {
   const fmt = clockFormat(tz)
+  // Sorted and gap-tested on the instant, not on wall-clock minutes: on a spring-forward day the
+  // clock skips an hour, so 01:55 → 03:00 reads as 65 minutes apart when it is really five.
   const placed = buckets
-    .map(b => ({ x: minutesFrom(fmt, b.t), level: b.level }))
-    .sort((a, b) => a.x - b.x)
+    .map(b => ({ t: b.t, x: minutesFrom(fmt, b.t), level: b.level }))
+    .sort((a, b) => a.t - b.t)
 
   const segments: StressSegment[] = []
   let run: StressSegment = []
-  for (const p of placed) {
-    if (run.length && p.x - run[run.length - 1].x > GAP_MINUTES) {
+  let prevT = 0
+  for (const { t, x, level } of placed) {
+    if (run.length && (t - prevT) / 60_000 > GAP_MINUTES) {
       segments.push(run)
       run = []
     }
-    run.push(p)
+    run.push({ x, level })
+    prevT = t
   }
   if (run.length) segments.push(run)
   return segments
