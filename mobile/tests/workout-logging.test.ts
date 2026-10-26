@@ -21,6 +21,8 @@ import {
   PROGRAM_AS_WRITTEN,
   WorkoutJournalStore,
 } from '../src/features/workouts/logging/WorkoutJournalStore.ts';
+import { loadBasis } from '../src/features/workouts/logging/targets.ts';
+import { workoutCalendarEvent } from '../src/features/platform/data/CalendarStore.ts';
 import { workoutFlow } from '../src/features/workouts/logging/flow.ts';
 import {
   formatSetLoad,
@@ -1088,4 +1090,25 @@ test('legacy snapshots gain optional timer defaults without fabricating effort, 
   assert.equal(timing.workExpectedSec, null);
   assert.equal(timing.restExpectedSec, null);
   assert.equal(timing.workActualSec, null);
+});
+
+test('a load stored as unrounded kg from the lb wheel reads 9.07 kg on read-only surfaces', () => {
+  const stored = '9.071847400000001';
+  assert.equal(loadLabel(stored), '9.07 kg');
+  const basis = loadBasis(
+    { exerciseType: 'weighted', equipment: [], estimated1rm: null, target80: null, latestWeight: stored } as never,
+    { plannedWeight: null, planned: null } as never,
+  );
+  assert.match(basis, /last saved load \(9\.07 kg\)/);
+  const event = workoutCalendarEvent({
+    id: 'w1',
+    status: 'completed',
+    sessionName: 'Legs',
+    startedAt: 1,
+    completedAt: 120_000,
+    exercises: [
+      { name: 'Curl', retired: false, sets: [{ weight: stored, reps: '8', completedAt: 5 }] },
+    ],
+  } as never);
+  assert.match(event.notes, /Curl: 9\.07 kg × 8/);
 });

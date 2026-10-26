@@ -140,7 +140,7 @@ export function loadBasis(exercise: WorkoutExercise, set: WorkoutSet) {
       : exercise.target80 !== null || exercise.estimated1rm !== null
         ? `Suggested from the saved strength target, rounded to ${step} kg increments.`
         : exercise.latestWeight !== null
-          ? `Starting suggestion from the last saved load (${exercise.latestWeight} kg), rounded to equipment increments.`
+          ? `Starting suggestion from the last saved load (${loadLabel(exercise.latestWeight)}), rounded to equipment increments.`
           : 'Default starting load; no personalised strength or previous-load basis is available. Choose a suitable load.';
   return `${basis} Your edits change this workout's entered load; the original prescription stays saved.`;
 }
