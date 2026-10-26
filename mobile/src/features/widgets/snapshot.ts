@@ -1,5 +1,6 @@
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
-import { bodyBatteryBand, type BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band';
+import { bodyBatteryBand } from '@trainingai/shared/health/body-battery-band';
+import { energyHero, type BodyBatteryEnergyInput } from '@trainingai/shared/health/body-battery-energy';
 import { scoreColors } from '../../shared/theme/tokens.ts';
 import { chipText, type ScoreChipModel } from '../home/data/score-chips.ts';
 import type { RecommendationModel } from '../home/data/recommendation-model.ts';
@@ -25,7 +26,7 @@ export type WidgetScore = {
   qualified: boolean;
 };
 export type WidgetBattery = {
-  /** "64" and "Good · Charging": the level, label and trend Home's Body Battery card shows. */
+  /** "64" and "Good · Charging": Home's Energy hero level and label (energyHero), with the live trend. */
   value: string;
   label: string;
   /** 0–100, for the bar. */
@@ -88,7 +89,7 @@ export type SnapshotInput = {
   timezone: string;
   /** Null until the readiness scores have loaded. */
   scores: readonly ScoreChipModel[] | null;
-  battery: Parameters<typeof batterySummary>[0];
+  battery: ((BodyBatteryEnergyInput & Parameters<typeof batterySummary>[0]) | null) | undefined;
   recommendation: RecommendationModel;
   /** The macro targets and what has been eaten (nutritionEnergyModel). */
   energy: EnergyModel | null;
@@ -127,14 +128,16 @@ export function snapshotIdentity(snapshot: WidgetSnapshot): string {
   return JSON.stringify({ ...snapshot, updated: undefined });
 }
 
+/** The figure and band are Home's Energy hero's own (energyHero), so the widget follows its rule. */
 function battery(data: SnapshotInput['battery']): WidgetBattery | null {
-  if (!data?.hasData || typeof data.current !== 'number' || !Number.isFinite(data.current)) return null;
-  const summary = batterySummary(data);
+  const hero = energyHero(data);
+  if (!data || !hero.hasData) return null;
+  const trend = batterySummary(data).trendLabel;
   return {
-    value: summary.value ?? '—',
-    label: [summary.levelLabel, summary.trendLabel].filter(Boolean).join(' · '),
-    level: Math.max(0, Math.min(100, Math.round(data.current))),
-    band: bodyBatteryBand(data.label as BodyBatteryLabel),
+    value: String(hero.level),
+    label: [hero.label, trend].filter(Boolean).join(' · '),
+    level: hero.level,
+    band: bodyBatteryBand(hero.label),
   };
 }
 

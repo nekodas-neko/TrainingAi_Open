@@ -4,6 +4,7 @@ import { knownInputKeys, limitedInputsNote } from '@trainingai/shared/health/rea
 import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite';
 import { scoreGapText } from '@trainingai/shared/health/score-gap-copy';
 import { scoreAverageChip } from '@trainingai/shared/health/score-average-chip';
+import { withLiveTodayActivity } from '@trainingai/shared/health/live-today-activity-trend';
 import {
   AppText,
   Badge,
@@ -95,6 +96,12 @@ export function HealthDetailScreen({
       : detail === 'activity'
         ? 'activityScore'
         : 'readinessScore';
+  // Today's Activity score is stored only once the day ends, so the trend has no point for today.
+  // Show the live score there, the number the hero is showing.
+  const scoreTrends =
+    trends.data && trendField === 'activityScore'
+      ? withLiveTodayActivity(trends.data.trends, health.today, score)
+      : trends.data?.trends;
   const averageChip =
     detail === 'readiness'
       ? scoreAverageChip(
@@ -348,7 +355,7 @@ export function HealthDetailScreen({
               title={`${title} Score`}
               tone={tone}
               caption="Last 14 days · gaps mean not recorded"
-              points={trends.data!.trends.map((day) => ({
+              points={scoreTrends!.map((day) => ({
                 label: day.date,
                 value: day[key],
               }))}
