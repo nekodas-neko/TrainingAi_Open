@@ -47,12 +47,15 @@ function view(
   other: typeof s.users.$inferSelect,
   viewerId: string,
   typed: string | null = null,
+  /** The status the row had when the viewer last saw it; differs from `r.status` after a revoke. */
+  statusBefore: string = r.status,
 ): TrainerRelationship {
-  const hidden = r.status === 'pending' && r.trainerId === viewerId
+  const hidden = statusBefore === 'pending' && r.trainerId === viewerId
   return {
     id: r.id,
     trainerId: r.trainerId,
-    traineeId: r.traineeId,
+    // The target's user id is as good a probe result as their name, so it is masked with them.
+    traineeId: hidden ? null : r.traineeId,
     status: r.status as TrainerRelationshipStatus,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -109,18 +112,29 @@ export async function acceptTrainer(db: Db, relationshipId: string, userId: stri
 
 /** Either party, from pending or accepted. Programs already assigned stay with the trainee. */
 export async function revokeTrainerRelationship(db: Db, relationshipId: string, userId: string): Promise<TrainerRelationship> {
-  const [r] = await db.update(s.trainerRelationships)
-    .set({ status: 'revoked', updatedAt: new Date() })
+  // The status BEFORE the update decides the mask: afterwards every row is 'revoked', and a trainer
+  // revoking their own pending request must not get the target's profile back (RV-195). The update
+  // is pinned to that status, so a row that moved in between is a 404 rather than an unmasked reply.
+  const [before] = await db.select({ status: s.trainerRelationships.status }).from(s.trainerRelationships)
     .where(and(
       eq(s.trainerRelationships.id, relationshipId),
       or(eq(s.trainerRelationships.trainerId, userId), eq(s.trainerRelationships.traineeId, userId)),
       ne(s.trainerRelationships.status, 'revoked'),
     ))
+    .limit(1)
+  if (!before) throw new NotFoundError('Relationship')
+  const [r] = await db.update(s.trainerRelationships)
+    .set({ status: 'revoked', updatedAt: new Date() })
+    .where(and(
+      eq(s.trainerRelationships.id, relationshipId),
+      or(eq(s.trainerRelationships.trainerId, userId), eq(s.trainerRelationships.traineeId, userId)),
+      eq(s.trainerRelationships.status, before.status),
+    ))
     .returning()
   if (!r) throw new NotFoundError('Relationship')
   const otherId = r.trainerId === userId ? r.traineeId : r.trainerId
   const [other] = await db.select().from(s.users).where(eq(s.users.id, otherId)).limit(1)
-  return view(r, other, userId)
+  return view(r, other, userId, null, before.status)
 }
 
 export async function listTrainerRelationships(db: Db, userId: string): Promise<TrainerRelationships> {

@@ -18,7 +18,8 @@ export interface TrainerCounterparty {
 export interface TrainerRelationship {
   id: string
   trainerId: string
-  traineeId: string
+  /** Null for the trainer on a request the trainee has not accepted: an id is a probe result too. */
+  traineeId: string | null
   status: TrainerRelationshipStatus
   createdAt: string
   updatedAt: string

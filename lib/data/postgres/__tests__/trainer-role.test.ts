@@ -534,6 +534,34 @@ describe.skipIf(!canRun)('trainer role (#2300)', () => {
       expect((await assign(TRAINEE, program({ name: 'Revoked By Trainer' }))).status).toBe(403)
     })
 
+    it('a trainer revoking their own pending request learns nothing about the target (RV-195)', async () => {
+      await pool.query(`DELETE FROM trainer_relationships WHERE trainer_id = $1 AND trainee_id = $2`, [TRAINER, STRANGER])
+      as(TRAINER)
+      const { rels } = await routes()
+      const made = await rels.POST(post('http://localhost/x', { emailOrCode: 'TST-STRG' }))
+      expect(made.status).toBe(201)
+      const created = (await made.json()).relationship
+      expect(created.traineeId).toBeNull()
+      expect(created.otherUser).toEqual({ id: null, displayName: 'TST-STRG', name: null, avatar: null })
+
+      const res = await act(created.id, 'revoke')
+      expect(res.status).toBe(200)
+      const { relationship } = await res.json()
+      expect(relationship.status).toBe('revoked')
+      expect(relationship.traineeId).toBeNull()
+      expect(relationship.otherUser).toEqual({ id: null, displayName: null, name: null, avatar: null })
+      expect(JSON.stringify(relationship)).not.toContain(STRANGER)
+      await pool.query(`DELETE FROM trainer_relationships WHERE id = $1`, [created.id])
+    })
+
+    it('a trainer revoking an accepted relationship still sees who it was with', async () => {
+      await pool.query(`UPDATE trainer_relationships SET status = 'accepted' WHERE id = $1`, [rel.main])
+      as(TRAINER)
+      const { relationship } = await (await act(rel.main, 'revoke')).json()
+      expect(relationship.traineeId).toBe(TRAINEE)
+      expect(relationship.otherUser.id).toBe(TRAINEE)
+    })
+
     it('a trainee deleting an assigned program removes its provenance row and nothing else', async () => {
       await pool.query(`UPDATE trainer_relationships SET status = 'accepted' WHERE id = $1`, [rel.main])
       as(TRAINER)
