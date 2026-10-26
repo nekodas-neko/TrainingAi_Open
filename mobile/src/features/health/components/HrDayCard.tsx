@@ -1,7 +1,6 @@
 import { hrChartDomain } from '@trainingai/shared/health/hr-smoothing';
 import {
   clockSkipOnDay,
-  closeClockSkip,
   dateStrMidnightInTz,
   wallClockMinuteReader,
 } from '@trainingai/shared/date-utils';
