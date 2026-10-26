@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createApiClient, ApiError } from '../src/features/account/api/client.ts';
+import { createApiClient, ApiError, isRejectedForGood } from '../src/features/account/api/client.ts';
+import { readPushAnswer } from '../src/core/sync/push-answer.ts';
 
 test('rejects unsafe hosts and absolute paths before credentials can be sent', async () => {
   assert.throws(() => createApiClient('http://example.com', async () => 'secret'));
@@ -95,4 +96,50 @@ test('data epoch: a server without the route has never reset the account, other 
   t.mock.restoreAll();
   t.mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 503, headers: { 'content-type': 'application/json' } }));
   await assert.rejects(client.dataEpoch(), error => error instanceof ApiError && error.status === 503);
+});
+
+test('only the server\'s own validation 400 is rejected for good; a proxy 400 is retried (#3392)', async t => {
+  const answers: [string, Record<string, string>][] = [
+    ['{"error":"Invalid body"}', { 'content-type': 'application/json' }],
+    ['<html><body>Bad Request</body></html>', { 'content-type': 'text/html' }],
+    ['', {}],
+    ['{"message":"Bad Request"}', { 'content-type': 'application/json' }],
+    ['{"error":""}', { 'content-type': 'application/json' }],
+  ];
+  const outcomes: boolean[] = [];
+  for (const [body, headers] of answers) {
+    t.mock.method(globalThis, 'fetch', async () => new Response(body || null, { status: 400, headers }));
+    const failure = await createApiClient('https://example.com', async () => 'test-session')
+      .post('/api/user/preferences', { a: 1 })
+      .catch((e: unknown) => e);
+    outcomes.push(isRejectedForGood(failure));
+    t.mock.restoreAll();
+  }
+  assert.deepEqual(outcomes, [true, false, false, false, false]);
+  assert.equal(isRejectedForGood(new ApiError(422)), true);
+  assert.equal(isRejectedForGood(new ApiError(400)), false);
+  assert.equal(isRejectedForGood(new ApiError(500)), false);
+});
+test('a push answer settles its one mutation by the shared rule: refusals count, retryable holds (#3392)', () => {
+  const op = { id: 'a', domain: 'mood_logs', date: '2026-10-23' };
+  const err = (e: object) => ({ domain: 'mood_logs', date: '2026-10-23', ...e });
+  assert.deepEqual(readPushAnswer(op, { processed: 1, errors: [] }), { kind: 'accepted' });
+  assert.deepEqual(readPushAnswer(op, { processed: 1 }), { kind: 'accepted' });
+  assert.deepEqual(readPushAnswer(op, { processed: 0, errors: [err({ id: 'a', error: 'bad' })] }), {
+    kind: 'refused', error: 'bad', attempts: 1, final: false,
+  });
+  // An unclassified error is non-retryable, so it counts rather than being set aside at once.
+  assert.deepEqual(readPushAnswer({ ...op, attempts: 3 }, { processed: 0, errors: [err({ id: 'a' })] }), {
+    kind: 'refused', error: 'sync failed', attempts: 4, final: false,
+  });
+  assert.equal(
+    (readPushAnswer({ ...op, attempts: 4 }, { processed: 0, errors: [err({ id: 'a' })] }) as { final: boolean }).final,
+    true,
+  );
+  assert.equal(readPushAnswer(op, { processed: 0, errors: [err({ id: 'a', retryable: true })] }).kind, 'hold');
+  assert.equal(readPushAnswer(op, { processed: 0, errors: [err({ id: 'other' })] }).kind, 'hold');
+  assert.equal(readPushAnswer(op, { processed: 0, errors: [] }).kind, 'hold');
+  assert.equal(readPushAnswer(op, {}).kind, 'hold');
+  // An older server's error carries no id: matched by domain and date.
+  assert.equal(readPushAnswer(op, { processed: 0, errors: [err({})] }).kind, 'refused');
 });

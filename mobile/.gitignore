@@ -18,3 +18,5 @@ credentials.json
 
 # Local Expo modules keep their Android sources in the repository.
 !/modules/*/android/
+/modules/*/android/.gradle/
+/modules/*/android/build/

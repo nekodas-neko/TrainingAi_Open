@@ -35,7 +35,7 @@ import {
  * recorded day forward from the beginning; a floor would silently change what the ladder reports for
  * anyone with history behind it, which is a behaviour change wearing a performance fix's clothes.
  * The growth the entry is right to worry about is addressed by the reads being one column wide
- * rather than by seeing less history — see `listStepDayKeys`.
+ * rather than by seeing less history — see `listStepTotals`.
  */
 const HISTORY_START = '2000-01-01'
 
@@ -58,16 +58,15 @@ export async function GET() {
   const today = todayInTz(tz)
   const repo = await getRepository()
 
-  const [trainedDays, restDays, program, stepDays, sleepDays, stepTotals, foodDays, weightDays, cardioCounts] = await Promise.all([
+  const [trainedDays, restDays, program, sleepDays, stepTotals, foodDays, weightDays, cardioCounts] = await Promise.all([
     repo.listTrainedDayKeys(userId, tz),
     repo.listRestDays(userId, HISTORY_START, today),
     repo.getActiveProgram(userId),
     // RV-63 — dates only. These were `listBodyMetrics` / `listSleepSessions` in full, 36 and 25
     // columns, immediately projected to `.map(x => x.date)`. The `> 0` predicate moved into SQL with
     // them, so the filter below is gone rather than relocated.
-    repo.listStepDayKeys(userId, HISTORY_START, today),
     repo.listSleepDayKeys(userId, HISTORY_START, today),
-    // PS-49 — v2's faucets.
+    // PS-49 — v2's faucets. The step days v1 replays are these totals' dates: one read, not two.
     repo.listStepTotals(userId, HISTORY_START, today),
     repo.listFoodLogDayKeys(userId, HISTORY_START, today),
     repo.listWeightDayKeys(userId, HISTORY_START, today),
@@ -87,12 +86,13 @@ export async function GET() {
   // fell in a deload, but a deload day you TRAINED is already a faucet day and needs no pause; what
   // a pause is for is the days you did not train, and a set of isolated stamped sessions cannot say
   // where those intervals began or ended.
+  const stepDays = stepTotals.map(r => r.date).sort((x, y) => y.localeCompare(x))
   const pausedDays = [...restDays, ...earlyDeloadWeekDays(program ?? {})]
 
   // A faucet day for these two is a day that was RECORDED, not one above a bar — see the note in
   // `ladder.ts`. Measured before wiring this up: only 35 of the owner's 130 step-days reach 8,000,
   // so a threshold would decay the steps ladder most weeks, against the engine's own instruction
-  // not to manufacture tension there. The `> 0` predicate now lives in the two reads above.
+  // not to manufacture tension there. The `> 0` predicate now lives in the reads above.
 
   const collections: Record<'workout' | 'steps' | 'sleep', CollectionState> = {
     workout: replayCollection({

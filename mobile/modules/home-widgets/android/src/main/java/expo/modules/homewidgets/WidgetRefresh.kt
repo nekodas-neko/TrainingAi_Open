@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import java.time.ZoneId
 
 /** Redraws the placed widgets, and arranges for them to be redrawn when the day turns. */
 internal object WidgetRefresh {
@@ -49,7 +48,7 @@ internal object WidgetRefresh {
     val alarms = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
     alarms.set(
       AlarmManager.RTC,
-      MidnightClock.nextMillis(System.currentTimeMillis(), ZoneId.systemDefault()),
+      MidnightClock.nextMillis(System.currentTimeMillis(), WidgetSnapshot.zoneOf(WidgetSnapshot.parse(WidgetStore.read(context)))),
       midnightIntent(context),
     )
   }

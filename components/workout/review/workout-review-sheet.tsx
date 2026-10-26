@@ -160,7 +160,7 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
       <SheetContent side="bottom" className="max-h-[88dvh] rounded-t-3xl flex flex-col p-0 gap-0">
         <SheetHeader className="text-left flex-none border-b border-border/50">
           <SheetTitle className="flex items-center gap-2">
-            <SparklesIcon className="h-5 w-5 text-accent-amber" />
+            <SparklesIcon className="h-5 w-5 text-amber-400" />
             Review{data ? ` · ${data.sessionName}` : " workout"}
           </SheetTitle>
         </SheetHeader>

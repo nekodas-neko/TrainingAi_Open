@@ -94,7 +94,7 @@ describe('#2148 — a band has one value', () => {
   it('no conditional line picks a band with a Tailwind green, amber or red class (#3421)', () => {
     const offenders: string[] = []
     for (const f of [...SCAN.flatMap(files)]) {
-      if (IDENTITY.has(f) || PALETTE_IDENTITY.has(f)) continue
+      if (PALETTE_IDENTITY.has(f)) continue
       stripComments(readFileSync(path.join(ROOT, f), 'utf8')).split('\n').forEach((line, i) => {
         if (PALETTE_BAND.test(line) && PALETTE_CONDITION.test(line)) offenders.push(`${f}:${i + 1} ${line.trim().slice(0, 120)}`)
       })
