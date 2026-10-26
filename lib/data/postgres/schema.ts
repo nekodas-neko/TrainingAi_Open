@@ -58,6 +58,10 @@ export const users = pgTable('users', {
   fitnessGoal:      text('fitness_goal'),
   lastGoalReviewAt: timestamp('last_goal_review_at', { withTimezone: true }),
   timingBaselineDate: date('timing_baseline_date', { mode: 'string' }),
+  /** #3369: a session or native access token whose `signedInAt` claim (stamped at sign-in, not `iat`,
+   *  which Auth.js re-issues as a cookie ages) is earlier than this is refused. NULL = no cut-off. An
+   *  admin's "reset data" sets it, so a device still holding the old rows cannot push them back. */
+  sessionsValidFrom: timestamp('sessions_valid_from', { withTimezone: true }),
 })
 
 export const authIdentities = pgTable('auth_identities', {
@@ -242,6 +246,8 @@ export const workoutSessions = pgTable('workout_sessions', {
   /** DEAD — never written, never read. See the block comment above; do not start using it. */
   unusedProgramSessionId: uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
   sessionRpe:        integer('session_rpe'),
+  /** #3266: whole seconds the workout was paused; NULL means never paused, the same as 0. */
+  pausedSec:         integer('paused_sec'),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),
 })
@@ -1830,6 +1836,8 @@ export const ouraBleBatteryPoll = pgTable('oura_ble_battery_poll', {
   measuredAt: timestamp('measured_at', { withTimezone: true }).notNull().defaultNow(),
   percent:    integer('percent').notNull(),
   charging:   boolean('charging'),
+  // Migration 202610252304: NULL = Bluetooth poll, 'oura_cloud' = Oura Cloud ring_battery_level (#3069).
+  source:     text('source'),
 })
 
 // TN-54 (migration 278). One row per `PolarStrapService` connection attempt or state change.

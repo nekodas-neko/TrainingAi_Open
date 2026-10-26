@@ -1,11 +1,14 @@
-import { ageFromDob, dateStrMidnightInTz, shiftDateStr } from '../date-utils'
+import { ageFromDob, dateStrMidnightInTz, shiftDateStr, todayInTz } from '../date-utils'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining, type AcwrResult, type ProgramAgeInput } from '../ai-periodization/acwr'
 import { computeActivityScore, strengthWindowEndingAt, type ActivityScoreResult } from './activity-score'
 import { getDailyGoals, type DailyGoals, type GoalProfile } from './daily-goals'
 import { hrMaxFromAge } from './hr-zones'
 import { latestWeightKg } from './latest-weight'
-import { intradayHrContributors } from './intraday-hr-contributors'
+import { intradayHrContributors, type MetGridInput } from './intraday-hr-contributors'
 import { excludeLowWearDays } from './wear-confidence'
+import { rowsOfDeviceInUse, perDeviceNormal } from './per-device-normal'
+import { BASELINE_MIN_NIGHTS } from './readiness-composite'
+import { dayStepCount } from './activity-steps'
 
 /** Qualifying days before the 28-day resting-HR mean is trusted (the readiness payload's rule). */
 const RESTING_HR_BASELINE_MIN_DAYS = 5
@@ -13,15 +16,40 @@ const RESTING_HR_BASELINE_MIN_DAYS = 5
 /**
  * The 28-day resting-HR baseline, low-wear days excluded: the floor of the zone-minute lane, and the
  * readiness payload's own `baselineRhr`. One definition, so the live score and a finalised day agree.
+ *
+ * Per device (#3001): the rows are those of the device that measured the newest night, so an Oura
+ * week is never judged against a baseline pooled with the ring's differently measured nights. Until
+ * that device has `RESTING_HR_BASELINE_MIN_DAYS` days the baseline is null, not the other device's.
  */
-export function restingHrBaseline<T extends { date: string; restingHeartRate?: number | null }>(
+export function restingHrBaseline<T extends { date: string; restingHeartRate?: number | null; restingHeartRateSource?: string | null }>(
   bodyMetrics: T[],
   ouraByDate: Map<string, { nonWearTimeSec?: number | null }>,
 ): number | null {
-  const rows = excludeLowWearDays(bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0), ouraByDate)
+  const onDevice = rowsOfDeviceInUse(bodyMetrics, m => m.restingHeartRate, m => m.restingHeartRateSource)
+  const rows = excludeLowWearDays(onDevice, ouraByDate)
   return rows.length >= RESTING_HR_BASELINE_MIN_DAYS
     ? rows.reduce((s, m) => s + m.restingHeartRate!, 0) / rows.length
     : null
+}
+
+/**
+ * The resting HR the zone lane reads while the device in use has no baseline of its own yet: the
+ * previous device's mature mean (the one the HR zones already hold still on), or null when there is
+ * no previous device. Without it the zone minutes and move hours drop for the first nights on a new
+ * device. Only for the zone lane; the displayed baseline stays null while the device warms up.
+ */
+export function carriedOverRestingHr(
+  bodyMetrics: readonly { date: string; restingHeartRate?: number | null; restingHeartRateSource?: string | null }[],
+): number | null {
+  const carried = perDeviceNormal(
+    bodyMetrics.map(m => ({
+      date: m.date,
+      value: m.restingHeartRate != null && m.restingHeartRate > 0 ? m.restingHeartRate : null,
+      source: m.restingHeartRateSource,
+    })),
+    { minNights: BASELINE_MIN_NIGHTS },
+  ).carriedOver
+  return carried == null ? null : Math.round(carried.value)
 }
 
 export interface ActivityDayInput {
@@ -32,8 +60,12 @@ export interface ActivityDayInput {
   bodyMetrics: readonly { date: string; steps?: number | null; activeCalories?: number | null; weightKg?: number | null }[]
   /** `restingHrBaseline` over the 28 days ending on `date`. */
   restingHrBaseline: number | null
+  /** `carriedOverRestingHr` when the device in use has no baseline yet; the zone lane reads it then. */
+  restingHrCarriedOver?: number | null
   /** The day's intraday heart rate, `[local midnight, next local midnight)`. */
   hrRows: readonly { timestamp: Date; bpm: number; source?: string | null }[]
+  /** Oura's per-minute MET (`ouraCloudMetGrid`) covering `date`: it decides the move lane (#3114). Null for none. */
+  metGrid?: MetGridInput | null
   /** The HR profile's ceiling; null falls back to the age formula. */
   maxHr: number | null
   /** Workout sessions covering at least the 28 days before `date`; later ones are ignored. */
@@ -41,6 +73,9 @@ export interface ActivityDayInput {
   program: ProgramAgeInput | null
   user: { dateOfBirth?: string | null; heightCm?: number | null; sex?: string | null; activityLevel?: GoalProfile['activityLevel'] } | null
   stepsGoal: number | null
+  /** The day's logged activities (`date` and `YYYY-MM-DD`); the treadmill ones add their steps to the
+   *  device count (`dayStepCount`, #3134). Left out, the day's steps are the device's alone. */
+  activityLogs?: readonly { date: string; activityType: string; steps?: number | null }[]
 }
 
 export interface ActivityDay {
@@ -105,13 +140,19 @@ export function scoreActivityForDay(input: ActivityDayInput): ActivityDay {
   let zoneMinutes: number | null = null
   let moveHours: number | null = null
   let moveHoursGoal: number | null = null
-  if (input.restingHrBaseline != null && input.hrRows.length > 0) {
+  // #3114: Oura's MET decides the move lane, so a day with MET and no heart rate still counts. A
+  // finished day also drops its non-wear waking hours from the goal (`dayIsOver`).
+  const hasMet = input.metGrid?.metsPerMinute.some(m => m != null) ?? false
+  const zoneRestingHr = input.restingHrBaseline ?? input.restingHrCarriedOver ?? null
+  if (zoneRestingHr != null && (input.hrRows.length > 0 || hasMet)) {
     const c = intradayHrContributors({
       hrRows: input.hrRows,
       maxHr: input.maxHr ?? hrMaxFromAge(ageYears),
-      restingHr: input.restingHrBaseline,
+      restingHr: zoneRestingHr,
       tz,
       dateIso: date,
+      metGrid: input.metGrid ?? null,
+      dayIsOver: date < todayInTz(tz),
     })
     zoneMinutes = c.zoneMinutes
     moveHours = c.moveHours
@@ -119,7 +160,8 @@ export function scoreActivityForDay(input: ActivityDayInput): ActivityDay {
   }
 
   const signals = {
-    steps: dayMetrics?.steps ?? null,
+    // The same step count every other surface shows (#3134), so a treadmill day scores on it.
+    steps: dayStepCount(dayMetrics?.steps, (input.activityLogs ?? []).filter(a => a.date === date)),
     activeCalories: dayMetrics?.activeCalories ?? null,
     zoneMinutes,
     moveHours,

@@ -22,15 +22,18 @@ import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { latestRestingHrRow } from '@trainingai/shared/health/latest-resting-hr'
+import { rowsOfDeviceInUse } from '@trainingai/shared/health/per-device-normal'
 import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
-import { scoreActivityForDay, restingHrBaseline, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
-import { staleFinishedDays } from '@trainingai/shared/health/finished-day-recheck'
-import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
+import { scoreActivityForDay, restingHrBaseline, carriedOverRestingHr, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
+import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
+import { staleFinishedDays, metLookbackFrom } from '@trainingai/shared/health/finished-day-recheck'
+import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, runBackgroundFinalise, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
 import { type DailyGoals } from '@trainingai/shared/health/daily-goals'
-import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
+import { resolveHrProfile, maxHrIsUnread } from '@trainingai/shared/health/hr-profile'
+import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult, type ContributorGap } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
@@ -387,7 +390,10 @@ export async function buildReadinessPayload(
 
   // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.
   const hrProfileP = resolveHrProfile(repo, userId, tz).catch(() => null)
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay] = await Promise.all([
+  // #3114: Oura's per-minute MET decides the move lane (its activity day starts at 4 a.m., hence the
+  // day before). Today's live read may go without it; a finalised day may not (`loadActivityDay`).
+  const cloudActivityP = (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay, stepActivityLogs] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -408,6 +414,9 @@ export async function buildReadinessPayload(
     (async () => repo.getOuraCloudReadinessContributors(userId, from28dIso, todayIso))().catch(() => []),
     // #3193: a failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
     (async () => knownSwitchDay !== undefined ? knownSwitchDay : repo.getOuraCloudSwitchDay(userId))().catch(() => null),
+    // #3134: today's and yesterday's treadmill steps join the device count in the Activity score. A failed
+    // read costs those steps only, so the score is served on the device count, as before this read existed.
+    (async () => repo.listActivityLogs(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => []),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -466,8 +475,13 @@ export async function buildReadinessPayload(
     ? Math.round((sleepScore100 / 100) * 40)
     : sleepHours != null ? Math.min(40, Math.round((sleepHours / 8) * 40)) : 0
 
-  const hrvRows       = excludeLowWearDays(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), ouraByDate)
-  const recentHrvRows = bodyMetrics.filter(m => m.date >= from7dIso && m.hrvMs != null && m.hrvMs > 0)
+  // #3001: the displayed baselines and the 7-day means are of the device that measured the newest
+  // night. Oura's HRV and the ring's differ by definition, so an Oura week judged against a baseline
+  // pooled with ring nights shows a change in the person that is a change of ruler. Until that device
+  // has the 5 nights a baseline needs, the baseline reads as not yet known rather than the other device's.
+  const hrvOnDevice   = rowsOfDeviceInUse(bodyMetrics, m => m.hrvMs, m => m.hrvSource)
+  const hrvRows       = excludeLowWearDays(hrvOnDevice, ouraByDate)
+  const recentHrvRows = hrvOnDevice.filter(m => m.date >= from7dIso)
   const baselineHrv   = hrvRows.length >= 5
     ? hrvRows.reduce((s, m) => s + m.hrvMs!, 0) / hrvRows.length
     : null
@@ -478,7 +492,9 @@ export async function buildReadinessPayload(
     ? Math.max(0, Math.min(30, Math.round(30 * (recentHrv / baselineHrv))))
     : 0
 
-  const recentRhrRows = bodyMetrics.filter(m => m.date >= from7dIso && m.restingHeartRate != null && m.restingHeartRate > 0)
+  // The 7-day mean and the baseline are of the device in use; `restingHrBaseline` picks the same rows.
+  const recentRhrRows = rowsOfDeviceInUse(bodyMetrics, m => m.restingHeartRate, m => m.restingHeartRateSource)
+    .filter(m => m.date >= from7dIso)
   const baselineRhr   = restingHrBaseline(bodyMetrics, ouraByDate)
   const recentRhr = recentRhrRows.length
     ? recentRhrRows.reduce((s, m) => s + m.restingHeartRate!, 0) / recentRhrRows.length
@@ -499,12 +515,17 @@ export async function buildReadinessPayload(
     tz,
     bodyMetrics,
     restingHrBaseline: baselineRhr,
+    // #3001: after a device switch the baseline is null for the first nights; the zone lane then reads
+    // the profile's resting HR, which is the previous device's mean, as the HR zones already do.
+    restingHrCarriedOver: baselineRhr == null && carriedOverRestingHr(bodyMetrics) != null ? hrProfile?.restingHr ?? null : null,
     hrRows: todayHrRows,
+    metGrid: ouraCloudMetGrid(await cloudActivityP, todayMid.getTime(), tomorrowMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,
     sessions: recentSessions,
     program,
     user: userProfile,
     stepsGoal: userGoals?.stepsGoal ?? null,
+    activityLogs: stepActivityLogs,
   })
   const { result: activityResult, goals, load, acwr } = activityToday
   const { sessions7d, volume7dKg } = activityToday.signals
@@ -519,8 +540,9 @@ export async function buildReadinessPayload(
   // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
   // today's, so on a training day the "previous day" score reacted to this morning's session.
   const prevWindow = strengthWindowEndingAt(recentSessions, yesterdayIso, tz)
-  const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0) ? (computeActivityScore({
-    steps: yesterdayMetrics?.steps ?? null,
+  const yesterdaySteps = dayStepCount(yesterdayMetrics?.steps, stepActivityLogs.filter(a => a.date === yesterdayIso))
+  const prevDayActivityScore = (yesterdayMetrics || yesterdaySteps != null || prevWindow.sessions7d > 0) ? (computeActivityScore({
+    steps: yesterdaySteps,
     activeCalories: yesterdayMetrics?.activeCalories ?? null,
     sessions7d: prevWindow.sessions7d,
     volume7dKg: prevWindow.volume7dKg,
@@ -534,8 +556,17 @@ export async function buildReadinessPayload(
   // older day in the look-back still holding a partial value is finalised behind the read.
   const nowDate = new Date()
   const activityStamps = new Map(derivedTodayRows.map(r => [r.day, activityFinalisedAt(r.activityContributors)]))
-  const staleActivityDays = staleFinishedDays(todayIso, tz, activityStamps, ACTIVITY_FINALISE_DAYS, activityFinalGrace(nowDate))
-  const maxHrOption = { maxHr: hrProfile?.maxHr ?? null }
+  // #3079: a finished day whose Oura MET changed after its stamp is scored once more, as the
+  // training-stress re-check does. A failed read only loses that trigger for this read.
+  const metChangedAt = await (async () =>
+    repo.getOuraCloudMetChangedAt(userId, metLookbackFrom(todayIso, ACTIVITY_FINALISE_DAYS), shiftDateStr(todayIso, -1)))()
+    .catch(() => [])
+  const staleActivityDays = staleFinishedDays(
+    todayIso, tz, activityStamps, ACTIVITY_FINALISE_DAYS, activityFinalGrace(nowDate),
+    new Map(metChangedAt.map(r => [r.date, r.changedAt])),
+  )
+  // A max HR that stands in for a failed read is not stored as a day's final score (the load refuses).
+  const maxHrOption = { maxHr: hrProfile?.maxHr ?? null, maxHrUnread: maxHrIsUnread(hrProfile) }
   const reportFinalise = (day: string, stage: 'scoring' | 'storing') => (err: unknown) =>
     reportServerError(new Error(`[readiness-score] ${stage} activity for ${day} failed — read still served`, { cause: err }), { userId })
   // Yesterday with no stamp at all has no usable stored value (a pre-#2435 row is a partial day), so
@@ -555,13 +586,14 @@ export async function buildReadinessPayload(
   }
   if (backgroundActivityDays.length > 0) {
     // One at a time and fire-and-forget, like the training-load re-check (#2400): the read never
-    // waits on it and a first visit after a week away does not open seven at once.
-    void (async () => {
+    // waits on it and a first visit after a week away does not open seven at once. One pass per user
+    // at a time, so parallel reads do not each run their own.
+    runBackgroundFinalise(userId, async () => {
       for (const day of backgroundActivityDays) {
         const scored = await scoreFinishedActivityDay(repo, userId, tz, day, nowDate, maxHrOption).catch(reportFinalise(day, 'scoring'))
         if (scored) await storeFinishedActivityDay(repo, userId, day, scored, nowDate).catch(reportFinalise(day, 'storing'))
       }
-    })()
+    })
   }
 
   // Q-284 — our own Activity Score, always. `blendActivityScore` used to adjust an Oura Cloud
