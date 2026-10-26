@@ -175,7 +175,7 @@ object WorkoutStatusNotifier {
     val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
       putExtra(EXTRA_WORKOUT_ID, workoutId)
-      putExtra(EXTRA_NONCE, nowMs)
+      putExtra(EXTRA_NONCE, WorkoutStatusPolicy.openNonce(nowMs, resume))
       if (resume) putExtra(EXTRA_RESUME, true)
     } ?: return null
     // A request code of its own, so the Resume button's intent is not the tap's.

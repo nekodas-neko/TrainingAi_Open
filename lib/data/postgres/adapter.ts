@@ -3811,6 +3811,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         startedAt: s.workoutSessions.startedAt,
         completedAt: s.workoutSessions.completedAt,
         warmupEndedAt: s.workoutSessions.warmupEndedAt,
+        pausedSec: s.workoutSessions.pausedSec,
       })
       .from(s.workoutSessions)
       .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, since), isNull(s.workoutSessions.deletedAt)))
@@ -3851,6 +3852,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         startedAt: r.startedAt.getTime(),
         completedAt: r.completedAt?.getTime() ?? null,
         warmupEndedAt: r.warmupEndedAt?.getTime() ?? null,
+        pausedSec: r.pausedSec ?? null,
       })),
       exercises: elRows.map(r => ({
         workoutSessionId: r.workoutSessionId,

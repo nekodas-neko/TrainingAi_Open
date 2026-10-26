@@ -27,6 +27,17 @@ class PipPresenterTest {
     for (phase in listOf(PipPolicy.IDLE, "pre", "done", "", null)) assertFalse("$phase", PipPolicy.isActivePhase(phase))
   }
 
+  @Test fun `leaving the app enters by hand only where the system does not enter on its own`() {
+    // Android 12 and later: a set, a rest and a pause auto-enter, so no manual entry.
+    for (phase in listOf("set", "rest", "paused")) assertFalse(phase, PipPolicy.entersOnLeave(phase, 34))
+    for (phase in listOf("complete", "summary")) assertTrue(phase, PipPolicy.entersOnLeave(phase, 34))
+    // Before Android 12 there is no auto-enter, so every active phase enters by hand.
+    for (phase in listOf("set", "rest", "paused", "complete", "summary")) assertTrue(phase, PipPolicy.entersOnLeave(phase, 30))
+    // No workout, no window.
+    assertFalse(PipPolicy.entersOnLeave(PipPolicy.IDLE, 34))
+    assertFalse(PipPolicy.entersOnLeave(null, 30))
+  }
+
   @Test fun `the system enters on its own only for a set, a rest or a pause`() {
     for (phase in listOf("set", "rest", "paused")) assertTrue(phase, PipPolicy.autoEnters(phase))
     for (phase in listOf("complete", "summary", "pre", "done", PipPolicy.IDLE, "", null)) {

@@ -46,6 +46,8 @@ class PictureInPictureModule : Module() {
   private var receiverRegistered = false
   private var watched: OnPictureInPictureModeChangedProvider? = null
   private var inPip = false
+  // The last params the system accepted (UI thread only); see pushParams.
+  private var lastPushed: ParamsKey? = null
   private val main = Handler(Looper.getMainLooper())
 
   private val context: Context
@@ -116,14 +118,19 @@ class PictureInPictureModule : Module() {
     OnActivityEntersForeground {
       appContext.currentActivity?.let {
         watch(it)
+        // Auto-enter is armed by the params; arm them for an activity that arrived after setPhase.
+        if (PipPolicy.isActivePhase(phase)) pushParams(it)
         report(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && it.isInPictureInPictureMode)
       }
     }
 
     OnUserLeavesActivity {
       val activity = appContext.currentActivity ?: return@OnUserLeavesActivity
-      if (!PipPolicy.isActivePhase(phase)) return@OnUserLeavesActivity
-      val params = params(activity, phase) ?: return@OnUserLeavesActivity
+      // From Android 12 the system enters the window itself for a set, a rest or a pause, shrinking
+      // the screen into the on-screen card (the source rect). Entering here as well would pre-empt
+      // that; pushParams has already armed auto-enter.
+      if (!PipPolicy.entersOnLeave(phase, Build.VERSION.SDK_INT)) return@OnUserLeavesActivity
+      val params = runCatching { params(activity, phase) }.getOrNull() ?: return@OnUserLeavesActivity
       watch(activity)
       if (runCatching { activity.enterPictureInPictureMode(params) }.getOrDefault(false)) report(true)
     }
@@ -167,13 +174,47 @@ class PictureInPictureModule : Module() {
     windowView = null
   }
 
-  /** Keeps the shape, buttons and auto-enter of the window in step with the workout. */
+  /**
+   * Keeps the shape, buttons and auto-enter of the window in step with the workout. The status
+   * changes about once a second with a heart-rate strap, but the window's shape and buttons do not,
+   * so a push whose params would be the same as the last one is skipped: rebuilding three
+   * RemoteActions and calling the system every second is wasted work on the UI thread.
+   */
   private fun pushParams(activity: Activity) {
     val current = phase
     activity.runOnUiThread {
-      params(activity, current)?.let { runCatching { activity.setPictureInPictureParams(it) } }
+      // Built on the UI thread by the framework's own classes; a failure must not crash the app.
+      runCatching {
+        val key = paramsKey(activity, current)
+        if (key == lastPushed) return@runCatching
+        params(activity, current)?.let {
+          activity.setPictureInPictureParams(it)
+          lastPushed = key
+        }
+      }
     }
   }
+
+  /** Everything `params` reads: if none of it changed, the system already has these params. */
+  private data class ParamsKey(
+    val activity: Int,
+    val phase: String,
+    val aspect: Pair<Int, Int>,
+    val buttons: List<Triple<String, String, String>>,
+    val title: String?,
+    val subtitle: String?,
+    val sourceRect: Rect?,
+  )
+
+  private fun paramsKey(activity: Activity, phase: String) = ParamsKey(
+    activity = System.identityHashCode(activity),
+    phase = phase,
+    aspect = PipPolicy.aspect(phase).let { it.first to it.second },
+    buttons = PipPresenter.buttons(phase, status).map { Triple(it.action, it.icon, it.label) },
+    title = PipPresenter.title(status),
+    subtitle = PipPresenter.subtitle(phase, status),
+    sourceRect = sourceRect?.let { Rect(it) },
+  )
 
   private fun params(activity: Activity, phase: String): PictureInPictureParams? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null

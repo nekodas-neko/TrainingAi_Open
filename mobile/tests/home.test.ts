@@ -625,6 +625,8 @@ test('an unsynced completed workout enters Home timeline and a lost-reply server
   const events = localTimeline([], [pending], [], day, 'Australia/Brisbane');
   assert.equal(events.length, 1);
   assert.equal(events[0].durationMin, 30);
+  const paused = localTimeline([], [{ ...pending, pausedMs: 10 * 60_000 }], [], day, 'Australia/Brisbane');
+  assert.equal(paused[0].durationMin, 20, 'time spent paused is not part of the duration');
   assert.equal(localTimeline(events, [pending], [], day, 'Australia/Brisbane').length, 1);
 });
 

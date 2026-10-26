@@ -1480,7 +1480,7 @@ export interface WorkoutRepository {
   /** BF-144: has this program session been trained since `since`? Keyed on the id link, not names. */
   wasProgramSessionTrainedSince(userId: string, programSessionId: string, since: Date): Promise<boolean>
   getRecentSessionsOfType(userId: string, programSessionId: string, limit: number): Promise<Array<{
-    id: string; startedAt: Date; completedAt: Date | null; sessionName: string
+    id: string; startedAt: Date; completedAt: Date | null; sessionName: string; pausedSec?: number | null
   }>>
   getSetLogsForSessions(workoutSessionIds: string[]): Promise<Array<{
     workoutSessionId: string; exerciseName: string; setNumber: number;

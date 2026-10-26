@@ -24,6 +24,17 @@ object PipPolicy {
 
   fun autoEnters(phase: String?): Boolean = phase in AUTO_ENTER_PHASES
 
+  /** `Build.VERSION_CODES.S`: auto-enter exists from here. */
+  private const val SDK_S = 31
+
+  /**
+   * Whether leaving the app should open the window by hand. From Android 12 the phases that
+   * auto-enter are entered by the system with the shrink animation, and a manual entry would
+   * pre-empt it; every other active phase, and every phase before Android 12, still enters here.
+   */
+  fun entersOnLeave(phase: String?, sdk: Int): Boolean =
+    isActivePhase(phase) && !(sdk >= SDK_S && autoEnters(phase))
+
   /** The window's width : height. Portrait while lifting, square for everything else. */
   fun aspect(phase: String?): Pair<Int, Int> = if (phase == "set") 3 to 4 else 1 to 1
 }

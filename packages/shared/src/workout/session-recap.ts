@@ -1,6 +1,7 @@
 import type { WorkoutSession } from '@trainingai/shared/types/log'
 import { restAdherencePct, restAdherenceSets } from './rest-adherence'
 import { median } from './time-audit'
+import { sessionActiveMin } from './active-duration'
 
 export interface RecapFacts {
   durationMin: number | null
@@ -27,7 +28,7 @@ const MIN_RECENT_FOR_MEDIAN = 3
 
 export function buildRecapFacts({ session, recentDurationsMin, restSecByStyleSet, prCount }: BuildRecapFactsInput): RecapFacts {
   const durationMin = session.completedAt
-    ? Math.round((session.completedAt.getTime() - session.startedAt.getTime()) / 60_000)
+    ? Math.round(sessionActiveMin(session.startedAt, session.completedAt, session.pausedSec))
     : null
 
   let durationVsMedianPct: number | null = null

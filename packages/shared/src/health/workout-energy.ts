@@ -144,17 +144,7 @@ export function isPlausibleSessionDuration(durationMin: number | null | undefine
     && durationMin > 0 && durationMin <= MAX_PLAUSIBLE_SESSION_MIN
 }
 
-/**
- * Minutes a session was actually under way: its span less the time it spent paused (#3266). The one
- * place a session's duration is taken for energy, so a 10-minute call mid-workout is not burned
- * off. Paused time is clamped to the span, and null or absent (every session saved before pause
- * existed) takes nothing off.
- */
-export function sessionActiveMin(startedAt: Date, completedAt: Date, pausedSec?: number | null): number {
-  const spanMin = (completedAt.getTime() - startedAt.getTime()) / 60_000
-  const pausedMin = typeof pausedSec === 'number' && Number.isFinite(pausedSec) ? Math.max(0, pausedSec) / 60 : 0
-  return spanMin - Math.min(pausedMin, Math.max(0, spanMin))
-}
+export { sessionActiveMin } from '../workout/active-duration'
 
 export interface WorkoutEnergyInput {
   durationMin: number
