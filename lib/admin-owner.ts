@@ -4,11 +4,10 @@ import { resolveClaudeRoOwner } from '@/lib/data/postgres/claude-ro-owner'
  * #3368 / #3369 — who the owner is, for the one rule that protects them: only the owner removes
  * admin from anyone, and nobody but the owner deactivates, resets or deletes the owner's account.
  *
- * **One source, not a new variable.** `resolveClaudeRoOwner()` is already how the app names its
- * owner (`CLAUDE_RO_OWNER_USER_ID`, else `ADMIN_EXPORT_USER_ID`, else `WEBHOOK_USER_ID`; see
- * `docs/environment-variables.md`). The day-review export, the agent key and the audit views all
- * resolve through it, and the agent key's variable must already name an admin. Reading it here
- * means the owner is defined once and cannot drift from the account the audit views are scoped to.
+ * **One source, not a new variable.** `resolveClaudeRoOwner()` is already how the audit views name
+ * the owner (`CLAUDE_RO_OWNER_USER_ID`, else `ADMIN_EXPORT_USER_ID`, else `WEBHOOK_USER_ID`; see
+ * `docs/environment-variables.md`). Reading it here means the owner is defined once and cannot
+ * drift from the account the audit views are scoped to.
  *
  * **Fails closed.** An unset or malformed value returns `null`, and every caller treats `null` as
  * "nobody is the owner, so nobody may do an owner-only thing": no one can revoke admin, and no
