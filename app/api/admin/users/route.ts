@@ -10,7 +10,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 import { rateLimit } from '@/lib/rate-limit'
-import { resolveOwnerUserId, judgeProtectedTarget, judgeRevokeAdmin, sameUserId } from '@/lib/admin-owner'
+import { resolveOwnerUserId, judgeProtectedTarget, judgeRevokeAdmin, sameUserId, ownerRefusalMessage } from '@/lib/admin-owner'
 
 /**
  * #2383 item 3 — the one self-check both mutating handlers share. Deleting or deactivating your own
@@ -94,7 +94,7 @@ export async function PATCH(req: NextRequest) {
       const refused = judgeProtectedTarget(session.user.id, userId, target.isAdmin === true, ownerId)
       if (refused) {
         console.warn(`[admin/users] deactivate refused (${refused}): admin ${session.user.id} -> ${userId}`)
-        return NextResponse.json({ error: 'Only the owner can deactivate this account' }, { status: 403 })
+        return NextResponse.json({ error: ownerRefusalMessage(refused, 'deactivate this account') }, { status: 403 })
       }
     }
   }
@@ -108,7 +108,7 @@ export async function PATCH(req: NextRequest) {
       const refused = judgeRevokeAdmin(session.user.id, ownerId)
       if (refused) {
         console.warn(`[admin/users] remove admin refused (${refused}): admin ${session.user.id} -> ${userId}`)
-        return NextResponse.json({ error: 'Only the owner can remove admin' }, { status: 403 })
+        return NextResponse.json({ error: ownerRefusalMessage(refused, 'remove admin') }, { status: 403 })
       }
     }
     const outcome = await repo.setUserAdmin({
@@ -119,7 +119,7 @@ export async function PATCH(req: NextRequest) {
       case 'not-found': return NextResponse.json({ error: 'User not found' }, { status: 404 })
       case 'inactive-target': return NextResponse.json({ error: 'Only an active user can be made admin' }, { status: 400 })
       case 'actor-not-admin': return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      default: return NextResponse.json({ error: 'Only the owner can remove admin' }, { status: 403 })
+      default: return NextResponse.json({ error: ownerRefusalMessage(outcome.reason, 'remove admin') }, { status: 403 })
     }
   }
 
