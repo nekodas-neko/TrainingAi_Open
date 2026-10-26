@@ -5,8 +5,11 @@
 -- phone that still holds the old rows. Every session issued before the reset must therefore stop
 -- being accepted, and this column is what it is compared against:
 --
---   sessions_valid_from  a web session or native access token whose `iat` is earlier than this is
---                        refused. NULL means "no cut-off", the state of every existing account.
+--   sessions_valid_from  a web session or native access token whose `signedInAt` claim (the moment
+--                        of the sign-in itself, stamped once) is earlier than this is refused. It is
+--                        not `iat`: Auth.js re-issues `iat` as a cookie ages, so `iat` would let a
+--                        stale session through after its next refresh. NULL means "no cut-off", the
+--                        state of every existing account.
 --
 -- Every existing row stays NULL, so nobody is signed out by this migration. NULL with no default
 -- keeps it catalog-only on any server version, and an older build that never reads the column
