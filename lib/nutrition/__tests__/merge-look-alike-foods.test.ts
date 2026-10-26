@@ -14,7 +14,7 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
   let db: ReturnType<typeof import('@/lib/data/postgres/client').getDb>
   let merge: typeof import('../merge-look-alike-foods').mergeLookAlikeFoods
   let nutrition: typeof import('@/lib/data/postgres/slices/nutrition')
-  let repo: import('@/lib/data/repository').Repository
+  let repo: import('@/lib/data/repository').WorkoutRepository
   let mealTypeId: string
 
   beforeAll(async () => {
