@@ -102,6 +102,8 @@ export type AuthPlatform = {
   holdsOtherAccountData?(origin: string, userId: string): Promise<boolean>;
   /** #3396: wipe every account scope except this user's. */
   wipeOtherAccountData?(origin: string, userId: string): Promise<void>;
+  /** The phone's owner changed: reset device-scoped state that belonged to the previous owner. */
+  deviceOwnerChanged?(): Promise<void>;
 };
 const RESET_MESSAGE = 'Your account data was reset. Sign in again to start fresh.';
 
@@ -202,6 +204,7 @@ export class AccountSession {
           wipe,
           holdsOtherAccounts: this.platform.holdsOtherAccountData?.bind(this.platform),
           wipeOthers: this.platform.wipeOtherAccountData?.bind(this.platform),
+          ownerChanged: this.platform.deviceOwnerChanged?.bind(this.platform),
         }
       : null;
   }

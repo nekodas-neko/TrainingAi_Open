@@ -327,3 +327,42 @@ test('reconcileDevice: an empty user id is refused before anything is read, wipe
   );
   assert.deepEqual(touched, []);
 });
+
+test('reconcileDevice: a new owner resets the device-scoped battery alert; the same owner behind a reset does not (#3435)', async () => {
+  const run = async (record: string | null, userId: string, serverEpoch: number, others = false) => {
+    const calls: string[] = [];
+    await reconcileDevice(
+      {
+        read: async () => record,
+        write: async () => {},
+        wipe: async () => void calls.push('wipe'),
+        holdsOtherAccounts: async () => others,
+        wipeOthers: async () => void calls.push('wipe-others'),
+        ownerChanged: async () => void calls.push('owner-changed'),
+      },
+      origin, userId, serverEpoch,
+    );
+    return calls;
+  };
+  const recorded = JSON.stringify({ origin, userId: 'u1', epoch: 0 });
+  assert.deepEqual(await run(recorded, 'u2', 0), ['wipe', 'owner-changed']);
+  assert.deepEqual(await run(null, 'u2', 0, true), ['wipe-others', 'owner-changed']);
+  assert.deepEqual(await run(recorded, 'u1', 3), ['wipe'], 'same person: their own alert state stands');
+  assert.deepEqual(await run(recorded, 'u1', 0), []);
+  assert.deepEqual(await run(null, 'u2', 0), [], 'a claimed empty phone has no previous owner');
+});
+
+test('reconcileDevice: a failure resetting the battery alert never blocks the sign-in', async () => {
+  const disk = { value: JSON.stringify({ origin, userId: 'u1', epoch: 0 }) as string | null };
+  const out = await reconcileDevice(
+    {
+      read: async () => disk.value,
+      write: async (v) => void (disk.value = v),
+      wipe: async () => {},
+      ownerChanged: async () => { throw new Error('locked'); },
+    },
+    origin, 'u2', 0,
+  );
+  assert.equal(out.outcome, 'wiped');
+  assert.equal(parseDeviceRecord(disk.value)?.userId, 'u2');
+});
