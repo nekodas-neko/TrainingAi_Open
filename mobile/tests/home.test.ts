@@ -859,3 +859,35 @@ test('the timeline Woke up event is the time you woke, not the recorded window e
   // Still after falling asleep, so the day's order does not change.
   assert.deepEqual(events.map((event) => event.type), ['wakeup', 'sleep']);
 });
+
+test('a ring night\'s Woke up from the server also reads the time you woke (#3426)', () => {
+  const night = sleepSchema.parse({
+    date: '2026-10-17',
+    sleepStart: '2026-10-16T12:00:00.000Z',
+    sleepEnd: '2026-10-16T20:23:00.000Z',
+    phaseWindowStart: '2026-10-16T12:00:00.000Z',
+    phaseWindowEnd: '2026-10-16T20:23:00.000Z',
+    sleepPhase5Min: '4' + '2'.repeat(96) + '4444',
+  });
+  const server = timelineEventSchema.parse({
+    type: 'wakeup',
+    time: '6:23 am',
+    timeMs: Date.parse('2026-10-16T20:23:00.000Z'),
+    title: 'Woke up',
+    day: 'today',
+    date: '2026-10-17',
+  });
+  const nap = sleepSchema.parse({
+    date: '2026-10-17',
+    sleepStart: '2026-10-17T04:00:00.000Z',
+    sleepEnd: '2026-10-17T04:40:00.000Z',
+  });
+  const events = localTimeline([server], [], [nap, night], '2026-10-17', 'Australia/Brisbane');
+  const woke = events.filter((event) => event.type === 'wakeup');
+  assert.equal(woke.length, 1);
+  assert.equal(woke[0].timeMs, Date.parse('2026-10-16T20:05:00.000Z'));
+  assert.equal(woke[0].time.replace(/\s/g, ' '), '6:05 am');
+  // A night that doesn't match the event's recorded end leaves it alone.
+  const other = localTimeline([server], [], [nap], '2026-10-17', 'Australia/Brisbane');
+  assert.equal(other[0].timeMs, server.timeMs);
+});

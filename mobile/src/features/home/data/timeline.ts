@@ -37,7 +37,18 @@ export function localTimeline(
   today: string,
   timezone: string,
 ) {
-  const rows = [...events];
+  // #3426: the server's "Woke up" is the session's recorded window end. Show the time that night's
+  // sleep ended, as the night header and Home do (#3415). The night is the one whose recorded end
+  // the event carries, so a nap on the same day is never picked.
+  const rows = events.map((row) => {
+    if (row.type !== 'wakeup') return row;
+    const night = sleep.find((n) => n.sleepEnd != null && Date.parse(n.sleepEnd) === row.timeMs);
+    const woke = night ? sleepWokeEnd(night) : null;
+    const timeMs = woke ? Date.parse(woke) : NaN;
+    return Number.isFinite(timeMs) && timeMs !== row.timeMs
+      ? { ...row, timeMs, time: formatTimeOfDay(timeMs, timezone) }
+      : row;
+  });
   const yesterday = shiftDateStr(today, -1);
   const group = (date: string) =>
     date === today ? ('today' as const) : ('yesterday' as const);
