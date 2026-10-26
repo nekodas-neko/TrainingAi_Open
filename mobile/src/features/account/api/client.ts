@@ -75,8 +75,17 @@ export function createApiClient(
   getToken: () => Promise<string | null>,
   fetcher?: typeof fetch,
   renew?: (stale: string) => Promise<string | null>,
+  /**
+   * #3369. `dataEpoch` is the `X-Data-Epoch` value this phone claims for the signed-in account
+   * (`device-record.ts`); every write carries it. `onDataEpochStale` runs when the server answers a
+   * write 409 `data-epoch-stale`: an admin reset the account since this phone last wiped.
+   */
+  epoch?: { dataEpoch?: () => string | null; onDataEpochStale?: () => void },
 ) {
   const base = backendOrigin(baseUrl);
+  const staleEpoch = (status: number, value: { error?: unknown } | null) => {
+    if (status === 409 && value?.error === 'data-epoch-stale') epoch?.onDataEpochStale?.();
+  };
   async function request(
     path: string,
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
@@ -130,6 +139,7 @@ export function createApiClient(
                   : 'application/json',
             ...(body ? { 'Content-Type': 'application/json' } : {}),
             ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+            ...(method !== 'GET' && epoch?.dataEpoch?.() ? { 'X-Data-Epoch': epoch.dataEpoch()! } : {}),
           },
           body: body ? JSON.stringify(body) : undefined,
           signal: controller.signal,
@@ -147,6 +157,7 @@ export function createApiClient(
         let value: { error?: unknown } | null = null;
         if (response.headers.get('content-type')?.includes('application/json')) {
           value = (await response.json().catch(() => null)) as { error?: unknown } | null;
+          staleEpoch(response.status, value);
           if (typeof value?.error === 'string' && /^[a-z_]{1,64}$/.test(value.error)) {
             code = value.error;
           }
@@ -214,6 +225,7 @@ export function createApiClient(
             Accept: 'text/event-stream',
             'Content-Type': 'application/json',
             Authorization: `Bearer ${bearer}`,
+            ...(epoch?.dataEpoch?.() ? { 'X-Data-Epoch': epoch.dataEpoch()! } : {}),
           },
           body: JSON.stringify(body),
           signal,
@@ -227,7 +239,9 @@ export function createApiClient(
         }
       }
       if (!response.ok) {
-        throw failedRequest('/api/coach', response.status, await response.json().catch(() => null));
+        const failure = await response.json().catch(() => null);
+        staleEpoch(response.status, failure as { error?: unknown } | null);
+        throw failedRequest('/api/coach', response.status, failure);
       }
       if (
         !response.headers.get('content-type')?.includes('text/event-stream') ||
@@ -359,6 +373,14 @@ export function createApiClient(
         link,
       )) as Record<string, unknown> | null;
       return sessionResponse(value);
+    },
+    /** The moment an admin last reset this account, in whole seconds (0 when never). */
+    async dataEpoch(): Promise<number> {
+      const value = (await request('/api/account/data-epoch', 'GET')) as { epoch?: unknown } | null;
+      if (typeof value?.epoch !== 'number' || !Number.isSafeInteger(value.epoch) || value.epoch < 0) {
+        throw new Error('Invalid data epoch response.');
+      }
+      return value.epoch;
     },
     async profile(): Promise<AccountProfile> {
       const value = (await request('/api/user/profile', 'GET')) as {

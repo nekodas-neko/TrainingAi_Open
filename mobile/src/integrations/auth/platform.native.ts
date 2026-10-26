@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { MOBILE_CALLBACKS } from '../../features/account/session';
 import type { AuthPlatform, MobileClient } from '../../features/account/session';
 import { homeWidgets } from '../widgets/platform';
+import { openLocalStorage } from '../../core/storage/open';
 
 const applicationId =
   Platform.OS === 'android'
@@ -111,6 +112,12 @@ export const authPlatform: AuthPlatform = {
     return (await import('expo-web-browser')).openAuthSessionAsync(url, callback);
   },
   clearAccountData() {
+    homeWidgets?.clearSnapshot();
+  },
+  async wipeAccountData(origin, userId) {
+    const storage = await openLocalStorage();
+    if (userId === null) await storage.clearAllAccounts();
+    else await storage.clearAccount(origin, userId);
     homeWidgets?.clearSnapshot();
   },
   dismiss() {

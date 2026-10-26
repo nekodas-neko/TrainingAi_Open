@@ -1,6 +1,13 @@
 import { ApiError, backendOrigin, createApiClient, REFRESH_TOKEN_RE } from './api/client.ts';
 import type { AccountProfile, SessionToken } from './api/client.ts';
 import { failureNotice } from '../../core/reporting/index.ts';
+import {
+  DEVICE_RECORD_KEY,
+  epochHeader,
+  parseDeviceRecord,
+  reconcileDevice,
+  type DeviceRecord,
+} from './device-record.ts';
 
 export const AUTH_CALLBACK = 'com.fitnessai.training:/auth/callback';
 export const MOBILE_CALLBACKS = {
@@ -86,7 +93,14 @@ export type AuthPlatform = {
    * widget snapshot (#3279). Called whenever no account is signed in any more.
    */
   clearAccountData?(): void;
+  /**
+   * #3369. Wipes what the phone keeps in its local database for an account, queued writes included
+   * (a user id), or for every account (null). Without it the phone cannot honour an admin reset, so
+   * the session does not try.
+   */
+  wipeAccountData?(origin: string, userId: string | null): Promise<void>;
 };
+const RESET_MESSAGE = 'Your account data was reset. Sign in again to start fresh.';
 
 export function parseAuthCallback(
   raw: string,
@@ -154,6 +168,9 @@ export class AccountSession {
   private profileRequest: { generation: number; promise: Promise<void> } | null = null;
   private renewal: Promise<Renewal> | null = null;
   private renewBackoffUntil = 0;
+  /** #3369: the account this phone's data belongs to and the admin reset it has wiped for. */
+  private device: DeviceRecord | null = null;
+  private staleRun: Promise<void> | null = null;
   constructor(origin: string, platform: AuthPlatform) {
     this.platform = platform;
     this.client = platform.client ?? 'ios';
@@ -164,7 +181,56 @@ export class AccountSession {
       () => this.accessToken(),
       platform.fetch,
       (stale) => this.renewedToken(stale),
+      this.epochOptions(),
     );
+  }
+  private epochOptions() {
+    return {
+      dataEpoch: () => epochHeader(this.device, this.origin, this.session?.userId ?? null),
+      onDataEpochStale: () => void this.dataEpochStale(),
+    };
+  }
+  private deviceDeps() {
+    const wipe = this.platform.wipeAccountData?.bind(this.platform);
+    return wipe
+      ? {
+          read: () => this.platform.get(DEVICE_RECORD_KEY),
+          write: (value: string) => this.platform.set(DEVICE_RECORD_KEY, value),
+          wipe,
+        }
+      : null;
+  }
+  /**
+   * #3369. Settle this phone against the server's reset moment for the account that is signing in,
+   * before any of the account's stores can be opened (its user id is not on the session yet).
+   */
+  private async settleDevice(userId: string): Promise<'ok' | 'wiped'> {
+    const deps = this.deviceDeps();
+    if (!deps) return 'ok';
+    const result = await reconcileDevice(deps, this.origin, userId, await this.api.dataEpoch());
+    this.device = result.record;
+    return result.outcome;
+  }
+  /**
+   * The server refused a write because an admin reset this account after the phone last wiped.
+   * Ask again, and if the phone is behind, wipe it and sign out so the stores reopen empty. One at
+   * a time; a failure leaves the next 409 to try again.
+   */
+  private dataEpochStale(): Promise<void> {
+    if (this.staleRun) return this.staleRun;
+    const run = (async () => {
+      const userId = this.session?.userId;
+      if (!userId || !this.deviceDeps()) return;
+      try {
+        if ((await this.settleDevice(userId)) === 'wiped') await this.signOut(RESET_MESSAGE);
+      } catch (error) {
+        this.record('data_epoch_failed', error);
+      }
+    })().finally(() => {
+      this.staleRun = null;
+    });
+    this.staleRun = run;
+    return run;
   }
   /** A session can make requests while its access token is live, or while it can renew one. */
   private usable(session: SavedSession | null): session is SavedSession {
@@ -291,6 +357,7 @@ export class AccountSession {
       () => this.accessToken(userId),
       this.platform.fetch,
       (stale) => this.renewedToken(stale, userId),
+      this.epochOptions(),
     );
     const readTimezone = () => this.session?.timezone ?? null;
     this.reader = {
@@ -440,10 +507,12 @@ export class AccountSession {
     );
     const generation = ++this.generation;
     try {
-      const [stored, savedPending] = await Promise.all([
+      const [stored, savedPending, savedDevice] = await Promise.all([
         this.platform.get(SESSION_KEY),
         this.platform.get(PENDING_KEY),
+        this.platform.get(DEVICE_RECORD_KEY),
       ]);
+      this.device = parseDeviceRecord(savedDevice);
       const raw = stored ? (JSON.parse(stored) as Partial<SavedSession>) : null;
       if (generation !== this.generation) {
         return;
@@ -737,6 +806,17 @@ export class AccountSession {
       }
       if (this.session.userId && this.session.userId !== profile.id) {
         await this.signOut('The account did not match the saved session. Sign in again.');
+        return;
+      }
+      // #3369: before the user id goes on the session, which is what opens the account's stores. A
+      // phone behind an admin reset, or last used by another account, is wiped here. If stores were
+      // already open (a saved session found at launch) they are not trusted: sign in again.
+      const storesOpen = this.session.userId !== null;
+      if ((await this.settleDevice(profile.id)) === 'wiped' && storesOpen) {
+        if (generation === this.generation) await this.signOut(RESET_MESSAGE);
+        return;
+      }
+      if (generation !== this.generation || !this.session) {
         return;
       }
       // Built inside the write queue from the session as it is then, so a renewal that finished

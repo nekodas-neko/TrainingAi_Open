@@ -48,6 +48,13 @@ export class LocalStorage {
     );
   }
 
+  /** #3369: every account's data on the phone, queued writes included. The device scope stays. */
+  clearAllAccounts() {
+    return this.run(() =>
+      this.database.runAsync('DELETE FROM local_values WHERE scope <> ?', JSON.stringify(['device'])),
+    );
+  }
+
   private run<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.operations.then(operation);
     this.operations = result.catch(() => undefined);
