@@ -709,6 +709,9 @@ describe('catchUpOuraCloudRingBattery (#3069)', () => {
     const calls = fetchMock.mock.calls.length
     startOuraCloudRingBatteryCatchUp(deps(), USER, now + 2 * RING_BATTERY_MIN_INTERVAL_MS)
     startOuraCloudRingBatteryCatchUp(deps(), USER, now + RING_BATTERY_REFUSED_BACKOFF_MS - 1)
+    // The catch-up fetches asynchronously, so give a request that should not happen time to happen;
+    // checked straight away, this passed even with the 401 back-off removed.
+    await new Promise(resolve => setTimeout(resolve, 100))
     expect(fetchMock.mock.calls.length).toBe(calls)
 
     fetchMock.mockClear()
