@@ -1,5 +1,8 @@
 package expo.modules.homewidgets
 
+import java.time.DateTimeException
+import java.time.Instant
+import java.time.ZoneId
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -54,6 +57,8 @@ data class Snapshot(
   val user: String,
   /** The user's local date the snapshot describes, `YYYY-MM-DD`. */
   val date: String,
+  /** The profile's zone id the date is in; null in a snapshot written before it was added. */
+  val tz: String?,
   /** "Updated 7:42 am", already in the user's time zone. */
   val updated: String,
   val scores: List<WidgetScore>,
@@ -80,6 +85,7 @@ object WidgetSnapshot {
       Snapshot(
         user = user,
         date = date,
+        tz = root.text("tz"),
         updated = root.optString("updated"),
         scores = today?.optJSONArray("scores").objects().mapNotNull(::score).take(MAX_SCORES),
         battery = today?.optJSONObject("battery")?.let(::battery),
@@ -90,6 +96,18 @@ object WidgetSnapshot {
       null
     }
   }
+
+  /**
+   * The zone the snapshot's date is in: the profile's. The phone's zone only when the snapshot has
+   * none (an older one) or names one this phone does not know.
+   */
+  fun zoneOf(snapshot: Snapshot?): ZoneId =
+    snapshot?.tz?.let { id -> try { ZoneId.of(id) } catch (_: DateTimeException) { null } }
+      ?: ZoneId.systemDefault()
+
+  /** Today's date as the profile counts it, so it can be compared with the snapshot's date. */
+  fun today(snapshot: Snapshot?, now: Instant = Instant.now()): String =
+    now.atZone(zoneOf(snapshot)).toLocalDate().toString()
 
   /** A snapshot from an earlier day is never shown as today's numbers. */
   fun isStale(snapshot: Snapshot, localDate: String): Boolean = snapshot.date != localDate

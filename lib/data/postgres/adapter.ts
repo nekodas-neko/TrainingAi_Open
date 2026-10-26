@@ -2402,8 +2402,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * `/api/collection` used to read `listBodyMetrics` / `listSleepSessions` in full and immediately
    * project to `.map(m => m.date)`: 36 columns of `body_metrics` and 25 of `sleep_sessions` (176
    * and 144 bytes a row, measured) to take one field each, over ALL history, on every home paint —
-   * `cachedFetch` revalidates regardless of TTL (Q-262). These select the one column and apply the
-   * `> 0` predicate in SQL, so the width no longer grows with the schema.
+   * `cachedFetch` revalidates regardless of TTL (Q-262). These select only the columns they need
+   * (a date, plus steps where a total is built) and apply the `> 0` predicate in SQL, so the width
+   * no longer grows with the schema. `/api/collection` derives its step days from `listStepTotals`
+   * rather than calling this, so the route reads steps once.
    *
    * The predicate is "recorded", not "above a bar" — see `ladder.ts`, and the measurement behind it:
    * only 35 of the owner's 130 step-days reach 8,000, so a threshold would decay the steps ladder
@@ -2426,6 +2428,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           eq(s.bodyMetrics.userId, userId),
           gte(s.bodyMetrics.date, from),
           lte(s.bodyMetrics.date, to),
+          gt(s.bodyMetrics.steps, 0),
           isNull(s.bodyMetrics.deletedAt),
         )),
       this.db.select({ date: s.activityLogs.date, activityType: s.activityLogs.activityType, steps: s.activityLogs.steps })

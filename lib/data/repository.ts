@@ -1064,8 +1064,9 @@ export interface WorkoutRepository {
   setRestDay(userId: string, date: string, resting: boolean): Promise<void>
   /** Whether this user chose to rest on this date. */
   isRestDayChosen(userId: string, date: string): Promise<boolean>
-  /** RV-63 — dates with a recorded step count, for the collection replay. Dates only: the full-width
-   *  read was 36 columns for one field, over all history, on every home paint. */
+  /** RV-63 — dates with a recorded step count (device or treadmill). Narrow reads, not the full-width
+   *  36 columns the collection replay once took for one field, over all history, on every home paint.
+   *  `/api/collection` derives the same days from `listStepTotals`. */
   listStepDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** RV-63 — dates with a recorded sleep duration. See `listStepDayKeys`. */
   listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]>

@@ -76,6 +76,8 @@ export type WidgetSnapshot = {
   user: string;
   /** The user's local date the snapshot describes. */
   date: string;
+  /** The profile's IANA zone that date is in; a widget judges "today" and midnight in it, not in the phone's zone. */
+  tz: string;
   updated: string;
   today: { scores: WidgetScore[]; battery: WidgetBattery | null };
   next: WidgetNext | null;
@@ -103,6 +105,7 @@ export function widgetSnapshot(input: SnapshotInput): WidgetSnapshot {
     v: WIDGET_SNAPSHOT_VERSION,
     user: input.user,
     date: input.date,
+    tz: input.timezone,
     updated: `Updated ${formatTimeOfDay(input.now, input.timezone)}`,
     today: {
       scores: (input.scores ?? []).map((chip) => ({
