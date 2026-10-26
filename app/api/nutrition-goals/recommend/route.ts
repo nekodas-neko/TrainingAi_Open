@@ -3,9 +3,9 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
-import { DEFAULT_TZ, todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, dateStrMidnightInTz, shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { calculateBaseline, clampRecommendation } from '@trainingai/shared/nutrition/goal-recommendation'
-import { buildGoalExplanation, suggestActivityLevel } from '@trainingai/shared/nutrition/goal-recommendation-text'
+import { buildGoalExplanation, suggestActivityLevel, RECOMMENDATION_WINDOW_DAYS } from '@trainingai/shared/nutrition/goal-recommendation-text'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
@@ -53,8 +53,10 @@ export async function POST(req: Request) {
 
   const tz = user.timezone ?? DEFAULT_TZ
   const todayIso = todayInTz(tz)
-  const windowStart = new Date(todayMidnightUtc(tz).getTime() - 14 * 86_400_000)
-  const fromIso = toAestDay(windowStart, tz)
+  // Exactly RECOMMENDATION_WINDOW_DAYS calendar days ending today, so today plus the 13 before it.
+  // The text and the sessions-per-week maths divide by that figure; `today - 14` made it 15.
+  const fromIso = shiftDateStr(todayIso, -(RECOMMENDATION_WINDOW_DAYS - 1))
+  const windowStart = dateStrMidnightInTz(fromIso, tz)
 
   const [bodyMetrics, workoutSessions, personalRecords, userGoals, nutritionTargets, program, activityLogs] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, todayIso),

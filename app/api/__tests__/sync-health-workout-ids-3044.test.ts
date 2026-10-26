@@ -112,6 +112,13 @@ describe('deletions in a fully read window', () => {
     expect(json.rejected).toEqual([expect.stringMatching(/already holds this start time/)])
   })
 
+  it('reports a swept session that came back as revived, and not as a rejection', async () => {
+    repo.upsertHealthConnectActivityLog.mockImplementationOnce(async () => 'revived')
+    const { status, json } = await post({ exerciseSessions: [session({ recordId: 'hc-1' }), session({ recordId: 'hc-2', startTime: '15:00', endTime: '15:30' })] })
+    expect(status).toBe(200)
+    expect(json).toMatchObject({ ok: true, exercisesRevived: 1, rejected: [] })
+  })
+
   it('takes either date separator', async () => {
     await post({ exerciseSessions: [session({ recordId: 'hc-1' })], exerciseWindow: window({ from: shiftDateStr(today, -6).replace(/-/g, '/') }) })
     expect(repo.tombstoneHealthConnectActivityLogs).toHaveBeenCalledWith('u1', expect.objectContaining({ from: shiftDateStr(today, -6) }))

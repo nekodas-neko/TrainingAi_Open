@@ -88,29 +88,34 @@ export async function fetchOuraDocument(accessToken: string, type: OuraDocumentT
   return parseOuraDocument(type, body)
 }
 
-async function readPages(path: string, accessToken: string, query: Record<string, string>): Promise<unknown[]> {
-  const out: unknown[] = []
+/**
+ * Every page of a collection. A 404 ends the read with what it has, and `complete: false`: the list
+ * was cut short, so it says nothing about what Oura no longer has (#3153).
+ */
+async function readPages(path: string, accessToken: string, query: Record<string, string>): Promise<{ items: unknown[]; complete: boolean }> {
+  const items: unknown[] = []
   let next: string | null | undefined
   for (let page = 0; page < MAX_PAGES; page++) {
     const { status, body } = await getJson(path, accessToken, next ? { ...query, next_token: next } : query)
-    if (status === 404) return out
+    if (status === 404) return { items, complete: false }
     const parsed = Page.safeParse(body)
     if (!parsed.success) throw new OuraUnavailableError(`Oura's ${path} page had an unexpected shape`)
-    out.push(...parsed.data.data)
+    items.push(...parsed.data.data)
     next = parsed.data.next_token
-    if (!next) return out
+    if (!next) return { items, complete: true }
   }
   throw new OuraUnavailableError(`Oura's ${path} returned more than ${MAX_PAGES} pages`)
 }
 
 /**
  * Every document of `type` whose `day` is in [startDate, endDate] (inclusive, `YYYY-MM-DD`).
- * `dropped` counts documents that did not match the spec's model.
+ * `dropped` counts documents that did not match the spec's model. `complete` is false when Oura
+ * answered 404 on some page, so the list may be short (#3153).
  */
 export async function fetchOuraDocuments(
   accessToken: string, type: OuraDocumentType, startDate: string, endDate: string,
-): Promise<{ docs: OuraDocument[]; dropped: number }> {
-  const raw = await readPages(OURA_DOCUMENT_TYPES[type].path, accessToken, { start_date: startDate, end_date: endDate })
+): Promise<{ docs: OuraDocument[]; dropped: number; complete: boolean }> {
+  const { items: raw, complete } = await readPages(OURA_DOCUMENT_TYPES[type].path, accessToken, { start_date: startDate, end_date: endDate })
   const docs: OuraDocument[] = []
   let dropped = 0
   for (const r of raw) {
@@ -118,14 +123,14 @@ export async function fetchOuraDocuments(
     if (doc) docs.push(doc)
     else dropped++
   }
-  return { docs, dropped }
+  return { docs, dropped, complete }
 }
 
 /** The heart-rate series between two instants. */
 export async function fetchOuraHeartRate(
   accessToken: string, start: Date, end: Date,
 ): Promise<{ rows: HeartRateRow[]; dropped: number }> {
-  const raw = await readPages('heartrate', accessToken, { start_datetime: start.toISOString(), end_datetime: end.toISOString() })
+  const { items: raw } = await readPages('heartrate', accessToken, { start_datetime: start.toISOString(), end_datetime: end.toISOString() })
   const rows: HeartRateRow[] = []
   let dropped = 0
   for (const r of raw) {

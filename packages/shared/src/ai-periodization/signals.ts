@@ -124,6 +124,8 @@ export interface PrescriptionSignals {
   // Own stress-resilience level (1–5) for the latest night with a reading (F9). null = no data,
   // which includes every day from the switch to the Oura API (#3077).
   resilienceLevel: number | null
+  /** Oura's own resilience word (`limited` … `exceptional`), shown as Oura's, never mapped onto the 1-5 scale (#3169). */
+  resilienceOura?: string | null
   confidenceTier: 1 | 2 | 3
   confidence: number
   // Plain-English factors limiting confidence (empty when the engine has full data).
@@ -271,7 +273,7 @@ export async function aggregateSignals(
   // Q-489: shifted on the date string, anchored on `todayMid`, the user's local midnight.
   const yesterday = shiftDateStr(toAestDay(todayMid, tz), -1)
 
-  const [recentSessions, timingRows, muscleAssignmentsMap, equipmentMap, exerciseTypeMap, todayMoodLog, yesterdayMoodLog, allRecentSessions, morningCheckinRow, rm1Histories, timingAudit, derivedRows, nightTemp, switchDay] = await Promise.all([
+  const [recentSessions, timingRows, muscleAssignmentsMap, equipmentMap, exerciseTypeMap, todayMoodLog, yesterdayMoodLog, allRecentSessions, morningCheckinRow, rm1Histories, timingAudit, derivedRows, nightTemp, switchDay, ouraDailyRows] = await Promise.all([
     repo.getRecentSessionsOfType(userId, programSessionId, 60),
     repo.getSetTimingRows(userId, exerciseNames),
     repo.getExerciseMuscleAssignments(exerciseNames),
@@ -296,6 +298,8 @@ export async function aggregateSignals(
     loadNightTemperature(repo, userId, today, tz),
     // #3077: a failed lookup reads as no switch, so the ring's rows stand, as before the switch existed.
     (async () => repo.getOuraCloudSwitchDay(userId))().catch(() => null),
+    // #3169: Oura's resilience word, for the prompt. A failed lookup reads as no word.
+    (async () => repo.getOuraDaily(userId, yesterday, today))().catch(() => []),
   ])
 
   const timeProfiles = buildTimeProfiles(timingRows)
@@ -640,6 +644,7 @@ export async function aggregateSignals(
     // (#3206). Oura's resilience word is not mapped onto this scale (owner question #3212).
     resilienceLevel: [...derivedRows].reverse()
       .find(r => r.resilienceLevel != null && ringValueStands(r.day, switchDay))?.resilienceLevel ?? null,
+    resilienceOura: [...ouraDailyRows].reverse().find(r => r.resilienceLevel)?.resilienceLevel ?? null,
     confidenceTier,
     confidence,
     confidenceReasons,
