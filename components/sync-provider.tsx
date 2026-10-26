@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
+import { installDataEpochFetchGuard } from '@/lib/data-epoch-fetch';
 import { initSQLite } from '@/lib/sqlite/sqlite-service';
 import { MIGRATIONS } from '@/lib/sqlite/migrations';
 import { getCached, mirrorToSessionCache, cachedFetch, cachedFetchToday } from '@/lib/sqlite/cache';
@@ -125,6 +126,8 @@ interface SyncProviderProps {
 
 export function SyncProvider({ userId }: SyncProviderProps) {
   const tz = useUserTimezone();
+  // #3369: a write the server refuses because an admin reset this account wipes the device and reloads.
+  useEffect(() => { installDataEpochFetchGuard(); }, []);
   useEffect(() => {
     let cancelled = false;
 

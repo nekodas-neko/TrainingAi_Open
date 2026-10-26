@@ -25,6 +25,13 @@ import { isSQLiteAvailable } from '@/lib/sqlite/sqlite-service'
  * store is empty, so the wipe loses nothing and the page reloads once.
  */
 export const DATA_EPOCH_KEY = 'ta_data_epoch'
+/**
+ * The same record as a cookie. Every request the WebView makes carries it, and so does the Kotlin
+ * ring service, which forwards the WebView's cookies; the server's write gate
+ * (`lib/auth/data-epoch-gate.ts`, `middleware.ts`) reads it, so no upload path has to remember to
+ * send the epoch. Not HttpOnly on purpose: the page writes it.
+ */
+export const DATA_EPOCH_COOKIE = 'ta_data_epoch'
 /** sessionStorage: this tab session already wiped for this epoch, so a failed record cannot loop. */
 export const DATA_EPOCH_WIPED_KEY = 'ta_data_epoch_wiped'
 
@@ -36,6 +43,8 @@ export interface DataEpochDeps {
   writeRecord(value: string): boolean
   readWipedFlag(): string | null
   writeWipedFlag(value: string): void
+  /** Mirror the record into the cookie the server's write gate reads (`null` removes it). */
+  mirror?(value: string | null): void
   wipe(): Promise<void>
   reload(): void
 }
@@ -56,7 +65,11 @@ export async function checkDataEpoch(userId: string, deps: DataEpochDeps): Promi
   if (server === null) return 'unknown'
 
   const recorded = parseRecord(deps.readRecord(), userId)
-  if (recorded !== null && recorded >= server) return 'ok'
+  if (recorded !== null && recorded >= server) {
+    // Keep the cookie in step with the record (it is what the server's write gate reads).
+    deps.mirror?.(recordOf(userId, recorded))
+    return 'ok'
+  }
   if (recorded === null && server === 0) {
     deps.writeRecord(recordOf(userId, 0))
     return 'ok'
@@ -65,10 +78,16 @@ export async function checkDataEpoch(userId: string, deps: DataEpochDeps): Promi
   // This tab session already wiped for this epoch but could not record it: do not wipe again.
   if (deps.readWipedFlag() === recordOf(userId, server)) return 'ok'
 
+  // Off first: from here until the record is written, this device claims no epoch, so the server
+  // refuses any write it still makes.
+  deps.mirror?.(null)
   await deps.wipe()
   deps.writeWipedFlag(recordOf(userId, server))
   // Recorded AFTER the wipe, which clears this key with the rest of the account's storage.
-  if (deps.writeRecord(recordOf(userId, server))) deps.reload()
+  if (deps.writeRecord(recordOf(userId, server))) {
+    deps.mirror?.(recordOf(userId, server))
+    deps.reload()
+  }
   return 'wiped'
 }
 
@@ -83,8 +102,17 @@ async function fetchServerEpoch(): Promise<number | null> {
   }
 }
 
+function mirrorCookie(value: string | null): void {
+  try {
+    const attrs = 'path=/; SameSite=Lax; Secure'
+    document.cookie = value === null
+      ? `${DATA_EPOCH_COOKIE}=; max-age=0; ${attrs}`
+      : `${DATA_EPOCH_COOKIE}=${encodeURIComponent(value)}; max-age=31536000; ${attrs}`
+  } catch { /* cookies unavailable */ }
+}
+
 /** Dynamic imports: this module is imported by the sync engine, and the wipe reaches back into it. */
-async function wipeDevice(): Promise<void> {
+export async function wipeDevice(): Promise<void> {
   const [{ clearLocalStoreData }, cache, { clearAccountStorage }] = await Promise.all([
     import('./index'),
     import('@/lib/sqlite/cache'),
@@ -95,6 +123,7 @@ async function wipeDevice(): Promise<void> {
   await clearLocalStoreData().catch(() => {})
   await cache.clearAllCache().catch(() => {})
   clearAccountStorage()
+  mirrorCookie(null)
 }
 
 const browserDeps: DataEpochDeps = {
@@ -108,6 +137,7 @@ const browserDeps: DataEpochDeps = {
   },
   readWipedFlag: () => { try { return window.sessionStorage.getItem(DATA_EPOCH_WIPED_KEY) } catch { return null } },
   writeWipedFlag: value => { try { window.sessionStorage.setItem(DATA_EPOCH_WIPED_KEY, value) } catch { /* unavailable */ } },
+  mirror: mirrorCookie,
   wipe: wipeDevice,
   reload: () => window.location.reload(),
 }
@@ -133,3 +163,22 @@ export function verifyDataEpoch(userId: string, deps: DataEpochDeps = browserDep
 
 /** Test seam: forget what this page has already verified. */
 export function _resetDataEpochGate(): void { settled.clear() }
+
+/**
+ * The server answered a write 409 `data-epoch-stale`: this device has not wiped for a reset it does
+ * not know about yet (or its record was lost). Ask again, now, past the memo, and wipe and reload if
+ * the server's epoch is newer. One at a time; a failure leaves the next 409 to try again.
+ */
+let staleCheck: Promise<DataEpochCheck> | null = null
+export function handleStaleDataEpoch(userId: string | null, deps: DataEpochDeps = browserDeps): Promise<DataEpochCheck> {
+  if (!userId) return Promise.resolve('unknown')
+  if (staleCheck) return staleCheck
+  settled.delete(userId)
+  // Not `verifyDataEpoch`: the web build has no local store, so that skips the check, yet its writes
+  // are gated too and need the cookie set. `checkDataEpoch` wipes what exists and records the epoch.
+  const run: Promise<DataEpochCheck> = checkDataEpoch(userId, deps)
+    .catch((): DataEpochCheck => 'unknown')
+    .finally(() => { staleCheck = null })
+  staleCheck = run
+  return run
+}

@@ -1,6 +1,6 @@
 // #3369 — a device behind an admin reset wipes before it can push the old rows back.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { checkDataEpoch, verifyDataEpoch, _resetDataEpochGate, type DataEpochDeps } from '../data-epoch'
+import { checkDataEpoch, verifyDataEpoch, handleStaleDataEpoch, _resetDataEpochGate, type DataEpochDeps } from '../data-epoch'
 
 const U = 'user-1'
 
@@ -106,5 +106,37 @@ describe('verifyDataEpoch', () => {
 
   it('passes straight through where there is no native store (the web build and tests)', async () => {
     expect(await verifyDataEpoch(U)).toBe('ok')
+  })
+})
+
+describe('the cookie the server\'s write gate reads (#3369)', () => {
+  it('is cleared before the wipe and set to the new epoch after it', async () => {
+    const calls: Array<string | null> = []
+    const { d } = deps({ server: 1_800_000_500, record: `${U}:0`, mirror: (v: string | null) => { calls.push(v) } })
+    await checkDataEpoch(U, d)
+    expect(calls).toEqual([null, `${U}:1800000500`])
+  })
+  it('is kept in step for a device that has already seen the reset', async () => {
+    const calls: Array<string | null> = []
+    const { d } = deps({ server: 1_800_000_500, record: `${U}:1800000500`, mirror: (v: string | null) => { calls.push(v) } })
+    await checkDataEpoch(U, d)
+    expect(calls).toEqual([`${U}:1800000500`])
+  })
+})
+
+describe('handleStaleDataEpoch: a write answered 409', () => {
+  it('asks the server again past the memo and wipes a device that is behind', async () => {
+    _resetDataEpochGate()
+    const { d } = deps({ server: 1_800_000_500, record: `${U}:1800000500` })
+    // The memo says this page already verified; the 409 proves the record is not what the server needs.
+    await verifyDataEpoch(U, d)
+    ;(d.fetchEpoch as ReturnType<typeof vi.fn>).mockResolvedValue(1_800_000_900)
+    expect(await handleStaleDataEpoch(U, d)).toBe('wiped')
+    expect(d.wipe).toHaveBeenCalledTimes(1)
+  })
+  it('does nothing for an unknown user', async () => {
+    const { d } = deps({ server: 5 })
+    expect(await handleStaleDataEpoch(null, d)).toBe('unknown')
+    expect(d.fetchEpoch).not.toHaveBeenCalled()
   })
 })

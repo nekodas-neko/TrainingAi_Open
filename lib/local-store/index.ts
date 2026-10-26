@@ -1,4 +1,5 @@
 import { isSQLiteAvailable, isLocalStoreDead, runSQL, querySQL } from '@/lib/sqlite/sqlite-service';
+import { storeOwnedByAnotherAccount } from './device-owner';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalManualSleepNight, LocalWorkoutSession,
   LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle, PendingMutation,
@@ -293,6 +294,9 @@ export function getLocalStore(userId: string): LocalStore | null {
   // write. Return null so write sites take their API fallback (the same path web
   // uses) instead of losing data behind a success toast.
   if (isLocalStoreDead()) return null;
+  // #3369: a store another account filled is not this account's to read, write or sync. Answers null
+  // (online-only) while the wipe runs; the page then reloads onto an empty store.
+  if (storeOwnedByAnotherAccount(userId)) return null;
   if (!_stores.has(userId)) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { SQLiteLocalStore } = require('./sqlite-backend') as typeof import('./sqlite-backend');

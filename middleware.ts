@@ -28,7 +28,7 @@ export default auth(async (req) => {
       })
       if (epoch !== null) {
         return NextResponse.json(
-          { error: "data-epoch-stale", epoch },
+          { error: "data-epoch-stale", epoch, userId: token?.userId },
           { status: 409, headers: { "Cache-Control": "private, no-store", [DATA_EPOCH_STALE_HEADER]: "1" } },
         )
       }
