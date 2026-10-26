@@ -602,6 +602,7 @@ SELECT
   t.barcode,
   t.region,
   t.created_at,
+  t.deleted_at,
   octet_length(t.image_data_uri) AS image_bytes
 FROM public.food_items t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;

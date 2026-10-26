@@ -901,6 +901,10 @@ export const foodItems = pgTable('food_items', {
   // on-device SQLite, where a URL renders nothing offline. Capped by FOOD_ITEM_IMAGE_MAX_BYTES.
   imageDataUri: text('image_data_uri'),
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // #2417 (migration 202610262031). A tombstone: set when a look-alike is merged into its keeper.
+  // The row stays because food_logs / saved_meal_items still point at it on a device that has not
+  // synced. NULL is live. Catalog reads leave tombstoned rows out; reads by id do not.
+  deletedAt:    timestamp('deleted_at', { withTimezone: true }),
 })
 
 export const foodLogs = pgTable('food_logs', {

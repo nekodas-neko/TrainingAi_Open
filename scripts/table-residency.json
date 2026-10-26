@@ -37,7 +37,7 @@
     "exercise_media": {"class":"SERVER-ONLY","note":"reference catalog (media); writer: route.ts, route.ts, route.ts"},
     "feedback_submissions": {"class":"SERVER-ONLY","note":"ops / owner inbox; writer: adapter.ts"},
     "fitness_tests": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull"},
-    "food_items": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull. No delete path exists anywhere (server, device or API), so no tombstone is needed until one is added"},
+    "food_items": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull. No user-facing delete path. `deleted_at` (#2417) marks a look-alike merged into its keeper; set only by the admin merge job"},
     "food_logs": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull"},
     "friendships": {"class":"SERVER-ONLY","note":"social; writer: social.ts"},
     "goal_recommendations": {"class":"SERVER-ONLY","note":"derived / AI; writer: adapter.ts"},
