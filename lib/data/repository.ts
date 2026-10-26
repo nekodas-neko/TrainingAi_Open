@@ -1175,6 +1175,12 @@ export interface WorkoutRepository {
   declineFriendRequest(friendshipId: string, userId: string): Promise<void>
   removeFriend(friendshipId: string, userId: string): Promise<void>
   getFriendIds(userId: string): Promise<string[]>
+  /**
+   * The saved meals of the other end of `friendshipId`, or `null` — one answer for every refusal
+   * (no such friendship, not mine, still pending, friend has not opted in), so a caller cannot tell
+   * them apart.
+   */
+  listFriendSavedMeals(friendshipId: string, viewerId: string): Promise<SavedMeal[] | null>
   updateEquippedTitle(userId: string, titleId: string | null): Promise<void>
 
   // ── Seasons ────────────────────────────────────────────────────────────────

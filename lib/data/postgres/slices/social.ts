@@ -4,6 +4,9 @@ import { normalizeEmail } from '@trainingai/shared/validation/email'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
+import type { SavedMeal } from '@trainingai/shared/types/nutrition'
+import type { UserPreferences } from '@trainingai/shared/user/preferences'
+import { listSavedMeals } from './nutrition'
 
 type Db = ReturnType<typeof getDb>
 
@@ -108,6 +111,42 @@ export async function getFriendIds(db: Db, userId: string): Promise<string[]> {
       or(eq(s.friendships.requesterId, userId), eq(s.friendships.addresseeId, userId)),
     ))
   return rows.map(r => r.requesterId === userId ? r.addresseeId : r.requesterId)
+}
+
+/**
+ * A friend's saved meals, behind two checks that both fail closed into the same `null`.
+ *
+ * 1. `friendshipId` names an **accepted** friendship that the viewer is one end of. The friend is
+ *    whichever end is not the viewer, so a client never names a user id and cannot ask for one it has
+ *    no friendship with, its own included.
+ * 2. That friend has `shareMealLibrary === true`. Strictly `true`: absent, `false`, or any other
+ *    value is off.
+ *
+ * The caller must not distinguish the two, or a stranger learns that a user exists and a friend's
+ * setting leaks, so this returns `null` for all of them rather than throwing different errors.
+ */
+export async function listFriendSavedMeals(db: Db, friendshipId: string, viewerId: string): Promise<SavedMeal[] | null> {
+  const [f] = await db.select({
+    requesterId: s.friendships.requesterId,
+    addresseeId: s.friendships.addresseeId,
+  }).from(s.friendships)
+    .where(and(
+      eq(s.friendships.id, friendshipId),
+      eq(s.friendships.status, 'accepted'),
+      or(eq(s.friendships.requesterId, viewerId), eq(s.friendships.addresseeId, viewerId)),
+    ))
+    .limit(1)
+  if (!f) return null
+  const friendId = f.requesterId === viewerId ? f.addresseeId : f.requesterId
+  if (friendId === viewerId) return null
+
+  const [u] = await db.select({ preferences: s.users.preferences })
+    .from(s.users)
+    .where(eq(s.users.id, friendId))
+    .limit(1)
+  if ((u?.preferences as UserPreferences | null | undefined)?.shareMealLibrary !== true) return null
+
+  return listSavedMeals(db, friendId)
 }
 
 export async function updateEquippedTitle(db: Db, userId: string, titleId: string | null): Promise<void> {
