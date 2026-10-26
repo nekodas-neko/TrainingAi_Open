@@ -3,6 +3,7 @@ import { computeVolumeAcwr, acwrBaselineDaysRemaining, type AcwrResult, type Pro
 import { computeActivityScore, strengthWindowEndingAt, type ActivityScoreResult } from './activity-score'
 import { getDailyGoals, type DailyGoals, type GoalProfile } from './daily-goals'
 import { hrMaxFromAge } from './hr-zones'
+import { latestWeightKg } from './latest-weight'
 import { intradayHrContributors } from './intraday-hr-contributors'
 import { excludeLowWearDays } from './wear-confidence'
 
@@ -75,10 +76,10 @@ export function scoreActivityForDay(input: ActivityDayInput): ActivityDay {
 
   const metricsToDay = input.bodyMetrics.filter(m => m.date <= date)
   const dayMetrics = metricsToDay.find(m => m.date === date) ?? null
-  const latestWeightKg = [...metricsToDay].reverse().find(m => m.weightKg != null && m.weightKg > 0)?.weightKg ?? null
+  const weightKg = latestWeightKg(metricsToDay, date)
   const ageYears = ageFromDob(input.user?.dateOfBirth, dayMid)
   const goals = getDailyGoals({
-    weightKg: latestWeightKg,
+    weightKg,
     heightCm: input.user?.heightCm ?? null,
     ageYears,
     sex: input.user?.sex ?? null,
