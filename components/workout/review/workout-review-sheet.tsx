@@ -160,7 +160,7 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
       <SheetContent side="bottom" className="max-h-[88dvh] rounded-t-3xl flex flex-col p-0 gap-0">
         <SheetHeader className="text-left flex-none border-b border-border/50">
           <SheetTitle className="flex items-center gap-2">
-            <SparklesIcon className="h-5 w-5 text-amber-400" />
+            <SparklesIcon className="h-5 w-5 text-accent-amber" />
             Review{data ? ` · ${data.sessionName}` : " workout"}
           </SheetTitle>
         </SheetHeader>
@@ -185,8 +185,8 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
           {proposal && data && !loading && (
             <div className="flex flex-col gap-4">
               {/* Duration summary — framed against the full session budget (warmup + working). */}
-              <div className={cn("rounded-xl px-3 py-2.5", proposal.fitsBudget ? "bg-green-500/10" : "bg-amber-500/10")}>
-                <div className={cn("flex items-center gap-2 text-sm font-semibold", proposal.fitsBudget ? "text-green-500" : "text-amber-500")}>
+              <div className={cn("rounded-xl px-3 py-2.5", proposal.fitsBudget ? "bg-accent-green/10" : "bg-accent-amber/10")}>
+                <div className={cn("flex items-center gap-2 text-sm font-semibold", proposal.fitsBudget ? "text-accent-green" : "text-accent-amber")}>
                   <Clock className="h-4 w-4 flex-none" />
                   <span>{data.totalBudgetMin === 0 ? `≈${proposal.projectedDurationMin} min · No time limit` : `≈${planTotalMin} of ${data.totalBudgetMin} min${proposal.fitsBudget ? " — fits" : " — still over"}`}</span>
                 </div>
@@ -260,14 +260,14 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
 
                   {/* Guard-protected: the time budget would drop these, but a training rule kept them. */}
                   {protectedRows.map(ex => (
-                    <div key={ex.sessionExerciseId} className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
+                    <div key={ex.sessionExerciseId} className="rounded-xl border border-accent-amber/25 bg-accent-amber/5 p-3">
                       <div className="flex items-start gap-2">
-                        <span className="flex-none mt-0.5 rounded-md p-1 bg-amber-500/15 text-amber-500">
+                        <span className="flex-none mt-0.5 rounded-md p-1 bg-accent-amber/15 text-accent-amber">
                           <ShieldCheck className="h-3.5 w-3.5" />
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm leading-tight truncate">{ex.name}</p>
-                          <p className="text-xs text-amber-500/90 mt-0.5">Over your time budget, but kept to protect your training</p>
+                          <p className="text-xs text-accent-amber/90 mt-0.5">Over your time budget, but kept to protect your training</p>
                           {ex.reason && <p className="text-xs text-muted-foreground/80 mt-1">{ex.reason}</p>}
                         </div>
                       </div>

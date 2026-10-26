@@ -60,7 +60,7 @@ export function InjuryAvoidanceNotice({
   return (
     <div role="note" className="rounded-xl bg-muted px-3 py-2.5 space-y-1">
       <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-        <TriangleAlertIcon className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden />
+        <TriangleAlertIcon className="h-3.5 w-3.5 shrink-0 text-accent-amber" aria-hidden />
         Avoiding exercises that load your injured {active.length === 1 ? 'muscle' : 'muscles'}
       </p>
       <ul className="space-y-0.5">

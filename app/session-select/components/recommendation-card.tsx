@@ -246,7 +246,7 @@ function RecommendationCardComponent({
             )
           )}
           {isTrainedToday ? (
-            <div className="flex items-center gap-2 rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-2.5">
+            <div className="flex items-center gap-2 rounded-xl border border-accent-green/40 bg-accent-green/10 px-4 py-2.5">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="7" stroke="var(--accent-green)" strokeWidth="1.5" />
                 <path
@@ -257,7 +257,7 @@ function RecommendationCardComponent({
                   strokeLinejoin="round"
                 />
               </svg>
-              <span className="text-sm font-semibold text-green-500">Completed Today</span>
+              <span className="text-sm font-semibold text-accent-green">Completed Today</span>
             </div>
           ) : recommendation?.deloadOrRestRecommended ? (
             <div className="flex flex-col gap-2">

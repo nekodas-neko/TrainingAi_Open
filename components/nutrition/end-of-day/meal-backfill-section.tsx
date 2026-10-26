@@ -75,11 +75,11 @@ export function MealBackfillSection({ mealTypes, logs, date, userId, onLogged }:
               <span className="text-xl leading-none">{mt.emoji}</span>
               <span className="text-sm font-semibold flex-1">{mt.name}</span>
               {logged ? (
-                <span className="flex items-center gap-1 text-[11px] text-green-500 font-medium">
+                <span className="flex items-center gap-1 text-[11px] text-accent-green font-medium">
                   <Check className="w-3.5 h-3.5" /> Logged
                 </span>
               ) : mt.required ? (
-                <span className="text-[11px] text-amber-500 font-medium">Not logged</span>
+                <span className="text-[11px] text-accent-amber font-medium">Not logged</span>
               ) : null}
             </div>
 

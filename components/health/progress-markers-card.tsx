@@ -35,8 +35,8 @@ export function ProgressMarkersCard({ trends }: { trends: TrendPoint[] | undefin
 
 function TrendIcon({ m }: { m: MarkerAssessment }) {
   const cls = "mt-0.5 h-4 w-4 shrink-0";
-  if (m.trend === "improving") return <TrendingUp className={`${cls} text-emerald-600 dark:text-emerald-400`} aria-label="improving" />;
-  if (m.trend === "declining") return <TrendingDown className={`${cls} text-amber-600 dark:text-amber-400`} aria-label="slipping" />;
+  if (m.trend === "improving") return <TrendingUp className={`${cls} text-accent-green`} aria-label="improving" />;
+  if (m.trend === "declining") return <TrendingDown className={`${cls} text-accent-amber`} aria-label="slipping" />;
   if (m.trend === "stable") return <Minus className={`${cls} text-muted-foreground`} aria-label="steady" />;
   return <CircleHelp className={`${cls} text-muted-foreground`} aria-label="unknown" />;
 }
