@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from 'sonner'
-import { UserCheck, UserX, ShieldCheck, ShieldOff, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, ClipboardList } from 'lucide-react'
+import { OUTSIDE_SOURCES_NOTICE } from '@trainingai/shared/admin-wipe-copy'
+import { UserCheck, UserX, ShieldCheck, ShieldOff, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, ClipboardList, Eraser } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import type { User } from '@trainingai/shared/types'
 import { invalidateAdminPendingCount } from '@/lib/cache-groups'
@@ -43,6 +44,10 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
   // email, so each asks first. Both name what the row already shows, so no new detail is exposed.
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
   const [confirmRemoveInvite, setConfirmRemoveInvite] = useState<string | null>(null)
+  // #3369: both ask for the target's email, which the server checks again. `confirmErase` deletes an
+  // account that holds data (the plain `confirmDelete` above is still the signup that never got in).
+  const [confirmReset, setConfirmReset] = useState<User | null>(null)
+  const [confirmErase, setConfirmErase] = useState<User | null>(null)
   // #3368: granting or removing admin is auth, so both ask first.
   const [confirmAdmin, setConfirmAdmin] = useState<{ user: User; grant: boolean } | null>(null)
 
@@ -161,6 +166,65 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
     }
   }
 
+  /** Reads the server's plain-words reason from a refusal, or says what we know. */
+  async function reasonOf(res: Response, fallback: string): Promise<string> {
+    const body = await res.json().catch(() => null) as { error?: unknown } | null
+    return typeof body?.error === 'string' ? body.error : fallback
+  }
+
+  // #3369. Both send what the admin typed, not the row's email, so the server's check is the real one.
+  async function resetUserData(u: User, typedEmail: string) {
+    setActionLoading(`reset-${u.id}`)
+    try {
+      const res = await fetch('/api/admin/users/reset-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u.id, confirmEmail: typedEmail }),
+      })
+      if (!res.ok) {
+        toast.error(await reasonOf(res, `The data could not be reset (HTTP ${res.status}). Nothing was removed.`))
+        return
+      }
+      const body = await res.json().catch(() => null) as { signedOut?: boolean; defaultsSeeded?: boolean } | null
+      if (body?.signedOut) {
+        // Their own account: the reset ended this session too, and the server has expired the cookie.
+        // Go to the sign-in page. This phone still holds the old rows; the data-epoch check wipes
+        // them on the next sign-in, before anything is pushed (`lib/local-store/data-epoch.ts`).
+        toast.success('Your data was reset. Sign in again to start fresh.')
+        window.location.replace('/sign-in')
+        return
+      }
+      toast.success(body?.defaultsSeeded === false
+        ? `${userLabel(u)}'s data was reset, but the built-in styles could not be put back. Reset again to add them.`
+        : `${userLabel(u)}'s data was reset. They are signed out on every device.`)
+    } catch {
+      toast.error('No connection. Nothing was removed.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function eraseUser(u: User, typedEmail: string) {
+    setActionLoading(`delete-${u.id}`)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u.id, confirmEmail: typedEmail }),
+      })
+      if (!res.ok) {
+        toast.error(await reasonOf(res, `The account could not be deleted (HTTP ${res.status}). Nothing was removed.`))
+        return
+      }
+      setUsers(prev => prev.filter(x => x.id !== u.id))
+      toast.success(`${userLabel(u)} and their data were deleted.`)
+    } catch {
+      toast.error('No connection. Nothing was removed.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   async function removeInvite(email: string) {
     setActionLoading(`invite-${email}`)
     try {
@@ -254,6 +318,8 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
                     user={u}
                     isSelf={u.id === currentUserId}
                     onToggle={toggleUser}
+                    onReset={() => setConfirmReset(u)}
+                    onErase={() => setConfirmErase(u)}
                     loadingId={actionLoading}
                   />
                 ))}
@@ -268,6 +334,8 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
                     user={u}
                     isSelf={u.id === currentUserId}
                     onToggle={(id, action) => action === 'deactivate' ? setConfirmDeactivate(u) : toggleUser(id, action)}
+                    onReset={() => setConfirmReset(u)}
+                    onErase={() => setConfirmErase(u)}
                     onToggleAdmin={() => setConfirmAdmin({ user: u, grant: !u.isAdmin })}
                     loadingId={actionLoading}
                   />
@@ -287,6 +355,38 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
                 const u = confirmDelete
                 setConfirmDelete(null)
                 if (u) deleteUser(u.id)
+              }}
+            />
+            <ConfirmDialog
+              open={!!confirmReset}
+              onOpenChange={o => { if (!o) setConfirmReset(null) }}
+              title="Reset data?"
+              message={confirmReset
+                ? `This permanently deletes everything ${userLabel(confirmReset)} has recorded: workouts, food, sleep, body metrics, goals, settings, friendships and connected devices, and their Oura connection is revoked. Their account, email, sign-in and ${confirmReset.isAdmin ? 'admin and ' : ''}active status stay. Every device they use is signed out and wiped, and they sign in again to start fresh.${confirmReset.id === currentUserId ? ' This is your own account, so you will be signed out now.' : ''} It cannot be undone. ${OUTSIDE_SOURCES_NOTICE} Type their email, ${confirmReset.email}, to confirm.`
+                : ''}
+              confirmLabel="Reset data"
+              confirmPhrase={confirmReset?.email}
+              confirmPhraseKind="email"
+              onConfirm={typed => {
+                const u = confirmReset
+                setConfirmReset(null)
+                if (u) resetUserData(u, typed)
+              }}
+            />
+            <ConfirmDialog
+              open={!!confirmErase}
+              onOpenChange={o => { if (!o) setConfirmErase(null) }}
+              title="Delete account and data?"
+              message={confirmErase
+                ? `This permanently deletes ${userLabel(confirmErase)}'s account and everything under it, and revokes their Oura connection. Their friendships are removed too. Their invite is removed as well, so they will need a new invite to sign up again. It cannot be undone. ${OUTSIDE_SOURCES_NOTICE} Type their email, ${confirmErase.email}, to confirm.`
+                : ''}
+              confirmLabel="Delete account"
+              confirmPhrase={confirmErase?.email}
+              confirmPhraseKind="email"
+              onConfirm={typed => {
+                const u = confirmErase
+                setConfirmErase(null)
+                if (u) eraseUser(u, typed)
               }}
             />
             <ConfirmDialog
@@ -504,6 +604,8 @@ function UserRow({
   isSelf = false,
   onToggle,
   onDelete,
+  onReset,
+  onErase,
   onToggleAdmin,
   loadingId,
 }: {
@@ -512,17 +614,28 @@ function UserRow({
   isSelf?: boolean
   onToggle: (id: string, action: 'activate' | 'deactivate') => void
   onDelete?: (id: string) => void
+  /** #3369: reset this user's data and keep the account. Offered for yourself or a non-admin, never another admin. */
+  onReset?: (id: string) => void
+  /** #3369: delete an account that holds data. Offered for a non-admin who is not you. */
+  onErase?: (id: string) => void
   /** Active rows only. Absent on your own row: the server refuses removing your own admin. */
   onToggleAdmin?: () => void
   loadingId: string | null
 }) {
   const isToggleLoading = loadingId === user.id
   const isDeleteLoading = loadingId === `delete-${user.id}`
+  const isResetLoading = loadingId === `reset-${user.id}`
+  // The server refuses another admin's account whatever the screen shows; this only hides the buttons.
+  // `hasData` is only computed for inactive users (the server sends `false` for every active one), so
+  // it means "nothing to reset" only on an inactive row: a signup that never got in.
+  const neverGotIn = !user.isActive && user.hasData === false
+  const canReset = onReset && !neverGotIn && (!user.isAdmin || isSelf)
+  const canErase = onErase && !neverGotIn && !user.isAdmin && !isSelf
   const isAdminLoading = loadingId === `admin-${user.id}`
   const initials = initialsOf(user.displayName || user.name || user.email)
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border px-4 py-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-4 py-3">
       {user.avatar ? (
         <Image src={user.avatar} alt="" width={32} height={32}
           unoptimized={user.avatar.startsWith('data:')} className="h-8 w-8 rounded-full object-cover" />
@@ -531,7 +644,8 @@ function UserRow({
           {initials}
         </div>
       )}
-      <div className="min-w-0 flex-1">
+      {/* min-w keeps the name readable at 384 px: with three icons the actions wrap to a second line instead of squeezing it away (#3369). */}
+      <div className="min-w-[9rem] flex-1">
         <p className="truncate text-sm font-medium">{user.displayName || user.name || '—'}</p>
         <p className="truncate text-xs text-muted-foreground">{user.email}</p>
       </div>
@@ -568,6 +682,34 @@ function UserRow({
           disabled={isDeleteLoading}
           title="Delete user"
           aria-label="Delete user"
+        >
+          {isDeleteLoading
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <Trash2 className="h-4 w-4 text-destructive" />}
+        </Button>
+      )}
+      {canReset && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onReset(user.id)}
+          disabled={isResetLoading}
+          title="Reset data"
+          aria-label="Reset data"
+        >
+          {isResetLoading
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <Eraser className="h-4 w-4 text-destructive" />}
+        </Button>
+      )}
+      {canErase && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onErase(user.id)}
+          disabled={isDeleteLoading}
+          title="Delete account and data"
+          aria-label="Delete account and data"
         >
           {isDeleteLoading
             ? <Loader2 className="h-4 w-4 animate-spin" />

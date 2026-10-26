@@ -524,6 +524,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       activityLevel: (r.activityLevel as ActivityLevel | null) ?? undefined,
       fitnessGoal: (r.fitnessGoal as FitnessGoal | null) ?? undefined,
       lastGoalReviewAt: r.lastGoalReviewAt ?? undefined,
+      sessionsValidFrom: r.sessionsValidFrom ?? null,
     }
   }
 
@@ -862,8 +863,36 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return r ? { ...this.rowToUser(r), passwordHash: r.passwordHash ?? undefined } : null
   }
 
-  async deleteAccount(userId: string, opts: { onlyIfNoData?: boolean } = {}): Promise<AccountDeletionResult> {
+  async deleteAccount(
+    userId: string,
+    opts: { onlyIfNoData?: boolean; guard?: accountDeletion.AdminWipeGuard; audit?: accountDeletion.AdminWipeAudit } = {},
+  ): Promise<AccountDeletionResult> {
     return accountDeletion.deleteAccount(this.db, userId, opts)
+  }
+
+  /** #3369: an admin's reset — everything an account holds goes, the account and its sign-ins stay. */
+  async resetAccountData(
+    userId: string,
+    opts: { guard: accountDeletion.AdminWipeGuard; audit: accountDeletion.AdminWipeAudit },
+  ): Promise<AccountDeletionResult> {
+    const result = await accountDeletion.resetAccountData(this.db, userId, opts)
+    if (result.deleted) {
+      // A new signup is seeded with the built-in progression styles, phase sets and a friend code by
+      // `ensureUserDefaults`, which runs when the row is created. A reset is a fresh start, and the
+      // person's next sign-in finds the existing row and seeds nothing, so seed here. It is
+      // idempotent, and it is outside the reset's transaction on purpose: a failure must not undo a
+      // reset that already happened. The caller is told, and a second reset seeds again.
+      try {
+        const user = await this.getUserById(userId)
+        if (!user) throw new Error('reset account not found after commit')
+        await this.ensureUserDefaults(user)
+        result.defaultsSeeded = true
+      } catch (err) {
+        console.error('[account reset] seeding the defaults failed', err instanceof Error ? err.name : 'unknown')
+        result.defaultsSeeded = false
+      }
+    }
+    return result
   }
 
   /** issue 2695: which of these accounts hold data (the admin Users screen's Pending / Deactivated split). */

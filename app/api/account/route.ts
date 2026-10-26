@@ -4,7 +4,8 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit, settleRateLimitFlushes } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
-import { disconnectOuraAccount } from '@/lib/oura/cloud/tokens'
+import { readOuraGrantBestEffort, revokeOuraGrantAfterCommit } from '@/lib/account/revoke-oura-grant'
+import { clearSessionCookies } from '@/lib/auth/clear-session-cookies'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { ACCOUNT_DELETION_PHRASE } from '@trainingai/shared/user/account-deletion'
 
@@ -15,28 +16,6 @@ const MAX_BODY_BYTES = 1024
 // session's own, and a body that tries to name another one (`userId`, `id`, …) is refused rather
 // than ignored, so a caller can never believe they deleted someone else.
 const BodySchema = z.object({ confirm: z.literal(ACCOUNT_DELETION_PHRASE) }).strict()
-
-// Every name the session cookie can carry: `__Secure-` in production, and Auth.js splits a large JWT
-// into `.0`, `.1`, … chunks.
-const SESSION_COOKIE = /^(__Secure-)?authjs\.session-token(\.\d+)?$/
-const CANONICAL_SESSION_COOKIE = process.env.NODE_ENV === 'production'
-  ? '__Secure-authjs.session-token'
-  : 'authjs.session-token'
-
-/**
- * #2892 — the delete removes the stored Oura tokens through the `users` cascade, but the grant at
- * Oura stays, and TrainingAI would keep showing in the user's connected apps. Revoke it first.
- * Best effort and never in the delete's way: whatever goes wrong here is logged and the delete
- * carries on. Only the error is reported, never a token.
- */
-async function revokeOuraGrantBestEffort(repo: Awaited<ReturnType<typeof getRepository>>, userId: string, url: string) {
-  try {
-    await disconnectOuraAccount(repo, userId)
-  } catch (err) {
-    console.error('[account] Oura revoke failed, deleting anyway', err instanceof Error ? err.name : 'unknown')
-    reportServerError(err, { userId, url })
-  }
-}
 
 /**
  * #2120 — delete the signed-in user's own account, immediately and irreversibly.
@@ -78,9 +57,11 @@ export async function DELETE(req: NextRequest) {
   await settleRateLimitFlushes()
 
   let result
+  let ouraToken: string | null = null
   try {
     const repo = await getRepository()
-    await revokeOuraGrantBestEffort(repo, userId, req.nextUrl.pathname)
+    // Read the Oura token now, revoke it only once the deletion has committed.
+    ouraToken = await readOuraGrantBestEffort(repo, userId, req.nextUrl.pathname)
     result = await repo.deleteAccount(userId)
   } catch (err) {
     console.error('[account] deletion failed', err)
@@ -91,18 +72,12 @@ export async function DELETE(req: NextRequest) {
     )
   }
   if (!result.deleted) return NextResponse.json({ error: 'Account not found' }, { status: 404 })
+  await revokeOuraGrantAfterCommit(ouraToken, userId, new URL(req.url).pathname)
 
   const res = NextResponse.json(
     { ok: true, deleted: true, signedOut: true, anonymised: result.anonymised, purged: result.purged },
     { headers: { 'Cache-Control': 'private, no-store' } },
   )
-  const names = new Set([CANONICAL_SESSION_COOKIE, ...req.cookies.getAll().map(c => c.name).filter(n => SESSION_COOKIE.test(n))])
-  for (const name of names) {
-    // A `__Secure-` cookie can only be overwritten by a Secure Set-Cookie; anything else is ignored.
-    res.cookies.set(name, '', {
-      httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0,
-      secure: name.startsWith('__Secure-') || process.env.NODE_ENV === 'production',
-    })
-  }
+  clearSessionCookies(req, res)
   return res
 }

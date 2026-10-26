@@ -18,7 +18,13 @@ interface ConfirmDialogProps {
    * cannot be undone by any means — a stray tap on a plain confirm is still one tap from the loss.
    */
   confirmPhrase?: string;
-  onConfirm: () => void;
+  /**
+   * `email` is for a phrase that is an email address (#3369): matched without case, and the field is
+   * a lowercase email field instead of the uppercase phrase field.
+   */
+  confirmPhraseKind?: "phrase" | "email";
+  /** Receives what was typed, trimmed, so the server can check it itself. */
+  onConfirm: (typed: string) => void;
 }
 
 export function ConfirmDialog({
@@ -30,6 +36,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   variant = "destructive",
   confirmPhrase,
+  confirmPhraseKind = "phrase",
   onConfirm,
 }: ConfirmDialogProps) {
   const [typed, setTyped] = useState("");
@@ -38,7 +45,8 @@ export function ConfirmDialog({
     if (!next) setTyped("");
     onOpenChange(next);
   };
-  const unlocked = phraseMatches(typed, confirmPhrase);
+  const isEmail = confirmPhraseKind === "email";
+  const unlocked = phraseMatches(typed, confirmPhrase, isEmail);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -51,9 +59,10 @@ export function ConfirmDialog({
           <input
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
-            placeholder={`Type ${confirmPhrase}`}
+            placeholder={isEmail ? "Type their email" : `Type ${confirmPhrase}`}
             aria-label={`Type ${confirmPhrase} to confirm`}
-            autoCapitalize="characters"
+            autoCapitalize={isEmail ? "none" : "characters"}
+            inputMode={isEmail ? "email" : undefined}
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
@@ -70,8 +79,9 @@ export function ConfirmDialog({
             disabled={!unlocked}
             onClick={() => {
               if (!unlocked) return;
+              const value = typed.trim();
               setTyped("");
-              onConfirm();
+              onConfirm(value);
             }}
           >
             {confirmLabel}

@@ -19,6 +19,9 @@ export function sessionFromToken(session: Session, token: JWT): Session {
   if (typeof token.isActive === 'boolean') {
     session.isActive = token.isActive
   }
+  if (typeof token.signedInAt === 'number') {
+    session.signedInAt = token.signedInAt
+  }
   if (typeof token.isAdmin === 'boolean') {
     session.user.isAdmin = token.isAdmin
   }

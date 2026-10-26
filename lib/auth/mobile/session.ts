@@ -11,6 +11,7 @@ import { sessionTokenFrom } from '../session-token';
 import { randomBytes } from 'node:crypto';
 import { getRepositoryAsync } from '@/lib/data';
 import { hashRefreshToken } from '../refresh-token-hash';
+import { nowSeconds } from '../session-cutoff';
 
 // #2076. A native sign-in is a refresh token (stored only as a hash, one family per device sign-in)
 // plus a one-day access token that names the refresh-token row it was issued with. The bearer check
@@ -50,6 +51,11 @@ async function accessTokenFor(user: User, nativeTokenId: string) {
       name: user.name ?? null,
       email: user.email,
       nativeTokenId,
+      // #3369: the refresh-token row is what ties this token to a sign-in (a reset deletes it), so
+      // the stamp is the issue time. That makes it right for the session cut-off, which only asks
+      // "issued after the reset?", and wrong as a sign-in time: every rotation moves it. So
+      // `/api/account/data-epoch` does not report it for a bearer request.
+      signedInAt: nowSeconds(),
     },
   });
   const token = await decode({ token: accessToken, secret, salt });
@@ -128,6 +134,12 @@ export async function rotateNativeSession(rawRefreshToken: string): Promise<Nati
   }
   const user = await repo.getUserById(stored.userId);
   if (!user?.isActive) return { ok: false, reason: 'invalid' };
+  // #3369, defence in depth: an admin reset deletes the account's refresh tokens, so none from before
+  // it should exist. If one does (a row written by a request that raced the reset), it must not mint
+  // a fresh `signedInAt` and so carry a pre-reset device back in.
+  if (user.sessionsValidFrom && stored.createdAt.getTime() < user.sessionsValidFrom.getTime()) {
+    return { ok: false, reason: 'invalid' };
+  }
   const next = newRefreshToken();
   if (stored.rotatedAt) {
     const regranted = await repo.regrantNativeRefreshToken({

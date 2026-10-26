@@ -6,6 +6,7 @@ import { MutationSchema } from '@trainingai/shared/sync/mutation-schema';
 import { rateLimit } from '@/lib/rate-limit';
 import { reportServerError } from '@/lib/observability';
 import { readJsonLimited } from '@trainingai/shared/http/request-guards';
+import { withUserWriteBarrier, CUT_OFF } from '@/lib/data/postgres/user-write-barrier';
 import { SUPERSEDED_WARNING, UNSTAMPED_WARNING } from '@trainingai/shared/sync/edited-at';
 
 /**
@@ -88,7 +89,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const repo = await getRepository();
-    const result = await repo.pushMutations(userId, valid);
+    // #3369 (e): holds off an admin reset for the length of the push, and refuses a push whose
+    // sign-in the reset has already cut off, so a request that passed auth() just before the commit
+    // cannot write into the fresh account.
+    const result = await withUserWriteBarrier(userId, session?.signedInAt, () => repo.pushMutations(userId, valid));
+    if (result === CUT_OFF) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     // Q-487: the outer catch below is the ONLY place this route reported to `error_events`, and
     // `pushMutations` never reaches it — it catches per mutation, deliberately, because that is what

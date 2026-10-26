@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { MOBILE_CALLBACKS } from '../../features/account/session';
 import type { AuthPlatform, MobileClient } from '../../features/account/session';
 import { homeWidgets } from '../widgets/platform';
+import { openLocalStorage } from '../../core/storage/open';
 
 const applicationId =
   Platform.OS === 'android'
@@ -112,6 +113,19 @@ export const authPlatform: AuthPlatform = {
   },
   clearAccountData() {
     homeWidgets?.clearSnapshot();
+  },
+  async wipeAccountData(origin, userId) {
+    const storage = await openLocalStorage();
+    if (userId === null) await storage.clearAllAccounts();
+    else await storage.clearAccount(origin, userId);
+    homeWidgets?.clearSnapshot();
+  },
+  async wipeOtherAccountData(origin, userId) {
+    await (await openLocalStorage()).clearOtherAccounts(origin, userId);
+    homeWidgets?.clearSnapshot();
+  },
+  async holdsOtherAccountData(origin, userId) {
+    return (await openLocalStorage()).holdsOtherAccounts(origin, userId);
   },
   dismiss() {
     const browser = requireOptionalNativeModule<{ dismissAuthSession(): void }>(

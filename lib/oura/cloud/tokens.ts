@@ -307,3 +307,25 @@ export async function disconnectOuraAccount(store: OuraTokenStore, userId: strin
   const deleted = await store.deleteOuraCloudTokens(userId)
   return { deleted, revoked }
 }
+
+/**
+ * The plaintext access token to revoke later, read WITHOUT deleting the row. A wipe (account
+ * deletion, an admin reset) reads this first, runs its transaction, and revokes at Oura only after
+ * the commit: the revoke cannot be undone, the wipe can fail and roll back, and a rolled-back wipe
+ * must not leave the person disconnected from Oura. Null when there is no connection or no usable key.
+ */
+export async function readOuraAccessTokenForRevoke(store: OuraTokenStore, userId: string): Promise<string | null> {
+  const row = await store.getOuraCloudTokens(userId)
+  if (!row) return null
+  try {
+    return decryptOuraToken(row.accessToken, userId, 'access_token')
+  } catch (err) {
+    if (!(err instanceof OuraTokenKeyMissingError)) throw err
+    return null
+  }
+}
+
+/** Revokes a token read by `readOuraAccessTokenForRevoke`. The row is already gone with the wipe. */
+export async function revokeOuraAccessToken(accessToken: string): Promise<boolean> {
+  return revokeAccessToken(accessToken)
+}

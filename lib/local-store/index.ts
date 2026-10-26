@@ -1,4 +1,5 @@
 import { isSQLiteAvailable, isLocalStoreDead, runSQL, querySQL } from '@/lib/sqlite/sqlite-service';
+import { storeOwnedByAnotherAccount } from './device-owner';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalManualSleepNight, LocalWorkoutSession,
   LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle, PendingMutation,
@@ -293,6 +294,24 @@ export function getLocalStore(userId: string): LocalStore | null {
   // write. Return null so write sites take their API fallback (the same path web
   // uses) instead of losing data behind a success toast.
   if (isLocalStoreDead()) return null;
+  // #3369: a store another account filled is not this account's to read, write or sync. Answers null
+  // (online-only) while the wipe runs; the page then reloads onto an empty store.
+  if (storeOwnedByAnotherAccount(userId)) return null;
+  if (!_stores.has(userId)) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { SQLiteLocalStore } = require('./sqlite-backend') as typeof import('./sqlite-backend');
+    _stores.set(userId, new SQLiteLocalStore());
+  }
+  return _stores.get(userId)!;
+}
+
+/**
+ * The store without the owner gate. Only the device-owner check uses it, to push the signed-in
+ * account's own queued writes before it wipes a store it cannot attribute (`device-owner.ts`).
+ * Everything else goes through `getLocalStore`.
+ */
+export function getUngatedLocalStore(userId: string): LocalStore | null {
+  if (typeof window === 'undefined' || !isSQLiteAvailable() || isLocalStoreDead()) return null;
   if (!_stores.has(userId)) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { SQLiteLocalStore } = require('./sqlite-backend') as typeof import('./sqlite-backend');
@@ -332,7 +351,9 @@ export async function clearLocalStoreData(): Promise<void> {
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
     [],
   );
-  await Promise.all(
+  // Every table is attempted even when one fails, then the failure is raised: a caller that records
+  // "this device is clean" (the data-epoch wipe) must not do so after a partial clear.
+  const results = await Promise.allSettled(
     tables
       .map(t => t.name)
       .filter(name => !KEEP_ON_SIGN_OUT.has(name))
@@ -341,4 +362,44 @@ export async function clearLocalStoreData(): Promise<void> {
       .map(name => runSQL(`DELETE FROM ${name}`, [])),
   );
   _stores.clear();
+  const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed.length > 0) throw new Error(`local store: ${failed.length} table(s) were not cleared (${String(failed[0].reason)})`);
+}
+
+function uploadQueueHasItems(key: string): boolean {
+  let raw: string | null;
+  try { raw = window.localStorage.getItem(key); } catch { return false; }
+  if (!raw) return false;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return !Array.isArray(parsed) || parsed.length > 0;
+  } catch {
+    // A queue that holds something unreadable is not known to be empty.
+    return true;
+  }
+}
+
+/**
+ * True when the device holds anything a wipe would discard: a row in any table `clearLocalStoreData`
+ * would empty, or an item in a localStorage upload queue (unsent changes are data, #3369). Rows are
+ * not stamped with the account that wrote them, so this is the only thing the device can say about a
+ * store whose owner record is missing (`device-owner.ts`). Cached responses (`api_cache`) and the
+ * exercise catalogue do not count: a wipe can clear them with nothing lost. A failed read throws:
+ * not knowing is not "empty".
+ */
+export async function deviceHasLocalData(): Promise<boolean> {
+  // Dynamic: sign-out-storage pulls in the zustand stores, which reach back into this module.
+  const { UPLOAD_QUEUE_STORAGE } = await import('@/lib/sign-out-storage');
+  if (Object.keys(UPLOAD_QUEUE_STORAGE).some(uploadQueueHasItems)) return true;
+  if (!isSQLiteAvailable()) return false;
+  const tables = await querySQL<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+    [],
+  );
+  for (const { name } of tables) {
+    if (KEEP_ON_SIGN_OUT.has(name)) continue;
+    const rows = await querySQL<{ x: number }>(`SELECT 1 AS x FROM ${name} LIMIT 1`, []);
+    if (rows.length > 0) return true;
+  }
+  return false;
 }

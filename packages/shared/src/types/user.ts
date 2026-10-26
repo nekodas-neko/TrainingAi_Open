@@ -24,4 +24,6 @@ export interface User {
   activityLevel?: ActivityLevel | null
   fitnessGoal?: FitnessGoal | null
   lastGoalReviewAt?: Date | null
+  /** #3369: a sign-in older than this is refused. Set by an admin's data reset; absent for everyone else. */
+  sessionsValidFrom?: Date | null
 }

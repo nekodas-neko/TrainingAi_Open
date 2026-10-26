@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { resolveClaudeRoOwner } from '../claude-ro-owner'
+import { judgeProtectedTarget, sameUserId } from '@/lib/admin-owner'
+import { userWriteLockKey } from '../user-write-barrier'
 
 type Db = ReturnType<typeof getDb>
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
@@ -51,11 +53,50 @@ export const OUTSIDE_THE_CASCADE: Record<string, { disposition: 'anonymised' | '
   seasons: { disposition: 'not-user-data', how: 'global season definitions' },
 }
 
+/**
+ * #3369 — what an admin's wipe must prove before it touches anything. Checked inside the transaction,
+ * after the row lock, so an account promoted to admin or renamed between the screen and the tap is
+ * judged as it is now.
+ */
+export interface AdminWipeGuard {
+  /** The signed-in admin. They may wipe themselves or a non-admin, never another admin. */
+  actingAdminId: string
+  /**
+   * The owner's user id (`resolveOwnerUserId()`), or null when it cannot be resolved. Required so no
+   * caller can forget it: nobody but the owner may wipe the owner, and with null no admin account
+   * can be wiped at all.
+   */
+  ownerId: string | null
+  /**
+   * The target's email as the admin typed it, compared server-side with case and edge spaces
+   * ignored. Left out only by the long-standing "delete a signup that holds no data" path, which has
+   * nothing to confirm; every wipe of an account with data sends it.
+   */
+  confirmEmail?: string
+}
+
+/** Why an admin wipe changed nothing. */
+export type AdminWipeRefusal =
+  | 'admin-target' | 'email-mismatch' | 'self' | 'actor-not-admin' | 'owner-protected' | 'owner-unresolved'
+
+/** The row an admin wipe leaves in `agent_action_log`, written in the same transaction as the wipe. */
+export interface AdminWipeAudit {
+  job: 'admin-reset-user-data' | 'admin-delete-account'
+  /** Who ran it, as the log's `actor` column wants it (`admin:<user id>`). */
+  actor: string
+}
+
 export interface AccountDeletionResult {
   /** False when no user row matched or the deletion was refused — nothing was changed. */
   deleted: boolean
   /** True when `onlyIfNoData` was set and the account holds data, so nothing was changed (issue 2695). */
   refusedHasData?: boolean
+  /** #3369: set when an admin guard refused the wipe. Nothing was changed. */
+  refused?: AdminWipeRefusal
+  /** #3369: rows removed from the tables that hang directly off `users`, by table (zero tables left out). */
+  removed?: Record<string, number>
+  /** #3369: for a reset, whether the built-in progression styles and phase sets were put back. */
+  defaultsSeeded?: boolean
   /** Rows kept with the user unlinked. */
   anonymised: { aiCallLog: number; errorEvents: number; authoredExercises: number }
   /** Rows outside the cascade removed because they named this user. */
@@ -129,9 +170,11 @@ const SIGNUP_SEEDED_ROOTS = new Map<string, string | null>([
  * (`ON DELETE SET NULL`) are not data under the account. Fails closed: if the schema read finds no
  * cascade table at all it throws rather than answer "no data".
  */
-export async function usersWithData(db: Db | Tx, userIds: readonly string[]): Promise<Set<string>> {
-  if (userIds.length === 0) return new Set()
-  const { rows: fks } = await db.execute<{ tbl: string; col: string; bare: string }>(sql`
+type CascadeRoot = { tbl: string; col: string; bare: string }
+
+/** Every table whose foreign key to `users` is `ON DELETE CASCADE`, read from the live schema. */
+async function cascadeRoots(db: Db | Tx, who: string): Promise<CascadeRoot[]> {
+  const { rows: fks } = await db.execute<CascadeRoot>(sql`
     SELECT format('%I', cl.relname) AS tbl, format('%I', a.attname) AS col, cl.relname::text AS bare
     FROM pg_constraint con
     JOIN pg_class cl ON cl.oid = con.conrelid
@@ -141,7 +184,13 @@ export async function usersWithData(db: Db | Tx, userIds: readonly string[]): Pr
       AND pc.relname = 'users' AND pc.relnamespace = 'public'::regnamespace
       AND cl.relnamespace = 'public'::regnamespace
     ORDER BY cl.relname`)
-  if (fks.length === 0) throw new Error('usersWithData: no cascade foreign keys to users found')
+  if (fks.length === 0) throw new Error(`${who}: no cascade foreign keys to users found`)
+  return fks
+}
+
+export async function usersWithData(db: Db | Tx, userIds: readonly string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set()
+  const fks = await cascadeRoots(db, 'usersWithData')
   const ids = sql`ARRAY[${sql.join(userIds.map(u => sql`${u}`), sql`, `)}]::uuid[]`
   const parts = fks.flatMap(({ tbl, col, bare }) => {
     const seeded = SIGNUP_SEEDED_ROOTS.get(bare)
@@ -154,18 +203,108 @@ export async function usersWithData(db: Db | Tx, userIds: readonly string[]): Pr
   return new Set(rows.map(r => r.uid))
 }
 
-export async function deleteAccount(
-  db: Db,
-  userId: string,
-  opts: { auditSubjectIds?: readonly string[]; onlyIfNoData?: boolean } = {},
-): Promise<AccountDeletionResult> {
+/**
+ * #3369 — how many rows each table hanging directly off `users` holds for this user, for the audit
+ * row. Direct children only: a deeper table's rows (a set under its exercise log) go with their
+ * parent and are not counted separately, so this is "rows the wipe took at the top of each chain",
+ * not a count of every row. Tables with nothing are left out.
+ */
+async function countDirectRows(tx: Tx, userId: string): Promise<Record<string, number>> {
+  const fks = await cascadeRoots(tx, 'countDirectRows')
+  const parts = fks.map(({ tbl, col, bare }) =>
+    sql`SELECT ${bare}::text AS t, count(*)::int AS n FROM ${sql.raw(tbl)} WHERE ${sql.raw(col)} = ${userId}`)
+  const { rows } = await tx.execute<{ t: string; n: number }>(sql`SELECT t, n FROM (${sql.join(parts, sql` UNION ALL `)}) c WHERE n > 0 ORDER BY t`)
+  return Object.fromEntries(rows.map(r => [r.t, r.n]))
+}
+
+/** The part of a `users` row that a reset keeps: how the person signs in, and the admin's switches. */
+type KeptAccount = {
+  id: string; oauth_sub: string | null; email: string; name: string | null; password_hash: string | null
+  is_active: boolean; is_admin: boolean; created_at: Date; timezone: string
+}
+type KeptIdentity = { user_id: string; provider: string; subject: string; email: string | null; created_at: Date }
+
+/** The guard of an admin wipe, judged against the locked row. `null` means go ahead. */
+function judgeGuard(
+  guard: AdminWipeGuard | undefined, userId: string, me: { email: string; is_admin: boolean },
+  actor: { is_admin: boolean; is_active: boolean } | undefined, mayWipeSelf: boolean,
+): AdminWipeRefusal | null {
+  if (!guard) return null
+  // The acting admin is judged on the row locked in THIS transaction, not on what the route read a
+  // moment ago: an admin demoted or deactivated in between does nothing.
+  if (!actor || !actor.is_admin || !actor.is_active) return 'actor-not-admin'
+  const protectedTarget = judgeProtectedTarget(guard.actingAdminId, userId, me.is_admin, guard.ownerId)
+  if (protectedTarget) return protectedTarget
+  if (me.is_admin && !sameUserId(userId, guard.actingAdminId)) return 'admin-target'
+  if (sameUserId(userId, guard.actingAdminId) && !mayWipeSelf) return 'self'
+  if (guard.confirmEmail === undefined) return null
+  return guard.confirmEmail.trim().toLowerCase() === me.email.trim().toLowerCase() ? null : 'email-mismatch'
+}
+
+async function writeAudit(
+  tx: Tx, audit: AdminWipeAudit, args: { targetUserId: string; keepsLink: boolean; removed: Record<string, number>; result: AccountDeletionResult },
+) {
+  const total = Object.values(args.removed).reduce((a, b) => a + b, 0)
+  // Not run through `redactActionParameters`: it drops any key that looks like a credential, which
+  // would erase `native_refresh_tokens` and `oura_tokens` from `removed`. Everything here is an id,
+  // a table name from the catalogue or a count, so there is nothing for it to protect.
+  // The log's target link is SET NULL when the account is deleted, so a deletion's row names the
+  // target in `parameters` as well (an id is not personal data; the email is left out on purpose).
+  await tx.execute(sql`
+    INSERT INTO agent_action_log (job, parameters, actor, target_user_id, finished_at, outcome, affected_rows)
+    VALUES (${audit.job},
+            ${JSON.stringify({
+              targetUserId: args.targetUserId,
+              removed: args.removed,
+              anonymised: args.result.anonymised,
+              purged: args.result.purged,
+            })}::jsonb,
+            ${audit.actor},
+            ${args.keepsLink ? args.targetUserId : null},
+            now(), 'succeeded', ${total})`)
+}
+
+interface EraseOpts {
+  auditSubjectIds?: readonly string[]
+  onlyIfNoData?: boolean
+  guard?: AdminWipeGuard
+  audit?: AdminWipeAudit
+  /** #3369: keep the account — put the signing-in half of the row back after the cascade. */
+  keepAccount?: boolean
+}
+
+/**
+ * The one erase. Both the deletion and the admin reset run it, so what a reset removes is what a
+ * deletion removes by construction: the same `DELETE FROM users` cascade, the same purge of rows
+ * outside it. A reset differs only in that it copies the signing-in half of the users row and its
+ * identities first and puts them back, under the same id, before the transaction ends.
+ */
+async function erase(db: Db, userId: string, opts: EraseOpts): Promise<AccountDeletionResult> {
   return db.transaction(async tx => {
     // The row lock serialises two deletions of the same account, and it makes every concurrent
     // write that references this user wait for the outcome: an FK insert takes KEY SHARE on the
     // users row, which FOR UPDATE blocks. When this commits, those writes fail on the FK rather
     // than recreating rows for an account that no longer exists.
-    const { rows: [me] } = await tx.execute<{ email: string }>(sql`SELECT email FROM users WHERE id = ${userId} FOR UPDATE`)
+    // #3369 (e): a reset waits for the covered writes already in flight and holds off new ones until
+    // it commits (`user-write-barrier.ts`). Before the row lock, so a waiter never holds a row the
+    // writer needs. lock_timeout turns an unexpectedly long write into an error, not a hang.
+    if (opts.keepAccount) {
+      await tx.execute(sql`SET LOCAL lock_timeout = '15s'`)
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${userWriteLockKey(userId)}, 0))`)
+      await tx.execute(sql`SET LOCAL lock_timeout = 0`)
+    }
+    // With an admin guard the acting admin's row is locked in the same statement, in id order (two
+    // admins acting on each other cannot deadlock), so it is judged as it is at commit time.
+    const lockIds = opts.guard && !sameUserId(opts.guard.actingAdminId, userId) ? [userId, opts.guard.actingAdminId] : [userId]
+    const { rows: locked } = await tx.execute<KeptAccount>(sql`
+      SELECT id, oauth_sub, email, name, password_hash, is_active, is_admin, created_at, timezone
+      FROM users WHERE id IN (${sql.join(lockIds.map(i => sql`${i}::uuid`), sql`, `)}) ORDER BY id FOR UPDATE`)
+    const me = locked.find(r => sameUserId(r.id, userId))
+    const actor = opts.guard ? locked.find(r => sameUserId(r.id, opts.guard!.actingAdminId)) : undefined
     if (!me) return NOT_FOUND
+
+    const refused = judgeGuard(opts.guard, userId, me, actor, opts.keepAccount === true)
+    if (refused) return { ...NOT_FOUND, refused }
 
     // issue 2695: checked AFTER the row lock, so a write that references this user is either already
     // visible here or waits for the outcome and then fails on the FK. The admin route sets this; a
@@ -185,6 +324,12 @@ export async function deleteAccount(
     const subjects = opts.auditSubjectIds
       ? new Set(opts.auditSubjectIds.map(s => s.toLowerCase()))
       : await auditSubjects(tx)
+
+    const removed = opts.audit ? await countDirectRows(tx, userId) : {}
+    const { rows: identities } = opts.keepAccount
+      ? await tx.execute<KeptIdentity>(sql`
+          SELECT user_id, provider, subject, email, created_at FROM auth_identities WHERE user_id = ${userId}`)
+      : { rows: [] as KeptIdentity[] }
 
     const { rows: [ai] } = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM ai_call_log WHERE user_id = ${userId}`)
     const { rows: [ee] } = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM error_events WHERE user_id = ${userId}`)
@@ -215,12 +360,30 @@ export async function deleteAccount(
     const gone = await tx.execute(sql`DELETE FROM users WHERE id = ${userId} RETURNING id`)
     if (count(gone) !== 1) throw new Error(`account deletion: expected to delete 1 users row, deleted ${count(gone)}`)
 
+    if (opts.keepAccount) {
+      // The same id, so the person's sign-ins still resolve to this account and the admin flag and
+      // active state are exactly what they were. `sessions_valid_from` is the cut-off every earlier
+      // session and native token is refused against; everything else takes its column default.
+      const back = await tx.execute(sql`
+        INSERT INTO users (id, oauth_sub, email, name, password_hash, is_active, is_admin, created_at, timezone, sessions_valid_from)
+        VALUES (${me.id}, ${me.oauth_sub}, ${me.email}, ${me.name}, ${me.password_hash}, ${me.is_active}, ${me.is_admin},
+                ${me.created_at}, ${me.timezone}, clock_timestamp())
+        RETURNING id`)
+      if (count(back) !== 1) throw new Error(`account reset: expected to restore 1 users row, restored ${count(back)}`)
+      for (const row of identities) {
+        const put = await tx.execute(sql`
+          INSERT INTO auth_identities (user_id, provider, subject, email, created_at)
+          VALUES (${row.user_id}, ${row.provider}, ${row.subject}, ${row.email}, ${row.created_at})`)
+        if (count(put) !== 1) throw new Error('account reset: an identity was not restored')
+      }
+    }
+
     // Last, so the window in which a concurrent request can write a fresh key for this user is as
     // short as this transaction allows. The route also waits for its own limiter write first. A key
     // that still lands afterwards ages out in the limiter's own two-day prune.
     const rateLimits = await tx.execute(sql`DELETE FROM rate_limits WHERE ${names('key')}`)
 
-    return {
+    const result: AccountDeletionResult = {
       deleted: true,
       anonymised: { aiCallLog: ai.n, errorEvents: ee.n, authoredExercises: ex.n },
       purged: {
@@ -230,5 +393,38 @@ export async function deleteAccount(
         emailPreimage: count(emailPreimage),
       },
     }
+    if (opts.audit) {
+      // Inside the transaction: a wipe that cannot be recorded does not happen.
+      await writeAudit(tx, opts.audit, { targetUserId: userId, keepsLink: opts.keepAccount === true, removed, result })
+      result.removed = removed
+    }
+    return result
   })
+}
+
+export async function deleteAccount(
+  db: Db,
+  userId: string,
+  opts: { auditSubjectIds?: readonly string[]; onlyIfNoData?: boolean; guard?: AdminWipeGuard; audit?: AdminWipeAudit } = {},
+): Promise<AccountDeletionResult> {
+  return erase(db, userId, opts)
+}
+
+/**
+ * #3369 — erase everything an account holds and keep the account. Exactly `deleteAccount`'s erase,
+ * then the users row and its sign-in identities back under the same id. One transaction: a failure
+ * anywhere leaves the account exactly as it was, and no reader ever sees the user missing.
+ *
+ * What stays: the id, email, provider name, password hash, Google subject, `is_admin`, `is_active`,
+ * `created_at`, the timezone (a reset to the default would date every new log in the wrong day), and
+ * every `auth_identities` row. What goes is everything else, including profile, goals, preferences
+ * and friend code. Sessions issued before the reset are refused (`sessions_valid_from`), and the
+ * cascade has already deleted the native refresh tokens, so every device is signed out.
+ */
+export async function resetAccountData(
+  db: Db,
+  userId: string,
+  opts: { auditSubjectIds?: readonly string[]; guard: AdminWipeGuard; audit: AdminWipeAudit },
+): Promise<AccountDeletionResult> {
+  return erase(db, userId, { ...opts, keepAccount: true })
 }
