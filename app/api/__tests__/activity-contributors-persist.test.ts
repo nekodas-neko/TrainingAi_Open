@@ -40,6 +40,7 @@ const repoStub = () => ({
     listSleepSessions:        async () => [],
     getWorkoutSessionsFrom:   async () => repo.workouts,
     getOuraDaily:             async () => [],
+    getOuraCloudActivitySeries: async () => [],
     getActiveProgram:         async () => repo.program,
     getHrForWindow:           async () => [],
     getObservedHrProfile: async () => computeObservedHr([]),

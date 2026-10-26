@@ -28,6 +28,7 @@ import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { scoreActivityForDay, restingHrBaseline, carriedOverRestingHr, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
+import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
 import { staleFinishedDays } from '@trainingai/shared/health/finished-day-recheck'
 import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
 import { type DailyGoals } from '@trainingai/shared/health/daily-goals'
@@ -388,6 +389,9 @@ export async function buildReadinessPayload(
 
   // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.
   const hrProfileP = resolveHrProfile(repo, userId, tz).catch(() => null)
+  // #3114: Oura's per-minute MET decides the move lane (its activity day starts at 4 a.m., hence the
+  // day before). Today's live read may go without it; a finalised day may not (`loadActivityDay`).
+  const cloudActivityP = (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
   const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
@@ -511,6 +515,7 @@ export async function buildReadinessPayload(
     // the profile's resting HR, which is the previous device's mean, as the HR zones already do.
     restingHrCarriedOver: baselineRhr == null && carriedOverRestingHr(bodyMetrics) != null ? hrProfile?.restingHr ?? null : null,
     hrRows: todayHrRows,
+    metGrid: ouraCloudMetGrid(await cloudActivityP, todayMid.getTime(), tomorrowMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,
     sessions: recentSessions,
     program,

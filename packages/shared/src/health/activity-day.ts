@@ -1,10 +1,10 @@
-import { ageFromDob, dateStrMidnightInTz, shiftDateStr } from '../date-utils'
+import { ageFromDob, dateStrMidnightInTz, shiftDateStr, todayInTz } from '../date-utils'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining, type AcwrResult, type ProgramAgeInput } from '../ai-periodization/acwr'
 import { computeActivityScore, strengthWindowEndingAt, type ActivityScoreResult } from './activity-score'
 import { getDailyGoals, type DailyGoals, type GoalProfile } from './daily-goals'
 import { hrMaxFromAge } from './hr-zones'
 import { latestWeightKg } from './latest-weight'
-import { intradayHrContributors } from './intraday-hr-contributors'
+import { intradayHrContributors, type MetGridInput } from './intraday-hr-contributors'
 import { excludeLowWearDays } from './wear-confidence'
 import { rowsOfDeviceInUse, perDeviceNormal } from './per-device-normal'
 import { BASELINE_MIN_NIGHTS } from './readiness-composite'
@@ -63,6 +63,8 @@ export interface ActivityDayInput {
   restingHrCarriedOver?: number | null
   /** The day's intraday heart rate, `[local midnight, next local midnight)`. */
   hrRows: readonly { timestamp: Date; bpm: number; source?: string | null }[]
+  /** Oura's per-minute MET (`ouraCloudMetGrid`) covering `date`: it decides the move lane (#3114). Null for none. */
+  metGrid?: MetGridInput | null
   /** The HR profile's ceiling; null falls back to the age formula. */
   maxHr: number | null
   /** Workout sessions covering at least the 28 days before `date`; later ones are ignored. */
@@ -134,14 +136,19 @@ export function scoreActivityForDay(input: ActivityDayInput): ActivityDay {
   let zoneMinutes: number | null = null
   let moveHours: number | null = null
   let moveHoursGoal: number | null = null
+  // #3114: Oura's MET decides the move lane, so a day with MET and no heart rate still counts. A
+  // finished day also drops its non-wear waking hours from the goal (`dayIsOver`).
+  const hasMet = input.metGrid?.metsPerMinute.some(m => m != null) ?? false
   const zoneRestingHr = input.restingHrBaseline ?? input.restingHrCarriedOver ?? null
-  if (zoneRestingHr != null && input.hrRows.length > 0) {
+  if (zoneRestingHr != null && (input.hrRows.length > 0 || hasMet)) {
     const c = intradayHrContributors({
       hrRows: input.hrRows,
       maxHr: input.maxHr ?? hrMaxFromAge(ageYears),
       restingHr: zoneRestingHr,
       tz,
       dateIso: date,
+      metGrid: input.metGrid ?? null,
+      dayIsOver: date < todayInTz(tz),
     })
     zoneMinutes = c.zoneMinutes
     moveHours = c.moveHours

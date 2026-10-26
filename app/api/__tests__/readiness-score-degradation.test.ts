@@ -27,6 +27,7 @@ vi.mock('@/lib/data', () => ({
     listSleepSessions:       async () => repo.sleepSessions,
     getWorkoutSessionsFrom:  async () => [],
     getOuraDaily:            async () => repo.ouraDaily,
+    getOuraCloudActivitySeries: async () => [],
     getActiveProgram:        async () => null,
     getHrForWindow:          async () => [],
     getObservedHrProfile: async () => computeObservedHr([]),

@@ -24,8 +24,8 @@ export const DEFAULT_WAKE_HOUR = 7
 export const DEFAULT_SLEEP_HOUR = 22 // 10pm — matches a typical waking day; the goal, not a hard cutoff on data
 
 /**
- * Distinct **waking** local hours today with at least one HR reading above the rest threshold.
- * Returns 0 for an empty series — an honest zero, not a fabricated value.
+ * The **waking** local hours of `dateIso` that have heart rate at all (`measured`) and, of those, the
+ * ones with at least one reading above the rest threshold (`moved`).
  *
  * The waking-hour filter is what makes this comparable to its own goal (Q-188, 2026-08-11). This
  * function previously counted any hour in 0–23 while `moveHoursGoal()` divided by
@@ -36,15 +36,16 @@ export const DEFAULT_SLEEP_HOUR = 22 // 10pm — matches a typical waking day; t
  * The window is the same half-open `[wakeHour, sleepHour)` that `moveHoursGoal` measures, so
  * numerator and denominator agree by construction for any wake/sleep pair.
  */
-export function computeMovedHours(input: HourlyMovementInput): number {
+export function hourlyHrActivity(input: HourlyMovementInput): { measured: Set<number>; moved: Set<number> } {
   const {
     hrRows, maxHr, restingHr, tz, dateIso,
     wakeHour = DEFAULT_WAKE_HOUR, sleepHour = DEFAULT_SLEEP_HOUR,
   } = input
-  if (hrRows.length === 0) return 0
+  const measured = new Set<number>()
+  const moved = new Set<number>()
+  if (hrRows.length === 0) return { measured, moved }
 
   const reserve = hrReserve(maxHr, restingHr)
-  const movedHours = new Set<number>()
 
   // RV-80 — hoisted, and the only reason this is worth a comment is that the loop it came out of
   // runs once per heart-rate row on a path warmed at every app launch. `tz` is a function input and
@@ -66,15 +67,22 @@ export function computeMovedHours(input: HourlyMovementInput): number {
     const day = `${local.find(p => p.type === 'year')!.value}-${local.find(p => p.type === 'month')!.value}-${local.find(p => p.type === 'day')!.value}`
     if (day !== dateIso) continue
 
+    const hourStr = local.find(p => p.type === 'hour')!.value
+    const hour = hourStr === '24' ? 0 : parseInt(hourStr, 10)
+    if (hour < wakeHour || hour >= sleepHour) continue  // outside the goal's own window
+    measured.add(hour)
     const hrr = (row.bpm - restingHr) / reserve
-    if (hrr > HR_REST_THRESHOLD) {
-      const hourStr = local.find(p => p.type === 'hour')!.value
-      const hour = hourStr === '24' ? 0 : parseInt(hourStr, 10)
-      if (hour < wakeHour || hour >= sleepHour) continue  // outside the goal's own window
-      movedHours.add(hour)
-    }
+    if (hrr > HR_REST_THRESHOLD) moved.add(hour)
   }
-  return movedHours.size
+  return { measured, moved }
+}
+
+/**
+ * Distinct **waking** local hours today with at least one HR reading above the rest threshold.
+ * Returns 0 for an empty series — an honest zero, not a fabricated value.
+ */
+export function computeMovedHours(input: HourlyMovementInput): number {
+  return hourlyHrActivity(input).moved.size
 }
 
 /** The goal denominator: how many waking hours today should have some movement. */

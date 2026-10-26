@@ -20,6 +20,7 @@ const repo = {
   listSleepSessions: vi.fn(async (_u: string, _f: string, _t: string) => [] as unknown[]),
   getWorkoutSessionsFrom: vi.fn(async (_u: string, _f: Date) => [] as unknown[]),
   getOuraDaily: vi.fn(async (_u: string, _f: string, _t: string) => [] as unknown[]),
+  getOuraCloudActivitySeries: vi.fn(async (_u: string, _f: string, _t: string) => [] as unknown[]),
   getActiveProgram: vi.fn(async (_u: string) => null as unknown),
   listProgramPhases: vi.fn(async (_u: string, _p: string) => [] as unknown[]),
   countSessionsSinceStart: vi.fn(async (_u: string, _p: string) => 0),
