@@ -150,3 +150,21 @@ export function planAlerts(
 export function wantsNotifications(settings: PlatformSettings, restCueOn: boolean) {
   return restCueOn || settings.walkCues || settings.reminders.some((row) => row.enabled);
 }
+
+/** The Rest timer alarm row in Preview settings (#3083): the rest cue drives the alarm, there is no switch of its own. */
+export const restAlarmRow = {
+  title: 'Rest timer alarm',
+  caption: "Follows each workout's rest cue. Turn the cue on in the workout to get the alarm.",
+  blockedLabel: 'Blocked',
+  blockedCaption:
+    "Android has notifications turned off for this app, so the rest alarm can't sound with the screen off.",
+} as const;
+
+/** True when something switched on needs notification permission and Android has refused it. */
+export function notificationsBlocked(
+  settings: PlatformSettings,
+  restCueOn: boolean,
+  permission: boolean,
+) {
+  return !permission && wantsNotifications(settings, restCueOn);
+}

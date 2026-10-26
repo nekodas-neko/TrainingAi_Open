@@ -14,7 +14,12 @@ import {
   type Alert,
 } from '../src/features/platform/data/models.ts';
 import { PlatformStore } from '../src/features/platform/data/PlatformStore.ts';
-import { planAlerts, wantsNotifications } from '../src/features/platform/data/alert-plan.ts';
+import {
+  notificationsBlocked,
+  planAlerts,
+  restAlarmRow,
+  wantsNotifications,
+} from '../src/features/platform/data/alert-plan.ts';
 import { AlertScheduler } from '../src/features/platform/data/AlertScheduler.ts';
 import {
   CalendarStore,
@@ -491,4 +496,21 @@ test('notification permission is wanted whenever the rest cue, a walk cue or a r
   assert.equal(wantsNotifications(quiet, false), false);
   assert.equal(wantsNotifications(quiet, true), true, 'the rest cue alone is enough');
   assert.equal(wantsNotifications(settings({ walkCues: true }), false), true);
+});
+
+test('the Rest timer alarm row pins its copy and shows Blocked only when permission is refused', () => {
+  assert.equal(restAlarmRow.title, 'Rest timer alarm');
+  assert.equal(
+    restAlarmRow.caption,
+    "Follows each workout's rest cue. Turn the cue on in the workout to get the alarm.",
+  );
+  assert.equal(restAlarmRow.blockedLabel, 'Blocked');
+  assert.equal(
+    restAlarmRow.blockedCaption,
+    "Android has notifications turned off for this app, so the rest alarm can't sound with the screen off.",
+  );
+  const quiet = settings({ walkCues: false });
+  assert.equal(notificationsBlocked(quiet, true, false), true, 'cue on, permission refused');
+  assert.equal(notificationsBlocked(quiet, true, true), false, 'permission granted');
+  assert.equal(notificationsBlocked(quiet, false, false), false, 'nothing needs notifications');
 });

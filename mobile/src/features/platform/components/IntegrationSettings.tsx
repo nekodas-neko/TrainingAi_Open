@@ -4,6 +4,7 @@ import { Linking, View } from 'react-native';
 import {
   AppButton,
   AppText,
+  Badge,
   Card,
   ChipPicker,
   IconButton,
@@ -17,7 +18,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { usePlatformIntegrations } from '../PlatformProvider';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
 import { calendars } from '../../../integrations/calendar/platform';
-import { wantsNotifications } from '../data/alert-plan';
+import { notificationsBlocked, restAlarmRow } from '../data/alert-plan';
 import { reminderKinds, reminderLabels, reminderSchema, type Reminder } from '../data/models';
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -60,6 +61,7 @@ export function IntegrationSettings() {
   const restCueOn =
     journal.data.preferences.timers.restCues ||
     journal.data.workouts.some((x) => x.status === 'active' && x.timers.restCues);
+  const blocked = !!settings && notificationsBlocked(settings, restCueOn, permission);
   return (
     <Card>
       <AppText variant="heading">Alerts & calendar</AppText>
@@ -83,14 +85,28 @@ export function IntegrationSettings() {
               )
             }
           />
-          {!permission && wantsNotifications(settings!, restCueOn) && (
+          <Stack direction="row" align="flex-start">
+            <View style={{ flex: 1 }}>
+              <AppText>{restAlarmRow.title}</AppText>
+              <AppText variant="caption" tone="muted">
+                {restAlarmRow.caption}
+              </AppText>
+            </View>
+            {blocked && <Badge label={restAlarmRow.blockedLabel} tone="checkin" />}
+          </Stack>
+          {blocked && (
+            <>
+              <AppText variant="caption" tone="muted">
+                {restAlarmRow.blockedCaption}
+              </AppText>
               <AppButton
                 title="Enable notification permission"
                 variant="secondary"
                 busy={busy}
                 onPress={() => void run(() => enableAlerts())}
               />
-            )}
+            </>
+          )}
           <AppText variant="label">Reminders</AppText>
           {settings!.reminders.map((row) => (
             <Stack key={row.id} direction="row" align="center">
