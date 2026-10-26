@@ -28,4 +28,12 @@ describe('movementWindows across a daylight-saving change (#3445)', () => {
     expect(windows).toHaveLength(1)
     expect(windows[0][1]).toBe(dateStrMidnightInTz('2027-04-05', TZ).getTime() + 30 * 60_000)
   })
+
+  it('gives no window to a log whose end is unusable and whose duration is 0', () => {
+    // Used to become a bogus 24 h window; with nothing to end it on, the log covers no instants.
+    for (const endTime of [null, 'soon']) {
+      const counted = { activityLogs: [{ date: '2026-10-03', startTime: '23:30:00', endTime, durationMin: 0 }], sessions: [] }
+      expect(movementWindows(counted, TZ)).toEqual([])
+    }
+  })
 })

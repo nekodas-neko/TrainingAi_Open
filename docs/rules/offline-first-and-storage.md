@@ -64,9 +64,9 @@ rebuild recreates the view from `claude-ro-views.sql`. Check the table against t
 with no view need no `DROP VIEW`.
 
 **A column added to `schema.ts` is load-bearing from the release that adds it** (#3435). Drizzle selects
-every column in the table's definition, so once `schema.ts` names the column, every read of that
-table selects it, and a migration that has not run (or failed) breaks every read of the table, not
-only the feature that uses the column. The migration comment "an older build that never reads the
+every column in the table's definition, so once `schema.ts` names the column, every full-row
+`select()` of that table selects it (projected reads do not), and a migration that has not run (or
+failed) breaks every full-row `select()` of the table, not only the feature that uses the column. The migration comment "an older build that never reads the
 column behaves exactly as before" (`202610260017_users_sessions_valid_from.sql`) is therefore wrong
 for the release that ships the schema change together with the migration: it holds for a build that
 predates the column, not for the one that adds it. That comment sits in an applied migration and is
