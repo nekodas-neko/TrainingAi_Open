@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OUTSIDE_SOURCES_NOTICE } from '@trainingai/shared/admin-wipe-copy';
 
 /** The admin console's reads. `cache` is off: other people's emails and screenshots stay off the phone's disk. */
 const noDiskCache = () => false;
@@ -151,3 +152,104 @@ export function actionFailure(action: UserAction, failure: unknown): string {
 
 /** The email an invite is stored under: trimmed and lower-cased, as the current app sends it. */
 export const inviteEmail = (input: string) => input.trim().toLowerCase();
+
+/** Reset data and Delete account (#3369): both ask for the user's email, and both go to the server with it. */
+export type WipeKind = 'reset' | 'erase';
+
+/** The web console's rule for who is offered which: never an admin but yourself, never a signup that never got in. */
+export function wipeActions(user: AdminUser, isSelf: boolean): WipeKind[] {
+  const neverGotIn = !user.isActive && user.hasData === false;
+  if (neverGotIn) return [];
+  const kinds: WipeKind[] = [];
+  if (!user.isAdmin || isSelf) kinds.push('reset');
+  if (!user.isAdmin && !isSelf) kinds.push('erase');
+  return kinds;
+}
+
+export function wipeConfirm(
+  kind: WipeKind,
+  user: AdminUser,
+  isSelf: boolean,
+): { title: string; message: string; confirmLabel: string } {
+  const who = userLabel(user);
+  if (kind === 'reset')
+    return {
+      title: 'Reset data?',
+      message: `This permanently deletes everything ${who} has recorded: workouts, food, sleep, body metrics, goals, settings, friendships and connected devices, and their Oura connection is revoked. Their account, email, sign-in and ${user.isAdmin ? 'admin and ' : ''}active status stay. Every device they use is signed out and wiped, and they sign in again to start fresh.${isSelf ? ' This is your own account, so you will be signed out now.' : ''} It cannot be undone. ${OUTSIDE_SOURCES_NOTICE}`,
+      confirmLabel: 'Reset data',
+    };
+  return {
+    title: 'Delete account and data?',
+    message: `This permanently deletes ${who}'s account and everything under it, and revokes their Oura connection. Their friendships are removed too. Their invite is removed as well, so they will need a new invite to sign up again. It cannot be undone. ${OUTSIDE_SOURCES_NOTICE}`,
+    confirmLabel: 'Delete account',
+  };
+}
+
+/** The confirm unlocks when the typed email is the row's, ignoring case and surrounding spaces, as the server compares. */
+export const emailMatches = (typed: string, email: string) =>
+  typed.trim().toLowerCase() === email.trim().toLowerCase() && email.trim() !== '';
+
+/** The route and body for a wipe. The typed email is sent, not the row's, so the server's check is the real one. */
+export function wipeRequest(kind: WipeKind, user: AdminUser, typedEmail: string) {
+  return {
+    method: kind === 'reset' ? ('POST' as const) : ('DELETE' as const),
+    path: kind === 'reset' ? '/api/admin/users/reset-data' : '/api/admin/users',
+    body: { userId: user.id, confirmEmail: typedEmail },
+  };
+}
+
+/** Plain sentences chosen from the status alone; the response's own text is never shown. */
+export function wipeFailure(kind: WipeKind, failure: unknown): string {
+  const status = (failure as { status?: unknown } | null)?.status;
+  const nothing = 'Nothing was removed.';
+  if (status === 403)
+    return "Another admin's account, or the owner's, cannot be reset or deleted from here. Nothing was removed.";
+  if (status === 409) return `The account changed while you were confirming. Refresh and try again. ${nothing}`;
+  if (status === 429) return `Too many resets and deletions this hour. Try again later. ${nothing}`;
+  if (status === 404) return `That user no longer exists. ${nothing}`;
+  if (status === 400) return `That email does not match this account. ${nothing}`;
+  return kind === 'reset'
+    ? `The data could not be reset. ${nothing}`
+    : `The account could not be deleted. ${nothing}`;
+}
+
+export const wipeDone = (kind: WipeKind, user: AdminUser, defaultsSeeded: boolean) =>
+  kind === 'erase'
+    ? `${userLabel(user)} and their data were deleted.`
+    : defaultsSeeded
+      ? `${userLabel(user)}'s data was reset. They are signed out on every device.`
+      : `${userLabel(user)}'s data was reset, but the built-in styles could not be put back. Reset again to add them.`;
+
+/**
+ * Sends the wipe, then refreshes the console's lists. Resetting your own account ends your session
+ * on the server, so the app signs out here, as the web console goes to its sign-in page; this phone's
+ * old rows are wiped by the data-epoch check on the next sign-in.
+ */
+export async function performWipe(
+  kind: WipeKind,
+  user: AdminUser,
+  typedEmail: string,
+  io: {
+    write: (
+      method: 'POST' | 'DELETE',
+      path: string,
+      body: unknown,
+      invalidate: string[],
+    ) => Promise<unknown>;
+    signOut: () => void | Promise<void>;
+  },
+): Promise<{ text: string; error: boolean }> {
+  const req = wipeRequest(kind, user, typedEmail);
+  let response: unknown;
+  try {
+    response = await io.write(req.method, req.path, req.body, [adminUsersSpec.path, adminPendingPath]);
+  } catch (failure) {
+    return { text: wipeFailure(kind, failure), error: true };
+  }
+  const reply = (response ?? {}) as { signedOut?: unknown; defaultsSeeded?: unknown };
+  if (kind === 'reset' && reply.signedOut === true) {
+    await io.signOut();
+    return { text: 'Your data was reset. Sign in again to start fresh.', error: false };
+  }
+  return { text: wipeDone(kind, user, reply.defaultsSeeded !== false), error: false };
+}
