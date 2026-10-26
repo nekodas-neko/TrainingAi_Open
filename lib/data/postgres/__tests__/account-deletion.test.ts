@@ -368,7 +368,7 @@ describe.skipIf(!canRun)('account deletion of the claude_ro audit subject (#2120
     await pool.query(`DELETE FROM db_query_log WHERE sql_text LIKE $1`, [`%${MARK}%`])
   })
 
-  it('purges every db_query_log row, because every audited query read their data', async () => {
+  it('purges the subject\'s own query rows, and keeps a query scoped to another user (#3357)', async () => {
     const client = await import('@/lib/data/postgres/client')
     pool = client.getPool()
     const { deleteAccount } = await import('../slices/account-deletion')
@@ -377,10 +377,17 @@ describe.skipIf(!canRun)('account deletion of the claude_ro audit subject (#2120
     await pool.query(
       `INSERT INTO db_query_log (sql_text, truncated, ok) VALUES ($1, false, true), ($2, false, true)`,
       [`SELECT count(*) FROM claude_ro.sleep_sessions /* ${MARK} subject-1 */`, `SELECT 1 /* ${MARK} subject-2 */`])
+    // A pivoted read of a feedback sender's data: the trace of another person's data leaving.
+    const OTHER = '00000000-0000-4000-8000-00000000357a'
+    await pool.query(
+      `INSERT INTO db_query_log (sql_text, truncated, ok, scoped_user_id) VALUES ($1, false, true, $2)`,
+      [`SELECT 1 /* ${MARK} scoped-other */`, OTHER])
 
     const r = await deleteAccount(client.getDb(), E, { auditSubjectIds: [E.toUpperCase()] })
     expect(r.deleted).toBe(true)
     const { rows } = await pool.query(`SELECT 1 FROM db_query_log WHERE sql_text LIKE $1`, [`%${MARK} subject%`])
     expect(rows).toHaveLength(0)
+    const kept = await pool.query(`SELECT scoped_user_id FROM db_query_log WHERE sql_text LIKE $1`, [`%${MARK} scoped-other%`])
+    expect(kept.rows).toEqual([{ scoped_user_id: OTHER }])
   })
 })

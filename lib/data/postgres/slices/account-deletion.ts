@@ -344,8 +344,11 @@ async function erase(db: Db, userId: string, opts: EraseOpts): Promise<AccountDe
         : sql`strpos(${col}, ${id}) > 0`
     }
 
+    // The audit subject's own queries all read their data, so they all go. A query scoped to
+    // another user who filed feedback (#2119) read that user's data, not the subject's: it is the
+    // trace #3357 keeps, and it stays until that user's own account goes.
     const dbQueryLog = await tx.execute(subjects.has(id)
-      ? sql`DELETE FROM db_query_log`
+      ? sql`DELETE FROM db_query_log WHERE scoped_user_id IS NULL OR scoped_user_id = ${userId}`
       : sql`DELETE FROM db_query_log WHERE ${names('sql_text')} OR ${names('error')} OR scoped_user_id = ${userId}`)
     const nothing = { rowCount: 0, rows: [] }
     const invitedEmails = email
