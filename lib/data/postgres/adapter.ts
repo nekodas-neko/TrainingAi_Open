@@ -873,7 +873,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // #2076 — native app refresh tokens. Only a hash is stored and no method returns one.
   async createNativeRefreshToken(input: nativeRefreshTokens.CreateNativeRefreshTokenInput) { return nativeRefreshTokens.createNativeRefreshToken(this.db, input) }
   async findNativeRefreshTokenByHash(tokenHash: import('@/lib/auth/refresh-token-hash').RefreshTokenHash) { return nativeRefreshTokens.findNativeRefreshTokenByHash(this.db, tokenHash) }
+  async findNativeRefreshTokenById(userId: string, id: string) { return nativeRefreshTokens.findNativeRefreshTokenById(this.db, userId, id) }
   async rotateNativeRefreshToken(input: nativeRefreshTokens.RotateNativeRefreshTokenInput) { return nativeRefreshTokens.rotateNativeRefreshToken(this.db, input) }
+  async regrantNativeRefreshToken(input: nativeRefreshTokens.RegrantNativeRefreshTokenInput) { return nativeRefreshTokens.regrantNativeRefreshToken(this.db, input) }
   async revokeNativeRefreshToken(userId: string, id: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshToken(this.db, userId, id, reason) }
   async revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshTokenFamily(this.db, userId, familyId, reason) }
   async listActiveNativeRefreshTokens(userId: string) { return nativeRefreshTokens.listActiveNativeRefreshTokens(this.db, userId) }
@@ -2329,14 +2331,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *  - a write that carries a weight or body fat re-derives those days, from the stored row, so a
    *    ranked merge that kept an older value is reflected;
    *  - the Oura Cloud ingest, the daily path that still runs, also catches up every day from the
-   *    last snapshot on, so days missed while nothing ran fill in. A day with no weigh-in writes
+   *    last snapshot on (the days after it), so days missed while nothing ran fill in. A day with no weigh-in writes
    *    nothing, so the last snapshot stands.
    * Never throws: the weigh-in is already saved, and a snapshot failure must not fail its write.
    */
   private async refreshBodyComp(userId: string, metrics: { date: string; weightKg?: number | null; bodyFatPct?: number | null }[], source: HealthSource): Promise<void> {
     try {
       const dates = Array.from(new Set(metrics.filter(m => m.weightKg != null || m.bodyFatPct != null).map(m => m.date)))
-      const fromDay = source === 'oura_cloud' ? await oura.getLatestBodyCompDay(this.db, userId) : null
+      // The catch-up starts the day AFTER the last snapshot: re-deriving that day itself changed
+      // nothing but its `updated_at`, and ran the calibration queries, on every Oura Cloud write.
+      // A weigh-in on that day arrives through `dates` above, which is how it is still refreshed.
+      const latestSnapshotDay = source === 'oura_cloud' ? await oura.getLatestBodyCompDay(this.db, userId) : null
+      const fromDay = latestSnapshotDay ? shiftDateStr(latestSnapshotDay, 1) : null
       if (dates.length === 0 && !fromDay) return
       // Read at most once, and only if a pass has a row to persist. A failed read skips the refresh
       // (below) rather than persisting an uncorrected snapshot over a corrected one.
@@ -2747,6 +2753,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             set: {
               ...set,
               deletedAt: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.deletedAt} ELSE NULL END`,
+              // #3309. The reason goes with the tombstone: a revived row has none.
+              deletedReason: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.deletedReason} ELSE NULL END`,
               // #3044. An in-app save landing on a Health Connect row's minute makes it the in-app
               // log: without this it kept Health Connect's id, so the next sync rewrote it with
               // Health Connect's times and the sweep deleted it once that session went. An edit to
@@ -2984,9 +2992,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // `true`, which is what keeps the operation idempotent for a double-tap or a row already deleted
   // on another device. `false` means genuinely absent or not yours — and those two stay
   // indistinguishable, which is the enumeration property the review's control pass verified.
+  //
+  // #3309. Every call here is the owner's delete (the web route, and a delete from either app's
+  // outbox through sync push), so it records 'app': a Health Connect record coming back under the
+  // same id must not undo it. That includes a row the sweep had already tombstoned: the owner's
+  // delete takes over the reason, so the row stays deleted.
   async deleteActivityLog(userId: string, id: string): Promise<boolean> {
     const rows = await this.db.update(s.activityLogs)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .set({ deletedAt: new Date(), deletedReason: 'app', updatedAt: new Date() })
       .where(and(eq(s.activityLogs.id, id), eq(s.activityLogs.userId, userId)))
       .returning({ id: s.activityLogs.id })
     return rows.length > 0
@@ -2995,9 +3008,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // #3044. A Health Connect session keyed on the record id Health Connect gave it, so an edit made
   // there updates this row instead of adding one at its new start time. Only the fields Health
   // Connect owns are written: the title, type and notes stay as stored, since the owner may have
-  // changed them here, and a metric the read left out keeps its stored value. A row deleted here, or
-  // tombstoned because Health Connect deleted it, stays deleted under that id. A different record at
-  // the minute of a tombstoned Health Connect row takes the row over (see below).
+  // changed them here, and a metric the read left out keeps its stored value. A row deleted here
+  // stays deleted under that id. A row the sweep tombstoned (#3309: `deleted_reason` is
+  // 'health_connect_sweep') comes back when its id reappears, since the sweep is Health Connect
+  // no longer returning it and the id returning means it is there again. A tombstone with no reason
+  // (every one from before the column) reads as an app delete and stays deleted. A different record
+  // at the minute of a tombstoned Health Connect row takes the row over (see below).
   async upsertHealthConnectActivityLog(
     userId: string, externalId: string, log: HealthConnectActivityLogInput,
   ): Promise<HealthConnectActivityLogOutcome> {
@@ -3008,7 +3024,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.activityLogs.externalId, externalId),
       ))
       .limit(1)
-    if (existing?.deletedAt) return 'deleted'
+    const revive = !!existing?.deletedAt && existing.deletedReason === 'health_connect_sweep'
+    if (existing?.deletedAt && !revive) return 'deleted'
     const caloriesBurned = log.caloriesBurned
       ?? (existing && existing.durationMin === log.durationMin ? existing.caloriesBurned : null)
       ?? await this.deriveActivityKcal(userId, existing?.activityType ?? log.activityType, log.durationMin)
@@ -3033,7 +3050,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // row: a live row keeps its minute, and an in-app log the owner deleted stays deleted. The
       // row's notes stay, since they are the owner's.
       const taken = await this.db.update(s.activityLogs)
-        .set({ ...fields, deletedAt: null, updatedAt: new Date() })
+        .set({ ...fields, deletedAt: null, deletedReason: null, updatedAt: new Date() })
         .where(and(
           eq(s.activityLogs.userId, userId),
           eq(s.activityLogs.date, log.date),
@@ -3055,13 +3072,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const same = (Object.keys(next) as (keyof typeof next)[]).every(k =>
       k === 'startTime' || k === 'endTime' ? existing[k]?.slice(0, 5) === next[k] : existing[k] === next[k])
     // Every sync re-reads the window, so an unchanged row is left alone: bumping `updated_at` would
-    // send it to every device on each pull.
-    if (same) return 'unchanged'
+    // send it to every device on each pull. A revival is never unchanged: the bump is what sends it.
+    if (same && !revive) return 'unchanged'
     let updated: { id: string }[]
     try {
       updated = await this.db.update(s.activityLogs)
-        .set({ ...next, updatedAt: new Date() })
-        .where(and(eq(s.activityLogs.id, existing.id), eq(s.activityLogs.userId, userId), isNull(s.activityLogs.deletedAt)))
+        // #3309. A revival clears the tombstone and its reason, and only a sweep tombstone is
+        // matched: an app delete that landed since the read above wins.
+        .set(revive
+          ? { ...next, deletedAt: null, deletedReason: null, updatedAt: new Date() }
+          : { ...next, updatedAt: new Date() })
+        .where(and(
+          eq(s.activityLogs.id, existing.id), eq(s.activityLogs.userId, userId),
+          revive
+            ? and(isNotNull(s.activityLogs.deletedAt), eq(s.activityLogs.deletedReason, 'health_connect_sweep'))
+            : isNull(s.activityLogs.deletedAt),
+        ))
         .returning({ id: s.activityLogs.id })
     } catch (err) {
       // The new start minute is another row's (the `(user, date, start_time)` index). That row wins
@@ -3071,7 +3097,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       throw err
     }
     // No row: it was deleted between the read above and this write, and a delete wins.
-    return updated.length ? 'updated' : 'deleted'
+    if (!updated.length) return 'deleted'
+    return revive ? 'revived' : 'updated'
   }
 
   // #3044. Tombstones Health Connect sessions that Health Connect no longer has: by record id (a
@@ -3084,7 +3111,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   ): Promise<number> {
     if ('ids' in scope && scope.ids.length === 0) return 0
     const rows = await this.db.update(s.activityLogs)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .set({ deletedAt: new Date(), deletedReason: 'health_connect_sweep', updatedAt: new Date() })
       .where(and(
         eq(s.activityLogs.userId, userId),
         eq(s.activityLogs.externalSource, HEALTH_CONNECT_SOURCE),
@@ -6282,6 +6309,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // so it could not see a gap on this side. Found 2026-09-04 while adding trainingLoadGate.
             daytimeStressCoverageMin:      int(p.daytimeStressCoverageMin),
             chronicStressGranularNights:   int(p.chronicStressGranularNights),
+            stillRhrBpm:                   num(p.stillRhrBpm),
+            stillRhrCoverageMin:           int(p.stillRhrCoverageMin),
             bdiDerived:            num(p.bdiDerived),
             bodyComp:              json(p.bodyComp),
           })
@@ -8147,6 +8176,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraCloudSleepPeriods(userId: string, rows: oura.OuraCloudSleepPeriodRow[]) { return oura.upsertOuraCloudSleepPeriods(this.db, userId, rows) }
   async upsertOuraCloudDaily(userId: string, rows: oura.OuraCloudDailyRow[]) { return oura.upsertOuraCloudDaily(this.db, userId, rows) }
   async upsertOuraSessions(userId: string, rows: oura.OuraSessionRow[]) { return oura.upsertOuraSessions(this.db, userId, rows) }
+  async tombstoneOuraSessions(userId: string, ids: string[]) { return oura.tombstoneOuraSessions(this.db, userId, ids) }
+  async tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }) { return oura.tombstoneOuraSessionsAbsent(this.db, userId, range) }
   async getOuraCloudActivitySeries(userId: string, from: string, to: string) { return oura.getOuraCloudActivitySeries(this.db, userId, from, to) }
   async getOuraCloudMetChangedAt(userId: string, from: string, to: string) { return oura.getOuraCloudMetChangedAt(this.db, userId, from, to) }
   async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }

@@ -22,7 +22,7 @@ import type {
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
 import type { AccountDeletionResult } from './postgres/slices/account-deletion'
 import type {
-  NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput,
+  NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput, RegrantNativeRefreshTokenInput,
 } from './postgres/slices/native-refresh-tokens'
 import type { RefreshTokenHash } from '@/lib/auth/refresh-token-hash'
 import type { OuraCloudTokenRow, SaveOuraCloudTokensInput } from './postgres/slices/oura-cloud-tokens'
@@ -357,8 +357,9 @@ export interface HealthConnectActivityLogInput {
 }
 
 /** `taken`: another row holds the session's start minute, so this one was not stored or moved.
- *  `deleted`: the row is tombstoned and stays so. */
-export type HealthConnectActivityLogOutcome = 'inserted' | 'updated' | 'unchanged' | 'taken' | 'deleted'
+ *  `deleted`: the row is tombstoned and stays so (the owner deleted it, #3309).
+ *  `revived`: the row had been swept and its id came back, so it is live again. */
+export type HealthConnectActivityLogOutcome = 'inserted' | 'updated' | 'unchanged' | 'taken' | 'deleted' | 'revived'
 
 export interface FitnessTest {
   id: string
@@ -678,16 +679,21 @@ export interface WorkoutRepository {
   usersWithData(userIds: readonly string[]): Promise<Set<string>>
 
   // ── Native app refresh tokens (#2076) ─────────────────────────────────────
-  // `native_refresh_tokens`. Only a hash is stored and no method returns one. Nothing calls these
-  // until the token flow (PR b). Every method but the hash lookup is scoped to `userId`.
+  // `native_refresh_tokens`. Only a hash is stored and no method returns one. Every method but the
+  // hash lookup is scoped to `userId`.
   /** A sign-in on a device: a new token in a new family. */
   createNativeRefreshToken(input: CreateNativeRefreshTokenInput): Promise<NativeRefreshToken>
   /** The row a presented token's hash names, in any state (rotated, revoked, expired). The one
    *  unscoped lookup: a presented token is how the server learns which user is asking. */
   findNativeRefreshTokenByHash(tokenHash: RefreshTokenHash): Promise<NativeRefreshToken | null>
+  /** The caller's row by id, in any state. A native access token names the row it was issued with. */
+  findNativeRefreshTokenById(userId: string, id: string): Promise<NativeRefreshToken | null>
   /** Marks a live token rotated and inserts its successor in the same family, atomically. `null`
    *  (nothing written) when it is not the caller's or is already rotated, revoked or expired. */
   rotateNativeRefreshToken(input: RotateNativeRefreshTokenInput): Promise<NativeRefreshToken | null>
+  /** Within the grace after a rotation whose successor is untouched: revokes that successor and
+   *  issues a new one in its place. `null` (nothing written) otherwise. */
+  regrantNativeRefreshToken(input: RegrantNativeRefreshTokenInput): Promise<NativeRefreshToken | null>
   /** True when the caller's token was revoked now; false when not theirs or already revoked. */
   revokeNativeRefreshToken(userId: string, id: string, reason: NativeRefreshTokenRevokedReason): Promise<boolean>
   /** Revokes the caller's not-yet-revoked tokens in one family; returns how many. */
@@ -1561,6 +1567,10 @@ export interface WorkoutRepository {
   getOuraCloudMetChangedAt(userId: string, from: string, to: string): Promise<{ date: string; changedAt: Date }[]>
   /** #2982: Oura's sessions (breathing, meditation …) with their series and mood. */
   upsertOuraSessions(userId: string, rows: import('./postgres/slices/oura').OuraSessionRow[]): Promise<number>
+  /** #3153: tombstones sessions deleted in the Oura app; never a hard delete. Returns rows newly tombstoned. */
+  tombstoneOuraSessions(userId: string, ids: string[]): Promise<number>
+  /** #3153: tombstones the sessions on `from`..`to` that Oura's full list for those days no longer has. */
+  tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }): Promise<number>
   /** #2895: the newest `oura_cloud` HR point at or after `since`; where the next Cloud HR read starts. */
   getLatestOuraCloudHeartrateAt(userId: string, since: Date): Promise<Date | null>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
@@ -1852,6 +1862,10 @@ export interface OuraDailyDerivedRow {
   /** Q-510. NULL = not evaluated (a contributor was missing), never zero coverage. */
   daytimeStressCoverageMin: number | null
   chronicStressGranularNights: number | null
+  /** #2634. Median HR of the day's still daytime minutes, and the minutes behind it. NULL = not
+   *  computed or too thin, never zero. Server-only: absent from the device mirror. */
+  stillRhrBpm: number | null
+  stillRhrCoverageMin: number | null
   bdiDerived: number | null
   bodyComp: unknown | null
 }
