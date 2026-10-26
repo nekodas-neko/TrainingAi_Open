@@ -1082,10 +1082,11 @@ export async function tombstoneOuraWorkouts(db: Db, userId: string, ids: string[
 /**
  * #3087: tombstones this user's workouts on `from`..`to` (Oura's `day`) that are not in `keepIds`,
  * the full list Oura just returned for those days. The catch-up for a missed delete event: the
- * caller passes only days it read completely.
+ * caller passes only days it read completely. With `dryRun` it writes nothing and returns how many
+ * rows it would tombstone (#3389).
  */
 export async function tombstoneOuraWorkoutsAbsent(
-  db: Db, userId: string, range: { from: string; to: string; keepIds: string[] },
+  db: Db, userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean },
 ): Promise<number> {
   const conditions = [
     eq(s.ouraWorkouts.userId, userId),
@@ -1093,6 +1094,10 @@ export async function tombstoneOuraWorkoutsAbsent(
     isNull(s.ouraWorkouts.deletedAt),
   ]
   if (range.keepIds.length > 0) conditions.push(sql`${s.ouraWorkouts.id} NOT IN (${sql.join(range.keepIds.map(id => sql`${id}`), sql`, `)})`)
+  if (range.dryRun) {
+    const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(s.ouraWorkouts).where(and(...conditions))
+    return row?.n ?? 0
+  }
   const rows = await db.update(s.ouraWorkouts)
     .set({ deletedAt: sql`NOW()` })
     .where(and(...conditions))
@@ -1324,14 +1329,19 @@ export async function tombstoneOuraSessions(db: Db, userId: string, ids: string[
 /**
  * #3153: tombstones this user's sessions on `from`..`to` (Oura's `day`) that are not in `keepIds`,
  * the full list Oura just returned for those days: the catch-up for a missed delete event, the
- * same sweep as `tombstoneOuraWorkoutsAbsent`. The caller passes only days it read completely.
+ * same sweep as `tombstoneOuraWorkoutsAbsent`. The caller passes only days it read completely. With
+ * `dryRun` it writes nothing and returns how many rows it would tombstone (#3389).
  */
 export async function tombstoneOuraSessionsAbsent(
-  db: Db, userId: string, range: { from: string; to: string; keepIds: string[] },
+  db: Db, userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean },
 ): Promise<number> {
   const t = s.ouraSessions
   const conditions = [eq(t.userId, userId), gte(t.day, range.from), lte(t.day, range.to), isNull(t.deletedAt)]
   if (range.keepIds.length > 0) conditions.push(sql`${t.ouraId} NOT IN (${sql.join(range.keepIds.map(id => sql`${id}`), sql`, `)})`)
+  if (range.dryRun) {
+    const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(t).where(and(...conditions))
+    return row?.n ?? 0
+  }
   const rows = await db.update(t)
     .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
     .where(and(...conditions))
