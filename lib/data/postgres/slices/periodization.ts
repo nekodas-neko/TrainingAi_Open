@@ -416,7 +416,7 @@ export async function wasProgramSessionTrainedSince(
 }
 
 export async function getRecentSessionsOfType(db: Db, userId: string, programSessionId: string, limit: number): Promise<Array<{
-  id: string; startedAt: Date; completedAt: Date | null; sessionName: string
+  id: string; startedAt: Date; completedAt: Date | null; sessionName: string; pausedSec: number | null
 }>> {
   return db
     .select({
@@ -424,6 +424,7 @@ export async function getRecentSessionsOfType(db: Db, userId: string, programSes
       startedAt: s.workoutSessions.startedAt,
       completedAt: s.workoutSessions.completedAt,
       sessionName: s.workoutSessions.sessionName,
+      pausedSec: s.workoutSessions.pausedSec,
     })
     .from(s.workoutSessions)
     .where(and(

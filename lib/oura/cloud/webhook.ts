@@ -18,10 +18,11 @@ import type { OuraOAuthConfig } from './config'
 import { OuraUnavailableError } from './client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
-import { fetchOuraDocument, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthorizedError } from './data'
-import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DELETE_TYPES, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
+import { fetchOuraDocument, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbiddenError, OuraUnauthorizedError } from './data'
+import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, mapRingBatteryRows, OURA_DELETE_TYPES, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
-import { reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
+import { isRingBatteryBackedOff, markRingBatteryRefused, resetRingBatteryBackoff } from './ring-battery-backoff'
+import { reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraBatteryStore, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import type { StillRhrRefresh } from './still-rhr'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import { confirmOuraTokenRefused, getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraRefusalVerdict, type OuraTokenStore } from './tokens'
@@ -129,10 +130,12 @@ export type OuraWebhookOutcome =
   | { result: 'forbidden' }
 
 export type OuraWebhookDeps = {
-  repo: OuraCloudWriter & OuraTokenStore & OuraHeartRateReader & { getUserIdByOuraUserId(ouraUserId: string): Promise<string | null> }
+  repo: OuraCloudWriter & OuraTokenStore & OuraHeartRateReader & OuraBatteryStore & { getUserIdByOuraUserId(ouraUserId: string): Promise<string | null> }
   config: OuraOAuthConfig
   /** Starts the heart-rate catch-up for a user; replaceable for tests. Default: `startOuraCloudHeartRateCatchUp`. */
   heartRate?: (userId: string) => void
+  /** #3069: starts the ring-battery read for a user; replaceable for tests. Default: `startOuraCloudRingBatteryCatchUp`. */
+  ringBattery?: (userId: string) => void
   /** #3079: re-scores a recent night a sleep event changed or deleted (`rescore-nights.ts`). */
   rescore?: NightRescoreRepo
   /**
@@ -193,6 +196,9 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
       if (isOuraTypeShared(granted, 'heartrate')) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
       // The user's choice on Oura's consent page, not a failure: logged, never reported (as the backfill does).
       else console.info('[oura] heart-rate catch-up skipped: the user did not share heart rate')
+    }
+    if (RING_BATTERY_TRIGGERS.has(event.data_type) && isOuraTypeShared(granted, 'ring_battery')) {
+      (deps.ringBattery ?? (u => startOuraCloudRingBatteryCatchUp(deps, u)))(userId)
     }
     return { result: 'written', counts }
   } catch (err) {
@@ -333,4 +339,85 @@ export function startOuraCloudHeartRateCatchUp(deps: Pick<OuraWebhookDeps, 'repo
 /** Test seam: forget the per-user throttle. */
 export function resetOuraCloudHeartRateThrottle(): void {
   heartRateLastRun.clear()
+}
+
+// ── The ring's battery (#3069) ────────────────────────────────────────────────────────────────
+// Oura has no battery webhook either. The ring's battery reaches Oura with the same sync that
+// brings a sleep, daily activity or workout, so those events also read `ring_battery_level` from
+// the newest `oura_cloud` reading to now, after the answer and at most once per interval per user.
+// The readings go beside the Bluetooth polls in `oura_ble_battery_poll`, source `oura_cloud`.
+
+/** The events that start a ring-battery read: the same ones that start the heart-rate catch-up. */
+export const RING_BATTERY_TRIGGERS: ReadonlySet<string> = HEART_RATE_TRIGGERS
+/** The furthest back one read goes; the connect backfill reads further. */
+export const RING_BATTERY_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000
+export const RING_BATTERY_MIN_INTERVAL_MS = 5 * 60 * 1000
+export { RING_BATTERY_REFUSED_BACKOFF_MS } from './ring-battery-backoff'
+/** Oura uploads in batches, so each read starts behind the newest stored reading, as the heart-rate one does. */
+export const RING_BATTERY_OVERLAP_MS = HEART_RATE_OVERLAP_MS
+
+/**
+ * Reads the ring's battery from `RING_BATTERY_OVERLAP_MS` behind the newest stored `oura_cloud`
+ * reading (at most a week back) to now and stores it. Returns rows inserted, or `null` when the user
+ * has no usable connection. Reports carry counts, never a reading.
+ */
+export async function catchUpOuraCloudRingBattery(
+  deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now(),
+): Promise<number | null> {
+  const token = await getOuraAccessToken(deps.repo, deps.config, userId)
+  if (!token) return null
+  const floor = new Date(now - RING_BATTERY_LOOKBACK_MS)
+  const newest = await deps.repo.getLatestOuraCloudBatteryAt(userId, floor)
+  const from = newest ? new Date(Math.max(floor.getTime(), newest.getTime() - RING_BATTERY_OVERLAP_MS)) : floor
+  let got: Awaited<ReturnType<typeof fetchOuraRingBattery>>
+  try {
+    got = await fetchOuraRingBattery(token, from, new Date(now))
+  } catch (err) {
+    if (err instanceof OuraUnauthorizedError) {
+      await confirmOuraTokenRefused(deps.repo, deps.config, userId, token).catch((checkErr: unknown) =>
+        reportOuraCloudIssue('webhook-ring-battery:refusal-check', checkErr instanceof Error ? checkErr.message : 'unknown', { userId }))
+    }
+    throw err
+  }
+  const inserted = await deps.repo.insertOuraCloudBatteryReadings(userId, mapRingBatteryRows(got.rows))
+  console.info(`[oura] ring-battery read from ${from.toISOString()}: ${got.rows.length} read, ${inserted} new`)
+  if (got.dropped > 0) {
+    reportOuraCloudIssue('webhook-ring-battery:dropped', `${got.dropped} of ${got.rows.length + got.dropped} rows did not match the spec`, { userId })
+  }
+  return inserted
+}
+
+const ringBatteryLastRun = new Map<string, number>()
+// A persistent refusal (the scope for this read is a guess, `OURA_SCOPE_FOR.ring_battery`) would
+// otherwise re-run on every sync past the 5-minute throttle and report each time, so it backs off
+// (`ring-battery-backoff.ts`); connecting again or refreshing the token clears it.
+
+/** Starts `catchUpOuraCloudRingBattery` in the background, throttled per user. Never throws. */
+export function startOuraCloudRingBatteryCatchUp(deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now()): void {
+  const last = ringBatteryLastRun.get(userId)
+  if (last !== undefined && now - last < RING_BATTERY_MIN_INTERVAL_MS) return
+  if (isRingBatteryBackedOff(userId, now)) return
+  ringBatteryLastRun.set(userId, now)
+  catchUpOuraCloudRingBattery(deps, userId, now).catch(err => {
+    // The scope for this read is a guess (`OURA_SCOPE_FOR.ring_battery`), so a refusal is reported, never silent.
+    const refused = err instanceof OuraUnauthorizedError ? 'Oura answered 401'
+      : err instanceof OuraForbiddenError ? 'Oura answered 403'
+      : err instanceof OuraReauthRequiredError ? 'the connection needs the user to connect again'
+      : null
+    if (refused) {
+      markRingBatteryRefused(userId, now)
+      console.warn(`[oura] ring-battery read refused: ${refused}`)
+      reportOuraCloudIssue('webhook-ring-battery:refused', `the ring-battery read was refused: ${refused}`, { userId })
+      return
+    }
+    const message = err instanceof Error ? err.message : 'unknown'
+    console.warn(`[oura] ring-battery read failed: ${message}`)
+    reportOuraCloudIssue('webhook-ring-battery:failed', message, { userId })
+  })
+}
+
+/** Test seam: forget the per-user throttle. */
+export function resetOuraCloudRingBatteryThrottle(): void {
+  ringBatteryLastRun.clear()
+  resetRingBatteryBackoff()
 }

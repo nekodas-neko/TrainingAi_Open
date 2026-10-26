@@ -76,4 +76,6 @@ export interface WorkoutSession {
   wasOverride: boolean
   intensityMode?: 'full' | 'deload' | null
   sessionRpe?: number | null
+  /** Whole seconds the workout was paused (#3266); null or absent means never paused. */
+  pausedSec?: number | null
 }

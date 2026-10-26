@@ -4,7 +4,7 @@ import type {
   WorkoutStatusPayload,
 } from '../../../integrations/workout-status/types.ts';
 import { loadLabel } from '../logging/preferences.ts';
-import { pipPhaseFor } from '../pip/pip.ts';
+import { pipPhaseFor, workoutPhaseOf } from '../pip/pip.ts';
 import { nextExerciseFlow, workoutFlow } from '../logging/flow.ts';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
 
@@ -34,8 +34,17 @@ export function knownLoad(exercise: WorkoutExercise, set: WorkoutSet | undefined
  * there is none open. One payload for both, so they can never disagree.
  */
 export function workoutStatusFor(workout: WorkoutRecord | null): WorkoutStatusPayload | null {
+  const status = statusWhileRunning(workout);
+  // A pause holds the screen it interrupted: the exercise, its set and the rest all stay in the
+  // payload, so the window can say what is waiting, and only the phase changes (#3255).
+  return status && workout && pipPhaseFor(workout) === 'paused'
+    ? { ...status, phase: 'paused', pausedAt: workout.pausedAt }
+    : status;
+}
+
+function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload | null {
   if (!workout || workout.status !== 'active') return null;
-  const phase = pipPhaseFor(workout);
+  const phase = workoutPhaseOf(workout);
   const base = {
     workoutId: workout.id,
     sessionName: workout.sessionName,
@@ -50,6 +59,8 @@ export function workoutStatusFor(workout: WorkoutRecord | null): WorkoutStatusPa
     restStartedAt: null,
     setsDone: 0,
     nextUp: null,
+    pausedAt: null,
+    setColors: null,
     hr: null,
   };
   if (phase === 'idle') return null;

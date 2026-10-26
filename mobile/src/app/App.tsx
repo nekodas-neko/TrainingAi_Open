@@ -50,6 +50,7 @@ import { HealthWeekScreen } from '../features/health/screens/HealthWeekScreen';
 import { DataSyncScreen } from '../features/settings/screens/DataSyncScreen';
 import { AccountScreen } from '../features/settings/screens/AccountScreen';
 import { AboutScreen } from '../features/settings/screens/AboutScreen';
+import { AdminConsoleScreen } from '../features/admin/screens/AdminConsoleScreen';
 import { OuraScreen, takeInitialOuraReturn } from '../features/devices/screens/OuraScreen';
 import { YearReviewScreen } from '../features/settings/screens/YearReviewScreen';
 import { CollectionScreen } from '../features/collection/screens/CollectionScreen';
@@ -356,6 +357,7 @@ function AppShell() {
           openData={() => setDetail('more-data')}
           openDevices={() => setDetail('more-devices')}
           openAbout={() => setDetail('more-about')}
+          openAdmin={() => setDetail('more-admin')}
           openYear={() => setDetail('year-review')}
           openCollection={() => setDetail('collection')}
         />
@@ -425,6 +427,8 @@ function AppShell() {
         <DataSyncScreen onBack={() => setDetail(null)} />
       ) : detail === 'more-about' ? (
         <AboutScreen onBack={() => setDetail(null)} />
+      ) : detail === 'more-admin' ? (
+        <AdminConsoleScreen onBack={() => setDetail(null)} />
       ) : detail === 'more-account' ? (
         <AccountScreen onBack={() => setDetail(null)} />
       ) : detail === 'more-devices' ? (

@@ -6,6 +6,7 @@ import {
   formatRecoveryRate,
 } from '@trainingai/shared/health/hr-recovery-by-exercise';
 import { workoutHrSpec } from '../data/models';
+import { exercisesWithoutRest, REST_NOT_MEASURED } from '../data/hr-rest';
 import { ResourceCard } from './ResourceCard';
 import type { WorkoutRecord } from '../logging/workout';
 
@@ -96,12 +97,22 @@ export function WorkoutHrRecovery({ workout }: { workout: WorkoutRecord }) {
                 {x.totalSets} sets measured
               </AppText>
             ))}
+            {exercisesWithoutRest(data.setStats).map((name) => (
+              <AppText key={name} variant="caption" tone="muted">
+                {name} · {REST_NOT_MEASURED}
+              </AppText>
+            ))}
             {data.setStats.map((x, index) => (
               <Disclosure key={index} title={`${x.exerciseName} · set ${x.setNumber}`}>
                 <AppText variant="caption">
-                  Peak {x.peakBpm ?? '—'} bpm · End {x.bpmAtLog ?? '—'} bpm · HRR60{' '}
-                  {x.hrr1 === null ? 'unavailable' : `${x.hrr1} bpm`}
+                  Peak {x.peakBpm ?? '—'} bpm · End {x.bpmAtLog ?? '—'} bpm
+                  {x.hrr1 === null ? '' : ` · HRR60 ${x.hrr1} bpm`}
                 </AppText>
+                {x.hrr1 === null && (
+                  <AppText variant="micro" tone="muted">
+                    {REST_NOT_MEASURED}
+                  </AppText>
+                )}
                 <AppText variant="micro" tone="muted">
                   {x.setStartMs === null
                     ? 'Start time unavailable'

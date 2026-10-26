@@ -271,11 +271,12 @@ export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:2026-10-26'
 /**
  * The stamp for each calibration (#2237): `v1` is the stamp above, `v2` the even-gain curve on the
  * same night definition. `sleepScoreCalibrationFor` picks by wake date, so the stamp always names
- * the curve that produced the stored score.
+ * the curve that produced the stored score. Both normals-learning rules apply to both curves, so
+ * `v2` carries the per-device mark too (#3387); no V2 row exists while `SLEEP_SCORE_V2_FROM` is null.
  */
 export const SLEEP_SCORE_MODEL_VERSIONS = {
   v1: SLEEP_SCORE_MODEL_VERSION,
-  v2: 'v2:even-gain:oura-long-sleep-night',
+  v2: 'v2:even-gain:per-device-baselines:2026-10-26',
 } as const
 
 /**

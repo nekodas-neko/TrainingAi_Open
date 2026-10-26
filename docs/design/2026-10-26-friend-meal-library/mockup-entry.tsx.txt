@@ -1,0 +1,12 @@
+import { registerRootComponent } from 'expo';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ThemeProvider } from './src/shared/theme/ThemeProvider';
+import { MockupApp } from './src/mockups/FriendMealLibraryMockup';
+const screen = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('s') ?? 'library';
+registerRootComponent(() => (
+  <SafeAreaProvider>
+    <ThemeProvider initialMode="dark">
+      <MockupApp screen={screen} />
+    </ThemeProvider>
+  </SafeAreaProvider>
+));
