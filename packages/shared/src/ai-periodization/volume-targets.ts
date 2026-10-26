@@ -105,6 +105,21 @@ export function phaseVolumeScale(phases: readonly string[]): PhaseVolumeScale {
 }
 
 /**
+ * The phases of the sessions trained in a week, for `phaseVolumeScale`: one entry per workout
+ * session, looked up by its program session. A session with no known phase is left out. The Training
+ * card and the prescription engine both build their week's mix here (#3287), so the target they
+ * pass to `weeklyVolumeTarget` can only differ by the phases they are given.
+ */
+export function trainedWeekPhases(
+  trainedProgramSessionIds: readonly (string | null | undefined)[],
+  phaseBySession: ReadonlyMap<string, string>,
+): string[] {
+  return trainedProgramSessionIds
+    .map(id => (id ? phaseBySession.get(id) : undefined))
+    .filter((p): p is string => !!p)
+}
+
+/**
  * The weekly set target for one muscle: the landmark table, the program's goal, and the week's
  * phase mix — the one place all three meet (BF-59).
  *

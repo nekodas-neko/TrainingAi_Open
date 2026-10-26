@@ -128,17 +128,6 @@ export interface OuraRawAggregateResult {
   chronicStress?: import('@trainingai/shared/health/chronic-stress-assembly').ChronicStressDiagnostics | null
 }
 
-/** One day the D0 historical step backfill (`allowStepsDecrease`) would change — a dry-run row, no
- *  write performed. Mirrors the real write's sourceMap rank protection exactly, so a listed day is
- *  guaranteed to actually change if the backfill runs, and an omitted day (e.g. `manual`-sourced)
- *  is guaranteed to be left untouched. */
-export interface StepsBackfillPreviewRow {
-  date: string
-  oldSteps: number
-  oldSource: string | null
-  newSteps: number
-}
-
 export interface StepLiveWindow {
   id: number
   userId: string
@@ -202,41 +191,6 @@ export interface OuraRawSampleSummary {
   newestMeasuredAt: string | null
   hrTiming: OuraRawSampleMetricTiming
   tempTiming: OuraRawSampleMetricTiming
-}
-
-export interface WorkoutSensorProbe {
-  sessionId: string
-  windowStart: string
-  windowEnd: string
-  durationMin: number
-  /** Continuous accel capture (oura_accel_chunks) overlapping the workout window. */
-  accel: { chunks: number; samples: number; steps: number; coveragePct: number | null }
-  /** oura_heartrate rows in the window. */
-  hrSamples: number
-  /** Raw BLE event tags present in the window (via the clock anchor), most frequent first. */
-  rawByTag: { tag: string; count: number }[]
-  hasAnchor: boolean
-}
-
-/**
- * Per-tag hour-of-day coverage of raw BLE samples — answers "does the ring stream daytime
- * motion/temp/MET when worn-idle, or only around sleep?" (the gate on the daytime-signal model
- * builds: steps, activity-detection, awake-HR, daytime stress). Read-only admin probe.
- */
-export interface DaytimeTagCoverage {
-  hasAnchor: boolean
-  days: number
-  tz: string
-  /** Local hours [from, to) counted as "daytime" (the worn-idle window we care about). */
-  daytimeHours: [number, number]
-  tags: {
-    tag: string          // '0x50'
-    label: string        // 'MET'
-    total: number
-    daytime: number      // samples whose local hour ∈ daytimeHours
-    night: number        // the rest
-    byHour: number[]     // length 24 — sample count per local hour-of-day
-  }[]
 }
 
 export interface SessionLoad {
@@ -1279,11 +1233,6 @@ export interface WorkoutRepository {
     userId: string; route: string; totalMs: number; cold: boolean
     responseStartMs?: number | null; domContentMs?: number | null; buildId?: string | null
   }): Promise<void>
-  /** BF-19 — p50/p95 per route, split cold/warm. The split is load-bearing: every deploy rewrites
-   *  the service-worker cache, so a pooled percentile measures release cadence, not the app. */
-  getAppLoadReport(userId: string, days: number): Promise<{
-    route: string; cold: boolean; samples: number; p50Ms: number; p95Ms: number; worstMs: number
-  }[]>
   insertErrorEvent(event: { userId: string | null; source: 'client' | 'server'; message: string; stack?: string | null; url?: string | null; userAgent?: string | null }): Promise<void>
   listErrorEvents(limit: number): Promise<{ id: string; source: string; message: string; stack: string | null; url: string | null; userAgent: string | null; createdAt: string; userEmail: string | null }[]>
 
@@ -1306,17 +1255,10 @@ export interface WorkoutRepository {
   /** TN-56: raw frames by tag and ring-clock range, across both tiers (hot and packed). Read-only,
    *  for the admin replay; the rollup reads through its own IO. */
   readOuraRawFrames(userId: string, q: import('./postgres/slices/oura-raw-frames').RawFrameQuery): Promise<import('./postgres/slices/oura-raw-frames').RawFrameRow[]>
-  /** Phase-B feasibility probe: what motion/HR the ring captured during one workout's window
-   *  (accel-chunk coverage, HR count, raw tags present) — tells us whether the neural energy
-   *  model's inputs are capturable during waking workouts. Read-only diagnostic. */
-  getWorkoutSensorProbe(userId: string, sessionId?: string): Promise<WorkoutSensorProbe | null>
-  /** Per-tag hour-of-day coverage of raw BLE samples over the last `days`, for confirming whether
-   *  the ring streams daytime motion/temp/MET when worn-idle. Read-only admin probe. */
-  getDaytimeTagCoverage(userId: string, tz: string, days: number): Promise<DaytimeTagCoverage>
   /** oura_heartrate rows in a wall-clock window, filtered by source ('ble' = ring, 'chest_strap' =
-   *  Polar H10). D6 comparison-harness read — both sources already land in this one table. */
+   *  Polar H10, 'oura_cloud'). The still-period resting-HR read (#3302) uses it for 'oura_cloud'. */
   getOuraHeartrateBySource(userId: string, source: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number }[]>
-  /** Stored daytime-stress buckets, for the device-comparison endpoint (PS-15). */
+  /** Stored daytime-stress buckets, for the body-battery stress-day route (PS-15). */
   getOuraDaytimeStressBuckets(userId: string, from: Date, to: Date): Promise<{ bucketMid: Date; level: number }[]>
   /** Daytime skin-temperature (0x46/0x69 → temps_c) and MET (0x50 → met) samples in a wall-clock
    *  window, for the daytime-stress engine. Empty when the ring has no clock anchor. */
@@ -1328,15 +1270,6 @@ export interface WorkoutRepository {
     /** #2781: the ring's `0x47` motion events, each with its low-intensity value (rung 2a of `MET/min`). */
     motion: { tsMs: number; lowIntensity: number }[]
   }>
-  /** Decoded 0x61 battery telemetry (level changes + charging-time) in a wall-clock window,
-   *  anchored via the ring clock. Empty when the ring has no clock anchor. Read-only. */
-  getOuraBatteryEvents(userId: string, from: Date, to: Date): Promise<Array<{
-    tsMs: number
-    kind: 'battery_level_changed' | 'charging_time'
-    batteryPct: number | null
-    voltageMv: number | null
-    chargingTimeSec: number | null
-  }>>
   /** Persist one live keepalive battery poll (migration 133) — fine-grained drain telemetry
    *  captured only while the app holds the BLE link. measured_at is server-stamped. */
   insertOuraBatteryPoll(userId: string, percent: number, charging: boolean | null): Promise<void>
@@ -1365,24 +1298,14 @@ export interface WorkoutRepository {
   redecodeOuraRawSamples(userId: string): Promise<{ scanned: number; updated: number; restamped: number }>
   /** Roll decoded raw samples up into body_metrics + sleep_sessions for the
    *  ring-clock window [sinceDs, +∞) (pass 0 to aggregate everything). */
-  // allowStepsDecrease: one-time owner-gated backfill lever (D0 historical correction). The steps
-  // step normally only ever RAISES a stored day's count (never regresses another source's value);
-  // this bypasses that magnitude guard so a corrected (lower) step_counter total can overwrite an
-  // old, inflated flat-30-estimate value. Safe: the downstream upsertBodyMetrics(..., 'oura_ble')
-  // still applies the per-field sourceMap rank merge, so a higher-ranked `manual` entry is preserved
-  // regardless of this flag — only oura_ble/oura_cloud/health_connect/unset steps can be overwritten.
   /** `sinceDs`: narrow the read window to the span an ingest touched. Omit to re-derive the whole
    *  35-day window — the caller must do that at least once per process before it starts narrowing,
    *  or a batch ingested before this process started could never be rolled up (Q-213). */
-  aggregateOuraRawSamples(userId: string, timezone: string, opts?: { debugDate?: string; disableNeuralStager?: boolean; fullHistory?: boolean; dumpOnly?: boolean; allowStepsDecrease?: boolean; sinceDs?: number }): Promise<OuraRawAggregateResult>
+  aggregateOuraRawSamples(userId: string, timezone: string, opts?: { debugDate?: string; disableNeuralStager?: boolean; fullHistory?: boolean; dumpOnly?: boolean; sinceDs?: number }): Promise<OuraRawAggregateResult>
   /** Issue 2236: add the daytime-stress buckets that history never got. Add-only (never deletes or
    *  changes a bucket, skips days that already have buckets), one transaction that rolls back unless
    *  rows written equal rows planned. `dryRun: true` computes and returns the plan, writing nothing. */
   backfillDaytimeStressBuckets(userId: string, timezone: string, opts: { dryRun: boolean }): Promise<import('@/lib/oura-ble/stress-backfill').StressBackfillReport>
-  // Read-only dry-run for the D0 historical step backfill — no write performed. Returns every day
-  // whose stored steps would actually change if `allowStepsDecrease` ran, computed the same way
-  // (same pipeline, same sourceMap rank protection), so the owner can review before firing it.
-  previewStepsBackfill(userId: string, timezone: string): Promise<StepsBackfillPreviewRow[]>
   /** Latest ring-clock anchor for the user (one row per epoch; newest wins). Used to
    *  convert wall-clock time to ring deciseconds for callers with no ring ds of their
    *  own (e.g. the accel-only live step tester). */
@@ -1530,7 +1453,7 @@ export interface WorkoutRepository {
 
   /** Q-535 — a redecode runs off the request. One in-flight job per user; `startRedecodeJob`
    *  returns the running one rather than starting a second, with `refused: true` when that run
-   *  would not write what `opts` asks for (issue 2383: a step backfill never follows a plain run). */
+   *  would not write what `opts` asks for (issue 2383: a run never follows one that would not write what it asks for, as a stress backfill never follows a plain redecode). */
   startRedecodeJob(userId: string, opts: Record<string, unknown>): Promise<{ job: import('./postgres/slices/oura').RedecodeJob; alreadyRunning: boolean; refused: boolean }>
   getRedecodeJob(userId: string, id: number): Promise<import('./postgres/slices/oura').RedecodeJob | null>
   getLatestRedecodeJob(userId: string): Promise<import('./postgres/slices/oura').RedecodeJob | null>
@@ -1714,7 +1637,6 @@ export interface WorkoutRepository {
   /** #3079: nulls a day's stored sleep and/or readiness scores when their night changed or went. */
   clearNightDerivedScores(userId: string, day: string, pillars: { sleep: boolean; readiness: boolean }): Promise<boolean>
   getOuraStorageStats(): Promise<OuraStorageStats>
-  nullHistoricalDecoded(userId: string, maxRows?: number): Promise<{ nulled: number; remaining: number }>
   vacuumOuraRawSamples(): Promise<{ beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number }>
   /** Q-315 — `VACUUM FULL` on an allowlisted table. The name is interpolated into the statement
    *  (VACUUM takes no bind parameter), so the allowlist is the safety boundary, not validation. */

@@ -85,8 +85,8 @@ export function pearson(points: Array<{ x: number; y: number }>): number | null 
  *
  * Lives here rather than beside its one caller because rank correlation is the only statistic that
  * survives a comparison across **different units**, and that turned out to be needed twice — the
- * model-report calibration and the device-comparison endpoint, where Oura stress is normalised
- * −1..+1 and the Colmi's is raw 0..100 (PS-15).
+ * model-report calibration and the device-comparison endpoint (retired in #2862), where Oura stress
+ * was normalised −1..+1 and the Colmi's is raw 0..100 (PS-15).
  */
 export function averageRanks(values: readonly number[]): number[] {
   const order = values.map((_, i) => i).sort((a, b) => values[a] - values[b])

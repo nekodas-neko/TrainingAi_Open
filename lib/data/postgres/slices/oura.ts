@@ -3,6 +3,7 @@ import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, 
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
+import { overnightHrvFromSeries } from '@trainingai/shared/health/oura-sleep-detail'
 import type { OuraCloudHeartrateWrite, OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
@@ -264,9 +265,9 @@ const asJob = (r: {
  *
  * - it is returned with `alreadyRunning: true` if it writes everything `opts` asks for, so the
  *   caller can follow it;
- * - otherwise `refused: true` and nothing is inserted. Issue 2383: a step backfill used to follow a
- *   plain redecode, the step correction never ran, and the screen said it had. The rule is
- *   `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
+ * - otherwise `refused: true` and nothing is inserted. Issue 2383: a request used to follow a
+ *   redecode that did not write what it asked for (then the step backfill, retired in #2862), its
+ *   correction never ran, and the screen said it had. The rule is `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
  *
  * Two requests racing past the read both try the insert; the index lets one through and the other
  * gets no row back, then reads the winner and applies the same rule rather than surfacing a 500.
@@ -899,6 +900,16 @@ export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date;
   return { kept, yielded, skipped }
 }
 
+/** A day's main Oura Cloud period, as `body_metrics` reads it (#3080). */
+export interface MainSleepPeriod {
+  date: string
+  /** Oura's own per-night average, as stored on `sleep_sessions`. Kept beside ours, not used for the night. */
+  averageHrvMs: number | null
+  lowestHeartRate: number | null
+  /** #3075: our overnight HRV from the period's stored 5-minute series, or null when it holds none. */
+  overnightHrvMs: number | null
+}
+
 /**
  * #3080. Each wake date's main Oura Cloud period, the one whose HRV and resting heart rate stand for
  * the night in `body_metrics`: the longest live `long_sleep`, else the longest live `sleep` period
@@ -910,25 +921,29 @@ export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date;
  */
 export async function getOuraMainSleepPeriods(
   db: Db, userId: string, dates: string[], tz: string,
-): Promise<{ date: string; averageHrvMs: number | null; lowestHeartRate: number | null }[]> {
+): Promise<MainSleepPeriod[]> {
   if (dates.length === 0) return []
   const rows = await db.execute<{
     date: string; sleep_type: string; sleep_start: Date; sleep_end: Date; duration_hours: number | null
-    average_hrv_ms: number | null; lowest_heart_rate: number | null
+    average_hrv_ms: number | null; lowest_heart_rate: number | null; hrv_series: s.OuraSampleSeries | null
   }>(sql`
-    SELECT s.date::text AS date, p.sleep_type, s.sleep_start, s.sleep_end, s.duration_hours, s.average_hrv_ms, s.lowest_heart_rate
+    SELECT s.date::text AS date, p.sleep_type, s.sleep_start, s.sleep_end, s.duration_hours, s.average_hrv_ms, s.lowest_heart_rate,
+           p.hrv AS hrv_series
       FROM sleep_sessions s
       JOIN oura_cloud_sleep_periods p ON p.user_id = s.user_id AND p.oura_id = s.oura_id
      WHERE s.user_id = ${userId} AND s.deleted_at IS NULL AND NOT s.manual_entry
        AND s.date IN (${sql.join(dates.map(d => sql`${d}::date`), sql`, `)})
        AND p.sleep_type IN ('long_sleep', 'sleep')
      ORDER BY s.date, (p.sleep_type = 'long_sleep') DESC, s.duration_hours DESC NULLS LAST, s.sleep_start`)
-  const out = new Map<string, { date: string; averageHrvMs: number | null; lowestHeartRate: number | null }>()
+  const out = new Map<string, MainSleepPeriod>()
   for (const r of rows.rows) {
     if (out.has(r.date)) continue
     const window = { sleepStart: new Date(r.sleep_start), sleepEnd: new Date(r.sleep_end), durationHours: r.duration_hours }
     if (r.sleep_type !== 'long_sleep' && !isNightWindow(window, tz)) continue
-    out.set(r.date, { date: r.date, averageHrvMs: r.average_hrv_ms, lowestHeartRate: r.lowest_heart_rate })
+    out.set(r.date, {
+      date: r.date, averageHrvMs: r.average_hrv_ms, lowestHeartRate: r.lowest_heart_rate,
+      overnightHrvMs: overnightHrvFromSeries(r.hrv_series),
+    })
   }
   return [...out.values()]
 }
@@ -3150,43 +3165,6 @@ export async function getOuraStorageStats(db: Db): Promise<import('../../reposit
       bodyHexBytes: Number(rawRow.body_hex_bytes ?? 0),
     },
   }
-}
-
-// Culling Lever 1b — one-off backfill nulling the `decoded` JSONB on rows written before Lever 1a
-// (which stops writing it going forward). DATA-DROPPING → admin-triggered only, never auto-run on
-// deploy/migration; the owner presses this deliberately, watching the G-2 footprint numbers drop.
-// body_hex is never touched (archival, untouched by definition) — every nulled row's decode path
-// already falls back to body_hex (proven in Lever 1a). No age cutoff: every row still carrying
-// `decoded` predates Lever 1a and is unconditionally safe to null.
-// Batched (500 rows/UPDATE, matching redecodeOuraRawSamples's page size) so no single statement can
-// exceed the pool's 15s statement_timeout — each batch commits independently (no wrapping
-// transaction), so a killed/interrupted run just leaves fewer rows remaining, never rolled back.
-// `maxRows` still bounds one call (owner explicitly asked for "all at once" — defaults high enough
-// to clear any realistic single-user backlog in one press, while keeping a finite ceiling rather
-// than a literal unbounded loop).
-export async function nullHistoricalDecoded(
-  db: Db, userId: string, maxRows = 1_000_000,
-): Promise<{ nulled: number; remaining: number }> {
-  const BATCH = 500
-  let nulled = 0
-  while (nulled < maxRows) {
-    const page = await db
-      .select({ id: s.ouraRawSamples.id })
-      .from(s.ouraRawSamples)
-      .where(and(eq(s.ouraRawSamples.userId, userId), isNotNull(s.ouraRawSamples.decoded)))
-      .orderBy(asc(s.ouraRawSamples.id))
-      .limit(Math.min(BATCH, maxRows - nulled))
-    if (page.length === 0) break
-    await db.update(s.ouraRawSamples)
-      .set({ decoded: null })
-      .where(inArray(s.ouraRawSamples.id, page.map(r => r.id)))
-    nulled += page.length
-  }
-  const [{ remaining }] = await db
-    .select({ remaining: sql<number>`count(*)::int` })
-    .from(s.ouraRawSamples)
-    .where(and(eq(s.ouraRawSamples.userId, userId), isNotNull(s.ouraRawSamples.decoded)))
-  return { nulled, remaining }
 }
 
 // Culling Lever 1c — physically reclaim the disk that Lever 1b freed only logically. Nulling the

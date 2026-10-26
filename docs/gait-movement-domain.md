@@ -157,7 +157,7 @@ read 114 steps naive → 0 gated; walk-30 → 31; calibrated on real captures 20
 | Walk/run detection service + GPS | `lib/activity/auto-detection-service.ts`, `gps-watchdog.ts`, `motion-gate.ts` |
 | Gait cadence classifier (Hz bands provisional; its AD-2 confirm was removed by #2471) | `packages/shared/src/health/gait-classifier.ts` |
 | Walks found after the fact in ring MET (#2471) | `packages/shared/src/health/walk-detection.ts`, `app/api/activity-detection/walks/route.ts`, `lib/activity/ring-walks.ts` |
-| **Cadence (spm) — both sources, shared autocorr primitive** | `lib/health/cadence.ts`, live fusion `lib/activity/cadence-tracker.ts`, console `/admin/cadence` |
+| **Cadence (spm) — both sources, shared autocorr primitive** | `lib/health/cadence.ts`, live fusion `lib/activity/cadence-tracker.ts` (the `/admin/cadence` console was retired in #2862) |
 | Oura's gold-standard classifier (future) | `lib/oura-models/` `automatic_activity_detection_3_1_11` (heavy; WASM-spike-gated) |
 
 ## Related plans

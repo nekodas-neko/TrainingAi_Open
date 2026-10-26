@@ -50,3 +50,43 @@ export function collectionRules(): RulePara[] {
     ],
   ]
 }
+
+/** A bottom tier's row name: "Ranger I" -> "Ranger". A row is named by its bottom tier. */
+export function collectionRowName(faucet: keyof typeof V2_LADDERS): string {
+  return V2_LADDERS[faucet].tiers[0].name.replace(/ I$/, '')
+}
+
+/** "A, B and C". */
+const joinList = (items: string[]) =>
+  items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+
+/**
+ * The four short captions under Preview's "How this works" diagrams (#2087): a bold lead and the
+ * sentence after it, in the same order as the diagrams (one a day, N make one, a gap costs the
+ * smallest, rest days are free). Every name and number is read from the ladders, so the mobile page
+ * draws the diagrams and prints these without typing a second copy of the wording.
+ */
+export function collectionRuleCaptions(): { lead: string; text: string }[] {
+  const { workout, steps } = V2_LADDERS
+  const rowName = collectionRowName
+  const banks = joinList((['steps', 'health', 'cardio'] as const).map(rowName))
+  const cost = steps.tiers[1].mergeCost
+  return [
+    {
+      lead: 'One a day.',
+      text: ` Each workout gives the ${rowName('workout')} row a ${workout.tiers[0].name}. Steps, health logging and cardio fill a bank that turns into ${banks} cats.`,
+    },
+    {
+      lead: `${cost} make one.`,
+      text: ` On the ${banks} rows, ${cost} of a tier make 1 of the next. The ${rowName('workout')} row costs ${workout.tiers.slice(1).map(t => t.mergeCost).join(' · ')}.`,
+    },
+    {
+      lead: 'A gap costs the smallest one.',
+      text: ' When a bank runs down the row loses its smallest cat, and a big one breaks back into its parts rather than vanishing.',
+    },
+    {
+      lead: 'Your own rest days are free.',
+      text: ` The ${rowName('workout')} row's allowance comes from your schedule, and a rest or deload day the app asked for never counts against it.`,
+    },
+  ]
+}

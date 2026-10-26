@@ -10,9 +10,9 @@ const BNE = 'Australia/Brisbane'
 
 const session = (at: Date) => ({ startedAt: at.toISOString(), exercises: [{ volume: 100 }] })
 
-/** strengthWindowEndingAt before #3222, taking the day's midnight as a number of ms. */
+/** strengthWindowEndingAt before #3222 (since #2739 six days back, not seven), taking the day's midnight as a number of ms. */
 function oldStrengthWindow(sessions: ReturnType<typeof session>[], dayMidMs: number) {
-  const from = dayMidMs - 7 * DAY
+  const from = dayMidMs - 6 * DAY
   const to = dayMidMs + DAY
   const rows = sessions.filter(ws => {
     const t = new Date(ws.startedAt).getTime()
@@ -42,7 +42,7 @@ describe('date-string window starts, Brisbane', () => {
     for (let i = 0; i < 365; i++, day = shiftDateStr(day, 1)) {
       const mid = dateStrMidnightInTz(day, BNE).getTime()
       const sessions = [
-        session(new Date(mid - 7 * DAY - 1)), session(new Date(mid - 7 * DAY)),
+        session(new Date(mid - 6 * DAY - 1)), session(new Date(mid - 6 * DAY)),
         session(new Date(mid + DAY - 1)), session(new Date(mid + DAY)),
       ]
       const got = strengthWindowEndingAt(sessions, day, BNE)
@@ -61,15 +61,15 @@ describe('strengthWindowEndingAt across a clock change', () => {
     expect(got.sessions7d).toBe(1)
   })
 
-  it('New York reaches back to local midnight seven calendar days earlier', () => {
-    // From 2026-03-11 the window starts 2026-03-04 00:00 EST (05:00Z), before the change.
-    const first = new Date('2026-03-04T05:00:00Z')
-    const before = new Date('2026-03-04T04:59:00Z')
+  it('New York reaches back to local midnight six calendar days earlier', () => {
+    // From 2026-03-11 the window starts 2026-03-05 00:00 EST (05:00Z), before the change.
+    const first = new Date('2026-03-05T05:00:00Z')
+    const before = new Date('2026-03-05T04:59:00Z')
     const got = strengthWindowEndingAt([session(first), session(before)], '2026-03-11', 'America/New_York')
     expect(got.sessions7d).toBe(1)
     // The old form started at 04:00Z, which is 2026-03-03 23:00 EST: it pulled in the previous evening.
-    const oldFrom = dateStrMidnightInTz('2026-03-11', 'America/New_York').getTime() - 7 * DAY
-    expect(new Date(oldFrom).toISOString()).toBe('2026-03-04T04:00:00.000Z')
+    const oldFrom = dateStrMidnightInTz('2026-03-11', 'America/New_York').getTime() - 6 * DAY
+    expect(new Date(oldFrom).toISOString()).toBe('2026-03-05T04:00:00.000Z')
   })
 
   it('Sydney 2026-10-04 (spring-forward) start is local midnight of the calendar date', () => {

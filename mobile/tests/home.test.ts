@@ -585,6 +585,8 @@ test('morning prompts inspect the row after a successful read and respect pendin
     phase: 'morning',
     vsNormal: 'same',
     vsNormalTouched: true,
+    sleepQualityFeel: 3,
+    sleepQualityFeelTouched: false,
     soreMuscles: [],
   });
   assert.equal(await shouldOfferMorning(store, day), false);
@@ -603,6 +605,23 @@ test('morning prompts inspect the row after a successful read and respect pendin
   );
   await canceled.initialize();
   assert.equal(await shouldOfferMorning(canceled, day), null);
+});
+test('a Home readiness answer is a row with no sleep feel, so the morning sheet still offers itself', async () => {
+  const row = { phase: 'morning', vsNormal: 'same', vsNormalTouched: true, soreMuscles: [] };
+  const stub = (checkin: Record<string, unknown> | null, pending?: Record<string, unknown>) => ({
+    getSnapshot: () =>
+      ({
+        checkins: { [day]: checkin },
+        operations: pending
+          ? [{ domain: 'day_checkins', date: day, payload: pending }]
+          : [],
+      }) as unknown as ReturnType<HealthStore['getSnapshot']>,
+    readCheckin: async () => true,
+  });
+  assert.equal(await shouldOfferMorning(stub(row), day), true);
+  assert.equal(await shouldOfferMorning(stub(null, row), day), true);
+  assert.equal(await shouldOfferMorning(stub({ ...row, sleepQualityFeel: 3 }), day), false);
+  assert.equal(await shouldOfferMorning(stub(null, { ...row, sleepQualityFeel: 3 }), day), false);
 });
 test('an unsynced completed workout enters Home timeline and a lost-reply server event does not duplicate it', () => {
   const f = loggingFixture();
