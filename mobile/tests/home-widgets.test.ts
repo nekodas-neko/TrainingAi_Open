@@ -239,4 +239,6 @@ test('the rest-day card offers "Train instead", which Home answers with its own 
   assert.match(await read(module + 'res/values/strings.xml'), />Train instead</);
   const app = await read('../src/app/App.tsx');
   assert.match(app, /target\.kind === 'train-instead'[\s\S]*?chooseRestDay\(today, false\)/);
+  // A cold start reaches here before HomeProvider opens the store, so the tap opens it first.
+  assert.match(app, /target\.kind === 'train-instead'[\s\S]*?initialize\(\)[\s\S]*?chooseRestDay\(today, false\)/);
 });

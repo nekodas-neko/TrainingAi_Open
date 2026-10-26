@@ -177,9 +177,17 @@ function AppShell() {
       setHealthDetail(null);
       openSession(target.id);
     } else if (target.kind === 'train-instead') {
-      // Home's own override (HomeRecommendation); the card then reads as a training day.
+      // Home's own override (HomeRecommendation); the card then reads as a training day. A widget
+      // tap usually cold-starts the app, before HomeProvider has opened the store, and the store
+      // refuses writes until it has, so open it first (initialize is shared, not repeated).
       selectTab('Home');
-      void home.store?.chooseRestDay(today, false).catch(() => undefined);
+      const store = home.store;
+      if (store) {
+        void store
+          .initialize()
+          .then(() => store.chooseRestDay(today, false))
+          .catch(() => undefined);
+      }
     } else selectTab(target.kind === 'home' ? 'Home' : target.kind === 'workout' ? 'Workout' : 'Nutrition');
   });
   function openSettings() {
