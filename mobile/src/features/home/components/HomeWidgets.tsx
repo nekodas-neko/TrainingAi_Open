@@ -42,6 +42,7 @@ import { CollectionCard } from '../../collection/components/CollectionCard';
 import { metricLabels } from '../data/models';
 import { budgetEnergyModel } from '../../nutrition/data/energy-model';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bandColor } from '../../../shared/theme/tokens';
 import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { DEFAULT_SLEEP_GOAL_HOURS } from '@trainingai/shared/health/daily-goals';
 import { formatHoursMinutes } from '@trainingai/shared/format/units'
@@ -749,7 +750,7 @@ function HomeWidgetBody({
                     {Math.round(row.pct)}%
                   </AppText>
                 </Stack>
-                <ProgressBar value={row.pct / 100} color={recoveryBand(row.pct).color} />
+                <ProgressBar value={row.pct / 100} color={bandColor(recoveryBand(row.pct).color, theme.status)} />
               </Stack>
             ))
           ) : (

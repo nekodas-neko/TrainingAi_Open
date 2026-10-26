@@ -152,3 +152,18 @@ test('bandColor maps the web band tokens to the theme status colours and leaves 
   assert.equal(bandColor('#f97316', statusColors.dark), '#f97316');
   assert.equal(bandColor(undefined, statusColors.dark), undefined);
 });
+
+// #2148: GradientProgressBar hands every stop to react-native-svg, which skips a `var(--…)` colour.
+test('no CSS variable survives mapping the calorie bar stops through bandColor', async () => {
+  const { bandColor, statusColors } = await import('../src/shared/theme/tokens');
+  const { barProgress } = await import('@trainingai/shared/nutrition/calorie-balance');
+  for (const mode of ['light', 'dark'] as const) {
+    for (const intakeKcal of [0, 800, 1600, 2000, 2400, 3200]) {
+      const { stops } = barProgress({ intakeKcal, budgetKcal: 2000 });
+      assert.ok(stops.length > 0);
+      for (const stop of stops) {
+        assert.ok(!bandColor(stop.color, statusColors[mode]).includes('var('), `${mode} ${stop.color}`);
+      }
+    }
+  }
+});
