@@ -9,7 +9,7 @@ import { invalidateNutritionWrite } from '@/lib/cache-groups'
 import { TTL_SHORT } from '@trainingai/shared/cache-ttl'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils'
 import type { DayCheckin } from '@trainingai/shared/types/day-checkin'
-import { calibrationProgress } from '@trainingai/shared/nutrition/calibration-progress'
+import { calibrationProgress, markedDayNote } from '@trainingai/shared/nutrition/calibration-progress'
 
 interface Props {
   date: string
@@ -87,7 +87,7 @@ export function FoodLoggingComplete({ date, isToday, daysLogged, minDays, calibr
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">Logging finished{isToday ? ' for today' : ''}</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              This day counts toward your maintenance estimate
+              {markedDayNote(isToday)}
               {completedAt ? ` · marked ${formatTimeOfDay(completedAt, tz)}` : ''}
             </p>
           </div>

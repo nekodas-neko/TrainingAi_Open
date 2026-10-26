@@ -23,9 +23,11 @@ import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { workoutFlow } from '../logging/flow';
 import { recordedSets, type WorkoutRecord } from '../logging/workout';
 import { SetEntry, SetActions } from '../components/SetEntry';
-import { RestCard } from '../components/WorkoutClocks';
+import { PausedBanner, RestCard, canPauseWorkout } from '../components/WorkoutClocks';
+import { PipHeartRate } from '../components/PipHeartRate';
 import { LiveHrCard } from '../components/LiveHrCard';
 import { useWorkoutPip } from '../pip/usePictureInPicture';
+import { usePipSourceRect } from '../pip/usePipSourceRect';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { hrProfileSpec } from '../../health/data/models';
 import { WorkoutSaveNotice } from '../components/WorkoutSaveNotice';
@@ -62,7 +64,8 @@ export function GuidedWorkoutScreen({
 }) {
   const journal = useWorkoutJournal();
   const controller = journal.controller!;
-  useWorkoutPip(workout, controller);
+  const pip = useWorkoutPip(workout, controller);
+  const setSource = usePipSourceRect();
   const { theme } = useTheme();
   // Read once for the screen, not per rest, as the current app does for its Live HR card (RV-64).
   const hrProfile = useWorkoutResource(hrProfileSpec).data;
@@ -175,8 +178,18 @@ export function GuidedWorkoutScreen({
       setPanel(decision);
     }
   }
-  const action =
-    flow.stage === 'summary' ? (
+  const paused = workout.pausedAt !== null;
+  const action = paused ? (
+    <AppButton
+      title="Resume"
+      icon="play"
+      variant="warning"
+      busy={journal.busy}
+      onPress={() => {
+        void controller.resume(workout.id);
+      }}
+    />
+  ) : flow.stage === 'summary' ? (
       <AppButton
         title={
           workout.soloExerciseId
@@ -294,6 +307,7 @@ export function GuidedWorkoutScreen({
         }
       >
         <WorkoutSaveNotice />
+        <PausedBanner workout={workout} />
         {workout.fromSavedPlan && <Badge label="Saved session" />}
         {flow.stage === 'warmup' ? (
           <WarmupContent workout={workout} />
@@ -401,15 +415,22 @@ export function GuidedWorkoutScreen({
                     )}
                 </>
               ) : set ? (
-                <Card tone="brand" style={{ flex: 1, padding: theme.spacing.md }}>
-                  <SetEntry
-                    fill
-                    workout={workout}
-                    exercise={exercise}
-                    set={set}
-                    index={exercise.sets.indexOf(set)}
-                  />
-                </Card>
+                <View
+                  ref={setSource.ref}
+                  onLayout={setSource.onLayout}
+                  collapsable={false}
+                  style={{ flex: 1 }}
+                >
+                  <Card tone="brand" style={{ flex: 1, padding: theme.spacing.md }}>
+                    <SetEntry
+                      fill
+                      workout={workout}
+                      exercise={exercise}
+                      set={set}
+                      index={exercise.sets.indexOf(set)}
+                    />
+                  </Card>
+                </View>
               ) : null}
             </View>
           </>
@@ -437,6 +458,7 @@ export function GuidedWorkoutScreen({
   return (
     <>
       {screen}
+      <PipHeartRate reporter={pip} profile={zoneProfile} />
       <Sheet
         visible={panel !== null}
         title={sheetTitle}
@@ -503,6 +525,18 @@ export function GuidedWorkoutScreen({
                 icon="info"
                 variant="surface"
                 onPress={() => setPanel('details')}
+              />
+            )}
+            {canPauseWorkout(workout) && (
+              <AppButton
+                title={paused ? 'Resume workout' : 'Pause workout'}
+                icon={paused ? 'play' : 'pause'}
+                variant="surface"
+                busy={journal.busy}
+                onPress={() => {
+                  void (paused ? controller.resume(workout.id) : controller.pause(workout.id));
+                  setPanel(null);
+                }}
               />
             )}
             <AppButton

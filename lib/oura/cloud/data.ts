@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { OURA_API_BASE, OURA_REQUEST_TIMEOUT_MS } from './config'
 import { OuraUnavailableError } from './client'
 import {
-  HeartRateRow, OURA_DOCUMENT_TYPES, parseOuraDocument,
+  HeartRateRow, OURA_DOCUMENT_TYPES, RingBatteryRow, parseOuraDocument,
   type OuraDocument, type OuraDocumentType,
 } from './documents'
 
@@ -135,6 +135,21 @@ export async function fetchOuraHeartRate(
   let dropped = 0
   for (const r of raw) {
     const parsed = HeartRateRow.safeParse(r)
+    if (parsed.success) rows.push(parsed.data)
+    else dropped++
+  }
+  return { rows, dropped }
+}
+
+/** The ring's battery readings between two instants (`ring_battery_level`, #3069). */
+export async function fetchOuraRingBattery(
+  accessToken: string, start: Date, end: Date,
+): Promise<{ rows: RingBatteryRow[]; dropped: number }> {
+  const { items: raw } = await readPages('ring_battery_level', accessToken, { start_datetime: start.toISOString(), end_datetime: end.toISOString() })
+  const rows: RingBatteryRow[] = []
+  let dropped = 0
+  for (const r of raw) {
+    const parsed = RingBatteryRow.safeParse(r)
     if (parsed.success) rows.push(parsed.data)
     else dropped++
   }

@@ -154,11 +154,11 @@ test('only known values are shown', () => {
   assert.equal(workoutStatusFor(bodyweight)?.load, '8 reps');
 });
 
-test('a pound exercise reads in pounds', () => {
+test('a pound exercise still reads in kilograms', () => {
   const pounds = workout();
   pounds.exercises[0].weightUnit = 'lb';
-  pounds.exercises[0].sets = pounds.exercises[0].sets.map((x) => ({ ...x, weight: '45' }));
-  assert.equal(workoutStatusFor(pounds)?.load, '99.21 lb × 8');
+  pounds.exercises[0].sets = pounds.exercises[0].sets.map((x) => ({ ...x, weight: '7.5' }));
+  assert.equal(workoutStatusFor(pounds)?.load, '7.5 kg × 8');
 });
 
 function recorder() {

@@ -22,6 +22,7 @@ import {
   StableContent,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bandColor } from '../../../shared/theme/tokens';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { balanceProvenance, budgetLine } from '../../nutrition/data/budget-line';
@@ -31,6 +32,7 @@ import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { useHealthData } from '../data/HealthDataProvider';
 import { energySpec, goalsSpec, trendsSpec } from '../data/models';
 import { ouraStatsSpec, ringBatterySpec } from '../data/body-models';
+import { readingAge } from '../../devices/data/ring-battery';
 import { waterGoalText, waterText, weekdayAxis, wornSeconds } from '../data/body-view';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
 import { HealthMetricCard } from './HealthMetricCard';
@@ -44,6 +46,7 @@ const signed = (value: number) => `${value >= 0 ? '+' : ''}${Math.round(value).t
  * Eaten, Burned and Net tiles, the maintenance estimate and an explanation behind a toggle.
  */
 export function EnergyBalanceCard() {
+  const { theme } = useTheme();
   const { today } = useHealthData();
   const energy = useWorkoutResource(energySpec(today));
   const balance = energy.data?.balance ?? null;
@@ -81,7 +84,7 @@ export function EnergyBalanceCard() {
               {intake.zoneLabel && (
                 <AppText
                   variant="label"
-                  style={zone ? { color: zone.color } : undefined}
+                  style={zone ? { color: bandColor(zone.color, theme.status) } : undefined}
                   tone={zone ? undefined : 'muted'}
                 >
                   {intake.zoneLabel} so far
@@ -300,6 +303,7 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
   }
   if (!stats.data?.connected) return null;
   const level = battery.data?.latest?.percent ?? null;
+  const batteryAge = battery.data?.latest?.ageMinutes ?? 0;
   const worn = wornSeconds(
     stats.data.daily?.nonWearTimeSec ?? null,
     secondsSinceLocalMidnight(timezone),
@@ -323,7 +327,13 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
                 compact
                 label="Battery"
                 value={`${Math.round(level)}%`}
-                caption={battery.data?.latest?.charging ? 'Charging' : undefined}
+                caption={
+                  battery.data?.latest?.charging
+                    ? 'Charging'
+                    : batteryAge >= 6 * 60
+                      ? readingAge(batteryAge)
+                      : undefined
+                }
                 color={cueColor(level >= 60 ? 'good' : level >= 25 ? 'watch' : 'bad')}
               />
             )}

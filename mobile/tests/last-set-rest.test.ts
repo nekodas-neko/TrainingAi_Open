@@ -66,7 +66,6 @@ async function finishExercise(f: Awaited<ReturnType<typeof setup>>, adjust = 0) 
 const settings = (extra = {}) =>
   platformSchema.parse({
     scope: 'account-one',
-    restAlerts: false,
     walkCues: false,
     ...extra,
   });
@@ -109,17 +108,16 @@ test('the summary rest schedules the rest alarm at its end, in the foreground an
   const f = await setup(t);
   const { active } = await finishExercise(f);
   const workout = active();
-  for (const foreground of [true, false]) {
-    const [alert] = planAlerts(settings(), [workout], null, f.now(), foreground);
+  {
+    const [alert] = planAlerts(settings(), [workout], null, f.now());
     assert.equal(alert?.title, 'Rest complete');
     // The current app's wording after an exercise's last set: N+1 (#3142).
     assert.equal(alert.body, 'Time for set 3');
     assert.deepEqual(alert.trigger, { at: workout.rest!.endsAt });
   }
-  // With the rest cue off, only the background Alerts setting adds it, as for any rest.
+  // With the rest cue off there is no alarm: the cue alone controls it.
   const quiet = { ...workout, timers: { ...workout.timers, restCues: false } };
-  assert.deepEqual(planAlerts(settings(), [quiet], null, f.now(), false), []);
-  assert.equal(planAlerts(settings({ restAlerts: true }), [quiet], null, f.now(), false).length, 1);
+  assert.deepEqual(planAlerts(settings(), [quiet], null, f.now()), []);
   // Once the rest is over, nothing is left to schedule; the summary shows overtime.
   assert.deepEqual(planAlerts(settings(), [workout], null, workout.rest!.endsAt + 1), []);
 });

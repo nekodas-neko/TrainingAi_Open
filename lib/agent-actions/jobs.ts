@@ -253,6 +253,11 @@ export const AGENT_JOBS = {
    * `backfillOuraCloud`, the code a new connection runs. Idempotent. A write can replace a stored
    * value whose source ranks at or below `oura_cloud` (a legacy row with no source, Health Connect),
    * so it needs an approval; the ring's BLE values and manual entries outrank it and never move.
+   * It also tombstones stored workouts and sessions Oura's list no longer has over the range, as the
+   * daily reconcile does for 3 days (#3389), under the same guard: only days read whole, never after
+   * a 404, a dropped document or a refusal. A dry run reports `workoutsTombstoned` and
+   * `sessionsTombstoned` as would-be counts and writes nothing. A tombstone is reversible: a session
+   * Oura sends again clears it.
    */
   'oura-cloud-backfill': {
     params: OuraCloudBackfillParams,
@@ -265,12 +270,13 @@ export const AGENT_JOBS = {
       if (!from || !to) return { status: 400, body: { error: 'Invalid date' }, finish: { outcome: 'refused', error: 'invalid date' } }
       if (!validBackfillRange(from, to)) return { status: 400, body: { error: 'invalid_range' }, finish: { outcome: 'refused', error: 'invalid_range' } }
       const run = backfillOuraCloud({ repo: ctx.repo, config, rescore: ctx.repo, workoutHr: workoutHrReattributor(ctx.repo), stillRhr: stillRhrRefresher(ctx.repo) }, ctx.userId, {
-        from, to, dryRun: p.dryRun, heartRate: p.heartRate ?? true, tz: ctx.tz, stampData: false,
+        from, to, dryRun: p.dryRun, heartRate: p.heartRate ?? true, tz: ctx.tz, tombstoneAbsent: true, stampData: false,
       })
       const finish = (result: OuraBackfillResult): FinishAgentActionInput => {
         if (!result.ok) return { outcome: 'refused', error: result.error }
         const { counts, stoppedEarly } = result.report
-        const written = p.dryRun ? 0 : counts.dailyRows + counts.bodyRows + counts.sleepWritten + counts.sleepTombstoned + counts.workouts + counts.heartRatePoints
+        const written = p.dryRun ? 0 : counts.dailyRows + counts.bodyRows + counts.sleepWritten + counts.sleepTombstoned + counts.workouts + counts.heartRatePoints +
+          result.report.workoutsTombstoned + result.report.sessionsTombstoned
         return { outcome: stoppedEarly ? 'failed' : 'succeeded', affectedRows: written, daysMoved: p.dryRun ? 0 : counts.dailyRows, error: stoppedEarly }
       }
       // A write can take tens of Oura requests (#2895 review, nit 10), so it runs after the answer

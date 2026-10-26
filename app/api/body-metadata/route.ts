@@ -5,7 +5,7 @@ import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz";
 import { DEFAULT_TZ, startOfWeekInTz, ageFromDob, shiftDateStr } from "@trainingai/shared/date-utils";
 import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metrics";
 import { ingestDayRejection } from "@trainingai/shared/validation/ingest-clock";
-import { type Sex } from "@trainingai/shared/health/workout-energy";
+import { sessionActiveMin, type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
 import { activityStepsForDayCount, withIndoorSteps } from "@trainingai/shared/health/activity-steps";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
@@ -241,7 +241,7 @@ export async function GET(req: NextRequest) {
       // Q-419: the session's own RPE decides the intensity tier, matching the done screen. Without it
       // this route reported a different burn for the same workout than the screen that logged it.
       // Q-421: and `avgBpm` takes precedence over the tier where the strap was worn.
-      .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
+      .map(ws => ({ durationMin: sessionActiveMin(ws.startedAt, ws.completedAt!, ws.pausedSec), rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
     activities: [
       ...movement.logs.filter(a => a.date === today).map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null, steps: a.steps ?? null })),
       ...movement.oura,

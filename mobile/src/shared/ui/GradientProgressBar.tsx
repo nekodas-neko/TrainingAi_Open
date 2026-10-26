@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { View } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect, Line } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
+import { bandColor } from '../theme/tokens';
 
 // The current app's CalorieProgressBar: a neutral track with the ramp faint along its whole length
 // (so green is visible before you reach it), the fill the same ramp at full strength clipped to
@@ -41,7 +42,7 @@ export function GradientProgressBar({
           {/* userSpaceOnUse: the ramp spans the whole track whatever the fill's width. */}
           <LinearGradient id={id} gradientUnits="userSpaceOnUse" x1="0" x2="1000" y1="0" y2="0">
             {stops.map((stop, i) => (
-              <Stop key={i} offset={stop.pct} stopColor={stop.color} />
+              <Stop key={i} offset={stop.pct} stopColor={bandColor(stop.color, theme.status)} />
             ))}
           </LinearGradient>
         </Defs>

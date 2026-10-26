@@ -25,8 +25,8 @@ const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout
 
 function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
   const calls: string[] = []
-  const absent: { from: string; to: string; keepIds: string[] }[] = []
-  const absentSessions: { from: string; to: string; keepIds: string[] }[] = []
+  const absent: { from: string; to: string; keepIds: string[]; dryRun?: boolean }[] = []
+  const absentSessions: { from: string; to: string; keepIds: string[]; dryRun?: boolean }[] = []
   const row: OuraCloudTokenRow | null = connected ? {
     userId: USER,
     accessToken: encryptOuraToken('acc', USER, 'access_token'),
@@ -85,6 +85,36 @@ describe('backfillOuraCloud (#2859)', () => {
   afterEach(() => {
     process.env.OURA_TOKEN_KEY = savedKey
     vi.unstubAllGlobals()
+  })
+
+  // #3069: the ring's battery is read per 7 days beside the heart rate, only when asked for.
+  it('reads ring_battery_level into the battery store only when ringBattery is set, and not on a dry run', async () => {
+    const rows = [{ timestamp: '2026-10-05T01:00:00+00:00', timestamp_unix: 1, level: 70, charging: false, in_charger: false }]
+    oura(path => (path === 'ring_battery_level' ? jsonResponse({ data: rows, next_token: null }) : null))
+    const stored: number[] = []
+    const { repo } = fakeRepo()
+    const withBattery: OuraBackfillDeps['repo'] = { ...repo, getLatestOuraCloudBatteryAt: async () => null, insertOuraCloudBatteryReadings: async (_u, r) => { stored.push(r.length); return r.length } }
+    const reads = () => fetchMock.mock.calls.filter(c => String(c[0]).includes('ring_battery_level')).length
+
+    await backfillOuraCloud({ repo: withBattery, config: CONFIG }, USER, { ...OPTS, dryRun: false })
+    expect(reads()).toBe(0)
+
+    const out = await backfillOuraCloud({ repo: withBattery, config: CONFIG }, USER, { ...OPTS, dryRun: false, ringBattery: true })
+    expect(reads()).toBe(2) // 12 days = two 7-day requests
+    expect(stored).toEqual([1, 1])
+    expect(out.ok && out.report.documents.ring_battery).toBe(2)
+
+    stored.length = 0
+    await backfillOuraCloud({ repo: withBattery, config: CONFIG }, USER, { ...OPTS, ringBattery: true, dryRun: true })
+    expect(stored).toEqual([])
+  })
+
+  it('skips ring_battery_level without a request when the grant does not cover it', async () => {
+    oura()
+    const { repo } = fakeRepo(true, 'extapi:personal extapi:heartrate')
+    const out = await backfillOuraCloud({ repo: { ...repo, getLatestOuraCloudBatteryAt: async () => null, insertOuraCloudBatteryReadings: async () => 0 }, config: CONFIG }, USER, { ...OPTS, dryRun: false, ringBattery: true })
+    expect(fetchMock.mock.calls.some(c => String(c[0]).includes('ring_battery_level'))).toBe(false)
+    expect(out.ok && out.report.notShared).toContain('ring_battery')
   })
 
   it('reads every type over the range and writes once', async () => {
@@ -424,15 +454,23 @@ describe('backfillOuraCloud tombstoneAbsent: workouts (#3087)', () => {
     expect(absent).toEqual([])
   })
 
-  it('tombstones nothing unless asked, and nothing on a dry run', async () => {
+  it('tombstones nothing unless asked', async () => {
     oura()
     const plain = fakeRepo()
     await backfillOuraCloud({ repo: plain.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false })
     expect(plain.absent).toEqual([])
+    const plainDry = fakeRepo()
+    await backfillOuraCloud({ repo: plainDry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true })
+    expect(plainDry.absent).toEqual([])
+  })
+
+  // #3389: the agent job's dry run reports what the write would tombstone, and the sweep is asked to count only.
+  it('on a dry run asks for a count only, and reports it as the would-be tombstones', async () => {
+    oura()
     const dry = fakeRepo()
     const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsent: true })
-    expect(dry.absent).toEqual([])
-    expect(out.ok && out.report.workoutsTombstoned).toBe(0)
+    expect(dry.absent).toEqual([{ from: '2026-10-08', to: '2026-10-09', keepIds: ['wo-1'], dryRun: true }])
+    expect(out.ok && out.report.workoutsTombstoned).toBe(1)
   })
 
   // A list that was not read whole says nothing about what Oura still has.
@@ -482,13 +520,13 @@ describe('backfillOuraCloud tombstoneAbsent: sessions (#3153)', () => {
     expect(out.ok && out.report.workoutsTombstoned).toBe(1)
   })
 
-  it('tombstones no session unless asked, on a dry run, or from a chunk not read whole', async () => {
+  it('tombstones no session unless asked, or from a chunk not read whole', async () => {
     oura()
     const plain = fakeRepo()
     await backfillOuraCloud({ repo: plain.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false })
     expect(plain.absentSessions).toEqual([])
     const dry = fakeRepo()
-    const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsent: true })
+    const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true })
     expect(dry.absentSessions).toEqual([])
     expect(out.ok && out.report.sessionsTombstoned).toBe(0)
 
@@ -540,6 +578,15 @@ describe('backfillOuraCloud tombstoneAbsent: a 404 is not a whole read (#3153)',
       expect(swept(f)).toEqual([])
       // What the first page held is still written.
       expect(out.ok && out.report.documents[type]).toBe(1)
+    })
+
+    // #3389: the agent job's dry run takes the same guard, so a cut list never shows a count.
+    it(`a ${type} read that 404s tombstones nothing on a dry run either, and counts none`, async () => {
+      oura(path => (path === type ? notFound() : null))
+      const f = fakeRepo()
+      const out = await backfillOuraCloud({ repo: f.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsent: true })
+      expect(swept(f)).toEqual([])
+      expect(out.ok && (type === 'workout' ? out.report.workoutsTombstoned : out.report.sessionsTombstoned)).toBe(0)
     })
   }
 })

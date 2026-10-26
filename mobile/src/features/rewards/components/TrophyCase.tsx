@@ -142,15 +142,15 @@ function PickerTile({
   );
 }
 
-/** More › Profile › Trophy Case: three slots for achievements to show off, chosen on this phone. */
+/** More › Profile › Trophy Case: three slots for achievements to show off, saved on the account and shown to friends. */
 export function TrophyCase({ achievements }: { achievements: Achievement[] }) {
   const { theme } = useTheme();
-  const { pinned, pin, unpin } = useTrophyCase();
+  const unlocked = achievements.filter((row) => row.unlocked);
+  const { pinned, saveFailed, pin, unpin } = useTrophyCase(unlocked.map((row) => row.id));
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Achievement | null>(null);
   const color = useCategoryColor(selected?.category ?? '');
   const slots = trophySlots(achievements, pinned ?? []);
-  const unlocked = achievements.filter((row) => row.unlocked);
   return (
     <Card>
       <Stack direction="row" align="center" justify="space-between">
@@ -183,6 +183,11 @@ export function TrophyCase({ achievements }: { achievements: Achievement[] }) {
           />
         ))}
       </Grid>
+      {saveFailed && (
+        <AppText variant="caption" tone="danger" accessibilityLiveRegion="polite">
+          Failed to save trophy case
+        </AppText>
+      )}
       {editing && unlocked.length > 0 && (
         <Stack
           gap="md"

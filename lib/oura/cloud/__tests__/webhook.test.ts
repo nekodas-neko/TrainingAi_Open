@@ -6,8 +6,9 @@ import { OURA_API_BASE, OURA_TOKEN_URL, type OuraOAuthConfig } from '../config'
 import { encryptOuraToken } from '../token-cipher'
 import { OuraUnavailableError } from '../client'
 import { NO_WRITES } from '../ingest'
+import { getOuraAccessToken, storeOuraGrant, type OuraTokenStore } from '../tokens'
 import {
-  catchUpOuraCloudHeartRate, handleOuraWebhookEvent, HEART_RATE_LOOKBACK_MS, HEART_RATE_OVERLAP_MS, MAX_EVENT_AGE_MS, ouraWebhookConfig,
+  catchUpOuraCloudHeartRate, catchUpOuraCloudRingBattery, handleOuraWebhookEvent, RING_BATTERY_OVERLAP_MS, resetOuraCloudRingBatteryThrottle, RING_BATTERY_MIN_INTERVAL_MS, RING_BATTERY_REFUSED_BACKOFF_MS, startOuraCloudRingBatteryCatchUp, HEART_RATE_LOOKBACK_MS, HEART_RATE_OVERLAP_MS, MAX_EVENT_AGE_MS, ouraWebhookConfig,
   resetOuraCloudHeartRateThrottle, startOuraCloudHeartRateCatchUp, verifyOuraSignature, type OuraWebhookDeps,
 } from '../webhook'
 import type { User } from '@trainingai/shared/types'
@@ -81,11 +82,13 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   let row: OuraCloudTokenRow | null
   const writes = { daily: 0, sleep: 0, sessions: 0, tombstoned: [] as string[], workoutsTombstoned: [] as string[], sessionsTombstoned: [] as string[], stamps: [] as string[] }
   const heartRate = vi.fn()
+  const ringBattery = vi.fn()
 
   function deps(): OuraWebhookDeps {
     return {
       config: CONFIG,
       heartRate,
+      ringBattery,
       repo: {
         getUserIdByOuraUserId: async id => (id === OURA_USER && row ? USER : null),
         getOuraCloudTokens: async id => (row && id === row.userId ? row : null),
@@ -115,6 +118,8 @@ describe('handleOuraWebhookEvent (#2859)', () => {
         tombstoneOuraSessions: async (_u, ids) => { writes.sessionsTombstoned.push(...ids); return ids.length },
         tombstoneOuraSessionsAbsent: async () => 0,
         getLatestOuraCloudHeartrateAt: async () => null,
+        getLatestOuraCloudBatteryAt: async () => null,
+        insertOuraCloudBatteryReadings: async () => 0,
         getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) as User,
       },
     }
@@ -131,6 +136,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
     }
     writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []; writes.workoutsTombstoned = []; writes.sessionsTombstoned = []; writes.stamps = []
     heartRate.mockReset()
+    ringBattery.mockReset()
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
   })
@@ -204,6 +210,23 @@ describe('handleOuraWebhookEvent (#2859)', () => {
     expect(await handleOuraWebhookEvent(deps(), event({ data_type: 'daily_spo2', object_id: 'sp-1' })))
       .toEqual({ result: 'ignored', reason: 'daily_spo2 is not shared' })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  // #3069: the ring's battery rides the same events as the heart rate, on its own scope.
+  it('starts the ring-battery read only for a sync event on a grant that covers it', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.daily_activity))
+    await handleOuraWebhookEvent(deps(), event({ data_type: 'daily_activity', object_id: 'da-1' }))
+    expect(ringBattery.mock.calls).toEqual([[USER]])
+
+    ringBattery.mockReset()
+    fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.daily_readiness))
+    await handleOuraWebhookEvent(deps(), event())
+    expect(ringBattery).not.toHaveBeenCalled()
+
+    row = { ...row!, scope: 'extapi:personal extapi:heartrate extapi:workout' }
+    fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.workout))
+    await handleOuraWebhookEvent(deps(), event({ data_type: 'workout', object_id: 'wo-1' }))
+    expect(ringBattery).not.toHaveBeenCalled()
   })
 
   it('reads any type when the grant has no scope string (a legacy row)', async () => {
@@ -387,6 +410,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       expect(await handleOuraWebhookEvent(deps(), event({ data_type: type, object_id: id }))).toMatchObject({ result: 'written' })
     }
     expect(heartRate.mock.calls).toEqual([[USER], [USER], [USER]])
+    expect(ringBattery.mock.calls).toEqual([[USER], [USER], [USER]])
     fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.daily_readiness))
     await handleOuraWebhookEvent(deps(), event())
     expect(heartRate).toHaveBeenCalledTimes(3)
@@ -441,6 +465,8 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
       tombstoneOuraSessions: async () => 0,
       tombstoneOuraSessionsAbsent: async () => 0,
       getLatestOuraCloudHeartrateAt: async (_u, from) => { since = from; return newest },
+      getLatestOuraCloudBatteryAt: async () => null,
+      insertOuraCloudBatteryReadings: async () => 0,
       getUserById: async () => ({ id: USER, timezone }) as User,
     },
   })
@@ -613,5 +639,163 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
     ])
     // Counts only: never a reading.
     expect(reported().join(' ')).not.toMatch(/\b61\b/)
+  })
+})
+
+describe('catchUpOuraCloudRingBattery (#3069)', () => {
+  const fetchMock = vi.fn<typeof fetch>()
+  const savedKey = process.env.OURA_TOKEN_KEY
+  const now = Date.parse('2026-10-14T02:00:00Z')
+  let newest: Date | null
+  let tokenExpiresAt: Date | null = null
+  const stored: { measuredAt: Date; percent: number; charging: boolean | null }[] = []
+
+  const deps = (): Pick<OuraWebhookDeps, 'repo' | 'config'> => ({
+    config: CONFIG,
+    repo: {
+      getOuraCloudTokens: async () => ({
+        userId: USER,
+        accessToken: encryptOuraToken('acc', USER, 'access_token'),
+        refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
+        expiresAt: tokenExpiresAt ?? new Date(Date.now() + 86_400_000), scope: 'extapi:daily', ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null,
+      }),
+      saveOuraCloudTokens: async () => {},
+      markOuraCloudReauthRequired: async () => true,
+      deleteOuraCloudTokens: async () => true,
+      getLatestOuraCloudBatteryAt: async () => newest,
+      insertOuraCloudBatteryReadings: async (_u: string, rows: typeof stored) => { stored.push(...rows); return rows.length },
+    } as unknown as OuraWebhookDeps['repo'],
+  })
+
+  beforeEach(() => {
+    process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
+    newest = null; tokenExpiresAt = null; stored.length = 0
+    resetOuraCloudRingBatteryThrottle()
+    resetOuraCloudReportThrottle()
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    fetchMock.mockReset()
+    fetchMock.mockImplementation(async () => jsonResponse({
+      data: [
+        { timestamp: '2026-10-14T01:00:00+00:00', timestamp_unix: 1, level: 64, charging: false, in_charger: false },
+        { timestamp: '2026-10-14T01:15:00+00:00', timestamp_unix: 2, level: 66, charging: null, in_charger: true },
+        { timestamp: '2026-10-14T01:30:00+00:00', timestamp_unix: 3, level: 140, charging: false, in_charger: false },
+      ],
+      next_token: null,
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    process.env.OURA_TOKEN_KEY = savedKey
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('reads ring_battery_level from 6 h behind the newest stored reading and stores what matches the spec', async () => {
+    newest = new Date('2026-10-13T22:30:00Z')
+    expect(await catchUpOuraCloudRingBattery(deps(), USER, now)).toBe(2)
+    const url = new URL(String(fetchMock.mock.calls[0][0]))
+    expect(url.pathname).toBe('/v2/usercollection/ring_battery_level')
+    expect(url.searchParams.get('start_datetime')).toBe(new Date(newest.getTime() - RING_BATTERY_OVERLAP_MS).toISOString())
+    expect(url.searchParams.get('end_datetime')).toBe('2026-10-14T02:00:00.000Z')
+    // A level of 140 is outside the spec's [0, 100] and is dropped; in_charger counts as charging.
+    expect(stored.map(r => [r.percent, r.charging])).toEqual([[64, false], [66, true]])
+  })
+
+  it('throttles the background start to once per interval per user', async () => {
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now)
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + 60_000)
+    await vi.waitFor(() => expect(stored.length).toBe(2))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not throw when Oura refuses the read: the background start swallows it', async () => {
+    fetchMock.mockImplementation(async () => new Response('{}', { status: 403 }))
+    expect(() => startOuraCloudRingBatteryCatchUp(deps(), USER, now)).not.toThrow()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(stored).toEqual([])
+  })
+
+  it('does not ask again for a day after a refusal, then tries once more', async () => {
+    fetchMock.mockImplementation(async () => new Response('{}', { status: 403 }))
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now)
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(console.warn).toHaveBeenCalled())
+
+    // Past the five-minute throttle, inside the day: skipped without a request.
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + 2 * RING_BATTERY_MIN_INTERVAL_MS)
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + RING_BATTERY_REFUSED_BACKOFF_MS - 1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + RING_BATTERY_REFUSED_BACKOFF_MS)
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+  })
+
+  it('backs off after a 401 too', async () => {
+    fetchMock.mockImplementation(async () => new Response('{}', { status: 401 }))
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now)
+    await vi.waitFor(() => expect(console.warn).toHaveBeenCalled())
+    const calls = fetchMock.mock.calls.length
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + 2 * RING_BATTERY_MIN_INTERVAL_MS)
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + RING_BATTERY_REFUSED_BACKOFF_MS - 1)
+    // The catch-up fetches asynchronously, so give a request that should not happen time to happen;
+    // checked straight away, this passed even with the 401 back-off removed.
+    await new Promise(resolve => setTimeout(resolve, 100))
+    expect(fetchMock.mock.calls.length).toBe(calls)
+
+    fetchMock.mockClear()
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + RING_BATTERY_REFUSED_BACKOFF_MS)
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+  })
+
+  describe('a renewed connection clears the back-off', () => {
+    const refuse = async () => {
+      fetchMock.mockImplementation(async () => new Response('{}', { status: 403 }))
+      startOuraCloudRingBatteryCatchUp(deps(), USER, now)
+      await vi.waitFor(() => expect(console.warn).toHaveBeenCalled())
+      fetchMock.mockClear()
+      fetchMock.mockImplementation(async () => new Response('{}', { status: 403 }))
+      // Inside the day and past the throttle: held back.
+      startOuraCloudRingBatteryCatchUp(deps(), USER, now + 2 * RING_BATTERY_MIN_INTERVAL_MS)
+      expect(fetchMock).not.toHaveBeenCalled()
+    }
+
+    it('connecting Oura again', async () => {
+      await refuse()
+      const store = { ...deps().repo, saveOuraCloudTokens: async () => {} } as unknown as OuraTokenStore
+      await storeOuraGrant(store, USER, { accessToken: 'acc-3', refreshToken: 'ref-3', expiresAt: new Date(now + 86_400_000), scope: 'extapi:daily', ouraUserId: OURA_USER }, () => {})
+      startOuraCloudRingBatteryCatchUp(deps(), USER, now + 3 * RING_BATTERY_MIN_INTERVAL_MS)
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    })
+
+    it('refreshing the token', async () => {
+      await refuse()
+      tokenExpiresAt = new Date(Date.now() - 1000)
+      fetchMock.mockImplementation(async () => jsonResponse({ access_token: 'acc-2', refresh_token: 'ref-2', expires_in: 86400 }))
+      expect(await getOuraAccessToken(deps().repo, CONFIG, USER)).toBe('acc-2')
+      tokenExpiresAt = null // the stored token is fresh now
+      fetchMock.mockClear()
+      fetchMock.mockImplementation(async () => new Response('{}', { status: 403 }))
+      startOuraCloudRingBatteryCatchUp(deps(), USER, now + 3 * RING_BATTERY_MIN_INTERVAL_MS)
+      await vi.waitFor(() => expect(fetchMock.mock.calls.some(c => String(c[0]).includes('ring_battery_level'))).toBe(true))
+    })
+
+    it('a user whose connection did not change stays backed off', async () => {
+      await refuse()
+      const store = { ...deps().repo, saveOuraCloudTokens: async () => {} } as unknown as OuraTokenStore
+      await storeOuraGrant(store, 'someone-else', { accessToken: 'a', refreshToken: 'r', expiresAt: new Date(now + 86_400_000), scope: null, ouraUserId: 'x' }, () => {})
+      startOuraCloudRingBatteryCatchUp(deps(), USER, now + 3 * RING_BATTERY_MIN_INTERVAL_MS)
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+  })
+
+  it('a failure that is not a refusal is not held back for a day', async () => {
+    fetchMock.mockImplementation(async () => new Response('{}', { status: 500 }))
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now)
+    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(1))
+    const before = fetchMock.mock.calls.length
+    await vi.waitFor(() => expect(console.warn).toHaveBeenCalled())
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + 2 * RING_BATTERY_MIN_INTERVAL_MS)
+    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(before))
   })
 })

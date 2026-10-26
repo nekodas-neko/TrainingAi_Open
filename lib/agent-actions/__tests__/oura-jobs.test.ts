@@ -14,7 +14,7 @@ import { AgentActionRequest, agentJobLosesData, runAgentJob, type AgentJobContex
 const OWNER = '00000000-0000-4000-8000-000000002859'
 const ctx = { repo: {} as AgentJobContext['repo'], userId: OWNER, tz: 'Australia/Brisbane' }
 const req = (job: string, params: unknown) => ({ job, actor: 'orchestrator', targetUserId: OWNER, params })
-const report = { dryRun: true, from: '2026-10-01', to: '2026-10-12', documents: {}, dropped: 0, forbidden: [], notShared: [], refusedDespiteGrant: [], stoppedEarly: null,
+const report = { dryRun: true, from: '2026-10-01', to: '2026-10-12', documents: {}, dropped: 0, workoutsTombstoned: 2, sessionsTombstoned: 1, forbidden: [], notShared: [], refusedDespiteGrant: [], stoppedEarly: null,
   counts: { dailyRows: 12, bodyRows: 12, sleepWritten: 12, sleepSkippedOverlap: 0, sleepTombstoned: 0, workouts: 2, heartRatePoints: 3000 } }
 
 describe('oura-cloud-backfill (#2859)', () => {
@@ -42,7 +42,7 @@ describe('oura-cloud-backfill (#2859)', () => {
       const out = await runAgentJob(ctx, AgentActionRequest.parse(req('oura-cloud-backfill', { dryRun: true })))
       expect(out.status).toBe(200)
       expect(backfill).toHaveBeenCalledWith(expect.objectContaining({ config: expect.any(Object) }), OWNER,
-        { from: '2026-07-17', to: '2026-10-14', dryRun: true, heartRate: true, tz: 'Australia/Brisbane', stampData: false })
+        { from: '2026-07-17', to: '2026-10-14', dryRun: true, heartRate: true, tz: 'Australia/Brisbane', tombstoneAbsent: true, stampData: false })
       expect(out.finish).toEqual({ outcome: 'succeeded', affectedRows: 0, daysMoved: 0, error: null })
     } finally {
       vi.useRealTimers()
@@ -58,7 +58,7 @@ describe('oura-cloud-backfill (#2859)', () => {
     expect('pending' in out.finish).toBe(true)
     release({ ok: true, report: { ...report, dryRun: false } })
     const finish = await (out.finish as { pending: Promise<unknown> }).pending
-    expect(finish).toEqual({ outcome: 'succeeded', affectedRows: 12 + 12 + 12 + 0 + 2 + 3000, daysMoved: 12, error: null })
+    expect(finish).toEqual({ outcome: 'succeeded', affectedRows: 12 + 12 + 12 + 0 + 2 + 3000 + 2 + 1, daysMoved: 12, error: null })
   })
 
   it('refuses a backwards range before starting anything', async () => {

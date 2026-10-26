@@ -1,6 +1,6 @@
 import { formatDateDisplay, formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
-import { actualSleepWindow } from '@trainingai/shared/health/actual-sleep-window';
+import { actualSleepWindow, wokeTime } from '@trainingai/shared/health/actual-sleep-window';
 import { evaluateWeightRateVsGoalBand } from '@trainingai/shared/health/long-term-goal-progress';
 import { hrvBaselineBand as sharedHrvBand } from '@trainingai/shared/health/hrv-baseline';
 import type { Tone } from '../../../shared/theme/theme';
@@ -19,10 +19,19 @@ export function signedRate(value: number): string {
   return `${v >= 0 ? '+' : ''}${v}`;
 }
 
-/** The bed to wake range. Start is the raw bedtime and the end is the ring's recorded wake. */
+/**
+ * Where a printed sleep range ends: the time you woke, the end of the last non-awake epoch (#2830).
+ * The stage minutes and the ribbon keep the recorded window, so this is only the displayed end.
+ * Without a hypnogram it is the recorded wake, then the raw sleepEnd.
+ */
+export function sleepWokeEnd(row: SleepRow): string | null {
+  return wokeTime(row) ?? actualSleepWindow(row)?.end ?? row.sleepEnd ?? null;
+}
+
+/** The bed to wake range. Start is the raw bedtime and the end is the time you woke. */
 export function sleepTimeRange(row: SleepRow | undefined, timezone: string): string | null {
   if (!row?.sleepStart || !row.sleepEnd) return null;
-  const end = actualSleepWindow(row)?.end ?? row.sleepEnd;
+  const end = sleepWokeEnd(row) ?? row.sleepEnd;
   const from = formatTimeOfDay(row.sleepStart, timezone);
   const to = formatTimeOfDay(end, timezone);
   return from && to ? `${from} – ${to}` : null;
