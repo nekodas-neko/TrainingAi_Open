@@ -283,8 +283,11 @@ function activityWindow(
   if (!end && a.durationMin != null && a.durationMin > 0)
     end = new Date(start.getTime() + a.durationMin * 60_000);
   if (!end) return [];
-  // An end before the start crossed midnight.
-  const endMs = end.getTime() <= start.getTime() ? end.getTime() + 86_400_000 : end.getTime();
+  // An end before the start crossed midnight: the same clock time on the next local day, not +24 h,
+  // which is an hour off across a daylight-saving change (#3406).
+  const endMs = end.getTime() <= start.getTime()
+    ? (localClockTimeToDate(shiftDateStr(a.date, 1), a.endTime, tz) ?? end).getTime()
+    : end.getTime();
   return [
     {
       startMs: start.getTime(),

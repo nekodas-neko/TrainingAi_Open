@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeActiveEnergy, stepEnergyKcal, STEPS_PER_KM, WALKING_CADENCE_SPM } from '../daily-energy'
 import { activeEnergyForDay } from '../../nutrition/day-budget'
-import { dateStrMidnightInTz } from '../../date-utils'
+import { dateStrMidnightInTz, shiftDateStr } from '../../date-utils'
 
 // #3082: a walk detected from the ring's MET and saved by the owner was paid twice — its MET kcal as
 // a logged activity, and its steps again inside the day's pedometer total — because the steps
@@ -23,7 +23,7 @@ const PEDOMETER = 9_000
 
 function day(activities: { date: string; activityType: string; durationMin: number | null; distanceKm: number | null; steps: number | null }[]) {
   return activeEnergyForDay({
-    day: DAY, dayStartUtc: dateStrMidnightInTz(DAY, TZ), profile,
+    day: DAY, dayStartUtc: dateStrMidnightInTz(DAY, TZ), dayEndUtc: dateStrMidnightInTz(shiftDateStr(DAY, 1), TZ), profile,
     workouts: [{ id: 'lift', startedAt: midday(DAY), completedAt: new Date(midday(DAY).getTime() + 45 * 60_000) }],
     avgBpmBySession: new Map(), activities, steps: PEDOMETER,
   })

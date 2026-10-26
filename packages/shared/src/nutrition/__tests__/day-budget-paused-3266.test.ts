@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { activeEnergyForDay } from '../day-budget'
-import { dateStrMidnightInTz } from '../../date-utils'
+import { dateStrMidnightInTz, shiftDateStr } from '../../date-utils'
 
 // #3266: a call in the middle of a session must not be credited as exercise. The day's budget costs
 // a strength session from its span, so it takes the time the workout was paused out of it.
@@ -14,7 +14,7 @@ const completedAt = new Date(startedAt.getTime() + 60 * 60_000)
 
 function lift(pausedSec?: number | null) {
   return activeEnergyForDay({
-    day: DAY, dayStartUtc: dateStrMidnightInTz(DAY, TZ), profile,
+    day: DAY, dayStartUtc: dateStrMidnightInTz(DAY, TZ), dayEndUtc: dateStrMidnightInTz(shiftDateStr(DAY, 1), TZ), profile,
     workouts: [{ id: 'lift', startedAt, completedAt, ...(pausedSec === undefined ? {} : { pausedSec }) }],
     avgBpmBySession: new Map(), activities: [], steps: null,
   })
