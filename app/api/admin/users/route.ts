@@ -10,7 +10,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 import { rateLimit, settleRateLimitFlushes } from '@/lib/rate-limit'
-import { revokeOuraGrantBestEffort } from '@/lib/account/revoke-oura-grant'
+import { readOuraGrantBestEffort, revokeOuraGrantAfterCommit } from '@/lib/account/revoke-oura-grant'
 import {
   DeleteBodySchema, WIPE_MAX_BODY_BYTES, WIPE_RATE, auditActor, precheckWipe, wipeRateKey, wipeRefusalResponse,
 } from '@/lib/admin/user-wipe'
@@ -157,6 +157,7 @@ export async function DELETE(req: NextRequest) {
   if (badId) return badId
   const self = refuseSelf(userId, session.user.id, 'delete')
   if (self) return self
+  const ownerId = resolveOwnerUserId()
 
   // #3369: with the target's email typed, an admin may delete an account that holds data. Without
   // it the long-standing rule stands (issue 2695): only a signup that never got in, which has
@@ -173,21 +174,22 @@ export async function DELETE(req: NextRequest) {
   // transaction after the row lock, so an account that gains data between the screen loading and
   // the tap is still refused.
   let result
+  let ouraToken: string | null = null
   try {
     const repo = await getRepository()
     if (confirmed) {
       // Judge the target first: the Oura grant cannot be put back, so it is not revoked for a
       // request the transaction would refuse.
-      const early = await precheckWipe(repo, { userId, actingAdminId: session.user.id, confirmEmail, mayWipeSelf: false })
+      const early = await precheckWipe(repo, { userId, actingAdminId: session.user.id, ownerId, confirmEmail, mayWipeSelf: false })
       if (early) return early
       // The limiter writes its row in the background; let this request's land before the
       // deletion purges keys naming the user.
       await settleRateLimitFlushes()
-      await revokeOuraGrantBestEffort(repo, userId, req.nextUrl.pathname)
+      ouraToken = await readOuraGrantBestEffort(repo, userId, req.nextUrl.pathname)
     }
     result = await repo.deleteAccount(userId, {
       onlyIfNoData: !confirmed,
-      guard: { actingAdminId: session.user.id, confirmEmail },
+      guard: { actingAdminId: session.user.id, ownerId, confirmEmail },
       audit: { job: 'admin-delete-account', actor: auditActor(session.user.id) },
     })
   } catch (err) {
@@ -200,5 +202,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'This account has data under it, so it cannot be deleted here. Deactivate it instead.' }, { status: 409 })
   }
   if (!result.deleted) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  await revokeOuraGrantAfterCommit(ouraToken, userId, new URL(req.url).pathname)
   return NextResponse.json({ ok: true, removedRows: Object.values(result.removed ?? {}).reduce((a, b) => a + b, 0) })
 }

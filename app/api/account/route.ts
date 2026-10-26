@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit, settleRateLimitFlushes } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
-import { revokeOuraGrantBestEffort } from '@/lib/account/revoke-oura-grant'
+import { readOuraGrantBestEffort, revokeOuraGrantAfterCommit } from '@/lib/account/revoke-oura-grant'
 import { clearSessionCookies } from '@/lib/auth/clear-session-cookies'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { ACCOUNT_DELETION_PHRASE } from '@trainingai/shared/user/account-deletion'
@@ -57,9 +57,11 @@ export async function DELETE(req: NextRequest) {
   await settleRateLimitFlushes()
 
   let result
+  let ouraToken: string | null = null
   try {
     const repo = await getRepository()
-    await revokeOuraGrantBestEffort(repo, userId, req.nextUrl.pathname)
+    // Read the Oura token now, revoke it only once the deletion has committed.
+    ouraToken = await readOuraGrantBestEffort(repo, userId, req.nextUrl.pathname)
     result = await repo.deleteAccount(userId)
   } catch (err) {
     console.error('[account] deletion failed', err)
@@ -70,6 +72,7 @@ export async function DELETE(req: NextRequest) {
     )
   }
   if (!result.deleted) return NextResponse.json({ error: 'Account not found' }, { status: 404 })
+  await revokeOuraGrantAfterCommit(ouraToken, userId, new URL(req.url).pathname)
 
   const res = NextResponse.json(
     { ok: true, deleted: true, signedOut: true, anonymised: result.anonymised, purged: result.purged },

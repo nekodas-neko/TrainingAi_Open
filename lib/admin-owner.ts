@@ -44,7 +44,7 @@ export function judgeRevokeAdmin(actingId: string, ownerId: string | null): Owne
  */
 export function judgeProtectedTarget(
   actingId: string, targetId: string, targetIsAdmin: boolean, ownerId: string | null,
-): OwnerRefusal | null {
+): Exclude<OwnerRefusal, 'owner-only'> | null {
   if (ownerId === null) return targetIsAdmin ? 'owner-unresolved' : null
   if (isOwnerUserId(targetId, ownerId) && !isOwnerUserId(actingId, ownerId)) return 'owner-protected'
   return null

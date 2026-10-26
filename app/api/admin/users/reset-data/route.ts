@@ -6,7 +6,8 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 import { rateLimit, settleRateLimitFlushes } from '@/lib/rate-limit'
-import { revokeOuraGrantBestEffort } from '@/lib/account/revoke-oura-grant'
+import { readOuraGrantBestEffort, revokeOuraGrantAfterCommit } from '@/lib/account/revoke-oura-grant'
+import { resolveOwnerUserId } from '@/lib/admin-owner'
 import { clearSessionCookies } from '@/lib/auth/clear-session-cookies'
 import {
   ResetBodySchema, WIPE_MAX_BODY_BYTES, WIPE_RATE, auditActor, precheckWipe, wipeRateKey, wipeRefusalResponse,
@@ -26,6 +27,9 @@ import {
  * admin can wipe the owner. The target's email is typed and checked on the server, inside the
  * transaction. The audit row is written in the same transaction as the reset, so a reset that
  * cannot be recorded does not happen.
+ *
+ * The Oura grant is read before the reset and revoked at Oura only after it commits (a failed reset
+ * must not leave the person disconnected).
  *
  * Fails closed at every step: nothing is changed unless the response is 200.
  */
@@ -55,18 +59,20 @@ export async function POST(req: NextRequest) {
   const { userId, confirmEmail } = parsed.data
   const badId = invalidUuidResponse(userId)
   if (badId) return badId
+  const ownerId = resolveOwnerUserId()
 
   let result
+  let ouraToken: string | null = null
   try {
     const repo = await getRepository()
-    const early = await precheckWipe(repo, { userId, actingAdminId: adminId, confirmEmail, mayWipeSelf: true })
+    const early = await precheckWipe(repo, { userId, actingAdminId: adminId, ownerId, confirmEmail, mayWipeSelf: true })
     if (early) return early
     // The limiter writes its row in the background; let this request's land before the reset
     // purges keys naming the user (their own, when an admin resets themselves).
     await settleRateLimitFlushes()
-    await revokeOuraGrantBestEffort(repo, userId, req.nextUrl.pathname)
+    ouraToken = await readOuraGrantBestEffort(repo, userId, req.nextUrl.pathname)
     result = await repo.resetAccountData(userId, {
-      guard: { actingAdminId: adminId, confirmEmail },
+      guard: { actingAdminId: adminId, ownerId, confirmEmail },
       audit: { job: 'admin-reset-user-data', actor: auditActor(adminId) },
     })
   } catch (err) {
@@ -76,6 +82,7 @@ export async function POST(req: NextRequest) {
   }
   if (result.refused) return wipeRefusalResponse(result.refused)
   if (!result.deleted) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  await revokeOuraGrantAfterCommit(ouraToken, userId, new URL(req.url).pathname)
 
   const res = NextResponse.json(
     {

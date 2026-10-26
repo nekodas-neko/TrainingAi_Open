@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { AdminWipeRefusal } from '@/lib/data/postgres/slices/account-deletion'
+import { judgeProtectedTarget } from '@/lib/admin-owner'
 import type { WorkoutRepository } from '@/lib/data/repository'
 
 /**
@@ -41,6 +42,12 @@ export function wipeRefusalResponse(refused: AdminWipeRefusal): NextResponse {
       return NextResponse.json({ error: 'That email does not match this account. Nothing was changed.' }, { status: 400 })
     case 'self':
       return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })
+    case 'owner-protected':
+      return NextResponse.json({ error: "Only the owner can reset or delete the owner's account." }, { status: 403 })
+    case 'owner-unresolved':
+      return NextResponse.json({ error: 'The owner account is not configured, so no admin account can be reset or deleted.' }, { status: 403 })
+    case 'actor-not-admin':
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 }
 
@@ -56,10 +63,12 @@ export function wipeRefusalResponse(refused: AdminWipeRefusal): NextResponse {
  */
 export async function precheckWipe(
   repo: Pick<WorkoutRepository, 'getUserById'>,
-  target: { userId: string; actingAdminId: string; confirmEmail?: string; mayWipeSelf: boolean },
+  target: { userId: string; actingAdminId: string; ownerId: string | null; confirmEmail?: string; mayWipeSelf: boolean },
 ): Promise<NextResponse | null> {
   const user = await repo.getUserById(target.userId)
   if (!user) return null
+  const protectedTarget = judgeProtectedTarget(target.actingAdminId, target.userId, user.isAdmin === true, target.ownerId)
+  if (protectedTarget) return wipeRefusalResponse(protectedTarget)
   if (user.isAdmin && target.userId !== target.actingAdminId) return wipeRefusalResponse('admin-target')
   if (target.userId === target.actingAdminId && !target.mayWipeSelf) return wipeRefusalResponse('self')
   if (target.confirmEmail !== undefined && target.confirmEmail.trim().toLowerCase() !== user.email.trim().toLowerCase()) {

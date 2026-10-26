@@ -13,7 +13,9 @@ const session = vi.hoisted(() => ({ current: null as null | { user: { id: string
 vi.mock('@/auth', () => ({ auth: vi.fn(async () => session.current) }))
 const revoke = vi.hoisted(() => ({ calls: [] as string[] }))
 vi.mock('@/lib/account/revoke-oura-grant', () => ({
-  revokeOuraGrantBestEffort: vi.fn(async (_repo: unknown, userId: string) => { revoke.calls.push(userId) }),
+  // The token stands in as the user's id: read before the wipe, revoked only once it has committed.
+  readOuraGrantBestEffort: vi.fn(async (_repo: unknown, userId: string) => userId),
+  revokeOuraGrantAfterCommit: vi.fn(async (token: string | null) => { if (token) revoke.calls.push(token) }),
 }))
 const limiter = vi.hoisted(() => ({ allow: true }))
 vi.mock('@/lib/rate-limit', async importOriginal => ({
@@ -71,10 +73,11 @@ describe.skipIf(!canRun)('admin reset and delete of a user\'s data (#3369)', () 
   beforeEach(async () => {
     limiter.allow = true
     revoke.calls.length = 0
+    vi.stubEnv('CLAUDE_RO_OWNER_USER_ID', ADMIN)   // ADMIN is the owner; OTHER_ADMIN is an ordinary admin
     session.current = { user: { id: ADMIN, isAdmin: true } }
     await seed()
   })
-  afterAll(async () => { if (canRun) await cleanup() })
+  afterAll(async () => { vi.unstubAllEnvs(); if (canRun) await cleanup() })
 
   describe('POST /api/admin/users/reset-data', () => {
     it('resets the data, keeps the account, signs the user out and records who did it', async () => {
@@ -109,6 +112,39 @@ describe.skipIf(!canRun)('admin reset and delete of a user\'s data (#3369)', () 
       expect(res.headers.get('set-cookie')).toMatch(/authjs\.session-token=;/)
       const { rows: [u] } = await pool.query('SELECT is_admin, is_active FROM users WHERE id = $1', [ADMIN])
       expect(u).toMatchObject({ is_admin: true, is_active: true })
+    })
+
+    it('demote-then-wipe: another admin cannot demote the owner, and wiping a demoted owner is refused', async () => {
+      session.current = { user: { id: OTHER_ADMIN, isAdmin: true } }
+      const users = await import('@/app/api/admin/users/route')
+      const { POST } = await import('@/app/api/admin/users/reset-data/route')
+      const demote = await users.PATCH(new NextRequest('http://localhost/api/admin/users', {
+        method: 'PATCH', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: ADMIN, action: 'revoke-admin' }),
+      }) as never)
+      expect(demote.status).toBe(403)
+      // Even with the flag stripped by some other route to it (a direct write), the owner id protects him.
+      await pool.query('UPDATE users SET is_admin = false WHERE id = $1', [ADMIN])
+      const reset = await POST(post({ userId: ADMIN, confirmEmail: email(ADMIN) }) as never)
+      expect(reset.status).toBe(403)
+      const erase = await users.DELETE(del({ userId: ADMIN, confirmEmail: email(ADMIN) }) as never)
+      expect(erase.status).toBe(403)
+      expect(await metrics(ADMIN)).toBe(1)
+      expect(await exists(ADMIN)).toBe(true)
+      expect(revoke.calls).toEqual([])
+      const { rows } = await pool.query(
+        `SELECT 1 FROM agent_action_log WHERE actor = $1 AND started_at >= $2`, [`admin:${OTHER_ADMIN}`, runStart])
+      expect(rows).toHaveLength(0)
+    })
+
+    it('403 for every admin account when the owner cannot be resolved, yours included', async () => {
+      for (const k of ['CLAUDE_RO_OWNER_USER_ID', 'ADMIN_EXPORT_USER_ID', 'WEBHOOK_USER_ID']) vi.stubEnv(k, '')
+      const { POST } = await import('@/app/api/admin/users/reset-data/route')
+      expect((await POST(post({ userId: ADMIN, confirmEmail: email(ADMIN) }) as never)).status).toBe(403)
+      expect((await POST(post({ userId: OTHER_ADMIN, confirmEmail: email(OTHER_ADMIN) }) as never)).status).toBe(403)
+      // A non-admin is unaffected.
+      expect((await POST(post({ userId: PERSON, confirmEmail: email(PERSON) }) as never)).status).toBe(200)
+      expect(await metrics(ADMIN)).toBe(1)
     })
 
     it('403 for another admin\'s account, with the right email, and nothing is touched or revoked', async () => {
@@ -174,7 +210,7 @@ describe.skipIf(!canRun)('admin reset and delete of a user\'s data (#3369)', () 
   })
 
   describe('DELETE /api/admin/users with the email typed', () => {
-    it('deletes an account that holds data, revokes Oura first, and records it', async () => {
+    it('deletes an account that holds data, revokes Oura after the commit, and records it', async () => {
       const { DELETE } = await import('@/app/api/admin/users/route')
       const res = await DELETE(del({ userId: GONE, confirmEmail: email(GONE) }) as never)
       expect(res.status).toBe(200)

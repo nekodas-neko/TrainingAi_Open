@@ -76,8 +76,8 @@ describe.skipIf(!canRun)('admin reset of a user\'s data (#3369)', () => {
   let identitiesBefore: Record<string, unknown>[]
   const exportedBefore = new Map<string, number>()
   const createdCatalogue: Record<string, unknown>[] = []
-  const guard = (target: string, over: Partial<{ actingAdminId: string; confirmEmail: string }> = {}) =>
-    ({ actingAdminId: ADM === target ? S : S, confirmEmail: email(target), ...over })
+  const guard = (target: string, over: Partial<{ actingAdminId: string; ownerId: string | null; confirmEmail: string }> = {}) =>
+    ({ actingAdminId: S, ownerId: S, confirmEmail: email(target), ...over })
   const audit = { job: 'admin-reset-user-data' as const, actor: `admin:${S}` }
 
   const exportedCount = async (table: string, userId: string) => {
@@ -268,7 +268,7 @@ describe.skipIf(!canRun)('who an admin wipe may target, and what it needs (#3369
   }
 
   it('refuses another admin\'s account for a reset, changing nothing and writing no audit row', async () => {
-    const res = await slice.resetAccountData(db, ADM, { guard: { actingAdminId: S, confirmEmail: email(ADM) }, audit })
+    const res = await slice.resetAccountData(db, ADM, { guard: { actingAdminId: S, ownerId: S, confirmEmail: email(ADM) }, audit })
     expect(res).toMatchObject({ deleted: false, refused: 'admin-target' })
     expect(await untouched(ADM)).toBe(true)
     const { rows } = await pool.query(`SELECT 1 FROM agent_action_log WHERE target_user_id = $1 AND started_at >= $2`, [ADM, runStart])
@@ -276,21 +276,21 @@ describe.skipIf(!canRun)('who an admin wipe may target, and what it needs (#3369
   })
 
   it('refuses another admin\'s account for a deletion too, even with the right email', async () => {
-    const res = await slice.deleteAccount(db, ADM, { guard: { actingAdminId: S, confirmEmail: email(ADM) }, audit: jobAudit })
+    const res = await slice.deleteAccount(db, ADM, { guard: { actingAdminId: S, ownerId: S, confirmEmail: email(ADM) }, audit: jobAudit })
     expect(res).toMatchObject({ deleted: false, refused: 'admin-target' })
     expect(await untouched(ADM)).toBe(true)
   })
 
   it('refuses a wrong email, in any case or spacing but the right address, and changes nothing', async () => {
     for (const typed of ['', 'someone@else.com', `x${email(R)}`, `${email(R)}x`]) {
-      const res = await slice.resetAccountData(db, R, { guard: { actingAdminId: S, confirmEmail: typed }, audit })
+      const res = await slice.resetAccountData(db, R, { guard: { actingAdminId: S, ownerId: S, confirmEmail: typed }, audit })
       expect(res, typed).toMatchObject({ deleted: false, refused: 'email-mismatch' })
     }
     expect(await untouched(R)).toBe(true)
   })
 
   it('refuses an admin deleting their own account', async () => {
-    const res = await slice.deleteAccount(db, S, { guard: { actingAdminId: S, confirmEmail: email(S) }, audit: jobAudit })
+    const res = await slice.deleteAccount(db, S, { guard: { actingAdminId: S, ownerId: S, confirmEmail: email(S) }, audit: jobAudit })
     expect(res).toMatchObject({ deleted: false, refused: 'self' })
     expect(await untouched(S)).toBe(true)
   })
@@ -299,7 +299,7 @@ describe.skipIf(!canRun)('who an admin wipe may target, and what it needs (#3369
     // Through the repository, not the slice: seeding what a new signup has is its step, because the
     // next sign-in finds the existing row and seeds nothing.
     const repo = await (await import('@/lib/data')).getRepository()
-    const res = await repo.resetAccountData(S, { guard: { actingAdminId: S, confirmEmail: ` ${email(S).toUpperCase()} ` }, audit })
+    const res = await repo.resetAccountData(S, { guard: { actingAdminId: S, ownerId: S, confirmEmail: ` ${email(S).toUpperCase()} ` }, audit })
     expect(res.deleted).toBe(true)
     expect(res.defaultsSeeded).toBe(true)
     const { rows: [styles] } = await pool.query(`SELECT count(*)::int AS n FROM progression_styles WHERE user_id = $1`, [S])
@@ -314,7 +314,7 @@ describe.skipIf(!canRun)('who an admin wipe may target, and what it needs (#3369
   })
 
   it('deletes a non-admin account that holds data when the email is typed, and the audit row survives it', async () => {
-    const res = await slice.deleteAccount(db, X, { guard: { actingAdminId: S, confirmEmail: email(X) }, audit: jobAudit })
+    const res = await slice.deleteAccount(db, X, { guard: { actingAdminId: S, ownerId: S, confirmEmail: email(X) }, audit: jobAudit })
     expect(res.deleted).toBe(true)
     expect(res.removed?.body_metrics).toBe(1)
     const { rows: [u] } = await pool.query(`SELECT 1 FROM users WHERE id = $1`, [X])
@@ -329,12 +329,12 @@ describe.skipIf(!canRun)('who an admin wipe may target, and what it needs (#3369
   it('the no-data rule still holds for a deletion without the typed email', async () => {
     await makeUser(pool, X)
     await pool.query(`INSERT INTO body_metrics (user_id, date, weight_kg) VALUES ($1, '2026-09-20', 80)`, [X])
-    const res = await slice.deleteAccount(db, X, { onlyIfNoData: true, guard: { actingAdminId: S }, audit: jobAudit })
+    const res = await slice.deleteAccount(db, X, { onlyIfNoData: true, guard: { actingAdminId: S, ownerId: S }, audit: jobAudit })
     expect(res).toMatchObject({ deleted: false, refusedHasData: true })
   })
 
   it('reports not-found for an id with no account', async () => {
-    const res = await slice.resetAccountData(db, '00000000-0000-4000-8000-000000000999', { guard: { actingAdminId: S, confirmEmail: 'a@b.co' }, audit })
+    const res = await slice.resetAccountData(db, '00000000-0000-4000-8000-000000000999', { guard: { actingAdminId: S, ownerId: S, confirmEmail: 'a@b.co' }, audit })
     expect(res.deleted).toBe(false)
     expect(res.refused).toBeUndefined()
   })
@@ -342,14 +342,15 @@ describe.skipIf(!canRun)('who an admin wipe may target, and what it needs (#3369
 
 describe.skipIf(!canRun)('a reset that cannot complete (#3369)', () => {
   let pool: Pool
-  afterAll(async () => { if (canRun) await dropEverything(pool, [F, G]) })
+  afterAll(async () => { if (canRun) await dropEverything(pool, [F, G, S]) })
 
   it('rolls back entirely, the audit row included, when another account\'s row points into this one', async () => {
     const client = await import('@/lib/data/postgres/client')
     pool = client.getPool()
     const slice = await import('../slices/account-deletion')
     runStart = (await pool.query<{ t: Date }>(`SELECT clock_timestamp() AS t`)).rows[0].t
-    await dropEverything(pool, [F, G])
+    await dropEverything(pool, [F, G, S])
+    await makeUser(pool, S, { admin: true })   // the acting admin must exist: it is locked and judged in the transaction
     await makeUser(pool, F)
     await makeUser(pool, G)
     const { rows: [item] } = await pool.query(
@@ -359,7 +360,7 @@ describe.skipIf(!canRun)('a reset that cannot complete (#3369)', () => {
       `INSERT INTO food_logs (user_id, date, meal_type_id, food_item_id) VALUES ($1, '2026-09-20', $2, $3)`, [G, mt.id, item.id])
 
     const err = await slice.resetAccountData(client.getDb(), F, {
-      guard: { actingAdminId: S, confirmEmail: email(F) }, audit: { job: 'admin-reset-user-data', actor: `admin:${S}` }, auditSubjectIds: [],
+      guard: { actingAdminId: S, ownerId: S, confirmEmail: email(F) }, audit: { job: 'admin-reset-user-data', actor: `admin:${S}` }, auditSubjectIds: [],
     } as never).then(() => null, (e: unknown) => e)
     expect(err).not.toBeNull()
 
@@ -373,3 +374,84 @@ describe.skipIf(!canRun)('a reset that cannot complete (#3369)', () => {
     expect(act, 'no audit row for a reset that did not happen').toHaveLength(0)
   })
 })
+
+// The hole found in review of #3379: `revoke-admin` let any admin demote the owner, and then the
+// "never another admin" guard no longer saw an admin. Now the owner's account is protected by id,
+// and the acting admin is judged on the row locked inside the transaction.
+const OWN = '00000000-0000-4000-8000-0000003369d1'
+const OTH = '00000000-0000-4000-8000-0000003369d2'
+describe.skipIf(!canRun)('the owner\'s account is protected from other admins (#3369)', () => {
+  let pool: Pool
+  let slice: typeof import('../slices/account-deletion')
+  let db: ReturnType<typeof import('@/lib/data/postgres/client').getDb>
+  const audit = { job: 'admin-reset-user-data' as const, actor: `admin:${OTH}` }
+  const jobAudit = { job: 'admin-delete-account' as const, actor: `admin:${OTH}` }
+  const guard = (over: Record<string, unknown> = {}) =>
+    ({ actingAdminId: OTH, ownerId: OWN, confirmEmail: email(OWN), ...over }) as never
+  const intact = async () => {
+    const { rows: [m] } = await pool.query(`SELECT count(*)::int AS n FROM body_metrics WHERE user_id = $1`, [OWN])
+    const { rows: [u] } = await pool.query(`SELECT is_admin FROM users WHERE id = $1`, [OWN])
+    return m.n === 1 && !!u
+  }
+
+  beforeAll(async () => {
+    const client = await import('@/lib/data/postgres/client')
+    pool = client.getPool(); db = client.getDb()
+    slice = await import('../slices/account-deletion')
+    await dropEverything(pool, [OWN, OTH])
+    await makeUser(pool, OWN, { admin: true })
+    await makeUser(pool, OTH, { admin: true })
+    await pool.query(`INSERT INTO body_metrics (user_id, date, weight_kg) VALUES ($1, '2026-09-20', 80)`, [OWN])
+  })
+  afterAll(async () => { if (canRun) await dropEverything(pool, [OWN, OTH]) })
+
+  it('another admin cannot reset or delete the owner', async () => {
+    expect(await slice.resetAccountData(db, OWN, { guard: guard(), audit })).toMatchObject({ deleted: false, refused: 'owner-protected' })
+    expect(await slice.deleteAccount(db, OWN, { guard: guard(), audit: jobAudit })).toMatchObject({ deleted: false, refused: 'owner-protected' })
+    expect(await intact()).toBe(true)
+  })
+
+  it('demote-then-wipe is refused: even with the owner stripped of is_admin, the owner id still protects him', async () => {
+    // The API can no longer demote the owner; this is the database state the old hole produced.
+    await pool.query(`UPDATE users SET is_admin = false WHERE id = $1`, [OWN])
+    try {
+      expect(await slice.resetAccountData(db, OWN, { guard: guard(), audit })).toMatchObject({ deleted: false, refused: 'owner-protected' })
+      expect(await slice.deleteAccount(db, OWN, { guard: guard(), audit: jobAudit })).toMatchObject({ deleted: false, refused: 'owner-protected' })
+      expect(await intact()).toBe(true)
+    } finally {
+      await pool.query(`UPDATE users SET is_admin = true WHERE id = $1`, [OWN])
+    }
+  })
+
+  it('an acting admin who was demoted or deactivated before the lock is refused', async () => {
+    await makeUser(pool, X0)
+    await pool.query(`UPDATE users SET is_admin = false WHERE id = $1`, [OTH])
+    try {
+      expect(await slice.resetAccountData(db, X0, { guard: guard({ confirmEmail: email(X0) }), audit })).toMatchObject({ deleted: false, refused: 'actor-not-admin' })
+    } finally {
+      await pool.query(`UPDATE users SET is_admin = true WHERE id = $1`, [OTH])
+    }
+    await pool.query(`UPDATE users SET is_active = false WHERE id = $1`, [OTH])
+    try {
+      expect(await slice.resetAccountData(db, X0, { guard: guard({ confirmEmail: email(X0) }), audit })).toMatchObject({ deleted: false, refused: 'actor-not-admin' })
+    } finally {
+      await pool.query(`UPDATE users SET is_active = true WHERE id = $1`, [OTH])
+      await dropEverything(pool, [X0])
+    }
+  })
+
+  it('with no resolvable owner, an admin account is refused even when it is your own', async () => {
+    expect(await slice.resetAccountData(db, OTH, { guard: guard({ ownerId: null, confirmEmail: email(OTH) }), audit }))
+      .toMatchObject({ deleted: false, refused: 'owner-unresolved' })
+    expect(await slice.resetAccountData(db, OWN, { guard: guard({ ownerId: null }), audit })).toMatchObject({ refused: 'owner-unresolved' })
+    expect(await intact()).toBe(true)
+  })
+
+  it('the owner can still reset himself', async () => {
+    const res = await slice.resetAccountData(db, OWN, {
+      guard: guard({ actingAdminId: OWN }), audit: { job: 'admin-reset-user-data', actor: `admin:${OWN}` },
+    })
+    expect(res.deleted).toBe(true)
+  })
+})
+const X0 = '00000000-0000-4000-8000-0000003369d3'

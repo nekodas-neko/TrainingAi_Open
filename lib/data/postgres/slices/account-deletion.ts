@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { resolveClaudeRoOwner } from '../claude-ro-owner'
+import { judgeProtectedTarget } from '@/lib/admin-owner'
 
 type Db = ReturnType<typeof getDb>
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
@@ -60,6 +61,12 @@ export interface AdminWipeGuard {
   /** The signed-in admin. They may wipe themselves or a non-admin, never another admin. */
   actingAdminId: string
   /**
+   * The owner's user id (`resolveOwnerUserId()`), or null when it cannot be resolved. Required so no
+   * caller can forget it: nobody but the owner may wipe the owner, and with null no admin account
+   * can be wiped at all.
+   */
+  ownerId: string | null
+  /**
    * The target's email as the admin typed it, compared server-side with case and edge spaces
    * ignored. Left out only by the long-standing "delete a signup that holds no data" path, which has
    * nothing to confirm; every wipe of an account with data sends it.
@@ -68,7 +75,8 @@ export interface AdminWipeGuard {
 }
 
 /** Why an admin wipe changed nothing. */
-export type AdminWipeRefusal = 'admin-target' | 'email-mismatch' | 'self'
+export type AdminWipeRefusal =
+  | 'admin-target' | 'email-mismatch' | 'self' | 'actor-not-admin' | 'owner-protected' | 'owner-unresolved'
 
 /** The row an admin wipe leaves in `agent_action_log`, written in the same transaction as the wipe. */
 export interface AdminWipeAudit {
@@ -217,9 +225,15 @@ type KeptIdentity = { user_id: string; provider: string; subject: string; email:
 
 /** The guard of an admin wipe, judged against the locked row. `null` means go ahead. */
 function judgeGuard(
-  guard: AdminWipeGuard | undefined, userId: string, me: { email: string; is_admin: boolean }, mayWipeSelf: boolean,
+  guard: AdminWipeGuard | undefined, userId: string, me: { email: string; is_admin: boolean },
+  actor: { is_admin: boolean; is_active: boolean } | undefined, mayWipeSelf: boolean,
 ): AdminWipeRefusal | null {
   if (!guard) return null
+  // The acting admin is judged on the row locked in THIS transaction, not on what the route read a
+  // moment ago: an admin demoted or deactivated in between does nothing.
+  if (!actor || !actor.is_admin || !actor.is_active) return 'actor-not-admin'
+  const protectedTarget = judgeProtectedTarget(guard.actingAdminId, userId, me.is_admin, guard.ownerId)
+  if (protectedTarget) return protectedTarget
   if (me.is_admin && userId !== guard.actingAdminId) return 'admin-target'
   if (userId === guard.actingAdminId && !mayWipeSelf) return 'self'
   if (guard.confirmEmail === undefined) return null
@@ -270,12 +284,17 @@ async function erase(db: Db, userId: string, opts: EraseOpts): Promise<AccountDe
     // write that references this user wait for the outcome: an FK insert takes KEY SHARE on the
     // users row, which FOR UPDATE blocks. When this commits, those writes fail on the FK rather
     // than recreating rows for an account that no longer exists.
-    const { rows: [me] } = await tx.execute<KeptAccount>(sql`
+    // With an admin guard the acting admin's row is locked in the same statement, in id order (two
+    // admins acting on each other cannot deadlock), so it is judged as it is at commit time.
+    const lockIds = opts.guard && opts.guard.actingAdminId !== userId ? [userId, opts.guard.actingAdminId] : [userId]
+    const { rows: locked } = await tx.execute<KeptAccount>(sql`
       SELECT id, oauth_sub, email, name, password_hash, is_active, is_admin, created_at, timezone
-      FROM users WHERE id = ${userId} FOR UPDATE`)
+      FROM users WHERE id IN (${sql.join(lockIds.map(i => sql`${i}::uuid`), sql`, `)}) ORDER BY id FOR UPDATE`)
+    const me = locked.find(r => r.id === userId)
+    const actor = opts.guard ? locked.find(r => r.id === opts.guard!.actingAdminId) : undefined
     if (!me) return NOT_FOUND
 
-    const refused = judgeGuard(opts.guard, userId, me, opts.keepAccount === true)
+    const refused = judgeGuard(opts.guard, userId, me, actor, opts.keepAccount === true)
     if (refused) return { ...NOT_FOUND, refused }
 
     // issue 2695: checked AFTER the row lock, so a write that references this user is either already
