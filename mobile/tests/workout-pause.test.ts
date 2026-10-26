@@ -184,8 +184,8 @@ test('a journal saved before pause existed reads as never paused (#3255)', async
 test('the rest cue and its alarm are off while paused, and back after Resume (#3255)', async (t) => {
   const f = await setup(t);
   const id = await resting(f);
-  const settings = platformSchema.parse({ scope: 'account-one', restAlerts: true, walkCues: false });
-  const plan = () => planAlerts(settings, f.controller.getSnapshot().data.workouts, null, f.now(), false);
+  const settings = platformSchema.parse({ scope: 'account-one', walkCues: false });
+  const plan = () => planAlerts(settings, f.controller.getSnapshot().data.workouts, null, f.now());
   assert.equal(plan().filter((x) => x.id.includes(':rest:')).length, 1);
   await f.controller.pause(id);
   assert.equal(plan().filter((x) => x.id.includes(':rest:')).length, 0);
