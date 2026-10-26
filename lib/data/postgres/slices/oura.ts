@@ -3,6 +3,7 @@ import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, 
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
+import { overnightHrvFromSeries } from '@trainingai/shared/health/oura-sleep-detail'
 import type { OuraCloudHeartrateWrite, OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
@@ -899,6 +900,16 @@ export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date;
   return { kept, yielded, skipped }
 }
 
+/** A day's main Oura Cloud period, as `body_metrics` reads it (#3080). */
+export interface MainSleepPeriod {
+  date: string
+  /** Oura's own per-night average, as stored on `sleep_sessions`. Kept beside ours, not used for the night. */
+  averageHrvMs: number | null
+  lowestHeartRate: number | null
+  /** #3075: our overnight HRV from the period's stored 5-minute series, or null when it holds none. */
+  overnightHrvMs: number | null
+}
+
 /**
  * #3080. Each wake date's main Oura Cloud period, the one whose HRV and resting heart rate stand for
  * the night in `body_metrics`: the longest live `long_sleep`, else the longest live `sleep` period
@@ -910,25 +921,29 @@ export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date;
  */
 export async function getOuraMainSleepPeriods(
   db: Db, userId: string, dates: string[], tz: string,
-): Promise<{ date: string; averageHrvMs: number | null; lowestHeartRate: number | null }[]> {
+): Promise<MainSleepPeriod[]> {
   if (dates.length === 0) return []
   const rows = await db.execute<{
     date: string; sleep_type: string; sleep_start: Date; sleep_end: Date; duration_hours: number | null
-    average_hrv_ms: number | null; lowest_heart_rate: number | null
+    average_hrv_ms: number | null; lowest_heart_rate: number | null; hrv_series: s.OuraSampleSeries | null
   }>(sql`
-    SELECT s.date::text AS date, p.sleep_type, s.sleep_start, s.sleep_end, s.duration_hours, s.average_hrv_ms, s.lowest_heart_rate
+    SELECT s.date::text AS date, p.sleep_type, s.sleep_start, s.sleep_end, s.duration_hours, s.average_hrv_ms, s.lowest_heart_rate,
+           p.hrv AS hrv_series
       FROM sleep_sessions s
       JOIN oura_cloud_sleep_periods p ON p.user_id = s.user_id AND p.oura_id = s.oura_id
      WHERE s.user_id = ${userId} AND s.deleted_at IS NULL AND NOT s.manual_entry
        AND s.date IN (${sql.join(dates.map(d => sql`${d}::date`), sql`, `)})
        AND p.sleep_type IN ('long_sleep', 'sleep')
      ORDER BY s.date, (p.sleep_type = 'long_sleep') DESC, s.duration_hours DESC NULLS LAST, s.sleep_start`)
-  const out = new Map<string, { date: string; averageHrvMs: number | null; lowestHeartRate: number | null }>()
+  const out = new Map<string, MainSleepPeriod>()
   for (const r of rows.rows) {
     if (out.has(r.date)) continue
     const window = { sleepStart: new Date(r.sleep_start), sleepEnd: new Date(r.sleep_end), durationHours: r.duration_hours }
     if (r.sleep_type !== 'long_sleep' && !isNightWindow(window, tz)) continue
-    out.set(r.date, { date: r.date, averageHrvMs: r.average_hrv_ms, lowestHeartRate: r.lowest_heart_rate })
+    out.set(r.date, {
+      date: r.date, averageHrvMs: r.average_hrv_ms, lowestHeartRate: r.lowest_heart_rate,
+      overnightHrvMs: overnightHrvFromSeries(r.hrv_series),
+    })
   }
   return [...out.values()]
 }
