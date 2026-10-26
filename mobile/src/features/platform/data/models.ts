@@ -60,6 +60,8 @@ export type Alert = {
   target: 'workout' | 'walk' | 'nutrition' | 'health' | 'review' | 'week';
   recordId?: string;
   restCueId?: string;
+  /** A meal reminder that carries the answer actions (#2123): the plan meal and its local day. */
+  mealEstimate?: { planMealId: string; date: string };
   zone?: string;
   trigger: { at: number } | { hour: number; minute: number; weekday?: number };
 };

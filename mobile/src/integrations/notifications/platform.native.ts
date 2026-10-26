@@ -3,6 +3,7 @@ import { AppState, Platform } from 'react-native';
 import { inPictureInPicture } from '../feedback/beep';
 import { feedback, restFeedback } from '../feedback/haptics';
 import { restSoundSource } from '../feedback/rest-cue';
+import { ESTIMATE_ACTION_IDS } from '../../features/meal-plans/data/estimated-meals';
 import {
   ALERT_OWNER,
   alertSignature,
@@ -11,6 +12,7 @@ import {
 export function alertsAvailable() {
   return !!requireOptionalNativeModule('ExpoNotificationScheduler');
 }
+const MEAL_ESTIMATE_CATEGORY = 'meal-estimate';
 let initialized: Promise<typeof import('expo-notifications')> | null = null;
 async function sdk() {
   if (!alertsAvailable())
@@ -30,6 +32,27 @@ async function sdk() {
         sound: 'default',
       });
     }
+    // The three answers a meal reminder carries (#2123). They open the app: an action that does
+    // not is delivered only while the app's process is alive, and a tap on a dead one would be
+    // lost, so the answer is made as the app starts instead.
+    // A failure here must not take the rest and walk alarms down with it.
+    await notifications.setNotificationCategoryAsync(MEAL_ESTIMATE_CATEGORY, [
+      {
+        identifier: ESTIMATE_ACTION_IDS.ate,
+        buttonTitle: 'I ate this',
+        options: { opensAppToForeground: true },
+      },
+      {
+        identifier: ESTIMATE_ACTION_IDS.else,
+        buttonTitle: 'Something else',
+        options: { opensAppToForeground: true },
+      },
+      {
+        identifier: ESTIMATE_ACTION_IDS.skipped,
+        buttonTitle: 'Skipped',
+        options: { opensAppToForeground: true },
+      },
+    ]).catch(() => undefined);
     notifications.setNotificationHandler({
       handleNotification: async (notification) => {
         const ours = notification.request.content.data?.owner === ALERT_OWNER;
@@ -119,7 +142,7 @@ export const nativeAlerts = {
   },
   async schedule(alert: Alert) {
     const notifications = await sdk();
-    const timer = 'at' in alert.trigger;
+    const timer = 'at' in alert.trigger && !alert.mealEstimate;
     const channelId = timer ? 'training-timers' : 'training-reminders';
     if ('at' in alert.trigger && alert.trigger.at <= Date.now()) return;
     const trigger: import('expo-notifications').NotificationTriggerInput =
@@ -149,12 +172,14 @@ export const nativeAlerts = {
         title: alert.title,
         body: alert.body,
         sound: 'default',
+        ...(alert.mealEstimate ? { categoryIdentifier: MEAL_ESTIMATE_CATEGORY } : {}),
         data: {
           owner: ALERT_OWNER,
           scope: alert.scope,
           target: alert.target,
           recordId: alert.recordId ?? null,
           restCueId: alert.restCueId ?? null,
+          mealEstimate: alert.mealEstimate ?? null,
           signature: alertSignature(alert),
         },
       },
@@ -172,7 +197,7 @@ export async function observeAlerts(onOpen: (data: Record<string, unknown>) => v
     const id = `${response.notification.request.identifier}:${response.notification.date}`;
     if (opened.has(id)) return;
     opened.add(id);
-    onOpen({ ...data, responseId: id });
+    onOpen({ ...data, responseId: id, actionIdentifier: response.actionIdentifier });
     void notifications.clearLastNotificationResponseAsync().catch(() => {});
   }
   handle(await notifications.getLastNotificationResponseAsync());

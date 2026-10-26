@@ -62,6 +62,7 @@ import { CardioScreen } from '../features/activities/screens/CardioScreen';
 import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
 import { WeighInBanner } from '../features/devices/components/WeighInBanner';
 import { AlertNavigation } from '../features/platform/components/AlertNavigation';
+import type { EstimateRequest } from '../features/meal-plans/data/estimated-meals';
 import {
   WorkoutStatusAccountGuard,
   WorkoutStatusSync,
@@ -92,6 +93,9 @@ function AppShell() {
     scope: '',
     count: 0,
   });
+  const [mealEstimateRequest, setMealEstimateRequest] = useState<
+    (EstimateRequest & { date: string; scope: string }) | null
+  >(null);
   const [nutritionDateRequest, setNutritionDateRequest] = useState({
     scope: '',
     date: '',
@@ -333,6 +337,9 @@ function AppShell() {
           reviewRequest={
             nutritionReviewRequest.scope === accountKey ? nutritionReviewRequest.count : 0
           }
+          estimateRequest={
+            mealEstimateRequest?.scope === accountKey ? mealEstimateRequest : null
+          }
         />
       </RetainedView>
       <RetainedView
@@ -558,6 +565,7 @@ function AppShell() {
       )}
       {!fullScreen && <ActiveWorkoutBar onResume={openWorkout} />}
       <AlertNavigation
+        onMealEstimate={(request) => setMealEstimateRequest({ ...request, scope: accountKey })}
         onWorkout={openWorkout}
         onWalk={() => setDetail('activity-recording')}
         onTab={selectTab}

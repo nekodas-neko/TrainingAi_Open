@@ -3,6 +3,7 @@ import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals';
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
 import { foodLine } from '../data/display';
+import { openingDraft } from '../data/opening-draft';
 import { randomUUID } from 'expo-crypto';
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
@@ -117,12 +118,15 @@ export function FoodLogger({
   onClose,
   onRecipes,
   library = false,
+  initialTab,
 }: {
   date: string;
   mealTypeId?: string;
   onClose: () => void;
   onRecipes: (meal?: SavedMeal) => void;
   library?: boolean;
+  /** Opens on this tab instead of the saved one (#2123: "Search all foods"). */
+  initialTab?: 'search';
 }) {
   const n = useNutrition(date);
   const resources = useWorkoutResources();
@@ -134,18 +138,19 @@ export function FoodLogger({
   const draft = useWorkoutDraft(loggerKey, draftSchema, {
     ...initial,
     mealTypeId: mealTypeId ?? n.view.mealTypes[0]?.id ?? '',
-    tab: library ? 'meals' : 'recent',
+    tab: initialTab ?? (library ? 'meals' : 'recent'),
   });
   const d = draft.value;
   const latestDraft = useRef({ value: d, setValue: draft.setValue });
   latestDraft.current = { value: d, setValue: draft.setValue };
   const energy = useWorkoutResource(energySpec(date), d.step === 'assign');
+  // One write for both: two effects each spreading the same stale snapshot overwrite each other.
   useEffect(() => {
     const latest = latestDraft.current;
-    if (draft.ready && mealTypeId && latest.value.mealTypeId !== mealTypeId) {
-      latest.setValue({ ...latest.value, mealTypeId });
-    }
-  }, [draft.ready, mealTypeId]);
+    if (!draft.ready) return;
+    const next = openingDraft(latest.value, { mealTypeId, tab: initialTab });
+    if (next) latest.setValue(next);
+  }, [draft.ready, mealTypeId, initialTab]);
   const update = (patch: Partial<typeof d>) => draft.setValue({ ...d, ...patch });
   const [busy, setBusy] = useState(false);
   const [captureStage, setCaptureStage] = useState<string | null>(null);
