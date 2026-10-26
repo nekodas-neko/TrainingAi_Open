@@ -368,7 +368,8 @@ SELECT
   t.truncated,
   t.ok,
   t.error,
-  t.caller_ip
+  t.caller_ip,
+  t.scoped_user_id
 FROM public.db_query_log t;
 
 CREATE VIEW claude_ro.detection_events AS
