@@ -80,7 +80,10 @@ export async function loadNightTemperature(
   } else if (deviation?.source === 'cloud' && night.nightDate) {
     const ouraDevs = ouraLong.filter(r => !isPreRekey(r.date) && r.temperatureDeviation != null && Number.isFinite(r.temperatureDeviation))
     baselineNights = ouraDevs.filter(r => r.date < night.nightDate!).length
-    trusted = isTemperatureBaselineCentred(ouraDaily.filter(r => !isPreRekey(r.date) && r.date <= night.nightDate!).map(r => r.temperatureDeviation))
+    // #3169 (owner, 26 Oct): the temperature deload stays off on Oura's deviation until its new
+    // baseline has been checked, however many nights it has. The prescription's `tempZ` is unaffected.
+    // Lift this by computing it again: `isTemperatureBaselineCentred` over the same Oura nights.
+    trusted = false
   }
 
   return {

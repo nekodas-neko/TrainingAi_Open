@@ -237,7 +237,7 @@ export function buildSleepAudit(input: SleepAuditInput): PillarAudit {
     pillar: 'sleep',
     label: 'Sleep',
     // Exactly what /api/readiness-score persists for this night — same score, same contributor map.
-    persist: result ? { score: result.score, contributors: sleepComponentsToContributors(result.components) } : null,
+    persist: result ? { score: result.score, contributors: sleepComponentsToContributors(result.components), modelVersion: result.modelVersion } : null,
     score: result?.score ?? null,
     band: result ? scoreBand(result.score).label : null,
     source: night ? 'own-model (computeSleepScore)' : 'no-data',

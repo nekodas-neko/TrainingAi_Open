@@ -308,13 +308,12 @@ export const OURA_DOCUMENT_TYPE_NAMES = Object.keys(OURA_DOCUMENT_TYPES) as Oura
 
 /**
  * The types whose `delete` event the webhook acts on, and so subscribes to (`subscriptions.ts`). A
- * sleep period (#2859) and a workout (#3087, `oura_workouts.deleted_at`) are tombstoned. A delete is a
- * tombstone, never a removal: deleting data is the owner's call (#3155 review). Not yet:
- *   - `session`: needs an `oura_sessions.deleted_at` tombstone first, a migration of its own (#3153);
- *   - the daily documents: a delete names only the document's id, which we do not store, so it cannot
- *     be traced to a day yet (#3153).
+ * sleep period (#2859), a workout (#3087, `oura_workouts.deleted_at`) and a session (#3153,
+ * `oura_sessions.deleted_at`) are tombstoned. A delete is a tombstone, never a removal: deleting data
+ * is the owner's call (#3155 review). Not yet: the daily documents. A delete names only the
+ * document's id, which we do not store, so it cannot be traced to a day yet (#3153).
  */
-export const OURA_DELETE_TYPES: readonly OuraDocumentType[] = ['sleep', 'workout']
+export const OURA_DELETE_TYPES: readonly OuraDocumentType[] = ['sleep', 'workout', 'session']
 
 /**
  * The OAuth scope each collection, and the heart-rate series, needs (#2974). Oura answers 401 for a

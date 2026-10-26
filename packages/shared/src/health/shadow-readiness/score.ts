@@ -19,12 +19,19 @@
  *   that scored, and the pillar detail says which dropped and why. A pillar with no unit is null and
  *   readiness renormalises over the pillars that scored. Nothing is ever a stand-in 0 or 50.
  * - **Settled days only.** A daytime unit whose input is not from a completed day is refused.
+ * - **Pillar totals float** (#2833). A pillar is worth the points of its units; units that read one
+ *   signal share a budget (#2826); quality and reliability factors scale a unit's weight and, through
+ *   the pillar's confidence, its pillar's.
+ * - **A graded ceiling** (#2832): readiness is the lower of the weighted sum and the lowest cap among
+ *   the red flags that fired. Scoring is untouched; only the final number is limited.
  */
 import { median, quantile } from '@trainingai/shared/stats'
-import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { daysBetweenDateStrs, shiftDateStr } from '@trainingai/shared/date-utils'
+import { computeIllnessRadar } from '@trainingai/shared/health/illness-radar'
 import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/shared/types/body'
 import {
   BASELINE_WINDOW_DAYS,
+  CEILING,
   CONTEXT_ADJUSTMENTS,
   CYCLE_PHASE_LOOKBACK_DAYS,
   CYCLE_PHASE_MIN_SAMPLES,
@@ -39,14 +46,22 @@ import {
   MATURITY_SETTLED_DAYS,
   MIN_WINDOW_SAMPLES,
   NEW_UNIT_WEIGHT_FACTOR,
-  PILLAR_WEIGHTS,
+  PILLAR_POINTS,
+  QUALITY_FACTOR,
   REGIME_HOLD_DAYS,
   REGIME_SHIFT_SIGMA,
+  RELIABILITY_FULL_COVERAGE,
+  RELIABILITY_MIN_EXPECTED_DAYS,
+  RELIABILITY_MIN_FACTOR,
+  RELIABILITY_WINDOW_DAYS,
+  SHARED_BUDGETS,
   SHADOW_MODEL_VERSION,
   SHADOW_PILLARS,
   SHADOW_UNIT_IDS,
   UNIT_DEFS,
   type Band,
+  type CeilingCap,
+  type ShadowCeiling,
   type ShadowPillarDetail,
   type ShadowUnitId,
   type ShadowUnitResult,
@@ -111,6 +126,8 @@ export interface ShadowScoreResult {
   shadowReadiness: number | null
   pillars: Record<ShadowReadinessPillar, number | null>
   pillarDetail: Record<ShadowReadinessPillar, ShadowPillarDetail>
+  /** The red-flag ceiling and whether it lowered `shadowReadiness`, which is the capped number. */
+  ceiling: ShadowCeiling
   units: Record<ShadowUnitId, ShadowUnitResult>
   maturityStage: ShadowReadinessStage
   inputsThrough: string | null
@@ -193,6 +210,31 @@ function levelFor(def: UnitDef, context: ShadowContext | undefined): Yardstick |
   return def.level
 }
 
+/**
+ * How much of the last {@link RELIABILITY_WINDOW_DAYS} days a unit was present on, as a factor on its
+ * weight (#2833). "Most nights" (70 %) counts in full; below that the weight scales with how often
+ * the unit showed up, down to a floor. Judged from the unit's own first appearance, so a unit with
+ * less than a week behind it is not called patchy, and never for a unit that only has a value after
+ * an event (`cadence: 'event'`).
+ */
+export function reliabilityFactor(def: UnitDef, history: readonly UnitObservation[], date: string): number {
+  if (def.cadence === 'event') return 1
+  const earlier = history.filter(o => o.date < date && Number.isFinite(o.value))
+  if (earlier.length === 0) return 1
+  const first = earlier.reduce((a, o) => (o.date < a ? o.date : a), earlier[0].date)
+  const expected = Math.min(RELIABILITY_WINDOW_DAYS, daysBetweenDateStrs(first, date))
+  if (expected < RELIABILITY_MIN_EXPECTED_DAYS) return 1
+  const from = shiftDateStr(date, -expected)
+  const present = new Set(earlier.filter(o => o.date >= from).map(o => o.date)).size
+  const coverage = Math.min(1, present / expected)
+  return coverage >= RELIABILITY_FULL_COVERAGE ? 1 : Math.max(RELIABILITY_MIN_FACTOR, coverage / RELIABILITY_FULL_COVERAGE)
+}
+
+/** The quality factor for how a value was obtained; a value that does not say is taken as measured. */
+export function qualityFactor(rung: UnitObservation['rung']): number {
+  return rung ? QUALITY_FACTOR[rung] : 1
+}
+
 function bandFor(def: UnitDef, input: UnitInput, context: ShadowContext | undefined): Band | undefined {
   if (!def.band) return undefined
   const band: Band = { ...def.band, ...input.band }
@@ -207,8 +249,8 @@ function bandFor(def: UnitDef, input: UnitInput, context: ShadowContext | undefi
 
 function emptyUnit(def: UnitDef, gap: UnitGap, note: string | null): ShadowUnitResult {
   return {
-    score: null, level: null, day: null, weight: 0, stage: 'learning', validDays: 0, value: null, normal: null,
-    provenance: null, daytimeThrough: null, gap, note, flags: [],
+    score: null, spread: null, quality: 1, reliability: 1, level: null, day: null, weight: 0, stage: 'learning',
+    validDays: 0, value: null, normal: null, provenance: null, daytimeThrough: null, gap, note, flags: [],
   }
 }
 
@@ -325,14 +367,16 @@ export function scoreUnit(
     flags.push('source_changed')
   }
 
-  const base: Omit<ShadowUnitResult, 'score' | 'level' | 'day' | 'normal' | 'gap' | 'note'> = {
+  const base: Omit<ShadowUnitResult, 'score' | 'spread' | 'level' | 'day' | 'normal' | 'gap' | 'note'> = {
+    quality: qualityFactor(today.rung),
+    reliability: round3(reliabilityFactor(def, input?.history ?? [], today.date)),
     weight: 0, stage, validDays, value: round1Maybe(today.value), provenance,
     daytimeThrough: def.daytime ? today.date : null, flags,
   }
 
   // Fuel is scored from its parts by the caller (`scoreFuel`); the unit carries the result.
   if (def.id === 'body.fuel') {
-    return { ...base, stage: 'settled', score: round1(clamp(today.value, 0, 100)), level: null, day: null, normal: null, gap: null, note: input?.note ?? null }
+    return { ...base, stage: 'settled', score: round1(clamp(today.value, 0, 100)), spread: null, level: null, day: null, normal: null, gap: null, note: input?.note ?? null }
   }
 
   const band = bandFor(def, input!, context)
@@ -356,6 +400,7 @@ export function scoreUnit(
     return {
       ...base,
       score: round1(score),
+      spread: normal ? round1Maybe(normal.spread) : null,
       level: level == null ? null : round1(level),
       day: level == null || !normal ? null : round1(score - level),
       normal: normal ? round1Maybe(normal.normal) : null,
@@ -372,10 +417,10 @@ export function scoreUnit(
     // Learning, a long gap, or a source restart: no personal normal yet. Level from the population
     // yardstick applied to the day itself; Day withheld. No yardstick means nothing honest to say.
     if (!yardstick) {
-      return { ...base, score: null, level: null, day: null, normal: null, gap: 'learning', note: 'Learning: no personal normal yet, and this unit has no population yardstick.' }
+      return { ...base, score: null, spread: null, level: null, day: null, normal: null, gap: 'learning', note: 'Learning: no personal normal yet, and this unit has no population yardstick.' }
     }
     const level = gradeOnYardstick(today.value, yardstick)
-    return { ...base, score: round1(clamp(level, 0, 100)), level: round1(level), day: null, normal: null, gap: null, note: 'Learning: Level from the population yardstick, Day withheld.' }
+    return { ...base, score: round1(clamp(level, 0, 100)), spread: null, level: round1(level), day: null, normal: null, gap: null, note: 'Learning: Level from the population yardstick, Day withheld.' }
   }
 
   const deviation = (today.value - normal.normal) / normal.spread
@@ -395,6 +440,7 @@ export function scoreUnit(
   return {
     ...base,
     score: round1(clamp(start + day, 0, 100)),
+    spread: round1Maybe(normal.spread),
     level: level == null ? null : round1(level),
     day: round1(day),
     normal: round1Maybe(normal.normal),
@@ -411,6 +457,74 @@ function fmt(v: number): string {
   return Number.isFinite(v) ? String(Math.round(v * 100) / 100) : '∞'
 }
 
+// ── The ceiling ──────────────────────────────────────────────────────────────────────────────────
+
+/** How many spreads today sits from the person's normal, signed (value − normal), or null. */
+function zOf(u: ShadowUnitResult): number | null {
+  return u.score != null && u.value != null && u.normal != null && u.spread != null && u.spread > 0
+    ? (u.value - u.normal) / u.spread : null
+}
+
+/**
+ * The red flags that fired and the cap each sets (#2832). Pure and independent of the weights: it
+ * reads the scored units, never the readiness. The temperature and illness caps both lean on
+ * temperature and resting HR, which a luteal phase moves as much as an illness does, so when the
+ * cycle is tracked but no phase normal could be built they wait (`waitingOnCycle`) rather than fire.
+ */
+function ceilingCaps(units: Record<ShadowUnitId, ShadowUnitResult>, input: ShadowScoreInput): { caps: CeilingCap[]; waitingOnCycle: boolean } {
+  const caps: CeilingCap[] = []
+  const cycleUncovered = (id: ShadowUnitId) =>
+    !!input.units[id]?.today?.phase && !units[id].flags.some(f => f.startsWith('cycle_phase:'))
+  const waitingOnCycle = cycleUncovered('body.temperature') || cycleUncovered('heart.overnight_rhr')
+
+  const temp = units['body.temperature']
+  if (!waitingOnCycle && temp.score != null && temp.value != null) {
+    const excess = temp.value - (temp.normal ?? 0)
+    if (excess >= CEILING.temperature[0][0]) {
+      caps.push({ id: 'temperature', cap: round1(gradeOnYardstick(excess, CEILING.temperature)), why: `Temperature ${round1(excess)} °C above normal.` })
+    }
+  }
+
+  // Illness signs: the live radar's rule over temperature, breathing and ONE heart signal. HRV and
+  // resting HR move together, so the worse of the two stands in for both rather than counting twice.
+  const zTemp = zOf(temp)
+  const zBreath = zOf(units['body.breathing_rate'])
+  const zRhr = zOf(units['heart.overnight_rhr'])
+  const zHrv = zOf(units['heart.overnight_hrv'])
+  const heartBad = zRhr == null && zHrv == null ? null : Math.max(zRhr ?? -Infinity, zHrv == null ? -Infinity : -zHrv)
+  const used: ShadowUnitId[] = []
+  if (zTemp != null) used.push('body.temperature')
+  if (zBreath != null) used.push('body.breathing_rate')
+  if (zRhr != null) used.push('heart.overnight_rhr')
+  if (zHrv != null) used.push('heart.overnight_hrv')
+  // "Signs" is plural: one biomarker alone, however far off, is not an illness flag. Needs two of
+  // temperature, breathing and the heart signal.
+  const signals = [zTemp, zBreath, heartBad].filter(z => z != null).length
+  if (!waitingOnCycle && signals >= 2) {
+    const radar = computeIllnessRadar({
+      tempZ: zTemp, breathZ: zBreath, rhrZ: heartBad, hrvZ: null,
+      nHistory: Math.min(...used.map(id => units[id].validDays)),
+    })
+    if (radar.flag === 'elevated' || radar.flag === 'fever') {
+      caps.push({ id: 'illness', cap: CEILING.illness, why: `Illness signs (radar ${radar.flag}, score ${radar.score}).` })
+    }
+  }
+
+  const hrv = units['heart.overnight_hrv']
+  if (hrv.score != null && hrv.score <= CEILING.hrvScoreAtOrBelow) {
+    caps.push({ id: 'hrv_crash', cap: CEILING.hrvCap, why: `Overnight HRV scored ${hrv.score}.` })
+  }
+  const sleep = units['sleep.duration']
+  if (sleep.score != null && sleep.value != null && sleep.value <= CEILING.sleepHoursAtOrBelow) {
+    caps.push({ id: 'short_sleep', cap: CEILING.sleepCap, why: `Slept ${sleep.value} h.` })
+  }
+  const load = units['activity.training_load']
+  if (load.score != null && load.value != null && load.value >= CEILING.loadRatioAtOrAbove) {
+    caps.push({ id: 'load_ratio', cap: CEILING.loadCap, why: `Training-load ratio ${load.value}.` })
+  }
+  return { caps, waitingOnCycle }
+}
+
 // ── Pillars and readiness ────────────────────────────────────────────────────────────────────────
 
 export function scoreShadowReadiness(input: ShadowScoreInput): ShadowScoreResult {
@@ -422,41 +536,68 @@ export function scoreShadowReadiness(input: ShadowScoreInput): ShadowScoreResult
 
   const pillars = {} as Record<ShadowReadinessPillar, number | null>
   const pillarDetail = {} as Record<ShadowReadinessPillar, ShadowPillarDetail>
+  /** What each pillar is worth in readiness today: its points times its confidence. */
+  const worth = {} as Record<ShadowReadinessPillar, number>
   for (const pillar of SHADOW_PILLARS) {
     const members = SHADOW_UNIT_IDS.filter(id => UNIT_DEFS[id].pillar === pillar)
     const dropped: Record<string, UnitGap> = {}
+    const scoredIds: ShadowUnitId[] = []
+    for (const id of members) {
+      if (units[id].score == null) dropped[id] = units[id].gap ?? 'missing'
+      else scoredIds.push(id)
+    }
+
+    // Points each scored unit holds. Units that share a budget carry all of it between them, whoever
+    // of them scored (#2826); everything else holds its own points.
+    const held = new Map<ShadowUnitId, number>()
+    for (const id of scoredIds) held.set(id, UNIT_DEFS[id].points)
+    for (const [group, budget] of Object.entries(SHARED_BUDGETS)) {
+      const inGroup = scoredIds.filter(id => UNIT_DEFS[id].sharedBudget === group)
+      const total = inGroup.reduce((sum, id) => sum + UNIT_DEFS[id].points, 0)
+      if (total > 0) for (const id of inGroup) held.set(id, (UNIT_DEFS[id].points / total) * budget)
+    }
+
     let sumW = 0
     let sumWS = 0
-    for (const id of members) {
+    let heldTotal = 0
+    let heldConfident = 0
+    for (const id of scoredIds) {
       const u = units[id]
-      if (u.score == null) {
-        dropped[id] = u.gap ?? 'missing'
-        continue
-      }
       const def = UNIT_DEFS[id]
-      // #2356: a new unit counts half until it has settled.
-      u.weight = def.weight * (def.isNew && u.stage !== 'settled' ? NEW_UNIT_WEIGHT_FACTOR : 1)
+      const factors = u.quality * u.reliability
+      // #2356: a new unit counts half until it has settled. That moves points inside its pillar only;
+      // quality and reliability also move the pillar (through its confidence below).
+      u.weight = round3(held.get(id)! * factors * (def.isNew && u.stage !== 'settled' ? NEW_UNIT_WEIGHT_FACTOR : 1))
       sumW += u.weight
-      sumWS += u.weight * u.score
+      sumWS += u.weight * u.score!
+      heldTotal += held.get(id)!
+      heldConfident += held.get(id)! * factors
     }
     const scored: Record<string, number> = {}
-    for (const id of members) if (units[id].score != null) scored[id] = round3(units[id].weight / sumW)
+    for (const id of scoredIds) scored[id] = round3(units[id].weight / sumW)
+    const confidence = heldTotal > 0 ? heldConfident / heldTotal : 0
     pillars[pillar] = sumW > 0 ? round1(sumWS / sumW) : null
-    pillarDetail[pillar] = { effectiveWeight: 0, scored, dropped }
+    worth[pillar] = pillars[pillar] == null ? 0 : PILLAR_POINTS[pillar] * confidence
+    pillarDetail[pillar] = { effectiveWeight: 0, points: PILLAR_POINTS[pillar], confidence: round3(confidence), scored, dropped }
   }
 
   let sumW = 0
   let sumWS = 0
   for (const p of SHADOW_PILLARS) {
-    const v = pillars[p]
-    if (v == null) continue
-    sumW += PILLAR_WEIGHTS[p]
-    sumWS += PILLAR_WEIGHTS[p] * v
+    if (pillars[p] == null) continue
+    sumW += worth[p]
+    sumWS += worth[p] * pillars[p]!
   }
   for (const p of SHADOW_PILLARS) {
-    pillarDetail[p].effectiveWeight = pillars[p] == null || sumW === 0 ? 0 : round3(PILLAR_WEIGHTS[p] / sumW)
+    pillarDetail[p].effectiveWeight = pillars[p] == null || sumW === 0 ? 0 : round3(worth[p] / sumW)
   }
-  const shadowReadiness = sumW > 0 ? round1(clamp(sumWS / sumW, 0, 100)) : null
+  const uncapped = sumW > 0 ? round1(clamp(sumWS / sumW, 0, 100)) : null
+
+  // The ceiling: the lowest cap among the red flags that fired.
+  const { caps, waitingOnCycle } = ceilingCaps(units, input)
+  const cap = caps.length ? Math.min(...caps.map(c => c.cap)) : null
+  const shadowReadiness = uncapped != null && cap != null ? Math.min(uncapped, cap) : uncapped
+  const ceiling: ShadowCeiling = { cap, caps, uncapped, applied: uncapped != null && cap != null && cap < uncapped, waitingOnCycle }
 
   // The row's stage is the least mature unit that scored; with nothing scored it is learning.
   let maturityStage: ShadowReadinessStage | null = null
@@ -475,6 +616,7 @@ export function scoreShadowReadiness(input: ShadowScoreInput): ShadowScoreResult
     shadowReadiness,
     pillars,
     pillarDetail,
+    ceiling,
     units,
     maturityStage: maturityStage ?? 'learning',
     inputsThrough,

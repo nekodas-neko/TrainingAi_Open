@@ -153,3 +153,32 @@ export function rowsOfDeviceInUse<T extends { date: string }>(
   if (device == null) return []
   return rows.filter(r => positive(r) != null && deviceOf(source(r)) === device)
 }
+
+/** The `source_map` label the ring's Bluetooth path writes. */
+export const RING_SOURCE = 'oura_ble'
+
+/**
+ * A night's stored sources with the keys that carry none filled in, so a row written without
+ * provenance is not an `unknown` device of its own that loses its term (#3001). Production has
+ * rows with no `source_map` keys at all, and rows with a heart-rate key but no HRV key.
+ *
+ * - A key missing on a night **before** the switch day is the ring's: only the ring wrote then.
+ * - A key missing on a **later** night is the device of that night's other keys (the first one that
+ *   has one), since one night comes from one device.
+ * - With no switch day (the user never moved to the Oura API) nothing is inferred.
+ *
+ * `date` and `switchDay` are local `YYYY-MM-DD`.
+ */
+export function fillMissingNightSources<K extends string>(
+  date: string,
+  sources: Record<K, string | undefined>,
+  switchDay: string | null,
+): Record<K, string | undefined> {
+  if (switchDay == null) return sources
+  const keys = Object.keys(sources) as K[]
+  const known = keys.map(k => sources[k]).find(v => v != null)
+  const fill = date < switchDay ? RING_SOURCE : known
+  const out = { ...sources }
+  for (const k of keys) if (out[k] == null) out[k] = fill
+  return out
+}

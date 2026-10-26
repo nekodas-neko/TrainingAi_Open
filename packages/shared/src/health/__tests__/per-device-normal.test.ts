@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { perDeviceNormal, currentDevice, currentDeviceReadings, normalOrCarriedOver, rowsOfDeviceInUse, type DeviceReading } from '../per-device-normal'
+import { perDeviceNormal, currentDevice, currentDeviceReadings, normalOrCarriedOver, rowsOfDeviceInUse, fillMissingNightSources, type DeviceReading } from '../per-device-normal'
 
 const day = (i: number) => `2026-10-${String(i).padStart(2, '0')}`
 const run = (from: number, n: number, value: number, source: string | null): DeviceReading[] =>
@@ -81,5 +81,42 @@ describe('rowsOfDeviceInUse (#3001)', () => {
     const rows = [body(4, 72, 'b'), body(1, 45, 'a'), body(5, 0, 'a'), body(3, null, 'a'), body(2, 70, 'b')]
     expect(pick(rows)).toEqual([day(4), day(2)])
     expect(pick([])).toEqual([])
+  })
+})
+
+describe('fillMissingNightSources (#3001)', () => {
+  const none = { durationSource: undefined, hrvSource: undefined, avgHeartRateSource: undefined }
+  const SWITCH = '2026-10-17'
+
+  it('reads a night with no keys before the switch day as the ring', () => {
+    expect(fillMissingNightSources('2026-09-02', none, SWITCH))
+      .toEqual({ durationSource: 'oura_ble', hrvSource: 'oura_ble', avgHeartRateSource: 'oura_ble' })
+  })
+
+  it('fills the one missing key before the switch day with the ring, keeping the keys it has', () => {
+    expect(fillMissingNightSources('2026-09-02', { ...none, durationSource: 'oura_ble', avgHeartRateSource: 'oura_ble' }, SWITCH))
+      .toMatchObject({ hrvSource: 'oura_ble', durationSource: 'oura_ble' })
+  })
+
+  it('reads a missing key on a later night as the device of the night’s other keys', () => {
+    expect(fillMissingNightSources('2026-10-20', { ...none, durationSource: 'oura_cloud', avgHeartRateSource: 'oura_cloud' }, SWITCH))
+      .toEqual({ durationSource: 'oura_cloud', hrvSource: 'oura_cloud', avgHeartRateSource: 'oura_cloud' })
+    expect(fillMissingNightSources('2026-10-20', { ...none, avgHeartRateSource: 'oura_cloud' }, SWITCH).hrvSource).toBe('oura_cloud')
+  })
+
+  it('leaves a later night with no keys at all unknown: nothing says which device', () => {
+    expect(fillMissingNightSources('2026-10-20', none, SWITCH)).toEqual(none)
+  })
+
+  it('counts the switch day itself as a later night', () => {
+    expect(fillMissingNightSources(SWITCH, { ...none, hrvSource: 'oura_cloud' }, SWITCH).durationSource).toBe('oura_cloud')
+  })
+
+  it('infers nothing for a user who never switched', () => {
+    expect(fillMissingNightSources('2026-09-02', none, null)).toEqual(none)
+  })
+
+  it('never overwrites a key a night carries', () => {
+    expect(fillMissingNightSources('2026-09-02', { ...none, hrvSource: 'manual' }, SWITCH).hrvSource).toBe('manual')
   })
 })

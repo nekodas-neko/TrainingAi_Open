@@ -316,7 +316,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  await storeHealthConnectWorkouts(repo, userId, usableSessions, rejected);
+  const { revived: exercisesRevived } = await storeHealthConnectWorkouts(repo, userId, usableSessions, rejected);
 
   // ── Sleep sessions (dedup handled by UNIQUE(user_id, sleep_start)) ────────
   const sleepRecords = usableRecords(body.sleepRecords, SleepRecordSchema, 'sleep', rejected);
@@ -415,5 +415,5 @@ export async function POST(req: NextRequest) {
     .filter(a => a.avgHr == null && a.distanceKm == null && a.caloriesBurned == null && a.startTime && a.endTime)
     .map(a => ({ id: a.id, date: a.date, startTime: a.startTime, endTime: a.endTime }));
 
-  return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateAccepted, intervalsAccepted, exercisesTombstoned });
+  return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateAccepted, intervalsAccepted, exercisesTombstoned, exercisesRevived });
 }

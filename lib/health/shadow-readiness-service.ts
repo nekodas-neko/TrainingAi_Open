@@ -255,7 +255,9 @@ export async function computeShadowRows(
       modelVersion: r.modelVersion,
       shadowReadiness: r.shadowReadiness,
       pillars: r.pillars,
-      pillarDetail: r.pillarDetail as unknown as Record<string, unknown>,
+      // The red-flag ceiling rides in the pillar detail (no column of its own): `shadowReadiness` is
+      // the capped number and `ceiling.uncapped` the weighted sum before it.
+      pillarDetail: { ...r.pillarDetail, ceiling: r.ceiling } as unknown as Record<string, unknown>,
       units: r.units as unknown as Record<string, unknown>,
       maturityStage: r.maturityStage,
       inputsThrough: r.inputsThrough,

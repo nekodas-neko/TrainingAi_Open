@@ -21,7 +21,7 @@ export interface ExclusionWindow {
   endDs: number
 }
 
-const inAnyWindow = (ds: number, windows: ExclusionWindow[]): boolean =>
+export const inAnyWindow = (ds: number, windows: ExclusionWindow[]): boolean =>
   windows.some(w => ds >= w.startDs && ds <= w.endDs)
 
 /**

@@ -183,6 +183,11 @@ describe('POST /api/workout-review/session/[sessionId]', () => {
     expect(generateObject).not.toHaveBeenCalled()
   })
 
+  it('gathers signals without adding the reviewed session to the week\'s phase mix a second time (#3287)', async () => {
+    expect((await reviewPost()).status).toBe(200)
+    expect(aggregateSignals.mock.calls[0][6]).toEqual({ includeSessionInWeekMix: false })
+  })
+
   it('reviews a finished baseline week', async () => {
     getSessionPeriodization.mockResolvedValue(state({ phase: 'baseline', baselineComplete: true }))
     expect((await reviewPost()).status).toBe(200)

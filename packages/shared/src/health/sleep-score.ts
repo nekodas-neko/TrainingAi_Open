@@ -153,7 +153,55 @@ const AWAKE_FRAGMENTATION_CAP = [[0, 100], [1, 100], [1.5, 88], [2, 72], [2.5, 5
 // The 93 anchor keeps a genuinely perfect night able to reach a true 100 (the session-245 intent,
 // guarded by tests). The owner's best real night blends to 91, so 100 stays reserved rather than
 // reachable by a merely-excellent one.
-const SCORE_CALIBRATION = [[0, 0], [20, 18], [34.6, 33], [50, 41], [65.4, 48], [74, 58], [78, 70], [81, 82], [85.6, 91], [88.7, 97], [91, 99], [93, 100]] as const
+const SCORE_CALIBRATION_V1 = [[0, 0], [20, 18], [34.6, 33], [50, 41], [65.4, 48], [74, 58], [78, 70], [81, 82], [85.6, 91], [88.7, 97], [91, 99], [93, 100]] as const
+
+// TN-5 / #2237 (owner sign-off 2026-08-24): the same endpoints, with the gain made even above 65.4.
+//
+// V1's slope swung 8-fold: a one-point gain in the blend showed as 4 displayed points at blend 79 and
+// 0.5 at blend 92, and six of twelve nights in August landed on the steep 3x/4x segments. This curve
+// keeps 0, the [93, 100] ceiling anchor and everything up to 65.4, and spreads the rest at about 1.9
+// points per blend point (every segment within 1.02x of the others, the pass test asks for 1.2x).
+//
+// What it is NOT: a fix for the volatility that prompted it. The curve must climb 0 to 100 across the
+// blend's range, so flattening one segment steepens another; measured night-to-night |delta| went
+// 13.53 -> 13.75. The owner's sleep really does vary that much (the raw blend moves ~9 points a night).
+// Measured on the 41 nights then stored: displayed mean 87.0 -> 85.5, and LOW_SLEEP_SCORE (42) fires
+// on 2 of 41 either way.
+//
+// History policy (owner, 2026-08-24): stored days keep the numbers the owner saw. So the curve is
+// chosen by the night's WAKE date (`SLEEP_SCORE_V2_FROM`), not swapped, and every path that recomputes
+// an old night (the weekly digest, the day audit, a backfill) still scores it on V1.
+const SCORE_CALIBRATION_V2 = [[0, 0], [20, 18], [34.6, 33], [50, 41], [65.4, 48], [74, 64.2], [78, 71.7], [81, 77.4], [85.6, 86.0], [88.7, 91.9], [91, 96.2], [93, 100]] as const
+
+/**
+ * The first wake date scored on `SCORE_CALIBRATION_V2`, or null while the curve is not live: every
+ * night then scores on V1 and nothing moves. Release prep sets it to the first wake date of the
+ * release that carries the curve (the night after the release deploys), so no night scored live on
+ * V1 is re-scored on V2 when it is recomputed. Same pattern as `SERVED_READINESS_STORED_FROM`.
+ *
+ * Set it only after the deploy is confirmed, with a margin, and in its own release (#2237: don't
+ * batch it with any other sleep change). If it is set before the deploy and the deploy slips, nights
+ * stored on V1 flip to V2 at their next recompute.
+ *
+ * Tests must hold whether it is null or a date: the ones that date nights relative to today pin the
+ * scorer to V1 with a partial mock of this module, and the pin test only asserts "null or an ISO date".
+ */
+export const SLEEP_SCORE_V2_FROM: string | null = null
+
+/** Which calibration scores the night that woke on `date` (`YYYY-MM-DD`), and its version stamp. */
+export function sleepScoreCalibrationFor(date: string, v2From: string | null = SLEEP_SCORE_V2_FROM): {
+  calibration: typeof SCORE_CALIBRATION_V1 | typeof SCORE_CALIBRATION_V2
+  modelVersion: string
+} {
+  const v1 = { calibration: SCORE_CALIBRATION_V1, modelVersion: SLEEP_SCORE_MODEL_VERSIONS.v1 }
+  if (v2From == null) return v1
+  // Compared as ISO text, so a "YYYY/MM/DD" key is normalised first ('/' sorts above '-', which would
+  // put every slash date on V2). A night with no date is a new one.
+  const iso = (date ?? '').replace(/\//g, '-')
+  return !iso || iso >= v2From
+    ? { calibration: SCORE_CALIBRATION_V2, modelVersion: SLEEP_SCORE_MODEL_VERSIONS.v2 }
+    : v1
+}
 
 const clamp100 = (n: number) => Math.max(0, Math.min(100, n))
 
@@ -215,8 +263,20 @@ export const MAIN_SLEEP_MIN_HOURS = 4
  * the night's source to the Oura API and the 19 Oct night composition (#3061) are unmarked steps in
  * its history: a row with no `sleep` key was scored before this stamp existed. Change it whenever a
  * weight, curve, baseline rule or the choice of which periods make the night changes.
+ * 2026-10-26 (#3001): each baseline is learned from the device that measured the night, so an Oura
+ * night re-scored per device no longer carries the stamp of its pooled score.
  */
-export const SLEEP_SCORE_MODEL_VERSION = 'v1:oura-long-sleep-night:2026-10-19'
+export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:2026-10-26'
+
+/**
+ * The stamp for each calibration (#2237): `v1` is the stamp above, `v2` the even-gain curve on the
+ * same night definition. `sleepScoreCalibrationFor` picks by wake date, so the stamp always names
+ * the curve that produced the stored score.
+ */
+export const SLEEP_SCORE_MODEL_VERSIONS = {
+  v1: SLEEP_SCORE_MODEL_VERSION,
+  v2: 'v2:even-gain:oura-long-sleep-night',
+} as const
 
 /**
  * The Sleep Score model in serialisable form — every weight, curve anchor and constant the score
@@ -242,7 +302,12 @@ export const SLEEP_MODEL = {
     scheduleWorstEndpointDeviationHours: SCHEDULE_DEV,
     awakeFractionPenalty: AWAKE_PENALTY,
     awakeFractionFragmentationCapByPersonalSd: AWAKE_FRAGMENTATION_CAP,
-    scoreCalibration: SCORE_CALIBRATION,
+    /** The curve scoring new nights now (#2237): V1 until `scoreCalibrationFrom` is set, V2 from that
+     *  wake date on. `sleepScoreCalibrationFor(date)` picks. */
+    scoreCalibration: SLEEP_SCORE_V2_FROM == null ? SCORE_CALIBRATION_V1 : SCORE_CALIBRATION_V2,
+    scoreCalibrationFrom: SLEEP_SCORE_V2_FROM,
+    scoreCalibrationBefore: SCORE_CALIBRATION_V1,
+    scoreCalibrationV2: SCORE_CALIBRATION_V2,
   },
   hrBaselineMinNights: SLEEP_HR_BASELINE_MIN_NIGHTS,
   scheduleMinNights: SLEEP_SCHEDULE_MIN_NIGHTS,
@@ -311,6 +376,8 @@ export function sleepScoreCoverage(components: Record<string, number>): SleepSco
 
 export interface SleepScoreResult {
   score: number
+  /** Which calibration scored it (`SLEEP_SCORE_MODEL_VERSIONS`), by the night's wake date (#2237). */
+  modelVersion: string
   /** OR-204: how complete the model's inputs were for this night. */
   coverage: SleepScoreCoverage
   /** Each available contributor's 0–100 sub-score (missing contributors are absent). */
@@ -336,6 +403,8 @@ export interface SleepScoreResult {
 }
 
 export interface SleepScoreOptions {
+  /** Overrides `SLEEP_SCORE_V2_FROM` (tests only): the first wake date scored on the V2 curve. */
+  v2From?: string | null
   /**
    * The user's personal overnight-HRV baseline (rMSSD ms) — typically the trailing ~28-night mean of
    * `averageHrvMs`. When supplied (and this night has an `averageHrvMs`), an `hrv` contributor is added
@@ -523,7 +592,8 @@ export function computeSleepScore(
   const blend = parts.reduce((s, p) => s + p.weight * p.sub, 0) / totalWeight
   // Calibration runs BEFORE the fragmentation cap: that cap's anchors (100/88/72/52/32/15) are
   // written on the displayed 0–100 scale, so it has to compare against a calibrated value.
-  const preCapScore = clamp100(Math.round(interp(blend, SCORE_CALIBRATION)))
+  const { calibration, modelVersion } = sleepScoreCalibrationFor(session.date, opts.v2From)
+  const preCapScore = clamp100(Math.round(interp(blend, calibration)))
 
   const components: Record<string, number> = {}
   for (const p of parts) components[p.key] = Math.round(p.sub)
@@ -552,7 +622,7 @@ export function computeSleepScore(
     }
   }
 
-  return { score: clamp100(score), preCapScore, components, fragmentationCap, coverage: sleepScoreCoverage(components) }
+  return { score: clamp100(score), preCapScore, components, fragmentationCap, coverage: sleepScoreCoverage(components), modelVersion }
 }
 
 /** Signed hours from `ref` to `h` on a 24-hour clock, in [−12, 12). Positive = later than `ref`.
