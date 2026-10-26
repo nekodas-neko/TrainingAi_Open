@@ -125,6 +125,16 @@ describe('planLookAlikeMerge', () => {
       expect(g.extras[0].worstChange.kcal).toBe(1)
     })
 
+    it('a kcal that lands on an exact .5 rounds the way the app does, so it is not automatic', () => {
+      // 1.5 x (150 / 250) is 0.8999999999999999: the keeper's 1012.5 shows as 1012, the extra's as 1013.
+      const k = food({ servingSizeG: 250, calories: 1125, proteinG: 0, carbsG: 0, fatG: 0, liveLogs: 5 })
+      const e = food({ servingSizeG: 150, calories: 675, proteinG: 0, carbsG: 0, fatG: 0, liveLogs: 1, quantities: [1.5] })
+      const [g] = planLookAlikeMerge([k, e]).groups
+      expect(g.kind).toBe('same-per-100g')
+      expect(g.automatic).toBe(false)
+      expect(g.worstChange.kcal).toBe(1)
+    })
+
     it('is automatic when the foods agree exactly per 100 g, whatever the quantity', () => {
       const k = food({ servingSizeG: 100, calories: 200, proteinG: 10, carbsG: 25, fatG: 5, liveLogs: 5 })
       const e = food({ servingSizeG: 45, calories: 90, proteinG: 4.5, carbsG: 11.25, fatG: 2.25, liveLogs: 2, quantities: [0.5, 1, 3.25] })

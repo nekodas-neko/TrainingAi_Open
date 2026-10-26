@@ -148,7 +148,7 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
       `INSERT INTO meal_logging_statuses (user_id, meal_type_id, log_date, skipped, explicit, decision_id, decided_at)
        VALUES ($1,$2,'2026-10-01',true,true,gen_random_uuid(),'2026-10-02T00:00:00Z')`, [USER, mealTypeId])
     const skipped = async () => (await repo.listMealLoggingStatuses(USER, '2026-10-01')).find(r => r.mealTypeId === mealTypeId)?.skipped
-    const complete = async () => (await repo.listMealLoggingCompleteness(USER, '2026-10-01', '2026-10-01'))[0]?.complete
+    const complete = async () => (await repo.listMealLoggingCompleteness!(USER, '2026-10-01', '2026-10-01'))[0]?.complete
     expect(await skipped()).toBe(true)
     expect(await complete()).toBe(true)
 
@@ -197,7 +197,7 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
     })
 
     it("only: 'exact' merges the automatic groups and leaves the others alone, dry run and write alike", async () => {
-      await addFood({ name: 'Same A' }); const sameB = await addFood({ name: 'Same A' })
+      const sameA = await addFood({ name: 'Same A' }); const sameB = await addFood({ name: 'Same A' })
       const { keeper, extra } = await roundingPair()
       const plan = await merge(db, USER, { dryRun: true, only: 'exact' })
       if (!plan.ok) throw new Error(plan.error)
@@ -206,8 +206,10 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
 
       const out = await merge(db, USER, { dryRun: false, only: 'exact' })
       expect(out.ok && out.report.failedGroups).toBe(0)
-      const { rows } = await pool.query(`SELECT id, deleted_at FROM food_items WHERE id = ANY($1)`, [[sameB, keeper, extra]])
-      expect(rows.find(r => r.id === sameB).deleted_at ?? rows.find(r => r.id !== keeper && r.id !== extra)).toBeTruthy()
+      const { rows } = await pool.query(`SELECT id, deleted_at FROM food_items WHERE id = ANY($1)`, [[sameA, sameB, keeper, extra]])
+      // Tie on logs: the newer row (sameB) is kept and the older one is retired.
+      expect(rows.find(r => r.id === sameA).deleted_at).not.toBeNull()
+      expect(rows.find(r => r.id === sameB).deleted_at).toBeNull()
       expect(rows.find(r => r.id === extra).deleted_at).toBeNull()
       expect(rows.find(r => r.id === keeper).deleted_at).toBeNull()
     })

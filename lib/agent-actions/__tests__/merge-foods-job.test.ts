@@ -28,6 +28,14 @@ describe('merge-look-alike-foods (#2417)', () => {
     expect(AgentActionRequest.safeParse(req({ dryRun: true, userId: OWNER })).success).toBe(false)
   })
 
+  it("takes only: 'exact', passes it to the merge, and refuses any other value", async () => {
+    expect(AgentActionRequest.safeParse(req({ dryRun: true, only: 'exact' })).success).toBe(true)
+    expect(AgentActionRequest.safeParse(req({ dryRun: true, only: 'all' })).success).toBe(false)
+    expect(AgentActionRequest.safeParse(req({ dryRun: true, only: true })).success).toBe(false)
+    await runAgentJob(ctx, AgentActionRequest.parse(req({ dryRun: false, only: 'exact' })))
+    expect(merge).toHaveBeenCalledWith({ db: true }, OWNER, { dryRun: false, only: 'exact' })
+  })
+
   it('needs an approval to write, not to dry-run', () => {
     expect(agentJobLosesData(AgentActionRequest.parse(req({ dryRun: true })))).toBe(false)
     expect(agentJobLosesData(AgentActionRequest.parse(req({ dryRun: false })))).toBe(true)

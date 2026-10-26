@@ -143,7 +143,9 @@ function samePer100g(a: MergeFood, b: MergeFood): boolean {
 }
 
 const ZERO: WorstChange = { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 }
-const roundTo = (v: number, step: number) => Math.round(v / step + 1e-7) * step
+// The app's own per-log rounding (computeLogMacros): kcal whole, macros to 0.1 g, no epsilon.
+const shownKcal = (v: number) => Math.round(v)
+const shownG = (v: number) => Math.round(v * 10) / 10
 const clean = (v: number) => Math.round(v * 1e6) / 1e6
 
 /**
@@ -155,10 +157,10 @@ export function worstChangeOf(extra: MergeFood, keeper: MergeFood, factor: numbe
   const worst = { ...ZERO }
   for (const q of extra.quantities ?? []) {
     const moved = q * factor
-    worst.kcal = Math.max(worst.kcal, Math.abs(roundTo(keeper.calories * moved, 1) - roundTo(extra.calories * q, 1)))
-    worst.proteinG = Math.max(worst.proteinG, Math.abs(roundTo(keeper.proteinG * moved, 0.1) - roundTo(extra.proteinG * q, 0.1)))
-    worst.carbsG = Math.max(worst.carbsG, Math.abs(roundTo(keeper.carbsG * moved, 0.1) - roundTo(extra.carbsG * q, 0.1)))
-    worst.fatG = Math.max(worst.fatG, Math.abs(roundTo(keeper.fatG * moved, 0.1) - roundTo(extra.fatG * q, 0.1)))
+    worst.kcal = Math.max(worst.kcal, Math.abs(shownKcal(keeper.calories * moved) - shownKcal(extra.calories * q)))
+    worst.proteinG = Math.max(worst.proteinG, Math.abs(shownG(keeper.proteinG * moved) - shownG(extra.proteinG * q)))
+    worst.carbsG = Math.max(worst.carbsG, Math.abs(shownG(keeper.carbsG * moved) - shownG(extra.carbsG * q)))
+    worst.fatG = Math.max(worst.fatG, Math.abs(shownG(keeper.fatG * moved) - shownG(extra.fatG * q)))
   }
   return { kcal: clean(worst.kcal), proteinG: clean(worst.proteinG), carbsG: clean(worst.carbsG), fatG: clean(worst.fatG) }
 }
