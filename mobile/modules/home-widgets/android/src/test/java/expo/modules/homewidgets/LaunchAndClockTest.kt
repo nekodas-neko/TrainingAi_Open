@@ -57,4 +57,14 @@ class MidnightClockTest {
     assertEquals(millis(LocalDateTime.of(2026, 10, 24, 0, 1), tokyo), MidnightClock.nextMillis(now, tokyo))
     assertNotEquals(MidnightClock.nextMillis(now, losAngeles), MidnightClock.nextMillis(now, tokyo))
   }
+
+  @Test fun `the alarm's zone comes from the stored snapshot, falling back to the phone's`() {
+    val tokyo = ZoneId.of("Asia/Tokyo")
+    val now = millis(LocalDateTime.of(2026, 10, 23, 23, 30), tokyo)
+    val stored = """{"v":1,"user":"u","date":"2026-10-23","tz":"Asia/Tokyo"}"""
+    val zone = WidgetSnapshot.zoneOf(WidgetSnapshot.parse(stored))
+    assertEquals(millis(LocalDateTime.of(2026, 10, 24, 0, 1), tokyo), MidnightClock.nextMillis(now, zone))
+    val older = WidgetSnapshot.zoneOf(WidgetSnapshot.parse("""{"v":1,"user":"u","date":"2026-10-23"}"""))
+    assertEquals(ZoneId.systemDefault(), older)
+  }
 }

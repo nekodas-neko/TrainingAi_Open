@@ -2,7 +2,6 @@ package expo.modules.homewidgets
 
 import java.time.DateTimeException
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import org.json.JSONArray
 import org.json.JSONObject
@@ -108,7 +107,7 @@ object WidgetSnapshot {
 
   /** Today's date as the profile counts it, so it can be compared with the snapshot's date. */
   fun today(snapshot: Snapshot?, now: Instant = Instant.now()): String =
-    LocalDate.ofInstant(now, zoneOf(snapshot)).toString()
+    now.atZone(zoneOf(snapshot)).toLocalDate().toString()
 
   /** A snapshot from an earlier day is never shown as today's numbers. */
   fun isStale(snapshot: Snapshot, localDate: String): Boolean = snapshot.date != localDate
