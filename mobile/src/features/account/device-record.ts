@@ -64,6 +64,8 @@ export type DeviceDeps = {
   wipe(origin: string, userId: string | null): Promise<void>;
   /** Whether data of any account but this one is on the phone. Absent: the check is skipped. */
   holdsOtherAccounts?(origin: string, userId: string): Promise<boolean>;
+  /** Wipes every account scope except `keepUserId`'s. Required wherever `holdsOtherAccounts` is. */
+  wipeOthers?(origin: string, keepUserId: string): Promise<void>;
 };
 
 export type DeviceReconcile = {
@@ -90,17 +92,22 @@ export async function reconcileDevice(
     return { outcome: 'ok', record };
   }
   let wiped = false;
-  const unclaimedWithOthers =
-    record === null && (await deps.holdsOtherAccounts?.(origin, userId)) === true;
-  if ((record !== null && !sameOwner) || unclaimedWithOthers) {
-    // Someone else's data is on this phone, or no one's record says whose it is: all of it goes,
-    // orphans of older accounts included.
+  if (record !== null && !sameOwner) {
+    // The recorded owner is someone else: all of it goes, orphans of older accounts included.
     await deps.wipe(origin, null);
     wiped = true;
-  } else if (sameOwner || serverEpoch > 0) {
-    // Behind a reset (or a phone with no record that meets one): this account's scope goes.
-    await deps.wipe(origin, userId);
-    wiped = true;
+  } else {
+    if (record === null && (await deps.holdsOtherAccounts?.(origin, userId)) === true) {
+      // No record, and other accounts' data is here that nobody can attribute. Theirs goes; this
+      // account's own scope and its unsent writes are not touched (#3396), and the session stays.
+      if (!deps.wipeOthers) throw new Error('Cannot wipe other accounts without a way to keep this one.');
+      await deps.wipeOthers(origin, userId);
+    }
+    if (sameOwner || serverEpoch > 0) {
+      // Behind a reset (or a phone with no record that meets one): this account's scope goes.
+      await deps.wipe(origin, userId);
+      wiped = true;
+    }
   }
   const next: DeviceRecord = { origin, userId, epoch: serverEpoch };
   await deps.write(JSON.stringify(next));

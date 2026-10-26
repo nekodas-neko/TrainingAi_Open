@@ -120,6 +120,10 @@ export const authPlatform: AuthPlatform = {
     else await storage.clearAccount(origin, userId);
     homeWidgets?.clearSnapshot();
   },
+  async wipeOtherAccountData(origin, userId) {
+    await (await openLocalStorage()).clearOtherAccounts(origin, userId);
+    homeWidgets?.clearSnapshot();
+  },
   async holdsOtherAccountData(origin, userId) {
     return (await openLocalStorage()).holdsOtherAccounts(origin, userId);
   },

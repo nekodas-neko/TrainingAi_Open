@@ -52,7 +52,9 @@ async function accessTokenFor(user: User, nativeTokenId: string) {
       email: user.email,
       nativeTokenId,
       // #3369: the refresh-token row is what ties this token to a sign-in (a reset deletes it), so
-      // the stamp is the issue time.
+      // the stamp is the issue time. That makes it right for the session cut-off, which only asks
+      // "issued after the reset?", and wrong as a sign-in time: every rotation moves it. So
+      // `/api/account/data-epoch` does not report it for a bearer request.
       signedInAt: nowSeconds(),
     },
   });

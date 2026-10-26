@@ -1008,15 +1008,18 @@ export function pushMutations(userId: string): Promise<PushResult> {
  * sweeps below**: they re-queue local rows under `userId`, which on a store of unknown ownership is
  * exactly the adoption the wipe exists to prevent. Never throws; a failed push loses nothing that
  * the wipe was not going to lose anyway.
+ *
+ * `signal` is the caller's cap: no new request starts once it aborts, and an in-flight one is
+ * cancelled. The caller waits for this to return before it wipes, so it never overlaps the wipe.
  */
-export async function pushOwnOutboxBeforeWipe(userId: string): Promise<void> {
+export async function pushOwnOutboxBeforeWipe(userId: string, signal?: AbortSignal): Promise<void> {
   try {
     const store = getUngatedLocalStore(userId);
-    if (store) await pushMutationsOnce(userId, store);
+    if (store) await pushMutationsOnce(userId, store, signal);
   } catch { /* best effort */ }
 }
 
-async function pushMutationsOnce(userId: string, ungatedStore?: LocalStore): Promise<PushResult> {
+async function pushMutationsOnce(userId: string, ungatedStore?: LocalStore, signal?: AbortSignal): Promise<PushResult> {
   const store = ungatedStore ?? getLocalStore(userId);
   if (!store) return null;
   const outboxOnly = ungatedStore !== undefined;
@@ -1080,11 +1083,13 @@ async function pushMutationsOnce(userId: string, ungatedStore?: LocalStore): Pro
   let anyRequestOk = false;
 
   for (let i = 0; i < pending.length; i += PUSH_CHUNK_SIZE) {
+    if (signal?.aborted) break;
     const chunk = pending.slice(i, i + PUSH_CHUNK_SIZE);
     let res: Response;
     try {
       res = await fetch('/api/sync/push', {
         method: 'POST',
+        signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mutations: await Promise.all(

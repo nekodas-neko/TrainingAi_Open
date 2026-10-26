@@ -46,6 +46,14 @@ describe('GET /api/account/data-epoch', () => {
     expect((await (await GET()).json()).signedInAt).toBeNull()
   })
 
+  it('a bearer request gets no signedInAt, since a native token is re-stamped on every rotation', async () => {
+    repo.getUserById.mockResolvedValue({ id: 'u1', sessionsValidFrom: null })
+    const { GET } = await import('../route')
+    session.current = { user: { id: 'u1' }, signedInAt: 1_790_000_000 }
+    const res = await GET(new Request('http://localhost/api/account/data-epoch', { headers: { authorization: 'Bearer abc' } }))
+    expect(await res.json()).toEqual({ epoch: 0 })
+  })
+
   it('401 when the account is gone, and 429 over the limit', async () => {
     repo.getUserById.mockResolvedValue(null)
     const { GET } = await import('../route')

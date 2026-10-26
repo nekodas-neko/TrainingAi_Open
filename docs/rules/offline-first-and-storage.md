@@ -113,10 +113,21 @@ any device that still holds the old rows. The guarantees, and where each lives:
   **A device with no record** (every install, on the first launch of the version that records one)
   looks at its store and at how the session began. Empty: claimed. Rows, and the session predates the
   update (its token has no `signedInAt`, so it is the session that wrote them): **adopted, nothing
-  wiped, outbox kept.** Rows, and a fresh sign-in (it has `signedInAt`): the delete-then-re-signup case,
-  so the account's own queued writes are pushed first (best effort; outbox only, no stranded-row
-  sweep), then everything is wiped and claimed. If either look fails the store stays closed and the
-  next call asks again. Queued localStorage uploads count as data; cached responses do not. An empty
+  wiped, outbox kept.** Rows, and a fresh sign-in (it has `signedInAt`): the same account signing in
+  again after an expired or lost cookie, or delete then re-signup. The outbox tells them apart: **an
+  entry stamped with the signed-in `user_id`, of any status (pending, in backoff, failed), proves the
+  rows are that account's, so the device adopts them and wipes nothing.** A replacement account never
+  has its new id in the outbox. With no such entry, the account's own queued writes are pushed first
+  (best effort; outbox only, no stranded-row sweep), the outbox is checked again, and only if it still
+  holds nothing for the account is everything wiped and claimed. The push is capped at 10 s: at the
+  cap it is aborted and waited for, so a push never runs alongside the wipe, and if it will not stop
+  the wipe does not happen. If any look fails the store stays closed and the next call asks again
+  after a short doubling backoff (5 s up to 60 s), not on every call; a record that cannot be written
+  is treated the same way. `/api/account/data-epoch` leaves `signedInAt` out for a bearer request
+  (a native token is re-stamped on every rotation), which the device reads as "cannot tell". Preview, a
+  phone with no record that also holds another account's scope: only the other accounts' scopes are
+  wiped; the signed-in account's scope and outbox stay, and it is not signed out (#3396). Queued
+  localStorage uploads count as data; cached responses do not. An empty
   user id is never recorded as an owner.
 - **A wipe that fails opens nothing.** The epoch record, and the cookie the server's gate reads, are
   written only after every clear (each SQLite table, the cache) succeeded. A partial wipe keeps the

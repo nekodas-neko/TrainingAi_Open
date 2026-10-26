@@ -194,8 +194,9 @@ test('a refused write (409) on a phone that is behind wipes it and signs out', a
   assert.equal(f.controller.state.status, 'signedOut');
 });
 
-test('reconcileDevice: a phone with no record that holds another account\'s data wipes every scope first', async () => {
+test('reconcileDevice: a phone with no record that holds another account\'s data wipes only the other accounts', async () => {
   const wipes: unknown[] = [];
+  const others: unknown[] = [];
   const disk = { value: null as string | null };
   const out = await reconcileDevice(
     {
@@ -203,12 +204,81 @@ test('reconcileDevice: a phone with no record that holds another account\'s data
       write: async (v) => void (disk.value = v),
       wipe: async (_o, u) => void wipes.push(u),
       holdsOtherAccounts: async () => true,
+      wipeOthers: async (_o, keep) => void others.push(keep),
     },
     origin, 'new', 0,
   );
-  assert.equal(out.outcome, 'wiped');
-  assert.deepEqual(wipes, [null]);
+  // The signed-in account's own scope and outbox are kept, and the phone is not told to sign out.
+  assert.equal(out.outcome, 'ok');
+  assert.deepEqual(others, ['new']);
+  assert.deepEqual(wipes, []);
   assert.equal(parseDeviceRecord(disk.value)?.userId, 'new');
+});
+
+test('reconcileDevice: other accounts plus a reset wipes the others, then the account that is behind', async () => {
+  const order: string[] = [];
+  const disk = { value: null as string | null };
+  const out = await reconcileDevice(
+    {
+      read: async () => disk.value,
+      write: async (v) => { order.push('write'); disk.value = v; },
+      wipe: async (_o, u) => void order.push(`wipe:${u}`),
+      holdsOtherAccounts: async () => true,
+      wipeOthers: async (_o, keep) => void order.push(`others-except:${keep}`),
+    },
+    origin, 'new', 700,
+  );
+  assert.equal(out.outcome, 'wiped');
+  assert.deepEqual(order, ['others-except:new', 'wipe:new', 'write']);
+});
+
+test('reconcileDevice: other accounts without a way to spare this one is refused, not wiped wholesale', async () => {
+  const wipes: unknown[] = [];
+  const disk = { value: null as string | null };
+  await assert.rejects(
+    reconcileDevice(
+      {
+        read: async () => disk.value,
+        write: async (v) => void (disk.value = v),
+        wipe: async (_o, u) => void wipes.push(u),
+        holdsOtherAccounts: async () => true,
+      },
+      origin, 'new', 0,
+    ),
+  );
+  assert.deepEqual(wipes, []);
+  assert.equal(disk.value, null);
+});
+
+test('reconcileDevice: a failed wipe of the other accounts records nothing', async () => {
+  const disk = { value: null as string | null };
+  await assert.rejects(
+    reconcileDevice(
+      {
+        read: async () => disk.value,
+        write: async (v) => void (disk.value = v),
+        wipe: async () => {},
+        holdsOtherAccounts: async () => true,
+        wipeOthers: async () => { throw new Error('locked'); },
+      },
+      origin, 'new', 0,
+    ),
+  );
+  assert.equal(disk.value, null);
+});
+
+test('a recordless Preview phone holding a second account keeps the signed-in account signed in with its scope untouched', async () => {
+  const f = sessionFixture({ saved: { accessToken: 'tok', expiresAt: now() + 86_000, userId: 'u1' }, deviceRecord: null, serverEpoch: 0 });
+  const calls: string[] = [];
+  const base = f.controller as unknown as { platform: AuthPlatform };
+  base.platform.holdsOtherAccountData = async () => true;
+  base.platform.wipeOtherAccountData = async (_o, keep) => void calls.push(`others-except:${keep}`);
+  await f.controller.initialize(null);
+  assert.deepEqual(calls, ['others-except:u1']);
+  assert.deepEqual(f.wipes, [], 'the signed-in account\'s scope is not wiped');
+  assert.equal(f.controller.state.status, 'signedIn', 'and the person is not signed out');
+  assert.ok(f.controller.dataReader);
+  assert.equal(parseDeviceRecord(f.storage.get(DEVICE_RECORD_KEY) ?? null)?.userId, 'u1');
 });
 
 test('reconcileDevice: a phone with no record and no other account\'s data is simply claimed', async () => {

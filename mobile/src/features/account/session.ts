@@ -100,6 +100,8 @@ export type AuthPlatform = {
    */
   wipeAccountData?(origin: string, userId: string | null): Promise<void>;
   holdsOtherAccountData?(origin: string, userId: string): Promise<boolean>;
+  /** #3396: wipe every account scope except this user's. */
+  wipeOtherAccountData?(origin: string, userId: string): Promise<void>;
 };
 const RESET_MESSAGE = 'Your account data was reset. Sign in again to start fresh.';
 
@@ -199,6 +201,7 @@ export class AccountSession {
           write: (value: string) => this.platform.set(DEVICE_RECORD_KEY, value),
           wipe,
           holdsOtherAccounts: this.platform.holdsOtherAccountData?.bind(this.platform),
+          wipeOthers: this.platform.wipeOtherAccountData?.bind(this.platform),
         }
       : null;
   }

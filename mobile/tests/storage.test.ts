@@ -141,3 +141,19 @@ test('holdsOtherAccounts sees data of any account but the one asked about, and i
   await storage.clearAllAccounts();
   assert.equal(await storage.holdsOtherAccounts(origin, 'u1'), false);
 });
+
+test('clearOtherAccounts removes every other account\'s data and keeps this account and the device scope', async () => {
+  const { database } = sqliteFixture();
+  const storage = await createLocalStorage(database);
+  const origin = 'https://example.com';
+  await storage.device().set('theme', 'dark');
+  await storage.account(origin, 'u1').set('outbox', 'unsent');
+  await storage.account(origin, 'old').set('k', 'v');
+  await storage.account('https://other.example', 'u1').set('k', 'v');
+  await storage.clearOtherAccounts(origin, 'u1');
+  assert.equal(await storage.account(origin, 'u1').get('outbox'), 'unsent');
+  assert.equal(await storage.device().get('theme'), 'dark');
+  assert.equal(await storage.account(origin, 'old').get('k'), null);
+  assert.equal(await storage.account('https://other.example', 'u1').get('k'), null);
+  assert.equal(await storage.holdsOtherAccounts(origin, 'u1'), false);
+});
