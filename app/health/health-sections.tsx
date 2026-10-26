@@ -295,7 +295,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
                   <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{leanKg} kg <span className="text-sm font-medium text-muted-foreground">lean</span></p>
                 )}
                 {delta != null && (
-                  <p className={`text-xs mt-0.5 ${delta >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <p className={`text-xs mt-0.5 ${delta >= 0 ? 'text-accent-green' : 'text-destructive'}`}>
                     {delta >= 0 ? '+' : ''}{delta} kg from oldest
                   </p>
                 )}

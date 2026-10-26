@@ -95,9 +95,48 @@ describe('querySQLOpen', () => {
   })
 
   it('throws, where querySQL answers [], when init was never started', async () => {
+    vi.useFakeTimers()
+    try {
+      const svc = await freshService()
+      await expect(svc.querySQL('SELECT 1')).resolves.toEqual([])
+      const read = expect(svc.querySQLOpen('SELECT 1')).rejects.toThrow(/not open/)
+      await vi.advanceTimersByTimeAsync(3_100)
+      await read
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // #3445: the store-owner check can ask on a first launch before init has been called.
+  it('waits briefly for init to begin, then reads, rather than throwing', async () => {
+    vi.useFakeTimers()
+    try {
+      const svc = await freshService()
+      query.mockResolvedValue({ values: [{ x: 1 }] })
+      const read = svc.querySQLOpen('SELECT 1 AS x')
+      await vi.advanceTimersByTimeAsync(500)
+      void svc.initSQLite([])
+      await vi.advanceTimersByTimeAsync(100)
+      await expect(read).resolves.toEqual([{ x: 1 }])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not wait when init already failed: that is a known answer, not a late start', async () => {
     const svc = await freshService()
-    await expect(svc.querySQL('SELECT 1')).resolves.toEqual([])
-    await expect(svc.querySQLOpen('SELECT 1')).rejects.toThrow(/not open/)
+    open.mockRejectedValue(new Error('upgrade failed'))
+    await expect(svc.initSQLite([])).rejects.toThrow()
+    vi.useFakeTimers()
+    try {
+      let settled = false
+      const read = svc.querySQLOpen('SELECT 1').catch(e => { settled = true; return e })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(settled).toBe(true)
+      expect((await read).message).toMatch(/not open/)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('throws when the DB failed to open', async () => {

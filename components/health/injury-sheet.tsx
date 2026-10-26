@@ -191,9 +191,9 @@ export function InjurySheet({ open, onOpenChange, injury, onSaved, onDeleted, us
   }
 
   const severityColors: Record<Severity, string> = {
-    mild: 'bg-green-500/15 text-green-500 border-green-500/30',
-    moderate: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
-    severe: 'bg-red-500/15 text-red-500 border-red-500/30',
+    mild: 'bg-accent-green/15 text-accent-green border-accent-green/30',
+    moderate: 'bg-accent-amber/15 text-accent-amber border-accent-amber/30',
+    severe: 'bg-destructive/15 text-destructive border-destructive/30',
   }
 
   return (

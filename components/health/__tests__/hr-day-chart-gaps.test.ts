@@ -66,3 +66,16 @@ describe('interpolateGaps', () => {
     expect(interpolateGaps([{ x: 0, y: 50 }], 20, 120)).toEqual([])
   })
 })
+
+// #3445: on a spring-forward day the chart's minutes are the clock face, so 01:50 → 03:00 reads 70.
+describe('gaps across a skipped hour (#3445)', () => {
+  const skip = { fromMin: 120, toMin: 180 }
+  const points = [{ x: 110, y: 60 }, { x: 180, y: 62 }]
+  it('withGapBreaks does not break the line where the clock jumped', () => {
+    expect(withGapBreaks(points, 20, skip)).toHaveLength(2)
+    expect(withGapBreaks(points, 20)).toHaveLength(3)
+  })
+  it('interpolateGaps does not bridge a gap that was only the clock jumping', () => {
+    expect(interpolateGaps(points, 20, 120, skip)).toEqual([])
+  })
+})

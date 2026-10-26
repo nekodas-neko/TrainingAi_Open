@@ -100,9 +100,9 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
     rmDiff == null
       ? ""
       : rmDiff > 0.1
-        ? "text-green-600 dark:text-green-400"
+        ? "text-accent-green"
         : rmDiff < -0.1
-          ? "text-red-500"
+          ? "text-destructive"
           : "text-muted-foreground";
 
   const isBodyweight = isBodyweightType(exerciseType);

@@ -48,7 +48,7 @@ function deltaChip(trends: HealthTrendDay[], field: Field) {
   if (!change) return null;
   if (change.direction === "same") return { text: change.text, colorClass: "text-muted-foreground" };
   // A-9: paired with ▲/▼ so state survives, but the -400 shade washed out in light theme.
-  const colorClass = change.direction === "up" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+  const colorClass = change.direction === "up" ? "text-accent-green" : "text-destructive";
   return { text: change.text, colorClass };
 }
 

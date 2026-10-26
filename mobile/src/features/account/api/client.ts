@@ -162,9 +162,10 @@ export function createApiClient(
       '/api/admin/reencode-',
       '/api/admin/recompute-',
     ].some((prefix) => path.startsWith(prefix));
-    // An admin reset or delete runs one transaction the server allows 120 s (a ring-heavy account
-    // cascades through hundreds of thousands of rows). Cut off sooner, it would read as a failure
-    // while the server went on to commit, and a self-reset would never sign out.
+    // An admin reset or delete runs one transaction whose statements the server allows 120 s each (a
+    // ring-heavy account cascades through hundreds of thousands of rows in one statement), so the
+    // whole request can take longer. Cut off sooner, it would read as a failure while the server
+    // went on to commit, and a self-reset would never sign out.
     const wipe =
       path === '/api/admin/users/reset-data' || (path === '/api/admin/users' && method === 'DELETE');
     const timeout = setTimeout(

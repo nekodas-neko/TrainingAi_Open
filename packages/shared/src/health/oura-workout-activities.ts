@@ -20,7 +20,7 @@
  *
  * Each workout lands on the user's local day of its start, the same day key everything else uses.
  */
-import { localClockTimeToDate, toAestDay } from '../date-utils'
+import { localClockTimeToDate, shiftDateStr, toAestDay } from '../date-utils'
 
 /** Oura activity → the app's own activity type, where the app has one. */
 const OURA_TO_APP_TYPE: Record<string, string> = {
@@ -67,7 +67,8 @@ export function movementWindows(counted: CountedMovement, tz: string): [number, 
     if (end && end <= start) {
       end = a.durationMin != null && a.durationMin > 0
         ? new Date(start.getTime() + a.durationMin * 60_000)
-        : new Date(end.getTime() + 86_400_000)
+        // The same clock time on the next calendar day, not 24 h on: a daylight-saving day is 23 or 25 h.
+        : localClockTimeToDate(shiftDateStr(a.date, 1), a.endTime?.slice(0, 5), tz)
     }
     if (end && end > start) windows.push([start.getTime(), end.getTime()])
   }
