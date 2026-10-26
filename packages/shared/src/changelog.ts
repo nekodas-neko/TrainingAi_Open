@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.503.0",
+    date: "2026-10-27",
+    changes: [
+      "TrainingAi Preview: admins can reset a user's data or delete their account from the Users screen, the timeline's Woke up and the Wake Time trend use the time you woke, the picture-in-picture window uses the app's colours, and a low ring battery alert is no longer held back by the phone's previous account.",
+      "Behind the scenes: on a daylight-saving day, active energy and the heart rate graph follow the clock, the Oura backfill tidies every day of its range, and an admin reset has a written runbook.",
+    ],
+  },
+  {
     version: "1.502.0",
     date: "2026-10-27",
     changes: [
