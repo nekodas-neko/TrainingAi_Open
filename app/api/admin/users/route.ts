@@ -10,7 +10,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 import { rateLimit } from '@/lib/rate-limit'
-import { resolveOwnerUserId, judgeProtectedTarget, judgeRevokeAdmin } from '@/lib/admin-owner'
+import { resolveOwnerUserId, judgeProtectedTarget, judgeRevokeAdmin, sameUserId } from '@/lib/admin-owner'
 
 /**
  * #2383 item 3 — the one self-check both mutating handlers share. Deleting or deactivating your own
@@ -19,7 +19,7 @@ import { resolveOwnerUserId, judgeProtectedTarget, judgeRevokeAdmin } from '@/li
  * acting admin can never remove themselves, these two routes also cannot leave zero active admins.
  */
 function refuseSelf(targetUserId: string, sessionUserId: string, verb: 'delete' | 'deactivate' | 'remove admin from') {
-  return targetUserId === sessionUserId
+  return sameUserId(targetUserId, sessionUserId)
     ? NextResponse.json({ error: `Cannot ${verb} yourself` }, { status: 400 })
     : null
 }
@@ -81,8 +81,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const ownerId = resolveOwnerUserId()
   const repo = await getRepository()
+  const ownerId = await resolveOwnerUserId(repo)
 
   // Activating yourself is a no-op (you are signed in, so already active); only deactivation locks out.
   if (action === 'deactivate') {
@@ -92,7 +92,10 @@ export async function PATCH(req: NextRequest) {
     const target = await repo.getUserById(userId)
     if (target) {
       const refused = judgeProtectedTarget(session.user.id, userId, target.isAdmin === true, ownerId)
-      if (refused) return NextResponse.json({ error: 'Only the owner can deactivate this account' }, { status: 403 })
+      if (refused) {
+        console.warn(`[admin/users] deactivate refused (${refused}): admin ${session.user.id} -> ${userId}`)
+        return NextResponse.json({ error: 'Only the owner can deactivate this account' }, { status: 403 })
+      }
     }
   }
 
@@ -102,7 +105,9 @@ export async function PATCH(req: NextRequest) {
       const self = refuseSelf(userId, session.user.id, 'remove admin from')
       if (self) return self
       // Only the owner removes admin. Checked again on the locked rows inside the transaction.
-      if (judgeRevokeAdmin(session.user.id, ownerId)) {
+      const refused = judgeRevokeAdmin(session.user.id, ownerId)
+      if (refused) {
+        console.warn(`[admin/users] remove admin refused (${refused}): admin ${session.user.id} -> ${userId}`)
         return NextResponse.json({ error: 'Only the owner can remove admin' }, { status: 403 })
       }
     }
