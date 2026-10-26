@@ -9,7 +9,8 @@ import {
   shiftDateStr,
   weekStartForDay,
   formatDateDisplay,
-  formatMinutesOfDay,
+  clockSkipOnDay,
+  dateStrMidnightInTz,
 } from '@trainingai/shared/date-utils';
 import {
   AppText,
@@ -27,6 +28,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { HistoryDay } from '../../workouts/screens/WorkoutHistoryScreen';
+import { hrTracePoints } from '../data/hr-trace';
 import { useHealthData } from '../data/HealthDataProvider';
 import {
   energySpec,
@@ -175,7 +177,7 @@ export function DayReadThrough({
   date: string;
   readOnly?: boolean;
 }) {
-  const { today } = useHealthData();
+  const { today, timezone } = useHealthData();
   const state = useWorkoutResource(healthDaySpec(date));
   const energy = useWorkoutResource(energySpec(date));
   const parsed = healthDaySchema.safeParse(state.data);
@@ -223,12 +225,12 @@ export function DayReadThrough({
           : [];
       })
     : [];
-  const points = data.hr.flatMap((p, i, series) => [
-    ...(i && p.minute - series[i - 1].minute > 30
-      ? [{ label: 'Not recorded', x: p.minute - 1, value: null }]
-      : []),
-    { label: formatMinutesOfDay(p.minute), x: p.minute, value: p.bpm },
-  ]);
+  // The trace is on wall-clock minutes (#3442); a spring-forward day's skipped hour is not a gap (#3445).
+  const skip = clockSkipOnDay(dateStrMidnightInTz(date, timezone).getTime(), timezone);
+  const points = hrTracePoints(
+    data.hr.map((p) => ({ x: p.minute, y: p.bpm })),
+    skip,
+  );
   const tempDeviation = ouraTemperatureDeviationRow(data.bodyTemp);
   return (
     <>

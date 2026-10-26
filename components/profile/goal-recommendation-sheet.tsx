@@ -221,8 +221,8 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
         </SheetHeader>
 
         {data.dataQualityNote && (
-          <div className="px-4 py-3 border-b border-border bg-amber-500/10">
-            <p className="text-xs text-amber-700 dark:text-amber-400">{data.dataQualityNote}</p>
+          <div className="px-4 py-3 border-b border-border bg-accent-amber/10">
+            <p className="text-xs text-accent-amber">{data.dataQualityNote}</p>
           </div>
         )}
 

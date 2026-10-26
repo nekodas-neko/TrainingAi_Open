@@ -83,13 +83,13 @@ export default function RootError({
           </>
         ) : (
           <>
-            <TriangleAlertIcon className="h-12 w-12 text-amber-500" />
+            <TriangleAlertIcon className="h-12 w-12 text-accent-amber" />
             <div>
               <h2 className="text-xl font-bold">Something went wrong</h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 Your data is safe. Tap below to reload this screen.
               </p>
-              <p className="mt-3 max-w-xs break-all font-mono text-xs text-red-400">{error?.message}</p>
+              <p className="mt-3 max-w-xs break-all font-mono text-xs text-destructive">{error?.message}</p>
             </div>
             <Button className="bg-brand text-brand-foreground hover:opacity-90" onClick={reset}>
               Try again

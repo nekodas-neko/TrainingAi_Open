@@ -651,7 +651,7 @@ function UserRow({
       </div>
       <span className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-        user.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'
+        user.isActive ? 'bg-accent-green/10 text-accent-green' : 'bg-muted text-muted-foreground'
       )}>
         {user.isActive ? 'Active' : user.hasData === false ? 'Pending' : 'Deactivated'}
       </span>

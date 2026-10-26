@@ -50,8 +50,8 @@ export function ZoneGauge({
       </div>
       <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground">
         <span>{labels[0]}</span>
-        <span className="text-green-600 dark:text-green-400 font-medium">{variant === 'centered' ? labels[1] : ''}</span>
-        <span className={variant === 'centered' ? '' : 'text-green-600 dark:text-green-400 font-medium'}>{labels[2]}</span>
+        <span className="text-accent-green font-medium">{variant === 'centered' ? labels[1] : ''}</span>
+        <span className={variant === 'centered' ? '' : 'text-accent-green font-medium'}>{labels[2]}</span>
       </div>
     </div>
   )

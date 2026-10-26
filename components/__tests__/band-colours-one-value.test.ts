@@ -24,6 +24,32 @@ const SCAN = ['app', 'components', 'lib', 'packages/shared/src']
 const TRIAD = /#22c55e|#eab308|#ef4444|#f59e0b|#f87171|rgba?\(\s*(?:34\s*,\s*197\s*,\s*94|234\s*,\s*179\s*,\s*8|239\s*,\s*68\s*,\s*68|245\s*,\s*158\s*,\s*11)\s*[,)]/i
 /** A ternary, an `if`, or a keyed state table on the same line is what separates a band from a tint. */
 const CONDITION = /\?|\bif\s*\(|\bup:|\bdown:|\bgood:|\bbad:|\bwarn:/
+/** #3421. The Tailwind palette spelling of the same triad. `text-green-500` paints the old
+ *  Tailwind-500 green, not `--accent-green`. A state picks the band, so the class is
+ *  `text-accent-green` / `text-accent-amber` / `text-destructive` (theme colours in `globals.css`,
+ *  so `/15` opacity and `border-` / `bg-` forms all work). A condition here is a ternary, an `&&`,
+ *  a `: "…"` continuation line, or a keyed table entry (`mild: "…"`). */
+const PALETTE_BAND = /\b(?:text|bg|border|ring|fill|stroke|from|to|via|divide|outline|shadow|decoration)-(?:green|emerald|amber|yellow|red|rose)-\d{2,3}\b/
+const PALETTE_CONDITION = /\?|&&|\bif\s*\(|^\s*:\s|^\s*['"]?\w+['"]?\s*:\s*['"`{]/
+
+/** Files that keep a Tailwind palette colour on a conditional line because it is identity, not a
+ *  band. Each reason is the whole argument; a new entry goes through review in the diff. */
+const PALETTE_IDENTITY = new Set([
+  'app/admin/admin-content.tsx', // the submission-type chip: bug is red, feature is blue
+  'components/exercises/add-exercise-sheet.tsx', // the secondary-muscle role chip is amber
+  'components/admin/exercise-manager.tsx', // the secondary-muscle role chip and the custom-exercise chip
+  'components/workout/exercise-role-labels.ts', // the secondary-muscle role chip is amber
+  'components/config/program-editor-sheet.tsx', // main vs secondary role pill, brand against amber
+  'components/more/friend-leaderboard.tsx', // the gold medal
+  'components/more/friend-feed.tsx', // the gold trophy
+  'components/health/body-cards/sleep-card.tsx', // per-metric chips: awake, efficiency, onset, HRV
+  'components/workout/review/workout-review-sheet.tsx', // a dropped exercise is red, an added one blue
+  'components/workout/pre-workout-screen.tsx', // the solid start button and its hover tint
+  'components/workout/active-workout-screen.tsx', // the solid green action button with white text
+  'components/nutrition/assign-step.tsx', // over-budget orange against green, orange has no token
+  'components/nutrition/meal-type-manager.tsx', // the required-meal star
+  'components/shell/local-store-dead-banner.tsx', // a solid amber banner with dark text
+])
 
 const IDENTITY = new Set([
   'components/admin/calibration-card.tsx', // a deliberate five-step rating ramp
@@ -65,8 +91,19 @@ describe('#2148 — a band has one value', () => {
     expect(offenders, 'a band colour is BAND_COLOR / var(--accent-green) / --accent-amber / --destructive').toEqual([])
   })
 
+  it('no conditional line picks a band with a Tailwind green, amber or red class (#3421)', () => {
+    const offenders: string[] = []
+    for (const f of [...SCAN.flatMap(files)]) {
+      if (IDENTITY.has(f) || PALETTE_IDENTITY.has(f)) continue
+      stripComments(readFileSync(path.join(ROOT, f), 'utf8')).split('\n').forEach((line, i) => {
+        if (PALETTE_BAND.test(line) && PALETTE_CONDITION.test(line)) offenders.push(`${f}:${i + 1} ${line.trim().slice(0, 120)}`)
+      })
+    }
+    expect(offenders, 'a band class is text-/bg-/border-accent-green, accent-amber or destructive').toEqual([])
+  })
+
   it('every IDENTITY entry still exists, so the list cannot rot into an allowlist', () => {
-    for (const f of IDENTITY) expect(() => readFileSync(path.join(ROOT, f), 'utf8'), f).not.toThrow()
+    for (const f of [...IDENTITY, ...PALETTE_IDENTITY]) expect(() => readFileSync(path.join(ROOT, f), 'utf8'), f).not.toThrow()
   })
 
   it('the shared band modules return the three tokens', () => {

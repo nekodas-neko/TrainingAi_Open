@@ -1,3 +1,5 @@
+import { closeClockSkip, type ClockSkip } from '@trainingai/shared/date-utils'
+
 // Extracted from hr-day-chart.tsx so this pure function can be unit-tested without
 // pulling chart.js/JSX into the test transform (importing the .tsx component directly
 // from a .ts test file fails vite's import-analysis in this repo's esbuild config).
@@ -14,10 +16,10 @@
 // undefined gaps are only valid for chart.js primitive/array data, never object data.
 // A point with `y: NaN` breaks the line identically under `spanGaps: false` while
 // still being a real object the parser can read `.x`/`.y` from.
-export function withGapBreaks(points: { x: number; y: number }[], gapMin = 20): { x: number; y: number }[] {
+export function withGapBreaks(points: { x: number; y: number }[], gapMin = 20, skip?: ClockSkip | null): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = []
   points.forEach((p, i) => {
-    if (i > 0 && p.x - points[i - 1].x > gapMin) {
+    if (i > 0 && closeClockSkip(p.x, skip) - closeClockSkip(points[i - 1].x, skip) > gapMin) {
       out.push({ x: (points[i - 1].x + p.x) / 2, y: NaN })
     }
     out.push(p)
@@ -35,12 +37,13 @@ export function interpolateGaps(
   points: { x: number; y: number }[],
   gapMin = 20,
   maxGapMin = 120,
+  skip?: ClockSkip | null,
 ): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = []
   points.forEach((p, i) => {
     if (i === 0) return
     const prev = points[i - 1]
-    const gap = p.x - prev.x
+    const gap = closeClockSkip(p.x, skip) - closeClockSkip(prev.x, skip)
     if (gap > gapMin && gap <= maxGapMin) {
       out.push({ x: prev.x, y: prev.y })
       out.push({ x: p.x, y: p.y })

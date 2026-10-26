@@ -43,6 +43,8 @@ export const SOFT_DELETED: Record<string, string> = {
   exercise_logs: 'deleted_at',
   fitness_tests: 'deleted_at',
   food_logs: 'deleted_at',
+  // #2417: a look-alike merged into its keeper
+  food_items: 'deleted_at',
   injuries: 'deleted_at',
   meal_plans: 'deleted_at',
   meal_types: 'deleted_at',
