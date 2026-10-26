@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.505.0",
+    date: "2026-10-27",
+    changes: [
+      "Behind the scenes: the database gets room to mark a food as retired, ready for merging look-alike foods in My Foods. Nothing you see changes until a later release uses it.",
+    ],
+  },
+  {
     version: "1.504.0",
     date: "2026-10-27",
     changes: [
