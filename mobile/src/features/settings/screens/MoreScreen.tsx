@@ -321,6 +321,7 @@ export function MoreScreen({
                 <ListRow
                   density="compact"
                   title="Delete account"
+                  titleTone="danger"
                   leading={<Icon name="delete" tone="danger" />}
                   disabled={!account.dataReader}
                   onPress={() => setModal('delete')}

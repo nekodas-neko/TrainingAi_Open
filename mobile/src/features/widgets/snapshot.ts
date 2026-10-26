@@ -12,6 +12,10 @@ import { batterySummary } from '../health/data/battery-summary.ts';
 // Bump `v` with any change a widget's parser must know about. Nothing in it is ever logged.
 
 export const WIDGET_SNAPSHOT_VERSION = 1;
+/** One tap of the widget's water button. The drain validates it again (validWaterMlDeltaOrNull). */
+export const WIDGET_WATER_TAP_ML = 250;
+/** Taps the widget can show before the app next runs; a ninth tap shows the eighth's row. */
+export const WIDGET_WATER_MAX_STEPS = 8;
 
 export type WidgetScore = {
   label: string;
@@ -34,6 +38,8 @@ export type WidgetNext = {
   meta: string;
   /** Opens this session; null for the check-in and rest-day cards. */
   sessionId: string | null;
+  /** Home offers "Start Workout" here: not for a workout in progress, a finished one or a rest day. */
+  startable: boolean;
   restDay: boolean;
 };
 export type WidgetMacro = {
@@ -44,11 +50,24 @@ export type WidgetMacro = {
   /** Eaten over target, 0–1; null without a target. */
   fraction: number | null;
 };
+/** The water row as it reads after some number of +250 ml taps the app has not seen yet. */
+export type WidgetWaterStep = { text: string; fraction: number | null };
 export type WidgetNutrition = {
   /** "1,240" and "kcal left"; null without a calorie goal. */
   kcal: { value: string; label: string } | null;
   macros: WidgetMacro[];
-  water: { text: string; goal: string | null; fraction: number | null };
+  water: {
+    text: string;
+    goal: string | null;
+    fraction: number | null;
+    /** The widget's +250 ml button adds this many ml per tap. */
+    tapMl: number;
+    /**
+     * The row after 0, 1, 2 … taps, worded here so the widget can redraw at once when the app is
+     * closed without working out a litre or a fraction itself. steps[0] is text and fraction.
+     */
+    steps: WidgetWaterStep[];
+  };
 };
 export type WidgetSnapshot = {
   v: typeof WIDGET_SNAPSHOT_VERSION;
@@ -71,7 +90,10 @@ export type SnapshotInput = {
   scores: readonly ScoreChipModel[] | null;
   battery: Parameters<typeof batterySummary>[0];
   recommendation: RecommendationModel;
+  /** The macro targets and what has been eaten (nutritionEnergyModel). */
   energy: EnergyModel | null;
+  /** "kcal left" as Home's nutrition card counts it: the energy balance's budget alone (budgetEnergyModel). */
+  budget: EnergyModel | null;
   water: { ml: number | null; goalMl: number } | null;
 };
 
@@ -91,7 +113,7 @@ export function widgetSnapshot(input: SnapshotInput): WidgetSnapshot {
       battery: battery(input.battery),
     },
     next: next(input.recommendation),
-    nutrition: input.energy && input.water ? nutrition(input.energy, input.water) : null,
+    nutrition: input.energy && input.water ? nutrition(input.energy, input.budget, input.water) : null,
   };
 }
 
@@ -124,16 +146,18 @@ function next(model: RecommendationModel): WidgetNext | null {
         name: model.name,
         meta: model.facts.map((fact) => fact.text).join(' · '),
         sessionId: model.session.id,
+        startable: model.action === 'start' || model.action === 'deload',
         restDay: false,
       };
     case 'rest':
-      return { eyebrow: 'Rest Day', name: 'Rest Day', meta: model.reason, sessionId: null, restDay: true };
+      return { eyebrow: 'Rest Day', name: 'Rest Day', meta: model.reason, sessionId: null, startable: false, restDay: true };
     case 'checkin':
       return {
         eyebrow: 'Exercise Readiness',
         name: 'How are you feeling?',
         meta: 'Log Readiness · ~15 sec',
         sessionId: null,
+        startable: false,
         restDay: false,
       };
     default:
@@ -147,9 +171,20 @@ const MACROS = [
   { key: 'fat', label: 'Fat', field: 'fatG' },
 ] as const;
 
-function nutrition(energy: EnergyModel, water: { ml: number | null; goalMl: number }): WidgetNutrition {
+function nutrition(
+  energy: EnergyModel,
+  budget: EnergyModel | null,
+  water: { ml: number | null; goalMl: number },
+): WidgetNutrition {
+  const step = (ml: number | null): WidgetWaterStep => ({
+    text: waterText(ml) ?? '—',
+    fraction: ml != null && water.goalMl > 0 ? Math.min(1, ml / water.goalMl) : null,
+  });
+  const steps = Array.from({ length: WIDGET_WATER_MAX_STEPS + 1 }, (_, taps) =>
+    step(taps === 0 ? water.ml : (water.ml ?? 0) + taps * WIDGET_WATER_TAP_ML),
+  );
   return {
-    kcal: energy.remaining == null ? null : remainingText(energy.remaining),
+    kcal: budget?.remaining == null ? null : remainingText(budget.remaining),
     macros: MACROS.map(({ key, label, field }) => {
       const target = energy.targets[field];
       const eaten = energy.total?.[field] ?? 0;
@@ -163,9 +198,11 @@ function nutrition(energy: EnergyModel, water: { ml: number | null; goalMl: numb
       };
     }),
     water: {
-      text: waterText(water.ml) ?? '—',
+      text: steps[0]!.text,
       goal: waterGoalText(water.goalMl),
-      fraction: water.ml != null && water.goalMl > 0 ? Math.min(1, water.ml / water.goalMl) : null,
+      fraction: steps[0]!.fraction,
+      tapMl: WIDGET_WATER_TAP_ML,
+      steps,
     },
   };
 }

@@ -25,6 +25,7 @@ import { rmrSpec, dexaSpec } from '../../health/data/clinical';
 import { baselinesSpec } from '../../activities/data/models';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { StrengthScreen } from '../../progress/StrengthScreen';
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
 export function ReadingCards({ groups }: { groups: ReadingGroup[] }) {
   return (
     <>
@@ -146,7 +147,7 @@ export function ProfileOverview({
           {[
             [
               'Time asleep',
-              sleep.durationHours == null ? null : `${sleep.durationHours.toFixed(1)} h`,
+              sleep.durationHours == null ? null : formatHoursMinutes(sleep.durationHours * 60),
             ],
             ['Bedtime', bedtime == null ? null : clockFromMinutes(bedtime)],
             [

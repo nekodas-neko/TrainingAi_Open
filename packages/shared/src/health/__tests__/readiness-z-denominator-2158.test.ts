@@ -11,8 +11,8 @@ const empty = {
 }
 
 describe('readiness z denominator (#2158)', () => {
-  it('stamps v9 so the step in the stored trend can be traced to this change', () => {
-    expect(READINESS_MODEL_VERSION).toMatch(/^v9:/)
+  it('stamps v9 or later so the step in the stored trend can be traced to this change', () => {
+    expect(Number(/^v(\d+):/.exec(READINESS_MODEL_VERSION)?.[1])).toBeGreaterThanOrEqual(9)
     expect(READINESS_MODEL.modelVersion).toBe(READINESS_MODEL_VERSION)
   })
 

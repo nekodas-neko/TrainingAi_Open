@@ -46,7 +46,6 @@ export function TrainingCalendarCard({ openDay }: { openDay: (date: string) => v
         markers={markers}
         dots={dots}
         topAligned
-        restLabel={state.data !== null}
         selected={selected ?? undefined}
         onMonthChange={setMonth}
         onSelect={(date) => {

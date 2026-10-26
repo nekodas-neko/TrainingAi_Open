@@ -24,7 +24,6 @@ export type AggregateOpts = {
   debugDate?: string
   dumpOnly?: boolean
   fullHistory?: boolean
-  allowStepsDecrease?: boolean
   disableNeuralStager?: boolean
 }
 

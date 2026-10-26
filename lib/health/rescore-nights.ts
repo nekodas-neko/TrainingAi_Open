@@ -43,7 +43,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import type { SleepSession } from '@trainingai/shared/types/body'
 import { DEFAULT_TZ, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
-import { sleepComponentsToContributors, SLEEP_SCORE_MODEL_VERSION } from '@trainingai/shared/health/sleep-score'
+import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 
 /** How many days back a changed night is re-scored. Matches the training-stress look-back. */
@@ -111,7 +111,7 @@ export function changedNightDates(before: Map<string, string>, after: Map<string
 /** `date`'s Sleep Score and contributors through the readiness read's own scorer. Null with no night. */
 export function scoreNightForDate(sessions: readonly SleepSession[], date: string, tz: string) {
   const scored = scoreSleepForDate(sessions, date, tz)
-  return scored ? { score: scored.result.score, contributors: sleepComponentsToContributors(scored.result.components) } : null
+  return scored ? { score: scored.result.score, contributors: sleepComponentsToContributors(scored.result.components), modelVersion: scored.result.modelVersion } : null
 }
 
 function windowFrom(today: string): string {
@@ -148,7 +148,7 @@ export async function rescoreChangedNights(repo: NightRescoreRepo, watch: NightW
       await repo.upsertOuraDailyDerived(userId, day, {
         sleepScore: scored.score,
         sleepContributors: scored.contributors,
-        modelVersions: { sleep: SLEEP_SCORE_MODEL_VERSION },
+        modelVersions: { sleep: scored.modelVersion },
       })
       out.sleepRescored.push(day)
     } else if (await repo.clearNightDerivedScores(userId, day, { sleep: true, readiness: false })) {

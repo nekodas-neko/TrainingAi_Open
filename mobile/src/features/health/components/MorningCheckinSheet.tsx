@@ -16,7 +16,7 @@ import {
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useHealthData } from '../data/HealthDataProvider';
-import { checkinSpec, verdictSpec } from '../data/checkin';
+import { carriedVsNormal, checkinSpec, verdictSpec } from '../data/checkin';
 import { verdictCopy, type StoredSleepVerdict } from '@trainingai/shared/health/sleep-verdict-copy';
 import { saveSleepValue } from '@trainingai/shared/checkin/save-sleep-value';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
@@ -91,7 +91,7 @@ export function MorningCheckinSheet({ onClose }: { onClose: () => void }) {
           sleepQualityFeel: sleep.value,
           sleepQualityFeelTouched: sleep.touched,
           illnessContext: draft.value.illness,
-          vsNormal: null,
+          ...carriedVsNormal(row),
           motivation: null,
           restingSoreness: null,
           wakeMood: null,
