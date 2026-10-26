@@ -66,14 +66,14 @@ with no view need no `DROP VIEW`.
 **A column added to `schema.ts` is load-bearing from the release that adds it** (#3435). Drizzle selects
 every column in the table's definition, so once `schema.ts` names the column, every full-row
 `select()` of that table selects it (projected reads do not), and a migration that has not run (or
-failed) breaks every full-row `select()` of the table, not only the feature that uses the column. The migration comment "an older build that never reads the
-column behaves exactly as before" (`202610260017_users_sessions_valid_from.sql`) is therefore wrong
-for the release that ships the schema change together with the migration: it holds for a build that
-predates the column, not for the one that adds it. That comment sits in an applied migration and is
-not edited; this is the correction. Read it as "so no code reads a column that is not there", which
-holds only once the migration has run before the code that names the column. Ship the migration alone and apply it before the code that
-names the column (CLAUDE.md: a migration never rides in a batch), and treat a failed migration as a
-failed release for every user.
+failed) breaks every full-row `select()` of the table, not only the feature that uses the column.
+The migration comment "an older build that never reads the column behaves exactly as before"
+(`202610260017_users_sessions_valid_from.sql`) is therefore wrong for the release that ships the schema change together with the migration: it
+holds for a build that predates the column, not for the one that adds it. That comment sits in an
+applied migration and is not edited; this is the correction. Read it as "so no code reads a column that is not there", which
+holds only once the migration has run before the code that names the column. Ship the migration
+alone and apply it before the code that names the column (CLAUDE.md: a migration never rides in a
+batch), and treat a failed migration as a failed release for every user.
 
 **⚠ The generator reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (LA-161). The wrong one does not
 fail: it reads the session's dev database, and anything hand-applied there reaches the file. Build a

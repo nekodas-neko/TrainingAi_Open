@@ -1,9 +1,12 @@
 /**
  * RV-63 — the `> 0` predicate that used to live in `/api/collection`, asserted where it now lives.
+ * (Steps count the device total plus treadmill steps, #3370; the route derives its step days from
+ * `listStepTotals`, which this file also pins against `listStepDayKeys`.)
  *
  * The route read `listBodyMetrics` / `listSleepSessions` in FULL — 36 and 25 columns, 176 and 144
  * bytes a row, over all history, on every home paint — and immediately projected to `.map(x =>
- * x.date)`. The reads are one column wide now and carry the predicate in SQL.
+ * x.date)`. The reads select only what they need now (a date, plus steps for the totals) and carry
+ * the predicate in SQL.
  *
  * **Two route-level tests changed because of that, and this file is why that is not a loss.** They
  * asserted that a LOW day still spawns a cat (400 steps, 3.5 h) — "recorded, not above a bar", which
