@@ -880,6 +880,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async revokeNativeRefreshToken(userId: string, id: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshToken(this.db, userId, id, reason) }
   async revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshTokenFamily(this.db, userId, familyId, reason) }
   async listActiveNativeRefreshTokens(userId: string) { return nativeRefreshTokens.listActiveNativeRefreshTokens(this.db, userId) }
+  async listNativeDevices(userId: string) { return nativeRefreshTokens.listNativeDevices(this.db, userId) }
 
   // #2858 — Oura Cloud OAuth tokens, stored encrypted.
   async getOuraCloudTokens(userId: string) { return ouraCloudTokens.getOuraCloudTokens(this.db, userId) }

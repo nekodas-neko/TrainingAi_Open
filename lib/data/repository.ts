@@ -22,7 +22,7 @@ import type {
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
 import type { AccountDeletionResult } from './postgres/slices/account-deletion'
 import type {
-  NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput, RegrantNativeRefreshTokenInput,
+  NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, NativeDevice, RotateNativeRefreshTokenInput, RegrantNativeRefreshTokenInput,
 } from './postgres/slices/native-refresh-tokens'
 import type { RefreshTokenHash } from '@/lib/auth/refresh-token-hash'
 import type { OuraCloudTokenRow, SaveOuraCloudTokensInput } from './postgres/slices/oura-cloud-tokens'
@@ -654,6 +654,8 @@ export interface WorkoutRepository {
   revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: NativeRefreshTokenRevokedReason): Promise<number>
   /** The caller's live tokens (one per signed-in device), newest first. */
   listActiveNativeRefreshTokens(userId: string): Promise<NativeRefreshToken[]>
+  /** The caller's signed-in devices (#3280): one per live family, with the sign-in date. */
+  listNativeDevices(userId: string): Promise<NativeDevice[]>
 
   // ── Oura Cloud OAuth tokens (#2858) ───────────────────────────────────────
   // `oura_tokens`. Tokens go in and come out encrypted; only `lib/oura/cloud/` opens them.

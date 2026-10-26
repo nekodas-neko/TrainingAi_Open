@@ -51,6 +51,7 @@ import { DataSyncScreen } from '../features/settings/screens/DataSyncScreen';
 import { AccountScreen } from '../features/settings/screens/AccountScreen';
 import { AboutScreen } from '../features/settings/screens/AboutScreen';
 import { OuraScreen, takeInitialOuraReturn } from '../features/devices/screens/OuraScreen';
+import { SignedInDevicesScreen } from '../features/devices/screens/SignedInDevicesScreen';
 import { YearReviewScreen } from '../features/settings/screens/YearReviewScreen';
 import { CollectionScreen } from '../features/collection/screens/CollectionScreen';
 
@@ -428,7 +429,13 @@ function AppShell() {
       ) : detail === 'more-account' ? (
         <AccountScreen onBack={() => setDetail(null)} />
       ) : detail === 'more-devices' ? (
-        <OuraScreen initialReturn={ouraReturn} onBack={() => setDetail(null)} />
+        <OuraScreen
+          initialReturn={ouraReturn}
+          onBack={() => setDetail(null)}
+          openSignedInDevices={() => setDetail('more-signed-in-devices')}
+        />
+      ) : detail === 'more-signed-in-devices' ? (
+        <SignedInDevicesScreen onBack={() => setDetail('more-devices')} />
       ) : detail === 'year-review' ? (
         <YearReviewScreen onBack={() => setDetail(null)} />
       ) : detail === 'collection' ? (

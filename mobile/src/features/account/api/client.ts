@@ -61,6 +61,8 @@ export type AccountProfile = {
   timezone: string | null;
   signInProviders: ('apple' | 'google')[];
 };
+/** What this install tells the server about itself at sign-in (#3280), for the device list. */
+export type DeviceInfo = { label?: string; id?: string };
 export type SessionToken = {
   accessToken: string;
   expiresAt: number;
@@ -311,11 +313,13 @@ export function createApiClient(
       }
       return `data:${type};base64,${btoa(binary)}`;
     },
-    async exchange(token: string, verifier: string): Promise<SessionToken> {
+    async exchange(token: string, verifier: string, device?: DeviceInfo): Promise<SessionToken> {
       const value = (await request('/api/auth/exchange-mobile-token', 'POST', {
         token,
         verifier,
         responseType: 'token',
+        ...(device?.label ? { deviceLabel: device.label } : {}),
+        ...(device?.id ? { deviceId: device.id } : {}),
       })) as Record<string, unknown> | null;
       return sessionResponse(value);
     },
