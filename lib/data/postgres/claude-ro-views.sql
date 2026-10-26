@@ -1923,7 +1923,8 @@ SELECT
   t.last_goal_review_at,
   t.timing_baseline_date,
   t.preferences,
-  t.sessions_valid_from
+  t.sessions_valid_from,
+  t.trophy_pins
 FROM public.users t
 WHERE t.id = current_setting('app.claude_ro_owner', true)::uuid;
 
