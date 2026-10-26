@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { clockSkipOnDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils';
 import { hrDayBuckets, hrTracePoints } from '../src/features/health/data/hr-trace';
@@ -48,4 +49,16 @@ test('the Home card keeps a fall-back day\'s repeated hour on the same minutes',
   );
   // 02:30 the first time and 02:30 the second time both read minute 150.
   assert.deepEqual(buckets.map((b) => b.x), [150]);
+});
+
+// The logic above is only worth anything if the screens hand it the skip. There is no renderer in the
+// mobile suite, so read the call sites.
+test('the Home card and the Day screen pass the skipped hour to hrTracePoints', () => {
+  const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+  const card = read('../src/features/health/components/HrDayCard.tsx');
+  assert.match(card, /clockSkipOnDay\(\s*midnight,\s*timezone\s*\)/);
+  assert.match(card, /hrTracePoints\(\s*buckets,\s*skip\s*\)/);
+  const screen = read('../src/features/health/screens/HealthDayScreen.tsx');
+  assert.match(screen, /clockSkipOnDay\(\s*dateStrMidnightInTz\(date,\s*timezone\)\.getTime\(\),\s*timezone\s*\)/);
+  assert.match(screen, /^\s*skip,$/m);
 });
