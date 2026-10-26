@@ -8,6 +8,7 @@ import { formatContributors, weakestContributor } from '@/lib/oura/contributors'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
+import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
@@ -226,9 +227,12 @@ export async function POST(req: Request) {
       }
     } else {
       const window = strengthWindowEndingAt(recentSessions, date, tz)
+      // The day's step count as the screens show it, treadmill steps included (#3134). A failed read
+      // costs those steps only.
+      const dayActivityLogs = await repo.listActivityLogs(userId, date, date).catch(() => [])
       activity = {
         score: derivedRows.find(r => r.day === date)?.activityScore ?? null,
-        steps: todayBmForActivity?.steps ?? null,
+        steps: dayStepCount(todayBmForActivity?.steps, dayActivityLogs),
         activeCalories: todayBmForActivity?.activeCalories ?? null,
         sessions7d: window.sessions7d,
         volume7dKg: window.volume7dKg,

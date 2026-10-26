@@ -33,4 +33,8 @@ describe('ouraTemperatureDeviationRow', () => {
     expect(ouraTemperatureDeviationRow({ meanC: null, devC: null })).toBeNull()
     expect(ouraTemperatureDeviationRow(null)).toBeNull()
   })
+  it("skips a night the ring's own data produced, whatever the deviation", () => {
+    expect(ouraTemperatureDeviationRow({ meanC: null, devC: 0.3, source: 'ble' })).toBeNull()
+    expect(ouraTemperatureDeviationRow({ meanC: null, devC: 0.3, source: 'oura_cloud' })).not.toBeNull()
+  })
 })

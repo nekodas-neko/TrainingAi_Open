@@ -11,7 +11,7 @@ import {
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
-import { ApiError } from '../../account/api/client.ts';
+import { ApiError, isRejectedForGood } from '../../account/api/client.ts';
 import { toAestDay, weekStartForDay } from '@trainingai/shared/date-utils';
 import { morningSchema, checkinSchema } from './checkin.ts';
 import { dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin';
@@ -510,6 +510,7 @@ export class HealthStore {
     const generation = this.generation;
     this.publish({ syncing: true });
     this.flushing = (async () => {
+      let setAside: string | null = null;
       try {
         await this.writes;
         while (generation === this.generation && this.current.operations.length) {
@@ -563,7 +564,18 @@ export class HealthStore {
         }
         while (generation === this.generation && this.current.verdictResponses.length) {
           const response = this.current.verdictResponses[0];
-          await this.connection.post('/api/sleep-verdict', response);
+          try {
+            await this.connection.post('/api/sleep-verdict', response);
+          } catch (failure) {
+            // A 400/422 will never be accepted; drop the answer rather than jam the queue behind it.
+            if (!isRejectedForGood(failure)) {
+              throw failure;
+            }
+            setAside = failureNotice(
+              'One answer was kept on this phone only; the server did not accept it.',
+              failure,
+            );
+          }
           if (generation !== this.generation) {
             return;
           }
@@ -574,7 +586,18 @@ export class HealthStore {
         }
         while (generation === this.generation && this.current.readinessResponses.length) {
           const response = this.current.readinessResponses[0];
-          await this.connection.post('/api/readiness-verdict', response);
+          try {
+            await this.connection.post('/api/readiness-verdict', response);
+          } catch (failure) {
+            // A 400/422 will never be accepted; drop the answer rather than jam the queue behind it.
+            if (!isRejectedForGood(failure)) {
+              throw failure;
+            }
+            setAside = failureNotice(
+              'One answer was kept on this phone only; the server did not accept it.',
+              failure,
+            );
+          }
           if (generation !== this.generation) {
             return;
           }
@@ -584,7 +607,7 @@ export class HealthStore {
           this.invalidate();
         }
         if (generation === this.generation) {
-          this.publish({ error: null });
+          this.publish({ error: setAside });
         }
       } catch (failure) {
         if (generation === this.generation) {

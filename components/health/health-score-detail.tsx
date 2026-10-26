@@ -10,6 +10,7 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { getLocalStore } from "@/lib/local-store";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
 import { scoreGapText } from "@/components/health/score-gap-copy";
+import { withLiveTodayActivity } from "@trainingai/shared/health/live-today-activity-trend";
 import { scoreAverageChip } from "@trainingai/shared/health/score-average-chip";
 import type { HealthTrendsResponse, HealthTrendDay } from "@/app/api/health/trends/route";
 import { DetailHero, usePageGradient, useHeroColorScheme, type ColorScheme } from "@/components/health/detail-hero";
@@ -219,7 +220,7 @@ export function HealthScoreDetail({
   // #2435: today's Activity score is live-only (a day is stored once it has ended), so the trend has
   // no stored point for today. Show the live score there, the number the hero above is showing.
   const sparkTrends = trends?.trends && trendField === "activityScore" && score != null
-    ? trends.trends.map(t => (t.date === today && t.activityScore == null ? { ...t, activityScore: score } : t))
+    ? withLiveTodayActivity(trends.trends, today, score)
     : trends?.trends;
   // Q-278: the reason behind the em dash. Keyed on `aiSection`, which already carries exactly the
   // three metric names the route reports availability for — no new prop for a value the component

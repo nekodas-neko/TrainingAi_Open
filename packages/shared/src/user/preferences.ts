@@ -48,6 +48,8 @@ export const UserPreferencesSchema = z.object({
   pillColors:         ColorMap.optional(),
   cardColors:         ColorMap.optional(),
   scoreRingStyle:     Key.optional(),
+  /** How big Home's Energy hero is: full, compact or slim. Read sites default to full. */
+  energyHeroSize:     Key.optional(),
   /** The read site accepts 7 or 30 today and coerces anything else to 7; the bound here is wider
    *  on purpose, so adding a third window is a one-line change at the read site. */
   weightLookback:     z.number().int().min(1).max(3650).optional(),
@@ -94,6 +96,7 @@ export const PREFERENCE_STORAGE: Readonly<Record<
   pillColors:         { key: 'ta_pill_colors',           encoding: 'json' },
   cardColors:         { key: 'ta_card_colors',           encoding: 'json' },
   scoreRingStyle:     { key: 'ta_score_ring_style',      encoding: 'string' },
+  energyHeroSize:     { key: 'ta_energy_hero_size',      encoding: 'string' },
   weightLookback:     { key: 'ta_weight_lookback',       encoding: 'number' },
   goalsProgressView:  { key: 'ta_goals_progress_view',   encoding: 'string' },
   weightBandPctPerWeek: { key: 'ta_weight_band_pct',     encoding: 'json' },

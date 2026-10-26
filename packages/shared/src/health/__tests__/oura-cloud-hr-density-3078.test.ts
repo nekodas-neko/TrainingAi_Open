@@ -1,8 +1,9 @@
-// #3078: since the switch to the Oura API the ring's heart rate is a 5-minute series at rest, with
-// irregular bursts while awake. Whether Activity's lanes gate it is the owner's call (#3114),
-// so they are pinned UNCHANGED here. The calorie estimate is held to the #2437 rule for the sources
-// #2437 gates (the source scoping is tested against Postgres in oura-late-hr-workouts-3078), and Body
-// Battery's gate is pinned against a complete Oura series.
+// #3078, #3114: since the switch to the Oura API the ring's heart rate is a 5-minute series at rest,
+// with irregular bursts while awake. The owner chose option C on 26 Oct: Activity's zone minutes read
+// Oura heart rate only in dense stretches, and "moved this hour" comes from Oura's per-minute MET. The
+// calorie estimate is held to the #2437 rule for the sources it gates, Oura Cloud included (the
+// source scoping is tested against Postgres in oura-late-hr-workouts-3078), and Body Battery's gate
+// is pinned against a complete Oura series.
 import { describe, it, expect } from 'vitest'
 import {
   dropSparseHrHours, intradayHrContributors, isDenseHrSeries, isDenseHrSpan, DENSITY_GATED_HR_SOURCES, HR_DENSE_MAX_GAP_MS,
@@ -24,15 +25,82 @@ const series = (source: string, from: Date, to: Date, everySec: number, bpm: num
 const run = (hrRows: { timestamp: Date; bpm: number; source?: string | null }[]) =>
   intradayHrContributors({ hrRows, ...PROFILE, tz: TZ, dateIso: DAY })
 
-describe('zone minutes and move hours: Oura Cloud stays ungated until the owner decides', () => {
-  it('does not gate oura_cloud', () => {
-    expect(DENSITY_GATED_HR_SOURCES.has('oura_cloud')).toBe(false)
+describe('Oura Cloud heart rate: zone minutes from dense stretches, moved hours from MET (#3114)', () => {
+  // A 07:00–22:00 worn day whose MET is 1.0 except the hours given, which are 2.0.
+  const metDay = (movedHours: number[], wornFrom = 0, wornTo = 24) => {
+    const start = at(0).getTime()
+    return {
+      startTimestampMs: start,
+      metsPerMinute: Array.from<unknown, number | null>({ length: 24 * 60 }, (_, i) => {
+        const h = Math.floor(i / 60)
+        if (h < wornFrom || h >= wornTo) return null
+        return movedHours.includes(h) ? 2.0 : 1.0
+      }),
+    }
+  }
+
+  it('gates oura_cloud by stretch: scattered readings go, a dense run stays', () => {
+    expect(DENSITY_GATED_HR_SOURCES.has('oura_cloud')).toBe(true)
+    const scattered = series('oura_cloud', at(12), at(13), 17 * 60, 140)
+    expect(dropSparseHrHours(scattered, TZ).rows).toEqual([])
+    expect(dropSparseHrHours(scattered, TZ).sparseHours).toEqual([{ date: DAY, hour: 12 }])
+    const workout = series('oura_cloud', at(12, 10), at(12, 40), 5, 150)
+    const outside = scattered.filter(r => r.timestamp < at(12, 5) || r.timestamp > at(12, 45))
+    expect(dropSparseHrHours([...outside, ...workout], TZ).rows).toHaveLength(workout.length)
   })
 
-  it('a scattered midday Oura half-hour still scores, as it did before this PR', () => {
-    const oura = series('oura_cloud', at(12), at(12, 30), 8 * 60, 140)
-    expect(dropSparseHrHours(oura, TZ).rows).toHaveLength(oura.length)
-    expect(run(oura).moveHoursGoal).toBe(moveHoursGoal())
+  it('an Oura-app workout inside an otherwise scattered hour still earns its zone minutes', () => {
+    const rows = [...series('oura_cloud', at(12), at(13), 17 * 60, 70), ...series('oura_cloud', at(12, 10), at(12, 40), 5, 150)]
+    expect(run(rows).zoneMinutes).toBeGreaterThanOrEqual(1)
+    expect(run(series('oura_cloud', at(12), at(13), 17 * 60, 150)).zoneMinutes).toBeNull()
+  })
+
+  it('a lone Oura reading is not a stretch', () => {
+    expect(run([{ timestamp: at(12), bpm: 150, source: 'oura_cloud' }]).zoneMinutes).toBeNull()
+  })
+
+  it('Oura heart rate never decides a moved hour, MET does', () => {
+    const hot = series('oura_cloud', at(12), at(13), 1, 160)
+    expect(run(hot).moveHours).toBeNull()
+    const c = intradayHrContributors({ hrRows: hot, ...PROFILE, tz: TZ, dateIso: DAY, metGrid: metDay([9]), dayIsOver: true })
+    expect(c.moveHours).toBe(1)
+    expect(c.moveHoursGoal).toBe(moveHoursGoal())
+  })
+
+  it('a minute at MET 1.8 moves its hour; 1.79 does not', () => {
+    const grid = (met: number) => {
+      const g = metDay([])
+      g.metsPerMinute[9 * 60 + 30] = met
+      return g
+    }
+    const moved = (met: number) => intradayHrContributors({ hrRows: [], ...PROFILE, tz: TZ, dateIso: DAY, metGrid: grid(met), dayIsOver: true }).moveHours
+    expect(moved(1.8)).toBe(1)
+    expect(moved(1.79)).toBe(0)
+  })
+
+  it('hours the ring was off leave the goal on a finished day', () => {
+    const c = intradayHrContributors({ hrRows: [], ...PROFILE, tz: TZ, dateIso: DAY, metGrid: metDay([8, 9, 10], 7, 17), dayIsOver: true })
+    expect(c).toEqual({ zoneMinutes: null, moveHours: 3, moveHoursGoal: 10 })
+  })
+
+  it('today, an hour after the last worn one has not arrived yet and stays in the goal', () => {
+    const grid = metDay([8], 7, 17)
+    const today = intradayHrContributors({ hrRows: [], ...PROFILE, tz: TZ, dateIso: DAY, metGrid: grid })
+    expect(today.moveHoursGoal).toBe(moveHoursGoal())
+    const gap = metDay([8], 7, 17)
+    for (let m = 11 * 60; m < 13 * 60; m++) gap.metsPerMinute[m] = null
+    expect(intradayHrContributors({ hrRows: [], ...PROFILE, tz: TZ, dateIso: DAY, metGrid: gap }).moveHoursGoal).toBe(moveHoursGoal() - 2)
+  })
+
+  it('the strap still moves an hour MET did not', () => {
+    const strap = series('chest_strap', at(15), at(15, 30), 1, 140)
+    const c = intradayHrContributors({ hrRows: strap, ...PROFILE, tz: TZ, dateIso: DAY, metGrid: metDay([9]), dayIsOver: true })
+    expect(c.moveHours).toBe(2)
+    expect(c.zoneMinutes).toBeGreaterThanOrEqual(29)
+  })
+
+  it('a day with no MET and no non-Oura heart rate has no move lane', () => {
+    expect(run(series('oura_cloud', at(12), at(12, 30), 5, 70))).toEqual({ zoneMinutes: expect.any(Number), moveHours: null, moveHoursGoal: null })
   })
 
   it('a dense strap hour at midday scores its zone minutes', () => {
