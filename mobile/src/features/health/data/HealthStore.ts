@@ -11,7 +11,13 @@ import {
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
-import { ApiError, isRejectedForGood } from '../../account/api/client.ts';
+import {
+  ApiError,
+  UploadRejected,
+  isNothingToAnswer,
+  isRejectedForGood,
+} from '../../account/api/client.ts';
+import { readPushAnswer } from '../../../core/sync/push-answer.ts';
 import { toAestDay, weekStartForDay } from '@trainingai/shared/date-utils';
 import { morningSchema, checkinSchema } from './checkin.ts';
 import { dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin';
@@ -31,6 +37,8 @@ const operationSchema = MutationSchema.extend({
   domain: z.enum(['body_metrics', 'manual_sleep', 'manual_bedtime', 'day_checkins']),
   acknowledged: z.boolean().default(false),
   attempted: z.boolean().default(true),
+  /** Server refusals of this push so far; set aside once they reach MAX_MUTATION_ATTEMPTS. */
+  attempts: z.number().int().positive().optional(),
 }).superRefine((operation, context) => {
   const p = operation.payload;
   const valid =
@@ -87,6 +95,7 @@ const savedSchema = z.object({
   checkins: z.record(z.string(), checkinSchema.nullable()).default({}),
   verdictResponses: z.array(verdictResponseSchema).default([]),
   readinessResponses: z.array(readinessResponseSchema).default([]),
+  setAside: z.string().nullable().default(null),
 });
 export type HealthState = {
   ready: boolean;
@@ -105,6 +114,8 @@ export type HealthState = {
   checkins: Record<string, z.infer<typeof checkinSchema> | null>;
   verdictResponses: z.infer<typeof verdictResponseSchema>[];
   readinessResponses: z.infer<typeof readinessResponseSchema>[];
+  /** The set-aside notice, kept on disk until the person has seen it (acknowledgeSetAside). */
+  setAside: string | null;
 };
 export const emptyHealthState: HealthState = {
   ready: false,
@@ -123,6 +134,7 @@ export const emptyHealthState: HealthState = {
   checkins: {},
   verdictResponses: [],
   readinessResponses: [],
+  setAside: null,
 };
 const key = 'health-records.v1';
 export class HealthStore {
@@ -176,7 +188,7 @@ export class HealthStore {
         if (generation !== this.generation) {
           return;
         }
-        this.publish({ ...(saved ?? {}), ready: true, error: null });
+        this.publish({ ...(saved ?? {}), ready: true, error: saved?.setAside ?? null });
         this.policyDay = toAestDay(
           new Date(saved?.bodyAt || this.now()),
           this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -500,6 +512,16 @@ export class HealthStore {
       this.publish({ bodyError: failureNotice('Could not save health refresh status.', failure) });
     }
   }
+  /** The person has seen the set-aside notice; it no longer comes back after a sync or a restart. */
+  async acknowledgeSetAside() {
+    if (!this.current.setAside) {
+      return;
+    }
+    await this.write((state) => ({
+      setAside: null,
+      error: state.error === state.setAside ? null : state.error,
+    }));
+  }
   sync() {
     if (this.flushing) {
       return this.flushing;
@@ -510,7 +532,6 @@ export class HealthStore {
     const generation = this.generation;
     this.publish({ syncing: true });
     this.flushing = (async () => {
-      let setAside: string | null = null;
       try {
         await this.writes;
         while (generation === this.generation && this.current.operations.length) {
@@ -539,12 +560,41 @@ export class HealthStore {
             if (generation !== this.generation) {
               return;
             }
-            if (
-              result.processed !== 1 ||
-              !Array.isArray(result.errors) ||
-              result.errors.length
-            ) {
+            if (!Array.isArray(result.errors)) {
               throw new Error('Upload not confirmed.');
+            }
+            const verdict = readPushAnswer(change, result);
+            if (verdict.kind === 'hold') {
+              throw new Error(verdict.error);
+            }
+            if (verdict.kind === 'refused') {
+              if (!verdict.final) {
+                // Counted and kept; the next sync tries it again (the queue waits behind it).
+                await this.write((state) => ({
+                  operations: state.operations.map((op) =>
+                    op.id === change.id ? { ...op, attempts: verdict.attempts } : op,
+                  ),
+                }));
+                throw new Error(verdict.error);
+              }
+              // Refused MAX_MUTATION_ATTEMPTS times: drop it so the queue behind it flows, and keep
+              // the value on this phone until the next refresh of its domain replaces it.
+              const notice = failureNotice(
+                'One change was kept on this phone only; the server did not accept it.',
+                new UploadRejected(),
+              );
+              this.revision++;
+              const today = toAestDay(
+                new Date(this.now()),
+                this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+              );
+              await this.write((state) => ({
+                ...keepLocally(state, change, today),
+                operations: state.operations.filter((op) => op.id !== change.id),
+                setAside: notice,
+                error: notice,
+              }));
+              continue;
             }
             this.revision++;
             await this.write((state) => ({
@@ -564,50 +614,63 @@ export class HealthStore {
         }
         while (generation === this.generation && this.current.verdictResponses.length) {
           const response = this.current.verdictResponses[0];
+          let notice: string | null = null;
           try {
             await this.connection.post('/api/sleep-verdict', response);
           } catch (failure) {
             // A 400/422 will never be accepted; drop the answer rather than jam the queue behind it.
-            if (!isRejectedForGood(failure)) {
+            // So is a 404 in the server's own JSON (no verdict was announced that day): dropped quietly.
+            if (isNothingToAnswer(failure)) {
+              // nothing to answer, nothing to tell the person
+            } else if (!isRejectedForGood(failure)) {
               throw failure;
+            } else {
+              notice = failureNotice(
+                'One answer was kept on this phone only; the server did not accept it.',
+                failure,
+              );
             }
-            setAside = failureNotice(
-              'One answer was kept on this phone only; the server did not accept it.',
-              failure,
-            );
           }
           if (generation !== this.generation) {
             return;
           }
           await this.write((state) => ({
             verdictResponses: state.verdictResponses.filter((r) => r !== response),
+            ...(notice ? { setAside: notice, error: notice } : {}),
           }));
           this.invalidate();
         }
         while (generation === this.generation && this.current.readinessResponses.length) {
           const response = this.current.readinessResponses[0];
+          let notice: string | null = null;
           try {
             await this.connection.post('/api/readiness-verdict', response);
           } catch (failure) {
             // A 400/422 will never be accepted; drop the answer rather than jam the queue behind it.
-            if (!isRejectedForGood(failure)) {
+            // So is a 404 in the server's own JSON (no verdict was announced that day): dropped quietly.
+            if (isNothingToAnswer(failure)) {
+              // nothing to answer, nothing to tell the person
+            } else if (!isRejectedForGood(failure)) {
               throw failure;
+            } else {
+              notice = failureNotice(
+                'One answer was kept on this phone only; the server did not accept it.',
+                failure,
+              );
             }
-            setAside = failureNotice(
-              'One answer was kept on this phone only; the server did not accept it.',
-              failure,
-            );
           }
           if (generation !== this.generation) {
             return;
           }
           await this.write((state) => ({
             readinessResponses: state.readinessResponses.filter((r) => r !== response),
+            ...(notice ? { setAside: notice, error: notice } : {}),
           }));
           this.invalidate();
         }
         if (generation === this.generation) {
-          this.publish({ error: setAside });
+          // A notice not yet seen outlasts a sync that sets nothing aside.
+          this.publish({ error: this.current.setAside });
         }
       } catch (failure) {
         if (generation === this.generation) {
@@ -631,6 +694,24 @@ export class HealthStore {
     this.canceled = true;
     this.generation++;
   }
+}
+/**
+ * The patch that keeps a set-aside op's value on this phone: it goes into the base the screens
+ * read, where the next refresh of its domain replaces it from the server.
+ */
+function keepLocally(
+  state: HealthState,
+  op: HealthOperation,
+  today: string,
+): Partial<HealthState> {
+  if (op.domain === 'body_metrics') {
+    return { body: overlayBody(state.body, [op], today) };
+  }
+  if (op.domain === 'day_checkins') {
+    const kept = checkinSchema.safeParse(op.payload);
+    return kept.success ? { checkins: { ...state.checkins, [op.date]: kept.data } } : {};
+  }
+  return { sleep: overlaySleep(state.sleep ?? [], [op]) };
 }
 export function overlayBody(
   base: BodyData | null,

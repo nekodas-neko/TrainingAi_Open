@@ -9,25 +9,54 @@ export class ApiError extends Error {
   notice?: string;
   /** The `/api/` path that failed, when the client made the request. */
   path?: string;
-  constructor(status: number, code?: string, notice?: string, path?: string) {
+  /**
+   * A 400 whose body is our own validation error (JSON with a string `error`, the shape every route
+   * answers a failed schema with). A 400 without it is a proxy or gateway page, not the server.
+   */
+  validation: boolean;
+  constructor(status: number, code?: string, notice?: string, path?: string, validation = false) {
     super(`TrainingAi request failed (${status}).`);
     this.status = status;
     this.code = code;
     this.notice = notice;
     this.path = path;
+    this.validation = validation;
   }
 }
-/** A 400 or 422 means the server will never take this write, so retrying it only blocks the queue. */
+/** The server took a push but refused this item for good, in the body of a 200. */
+export class UploadRejected extends Error {
+  constructor() {
+    super('Upload not accepted.');
+  }
+}
+/**
+ * The server will never take this write, so retrying it only blocks the queue: its own validation
+ * 400, a 422, or a push it answered 200 with this item's rejection. A 400 from anything else (an
+ * HTML proxy page, an empty body) says nothing about the write and is retried like any failure.
+ */
 export function isRejectedForGood(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === 400 || error.status === 422);
+  return (
+    error instanceof UploadRejected ||
+    (error instanceof ApiError &&
+      ((error.status === 400 && error.validation) || error.status === 422))
+  );
+}
+/**
+ * The server answered, in its own JSON, that there is nothing to answer: /api/sleep-verdict and
+ * /api/readiness-verdict send a 404 `{ error }` when no verdict was announced for that date. Waiting
+ * will not change it. An HTML or empty 404 (a proxy, or a server without the route) is not this.
+ */
+export function isNothingToAnswer(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404 && error.validation;
 }
 /**
  * The error for a failed response whose body (already parsed, or null) may be the paused notice.
  * Only the fixed sentence is kept, never the body's own text.
  */
 function failedRequest(path: string, status: number, body: unknown, code?: string) {
+  const error = (body as { error?: unknown } | null)?.error;
   return aiPausedMessage(status, body) === null
-    ? new ApiError(status, code, undefined, path)
+    ? new ApiError(status, code, undefined, path, typeof error === 'string' && error.length > 0)
     : new ApiError(status, AI_PAUSED_CODE, AI_PAUSED_MESSAGE, path);
 }
 /** The paused sentence for an AI failure, else the caller's own line. Never any other server text. */

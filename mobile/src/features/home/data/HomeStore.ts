@@ -3,7 +3,8 @@ import { MoodFieldsSchema, type MoodFields } from '@trainingai/shared/validation
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { ApiError, isRejectedForGood } from '../../account/api/client.ts';
+import { ApiError, UploadRejected, isRejectedForGood } from '../../account/api/client.ts';
+import { readPushAnswer } from '../../../core/sync/push-answer.ts';
 import { isCalendarDate } from '@trainingai/shared/date-utils';
 import { moodSchema, preferencesSchema, type HomePreferences, type Mood } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
@@ -18,6 +19,8 @@ const operationSchema = z.discriminatedUnion('kind', [
     id: z.uuid(),
     date: dateSchema,
     payload: MoodFieldsSchema,
+    /** Server refusals of this push so far; set aside once they reach MAX_MUTATION_ATTEMPTS. */
+    attempts: z.number().int().positive().optional(),
   }),
   z.object({ kind: z.literal('preferences'), id: z.uuid(), payload: preferencesSchema }),
   z.object({ kind: z.literal('rest'), id: z.uuid(), date: dateSchema, resting: z.boolean() }),
@@ -33,6 +36,7 @@ const diskSchema = z.object({
   savedAt: z.record(z.string(), z.number()),
   restDays: z.record(z.string(), z.boolean()).default({}),
   markers: z.record(z.string(), z.boolean()).default({}),
+  setAside: z.string().nullable().default(null),
 });
 type Operation = z.infer<typeof operationSchema>;
 export type HomeChange = Operation['kind'];
@@ -49,6 +53,8 @@ export type HomeState = {
   error: string | null;
   restDays: Record<string, boolean>;
   markers: Record<string, boolean>;
+  /** The set-aside notice, kept on disk until the person has seen it (acknowledgeSetAside). */
+  setAside: string | null;
 };
 export const emptyHome: HomeState = {
   ready: false,
@@ -63,6 +69,7 @@ export const emptyHome: HomeState = {
   error: null,
   restDays: {},
   markers: {},
+  setAside: null,
 };
 function sameFields(actual: Record<string, unknown>, expected: Record<string, unknown>) {
   return Object.entries(expected).every(
@@ -115,7 +122,7 @@ export class HomeStore {
             throw new Error('Wrong account cache.');
           }
           if (generation === this.generation) {
-            this.publish({ ...(saved ?? {}), ready: true });
+            this.publish({ ...(saved ?? {}), ready: true, error: saved?.setAside ?? null });
           }
         } catch (failure) {
           if (generation === this.generation) {
@@ -312,6 +319,16 @@ export class HomeStore {
     void work.finally(() => this.requests.delete(key));
     return work;
   }
+  /** The person has seen the set-aside notice; it no longer comes back after a sync or a restart. */
+  async acknowledgeSetAside() {
+    if (!this.current.setAside) {
+      return;
+    }
+    await this.write((state) => ({
+      setAside: null,
+      error: state.error === state.setAside ? null : state.error,
+    }));
+  }
   sync(): Promise<void> {
     if (this.flushing) {
       return this.flushing;
@@ -323,11 +340,11 @@ export class HomeStore {
         return;
       }
       this.publish({ syncing: true });
-      let setAside: string | null = null;
       try {
         while (this.current.operations.length && generation === this.generation) {
           const op = this.current.operations[0];
           let accepted = true;
+          let notice: string | null = null;
           try {
             if (op.kind === 'mood') {
               const result = z
@@ -344,8 +361,24 @@ export class HomeStore {
                     ],
                   }),
                 );
-              if (result.processed !== 1 || result.errors?.length) {
-                throw new Error('Upload not accepted.');
+              const verdict = readPushAnswer(
+                { id: op.id, domain: 'mood_logs', date: op.date, attempts: op.attempts },
+                result,
+              );
+              if (verdict.kind === 'hold') {
+                throw new Error(verdict.error);
+              }
+              if (verdict.kind === 'refused') {
+                if (verdict.final) {
+                  throw new UploadRejected();
+                }
+                // Counted and kept; the next sync tries it again (the queue waits behind it).
+                await this.write((state) => ({
+                  operations: state.operations.map((x) =>
+                    x.id === op.id && x.kind === 'mood' ? { ...x, attempts: verdict.attempts } : x,
+                  ),
+                }));
+                throw new Error(verdict.error);
               }
               const row = moodSchema
                 .nullable()
@@ -408,7 +441,7 @@ export class HomeStore {
               return;
             }
             accepted = false;
-            setAside = failureNotice(
+            notice = failureNotice(
               'One change was kept on this phone only; the server did not accept it.',
               cause,
             );
@@ -416,15 +449,20 @@ export class HomeStore {
           if (generation !== this.generation) {
             return;
           }
+          // The notice is saved in the write that drops the op, so a later op failing cannot lose it.
           await this.write((state) => ({
             operations: state.operations.filter((x) => x.id !== op.id),
-            error: null,
+            ...(notice ? { setAside: notice } : {}),
+            error: notice ?? state.setAside,
           }));
           if (accepted) {
             this.changed(op.kind);
           }
         }
-        this.publish({ error: setAside });
+        if (generation === this.generation) {
+          // A notice not yet seen outlasts a sync that sets nothing aside.
+          this.publish({ error: this.current.setAside });
+        }
       } catch (cause) {
         if (generation === this.generation) {
           const denied = cause instanceof ApiError && [401, 403].includes(cause.status);
