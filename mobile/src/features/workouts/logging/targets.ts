@@ -14,7 +14,7 @@ import {
 } from '@trainingai/shared/workout/load-rounding';
 import type { ExercisePreview, SetPreview } from '../catalog';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from './workout';
-import { displayLoad } from './preferences';
+import { loadLabel } from './preferences';
 
 export function weightStep(equipment: string[] = []) {
   return weightStepFor(equipment);
@@ -67,7 +67,7 @@ export function formatSetLoad(
   }
   const prefix =
     exercise.exerciseType === 'bodyweight' && Number(set.weight) > 0 ? '+' : '';
-  return `${prefix}${displayLoad(set.weight, 'kg')} kg × ${set.reps} reps`;
+  return `${prefix}${loadLabel(set.weight)} × ${set.reps} reps`;
 }
 
 export function loadSuggestion(
