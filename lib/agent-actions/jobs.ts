@@ -81,6 +81,8 @@ const MergeLookAlikeFoodsParams = z.object({
   dryRun: z.boolean(),
   /** `{groupKey: foodItemId}`: the owner's pick of keeper for a group, from the dry run's `groupKey`. */
   keepers: z.record(z.string().max(300), z.string().uuid()).refine(m => Object.keys(m).length <= 100, 'at most 100 keepers').optional(),
+  /** `'exact'`: merge only the groups that leave every moved log's calories and macros unchanged. */
+  only: z.literal('exact').optional(),
 }).strict()
 
 export const AGENT_JOBS = {
@@ -331,7 +333,10 @@ export const AGENT_JOBS = {
    * #2417. Merges look-alike `food_items` (same name and brand) into one keeper: the most-logged row,
    * or the one the owner names in `keepers`. A write re-points the extras' food logs and saved-meal
    * ingredients to the keeper with the quantity rescaled so the grams eaten do not change, then
-   * tombstones the extras (`deleted_at`, never a delete). It rewrites what the owner ate, so a write
+   * tombstones the extras (`deleted_at`, never a delete). Grams never change; calories and macros
+   * stay exactly as they were only for the groups the dry run marks `automatic` (`only: 'exact'`
+   * merges just those). A group with any non-zero change, or whose foods differ, is the owner's
+   * review. It also fills a keeper's missing barcode and picture from its extras (add-only). It rewrites what the owner ate, so a write
    * needs an approval, and a verified snapshot comes first. Idempotent: a second run finds nothing.
    * A dry run writes nothing and lists every group.
    */
@@ -339,7 +344,7 @@ export const AGENT_JOBS = {
     params: MergeLookAlikeFoodsParams,
     losesData: p => !p.dryRun,
     run: async (ctx, p) => {
-      const result = await mergeLookAlikeFoods(getDb(), ctx.userId, { dryRun: p.dryRun, keepers: p.keepers })
+      const result = await mergeLookAlikeFoods(getDb(), ctx.userId, { dryRun: p.dryRun, keepers: p.keepers, only: p.only })
       if (!result.ok) return { status: 400, body: { error: result.error }, finish: { outcome: 'refused', error: result.error } }
       const { report } = result
       const t = report.totals

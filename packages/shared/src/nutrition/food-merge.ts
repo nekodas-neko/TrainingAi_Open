@@ -18,6 +18,17 @@
 // With that factor the grams are the same by construction, and so are the calories and macros
 // whenever the two foods agree per 100 g. When they do NOT agree (the groups the owner reviews) the
 // grams still hold and the numbers become the keeper's: that is the owner's choice, not an error.
+//
+// ## What "automatic" means
+//
+// The owner made a group automatic because the merge leaves calories and macros exactly unchanged
+// (#2417, 2026-10-09). "Same per 100 g" within rounding does NOT guarantee that: a 30 g / 16 kcal
+// keeper and a 100 g / 52 kcal extra agree within rounding, yet a 1x log of the extra moves from 52
+// to 53 kcal. So each extra's worst per-log change is computed from the quantities actually logged,
+// at the precision the numbers are stored in (kcal whole, macros 0.1 g), and a group is automatic
+// only when every one of those changes is zero.
+
+import { text as norm } from './food-item-identity'
 
 /** The columns the plan reads. A superset is fine. */
 export interface MergeFood {
@@ -37,12 +48,26 @@ export interface MergeFood {
   createdAtMs: number
   /** Already merged away. Only kept in the input so a log still pointing at it can be moved. */
   tombstoned: boolean
-  /** Live (not deleted) food logs that point at this row: what "most-logged" counts. */
+  /**
+   * Live (not deleted) food logs that point at this row: what "most-logged" counts, and what moves.
+   * A deleted log stays where it is (see `merge-look-alike-foods.ts`).
+   */
   liveLogs: number
-  /** Every food log that points at this row, deleted ones included. These all move. */
-  allLogs: number
   /** Saved-meal ingredients that point at this row. These all move. */
   mealItems: number
+  /**
+   * The distinct `quantity_multiplier` values of every log (live ones) and saved-meal
+   * ingredient pointing at this row. Used to measure what the merge does to each. Omitted means none.
+   */
+  quantities?: number[]
+}
+
+/** The largest change a merge makes to any one log or ingredient, at stored precision. */
+export interface WorstChange {
+  kcal: number
+  proteinG: number
+  carbsG: number
+  fatG: number
 }
 
 /**
@@ -58,18 +83,26 @@ export interface PlannedExtra {
   id: string
   /** `extra.servingSizeG / keeper.servingSizeG`, exactly 1 when the serving sizes are equal. */
   factor: number
-  /** Food logs (deleted ones too) that move to the keeper. */
+  /** Live food logs that move to the keeper. */
   logsToMove: number
   mealItemsToMove: number
   /** False for a row already tombstoned that only has stragglers left to move. */
   tombstone: boolean
+  /** Worst change to a moved log's calories and macros once rescaled onto the keeper. All zero when exact. */
+  worstChange: WorstChange
 }
 
 export interface PlannedGroup {
   groupKey: string
   kind: GroupKind
-  /** `identical` and `same-per-100g` merge with no one's say-so; `differs` is the owner's review. */
+  /**
+   * True only when no moved log changes in calories or macros (`worstChange` is zero for every
+   * extra). Every `identical` group is; a `same-per-100g` group is only when the rounding happens to
+   * cancel at the quantities logged. Anything else is the owner's review.
+   */
   automatic: boolean
+  /** The worst of the extras' `worstChange`, per field. */
+  worstChange: WorstChange
   keeperId: string
   keeperChosenBy: 'most-logged' | 'owner'
   extras: PlannedExtra[]
@@ -84,7 +117,6 @@ export interface MergePlan {
   invalidKeepers: { groupKey: string; reason: string }[]
 }
 
-const norm = (v: string | null | undefined) => (v ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
 
 /** The key two rows share when they are look-alikes. Shown to the owner, who passes it back in `keepers`. */
 export function lookAlikeKey(f: { name: string; brand?: string | null }): string {
@@ -109,6 +141,29 @@ function samePer100g(a: MergeFood, b: MergeFood): boolean {
     near(a.carbsG, b.carbsG, GRAM_HALF_UNIT) &&
     near(a.fatG, b.fatG, GRAM_HALF_UNIT)
 }
+
+const ZERO: WorstChange = { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 }
+const roundTo = (v: number, step: number) => Math.round(v / step + 1e-7) * step
+const clean = (v: number) => Math.round(v * 1e6) / 1e6
+
+/**
+ * What re-pointing `extra` at `keeper` does to the logs and ingredients it has, as the app would show
+ * them: calories whole, macros to 0.1 g, from `food x quantity`. The quantity is rescaled by
+ * `factor`, so the grams are the same and only the per-gram numbers can differ.
+ */
+export function worstChangeOf(extra: MergeFood, keeper: MergeFood, factor: number): WorstChange {
+  const worst = { ...ZERO }
+  for (const q of extra.quantities ?? []) {
+    const moved = q * factor
+    worst.kcal = Math.max(worst.kcal, Math.abs(roundTo(keeper.calories * moved, 1) - roundTo(extra.calories * q, 1)))
+    worst.proteinG = Math.max(worst.proteinG, Math.abs(roundTo(keeper.proteinG * moved, 0.1) - roundTo(extra.proteinG * q, 0.1)))
+    worst.carbsG = Math.max(worst.carbsG, Math.abs(roundTo(keeper.carbsG * moved, 0.1) - roundTo(extra.carbsG * q, 0.1)))
+    worst.fatG = Math.max(worst.fatG, Math.abs(roundTo(keeper.fatG * moved, 0.1) - roundTo(extra.fatG * q, 0.1)))
+  }
+  return { kcal: clean(worst.kcal), proteinG: clean(worst.proteinG), carbsG: clean(worst.carbsG), fatG: clean(worst.fatG) }
+}
+
+const isZero = (w: WorstChange) => w.kcal === 0 && w.proteinG === 0 && w.carbsG === 0 && w.fatG === 0
 
 const optionalEqual = (x: number | null | undefined, y: number | null | undefined) =>
   (x ?? null) === (y ?? null)
@@ -178,7 +233,7 @@ export function planLookAlikeMerge(foods: MergeFood[], keepers: Record<string, s
     const extras = rows
       .filter(r => r.id !== keeper.id)
       // A tombstoned row with nothing left pointing at it is finished business.
-      .filter(r => !r.tombstoned || r.allLogs > 0 || r.mealItems > 0)
+      .filter(r => !r.tombstoned || r.liveLogs > 0 || r.mealItems > 0)
     if (extras.length === 0) continue
 
     if (!usableServing(keeper.servingSizeG) || extras.some(e => !usableServing(e.servingSizeG))) {
@@ -187,21 +242,32 @@ export function planLookAlikeMerge(foods: MergeFood[], keepers: Record<string, s
     }
 
     const kind = groupKind(rows)
+    const planned = extras
+      .sort(byKeeperRank)
+      .map(e => {
+        const factor = e.servingSizeG === keeper.servingSizeG ? 1 : e.servingSizeG / keeper.servingSizeG
+        return {
+          id: e.id,
+          factor,
+          logsToMove: e.liveLogs,
+          mealItemsToMove: e.mealItems,
+          tombstone: !e.tombstoned,
+          worstChange: kind === 'identical' ? { ...ZERO } : worstChangeOf(e, keeper, factor),
+        }
+      })
+    const worst = planned.reduce<WorstChange>((w, e) => ({
+      kcal: Math.max(w.kcal, e.worstChange.kcal), proteinG: Math.max(w.proteinG, e.worstChange.proteinG),
+      carbsG: Math.max(w.carbsG, e.worstChange.carbsG), fatG: Math.max(w.fatG, e.worstChange.fatG),
+    }), { ...ZERO })
     groups.push({
       groupKey,
       kind,
-      automatic: kind !== 'differs',
+      // A `differs` group changes numbers by definition, even if the quantities logged hide it.
+      automatic: kind !== 'differs' && isZero(worst),
+      worstChange: worst,
       keeperId: keeper.id,
       keeperChosenBy: named ? 'owner' : 'most-logged',
-      extras: extras
-        .sort(byKeeperRank)
-        .map(e => ({
-          id: e.id,
-          factor: e.servingSizeG === keeper.servingSizeG ? 1 : e.servingSizeG / keeper.servingSizeG,
-          logsToMove: e.allLogs,
-          mealItemsToMove: e.mealItems,
-          tombstone: !e.tombstoned,
-        })),
+      extras: planned,
     })
   }
 

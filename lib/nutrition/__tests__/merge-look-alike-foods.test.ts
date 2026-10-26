@@ -2,7 +2,7 @@
 // deleted, a dry run writes nothing, a second run finds nothing, and a device that has not synced
 // can still log against a retired food.
 //
-// Runs only against a local dev Postgres; skips in CI's "Tests" job when there is no database.
+// Needs Postgres (DATABASE_URL). CI's Tests job provides one; the suite skips only where none is set.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 
 const canRun = !!process.env.DATABASE_URL
@@ -134,6 +134,101 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
     await write()
     const { rows } = await pool.query(`SELECT updated_at > '2026-06-01' AS bumped, food_item_id FROM food_logs WHERE id = $1`, [moved])
     expect(rows[0]).toEqual({ bumped: true, food_item_id: keeper })
+  })
+
+  it('a skipped meal stays skipped: a deleted log of an extra is left where it is, not bumped', async () => {
+    const keeper = await addFood(); const extra = await addFood()
+    await addLog(keeper, 1, '2026-10-05'); await addLog(keeper, 1, '2026-10-05')
+    // Inserted already deleted: the BEFORE UPDATE trigger would stamp updated_at = now() on an UPDATE.
+    const { rows: [{ id: deletedLog }] } = await pool.query(
+      `INSERT INTO food_logs (user_id, date, meal_type_id, food_item_id, quantity_multiplier, deleted_at, updated_at)
+       VALUES ($1,'2026-10-01',$2,$3,1,'2026-10-01T12:00:00Z','2026-10-01T12:00:00Z') RETURNING id`, [USER, mealTypeId, extra])
+    // The log sits on the Lunch of 10-01; the owner skipped that Lunch after deleting the log.
+    await pool.query(
+      `INSERT INTO meal_logging_statuses (user_id, meal_type_id, log_date, skipped, explicit, decision_id, decided_at)
+       VALUES ($1,$2,'2026-10-01',true,true,gen_random_uuid(),'2026-10-02T00:00:00Z')`, [USER, mealTypeId])
+    const skipped = async () => (await repo.listMealLoggingStatuses(USER, '2026-10-01')).find(r => r.mealTypeId === mealTypeId)?.skipped
+    const complete = async () => (await repo.listMealLoggingCompleteness(USER, '2026-10-01', '2026-10-01'))[0]?.complete
+    expect(await skipped()).toBe(true)
+    expect(await complete()).toBe(true)
+
+    const out = await write()
+    expect(out.ok && out.report.failedGroups).toBe(0)
+
+    const { rows } = await pool.query(`SELECT food_item_id, updated_at FROM food_logs WHERE id = $1`, [deletedLog])
+    expect(rows[0].food_item_id).not.toBe(keeper)
+    expect(rows[0].updated_at.toISOString()).toBe('2026-10-01T12:00:00.000Z')
+    expect(await skipped()).toBe(true)
+    expect(await complete()).toBe(true)
+  })
+
+  describe('exact versus review (calories and macros)', () => {
+    // 30 g / 16 kcal and 100 g / 52 kcal agree within rounding, but a 1x log of the 100 g row is 52 kcal
+    // and becomes 53 on the 30 g keeper.
+    const roundingPair = async () => {
+      const keeper = await addFood({ servingSizeG: 30, calories: 16, proteinG: 1, carbsG: 3, fatG: 0.5 })
+      const extra = await addFood({ servingSizeG: 100, calories: 52, proteinG: 3.3, carbsG: 10, fatG: 1.7 })
+      await addLog(keeper, 1); await addLog(keeper, 1); await addLog(extra, 1)
+      return { keeper, extra }
+    }
+
+    it('a same-per-100g group whose logs change by a kcal is reported with its worst change, not automatic', async () => {
+      const { keeper, extra } = await roundingPair()
+      const out = await dry()
+      if (!out.ok) throw new Error(out.error)
+      const g = out.report.groups[0]
+      expect(g.kind).toBe('same-per-100g')
+      expect(g.automatic).toBe(false)
+      expect(g.keeper.id).toBe(keeper)
+      expect(g.extras[0].id).toBe(extra)
+      expect(g.worstChange.kcal).toBe(1)
+      expect(out.report.totals).toMatchObject({ groups: 1, automatic: 0, identical: 0, sameExact: 0, needsReview: 1 })
+    })
+
+    it('exact groups are automatic with a zero change; the totals say identical, exact and review apart', async () => {
+      await addFood({ name: 'Same A' }); await addFood({ name: 'Same A' })
+      const k = await addFood({ ...dense(100, 'Scaled') }); const e = await addFood({ ...dense(45, 'Scaled') })
+      await addLog(k, 1); await addLog(e, 1); await addLog(e, 2.5)
+      await roundingPair()
+      const out = await dry()
+      if (!out.ok) throw new Error(out.error)
+      expect(out.report.totals).toMatchObject({ groups: 3, automatic: 2, identical: 1, sameExact: 1, needsReview: 1 })
+      expect(out.report.groups.find(g => g.name === 'Scaled')!.worstChange).toEqual({ kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 })
+    })
+
+    it("only: 'exact' merges the automatic groups and leaves the others alone, dry run and write alike", async () => {
+      await addFood({ name: 'Same A' }); const sameB = await addFood({ name: 'Same A' })
+      const { keeper, extra } = await roundingPair()
+      const plan = await merge(db, USER, { dryRun: true, only: 'exact' })
+      if (!plan.ok) throw new Error(plan.error)
+      expect(plan.report.groups.map(g => g.name)).toEqual(['Same A'])
+      expect(plan.report.skipped).toEqual([expect.objectContaining({ reason: expect.stringContaining('owner review') })])
+
+      const out = await merge(db, USER, { dryRun: false, only: 'exact' })
+      expect(out.ok && out.report.failedGroups).toBe(0)
+      const { rows } = await pool.query(`SELECT id, deleted_at FROM food_items WHERE id = ANY($1)`, [[sameB, keeper, extra]])
+      expect(rows.find(r => r.id === sameB).deleted_at ?? rows.find(r => r.id !== keeper && r.id !== extra)).toBeTruthy()
+      expect(rows.find(r => r.id === extra).deleted_at).toBeNull()
+      expect(rows.find(r => r.id === keeper).deleted_at).toBeNull()
+    })
+  })
+
+  it('fails the group and rolls it back when the rows moved are not the rows planned', async () => {
+    const keeper = await addFood(); const extra = await addFood()
+    await addLog(keeper, 1); await addLog(keeper, 1)
+    const straggler = await addLog(extra, 1)
+    // The plan is read first; a log is hard-removed between the plan and the group's transaction.
+    const racy = Object.create(db) as typeof db
+    racy.transaction = (async (cb: never) => {
+      await pool.query(`DELETE FROM food_logs WHERE id = $1`, [straggler])
+      return db.transaction(cb)
+    }) as typeof db.transaction
+    const out = await merge(racy, USER, { dryRun: false })
+    if (!out.ok) throw new Error(out.error)
+    expect(out.report.failedGroups).toBe(1)
+    expect(out.report.groups[0].result).toEqual({ failed: expect.stringContaining('food logs moved: expected 1, got 0') })
+    const { rows } = await pool.query(`SELECT deleted_at FROM food_items WHERE id = $1`, [extra])
+    expect(rows[0].deleted_at).toBeNull()
   })
 
   it('a dry run writes nothing and reports every group', async () => {

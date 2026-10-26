@@ -6,7 +6,7 @@ let n = 0
 const food = (over: Partial<MergeFood> = {}): MergeFood => ({
   id: `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
   name: 'Greek Yoghurt', brand: 'Chobani', servingSizeG: 100, calories: 60, proteinG: 10, carbsG: 4, fatG: 0.5,
-  createdAtMs: 1_000, tombstoned: false, liveLogs: 0, allLogs: 0, mealItems: 0, ...over,
+  createdAtMs: 1_000, tombstoned: false, liveLogs: 0, mealItems: 0, ...over,
 })
 
 describe('lookAlikeKey', () => {
@@ -71,7 +71,7 @@ describe('planLookAlikeMerge', () => {
   })
 
   it('refuses a keeper that is not in the group, not live, or for no group', () => {
-    const a = food(), b = food(), gone = food({ tombstoned: true, allLogs: 0 })
+    const a = food(), b = food(), gone = food({ tombstoned: true })
     const key = lookAlikeKey(a)
     expect(planLookAlikeMerge([a, b], { [key]: food().id }).invalidKeepers).toHaveLength(1)
     expect(planLookAlikeMerge([a, b, gone], { [key]: gone.id }).invalidKeepers[0].reason).toMatch(/already been merged/)
@@ -79,27 +79,27 @@ describe('planLookAlikeMerge', () => {
   })
 
   it('the factor is the ratio of serving sizes, and exactly 1 when they are equal', () => {
-    const k = food({ servingSizeG: 250, liveLogs: 5 }), e = food({ servingSizeG: 100, allLogs: 2 }), same = food({ servingSizeG: 250 })
+    const k = food({ servingSizeG: 250, liveLogs: 5 }), e = food({ servingSizeG: 100, liveLogs: 2 }), same = food({ servingSizeG: 250 })
     const g = planLookAlikeMerge([k, e, same]).groups[0]
     expect(g.extras.find(x => x.id === e.id)!.factor).toBeCloseTo(0.4, 12)
     expect(g.extras.find(x => x.id === same.id)!.factor).toBe(1)
   })
 
-  it('counts every log of an extra to move, deleted ones included', () => {
-    const k = food({ liveLogs: 5 }), e = food({ liveLogs: 1, allLogs: 4, mealItems: 2 })
+  it('moves the live logs of an extra, and its saved-meal ingredients', () => {
+    const k = food({ liveLogs: 5 }), e = food({ liveLogs: 4, mealItems: 2 })
     const x = planLookAlikeMerge([k, e]).groups[0].extras[0]
     expect(x).toMatchObject({ logsToMove: 4, mealItemsToMove: 2, tombstone: true })
   })
 
   it('is idempotent: a merged group plans nothing', () => {
     const k = food({ liveLogs: 12 })
-    const done = food({ tombstoned: true, liveLogs: 0, allLogs: 0, mealItems: 0 })
+    const done = food({ tombstoned: true, liveLogs: 0, mealItems: 0 })
     expect(planLookAlikeMerge([k, done]).groups).toEqual([])
   })
 
   it('moves a straggler: a log an unsynced device pushed against a retired row', () => {
     const k = food({ liveLogs: 12 })
-    const retired = food({ tombstoned: true, allLogs: 1 })
+    const retired = food({ tombstoned: true, liveLogs: 1 })
     const [g] = planLookAlikeMerge([k, retired]).groups
     expect(g.extras).toEqual([expect.objectContaining({ id: retired.id, logsToMove: 1, tombstone: false })])
   })
@@ -112,5 +112,36 @@ describe('planLookAlikeMerge', () => {
 
   it('a group of one is not a group', () => {
     expect(planLookAlikeMerge([food(), food({ name: 'Other' })]).groups).toEqual([])
+  })
+
+  describe('automatic means calories and macros come out exactly as before', () => {
+    it('a same-per-100g group is not automatic when a moved log changes by a kcal', () => {
+      const k = food({ servingSizeG: 30, calories: 16, proteinG: 1, carbsG: 3, fatG: 0.5, liveLogs: 5 })
+      const e = food({ servingSizeG: 100, calories: 52, proteinG: 3.3, carbsG: 10, fatG: 1.7, liveLogs: 1, quantities: [1] })
+      const [g] = planLookAlikeMerge([k, e]).groups
+      expect(g.kind).toBe('same-per-100g')
+      expect(g.automatic).toBe(false)
+      expect(g.worstChange.kcal).toBe(1)
+      expect(g.extras[0].worstChange.kcal).toBe(1)
+    })
+
+    it('is automatic when the foods agree exactly per 100 g, whatever the quantity', () => {
+      const k = food({ servingSizeG: 100, calories: 200, proteinG: 10, carbsG: 25, fatG: 5, liveLogs: 5 })
+      const e = food({ servingSizeG: 45, calories: 90, proteinG: 4.5, carbsG: 11.25, fatG: 2.25, liveLogs: 2, quantities: [0.5, 1, 3.25] })
+      const [g] = planLookAlikeMerge([k, e]).groups
+      expect(g.automatic).toBe(true)
+      expect(g.worstChange).toEqual({ kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 })
+    })
+
+    it('the same rounding disagreement is invisible when the only logs are at a quantity that hides it', () => {
+      const k = food({ servingSizeG: 30, calories: 16, proteinG: 1, carbsG: 3, fatG: 0.5, liveLogs: 5 })
+      const e = food({ servingSizeG: 100, calories: 52, proteinG: 3.3, carbsG: 10, fatG: 1.7, liveLogs: 0 })
+      expect(planLookAlikeMerge([k, e]).groups[0].automatic).toBe(true)
+    })
+
+    it('a group that differs is never automatic', () => {
+      const k = food({ liveLogs: 5 }), e = food({ calories: 400, liveLogs: 1, quantities: [1] })
+      expect(planLookAlikeMerge([k, e]).groups[0]).toMatchObject({ kind: 'differs', automatic: false })
+    })
   })
 })
