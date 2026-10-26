@@ -47,7 +47,7 @@ export const SetsGrid = memo(function SetsGrid({
             <div
               key={i}
               className="rounded-xl px-2.5 py-2"
-              style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.16)" }}
+              style={{ background: "color-mix(in oklch, var(--accent-green) 7%, transparent)", border: "1px solid color-mix(in oklch, var(--accent-green) 16%, transparent)" }}
             >
               <div className="flex items-center justify-between">
                 <span className="text-green-500 text-[10px] font-bold">{i + 1}✓</span>

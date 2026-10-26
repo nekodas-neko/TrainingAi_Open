@@ -1,3 +1,4 @@
+import { BAND_COLOR } from './score-band'
 import { displayOneRm, displayOneRmDelta, oneRmUnit, type OneRmUnit } from '@trainingai/shared/1rm'
 
 export interface StrengthReading {
@@ -24,8 +25,8 @@ export interface BarMetric {
 
 const GOLD = '#fbbf24'
 const PURPLE = '#bf5fff'
-const GREEN = '#22c55e'
-const RED = '#f87171'
+const GREEN = BAND_COLOR.good
+const RED = BAND_COLOR.bad
 
 /** The colour of a better / worse change beside a bar. `same` has no entry: it prints nothing. */
 export const TREND_COLOR = { up: GREEN, down: RED } as const

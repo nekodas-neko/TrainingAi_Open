@@ -21,7 +21,7 @@ describe('balanceZone', () => {
     for (const dev of [-900, -300, 0, 300, 900]) {
       const z = balanceZone(dev)
       expect(z.label.length).toBeGreaterThan(0)
-      expect(z.color).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(z.color).toMatch(/^(#[0-9a-f]{6}|var\(--[a-z-]+\))$/i)
     }
   })
 })

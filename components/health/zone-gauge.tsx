@@ -26,8 +26,8 @@ export function ZoneGauge({
   // [widthPct, color] segments left→right. Optimal zone is the brighter green.
   const segments: Array<[number, string]> =
     variant === 'centered'
-      ? [[20, '#ef4444'], [12, '#f59e0b'], [36, '#22c55e'], [12, '#f59e0b'], [20, '#ef4444']]
-      : [[50, '#ef4444'], [20, '#f59e0b'], [30, '#22c55e']]
+      ? [[20, 'var(--destructive)'], [12, 'var(--accent-amber)'], [36, 'var(--accent-green)'], [12, 'var(--accent-amber)'], [20, 'var(--destructive)']]
+      : [[50, 'var(--destructive)'], [20, 'var(--accent-amber)'], [30, 'var(--accent-green)']]
   const labels =
     variant === 'centered'
       ? [lowLabel ?? 'Low', midLabel ?? 'Ideal', highLabel ?? 'High']

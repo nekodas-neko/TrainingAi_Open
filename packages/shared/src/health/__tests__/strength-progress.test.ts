@@ -168,8 +168,8 @@ describe('strengthDeltaText', () => {
         }
   })
 
-  it('keeps the two trend colours the web card used', () => {
-    expect(TREND_COLOR).toEqual({ up: '#22c55e', down: '#f87171' })
+  it('reads the good and bad band tokens for the two trends (#2148)', () => {
+    expect(TREND_COLOR).toEqual({ up: 'var(--accent-green)', down: 'var(--destructive)' })
   })
 })
 

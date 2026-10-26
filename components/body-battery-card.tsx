@@ -36,8 +36,8 @@ function BatteryIcon({ label }: { label: BodyBatteryLabel }): React.ReactElement
 
 function TrendBadge({ trend }: { trend: BodyBatteryResponse['trend'] }) {
   const map = {
-    charging: { Icon: ArrowUp, color: '#22c55e', text: BODY_BATTERY_TREND_LABEL.charging },
-    draining: { Icon: ArrowDown, color: '#ef4444', text: BODY_BATTERY_TREND_LABEL.draining },
+    charging: { Icon: ArrowUp, color: 'var(--accent-green)', text: BODY_BATTERY_TREND_LABEL.charging },
+    draining: { Icon: ArrowDown, color: 'var(--destructive)', text: BODY_BATTERY_TREND_LABEL.draining },
     steady:   { Icon: Minus, color: 'var(--color-muted-foreground)', text: BODY_BATTERY_TREND_LABEL.steady },
   }[trend]
   const { Icon } = map

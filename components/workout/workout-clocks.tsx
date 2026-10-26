@@ -255,7 +255,7 @@ export function RestTimer({
       overtimeSec={overtimeSec}
     />
   );
-  const labelColor = isRestOvertime ? "#ef4444" : "var(--color-muted-foreground)";
+  const labelColor = isRestOvertime ? "var(--destructive)" : "var(--color-muted-foreground)";
   return (
     <>
       <p

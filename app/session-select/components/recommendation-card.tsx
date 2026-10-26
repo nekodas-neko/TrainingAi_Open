@@ -131,17 +131,17 @@ function RecommendationCardComponent({
           style={{
             backgroundColor: "color-mix(in oklch, var(--muted) 60%, transparent)",
             backgroundImage: isTrainedToday
-              ? "linear-gradient(135deg, rgba(34,197,94,0.06), rgba(34,197,94,0.02))"
+              ? "linear-gradient(135deg, color-mix(in oklch, var(--accent-green) 6%, transparent), color-mix(in oklch, var(--accent-green) 2%, transparent))"
               : `linear-gradient(135deg, rgba(${_rtR},${_rtG},${_rtB},0.25), rgba(${_rtR},${_rtG},${_rtB},0.08))`,
             border: isTrainedToday
-              ? "1px solid rgba(34,197,94,0.25)"
+              ? "1px solid color-mix(in oklch, var(--accent-green) 25%, transparent)"
               : `1px solid rgba(${_rtR},${_rtG},${_rtB},0.4)`,
           }}
         >
           <div className="flex items-center justify-between gap-2">
             <p
               className="text-[10px] font-bold uppercase tracking-widest"
-              style={{ color: isTrainedToday ? "#22c55e" : _rtColor }}
+              style={{ color: isTrainedToday ? "var(--accent-green)" : _rtColor }}
             >
               {isTrainedToday ? "Trained Today" : "Recommended Today"}
             </p>
@@ -248,10 +248,10 @@ function RecommendationCardComponent({
           {isTrainedToday ? (
             <div className="flex items-center gap-2 rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-2.5">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="7" stroke="#22c55e" strokeWidth="1.5" />
+                <circle cx="8" cy="8" r="7" stroke="var(--accent-green)" strokeWidth="1.5" />
                 <path
                   d="M5 8l2 2 4-4"
-                  stroke="#22c55e"
+                  stroke="var(--accent-green)"
                   strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"

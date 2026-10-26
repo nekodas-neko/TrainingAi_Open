@@ -68,7 +68,7 @@ export function TimeSummaryCard({ workoutSessionId }: { workoutSessionId: string
             <div className="rounded-xl border border-border/60 bg-background/40 p-3 space-y-2">
               <p className="text-[11px] font-medium text-muted-foreground">Rest this session</p>
               <div className="flex items-end justify-between gap-3">
-                <span className="text-base font-bold tabular-nums" style={{ color: restDiff != null && restDiff > 60 ? "var(--accent-amber, #f59e0b)" : "var(--color-brand)" }}>
+                <span className="text-base font-bold tabular-nums" style={{ color: restDiff != null && restDiff > 60 ? "var(--accent-amber)" : "var(--color-brand)" }}>
                   {fmtMin(restActual)}
                   <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">actual</span>
                 </span>
@@ -133,7 +133,7 @@ function LabelledBar({ label, actual, expected, kind }: { label: string; actual:
       <div className="flex items-baseline justify-between text-[11px]">
         <span className="w-12 flex-none uppercase tracking-wide text-muted-foreground">{label}</span>
         <span className="tabular-nums">
-          <span className="font-semibold" style={{ color: over ? (kind === "rest" ? "var(--accent-amber, #f59e0b)" : "#0ea5e9") : "var(--color-brand)" }}>{formatTime(actual)}</span>
+          <span className="font-semibold" style={{ color: over ? (kind === "rest" ? "var(--accent-amber)" : "#0ea5e9") : "var(--color-brand)" }}>{formatTime(actual)}</span>
           <span className="text-muted-foreground"> actual · {formatTime(expected)} planned</span>
         </span>
       </div>
@@ -152,7 +152,7 @@ function TimeBar({ actualSec, expectedSec, kind }: { actualSec: number; expected
   const actualPct = Math.min(100, (actualSec / scaleMax) * 100);
   const expectedPct = Math.min(100, (expectedSec / scaleMax) * 100);
   const over = actualSec > expectedSec * 1.05;
-  const fill = over ? (kind === "rest" ? "var(--accent-amber, #f59e0b)" : "#0ea5e9") : "var(--color-brand)";
+  const fill = over ? (kind === "rest" ? "var(--accent-amber)" : "#0ea5e9") : "var(--color-brand)";
   return (
     <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
       <ProgressFill pct={actualPct} color={fill} />
