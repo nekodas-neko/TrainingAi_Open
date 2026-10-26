@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.504.0",
+    date: "2026-10-27",
+    changes: [
+      "Treadmill steps now count in the collection's steps too, as they already do everywhere else.",
+      "The current app's remaining warnings, done ticks and over-budget figures use the same bright red, amber and green as the rest of the app.",
+      "TrainingAi Preview: on a daylight-saving day, Home's heart rate card follows the clock and no longer marks the skipped hour as not recorded.",
+      "Behind the scenes: the workout prescription compares SpO2 only within the device you wear, a movement log that runs past midnight and the energy balance day follow the clock on daylight-saving days, and a first launch waits for the phone's database before checking whose it is.",
+    ],
+  },
+  {
     version: "1.503.0",
     date: "2026-10-27",
     changes: [
