@@ -893,7 +893,8 @@ SELECT
   t.user_id,
   t.measured_at,
   t.percent,
-  t.charging
+  t.charging,
+  t.source
 FROM public.oura_ble_battery_poll t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

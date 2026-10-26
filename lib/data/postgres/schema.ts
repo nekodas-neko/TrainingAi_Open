@@ -1830,6 +1830,8 @@ export const ouraBleBatteryPoll = pgTable('oura_ble_battery_poll', {
   measuredAt: timestamp('measured_at', { withTimezone: true }).notNull().defaultNow(),
   percent:    integer('percent').notNull(),
   charging:   boolean('charging'),
+  // Migration 202610252304: NULL = Bluetooth poll, 'oura_cloud' = Oura Cloud ring_battery_level (#3069).
+  source:     text('source'),
 })
 
 // TN-54 (migration 278). One row per `PolarStrapService` connection attempt or state change.
