@@ -10,6 +10,7 @@ import type { SleepRow } from "@/app/health/health-sections";
 import { ProvisionalBadge } from "@/components/health/provisional-badge";
 import type { SleepScoreCoverage } from "@trainingai/shared/health/sleep-score";
 import { sleepCoverageNote } from "@trainingai/shared/health/sleep-coverage-note";
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
 
 interface Props {
   recentSleep: SleepRow | null;
@@ -52,7 +53,7 @@ export function SleepCard({ recentSleep, nightLabel, computedSleepScore, sleepSc
               <div className="h-8 w-20 animate-pulse rounded-lg bg-muted" />
             ) : (
               <p className="text-3xl font-bold tabular-nums" style={{ color: "#8b5cf6" }}>
-                {recentSleep?.durationHours != null ? `${recentSleep.durationHours.toFixed(1)}h` : "—"}
+                {recentSleep?.durationHours != null ? formatHoursMinutes(recentSleep.durationHours * 60) : "—"}
               </p>
             )}
             {recentSleep?.sleepStart && recentSleep?.sleepEnd && (() => {
@@ -96,10 +97,10 @@ export function SleepCard({ recentSleep, nightLabel, computedSleepScore, sleepSc
       {recentSleep ? (
         <div className="space-y-1.5">
           <div className="flex gap-1.5 flex-wrap">
-            {recentSleep.deepSleepHours  != null && <span className="text-[9px] rounded bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5">Deep {recentSleep.deepSleepHours.toFixed(1)}h</span>}
-            {recentSleep.remSleepHours   != null && <span className="text-[9px] rounded bg-violet-500/20 text-violet-400 px-1.5 py-0.5">REM {recentSleep.remSleepHours.toFixed(1)}h</span>}
-            {recentSleep.lightSleepHours != null && <span className="text-[9px] rounded bg-slate-500/20 text-slate-400 px-1.5 py-0.5">Light {recentSleep.lightSleepHours.toFixed(1)}h</span>}
-            {recentSleep.awakHours != null && recentSleep.awakHours > 0 && <span className="text-[9px] rounded bg-amber-500/20 text-amber-400 px-1.5 py-0.5">Awake {recentSleep.awakHours.toFixed(1)}h</span>}
+            {recentSleep.deepSleepHours  != null && <span className="text-[9px] rounded bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5">Deep {formatHoursMinutes(recentSleep.deepSleepHours * 60)}</span>}
+            {recentSleep.remSleepHours   != null && <span className="text-[9px] rounded bg-violet-500/20 text-violet-400 px-1.5 py-0.5">REM {formatHoursMinutes(recentSleep.remSleepHours * 60)}</span>}
+            {recentSleep.lightSleepHours != null && <span className="text-[9px] rounded bg-slate-500/20 text-slate-400 px-1.5 py-0.5">Light {formatHoursMinutes(recentSleep.lightSleepHours * 60)}</span>}
+            {recentSleep.awakHours != null && recentSleep.awakHours > 0 && <span className="text-[9px] rounded bg-amber-500/20 text-amber-400 px-1.5 py-0.5">Awake {formatHoursMinutes(recentSleep.awakHours * 60)}</span>}
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {recentSleep.efficiency      != null && <span className="text-[9px] rounded bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5">{recentSleep.efficiency}% eff</span>}

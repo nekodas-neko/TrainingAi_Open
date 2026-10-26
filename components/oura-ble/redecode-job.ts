@@ -63,7 +63,6 @@ interface PollResponse {
 const POLL_INTERVAL_MS = 3_000
 
 function kindLabel(kind: RedecodeJobKind | undefined): string {
-  if (kind === 'step-backfill') return 'step backfill'
   if (kind === 'stress-backfill') return 'stress-bucket backfill'
   if (kind === 'stress-backfill-dry-run') return 'stress-bucket backfill dry run'
   return 'redecode'

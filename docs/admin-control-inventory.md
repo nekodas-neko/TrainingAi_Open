@@ -124,4 +124,4 @@ needed; one behind a disclosure is out of the way and still there.
   OR-115's scope.
 - **The `/admin/oura-ble` labels.** The owner's "could be labeled better" is a separate, open thread.
 - **`/admin/cadence` and `/admin/data-capture`.** Single-purpose pages reached from one row each;
-  neither shows accretion, so neither is itemised.
+  neither shows accretion, so neither is itemised. (`/admin/cadence` was retired in #2862.)

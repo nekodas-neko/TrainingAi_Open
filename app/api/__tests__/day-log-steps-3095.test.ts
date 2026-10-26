@@ -10,6 +10,9 @@ const repo = vi.hoisted(() => ({
 }))
 
 vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: 'u1', timezone: TZ } })) }))
+// Today's Activity score is scored live on this route (#2435); this repo cannot, and that is not what
+// this file is about, so the report of the failed score goes nowhere.
+vi.mock('@/lib/observability', () => ({ reportServerError: vi.fn() }))
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
     getDayLog: async () => [],

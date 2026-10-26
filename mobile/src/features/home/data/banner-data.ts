@@ -1,23 +1,31 @@
 import type { HealthStore } from '../../health/data/HealthStore.ts';
 
+/**
+ * Whether the morning sheet should open itself. It keys on the sleep feel being missing, not on a
+ * check-in row existing: a Home readiness answer (#2106) creates the day's row without one, and
+ * that must not stop the sheet offering itself. Every save of the sheet writes a numeric
+ * `sleepQualityFeel`, so a number there means the sheet has been done.
+ */
 export async function shouldOfferMorning(
   store: Pick<HealthStore, 'getSnapshot' | 'readCheckin'>,
   date: string,
 ) {
-  const hasCheckin = () => {
+  const sleepFeelSaved = () => {
     const state = store.getSnapshot();
-    return (
-      !!state.checkins[date] ||
-      state.operations.some(
-        (operation) => operation.domain === 'day_checkins' && operation.date === date,
-      )
-    );
+    const pending = state.operations
+      .filter((operation) => operation.domain === 'day_checkins' && operation.date === date)
+      .at(-1);
+    const row = (pending?.payload ?? state.checkins[date]) as
+      | { sleepQualityFeel?: unknown }
+      | null
+      | undefined;
+    return typeof row?.sleepQualityFeel === 'number';
   };
-  if (hasCheckin()) {
+  if (sleepFeelSaved()) {
     return false;
   }
   const confirmed = await store.readCheckin(date);
-  return hasCheckin() ? false : confirmed ? true : null;
+  return sleepFeelSaved() ? false : confirmed ? true : null;
 }
 
 export function localHour(timezone: string, now = new Date()) {

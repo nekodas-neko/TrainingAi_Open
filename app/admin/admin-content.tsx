@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from 'sonner'
-import { UserCheck, UserX, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, Footprints, ClipboardList } from 'lucide-react'
+import { UserCheck, UserX, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, ClipboardList } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import type { User } from '@trainingai/shared/types'
 import { invalidateAdminPendingCount } from '@/lib/cache-groups'
@@ -340,8 +340,7 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
             section = bad"*. They are listed here now, in the order the operations runbook uses. */}
         {tab === 'devices' && (
           <MoreRowGroup label="Ring, strap & capture">
-            <MoreRow icon={Bluetooth} label="Oura BLE — drain, verify, validate" onClick={() => router.push('/admin/oura-ble')} />
-            <MoreRow icon={Footprints} label="Cadence calibration" onClick={() => router.push('/admin/cadence')} />
+            <MoreRow icon={Bluetooth} label="Oura BLE — drain and verify" onClick={() => router.push('/admin/oura-ble')} />
             <MoreRow icon={ClipboardList} label="Device data capture" onClick={() => router.push('/admin/data-capture')} />
           </MoreRowGroup>
         )}

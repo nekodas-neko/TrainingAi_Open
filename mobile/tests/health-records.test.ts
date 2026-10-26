@@ -54,6 +54,7 @@ function fixture() {
   const applied = new Set<string>();
   const mutations: { id: string; payload: Record<string, number> }[] = [];
   const verdicts: unknown[] = [];
+  const readinessAnswers: unknown[] = [];
   const connection = {
     origin: 'https://example.com',
     userId: 'one',
@@ -67,6 +68,10 @@ function fixture() {
     post: async (path: string, envelope: unknown) => {
       if (!online) {
         throw new Error('offline');
+      }
+      if (path === '/api/readiness-verdict') {
+        readinessAnswers.push(envelope);
+        return { ok: true };
       }
       if (path === '/api/sleep-verdict') {
         verdicts.push(envelope);
@@ -116,6 +121,7 @@ function fixture() {
     storage,
     mutations,
     verdicts,
+    readinessAnswers,
     setOnline: (value: boolean) => {
       online = value;
     },
@@ -375,4 +381,21 @@ test('a denied account cannot respond to a sleep verdict', async () => {
   };
   await store.refresh(true);
   await assert.rejects(store.respondToVerdict(date, 'corrected'));
+});
+
+test('the readiness answer is kept while offline and posted once, the last tap winning', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.respondToReadiness(date, 'dismissed');
+  await store.respondToReadiness(date, 'rated');
+  assert.deepEqual(store.getSnapshot().readinessResponses, [{ date, state: 'rated' }]);
+  const reopened = f.store();
+  await reopened.refresh();
+  assert.equal(reopened.getSnapshot().readinessResponses.length, 1);
+  f.setOnline(true);
+  await reopened.sync();
+  assert.deepEqual(f.readinessAnswers, [{ date, state: 'rated' }]);
+  assert.equal(reopened.getSnapshot().readinessResponses.length, 0);
 });
