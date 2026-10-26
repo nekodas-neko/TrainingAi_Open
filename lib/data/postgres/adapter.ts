@@ -440,11 +440,6 @@ const AI_CALL_LOG_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 let lastStepWindowPrune = 0
 const STEP_WINDOW_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 
-// Live battery-poll retention (migration 133): 90 days of 5-min-while-connected samples is
-// ample for drain-rate analytics; throttled once/24h.
-let lastBatteryPollPrune = 0
-const BATTERY_POLL_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
-
 // oura_accel_chunks retention (7-day recount/calibration window). Was awaited on every insert (H-5c)
 // — a transient delete lock would 500 an accel POST that already succeeded semantically; now
 // throttled + fire-and-forget like its siblings.
@@ -7104,12 +7099,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async insertOuraBatteryPoll(userId: string, percent: number, charging: boolean | null): Promise<void> {
+    // Unpruned, like `strap_status`. This table once pruned at 90 days, with no source or user filter,
+    // which would have eroded the Bluetooth history the ring battery health chart reads back through
+    // (120 days) and the Oura Cloud rows beside it (#3069). The read bounds what it returns instead
+    // (`getRingBatteryReadings` downsamples); a retention delete is the owner's call.
     await this.db.insert(s.ouraBleBatteryPoll).values({ userId, percent, charging })
-    const now = Date.now()
-    if (shouldPrune(lastBatteryPollPrune, now, BATTERY_POLL_PRUNE_THROTTLE_MS)) {
-      lastBatteryPollPrune = now
-      this.db.execute(sql`DELETE FROM oura_ble_battery_poll WHERE measured_at < now() - interval '90 days'`).catch(err => console.error('[prune] oura_ble_battery_poll failed:', err))
-    }
   }
 
   // #2469. Unpruned, like `strap_status`: the client posts at most hourly while the app is open, so

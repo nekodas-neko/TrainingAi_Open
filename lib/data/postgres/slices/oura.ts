@@ -1554,44 +1554,79 @@ export async function getLatestOuraCloudBatteryAt(db: Db, userId: string, since:
  * Stores Oura Cloud battery readings beside the Bluetooth polls. The table has no unique key on the
  * reading, so a re-read is made idempotent here: a reading whose instant is already stored for this
  * user as `oura_cloud` is skipped. Returns the rows inserted.
+ *
+ * The check and the insert run in one transaction under a per-user advisory lock. Without it two
+ * catch-ups started together (a webhook and a connect backfill, or two events a second apart on
+ * different instances) each read "nothing stored" and both inserted the same instants. A unique
+ * index would be the stronger fix but is a migration; the lock needs none.
  */
 export async function insertOuraCloudBatteryReadings(
   db: Db, userId: string, readings: { measuredAt: Date; percent: number; charging: boolean | null }[],
 ): Promise<number> {
   if (readings.length === 0) return 0
   const times = readings.map(r => r.measuredAt.getTime())
-  const have = await db.select({ measuredAt: s.ouraBleBatteryPoll.measuredAt }).from(s.ouraBleBatteryPoll)
-    .where(and(
-      eq(s.ouraBleBatteryPoll.userId, userId),
-      eq(s.ouraBleBatteryPoll.source, OURA_CLOUD_BATTERY_SOURCE),
-      gte(s.ouraBleBatteryPoll.measuredAt, new Date(Math.min(...times))),
-      lte(s.ouraBleBatteryPoll.measuredAt, new Date(Math.max(...times))),
-    ))
-  const stored = new Set(have.map(r => r.measuredAt.getTime()))
-  const seen = new Set<number>()
-  const fresh = readings.filter(r => {
-    const t = r.measuredAt.getTime()
-    if (stored.has(t) || seen.has(t)) return false
-    seen.add(t)
-    return true
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`oura-cloud-battery:${userId}`}, 0))`)
+    const have = await tx.select({ measuredAt: s.ouraBleBatteryPoll.measuredAt }).from(s.ouraBleBatteryPoll)
+      .where(and(
+        eq(s.ouraBleBatteryPoll.userId, userId),
+        eq(s.ouraBleBatteryPoll.source, OURA_CLOUD_BATTERY_SOURCE),
+        gte(s.ouraBleBatteryPoll.measuredAt, new Date(Math.min(...times))),
+        lte(s.ouraBleBatteryPoll.measuredAt, new Date(Math.max(...times))),
+      ))
+    const stored = new Set(have.map(r => r.measuredAt.getTime()))
+    const seen = new Set<number>()
+    const fresh = readings.filter(r => {
+      const t = r.measuredAt.getTime()
+      if (stored.has(t) || seen.has(t)) return false
+      seen.add(t)
+      return true
+    })
+    for (let i = 0; i < fresh.length; i += 1000) {
+      await tx.insert(s.ouraBleBatteryPoll).values(fresh.slice(i, i + 1000).map(r => ({
+        userId, measuredAt: r.measuredAt, percent: r.percent, charging: r.charging, source: OURA_CLOUD_BATTERY_SOURCE,
+      })))
+    }
+    return fresh.length
   })
-  for (let i = 0; i < fresh.length; i += 1000) {
-    await db.insert(s.ouraBleBatteryPoll).values(fresh.slice(i, i + 1000).map(r => ({
-      userId, measuredAt: r.measuredAt, percent: r.percent, charging: r.charging, source: OURA_CLOUD_BATTERY_SOURCE,
-    })))
-  }
-  return fresh.length
 }
 
-/** Every battery reading in a window, Bluetooth and Oura Cloud together, oldest first. */
+/** The last stretch of the battery read that keeps every reading; older than this is one per hour. */
+export const RING_BATTERY_DETAIL_MS = 2 * 86_400_000
+
+/**
+ * Battery readings in a window, Bluetooth and Oura Cloud together, oldest first, at a bounded size.
+ *
+ * The table holds a reading every few minutes (Bluetooth polls every 5 min while connected, Oura
+ * Cloud more sparsely) and the chart reads 120 days on each foreground, which unbounded is tens of
+ * thousands of rows. So the last `RING_BATTERY_DETAIL_MS` (2 days) come back in full, and anything
+ * older as one reading per UTC hour: the last level of the hour, reported as charging if any reading
+ * in that hour was. At most ~24 rows a day for the older part, ~3,000 for 120 days, and the drain and
+ * charge maths (neighbours up to 8 h apart, rises as charges) read an hourly line the same way.
+ * Detail is measured back from `to`, not from the clock, so a caller choosing its window gets a
+ * deterministic cut.
+ */
 export async function getRingBatteryReadings(
   db: Db, userId: string, from: Date, to: Date,
 ): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>> {
-  const rows = await db.select({ measuredAt: s.ouraBleBatteryPoll.measuredAt, percent: s.ouraBleBatteryPoll.percent, charging: s.ouraBleBatteryPoll.charging })
-    .from(s.ouraBleBatteryPoll)
-    .where(and(eq(s.ouraBleBatteryPoll.userId, userId), gte(s.ouraBleBatteryPoll.measuredAt, from), lte(s.ouraBleBatteryPoll.measuredAt, to)))
-    .orderBy(asc(s.ouraBleBatteryPoll.measuredAt))
-  return rows.map(r => ({ tsMs: r.measuredAt.getTime(), percent: r.percent, charging: r.charging }))
+  const detailFrom = new Date(to.getTime() - RING_BATTERY_DETAIL_MS)
+  const { rows } = await db.execute<{ measured_at: Date; percent: number; charging: boolean | null }>(sql`
+    SELECT measured_at, percent, charging FROM (
+      SELECT measured_at, percent,
+             bool_or(charging) OVER (PARTITION BY date_trunc('hour', measured_at)) AS charging,
+             row_number() OVER (PARTITION BY date_trunc('hour', measured_at) ORDER BY measured_at DESC) AS rn
+        FROM oura_ble_battery_poll
+       WHERE user_id = ${userId} AND measured_at >= ${from.toISOString()}::timestamptz
+         AND measured_at < ${detailFrom.toISOString()}::timestamptz AND measured_at <= ${to.toISOString()}::timestamptz
+    ) hourly
+    WHERE rn = 1
+    UNION ALL
+    SELECT measured_at, percent, charging
+      FROM oura_ble_battery_poll
+     WHERE user_id = ${userId} AND measured_at >= ${from.toISOString()}::timestamptz
+       AND measured_at >= ${detailFrom.toISOString()}::timestamptz AND measured_at <= ${to.toISOString()}::timestamptz
+    ORDER BY measured_at ASC`)
+  return rows.map(r => ({ tsMs: new Date(r.measured_at).getTime(), percent: Number(r.percent), charging: r.charging }))
 }
 
 /** Writes the rows; returns the timestamps actually inserted or changed (a row the `setWhere` arm

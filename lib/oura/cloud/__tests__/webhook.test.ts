@@ -7,7 +7,7 @@ import { encryptOuraToken } from '../token-cipher'
 import { OuraUnavailableError } from '../client'
 import { NO_WRITES } from '../ingest'
 import {
-  catchUpOuraCloudHeartRate, catchUpOuraCloudRingBattery, handleOuraWebhookEvent, RING_BATTERY_OVERLAP_MS, resetOuraCloudRingBatteryThrottle, startOuraCloudRingBatteryCatchUp, HEART_RATE_LOOKBACK_MS, HEART_RATE_OVERLAP_MS, MAX_EVENT_AGE_MS, ouraWebhookConfig,
+  catchUpOuraCloudHeartRate, catchUpOuraCloudRingBattery, handleOuraWebhookEvent, RING_BATTERY_OVERLAP_MS, resetOuraCloudRingBatteryThrottle, RING_BATTERY_MIN_INTERVAL_MS, RING_BATTERY_REFUSED_BACKOFF_MS, startOuraCloudRingBatteryCatchUp, HEART_RATE_LOOKBACK_MS, HEART_RATE_OVERLAP_MS, MAX_EVENT_AGE_MS, ouraWebhookConfig,
   resetOuraCloudHeartRateThrottle, startOuraCloudHeartRateCatchUp, verifyOuraSignature, type OuraWebhookDeps,
 } from '../webhook'
 import type { User } from '@trainingai/shared/types'
@@ -683,5 +683,30 @@ describe('catchUpOuraCloudRingBattery (#3069)', () => {
     expect(() => startOuraCloudRingBatteryCatchUp(deps(), USER, now)).not.toThrow()
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     expect(stored).toEqual([])
+  })
+
+  it('does not ask again for a day after a refusal, then tries once more', async () => {
+    fetchMock.mockImplementation(async () => new Response('{}', { status: 403 }))
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now)
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(console.warn).toHaveBeenCalled())
+
+    // Past the five-minute throttle, inside the day: skipped without a request.
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + 2 * RING_BATTERY_MIN_INTERVAL_MS)
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + RING_BATTERY_REFUSED_BACKOFF_MS - 1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + RING_BATTERY_REFUSED_BACKOFF_MS)
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+  })
+
+  it('a failure that is not a refusal is not held back for a day', async () => {
+    fetchMock.mockImplementation(async () => new Response('{}', { status: 500 }))
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now)
+    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(1))
+    const before = fetchMock.mock.calls.length
+    await vi.waitFor(() => expect(console.warn).toHaveBeenCalled())
+    startOuraCloudRingBatteryCatchUp(deps(), USER, now + 2 * RING_BATTERY_MIN_INTERVAL_MS)
+    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(before))
   })
 })
