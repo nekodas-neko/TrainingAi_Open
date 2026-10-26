@@ -302,3 +302,12 @@ test('the snapshot is written only for the signed-in account', async () => {
   assert.match(source, /return userId \? <AccountWidgetSync key=\{userId\} userId=\{userId\} \/> : null;/);
   assert.match(source, /user: userId,/);
 });
+
+test('kcal is null when the calorie target gives a remaining but the energy budget does not', () => {
+  assert.equal(energy.remaining != null, true, 'the Nutrition screen has a remaining from the target');
+  const noBudget = budgetEnergyModel({ totals: { calories: 1260, proteinG: 98, carbsG: 132, fatG: 46 }, recordedIntake: null, budgetKcal: null });
+  assert.equal(noBudget.remaining, null);
+  const snapshot = widgetSnapshot(input({ energy, budget: noBudget }));
+  assert.equal(snapshot.nutrition?.kcal, null);
+  assert.deepEqual(widgetSnapshot(input()).nutrition?.kcal, remainingText(budget.remaining!));
+});

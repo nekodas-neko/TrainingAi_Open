@@ -6,11 +6,15 @@ export type LaunchTarget =
   | { kind: 'home' }
   | { kind: 'workout' }
   | { kind: 'nutrition' }
+  /** The rest-day card's "Train instead": Home's override, then Home. */
+  | { kind: 'train-instead' }
   | { kind: 'session'; id: string };
 
 export function parseLaunchTarget(raw: string | null | undefined): LaunchTarget | null {
   if (!raw) return null;
-  if (raw === 'home' || raw === 'workout' || raw === 'nutrition') return { kind: raw };
+  if (raw === 'home' || raw === 'workout' || raw === 'nutrition' || raw === 'train-instead') {
+    return { kind: raw };
+  }
   const prefix = 'next-session:';
   if (raw.startsWith(prefix) && raw.length > prefix.length) {
     return { kind: 'session', id: raw.slice(prefix.length) };

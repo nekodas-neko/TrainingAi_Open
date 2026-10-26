@@ -5,8 +5,8 @@ import android.view.View
 import android.widget.RemoteViews
 
 // The Next workout widget: the card Home shows as "Recommended Today", worded by the same code.
-// Start opens that session; Sessions opens the Workout tab. A rest day or a check-in is shown as
-// Home shows it, without a Start. Yesterday's recommendation is never shown as today's.
+// Start opens that session; Sessions opens the Workout tab. A rest day is shown as Home shows it,
+// with "Train instead" (Home's override) in place of Sessions; a check-in has no Start. Yesterday's recommendation is never shown as today's.
 class NextWorkoutWidgetProvider : BaseWidgetProvider() {
   override fun render(context: Context, snapshot: Snapshot?, stale: Boolean, heightDp: Int): RemoteViews {
     val views = RemoteViews(context.packageName, R.layout.home_widget_next)
@@ -52,10 +52,17 @@ class NextWorkoutWidgetProvider : BaseWidgetProvider() {
       )
     }
     views.setViewVisibility(R.id.home_widget_secondary, if (checkIn) View.GONE else View.VISIBLE)
-    views.setTextViewText(R.id.home_widget_secondary, context.getString(R.string.home_widget_sessions))
+    views.setTextViewText(
+      R.id.home_widget_secondary,
+      context.getString(if (next.restDay) R.string.home_widget_train_instead else R.string.home_widget_sessions),
+    )
     views.setOnClickPendingIntent(
       R.id.home_widget_secondary,
-      WidgetRender.openApp(context, WidgetRender.REQ_NEXT_SESSIONS, "workout"),
+      WidgetRender.openApp(
+        context,
+        WidgetRender.REQ_NEXT_SESSIONS,
+        if (next.restDay) "train-instead" else "workout",
+      ),
     )
     return views
   }

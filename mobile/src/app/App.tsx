@@ -17,6 +17,8 @@ import { useTheme } from '../shared/theme/ThemeProvider';
 import { useGeistFonts } from '../shared/theme/font-loading';
 import { Screen, Notice } from '../shared/ui';
 import { useHealthContext } from '../features/health/HealthProvider';
+import { useHealthData } from '../features/health/data/HealthDataProvider';
+import { useHome } from '../features/home/data/HomeProvider';
 import type { Tab, DetailScreen, MoreDetail } from './navigation/tabs';
 import { TabBar } from './navigation/TabBar';
 import { RetainedView } from '../shared/ui/RetainedView';
@@ -72,6 +74,8 @@ installErrorReporting();
 
 function AppShell() {
   const health = useHealthContext();
+  const home = useHome();
+  const { today } = useHealthData();
   const { dataReader } = useAccountContext();
   const accountKey = JSON.stringify([dataReader?.origin, dataReader?.userId]);
   const { theme } = useTheme();
@@ -172,6 +176,10 @@ function AppShell() {
     if (target.kind === 'session') {
       setHealthDetail(null);
       openSession(target.id);
+    } else if (target.kind === 'train-instead') {
+      // Home's own override (HomeRecommendation); the card then reads as a training day.
+      selectTab('Home');
+      void home.store?.chooseRestDay(today, false).catch(() => undefined);
     } else selectTab(target.kind === 'home' ? 'Home' : target.kind === 'workout' ? 'Workout' : 'Nutrition');
   });
   function openSettings() {

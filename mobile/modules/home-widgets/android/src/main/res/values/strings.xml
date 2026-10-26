@@ -16,6 +16,7 @@
   <string name="home_widget_start">Start</string>
   <string name="home_widget_checkin">Check in</string>
   <string name="home_widget_sessions">Sessions</string>
+  <string name="home_widget_train_instead">Train instead</string>
   <string name="home_widget_add_water">+250 ml</string>
   <string name="home_widget_add_water_description">Add 250 millilitres of water</string>
   <string name="home_widget_water_queued">+%1$d ml waiting for the app</string>

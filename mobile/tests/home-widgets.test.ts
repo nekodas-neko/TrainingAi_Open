@@ -150,6 +150,7 @@ test('launch targets: the screens a widget can ask for, and nothing else', () =>
   assert.deepEqual(parseLaunchTarget('home'), { kind: 'home' });
   assert.deepEqual(parseLaunchTarget('workout'), { kind: 'workout' });
   assert.deepEqual(parseLaunchTarget('nutrition'), { kind: 'nutrition' });
+  assert.deepEqual(parseLaunchTarget('train-instead'), { kind: 'train-instead' });
   assert.deepEqual(parseLaunchTarget('next-session:12'), { kind: 'session', id: '12' });
   assert.deepEqual(parseLaunchTarget('next-session:a:b'), { kind: 'session', id: 'a:b' });
   for (const bad of [null, undefined, '', 'next-session:', 'settings', 'com.trainingai.app.preview://auth?code=1', 'HOME']) {
@@ -229,4 +230,13 @@ test('the widgets\' colours are the app\'s: values and values-night mirror the t
   assert.deepEqual([light.good, dark.good], [statusColors.light.success, statusColors.dark.success]);
   assert.deepEqual([light.drained, dark.drained], [statusColors.light.danger, statusColors.dark.danger]);
   assert.deepEqual([light.low, dark.low], [domainTones.light.checkin.foreground, domainTones.dark.checkin.foreground]);
+});
+
+test('the rest-day card offers "Train instead", which Home answers with its own override', async () => {
+  const provider = await read(module + 'java/expo/modules/homewidgets/NextWorkoutWidgetProvider.kt');
+  assert.match(provider, /if \(next\.restDay\) R\.string\.home_widget_train_instead else R\.string\.home_widget_sessions/);
+  assert.match(provider, /if \(next\.restDay\) "train-instead" else "workout"/);
+  assert.match(await read(module + 'res/values/strings.xml'), />Train instead</);
+  const app = await read('../src/app/App.tsx');
+  assert.match(app, /target\.kind === 'train-instead'[\s\S]*?chooseRestDay\(today, false\)/);
 });
