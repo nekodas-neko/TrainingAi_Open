@@ -45,8 +45,8 @@ describe('RV-97 — the ACWR value is painted by its own band', () => {
     expect(new Set(colours).size, 'two bands share a colour — the card cannot distinguish them')
       .toBe(keys.length)
     // The specific confusion RV-97 found: optimal must not be the amber the literal hard-coded.
-    expect(acwrBandByKey('optimal').color).not.toBe('#f59e0b')
-    expect(acwrBandByKey('high').color).toBe('#f59e0b')
+    expect(acwrBandByKey('optimal').color).not.toBe('var(--accent-amber)')
+    expect(acwrBandByKey('high').color).toBe('var(--accent-amber)')
   })
 
   it('an ACWR inside the copy\'s own green zone bands as optimal', () => {

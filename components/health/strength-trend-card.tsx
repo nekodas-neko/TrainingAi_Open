@@ -13,7 +13,7 @@ interface Props {
   loading: boolean;
 }
 
-const GAIN_COLOR = { up: "#22c55e", down: "#ef4444", flat: "#f59e0b" } as const;
+const GAIN_COLOR = { up: "var(--accent-green)", down: "var(--destructive)", flat: "var(--accent-amber)" } as const;
 
 function gainColor(gainPct: number | null): string {
   const tone = gainTone(gainPct);

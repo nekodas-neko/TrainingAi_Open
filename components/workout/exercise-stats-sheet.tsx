@@ -118,8 +118,8 @@ export function ExerciseStatsSheet({ exercise, isDoneToday, onClose, onRedo }: E
     const beatReps = matchReps + 1;
     const belowReps = Math.max(1, matchReps - 1);
     return [
-      { label: "Below 1RM", beat: false, reps: belowReps, est: estFn(belowReps), color: "#ef4444" },
-      { label: "Match 1RM", beat: false, reps: matchReps, est: estFn(matchReps), color: "#22c55e" },
+      { label: "Below 1RM", beat: false, reps: belowReps, est: estFn(belowReps), color: "var(--destructive)" },
+      { label: "Match 1RM", beat: false, reps: matchReps, est: estFn(matchReps), color: "var(--accent-green)" },
       { label: "Beat 1RM", beat: true, reps: beatReps, est: estFn(beatReps), color: "var(--accent-cyan)" },
     ];
   })();

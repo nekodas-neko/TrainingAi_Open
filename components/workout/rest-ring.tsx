@@ -22,32 +22,32 @@ export function RestRing({
     <>
       <div
         className="absolute inset-0 rounded-full blur-3xl opacity-20 transition-opacity group-active:opacity-35"
-        style={{ background: isRestOvertime ? "#ef4444" : "var(--color-brand)" }}
+        style={{ background: isRestOvertime ? "var(--destructive)" : "var(--color-brand)" }}
       />
       <svg width="180" height="180" viewBox="0 0 180 180" className="relative">
         <circle cx="90" cy="90" r={r} fill="none" stroke="currentColor" strokeOpacity="0.08" strokeWidth="13" />
         <circle
           cx="90" cy="90" r={r}
           fill="none"
-          stroke={isRestOvertime ? "#ef4444" : "var(--color-brand)"}
+          stroke={isRestOvertime ? "var(--destructive)" : "var(--color-brand)"}
           strokeWidth="13"
           strokeLinecap="round"
           strokeDasharray={`${circ * restProgress} ${circ}`}
           transform="rotate(-90 90 90)"
-          style={{ filter: isRestOvertime ? "drop-shadow(0 0 10px #ef4444)" : "drop-shadow(0 0 10px var(--color-brand))" }}
+          style={{ filter: isRestOvertime ? "drop-shadow(0 0 10px var(--destructive))" : "drop-shadow(0 0 10px var(--color-brand))" }}
         />
         {/* Overtime arc — grows clockwise from top as overtime accumulates */}
         {isRestOvertime && (
           <circle
             cx="90" cy="90" r={r}
             fill="none"
-            stroke="#ef4444"
+            stroke="var(--destructive)"
             strokeWidth="13"
             strokeLinecap="round"
             strokeDasharray={`${Math.min(circ, circ * (overtimeSec / currentRestSec))} ${circ}`}
             transform="rotate(-90 90 90)"
             strokeOpacity="0.35"
-            style={{ filter: "drop-shadow(0 0 6px #ef4444)" }}
+            style={{ filter: "drop-shadow(0 0 6px var(--destructive))" }}
           />
         )}
       </svg>
@@ -56,7 +56,7 @@ export function RestRing({
           className="font-black tabular-nums leading-none"
           style={{
             fontSize: isRestOvertime ? "44px" : "56px",
-            color: isRestOvertime ? "#ef4444" : "var(--color-brand)",
+            color: isRestOvertime ? "var(--destructive)" : "var(--color-brand)",
           }}
         >
           {isRestOvertime ? `+${overtimeSec}` : restRemaining}

@@ -12,8 +12,8 @@ interface Live1rmReadoutProps {
 }
 
 const TREND_COLOR = {
-  up: "#22c55e",
-  down: "#ef4444",
+  up: "var(--accent-green)",
+  down: "var(--destructive)",
   even: "var(--color-brand)",
   none: "var(--color-brand)",
 } as const;

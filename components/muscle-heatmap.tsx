@@ -38,9 +38,9 @@ const MUSCLE_TO_SLUG: Record<string, Slug> = {
   hamstrings: "hamstring",
 };
 
-const PRIMARY_COLOR = "#22c55e";
-const SECONDARY_COLOR = "#f59e0b";
-const INJURED_COLOR = "#ef4444";
+const PRIMARY_COLOR = "var(--accent-green)";
+const SECONDARY_COLOR = "var(--accent-amber)";
+const INJURED_COLOR = "var(--destructive)";
 // Volume mode has no ramp of its own any more (#2554). The patch is the bar's colour — the
 // green / amber / red / grey rule lives once in `components/health/volume-band.ts`
 // (`muscleVolumeColor`) — so the map cannot read "far under" in green while the bars read it red.

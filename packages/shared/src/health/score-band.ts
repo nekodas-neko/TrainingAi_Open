@@ -14,10 +14,19 @@
 // of the move: every current consumer is DOM or SVG.
 export interface ScoreBand { label: 'High' | 'Moderate' | 'Low'; color: string }
 
+/** The good / warning / bad triad, once (#2148). Every band in the app reads these three and no hex
+ *  spelling of them; `check-hex-literals` and `band-colours-read-the-token.test.ts` hold the line.
+ *  Preview maps them to its status colours with `bandColor()` (`mobile/src/shared/theme/tokens.ts`). */
+export const BAND_COLOR = {
+  good: 'var(--accent-green)',
+  warning: 'var(--accent-amber)',
+  bad: 'var(--destructive)',
+} as const
+
 export const SCORE_BAND_COLOR = {
-  High: 'var(--accent-green)',
-  Moderate: 'var(--accent-amber)',
-  Low: 'var(--destructive)',
+  High: BAND_COLOR.good,
+  Moderate: BAND_COLOR.warning,
+  Low: BAND_COLOR.bad,
 } as const
 
 export function scoreBand(score: number): ScoreBand {
