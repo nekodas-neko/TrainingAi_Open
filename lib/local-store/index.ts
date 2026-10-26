@@ -1,4 +1,4 @@
-import { isSQLiteAvailable, isLocalStoreDead, runSQL, querySQL } from '@/lib/sqlite/sqlite-service';
+import { isSQLiteAvailable, isLocalStoreDead, runSQL, querySQL, querySQLOpen } from '@/lib/sqlite/sqlite-service';
 import { storeOwnedByAnotherAccount } from './device-owner';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalManualSleepNight, LocalWorkoutSession,
@@ -384,21 +384,21 @@ function uploadQueueHasItems(key: string): boolean {
  * would empty, or an item in a localStorage upload queue (unsent changes are data, #3369). Rows are
  * not stamped with the account that wrote them, so this is the only thing the device can say about a
  * store whose owner record is missing (`device-owner.ts`). Cached responses (`api_cache`) and the
- * exercise catalogue do not count: a wipe can clear them with nothing lost. A failed read throws:
- * not knowing is not "empty".
+ * exercise catalogue do not count: a wipe can clear them with nothing lost. A failed read throws,
+ * and so does a database that is not open (`querySQLOpen`): not knowing is not "empty" (#3435).
  */
 export async function deviceHasLocalData(): Promise<boolean> {
   // Dynamic: sign-out-storage pulls in the zustand stores, which reach back into this module.
   const { UPLOAD_QUEUE_STORAGE } = await import('@/lib/sign-out-storage');
   if (Object.keys(UPLOAD_QUEUE_STORAGE).some(uploadQueueHasItems)) return true;
   if (!isSQLiteAvailable()) return false;
-  const tables = await querySQL<{ name: string }>(
+  const tables = await querySQLOpen<{ name: string }>(
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
     [],
   );
   for (const { name } of tables) {
     if (KEEP_ON_SIGN_OUT.has(name)) continue;
-    const rows = await querySQL<{ x: number }>(`SELECT 1 AS x FROM ${name} LIMIT 1`, []);
+    const rows = await querySQLOpen<{ x: number }>(`SELECT 1 AS x FROM ${name} LIMIT 1`, []);
     if (rows.length > 0) return true;
   }
   return false;

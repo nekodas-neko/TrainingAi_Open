@@ -7,12 +7,21 @@ const sql = vi.hoisted(() => ({
   deleted: [] as string[],
   rows: {} as Record<string, number>,
 }))
+const dbOpen = vi.hoisted(() => ({ value: true }))
 const cache = vi.hoisted(() => ({ clearAllCache: vi.fn(async (_o?: { throwOnError?: boolean }) => {}), disableCacheWrites: vi.fn() }))
 
 vi.mock('@/lib/sqlite/sqlite-service', async () => ({
   isSQLiteAvailable: () => true,
   isLocalStoreDead: () => false,
+  // `querySQL` answers [] for a database that is not open; `querySQLOpen` throws instead (#3435).
   querySQL: vi.fn(async (q: string) => {
+    if (!dbOpen.value) return []
+    if (q.includes('sqlite_master')) return sql.tables.map(name => ({ name }))
+    const m = /FROM (\w+) LIMIT 1/.exec(q)
+    return m && (sql.rows[m[1]] ?? 0) > 0 ? [{ x: 1 }] : []
+  }),
+  querySQLOpen: vi.fn(async (q: string) => {
+    if (!dbOpen.value) throw new Error('The local database is not open')
     if (q.includes('sqlite_master')) return sql.tables.map(name => ({ name }))
     const m = /FROM (\w+) LIMIT 1/.exec(q)
     return m && (sql.rows[m[1]] ?? 0) > 0 ? [{ x: 1 }] : []
@@ -33,7 +42,7 @@ import { clearLocalStoreData, deviceHasLocalData } from '../index'
 import { wipeDevice } from '../data-epoch'
 
 beforeEach(() => {
-  sql.failDelete.clear(); sql.deleted.length = 0; sql.rows = {}
+  sql.failDelete.clear(); sql.deleted.length = 0; sql.rows = {}; dbOpen.value = true
   cache.clearAllCache.mockReset().mockResolvedValue(undefined)
   // `document` is absent in the node environment; the cookie mirror is best-effort and try/caught.
 })
@@ -67,6 +76,10 @@ describe('deviceHasLocalData', () => {
   it('is false for a store whose only rows are in the kept tables', async () => {
     sql.rows = { exercise_library: 40, api_cache: 3 }
     expect(await deviceHasLocalData()).toBe(false)
+  })
+  it('throws when the database is not open, rather than reading it as empty (#3435)', async () => {
+    dbOpen.value = false
+    await expect(deviceHasLocalData()).rejects.toThrow(/not open/)
   })
   it('is true as soon as any other table holds a row', async () => {
     sql.rows = { food_logs: 1 }

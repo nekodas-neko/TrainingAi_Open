@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
   // Deactivated (has data, not deletable). Only inactive rows are asked about; the server still
   // decides again at delete time, so this is display, not the guard.
   const withData = await repo.usersWithData(users.filter(u => !u.isActive).map(u => u.id))
-  return NextResponse.json({ users: users.map(u => ({ ...u, hasData: !u.isActive && withData.has(u.id) })) })
+  return NextResponse.json({ users: users.map(({ sessionsValidFrom: _cutoff, ...u }) => ({ ...u, hasData: !u.isActive && withData.has(u.id) })) })
 }
 
 export async function PATCH(req: NextRequest) {

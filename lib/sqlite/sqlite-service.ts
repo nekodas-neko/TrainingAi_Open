@@ -371,6 +371,18 @@ export async function withTransaction<T>(fn: (tx: SQLTransaction) => Promise<T>)
   }, 'withTransaction');
 }
 
+/** A read that must see the real database: throws when it is not open, where `querySQL` answers `[]`.
+ *  For a caller that treats "no rows" as an answer (`deviceHasLocalData`: empty means safe to keep). */
+export async function querySQLOpen<T = Record<string, unknown>>(
+  sql: string,
+  values?: unknown[],
+): Promise<T[]> {
+  await awaitOpen();
+  if (!_db) throw new Error('The local database is not open');
+  const result = await _db.query(sql, values ?? []);
+  return (result.values ?? []) as T[];
+}
+
 export async function querySQL<T = Record<string, unknown>>(
   sql: string,
   values?: unknown[],
