@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { TROPHY_PINS_TTL } from "@trainingai/shared/cache-ttl";
 import {
-  TROPHY_PINS_KEY, TROPHY_PINS_URL, carryOverLegacyPins, savePins,
+  TROPHY_PINS_KEY, TROPHY_PINS_URL, carryOverLegacyPins, readAccountPins, savePins,
 } from "@/lib/trophy/trophy-pins-client";
 
 interface TrophyCaseProps {
@@ -95,14 +95,27 @@ function OwnTrophyCase({ achievements, readOnly }: { achievements: AchievementRe
     if (account) setPinnedIds(account.pins ?? []);
   }, [account]);
 
-  // The list this browser kept before pins lived on the account moves over once, after the account's
-  // own pins have been read.
+  // The account's pins read from the server now. The cached value above paints at once but can be
+  // older than a change made on another device, and a failed read leaves nothing known at all.
+  const [confirmed, setConfirmed] = useState<{ pins: string[] | null } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void readAccountPins().then(read => { if (alive) setConfirmed(read); });
+    return () => { alive = false; };
+  }, []);
+
+  // The list this browser kept before pins lived on the account moves over once, and only after that
+  // fresh read says the account has none; a cached `{ pins: null }` is not that.
   const carried = useRef(false);
   useEffect(() => {
-    if (readOnly || !account || carried.current || unlockedKey === "") return;
+    if (readOnly || !confirmed || carried.current || unlockedKey === "") return;
     carried.current = true;
-    void carryOverLegacyPins(account.pins, new Set(unlockedKey.split(",")));
-  }, [readOnly, account, unlockedKey]);
+    void carryOverLegacyPins(confirmed.pins, new Set(unlockedKey.split(",")));
+  }, [readOnly, confirmed, unlockedKey]);
+
+  // An edit saves the whole list, so it is held back while the account's pins are unknown: the
+  // read failed and nothing is cached, which would otherwise show three empty slots to edit from.
+  const known = account !== null || confirmed !== null;
 
   const change = async (next: string[]) => {
     const before = pinnedIds;
@@ -116,7 +129,7 @@ function OwnTrophyCase({ achievements, readOnly }: { achievements: AchievementRe
   return (
     <TrophyCaseView
       achievements={achievements}
-      readOnly={readOnly}
+      readOnly={readOnly || !known}
       pinnedIds={pinnedIds}
       onPin={id => void change(pinTrophy(pinnedIds, id))}
       onUnpin={id => void change(unpinTrophy(pinnedIds, id))}

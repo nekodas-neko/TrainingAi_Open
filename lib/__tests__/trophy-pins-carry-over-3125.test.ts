@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const invalidate = vi.fn(async () => {})
 vi.mock('@/lib/cache-groups', () => ({ invalidateTrophyPins: () => invalidate() }))
 
-import { carryOverLegacyPins, savePins, readLegacyPins } from '@/lib/trophy/trophy-pins-client'
+import { carryOverLegacyPins, readAccountPins, savePins, readLegacyPins } from '@/lib/trophy/trophy-pins-client'
 
 const LEGACY = 'ta_trophy_case'
 const unlocked = new Set(['a', 'b', 'c'])
@@ -82,5 +82,25 @@ describe('carryOverLegacyPins', () => {
     await carryOverLegacyPins(null, new Set())
     expect(put).not.toHaveBeenCalled()
     expect(readLegacyPins()).toEqual(['a'])
+  })
+})
+
+describe('readAccountPins', () => {
+  it('returns the account pins, null pins when it has none', async () => {
+    put.mockResolvedValueOnce(new Response(JSON.stringify({ pins: ['a', 'b'] }), { status: 200 }))
+    expect(await readAccountPins()).toEqual({ pins: ['a', 'b'] })
+    put.mockResolvedValueOnce(new Response(JSON.stringify({ pins: null }), { status: 200 }))
+    expect(await readAccountPins()).toEqual({ pins: null })
+  })
+
+  it('returns null, not "no pins", when the read fails or the body is not pins', async () => {
+    put.mockResolvedValueOnce(new Response('{}', { status: 500 }))
+    expect(await readAccountPins()).toBeNull()
+    put.mockRejectedValueOnce(new TypeError('offline'))
+    expect(await readAccountPins()).toBeNull()
+    put.mockResolvedValueOnce(new Response(JSON.stringify({ pins: [1] }), { status: 200 }))
+    expect(await readAccountPins()).toBeNull()
+    put.mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
+    expect(await readAccountPins()).toBeNull()
   })
 })

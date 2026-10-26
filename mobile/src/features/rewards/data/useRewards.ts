@@ -12,6 +12,7 @@ import { markSeen, readSeen } from './seen';
 import {
   cachedTrophyCase,
   carryOverTrophyCase,
+  readFreshTrophyPins,
   rememberTrophyCase,
   saveTrophyPins,
   trophyCacheKey,
@@ -72,10 +73,20 @@ export function useTrophyCase(unlockedIds: readonly string[]) {
   useEffect(() => {
     setSettled(false);
   }, [key]);
+  // The carry-over waits for the server's own answer: `data` may be the copy this phone saved, older
+  // than a change made on another device. A failed read leaves the old list for the next load.
   useEffect(() => {
     let live = true;
-    if (key && resources && scoped && data) {
-      void carryOverTrophyCase(resources, scoped, new Set(unlockedKey.split(',').filter(Boolean)))
+    if (key && resources && scoped && data && connection) {
+      void readFreshTrophyPins(connection)
+        .then((fresh) =>
+          carryOverTrophyCase(
+            resources,
+            scoped,
+            new Set(unlockedKey.split(',').filter(Boolean)),
+            fresh,
+          ),
+        )
         .catch(() => {})
         .then(() => live && setSettled(true));
     }

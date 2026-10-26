@@ -22,6 +22,24 @@ export function clearLegacyPins() {
 }
 
 /**
+ * The account's pins read from the server now, never from a cache: `null` when the read failed (so
+ * nothing is known), otherwise `{ pins }` with `pins: null` meaning the account has none. The
+ * carry-over below must wait for this, since the cached copy can be older than a change made on
+ * another device.
+ */
+export async function readAccountPins(): Promise<{ pins: string[] | null } | null> {
+  try {
+    const res = await fetch(TROPHY_PINS_URL, { cache: 'no-store' })
+    if (!res.ok) return null
+    const body: unknown = await res.json()
+    const pins = (body as { pins?: unknown } | null)?.pins
+    if (pins === null) return { pins: null }
+    if (Array.isArray(pins) && pins.every(id => typeof id === 'string')) return { pins }
+    return null
+  } catch { return null }
+}
+
+/**
  * Save the pins on the account, which is what friends see. 'refused' is the server saying no (a
  * trophy that is not unlocked, a malformed list): retrying the same list cannot work. 'failed' is
  * anything else — offline, a 5xx, a rate limit — where it can.
