@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createApiClient, ApiError } from '../src/features/account/api/client.ts';
+import { createApiClient, ApiError, isRejectedForGood, pushOutcome } from '../src/features/account/api/client.ts';
 
 test('rejects unsafe hosts and absolute paths before credentials can be sent', async () => {
   assert.throws(() => createApiClient('http://example.com', async () => 'secret'));
@@ -95,4 +95,37 @@ test('data epoch: a server without the route has never reset the account, other 
   t.mock.restoreAll();
   t.mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 503, headers: { 'content-type': 'application/json' } }));
   await assert.rejects(client.dataEpoch(), error => error instanceof ApiError && error.status === 503);
+});
+
+test('only the server\'s own validation 400 is rejected for good; a proxy 400 is retried (#3392)', async t => {
+  const answers: [string, Record<string, string>][] = [
+    ['{"error":"Invalid body"}', { 'content-type': 'application/json' }],
+    ['<html><body>Bad Request</body></html>', { 'content-type': 'text/html' }],
+    ['', {}],
+    ['{"message":"Bad Request"}', { 'content-type': 'application/json' }],
+    ['{"error":""}', { 'content-type': 'application/json' }],
+  ];
+  const outcomes: boolean[] = [];
+  for (const [body, headers] of answers) {
+    t.mock.method(globalThis, 'fetch', async () => new Response(body || null, { status: 400, headers }));
+    const failure = await createApiClient('https://example.com', async () => 'test-session')
+      .post('/api/user/preferences', { a: 1 })
+      .catch((e: unknown) => e);
+    outcomes.push(isRejectedForGood(failure));
+    t.mock.restoreAll();
+  }
+  assert.deepEqual(outcomes, [true, false, false, false, false]);
+  assert.equal(isRejectedForGood(new ApiError(422)), true);
+  assert.equal(isRejectedForGood(new ApiError(400)), false);
+  assert.equal(isRejectedForGood(new ApiError(500)), false);
+});
+test('a push answer settles its one mutation as accepted, rejected for good, or retried (#3392)', () => {
+  assert.equal(pushOutcome({ processed: 1, errors: [] }, 'a'), 'accepted');
+  assert.equal(pushOutcome({ processed: 1 }, 'a'), 'accepted');
+  assert.equal(pushOutcome({ processed: 0, errors: [{ id: 'a', retryable: false }] }, 'a'), 'rejected');
+  assert.equal(pushOutcome({ processed: 0, errors: [{ id: 'a' }] }, 'a'), 'rejected');
+  assert.equal(pushOutcome({ processed: 0, errors: [{ id: 'a', retryable: true }] }, 'a'), 'retry');
+  assert.equal(pushOutcome({ processed: 0, errors: [{ id: 'other' }] }, 'a'), 'retry');
+  assert.equal(pushOutcome({ processed: 0, errors: [] }, 'a'), 'retry');
+  assert.equal(pushOutcome(null, 'a'), 'retry');
 });

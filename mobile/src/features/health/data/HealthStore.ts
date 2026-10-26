@@ -11,7 +11,7 @@ import {
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
-import { ApiError, isRejectedForGood } from '../../account/api/client.ts';
+import { ApiError, UploadRejected, isRejectedForGood, pushOutcome } from '../../account/api/client.ts';
 import { toAestDay, weekStartForDay } from '@trainingai/shared/date-utils';
 import { morningSchema, checkinSchema } from './checkin.ts';
 import { dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin';
@@ -87,6 +87,7 @@ const savedSchema = z.object({
   checkins: z.record(z.string(), checkinSchema.nullable()).default({}),
   verdictResponses: z.array(verdictResponseSchema).default([]),
   readinessResponses: z.array(readinessResponseSchema).default([]),
+  setAside: z.string().nullable().default(null),
 });
 export type HealthState = {
   ready: boolean;
@@ -105,6 +106,8 @@ export type HealthState = {
   checkins: Record<string, z.infer<typeof checkinSchema> | null>;
   verdictResponses: z.infer<typeof verdictResponseSchema>[];
   readinessResponses: z.infer<typeof readinessResponseSchema>[];
+  /** The set-aside notice, kept on disk until the person has seen it (acknowledgeSetAside). */
+  setAside: string | null;
 };
 export const emptyHealthState: HealthState = {
   ready: false,
@@ -123,6 +126,7 @@ export const emptyHealthState: HealthState = {
   checkins: {},
   verdictResponses: [],
   readinessResponses: [],
+  setAside: null,
 };
 const key = 'health-records.v1';
 export class HealthStore {
@@ -176,7 +180,7 @@ export class HealthStore {
         if (generation !== this.generation) {
           return;
         }
-        this.publish({ ...(saved ?? {}), ready: true, error: null });
+        this.publish({ ...(saved ?? {}), ready: true, error: saved?.setAside ?? null });
         this.policyDay = toAestDay(
           new Date(saved?.bodyAt || this.now()),
           this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -500,6 +504,16 @@ export class HealthStore {
       this.publish({ bodyError: failureNotice('Could not save health refresh status.', failure) });
     }
   }
+  /** The person has seen the set-aside notice; it no longer comes back after a sync or a restart. */
+  async acknowledgeSetAside() {
+    if (!this.current.setAside) {
+      return;
+    }
+    await this.write((state) => ({
+      setAside: null,
+      error: state.error === state.setAside ? null : state.error,
+    }));
+  }
   sync() {
     if (this.flushing) {
       return this.flushing;
@@ -539,11 +553,24 @@ export class HealthStore {
             if (generation !== this.generation) {
               return;
             }
-            if (
-              result.processed !== 1 ||
-              !Array.isArray(result.errors) ||
-              result.errors.length
-            ) {
+            if (!Array.isArray(result.errors)) {
+              throw new Error('Upload not confirmed.');
+            }
+            const outcome = pushOutcome(result, change.id);
+            if (outcome === 'rejected') {
+              // The server answered 200 but refused this change for good; drop it so the queue
+              // behind it flows, and keep the local value.
+              setAside = failureNotice(
+                'One change was kept on this phone only; the server did not accept it.',
+                new UploadRejected(),
+              );
+              this.revision++;
+              await this.write((state) => ({
+                operations: state.operations.filter((op) => op.id !== change.id),
+              }));
+              continue;
+            }
+            if (outcome === 'retry') {
               throw new Error('Upload not confirmed.');
             }
             this.revision++;
@@ -607,7 +634,11 @@ export class HealthStore {
           this.invalidate();
         }
         if (generation === this.generation) {
-          this.publish({ error: setAside });
+          if (setAside) {
+            await this.write(() => ({ setAside, error: setAside }));
+          }
+          // A notice not yet seen outlasts a sync that sets nothing aside.
+          this.publish({ error: setAside ?? this.current.setAside });
         }
       } catch (failure) {
         if (generation === this.generation) {

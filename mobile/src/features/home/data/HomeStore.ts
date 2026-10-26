@@ -3,7 +3,7 @@ import { MoodFieldsSchema, type MoodFields } from '@trainingai/shared/validation
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { ApiError, isRejectedForGood } from '../../account/api/client.ts';
+import { ApiError, UploadRejected, isRejectedForGood, pushOutcome } from '../../account/api/client.ts';
 import { isCalendarDate } from '@trainingai/shared/date-utils';
 import { moodSchema, preferencesSchema, type HomePreferences, type Mood } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
@@ -33,6 +33,7 @@ const diskSchema = z.object({
   savedAt: z.record(z.string(), z.number()),
   restDays: z.record(z.string(), z.boolean()).default({}),
   markers: z.record(z.string(), z.boolean()).default({}),
+  setAside: z.string().nullable().default(null),
 });
 type Operation = z.infer<typeof operationSchema>;
 export type HomeChange = Operation['kind'];
@@ -49,6 +50,8 @@ export type HomeState = {
   error: string | null;
   restDays: Record<string, boolean>;
   markers: Record<string, boolean>;
+  /** The set-aside notice, kept on disk until the person has seen it (acknowledgeSetAside). */
+  setAside: string | null;
 };
 export const emptyHome: HomeState = {
   ready: false,
@@ -63,6 +66,7 @@ export const emptyHome: HomeState = {
   error: null,
   restDays: {},
   markers: {},
+  setAside: null,
 };
 function sameFields(actual: Record<string, unknown>, expected: Record<string, unknown>) {
   return Object.entries(expected).every(
@@ -115,7 +119,7 @@ export class HomeStore {
             throw new Error('Wrong account cache.');
           }
           if (generation === this.generation) {
-            this.publish({ ...(saved ?? {}), ready: true });
+            this.publish({ ...(saved ?? {}), ready: true, error: saved?.setAside ?? null });
           }
         } catch (failure) {
           if (generation === this.generation) {
@@ -312,6 +316,16 @@ export class HomeStore {
     void work.finally(() => this.requests.delete(key));
     return work;
   }
+  /** The person has seen the set-aside notice; it no longer comes back after a sync or a restart. */
+  async acknowledgeSetAside() {
+    if (!this.current.setAside) {
+      return;
+    }
+    await this.write((state) => ({
+      setAside: null,
+      error: state.error === state.setAside ? null : state.error,
+    }));
+  }
   sync(): Promise<void> {
     if (this.flushing) {
       return this.flushing;
@@ -344,7 +358,11 @@ export class HomeStore {
                     ],
                   }),
                 );
-              if (result.processed !== 1 || result.errors?.length) {
+              const outcome = pushOutcome(result, op.id);
+              if (outcome === 'rejected') {
+                throw new UploadRejected();
+              }
+              if (outcome === 'retry') {
                 throw new Error('Upload not accepted.');
               }
               const row = moodSchema
@@ -424,7 +442,13 @@ export class HomeStore {
             this.changed(op.kind);
           }
         }
-        this.publish({ error: setAside });
+        if (setAside) {
+          await this.write(() => ({ setAside, error: setAside }));
+        }
+        if (generation === this.generation) {
+          // A notice not yet seen outlasts a sync that sets nothing aside.
+          this.publish({ error: setAside ?? this.current.setAside });
+        }
       } catch (cause) {
         if (generation === this.generation) {
           const denied = cause instanceof ApiError && [401, 403].includes(cause.status);

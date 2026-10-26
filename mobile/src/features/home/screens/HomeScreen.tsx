@@ -64,6 +64,8 @@ export type HomeNavigation = {
   openCollection: () => void;
   openExplanation: (id: string) => void;
 };
+const SET_ASIDE_SEEN_MS = 6000;
+
 export function HomeScreen(navigation: HomeNavigation) {
   const { theme } = useTheme();
   const home = useHome();
@@ -153,6 +155,18 @@ export function HomeScreen(navigation: HomeNavigation) {
     (key) => !home.preferences.homeHiddenSections?.includes(key),
   );
   const showHome = workout.signedIn && !health.denied && !home.denied;
+  // The header shows a set-aside notice; once it has been on screen for a few seconds it is seen.
+  const setAsideShown = showHome && !!(home.setAside || health.setAside);
+  useEffect(() => {
+    if (!setAsideShown) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void home.store?.acknowledgeSetAside();
+      void health.store?.acknowledgeSetAside();
+    }, SET_ASIDE_SEEN_MS);
+    return () => clearTimeout(timer);
+  }, [setAsideShown, home.store, health.store]);
   const { signups: adminSignups } = useAdminPending();
   return (
     <PageLayout

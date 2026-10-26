@@ -409,7 +409,7 @@ test('a readiness answer the server rejects with a 400 is set aside, a 500 holds
   await store.respondToReadiness(date, 'rated');
   f.setOnline(true);
   const post = f.connection.post;
-  f.connection.post = async (path: string, body: unknown) => {
+  (f.connection as { post: unknown }).post = async (path: string, body: unknown) => {
     if (path === '/api/sleep-verdict') {
       throw new ApiError(500);
     }
@@ -418,9 +418,9 @@ test('a readiness answer the server rejects with a 400 is set aside, a 500 holds
   await store.sync();
   assert.equal(store.getSnapshot().verdictResponses.length, 1);
   assert.equal(store.getSnapshot().readinessResponses.length, 1);
-  f.connection.post = async (path: string, body: unknown) => {
+  (f.connection as { post: unknown }).post = async (path: string, body: unknown) => {
     if (path === '/api/sleep-verdict') {
-      throw new ApiError(400);
+      throw new ApiError(400, undefined, undefined, undefined, true);
     }
     return post(path, body);
   };
@@ -441,9 +441,9 @@ test('a readiness answer rejected with a 400 is set aside even when the sleep an
   await store.sync(); // let the offline attempt the answer started settle
   f.setOnline(true);
   const post = f.connection.post;
-  f.connection.post = async (path: string, body: unknown) => {
+  (f.connection as { post: unknown }).post = async (path: string, body: unknown) => {
     if (path === '/api/readiness-verdict') {
-      throw new ApiError(400);
+      throw new ApiError(400, undefined, undefined, undefined, true);
     }
     return post(path, body);
   };
@@ -451,6 +451,80 @@ test('a readiness answer rejected with a 400 is set aside even when the sleep an
   assert.equal(store.getSnapshot().verdictResponses.length, 0);
   assert.equal(store.getSnapshot().readinessResponses.length, 0);
   assert.match(store.getSnapshot().error ?? '', /kept on this phone only/);
+});
+
+const rejection = (m: { id: string }, retryable: boolean) => ({
+  processed: 0,
+  errors: [
+    { id: m.id, domain: 'body_metrics', date, error: 'Rejected by the sync schema at payload: invalid', retryable },
+  ],
+});
+
+test('a Health push answered 200 with a rejected item sets it aside and the accepted ones go through (#3392)', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.logMetric('weightKg', 81, date);
+  await store.addWater(250, date);
+  await store.sync(); // let the offline attempts settle
+  f.setOnline(true);
+  const post = f.connection.post;
+  let pushes = 0;
+  (f.connection as { post: unknown }).post = async (path: string, body: unknown) => {
+    if (path === '/api/sync/push' && pushes++ === 0) {
+      return rejection((body as { mutations: { id: string }[] }).mutations[0], false);
+    }
+    return post(path, body);
+  };
+  await store.sync();
+  const state = store.getSnapshot();
+  assert.equal(state.operations.length, 0);
+  assert.equal(pushes, 2);
+  assert.match(state.error ?? '', /kept on this phone only/);
+});
+
+test('a Health push answered 200 with a retryable error holds the queue (#3392)', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.addWater(250, date);
+  await store.sync();
+  f.setOnline(true);
+  (f.connection as { post: unknown }).post = async (_path: string, body: unknown) =>
+    rejection((body as { mutations: { id: string }[] }).mutations[0], true);
+  await store.sync();
+  assert.equal(store.getSnapshot().operations.length, 1);
+  assert.match(store.getSnapshot().error ?? '', /Saved on this phone/);
+  assert.equal(store.getSnapshot().setAside, null);
+});
+
+test('the Health set-aside notice survives a sync and a restart, and clears once shown (#3392)', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.addWater(250, date);
+  await store.sync();
+  f.setOnline(true);
+  (f.connection as { post: unknown }).post = async (_path: string, body: unknown) =>
+    rejection((body as { mutations: { id: string }[] }).mutations[0], false);
+  await store.sync();
+  const notice = store.getSnapshot().error;
+  assert.match(notice ?? '', /kept on this phone only/);
+  await store.sync();
+  assert.equal(store.getSnapshot().error, notice);
+  const reopened = f.store();
+  await reopened.initialize();
+  assert.equal(reopened.getSnapshot().error, notice);
+  await reopened.sync();
+  assert.equal(reopened.getSnapshot().error, notice);
+  await reopened.acknowledgeSetAside();
+  assert.equal(reopened.getSnapshot().error, null);
+  const again = f.store();
+  await again.initialize();
+  assert.equal(again.getSnapshot().error, null);
 });
 
 for (const status of [401, 403]) {
@@ -464,7 +538,7 @@ for (const status of [401, 403]) {
     await store.respondToReadiness(date, 'rated');
     await store.sync();
     f.setOnline(true);
-    f.connection.post = async () => {
+    (f.connection as { post: unknown }).post = async () => {
       throw new ApiError(status);
     };
     await store.sync();
@@ -472,7 +546,7 @@ for (const status of [401, 403]) {
     assert.equal(state.operations.length, 1);
     assert.match(state.error ?? '', /Saved on this phone/);
     // The two answers sit behind the stuck write; take it out of the way to reach their loops.
-    f.connection.post = async (path: string) => {
+    (f.connection as { post: unknown }).post = async (path: string) => {
       if (path === '/api/sync/push') {
         return { processed: 1, errors: [] };
       }
