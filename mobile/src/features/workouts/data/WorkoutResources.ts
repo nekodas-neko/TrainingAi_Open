@@ -579,7 +579,9 @@ export class WorkoutResources {
       const response =
         method === 'DELETE' && this.connection.delete
           ? await this.connection.delete(path, body, query)
-          : await operation(path, body);
+          : method === 'POST'
+            ? await this.connection.post(path, body, query)
+            : await operation(path, body);
       if (generation !== this.generation) {
         throw new Error('The account changed.');
       }

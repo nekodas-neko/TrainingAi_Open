@@ -109,6 +109,12 @@ export function createApiClient(
       '/api/exercises/generate',
       '/api/workout-review/session/',
       '/api/ai-periodization/session/',
+      // The admin data jobs read and rewrite history in one request; a client timeout would read as
+      // a failure while the server went on to commit.
+      '/api/admin/backfill-',
+      '/api/admin/rederive-',
+      '/api/admin/reencode-',
+      '/api/admin/recompute-',
     ].some((prefix) => path.startsWith(prefix));
     const timeout = setTimeout(
       () => controller.abort(),
@@ -247,8 +253,8 @@ export function createApiClient(
     get(path: string, query?: Record<string, string>) {
       return request(path, 'GET', undefined, true, query);
     },
-    post(path: string, body: unknown) {
-      return request(path, 'POST', body, true);
+    post(path: string, body: unknown, query?: Record<string, string>) {
+      return request(path, 'POST', body, true, query);
     },
     put(path: string, body: unknown) {
       return request(path, 'PUT', body, true);
