@@ -264,9 +264,9 @@ const asJob = (r: {
  *
  * - it is returned with `alreadyRunning: true` if it writes everything `opts` asks for, so the
  *   caller can follow it;
- * - otherwise `refused: true` and nothing is inserted. Issue 2383: a step backfill used to follow a
- *   plain redecode, the step correction never ran, and the screen said it had. The rule is
- *   `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
+ * - otherwise `refused: true` and nothing is inserted. Issue 2383: a request used to follow a
+ *   redecode that did not write what it asked for (then the step backfill, retired in #2862), its
+ *   correction never ran, and the screen said it had. The rule is `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
  *
  * Two requests racing past the read both try the insert; the index lets one through and the other
  * gets no row back, then reads the winner and applies the same rule rather than surfacing a 500.
@@ -3150,43 +3150,6 @@ export async function getOuraStorageStats(db: Db): Promise<import('../../reposit
       bodyHexBytes: Number(rawRow.body_hex_bytes ?? 0),
     },
   }
-}
-
-// Culling Lever 1b — one-off backfill nulling the `decoded` JSONB on rows written before Lever 1a
-// (which stops writing it going forward). DATA-DROPPING → admin-triggered only, never auto-run on
-// deploy/migration; the owner presses this deliberately, watching the G-2 footprint numbers drop.
-// body_hex is never touched (archival, untouched by definition) — every nulled row's decode path
-// already falls back to body_hex (proven in Lever 1a). No age cutoff: every row still carrying
-// `decoded` predates Lever 1a and is unconditionally safe to null.
-// Batched (500 rows/UPDATE, matching redecodeOuraRawSamples's page size) so no single statement can
-// exceed the pool's 15s statement_timeout — each batch commits independently (no wrapping
-// transaction), so a killed/interrupted run just leaves fewer rows remaining, never rolled back.
-// `maxRows` still bounds one call (owner explicitly asked for "all at once" — defaults high enough
-// to clear any realistic single-user backlog in one press, while keeping a finite ceiling rather
-// than a literal unbounded loop).
-export async function nullHistoricalDecoded(
-  db: Db, userId: string, maxRows = 1_000_000,
-): Promise<{ nulled: number; remaining: number }> {
-  const BATCH = 500
-  let nulled = 0
-  while (nulled < maxRows) {
-    const page = await db
-      .select({ id: s.ouraRawSamples.id })
-      .from(s.ouraRawSamples)
-      .where(and(eq(s.ouraRawSamples.userId, userId), isNotNull(s.ouraRawSamples.decoded)))
-      .orderBy(asc(s.ouraRawSamples.id))
-      .limit(Math.min(BATCH, maxRows - nulled))
-    if (page.length === 0) break
-    await db.update(s.ouraRawSamples)
-      .set({ decoded: null })
-      .where(inArray(s.ouraRawSamples.id, page.map(r => r.id)))
-    nulled += page.length
-  }
-  const [{ remaining }] = await db
-    .select({ remaining: sql<number>`count(*)::int` })
-    .from(s.ouraRawSamples)
-    .where(and(eq(s.ouraRawSamples.userId, userId), isNotNull(s.ouraRawSamples.decoded)))
-  return { nulled, remaining }
 }
 
 // Culling Lever 1c — physically reclaim the disk that Lever 1b freed only logically. Nulling the

@@ -393,13 +393,13 @@ export function HealthMetricSheet({
                         </div>
                         <div className="text-right">
                           <span className="text-sm font-bold tabular-nums" style={{ color }}>
-                            {r.durationHours != null ? `${r.durationHours.toFixed(1)}h` : "—"}
+                            {r.durationHours != null ? formatHoursMinutes(r.durationHours * 60) : "—"}
                           </span>
                           {r.durationHours != null && (
                             <div className="flex gap-1 justify-end flex-wrap mt-0.5">
-                              {r.deepSleepHours  != null && <span className="text-[9px] rounded bg-blue-500/20 text-blue-400 px-1.5 py-0.5">Deep {r.deepSleepHours.toFixed(1)}h</span>}
-                              {r.remSleepHours   != null && <span className="text-[9px] rounded bg-violet-500/20 text-violet-400 px-1.5 py-0.5">REM {r.remSleepHours.toFixed(1)}h</span>}
-                              {r.lightSleepHours != null && <span className="text-[9px] rounded bg-sky-500/20 text-sky-400 px-1.5 py-0.5">Light {r.lightSleepHours.toFixed(1)}h</span>}
+                              {r.deepSleepHours  != null && <span className="text-[9px] rounded bg-blue-500/20 text-blue-400 px-1.5 py-0.5">Deep {formatHoursMinutes(r.deepSleepHours * 60)}</span>}
+                              {r.remSleepHours   != null && <span className="text-[9px] rounded bg-violet-500/20 text-violet-400 px-1.5 py-0.5">REM {formatHoursMinutes(r.remSleepHours * 60)}</span>}
+                              {r.lightSleepHours != null && <span className="text-[9px] rounded bg-sky-500/20 text-sky-400 px-1.5 py-0.5">Light {formatHoursMinutes(r.lightSleepHours * 60)}</span>}
                             </div>
                           )}
                         </div>

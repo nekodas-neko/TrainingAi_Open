@@ -89,6 +89,13 @@ export const sizes = {
   calendarMonthLabel: 96,
   // muscle-heatmap.tsx KeyItem: a w-2.5 h-2.5 rounded-[2px] swatch.
   legendSwatch: 10,
+  // collection chain (#2088): a 34 px cat on a 38 px rung, so six rungs and five links fit at 384 dp.
+  chainSprite: 34,
+  chainRung: 38,
+  rosterSprite: 22,
+  // collection rules (#2087): the diagram column beside each rule's caption.
+  ruleDiagram: 132,
+  ruleSprite: 26,
 };
 // Sizes are the current app's CSS px at its 384 px width, which is 384 dp on the S25 Ultra, so they
 // carry across one for one. Each comment names the class the current app uses for that role, and

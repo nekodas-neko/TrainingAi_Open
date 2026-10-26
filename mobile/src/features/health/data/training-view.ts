@@ -41,10 +41,11 @@ export function activityRow(log: ActivityRowInput) {
   };
 }
 
-// "3 / 13 sets" against a program target, "3 sets" without one.
+// "3 / 13 sets" against a program target (the target is a count, so always plural), "3 sets"
+// without one.
 export function muscleSetsLabel(sets: number, target: number | null) {
   return target !== null
-    ? `${sets} / ${plural(target, 'set', 'sets')}`
+    ? `${sets} / ${target} sets`
     : plural(sets, 'set', 'sets');
 }
 

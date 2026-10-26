@@ -21,9 +21,8 @@
 // axis. Getting it backwards inverts every correlation reported, which is why it has its own test.
 
 // `averageRanks` is imported rather than kept private: rank correlation is the statistic that
-// survives a comparison in mismatched units, and PS-15 needed a second one — the device-comparison
-// endpoint, where Oura stress is normalised -1..+1 and the Colmi's is raw 0..100. One copy, in the
-// module that owns correlation.
+// survives a comparison in mismatched units, and PS-15 added a second one — the device-comparison
+// endpoint (retired in #2862). One copy, in the module that owns correlation.
 import { averageRanks } from './correlation'
 
 export interface CalibrationCopy {

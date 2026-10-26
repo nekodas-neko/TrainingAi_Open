@@ -103,7 +103,8 @@ describe('every caller names itself (discovery)', () => {
         if (!/\bcaller\b/.test(window)) offenders.push(`${rel}: ${m[0].slice(0, 80)}`)
       }
     }
-    expect(seen, 'the scan matched no readRawFrames calls at all').toBeGreaterThanOrEqual(8)
+    // A floor that proves the scan still finds calls; 8 until #2862 retired the step-backfill preview.
+    expect(seen, 'the scan matched no readRawFrames calls at all').toBeGreaterThanOrEqual(5)
     expect(offenders).toEqual([])
   })
 

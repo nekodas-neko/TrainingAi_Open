@@ -24,8 +24,8 @@ import { resultOfVerdict, type WeighResult } from './labels.ts';
 // seconds of a weigh-in and does not advertise while idle, so the link works as the current app's
 // `ScaleBleService` does: scan for it, connect the moment it is seen advertising, ask for a
 // measurement, then keep the link open to catch every weigh-in on it. Here that happens only while
-// a screen holds the link (the Devices screen); the current app's background service has no
-// equivalent yet. The timings below are `ScaleBleService`'s and `ScaleGattClient`'s.
+// Preview is in the foreground (or the Devices screen is open); the current app's background
+// service has no equivalent yet. The timings below are `ScaleBleService`'s and `ScaleGattClient`'s.
 const PAIRED_KEY = 'paired-scale.v1';
 /** Attempts to reach a first live link after a scan hit. */
 const MAX_ATTEMPTS = 5;
@@ -40,7 +40,8 @@ export const SCAN_MS = 20_000;
 
 const pairedSchema = z.object({ id: z.string().min(1), name: z.string() });
 export type PairedScale = z.infer<typeof pairedSchema>;
-export type ScaleHold = 'settings';
+/** `app` holds the link on every screen while Preview is in the foreground (#3158). */
+export type ScaleHold = 'settings' | 'app';
 export type ScalePhase =
   | 'idle'
   | 'listening'
@@ -176,7 +177,8 @@ export class ScaleSession {
   setOutbox(outbox: ScaleOutbox | null) {
     if (outbox === this.outbox) return;
     this.outbox = outbox;
-    this.publish({ queued: outbox?.pending() ?? 0 });
+    // `result` is device-scoped; a new account must not inherit the last weigh-in's banner.
+    this.publish({ queued: outbox?.pending() ?? 0, result: null });
     void outbox?.sync().then(() => this.publish({ queued: outbox.pending() }));
   }
 

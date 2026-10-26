@@ -10,7 +10,7 @@ import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { sleepDurationTrend, sleepScoreTrend } from '@trainingai/shared/health/sleep-trend'
 import { moodMuscleMatches, normalizeMuscle } from '@trainingai/shared/muscles'
 import { sessionsRemainingThisWeek } from '@trainingai/shared/schedule-utils'
-import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
+import { volumeLandmarks, weeklyVolumeTarget, trainedWeekPhases } from '@trainingai/shared/ai-periodization/volume-targets'
 import { isRmPlateau } from '@trainingai/shared/health/strength-projection'
 import { oneRmTrendStatus } from '@trainingai/shared/1rm'
 import { workingBudgetMin, planningBudgetMin } from '@trainingai/shared/workout/duration-model'
@@ -228,6 +228,13 @@ export function resolveSelfReportedSick(
   return (bodyState?.includes('sick') ?? false) || illnessContext === 'sick'
 }
 
+export interface AggregateSignalsOptions {
+  /** Add the session's own phase to the week's phase mix (default true). A caller reviewing a session
+   *  that is already trained passes false: it is already among the trained sessions, so adding it
+   *  again would weight its phase twice and put the target off the Training card's (#3287). */
+  includeSessionInWeekMix?: boolean
+}
+
 export async function aggregateSignals(
   userId: string,
   programSessionId: string,
@@ -241,6 +248,7 @@ export async function aggregateSignals(
   // Today-only override of the session's configured time budget (the short/long presets).
   // Undefined = use the program's own timeBudgetMinutes.
   budgetOverrideMin?: number,
+  options?: AggregateSignalsOptions,
 ): Promise<PrescriptionSignals | null> {
   const today = todayInTz(tz)
   const todayMid = todayMidnightUtc(tz)
@@ -483,9 +491,25 @@ export async function aggregateSignals(
   // exercise-library labels, so those are normalized where they are read below.
   const weeklyLogged = await repo.getWeeklySetsByMuscleGroup(userId, program.id, weekStart, weekEnd, tz)
 
+  // #3287: the target the Training card prints (`weeklyVolumeTarget`), not the stored
+  // `targetSetsPerWeek`. The stored rows only say which muscles this program trains. The week's phase
+  // mix is the card's (the phases of the sessions trained since the week began) plus the session
+  // being prescribed, since the card has nothing to add for a session that has not happened yet.
+  // A caller reviewing a trained session opts out of that extra entry (`includeSessionInWeekMix`).
+  const periodization = await repo.listSessionPeriodizationForProgram(userId, program.id).catch(() => [])
+  const phaseBySession = new Map(periodization.map(p => [p.programSessionId, p.phase as string]))
+  const weekStartMs = dateStrMidnightInTz(weekStart, tz).getTime()
+  const weekPhases = [
+    ...trainedWeekPhases(
+      allRecentSessions.filter(ws => ws.startedAt.getTime() >= weekStartMs).map(ws => ws.sessionId),
+      phaseBySession,
+    ),
+    ...(options?.includeSessionInWeekMix === false ? [] : [state.phase]),
+  ]
   const weeklyTargets: Record<string, number> = {}
   for (const vt of volumeTargets) {
-    weeklyTargets[normalizeMuscle(vt.muscleGroup)] = vt.targetSetsPerWeek
+    const muscle = normalizeMuscle(vt.muscleGroup)
+    weeklyTargets[muscle] = weeklyVolumeTarget(program.trainingGoal, muscle, weekPhases)
   }
 
   const volumeBudgetPerMuscleGroup: Record<string, number> = {}

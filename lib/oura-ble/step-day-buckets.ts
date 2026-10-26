@@ -1,14 +1,10 @@
 /**
  * Bucket the daily-steps inputs by local day, and compute each day's merged step total.
  *
- * ONE implementation, deliberately. The rollup (`aggregateOuraRawSamples`) and the backfill preview
- * (`previewStepsBackfill`) previously carried hand-copied duplicates of this logic — so the preview
- * an owner authorises a destructive backfill from was computed by different code than the write that
- * follows it. The 2026-07-28 midnight-split fix landed in one copy and not the other, which is
- * exactly how that drift manifests.
- *
- * Callers still own their own queries (the rollup applies `rollupCutoffDs`, the preview does not),
- * because that difference is intentional. Everything downstream of the rows is shared.
+ * ONE implementation, deliberately. The rollup (`aggregateOuraRawSamples`) and a backfill preview
+ * (retired in #2862) once carried hand-copied duplicates of this logic, and the 2026-07-28
+ * midnight-split fix landed in one copy and not the other. Callers own their own queries; everything
+ * downstream of the rows is shared.
  */
 import { resolveDsToMs, type ClockAnchor } from './clock'
 import { runStepCounterPipeline, type RawFrame } from './step-counter-pipeline'
