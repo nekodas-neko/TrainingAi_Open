@@ -38,13 +38,21 @@ describe('the V2 calibration curve', () => {
   })
 })
 
-describe('until release prep sets the cutover', () => {
-  it('is not set, so nothing moves: every night scores on V1, however new', () => {
-    expect(SLEEP_SCORE_V2_FROM).toBeNull()
-    expect(sleepScoreCalibrationFor('2026-12-01').modelVersion).toBe(SLEEP_SCORE_MODEL_VERSIONS.v1)
-    expect(sleepScoreCalibrationFor('').modelVersion).toBe(SLEEP_SCORE_MODEL_VERSIONS.v1)
-    expect(SLEEP_MODEL.curves.scoreCalibration).toBe(V1)
-    expect(computeSleepScore(night('2026-12-01'), TZ)!.modelVersion).toBe(SLEEP_SCORE_MODEL_VERSIONS.v1)
+describe('the cutover constant', () => {
+  // Release prep sets it, so the test must hold on both sides: it only pins the shape.
+  it('is null or an ISO date', () => {
+    expect(SLEEP_SCORE_V2_FROM === null || /^\d{4}-\d{2}-\d{2}$/.test(SLEEP_SCORE_V2_FROM)).toBe(true)
+  })
+
+  it('while unset, nothing moves: every night scores on V1, however new', () => {
+    const unset = { v2From: null }
+    expect(sleepScoreCalibrationFor('2026-12-01', null).modelVersion).toBe(SLEEP_SCORE_MODEL_VERSIONS.v1)
+    expect(sleepScoreCalibrationFor('', null).modelVersion).toBe(SLEEP_SCORE_MODEL_VERSIONS.v1)
+    expect(computeSleepScore(night('2026-12-01'), TZ, unset)!.modelVersion).toBe(SLEEP_SCORE_MODEL_VERSIONS.v1)
+  })
+
+  it('tracks the constant: the live curve is V1 exactly while it is null', () => {
+    expect(SLEEP_MODEL.curves.scoreCalibration).toBe(SLEEP_SCORE_V2_FROM == null ? V1 : V2)
   })
 })
 
@@ -73,13 +81,15 @@ describe('which curve scores a night', () => {
       .toBe(computeSleepScore(night('2026-10-13', poor), TZ, live)!.score)
   })
 
-  it('a backfill persists the V1 stamp beside the score while the cutover is unset', () => {
+  it('a backfill stamps the version of the curve that scored the night', () => {
     // 23:00 -> 07:00 Brisbane, waking on the date the audit looks up.
     const s = night(CUTOVER, {
       efficiency: 90, sleepStart: new Date('2026-10-13T13:00:00Z'), sleepEnd: new Date('2026-10-13T21:00:00Z'),
     })
     const audit = buildSleepAudit({ date: CUTOVER, tz: TZ, sleepSessions: [s], derived: null })
-    expect(audit.persist).toMatchObject({ modelVersion: SLEEP_SCORE_MODEL_VERSIONS.v1 })
+    expect(audit.persist).toMatchObject({
+      modelVersion: sleepScoreCalibrationFor(CUTOVER).modelVersion,
+    })
   })
 })
 

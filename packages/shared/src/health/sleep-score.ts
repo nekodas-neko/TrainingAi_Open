@@ -178,6 +178,13 @@ const SCORE_CALIBRATION_V2 = [[0, 0], [20, 18], [34.6, 33], [50, 41], [65.4, 48]
  * night then scores on V1 and nothing moves. Release prep sets it to the first wake date of the
  * release that carries the curve (the night after the release deploys), so no night scored live on
  * V1 is re-scored on V2 when it is recomputed. Same pattern as `SERVED_READINESS_STORED_FROM`.
+ *
+ * Set it only after the deploy is confirmed, with a margin, and in its own release (#2237: don't
+ * batch it with any other sleep change). If it is set before the deploy and the deploy slips, nights
+ * stored on V1 flip to V2 at their next recompute.
+ *
+ * Tests must hold whether it is null or a date: the ones that date nights relative to today pin the
+ * scorer to V1 with a partial mock of this module, and the pin test only asserts "null or an ISO date".
  */
 export const SLEEP_SCORE_V2_FROM: string | null = null
 
