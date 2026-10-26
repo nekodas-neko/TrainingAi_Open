@@ -121,4 +121,10 @@ describe('GET /api/user/trophy-pins', () => {
     sessionUser = null
     expect((await GET()).status).toBe(401)
   })
+
+  it('is rate limited, and reads nothing when it is', async () => {
+    limit.mockReturnValue(false)
+    expect((await GET()).status).toBe(429)
+    expect(getTrophyPins).not.toHaveBeenCalled()
+  })
 })

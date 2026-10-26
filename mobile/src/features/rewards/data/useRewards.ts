@@ -59,12 +59,15 @@ export function useSeenAchievements() {
 }
 
 /** The achievements pinned in this account's trophy case, which friends see too; null until first read. */
-export function useTrophyCase() {
+export function useTrophyCase(unlockedIds: readonly string[]) {
   const scoped = useAccountStorage();
   const connection = useAccountContext().dataReader;
   const { data, resources } = useWorkoutResource(trophyPinsSpec);
   const key = connection ? trophyCacheKey(connection.origin, connection.userId) : null;
   const [settled, setSettled] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  // A string, so the carry-over effect re-runs when the set changes and not on every render.
+  const unlockedKey = unlockedIds.join(',');
   const account = data ? (data.pins ?? []) : null;
   useEffect(() => {
     setSettled(false);
@@ -72,7 +75,7 @@ export function useTrophyCase() {
   useEffect(() => {
     let live = true;
     if (key && resources && scoped && data) {
-      void carryOverTrophyCase(resources, scoped)
+      void carryOverTrophyCase(resources, scoped, new Set(unlockedKey.split(',').filter(Boolean)))
         .catch(() => {})
         .then(() => live && setSettled(true));
     }
@@ -80,7 +83,7 @@ export function useTrophyCase() {
       live = false;
     };
     // Once per account: a later edit changes `data`, and the old list is gone by then.
-  }, [key, resources, scoped, data !== null]);
+  }, [key, resources, scoped, data !== null, unlockedKey]);
   const pinned = settled ? account : key ? (cachedTrophyCase(key) ?? null) : null;
   useEffect(() => {
     if (key && settled && account) {
@@ -90,12 +93,15 @@ export function useTrophyCase() {
   const change = useCallback(
     (next: (pinned: readonly string[]) => string[]) => {
       if (!resources || !pinned) return;
-      void saveTrophyPins(resources, next(pinned));
+      setSaveFailed(false);
+      void saveTrophyPins(resources, next(pinned)).then((saved) => setSaveFailed(saved !== 'saved'));
     },
     [resources, pinned],
   );
   return {
     pinned,
+    /** The last save did not reach the account, so the view went back to what it held. */
+    saveFailed,
     pin: (id: string) => change((now) => pinTrophy(now, id)),
     unpin: (id: string) => change((now) => unpinTrophy(now, id)),
   };

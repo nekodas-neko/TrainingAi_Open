@@ -30,14 +30,23 @@ export const trophyPinsSpec = {
   ttl: 300000,
 };
 
+export type PinsSave = 'saved' | 'refused' | 'failed';
+
+/** The server saying no to this list (400 malformed, 403 a trophy not unlocked): retrying cannot help. */
+const refused = (error: unknown) => {
+  const status = (error as { status?: unknown } | null)?.status;
+  return status === 400 || status === 403;
+};
+
 /**
- * Save the pins on the account, which is what friends see, and show them at once. Resolves false when
- * the server refuses or cannot be reached; the view then goes back to what it showed before.
+ * Save the pins on the account, which is what friends see, and show them at once. 'refused' is the
+ * server rejecting the list itself; 'failed' is anything that could clear (offline, a 5xx). On either
+ * the view goes back to what it showed before.
  */
 export async function saveTrophyPins(
   resources: Pick<WorkoutResources, 'write' | 'state' | 'replace'>,
   pins: readonly string[],
-) {
+): Promise<PinsSave> {
   const before = resources.state(trophyPinsSpec).data;
   const kept = pins.slice(0, TROPHY_SLOTS);
   const show = (value: string[]) =>
@@ -45,27 +54,35 @@ export async function saveTrophyPins(
   await show(kept);
   try {
     await resources.write('PUT', trophyPinsSpec.path, { pins: kept }, ['/api/profile']);
-  } catch {
+  } catch (error) {
     await show(before?.pins ?? []);
-    return false;
+    return refused(error) ? 'refused' : 'failed';
   }
-  return true;
+  return 'saved';
 }
 
 /**
  * Move the pins this phone kept before the account held them onto the account, once. Run it after
  * the account's own pins have been read: an account that already has pins keeps them, and the old
- * list is dropped either way so it can never overwrite a later change. If the save fails the old
- * list stays, and the next load tries again.
+ * list is dropped either way so it can never overwrite a later change.
+ *
+ * The old list is cut to the trophies unlocked now. The server refuses a whole list if any id is
+ * locked or unknown, so a kept list holding one would be retried on every load for ever. A refusal
+ * drops it too; only a failure that could clear (offline, a 5xx) keeps it for the next load. With
+ * nothing known to be unlocked yet, it waits.
  */
 export async function carryOverTrophyCase(
   resources: Pick<WorkoutResources, 'write' | 'state' | 'replace'>,
   storage: ScopedStorage,
+  unlockedIds: ReadonlySet<string>,
 ) {
   const account = resources.state(trophyPinsSpec).data;
-  if (!account) return;
+  if (!account || unlockedIds.size === 0) return;
   const old = await readTrophyCase(storage);
-  if (old.length > 0 && account.pins === null && !(await saveTrophyPins(resources, old))) return;
+  const usable = old.filter((id) => unlockedIds.has(id));
+  if (usable.length > 0 && account.pins === null) {
+    if ((await saveTrophyPins(resources, usable)) === 'failed') return;
+  }
   await storage.remove(key).catch(() => {});
 }
 

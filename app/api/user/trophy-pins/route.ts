@@ -21,6 +21,10 @@ const bodySchema = z.object({
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // The trophy case reads this on every foreground; generous, but not unbounded.
+  if (!rateLimit(`${session.user.id}:trophy-pins-read`, 120, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
   const repo = await getRepositoryAsync()
   return NextResponse.json({ pins: await repo.getTrophyPins(session.user.id) }, { headers: NO_STORE })
 }

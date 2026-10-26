@@ -438,6 +438,15 @@ export async function invalidateUserProfile(): Promise<void> {
   ])
 }
 
+/** The pinned trophies were saved. Friends see them on `/profile/[userId]`, so the viewed-profile
+ *  entries go too (the same own-profile-through-a-shared-link case as `invalidateUserProfile`). */
+export async function invalidateTrophyPins(): Promise<void> {
+  await Promise.all([
+    invalidateCache('trophy-pins'),
+    invalidateCache('public-profile:'),
+  ])
+}
+
 /** A Coach conversation was saved, or a suggested change applied — both change the
  *  history list the Coach screen paints from its cache seed. */
 export async function invalidateCoachHistory(): Promise<void> {
