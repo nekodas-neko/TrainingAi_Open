@@ -49,6 +49,23 @@ export interface CreateNativeRefreshTokenInput {
   expiresAt: Date
 }
 
+/** Every write that adds to or revokes a family takes this lock first, so a family revocation and
+ *  a rotation in the same family run one after the other. Without it, a revoke running while a
+ *  rotation is uncommitted cannot see the successor that rotation inserts, and leaves it live. */
+async function lockFamily(tx: Pick<Db, 'execute'>, familyId: string) {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${familyId}::text))`)
+}
+
+export interface RegrantNativeRefreshTokenInput {
+  userId: string
+  /** The rotated row the presented token resolved to. */
+  id: string
+  newTokenHash: RefreshTokenHash
+  expiresAt: Date
+  /** How recently the presented row must have been rotated. */
+  graceSeconds: number
+}
+
 export interface RotateNativeRefreshTokenInput {
   userId: string
   /** The row the presented token resolved to. */
@@ -102,6 +119,13 @@ export async function findNativeRefreshTokenByHash(db: Db, tokenHash: RefreshTok
   return row ? toToken(row) : null
 }
 
+/** The caller's row by id, whatever its state. A native access token names the row it was issued
+ *  with, so the bearer check can refuse it once that row's family is revoked. */
+export async function findNativeRefreshTokenById(db: Db, userId: string, id: string): Promise<NativeRefreshToken | null> {
+  const [row] = await db.select(COLUMNS).from(t).where(and(eq(t.id, id), eq(t.userId, userId))).limit(1)
+  return row ? toToken(row) : null
+}
+
 /**
  * Exchange a live token for its successor in one transaction: mark the old row rotated (and used),
  * insert the new one in the same family and device, and link the old row to it. Returns the new row,
@@ -109,12 +133,16 @@ export async function findNativeRefreshTokenByHash(db: Db, tokenHash: RefreshTok
  * or expired.
  *
  * The conditional UPDATE is the race guard: two requests presenting the same token at once both
- * reach it, and only one matches `rotated_at IS NULL`. The loser gets `null`; PR b decides whether
- * that is reuse (revoke the family) or a retry inside a grace window.
+ * reach it, and only one matches `rotated_at IS NULL`. The loser gets `null`, which the refresh
+ * route treats as reuse.
  */
 export async function rotateNativeRefreshToken(db: Db, input: RotateNativeRefreshTokenInput): Promise<NativeRefreshToken | null> {
   const { userId } = input
   return db.transaction(async tx => {
+    const [row] = await tx.select({ familyId: t.familyId }).from(t)
+      .where(and(eq(t.id, input.id), eq(t.userId, userId))).limit(1)
+    if (!row) return null
+    await lockFamily(tx, row.familyId)
     const [old] = await tx.update(t)
       .set({ rotatedAt: sql`now()`, lastUsedAt: sql`now()` })
       .where(and(
@@ -145,6 +173,57 @@ export async function rotateNativeRefreshToken(db: Db, input: RotateNativeRefres
   })
 }
 
+/**
+ * The grace for a lost refresh response (#2076): the presented row was rotated within
+ * `graceSeconds`, and the successor it was rotated to has not been used or revoked. That successor
+ * is revoked — its token and the access token issued with it never reached the app — and a new one
+ * takes its place in the family. Returns the new row, or `null` with nothing written when any
+ * condition fails; the caller then treats the token as reused.
+ */
+export async function regrantNativeRefreshToken(db: Db, input: RegrantNativeRefreshTokenInput): Promise<NativeRefreshToken | null> {
+  const { userId } = input
+  return db.transaction(async tx => {
+    const [row] = await tx.select({ familyId: t.familyId }).from(t)
+      .where(and(eq(t.id, input.id), eq(t.userId, userId))).limit(1)
+    if (!row) return null
+    await lockFamily(tx, row.familyId)
+    const [old] = await tx.select({ replacedBy: t.replacedBy, deviceLabel: t.deviceLabel, deviceId: t.deviceId })
+      .from(t)
+      .where(and(
+        eq(t.id, input.id),
+        eq(t.userId, userId),
+        isNull(t.revokedAt),
+        gt(t.rotatedAt, sql`now() - make_interval(secs => ${input.graceSeconds})`),
+      ))
+    if (!old?.replacedBy) return null
+    const [superseded] = await tx.update(t)
+      .set({ revokedAt: sql`now()`, revokedReason: 'rotation_reuse' })
+      .where(and(
+        eq(t.id, old.replacedBy),
+        eq(t.userId, userId),
+        isNull(t.rotatedAt),
+        isNull(t.lastUsedAt),
+        isNull(t.revokedAt),
+      ))
+      .returning({ id: t.id })
+    if (!superseded) return null
+    const [next] = await tx.insert(t)
+      .values({
+        userId,
+        tokenHash: input.newTokenHash,
+        familyId: row.familyId,
+        deviceLabel: old.deviceLabel,
+        deviceId: old.deviceId,
+        expiresAt: input.expiresAt,
+      })
+      .returning(COLUMNS)
+    await tx.update(t)
+      .set({ replacedBy: next.id })
+      .where(eq(t.id, input.id))
+    return toToken(next)
+  })
+}
+
 /** Revoke one token. True when it was the caller's and not already revoked; the first reason given
  *  is kept. */
 export async function revokeNativeRefreshToken(
@@ -163,11 +242,14 @@ export async function revokeNativeRefreshToken(
 export async function revokeNativeRefreshTokenFamily(
   db: Db, userId: string, familyId: string, reason: NativeRefreshTokenRevokedReason,
 ): Promise<number> {
-  const rows = await db.update(t)
-    .set({ revokedAt: sql`now()`, revokedReason: reason })
-    .where(and(eq(t.familyId, familyId), eq(t.userId, userId), isNull(t.revokedAt)))
-    .returning({ id: t.id })
-  return rows.length
+  return db.transaction(async tx => {
+    await lockFamily(tx, familyId)
+    const rows = await tx.update(t)
+      .set({ revokedAt: sql`now()`, revokedReason: reason })
+      .where(and(eq(t.familyId, familyId), eq(t.userId, userId), isNull(t.revokedAt)))
+      .returning({ id: t.id })
+    return rows.length
+  })
 }
 
 /** The caller's live tokens — one per signed-in device: not rotated, not revoked, not expired.

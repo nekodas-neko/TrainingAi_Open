@@ -8,14 +8,13 @@ import { toast } from 'sonner'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateCheckinAffectsPrescription, invalidateHealthTrends } from '@/lib/cache-groups'
-import { type IllnessContext, type VsNormal, CURRENT_VS_QUESTION } from '@trainingai/shared/types/day-checkin'
+import { type IllnessContext } from '@trainingai/shared/types/day-checkin'
 import { SleepAnnouncement } from '@/components/checkin/sleep-announcement'
 import { type StoredSleepVerdict } from '@trainingai/shared/health/sleep-verdict-copy'
 import { saveSleepValue } from '@trainingai/shared/checkin/save-sleep-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { cachedFetch } from '@/lib/sqlite/cache'
 import { IllnessContextPicker } from '@/components/checkin/illness-context-picker'
-import { VS_NORMAL_DEFAULT, VsNormalPicker } from '@/components/checkin/vs-normal-picker'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 
@@ -35,17 +34,6 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
   const [correction, setCorrection] = useState<number | null>(null)
   const [acknowledged, setAcknowledged] = useState(false)
   const [illnessContext, setIllnessContext] = useState<IllnessContext | null>(null)
-  // LB-191. Seeded with the neutral, by the owner's explicit call against the recommendation. Still
-  // no `touched` flag: the column has no default and the sheet writes solely on Save, so DISMISSING
-  // is what stores nothing — and with a value seeded, that dismissal is the only remaining signal
-  // of "not answered". A restored row is the exception below: it is read back exactly as stored,
-  // NULL included, so a cleared-and-saved answer is not re-seeded into agreeing with itself.
-  const [vsNormal, setVsNormal] = useState<VsNormal | null>(VS_NORMAL_DEFAULT)
-  // LB-198. Did the owner TAP the picker? The seed above means an untouched Save stores a neutral he
-  // may never have considered, and rows on both sides of that look identical without this. It is set
-  // by the picker's onChange alone, never inferred from Save. `false` for a fresh sheet; a restored
-  // row brings back what was stored, and null (unknown, a row from before the flag) stays null.
-  const [vsTouched, setVsTouched] = useState<boolean | null>(false)
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
   // Set as soon as the user taps anything — the async saved-checkin fetch below must
@@ -57,8 +45,6 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
       setLoaded(false); editedRef.current = false
       setCorrection(null)
       setAcknowledged(false)
-      setVsNormal(VS_NORMAL_DEFAULT)
-      setVsTouched(false)
       setIllnessContext(null)
       return
     }
@@ -79,11 +65,6 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
           // itself — the shape TN-57 exists to prevent.
           setCorrection(saved.sleepQualityFeelTouched ? saved.sleepQualityFeel ?? null : null)
           setIllnessContext(saved.illnessContext ?? null)
-          // `?? null`, not `?? VS_NORMAL_DEFAULT` (LB-191): a stored NULL is either a cleared
-          // answer or a row from before the seed, and re-seeding the neutral over it would show
-          // his own screen agreeing with itself — the shape TN-57 exists to prevent.
-          setVsNormal(saved.vsNormal ?? null)
-          setVsTouched(saved.vsNormal != null ? saved.vsNormalTouched ?? null : false)
         }
       }
       setLoaded(true)
@@ -135,12 +116,8 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
       sleepQualityFeel:  sleepWrite.value,
       sleepQualityFeelTouched:  sleepWrite.touched,
       illnessContext,
-      vsNormal,
-      // LB-190: which question the picker asked, stored beside the answer. Omitted when unanswered,
-      // because the schema takes no null here and a question nobody answered has no version.
-      ...(vsNormal != null ? { vsQuestion: CURRENT_VS_QUESTION } : {}),
-      // LB-198: omitted when unanswered or unknown, so the server stores NULL, never a guessed false.
-      ...(vsNormal != null && vsTouched != null ? { vsNormalTouched: vsTouched } : {}),
+      // Retired (#2411): the comparative row is no longer asked. The column stays; nothing reads it.
+      vsNormal: null,
       // Retired scales — always null so a re-save clears any historical value.
       motivation:        null,
       restingSoreness:   null,
@@ -270,10 +247,6 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
               is now the thing on this sheet he is meant to READ. Burying it under a question that
               collected 2 of 82 is the failure mode the plan names (§3: him not reading it), so the
               announcement leads and this follows. */}
-          <VsNormalPicker
-            value={vsNormal}
-            onChange={v => { editedRef.current = true; setVsTouched(true); setVsNormal(v) }}
-          />
           <IllnessContextPicker
             value={illnessContext}
             onChange={v => { editedRef.current = true; setIllnessContext(v) }}

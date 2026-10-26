@@ -1,4 +1,4 @@
-import { ApiError, backendOrigin, createApiClient } from './api/client.ts';
+import { ApiError, backendOrigin, createApiClient, REFRESH_TOKEN_RE } from './api/client.ts';
 import type { AccountProfile, SessionToken } from './api/client.ts';
 import { failureNotice } from '../../core/reporting/index.ts';
 
@@ -18,6 +18,14 @@ export const STUCK_ATTEMPT_GRACE = 90 * 1000;
 /** How long to wait for the callback after the app returns to the foreground mid sign-in. */
 export const FOREGROUND_CALLBACK_WAIT = 2 * 1000;
 const RANDOM_RE = /^[A-Za-z0-9_-]{43}$/;
+/** Renew this long before the one-day access token runs out (#2076). */
+const RENEW_BEFORE_SECONDS = 5 * 60;
+/** After a renewal that could not reach the server, wait this long before renewing early again. */
+const RENEW_BACKOFF_MS = 30_000;
+/** How a renewal ended. `transient` holds the error when the server could not be reached or was
+ *  busy; the session is kept and a caller that needed the new token sees that error. */
+type Renewal = { transient?: unknown };
+const nowSeconds = () => Date.now() / 1000;
 type SavedSession = SessionToken & {
   origin: string;
   userId: string | null;
@@ -61,7 +69,7 @@ export function canRetryAccountCheck(
 export type AuthPlatform = {
   client?: MobileClient;
   fetch?: typeof fetch;
-  revokeSession?(origin: string, accessToken: string): Promise<void>;
+  revokeSession?(origin: string, accessToken: string, refreshToken?: string): Promise<void>;
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
   remove(key: string): Promise<void>;
@@ -144,6 +152,8 @@ export class AccountSession {
   private events: { at: string; event: string; httpStatus?: number }[] = [];
   private reader: AccountConnection | null = null;
   private profileRequest: { generation: number; promise: Promise<void> } | null = null;
+  private renewal: Promise<Renewal> | null = null;
+  private renewBackoffUntil = 0;
   constructor(origin: string, platform: AuthPlatform) {
     this.platform = platform;
     this.client = platform.client ?? 'ios';
@@ -151,19 +161,126 @@ export class AccountSession {
     this.origin = backendOrigin(origin);
     this.api = createApiClient(
       this.origin,
-      async () =>
-        this.session && this.session.expiresAt > Date.now() / 1000
-          ? this.session.accessToken
-          : null,
+      () => this.accessToken(),
       platform.fetch,
+      (stale) => this.renewedToken(stale),
     );
+  }
+  /** A session can make requests while its access token is live, or while it can renew one. */
+  private usable(session: SavedSession | null): session is SavedSession {
+    return !!session && (session.expiresAt > nowSeconds() || !!session.refreshToken);
+  }
+  /**
+   * The access token for a request, renewed first when it is about to run out. Null when there is
+   * no session (or it belongs to another user than `userId`). When renewal could not reach the
+   * server and the token has already lapsed, the request fails, but the session and everything
+   * saved on the phone stay; the next request tries again.
+   */
+  private async accessToken(userId?: string): Promise<string | null> {
+    const current = this.session;
+    if (!current || (userId !== undefined && current.userId !== userId)) {
+      return null;
+    }
+    const lapsed = current.expiresAt <= nowSeconds();
+    if (
+      current.refreshToken &&
+      current.expiresAt - nowSeconds() < RENEW_BEFORE_SECONDS &&
+      // Early renewal backs off after a failure; a lapsed token always tries.
+      (lapsed || Date.now() >= this.renewBackoffUntil)
+    ) {
+      await this.renew(current.accessToken);
+    }
+    const session = this.session;
+    if (!session || (userId !== undefined && session.userId !== userId)) {
+      return null;
+    }
+    if (session.expiresAt > nowSeconds()) {
+      return session.accessToken;
+    }
+    if (session.refreshToken) {
+      throw new Error('Could not renew the session. Check the connection and retry.');
+    }
+    return null;
+  }
+  /**
+   * After a 401 on `stale`: a different, live token to retry with once, or null. When renewal could
+   * not reach the server its error is thrown instead, so the caller reports a connection problem
+   * rather than the 401, which would read as a session the server ended.
+   */
+  private async renewedToken(stale: string, userId?: string): Promise<string | null> {
+    const { transient } = await this.renew(stale);
+    if (transient !== undefined) {
+      throw transient;
+    }
+    const session = this.session;
+    return session &&
+      (userId === undefined || session.userId === userId) &&
+      session.accessToken !== stale &&
+      session.expiresAt > nowSeconds()
+      ? session.accessToken
+      : null;
+  }
+  /**
+   * Swap the refresh token for a new pair, once for every caller holding `stale`: concurrent
+   * requests share one call, because presenting a refresh token twice revokes the device's sign-in.
+   */
+  private renew(stale: string): Promise<Renewal> {
+    const session = this.session;
+    if (!session?.refreshToken || session.accessToken !== stale) {
+      return this.renewal ?? Promise.resolve({});
+    }
+    this.renewal ??= this.runRenewal(session).finally(() => {
+      this.renewal = null;
+    });
+    return this.renewal;
+  }
+  private async runRenewal(session: SavedSession): Promise<Renewal> {
+    const presented = session.refreshToken!;
+    this.record('renew_started');
+    let token: SessionToken;
+    try {
+      token = await this.api.refreshSession(presented);
+    } catch (error) {
+      this.record('renew_failed', error);
+      // Only the server saying no ends the session. Offline, a timeout, 429 or 5xx keep it.
+      if (
+        error instanceof ApiError &&
+        [400, 401, 403].includes(error.status) &&
+        this.session?.refreshToken === presented
+      ) {
+        await this.signOut('Your session ended. Sign in again.');
+        return {};
+      }
+      this.renewBackoffUntil = Date.now() + RENEW_BACKOFF_MS;
+      return { transient: error };
+    }
+    this.renewBackoffUntil = 0;
+    try {
+      await this.write(async () => {
+        // Signed out, or another sign-in replaced the session, while the call was out.
+        if (this.session?.refreshToken !== presented) {
+          return;
+        }
+        const next: SavedSession = { ...this.session, ...token };
+        // Memory first: the old refresh token is spent, so the new one must survive a failed write.
+        this.session = next;
+        await this.platform.set(SESSION_KEY, JSON.stringify(next));
+      });
+      this.record('renewed');
+    } catch (error) {
+      this.record('renew_store_failed', error);
+    }
+    if (this.session?.refreshToken === token.refreshToken) {
+      this.publish(this.current.status, this.current.message, this.current.profile);
+    }
+    return {};
   }
   get state() {
     return this.current;
   }
   get dataReader(): AccountConnection | null {
     const userId = this.session?.userId;
-    if (!userId || !this.session || this.session.expiresAt <= Date.now() / 1000) {
+    if (!userId || !this.usable(this.session)) {
       return null;
     }
     if (this.reader?.userId === userId) {
@@ -171,11 +288,9 @@ export class AccountSession {
     }
     const api = createApiClient(
       this.origin,
-      async () =>
-        this.session?.userId === userId && this.session.expiresAt > Date.now() / 1000
-          ? this.session.accessToken
-          : null,
+      () => this.accessToken(userId),
       this.platform.fetch,
+      (stale) => this.renewedToken(stale, userId),
     );
     const readTimezone = () => this.session?.timezone ?? null;
     this.reader = {
@@ -341,7 +456,13 @@ export class AccountSession {
         raw.accessToken.length <= 16_384 &&
         typeof raw.expiresAt === 'number' &&
         Number.isSafeInteger(raw.expiresAt) &&
-        raw.expiresAt > Date.now() / 1000 &&
+        (raw.refreshToken === undefined ||
+          (typeof raw.refreshToken === 'string' &&
+            REFRESH_TOKEN_RE.test(raw.refreshToken) &&
+            typeof raw.refreshExpiresAt === 'number' &&
+            Number.isSafeInteger(raw.refreshExpiresAt))) &&
+        (raw.expiresAt > nowSeconds() ||
+          (raw.refreshToken !== undefined && raw.refreshExpiresAt! > nowSeconds())) &&
         (raw.userId === null || typeof raw.userId === 'string') &&
         (raw.timezone == null || typeof raw.timezone === 'string')
       ) {
@@ -413,7 +534,7 @@ export class AccountSession {
     ) {
       return;
     }
-    if (link && this.session!.expiresAt <= Date.now() / 1000) {
+    if (link && !this.usable(this.session)) {
       await this.signOut('Your session expired. Sign in again.');
       return;
     }
@@ -590,7 +711,7 @@ export class AccountSession {
     if (!this.session) {
       return Promise.resolve();
     }
-    if (this.session.expiresAt <= Date.now() / 1000) {
+    if (!this.usable(this.session)) {
       return this.signOut('Your session expired. Sign in again.');
     }
     if (this.profileRequest?.generation === this.generation) {
@@ -618,12 +739,21 @@ export class AccountSession {
         await this.signOut('The account did not match the saved session. Sign in again.');
         return;
       }
-      const session = { ...this.session, userId: profile.id, timezone: profile.timezone };
-      await this.write(() => this.platform.set(SESSION_KEY, JSON.stringify(session)));
+      // Built inside the write queue from the session as it is then, so a renewal that finished
+      // while the profile was loading is kept rather than overwritten with the spent token.
+      await this.write(async () => {
+        if (!this.session || generation !== this.generation) {
+          return;
+        }
+        const session = { ...this.session, userId: profile.id, timezone: profile.timezone };
+        await this.platform.set(SESSION_KEY, JSON.stringify(session));
+        if (generation === this.generation) {
+          this.session = session;
+        }
+      });
       if (generation !== this.generation) {
         return;
       }
-      this.session = session;
       this.record('profile_verified');
       this.publish('signedIn', null, profile);
     } catch (error) {
@@ -710,7 +840,11 @@ export class AccountSession {
       }
       if (previous && message === null && this.platform.revokeSession) {
         try {
-          await this.platform.revokeSession(previous.origin, previous.accessToken);
+          await this.platform.revokeSession(
+            previous.origin,
+            previous.accessToken,
+            previous.refreshToken,
+          );
         } catch {}
       }
     } catch (failure) {
