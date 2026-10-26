@@ -8,6 +8,7 @@ import { intradayHrContributors, type MetGridInput } from './intraday-hr-contrib
 import { excludeLowWearDays } from './wear-confidence'
 import { rowsOfDeviceInUse, perDeviceNormal } from './per-device-normal'
 import { BASELINE_MIN_NIGHTS } from './readiness-composite'
+import { dayStepCount } from './activity-steps'
 
 /** Qualifying days before the 28-day resting-HR mean is trusted (the readiness payload's rule). */
 const RESTING_HR_BASELINE_MIN_DAYS = 5
@@ -72,6 +73,9 @@ export interface ActivityDayInput {
   program: ProgramAgeInput | null
   user: { dateOfBirth?: string | null; heightCm?: number | null; sex?: string | null; activityLevel?: GoalProfile['activityLevel'] } | null
   stepsGoal: number | null
+  /** The day's logged activities (`date` and `YYYY-MM-DD`); the treadmill ones add their steps to the
+   *  device count (`dayStepCount`, #3134). Left out, the day's steps are the device's alone. */
+  activityLogs?: readonly { date: string; activityType: string; steps?: number | null }[]
 }
 
 export interface ActivityDay {
@@ -156,7 +160,8 @@ export function scoreActivityForDay(input: ActivityDayInput): ActivityDay {
   }
 
   const signals = {
-    steps: dayMetrics?.steps ?? null,
+    // The same step count every other surface shows (#3134), so a treadmill day scores on it.
+    steps: dayStepCount(dayMetrics?.steps, (input.activityLogs ?? []).filter(a => a.date === date)),
     activeCalories: dayMetrics?.activeCalories ?? null,
     zoneMinutes,
     moveHours,

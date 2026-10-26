@@ -11,6 +11,7 @@ import { calorieBudgetsByDay, budgetMetricsStart } from '@trainingai/shared/nutr
 import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import { budgetMovement } from '@/lib/health/oura-budget-activities'
+import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 
 function computeLevel(xp: number): { level: number; levelLabel: string; currentLevelXp: number; nextLevelXp: number } {
   let level = 1
@@ -112,7 +113,8 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
     weightCountRes,
     calorieDaysRes,
     calorieTargetRes,
-    maxStepsRes,
+    dayStepsRes,
+    activityStepsRes,
     distanceRes,
     scheduleRes,
     goalDirRes,
@@ -187,10 +189,18 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
     calorieTargetRes: db.execute(sql`
       SELECT calories AS daily_calories FROM nutrition_targets WHERE user_id = ${userId}::uuid LIMIT 1
     `),
-    maxStepsRes: db.execute(sql`
-      SELECT COALESCE(MAX(steps), 0)::int AS max_steps
+    // #3134: a day's steps are the device total plus the treadmill session's (`dayStepCountsByDate`), so
+    // the "steps in a day" ladder reads the same figure the screens show. Both halves come back as rows
+    // and the shared rule adds them; the indoor-type list lives in one place.
+    dayStepsRes: db.execute(sql`
+      SELECT date::text AS date, steps
       FROM body_metrics
       WHERE user_id = ${userId}::uuid AND steps IS NOT NULL AND deleted_at IS NULL
+    `),
+    activityStepsRes: db.execute(sql`
+      SELECT date::text AS date, activity_type AS "activityType", steps
+      FROM activity_logs
+      WHERE user_id = ${userId}::uuid AND steps IS NOT NULL AND steps > 0 AND deleted_at IS NULL
     `),
     distanceRes: db.execute(sql`
       SELECT COALESCE(SUM(distance_km), 0)::float AS total
@@ -229,7 +239,10 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
   const nightOwlCount = Number((nightOwlRes.rows[0] as { count: number })?.count ?? 0)
   const weightLogCount = Number((weightCountRes.rows[0] as { count: number })?.count ?? 0)
   const calorieTarget = Number((calorieTargetRes.rows[0] as { daily_calories: number } | undefined)?.daily_calories ?? 0)
-  const maxDailySteps = Number((maxStepsRes.rows[0] as { max_steps: number })?.max_steps ?? 0)
+  const maxDailySteps = Math.max(0, ...dayStepCountsByDate(
+    dayStepsRes.rows as Array<{ date: string; steps: number | null }>,
+    activityStepsRes.rows as Array<{ date: string; activityType: string; steps: number | null }>,
+  ).values())
   const totalDistanceKm = Number((distanceRes.rows[0] as { total: number })?.total ?? 0)
 
   const prValues = (prValuesRes.rows as Array<{ exercise_name: string; estimated_1rm: number }>)
