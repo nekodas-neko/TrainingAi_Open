@@ -1546,6 +1546,9 @@ export const ouraTokens = pgTable('oura_tokens', {
   webhookSigningKey:   text('webhook_signing_key'),    // HMAC key from Oura webhook subscription response
   // #3204: when Oura refused the grant (`invalid_grant`, or a fresh token refused). Cleared by new tokens.
   reauthRequiredAt:    timestamp('reauth_required_at', { withTimezone: true }),
+  // #2861: the last verified webhook event for this user, and the last Oura data written for them.
+  lastWebhookAt:       timestamp('last_webhook_at', { withTimezone: true }),
+  lastDataAt:          timestamp('last_data_at', { withTimezone: true }),
   createdAt:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
