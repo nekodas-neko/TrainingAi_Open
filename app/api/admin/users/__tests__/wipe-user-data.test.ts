@@ -114,6 +114,14 @@ describe.skipIf(!canRun)('admin reset and delete of a user\'s data (#3369)', () 
       expect(u).toMatchObject({ is_admin: true, is_active: true })
     })
 
+    it('resetting yourself by an upper-case copy of your id is still a self reset, not "another admin"', async () => {
+      const { POST } = await import('@/app/api/admin/users/reset-data/route')
+      const res = await POST(post({ userId: ADMIN.toUpperCase(), confirmEmail: email(ADMIN) }) as never)
+      expect(res.status).toBe(200)
+      expect(await metrics(ADMIN)).toBe(0)
+      expect(await exists(ADMIN)).toBe(true)
+    })
+
     it('demote-then-wipe: another admin cannot demote the owner, and wiping a demoted owner is refused', async () => {
       session.current = { user: { id: OTHER_ADMIN, isAdmin: true } }
       const users = await import('@/app/api/admin/users/route')
@@ -246,6 +254,15 @@ describe.skipIf(!canRun)('admin reset and delete of a user\'s data (#3369)', () 
       const { DELETE } = await import('@/app/api/admin/users/route')
       expect((await DELETE(del({ userId: ADMIN, confirmEmail: email(ADMIN) }) as never)).status).toBe(400)
       expect(await exists(ADMIN)).toBe(true)
+    })
+
+    it('an upper-case copy of your own id is still you: no self deletion', async () => {
+      const { DELETE } = await import('@/app/api/admin/users/route')
+      for (const confirmEmail of [undefined, email(ADMIN)]) {
+        expect((await DELETE(del({ userId: ADMIN.toUpperCase(), confirmEmail }) as never)).status).toBe(400)
+      }
+      expect(await exists(ADMIN)).toBe(true)
+      expect(await metrics(ADMIN)).toBe(1)
     })
 
     it('without the email, an account that holds data is still refused (409), as before', async () => {

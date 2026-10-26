@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import type { getDb } from '../client'
-import { judgeRevokeAdmin, type OwnerRefusal } from '@/lib/admin-owner'
+import { judgeRevokeAdmin, sameUserId, type OwnerRefusal } from '@/lib/admin-owner'
 
 type Db = ReturnType<typeof getDb>
 
@@ -35,8 +35,8 @@ export async function setUserAdmin(
       SELECT id, is_admin, is_active FROM users
       WHERE id IN (${actingAdminId}::uuid, ${targetUserId}::uuid)
       ORDER BY id FOR UPDATE`)
-    const actor = rows.find(r => r.id === actingAdminId)
-    const target = rows.find(r => r.id === targetUserId)
+    const actor = rows.find(r => sameUserId(r.id, actingAdminId))
+    const target = rows.find(r => sameUserId(r.id, targetUserId))
     if (!actor || !actor.is_admin || !actor.is_active) return { ok: false, reason: 'actor-not-admin' } as const
     if (!target) return { ok: false, reason: 'not-found' } as const
 

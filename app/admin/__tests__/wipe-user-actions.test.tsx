@@ -125,6 +125,8 @@ describe('Reset data', () => {
     const d = dialog()!
     expect(d.textContent).toContain('Person@Example.com')
     expect(d.textContent).toContain('cannot be undone')
+    // It says plainly that outside sources can hand the data back.
+    for (const source of ['Health Connect', 'their ring', 'Oura Cloud']) expect(d.textContent).toContain(source)
     const confirm = buttonIn(d, 'Reset data')!
     expect(confirm.disabled).toBe(true)
     await type(d.querySelector('input')!, 'someone@else.com')
@@ -197,6 +199,7 @@ describe('Delete account and data', () => {
     const d = dialog()!
     const confirm = buttonIn(d, 'Delete account')!
     expect(confirm.disabled).toBe(true)
+    for (const source of ['Health Connect', 'their ring', 'Oura Cloud']) expect(d.textContent).toContain(source)
     expect(callsTo('/api/admin/users', 'DELETE')).toHaveLength(0)
     await type(d.querySelector('input')!, 'person@example.com')
     expect(confirm.disabled).toBe(false)

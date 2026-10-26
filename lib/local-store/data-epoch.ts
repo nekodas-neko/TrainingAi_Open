@@ -19,6 +19,10 @@ import { isSQLiteAvailable } from '@/lib/sqlite/sqlite-service'
  * settled; if it cannot be reached or does not parse, the sync engine skips this push or pull and
  * the next one asks again. The cost is one request per app start (an `ok` is remembered for the page).
  *
+ * **A wipe that fails opens nothing.** The record (and with it the cookie the server's write gate
+ * reads) is written only after every clear succeeded. If one fails, the cookie stays off, the sync
+ * engine skips, and the next launch wipes again.
+ *
  * **What a wipe costs.** A change made on this phone and never synced is discarded with the rest:
  * it belonged to the account as it was before the reset. The one case this also wipes for no reason
  * is a phone that signs in for the first time after a reset (no record, server number above 0): its
@@ -119,9 +123,12 @@ export async function wipeDevice(): Promise<void> {
     import('@/lib/sign-out-storage'),
   ])
   // The same order as a sign-out (`lib/sign-out.ts`), minus the server half: the session is fine.
+  // Unlike a sign-out, a failure here is raised: the caller records the epoch (which opens the
+  // gate) only after this returns, so a partial wipe leaves the gate closed and the next launch
+  // wipes again, rather than letting the rows that survived pass as clean.
   cache.disableCacheWrites()
-  await clearLocalStoreData().catch(() => {})
-  await cache.clearAllCache().catch(() => {})
+  await clearLocalStoreData()
+  await cache.clearAllCache({ throwOnError: true })
   clearAccountStorage()
   mirrorCookie(null)
 }

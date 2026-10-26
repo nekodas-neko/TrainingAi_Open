@@ -336,7 +336,9 @@ export async function clearLocalStoreData(): Promise<void> {
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
     [],
   );
-  await Promise.all(
+  // Every table is attempted even when one fails, then the failure is raised: a caller that records
+  // "this device is clean" (the data-epoch wipe) must not do so after a partial clear.
+  const results = await Promise.allSettled(
     tables
       .map(t => t.name)
       .filter(name => !KEEP_ON_SIGN_OUT.has(name))
@@ -345,4 +347,25 @@ export async function clearLocalStoreData(): Promise<void> {
       .map(name => runSQL(`DELETE FROM ${name}`, [])),
   );
   _stores.clear();
+  const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed.length > 0) throw new Error(`local store: ${failed.length} table(s) were not cleared (${String(failed[0].reason)})`);
+}
+
+/**
+ * True when any table `clearLocalStoreData` would empty holds a row. Rows are not stamped with the
+ * account that wrote them, so this is the only thing the device can say about a store whose owner
+ * record is missing (`device-owner.ts`). A failed read throws: not knowing is not "empty".
+ */
+export async function deviceHasLocalData(): Promise<boolean> {
+  if (!isSQLiteAvailable()) return false;
+  const tables = await querySQL<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+    [],
+  );
+  for (const { name } of tables) {
+    if (KEEP_ON_SIGN_OUT.has(name)) continue;
+    const rows = await querySQL<{ x: number }>(`SELECT 1 AS x FROM ${name} LIMIT 1`, []);
+    if (rows.length > 0) return true;
+  }
+  return false;
 }

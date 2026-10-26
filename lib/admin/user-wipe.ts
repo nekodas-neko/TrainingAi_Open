@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { AdminWipeRefusal } from '@/lib/data/postgres/slices/account-deletion'
-import { judgeProtectedTarget } from '@/lib/admin-owner'
+import { judgeProtectedTarget, sameUserId } from '@/lib/admin-owner'
 import type { WorkoutRepository } from '@/lib/data/repository'
 
 /**
@@ -69,8 +69,8 @@ export async function precheckWipe(
   if (!user) return null
   const protectedTarget = judgeProtectedTarget(target.actingAdminId, target.userId, user.isAdmin === true, target.ownerId)
   if (protectedTarget) return wipeRefusalResponse(protectedTarget)
-  if (user.isAdmin && target.userId !== target.actingAdminId) return wipeRefusalResponse('admin-target')
-  if (target.userId === target.actingAdminId && !target.mayWipeSelf) return wipeRefusalResponse('self')
+  if (user.isAdmin && !sameUserId(target.userId, target.actingAdminId)) return wipeRefusalResponse('admin-target')
+  if (sameUserId(target.userId, target.actingAdminId) && !target.mayWipeSelf) return wipeRefusalResponse('self')
   if (target.confirmEmail !== undefined && target.confirmEmail.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
     return wipeRefusalResponse('email-mismatch')
   }

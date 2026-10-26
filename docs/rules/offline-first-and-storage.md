@@ -110,6 +110,13 @@ any device that still holds the old rows. The guarantees, and where each lives:
 - **A device records which user id owns its local store** (`lib/local-store/device-owner.ts`;
   Preview: `src/features/account/device-record.ts`). Signing in as a different id wipes before any read or sync.
   `getLocalStore` answers null while another account's rows are there. This is what covers delete then re-signup.
+  **A device with no record is not adopted blindly:** local rows carry no account id, so a phone that
+  never opened the app as the old user cannot say whose rows it holds. Empty store: claimed. Any rows:
+  wiped first, then claimed. A phone upgrading with changes it never synced loses them once. Preview
+  does the same for other accounts' scopes. An empty user id is never recorded as an owner.
+- **A wipe that fails opens nothing.** The epoch record, and the cookie the server's gate reads, are
+  written only after every clear (each SQLite table, the cache) succeeded. A partial wipe keeps the
+  gate closed and the next launch wipes again; the clears raise instead of being swallowed.
 - **A covered write holds off a reset and a reset holds off a covered write**
   (`lib/data/postgres/user-write-barrier.ts`, an advisory lock). The sync push and the ring-sample
   ingest use it; the other upload paths rely on the 409 gate alone.
@@ -119,4 +126,4 @@ any device that still holds the old rows. The guarantees, and where each lives:
   Nothing re-uploads its old rows (only newly drained batches are POSTed), and clearing it resets the
   ring cursor to 0, which would re-drain and re-upload the ring's whole buffer, i.e. bring pre-reset
   history back. Its cursor is tied to the ring's BLE key and pairing, which no wipe may touch.
-  Not covered: ring events recorded before a reset that the phone had not yet drained still arrive afterwards.
+  Not covered: ring events recorded before a reset that the phone had not yet drained still arrive afterwards. Likewise Health Connect's history window is imported again on the next sync, and Oura Cloud returns on reconnect; the admin dialogs say so (`packages/shared/src/admin-wipe-copy.ts`).

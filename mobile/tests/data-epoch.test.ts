@@ -193,3 +193,67 @@ test('a refused write (409) on a phone that is behind wipes it and signs out', a
   assert.deepEqual(f.wipes, ['u1']);
   assert.equal(f.controller.state.status, 'signedOut');
 });
+
+test('reconcileDevice: a phone with no record that holds another account\'s data wipes every scope first', async () => {
+  const wipes: unknown[] = [];
+  const disk = { value: null as string | null };
+  const out = await reconcileDevice(
+    {
+      read: async () => disk.value,
+      write: async (v) => void (disk.value = v),
+      wipe: async (_o, u) => void wipes.push(u),
+      holdsOtherAccounts: async () => true,
+    },
+    origin, 'new', 0,
+  );
+  assert.equal(out.outcome, 'wiped');
+  assert.deepEqual(wipes, [null]);
+  assert.equal(parseDeviceRecord(disk.value)?.userId, 'new');
+});
+
+test('reconcileDevice: a phone with no record and no other account\'s data is simply claimed', async () => {
+  const wipes: unknown[] = [];
+  const disk = { value: null as string | null };
+  const out = await reconcileDevice(
+    {
+      read: async () => disk.value,
+      write: async (v) => void (disk.value = v),
+      wipe: async (_o, u) => void wipes.push(u),
+      holdsOtherAccounts: async () => false,
+    },
+    origin, 'new', 0,
+  );
+  assert.equal(out.outcome, 'ok');
+  assert.deepEqual(wipes, []);
+});
+
+test('reconcileDevice: if the other-account check fails nothing is claimed or recorded', async () => {
+  const disk = { value: null as string | null };
+  await assert.rejects(
+    reconcileDevice(
+      {
+        read: async () => disk.value,
+        write: async (v) => void (disk.value = v),
+        wipe: async () => {},
+        holdsOtherAccounts: async () => { throw new Error('locked'); },
+      },
+      origin, 'new', 0,
+    ),
+  );
+  assert.equal(disk.value, null);
+});
+
+test('reconcileDevice: an empty user id is refused before anything is read, wiped or recorded', async () => {
+  const touched: string[] = [];
+  await assert.rejects(
+    reconcileDevice(
+      {
+        read: async () => { touched.push('read'); return null; },
+        write: async () => void touched.push('write'),
+        wipe: async () => void touched.push('wipe'),
+      },
+      origin, '', 0,
+    ),
+  );
+  assert.deepEqual(touched, []);
+});

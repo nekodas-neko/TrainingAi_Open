@@ -109,6 +109,25 @@ describe('verifyDataEpoch', () => {
   })
 })
 
+describe('a wipe that fails keeps the gate closed (#3369)', () => {
+  it('records no epoch, sets no cookie, does not reload, and the next launch wipes again', async () => {
+    const calls: Array<string | null> = []
+    const wipe = vi.fn()
+      .mockRejectedValueOnce(new Error('partial'))
+      .mockResolvedValue(undefined)
+    const { d, state } = deps({ server: 1_800_000_500, record: `${U}:0`, wipe, mirror: (v: string | null) => { calls.push(v) } })
+    await expect(checkDataEpoch(U, d)).rejects.toThrow('partial')
+    expect(d.writeRecord).not.toHaveBeenCalled()
+    expect(d.writeWipedFlag).not.toHaveBeenCalled()
+    expect(d.reload).not.toHaveBeenCalled()
+    expect(calls).toEqual([null])
+    expect(state.record).toBe(`${U}:0`)
+    // Next launch: the old record is still there, so it wipes again and only then opens.
+    expect(await checkDataEpoch(U, d)).toBe('wiped')
+    expect(calls).toEqual([null, null, `${U}:1800000500`])
+  })
+})
+
 describe('the cookie the server\'s write gate reads (#3369)', () => {
   it('is cleared before the wipe and set to the new epoch after it', async () => {
     const calls: Array<string | null> = []

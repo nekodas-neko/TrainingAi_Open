@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from 'sonner'
+import { OUTSIDE_SOURCES_NOTICE } from '@trainingai/shared/admin-wipe-copy'
 import { UserCheck, UserX, ShieldCheck, ShieldOff, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, ClipboardList, Eraser } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import type { User } from '@trainingai/shared/types'
@@ -361,7 +362,7 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
               onOpenChange={o => { if (!o) setConfirmReset(null) }}
               title="Reset data?"
               message={confirmReset
-                ? `This permanently deletes everything ${userLabel(confirmReset)} has recorded: workouts, food, sleep, body metrics, goals, settings, friendships and connected devices, and their Oura connection is revoked. Their account, email, sign-in and ${confirmReset.isAdmin ? 'admin and ' : ''}active status stay. Every device they use is signed out and wiped, and they sign in again to start fresh.${confirmReset.id === currentUserId ? ' This is your own account, so you will be signed out now.' : ''} It cannot be undone. Type their email, ${confirmReset.email}, to confirm.`
+                ? `This permanently deletes everything ${userLabel(confirmReset)} has recorded: workouts, food, sleep, body metrics, goals, settings, friendships and connected devices, and their Oura connection is revoked. Their account, email, sign-in and ${confirmReset.isAdmin ? 'admin and ' : ''}active status stay. Every device they use is signed out and wiped, and they sign in again to start fresh.${confirmReset.id === currentUserId ? ' This is your own account, so you will be signed out now.' : ''} It cannot be undone. ${OUTSIDE_SOURCES_NOTICE} Type their email, ${confirmReset.email}, to confirm.`
                 : ''}
               confirmLabel="Reset data"
               confirmPhrase={confirmReset?.email}
@@ -377,7 +378,7 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
               onOpenChange={o => { if (!o) setConfirmErase(null) }}
               title="Delete account and data?"
               message={confirmErase
-                ? `This permanently deletes ${userLabel(confirmErase)}'s account and everything under it, and revokes their Oura connection. Their friendships are removed too. Their invite is removed as well, so they will need a new invite to sign up again. It cannot be undone. Type their email, ${confirmErase.email}, to confirm.`
+                ? `This permanently deletes ${userLabel(confirmErase)}'s account and everything under it, and revokes their Oura connection. Their friendships are removed too. Their invite is removed as well, so they will need a new invite to sign up again. It cannot be undone. ${OUTSIDE_SOURCES_NOTICE} Type their email, ${confirmErase.email}, to confirm.`
                 : ''}
               confirmLabel="Delete account"
               confirmPhrase={confirmErase?.email}

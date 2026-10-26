@@ -14,6 +14,11 @@
  *   user id: the old scope is an orphan holding their data, which nothing would ever remove. Signing
  *   in as anyone but the recorded owner wipes every account scope on the phone first.
  *
+ * - **No record at all.** A phone that never ran this version has no owner on file. Its stores are
+ *   per account, so another user's rows cannot be read as the new account's, but they are still
+ *   orphans of a possibly deleted account. If any other account's data is there and nobody can say
+ *   whose it is, it is wiped, and the new account is recorded.
+ *
  * Every write then carries the epoch in `X-Data-Epoch` (`epochHeader`), and the server refuses a
  * write from a phone that has not reached it (409), which is the guard for the queued writes of a
  * phone whose record was lost.
@@ -57,6 +62,8 @@ export type DeviceDeps = {
   write(value: string): Promise<void>;
   /** A user id wipes that account's scope; null wipes every account scope on the phone. */
   wipe(origin: string, userId: string | null): Promise<void>;
+  /** Whether data of any account but this one is on the phone. Absent: the check is skipped. */
+  holdsOtherAccounts?(origin: string, userId: string): Promise<boolean>;
 };
 
 export type DeviceReconcile = {
@@ -75,14 +82,19 @@ export async function reconcileDevice(
   userId: string,
   serverEpoch: number,
 ): Promise<DeviceReconcile> {
+  // An empty id would be recorded as an owner and match nothing real; refuse it before any effect.
+  if (!userId) throw new Error('A device record needs a user id.');
   const record = parseDeviceRecord(await deps.read());
   const sameOwner = record !== null && record.origin === origin && record.userId === userId;
   if (sameOwner && record.epoch >= serverEpoch) {
     return { outcome: 'ok', record };
   }
   let wiped = false;
-  if (record !== null && !sameOwner) {
-    // Someone else's data is on this phone: all of it goes, orphans of older accounts included.
+  const unclaimedWithOthers =
+    record === null && (await deps.holdsOtherAccounts?.(origin, userId)) === true;
+  if ((record !== null && !sameOwner) || unclaimedWithOthers) {
+    // Someone else's data is on this phone, or no one's record says whose it is: all of it goes,
+    // orphans of older accounts included.
     await deps.wipe(origin, null);
     wiped = true;
   } else if (sameOwner || serverEpoch > 0) {

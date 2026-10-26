@@ -99,6 +99,7 @@ export type AuthPlatform = {
    * the session does not try.
    */
   wipeAccountData?(origin: string, userId: string | null): Promise<void>;
+  holdsOtherAccountData?(origin: string, userId: string): Promise<boolean>;
 };
 const RESET_MESSAGE = 'Your account data was reset. Sign in again to start fresh.';
 
@@ -197,6 +198,7 @@ export class AccountSession {
           read: () => this.platform.get(DEVICE_RECORD_KEY),
           write: (value: string) => this.platform.set(DEVICE_RECORD_KEY, value),
           wipe,
+          holdsOtherAccounts: this.platform.holdsOtherAccountData?.bind(this.platform),
         }
       : null;
   }

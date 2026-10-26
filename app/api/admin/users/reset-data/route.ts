@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   const { userId, confirmEmail } = parsed.data
   const badId = invalidUuidResponse(userId)
   if (badId) return badId
-  const ownerId = resolveOwnerUserId()
+  const ownerId = await resolveOwnerUserId(await getRepository())
 
   let result
   let ouraToken: string | null = null

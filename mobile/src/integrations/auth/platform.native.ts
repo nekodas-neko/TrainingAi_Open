@@ -120,6 +120,9 @@ export const authPlatform: AuthPlatform = {
     else await storage.clearAccount(origin, userId);
     homeWidgets?.clearSnapshot();
   },
+  async holdsOtherAccountData(origin, userId) {
+    return (await openLocalStorage()).holdsOtherAccounts(origin, userId);
+  },
   dismiss() {
     const browser = requireOptionalNativeModule<{ dismissAuthSession(): void }>(
       'ExpoWebBrowser',

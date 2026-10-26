@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { resolveClaudeRoOwner } from '../claude-ro-owner'
-import { judgeProtectedTarget } from '@/lib/admin-owner'
+import { judgeProtectedTarget, sameUserId } from '@/lib/admin-owner'
 import { userWriteLockKey } from '../user-write-barrier'
 
 type Db = ReturnType<typeof getDb>
@@ -235,8 +235,8 @@ function judgeGuard(
   if (!actor || !actor.is_admin || !actor.is_active) return 'actor-not-admin'
   const protectedTarget = judgeProtectedTarget(guard.actingAdminId, userId, me.is_admin, guard.ownerId)
   if (protectedTarget) return protectedTarget
-  if (me.is_admin && userId !== guard.actingAdminId) return 'admin-target'
-  if (userId === guard.actingAdminId && !mayWipeSelf) return 'self'
+  if (me.is_admin && !sameUserId(userId, guard.actingAdminId)) return 'admin-target'
+  if (sameUserId(userId, guard.actingAdminId) && !mayWipeSelf) return 'self'
   if (guard.confirmEmail === undefined) return null
   return guard.confirmEmail.trim().toLowerCase() === me.email.trim().toLowerCase() ? null : 'email-mismatch'
 }
@@ -295,12 +295,12 @@ async function erase(db: Db, userId: string, opts: EraseOpts): Promise<AccountDe
     }
     // With an admin guard the acting admin's row is locked in the same statement, in id order (two
     // admins acting on each other cannot deadlock), so it is judged as it is at commit time.
-    const lockIds = opts.guard && opts.guard.actingAdminId !== userId ? [userId, opts.guard.actingAdminId] : [userId]
+    const lockIds = opts.guard && !sameUserId(opts.guard.actingAdminId, userId) ? [userId, opts.guard.actingAdminId] : [userId]
     const { rows: locked } = await tx.execute<KeptAccount>(sql`
       SELECT id, oauth_sub, email, name, password_hash, is_active, is_admin, created_at, timezone
       FROM users WHERE id IN (${sql.join(lockIds.map(i => sql`${i}::uuid`), sql`, `)}) ORDER BY id FOR UPDATE`)
-    const me = locked.find(r => r.id === userId)
-    const actor = opts.guard ? locked.find(r => r.id === opts.guard!.actingAdminId) : undefined
+    const me = locked.find(r => sameUserId(r.id, userId))
+    const actor = opts.guard ? locked.find(r => sameUserId(r.id, opts.guard!.actingAdminId)) : undefined
     if (!me) return NOT_FOUND
 
     const refused = judgeGuard(opts.guard, userId, me, actor, opts.keepAccount === true)

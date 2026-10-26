@@ -127,3 +127,17 @@ test('an older app refuses a newer database without resetting saved data', async
     fixture.connection.close();
   }
 });
+
+test('holdsOtherAccounts sees data of any account but the one asked about, and ignores the device scope', async () => {
+  const { database } = sqliteFixture();
+  const storage = await createLocalStorage(database);
+  const origin = 'https://example.com';
+  await storage.device().set('theme', 'dark');
+  assert.equal(await storage.holdsOtherAccounts(origin, 'u1'), false);
+  await storage.account(origin, 'u1').set('k', 'v');
+  assert.equal(await storage.holdsOtherAccounts(origin, 'u1'), false);
+  await storage.account(origin, 'old').set('k', 'v');
+  assert.equal(await storage.holdsOtherAccounts(origin, 'u1'), true);
+  await storage.clearAllAccounts();
+  assert.equal(await storage.holdsOtherAccounts(origin, 'u1'), false);
+});
