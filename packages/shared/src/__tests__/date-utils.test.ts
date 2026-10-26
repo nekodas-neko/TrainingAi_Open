@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatInTimeZone } from 'date-fns-tz'
-import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz, midnightDaysAgoInTz } from '../date-utils'
+import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz, midnightDaysAgoInTz, clockSkipOnDay, closeClockSkip } from '../date-utils'
 
 describe('ageFromDob', () => {
   const today = new Date('2026-07-22T00:00:00Z')
@@ -389,5 +389,26 @@ describe('midnightDaysAgoInTz (#3117)', () => {
     const at = new Date('2026-10-05T02:00:00Z') // 13:00 AEDT, 5 Oct
     // 28 Sept is AEST (UTC+10): midnight is 14:00Z the day before. A 7×24h subtraction would land at 01:00.
     expect(midnightDaysAgoInTz('Australia/Sydney', 7, at).toISOString()).toBe('2026-09-27T14:00:00.000Z')
+  })
+})
+
+describe('clockSkipOnDay / closeClockSkip (#3445)', () => {
+  const start = (day: string, tz: string) => dateStrMidnightInTz(day, tz).getTime()
+  it('names the hour a spring-forward day skips', () => {
+    expect(clockSkipOnDay(start('2026-10-04', 'Australia/Sydney'), 'Australia/Sydney')).toEqual({ fromMin: 120, toMin: 180 })
+  })
+  it('is null on an ordinary day, a fall-back day and a zone with no daylight saving', () => {
+    expect(clockSkipOnDay(start('2026-10-05', 'Australia/Sydney'), 'Australia/Sydney')).toBeNull()
+    expect(clockSkipOnDay(start('2027-04-04', 'Australia/Sydney'), 'Australia/Sydney')).toBeNull()
+    expect(clockSkipOnDay(start('2026-10-04', 'Australia/Brisbane'), 'Australia/Brisbane')).toBeNull()
+  })
+  it('finds the half-hour skip of Lord Howe', () => {
+    expect(clockSkipOnDay(start('2026-10-04', 'Australia/Lord_Howe'), 'Australia/Lord_Howe')).toEqual({ fromMin: 120, toMin: 150 })
+  })
+  it('takes the skipped hour out of minutes after it', () => {
+    const skip = { fromMin: 120, toMin: 180 }
+    expect(closeClockSkip(105, skip)).toBe(105)
+    expect(closeClockSkip(180, skip) - closeClockSkip(105, skip)).toBe(15)
+    expect(closeClockSkip(500, null)).toBe(500)
   })
 })
