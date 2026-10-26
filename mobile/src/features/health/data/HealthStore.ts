@@ -11,7 +11,8 @@ import {
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
-import { ApiError, UploadRejected, isRejectedForGood, pushOutcome } from '../../account/api/client.ts';
+import { ApiError, UploadRejected, isRejectedForGood } from '../../account/api/client.ts';
+import { readPushAnswer } from '../../../core/sync/push-answer.ts';
 import { toAestDay, weekStartForDay } from '@trainingai/shared/date-utils';
 import { morningSchema, checkinSchema } from './checkin.ts';
 import { dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin';
@@ -31,6 +32,8 @@ const operationSchema = MutationSchema.extend({
   domain: z.enum(['body_metrics', 'manual_sleep', 'manual_bedtime', 'day_checkins']),
   acknowledged: z.boolean().default(false),
   attempted: z.boolean().default(true),
+  /** Server refusals of this push so far; set aside once they reach MAX_MUTATION_ATTEMPTS. */
+  attempts: z.number().int().positive().optional(),
 }).superRefine((operation, context) => {
   const p = operation.payload;
   const valid =
@@ -524,7 +527,6 @@ export class HealthStore {
     const generation = this.generation;
     this.publish({ syncing: true });
     this.flushing = (async () => {
-      let setAside: string | null = null;
       try {
         await this.writes;
         while (generation === this.generation && this.current.operations.length) {
@@ -556,22 +558,38 @@ export class HealthStore {
             if (!Array.isArray(result.errors)) {
               throw new Error('Upload not confirmed.');
             }
-            const outcome = pushOutcome(result, change.id);
-            if (outcome === 'rejected') {
-              // The server answered 200 but refused this change for good; drop it so the queue
-              // behind it flows, and keep the local value.
-              setAside = failureNotice(
+            const verdict = readPushAnswer(change, result);
+            if (verdict.kind === 'hold') {
+              throw new Error(verdict.error);
+            }
+            if (verdict.kind === 'refused') {
+              if (!verdict.final) {
+                // Counted and kept; the next sync tries it again (the queue waits behind it).
+                await this.write((state) => ({
+                  operations: state.operations.map((op) =>
+                    op.id === change.id ? { ...op, attempts: verdict.attempts } : op,
+                  ),
+                }));
+                throw new Error(verdict.error);
+              }
+              // Refused MAX_MUTATION_ATTEMPTS times: drop it so the queue behind it flows, and keep
+              // the value on this phone until the next refresh of its domain replaces it.
+              const notice = failureNotice(
                 'One change was kept on this phone only; the server did not accept it.',
                 new UploadRejected(),
               );
               this.revision++;
+              const today = toAestDay(
+                new Date(this.now()),
+                this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+              );
               await this.write((state) => ({
+                ...keepLocally(state, change, today),
                 operations: state.operations.filter((op) => op.id !== change.id),
+                setAside: notice,
+                error: notice,
               }));
               continue;
-            }
-            if (outcome === 'retry') {
-              throw new Error('Upload not confirmed.');
             }
             this.revision++;
             await this.write((state) => ({
@@ -591,6 +609,7 @@ export class HealthStore {
         }
         while (generation === this.generation && this.current.verdictResponses.length) {
           const response = this.current.verdictResponses[0];
+          let notice: string | null = null;
           try {
             await this.connection.post('/api/sleep-verdict', response);
           } catch (failure) {
@@ -598,7 +617,7 @@ export class HealthStore {
             if (!isRejectedForGood(failure)) {
               throw failure;
             }
-            setAside = failureNotice(
+            notice = failureNotice(
               'One answer was kept on this phone only; the server did not accept it.',
               failure,
             );
@@ -608,11 +627,13 @@ export class HealthStore {
           }
           await this.write((state) => ({
             verdictResponses: state.verdictResponses.filter((r) => r !== response),
+            ...(notice ? { setAside: notice, error: notice } : {}),
           }));
           this.invalidate();
         }
         while (generation === this.generation && this.current.readinessResponses.length) {
           const response = this.current.readinessResponses[0];
+          let notice: string | null = null;
           try {
             await this.connection.post('/api/readiness-verdict', response);
           } catch (failure) {
@@ -620,7 +641,7 @@ export class HealthStore {
             if (!isRejectedForGood(failure)) {
               throw failure;
             }
-            setAside = failureNotice(
+            notice = failureNotice(
               'One answer was kept on this phone only; the server did not accept it.',
               failure,
             );
@@ -630,15 +651,13 @@ export class HealthStore {
           }
           await this.write((state) => ({
             readinessResponses: state.readinessResponses.filter((r) => r !== response),
+            ...(notice ? { setAside: notice, error: notice } : {}),
           }));
           this.invalidate();
         }
         if (generation === this.generation) {
-          if (setAside) {
-            await this.write(() => ({ setAside, error: setAside }));
-          }
           // A notice not yet seen outlasts a sync that sets nothing aside.
-          this.publish({ error: setAside ?? this.current.setAside });
+          this.publish({ error: this.current.setAside });
         }
       } catch (failure) {
         if (generation === this.generation) {
@@ -662,6 +681,24 @@ export class HealthStore {
     this.canceled = true;
     this.generation++;
   }
+}
+/**
+ * The patch that keeps a set-aside op's value on this phone: it goes into the base the screens
+ * read, where the next refresh of its domain replaces it from the server.
+ */
+function keepLocally(
+  state: HealthState,
+  op: HealthOperation,
+  today: string,
+): Partial<HealthState> {
+  if (op.domain === 'body_metrics') {
+    return { body: overlayBody(state.body, [op], today) };
+  }
+  if (op.domain === 'day_checkins') {
+    const kept = checkinSchema.safeParse(op.payload);
+    return kept.success ? { checkins: { ...state.checkins, [op.date]: kept.data } } : {};
+  }
+  return { sleep: overlaySleep(state.sleep ?? [], [op]) };
 }
 export function overlayBody(
   base: BodyData | null,

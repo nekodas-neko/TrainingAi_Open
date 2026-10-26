@@ -862,7 +862,7 @@ test('a readiness push answered 200 with a rejected item sets it aside and the r
   const post = f.connection.post;
   let pushes = 0;
   (f.connection as { post: unknown }).post = async (path: string, body: unknown) => {
-    if (path === '/api/sync/push' && pushes++ === 0) {
+    if (path === '/api/sync/push' && pushes++ < 5) {
       const m = (body as { mutations: { id: string; domain: string; date: string }[] }).mutations[0];
       return {
         processed: 0,
@@ -879,12 +879,70 @@ test('a readiness push answered 200 with a rejected item sets it aside and the r
   await store.saveMood(day, { energyLevel: 'low', soreMuscles: [], bodyState: [] });
   await store.saveMood('2026-10-13', { energyLevel: 'good', soreMuscles: [], bodyState: [] });
   f.online(true);
+  // Each refusal counts; the queue waits behind it until the fifth, then the rest go through.
+  for (let attempt = 1; attempt < 5; attempt++) {
+    await store.sync();
+    assert.equal(store.getSnapshot().operations.length, 2);
+    assert.equal(store.getSnapshot().setAside, null);
+  }
   await store.sync();
   const state = store.getSnapshot();
   assert.equal(state.operations.length, 0);
   assert.deepEqual(f.sent.map((m) => m.date), ['2026-10-13']);
   assert.equal(state.moods[day]?.energyLevel, 'low');
   assert.match(state.error ?? '', /kept on this phone only/);
+});
+
+test('a rejected op followed by a transient failure keeps the notice through a reopen (#3392)', async () => {
+  const f = fixture();
+  f.connection.patch = async () => {
+    throw validation400();
+  };
+  const post = f.connection.post;
+  f.connection.post = async (path: string, body: unknown) => {
+    if (path === '/api/log-rest-day') {
+      throw new ApiError(500);
+    }
+    return post(path, body);
+  };
+  const store = f.make();
+  await store.initialize();
+  await store.savePreferences({ energyHeroSize: 'large' } as never);
+  await store.chooseRestDay(day, true);
+  await store.sync();
+  assert.deepEqual(
+    store.getSnapshot().operations.map((op) => op.kind),
+    ['rest'],
+  );
+  assert.match(store.getSnapshot().setAside ?? '', /kept on this phone only/);
+  const reopened = f.make();
+  await reopened.initialize();
+  assert.match(reopened.getSnapshot().error ?? '', /kept on this phone only/);
+  assert.equal(reopened.getSnapshot().setAside, reopened.getSnapshot().error);
+});
+
+test('a cancel while the set-aside is being written leaves the disk alone afterwards (#3392)', async () => {
+  const f = fixture();
+  f.connection.patch = async () => {
+    throw validation400();
+  };
+  const store = f.make();
+  await store.initialize();
+  await store.savePreferences({ energyHeroSize: 'large' } as never);
+  let writes = 0;
+  let canceledAt = -1;
+  const set = f.storage.set;
+  f.storage.set = async (key: string, value: string) => {
+    await set(key, value);
+    writes++;
+    if (JSON.parse(value).operations.length === 0 && canceledAt < 0) {
+      canceledAt = writes;
+      store.cancel(); // a sign-out lands while the op is being dropped
+    }
+  };
+  await store.sync();
+  assert.ok(canceledAt > 0);
+  assert.equal(writes, canceledAt);
 });
 
 test('a readiness push answered 200 with a retryable error holds the queue (#3392)', async () => {

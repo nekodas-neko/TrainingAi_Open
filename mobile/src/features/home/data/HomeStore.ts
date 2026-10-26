@@ -3,7 +3,8 @@ import { MoodFieldsSchema, type MoodFields } from '@trainingai/shared/validation
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { ApiError, UploadRejected, isRejectedForGood, pushOutcome } from '../../account/api/client.ts';
+import { ApiError, UploadRejected, isRejectedForGood } from '../../account/api/client.ts';
+import { readPushAnswer } from '../../../core/sync/push-answer.ts';
 import { isCalendarDate } from '@trainingai/shared/date-utils';
 import { moodSchema, preferencesSchema, type HomePreferences, type Mood } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
@@ -18,6 +19,8 @@ const operationSchema = z.discriminatedUnion('kind', [
     id: z.uuid(),
     date: dateSchema,
     payload: MoodFieldsSchema,
+    /** Server refusals of this push so far; set aside once they reach MAX_MUTATION_ATTEMPTS. */
+    attempts: z.number().int().positive().optional(),
   }),
   z.object({ kind: z.literal('preferences'), id: z.uuid(), payload: preferencesSchema }),
   z.object({ kind: z.literal('rest'), id: z.uuid(), date: dateSchema, resting: z.boolean() }),
@@ -337,11 +340,11 @@ export class HomeStore {
         return;
       }
       this.publish({ syncing: true });
-      let setAside: string | null = null;
       try {
         while (this.current.operations.length && generation === this.generation) {
           const op = this.current.operations[0];
           let accepted = true;
+          let notice: string | null = null;
           try {
             if (op.kind === 'mood') {
               const result = z
@@ -358,12 +361,24 @@ export class HomeStore {
                     ],
                   }),
                 );
-              const outcome = pushOutcome(result, op.id);
-              if (outcome === 'rejected') {
-                throw new UploadRejected();
+              const verdict = readPushAnswer(
+                { id: op.id, domain: 'mood_logs', date: op.date, attempts: op.attempts },
+                result,
+              );
+              if (verdict.kind === 'hold') {
+                throw new Error(verdict.error);
               }
-              if (outcome === 'retry') {
-                throw new Error('Upload not accepted.');
+              if (verdict.kind === 'refused') {
+                if (verdict.final) {
+                  throw new UploadRejected();
+                }
+                // Counted and kept; the next sync tries it again (the queue waits behind it).
+                await this.write((state) => ({
+                  operations: state.operations.map((x) =>
+                    x.id === op.id && x.kind === 'mood' ? { ...x, attempts: verdict.attempts } : x,
+                  ),
+                }));
+                throw new Error(verdict.error);
               }
               const row = moodSchema
                 .nullable()
@@ -426,7 +441,7 @@ export class HomeStore {
               return;
             }
             accepted = false;
-            setAside = failureNotice(
+            notice = failureNotice(
               'One change was kept on this phone only; the server did not accept it.',
               cause,
             );
@@ -434,20 +449,19 @@ export class HomeStore {
           if (generation !== this.generation) {
             return;
           }
+          // The notice is saved in the write that drops the op, so a later op failing cannot lose it.
           await this.write((state) => ({
             operations: state.operations.filter((x) => x.id !== op.id),
-            error: null,
+            ...(notice ? { setAside: notice } : {}),
+            error: notice ?? state.setAside,
           }));
           if (accepted) {
             this.changed(op.kind);
           }
         }
-        if (setAside) {
-          await this.write(() => ({ setAside, error: setAside }));
-        }
         if (generation === this.generation) {
           // A notice not yet seen outlasts a sync that sets nothing aside.
-          this.publish({ error: setAside ?? this.current.setAside });
+          this.publish({ error: this.current.setAside });
         }
       } catch (cause) {
         if (generation === this.generation) {

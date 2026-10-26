@@ -42,22 +42,6 @@ export function isRejectedForGood(error: unknown): boolean {
   );
 }
 /**
- * What `/api/sync/push` said about the one mutation sent: done, refused for good (an `errors` entry
- * for it that is not `retryable`), or not settled (the server could not write; try again).
- */
-export function pushOutcome(result: unknown, id: string): 'accepted' | 'rejected' | 'retry' {
-  const body = (result ?? {}) as { processed?: unknown; errors?: unknown };
-  const errors = Array.isArray(body.errors) ? (body.errors as unknown[]) : [];
-  if (body.processed === 1 && !errors.length) {
-    return 'accepted';
-  }
-  const ours = errors.filter((entry): entry is { retryable?: unknown } => {
-    const item = entry as { id?: unknown } | null;
-    return !!item && typeof item === 'object' && (item.id === undefined || item.id === id);
-  });
-  return ours.length && ours.every((entry) => entry.retryable !== true) ? 'rejected' : 'retry';
-}
-/**
  * The error for a failed response whose body (already parsed, or null) may be the paused notice.
  * Only the fixed sentence is kept, never the body's own text.
  */

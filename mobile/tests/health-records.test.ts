@@ -472,16 +472,96 @@ test('a Health push answered 200 with a rejected item sets it aside and the acce
   const post = f.connection.post;
   let pushes = 0;
   (f.connection as { post: unknown }).post = async (path: string, body: unknown) => {
-    if (path === '/api/sync/push' && pushes++ === 0) {
+    if (path === '/api/sync/push' && pushes++ < 5) {
       return rejection((body as { mutations: { id: string }[] }).mutations[0], false);
     }
     return post(path, body);
   };
+  // Each refusal counts; the queue waits behind it until the fifth, then the rest go through.
+  for (let attempt = 1; attempt < 5; attempt++) {
+    await store.sync();
+    assert.equal(store.getSnapshot().operations.length, 2);
+    assert.equal(store.getSnapshot().setAside, null);
+  }
   await store.sync();
   const state = store.getSnapshot();
   assert.equal(state.operations.length, 0);
-  assert.equal(pushes, 2);
+  assert.equal(pushes, 6);
   assert.match(state.error ?? '', /kept on this phone only/);
+});
+
+test('a set-aside weight stays what the person logged until the next refresh replaces it (#3392)', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.logMetric('weightKg', 81, date);
+  await store.sync();
+  f.setOnline(true);
+  (f.connection as { post: unknown }).post = async (_path: string, body: unknown) =>
+    rejection((body as { mutations: { id: string }[] }).mutations[0], false);
+  const shown = () => {
+    const state = store.getSnapshot();
+    return overlayBody(state.body, state.operations, date)?.latestWeightKg;
+  };
+  assert.equal(shown(), 81);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await store.sync();
+  }
+  assert.equal(store.getSnapshot().operations.length, 0);
+  assert.equal(shown(), 81);
+  // It survives a restart, and the next refresh puts the server's value back.
+  const reopened = f.store();
+  await reopened.initialize();
+  assert.equal(overlayBody(reopened.getSnapshot().body, [], date)?.latestWeightKg, 81);
+  await store.refresh(true);
+  assert.equal(shown(), 80);
+});
+
+test('a rejected change followed by a transient failure keeps the notice through a reopen (#3392)', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.logMetric('weightKg', 81, date);
+  await store.addWater(250, date);
+  await store.sync();
+  f.setOnline(true);
+  let pushes = 0;
+  (f.connection as { post: unknown }).post = async (_path: string, body: unknown) => {
+    const m = (body as { mutations: { id: string }[] }).mutations[0];
+    if (pushes++ < 5) {
+      return rejection(m, false);
+    }
+    throw new Error('server unavailable');
+  };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await store.sync();
+  }
+  await store.sync(); // the weight is set aside, then the water push fails
+  assert.equal(store.getSnapshot().operations.length, 1);
+  assert.match(store.getSnapshot().setAside ?? '', /kept on this phone only/);
+  const reopened = f.store();
+  await reopened.initialize();
+  assert.match(reopened.getSnapshot().error ?? '', /kept on this phone only/);
+});
+
+test('a rejected change with a refusal that is not final is counted and kept (#3392)', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.addWater(250, date);
+  await store.sync();
+  f.setOnline(true);
+  (f.connection as { post: unknown }).post = async (_path: string, body: unknown) =>
+    rejection((body as { mutations: { id: string }[] }).mutations[0], false);
+  await store.sync();
+  await store.sync();
+  assert.equal(store.getSnapshot().operations[0].attempts, 2);
+  const reopened = f.store();
+  await reopened.initialize();
+  assert.equal(reopened.getSnapshot().operations[0].attempts, 2);
 });
 
 test('a Health push answered 200 with a retryable error holds the queue (#3392)', async () => {
@@ -510,7 +590,9 @@ test('the Health set-aside notice survives a sync and a restart, and clears once
   f.setOnline(true);
   (f.connection as { post: unknown }).post = async (_path: string, body: unknown) =>
     rejection((body as { mutations: { id: string }[] }).mutations[0], false);
-  await store.sync();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await store.sync();
+  }
   const notice = store.getSnapshot().error;
   assert.match(notice ?? '', /kept on this phone only/);
   await store.sync();
