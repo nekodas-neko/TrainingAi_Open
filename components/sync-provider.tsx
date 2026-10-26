@@ -32,6 +32,9 @@ import { readRollupState, announceOuraSynced, syncOuraRingIfStale } from '@/lib/
 import { reportRingLinkStats, LINK_STATS_PERIOD_MS } from '@/lib/oura-ble/link-stats';
 import { waitForRollup, type RollupState } from '@/lib/oura-ble/rollup-wait';
 
+// Module scope, not an effect: installed once per page load, before any upload can fire; a no-op off the browser.
+installDataEpochFetchGuard();
+
 interface CacheTask {
   key: string;
   url: string;
@@ -127,7 +130,6 @@ interface SyncProviderProps {
 export function SyncProvider({ userId }: SyncProviderProps) {
   const tz = useUserTimezone();
   // #3369: a write the server refuses because an admin reset this account wipes the device and reloads.
-  useEffect(() => { installDataEpochFetchGuard(); }, []);
   useEffect(() => {
     let cancelled = false;
 
