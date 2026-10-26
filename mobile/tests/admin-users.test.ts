@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { createApiClient } from '../src/features/account/api/client.ts';
 import {
   actionFailure,
+  emailMatches,
+  performWipe,
+  wipeActions,
+  wipeConfirm,
+  wipeFailure,
+  wipeRequest,
   inviteEmail,
   partitionUsers,
   userActionConfirm,
@@ -63,4 +70,105 @@ test('failures read in plain words from the status', () => {
 
 test('invites are stored trimmed and lower-case', () => {
   assert.equal(inviteEmail('  Foo@Bar.com '), 'foo@bar.com');
+});
+
+test('wipe confirm unlocks only on the row\'s email, ignoring case and spaces', () => {
+  assert.equal(emailMatches('', 'a@b.co'), false);
+  assert.equal(emailMatches('a@b.c', 'a@b.co'), false);
+  assert.equal(emailMatches(' A@B.CO ', 'a@b.co'), true);
+  assert.equal(emailMatches('', ''), false);
+  assert.match(readFileSync(new URL('../src/features/admin/components/ConfirmSheet.tsx', import.meta.url), 'utf8'), /disabled=\{locked\}/);
+});
+
+test('wipe titles and labels are the web console\'s', () => {
+  const r = wipeConfirm('reset', user({}), false);
+  assert.deepEqual([r.title, r.confirmLabel], ['Reset data?', 'Reset data']);
+  const e = wipeConfirm('erase', user({}), false);
+  assert.deepEqual([e.title, e.confirmLabel], ['Delete account and data?', 'Delete account']);
+  assert.match(wipeConfirm('reset', user({}), true).message, /signed out now/);
+});
+
+test('wipe buttons follow the web console: no other admin, no signup that never got in', () => {
+  assert.deepEqual(wipeActions(user({}), false), ['reset', 'erase']);
+  assert.deepEqual(wipeActions(user({ isAdmin: true }), false), []);
+  assert.deepEqual(wipeActions(user({ isAdmin: true }), true), ['reset']);
+  assert.deepEqual(wipeActions(user({}), true), ['reset']);
+  assert.deepEqual(wipeActions(user({ isActive: false, hasData: false }), false), []);
+});
+
+test('the right route and body are sent, with the typed email', () => {
+  const u = user({ id: 'u1', email: 'a@b.co' });
+  assert.deepEqual(wipeRequest('reset', u, 'A@B.co'), {
+    method: 'POST',
+    path: '/api/admin/users/reset-data',
+    body: { userId: 'u1', confirmEmail: 'A@B.co' },
+  });
+  assert.deepEqual(wipeRequest('erase', u, 'a@b.co'), {
+    method: 'DELETE',
+    path: '/api/admin/users',
+    body: { userId: 'u1', confirmEmail: 'a@b.co' },
+  });
+});
+
+test('each refusal reads as a sentence and never shows the response text', () => {
+  for (const kind of ['reset', 'erase'] as const) {
+    const said = new Set<string>();
+    for (const status of [403, 409, 429, 404]) {
+      const text = wipeFailure(kind, Object.assign(new Error('SECRET body text'), { status }));
+      assert.ok(!text.includes('SECRET'));
+      said.add(text);
+    }
+    assert.equal(said.size, 4);
+  }
+  assert.match(wipeFailure('reset', { status: 403 }), /another admin's or the owner's, or the server's owner setting/);
+  assert.match(wipeFailure('erase', { status: 429 }), /Too many/);
+  assert.match(wipeFailure('erase', { status: 404 }), /no longer exists/);
+  assert.match(wipeFailure('reset', { status: 500 }), /could not be reset\. Nothing was removed/);
+  // A timeout or gateway error may have committed on the server: never claim nothing was removed.
+  for (const failure of [new Error('aborted'), { status: 502 }, { status: 504 }]) {
+    const text = wipeFailure('reset', failure);
+    assert.match(text, /not known whether anything was removed/);
+    assert.ok(!text.includes('Nothing was removed'));
+  }
+});
+
+test('performWipe: refreshes the lists, signs out only after your own reset', async () => {
+  const calls: unknown[][] = [];
+  let signOuts = 0;
+  const io = (response: unknown) => ({
+    write: async (...args: unknown[]) => (calls.push(args), response),
+    signOut: () => void signOuts++,
+  });
+  const u = user({ id: 'u1' });
+  const other = await performWipe('reset', u, 'a@b.co', io({ ok: true, signedOut: false, defaultsSeeded: true }));
+  assert.equal(other.error, false);
+  assert.equal(signOuts, 0);
+  assert.deepEqual(calls[0].slice(0, 2), ['POST', '/api/admin/users/reset-data']);
+  assert.deepEqual(calls[0][3], ['/api/admin/users', '/api/admin/pending-count']);
+  const own = await performWipe('reset', u, 'a@b.co', io({ ok: true, signedOut: true }));
+  assert.equal(signOuts, 1);
+  assert.match(own.text, /Sign in again/);
+  await performWipe('erase', u, 'a@b.co', io({ ok: true, signedOut: true }));
+  assert.equal(signOuts, 1);
+  const failed = await performWipe('erase', u, 'a@b.co', {
+    write: async () => { throw Object.assign(new Error('x'), { status: 403 }); },
+    signOut: () => void signOuts++,
+  });
+  assert.equal(failed.error, true);
+  assert.equal(signOuts, 1);
+});
+
+test('an admin reset or delete gets the long client timeout, so a heavy wipe is not cut off', async (t) => {
+  const delays: number[] = [];
+  t.mock.method(globalThis, 'setTimeout', ((fn: () => void, ms: number) => {
+    delays.push(ms);
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout);
+  t.mock.method(globalThis, 'fetch', async () =>
+    new Response('{}', { headers: { 'content-type': 'application/json' } }));
+  const client = createApiClient('https://example.com', async () => 'session');
+  await client.post('/api/admin/users/reset-data', { userId: 'u1', confirmEmail: 'a@b.co' });
+  await client.delete('/api/admin/users', { userId: 'u1', confirmEmail: 'a@b.co' });
+  await client.get('/api/admin/users');
+  assert.deepEqual(delays, [130_000, 130_000, 15_000]);
 });
