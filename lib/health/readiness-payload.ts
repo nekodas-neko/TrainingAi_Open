@@ -29,10 +29,10 @@ import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/s
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { scoreActivityForDay, restingHrBaseline, carriedOverRestingHr, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
 import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
-import { staleFinishedDays } from '@trainingai/shared/health/finished-day-recheck'
-import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
+import { staleFinishedDays, metLookbackFrom } from '@trainingai/shared/health/finished-day-recheck'
+import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, runBackgroundFinalise, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
 import { type DailyGoals } from '@trainingai/shared/health/daily-goals'
-import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
+import { resolveHrProfile, maxHrIsUnread } from '@trainingai/shared/health/hr-profile'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult, type ContributorGap } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
@@ -550,8 +550,17 @@ export async function buildReadinessPayload(
   // older day in the look-back still holding a partial value is finalised behind the read.
   const nowDate = new Date()
   const activityStamps = new Map(derivedTodayRows.map(r => [r.day, activityFinalisedAt(r.activityContributors)]))
-  const staleActivityDays = staleFinishedDays(todayIso, tz, activityStamps, ACTIVITY_FINALISE_DAYS, activityFinalGrace(nowDate))
-  const maxHrOption = { maxHr: hrProfile?.maxHr ?? null }
+  // #3079: a finished day whose Oura MET changed after its stamp is scored once more, as the
+  // training-stress re-check does. A failed read only loses that trigger for this read.
+  const metChangedAt = await (async () =>
+    repo.getOuraCloudMetChangedAt(userId, metLookbackFrom(todayIso, ACTIVITY_FINALISE_DAYS), shiftDateStr(todayIso, -1)))()
+    .catch(() => [])
+  const staleActivityDays = staleFinishedDays(
+    todayIso, tz, activityStamps, ACTIVITY_FINALISE_DAYS, activityFinalGrace(nowDate),
+    new Map(metChangedAt.map(r => [r.date, r.changedAt])),
+  )
+  // A max HR that stands in for a failed read is not stored as a day's final score (the load refuses).
+  const maxHrOption = { maxHr: hrProfile?.maxHr ?? null, maxHrUnread: maxHrIsUnread(hrProfile) }
   const reportFinalise = (day: string, stage: 'scoring' | 'storing') => (err: unknown) =>
     reportServerError(new Error(`[readiness-score] ${stage} activity for ${day} failed — read still served`, { cause: err }), { userId })
   // Yesterday with no stamp at all has no usable stored value (a pre-#2435 row is a partial day), so
@@ -571,13 +580,14 @@ export async function buildReadinessPayload(
   }
   if (backgroundActivityDays.length > 0) {
     // One at a time and fire-and-forget, like the training-load re-check (#2400): the read never
-    // waits on it and a first visit after a week away does not open seven at once.
-    void (async () => {
+    // waits on it and a first visit after a week away does not open seven at once. One pass per user
+    // at a time, so parallel reads do not each run their own.
+    runBackgroundFinalise(userId, async () => {
       for (const day of backgroundActivityDays) {
         const scored = await scoreFinishedActivityDay(repo, userId, tz, day, nowDate, maxHrOption).catch(reportFinalise(day, 'scoring'))
         if (scored) await storeFinishedActivityDay(repo, userId, day, scored, nowDate).catch(reportFinalise(day, 'storing'))
       }
-    })()
+    })
   }
 
   // Q-284 — our own Activity Score, always. `blendActivityScore` used to adjust an Oura Cloud

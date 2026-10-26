@@ -31,6 +31,10 @@ const repo = {
   getMoodLog: vi.fn(async (_u: string, _d: string) => null),
   getUserById: vi.fn(async (_u: string) => ({ timezone: TZ, dateOfBirth: '1990-01-01', sex: 'male', heightCm: 180 })),
   getUserGoals: vi.fn(async (_u: string) => ({ stepsGoal: null })),
+  // The HR profile resolves for real: without these it fails, and a finished day is no longer scored on that (#3347 review).
+  getObservedHrProfile: vi.fn(async () => EMPTY_OBSERVED_HR),
+  listFitnessTests: vi.fn(async () => [] as unknown[]),
+  getOuraCloudMetChangedAt: vi.fn(async () => [] as unknown[]),
   upsertOuraDailyDerived: vi.fn(async () => undefined),
   upsertOuraDailySummary: vi.fn(async () => undefined),
 }
@@ -53,6 +57,7 @@ vi.mock('@trainingai/shared/health/sleep-score', async (importOriginal) => {
   }
 })
 
+import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 

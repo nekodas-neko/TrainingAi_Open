@@ -3,6 +3,7 @@
 // filtered by the same bounds the real queries use.
 import { vi } from 'vitest'
 import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
+import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 
 export interface FixtureMetric {
   date: string
@@ -25,6 +26,10 @@ export interface ActivityFixture {
   cloudActivity?: { date: string; met: { interval: number; items: (number | null)[]; timestamp: string } | null; class5Min: string | null }[]
   /** Makes the MET read throw, as a database or connector error would. */
   cloudActivityFails?: boolean
+  /** When each Oura day's `oura_cloud_daily` row last changed (#3079), for days that carry MET. */
+  metChangedAt?: { date: string; changedAt: Date }[]
+  /** Reads the finalise must not swallow on a finished day: each throws, as a database error would. */
+  failReads?: { goals?: boolean; user?: boolean; observedHr?: boolean; fitnessTests?: boolean }
 }
 
 /** A repository over the fixture. Upserts land in `fixture.derived` with the real COALESCE rule. */
@@ -57,8 +62,24 @@ export function fixtureRepo(fx: ActivityFixture) {
       fx.derived.filter(r => r.day >= from && r.day <= to).sort((a, b) => a.day.localeCompare(b.day))
         .map(r => ({ activityScore: null, activityContributors: null, ...r }))),
     getLatestOuraCloudVitals: vi.fn(async () => null),
-    getUserById: vi.fn(async () => ({ dateOfBirth: '1990-01-01', sex: 'male', heightCm: 180, activityLevel: 'moderate' })),
-    getUserGoals: vi.fn(async () => ({ stepsGoal: null })),
+    getOuraCloudMetChangedAt: vi.fn(async (_u: string, from: string, to: string) =>
+      (fx.metChangedAt ?? []).filter(r => r.date >= from && r.date <= to)),
+    getObservedHrProfile: vi.fn(async () => {
+      if (fx.failReads?.observedHr) throw new Error('observed hr read failed')
+      return EMPTY_OBSERVED_HR
+    }),
+    listFitnessTests: vi.fn(async () => {
+      if (fx.failReads?.fitnessTests) throw new Error('fitness tests read failed')
+      return [] as unknown[]
+    }),
+    getUserById: vi.fn(async () => {
+      if (fx.failReads?.user) throw new Error('user read failed')
+      return ({ dateOfBirth: '1990-01-01', sex: 'male', heightCm: 180, activityLevel: 'moderate' })
+    }),
+    getUserGoals: vi.fn(async () => {
+      if (fx.failReads?.goals) throw new Error('goals read failed')
+      return { stepsGoal: null }
+    }),
     listDoseEvents: vi.fn(async () => [] as unknown[]),
     listProgramPhases: vi.fn(async () => [] as unknown[]),
     countSessionsSinceStart: vi.fn(async () => 0),
