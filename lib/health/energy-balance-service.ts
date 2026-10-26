@@ -299,7 +299,7 @@ export async function computeEnergyBalance(
   const movement = await budgetMovement(repo, userId, windowStart, date, tz, { activityLogs, sessions: workouts })
   const budgetActivities = [...movement.logs, ...movement.oura]
   const activeEnergyFor = (day: string) => activeEnergyForDay({
-    day, dayStartUtc: localMidnightUtc(day, tz), profile: energyProfile,
+    day, dayStartUtc: localMidnightUtc(day, tz), dayEndUtc: localMidnightUtc(shiftDateStr(day, 1), tz), profile: energyProfile,
     workouts, avgBpmBySession, activities: budgetActivities, steps: metricByDate.get(day)?.steps ?? null,
   })
   const activeEnergy = activeEnergyFor(date)
