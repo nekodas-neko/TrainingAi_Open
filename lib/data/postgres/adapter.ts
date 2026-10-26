@@ -5194,6 +5194,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // storing bytes rather than a URL.
       imageDataUri: s.foodItems.imageDataUri,
       createdAt: s.foodItems.createdAt,
+      // #2417. The device drops a tombstoned row once no local log or saved meal needs it.
+      deletedAt: s.foodItems.deletedAt,
     }
 
     const [programs, progressionStyles, bodyMetrics, sleepSessions,
@@ -5375,9 +5377,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.db.selectDistinct(foodItemCols).from(s.foodItems)
         .innerJoin(s.foodLogs, eq(s.foodLogs.foodItemId, s.foodItems.id))
         .where(and(eq(s.foodLogs.userId, userId), gt(s.foodLogs.updatedAt, effectiveSince))),
-      // plus items the user created since the cutoff but hasn't logged yet
+      // plus items the user created since the cutoff but hasn't logged yet, and items merged away
+      // since it (#2417: the row's own `deleted_at` is the only clock a tombstone has, because
+      // `food_items` has no `updated_at`)
       this.db.select(foodItemCols).from(s.foodItems)
-        .where(and(eq(s.foodItems.userId, userId), gt(s.foodItems.createdAt, effectiveSince))),
+        .where(and(eq(s.foodItems.userId, userId), or(
+          gt(s.foodItems.createdAt, effectiveSince),
+          gt(s.foodItems.deletedAt, effectiveSince),
+        ))),
       // Phase-2 A1: oura_daily_summary backup pull (device-computed nightly physiology + rolling
       // EMA baselines). Server `date` → client `day`; cursor on `updated_at`. Selects every column
       // so the local mirror (incl. the *_baseline_*_x8 + n_history EMA state) restores intact.

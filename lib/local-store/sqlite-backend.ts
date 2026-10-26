@@ -2143,8 +2143,14 @@ export class SQLiteLocalStore implements LocalStore {
       );
     }
 
+    // #2417. A food the server merged into a keeper arrives with `deletedAt`. It is written like any
+    // other row first, because a log in this same delta (or one still waiting to push) may point at
+    // it and a log whose food is missing is not drawn. It is dropped after the logs below, and only
+    // if nothing local still points at it.
+    const mergedAwayFoodIds: string[] = [];
     for (const r of delta.foodItems ?? []) {
       await this.upsertFoodItemWith(tx.run, r);
+      if (r.deletedAt) mergedAwayFoodIds.push(r.id);
     }
 
     for (const r of delta.foodLogs ?? []) {
@@ -2193,6 +2199,16 @@ export class SQLiteLocalStore implements LocalStore {
            r.loggedAt, r.updatedAt, r.deletedAt],
         );
       }
+    }
+
+    for (const id of mergedAwayFoodIds) {
+      await tx.run(
+        `DELETE FROM food_items
+          WHERE id = ?
+            AND NOT EXISTS (SELECT 1 FROM food_logs WHERE food_item_id = food_items.id AND deleted_at IS NULL)
+            AND NOT EXISTS (SELECT 1 FROM saved_meal_items WHERE food_item_id = food_items.id)`,
+        [id],
+      );
     }
 
     for (const r of delta.supplements ?? []) {
