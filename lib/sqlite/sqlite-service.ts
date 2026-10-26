@@ -371,12 +371,26 @@ export async function withTransaction<T>(fn: (tx: SQLTransaction) => Promise<T>)
   }, 'withTransaction');
 }
 
+// How long `querySQLOpen` waits for `initSQLite` to be called at all (#3445). On a first launch the
+// store-owner check can ask before `SyncProvider` has started init; refusing then closes the store for
+// the whole backoff. Only "init has not begun" waits: a failed open, or init that never starts, still throws.
+const INIT_START_GRACE_MS = 3000;
+const INIT_START_POLL_MS = 50;
+
+async function awaitInitStarted(): Promise<void> {
+  for (let waited = 0; !_db && !_initPromise && !_initFailed && waited < INIT_START_GRACE_MS; waited += INIT_START_POLL_MS) {
+    await new Promise<void>(resolve => setTimeout(resolve, INIT_START_POLL_MS));
+  }
+}
+
 /** A read that must see the real database: throws when it is not open, where `querySQL` answers `[]`.
- *  For a caller that treats "no rows" as an answer (`deviceHasLocalData`: empty means safe to keep). */
+ *  For a caller that treats "no rows" as an answer (`deviceHasLocalData`: empty means safe to keep).
+ *  Waits up to 3 s for init to begin, then throws: not knowing is never "empty". */
 export async function querySQLOpen<T = Record<string, unknown>>(
   sql: string,
   values?: unknown[],
 ): Promise<T[]> {
+  await awaitInitStarted();
   await awaitOpen();
   if (!_db) throw new Error('The local database is not open');
   const result = await _db.query(sql, values ?? []);

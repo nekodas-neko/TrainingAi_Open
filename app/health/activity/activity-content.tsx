@@ -95,7 +95,7 @@ export function ActivityContent({ userId }: { userId?: string }) {
               </div>
 
               {data.activityTaperApplied && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-center">
+                <div className="rounded-lg border border-accent-amber/30 bg-accent-amber/10 px-3 py-2 text-center">
                   <p className="text-xs text-muted-foreground">
                     <span className="font-semibold text-foreground">Eased back today</span> — your recent training load is above the optimal range, so the score tapers rather than maxing out.
                   </p>

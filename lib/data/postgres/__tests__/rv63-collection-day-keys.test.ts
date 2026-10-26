@@ -97,6 +97,28 @@ describe.skipIf(!canRun)('RV-63 — collection day keys', () => {
     expect(await repo.listSleepDayKeys(USER, ...ALL)).toEqual(['2026-09-10'])
   })
 
+  // #3370 — the collection reads a day's steps the way achievements do: device total plus treadmill.
+  const treadmill = (date: string, n: number) =>
+    pool.query(`INSERT INTO activity_logs (user_id, date, activity_type, title, steps) VALUES ($1,$2,'treadmill','Treadmill',$3)`, [USER, date, n])
+
+  it('adds a treadmill session to the day total, so a day under the bar on raw steps clears it (#3370)', async () => {
+    await steps('2026-09-10', 5_000)
+    await treadmill('2026-09-10', 4_000)
+
+    expect(await repo.listStepTotals(USER, ...ALL)).toEqual([{ date: '2026-09-10', steps: 9_000 }])
+  })
+
+  it('counts a treadmill-only day, and ignores an outdoor walk the device already counted (#3370)', async () => {
+    await treadmill('2026-09-10', 6_000)
+    await steps('2026-09-11', 5_000)
+    await pool.query(`INSERT INTO activity_logs (user_id, date, activity_type, title, steps) VALUES ($1,'2026-09-11','walk','Walk',3000)`, [USER])
+
+    expect(await repo.listStepTotals(USER, ...ALL)).toEqual([
+      { date: '2026-09-10', steps: 6_000 }, { date: '2026-09-11', steps: 5_000 },
+    ])
+    expect((await repo.listStepDayKeys(USER, ...ALL)).sort()).toEqual(['2026-09-10', '2026-09-11'])
+  })
+
   /** The window still bounds, even though the caller passes all history — a floor that silently
    *  ignored `from`/`to` would pass every case above. */
   it('honours the from/to bounds', async () => {

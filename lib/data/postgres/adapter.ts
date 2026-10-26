@@ -37,6 +37,7 @@ export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
 import { classifyClockRegression, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
+import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 import { rowsOfDeviceInUse, fillMissingNightSources } from '@trainingai/shared/health/per-device-normal'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
@@ -2409,15 +2410,41 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * most weeks.
    */
   async listStepDayKeys(userId: string, from: string, to: string): Promise<string[]> {
-    const rows = await this.db.select({ date: s.bodyMetrics.date }).from(s.bodyMetrics)
-      .where(and(
-        eq(s.bodyMetrics.userId, userId),
-        gte(s.bodyMetrics.date, from),
-        lte(s.bodyMetrics.date, to),
-        gt(s.bodyMetrics.steps, 0),
-      ))
-      .orderBy(desc(s.bodyMetrics.date))
-    return rows.map(r => r.date)
+    const totals = await this.dayStepTotals(userId, from, to)
+    return totals.map(r => r.date).sort((x, y) => y.localeCompare(x))
+  }
+
+  /**
+   * #3370 — each day's steps as every other surface reads them: the device total plus the treadmill
+   * session's (`dayStepCountsByDate`, #3134), so the steps ladder and the bank agree with
+   * achievements. A treadmill-only day counts. Days at zero are dropped, ascending by date.
+   */
+  private async dayStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]> {
+    const [metrics, activities] = await Promise.all([
+      this.db.select({ date: s.bodyMetrics.date, steps: s.bodyMetrics.steps }).from(s.bodyMetrics)
+        .where(and(
+          eq(s.bodyMetrics.userId, userId),
+          gte(s.bodyMetrics.date, from),
+          lte(s.bodyMetrics.date, to),
+          isNull(s.bodyMetrics.deletedAt),
+        )),
+      this.db.select({ date: s.activityLogs.date, activityType: s.activityLogs.activityType, steps: s.activityLogs.steps })
+        .from(s.activityLogs)
+        .where(and(
+          eq(s.activityLogs.userId, userId),
+          gte(s.activityLogs.date, from),
+          lte(s.activityLogs.date, to),
+          gt(s.activityLogs.steps, 0),
+          isNull(s.activityLogs.deletedAt),
+        )),
+    ])
+    return [...dayStepCountsByDate(
+      metrics.map(r => ({ date: String(r.date), steps: r.steps == null ? null : Number(r.steps) })),
+      activities.map(r => ({ date: String(r.date), activityType: r.activityType, steps: r.steps == null ? null : Number(r.steps) })),
+    )]
+      .filter(([, steps]) => steps > 0)
+      .map(([date, steps]) => ({ date, steps }))
+      .sort((x, y) => x.date.localeCompare(y.date))
   }
 
   /** RV-63 — see `listStepDayKeys`. Nights with a recorded duration, dates only. */
@@ -2436,16 +2463,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   /** PS-49 — per-day step totals for the Ranger's bank. */
   async listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]> {
-    const rows = await this.db.select({ date: s.bodyMetrics.date, steps: s.bodyMetrics.steps }).from(s.bodyMetrics)
-      .where(and(
-        eq(s.bodyMetrics.userId, userId),
-        gte(s.bodyMetrics.date, from),
-        lte(s.bodyMetrics.date, to),
-        gt(s.bodyMetrics.steps, 0),
-        isNull(s.bodyMetrics.deletedAt),
-      ))
-      .orderBy(asc(s.bodyMetrics.date))
-    return rows.map(r => ({ date: r.date, steps: Number(r.steps) }))
+    return this.dayStepTotals(userId, from, to)
   }
 
   /** PS-49 — days with at least one live food log (a Health cat point). */

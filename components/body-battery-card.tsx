@@ -207,8 +207,8 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
                       {battery.anchorProvisional && BODY_BATTERY_PROVISIONAL_SUFFIX}
                     </span>
                     <span className="flex items-center gap-3 tabular-nums">
-                      <span className="text-green-400 font-semibold">+{battery.charged} charged</span>
-                      <span className="text-red-400 font-semibold">−{battery.drained} drained</span>
+                      <span className="text-accent-green font-semibold">+{battery.charged} charged</span>
+                      <span className="text-destructive font-semibold">−{battery.drained} drained</span>
                     </span>
                   </div>
                   {lowData && (
@@ -242,8 +242,8 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
                 <div className="space-y-2 py-1">
                   <p className="text-[11px] leading-relaxed text-muted-foreground">
                     Body Battery is your live energy tank. It opens each morning at your
-                    readiness score, then <span className="text-red-400 font-medium">drains</span> as
-                    you train or your heart rate climbs and <span className="text-green-400 font-medium">recharges</span> while
+                    readiness score, then <span className="text-destructive font-medium">drains</span> as
+                    you train or your heart rate climbs and <span className="text-accent-green font-medium">recharges</span> while
                     you rest.
                   </p>
                   <p className="text-[11px] text-muted-foreground">
@@ -261,7 +261,7 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
               <div className="rounded-lg bg-muted/40 border border-border p-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">How it moves</p>
                 <div className="mb-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Sunrise className="h-3.5 w-3.5 flex-none text-amber-400" />
+                  <Sunrise className="h-3.5 w-3.5 flex-none text-accent-amber" />
                   <span>
                     Opens each morning at your{" "}
                     <span className="font-medium text-foreground">
@@ -270,20 +270,20 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-md border border-green-500/20 bg-green-500/10 p-2">
+                  <div className="rounded-md border border-accent-green/20 bg-accent-green/10 p-2">
                     <div className="mb-1.5 flex items-center gap-1">
-                      <ArrowUp className="h-3 w-3 text-green-600 dark:text-green-400" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-green-600 dark:text-green-400">Recharges</span>
+                      <ArrowUp className="h-3 w-3 text-accent-green" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-accent-green">Recharges</span>
                     </div>
                     <ul className="space-y-1">
                       <li className="flex items-center gap-1.5 text-[11px] text-foreground"><Moon className="h-3.5 w-3.5 flex-none text-muted-foreground" /> Deep sleep</li>
                       <li className="flex items-center gap-1.5 text-[11px] text-foreground"><Bed className="h-3.5 w-3.5 flex-none text-muted-foreground" /> Calm rest</li>
                     </ul>
                   </div>
-                  <div className="rounded-md border border-red-500/20 bg-red-500/10 p-2">
+                  <div className="rounded-md border border-destructive/20 bg-destructive/10 p-2">
                     <div className="mb-1.5 flex items-center gap-1">
-                      <ArrowDown className="h-3 w-3 text-red-600 dark:text-red-400" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">Drains</span>
+                      <ArrowDown className="h-3 w-3 text-destructive" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-destructive">Drains</span>
                     </div>
                     <ul className="space-y-1">
                       <li className="flex items-center gap-1.5 text-[11px] text-foreground"><Dumbbell className="h-3.5 w-3.5 flex-none text-muted-foreground" /> Training</li>

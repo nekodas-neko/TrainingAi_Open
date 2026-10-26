@@ -80,7 +80,7 @@ export const StrengthTrendCard = memo(function StrengthTrendCard({ exercises, lo
                 → ~{displayOneRm(projection.projectedRm, ex.exerciseType).value}{unitSuffix} in 30d
               </span>
               {isRmPlateau(ex.history) && (
-                <span className="text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-amber-500/15 text-amber-500">
+                <span className="text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-accent-amber/15 text-accent-amber">
                   Plateau
                 </span>
               )}

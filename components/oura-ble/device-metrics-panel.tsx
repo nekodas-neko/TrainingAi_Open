@@ -16,7 +16,7 @@ export function DeviceMetricsPanel() {
       .then(setData)
       .catch(e => setError(String(e)));
   }, []);
-  if (error) return <div className="text-xs text-red-500">Device metrics: {error}</div>;
+  if (error) return <div className="text-xs text-destructive">Device metrics: {error}</div>;
   if (!data) return <div className="text-xs text-muted-foreground">Loading device metrics…</div>;
   return (
     <div className="rounded-xl border border-border p-3 text-xs space-y-3">
