@@ -15,7 +15,6 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { profileSpec } from '../../health/data/models';
 import { AdminActivityTypesPanel } from '../components/AdminActivityTypesPanel';
 import { AdminAiUsagePanel } from '../components/AdminAiUsagePanel';
-import { AdminAppLoadPanel } from '../components/AdminAppLoadPanel';
 import { AdminErrorsPanel } from '../components/AdminErrorsPanel';
 import { AdminExercisesPanel } from '../components/AdminExercisesPanel';
 import { AdminUnitFixPanel } from '../components/AdminUnitFixPanel';
@@ -32,7 +31,6 @@ type Tab =
   | 'feedback'
   | 'errors'
   | 'ai'
-  | 'load'
   | 'exercises'
   | 'activities'
   | 'units';
@@ -74,8 +72,8 @@ export function AdminConsoleScreen({ onBack }: { onBack: () => void }) {
   const resourceFor = {
     users, invites, feedback, errors, exercises, activities, units: unitNames,
   } as const;
-  // AI usage and App load read their own windowed resources and show their own loading and error states.
-  const active = tab === 'ai' || tab === 'load' ? null : resourceFor[tab];
+  // AI usage reads its own windowed resource and shows its own loading and error states.
+  const active = tab === 'ai' ? null : resourceFor[tab];
   return (
     <PageLayout
       title="Admin Console"
@@ -97,7 +95,6 @@ export function AdminConsoleScreen({ onBack }: { onBack: () => void }) {
                 { label: `Feedback${feedbackCount > 0 ? ` (${feedbackCount})` : ''}`, value: 'feedback' },
                 { label: 'Errors', value: 'errors' },
                 { label: 'AI usage', value: 'ai' },
-                { label: 'App load', value: 'load' },
                 { label: 'Exercises', value: 'exercises' },
                 { label: 'Activities', value: 'activities' },
                 { label: 'Unit fix', value: 'units' },
@@ -106,8 +103,6 @@ export function AdminConsoleScreen({ onBack }: { onBack: () => void }) {
           </ScrollView>
           {tab === 'ai' ? (
             <AdminAiUsagePanel />
-          ) : tab === 'load' ? (
-            <AdminAppLoadPanel />
           ) : active && active.error && !active.data ? (
             <StateCard error title="Could not load" message={active.error} action="Retry" onAction={active.refresh} />
           ) : active && !active.data ? (

@@ -14,7 +14,7 @@ import {
   toggleMuscle,
   type AdminExercise,
 } from '../src/features/admin/data/admin-content.ts';
-import { barShares, estCostUsd, fmtUsd, splitLoadRoutes } from '../src/features/admin/data/admin-monitoring.ts';
+import { barShares, estCostUsd, fmtUsd } from '../src/features/admin/data/admin-monitoring.ts';
 
 const ex = (over: Partial<AdminExercise>): AdminExercise => ({
   id: 'e', name: 'Squat', equipment: [], muscles: [], exerciseType: 'weighted',
@@ -92,11 +92,4 @@ test('AI usage: estimate, formatting, and bars never vanish for a quiet bucket',
   assert.equal(fmtUsd(1.234), '$1.23');
   assert.deepEqual(barShares([0, 1, 100]), [4, 4, 100]);
   assert.deepEqual(barShares([0, 0]), [0, 0]);
-});
-
-test('app load keeps cold and warm apart', () => {
-  const r = { route: '/', samples: 1, p50Ms: 1, p95Ms: 2, worstMs: 3 };
-  const { cold, warm } = splitLoadRoutes([{ ...r, cold: true }, { ...r, cold: false }, { ...r, cold: false }]);
-  assert.equal(cold.length, 1);
-  assert.equal(warm.length, 2);
 });

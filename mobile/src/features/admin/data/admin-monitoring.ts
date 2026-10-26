@@ -82,39 +82,3 @@ export function barShares(calls: readonly number[]): number[] {
   const max = Math.max(0, ...calls);
   return calls.map((c) => (max ? Math.max(4, (c / max) * 100) : 0));
 }
-
-const appLoadSchema = z
-  .object({
-    days: z.number(),
-    coldSamples: z.number(),
-    warmSamples: z.number(),
-    routes: z.array(
-      z
-        .object({
-          route: z.string(),
-          cold: z.boolean(),
-          samples: z.number(),
-          p50Ms: z.number(),
-          p95Ms: z.number(),
-          worstMs: z.number(),
-        })
-        .passthrough(),
-    ),
-  })
-  .passthrough();
-export type AppLoadReport = z.infer<typeof appLoadSchema>;
-export const APP_LOAD_DAYS = [1, 7, 14] as const;
-export const adminAppLoadSpec = (days: number) => ({
-  path: '/api/admin/app-load-report',
-  query: { days: String(days) },
-  ttl: 60_000,
-  cache: noDiskCache,
-  schema: appLoadSchema,
-});
-/** Cold and warm are separate reports, never pooled: a percentile over both measures release cadence. */
-export function splitLoadRoutes(routes: AppLoadReport['routes']) {
-  return {
-    cold: routes.filter((r) => r.cold),
-    warm: routes.filter((r) => !r.cold),
-  };
-}
