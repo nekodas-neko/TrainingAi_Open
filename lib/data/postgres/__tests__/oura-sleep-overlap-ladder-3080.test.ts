@@ -113,11 +113,12 @@ describe.skipIf(!canRun)('Oura sleep overlap follows the source ladder (#3080)',
   it("HRV and resting HR follow the day's main period across separate writes, and clear when it goes", async () => {
     // Two webhooks: the long night first, then a shorter long_sleep the same day. The longer one wins.
     await writeSleep(sleepPeriod)
-    await writeSleep({ ...sleepPeriod, id: 'sl-2', bedtime_start: '2026-10-10T13:00:00+10:00', bedtime_end: '2026-10-10T15:00:00+10:00', total_sleep_duration: 6000, average_hrv: 90, lowest_heart_rate: 40 })
-    expect(await vitals()).toEqual({ hrv_ms: 62, resting_heart_rate: 47, hrv_source: 'oura_cloud' })
+    await writeSleep({ ...sleepPeriod, id: 'sl-2', bedtime_start: '2026-10-10T13:00:00+10:00', bedtime_end: '2026-10-10T15:00:00+10:00', total_sleep_duration: 6000, average_hrv: 95, hrv: { interval: 300, items: [88, 92], timestamp: '2026-10-10T13:00:00+10:00' }, lowest_heart_rate: 40 })
+    // #3075: the night's HRV is the median of the main period's series ([48, 61]), not Oura's average (62).
+    expect(await vitals()).toEqual({ hrv_ms: 54.5, resting_heart_rate: 47, hrv_source: 'oura_cloud' })
 
     // Oura revises the main night's HRV to null: the value goes, rather than standing.
-    await writeSleep({ ...sleepPeriod, average_hrv: null })
+    await writeSleep({ ...sleepPeriod, average_hrv: null, hrv: null })
     expect(await vitals()).toMatchObject({ hrv_ms: null, resting_heart_rate: 47 })
 
     // The main night is deleted, as the webhook's delete path does it: the remaining long_sleep is the
@@ -132,7 +133,7 @@ describe.skipIf(!canRun)('Oura sleep overlap follows the source ladder (#3080)',
 
   it("a night Oura typed sleep, with no long_sleep, still writes the day's vitals", async () => {
     await writeSleep({ ...sleepPeriod, type: 'sleep' })
-    expect(await vitals()).toMatchObject({ hrv_ms: 62, resting_heart_rate: 47 })
+    expect(await vitals()).toMatchObject({ hrv_ms: 54.5, resting_heart_rate: 47 })
   })
 
   it("never clears a vital the ring or a manual entry owns", async () => {
@@ -197,6 +198,22 @@ describe.skipIf(!canRun)('Oura sleep overlap follows the source ladder (#3080)',
     await writeSleep(sleepPeriod)
     const rows = (await pool.query(`SELECT id, deleted_at IS NOT NULL AS gone FROM sleep_sessions WHERE user_id = $1`, [USER])).rows
     expect(rows).toEqual([{ id, gone: false }])
-    expect(await vitals()).toMatchObject({ hrv_ms: 62, resting_heart_rate: 47 })
+    expect(await vitals()).toMatchObject({ hrv_ms: 54.5, resting_heart_rate: 47 })
+  })
+
+  // ── #3075, stage 1 ──────────────────────────────────────────────────────────────────────────
+
+  it("the night's HRV is the median of Oura's 5-minute series, with Oura's own average kept beside it", async () => {
+    // Oura's average (70) is pulled up by a high stretch; the median of the series is 49.
+    const hrv = { interval: 300, items: [45, 47, 49, 51, 96], timestamp: '2026-10-09T22:30:00+10:00' }
+    await writeSleep({ ...sleepPeriod, average_hrv: 70, hrv })
+    expect(await vitals()).toMatchObject({ hrv_ms: 49, hrv_source: 'oura_cloud' })
+    const kept = (await pool.query(`SELECT average_hrv_ms FROM sleep_sessions WHERE user_id = $1`, [USER])).rows
+    expect(kept).toEqual([{ average_hrv_ms: 70 }])
+  })
+
+  it("a period Oura sent no series for keeps Oura's average rather than losing the night", async () => {
+    await writeSleep({ ...sleepPeriod, average_hrv: 66, hrv: null })
+    expect(await vitals()).toMatchObject({ hrv_ms: 66 })
   })
 })

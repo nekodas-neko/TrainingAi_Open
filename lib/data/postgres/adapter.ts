@@ -8175,6 +8175,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * typed `sleep` wrote none, and a delete, a retype or a revision to null left the old value standing.
    * A value goes in through the normal merge (`oura_cloud`, so the ring and manual still outrank it
    * where they hold the field); a missing one clears only a value Oura Cloud owns.
+   *
+   * #3075, stage 1: the night's HRV is OURS, the median of the period's stored 5-minute HRV series
+   * (the ring-era definition), not Oura's per-night average. Oura's average stays on
+   * `sleep_sessions.average_hrv_ms` beside it. A period with no usable series keeps Oura's average
+   * rather than losing the night. Resting HR is still Oura's (a later stage).
    */
   async syncOuraMainSleepBodyMetrics(userId: string, touched: { days: string[]; ouraIds: string[] }) {
     const dates = [...new Set([...touched.days, ...await oura.getOuraCloudSleepDatesForIds(this.db, userId, touched.ouraIds)])].sort()
@@ -8185,7 +8190,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     let cleared = 0
     for (const date of dates) {
       const m = main.get(date)
-      const hrvMs = m?.averageHrvMs ?? null
+      const hrvMs = m?.overnightHrvMs ?? m?.averageHrvMs ?? null
       const restingHeartRate = m?.lowestHeartRate ?? null
       if (hrvMs != null || restingHeartRate != null) {
         values.push({ date, ...(hrvMs != null ? { hrvMs } : {}), ...(restingHeartRate != null ? { restingHeartRate } : {}) })
