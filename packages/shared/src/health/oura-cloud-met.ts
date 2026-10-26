@@ -72,3 +72,43 @@ export function ouraCloudMetGrid(
     metsPerMinute: sum.map((s, i) => (weight[i] > 0 && !nonWear[i] ? s / weight[i] : null)),
   }
 }
+
+/**
+ * #3114: which waking local hours of `dateIso` the ring was worn in, and in which of those it moved,
+ * from a grid built by `ouraCloudMetGrid`. A minute with a MET value is worn (the wear gate already
+ * made non-wear minutes null); an hour moved when any worn minute in it is at `activeMet` or more,
+ * Oura's own active limit. `lastWornHour` is the latest worn waking hour, or null for a day with
+ * none, which lets a caller tell hours the ring was off from hours that have not arrived yet.
+ */
+export function ouraCloudMovedHours(
+  grid: { startTimestampMs: number; metsPerMinute: readonly (number | null)[] },
+  opts: { tz: string; dateIso: string; wakeHour: number; sleepHour: number; activeMet: number },
+): { worn: Set<number>; moved: Set<number>; lastWornHour: number | null } {
+  const { tz, dateIso, wakeHour, sleepHour, activeMet } = opts
+  const worn = new Set<number>()
+  const moved = new Set<number>()
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false,
+  })
+  // Every zone's offset is a multiple of 15 minutes, so the local hour holds across a 15-minute bucket.
+  const BUCKET_MS = 15 * MINUTE_MS
+  const cache = new Map<number, number | null>()
+  const wakingHourOf = (ms: number): number | null => {
+    const key = Math.floor(ms / BUCKET_MS)
+    if (cache.has(key)) return cache.get(key)!
+    const p = fmt.formatToParts(ms)
+    const get = (type: string) => p.find(x => x.type === type)!.value
+    const hour = get('hour') === '24' ? 0 : Number(get('hour'))
+    const hit = `${get('year')}-${get('month')}-${get('day')}` === dateIso && hour >= wakeHour && hour < sleepHour ? hour : null
+    cache.set(key, hit)
+    return hit
+  }
+  grid.metsPerMinute.forEach((met, i) => {
+    if (met == null) return
+    const hour = wakingHourOf(grid.startTimestampMs + i * MINUTE_MS)
+    if (hour == null) return
+    worn.add(hour)
+    if (met >= activeMet) moved.add(hour)
+  })
+  return { worn, moved, lastWornHour: worn.size > 0 ? Math.max(...worn) : null }
+}

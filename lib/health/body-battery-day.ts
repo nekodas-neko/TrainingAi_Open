@@ -3,10 +3,13 @@ import { shiftDateStr, ageFromDob, dateStrMidnightInTz } from '@trainingai/share
 import { reportServerError } from '@/lib/observability'
 import { tryEnsureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { hrMaxFromAge, hrReserve } from '@trainingai/shared/health/hr-zones'
+import { meanRestingHr } from '@trainingai/shared/health/resting-hr-mean'
+import { perDeviceNormal, normalOrCarriedOver } from '@trainingai/shared/health/per-device-normal'
+import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { resolveBatteryHrMax, batteryConfidence, HR_PEAK_WINDOW_DAYS, type BatteryConfidence } from '@trainingai/shared/health/body-battery-inputs'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
-import type { BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
+import { bodyBatteryLabelFor, type BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
 import { nightSessions, nightWokenFrom } from '@trainingai/shared/health/sleep-night'
 import { walkBodyBattery, restThresholdFromOffset } from '@trainingai/shared/health/body-battery-walk'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
@@ -120,13 +123,6 @@ const STRESS_DRAIN_RATE = 0.020 // battery points per minute at a full (100%) be
 // longer anchor the day.
 export const BODY_BATTERY_MODEL_VERSION = `v7:rest+${WAKING_REST_OFFSET_BPM}bpm:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule:oura-stress`
 
-function labelFor(v: number): BodyBatteryResponse['label'] {
-  if (v >= 75) return 'Charged'
-  if (v >= 50) return 'Good'
-  if (v >= 25) return 'Low'
-  return 'Drained'
-}
-
 export interface BodyBatteryDayInput {
   repo: WorkoutRepository
   userId: string
@@ -173,10 +169,9 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   const derivedDay = derivedRows[0] ?? null
 
   // ── Resting HR baseline + HRmax (for HR reserve) ──────────────────────────
-  const rhrRows = bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0)
-  const restingHr = rhrRows.length
-    ? Math.round(rhrRows.reduce((s, m) => s + m.restingHeartRate!, 0) / rhrRows.length)
-    : 60
+  // #3001: the mean of the device that measured the newest night (the ring's until Oura has the
+  // nights), through the one resting-HR mean the HR zones use, so the two cannot disagree.
+  const restingHr = meanRestingHr(bodyMetrics) ?? 60
   const age = ageFromDob(user?.dateOfBirth, now)
   // The reserve is resolved from what this body has actually reached, not 220 − age. On the owner's
   // data the estimate reads 190 against a real 90-day peak of 168, and an inflated ceiling makes
@@ -219,7 +214,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   // early-morning fallback anchor can't disagree with the score the Health screen shows later.
   const ownSleepScore = daySleep
     ? computeSleepScore(daySleep, tz, sleepScoreBaselines(
-        nights.filter(s => s.sleepEnd.getTime() < daySleep.sleepEnd.getTime()), tz,
+        nights.filter(s => s.sleepEnd.getTime() < daySleep.sleepEnd.getTime()), tz, daySleep,
       ))?.score ?? null
     : null
   // The precedence itself is unchanged; what changed is that a readiness anchor, once today has
@@ -271,8 +266,12 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   // temp_baseline = mean measured skin temp. The stress signal is each bucket's dHRV vs the day's
   // median (self-calibrating), so the overnight-vs-daytime baseline offset doesn't bias it. No
   // daytime signal → empty series → no modifier (battery behaves exactly as before).
-  const hrvRows = bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0)
-  const dhrvBaseline = hrvRows.length ? hrvRows.reduce((s, m) => s + m.hrvMs!, 0) / hrvRows.length : null
+  // #3001: per device, like the resting HR above. Oura's overnight HRV is an average and the ring's a
+  // median of gated rMSSD, so the stress series is never read against a pooled mean of the two.
+  const dhrvBaseline = normalOrCarriedOver(perDeviceNormal(
+    bodyMetrics.map(m => ({ date: m.date, value: m.hrvMs != null && m.hrvMs > 0 ? m.hrvMs : null, source: m.hrvSource })),
+    { minNights: BASELINE_MIN_NIGHTS },
+  ))
   // #2985: the Oura API has no per-minute skin temperature, so after the switch the only temperatures
   // are the ring's last minutes before it, overnight. A baseline needs at least one reading from the
   // waking day; without one it is "not enough data" and the dHRV series is not built, never built
@@ -425,7 +424,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
 
   const response: BodyBatteryResponse = {
     current,
-    label: labelFor(current),
+    label: bodyBatteryLabelFor(current),
     trend,
     anchor: Math.round(anchor),
     anchorSource,

@@ -19,6 +19,8 @@ export function ScoreChip({
   style = 'default',
   color: accent,
   display,
+  unit,
+  diameter,
   first = false,
 }: {
   label: string;
@@ -32,6 +34,11 @@ export function ScoreChip({
   style?: string;
   color?: string;
   display?: string;
+  /** What the figure counts when it is not a score ("bpm", "h"); shown beside it in every style. */
+  unit?: string;
+  /** Caps the circle or tile, for a chip that sits in a tight column (Home's Compact Energy). */
+  diameter?: number;
+  /** The first chip in its row: it has no hairline to its left. */
   first?: boolean;
 }) {
   const { theme } = useTheme();
@@ -39,6 +46,8 @@ export function ScoreChip({
   const id = useId().replace(/:/g, '');
   const color = accent ?? theme.tones[tone].foreground;
   const text = display ?? (value === null ? '—' : String(Math.round(value)));
+  // A dash has nothing to count, so it never carries a unit ("— bpm").
+  const shownUnit = unit && (display != null || value !== null) ? unit : undefined;
   const circle = [
     'default',
     'openring',
@@ -73,20 +82,32 @@ export function ScoreChip({
       color={color}
     />
   );
-  const number = (
+  const figure = (
     <AppText
       variant={pill || rail ? 'heading' : compact ? 'hero' : 'score'}
       numberOfLines={1}
       adjustsFontSizeToFit
+      style={{ flexShrink: 1 }}
     >
       {text}
     </AppText>
+  );
+  // The unit follows the figure so a bpm or hours reading never passes for a score.
+  const number = shownUnit ? (
+    <Stack direction="row" align="baseline" gap="xxs" style={{ maxWidth: '100%' }}>
+      {figure}
+      <AppText variant="micro" tone="muted" numberOfLines={1}>
+        {shownUnit}
+      </AppText>
+    </Stack>
+  ) : (
+    figure
   );
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      accessibilityLabel={`${label}: ${display ?? value ?? 'unavailable'}${qualified ? ', limited or provisional data' : ''}`}
+      accessibilityLabel={`${label}: ${display ?? value ?? 'unavailable'}${shownUnit ? ` ${shownUnit}` : ''}${qualified ? ', limited or provisional data' : ''}`}
       style={{
         flex: 1,
         minWidth: 0,
@@ -113,7 +134,7 @@ export function ScoreChip({
             style={{
               width: '100%',
               aspectRatio: 1,
-              maxWidth: theme.sizes.scoreChip,
+              maxWidth: diameter ?? theme.sizes.scoreChip,
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: tile ? theme.radii.card : theme.radii.pill,
