@@ -264,9 +264,9 @@ const asJob = (r: {
  *
  * - it is returned with `alreadyRunning: true` if it writes everything `opts` asks for, so the
  *   caller can follow it;
- * - otherwise `refused: true` and nothing is inserted. Issue 2383: a step backfill used to follow a
- *   plain redecode, the step correction never ran, and the screen said it had. The rule is
- *   `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
+ * - otherwise `refused: true` and nothing is inserted. Issue 2383: a request used to follow a
+ *   redecode that did not write what it asked for (then the step backfill, retired in #2862), its
+ *   correction never ran, and the screen said it had. The rule is `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
  *
  * Two requests racing past the read both try the insert; the index lets one through and the other
  * gets no row back, then reads the winner and applies the same rule rather than surfacing a 500.

@@ -6848,7 +6848,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return oura.getOuraRollupState(this.db, userId)
   }
 
-  /** The stored daytime-stress buckets, for the device-comparison endpoint (PS-15). Read-only, and
+  async getOuraHeartrateBySource(userId: string, source: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number }[]> {
+    const rows = await this.db
+      .select({ timestamp: s.ouraHeartrate.timestamp, bpm: s.ouraHeartrate.bpm })
+      .from(s.ouraHeartrate)
+      .where(and(
+        eq(s.ouraHeartrate.userId, userId),
+        eq(s.ouraHeartrate.source, source),
+        gte(s.ouraHeartrate.timestamp, from),
+        lte(s.ouraHeartrate.timestamp, to),
+      ))
+      .orderBy(asc(s.ouraHeartrate.timestamp))
+    return rows
+  }
+
+  /** The stored daytime-stress buckets, for the body-battery stress-day route (PS-15). Read-only, and
    *  the only reader — everything else writes this table or reads it through the rollup. */
   async getOuraDaytimeStressBuckets(userId: string, from: Date, to: Date): Promise<{ bucketMid: Date; level: number }[]> {
     return this.db

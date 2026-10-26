@@ -357,6 +357,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getOuraClockAnchor', r => r.getOuraClockAnchor(USER_A)],
     ['getOuraClockAnchors', r => r.getOuraClockAnchors(USER_A)],
     ['getOuraClockOffsets', r => r.getOuraClockOffsets(USER_A)],
+    ['getOuraHeartrateBySource', r => r.getOuraHeartrateBySource(USER_A, bVal('oura_heartrate', 'source'), FROM_TS, TO_TS)],
     ['getOuraDaytimeStressBuckets', r => r.getOuraDaytimeStressBuckets(USER_A, FROM_TS, TO_TS)],
     ['getLatestStrapStatus', r => r.getLatestStrapStatus(USER_A)],
     ['listStrapStatus', r => r.listStrapStatus(USER_A, FROM_TS, 50)],

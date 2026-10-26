@@ -321,7 +321,7 @@ are read-only by design.
 - **Fix lbs logged as kg > Apply**: a one-way rewrite (Apply now runs once per log). (The D0 step backfill and Null historical decoded were retired in #2862.)
 - **Pack sealed frames**: deletes archival rows.
 - Users activate, deactivate and delete; invites; feedback delete; exercise and activity delete. These touch auth or delete data, which CLAUDE.md makes confirm-first.
-- Per-row regenerate: it spends money. (**AI all** was folded away in #2862.)
+- Per-row regenerate: it spends money. (**AI all** was removed in #2862.)
 - Reference-figure upload: a global content change.
 
 ## (b) Labels that do not say what the button does

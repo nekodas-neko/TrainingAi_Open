@@ -127,17 +127,6 @@ export interface OuraRawAggregateResult {
   chronicStress?: import('@trainingai/shared/health/chronic-stress-assembly').ChronicStressDiagnostics | null
 }
 
-/** One day the D0 historical step backfill (`allowStepsDecrease`) would change — a dry-run row, no
- *  write performed. Mirrors the real write's sourceMap rank protection exactly, so a listed day is
- *  guaranteed to actually change if the backfill runs, and an omitted day (e.g. `manual`-sourced)
- *  is guaranteed to be left untouched. */
-export interface StepsBackfillPreviewRow {
-  date: string
-  oldSteps: number
-  oldSource: string | null
-  newSteps: number
-}
-
 export interface StepLiveWindow {
   id: number
   userId: string
@@ -201,41 +190,6 @@ export interface OuraRawSampleSummary {
   newestMeasuredAt: string | null
   hrTiming: OuraRawSampleMetricTiming
   tempTiming: OuraRawSampleMetricTiming
-}
-
-export interface WorkoutSensorProbe {
-  sessionId: string
-  windowStart: string
-  windowEnd: string
-  durationMin: number
-  /** Continuous accel capture (oura_accel_chunks) overlapping the workout window. */
-  accel: { chunks: number; samples: number; steps: number; coveragePct: number | null }
-  /** oura_heartrate rows in the window. */
-  hrSamples: number
-  /** Raw BLE event tags present in the window (via the clock anchor), most frequent first. */
-  rawByTag: { tag: string; count: number }[]
-  hasAnchor: boolean
-}
-
-/**
- * Per-tag hour-of-day coverage of raw BLE samples — answers "does the ring stream daytime
- * motion/temp/MET when worn-idle, or only around sleep?" (the gate on the daytime-signal model
- * builds: steps, activity-detection, awake-HR, daytime stress). Read-only admin probe.
- */
-export interface DaytimeTagCoverage {
-  hasAnchor: boolean
-  days: number
-  tz: string
-  /** Local hours [from, to) counted as "daytime" (the worn-idle window we care about). */
-  daytimeHours: [number, number]
-  tags: {
-    tag: string          // '0x50'
-    label: string        // 'MET'
-    total: number
-    daytime: number      // samples whose local hour ∈ daytimeHours
-    night: number        // the rest
-    byHour: number[]     // length 24 — sample count per local hour-of-day
-  }[]
 }
 
 export interface SessionLoad {
@@ -1293,7 +1247,10 @@ export interface WorkoutRepository {
   /** TN-56: raw frames by tag and ring-clock range, across both tiers (hot and packed). Read-only,
    *  for the admin replay; the rollup reads through its own IO. */
   readOuraRawFrames(userId: string, q: import('./postgres/slices/oura-raw-frames').RawFrameQuery): Promise<import('./postgres/slices/oura-raw-frames').RawFrameRow[]>
-  /** Stored daytime-stress buckets, for the device-comparison endpoint (PS-15). */
+  /** oura_heartrate rows in a wall-clock window, filtered by source ('ble' = ring, 'chest_strap' =
+   *  Polar H10, 'oura_cloud'). The still-period resting-HR read (#3302) uses it for 'oura_cloud'. */
+  getOuraHeartrateBySource(userId: string, source: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number }[]>
+  /** Stored daytime-stress buckets, for the body-battery stress-day route (PS-15). */
   getOuraDaytimeStressBuckets(userId: string, from: Date, to: Date): Promise<{ bucketMid: Date; level: number }[]>
   /** Daytime skin-temperature (0x46/0x69 → temps_c) and MET (0x50 → met) samples in a wall-clock
    *  window, for the daytime-stress engine. Empty when the ring has no clock anchor. */
@@ -1333,16 +1290,10 @@ export interface WorkoutRepository {
   redecodeOuraRawSamples(userId: string): Promise<{ scanned: number; updated: number; restamped: number }>
   /** Roll decoded raw samples up into body_metrics + sleep_sessions for the
    *  ring-clock window [sinceDs, +∞) (pass 0 to aggregate everything). */
-  // allowStepsDecrease: one-time owner-gated backfill lever (D0 historical correction). The steps
-  // step normally only ever RAISES a stored day's count (never regresses another source's value);
-  // this bypasses that magnitude guard so a corrected (lower) step_counter total can overwrite an
-  // old, inflated flat-30-estimate value. Safe: the downstream upsertBodyMetrics(..., 'oura_ble')
-  // still applies the per-field sourceMap rank merge, so a higher-ranked `manual` entry is preserved
-  // regardless of this flag — only oura_ble/oura_cloud/health_connect/unset steps can be overwritten.
   /** `sinceDs`: narrow the read window to the span an ingest touched. Omit to re-derive the whole
    *  35-day window — the caller must do that at least once per process before it starts narrowing,
    *  or a batch ingested before this process started could never be rolled up (Q-213). */
-  aggregateOuraRawSamples(userId: string, timezone: string, opts?: { debugDate?: string; disableNeuralStager?: boolean; fullHistory?: boolean; dumpOnly?: boolean; allowStepsDecrease?: boolean; sinceDs?: number }): Promise<OuraRawAggregateResult>
+  aggregateOuraRawSamples(userId: string, timezone: string, opts?: { debugDate?: string; disableNeuralStager?: boolean; fullHistory?: boolean; dumpOnly?: boolean; sinceDs?: number }): Promise<OuraRawAggregateResult>
   /** Issue 2236: add the daytime-stress buckets that history never got. Add-only (never deletes or
    *  changes a bucket, skips days that already have buckets), one transaction that rolls back unless
    *  rows written equal rows planned. `dryRun: true` computes and returns the plan, writing nothing. */
@@ -1494,7 +1445,7 @@ export interface WorkoutRepository {
 
   /** Q-535 — a redecode runs off the request. One in-flight job per user; `startRedecodeJob`
    *  returns the running one rather than starting a second, with `refused: true` when that run
-   *  would not write what `opts` asks for (issue 2383: a step backfill never follows a plain run). */
+   *  would not write what `opts` asks for (issue 2383: a run never follows one that would not write what it asks for, as a stress backfill never follows a plain redecode). */
   startRedecodeJob(userId: string, opts: Record<string, unknown>): Promise<{ job: import('./postgres/slices/oura').RedecodeJob; alreadyRunning: boolean; refused: boolean }>
   getRedecodeJob(userId: string, id: number): Promise<import('./postgres/slices/oura').RedecodeJob | null>
   getLatestRedecodeJob(userId: string): Promise<import('./postgres/slices/oura').RedecodeJob | null>

@@ -87,12 +87,12 @@
 // coach-content posts `{threadId, messages:[{role,parts}]}`) and `coach/options` (the
 // route-builds-the-object class — it reads two named `searchParams` into a literal).
 //
-// **Every one of the 37 that remain is in an exemption class above or is not a request schema.**
+// **Every one of the 36 that remain is in an exemption class above or is not a request schema.**
 // Categorised and verified rather than assumed:
 //   * 16 outbox / `pushMutations` — the 8 shared `validation/*` files (activity-log 6, day-checkin
 //     2, fitness-test 1, food-item 1, mood-log 1, oura-summary 2, prescribed-run 1, session-rpe 1)
 //     plus `sync/push`. Tightening any of these can dead-letter a mutation queued by an older APK.
-//   * 8 external / native client — `oura-ble/{accel-chunks,live-steps,samples}`
+//   * 7 external / native client — `oura-ble/{accel-chunks,live-steps,samples}`
 //     (4), `scale-ble/samples`, `hr-ingest` (its Kotlin clients are `PolarStrapService.kt` and
 //     `ScaleBleService.kt`), and `health-connect-ingest` (Tasker). The APK does not update with a
 //     Railway deploy, so an old build can send a field a new schema does not name.
