@@ -107,11 +107,13 @@ export type OuraBackfillResult =
   | { ok: true; report: OuraBackfillReport }
   | { ok: false; error: 'not_connected' | 'reauth' | 'invalid_range' }
 
-function chunks(from: string, to: string, size: number): [string, string][] {
+/** `overlap` starts every chunk after the first that many days early, so its first day is also the
+ *  last day of the chunk before (#3429). */
+function chunks(from: string, to: string, size: number, overlap = 0): [string, string][] {
   const days = daysBetweenDateStrs(from, to) + 1
   const out: [string, string][] = []
   // A day count, never a string-compared loop bound (see `shiftDateStr`).
-  for (let i = 0; i < days; i += size) out.push([shiftDateStr(from, i), shiftDateStr(from, Math.min(i + size, days) - 1)])
+  for (let i = 0; i < days; i += size) out.push([shiftDateStr(from, i === 0 ? 0 : i - overlap), shiftDateStr(from, Math.min(i + size, days) - 1)])
   return out
 }
 
@@ -193,14 +195,22 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   // Each chunk's last day is left out too: the pinned spec does not say whether `end_date` is
   // inclusive, and if it is not, that day was never read. It is checked by a later read instead (the
   // reconcile runs daily over three days, so a day reaches the middle of the window the next morning).
+  // Chunks overlap by a day, so a day one chunk leaves out is the first day, surely read, of the next;
+  // only the range's own last day is left to the reconcile (#3429). A document on the shared day comes
+  // back twice and is kept once.
   const readWhole: { type: AbsentTombstoneType; from: string; to: string; keepIds: string[] }[] = []
+  const seenDocs = new Set<string>()
   read: for (const type of OURA_DOCUMENT_TYPE_NAMES) {
     if (!isOuraTypeShared(granted, type)) { report.notShared.push(type); continue }
-    for (const [from, to] of chunks(opts.from, opts.to, DOC_CHUNK_DAYS)) {
+    for (const [from, to] of chunks(opts.from, opts.to, DOC_CHUNK_DAYS, 1)) {
       try {
         const got = await withRetry(() => fetchOuraDocuments(token, type, from, to))
-        docs.push(...got.docs)
-        report.documents[type] = (report.documents[type] ?? 0) + got.docs.length
+        const fresh = got.docs.filter(d => {
+          const id = (d.doc as { id?: string }).id
+          return id == null || !seenDocs.has(`${d.type}:${id}`) && !!seenDocs.add(`${d.type}:${id}`)
+        })
+        docs.push(...fresh)
+        report.documents[type] = (report.documents[type] ?? 0) + fresh.length
         report.dropped += got.dropped
         if (isAbsentTombstoneType(type) && got.complete && got.dropped === 0 && daysBetweenDateStrs(from, to) > 0) {
           readWhole.push({ type, from, to: shiftDateStr(to, -1), keepIds: got.docs.flatMap(d => d.type === type ? [d.doc.id] : []) })
