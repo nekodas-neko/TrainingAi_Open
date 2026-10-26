@@ -108,8 +108,8 @@ export function RekeyDeclarationCard() {
 
       {loaded && pending ? (
         <div className="space-y-2">
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+          <div className="flex items-start gap-2 rounded-md border border-accent-amber/40 bg-accent-amber/5 p-2.5 text-xs">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-accent-amber" />
             <span className="text-muted-foreground">
               A declaration is <strong>waiting</strong> (made {new Date(pending.declaredAt).toLocaleString()}).
               It is consumed by the next drain. Cancel it only if it was a mistake.

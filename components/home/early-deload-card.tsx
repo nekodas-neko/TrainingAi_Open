@@ -21,7 +21,7 @@ import type { EarlyDeloadReason } from '@/lib/health/readiness-payload'
 function WhyThisCard({ reason }: { reason: EarlyDeloadReason }) {
   const [open, setOpen] = useState(false)
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-amber-500/25 bg-amber-500/5">
+    <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-accent-amber/25 bg-accent-amber/5">
       <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
         <span className="text-xs font-medium text-muted-foreground">Why this recommendation?</span>
         <ChevronDownIcon className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
@@ -50,7 +50,7 @@ function WhyThisCard({ reason }: { reason: EarlyDeloadReason }) {
             </li>
           </ul>
 
-          <div className="space-y-1.5 border-t border-amber-500/20 pt-2.5">
+          <div className="space-y-1.5 border-t border-accent-amber/20 pt-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Your options</p>
             <Option color="var(--accent-amber)" label="Take a deload week" desc="Starts the deload phase now instead of when the cycle reaches it. Lighter loads for a week, then the block resumes." />
             <Option color="#94a3b8" label="Dismiss" desc="Nothing changes. The card comes back if both signals are still true tomorrow." />
@@ -89,8 +89,8 @@ export const EarlyDeloadCard = memo(function EarlyDeloadCard({
     }
   }
   return (
-    <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4 space-y-2">
-      <p className="font-semibold text-sm text-amber-700 dark:text-amber-400">Fatigue detected</p>
+    <div className="rounded-2xl bg-accent-amber/10 border border-accent-amber/30 p-4 space-y-2">
+      <p className="font-semibold text-sm text-accent-amber">Fatigue detected</p>
       <p className="text-xs text-muted-foreground">
         Your readiness is low and training load is elevated. Consider taking a deload week now.
       </p>

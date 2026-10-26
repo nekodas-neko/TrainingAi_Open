@@ -33,9 +33,9 @@ function formatSyncAge(iso: string): string {
 
 function BatteryIcon({ level, charging }: { level: number; charging: boolean | null }) {
   if (charging) return <BatteryCharging className="h-3.5 w-3.5" style={{ color: "var(--color-brand)" }} />
-  if (level >= 60) return <BatteryFull className="h-3.5 w-3.5 text-green-400" />
-  if (level >= 25) return <BatteryMedium className="h-3.5 w-3.5 text-yellow-400" />
-  return <BatteryLow className="h-3.5 w-3.5 text-red-400" />
+  if (level >= 60) return <BatteryFull className="h-3.5 w-3.5 text-accent-green" />
+  if (level >= 25) return <BatteryMedium className="h-3.5 w-3.5 text-accent-amber" />
+  return <BatteryLow className="h-3.5 w-3.5 text-destructive" />
 }
 
 /**
@@ -133,10 +133,10 @@ export function OuraConnectionSection() {
         </p>
         <Link
           href="/admin/oura-ble"
-          className="flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3.5"
+          className="flex items-center gap-3 rounded-2xl border border-accent-amber/40 bg-accent-amber/5 px-4 py-3.5"
         >
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-500/15">
-            <KeyRound className="h-4 w-4 text-amber-500" />
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-accent-amber/15">
+            <KeyRound className="h-4 w-4 text-accent-amber" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold">No ring key stored</p>

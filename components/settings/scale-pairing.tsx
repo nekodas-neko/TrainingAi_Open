@@ -237,7 +237,7 @@ export function ScalePairing() {
         </div>
       )}
 
-      {error && <p className="text-[10px] text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-[10px] text-destructive">{error}</p>}
 
       {today.length > 0 && (
         <div className="space-y-1 pt-1 border-t border-border">

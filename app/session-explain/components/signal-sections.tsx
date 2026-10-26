@@ -6,8 +6,8 @@ import { groupSignals } from '@trainingai/shared/session-explain/group-signals'
 import type { SessionExplainData } from '@trainingai/shared/session-explain/build-explain-data'
 
 const chipTone: Record<'warn' | 'ok', string> = {
-  warn: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  ok:   'bg-green-500/15 text-green-400 border-green-500/30',
+  warn: 'bg-accent-amber/15 text-accent-amber border-accent-amber/30',
+  ok:   'bg-accent-green/15 text-accent-green border-accent-green/30',
 }
 
 export function SignalSections({ data }: { data: SessionExplainData }) {
