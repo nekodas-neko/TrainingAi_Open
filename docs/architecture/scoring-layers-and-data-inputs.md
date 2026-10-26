@@ -657,8 +657,9 @@ and [`owner-manual.md`](../owner-manual.md).
 - **Red flags:** a graded ceiling on readiness (the owner's leaning, 2026-10-12), and its numbers
   (#2832).
 - **Source-quality and reliability factors** on weights: adopt them or not (#2833).
-- **Pillar weights:** keep Sleep 30 · Heart 30 · Activity 20 · Body 20, or let totals float with
-  splits (#2833)?
+- **Pillar weights:** decided for the shadow model (owner, 26 Oct, #2833): totals float with their
+  scores' points (section 3). What is open is whether the live score follows it, which is a
+  `type: tuning` proposal with the days it moves.
 - **New pillars:** split Health and Nutrition out of Body (#2833), and whether the morning check-in
   becomes its own wellness part of readiness (#2823).
 - **Training load:** count cardio and runs, through session RPE (#2823).
