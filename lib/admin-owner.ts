@@ -35,15 +35,12 @@ export async function resolveOwnerUserId(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<string | null> {
   const owner = parseConfiguredOwnerId(env)
-  if (!owner) {
-    console.warn('[admin-owner] no owner is configured (or the id is malformed); owner-only admin actions are refused')
-    return null
-  }
+  // Silent on purpose: this runs on every PATCH, owner-only or not, and the call that refuses
+  // because of it logs the refusal itself, once. Only a failing lookup is worth a line here.
+  if (!owner) return null
   try {
     const user = await repo.getUserById(owner)
-    if (user && user.isAdmin === true && user.isActive === true) return owner
-    console.warn('[admin-owner] the configured owner is not an active admin; owner-only admin actions are refused')
-    return null
+    return user && user.isAdmin === true && user.isActive === true ? owner : null
   } catch (err) {
     console.error('[admin-owner] owner lookup failed; treating the owner as unresolved', err)
     return null
