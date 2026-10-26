@@ -167,6 +167,27 @@ follows the running job.
 | … > **Add** / form **Sparkles** / **Save** | `:609` / `:168` / `:211` | `POST /api/exercises/generate` (AI fills details) · `POST` or `PATCH /api/admin/exercises` | Creates or edits an exercise. A rename shows a warning (`:172`), because references are by name. | one | yes | admin session (generate: user session plus rate limit) | rename can orphan references by name | |
 | Admin > activities > **Add** / **Save** / **pencil** / **trash icon** | `components/admin/activity-type-manager.tsx:164` / `:86` / `:204` / `:212` | `POST`, `PATCH` or `DELETE /api/admin/activity-types` | Manages activity types. Delete opens a confirm naming the type (since #2693); it hard-deletes the global row and is refused while any activity log uses the type (409) and for `other`. | one | yes | admin session | delete: low (guarded), confirm and `aria-label` since #2693 | |
 
+### 7a. After a Reset data: what to check (#3435)
+
+The reset commits in one transaction, but two things outside it can still touch the account for a
+short while. Run through this after every reset, before telling the tester it is done.
+
+1. **Look for new Oura rows a few minutes after the reset.** A webhook, a catch-up or the backfill
+   that starts on connect may already hold an access token when the reset commits, and can land rows
+   seconds later. The reset revokes the Oura grant, so no new work starts, but work already in flight
+   is not stopped. A few minutes after, read the account's newest `oura_cloud` rows. The `claude_ro`
+   views are scoped to the owner's rows only, so for the owner's own account use them, and for a
+   tester's account ask the owner to run the one-off query. Anything dated after the reset's
+   `agent_action_log` row (`admin-reset-user-data`) is work that outran it. Run **Reset data** again
+   and re-check; the grant is already revoked, so nothing new starts.
+2. **The tester must be on a build that sends `X-Data-Epoch`.** Preview builds from before the
+   data-epoch change (#3369) never send it. For an account that has been reset, the middleware answers
+   **every write from such a build with 409**, and an old build has no handler for the 409: nothing
+   saves, and it does not wipe. Nothing is lost server-side, but the tester sees saves silently fail.
+   Ask them to update the app first, then sign in again; the new build wipes the old rows and re-reads.
+3. **Data from outside sources comes back by design** (Health Connect's window, ring events not yet
+   drained, Oura on reconnect). That is a fresh import, not a restore; see the Reset data row above.
+
 ## 8. `/more/settings/developer` (the six bare cards and the diagnostics rows)
 
 **Since #2379 (#2250) the six cards sit in three groups:** *Checks* (model assets, time audit,

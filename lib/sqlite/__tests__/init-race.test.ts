@@ -84,3 +84,39 @@ describe('runSQL during the initSQLite window', () => {
     expect(run).not.toHaveBeenCalled()
   })
 })
+
+// #3435: `querySQL` answers [] for a database that is not open, so a caller that reads "no rows" as
+// "nothing to lose" (`deviceHasLocalData`) takes `querySQLOpen`, which throws instead.
+describe('querySQLOpen', () => {
+  beforeEach(() => {
+    native = true
+    query.mockClear()
+    open.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('throws, where querySQL answers [], when init was never started', async () => {
+    const svc = await freshService()
+    await expect(svc.querySQL('SELECT 1')).resolves.toEqual([])
+    await expect(svc.querySQLOpen('SELECT 1')).rejects.toThrow(/not open/)
+  })
+
+  it('throws when the DB failed to open', async () => {
+    const svc = await freshService()
+    open.mockRejectedValue(new Error('upgrade failed'))
+    await expect(svc.initSQLite([])).rejects.toThrow()
+    await expect(svc.querySQLOpen('SELECT 1')).rejects.toThrow(/not open/)
+  })
+
+  it('waits for an in-flight open and then reads', async () => {
+    const svc = await freshService()
+    query.mockResolvedValue({ values: [{ x: 1 }] })
+    let releaseOpen: () => void = () => {}
+    const opened = new Promise<void>(res => { releaseOpen = res })
+    open.mockImplementation(() => opened)
+    const init = svc.initSQLite([])
+    const read = svc.querySQLOpen('SELECT 1 AS x')
+    releaseOpen()
+    await init
+    await expect(read).resolves.toEqual([{ x: 1 }])
+  })
+})

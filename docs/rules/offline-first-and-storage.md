@@ -63,6 +63,17 @@ depends on column <col>`, and that is the statement someone pastes during an inc
 rebuild recreates the view from `claude-ro-views.sql`. Check the table against that file; tables
 with no view need no `DROP VIEW`.
 
+**A column added to `schema.ts` is load-bearing from the release that adds it** (#3435). Drizzle selects
+every column in the table's definition, so once `schema.ts` names the column, every read of that
+table selects it, and a migration that has not run (or failed) breaks every read of the table, not
+only the feature that uses the column. The migration comment "an older build that never reads the
+column behaves exactly as before" (`202610260017_users_sessions_valid_from.sql`) is therefore wrong
+for the release that ships the schema change together with the migration: it holds for a build that
+predates the column, not for the one that adds it. That comment sits in an applied migration and is
+not edited; this is the correction. Ship the migration alone and apply it before the code that
+names the column (CLAUDE.md: a migration never rides in a batch), and treat a failed migration as a
+failed release for every user.
+
 **⚠ The generator reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (LA-161). The wrong one does not
 fail: it reads the session's dev database, and anything hand-applied there reaches the file. Build a
 scratch database (`CREATE DATABASE` + `node scripts/local-db/migrate.js`) if in doubt.
@@ -134,7 +145,13 @@ any device that still holds the old rows. The guarantees, and where each lives:
   gate closed and the next launch wipes again; the clears raise instead of being swallowed.
 - **A covered write holds off a reset and a reset holds off a covered write**
   (`lib/data/postgres/user-write-barrier.ts`, an advisory lock). The sync push and the ring-sample
-  ingest use it; the other upload paths rely on the 409 gate alone.
+  ingest use it; the other upload paths rely on the 409 gate alone. **Pool cost (#3435):** each
+  covered write holds one pooled connection for its whole duration, and the pool is 10, so roughly ten
+  covered writes at once would leave the rest waiting out `connectionTimeoutMillis` (5 s) and failing.
+  That is not realistic for the few users today, and there is no cheap fix: the shared lock lives on the
+  session, so the connection cannot be returned early. After a deploy that touches either path, watch
+  `error_events` for pool-timeout errors; if they appear, the answer is fewer concurrent covered writes
+  per user (the push is one request per sync), not a bigger pool, which `client.ts` deliberately cannot raise.
 - **A new upload path needs nothing to be covered by the gate**, but a new queue of unsent writes must
   be wiped by `clearAccountStorage` (web) or live under the account scope (Preview), the same census as sign-out.
 - **The phone's `oura_raw.db` is deliberately NOT wiped** by a reset, a sign-out or an account change.
