@@ -52,10 +52,16 @@ export const users = pgTable('users', {
   targetBfPct:      doublePrecision('target_bf_pct'),
   friendCode:       text('friend_code').unique(),
   equippedTitle:    text('equipped_title'),
+  /** Achievement ids the user pinned to their trophy case, in pin order; null = none pinned (friends then see the top three by XP). */
+  trophyPins:       text('trophy_pins').array(),
   activityLevel:    text('activity_level'),
   fitnessGoal:      text('fitness_goal'),
   lastGoalReviewAt: timestamp('last_goal_review_at', { withTimezone: true }),
   timingBaselineDate: date('timing_baseline_date', { mode: 'string' }),
+  /** #3369: a session or native access token whose `signedInAt` claim (stamped at sign-in, not `iat`,
+   *  which Auth.js re-issues as a cookie ages) is earlier than this is refused. NULL = no cut-off. An
+   *  admin's "reset data" sets it, so a device still holding the old rows cannot push them back. */
+  sessionsValidFrom: timestamp('sessions_valid_from', { withTimezone: true }),
 })
 
 export const authIdentities = pgTable('auth_identities', {
@@ -240,6 +246,8 @@ export const workoutSessions = pgTable('workout_sessions', {
   /** DEAD — never written, never read. See the block comment above; do not start using it. */
   unusedProgramSessionId: uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
   sessionRpe:        integer('session_rpe'),
+  /** #3266: whole seconds the workout was paused; NULL means never paused, the same as 0. */
+  pausedSec:         integer('paused_sec'),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),
 })

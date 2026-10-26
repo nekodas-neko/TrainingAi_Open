@@ -1,5 +1,6 @@
 // The Body Battery card's wording, shared by the current app (components/body-battery-card.tsx) and
-// the native app (mobile/.../BodyBatteryCard.tsx) so the two cannot drift. Only text lives here;
+// the native app (mobile/.../BodyBatteryDetails.tsx, and the Energy hero's origin line) so the two
+// cannot drift. Only text lives here;
 // layout and colour stay with each app.
 
 /**

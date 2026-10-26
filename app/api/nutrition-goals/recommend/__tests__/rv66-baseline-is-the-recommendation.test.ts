@@ -37,6 +37,7 @@ vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
     getUserById: async () => USER,
     getUserGoals: async () => ({ stepsGoal: 8000, stepsGoalType: 'manual', calorieGoal: 2000, calorieGoalType: 'manual', waterGoalMl: 2500, waterGoalType: 'manual' }),
+    listActivityLogs: async () => [],
     getNutritionTargets: async () => ({ calories: 2000, proteinG: 150, carbsG: 200, fatG: 60 }),
     listBodyMetrics: async () => [{ date: '2026-09-14', weightKg: WEIGHT_KG, bodyFatPct: BODY_FAT_PCT, bodyFatSource: 'scale' }],
     getWorkoutSessionsFrom: async () => Array.from({ length: sessionCount }, (_, i) => ({ id: `w${i}` })),

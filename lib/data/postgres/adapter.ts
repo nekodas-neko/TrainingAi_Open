@@ -37,6 +37,7 @@ export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
 import { classifyClockRegression, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
+import { rowsOfDeviceInUse, fillMissingNightSources } from '@trainingai/shared/health/per-device-normal'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
@@ -2126,7 +2127,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
       // HRV trend: ratio of recent 3 days vs older baseline
       let hrvTrend: number | null = null
-      const hrvRows = bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0)
+      // #3001: both stretches from the device in use, so Oura's HRV is never compared with the ring's.
+      const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource)
       if (hrvRows.length >= 4) {
         const sorted = [...hrvRows].sort((a, b) => b.date.localeCompare(a.date))
         const recent3 = sorted.slice(0, 3)
@@ -3548,6 +3550,20 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         isNull(s.sleepSessions.deletedAt),
       ))
       .orderBy(desc(s.sleepSessions.date))
+    // #3001: a row with no provenance key reads as the ring before the switch day, else as the device
+    // of its other keys, so it is not an `unknown` device that drops out of the per-device normals.
+    const switchDay = await this.getOuraCloudSwitchDay(userId).catch(() => null)
+    const nightSources = (r: (typeof rows)[number]) => {
+      if (r.manualEntry) {
+        return { durationSource: 'manual', respiratoryRateSource: 'manual', hrvSource: 'manual', avgHeartRateSource: 'manual' }
+      }
+      return fillMissingNightSources(r.date, {
+        durationSource: r.sourceMap?.duration_hours ?? undefined,
+        respiratoryRateSource: r.sourceMap?.respiratory_rate ?? undefined,
+        hrvSource: r.sourceMap?.average_hrv_ms ?? undefined,
+        avgHeartRateSource: r.sourceMap?.avg_heart_rate ?? undefined,
+      }, switchDay)
+    }
     return preferDeviceNights(rows).filter(r => r.date >= from && r.date <= to).map(r => ({
       id: r.id, userId: r.userId, date: r.date,
       sleepStart:      r.sleepStart,
@@ -3572,8 +3588,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       timeInBedHours:  r.timeInBedHours  ?? undefined,
       manualSleepStart: r.manualSleepStart ?? null,
       manualEntry:     r.manualEntry,
-      durationSource:  r.manualEntry ? 'manual' : r.sourceMap?.duration_hours ?? undefined,
-      respiratoryRateSource: r.manualEntry ? 'manual' : r.sourceMap?.respiratory_rate ?? undefined,
+      ...nightSources(r),
       ouraSleepType:   r.ouraSleepType   ?? null,
     }))
   }

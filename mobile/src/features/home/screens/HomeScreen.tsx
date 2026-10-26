@@ -3,7 +3,7 @@ import { preserveHiddenOrder } from '../../../shared/ui/reorder';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { HomeSection, HiddenHomeSections } from '../components/HomeSection';
 import { HomeHeader } from '../components/HomeHeader';
-import { HomeScores } from '../components/HomeScores';
+import { HomeEnergy } from '../components/HomeEnergy';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils';
@@ -25,7 +25,6 @@ import { useTrainingDays } from '../data/useTrainingDays';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { readinessSpec, profileSpec } from '../../health/data/models';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
-import { BodyBatteryCard } from '../../health/components/BodyBatteryCard';
 import { MorningCheckinSheet } from '../../health/components/MorningCheckinSheet';
 import { MetricLogSheet, type LogMetric } from '../../health/components/MetricLogSheet';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
@@ -194,7 +193,7 @@ export function HomeScreen(navigation: HomeNavigation) {
               onProfile={navigation.openMore}
               badge={adminSignups}
             />
-            <HomeScores onOpen={navigation.openHealthDetail} />
+            <HomeEnergy onOpen={navigation.openHealthDetail} />
             {scores?.illnessAdvisory && scores.illnessFlag === 'watch' && (
               <AppText variant="micro" tone="muted">
                 {scores.illnessAdvisory}
@@ -214,7 +213,6 @@ export function HomeScreen(navigation: HomeNavigation) {
                   </AppText>
                 </Card>
               )}
-            <BodyBatteryCard />
             {editing && (
               <AppButton
                 title="Widgets & score style"

@@ -3,6 +3,7 @@
 // filtered by the same bounds the real queries use.
 import { vi } from 'vitest'
 import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
+import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 
 export interface FixtureMetric {
   date: string
@@ -21,6 +22,16 @@ export interface ActivityFixture {
   sessions: FixtureSession[]
   derived: FixtureDerived[]
   program: Record<string, unknown> | null
+  /** `oura_cloud_daily` activity rows (#3114): the MET series that decides the move lane. */
+  cloudActivity?: { date: string; met: { interval: number; items: (number | null)[]; timestamp: string } | null; class5Min: string | null }[]
+  /** Makes the MET read throw, as a database or connector error would. */
+  cloudActivityFails?: boolean
+  /** When each Oura day's `oura_cloud_daily` row last changed (#3079), for days that carry MET. */
+  metChangedAt?: { date: string; changedAt: Date }[]
+  /** Reads the finalise must not swallow on a finished day: each throws, as a database error would. */
+  failReads?: { goals?: boolean; user?: boolean; observedHr?: boolean; fitnessTests?: boolean }
+  /** Logged activities, for the treadmill steps that join a day's count (#3134). */
+  activityLogs?: { date: string; activityType: string; steps?: number | null }[]
 }
 
 /** A repository over the fixture. Upserts land in `fixture.derived` with the real COALESCE rule. */
@@ -41,6 +52,10 @@ export function fixtureRepo(fx: ActivityFixture) {
     getWorkoutSessionsFrom: vi.fn(async (_u: string, from: Date) =>
       fx.sessions.filter(s => s.startedAt.getTime() >= from.getTime())),
     getOuraDaily: vi.fn(async () => [] as unknown[]),
+    getOuraCloudActivitySeries: vi.fn(async (_u: string, from: string, to: string) => {
+      if (fx.cloudActivityFails) throw new Error('oura_cloud_daily read failed')
+      return (fx.cloudActivity ?? []).filter(r => r.date >= from && r.date <= to)
+    }),
     getActiveProgram: vi.fn(async () => fx.program),
     getHrForWindow: vi.fn(async (_u: string, from: Date, to: Date) =>
       fx.hr.filter(r => r.timestamp.getTime() >= from.getTime() && r.timestamp.getTime() < to.getTime())),
@@ -49,8 +64,26 @@ export function fixtureRepo(fx: ActivityFixture) {
       fx.derived.filter(r => r.day >= from && r.day <= to).sort((a, b) => a.day.localeCompare(b.day))
         .map(r => ({ activityScore: null, activityContributors: null, ...r }))),
     getLatestOuraCloudVitals: vi.fn(async () => null),
-    getUserById: vi.fn(async () => ({ dateOfBirth: '1990-01-01', sex: 'male', heightCm: 180, activityLevel: 'moderate' })),
-    getUserGoals: vi.fn(async () => ({ stepsGoal: null })),
+    getOuraCloudMetChangedAt: vi.fn(async (_u: string, from: string, to: string) =>
+      (fx.metChangedAt ?? []).filter(r => r.date >= from && r.date <= to)),
+    getObservedHrProfile: vi.fn(async () => {
+      if (fx.failReads?.observedHr) throw new Error('observed hr read failed')
+      return EMPTY_OBSERVED_HR
+    }),
+    listFitnessTests: vi.fn(async () => {
+      if (fx.failReads?.fitnessTests) throw new Error('fitness tests read failed')
+      return [] as unknown[]
+    }),
+    getUserById: vi.fn(async () => {
+      if (fx.failReads?.user) throw new Error('user read failed')
+      return ({ dateOfBirth: '1990-01-01', sex: 'male', heightCm: 180, activityLevel: 'moderate' })
+    }),
+    getUserGoals: vi.fn(async () => {
+      if (fx.failReads?.goals) throw new Error('goals read failed')
+      return { stepsGoal: null }
+    }),
+    listActivityLogs: vi.fn(async (_u: string, from: string, to: string) =>
+      (fx.activityLogs ?? []).filter(a => a.date >= from && a.date <= to)),
     listDoseEvents: vi.fn(async () => [] as unknown[]),
     listProgramPhases: vi.fn(async () => [] as unknown[]),
     countSessionsSinceStart: vi.fn(async () => 0),
