@@ -51,13 +51,11 @@ export function DbFootprintCard() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [backfilling, setBackfilling] = useState(false)
-  const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
   const [vacuuming, setVacuuming] = useState(false)
   const [vacuumMsg, setVacuumMsg] = useState<string | null>(null)
   const [vacuumTables, setVacuumTables] = useState<VacuumTable[]>([])
   const [vacuumTable, setVacuumTable] = useState('oura_raw_samples')
-  const [confirm, setConfirm] = useState<'backfill' | 'vacuum' | 'pack' | null>(null)
+  const [confirm, setConfirm] = useState<'vacuum' | 'pack' | null>(null)
   const [packable, setPackable] = useState<PackableCount | null>(null)
   const [packing, setPacking] = useState(false)
   const [packMsg, setPackMsg] = useState<string | null>(null)
@@ -88,33 +86,10 @@ export function DbFootprintCard() {
 
   useEffect(() => { void load() }, [load])
 
-  // Culling Lever 1b — data-dropping (nulls the decoded JSONB on historical rows; body_hex is
-  // untouched). Confirm-gated, admin-triggered only. Defaults to clearing the whole backlog in one
-  // press (owner-requested); `remaining` will still be non-zero if the backlog somehow exceeds the
-  // server's per-call ceiling, in which case pressing again continues from where it left off.
-  const runBackfill = useCallback(async () => {
-    setConfirm(null)
-    setBackfilling(true)
-    setBackfillMsg(null)
-    try {
-      const res = await fetch('/api/oura-ble/samples/backfill-null-decoded', { method: 'POST' })
-      if (!res.ok) { setBackfillMsg(`backfill failed: ${res.status}`); return }
-      const j = await res.json() as { nulled: number; remaining: number }
-      setBackfillMsg(j.remaining > 0
-        ? `nulled ${j.nulled.toLocaleString()} rows · ${j.remaining.toLocaleString()} still remaining — press again`
-        : `nulled ${j.nulled.toLocaleString()} rows · backlog cleared`)
-      await load()
-    } catch (err) {
-      setBackfillMsg(err instanceof Error ? err.message : String(err))
-    } finally {
-      setBackfilling(false)
-    }
-  }, [stats, load])
-
-  // Culling Lever 1c — physically reclaim the disk Lever 1b freed only logically. VACUUM FULL
+  // Culling Lever 1c — physically reclaim disk that dead tuples hold. VACUUM FULL
   // rewrites oura_raw_samples into a smaller file (Postgres MVCC leaves dead tuples until then; see
   // docs/oura-ble-operations.md I17). No data is dropped — body_hex and every row are preserved; the
-  // table is briefly locked during the rewrite. Useful right after a Lever 1b run.
+  // table is briefly locked during the rewrite.
   const runVacuum = useCallback(async () => {
     setConfirm(null)
     setVacuuming(true)
@@ -203,20 +178,12 @@ export function DbFootprintCard() {
           <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-muted-foreground">
             <dt>Rows still carrying <code>decoded</code></dt>
             <dd className="tabular-nums text-foreground">{fmtNum(raw.decodedRows)} / {fmtNum(raw.totalRows)}</dd>
-            <dt><code>decoded</code> JSONB (reclaimable — Lever 1b)</dt>
+            <dt><code>decoded</code> JSONB</dt>
             <dd className="tabular-nums text-foreground">{fmtBytes(raw.decodedBytes)}</dd>
             <dt><code>body_hex</code> (archival — Lever 5)</dt>
             <dd className="tabular-nums text-foreground">{fmtBytes(raw.bodyHexBytes)}</dd>
           </dl>
           <div className="mt-2 flex flex-col gap-2 border-t border-border/40 pt-2">
-            {raw.decodedRows > 0 && (
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="destructive" disabled={backfilling} onClick={() => setConfirm('backfill')}>
-                  {backfilling ? 'Nulling…' : 'Null historical decoded (Lever 1b)'}
-                </Button>
-                {backfillMsg && <span className="text-muted-foreground">{backfillMsg}</span>}
-              </div>
-            )}
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-1.5 text-muted-foreground">
                 <span>Table</span>
@@ -287,14 +254,6 @@ export function DbFootprintCard() {
 
       {!stats && !error && <p className="text-xs text-muted-foreground">Loading…</p>}
 
-      <ConfirmDialog
-        open={confirm === 'backfill'}
-        onOpenChange={o => !o && setConfirm(null)}
-        title="Null the decoded JSONB?"
-        message={`Null the "decoded" JSONB on all ${(stats?.rawSamples.decodedRows ?? 0).toLocaleString()} historical oura_raw_samples rows that still carry it? body_hex stays untouched and every row still redecodes from it. This cannot be undone automatically.`}
-        confirmLabel="Null decoded"
-        onConfirm={() => void runBackfill()}
-      />
       <ConfirmDialog
         open={confirm === 'pack'}
         onOpenChange={o => !o && setConfirm(null)}

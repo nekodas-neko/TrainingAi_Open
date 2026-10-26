@@ -1,14 +1,10 @@
 /**
- * PS-39 — three admin reports: `admin/app-load-report`, `admin/timing-baseline` and
- * `admin/sleep-feel-calibration`. They share the admin gate and each parses its window a different
- * way, which is the whole of what a route-level test can hold them to.
+ * PS-39 — two admin reports: `admin/timing-baseline` and `admin/sleep-feel-calibration`
+ * (`admin/app-load-report` was retired in #2862). They share the admin gate and each parses its
+ * window a different way, which is the whole of what a route-level test can hold them to.
  *
  * What each decides:
  *
- *   · **`app-load-report` splits cold from warm and reports both totals.** The split is the report,
- *     not a facet of it: every merge is a deploy, the service worker's cache name is stamped from
- *     the deploy SHA, and a pooled percentile measures release cadence rather than the app. The two
- *     sample counts are stated so a reader seeing only warm rows knows which it means.
  *   · **`timing-baseline` accepts a NULL date**, because clearing the baseline is the operation you
  *     reach for when the stored one is wrong — a schema that only took a string would make the
  *     clear button unimplementable.
@@ -27,7 +23,6 @@ type Row = Record<string, unknown>
 
 const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
-const getAppLoadReport = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getTimingBaselineDate = vi.fn(async (_u: string) => '2026-01-15' as string | null)
 const setTimingBaselineDate = vi.fn(async (..._a: unknown[]) => undefined)
 const listSleepSessions = vi.fn(async (..._a: unknown[]) => [] as Row[])
@@ -46,7 +41,6 @@ vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => 
 vi.mock('@/lib/data', () => {
   const repo = async () => ({
     getUserById,
-    getAppLoadReport: (...a: unknown[]) => getAppLoadReport(...a),
     getTimingBaselineDate: (...a: unknown[]) => getTimingBaselineDate(...(a as [string])),
     setTimingBaselineDate: (...a: unknown[]) => setTimingBaselineDate(...a),
     listSleepSessions: (...a: unknown[]) => listSleepSessions(...a),
@@ -66,12 +60,8 @@ vi.mock('@trainingai/shared/health/sleep-feel-calibration', () => ({
   buildSleepFeelCalibration: (i: Row) => buildSleepFeelCalibration(i),
 }))
 
-import { GET as appLoadGet } from '@/app/api/admin/app-load-report/route'
 import { GET as timingGet, POST as timingPost } from '@/app/api/admin/timing-baseline/route'
 import { GET as calibrationGet } from '@/app/api/admin/sleep-feel-calibration/route'
-
-const appLoadReq = (qs = '') =>
-  appLoadGet(new Request(`http://localhost/api/admin/app-load-report${qs}`))
 
 const timingReq = (body: unknown) =>
   timingPost(new Request('http://localhost/api/admin/timing-baseline', {
@@ -85,12 +75,11 @@ const calibrationReq = async (qs = '') => {
 }
 
 beforeEach(() => {
-  for (const m of [getUserById, rateLimit, getAppLoadReport, getTimingBaselineDate, setTimingBaselineDate,
+  for (const m of [getUserById, rateLimit, getTimingBaselineDate, setTimingBaselineDate,
                    listSleepSessions, listDayCheckins, reportServerError, nightSessions,
                    computeSleepScoreSeries, buildSleepFeelCalibration]) m.mockClear()
   rateLimit.mockReturnValue(true)
   getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
-  getAppLoadReport.mockResolvedValue([])
   getTimingBaselineDate.mockResolvedValue('2026-01-15')
   listSleepSessions.mockResolvedValue([])
   listDayCheckins.mockResolvedValue([])
@@ -99,9 +88,8 @@ beforeEach(() => {
   sessionUser = { id: 'u-1', isAdmin: true }
 })
 
-describe('the admin gate on all three reports', () => {
+describe('the admin gate on both reports', () => {
   const ALL: [string, () => Promise<Response>][] = [
-    ['app-load GET', () => appLoadReq()],
     ['timing GET', () => timingGet()],
     ['timing POST', () => timingReq({ date: '2026-02-01' })],
     ['calibration GET', () => calibrationReq()],
@@ -114,7 +102,6 @@ describe('the admin gate on all three reports', () => {
     getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(setTimingBaselineDate).not.toHaveBeenCalled()
-    expect(getAppLoadReport).not.toHaveBeenCalled()
   })
 
   it('answers 503 when the CHECK could not run, not 403 (Q-548)', async () => {
@@ -142,80 +129,6 @@ describe('the admin gate on all three reports', () => {
       expect(await res.json(), name).toEqual({ error: 'Unauthorized' })
     }
     expect(getUserById).not.toHaveBeenCalled()
-  })
-})
-
-describe('GET /api/admin/app-load-report', () => {
-  it('defaults to 7 days, and reports the window it actually used', async () => {
-    await appLoadReq()
-    expect(getAppLoadReport).toHaveBeenLastCalledWith('u-1', 7)
-    expect((await (await appLoadReq('?days=14')).json()).days).toBe(14)
-    expect(getAppLoadReport).toHaveBeenLastCalledWith('u-1', 14)
-  })
-
-  it('REFUSES a window wider than retention rather than clamping it', async () => {
-    // `.max(14)` rejects; it does not silently narrow. That is the better half of the choice — a
-    // clamp would answer 200 with `days: 14` to someone who asked for 30 and believes they are
-    // reading a month. 14 is the retention window, so there is no wider answer to give.
-    const res = await appLoadReq('?days=30')
-    expect(res.status).toBe(400)
-    expect(await res.json()).toEqual({ error: 'Invalid query' })
-    expect(getAppLoadReport).not.toHaveBeenCalled()
-  })
-
-  it('refuses a non-numeric, zero or fractional days', async () => {
-    // Each of these is a different schema rule — coercion, `.min(1)`, `.int()` — and defaulting
-    // instead would answer 200 with a window the caller did not ask for, which is the same shape
-    // as a correct response and so the worst way to be wrong.
-    for (const qs of ['?days=nonsense', '?days=0', '?days=2.5', '?days=']) {
-      expect((await appLoadReq(qs)).status, qs).toBe(400)
-    }
-    expect(getAppLoadReport).not.toHaveBeenCalled()
-  })
-
-  it('IGNORES an unknown query param despite the schema being strict — pinned, not endorsed', async () => {
-    // `.strict()` cannot fire here: the route hands the schema an object it built itself, holding
-    // only `days`, so an unknown param is dropped before validation ever sees it. The `.strict()`
-    // on this schema therefore guards nothing. Harmless as it stands — but a reader adding a second
-    // param will assume the typo protection is already in place, and it is not.
-    const res = await appLoadReq('?unknown=1&dayz=30')
-    expect(res.status).toBe(200)
-    expect((await res.json()).days).toBe(7)
-  })
-
-  it('counts cold and warm samples separately, summing samples rather than rows', async () => {
-    // Two cold rows carrying 3 and 4 samples: a fixture of one row each, or of rows whose sample
-    // counts matched, could not tell "sum the samples" from "count the rows".
-    getAppLoadReport.mockResolvedValue([
-      { route: '/home', cold: true, samples: 3, p50Ms: 900, p95Ms: 1800, worstMs: 2400 },
-      { route: '/nutrition', cold: true, samples: 4, p50Ms: 800, p95Ms: 1500, worstMs: 2000 },
-      { route: '/home', cold: false, samples: 11, p50Ms: 120, p95Ms: 300, worstMs: 900 },
-    ])
-    const body = await (await appLoadReq()).json()
-    expect(body.coldSamples).toBe(7)
-    expect(body.warmSamples).toBe(11)
-    expect(body.routes).toHaveLength(3)
-  })
-
-  it('reports zero for a side with no rows rather than omitting it', async () => {
-    // "No cold samples recorded" and "the app is never cold" are different findings, and an absent
-    // key reads as the second.
-    getAppLoadReport.mockResolvedValue([
-      { route: '/home', cold: false, samples: 5, p50Ms: 120, p95Ms: 300, worstMs: 900 },
-    ])
-    const body = await (await appLoadReq()).json()
-    expect(body.coldSamples).toBe(0)
-    expect(body.warmSamples).toBe(5)
-  })
-
-  it('sends no-store, so nothing sits between the reader and the numbers', async () => {
-    expect((await appLoadReq()).headers.get('Cache-Control')).toBe('private, no-store')
-  })
-
-  it('rate-limits before reading', async () => {
-    rateLimit.mockReturnValue(false)
-    expect((await appLoadReq()).status).toBe(429)
-    expect(getAppLoadReport).not.toHaveBeenCalled()
   })
 })
 

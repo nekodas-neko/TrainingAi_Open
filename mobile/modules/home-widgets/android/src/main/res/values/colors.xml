@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The app's light theme (mobile/src/shared/theme). tests/widget-resources.test.ts keeps these equal to the tokens. -->
+  <color name="home_widget_surface">#ffffff</color>
+  <color name="home_widget_raised">#f5f5f5</color>
+  <color name="home_widget_text">#121212</color>
+  <color name="home_widget_muted">#666666</color>
+  <color name="home_widget_brand">#008700</color>
+  <color name="home_widget_onbrand">#ffffff</color>
+  <color name="home_widget_track">#dfe3e0</color>
+  <color name="home_widget_border">#e8e8e8</color>
+  <color name="home_widget_protein">#177a3c</color>
+  <color name="home_widget_carbs">#1d4ed8</color>
+  <color name="home_widget_fat">#c2410c</color>
+  <color name="home_widget_water">#0369a1</color>
+  <color name="home_widget_good">#177a3c</color>
+  <color name="home_widget_low">#a16207</color>
+  <color name="home_widget_drained">#b91c1c</color>
+</resources>

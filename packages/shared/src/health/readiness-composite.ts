@@ -50,7 +50,8 @@ export interface ReadinessCompositeInputs {
   previousNightScore: number | null
   /** Our own 0-100 activity score for the day before last night. */
   prevDayActivityScore: number | null
-  /** Our own 0-100 activity score for today. */
+  /** Our own 0-100 PRE-taper activity score for the previous completed day (#2435). It read today's
+   *  partial score until then, so a morning readiness saw a near-empty day. */
   activityBalanceScore: number | null
   /** Nights of baseline history accrued (oura_daily_summary.n_history). */
   nHistory: number
@@ -249,8 +250,16 @@ function plainScore(v: number | null): ReadinessContributor {
  *  v8: each night input is chosen per field (the ring's summary where it has the field, else the
  *  generic value for the same night) and judged against a normal learned from its own device; the
  *  recovery index takes Oura's own contributor where no hours exist (#2984). A full ring night with
- *  no Oura data scores as v7. */
-export const READINESS_MODEL_VERSION = 'v8:per-input-per-device:2026-10-18'
+ *  no Oura data scores as v7.
+ *  v9: every baseline z is in standard deviations, √(π/2) × the fold's mean absolute deviation, where
+ *  it used to divide by the deviation itself (#2158). Every baseline contributor's z shrinks by ~0.8, so
+ *  `Z_POINTS_PER_UNIT`'s ±1.5 knee now means ±1.5σ. The illness radar reads the same z.
+ *  v10: the activity-balance input is the previous completed day's finalised Activity score, not
+ *  today's partial one (#2435). The weights are unchanged; the input means something else.
+ *  v11: the night's HRV input is the median of Oura's 5-minute series, not Oura's per-night average
+ *  (#3075 stage 1a). The definition changes under the same `oura_cloud` label, so the HRV normal mixes
+ *  averages and medians until the Oura Cloud backfill from 17 Oct has rewritten those nights. */
+export const READINESS_MODEL_VERSION = 'v11:own-overnight-hrv:2026-10-26'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.

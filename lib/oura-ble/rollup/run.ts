@@ -36,7 +36,6 @@ export interface RollupOptions {
   disableNeuralStager?: boolean
   fullHistory?: boolean
   dumpOnly?: boolean
-  allowStepsDecrease?: boolean
   sinceDs?: number
 }
 
@@ -802,10 +801,7 @@ export async function runOuraRollup(
       io.readRawFrames({ tags: [STEP_MOTION_TAG], startDs: rollupCutoffDs }),
       io.readStepLiveWindows(),
     ])
-    // Bucketing + per-day merge live in lib/oura-ble/step-day-buckets.ts, shared with
-    // previewStepsBackfill — the preview an owner authorises a backfill from must be computed by
-    // the SAME code as the write that follows it. (They were hand-copied duplicates until
-    // 2026-07-28, and the midnight-split fix landed in only one of them.)
+    // Bucketing + per-day merge live in lib/oura-ble/step-day-buckets.ts.
     // Every anchor observation, not just the newest: resolved via a robust per-epoch offset
     // (Q-139), not the newest-anchor extrapolation this rollup used to use everywhere; a frame
     // that still lands in the future is skipped rather than dated forward (Q-56). Reuses the
@@ -832,12 +828,8 @@ export async function runOuraRollup(
     const existingStepsRank = new Map(existing.map(r =>
       [r.date, sourceRank((r.sourceMap as Record<string, string> | null)?.steps)]))
     for (const [day, mergedSteps] of stepsByDay) {
-      // allowStepsDecrease (D0 historical backfill, owner-gated): skip the magnitude guard so a
-      // corrected (lower) step_counter total can overwrite an old inflated flat-30-estimate value.
-      // Still safe — upsertBodyMetrics(..., 'oura_ble') below applies the per-field sourceMap rank
-      // merge, so a higher-ranked `manual` entry is preserved regardless of this flag.
       const guardApplies = (existingStepsRank.get(day) ?? 0) >= sourceRank('oura_ble')
-      if (opts?.allowStepsDecrease === true || !guardApplies || mergedSteps > (existingSteps.get(day) ?? 0)) {
+      if (!guardApplies || mergedSteps > (existingSteps.get(day) ?? 0)) {
         const row = byDay.get(day) ?? { date: day }
         row.steps = mergedSteps
         byDay.set(day, row)

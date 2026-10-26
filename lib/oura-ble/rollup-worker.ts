@@ -21,7 +21,6 @@ type RollupOpts = {
   debugDate?: string
   dumpOnly?: boolean
   fullHistory?: boolean
-  allowStepsDecrease?: boolean
   disableNeuralStager?: boolean
 }
 

@@ -136,15 +136,17 @@ describe.skipIf(!canRun)('ai_dynamic temperature and stress follow the switch da
     expect(next?.temperatureAlert).toBe(true)
   })
 
-  it("after the switch, an Oura-only night raises the alert on Oura's own baseline", async () => {
+  // #3169 (owner, 26 Oct): the deload stays off on Oura's deviation until its new baseline has been
+  // checked, however mature and centred it is. The deviation itself is still read.
+  it("after the switch, a mature, centred Oura baseline still does not raise the alert (#3169)", async () => {
     setSwitchDay(day(-3))
     await seedOura(Array.from({ length: 35 }, (_, i) => (i % 2 ? 0.1 : -0.1)), 0.6)
     const next = await repo.getNextSession(USER, TZ)
     expect(next?.signals?.temperatureDeviation).toBeCloseTo(0.6, 5)
     expect(next?.signals?.temperatureBaselineDays).toBe(35)
-    expect(next?.signals?.temperatureTrusted).toBe(true)
-    expect(next?.temperatureAlert).toBe(true)
-    expect(next?.deloadOrRestRecommended).toBe(true)
+    expect(next?.signals?.temperatureTrusted).toBe(false)
+    expect(next?.temperatureAlert).toBe(false)
+    expect(next?.deloadOrRestRecommended).toBe(false)
   })
 
   // The ring's month of centred history must not mature or centre a young Oura normal. On `main`

@@ -37,12 +37,14 @@ import {
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useHome } from '../data/HomeProvider';
+import { ReadinessPromptCard } from './ReadinessPromptCard';
 import { CollectionCard } from '../../collection/components/CollectionCard';
 import { metricLabels } from '../data/models';
 import { budgetEnergyModel } from '../../nutrition/data/energy-model';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { DEFAULT_SLEEP_GOAL_HOURS } from '@trainingai/shared/health/daily-goals';
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
 
 /**
  * A macro for Home's tiles and nutrition card. Nothing logged is "—", not "0 g": the totals of an
@@ -467,7 +469,7 @@ function HomeWidgetBody({
               <Stack gap="xs" style={{ flex: 1 }}>
                 {title('Sleep')}
                 <AppText variant="hero">
-                  {night?.durationHours == null ? '—' : night.durationHours.toFixed(1) + 'h'}
+                  {night?.durationHours == null ? '—' : formatHoursMinutes(night.durationHours * 60)}
                   {night?.durationHours != null && (
                     <AppText variant="caption" tone="muted">
                       {' '}
@@ -522,7 +524,7 @@ function HomeWidgetBody({
                         {row.label}
                       </AppText>
                       <AppText variant="caption" style={{ fontWeight: '700' }}>
-                        {row.hours == null ? '—' : row.hours.toFixed(1) + 'h'}
+                        {row.hours == null ? '—' : formatHoursMinutes(row.hours * 60)}
                       </AppText>
                     </Stack>
                   ))}
@@ -610,7 +612,7 @@ function HomeWidgetBody({
   }
   if (id === 'moodWidget') {
     const feel = health.checkins[health.today]?.sleepQualityFeel;
-    return (
+    const logged = (
       <Pressable
         onPress={openReadiness}
         accessibilityRole="button"
@@ -697,6 +699,7 @@ function HomeWidgetBody({
         </Card>
       </Pressable>
     );
+    return <ReadinessPromptCard openReadiness={openReadiness} logged={logged} />;
   }
   if (id === 'acwrWidget') {
     const data = load?.data;

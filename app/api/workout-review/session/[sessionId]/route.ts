@@ -60,7 +60,8 @@ export async function POST(
     return NextResponse.json({ error: 'Finish the baseline week before reviewing this session.' }, { status: 400 })
   }
 
-  const signals = await aggregateSignals(userId, programSessionId, repo, tz)
+  // The session under review is already trained, so it is already in the week's phase mix.
+  const signals = await aggregateSignals(userId, programSessionId, repo, tz, undefined, undefined, { includeSessionInWeekMix: false })
   if (!signals) return NextResponse.json({ error: 'Could not gather training data for this session.' }, { status: 404 })
 
   const program = await repo.getActiveProgram(userId)
