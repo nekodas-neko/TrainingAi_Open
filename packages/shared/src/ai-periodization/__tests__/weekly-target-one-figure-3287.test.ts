@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { weeklyVolumeTarget, trainedWeekPhases } from '../volume-targets'
-import { aggregateSignals } from '../signals'
+import { aggregateSignals, type AggregateSignalsOptions } from '../signals'
 
 const TZ = 'Australia/Brisbane'
 const USER = 'u-3287'
@@ -45,8 +45,8 @@ function repoFor(phase: string, trained: { sessionId: string; phase: string }[])
   }) as never
 }
 
-const targetFor = async (phase: string, trained: { sessionId: string; phase: string }[] = []) =>
-  (await aggregateSignals(USER, SESSION, repoFor(phase, trained), TZ))!.weeklyTargets.chest
+const targetFor = async (phase: string, trained: { sessionId: string; phase: string }[] = [], options?: AggregateSignalsOptions) =>
+  (await aggregateSignals(USER, SESSION, repoFor(phase, trained), TZ, undefined, undefined, options))!.weeklyTargets.chest
 
 describe('the engine reads the Training card\'s weekly target (#3287)', () => {
   it('an accumulation week is unchanged: the landmark MAV, not the stored 14', async () => {
@@ -62,6 +62,22 @@ describe('the engine reads the Training card\'s weekly target (#3287)', () => {
   it('the week mixes the phases already trained with the session being prescribed', async () => {
     const mix = ['accumulation', 'realisation']
     expect(await targetFor('realisation', [{ sessionId: 'ps-other', phase: 'accumulation' }])).toBe(weeklyVolumeTarget('strength', 'chest', mix))
+  })
+
+  it('a review of a trained session leaves its own phase out, so it shows the card\'s figure', async () => {
+    // Accumulation, accumulation, then the realisation session being reviewed (already trained, so it is
+    // in the trained list as well as being the session's own phase).
+    const trained = [
+      { sessionId: 'ps-a', phase: 'accumulation' },
+      { sessionId: 'ps-b', phase: 'accumulation' },
+      { sessionId: SESSION, phase: 'realisation' },
+    ]
+    const card = weeklyVolumeTarget('strength', 'chest', ['accumulation', 'accumulation', 'realisation'])
+    expect(await targetFor('realisation', trained, { includeSessionInWeekMix: false })).toBe(card)
+    // The default still adds the session again: the double count the option exists to avoid.
+    const doubled = weeklyVolumeTarget('strength', 'chest', ['accumulation', 'accumulation', 'realisation', 'realisation'])
+    expect(await targetFor('realisation', trained)).toBe(doubled)
+    expect(doubled).toBeLessThan(card)
   })
 
   it('the card and the engine build the mix with the same helper', () => {

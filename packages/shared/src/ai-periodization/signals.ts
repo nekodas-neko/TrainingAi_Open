@@ -228,6 +228,13 @@ export function resolveSelfReportedSick(
   return (bodyState?.includes('sick') ?? false) || illnessContext === 'sick'
 }
 
+export interface AggregateSignalsOptions {
+  /** Add the session's own phase to the week's phase mix (default true). A caller reviewing a session
+   *  that is already trained passes false: it is already among the trained sessions, so adding it
+   *  again would weight its phase twice and put the target off the Training card's (#3287). */
+  includeSessionInWeekMix?: boolean
+}
+
 export async function aggregateSignals(
   userId: string,
   programSessionId: string,
@@ -241,6 +248,7 @@ export async function aggregateSignals(
   // Today-only override of the session's configured time budget (the short/long presets).
   // Undefined = use the program's own timeBudgetMinutes.
   budgetOverrideMin?: number,
+  options?: AggregateSignalsOptions,
 ): Promise<PrescriptionSignals | null> {
   const today = todayInTz(tz)
   const todayMid = todayMidnightUtc(tz)
@@ -487,6 +495,7 @@ export async function aggregateSignals(
   // `targetSetsPerWeek`. The stored rows only say which muscles this program trains. The week's phase
   // mix is the card's (the phases of the sessions trained since the week began) plus the session
   // being prescribed, since the card has nothing to add for a session that has not happened yet.
+  // A caller reviewing a trained session opts out of that extra entry (`includeSessionInWeekMix`).
   const periodization = await repo.listSessionPeriodizationForProgram(userId, program.id).catch(() => [])
   const phaseBySession = new Map(periodization.map(p => [p.programSessionId, p.phase as string]))
   const weekStartMs = dateStrMidnightInTz(weekStart, tz).getTime()
@@ -495,7 +504,7 @@ export async function aggregateSignals(
       allRecentSessions.filter(ws => ws.startedAt.getTime() >= weekStartMs).map(ws => ws.sessionId),
       phaseBySession,
     ),
-    state.phase,
+    ...(options?.includeSessionInWeekMix === false ? [] : [state.phase]),
   ]
   const weeklyTargets: Record<string, number> = {}
   for (const vt of volumeTargets) {
