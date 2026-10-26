@@ -19,18 +19,28 @@ export const ouraStatsSpec = (date: string) => ({
   }),
 });
 
-/** `/api/oura-ble/battery-latest`: the newest ring battery reading from the last three days. */
+/**
+ * `/api/oura/ring-battery` (#3069): the newest ring battery reading, from Bluetooth polls and Oura
+ * Cloud together, with the drain, charge and days-left figures the Oura Ring screen shows.
+ */
 export const ringBatterySpec = {
-  path: '/api/oura-ble/battery-latest',
+  path: '/api/oura/ring-battery',
   ttl: 300_000,
   schema: z.object({
     latest: z
       .object({
         percent: z.number().finite(),
         charging: z.boolean().nullish(),
+        tsMs: z.number().finite(),
         ageMinutes: n,
       })
       .passthrough()
       .nullable(),
+    drainPerDayPct: n,
+    daysLeft: n,
+    daysBetweenCharges: n,
+    avgChargeSec: n,
+    lastChargedMs: n,
+    series: z.array(z.object({ day: z.string(), drainPct: z.number().finite() })).default([]),
   }),
 };

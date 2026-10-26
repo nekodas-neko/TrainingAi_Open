@@ -18,11 +18,13 @@ export function formatTemperatureDeviation(devC: number | null | undefined): str
 /**
  * The deviation-only row, or `null` when it does not apply. It applies when there is no absolute
  * mean (`meanC == null`) and a deviation is present; a night with a mean keeps its existing row.
+ * A night the ring's own BLE data produced (`source: 'ble'`) is never Oura's number, so the "From
+ * Oura" row stays out of it.
  */
 export function ouraTemperatureDeviationRow(
-  temp: { meanC?: number | null; devC?: number | null } | null | undefined,
+  temp: { meanC?: number | null; devC?: number | null; source?: string | null } | null | undefined,
 ): { label: string; value: string; note: string } | null {
-  if (!temp || temp.meanC != null) return null
+  if (!temp || temp.meanC != null || temp.source === 'ble') return null
   const value = formatTemperatureDeviation(temp.devC)
   if (value == null) return null
   return { label: TEMPERATURE_DEVIATION_LABEL, value, note: TEMPERATURE_DEVIATION_NOTE }

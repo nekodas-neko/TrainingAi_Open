@@ -243,6 +243,13 @@ export interface SleepSession {
   durationSource?: string
   respiratoryRateSource?: string
   /**
+   * #3001. READ-ONLY provenance for `averageHrvMs` and `avgHeartRate` (`source_map->>'average_hrv_ms'`
+   * and `'avg_heart_rate'`, or `manual`), so the Sleep Score learns its HRV and heart-rate normals per
+   * device. Never written, for the same reason as `durationSource`.
+   */
+  hrvSource?: string
+  avgHeartRateSource?: string
+  /**
    * Q-519 — a bedtime the user remembers for a night the ring did not observe.
    *
    * **Read only by the bedtime estimate.** It is deliberately not `sleepStart`, and the distinction

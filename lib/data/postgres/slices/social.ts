@@ -114,6 +114,16 @@ export async function updateEquippedTitle(db: Db, userId: string, titleId: strin
   await db.update(s.users).set({ equippedTitle: titleId }).where(eq(s.users.id, userId))
 }
 
+export async function getTrophyPins(db: Db, userId: string): Promise<string[] | null> {
+  const [row] = await db.select({ pins: s.users.trophyPins }).from(s.users).where(eq(s.users.id, userId)).limit(1)
+  return row?.pins ?? null
+}
+
+export async function updateTrophyPins(db: Db, userId: string, pins: string[] | null): Promise<boolean> {
+  const rows = await db.update(s.users).set({ trophyPins: pins }).where(eq(s.users.id, userId)).returning({ id: s.users.id })
+  return rows.length > 0
+}
+
 // ── Seasons ────────────────────────────────────────────────────────────────────
 
 export async function listSeasonsWithResults(db: Db, userId: string): Promise<Season[]> {

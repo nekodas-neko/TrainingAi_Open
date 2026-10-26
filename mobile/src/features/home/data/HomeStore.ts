@@ -3,7 +3,7 @@ import { MoodFieldsSchema, type MoodFields } from '@trainingai/shared/validation
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { ApiError } from '../../account/api/client.ts';
+import { ApiError, isRejectedForGood } from '../../account/api/client.ts';
 import { isCalendarDate } from '@trainingai/shared/date-utils';
 import { moodSchema, preferencesSchema, type HomePreferences, type Mood } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
@@ -323,77 +323,95 @@ export class HomeStore {
         return;
       }
       this.publish({ syncing: true });
+      let setAside: string | null = null;
       try {
         while (this.current.operations.length && generation === this.generation) {
           const op = this.current.operations[0];
-          if (op.kind === 'mood') {
-            const result = z
-              .object({ processed: z.number(), errors: z.array(z.unknown()).optional() })
-              .parse(
-                await this.connection.post('/api/sync/push', {
-                  mutations: [
-                    {
-                      id: op.id,
-                      domain: 'mood_logs',
-                      date: op.date,
-                      payload: op.payload,
-                    },
-                  ],
-                }),
+          let accepted = true;
+          try {
+            if (op.kind === 'mood') {
+              const result = z
+                .object({ processed: z.number(), errors: z.array(z.unknown()).optional() })
+                .parse(
+                  await this.connection.post('/api/sync/push', {
+                    mutations: [
+                      {
+                        id: op.id,
+                        domain: 'mood_logs',
+                        date: op.date,
+                        payload: op.payload,
+                      },
+                    ],
+                  }),
+                );
+              if (result.processed !== 1 || result.errors?.length) {
+                throw new Error('Upload not accepted.');
+              }
+              const row = moodSchema
+                .nullable()
+                .parse(await this.connection.get('/api/mood', { date: op.date }));
+              if (
+                !row ||
+                row.userId !== this.connection.userId ||
+                row.logDate !== op.date ||
+                !sameFields(
+                  row,
+                  Object.fromEntries(
+                    Object.entries(op.payload).filter(([key]) => key !== 'suggestedSoreMuscles'),
+                  ),
+                )
+              ) {
+                throw new Error('Readback not confirmed.');
+              }
+            } else if (op.kind === 'rest') {
+              await this.connection.post('/api/log-rest-day', {
+                date: op.date,
+                resting: op.resting,
+              });
+              const result = z
+                .object({ dates: z.array(z.string()) })
+                .parse(
+                  await this.connection.get('/api/log-rest-day', { from: op.date, to: op.date }),
+                );
+              if (result.dates.includes(op.date) !== op.resting) {
+                throw new Error('Readback not confirmed.');
+              }
+            } else if (op.kind === 'goal-review') {
+              await this.connection.post('/api/nutrition-goals/touch-review', {});
+            } else {
+              if (!this.connection.patch) {
+                throw new Error('Preference writes unavailable.');
+              }
+              const response = preferencesSchema.parse(
+                await this.connection.patch('/api/user/preferences', op.payload),
               );
-            if (result.processed !== 1 || result.errors?.length) {
-              throw new Error('Upload not accepted.');
-            }
-            const row = moodSchema
-              .nullable()
-              .parse(await this.connection.get('/api/mood', { date: op.date }));
-            if (
-              !row ||
-              row.userId !== this.connection.userId ||
-              row.logDate !== op.date ||
-              !sameFields(
-                row,
-                Object.fromEntries(
-                  Object.entries(op.payload).filter(([key]) => key !== 'suggestedSoreMuscles'),
+              if (!sameFields(response, op.payload)) {
+                throw new Error('Readback not confirmed.');
+              }
+              await this.write((state) => ({
+                preferences: Object.assign(
+                  {},
+                  response,
+                  ...state.operations.flatMap((x) =>
+                    x.kind === 'preferences' && x.id !== op.id ? [x.payload] : [],
+                  ),
                 ),
-              )
-            ) {
-              throw new Error('Readback not confirmed.');
+              }));
             }
-          } else if (op.kind === 'rest') {
-            await this.connection.post('/api/log-rest-day', {
-              date: op.date,
-              resting: op.resting,
-            });
-            const result = z
-              .object({ dates: z.array(z.string()) })
-              .parse(
-                await this.connection.get('/api/log-rest-day', { from: op.date, to: op.date }),
-              );
-            if (result.dates.includes(op.date) !== op.resting) {
-              throw new Error('Readback not confirmed.');
+          } catch (cause) {
+            if (!isRejectedForGood(cause)) {
+              throw cause;
             }
-          } else if (op.kind === 'goal-review') {
-            await this.connection.post('/api/nutrition-goals/touch-review', {});
-          } else {
-            if (!this.connection.patch) {
-              throw new Error('Preference writes unavailable.');
+            // The server will never take this op. Keep the local value, drop the op, and let the
+            // rest of the queue flow instead of jamming behind it.
+            if (generation !== this.generation) {
+              return;
             }
-            const response = preferencesSchema.parse(
-              await this.connection.patch('/api/user/preferences', op.payload),
+            accepted = false;
+            setAside = failureNotice(
+              'One change was kept on this phone only; the server did not accept it.',
+              cause,
             );
-            if (!sameFields(response, op.payload)) {
-              throw new Error('Readback not confirmed.');
-            }
-            await this.write((state) => ({
-              preferences: Object.assign(
-                {},
-                response,
-                ...state.operations.flatMap((x) =>
-                  x.kind === 'preferences' && x.id !== op.id ? [x.payload] : [],
-                ),
-              ),
-            }));
           }
           if (generation !== this.generation) {
             return;
@@ -402,9 +420,11 @@ export class HomeStore {
             operations: state.operations.filter((x) => x.id !== op.id),
             error: null,
           }));
-          this.changed(op.kind);
+          if (accepted) {
+            this.changed(op.kind);
+          }
         }
-        this.publish({ error: null });
+        this.publish({ error: setAside });
       } catch (cause) {
         if (generation === this.generation) {
           const denied = cause instanceof ApiError && [401, 403].includes(cause.status);

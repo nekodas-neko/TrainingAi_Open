@@ -130,33 +130,37 @@ export function WorkoutStatusSync({
     return () => listener.remove();
   }, [journal.ready, reporter]);
 
-  const pending = useRef<string | null>(null);
+  const pending = useRef<{ workoutId: string; resume: boolean } | null>(null);
   const open = useRef({ onWorkout, onWorkoutTab });
   open.current = { onWorkout, onWorkoutTab };
-  function route(workoutId: string) {
-    if (routeOpen(latest.current?.id ?? null, workoutId) === 'workout')
+  const controller = useRef(journal.controller);
+  controller.current = journal.controller;
+  function route({ workoutId, resume }: { workoutId: string; resume: boolean }) {
+    if (routeOpen(latest.current?.id ?? null, workoutId) === 'workout') {
       open.current.onWorkout(workoutId);
-    else open.current.onWorkoutTab();
+      // The paused notification's Resume button brings the app up and resumes it (#3255).
+      if (resume && latest.current?.pausedAt != null) void controller.current?.resume(workoutId);
+    } else open.current.onWorkoutTab();
   }
   useEffect(() => {
     let subscription: { remove(): void } | undefined;
     try {
       subscription = workoutStatus?.addListener('onOpen', (event) => {
-        if (journal.ready) route(event.workoutId);
-        else pending.current = event.workoutId;
+        if (journal.ready) route(event);
+        else pending.current = event;
       });
     } catch {}
     return () => subscription?.remove();
   }, [journal.ready]);
   useEffect(() => {
     if (!journal.ready) return;
-    let taken: string | null = null;
+    let taken: { workoutId: string; resume: boolean } | null = null;
     try {
       taken = workoutStatus?.takeOpenRequest() ?? null;
     } catch {}
-    const workoutId = pending.current ?? taken;
+    const request = pending.current ?? taken;
     pending.current = null;
-    if (workoutId) route(workoutId);
+    if (request) route(request);
   }, [journal.ready]);
   return null;
 }

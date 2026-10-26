@@ -66,7 +66,7 @@ export async function GET() {
     const day = toAestDay(ws.startedAt, tz)
     const volumeKg = ws.exercises.reduce((sum, ex) => sum + (ex.volume ?? 0), 0)
     const list = sessionsByDate.get(day) ?? []
-    list.push({ startedAt: ws.startedAt, completedAt: ws.completedAt ?? null, volumeKg })
+    list.push({ startedAt: ws.startedAt, completedAt: ws.completedAt ?? null, volumeKg, pausedSec: ws.pausedSec })
     sessionsByDate.set(day, list)
   }
 

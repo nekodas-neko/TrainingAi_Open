@@ -288,8 +288,8 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
   'activity.yesterday_movement': {
     id: 'activity.yesterday_movement', pillar: 'activity', shape: 'sweet_spot', reference: 'guarded', points: 0, daytime: true,
     unavailable:
-      'Retired in model version 4: yesterday\'s activity is scored as load, not as a step target reached '
-      + '(`activity.yesterday_load`, #2826). The id stays so rows from versions 1–3 remain readable.',
+      'Retired in model version 5: yesterday\'s activity is scored as load, not as a step target reached '
+      + '(`activity.yesterday_load`, #2826). The id stays so rows from versions 1–4 remain readable.',
   },
   'activity.yesterday_load': {
     id: 'activity.yesterday_load', pillar: 'activity', shape: 'steady', reference: 'learned', points: 7, daytime: true,
@@ -385,7 +385,7 @@ export const SHADOW_PILLARS: readonly ShadowReadinessPillar[] = ['sleep', 'heart
 /**
  * Pillar totals float (#2833): a pillar is worth the points of the units inside it, so a unit added,
  * shared or cut moves its own pillar and nothing else. At version 3 these were fixed at Sleep 30 ·
- * Heart 30 · Activity 20 · Body 20; version 4 gives Sleep 30 · Heart 23.5 · Activity 20 · Body 20,
+ * Heart 30 · Activity 20 · Body 20; version 5 gives Sleep 30 · Heart 23.5 · Activity 20 · Body 20,
  * the Heart difference being the 6.5 points the HRV + resting HR pattern gave up.
  */
 export const PILLAR_POINTS: Record<ShadowReadinessPillar, number> = Object.fromEntries(

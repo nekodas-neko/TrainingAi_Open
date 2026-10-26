@@ -10,6 +10,7 @@
  * counts as final only once it was written `ACTIVITY_FINAL_GRACE_HOURS` after the day ended.
  */
 import type { WorkoutRepository } from '@/lib/data/repository'
+import { reportServerError } from '@/lib/observability'
 import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { activityContributorsRow, type ActivityDay } from '@trainingai/shared/health/activity-day'
 import { loadActivityDay, type LoadActivityDayOptions } from '@trainingai/shared/health/activity-day-load'
@@ -80,4 +81,24 @@ export async function finaliseActivityDay(
   const day = await scoreFinishedActivityDay(repo, userId, tz, date, now, options)
   await storeFinishedActivityDay(repo, userId, date, day, now)
   return day
+}
+
+const backgroundPassInFlight = new Set<string>()
+
+/**
+ * Runs the background finalise pass unless one is already running for this user, and returns whether
+ * it started. A morning's reads (readiness, Body Battery, the day screens) arrive together, and each
+ * ran its own pass over the same stale days: four parallel payload reads scored 7 days 28 times and
+ * called `getHrForWindow` 32 times, on a deliberately small pool. The skipped reads lose nothing:
+ * the running pass covers the days they would have, and a day it misses is stale on the next read.
+ */
+export function runBackgroundFinalise(userId: string, pass: () => Promise<void>): boolean {
+  if (backgroundPassInFlight.has(userId)) return false
+  backgroundPassInFlight.add(userId)
+  // `Promise.resolve().then(pass)`: a synchronous throw from `pass` becomes a rejection the guard
+  // releases on, instead of escaping with the user's id left in the set for good.
+  void Promise.resolve().then(pass)
+    .catch(err => reportServerError(new Error('[activity-finalise] background pass failed', { cause: err }), { userId }))
+    .finally(() => { backgroundPassInFlight.delete(userId) })
+  return true
 }

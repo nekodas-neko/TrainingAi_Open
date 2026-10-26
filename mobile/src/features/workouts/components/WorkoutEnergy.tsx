@@ -7,16 +7,14 @@ import { AppText, Card, IconButton, Notice, Picker, Stack } from '../../../share
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { energySpec, trainingStressSpec } from '../data/models';
-import type { WorkoutRecord } from '../logging/workout';
+import { activeElapsedMs, type WorkoutRecord } from '../logging/workout';
 import { formatDayShort } from '@trainingai/shared/date-utils';
 
 export function WorkoutEnergy({ workout }: { workout: WorkoutRecord }) {
   const { theme } = useTheme();
   const [activityId, setActivityId] = useState(DEFAULT_ACTIVITY_ID);
-  const minutes = Math.max(
-    0,
-    ((workout.completedAt ?? workout.startedAt) - workout.startedAt) / 60_000,
-  );
+  // Paused time is not exercise: a call in the middle of a session is not burned off (#3255).
+  const minutes = activeElapsedMs(workout, workout.completedAt ?? workout.startedAt) / 60_000;
   const enabled = workout.pending.length === 0 && minutes > 0;
   const energy = useWorkoutResource(energySpec(workout.id, minutes, activityId), enabled);
   const stress = useWorkoutResource(trainingStressSpec(workout.date), enabled);

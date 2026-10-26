@@ -103,7 +103,7 @@ export async function completeWorkoutFromPayload(
   userId: string,
   payload: CompleteWorkoutPayload,
 ): Promise<{ alreadyCompleted: boolean; programSessionId: string | null }> {
-  const { workoutSessionId, completedAtMs } = payload
+  const { workoutSessionId, completedAtMs, pausedSec } = payload
   // Lazy import: same static-import-of-async-Turbopack-module edge as
   // lib/workout/log-exercise.ts (see docs/superpowers/plans/
   // 2026-07-05-log-exercise-turbopack-dev-fix.md) — this module is also
@@ -119,7 +119,11 @@ export async function completeWorkoutFromPayload(
   }
 
   const completedAt = resolveCompletedAt(completedAtMs, existing.startedAt)
-  const stamped = await repo.completeWorkoutSession(workoutSessionId, userId, completedAt)
+  // The phone's pause total can't exceed the span it sits in; a longer one is a bad clock reading,
+  // and is cut to the span rather than refused, as `completedAtMs` above is (#3266).
+  const spanSec = Math.max(0, Math.floor((completedAt.getTime() - existing.startedAt.getTime()) / 1000))
+  const paused: [number] | [] = pausedSec === undefined ? [] : [Math.min(pausedSec, spanSec)]
+  const stamped = await repo.completeWorkoutSession(workoutSessionId, userId, completedAt, ...paused)
   const alreadyCompleted = !stamped
 
   const programSessionId = await repo.getWorkoutSessionProgramSessionId(userId, workoutSessionId)

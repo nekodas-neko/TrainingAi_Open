@@ -107,8 +107,9 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       unsubscribe?.();
     };
   }, []);
+  // A paused workout's rest is not running down: no cue, until Resume moves its end on (#3255).
   const restWorkout = journal.data.workouts.find(
-    (x) => x.status === 'active' && x.rest && x.timers.restCues,
+    (x) => x.status === 'active' && x.rest && x.timers.restCues && x.pausedAt == null,
   );
   const restDeadline = restWorkout?.rest?.endsAt;
   const restCueId = restWorkout?.rest

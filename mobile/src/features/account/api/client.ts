@@ -17,6 +17,10 @@ export class ApiError extends Error {
     this.path = path;
   }
 }
+/** A 400 or 422 means the server will never take this write, so retrying it only blocks the queue. */
+export function isRejectedForGood(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 400 || error.status === 422);
+}
 /**
  * The error for a failed response whose body (already parsed, or null) may be the paused notice.
  * Only the fixed sentence is kept, never the body's own text.
