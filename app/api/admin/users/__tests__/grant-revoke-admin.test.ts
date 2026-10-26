@@ -105,8 +105,23 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
     await pool.query('UPDATE users SET is_admin = true WHERE id = $1', [OTHER])
     asUser(OWNER)
     const { PATCH } = await import('@/app/api/admin/users/route')
-    expect((await PATCH(patch({ userId: OTHER, action: 'revoke-admin' }) as never)).status).toBe(403)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const res = await PATCH(patch({ userId: OTHER, action: 'revoke-admin' }) as never)
+    expect(res.status).toBe(403)
+    // A broken setting says so, instead of telling the owner they are not the owner.
+    expect((await res.json()).error).toMatch(/not configured/)
+    expect(warn.mock.calls.filter(c => String(c[0]).includes('no owner is configured'))).toHaveLength(1)
+    warn.mockRestore()
     expect(await isAdmin(OTHER)).toBe(true)
+  })
+
+  it('a plain non-owner admin is told only the owner can remove admin', async () => {
+    await pool.query('UPDATE users SET is_admin = true WHERE id = $1', [OTHER])
+    asUser(OTHER)
+    const { PATCH } = await import('@/app/api/admin/users/route')
+    const res = await PATCH(patch({ userId: OWNER, action: 'revoke-admin' }) as never)
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toBe('Only the owner can remove admin')
   })
 
   it('a malformed owner setting fails closed like an unset one', async () => {
@@ -120,7 +135,9 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
   it('an owner setting that names no user switches nothing off: a non-owner still cannot deactivate the real owner', async () => {
     vi.stubEnv('CLAUDE_RO_OWNER_USER_ID', UNKNOWN)
     const { PATCH } = await import('@/app/api/admin/users/route')
-    expect((await PATCH(patch({ userId: OWNER, action: 'deactivate' }) as never)).status).toBe(403)
+    const res = await PATCH(patch({ userId: OWNER, action: 'deactivate' }) as never)
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/not configured/)
     const stillActive = (await pool.query<{ is_active: boolean }>('SELECT is_active FROM users WHERE id = $1', [OWNER])).rows[0]?.is_active
     expect(stillActive).toBe(true)
   })
@@ -137,7 +154,10 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
   it('a demoted owner is still protected: another admin cannot deactivate them', async () => {
     await pool.query('UPDATE users SET is_admin = false WHERE id = $1', [OWNER])
     const { PATCH } = await import('@/app/api/admin/users/route')
-    expect((await PATCH(patch({ userId: OWNER, action: 'deactivate' }) as never)).status).toBe(403)
+    const res = await PATCH(patch({ userId: OWNER, action: 'deactivate' }) as never)
+    expect(res.status).toBe(403)
+    // The named owner is protected, and the message is the plain one: the setting is fine, the caller is not the owner.
+    expect((await res.json()).error).toBe('Only the owner can deactivate this account')
     const stillActive = (await pool.query<{ is_active: boolean }>('SELECT is_active FROM users WHERE id = $1', [OWNER])).rows[0]?.is_active
     expect(stillActive).toBe(true)
   })

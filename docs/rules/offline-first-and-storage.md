@@ -110,10 +110,14 @@ any device that still holds the old rows. The guarantees, and where each lives:
 - **A device records which user id owns its local store** (`lib/local-store/device-owner.ts`;
   Preview: `src/features/account/device-record.ts`). Signing in as a different id wipes before any read or sync.
   `getLocalStore` answers null while another account's rows are there. This is what covers delete then re-signup.
-  **A device with no record is not adopted blindly:** local rows carry no account id, so a phone that
-  never opened the app as the old user cannot say whose rows it holds. Empty store: claimed. Any rows:
-  wiped first, then claimed. A phone upgrading with changes it never synced loses them once. Preview
-  does the same for other accounts' scopes. An empty user id is never recorded as an owner.
+  **A device with no record** (every install, on the first launch of the version that records one)
+  looks at its store and at how the session began. Empty: claimed. Rows, and the session predates the
+  update (its token has no `signedInAt`, so it is the session that wrote them): **adopted, nothing
+  wiped, outbox kept.** Rows, and a fresh sign-in (it has `signedInAt`): the delete-then-re-signup case,
+  so the account's own queued writes are pushed first (best effort; outbox only, no stranded-row
+  sweep), then everything is wiped and claimed. If either look fails the store stays closed and the
+  next call asks again. Queued localStorage uploads count as data; cached responses do not. An empty
+  user id is never recorded as an owner.
 - **A wipe that fails opens nothing.** The epoch record, and the cookie the server's gate reads, are
   written only after every clear (each SQLite table, the cache) succeeded. A partial wipe keeps the
   gate closed and the next launch wipes again; the clears raise instead of being swallowed.
