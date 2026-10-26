@@ -21,6 +21,7 @@ import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { fetchOuraDocument, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbiddenError, OuraUnauthorizedError } from './data'
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, mapRingBatteryRows, OURA_DELETE_TYPES, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
+import { isRingBatteryBackedOff, markRingBatteryRefused, resetRingBatteryBackoff } from './ring-battery-backoff'
 import { reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraBatteryStore, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import type { StillRhrRefresh } from './still-rhr'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
@@ -351,8 +352,7 @@ export const RING_BATTERY_TRIGGERS: ReadonlySet<string> = HEART_RATE_TRIGGERS
 /** The furthest back one read goes; the connect backfill reads further. */
 export const RING_BATTERY_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000
 export const RING_BATTERY_MIN_INTERVAL_MS = 5 * 60 * 1000
-/** After a refusal (401, 403, or a connection needing the user), the read waits this long before trying again. */
-export const RING_BATTERY_REFUSED_BACKOFF_MS = 24 * 60 * 60 * 1000
+export { RING_BATTERY_REFUSED_BACKOFF_MS } from './ring-battery-backoff'
 /** Oura uploads in batches, so each read starts behind the newest stored reading, as the heart-rate one does. */
 export const RING_BATTERY_OVERLAP_MS = HEART_RATE_OVERLAP_MS
 
@@ -389,16 +389,14 @@ export async function catchUpOuraCloudRingBattery(
 
 const ringBatteryLastRun = new Map<string, number>()
 // A persistent refusal (the scope for this read is a guess, `OURA_SCOPE_FOR.ring_battery`) would
-// otherwise re-run on every sync past the 5-minute throttle and report each time. Held in this
-// process, so a restart retries once more; that is a bounded cost, a day-long cache is not persisted.
-const ringBatteryRefusedAt = new Map<string, number>()
+// otherwise re-run on every sync past the 5-minute throttle and report each time, so it backs off
+// (`ring-battery-backoff.ts`); connecting again or refreshing the token clears it.
 
 /** Starts `catchUpOuraCloudRingBattery` in the background, throttled per user. Never throws. */
 export function startOuraCloudRingBatteryCatchUp(deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now()): void {
   const last = ringBatteryLastRun.get(userId)
   if (last !== undefined && now - last < RING_BATTERY_MIN_INTERVAL_MS) return
-  const refusedAt = ringBatteryRefusedAt.get(userId)
-  if (refusedAt !== undefined && now - refusedAt < RING_BATTERY_REFUSED_BACKOFF_MS) return
+  if (isRingBatteryBackedOff(userId, now)) return
   ringBatteryLastRun.set(userId, now)
   catchUpOuraCloudRingBattery(deps, userId, now).catch(err => {
     // The scope for this read is a guess (`OURA_SCOPE_FOR.ring_battery`), so a refusal is reported, never silent.
@@ -407,7 +405,7 @@ export function startOuraCloudRingBatteryCatchUp(deps: Pick<OuraWebhookDeps, 're
       : err instanceof OuraReauthRequiredError ? 'the connection needs the user to connect again'
       : null
     if (refused) {
-      ringBatteryRefusedAt.set(userId, now)
+      markRingBatteryRefused(userId, now)
       console.warn(`[oura] ring-battery read refused: ${refused}`)
       reportOuraCloudIssue('webhook-ring-battery:refused', `the ring-battery read was refused: ${refused}`, { userId })
       return
@@ -421,5 +419,5 @@ export function startOuraCloudRingBatteryCatchUp(deps: Pick<OuraWebhookDeps, 're
 /** Test seam: forget the per-user throttle. */
 export function resetOuraCloudRingBatteryThrottle(): void {
   ringBatteryLastRun.clear()
-  ringBatteryRefusedAt.clear()
+  resetRingBatteryBackoff()
 }

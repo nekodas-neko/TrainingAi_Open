@@ -2,7 +2,7 @@
 // against Postgres (the route test mocks the repo, so this covers the DB layer).
 //
 // Runs only against a real local dev Postgres — skips cleanly in CI without DATABASE_URL.
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest'
 
 const canRun = !!process.env.DATABASE_URL
 const TEST_USER_ID = '00000000-0000-4000-8000-0000000ba770'
@@ -102,8 +102,8 @@ describe.skipIf(!canRun)('oura battery-poll persistence', () => {
 
     const to = new Date('2026-10-20T12:00:00Z')
 
-    it('returns every reading in the last two days and one per hour before that', async () => {
-      // Five days back: four readings in one hour (the middle two charging) and one the next hour.
+    it('returns every reading in the last two days, and before that one per hour plus the rows that mark a charge', async () => {
+      // Five days back: four readings in one hour (a charge: 70 reported charging, 75 a rise) and one the next hour.
       await at('2026-10-15T03:00:00Z', 80, false)
       await at('2026-10-15T03:15:00Z', 70, true, 'oura_cloud')
       await at('2026-10-15T03:30:00Z', 75, null)
@@ -116,6 +116,8 @@ describe.skipIf(!canRun)('oura battery-poll persistence', () => {
 
       const got = await repo.getRingBatteryReadings(USER, new Date('2026-06-01T00:00:00Z'), to)
       expect(got.map(r => [new Date(r.tsMs).toISOString(), r.percent, r.charging])).toEqual([
+        ['2026-10-15T03:15:00.000Z', 70, true],   // kept: reported as charging, and the row before the rise
+        ['2026-10-15T03:30:00.000Z', 75, null],   // kept: a rise
         ['2026-10-15T03:45:00.000Z', 74, true],   // last of the hour; charging because one reading was
         ['2026-10-15T04:05:00.000Z', 72, false],
         ['2026-10-19T08:00:00.000Z', 60, false],
@@ -133,22 +135,76 @@ describe.skipIf(!canRun)('oura battery-poll persistence', () => {
 
     it('does not prune old readings when a Bluetooth poll is stored', async () => {
       await at('2026-03-01T00:00:00Z', 90, false)
-      await repo.insertOuraBatteryPoll(USER, 55, false)
-      const { rows } = await pool.query(`SELECT count(*)::int AS n FROM oura_ble_battery_poll WHERE user_id = $1 AND measured_at < '2026-04-01'`, [USER])
-      expect(rows[0].n).toBe(1)
+      // A prune was throttled to once a day per process, and the tests above already store polls, so
+      // it would never fire here. A fresh module has an untouched throttle: a prune would run now.
+      vi.resetModules()
+      const { getRepository } = await import('@/lib/data')
+      const { getPool } = await import('@/lib/data/postgres/client')
+      const fresh = await getRepository()
+      try {
+        await fresh.insertOuraBatteryPoll(USER, 55, false)
+        await new Promise(resolve => setTimeout(resolve, 500)) // a prune is fire-and-forget
+        const { rows } = await pool.query(`SELECT count(*)::int AS n FROM oura_ble_battery_poll WHERE user_id = $1 AND measured_at < '2026-04-01'`, [USER])
+        expect(rows[0].n).toBe(1)
+      } finally {
+        await getPool().end()
+      }
     })
 
-    it('stores each instant once when two catch-ups run together', async () => {
+    it('stores each instant once when catch-ups run together', async () => {
+      // A cold pool opens its connections one at a time and so serialises the transactions; with the
+      // pool warm every call gets its own connection and the lock is what keeps the instants single.
+      await Promise.all(Array.from({ length: 8 }, () => pool.query('SELECT pg_sleep(0.05)')))
       const t0 = new Date('2026-10-10T00:00:00Z')
-      const batch = Array.from({ length: 20 }, (_, i) => ({ measuredAt: new Date(t0.getTime() + i * 900_000), percent: 90 - i, charging: null }))
+      const batch = Array.from({ length: 200 }, (_, i) => ({ measuredAt: new Date(t0.getTime() + i * 900_000), percent: 90 - (i % 50), charging: null }))
       const inserted = await Promise.all([
         repo.insertOuraCloudBatteryReadings(USER, batch),
         repo.insertOuraCloudBatteryReadings(USER, batch),
+        repo.insertOuraCloudBatteryReadings(USER, batch),
         repo.insertOuraCloudBatteryReadings(USER, batch.slice(5)),
+        repo.insertOuraCloudBatteryReadings(USER, batch.slice(50)),
       ])
-      expect(inserted.reduce((a, b) => a + b, 0)).toBe(20)
+      expect(inserted.reduce((a, b) => a + b, 0)).toBe(200)
       const { rows } = await pool.query(`SELECT count(*)::int AS n, count(DISTINCT measured_at)::int AS d FROM oura_ble_battery_poll WHERE user_id = $1`, [USER])
-      expect(rows[0]).toEqual({ n: 20, d: 20 })
+      expect(rows[0]).toEqual({ n: 200, d: 200 })
+    })
+
+    it('keeps the rows around a charge, so the summary reads its length back from the hourly part', async () => {
+      // Ten days back (all hourly): a reading every 5 min, falling 1 point per 30 min, with a charge of
+      // exactly 45 min (last level before the rise at 04:00, last rise at 04:45), held full to 05:30.
+      const day = Date.parse('2026-10-10T00:00:00Z')
+      const rows: [number, number, boolean][] = []
+      for (let m = 0; m <= 12 * 60; m += 5) {
+        let percent: number, charging = false
+        if (m < 240) percent = 90 - Math.floor(m / 30)
+        else if (m <= 285) { percent = Math.min(100, 82 + (m - 240) / 5 * 2); charging = m > 240 }
+        else if (m <= 330) { percent = 100; charging = true }
+        else percent = 100 - Math.floor((m - 330) / 30)
+        rows.push([day + m * 60_000, percent, charging])
+      }
+      for (const [t, percent, charging] of rows) await at(new Date(t).toISOString(), percent, charging)
+
+      const got = await repo.getRingBatteryReadings(USER, new Date('2026-06-01T00:00:00Z'), to)
+      expect(got.length).toBeLessThan(rows.length) // still bounded: the plateaus fall to one an hour
+      const { summariseRingBattery } = await import('@trainingai/shared/health/ring-battery-health')
+      const health = summariseRingBattery(got, 'Australia/Brisbane', to.getTime())
+      expect(Math.abs(health.avgChargeSec! - 45 * 60)).toBeLessThanOrEqual(5 * 60)
+    })
+
+    it('buckets the hour in UTC whatever the session timezone', async () => {
+      // 03:15 and 03:45 UTC share a UTC hour; in a +05:30 session they would fall in different ones.
+      await at('2026-10-01T03:15:00Z', 80, false)
+      await at('2026-10-01T03:45:00Z', 79, false)
+      const { Pool } = await import('pg')
+      const { drizzle } = await import('drizzle-orm/node-postgres')
+      const { getRingBatteryReadings } = await import('@/lib/data/postgres/slices/oura')
+      const own = new Pool({ connectionString: process.env.DATABASE_URL, max: 1, options: '-c timezone=Asia/Kolkata' })
+      try {
+        const got = await getRingBatteryReadings(drizzle(own) as never, USER, new Date('2026-09-01T00:00:00Z'), to)
+        expect(got.map(r => r.percent)).toEqual([79])
+      } finally {
+        await own.end()
+      }
     })
   })
 })

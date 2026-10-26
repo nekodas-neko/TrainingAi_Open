@@ -1616,31 +1616,45 @@ export const RING_BATTERY_DETAIL_MS = 2 * 86_400_000
  * Cloud more sparsely) and the chart reads 120 days on each foreground, which unbounded is tens of
  * thousands of rows. So the last `RING_BATTERY_DETAIL_MS` (2 days) come back in full, and anything
  * older as one reading per UTC hour: the last level of the hour, reported as charging if any reading
- * in that hour was. At most ~24 rows a day for the older part, ~3,000 for 120 days, and the drain and
- * charge maths (neighbours up to 8 h apart, rises as charges) read an hourly line the same way.
- * Detail is measured back from `to`, not from the clock, so a caller choosing its window gets a
- * deterministic cut.
+ * in that hour was. Detail is measured back from `to`, not from the clock, so a caller choosing its
+ * window gets a deterministic cut.
+ *
+ * The hourly part also keeps every row that marks a charge: a row reported as charging, a row whose
+ * level rose from the one before, and the row before a rise. The summary infers a charge session from
+ * the first reading before a rise to the last rise, so "last of the hour" alone pushed both ends
+ * outward (a 45-minute charge read as ~90). The charge time is therefore exact in the hourly part
+ * too; the cost is a few dozen extra rows per charge, and the drain maths (neighbours up to 8 h
+ * apart, falls only) is unaffected by finer neighbours. This was chosen over sending only a summary
+ * because the series, the client's own maths and the preview all read the same readings.
  */
 export async function getRingBatteryReadings(
   db: Db, userId: string, from: Date, to: Date,
 ): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>> {
   const detailFrom = new Date(to.getTime() - RING_BATTERY_DETAIL_MS)
+  // The hour bucket is pinned to UTC so a session timezone with a half-hour offset cannot shift it.
   const { rows } = await db.execute<{ measured_at: Date; percent: number; charging: boolean | null }>(sql`
-    SELECT measured_at, percent, charging FROM (
-      SELECT measured_at, percent,
-             bool_or(charging) OVER (PARTITION BY date_trunc('hour', measured_at)) AS charging,
-             row_number() OVER (PARTITION BY date_trunc('hour', measured_at) ORDER BY measured_at DESC) AS rn
-        FROM oura_ble_battery_poll
-       WHERE user_id = ${userId} AND measured_at >= ${from.toISOString()}::timestamptz
-         AND measured_at < ${detailFrom.toISOString()}::timestamptz AND measured_at <= ${to.toISOString()}::timestamptz
-    ) hourly
-    WHERE rn = 1
-    UNION ALL
-    SELECT measured_at, percent, charging
-      FROM oura_ble_battery_poll
-     WHERE user_id = ${userId} AND measured_at >= ${from.toISOString()}::timestamptz
-       AND measured_at >= ${detailFrom.toISOString()}::timestamptz AND measured_at <= ${to.toISOString()}::timestamptz
-    ORDER BY measured_at ASC`)
+    SELECT measured_at, percent,
+           CASE WHEN rn = 1 THEN hour_charging ELSE charging END AS charging
+      FROM (
+        SELECT measured_at, percent, charging, prev_percent, next_percent,
+               bool_or(charging) OVER (PARTITION BY hr) AS hour_charging,
+               row_number() OVER (PARTITION BY hr ORDER BY measured_at DESC) AS rn
+          FROM (
+            SELECT measured_at, percent, charging,
+                   date_trunc('hour', measured_at, 'UTC') AS hr,
+                   lag(percent) OVER (ORDER BY measured_at) AS prev_percent,
+                   lead(percent) OVER (ORDER BY measured_at) AS next_percent
+              FROM oura_ble_battery_poll
+             WHERE user_id = ${userId} AND measured_at >= ${from.toISOString()}::timestamptz
+               AND measured_at <= ${to.toISOString()}::timestamptz
+          ) w
+      ) x
+     WHERE measured_at >= ${detailFrom.toISOString()}::timestamptz
+        OR rn = 1
+        OR charging IS TRUE
+        OR percent > prev_percent
+        OR next_percent > percent
+     ORDER BY measured_at ASC`)
   return rows.map(r => ({ tsMs: new Date(r.measured_at).getTime(), percent: Number(r.percent), charging: r.charging }))
 }
 
