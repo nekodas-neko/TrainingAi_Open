@@ -136,7 +136,7 @@ test('the reminder text does not move when the estimate appears beside it', () =
 test('planAlerts schedules a meal reminder that carries the answer actions\' data', () => {
   const settings = platformSchema.parse({ scope: 'u1' });
   const [reminder] = estimateReminders(reminderInput);
-  const alerts = planAlerts(settings, [], null, Date.parse('2026-10-26T00:00:00Z'), false, [reminder]);
+  const alerts = planAlerts(settings, [], null, Date.parse('2026-10-26T00:00:00Z'), [reminder]);
   assert.equal(alerts.length, 1);
   const [alert] = alerts;
   assert.equal(alert.id, 'u1:meal-estimate:2026-10-26:m1');
@@ -144,9 +144,9 @@ test('planAlerts schedules a meal reminder that carries the answer actions\' dat
   assert.deepEqual(alert.mealEstimate, { planMealId: 'm1', date: '2026-10-26' });
   assert.deepEqual(alert.trigger, { at: reminder.at });
   // Unchanged inputs give an unchanged signature, so the scheduler leaves it alone.
-  const again = planAlerts(settings, [], null, Date.parse('2026-10-26T01:00:00Z'), true, [reminder]);
+  const again = planAlerts(settings, [], null, Date.parse('2026-10-26T01:00:00Z'), [reminder]);
   assert.equal(alertSignature(again[0]), alertSignature(alert));
-  assert.deepEqual(planAlerts(settings, [], null, 0, false), []);
+  assert.deepEqual(planAlerts(settings, [], null, 0), []);
 });
 
 test('a reminder for a meal the plan has not loaded yet has no target, so it can be answered later', () => {

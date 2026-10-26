@@ -9,17 +9,17 @@ export function planAlerts(
   workouts: WorkoutRecord[],
   activity: ActivitySession | null,
   now = Date.now(),
-  foreground = false,
   mealReminders: MealEstimateReminder[] = [],
 ): Alert[] {
   const scope = settings.scope;
   const result: Alert[] = [];
   for (const workout of workouts) {
-    // The rest cue's alarm must survive backgrounding (#3062); the Alerts setting adds one when
-    // the cue is off. The last set's rest on the exercise summary alarms too (#3111).
+    // The rest cue's alarm must survive backgrounding (#3062). The last set's rest on the
+    // exercise summary alarms too (#3111).
     if (
-      (workout.timers.restCues || (!foreground && settings.restAlerts)) &&
+      workout.timers.restCues &&
       workout.status === 'active' &&
+      workout.pausedAt == null &&
       workout.rest &&
       workout.rest.endsAt > now
     ) {
@@ -160,4 +160,27 @@ export function planAlerts(
     });
   }
   return result;
+}
+
+/** Whether anything the user has switched on needs notification permission to work. */
+export function wantsNotifications(settings: PlatformSettings, restCueOn: boolean) {
+  return restCueOn || settings.walkCues || settings.reminders.some((row) => row.enabled);
+}
+
+/** The Rest timer alarm row in Preview settings (#3083): the rest cue drives the alarm, there is no switch of its own. */
+export const restAlarmRow = {
+  title: 'Rest timer alarm',
+  caption: "Follows each workout's rest cue. Turn the cue on in the workout to get the alarm.",
+  blockedLabel: 'Blocked',
+  blockedCaption:
+    "Android has notifications turned off for this app, so the rest alarm can't sound with the screen off.",
+} as const;
+
+/** True when something switched on needs notification permission and Android has refused it. */
+export function notificationsBlocked(
+  settings: PlatformSettings,
+  restCueOn: boolean,
+  permission: boolean,
+) {
+  return !permission && wantsNotifications(settings, restCueOn);
 }

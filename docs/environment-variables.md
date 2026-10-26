@@ -61,6 +61,15 @@ Optional:
   if none of those is set the views return **zero rows**, which is fail-closed and is why
   `/api/admin/db-query` answering nothing is a missing setting rather than a quiet production. The
   boot log names the variable it used.
+  **The same three variables decide who the protected owner is** (#3368, `lib/admin-owner.ts`): only
+  that account removes admin from anyone, and nobody else deactivates it (or, with #3369, resets or
+  deletes it). Same order: `CLAUDE_RO_OWNER_USER_ID`, then `ADMIN_EXPORT_USER_ID`, then
+  `WEBHOOK_USER_ID`. The id must be a uuid that names an **existing, active admin**; anything else
+  (unset, malformed, no such user, a non-admin, a database error) leaves the owner unresolved, which
+  fails closed: no one can remove admin, and no admin account can be deactivated. So changing one of
+  these changes who is protected, not just which rows the audit views show. The day-review export
+  and the agent key do **not** use this helper; they read `ADMIN_EXPORT_USER_ID ?? WEBHOOK_USER_ID`
+  directly.
   **When you add a table, re-run `CLAUDE_RO_OWNER_USER_ID=<id> node scripts/generate-claude-ro-views.js`
   into a NEW migration number** (never overwrite the previous one — `ensureSchema` tracks by filename,
   so an edited already-applied migration is skipped forever and the change silently never lands) — the schema is default-deny, so a new table is unreadable

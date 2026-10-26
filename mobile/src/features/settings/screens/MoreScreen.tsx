@@ -49,6 +49,7 @@ export function MoreScreen({
   openData,
   openDevices,
   openAbout,
+  openAdmin,
   openYear,
   openCollection,
   openFriendProfile,
@@ -63,6 +64,7 @@ export function MoreScreen({
   openData: () => void;
   openDevices: () => void;
   openAbout: () => void;
+  openAdmin: () => void;
   openYear: () => void;
   openCollection: () => void;
   openFriendProfile: (id: string) => void;
@@ -282,6 +284,7 @@ export function MoreScreen({
                   <FeatureRow
                     density="snug"
                     title="Admin Console"
+                    onPress={openAdmin}
                     leading={<Icon name="shieldPlain" tone="muted" size={theme.sizes.iconCompact} />}
                     divider={false}
                   />

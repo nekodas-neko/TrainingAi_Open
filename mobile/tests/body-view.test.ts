@@ -9,6 +9,7 @@ import {
   signedRate,
   sleepChips,
   sleepTimeRange,
+  sleepWokeEnd,
   titleCaseWords,
   waterGoalText,
   waterText,
@@ -31,19 +32,28 @@ test('a fitted rate that rounds to minus zero prints +0, as the current app does
   assert.equal(signedRate(0.3), '+0.3');
 });
 
-test('the sleep range starts at the raw bedtime and ends at the ring wake time', () => {
+test('the sleep range starts at the raw bedtime and ends at the time you woke', () => {
   const row = night({
     sleepStart: '2026-10-16T12:00:00.000Z',
     sleepEnd: '2026-10-16T20:07:00.000Z',
     phaseWindowStart: '2026-10-16T12:00:00.000Z',
     phaseWindowEnd: '2026-10-16T20:03:00.000Z',
-    sleepPhase5Min: '4' + '2'.repeat(95),
+    sleepPhase5Min: '4' + '2'.repeat(96),
   });
-  // UTC+10: 22:00 to 06:03. The recorded wake wins over the padded sleepEnd.
+  // UTC+10: 22:00 to 06:03. A night that ends asleep ends at the recorded wake, not the padded sleepEnd.
   assert.equal(
     sleepTimeRange(row, 'Australia/Brisbane')?.replace(/\s/g, ' '),
     '10:00 pm – 6:03 am',
   );
+  // Twenty minutes lying awake before the window closes: the range ends where the sleep did (06:05 local), not at the window's 06:23.
+  const inBed = night({
+    sleepStart: '2026-10-16T12:00:00.000Z',
+    sleepEnd: '2026-10-16T20:23:00.000Z',
+    phaseWindowStart: '2026-10-16T12:00:00.000Z',
+    phaseWindowEnd: '2026-10-16T20:23:00.000Z',
+    sleepPhase5Min: '4' + '2'.repeat(96) + '4444',
+  });
+  assert.equal(sleepWokeEnd(inBed), '2026-10-16T20:05:00.000Z');
   assert.equal(sleepTimeRange(night(), 'Australia/Brisbane'), null);
   assert.equal(sleepTimeRange(undefined, 'Australia/Brisbane'), null);
 });

@@ -34,7 +34,7 @@ const Context = createContext<{
   calendar: CalendarStore | null;
   alertError: string | null;
   permission: boolean;
-  enableAlerts: (key?: 'restAlerts' | 'walkCues') => Promise<void>;
+  enableAlerts: (key?: 'walkCues') => Promise<void>;
   refresh: () => void;
   opened: Record<string, unknown> | null;
 } | null>(null);
@@ -113,8 +113,9 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       unsubscribe?.();
     };
   }, []);
+  // A paused workout's rest is not running down: no cue, until Resume moves its end on (#3255).
   const restWorkout = journal.data.workouts.find(
-    (x) => x.status === 'active' && x.rest && x.timers.restCues,
+    (x) => x.status === 'active' && x.rest && x.timers.restCues && x.pausedAt == null,
   );
   const restDeadline = restWorkout?.rest?.endsAt;
   const restCueId = restWorkout?.rest
@@ -169,7 +170,6 @@ export function PlatformProvider({ children }: PropsWithChildren) {
             journal.data.workouts,
             activity.session,
             Date.now(),
-            foreground,
             lastMealReminders.current,
           ),
         )
@@ -200,7 +200,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       void stores.calendar?.sync(journal.data.workouts, state.settings).catch(() => {});
   }, [state, stores.calendar, journal.ready, journal.data.workouts, tick]);
   const enableAlerts = useCallback(
-    async (key?: 'restAlerts' | 'walkCues') => {
+    async (key?: 'walkCues') => {
       if (!stores.settings) throw new Error('Sign in to enable alerts.');
       const allowed = await alertPermission(true);
       setPermission(allowed);

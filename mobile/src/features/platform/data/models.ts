@@ -27,7 +27,6 @@ export type Reminder = z.infer<typeof reminderSchema>;
 export const platformSchema = z
   .object({
     scope: z.string().min(1),
-    restAlerts: z.boolean().default(false),
     walkCues: z.boolean().default(false),
     keepAwake: z.boolean().default(true),
     reminders: z.array(reminderSchema).max(12).default([]),

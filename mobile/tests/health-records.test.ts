@@ -430,3 +430,58 @@ test('a readiness answer the server rejects with a 400 is set aside, a 500 holds
   assert.deepEqual(f.readinessAnswers, [{ date, state: 'rated' }]);
   assert.match(store.getSnapshot().error ?? '', /kept on this phone only/);
 });
+
+test('a readiness answer rejected with a 400 is set aside even when the sleep answer ahead of it posts fine (#3392)', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.respondToVerdict(date, 'corrected');
+  await store.respondToReadiness(date, 'rated');
+  await store.sync(); // let the offline attempt the answer started settle
+  f.setOnline(true);
+  const post = f.connection.post;
+  f.connection.post = async (path: string, body: unknown) => {
+    if (path === '/api/readiness-verdict') {
+      throw new ApiError(400);
+    }
+    return post(path, body);
+  };
+  await store.sync();
+  assert.equal(store.getSnapshot().verdictResponses.length, 0);
+  assert.equal(store.getSnapshot().readinessResponses.length, 0);
+  assert.match(store.getSnapshot().error ?? '', /kept on this phone only/);
+});
+
+for (const status of [401, 403]) {
+  test(`a ${status} keeps every queued Health write, sleep answer and readiness answer queued (#3392)`, async () => {
+    const f = fixture();
+    const store = f.store();
+    await store.refresh();
+    f.setOnline(false);
+    await store.addWater(250, date);
+    await store.respondToVerdict(date, 'corrected');
+    await store.respondToReadiness(date, 'rated');
+    await store.sync();
+    f.setOnline(true);
+    f.connection.post = async () => {
+      throw new ApiError(status);
+    };
+    await store.sync();
+    let state = store.getSnapshot();
+    assert.equal(state.operations.length, 1);
+    assert.match(state.error ?? '', /Saved on this phone/);
+    // The two answers sit behind the stuck write; take it out of the way to reach their loops.
+    f.connection.post = async (path: string) => {
+      if (path === '/api/sync/push') {
+        return { processed: 1, errors: [] };
+      }
+      throw new ApiError(status);
+    };
+    await store.sync();
+    state = store.getSnapshot();
+    assert.equal(state.verdictResponses.length, 1);
+    assert.equal(state.readinessResponses.length, 1);
+    assert.doesNotMatch(state.error ?? '', /kept on this phone only/);
+  });
+}

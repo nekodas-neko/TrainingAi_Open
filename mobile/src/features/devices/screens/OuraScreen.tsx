@@ -38,6 +38,7 @@ import {
   type OuraStatus,
 } from '../data/oura';
 import { ChestStrapCard } from '../components/ChestStrapCard';
+import { RingBatteryCard } from '../components/RingBatteryCard';
 import { ScaleCard } from '../components/ScaleCard';
 
 const CHECKLIST: { title: string; steps: string; page: OuraSettingsPage; button: string }[] = [
@@ -274,6 +275,7 @@ export function OuraScreen({
               divider={false}
             />
           </Card>
+          {connected && <RingBatteryCard />}
           {ouraSettingsAvailable && (
             <Section title="Keep Oura syncing in the background">
               <AppText

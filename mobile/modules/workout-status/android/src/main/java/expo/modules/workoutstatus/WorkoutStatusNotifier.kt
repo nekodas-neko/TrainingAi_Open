@@ -20,6 +20,8 @@ import org.json.JSONObject
 object WorkoutStatusNotifier {
   const val EXTRA_WORKOUT_ID = "trainingai.workoutStatus.workoutId"
   const val EXTRA_NONCE = "trainingai.workoutStatus.nonce"
+  /** Set on the paused notification's Resume button: the tap opens the app and resumes the workout. */
+  const val EXTRA_RESUME = "trainingai.workoutStatus.resume"
   const val CHANNEL_ID = "training-workout-status"
   const val NOTIFICATION_ID = 7301
   private const val PREFS = "workout-status"
@@ -155,6 +157,11 @@ object WorkoutStatusNotifier {
     } else {
       builder.setShowWhen(false)
     }
+    // Resume brings the app up and resumes there: the pause lives in the app's own journal, which
+    // only the app can write (#3266).
+    if (status.phase == WorkoutStatusPresenter.PAUSED) {
+      builder.addAction(0, "Resume", openIntent(context, status.workoutId, nowMs, resume = true))
+    }
     if (promote) {
       builder.setRequestPromotedOngoing(true)
       view.shortCriticalText?.let { builder.setShortCriticalText(it) }
@@ -164,13 +171,17 @@ object WorkoutStatusNotifier {
 
   // The app's own launch intent, so the tap brings the existing task forward rather than starting
   // a second one; the extras tell JS which workout, and the nonce stops a replay from reopening it.
-  private fun openIntent(context: Context, workoutId: String, nowMs: Long): PendingIntent? {
+  private fun openIntent(context: Context, workoutId: String, nowMs: Long, resume: Boolean = false): PendingIntent? {
     val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
       putExtra(EXTRA_WORKOUT_ID, workoutId)
-      putExtra(EXTRA_NONCE, nowMs)
+      putExtra(EXTRA_NONCE, WorkoutStatusPolicy.openNonce(nowMs, resume))
+      if (resume) putExtra(EXTRA_RESUME, true)
     } ?: return null
-    return PendingIntent.getActivity(context, 0, launch, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    // A request code of its own, so the Resume button's intent is not the tap's.
+    return PendingIntent.getActivity(
+      context, if (resume) 3 else 0, launch, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
   }
 
   private fun dismissIntent(context: Context, workoutId: String): PendingIntent {

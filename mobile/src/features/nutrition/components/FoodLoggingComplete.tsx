@@ -1,5 +1,5 @@
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
-import { calibrationProgress } from '@trainingai/shared/nutrition/calibration-progress';
+import { calibrationProgress, markedDayNote } from '@trainingai/shared/nutrition/calibration-progress';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -64,7 +64,7 @@ export function FoodLoggingComplete({
           <Stack gap="xs" style={{ flex: 1 }}>
             <AppText variant="label">Logging finished{isToday ? ' for today' : ''}</AppText>
             <AppText variant="caption" tone="muted">
-              This day counts toward your maintenance estimate
+              {markedDayNote(isToday)}
               {time ? ` · marked ${time}` : ''}
             </AppText>
           </Stack>

@@ -2,6 +2,7 @@ import { useRecordedIntake } from '../data/useRecordedIntake';
 import { balanceZone, barProgress } from '@trainingai/shared/nutrition/calorie-balance';
 import { useState } from 'react';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bandColor } from '../../../shared/theme/tokens';
 import {
   AppButton,
   AppText,
@@ -130,7 +131,7 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
             <AppText
               variant="caption"
               tone={pending ? 'muted' : undefined}
-              style={pending ? undefined : { color: zone.color, fontWeight: '600' }}
+              style={pending ? undefined : { color: bandColor(zone.color, theme.status), fontWeight: '600' }}
             >
               {pending ? 'Budget awaiting upload' : zone.label}
               {date === n.today ? ' so far' : ''}

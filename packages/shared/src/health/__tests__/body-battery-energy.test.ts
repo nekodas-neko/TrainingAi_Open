@@ -12,7 +12,7 @@ const battery = (over: Partial<BodyBatteryEnergyInput> = {}): BodyBatteryEnergyI
 })
 
 describe('energyHero', () => {
-  it("shows the day's low with the morning mark and how far it has fallen", () => {
+  it('shows the current level with the morning mark and how far it has fallen', () => {
     const hero = energyHero(battery())
     if (!hero.hasData) throw new Error('expected data')
     expect(hero.level).toBe(46)
@@ -23,11 +23,13 @@ describe('energyHero', () => {
     expect(hero.origin).toBe('set from sleep')
   })
 
-  it("never rises: a recharge leaves the number at the day's low", () => {
+  it('rises with a recharge, not held at the day\'s low', () => {
     const hero = energyHero(battery({ current: 58, series: [{ v: 76 }, { v: 40 }, { v: 58 }] }))
     if (!hero.hasData) throw new Error('expected data')
-    expect(hero.level).toBe(40)
-    expect(hero.label).toBe('Low')
+    expect(hero.level).toBe(58)
+    expect(hero.drained).toBe(18)
+    expect(hero.label).toBe('Good')
+    expect(hero.sub).toBe('woke at 76 · drained 18')
   })
 
   it('never sits above the morning mark', () => {

@@ -28,5 +28,6 @@ export type MoreDetail =
   | 'more-about'
   | 'more-devices'
   | 'more-account'
+  | 'more-admin'
   | 'year-review'
   | 'collection';
