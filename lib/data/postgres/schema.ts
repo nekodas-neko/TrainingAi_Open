@@ -56,6 +56,10 @@ export const users = pgTable('users', {
   fitnessGoal:      text('fitness_goal'),
   lastGoalReviewAt: timestamp('last_goal_review_at', { withTimezone: true }),
   timingBaselineDate: date('timing_baseline_date', { mode: 'string' }),
+  /** #3369: a session or native access token whose `signedInAt` claim (stamped at sign-in, not `iat`,
+   *  which Auth.js re-issues as a cookie ages) is earlier than this is refused. NULL = no cut-off. An
+   *  admin's "reset data" sets it, so a device still holding the old rows cannot push them back. */
+  sessionsValidFrom: timestamp('sessions_valid_from', { withTimezone: true }),
 })
 
 export const authIdentities = pgTable('auth_identities', {
