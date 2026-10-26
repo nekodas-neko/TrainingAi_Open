@@ -14,6 +14,7 @@ import {
   adminSignupCount,
 } from '../src/features/home/data/admin-pending-counts.ts';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
+import { setAsideShown } from '../src/features/home/data/set-aside-seen.ts';
 import { ApiError } from '../src/features/account/api/client.ts';
 import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
 import { bannerTone } from '../src/features/home/data/banner-data.ts';
@@ -857,7 +858,7 @@ test('the set-aside notice survives a sync and a restart, and clears once shown 
   assert.equal(again.getSnapshot().setAside, null);
 });
 
-test('a readiness push answered 200 with a rejected item sets it aside and the rest go through (#3392)', async () => {
+test('a Mood push answered 200 with a rejected item sets it aside and the rest go through (#3392)', async () => {
   const f = fixture();
   const post = f.connection.post;
   let pushes = 0;
@@ -945,7 +946,7 @@ test('a cancel while the set-aside is being written leaves the disk alone afterw
   assert.equal(writes, canceledAt);
 });
 
-test('a readiness push answered 200 with a retryable error holds the queue (#3392)', async () => {
+test('a Mood push answered 200 with a retryable error holds the queue (#3392)', async () => {
   const f = fixture();
   (f.connection as { post: unknown }).post = async (_path: string, body: unknown) => {
     const m = (body as { mutations: { id: string; domain: string; date: string }[] }).mutations[0];
@@ -1051,4 +1052,19 @@ test('a ring night\'s Woke up from the server also reads the time you woke (#342
   // A night that doesn't match the event's recorded end leaves it alone.
   const other = localTimeline([server], [], [nap], '2026-10-17', 'Australia/Brisbane');
   assert.equal(other[0].timeMs, server.timeMs);
+});
+
+test('the set-aside notice counts as seen only for a store whose notice is still its error (#3392)', () => {
+  const notice = 'One change was kept on this phone only; the server did not accept it.';
+  const none = { setAside: null, error: null };
+  const shown = { setAside: notice, error: notice };
+  const overwritten = { setAside: notice, error: 'Could not sync.' };
+  assert.deepEqual(setAsideShown(true, shown, none), { home: true, health: false });
+  assert.deepEqual(setAsideShown(true, none, shown), { home: false, health: true });
+  assert.deepEqual(setAsideShown(true, shown, shown), { home: true, health: true });
+  // A later 500 hid the notice: nothing is seen, so nothing is acknowledged.
+  assert.deepEqual(setAsideShown(true, overwritten, none), { home: false, health: false });
+  // Health's notice is on screen while Home's was overwritten: only Health is acknowledged.
+  assert.deepEqual(setAsideShown(true, overwritten, shown), { home: false, health: true });
+  assert.deepEqual(setAsideShown(false, shown, shown), { home: false, health: false });
 });

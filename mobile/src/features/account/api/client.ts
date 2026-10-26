@@ -42,6 +42,14 @@ export function isRejectedForGood(error: unknown): boolean {
   );
 }
 /**
+ * The server answered, in its own JSON, that there is nothing to answer: /api/sleep-verdict and
+ * /api/readiness-verdict send a 404 `{ error }` when no verdict was announced for that date. Waiting
+ * will not change it. An HTML or empty 404 (a proxy, or a server without the route) is not this.
+ */
+export function isNothingToAnswer(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404 && error.validation;
+}
+/**
  * The error for a failed response whose body (already parsed, or null) may be the paused notice.
  * Only the fixed sentence is kept, never the body's own text.
  */

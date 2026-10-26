@@ -22,6 +22,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHome } from '../data/HomeProvider';
 import { homeSections, sectionLabels } from '../data/models';
 import { useTrainingDays } from '../data/useTrainingDays';
+import { setAsideShown } from '../data/set-aside-seen';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { readinessSpec, profileSpec } from '../../health/data/models';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
@@ -155,18 +156,23 @@ export function HomeScreen(navigation: HomeNavigation) {
     (key) => !home.preferences.homeHiddenSections?.includes(key),
   );
   const showHome = workout.signedIn && !health.denied && !home.denied;
-  // The header shows a set-aside notice; once it has been on screen for a few seconds it is seen.
-  const setAsideShown = showHome && !!(home.setAside || health.setAside);
+  // The header shows a set-aside notice only while it is the store's current error; once it has been
+  // on screen for a few seconds it is seen, and only the store that showed it is acknowledged.
+  const shown = setAsideShown(showHome, home, health);
   useEffect(() => {
-    if (!setAsideShown) {
+    if (!shown.home && !shown.health) {
       return;
     }
     const timer = setTimeout(() => {
-      void home.store?.acknowledgeSetAside();
-      void health.store?.acknowledgeSetAside();
+      if (shown.home) {
+        home.store?.acknowledgeSetAside().catch(() => {});
+      }
+      if (shown.health) {
+        health.store?.acknowledgeSetAside().catch(() => {});
+      }
     }, SET_ASIDE_SEEN_MS);
     return () => clearTimeout(timer);
-  }, [setAsideShown, home.store, health.store]);
+  }, [shown.home, shown.health, home.setAside, health.setAside, home.store, health.store]);
   const { signups: adminSignups } = useAdminPending();
   return (
     <PageLayout

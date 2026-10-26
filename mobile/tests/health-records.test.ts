@@ -641,3 +641,53 @@ for (const status of [401, 403]) {
     assert.doesNotMatch(state.error ?? '', /kept on this phone only/);
   });
 }
+
+for (const route of ['/api/sleep-verdict', '/api/readiness-verdict']) {
+  test(`a ${route} answer the server's own 404 says has nothing to answer is dropped without a notice (#3392)`, async () => {
+    const f = fixture();
+    const store = f.store();
+    await store.refresh();
+    f.setOnline(false);
+    await store.respondToVerdict(date, 'corrected');
+    await store.respondToReadiness(date, 'rated');
+    await store.sync();
+    f.setOnline(true);
+    const post = f.connection.post;
+    (f.connection as { post: unknown }).post = async (path: string, body: unknown) => {
+      if (path === route) {
+        throw new ApiError(404, undefined, undefined, undefined, true);
+      }
+      return post(path, body);
+    };
+    await store.sync();
+    assert.equal(store.getSnapshot().verdictResponses.length, 0);
+    assert.equal(store.getSnapshot().readinessResponses.length, 0);
+    assert.equal(store.getSnapshot().setAside, null);
+    assert.doesNotMatch(store.getSnapshot().error ?? '', /kept on this phone only/);
+  });
+
+  test(`a ${route} 404 that is not the server's JSON (a proxy page, or no route) holds the answer (#3392)`, async () => {
+    const f = fixture();
+    const store = f.store();
+    await store.refresh();
+    f.setOnline(false);
+    await store.respondToVerdict(date, 'corrected');
+    await store.respondToReadiness(date, 'rated');
+    await store.sync();
+    f.setOnline(true);
+    const post = f.connection.post;
+    (f.connection as { post: unknown }).post = async (path: string, body: unknown) => {
+      if (path === route) {
+        throw new ApiError(404);
+      }
+      return post(path, body);
+    };
+    await store.sync();
+    const held =
+      route === '/api/sleep-verdict'
+        ? store.getSnapshot().verdictResponses
+        : store.getSnapshot().readinessResponses;
+    assert.equal(held.length, 1);
+    assert.equal(store.getSnapshot().setAside, null);
+  });
+}

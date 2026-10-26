@@ -11,7 +11,12 @@ import {
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
-import { ApiError, UploadRejected, isRejectedForGood } from '../../account/api/client.ts';
+import {
+  ApiError,
+  UploadRejected,
+  isNothingToAnswer,
+  isRejectedForGood,
+} from '../../account/api/client.ts';
 import { readPushAnswer } from '../../../core/sync/push-answer.ts';
 import { toAestDay, weekStartForDay } from '@trainingai/shared/date-utils';
 import { morningSchema, checkinSchema } from './checkin.ts';
@@ -614,13 +619,17 @@ export class HealthStore {
             await this.connection.post('/api/sleep-verdict', response);
           } catch (failure) {
             // A 400/422 will never be accepted; drop the answer rather than jam the queue behind it.
-            if (!isRejectedForGood(failure)) {
+            // So is a 404 in the server's own JSON (no verdict was announced that day): dropped quietly.
+            if (isNothingToAnswer(failure)) {
+              // nothing to answer, nothing to tell the person
+            } else if (!isRejectedForGood(failure)) {
               throw failure;
+            } else {
+              notice = failureNotice(
+                'One answer was kept on this phone only; the server did not accept it.',
+                failure,
+              );
             }
-            notice = failureNotice(
-              'One answer was kept on this phone only; the server did not accept it.',
-              failure,
-            );
           }
           if (generation !== this.generation) {
             return;
@@ -638,13 +647,17 @@ export class HealthStore {
             await this.connection.post('/api/readiness-verdict', response);
           } catch (failure) {
             // A 400/422 will never be accepted; drop the answer rather than jam the queue behind it.
-            if (!isRejectedForGood(failure)) {
+            // So is a 404 in the server's own JSON (no verdict was announced that day): dropped quietly.
+            if (isNothingToAnswer(failure)) {
+              // nothing to answer, nothing to tell the person
+            } else if (!isRejectedForGood(failure)) {
               throw failure;
+            } else {
+              notice = failureNotice(
+                'One answer was kept on this phone only; the server did not accept it.',
+                failure,
+              );
             }
-            notice = failureNotice(
-              'One answer was kept on this phone only; the server did not accept it.',
-              failure,
-            );
           }
           if (generation !== this.generation) {
             return;
