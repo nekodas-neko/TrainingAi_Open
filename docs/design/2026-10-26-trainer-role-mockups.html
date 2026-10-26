@@ -1,0 +1,203 @@
+<title>Trainer Role Screens</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a board of 384 px dark phone frames, three entry-point options first, then the screens every option shares. */
+:root{
+  --ground:#080b12; --surface:#111827; --surface-2:#182136; --hair:rgba(255,255,255,.08); --hair-2:rgba(255,255,255,.16);
+  --ink:#eef2f8; --ink-2:#9aa5b8; --ink-3:#6b7589; --accent:#38bdf8; --good:#34d399; --warn:#fbbf24; --bad:#fb7185;
+  --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--app);line-height:1.5;font-size:15px;
+  padding-block:40px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1300px;margin:0 auto}
+h1{margin:0 0 10px;font-size:clamp(26px,4vw,38px);letter-spacing:-.03em;line-height:1.1;text-wrap:balance}
+h2{margin:48px 0 6px;font-size:20px;letter-spacing:-.01em}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+.lede{max-width:68ch;color:var(--ink-2);margin:0 0 8px}
+.lede b{color:var(--ink)}
+.sub{color:var(--ink-3);font-size:13.5px;max-width:68ch;margin:0 0 20px}
+.board{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:10px;width:384px;max-width:100%;min-width:0}
+.cap{font-size:13px;color:var(--ink-2)} .cap b{color:var(--ink)}
+.tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:rgba(56,189,248,.14);color:var(--accent);margin-right:6px}
+.tag.rec{background:rgba(52,211,153,.16);color:var(--good)}
+/* phone: 384 css px wide */
+.phone{width:384px;max-width:100%;min-height:640px;background:var(--ground);border:1px solid var(--hair-2);border-radius:28px;padding:16px 16px 24px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.bar{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink-3);padding:0 4px}
+.top{font-size:20px;font-weight:700;letter-spacing:-.01em;padding:2px 4px}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.card h4{margin:0;font-size:13px;color:var(--ink-2);font-weight:600;letter-spacing:.01em}
+.disc{background:var(--surface);border:1px solid var(--hair);border-radius:16px;padding:0 14px;min-height:48px;display:flex;align-items:center;justify-content:space-between;font-weight:600}
+.disc small{font-weight:400;color:var(--ink-3);font-size:12.5px}
+.row{display:flex;align-items:center;gap:12px;min-height:48px}
+.av{width:40px;height:40px;border-radius:50%;background:var(--surface-2);border:1px solid var(--hair-2);display:grid;place-items:center;font-weight:700;font-size:14px;color:var(--ink-2);flex:none}
+.grow{flex:1;min-width:0} .grow b{display:block;font-weight:600} .grow span{display:block;font-size:12.5px;color:var(--ink-3)}
+.pill{font-size:11.5px;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.07);color:var(--ink-2);white-space:nowrap}
+.pill.wait{background:rgba(251,191,36,.15);color:var(--warn)} .pill.ok{background:rgba(52,211,153,.15);color:var(--good)}
+.btn{min-height:48px;border-radius:12px;border:1px solid var(--hair-2);background:var(--surface-2);color:var(--ink);font:600 15px var(--app);display:flex;align-items:center;justify-content:center;padding:0 16px;text-align:center}
+.btn.pri{background:var(--accent);color:#06222e;border-color:transparent}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:40px;font-size:13.5px;padding:0 12px}
+.btns{display:flex;gap:8px}.btns .btn{flex:1}
+.field{min-height:48px;border-radius:12px;border:1px solid var(--hair-2);background:var(--ground);display:flex;align-items:center;padding:0 14px;color:var(--ink-3)}
+.note{font-size:12.5px;color:var(--ink-2);line-height:1.45}
+.banner{border-radius:14px;border:1px solid rgba(56,189,248,.35);background:rgba(56,189,248,.09);padding:12px 14px;font-size:13px;color:var(--ink)}
+.banner b{color:var(--accent)}
+.ex{display:flex;gap:10px;align-items:center;min-height:44px;border-top:1px solid var(--hair);font-size:14px}
+.ex:first-of-type{border-top:0} .ex i{font-style:normal;color:var(--ink-3);font-family:var(--mono);font-size:11px;margin-left:auto}
+.sheet{margin-top:auto;background:var(--surface);border:1px solid var(--hair-2);border-radius:20px 20px 0 0;padding:16px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;background:var(--surface);border-radius:12px;padding:3px;gap:3px}
+.tabs span{flex:1;min-height:40px;display:grid;place-items:center;border-radius:9px;font-size:13.5px;color:var(--ink-2)}
+.tabs span.on{background:var(--surface-2);color:var(--ink);font-weight:600}
+.q{border:1px solid var(--hair-2);border-radius:16px;padding:18px 20px;background:var(--surface);max-width:760px;margin:22px 0 0}
+.q p{margin:0 0 10px} .q p:last-child{margin:0}
+</style>
+
+<div class="wrap">
+<p class="eyebrow">#2300 · trainer role · PR 3 screens</p>
+<h1>Build a program for someone, from the native app</h1>
+<p class="lede">Server side is built (tables and routes). These are the screens that sit on it, drawn in the native app's dark theme at 384 px. <b>The decision needed is where it lives.</b> The screens after the three options are the same whichever you pick.</p>
+<p class="sub">Names and programs below are examples. The program always arrives on the other person's phone <b>inactive</b>: their current program keeps running until they choose to start the new one.</p>
+
+<h2>Where does it live?</h2>
+<p class="sub">Three entry points, same data underneath.</p>
+<div class="board">
+
+<div class="col">
+<div class="cap"><span class="tag rec">Recommended</span><b>A. A "Coaching" section on the Program screen</b></div>
+<div class="phone">
+ <div class="bar"><span>9:41</span><span>Program</span></div>
+ <div class="top">Program</div>
+ <div class="disc">Programs <small>3</small></div>
+ <div class="card">
+  <h4>COACHING</h4>
+  <div class="row"><div class="av">SK</div><div class="grow"><b>Sam K.</b><span>2 programs sent</span></div><span class="pill ok">Training</span></div>
+  <div class="row"><div class="av">?</div><div class="grow"><b>Waiting for Alex</b><span>Asked 2 days ago</span></div><span class="pill wait">Pending</span></div>
+  <div class="btn">Add someone to train</div>
+ </div>
+ <div class="card">
+  <h4>YOUR TRAINERS</h4>
+  <div class="row"><div class="av">JR</div><div class="grow"><b>Jo R. wants to train you</b><span>They can send you programs. You choose when to start one.</span></div></div>
+  <div class="btns"><div class="btn pri sm">Accept</div><div class="btn sm">Decline</div></div>
+ </div>
+ <div class="disc">Advanced Settings <small>Styles, phase sets</small></div>
+</div>
+</div>
+
+<div class="col">
+<div class="cap"><span class="tag">Option</span><b>B. Inside Friends → Manage</b></div>
+<div class="phone">
+ <div class="bar"><span>9:41</span><span>Friends</span></div>
+ <div class="top">Friends</div>
+ <div class="tabs"><span>Feed</span><span>Board</span><span class="on">Manage</span></div>
+ <div class="card">
+  <h4>FRIEND REQUESTS</h4>
+  <div class="row"><div class="av">MT</div><div class="grow"><b>Mia T.</b><span>wants to be friends</span></div></div>
+  <div class="btns"><div class="btn pri sm">Accept</div><div class="btn sm">Decline</div></div>
+ </div>
+ <div class="card">
+  <h4>TRAINING</h4>
+  <div class="row"><div class="av">SK</div><div class="grow"><b>Sam K.</b><span>You train Sam · 2 programs sent</span></div></div>
+  <div class="row"><div class="av">JR</div><div class="grow"><b>Jo R.</b><span>Asked to train you</span></div><span class="pill wait">Review</span></div>
+  <div class="btn">Add someone to train</div>
+ </div>
+</div>
+</div>
+
+<div class="col">
+<div class="cap"><span class="tag">Option</span><b>C. A button on a friend's profile</b></div>
+<div class="phone">
+ <div class="bar"><span>9:41</span><span>Profile</span></div>
+ <div class="row"><div class="av" style="width:64px;height:64px">SK</div><div class="grow"><b style="font-size:18px">Sam K.</b><span>Level 12 · 4 sessions this week</span></div></div>
+ <div class="btn">Message</div>
+ <div class="btn pri">Train Sam</div>
+ <div class="note">Sam will get a request and has to accept. After that you can build programs for them from here.</div>
+ <div class="card"><h4>RECENT</h4><div class="ex">Bench PR · 82.5 kg <i>2d</i></div><div class="ex">Leg day <i>4d</i></div></div>
+</div>
+</div>
+</div>
+
+<div class="q">
+<p><b>Recommendation: A.</b> It puts coaching beside the thing you actually do, which is build and send programs. Someone who trains three people finds all of them in one place a year from now, and nothing new appears in the bottom navigation.</p>
+<p><b>B is better at</b> reusing the friend-request habit and the friend list. It loses because training someone is not a social act, and the list would mix the two.</p>
+<p><b>C is better at</b> being discoverable from a person. It loses because there is no overview of who you train, and a trainee with no friend profile has no home.</p>
+<p><b>Reversal cost:</b> low. All three are screens over the same routes, so moving the entry point later changes no data.</p>
+</div>
+
+<h2>Screens every option shares</h2>
+<p class="sub">Shown on option A's placement.</p>
+<div class="board">
+
+<div class="col">
+<div class="cap"><b>1. Ask someone</b>: by friend code or email</div>
+<div class="phone">
+ <div class="bar"><span>9:41</span><span>Program</span></div>
+ <div class="top" style="opacity:.35">Program</div>
+ <div class="sheet">
+  <div style="font-weight:700;font-size:17px">Add someone to train</div>
+  <div class="field">Friend code or email</div>
+  <div class="note">They have to accept before you can send them anything. You will see their name once they do.</div>
+  <div class="btn pri">Send request</div>
+  <div class="btn ghost">Cancel</div>
+ </div>
+</div>
+</div>
+
+<div class="col">
+<div class="cap"><b>2. Someone you train</b>: what you sent, and the way in</div>
+<div class="phone">
+ <div class="bar"><span>9:41</span><span>Sam K.</span></div>
+ <div class="row"><div class="av" style="width:56px;height:56px">SK</div><div class="grow"><b style="font-size:18px">Sam K.</b><span>You train Sam</span></div></div>
+ <div class="btn pri">Build a program for Sam</div>
+ <div class="card">
+  <h4>SENT TO SAM</h4>
+  <div class="row"><div class="grow"><b>Upper / Lower, 4 weeks</b><span>3 sessions · sent 12 Oct</span></div><span class="pill ok">Active</span></div>
+  <div class="row"><div class="grow"><b>Deload week</b><span>2 sessions · sent 20 Oct</span></div><span class="pill">Not started</span></div>
+ </div>
+ <div class="note">You only see programs you sent. Sam's own training stays private to Sam.</div>
+ <div class="btn ghost" style="color:var(--bad)">Stop training Sam</div>
+</div>
+</div>
+
+<div class="col">
+<div class="cap"><b>3. Building for Sam</b>: the normal program editor, clearly pointed at someone</div>
+<div class="phone">
+ <div class="bar"><span>9:41</span><span>New program</span></div>
+ <div class="banner">Building for <b>Sam K.</b>. It lands in Sam's programs, switched off. Sam chooses when to start it.</div>
+ <div class="field" style="color:var(--ink)">Upper / Lower, 4 weeks</div>
+ <div class="card">
+  <h4>SESSION 1 · UPPER</h4>
+  <div class="ex">Bench Press<i>Coach Ramp</i></div>
+  <div class="ex">Barbell Row<i>3×8</i></div>
+  <div class="ex">Overhead Press<i>3×10</i></div>
+ </div>
+ <div class="note">Progression styles you use are copied to Sam's account. Later edits to your style don't change Sam's program.</div>
+ <div class="btn pri" style="margin-top:auto">Send to Sam</div>
+</div>
+</div>
+
+<div class="col">
+<div class="cap"><b>4. What Sam sees</b>: the program in their list, with who sent it</div>
+<div class="phone">
+ <div class="bar"><span>9:41</span><span>Program</span></div>
+ <div class="top">Program</div>
+ <div class="card">
+  <h4>PROGRAMS</h4>
+  <div class="row"><div class="grow"><b>My Block</b><span>3 sessions</span></div><span class="pill ok">Active</span></div>
+  <div class="row"><div class="grow"><b>Upper / Lower, 4 weeks</b><span>From <span style="display:inline;color:var(--accent)">Nick</span> · 12 Oct</span></div><span class="pill">New</span></div>
+  <div class="btn">Start this program</div>
+ </div>
+ <div class="note">Starting it switches your active program. Your old one stays in the list.</div>
+ <div class="card">
+  <h4>YOUR TRAINERS</h4>
+  <div class="row"><div class="av">NK</div><div class="grow"><b>Nick</b><span>Can send you programs</span></div></div>
+  <div class="btn ghost sm" style="color:var(--bad)">Stop being trained by Nick</div>
+  <div class="note">Programs already sent stay yours.</div>
+ </div>
+</div>
+</div>
+</div>
+</div>
