@@ -322,6 +322,9 @@ export async function invalidateActivityWrites(): Promise<void> {
     // treadmill steps fold into the day/week step totals (body-metadata)
     invalidateCache('body-metadata'),
     invalidateCache('day-log:'),
+    // the Activity score's step input and the Steps gauge read activity_logs (treadmill steps); the
+    // Activity screen caches both under this key (#3351)
+    invalidateCache('readiness-score'),
     // walks/runs feed the training-load ACWR + the F6 health-trends sparkline
     invalidateCache('training-load'),
     invalidateCache('health-trends-summary'),
@@ -434,6 +437,15 @@ export async function invalidateUserProfile(): Promise<void> {
     // someone ELSE's profile, which nothing on this device can change; the case this covers is
     // viewing your own through a shared link after editing it. Prefix-invalidated, one entry per
     // viewed user.
+    invalidateCache('public-profile:'),
+  ])
+}
+
+/** The pinned trophies were saved. Friends see them on `/profile/[userId]`, so the viewed-profile
+ *  entries go too (the same own-profile-through-a-shared-link case as `invalidateUserProfile`). */
+export async function invalidateTrophyPins(): Promise<void> {
+  await Promise.all([
+    invalidateCache('trophy-pins'),
     invalidateCache('public-profile:'),
   ])
 }

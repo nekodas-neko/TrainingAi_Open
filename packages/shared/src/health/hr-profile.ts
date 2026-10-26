@@ -48,6 +48,22 @@ export interface HrProfile {
   /** The observed-HR read itself FAILED and `observed` is the empty profile standing in for it —
    *  so `observed.sampleCount === 0` says nothing about whether this person has an HR source. */
   observedUnread?: boolean
+  /** The fitness-test read FAILED and the ceiling fell back to the age estimate, so a Cooper test
+   *  that exists is not in `maxHr`. */
+  fitnessTestsUnread?: boolean
+}
+
+/**
+ * Whether `maxHr` is a stand-in for a read that FAILED rather than a value the data supports: the
+ * age was unreadable, the observed-HR read failed, or the fitness-test read failed. A day's score
+ * stored as final must not carry such a ceiling, because the zone minutes it sets never get redone
+ * (#3347 review). A missing profile (the resolver itself threw) counts as unread.
+ */
+export function maxHrIsUnread(profile: HrProfile | null | undefined): boolean {
+  return profile == null
+    || profile.maxHrSource === 'estimated-age-unread'
+    || profile.observedUnread === true
+    || profile.fitnessTestsUnread === true
 }
 
 /**
@@ -98,6 +114,7 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     unread.add(what)
     return null
   }
+  let fitnessTestsUnread = false
   const [user, bodyMetrics, observed, tests] = await Promise.all([
     repo.getUserById(userId).catch(failed('user')),
     repo.listBodyMetrics(userId, restingWindow.from, restingWindow.to).catch(failed('restingHr')),
@@ -108,6 +125,7 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     // #2182: a maximal test sets the ceiling. A failed read falls back to the age estimate, never 0.
     Promise.resolve().then(() => repo.listFitnessTests(userId, '2000-01-01', todayIso)).catch((err: unknown) => {
       console.error('[hr-profile] fitness-test read failed, using the age estimate:', err)
+      fitnessTestsUnread = true
       return []
     }),
   ])
@@ -138,6 +156,7 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     ...(zoneBase.cooperPeak != null ? { cooperPeak: zoneBase.cooperPeak } : {}),
     observed,
     ...(unread.has('observed') ? { observedUnread: true } : {}),
+    ...(fitnessTestsUnread ? { fitnessTestsUnread: true } : {}),
   }
 }
 

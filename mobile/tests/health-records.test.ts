@@ -399,3 +399,34 @@ test('the readiness answer is kept while offline and posted once, the last tap w
   assert.deepEqual(f.readinessAnswers, [{ date, state: 'rated' }]);
   assert.equal(reopened.getSnapshot().readinessResponses.length, 0);
 });
+
+test('a readiness answer the server rejects with a 400 is set aside, a 500 holds it', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.respondToVerdict(date, 'corrected');
+  await store.respondToReadiness(date, 'rated');
+  f.setOnline(true);
+  const post = f.connection.post;
+  f.connection.post = async (path: string, body: unknown) => {
+    if (path === '/api/sleep-verdict') {
+      throw new ApiError(500);
+    }
+    return post(path, body);
+  };
+  await store.sync();
+  assert.equal(store.getSnapshot().verdictResponses.length, 1);
+  assert.equal(store.getSnapshot().readinessResponses.length, 1);
+  f.connection.post = async (path: string, body: unknown) => {
+    if (path === '/api/sleep-verdict') {
+      throw new ApiError(400);
+    }
+    return post(path, body);
+  };
+  await store.sync();
+  assert.equal(store.getSnapshot().verdictResponses.length, 0);
+  assert.equal(store.getSnapshot().readinessResponses.length, 0);
+  assert.deepEqual(f.readinessAnswers, [{ date, state: 'rated' }]);
+  assert.match(store.getSnapshot().error ?? '', /kept on this phone only/);
+});

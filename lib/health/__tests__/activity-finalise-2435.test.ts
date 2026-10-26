@@ -5,6 +5,7 @@ import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils
 import { activityFinalisedAt } from '@trainingai/shared/health/activity-day'
 import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 import { staleFinishedDays } from '@trainingai/shared/health/finished-day-recheck'
+import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 import { monthFixture, fixtureRepo, type ActivityFixture } from './fixtures/activity-day-fixtures'
 
 let repo: ReturnType<typeof fixtureRepo>
@@ -281,7 +282,7 @@ describe('a day with nothing to score (issue 2435)', () => {
 
   it('resolves the HR profile once for a whole read, not once per scored day', async () => {
     setup()
-    const observed = vi.fn(async () => null)
+    const observed = vi.fn(async () => EMPTY_OBSERVED_HR)
     ;(repo as unknown as Record<string, unknown>).getObservedHrProfile = observed
     ;(repo as unknown as Record<string, unknown>).listFitnessTests = vi.fn(async () => [])
     await buildReadinessPayload('u1', TZ)

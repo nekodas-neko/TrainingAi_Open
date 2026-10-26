@@ -69,6 +69,20 @@ class WorkoutStatusNotifierTest {
     assertTrue(shadowOf(n.deleteIntent).flags and android.app.PendingIntent.FLAG_IMMUTABLE != 0)
   }
 
+  @Test fun `a paused notification has a Resume button that opens the app and resumes`() {
+    val paused = WorkoutStatusNotifier.build(context, resting.copy(phase = "paused"), now, promote = false)
+    assertEquals(1, paused.actions?.size)
+    assertEquals("Resume", paused.actions[0].title.toString())
+    val intent = shadowOf(paused.actions[0].actionIntent).savedIntent
+    assertTrue(intent.getBooleanExtra(WorkoutStatusNotifier.EXTRA_RESUME, false))
+    assertEquals("w1", intent.getStringExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID))
+    assertTrue(shadowOf(paused.actions[0].actionIntent).flags and android.app.PendingIntent.FLAG_IMMUTABLE != 0)
+    // The tap on the body only opens the workout.
+    assertFalse(shadowOf(paused.contentIntent).savedIntent.getBooleanExtra(WorkoutStatusNotifier.EXTRA_RESUME, false))
+    // A running workout has no such button.
+    assertNull(WorkoutStatusNotifier.build(context, resting, now, promote = false).actions)
+  }
+
   @Test fun `without a launcher activity it still posts, just without a tap target`() {
     shadowOf(context.packageManager).removeResolveInfosForIntent(
       Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(context.packageName),

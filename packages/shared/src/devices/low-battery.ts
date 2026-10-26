@@ -16,9 +16,14 @@ export interface LowBatteryDecision {
   fired: boolean
 }
 
-export function decideLowBatteryAlert(percent: number, charging: boolean, alreadyFired: boolean): LowBatteryDecision {
+/**
+ * `level` is the owner's own alert level where a device has one (the Oura ring, #3069); it defaults to
+ * the strap's 35. The re-arm point keeps the same 5-point band above it.
+ */
+export function decideLowBatteryAlert(percent: number, charging: boolean, alreadyFired: boolean, level = LOW_BATTERY_PERCENT): LowBatteryDecision {
+  const rearm = level + (LOW_BATTERY_REARM_PERCENT - LOW_BATTERY_PERCENT)
   if (charging) return { notify: false, fired: false }
-  if (percent < LOW_BATTERY_PERCENT) return { notify: !alreadyFired, fired: true }
-  if (percent >= LOW_BATTERY_REARM_PERCENT) return { notify: false, fired: false }
+  if (percent < level) return { notify: !alreadyFired, fired: true }
+  if (percent >= rearm) return { notify: false, fired: false }
   return { notify: false, fired: alreadyFired }
 }

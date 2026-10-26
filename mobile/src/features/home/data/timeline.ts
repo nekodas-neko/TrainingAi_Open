@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
-import type { WorkoutRecord } from '../../workouts/logging/workout.ts';
+import { activeElapsedMs, type WorkoutRecord } from '../../workouts/logging/workout.ts';
 import type { SleepRow } from '../../health/data/models.ts';
 export const timelineEventSchema = z
   .object({
@@ -66,7 +66,7 @@ export function localTimeline(
       durationMin:
         workout.completedAt === null
           ? undefined
-          : Math.round((workout.completedAt - workout.startedAt) / 60_000),
+          : Math.round(activeElapsedMs(workout, workout.completedAt) / 60_000),
       sets: workout.exercises.reduce(
         (sum, row) => sum + row.sets.filter((set) => set.completedAt !== null).length,
         0,

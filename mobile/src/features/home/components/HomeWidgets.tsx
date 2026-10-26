@@ -24,6 +24,7 @@ import {
 } from '../../../shared/ui';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
 import { useHealthData } from '../../health/data/HealthDataProvider';
+import { sleepWokeEnd } from '../../health/data/body-view';
 import { useOuraHandoff, type OuraHandoffStatus } from '../../health/OuraHandoffProvider';
 import { hasLastNight } from '../../health/data/oura-handoff';
 import {
@@ -480,7 +481,7 @@ function HomeWidgetBody({
                 {night?.sleepStart && night.sleepEnd && (
                   <AppText variant="caption" tone="muted">
                     {formatTimeOfDay(night.sleepStart, health.timezone)} →{' '}
-                    {formatTimeOfDay(night.sleepEnd, health.timezone)}
+                    {formatTimeOfDay(sleepWokeEnd(night) ?? night.sleepEnd, health.timezone)}
                   </AppText>
                 )}
               </Stack>

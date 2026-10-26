@@ -50,6 +50,9 @@ export interface ShadowRawHistory {
   /** `oura_daily_derived`: high-stress minutes, and (#2634) the still-period resting HR, which the
    *  rollup stores only when its coverage cleared the floor, so a value here is already trusted. */
   derived: readonly { day: string; stressHighMinutes: number | null; stillRhrBpm?: number | null }[]
+  /** `oura_cloud_daily.readiness_contributors` per day: Oura's `recovery_index` stands in for the ring's
+   *  hours on a night the ring's summary has none (#3001), as the live composite takes it (rule 4). */
+  ouraCloudContributors?: readonly { date: string; readinessContributors: Record<string, number | null> | null }[]
   /** The local day the user switched to the Oura API (`getOuraCloudSwitchDay`), or null. */
   ouraCloudFrom?: string | null
   /** Strength sessions with their total volume. */
@@ -92,6 +95,10 @@ export function deepRemSharePct(n: Pick<AggregatableSleep, 'deepSleepHours' | 'r
 /** The ring summary's label. Kept as the table name it has always carried, so the ring's existing
  *  normals do not restart; only a different device's values get a different label. */
 const RING_SUMMARY_SRC = 'oura_daily_summary'
+
+/** The smallest change worth reading in Oura's 0–100 recovery-index contributor (#3001): 5 points,
+ *  against the 0.25 hours the unit uses for the ring's value. */
+const RECOVERY_CONTRIBUTOR_MIN_CHANGE = 5
 
 /** Night sources whose sleep stages are our own estimate rather than a device's measurement (#2833). */
 const STAGER_SOURCES: ReadonlySet<string> = new Set(['oura_ble'])
@@ -205,6 +212,11 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     return compact(dates.map(d => obs(d, ring(d), RING_SUMMARY_SRC) ?? fallback.get(d) ?? null))
   }
   const ouraTemperature = new Map(compact(raw.wear.map(w => obs(w.date, w.temperatureDeviation, 'oura_cloud'))).map(o => [o.date, o]))
+  const recoveryContributor = new Map(compact((raw.ouraCloudContributors ?? []).map(c => {
+    const v = c.readinessContributors?.recovery_index
+    const o = obs(c.date, typeof v === 'number' ? v : null, 'oura_cloud')
+    return o ? { ...o, minMeaningfulChange: RECOVERY_CONTRIBUTOR_MIN_CHANGE } : null
+  })).map(o => [o.date, o]))
   const nightBreathing = new Map(compact(nightList.map(([d, n]) => obs(d, n.respiratoryRate, n.respiratoryRateSource ?? 'sleep_sessions'))).map(o => [o.date, o]))
 
   const series: PreparedShadowHistory['series'] = {
@@ -220,9 +232,10 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     'sleep.balance': balance,
     'heart.overnight_hrv': nightlySeries(raw.bodyMetrics, 'hrvMs', 'HRV/night', 'night_hrv', wearByDate),
     'heart.overnight_rhr': nightlySeries(raw.bodyMetrics, 'restingHeartRate', 'RHR/night', 'night_rhr', wearByDate),
-    // Hours only: Oura's recovery-index contributor is a 0–100 sub-score, not hours, so it is not
-    // mixed into this unit's hours normal. The live composite takes it where no hours exist.
-    'heart.overnight_settling': compact(summaries.map(s => obs(s.date, s.recoveryIndexHours, RING_SUMMARY_SRC))),
+    // The ring's hours where its summary has them, else Oura's recovery-index contributor, as the live
+    // composite takes it (#3001). The contributor is a 0–100 sub-score, not hours, so it carries its
+    // own device label and is learned against its own nights only, with a floor in its own units.
+    'heart.overnight_settling': perInput(d => summaryByDate.get(d)?.recoveryIndexHours, recoveryContributor),
     'heart.daytime_rhr': compact(raw.derived.map(r => obs(r.day, r.stillRhrBpm, 'oura_daily_derived'))).sort((x, y) => x.date.localeCompare(y.date)),
     'heart.hr_recovery': [...hrrByDay.entries()].sort(([a], [b]) => a.localeCompare(b))
       .map(([d, e]) => ({ date: d, value: median(e.values)!, source: e.source, rung: 'derived' as const })),

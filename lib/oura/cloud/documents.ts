@@ -269,6 +269,18 @@ export const HeartRateRow = z.object({
   source: added(z.enum(['awake', 'workout', 'rest', 'sleep', 'live', 'session'])),
 })
 
+/**
+ * `PublicRingBatteryLevelRow` (spec v1.42): one battery sample. `charging` and `in_charger` are
+ * `boolean | null`; `level` is an integer in [0, 100]. A row outside that range is dropped.
+ */
+export const RingBatteryRow = z.object({
+  timestamp: Instant,
+  level: z.number().int().min(0).max(100),
+  charging: added(z.boolean()),
+  in_charger: added(z.boolean()),
+})
+export type RingBatteryRow = z.infer<typeof RingBatteryRow>
+
 export type DailyReadinessDoc = z.infer<typeof DailyReadinessDoc>
 export type DailySleepDoc = z.infer<typeof DailySleepDoc>
 export type DailyActivityDoc = z.infer<typeof DailyActivityDoc>
@@ -322,7 +334,10 @@ export const OURA_DELETE_TYPES: readonly OuraDocumentType[] = ['sleep', 'workout
  * descriptions and what Oura refused (#3026). It names no scope for stress; `daily` has been
  * accepted for it.
  */
-export const OURA_SCOPE_FOR: Record<OuraDocumentType | 'heartrate', OuraScope> = {
+/** The time series read by a time window, not a day range, that are not documents. */
+export type OuraSeriesType = 'heartrate' | 'ring_battery'
+
+export const OURA_SCOPE_FOR: Record<OuraDocumentType | OuraSeriesType, OuraScope> = {
   daily_readiness: 'daily',
   daily_sleep: 'daily',
   daily_activity: 'daily',
@@ -339,10 +354,13 @@ export const OURA_SCOPE_FOR: Record<OuraDocumentType | 'heartrate', OuraScope> =
   workout: 'workout',
   session: 'session',
   heartrate: 'heartrate',
+  // A guess (#3069). The spec names no scope for `ring_battery_level`, and it is a ring-status reading
+  // beside the daily ones. A 401 on a grant that covers `daily` lands in `refusedDespiteGrant`.
+  ring_battery: 'daily',
 }
 
 /** True when the grant covers `type`. A `null` grant (no scope string stored) covers everything. */
-export function isOuraTypeShared(granted: ReadonlySet<string> | null, type: OuraDocumentType | 'heartrate'): boolean {
+export function isOuraTypeShared(granted: ReadonlySet<string> | null, type: OuraDocumentType | OuraSeriesType): boolean {
   return granted === null || granted.has(OURA_SCOPE_FOR[type])
 }
 
@@ -627,6 +645,18 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
     sessions: [...sessions.values()],
     unknownValues,
   }
+}
+
+/** A battery sample ready to store. */
+export interface OuraBatteryReading { measuredAt: Date; percent: number; charging: boolean | null }
+
+/** Rows to readings. `charging` is true when Oura says the ring is charging or sits in the charger. */
+export function mapRingBatteryRows(rows: readonly RingBatteryRow[]): OuraBatteryReading[] {
+  return rows.map(r => ({
+    measuredAt: new Date(r.timestamp),
+    percent: r.level,
+    charging: r.charging == null && r.in_charger == null ? null : r.charging === true || r.in_charger === true,
+  }))
 }
 
 export interface OuraHeartRatePoint { timestamp: Date; bpm: number; context: string | null }

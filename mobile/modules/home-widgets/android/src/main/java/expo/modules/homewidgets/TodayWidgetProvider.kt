@@ -5,7 +5,7 @@ import android.graphics.Color
 import android.view.View
 import android.widget.RemoteViews
 
-// The Today widget: Home's four scores, 4 x 1; resized to 4 x 2 it adds Body Battery. A tap opens
+// The Today widget: Home's four scores, 4 x 1; resized to 4 x 2 it adds Energy (Body Battery). A tap opens
 // Home. Scores are only as fresh as the last time the app ran, so a snapshot from an earlier day
 // shows dashes and "Open to update" instead of yesterday's numbers.
 class TodayWidgetProvider : BaseWidgetProvider() {

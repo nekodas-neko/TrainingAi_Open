@@ -25,6 +25,7 @@ export const preferencesSchema = UserPreferencesSchema.pick({
   pillColors: true,
   cardColors: true,
   scoreRingStyle: true,
+  energyHeroSize: true,
   weightLookback: true,
 }).strip();
 export type HomePreferences = z.infer<typeof preferencesSchema>;

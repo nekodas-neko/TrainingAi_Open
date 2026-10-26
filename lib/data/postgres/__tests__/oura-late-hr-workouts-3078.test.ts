@@ -142,12 +142,13 @@ describe.skipIf(!canRun)('late Oura heart rate re-attributes workouts (#3078)', 
     expect(await repo.upsertOuraCloudHeartrate(USER, revised, TZ)).toEqual({ offered: 2, changed: 1, changedFrom: pts[1].timestamp, changedTo: pts[1].timestamp })
   })
 
-  // The gate holds only sources #2437 already gates (Health Connect, Apple Health). The ring's BLE,
-  // the strap and Oura Cloud keep their average, as on `main`: that choice is the owner's (#3114).
-  it('a sparse Health Connect-only session falls back to METs; sparse ring BLE or Oura Cloud and a dense strap keep HR', async () => {
+  // The gate holds the sources #2437 gates (Health Connect, Apple Health) and, since #3114, Oura Cloud.
+  // The ring's BLE and the strap keep their average, as on `main`.
+  it('a sparse Health Connect or Oura Cloud session falls back to METs; a dense Oura workout, sparse ring BLE and a dense strap keep HR', async () => {
     const hour = 60 * MIN
     const starts = [0, 1, 2, 3].map(i => new Date(START.getTime() + i * 2 * hour))
-    for (const [i, st] of starts.entries()) await addSession(ws(i + 1), st, new Date(st.getTime() + 71 * MIN))
+    const ouraWorkout = new Date(START.getTime() + 8 * hour)
+    for (const [i, st] of [...starts, ouraWorkout].entries()) await addSession(ws(i + 1), st, new Date(st.getTime() + 71 * MIN))
     // 21 points over 71 minutes, gaps up to 19 minutes: a high enough average rate, but not the ring's cadence.
     const gaps = [...Array(19).fill((71 - 19) / 19), 19]
     const sparseAt = (st: Date) => {
@@ -166,12 +167,14 @@ describe.skipIf(!canRun)('late Oura heart rate re-attributes workouts (#3078)', 
       `INSERT INTO oura_heartrate (user_id, timestamp, bpm, source)
        SELECT $1, ts, 130, 'chest_strap' FROM generate_series($2::timestamptz, $3::timestamptz, interval '1 second') ts`,
       [USER, starts[3], new Date(starts[3].getTime() + 71 * MIN)])
-    for (const i of [1, 2, 3]) {
+    // An Oura-app workout: a reading every 5 seconds.
+    await repo.upsertOuraCloudHeartrate(USER, Array.from({ length: 71 * 12 + 1 }, (_, k) => ({ timestamp: new Date(ouraWorkout.getTime() + k * 5000), bpm: 130 })), TZ)
+    for (const i of [1, 2, 3, 5]) {
       await repo.upsertWorkoutHrStats(USER, ws(i), { avgBpm: 100, peakBpm: 120, hrr1Best: null, workoutHrvMs: null, readingsCount: 21, source: null })
     }
     await repo.upsertWorkoutHrStats(USER, ws(4), { avgBpm: 130, peakBpm: 160, hrr1Best: null, workoutHrvMs: null, readingsCount: 4261, source: 'chest_strap' })
-    const got = await repo.getAvgBpmBySession(USER, [ws(1), ws(2), ws(3), ws(4)])
-    expect([...got.keys()].sort()).toEqual([ws(2), ws(3), ws(4)])
+    const got = await repo.getAvgBpmBySession(USER, [ws(1), ws(2), ws(3), ws(4), ws(5)])
+    expect([...got.keys()].sort()).toEqual([ws(2), ws(4), ws(5)])
   })
 
   it('a session past HR retention keeps its snapshot: there is no series left to check', async () => {

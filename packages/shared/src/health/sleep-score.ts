@@ -1,7 +1,7 @@
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { SleepSession } from '@trainingai/shared/types/body'
-import { median } from '@trainingai/shared/stats'
+import { perDeviceNormal, deviceOf } from '@trainingai/shared/health/per-device-normal'
 
 // Our own 0–100 Sleep Score. The weights are the ecore combiner weights recovered by
 // open_health (`Th0rgal/open_health`, docs/algorithms/score-weights.md) by regressing an
@@ -263,17 +263,20 @@ export const MAIN_SLEEP_MIN_HOURS = 4
  * the night's source to the Oura API and the 19 Oct night composition (#3061) are unmarked steps in
  * its history: a row with no `sleep` key was scored before this stamp existed. Change it whenever a
  * weight, curve, baseline rule or the choice of which periods make the night changes.
+ * 2026-10-26 (#3001): each baseline is learned from the device that measured the night, so an Oura
+ * night re-scored per device no longer carries the stamp of its pooled score.
  */
-export const SLEEP_SCORE_MODEL_VERSION = 'v1:oura-long-sleep-night:2026-10-19'
+export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:2026-10-26'
 
 /**
  * The stamp for each calibration (#2237): `v1` is the stamp above, `v2` the even-gain curve on the
  * same night definition. `sleepScoreCalibrationFor` picks by wake date, so the stamp always names
- * the curve that produced the stored score.
+ * the curve that produced the stored score. Both normals-learning rules apply to both curves, so
+ * `v2` carries the per-device mark too (#3387); no V2 row exists while `SLEEP_SCORE_V2_FROM` is null.
  */
 export const SLEEP_SCORE_MODEL_VERSIONS = {
   v1: SLEEP_SCORE_MODEL_VERSION,
-  v2: 'v2:even-gain:oura-long-sleep-night',
+  v2: 'v2:even-gain:per-device-baselines:2026-10-26',
 } as const
 
 /**
@@ -326,7 +329,7 @@ export function computeSleepScoreSeries(
   const oldestFirst = [...sessions].sort((a, b) => a.sleepEnd.getTime() - b.sleepEnd.getTime())
   const out = oldestFirst.map((session, i) => ({
     session,
-    result: computeSleepScore(session, tz, sleepScoreBaselines(oldestFirst.slice(0, i), tz)),
+    result: computeSleepScore(session, tz, sleepScoreBaselines(oldestFirst.slice(0, i), tz, session)),
   }))
   return out.reverse()
 }
@@ -444,7 +447,14 @@ export interface BaselineSessionInput {
   averageHrvMs?: number | null
   avgHeartRate?: number | null
   awakHours?: number | null
+  /** #3001: the device behind each reading, so a normal is learned from one device's nights. */
+  durationSource?: string | null
+  hrvSource?: string | null
+  avgHeartRateSource?: string | null
 }
+
+/** The night being scored, as far as `sleepScoreBaselines` needs it: which devices measured it. */
+export type ScoredNightDevices = Pick<BaselineSessionInput, 'durationSource' | 'hrvSource' | 'avgHeartRateSource'>
 
 /** Mean of a set of clock hours, taken on the circle so 23:50 and 00:10 average to midnight. */
 function circularMeanHour(hours: number[]): number {
@@ -465,15 +475,39 @@ function circularMeanHour(hours: number[]): number {
  * `priorSessions` must EXCLUDE the night being scored. Naps and rest fragments are filtered out —
  * they carry HRV/HR readings taken awake, and folding them into a sleep baseline drags it off.
  */
-export function sleepScoreBaselines(priorSessions: BaselineSessionInput[], tz: string = DEFAULT_TZ): SleepScoreBaselines {
-  const nights = priorSessions.filter(s => (s.durationHours ?? 0) >= MAIN_SLEEP_MIN_HOURS)
+export function sleepScoreBaselines(
+  priorSessions: BaselineSessionInput[],
+  tz: string = DEFAULT_TZ,
+  scored?: ScoredNightDevices,
+): SleepScoreBaselines {
+  const allNights = priorSessions.filter(s => (s.durationHours ?? 0) >= MAIN_SLEEP_MIN_HOURS)
   const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
 
+  // #3001: each normal is learned from the device that measured the night being scored (the same
+  // rule as readiness, #2991), never pooled with another device's nights. Ring and Oura read HRV and
+  // heart rate by different definitions, so an Oura night judged against a ring-built normal moves
+  // the score for a reason that is not the sleep. While the device has fewer nights than the gate
+  // the normal is null and the contributor is left out, as it is for any night without a baseline.
+  // The scored night names its device; with no night given, the newest prior night does.
+  const newestNight = allNights.length
+    ? allNights.reduce((a, b) => (b.sleepEnd.getTime() >= a.sleepEnd.getTime() ? b : a))
+    : null
+  const nightDevice = scored ? deviceOf(scored.durationSource) : newestNight ? deviceOf(newestNight.durationSource) : null
+  // Schedule and awake-fraction baselines are the nights of the device that measured the window.
+  const nights = nightDevice == null ? allNights : allNights.filter(s => deviceOf(s.durationSource) === nightDevice)
+
   // Trailing window, newest last — see SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS for why these two
-  // are not an all-time mean. The min-nights gates below still count the windowed sample.
-  const recent = <T,>(xs: T[]) => xs.slice(-SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS)
-  const hrv = recent(nights.map(s => s.averageHrvMs).filter((v): v is number => v != null && v > 0))
-  const hr = recent(nights.map(s => s.avgHeartRate).filter((v): v is number => v != null && v > 0))
+  // are not an all-time mean. The min-nights gates still count the windowed sample. The order is the
+  // caller's (oldest first, as `nightSessions` returns), so the readings are keyed by position.
+  const autonomic = (
+    pick: (s: BaselineSessionInput) => number | null | undefined,
+    sourceOf: (s: BaselineSessionInput) => string | null | undefined,
+    given: string | null | undefined,
+    minNights: number,
+  ) => perDeviceNormal(
+    allNights.map((s, i) => ({ date: String(i).padStart(6, '0'), value: (pick(s) ?? 0) > 0 ? pick(s) : null, source: sourceOf(s) })),
+    { minNights, aggregate: 'median', window: SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS, device: scored ? deviceOf(given) : undefined },
+  ).value
   const localHour = (d: Date) => {
     const [h, m] = formatInTimeZone(d, tz, 'HH:mm').split(':').map(Number)
     return h + m / 60
@@ -489,8 +523,8 @@ export function sleepScoreBaselines(priorSessions: BaselineSessionInput[], tz: s
     : null
 
   return {
-    hrvBaselineMs: hrv.length >= SLEEP_HRV_BASELINE_MIN_NIGHTS ? median(hrv) : null,
-    hrBaselineBpm: hr.length >= SLEEP_HR_BASELINE_MIN_NIGHTS ? median(hr) : null,
+    hrvBaselineMs: autonomic(s => s.averageHrvMs, s => s.hrvSource, scored?.hrvSource, SLEEP_HRV_BASELINE_MIN_NIGHTS),
+    hrBaselineBpm: autonomic(s => s.avgHeartRate, s => s.avgHeartRateSource, scored?.avgHeartRateSource, SLEEP_HR_BASELINE_MIN_NIGHTS),
     habitualBedHour: nights.length >= SLEEP_SCHEDULE_MIN_NIGHTS ? circularMeanHour(nights.map(s => localHour(s.sleepStart))) : null,
     habitualWakeHour: nights.length >= SLEEP_SCHEDULE_MIN_NIGHTS ? circularMeanHour(nights.map(s => localHour(s.sleepEnd))) : null,
     awakeFractionBaselineMean,
