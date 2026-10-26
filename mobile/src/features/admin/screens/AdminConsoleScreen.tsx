@@ -15,6 +15,7 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { profileSpec } from '../../health/data/models';
 import { AdminActivityTypesPanel } from '../components/AdminActivityTypesPanel';
 import { AdminAiUsagePanel } from '../components/AdminAiUsagePanel';
+import { AdminJobsPanel } from '../components/AdminJobsPanel';
 import { AdminErrorsPanel } from '../components/AdminErrorsPanel';
 import { AdminExercisesPanel } from '../components/AdminExercisesPanel';
 import { AdminUnitFixPanel } from '../components/AdminUnitFixPanel';
@@ -33,7 +34,8 @@ type Tab =
   | 'ai'
   | 'exercises'
   | 'activities'
-  | 'units';
+  | 'units'
+  | 'jobs';
 
 /** The current app's admin console, for admins. The server checks `requireAdmin` on every route; this only hides the door. */
 export function AdminConsoleScreen({ onBack }: { onBack: () => void }) {
@@ -73,7 +75,7 @@ export function AdminConsoleScreen({ onBack }: { onBack: () => void }) {
     users, invites, feedback, errors, exercises, activities, units: unitNames,
   } as const;
   // AI usage reads its own windowed resource and shows its own loading and error states.
-  const active = tab === 'ai' ? null : resourceFor[tab];
+  const active = tab === 'ai' || tab === 'jobs' ? null : resourceFor[tab];
   return (
     <PageLayout
       title="Admin Console"
@@ -98,11 +100,14 @@ export function AdminConsoleScreen({ onBack }: { onBack: () => void }) {
                 { label: 'Exercises', value: 'exercises' },
                 { label: 'Activities', value: 'activities' },
                 { label: 'Unit fix', value: 'units' },
+                { label: 'Data jobs', value: 'jobs' },
               ]}
             />
           </ScrollView>
           {tab === 'ai' ? (
             <AdminAiUsagePanel />
+          ) : tab === 'jobs' ? (
+            <AdminJobsPanel />
           ) : active && active.error && !active.data ? (
             <StateCard error title="Could not load" message={active.error} action="Retry" onAction={active.refresh} />
           ) : active && !active.data ? (
