@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import {
   DIAL,
   TIDE,
@@ -68,4 +69,17 @@ test("Slim's sleep-hours fallback carries its h; a sleep score carries no unit",
 test('the widget still reads the full four-chip model', () => {
   const chips = homeScoreChips({ restingHr: 54 }, [], today);
   assert.deepEqual(chips.map((chip) => chip.key), ['readiness', 'heart', 'sleep', 'activity']);
+});
+
+test('Full and Compact chips take their unit from chipFigure, and a dash never carries one', async () => {
+  // Slim draws chipFigure directly; Full and Compact go through HomeScores and ScoreChip, so both
+  // are pinned here (mobile tests do not render components).
+  const scores = await readFile(
+    new URL('../src/features/home/components/HomeScores.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(scores, /unit=\{chipFigure\(chip\)\.unit\}/);
+  const chip = await readFile(new URL('../src/shared/ui/ScoreChip.tsx', import.meta.url), 'utf8');
+  assert.match(chip, /shownUnit = unit && \(display != null \|\| value !== null\) \? unit : undefined/);
+  assert.doesNotMatch(chip, /\{unit\}/);
 });

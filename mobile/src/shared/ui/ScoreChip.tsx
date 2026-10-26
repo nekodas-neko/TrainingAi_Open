@@ -46,6 +46,8 @@ export function ScoreChip({
   const id = useId().replace(/:/g, '');
   const color = accent ?? theme.tones[tone].foreground;
   const text = display ?? (value === null ? '—' : String(Math.round(value)));
+  // A dash has nothing to count, so it never carries a unit ("— bpm").
+  const shownUnit = unit && (display != null || value !== null) ? unit : undefined;
   const circle = [
     'default',
     'openring',
@@ -91,11 +93,11 @@ export function ScoreChip({
     </AppText>
   );
   // The unit follows the figure so a bpm or hours reading never passes for a score.
-  const number = unit ? (
+  const number = shownUnit ? (
     <Stack direction="row" align="baseline" gap="xxs" style={{ maxWidth: '100%' }}>
       {figure}
       <AppText variant="micro" tone="muted" numberOfLines={1}>
-        {unit}
+        {shownUnit}
       </AppText>
     </Stack>
   ) : (
@@ -105,7 +107,7 @@ export function ScoreChip({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      accessibilityLabel={`${label}: ${display ?? value ?? 'unavailable'}${unit && (display ?? value) != null ? ` ${unit}` : ''}${qualified ? ', limited or provisional data' : ''}`}
+      accessibilityLabel={`${label}: ${display ?? value ?? 'unavailable'}${shownUnit ? ` ${shownUnit}` : ''}${qualified ? ', limited or provisional data' : ''}`}
       style={{
         flex: 1,
         minWidth: 0,

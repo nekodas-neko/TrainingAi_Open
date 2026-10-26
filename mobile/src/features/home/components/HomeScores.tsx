@@ -6,7 +6,7 @@ import { readinessSpec } from '../../health/data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
 import { useHome } from '../data/HomeProvider';
-import { homePillars } from '../data/score-chips';
+import { chipFigure, homePillars } from '../data/score-chips';
 /**
  * The three pillars beside Energy (#2989), in the user's ring style. Readiness no longer has a
  * chip: Energy opens at the readiness score and the hero is where it is read. A ScoreChip shrinks
@@ -40,7 +40,7 @@ export function HomeScores({
       first={grid ? index % 2 === 0 : index === 0}
       value={chip.value}
       display={chip.display}
-      unit={chip.unit}
+      unit={chipFigure(chip).unit}
       icon={icon}
       tone={tone}
       color={color}

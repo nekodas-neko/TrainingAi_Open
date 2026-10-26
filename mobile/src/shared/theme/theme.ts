@@ -133,8 +133,9 @@ export function createTheme(
     scrim: '#00000088',
     onSignal: '#000000',
     grid: mode === 'dark' ? '#ffffff18' : '#d0d5d1',
-    // The mockups' dark glass (12,14,20 at 42%) and, in light, white at 70% (D7).
-    glass: mode === 'dark' ? '#0c0e146b' : '#ffffffb3',
+    // The mockups' dark glass (12,14,20 at 42%) and, in light, white at 75%. D7 drew 70%, which
+    // left the muted sub-text at 4.48:1 on a deep-night sky; 75% keeps it above 4.5:1 on every sky.
+    glass: mode === 'dark' ? '#0c0e146b' : '#ffffffbf',
     glassBorder: mode === 'dark' ? '#ffffff24' : '#e8e8e8',
     glassTrack: mode === 'dark' ? '#ffffff1c' : '#dfe3e0',
     ...overrides.colors,
