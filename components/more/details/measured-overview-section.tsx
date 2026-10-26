@@ -13,6 +13,7 @@ import {
 } from "./measured-overview";
 import { ReadingGroupCard } from "./reading-group-card";
 import { sleepReplyWithPending } from "@/lib/sleep/manual-night-view";
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
 
 interface Props {
   userId?: string
@@ -87,7 +88,7 @@ export function MeasuredOverviewSection({ userId, serverRecent }: Props) {
     : null
 
   const sleepRows = sleep ? ([
-    sleep.durationHours != null && { label: 'Time asleep', value: `${sleep.durationHours.toFixed(1)} h` },
+    sleep.durationHours != null && { label: 'Time asleep', value: formatHoursMinutes(sleep.durationHours * 60) },
     bedtime != null && { label: 'Bedtime', value: clockFromMinutes(bedtime) },
     sleep.efficiency != null && { label: 'Efficiency', value: `${Math.round(sleep.efficiency)} %` },
     // Named for its window: this is the overnight low, not the daily resting figure above it and
