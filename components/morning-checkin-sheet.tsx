@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Sunrise, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
@@ -12,6 +12,7 @@ import { type IllnessContext } from '@trainingai/shared/types/day-checkin'
 import { SleepAnnouncement } from '@/components/checkin/sleep-announcement'
 import { type StoredSleepVerdict } from '@trainingai/shared/health/sleep-verdict-copy'
 import { saveSleepValue } from '@trainingai/shared/checkin/save-sleep-value'
+import { carriedVsNormal } from '@trainingai/shared/checkin/carried-vs-normal'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { cachedFetch } from '@/lib/sqlite/cache'
 import { IllnessContextPicker } from '@/components/checkin/illness-context-picker'
@@ -40,6 +41,14 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
   // never clobber a tap that landed before it resolved (a real race on slower networks).
   const editedRef = useRef(false)
 
+  const readSaved = useCallback(async (date: string) => {
+    const store = userId ? getLocalStore(userId) : null
+    return store
+      ? await store.getDayCheckin(date, 'morning')
+      : await fetch(`/api/day-checkin?date=${date}&phase=morning`)
+          .then(r => (r.ok ? r.json() : null)).catch(() => null)
+  }, [userId])
+
   useEffect(() => {
     if (!open) {
       setLoaded(false); editedRef.current = false
@@ -52,11 +61,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
     let cancelled = false
     async function init() {
       const date = todayInTz(tz)
-      const store = userId ? getLocalStore(userId) : null
-      const saved = store
-        ? await store.getDayCheckin(date, 'morning')
-        : await fetch(`/api/day-checkin?date=${date}&phase=morning`)
-            .then(r => (r.ok ? r.json() : null)).catch(() => null)
+      const saved = await readSaved(date)
       if (cancelled) return
       if (!editedRef.current) {
         if (saved) {
@@ -71,7 +76,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
     }
     init()
     return () => { cancelled = true }
-  }, [open, loaded, userId, tz])
+  }, [open, loaded, readSaved, tz])
 
   /**
    * The verdict, in its OWN effect — and that is not tidiness.
@@ -106,6 +111,8 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
     setSaving(true)
     const date = todayInTz(tz)
     const sleepWrite = saveSleepValue(correction, verdict)
+    // Read again at save time: Home's readiness card may have been answered since the sheet opened.
+    const saved = await readSaved(date).catch(() => null)
     const payload = {
       phase: 'morning' as const,
       // TN-82. Recovery is no longer asked and has no verdict to announce in its place — there is
@@ -116,8 +123,9 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
       sleepQualityFeel:  sleepWrite.value,
       sleepQualityFeelTouched:  sleepWrite.touched,
       illnessContext,
-      // Retired (#2411): the comparative row is no longer asked. The column stays; nothing reads it.
-      vsNormal: null,
+      // The row is no longer asked here (#2411), but Home's readiness card stores its answer in it,
+      // and this save writes the whole row — so carry it through rather than clear it.
+      ...carriedVsNormal(saved),
       // Retired scales — always null so a re-save clears any historical value.
       motivation:        null,
       restingSoreness:   null,

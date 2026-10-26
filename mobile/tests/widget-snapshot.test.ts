@@ -5,6 +5,7 @@ import { homeScoreChips } from '../src/features/home/data/score-chips.ts';
 import { homeRecommendationModel, type RecommendationInput } from '../src/features/home/data/recommendation-model.ts';
 import { budgetEnergyModel, nutritionEnergyModel, remainingText } from '../src/features/nutrition/data/energy-model.ts';
 import { batterySummary } from '../src/features/health/data/battery-summary.ts';
+import { energyHero } from '@trainingai/shared/health/body-battery-energy';
 import { hasContent, snapshotIdentity, widgetSnapshot, type SnapshotInput } from '../src/features/widgets/snapshot.ts';
 import { workoutFixture } from './workout-fixture.ts';
 import { WorkoutResources } from '../src/features/workouts/data/WorkoutResources.ts';
@@ -45,7 +46,7 @@ const input = (over: Partial<SnapshotInput> = {}): SnapshotInput => ({
   now,
   timezone: tz,
   scores: homeScoreChips({ readinessDisplayScore: 78.4, sleepScore: 84, activityScore: 61, restingHrLastNight: 52 }, [], today),
-  battery: { hasData: true, current: 64, label: 'Good', trend: 'charging' },
+  battery: { hasData: true, current: 64, label: 'Good', trend: 'charging', anchor: 64, anchorSource: 'readiness', anchorProvisional: false, series: [{ v: 64 }] },
   recommendation: homeRecommendationModel(recInput()),
   energy,
   budget,
@@ -148,7 +149,7 @@ test('missing data stays missing in the snapshot rather than turning into zero',
   const snapshot = widgetSnapshot(
     input({
       scores: homeScoreChips({}, [], today),
-      battery: { hasData: false, current: null, label: 'Good', trend: 'steady' },
+      battery: { hasData: false, current: 0, label: 'Good', trend: 'steady', anchor: 0, anchorSource: 'default', anchorProvisional: false, series: [] },
       energy: nutritionEnergyModel({ totals: null, recordedIntake: null, budgetKcal: null, targetCalories: null, targets: {}, scaledTargets: null }),
       budget: budgetEnergyModel({ totals: null, recordedIntake: null, budgetKcal: null }),
       water: { ml: null, goalMl: 2500 },
@@ -310,4 +311,28 @@ test('kcal is null when the calorie target gives a remaining but the energy budg
   const snapshot = widgetSnapshot(input({ energy, budget: noBudget }));
   assert.equal(snapshot.nutrition?.kcal, null);
   assert.deepEqual(widgetSnapshot(input()).nutrition?.kcal, remainingText(budget.remaining!));
+});
+
+test("the widget's Body Battery is the figure and band Home's Energy hero draws", () => {
+  // Woke at 80, fell to 22, recharged to 64: the hero draws the day's low, so the widget must too.
+  const data = {
+    hasData: true,
+    current: 64,
+    label: 'Good',
+    trend: 'charging' as const,
+    anchor: 80,
+    anchorSource: 'readiness' as const,
+    anchorProvisional: false,
+    series: [{ v: 80 }, { v: 22 }, { v: 64 }],
+  };
+  const hero = energyHero(data);
+  assert.ok(hero.hasData);
+  const battery = widgetSnapshot(input({ battery: data })).today.battery;
+  assert.deepEqual(battery, {
+    value: String(hero.level),
+    label: `${hero.label} · Charging`,
+    level: hero.level,
+    band: 'drained',
+  });
+  assert.equal(battery!.value, '22');
 });
