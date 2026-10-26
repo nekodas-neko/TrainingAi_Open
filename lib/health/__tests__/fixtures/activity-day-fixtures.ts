@@ -30,6 +30,8 @@ export interface ActivityFixture {
   metChangedAt?: { date: string; changedAt: Date }[]
   /** Reads the finalise must not swallow on a finished day: each throws, as a database error would. */
   failReads?: { goals?: boolean; user?: boolean; observedHr?: boolean; fitnessTests?: boolean }
+  /** Logged activities, for the treadmill steps that join a day's count (#3134). */
+  activityLogs?: { date: string; activityType: string; steps?: number | null }[]
 }
 
 /** A repository over the fixture. Upserts land in `fixture.derived` with the real COALESCE rule. */
@@ -80,6 +82,8 @@ export function fixtureRepo(fx: ActivityFixture) {
       if (fx.failReads?.goals) throw new Error('goals read failed')
       return { stepsGoal: null }
     }),
+    listActivityLogs: vi.fn(async (_u: string, from: string, to: string) =>
+      (fx.activityLogs ?? []).filter(a => a.date >= from && a.date <= to)),
     listDoseEvents: vi.fn(async () => [] as unknown[]),
     listProgramPhases: vi.fn(async () => [] as unknown[]),
     countSessionsSinceStart: vi.fn(async () => 0),
