@@ -392,7 +392,7 @@ export async function buildReadinessPayload(
   // #3114: Oura's per-minute MET decides the move lane (its activity day starts at 4 a.m., hence the
   // day before). Today's live read may go without it; a finalised day may not (`loadActivityDay`).
   const cloudActivityP = (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay, metChangedAt] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -413,6 +413,10 @@ export async function buildReadinessPayload(
     (async () => repo.getOuraCloudReadinessContributors(userId, from28dIso, todayIso))().catch(() => []),
     // #3193: a failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
     (async () => knownSwitchDay !== undefined ? knownSwitchDay : repo.getOuraCloudSwitchDay(userId))().catch(() => null),
+    // #3079: a finished day whose Oura MET changed after its stamp is scored once more, as the
+    // training-stress re-check does. A failed read only loses that trigger for this read. Read here
+    // with the rest rather than after them (#3392): it adds no round trip to the read.
+    (async () => repo.getOuraCloudMetChangedAt(userId, metLookbackFrom(todayIso, ACTIVITY_FINALISE_DAYS), shiftDateStr(todayIso, -1)))().catch(() => []),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -550,11 +554,6 @@ export async function buildReadinessPayload(
   // older day in the look-back still holding a partial value is finalised behind the read.
   const nowDate = new Date()
   const activityStamps = new Map(derivedTodayRows.map(r => [r.day, activityFinalisedAt(r.activityContributors)]))
-  // #3079: a finished day whose Oura MET changed after its stamp is scored once more, as the
-  // training-stress re-check does. A failed read only loses that trigger for this read.
-  const metChangedAt = await (async () =>
-    repo.getOuraCloudMetChangedAt(userId, metLookbackFrom(todayIso, ACTIVITY_FINALISE_DAYS), shiftDateStr(todayIso, -1)))()
-    .catch(() => [])
   const staleActivityDays = staleFinishedDays(
     todayIso, tz, activityStamps, ACTIVITY_FINALISE_DAYS, activityFinalGrace(nowDate),
     new Map(metChangedAt.map(r => [r.date, r.changedAt])),
