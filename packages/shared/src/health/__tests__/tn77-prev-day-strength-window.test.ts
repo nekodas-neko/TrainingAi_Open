@@ -48,10 +48,10 @@ describe("yesterday's strength window excludes today (TN-77a)", () => {
     expect(strengthWindowEndingAt(sessions, YESTERDAY, TZ)).toEqual({ sessions7d: 1, volume7dKg: 2000 })
   })
 
-  it('the window reaches back seven days and no further', () => {
+  it('the window is seven local days, the day itself included, and no more', () => {
     const sessions = [
-      session(YESTERDAY_MID - 7 * DAY, 100),          // oldest day still inside
-      session(YESTERDAY_MID - 7 * DAY - 1, 999),      // one millisecond too old
+      session(YESTERDAY_MID - 6 * DAY, 100),          // oldest day still inside: the day plus six before it (#2739)
+      session(YESTERDAY_MID - 6 * DAY - 1, 999),      // one millisecond too old
     ]
     expect(strengthWindowEndingAt(sessions, YESTERDAY, TZ)).toEqual({ sessions7d: 1, volume7dKg: 100 })
   })

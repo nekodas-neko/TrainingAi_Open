@@ -1,7 +1,7 @@
 // #2865 — the Activity insight quoted 73/100 and 3 sessions while the Activity page showed 79 and 4.
 //
 // The insight built its own strength window from UTC midnight and scored without the zone-minute,
-// move-hour and ACWR lanes. In Brisbane (UTC+10) a session before 10 am, seven days ago, sat inside
+// move-hour and ACWR lanes. In Brisbane (UTC+10) a session before 10 am, six days ago, sat inside
 // the page's window and outside the insight's. This pins the insight to the page's numbers: today
 // it must quote exactly what /api/readiness-score serves, and a past day the score that route
 // stored and the same local-midnight window.
@@ -85,8 +85,8 @@ describe.skipIf(!canRun)('Activity insight reads the page’s numbers (#2865)', 
         [rows[0].id, startedAt, kg],
       )
     }
-    await session(local(shiftDateStr(TODAY, -8), 6), 2000)  // in yesterday's window only — boundary
-    await session(local(shiftDateStr(TODAY, -7), 6), 3000)  // in both windows — boundary; UTC dropped it
+    await session(local(shiftDateStr(TODAY, -7), 6), 2000)  // in yesterday's window only — boundary
+    await session(local(shiftDateStr(TODAY, -6), 6), 3000)  // in both windows — boundary; UTC dropped it
     await session(local(shiftDateStr(TODAY, -3), 12), 4000)
     await session(local(shiftDateStr(TODAY, -1), 12), 5000)
     await session(local(TODAY, 9), 6000)                     // today's own window only
@@ -103,7 +103,7 @@ describe.skipIf(!canRun)('Activity insight reads the page’s numbers (#2865)', 
     const page = await (await GET()).json()
 
     // Not vacuous: the page has a score, the lanes the insight used to skip are live, and the
-    // window holds the 06:00 session from seven days ago that the UTC window dropped.
+    // window holds the 06:00 session from six days ago that the UTC window dropped.
     expect(page.activityScore).not.toBeNull()
     expect(page.activitySignals.zoneMinutes).not.toBeNull()
     expect(page.activitySignals.sessions7d).toBe(4)
@@ -123,7 +123,7 @@ describe.skipIf(!canRun)('Activity insight reads the page’s numbers (#2865)', 
     )
     const text = await insight(yesterday)
     expect(text).toContain('Activity is 64/100')
-    // Eight days back at 06:00 counts, today's 09:00 session does not.
+    // Seven days back at 06:00 counts (the day plus six before it, #2739), today's 09:00 session does not.
     expect(text).toContain('4 session(s)')
     expect(text).toContain('14000 kg total volume')
   })
