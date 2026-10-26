@@ -11,6 +11,7 @@ import { sessionTokenFrom } from '../session-token';
 import { randomBytes } from 'node:crypto';
 import { getRepositoryAsync } from '@/lib/data';
 import { hashRefreshToken } from '../refresh-token-hash';
+import { nowSeconds } from '../session-cutoff';
 
 // #2076. A native sign-in is a refresh token (stored only as a hash, one family per device sign-in)
 // plus a one-day access token that names the refresh-token row it was issued with. The bearer check
@@ -50,6 +51,9 @@ async function accessTokenFor(user: User, nativeTokenId: string) {
       name: user.name ?? null,
       email: user.email,
       nativeTokenId,
+      // #3369: the refresh-token row is what ties this token to a sign-in (a reset deletes it), so
+      // the stamp is the issue time.
+      signedInAt: nowSeconds(),
     },
   });
   const token = await decode({ token: accessToken, secret, salt });

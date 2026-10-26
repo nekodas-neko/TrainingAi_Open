@@ -5,6 +5,8 @@ import type { ActivityLevel } from "@trainingai/shared/types/user"
 declare module "next-auth" {
   interface Session {
     isActive?: boolean
+    /** #3369: when this sign-in happened, in seconds. Compared with `users.sessions_valid_from`. */
+    signedInAt?: number
     user: {
       id: string
       name?: string | null
@@ -41,6 +43,8 @@ declare module "next-auth/jwt" {
     isActive?: boolean
 
     isActiveCheckedAt?: number
+    /** #3369: stamped once at sign-in and carried through every re-issue of the token. */
+    signedInAt?: number
     isAdmin?: boolean
     timezone?: string
     sex?: string | null

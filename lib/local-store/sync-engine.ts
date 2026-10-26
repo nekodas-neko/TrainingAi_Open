@@ -1,5 +1,6 @@
 import { getLocalStore } from './index';
 import { reconcileDeadLetters } from './dead-letter-signal';
+import { verifyDataEpoch } from './data-epoch';
 import { resolveFailedOutboxIds, serverBackoffMs, buildWorkoutLogPayload } from './sync-helpers';
 import type { SyncDelta } from '@/lib/data/repository';
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
@@ -91,6 +92,11 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   // A dead network otherwise gets one pull attempt per mount (every mount trigger
   // calls this with force=true, bypassing the interval throttle below).
   if (Date.now() < pullBackoffUntil) return null;
+
+  // #3369: a pull would write the server's (reset) state under local rows that predate the reset,
+  // and the push below would send those rows back. Settle whether this device is behind a reset
+  // first; if it is, it wipes and reloads, and neither happens.
+  if (await verifyDataEpoch(userId) !== 'ok') return null;
 
   // Throttle to once every 5 minutes (bypassed when force = true)
   if (!force && Date.now() - lastSyncMs < MIN_SYNC_INTERVAL_MS) return null;
@@ -1005,6 +1011,10 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
   reconcileDeadLetters(userId).catch(() => {});
 
   if (Date.now() < push5xxUntil) return null;
+
+  // #3369: before anything is read from the outbox. A device that holds data from before an admin
+  // reset wipes it here, outbox included, instead of sending it under the fresh sign-in.
+  if (await verifyDataEpoch(userId) !== 'ok') return null;
 
   // Re-queue workouts stranded by a double failure (POST threw AND queueMutation
   // threw): pending locally, absent from the outbox. Grace period avoids racing

@@ -20,7 +20,7 @@ import type {
   CreateMealPlanInput, UpdateMealPlanInput, UpdateMealInput, ReplaceStructureInput, PlanMealAnswer, EstimateToStore,
 } from './postgres/slices/meal-plans'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
-import type { AccountDeletionResult } from './postgres/slices/account-deletion'
+import type { AccountDeletionResult, AdminWipeGuard, AdminWipeAudit } from './postgres/slices/account-deletion'
 import type {
   NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput, RegrantNativeRefreshTokenInput,
 } from './postgres/slices/native-refresh-tokens'
@@ -675,7 +675,12 @@ export interface WorkoutRepository {
   getUserCredentials(userId: string): Promise<(User & { passwordHash?: string }) | null>
   /** #2120. Deletes the account and everything that cascades from it, in one transaction; the
    *  one path for both self-service and admin deletion. `deleted: false` means no row matched. */
-  deleteAccount(userId: string, opts?: { onlyIfNoData?: boolean }): Promise<AccountDeletionResult>
+  deleteAccount(
+    userId: string,
+    opts?: { onlyIfNoData?: boolean; guard?: AdminWipeGuard; audit?: AdminWipeAudit },
+  ): Promise<AccountDeletionResult>
+  /** #3369: erase everything an account holds and keep the account, its sign-ins and its admin/active flags. */
+  resetAccountData(userId: string, opts: { guard: AdminWipeGuard; audit: AdminWipeAudit }): Promise<AccountDeletionResult>
   usersWithData(userIds: readonly string[]): Promise<Set<string>>
 
   // ── Native app refresh tokens (#2076) ─────────────────────────────────────

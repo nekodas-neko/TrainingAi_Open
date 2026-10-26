@@ -107,6 +107,10 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   ta_evening_reminder_date: 'reminder dedupe', ta_weekly_recap_reminder_sunday: 'reminder dedupe',
   ta_health_alert_notified_today: 'alert dedupe', ta_supplement_reminder_notified_today: 'reminder dedupe',
   ta_workout_reminder_notified_today: 'reminder dedupe', ta_deadletter_notified_v1: 'failed-sync notices shown',
+  // #3369: which admin reset this device has wiped for. A sign-out empties the device anyway, and the
+  // next sign-in then has nothing old to wipe, so the record goes with the account.
+  ta_data_epoch: 'the admin-reset moment this device last saw (userId:seconds); a newer server value wipes the device',
+  ta_data_epoch_wiped: 'sessionStorage: this tab session already wiped for that epoch, so a failed record cannot loop',
   // Sync cursors and upload queues. A queue left behind would POST under the next account.
   ta_hc_last_sync: 'Health Connect cursor — the next account backfills the window for itself',
   ta_hc_first_hand_skipped_since: 'Health Connect rewind marker — the next account starts without one',
