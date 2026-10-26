@@ -18,7 +18,7 @@
 import { spearman } from '@trainingai/shared/health/correlation'
 import { canonicalNightForDate, nightSessions } from '@trainingai/shared/health/sleep-night'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
-import { PILLAR_WEIGHTS, UNIT_DEFS, type ShadowUnitId } from '@trainingai/shared/health/shadow-readiness/model'
+import { PILLAR_POINTS, UNIT_DEFS, type ShadowUnitId } from '@trainingai/shared/health/shadow-readiness/model'
 import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite'
 import { SLEEP_WEIGHTS, sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
 
@@ -84,6 +84,20 @@ export interface ShadowRow {
   units: Record<string, ShadowUnitStored> | null
 }
 
+/**
+ * #2826 — how the person felt, the thing the shadow weights are checked against. Until a multi-item
+ * daily check-in exists (#2823; fatigue first) it is the pre-workout energy rating in `mood_logs`,
+ * which the owner already answers. One row per day.
+ */
+export interface FeelRow {
+  /** The day the rating was given; the same day's shadow readiness row is compared with it. */
+  date: string
+  energyLevel: string
+}
+
+/** The energy rating as a number, low = drained. Anything else is not a rating and is skipped. */
+export const ENERGY_RATING: Readonly<Record<string, number>> = { drained: 1, low: 2, ok: 3, good: 4, pumped: 5 }
+
 export interface TuneInput {
   tz: string
   /** Oura dates, inclusive. */
@@ -95,6 +109,8 @@ export interface TuneInput {
   sleepSessions: OurSleepRow[]
   derived: DerivedRow[]
   shadow: ShadowRow[]
+  /** How the person felt each morning (#2826). Absent = not read. */
+  feel?: FeelRow[]
   /** Which shadow model to read. Defaults to the newest version stored in the range. */
   shadowModelVersion?: number
 }
@@ -394,9 +410,26 @@ function contributorsAsNumbers(stored: Record<string, unknown> | null | undefine
 }
 
 const unitIds = (pillar: string) => (Object.keys(UNIT_DEFS) as ShadowUnitId[]).filter(id => UNIT_DEFS[id].pillar === pillar)
-const unitWeights = (pillar: string) => Object.fromEntries(unitIds(pillar).map(id => [id, UNIT_DEFS[id].weight]))
+const unitWeights = (pillar: string) => Object.fromEntries(unitIds(pillar).map(id => [id, UNIT_DEFS[id].points]))
 const unitFeatures = (row: ShadowRow | undefined, pillar: string) =>
   row ? Object.fromEntries(unitIds(pillar).map(id => [id, shadowUnitScore(row, id)])) : null
+
+export interface FeelCorrelation {
+  label: string
+  /** Days with both a rating and a score. */
+  n: number
+  /** Spearman rank correlation of the score with the energy rating; null under 3 days. */
+  rho: number | null
+}
+
+export interface FeelReport {
+  /** Days with a usable energy rating in the range. */
+  ratedDays: number
+  /** How many distinct ratings were given: one answer on every day tells the model nothing. */
+  distinctRatings: number
+  /** Shadow readiness, each pillar, then each unit, against the rating. */
+  correlations: FeelCorrelation[]
+}
 
 export interface TuneReport {
   from: string
@@ -407,6 +440,36 @@ export interface TuneReport {
   comparisons: Comparison[]
   ouraFits: FitResult[]
   ourFits: FitResult[]
+  feel: FeelReport
+}
+
+/** Shadow readiness, its pillars and its units against the day's energy rating (#2826). */
+export function buildFeelReport(ctx: Pick<Context, 'shadowByDate'>, feel: readonly FeelRow[], dates: readonly string[]): FeelReport {
+  const inRange = new Set(dates)
+  const rating = new Map<string, number>()
+  for (const f of feel) {
+    const r = ENERGY_RATING[f.energyLevel]
+    if (r != null && inRange.has(f.date)) rating.set(f.date, r)
+  }
+  const against = (label: string, get: (r: ShadowRow) => number | null): FeelCorrelation => {
+    const points: { x: number; y: number }[] = []
+    for (const [date, y] of rating) {
+      const row = ctx.shadowByDate.get(date)
+      const x = row ? get(row) : null
+      if (x != null) points.push({ x, y })
+    }
+    return { label, n: points.length, rho: points.length >= 3 ? spearman(points) : null }
+  }
+  const correlations: FeelCorrelation[] = [
+    against('Shadow readiness', r => num(r.shadowReadiness)),
+    against('Sleep pillar', r => num(r.sleepPillar)),
+    against('Heart pillar', r => num(r.heartPillar)),
+    against('Activity pillar', r => num(r.activityPillar)),
+    against('Body pillar', r => num(r.bodyPillar)),
+    ...(Object.keys(UNIT_DEFS) as ShadowUnitId[]).filter(id => !UNIT_DEFS[id].unavailable)
+      .map(id => against(id, r => shadowUnitScore(r, id))),
+  ]
+  return { ratedDays: rating.size, distinctRatings: new Set(rating.values()).size, correlations }
 }
 
 export function buildTuneReport(input: TuneInput): TuneReport {
@@ -468,7 +531,7 @@ export function buildTuneReport(input: TuneInput): TuneReport {
     fitAgainst('Oura readiness ~ our pillars (shadow)', onPaired(shadowReadiness, p => {
       const row = ctx.shadowByDate.get(p.ourDate)
       return row ? { sleep: num(row.sleepPillar), heart: num(row.heartPillar), activity: num(row.activityPillar), body: num(row.bodyPillar) } : null
-    }), { ...PILLAR_WEIGHTS }),
+    }), { ...PILLAR_POINTS }),
     fitAgainst('Oura activity ~ our Activity units (shadow)', onPaired(activityPillar, p => unitFeatures(ctx.shadowByDate.get(p.ourDate), 'activity')), unitWeights('activity')),
   ]
 
@@ -477,6 +540,7 @@ export function buildTuneReport(input: TuneInput): TuneReport {
     shadowVersion: ctx.shadowVersion, shadowOtherVersions: ctx.shadowOtherVersions,
     comparisons: [sleepPillar, sleepScore, readiness, shadowReadiness, activityPillar],
     ouraFits, ourFits,
+    feel: buildFeelReport(ctx, input.feel ?? [], dates),
   }
 }
 
@@ -536,5 +600,13 @@ export function formatTuneReport(report: TuneReport, opts: { perDay?: boolean } 
   out.push('')
   out.push('3. What explains Oura from our side (ours = our current weight, renormalised over the inputs kept)')
   for (const fit of report.ourFits) out.push(...fitLines(fit))
+  out.push('')
+  out.push('4. Against how you felt (the pre-workout energy rating, drained 1 to pumped 5; same-day rows, rank correlation)')
+  const f = report.feel
+  out.push(`  ${f.ratedDays} rated days, ${f.distinctRatings} distinct rating${f.distinctRatings === 1 ? '' : 's'}.`)
+  if (f.ratedDays < MIN_FIT_DAYS || f.distinctRatings < 2) {
+    out.push(`  not yet meaningful: a check needs ${MIN_FIT_DAYS} rated days and more than one distinct answer.`)
+  }
+  for (const c of f.correlations) out.push(`  ${c.label.padEnd(32)} n ${String(c.n).padStart(3)}  rho ${f2(c.rho)}`)
   return out
 }

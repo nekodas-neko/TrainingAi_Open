@@ -102,8 +102,10 @@ async function main() {
       // To + 1: the Activity pillar on readiness date D reads day D − 1.
       `SELECT date::text AS date, model_version, shadow_readiness, sleep_pillar, heart_pillar, activity_pillar, body_pillar, units
            FROM ${schema}.shadow_readiness WHERE ${inRange('date', from, shiftDateStr(to, 1))}`,
+      // How the owner felt (#2826): the pre-workout energy rating, one row a day.
+      `SELECT log_date::text AS date, energy_level FROM ${schema}.mood_logs WHERE ${inRange('log_date', from, to)} AND deleted_at IS NULL`,
     ]) reads.push(await run(sql))
-    const [ouraDaily, ouraCloudDaily, periods, sleep, derived, shadow] = reads
+    const [ouraDaily, ouraCloudDaily, periods, sleep, derived, shadow, mood] = reads
 
     const input: TuneInput = {
       tz, from, to,
@@ -126,6 +128,7 @@ async function main() {
         day: date(r.day), sleepScore: numOrNull(r.sleep_score), sleepContributors: json(r.sleep_contributors),
         readinessScore: numOrNull(r.readiness_score), readinessContributors: json(r.readiness_contributors),
       })),
+      feel: mood.map(r => ({ date: date(r.date), energyLevel: String(r.energy_level) })),
       shadow: shadow.map(r => ({
         date: date(r.date), modelVersion: Number(r.model_version), shadowReadiness: numOrNull(r.shadow_readiness),
         sleepPillar: numOrNull(r.sleep_pillar), heartPillar: numOrNull(r.heart_pillar),

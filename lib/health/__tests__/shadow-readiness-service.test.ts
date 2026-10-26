@@ -112,7 +112,11 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
     // The seed leaves every ninth night unstaged: those have no value and no score.
     expect(dropped.length).toBeGreaterThan(0)
     for (const r of dropped) expect(r.u).toMatchObject({ value: null, weight: 0 })
-    for (const r of scored) expect(r.u).toMatchObject({ gap: null, weight: 10, level: null })
+    // Its 3 points (v4) are scaled by the quality and reliability factors stored beside the weight.
+    for (const r of scored) {
+      expect(r.u).toMatchObject({ gap: null, level: null })
+      expect(r.u.weight).toBeCloseTo(3 * r.u.quality * r.u.reliability, 2)
+    }
   }, 60_000)
 
   it('today is never replayed — it belongs to the daily step', async () => {
