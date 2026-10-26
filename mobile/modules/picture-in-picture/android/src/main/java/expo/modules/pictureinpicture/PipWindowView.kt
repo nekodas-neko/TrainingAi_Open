@@ -115,7 +115,7 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
   // The amber frame around a paused window, drawn over the content.
   private val pausedFrame = View(context).apply {
     background = GradientDrawable().apply {
-      setStroke(dp(2f), Color.parseColor("#88F59E0B"))
+      setStroke(dp(2f), Color.parseColor("#88EFAF00"))
       setColor(Color.TRANSPARENT)
     }
   }
@@ -412,8 +412,10 @@ class PipWindowView(context: Context, private val frameAt: (Long) -> PipFrame) :
     private const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
     private const val MAX_DOTS = 12
     private val BRAND = Color.parseColor("#00C84E")
-    private val AMBER = Color.parseColor("#F59E0B")
-    private val OVER = Color.parseColor("#EF4444")
+    // The dark warning and danger status tokens (`statusColors.dark` in mobile/src/shared/theme/tokens.ts),
+    // the same values the in-app chips use. The window is always dark, so it never needs the light steps.
+    private val AMBER = Color.parseColor("#EFAF00")
+    private val OVER = Color.parseColor("#FF6467")
     private val MUTED = Color.parseColor("#B2B8B3")
     private val TRACK = Color.parseColor("#14FFFFFF")
     private val DOT_OFF = Color.parseColor("#26FFFFFF")
