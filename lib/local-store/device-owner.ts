@@ -97,6 +97,17 @@ export function sessionPredatesFromAnswer(body: unknown): boolean {
   throw new Error('session look failed: unreadable answer')
 }
 
+/**
+ * The data-epoch answer as a session look. A server from before #3369 has no such route and never
+ * stamped a sign-in, so its session predates any record: the device adopts its rows, as it would for
+ * a session carried over the update. Any other failure still throws: not knowing is not "adopt".
+ */
+export async function sessionPredatesFromResponse(res: Response): Promise<boolean> {
+  if (res.status === 404) return true
+  if (!res.ok) throw new Error(`session look failed: HTTP ${res.status}`)
+  return sessionPredatesFromAnswer(await res.json())
+}
+
 /** `unclaimed`: no usable record, so whose rows are on the device is not known yet. */
 export type OwnerCheck = 'owned' | 'unclaimed' | 'mismatch' | 'ignored'
 
@@ -246,11 +257,8 @@ const browserDeps: OwnerDeps = {
     } catch { return false }
   },
   hasData: async () => (await import('./index')).deviceHasLocalData(),
-  sessionPredatesOwnerRecord: async () => {
-    const res = await fetch('/api/account/data-epoch', { cache: 'no-store' })
-    if (!res.ok) throw new Error(`session look failed: HTTP ${res.status}`)
-    return sessionPredatesFromAnswer(await res.json())
-  },
+  sessionPredatesOwnerRecord: async () =>
+    sessionPredatesFromResponse(await fetch('/api/account/data-epoch', { cache: 'no-store' })),
   outboxHoldsEntriesFor: async userId => {
     const { getUngatedLocalStore } = await import('./index')
     const store = getUngatedLocalStore(userId)
