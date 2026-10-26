@@ -17,6 +17,7 @@ import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
 import { fetchOuraDocuments, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, mapRingBatteryRows, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType, type OuraSeriesType } from './documents'
 import { NO_WRITES, plannedCounts, reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraBatteryStore, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
+import { stampOuraData } from './freshness'
 import { stillRhrRefresher, type StillRhrRefresh } from './still-rhr'
 import { reportOuraCloudIssue } from './report'
 import type { NightRescoreRepo } from '@/lib/health/rescore-nights'
@@ -51,6 +52,12 @@ export interface OuraBackfillOptions {
    * job (#3389). On a dry run nothing is written and the report counts what would be tombstoned.
    */
   tombstoneAbsent?: boolean
+  /**
+   * #2861: stamp `last_data_at` when documents or heart-rate points land. Default true. The daily
+   * reconcile and the admin backfill pass false: they re-read days already stored, so what they
+   * return is not new data from the ring and must not make a stale ring look fresh.
+   */
+  stampData?: boolean
 }
 
 export interface OuraBackfillReport {
@@ -219,6 +226,8 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   }
   const writes = mapOuraDocuments(docs)
   report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes, deps.rescore, deps.stillRhr)
+  // #2861: documents that landed count as data received; an empty read does not.
+  if (!opts.dryRun && opts.stampData !== false && docs.length > 0) await stampOuraData(deps.repo, userId)
   if (opts.tombstoneAbsent) {
     for (const { type, ...whole } of readWhole) {
       const range = opts.dryRun ? { ...whole, dryRun: true } : whole
@@ -239,6 +248,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
         if (!opts.dryRun && points.length > 0) {
           const write = await deps.repo.upsertOuraCloudHeartrate(userId, points, opts.tz)
           written = write.offered
+          if (written > 0 && opts.stampData !== false) await stampOuraData(deps.repo, userId)
           await reattributeAfterHeartRate(deps.workoutHr, userId, write, opts.tz, 'backfill-heartrate:workouts')
           await refreshStillRhrAfterHeartRate(deps.stillRhr, userId, write, opts.tz)
         }

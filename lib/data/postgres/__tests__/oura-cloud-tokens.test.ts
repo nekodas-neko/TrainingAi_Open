@@ -90,6 +90,24 @@ describe.skipIf(!canRun)('oura_tokens as the Oura Cloud token store (#2858)', ()
     expect((await repo.getOuraCloudTokens(USER_A))?.reauthRequiredAt).toBeNull()
   })
 
+  // #2861
+  it('stamps the last webhook and the last data on the caller\'s row only, leaving updated_at alone', async () => {
+    const before = await repo.getOuraCloudTokens(USER_A)
+    expect(before?.lastWebhookAt).toBeNull()
+    expect(before?.lastDataAt).toBeNull()
+    await repo.touchOuraCloudWebhook(USER_A)
+    const hooked = await repo.getOuraCloudTokens(USER_A)
+    expect(hooked?.lastWebhookAt).toBeInstanceOf(Date)
+    expect(hooked?.lastDataAt).toBeNull()
+    await repo.touchOuraCloudData(USER_A)
+    const after = await repo.getOuraCloudTokens(USER_A)
+    expect(after?.lastDataAt).toBeInstanceOf(Date)
+    expect(after?.updatedAt.getTime()).toBe(before!.updatedAt.getTime())
+    // No row, no-op; and nobody else's row is touched.
+    await repo.touchOuraCloudWebhook(USER_B)
+    expect(await repo.getOuraCloudTokens(USER_B)).toBeNull()
+  })
+
   it('refuses a second user for the same Oura account (23505)', async () => {
     const t = tokens(USER_B, 'b', 'b')
     await expect(repo.saveOuraCloudTokens(USER_B, { ...t, expiresAt: new Date(), scope: null, ouraUserId: 'oura-A' }))

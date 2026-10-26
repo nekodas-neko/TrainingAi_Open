@@ -9,6 +9,9 @@ const statusSchema = z.object({
   connected: z.boolean(),
   scope: z.string().nullable(),
   expiresAt: z.string().nullable(),
+  // #2861: when the feed last spoke. Absent from a server that predates the stamps.
+  lastDataAt: z.string().nullish(),
+  lastWebhookAt: z.string().nullish(),
 });
 export type OuraStatus = z.infer<typeof statusSchema>;
 export type OuraCallback =

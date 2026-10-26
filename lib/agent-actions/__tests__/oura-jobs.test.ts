@@ -42,7 +42,7 @@ describe('oura-cloud-backfill (#2859)', () => {
       const out = await runAgentJob(ctx, AgentActionRequest.parse(req('oura-cloud-backfill', { dryRun: true })))
       expect(out.status).toBe(200)
       expect(backfill).toHaveBeenCalledWith(expect.objectContaining({ config: expect.any(Object) }), OWNER,
-        { from: '2026-07-17', to: '2026-10-14', dryRun: true, heartRate: true, tz: 'Australia/Brisbane', tombstoneAbsent: true })
+        { from: '2026-07-17', to: '2026-10-14', dryRun: true, heartRate: true, tz: 'Australia/Brisbane', tombstoneAbsent: true, stampData: false })
       expect(out.finish).toEqual({ outcome: 'succeeded', affectedRows: 0, daysMoved: 0, error: null })
     } finally {
       vi.useRealTimers()

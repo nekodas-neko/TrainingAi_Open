@@ -17,6 +17,8 @@ import {
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useAccountContext } from '../../account/AccountProvider';
+import { useHealthData } from '../../health/data/HealthDataProvider';
+import { ouraFeedStatus } from '@trainingai/shared/health/oura-freshness';
 import { authPlatform } from '../../../integrations/auth/platform';
 import {
   openOuraApp,
@@ -89,6 +91,7 @@ export function OuraScreen({
 }) {
   const { theme } = useTheme();
   const account = useAccountContext();
+  const health = useHealthData();
   const connection = account.dataReader;
   const client = authPlatform.client;
   const [status, setStatus] = useState<OuraStatus | null>(null);
@@ -210,6 +213,11 @@ export function OuraScreen({
                 ? 'Your ring’s sleep, readiness and activity reach TrainingAi from Oura after each sync.'
                 : 'Connect your Oura account so your ring’s data reaches TrainingAi. You approve it on Oura’s page and come straight back.'}
             </AppText>
+            {connected && status && (
+              <AppText variant="caption" tone="muted">
+                {ouraFeedStatus(status, Date.now(), health.timezone)}
+              </AppText>
+            )}
             <StatusIndicator
               label={
                 busy === 'disconnect'

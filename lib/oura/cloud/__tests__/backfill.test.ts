@@ -7,6 +7,7 @@ import { OURA_API_BASE, type OuraOAuthConfig } from '../config'
 import { encryptOuraToken } from '../token-cipher'
 import { backfillOuraCloud, MAX_RATE_LIMIT_WAITS, startOuraConnectBackfill, validBackfillRange, type OuraBackfillDeps } from '../backfill'
 import { parseRetryAfter } from '../data'
+import { reconcileOuraCloud } from '../reconcile'
 import { resetOuraCloudReportThrottle } from '../report'
 
 const reportServerError = vi.fn()
@@ -30,12 +31,14 @@ function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
     userId: USER,
     accessToken: encryptOuraToken('acc', USER, 'access_token'),
     refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-    expiresAt: new Date(Date.now() + 86_400_000), scope, ouraUserId: 'o', updatedAt: new Date(), reauthRequiredAt: null,
+    expiresAt: new Date(Date.now() + 86_400_000), scope, ouraUserId: 'o', updatedAt: new Date(), reauthRequiredAt: null, lastWebhookAt: null, lastDataAt: null,
   } : null
   const repo: OuraBackfillDeps['repo'] = {
     getOuraCloudTokens: async () => row,
     saveOuraCloudTokens: async () => {},
     markOuraCloudReauthRequired: async () => { calls.push('marked'); return true },
+    touchOuraCloudWebhook: async () => { calls.push('stamp:webhook') },
+    touchOuraCloudData: async () => { calls.push('stamp:data') },
     deleteOuraCloudTokens: async () => true,
     getUserIdByOuraUserId: async () => (connected ? USER : null),
     upsertOuraDaily: async (_u, rows) => { calls.push(`daily:${rows.length}`) },
@@ -124,7 +127,8 @@ describe('backfillOuraCloud (#2859)', () => {
     expect(out.report.counts).toMatchObject({
       dailyRows: 1, bodyRows: 1, sleepWritten: 1, workouts: 1, heartRatePoints: 4, sleepPeriods: 1, cloudDays: 1, sessions: 1,
     })
-    expect(calls).toEqual(['daily:1', 'body:1', 'periods:1', 'sleep:1', 'workouts:1', 'cloudDaily:1', 'sessions:1', 'hr:2', 'hr:2'])
+    // The default stamps data received: once after the documents, and once per heart-rate window that wrote.
+    expect(calls).toEqual(['daily:1', 'body:1', 'periods:1', 'sleep:1', 'workouts:1', 'cloudDaily:1', 'sessions:1', 'stamp:data', 'hr:2', 'stamp:data', 'hr:2', 'stamp:data'])
     const first = new URL(String(fetchMock.mock.calls[0][0]))
     expect(first.href.startsWith(`${OURA_API_BASE}/v2/usercollection/daily_readiness`)).toBe(true)
     expect(Object.fromEntries(first.searchParams)).toEqual({ start_date: '2026-10-01', end_date: '2026-10-12' })
@@ -585,4 +589,48 @@ describe('backfillOuraCloud tombstoneAbsent: a 404 is not a whole read (#3153)',
       expect(out.ok && (type === 'workout' ? out.report.workoutsTombstoned : out.report.sessionsTombstoned)).toBe(0)
     })
   }
+})
+
+describe('a re-read does not count as new data (#2861)', () => {
+  const savedKey = process.env.OURA_TOKEN_KEY
+  beforeEach(() => {
+    process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+    oura()
+  })
+  afterEach(() => {
+    process.env.OURA_TOKEN_KEY = savedKey
+    vi.unstubAllGlobals()
+  })
+
+  it('stampData: false writes the documents and heart rate but never stamps last_data_at', async () => {
+    const { repo, calls } = fakeRepo()
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false, stampData: false })
+    expect(out.ok).toBe(true)
+    expect(calls).toContain('sleep:1')
+    expect(calls).toContain('hr:2')
+    expect(calls).not.toContain('stamp:data')
+  })
+
+  it('the daily reconcile re-reads documents and heart rate without stamping data received', async () => {
+    const { repo, calls } = fakeRepo()
+    const full = {
+      ...repo,
+      listOuraCloudConnectedUserIds: async () => [USER],
+      getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }),
+      // The night re-score the reconcile attaches: nothing stored, so nothing to re-score.
+      withOuraSleepWriteLock: async (_u: string, run: () => Promise<unknown>) => run(),
+      listSleepSessions: async () => [],
+      listDeletedOuraCloudSleepDates: async () => [],
+      getOuraDailyDerived: async () => null,
+      upsertOuraDailyDerived: async () => {},
+      clearNightDerivedScores: async () => {},
+      releaseBodyBatteryAnchor: async () => {},
+    } as unknown as Parameters<typeof reconcileOuraCloud>[0]['repo']
+    const out = await reconcileOuraCloud({ repo: full, config: CONFIG, now: () => new Date('2026-10-19T02:00:00.000Z') })
+    expect(out.map(o => o.result)).toEqual(['ok'])
+    expect(calls).toContain('sleep:1')
+    expect(calls).not.toContain('stamp:data')
+  })
 })

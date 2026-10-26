@@ -22,6 +22,7 @@ import { fetchOuraDocument, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbid
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, mapRingBatteryRows, OURA_DELETE_TYPES, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
 import { isRingBatteryBackedOff, markRingBatteryRefused, resetRingBatteryBackoff } from './ring-battery-backoff'
+import { stampOuraData, stampOuraWebhook } from './freshness'
 import { reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraBatteryStore, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import type { StillRhrRefresh } from './still-rhr'
 import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
@@ -159,6 +160,8 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
   if (!isStoredType(event.data_type)) return { result: 'ignored', reason: `data_type ${event.data_type} is not stored` }
   const userId = await deps.repo.getUserIdByOuraUserId(event.user_id)
   if (!userId) return { result: 'unknown_user' }
+  // #2861: the Devices status says when the feed last spoke, whatever the event turns out to be.
+  await stampOuraWebhook(deps.repo, userId)
 
   if (event.event_type === 'delete') {
     if (!OURA_DELETE_TYPES.includes(event.data_type)) return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
@@ -192,6 +195,7 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     const doc = await fetchOuraDocument(token, event.data_type, event.object_id)
     if (!doc) return { result: 'not_found' }
     const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]), deps.rescore, deps.stillRhr)
+    await stampOuraData(deps.repo, userId)
     if (HEART_RATE_TRIGGERS.has(event.data_type)) {
       if (isOuraTypeShared(granted, 'heartrate')) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
       // The user's choice on Oura's consent page, not a failure: logged, never reported (as the backfill does).
@@ -293,6 +297,7 @@ export async function catchUpOuraCloudHeartRate(
     ? { offered: 0, changed: 0, changedFrom: null, changedTo: null }
     : await deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
   const written = write.offered
+  if (written > 0) await stampOuraData(deps.repo, userId)
   await reattributeAfterHeartRate(deps.workoutHr, userId, write, tz, 'webhook-heartrate:workouts')
   await refreshStillRhrAfterHeartRate(deps.stillRhr, userId, write, tz)
   // The span with nothing stored yet: what an empty answer says Oura is missing.

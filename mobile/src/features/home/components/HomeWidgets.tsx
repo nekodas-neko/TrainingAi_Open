@@ -23,6 +23,7 @@ import {
   AppButton,
 } from '../../../shared/ui';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
+import { OuraStaleNote } from '../../devices/components/OuraStaleNote';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { sleepWokeEnd } from '../../health/data/body-view';
 import { useOuraHandoff, type OuraHandoffStatus } from '../../health/OuraHandoffProvider';
@@ -485,6 +486,7 @@ function HomeWidgetBody({
                     {formatTimeOfDay(sleepWokeEnd(night) ?? night.sleepEnd, health.timezone)}
                   </AppText>
                 )}
+                <OuraStaleNote />
               </Stack>
               <Icon name="moon" color={theme.scores.sleep} />
             </Stack>

@@ -122,6 +122,11 @@ test('status is parsed strictly, and disconnect calls DELETE', async () => {
   }, calls);
   assert.deepEqual(await readOuraStatus(conn), { connected: true, scope: 'daily', expiresAt: '2026-10-15T00:00:00Z' });
   await assert.rejects(readOuraStatus(connection({ 'GET /api/oura/connection': { connected: 'yes' } })));
+  // #2861: when the feed last spoke comes through, and a server without the stamps still parses.
+  assert.deepEqual(
+    await readOuraStatus(connection({ 'GET /api/oura/connection': { connected: true, scope: 'daily', expiresAt: null, lastDataAt: '2026-10-26T01:05:00.000Z', lastWebhookAt: null } })),
+    { connected: true, scope: 'daily', expiresAt: null, lastDataAt: '2026-10-26T01:05:00.000Z', lastWebhookAt: null },
+  );
   // #3227: a grant Oura refused comes back not connected, with a field the schema drops.
   assert.deepEqual(
     await readOuraStatus(connection({ 'GET /api/oura/connection': { connected: false, scope: null, expiresAt: null, reauthRequired: true } })),
