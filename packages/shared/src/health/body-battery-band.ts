@@ -1,6 +1,19 @@
 export type BodyBatteryLabel = 'Charged' | 'Good' | 'Low' | 'Drained'
 
 /**
+ * The label for a level: Charged 75 or more, Good 50 to 74, Low 25 to 49, Drained under 25. The one
+ * place the tiers live. The route ships the label for the level it computes; an app that shows a
+ * different level (Home's Energy hero, `body-battery-energy.ts`) asks here rather than
+ * re-deriving 75 / 50 / 25.
+ */
+export function bodyBatteryLabelFor(level: number): BodyBatteryLabel {
+  if (level >= 75) return 'Charged'
+  if (level >= 50) return 'Good'
+  if (level >= 25) return 'Low'
+  return 'Drained'
+}
+
+/**
  * The one colour table for a body-battery level. Two had drifted for the same concept — a
  * continuous `hsl()` ramp keyed on the number (theme-blind, so it ignored the light palette) and a
  * three-token map keyed on the label. The token map wins; the ramp's continuity bought nothing,
