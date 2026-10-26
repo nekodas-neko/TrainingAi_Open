@@ -49,7 +49,10 @@ const SOURCE = stripComments(read('lib/achievements.ts'))
 const templates = [...SOURCE.matchAll(/db\.execute\(\s*sql`([\s\S]*?)`\s*\)/g)].map(m => m[1])
 
 describe('computeAchievements skips deleted entries (issue 2661)', () => {
-  const tables = new Set(softDeletedTables())
+  // `food_items` carries a tombstone only for a look-alike merged into its keeper (#2417). It is
+  // reached through a live food log's FK, and that log still counts at its retired row's values, so
+  // filtering it here would drop calories the owner ate. The log's own `deleted_at` is the filter.
+  const tables = new Set(softDeletedTables().filter(t => t !== 'food_items'))
 
   it('finds the soft-deleted tables and the queries at all — a scan that matches nothing passes silently', () => {
     // Floors, not targets. Lower one only when a table or query genuinely goes.
