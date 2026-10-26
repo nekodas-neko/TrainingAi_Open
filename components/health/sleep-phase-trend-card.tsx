@@ -12,6 +12,7 @@ import {
   type ChartData,
 } from "chart.js";
 import { resolveColor } from "@trainingai/shared/chart-colors";
+import { formatHoursMinutes } from "@trainingai/shared/format/units";
 import { STAGE_COLOR } from "@trainingai/shared/health/hypnogram";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
@@ -59,7 +60,7 @@ export function SleepPhaseTrendCard({ nights }: { nights: PhaseHoursNight[] }) {
             tooltip: {
               mode: "index",
               intersect: false,
-              callbacks: { label: ctx => `${ctx.dataset.label}: ${(ctx.raw as number).toFixed(1)}h` },
+              callbacks: { label: ctx => `${ctx.dataset.label}: ${formatHoursMinutes((ctx.raw as number) * 60)}` },
             },
           },
           scales: {

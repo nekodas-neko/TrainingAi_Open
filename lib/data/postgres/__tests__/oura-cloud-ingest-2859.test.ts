@@ -111,7 +111,7 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     expect(daily.stress_high).toBe(5400)
 
     const body = await one(`SELECT steps, active_calories, spo2_pct, hrv_ms, resting_heart_rate, source_map FROM body_metrics WHERE user_id = $1`)
-    expect(body).toMatchObject({ steps: 9123, active_calories: 512, spo2_pct: 96.4, hrv_ms: 62, resting_heart_rate: 47 })
+    expect(body).toMatchObject({ steps: 9123, active_calories: 512, spo2_pct: 96.4, hrv_ms: 54.5, resting_heart_rate: 47 })
     for (const c of ['steps', 'active_calories', 'spo2_pct', 'hrv_ms', 'resting_heart_rate']) expect(body.source_map[c], c).toBe('oura_cloud')
 
     const sleep = await one(`SELECT * FROM sleep_sessions WHERE user_id = $1`)

@@ -44,7 +44,7 @@ describe('More tab sleep averages with pending manual writes', () => {
     }
     const text = await mount()
     expect(text).toContain('average of 1 night')
-    expect(text).toContain('8.0 h')
+    expect(text).toContain('8h 00m')
   })
 
   it('a typed night the server does not have yet counts', async () => {
@@ -56,7 +56,7 @@ describe('More tab sleep averages with pending manual writes', () => {
     }
     const text = await mount()
     expect(text).toContain('average of 2 nights')
-    expect(text).toContain('7.0 h')
+    expect(text).toContain('7h 00m')
   })
 
   it('with no local store (the web build) the reply is shown as it came', async () => {
@@ -64,6 +64,6 @@ describe('More tab sleep averages with pending manual writes', () => {
     h.store = null
     const text = await mount()
     expect(text).toContain('average of 2 nights')
-    expect(text).toContain('7.0 h')
+    expect(text).toContain('7h 00m')
   })
 })
