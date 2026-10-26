@@ -11,6 +11,7 @@ import {
   FEEL_OPTIONS,
   feelCheckin,
   readinessPrompt,
+  respondedToday,
   type Feel,
 } from '../data/readiness-prompt';
 import { failureNotice } from '../../../core/reporting/index.ts';
@@ -39,7 +40,12 @@ export function ReadinessPromptCard({
   const row = pending.at(-1)?.payload ?? health.checkins[health.today] ?? null;
   const feelAnswered =
     row?.vsNormal != null && (row.vsNormalTouched as boolean | null | undefined) === true;
-  const prompt = readinessPrompt(verdict.data?.verdict, feelAnswered);
+  // A skip lives only in `readinessResponses` (until the POST lands), so offline or in flight it is
+  // the only record that the question was dealt with today.
+  const prompt = readinessPrompt(
+    verdict.data?.verdict,
+    feelAnswered || respondedToday(health.readinessResponses, health.today),
+  );
   async function answer(feel: Feel | null) {
     if (!health.store || busy) {
       return;
@@ -70,8 +76,9 @@ export function ReadinessPromptCard({
       onPress={openReadiness}
       hitSlop={theme.spacing.xs}
       style={({ pressed }) => ({
+        minHeight: theme.sizes.touchTarget,
+        justifyContent: 'center',
         paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
         borderRadius: theme.radii.pill,
         backgroundColor: theme.colors.raised,
         opacity: pressed ? 0.65 : 1,
@@ -100,6 +107,8 @@ export function ReadinessPromptCard({
                 minHeight: theme.sizes.touchTarget,
                 alignItems: 'center',
                 justifyContent: 'center',
+                paddingHorizontal: theme.spacing.xs,
+                paddingVertical: theme.spacing.xs,
                 borderRadius: theme.radii.pill,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
@@ -107,7 +116,8 @@ export function ReadinessPromptCard({
                 opacity: pressed || busy ? 0.65 : 1,
               })}
             >
-              <AppText variant="label" numberOfLines={1}>
+              {/* Three pills share ~103 dp at 384 px: "About the same" wraps rather than clips. */}
+              <AppText variant="label" style={{ textAlign: 'center' }}>
                 {option.label}
               </AppText>
             </Pressable>
@@ -119,8 +129,8 @@ export function ReadinessPromptCard({
             accessibilityRole="button"
             accessibilityLabel="Skip the readiness question"
             disabled={busy}
-            hitSlop={theme.spacing.sm}
             onPress={() => void answer(null)}
+            style={{ minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}
           >
             <AppText variant="caption" tone="muted">
               Not now

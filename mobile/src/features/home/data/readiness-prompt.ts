@@ -35,9 +35,13 @@ export type Feel = (typeof FEEL_OPTIONS)[number]['value'];
 const range = (verdict: ReadinessVerdictData) =>
   `${Math.round(verdict.band.low)}–${Math.round(verdict.band.high)}`;
 
+/** A queued answer or skip for today: the only record of a "Not now" until its POST lands. */
+export const respondedToday = (responses: readonly { date: string }[], today: string) =>
+  responses.some((response) => response.date === today);
+
 export function readinessPrompt(
   verdict: ReadinessVerdictData | null | undefined,
-  /** Today's check-in already carries a tapped answer to the same question. */
+  /** Today's check-in carries a tapped answer, or a queued answer or skip is waiting to upload. */
   feelAnswered = false,
 ): ReadinessPrompt {
   if (!verdict) {

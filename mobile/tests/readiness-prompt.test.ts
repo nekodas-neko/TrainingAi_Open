@@ -3,9 +3,10 @@ import { test } from 'node:test';
 import {
   feelCheckin,
   readinessPrompt,
+  respondedToday,
   type ReadinessVerdictData,
 } from '../src/features/home/data/readiness-prompt.ts';
-import { morningSchema } from '../src/features/health/data/checkin.ts';
+import { carriedVsNormal, morningSchema } from '../src/features/health/data/checkin.ts';
 
 const verdict = (
   over: Partial<ReadinessVerdictData> & Pick<ReadinessVerdictData, 'verdict' | 'score'>,
@@ -93,4 +94,33 @@ test('answering keeps what the morning check-in already holds and marks the tap 
   });
   assert.equal(morningSchema.safeParse(saved).success, true);
   assert.equal(morningSchema.safeParse(feelCheckin(null, 'better', 2)).success, true);
+});
+
+test('a queued skip keeps the question away offline, before the verdict reports it', () => {
+  assert.equal(respondedToday([{ date: '2026-10-26' }], '2026-10-26'), true);
+  assert.equal(respondedToday([{ date: '2026-10-25' }], '2026-10-26'), false);
+  const prompt = readinessPrompt(verdict({ verdict: 'poor', score: 47 }), true);
+  assert.equal(prompt.kind, 'usual');
+});
+
+test('the morning sheet carries a Home answer through its save instead of clearing it', () => {
+  const answered = feelCheckin({ sleepQualityFeel: 4 }, 'worse', 1);
+  const carried = carriedVsNormal(answered);
+  assert.deepEqual(carried, { vsNormal: 'worse', vsQuestion: 1, vsNormalTouched: true });
+  // The sheet's save must still validate with the carried fields in it.
+  assert.ok(
+    morningSchema.safeParse({
+      phase: 'morning',
+      sleepQualityFeel: 4,
+      sleepQualityFeelTouched: false,
+      ...carried,
+      soreMuscles: [],
+    }).success,
+  );
+  // No answer on file: nothing is invented.
+  assert.deepEqual(carriedVsNormal(null), { vsNormal: null, vsNormalTouched: false });
+  assert.deepEqual(carriedVsNormal({ vsNormal: 'same' }), {
+    vsNormal: 'same',
+    vsNormalTouched: false,
+  });
 });
