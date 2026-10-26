@@ -7,7 +7,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { dateStrMidnightInTz, shiftDateStr } from '../date-utils'
 import { resolveHrProfile } from './hr-profile'
 import { toOuraByDate } from './wear-confidence'
-import { scoreActivityForDay, restingHrBaseline, type ActivityDay } from './activity-day'
+import { scoreActivityForDay, restingHrBaseline, carriedOverRestingHr, type ActivityDay } from './activity-day'
 
 /** The history a day's score reads: the 28-day resting-HR baseline and the ACWR chronic window. */
 const HISTORY_DAYS = 28
@@ -47,6 +47,9 @@ export async function loadActivityDay(
     tz,
     bodyMetrics,
     restingHrBaseline: restingHrBaseline(bodyMetrics, toOuraByDate(ouraRows)),
+    // The previous device's mean while the device in use warms up, so the stored score keeps its zone
+    // lane the same way the live one does (#3001).
+    restingHrCarriedOver: carriedOverRestingHr(bodyMetrics),
     hrRows,
     maxHr: hrProfile?.maxHr ?? null,
     sessions,
