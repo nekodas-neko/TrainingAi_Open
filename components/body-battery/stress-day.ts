@@ -11,6 +11,8 @@
  * the parts worth pinning.
  */
 
+import type { ClockSkip } from '@trainingai/shared/date-utils'
+
 /** A measured bucket: midpoint in epoch ms, level ∈ [−1,+1] with negative meaning stressed. */
 export interface StressBucket {
   t: number
@@ -96,9 +98,19 @@ export function toSegments(buckets: StressBucket[], tz: string): StressSegment[]
   return segments
 }
 
-/** Total minutes covered by measured runs — the honest denominator for "how much of the day is this". */
-export function coveredMinutes(segments: StressSegment[]): number {
+/**
+ * Total minutes covered by measured runs — the honest denominator for "how much of the day is this".
+ *
+ * `skip` is the hour a spring-forward day's clock skips (`clockSkipOnDay`). A run that joins across
+ * it spans that hour on the axis though no time passed, so it is taken out of that run.
+ */
+export function coveredMinutes(segments: StressSegment[], skip?: ClockSkip | null): number {
   // A lone bucket covers its own 30 minutes; a run covers its span plus that same half-bucket at
   // each end, which is what makes one reading and two adjacent readings differ by 30 rather than 0.
-  return segments.reduce((n, seg) => n + (seg[seg.length - 1].x - seg[0].x) + 30, 0)
+  return segments.reduce((n, seg) => {
+    const first = seg[0].x
+    const last = seg[seg.length - 1].x
+    const skipped = skip && first < skip.fromMin && last >= skip.toMin ? skip.toMin - skip.fromMin : 0
+    return n + (last - first) - skipped + 30
+  }, 0)
 }

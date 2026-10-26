@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { clockSkipOnDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils';
 import { minutesIntoDay, toSegments, coveredMinutes } from '../stress-day';
 
 const TZ = 'Australia/Brisbane'; // UTC+10, no DST — the owner's zone.
@@ -111,5 +112,32 @@ describe('daylight-saving days in Sydney', () => {
     const segments = toSegments([{ t: second, level: -0.2 }, { t: first, level: -0.1 }], SYD);
     expect(segments).toHaveLength(1);
     expect(segments[0].map(p => p.level)).toEqual([-0.1, -0.2]);
+  });
+
+  it('does not count the skipped hour as measured: four contiguous buckets either side of it are 2 h', () => {
+    const segments = toSegments(
+      [aest(4, 1, 15), aest(4, 1, 45), aedt(4, 3, 15), aedt(4, 3, 45)].map(t => ({ t, level: -0.1 })),
+      SYD,
+    );
+    expect(segments).toHaveLength(1);
+    const skip = clockSkipOnDay(dateStrMidnightInTz('2026-10-04', SYD).getTime(), SYD);
+    expect(skip).toEqual({ fromMin: 120, toMin: 180 });
+    expect(coveredMinutes(segments, skip)).toBe(120);
+  });
+
+  it('leaves a run that ends before the skipped hour alone', () => {
+    const segments = toSegments([aest(4, 0, 15), aest(4, 0, 45)].map(t => ({ t, level: -0.1 })), SYD);
+    const skip = clockSkipOnDay(dateStrMidnightInTz('2026-10-04', SYD).getTime(), SYD);
+    expect(coveredMinutes(segments, skip)).toBe(60);
+  });
+});
+
+describe('a day with no skipped hour', () => {
+  it('measures the same with Brisbane\'s null skip as without one', () => {
+    const skip = clockSkipOnDay(dateStrMidnightInTz('2026-10-04', TZ).getTime(), TZ);
+    expect(skip).toBeNull();
+    const segments = toSegments([at(1, 15, -0.1), at(1, 45, -0.1), at(3, 15, -0.1), at(3, 45, -0.1)], TZ);
+    expect(coveredMinutes(segments, skip)).toBe(coveredMinutes(segments));
+    expect(coveredMinutes(segments, skip)).toBe(60 + 60);
   });
 });
