@@ -644,6 +644,8 @@ test('an unsynced completed workout enters Home timeline and a lost-reply server
   const events = localTimeline([], [pending], [], day, 'Australia/Brisbane');
   assert.equal(events.length, 1);
   assert.equal(events[0].durationMin, 30);
+  const paused = localTimeline([], [{ ...pending, pausedMs: 10 * 60_000 }], [], day, 'Australia/Brisbane');
+  assert.equal(paused[0].durationMin, 20, 'time spent paused is not part of the duration');
   assert.equal(localTimeline(events, [pending], [], day, 'Australia/Brisbane').length, 1);
 });
 
@@ -818,3 +820,24 @@ test('a 500 on a preference holds the queue so later writes wait behind it', asy
   assert.equal(f.rests.has(day), false);
   assert.match(state.error ?? '', /Could not sync/);
 });
+
+for (const status of [401, 403]) {
+  test(`a ${status} on a preference keeps it queued, with the queue behind it, and marks Home denied (#3392)`, async () => {
+    const f = fixture();
+    f.connection.patch = async () => {
+      throw new ApiError(status);
+    };
+    const store = f.make();
+    await store.initialize();
+    await store.savePreferences({ energyHeroSize: 'large' } as never);
+    await store.chooseRestDay(day, true);
+    await store.sync();
+    const state = store.getSnapshot();
+    assert.deepEqual(
+      state.operations.map((op) => op.kind),
+      ['preferences', 'rest'],
+    );
+    assert.equal(state.denied, true);
+    assert.doesNotMatch(state.error ?? '', /kept on this phone only/);
+  });
+}

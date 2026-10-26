@@ -314,7 +314,7 @@ test('kcal is null when the calorie target gives a remaining but the energy budg
 });
 
 test("the widget's Body Battery is the figure and band Home's Energy hero draws", () => {
-  // Woke at 80, fell to 22, recharged to 64: the hero draws the day's low, so the widget must too.
+  // Woke at 80, fell to 22, recharged to 64: the hero draws the current level, so the widget must too.
   const data = {
     hasData: true,
     current: 64,
@@ -332,7 +332,7 @@ test("the widget's Body Battery is the figure and band Home's Energy hero draws"
     value: String(hero.level),
     label: `${hero.label} · Charging`,
     level: hero.level,
-    band: 'drained',
+    band: 'good',
   });
-  assert.equal(battery!.value, '22');
+  assert.equal(battery!.value, '64');
 });

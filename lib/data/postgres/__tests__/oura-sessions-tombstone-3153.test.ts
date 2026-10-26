@@ -79,6 +79,14 @@ describe.skipIf(!canRun)('oura_sessions tombstones (#3153)', () => {
     expect(await ids()).toEqual(['t3153-c'])
   })
 
+  it('a dry run counts what the sweep would tombstone and writes nothing (#3389)', async () => {
+    const before = (await pool.query(`SELECT oura_id, deleted_at, updated_at FROM oura_sessions WHERE user_id = $1 ORDER BY oura_id`, [USER])).rows
+    expect(await repo.tombstoneOuraSessionsAbsent(USER, { from: '2026-10-08', to: '2026-10-10', keepIds: [], dryRun: true })).toBe(2)
+    expect(await ids()).toEqual(['t3153-a', 't3153-b', 't3153-c'])
+    const after = (await pool.query(`SELECT oura_id, deleted_at, updated_at FROM oura_sessions WHERE user_id = $1 ORDER BY oura_id`, [USER])).rows
+    expect(after).toEqual(before)
+  })
+
   it('a session Oura sends again is live again', async () => {
     await repo.tombstoneOuraSessions(USER, ['t3153-b'])
     await repo.upsertOuraSessions(USER, [session('t3153-b', '2026-10-09')])

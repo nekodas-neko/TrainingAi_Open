@@ -32,6 +32,7 @@ import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { useHealthData } from '../data/HealthDataProvider';
 import { energySpec, goalsSpec, trendsSpec } from '../data/models';
 import { ouraStatsSpec, ringBatterySpec } from '../data/body-models';
+import { readingAge } from '../../devices/data/ring-battery';
 import { waterGoalText, waterText, weekdayAxis, wornSeconds } from '../data/body-view';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
 import { HealthMetricCard } from './HealthMetricCard';
@@ -302,6 +303,7 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
   }
   if (!stats.data?.connected) return null;
   const level = battery.data?.latest?.percent ?? null;
+  const batteryAge = battery.data?.latest?.ageMinutes ?? 0;
   const worn = wornSeconds(
     stats.data.daily?.nonWearTimeSec ?? null,
     secondsSinceLocalMidnight(timezone),
@@ -325,7 +327,13 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
                 compact
                 label="Battery"
                 value={`${Math.round(level)}%`}
-                caption={battery.data?.latest?.charging ? 'Charging' : undefined}
+                caption={
+                  battery.data?.latest?.charging
+                    ? 'Charging'
+                    : batteryAge >= 6 * 60
+                      ? readingAge(batteryAge)
+                      : undefined
+                }
                 color={cueColor(level >= 60 ? 'good' : level >= 25 ? 'watch' : 'bad')}
               />
             )}

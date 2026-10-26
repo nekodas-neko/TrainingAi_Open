@@ -55,4 +55,16 @@ describe('aggregateWorkoutDay', () => {
     ])
     expect(result).toEqual({ sessionDurationMin: 0, workoutDensity: null })
   })
+
+  it('takes paused time off the duration and the density denominator (#3266)', () => {
+    const result = aggregateWorkoutDay([
+      {
+        startedAt: new Date('2026-07-04T18:00:00Z'),
+        completedAt: new Date('2026-07-04T19:00:00Z'),
+        volumeKg: 2500,
+        pausedSec: 600,
+      },
+    ])
+    expect(result).toEqual({ sessionDurationMin: 50, workoutDensity: 50 })
+  })
 })

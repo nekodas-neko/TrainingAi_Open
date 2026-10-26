@@ -8,6 +8,7 @@ import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, toAestDay } from '@trainingai/shared/date-utils'
 import { buildRecapFacts } from '@trainingai/shared/workout/session-recap'
+import { sessionActiveMin } from '@trainingai/shared/workout/active-duration'
 import { errorLog } from '@trainingai/shared/logger'
 import { reportServerError } from '@/lib/observability'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
@@ -50,7 +51,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const recentDurationsMin = recentSessions
       .filter(s => s.id !== sessionId && s.completedAt != null)
-      .map(s => (s.completedAt!.getTime() - s.startedAt.getTime()) / 60_000)
+      .map(s => sessionActiveMin(s.startedAt, s.completedAt!, s.pausedSec))
 
     const restSecByStyleSet = new Map<string, number>()
     for (const style of styles) {

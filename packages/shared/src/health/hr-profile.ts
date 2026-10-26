@@ -51,6 +51,10 @@ export interface HrProfile {
   /** The fitness-test read FAILED and the ceiling fell back to the age estimate, so a Cooper test
    *  that exists is not in `maxHr`. */
   fitnessTestsUnread?: boolean
+  /** The user (date of birth) read FAILED, so `estimatedMax` is `hrMaxFromAge(null)`. Unlike
+   *  `maxHrSource`, this survives a Cooper blend or an observed max winning the ceiling, both of
+   *  which are still built on that estimate. */
+  userUnread?: boolean
 }
 
 /**
@@ -64,6 +68,7 @@ export function maxHrIsUnread(profile: HrProfile | null | undefined): boolean {
     || profile.maxHrSource === 'estimated-age-unread'
     || profile.observedUnread === true
     || profile.fitnessTestsUnread === true
+    || profile.userUnread === true
 }
 
 /**
@@ -157,6 +162,7 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     observed,
     ...(unread.has('observed') ? { observedUnread: true } : {}),
     ...(fitnessTestsUnread ? { fitnessTestsUnread: true } : {}),
+    ...(unread.has('user') ? { userUnread: true } : {}),
   }
 }
 
