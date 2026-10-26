@@ -1,5 +1,10 @@
-import { bucketAverage, hrChartDomain } from '@trainingai/shared/health/hr-smoothing';
-import { dateStrMidnightInTz, formatMinutesOfDay } from '@trainingai/shared/date-utils';
+import { hrChartDomain } from '@trainingai/shared/health/hr-smoothing';
+import {
+  clockSkipOnDay,
+  closeClockSkip,
+  dateStrMidnightInTz,
+  wallClockMinuteReader,
+} from '@trainingai/shared/date-utils';
 import { bedtimeToMinuteWindow } from '@trainingai/shared/health/hr-sleep-band';
 import { noHrDataCopy } from '@trainingai/shared/health/hr-source-copy';
 import { HealthResourceHeader } from './HealthResourceHeader';
@@ -8,6 +13,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { daySpec } from '../../workouts/data/models';
 import { useHealthData } from '../data/HealthDataProvider';
+import { hrDayBuckets, hrTracePoints } from '../data/hr-trace';
 import { hrSpec, stressSpec } from '../data/models';
 export function HrDayCard({
   embedded = false,
@@ -20,21 +26,13 @@ export function HrDayCard({
   const stress = useWorkoutResource(stressSpec(today));
   const workouts = useWorkoutResource(daySpec(today));
   const midnight = dateStrMidnightInTz(today, timezone).getTime();
-  const minute = (at: string | number) =>
-    (typeof at === 'string' ? Date.parse(at) : at) - midnight;
+  // Wall-clock minutes of the day, so the axis is the clock face on a 23- or 25-hour day too (#3445).
+  const wallMinute = wallClockMinuteReader(midnight, timezone);
+  const skip = clockSkipOnDay(midnight, timezone);
+  const minute = (at: string | number) => wallMinute(typeof at === 'string' ? Date.parse(at) : at);
   const readings = state.data?.readings ?? [];
-  const buckets = bucketAverage(
-    readings
-      .map((row) => ({ x: minute(row.timestamp) / 60000, bpm: row.bpm }))
-      .filter((p) => p.x >= 0 && p.x <= 1440),
-    10,
-  );
-  const points = buckets.flatMap((p, i) => [
-    ...(i && p.x - buckets[i - 1].x > 30
-      ? [{ x: p.x - 1, label: 'Not recorded', value: null }]
-      : []),
-    { x: p.x, label: formatMinutesOfDay(p.x), value: p.y },
-  ]);
+  const buckets = hrDayBuckets(readings, midnight, timezone);
+  const points = hrTracePoints(buckets, skip);
   const night = sleep.find((n) => n.date === today);
   const sleepWindow =
     state.data?.sleep ??
@@ -61,8 +59,8 @@ export function HrDayCard({
       d
         ? [
             {
-              from: minute(d.start) / 60000,
-              to: minute(d.end) / 60000,
+              from: minute(d.start),
+              to: minute(d.end),
               label: 'Workout',
               color: theme.tones.activity.foreground,
             },
@@ -72,9 +70,9 @@ export function HrDayCard({
   ];
   const stressPoints = (stress.data?.series ?? []).flatMap((p, i, rows) => [
     ...(i && p.t - rows[i - 1].t > 75 * 60000
-      ? [{ x: minute(p.t) / 60000 - 1, value: null }]
+      ? [{ x: minute(p.t) - 1, value: null }]
       : []),
-    { x: minute(p.t) / 60000, value: p.level },
+    { x: minute(p.t), value: p.level },
   ]);
   // With nothing to draw the card is a heading and one line, as the current app's is: no plot box,
   // legend or footnote. The tall plot returns once readings arrive (Home needs two for a line).
