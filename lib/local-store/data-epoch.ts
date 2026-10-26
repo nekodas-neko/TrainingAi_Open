@@ -95,9 +95,13 @@ export async function checkDataEpoch(userId: string, deps: DataEpochDeps): Promi
   return 'wiped'
 }
 
-async function fetchServerEpoch(): Promise<number | null> {
+export async function fetchServerEpoch(): Promise<number | null> {
   try {
     const res = await fetch('/api/account/data-epoch', { cache: 'no-store' })
+    // A server from before #3369 has no such route, and the route ships with the only thing that can
+    // reset an account, so it has never reset this one. Seen only when this page is newer than the
+    // server answering it (a deploy's overlap, a rollback); Preview reads it the same way.
+    if (res.status === 404) return 0
     if (!res.ok) return null
     const body = await res.json() as { epoch?: unknown }
     return typeof body.epoch === 'number' && Number.isInteger(body.epoch) && body.epoch >= 0 ? body.epoch : null
