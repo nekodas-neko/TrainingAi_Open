@@ -47,7 +47,8 @@ export interface OuraBackfillOptions {
   /**
    * #3087, #3153: tombstone a stored workout or session on a day whose list of that type was read
    * completely when Oura's list for that day no longer has it: the catch-up for a missed `workout`
-   * or `session` delete event. The daily reconcile sets it.
+   * or `session` delete event. The daily reconcile sets it, and so does the `oura-cloud-backfill` agent
+   * job (#3389). On a dry run nothing is written and the report counts what would be tombstoned.
    */
   tombstoneAbsent?: boolean
 }
@@ -62,9 +63,9 @@ export interface OuraBackfillReport {
   dropped: number
   /** Written (or, for a dry run, planned). A dry run cannot know how many sleep periods overlap. */
   counts: OuraCloudWriteCounts
-  /** #3087: stored workouts tombstoned because Oura's list for their day no longer has them. */
+  /** #3087: stored workouts tombstoned because Oura's list for their day no longer has them (on a dry run, would be). */
   workoutsTombstoned: number
-  /** #3153: stored sessions tombstoned the same way. */
+  /** #3153: stored sessions tombstoned the same way (on a dry run, would be). */
   sessionsTombstoned: number
   /** Types Oura refused (403: membership or consent), and why the run stopped early, if it did. */
   forbidden: string[]
@@ -218,8 +219,9 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   }
   const writes = mapOuraDocuments(docs)
   report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes, deps.rescore, deps.stillRhr)
-  if (opts.tombstoneAbsent && !opts.dryRun) {
-    for (const { type, ...range } of readWhole) {
+  if (opts.tombstoneAbsent) {
+    for (const { type, ...whole } of readWhole) {
+      const range = opts.dryRun ? { ...whole, dryRun: true } : whole
       if (type === 'workout') report.workoutsTombstoned += await deps.repo.tombstoneOuraWorkoutsAbsent(userId, range)
       else report.sessionsTombstoned += await deps.repo.tombstoneOuraSessionsAbsent(userId, range)
     }

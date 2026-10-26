@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calibrationProgress } from '../calibration-progress'
+import { calibrationProgress, markedDayNote } from '../calibration-progress'
 import { MIN_LOGGED_DAYS } from '../adaptive-tdee'
 
 describe('calibrationProgress', () => {
@@ -29,5 +29,12 @@ describe('calibrationProgress', () => {
 
   it('returns nothing when there is no estimate to calibrate', () => {
     expect(calibrationProgress(null, false)).toBeNull()
+  })
+})
+
+describe('markedDayNote', () => {
+  it('says today counts from tomorrow, and a past day keeps the plain sentence', () => {
+    expect(markedDayNote(true)).toBe('This day counts toward your maintenance estimate from tomorrow')
+    expect(markedDayNote(false)).toBe('This day counts toward your maintenance estimate')
   })
 })

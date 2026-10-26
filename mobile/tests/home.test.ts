@@ -820,3 +820,24 @@ test('a 500 on a preference holds the queue so later writes wait behind it', asy
   assert.equal(f.rests.has(day), false);
   assert.match(state.error ?? '', /Could not sync/);
 });
+
+for (const status of [401, 403]) {
+  test(`a ${status} on a preference keeps it queued, with the queue behind it, and marks Home denied (#3392)`, async () => {
+    const f = fixture();
+    f.connection.patch = async () => {
+      throw new ApiError(status);
+    };
+    const store = f.make();
+    await store.initialize();
+    await store.savePreferences({ energyHeroSize: 'large' } as never);
+    await store.chooseRestDay(day, true);
+    await store.sync();
+    const state = store.getSnapshot();
+    assert.deepEqual(
+      state.operations.map((op) => op.kind),
+      ['preferences', 'rest'],
+    );
+    assert.equal(state.denied, true);
+    assert.doesNotMatch(state.error ?? '', /kept on this phone only/);
+  });
+}

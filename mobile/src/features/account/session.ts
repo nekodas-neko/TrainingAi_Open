@@ -47,7 +47,7 @@ export type AccountConnection = AccountReader & {
   coachStream?(body: unknown, signal?: AbortSignal | null): Promise<Response>;
   streamExport?(write: (bytes: Uint8Array) => Promise<void>): Promise<void>;
   readonly timezone: string | null;
-  post(path: string, body: unknown): Promise<unknown>;
+  post(path: string, body: unknown, query?: Record<string, string>): Promise<unknown>;
   put?(path: string, body: unknown): Promise<unknown>;
   patch?(path: string, body: unknown): Promise<unknown>;
   delete?(path: string, body: unknown, query?: Record<string, string>): Promise<unknown>;
@@ -397,8 +397,8 @@ export class AccountSession {
         }
         return value;
       },
-      post: async (path, body) => {
-        const value = await api.post(path, body);
+      post: async (path, body, query) => {
+        const value = await api.post(path, body, query);
         if (this.session?.userId !== userId) {
           throw new Error('The account changed during the request.');
         }

@@ -89,6 +89,7 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   ta_rest_duration: 'default rest', ta_food_region: 'food database region',
   ta_pref_meal_reminders: 'reminder toggle', ta_pref_health_alerts: 'alert toggle',
   ta_pref_day_review_reminders: 'reminder toggle', ta_pref_calendar_sync: 'calendar toggle',
+  ta_pref_share_meal_library: 'meal-library sharing toggle — cleared so the next account never inherits this one\'s consent',
   ta_prefs_unsynced: 'preference names whose PATCH is unacknowledged — kept, they would be re-sent to the NEXT account\'s server bag',
   // Goals seeded from the server (Q-241).
   ta_steps_goal: 'goal', ta_steps_goal_type: 'goal', ta_sleep_goal_hours: 'goal',

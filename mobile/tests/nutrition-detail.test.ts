@@ -90,10 +90,7 @@ test("End of Day falls back to logged food and shows no denominator without a bu
 test("the Body Battery pill takes theme colours, never CSS variables", () => {
   const theme = {
     colors: { danger: "#d00" },
-    tones: {
-      checkin: { foreground: "#fa0" },
-    },
-    status: { success: "#0a0" },
+    status: { success: "#0a0", warning: "#fa0" },
   };
   assert.equal(batteryColor("Drained", theme), "#d00");
   assert.equal(batteryColor("Low", theme), "#fa0");

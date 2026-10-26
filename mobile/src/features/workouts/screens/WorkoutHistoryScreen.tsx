@@ -17,6 +17,7 @@ import {
   Stack,
   StatusIndicator,
 } from '../../../shared/ui';
+import { loadLabel } from '../logging/preferences';
 import { WorkoutLayout } from '../components/WorkoutLayout';
 import { ResourceStatus } from '../components/ResourceStatus';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
@@ -215,11 +216,11 @@ export function HistoryDay({
                   <AppText variant="micro">
                     {entry.exerciseType === 'bodyweight'
                       ? entry.weightKg
-                        ? `BW +${entry.weightKg} kg`
+                        ? `BW +${loadLabel(entry.weightKg)}`
                         : 'BW'
                       : entry.weightKg == null
                         ? '—'
-                        : `${entry.weightKg} kg`}
+                        : loadLabel(entry.weightKg)}
                   </AppText>
                   {!readOnly && <>
                   <IconButton
