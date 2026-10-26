@@ -19,10 +19,14 @@ export interface StressBucket {
   level: number
 }
 
-/** One point placed on the axis. `x` is minutes since local midnight, 0–1440. */
+/**
+ * One point placed on the axis. `x` is minutes since local midnight, 0–1440. `t` is the bucket's
+ * instant, kept so a run's measured time is real elapsed time on a 23- or 25-hour day.
+ */
 export interface PlacedPoint {
   x: number
   level: number
+  t?: number
 }
 
 /**
@@ -91,7 +95,7 @@ export function toSegments(buckets: StressBucket[], tz: string): StressSegment[]
       segments.push(run)
       run = []
     }
-    run.push({ x, level })
+    run.push({ x, level, t })
     prevT = t
   }
   if (run.length) segments.push(run)
@@ -101,13 +105,17 @@ export function toSegments(buckets: StressBucket[], tz: string): StressSegment[]
 /**
  * Total minutes covered by measured runs — the honest denominator for "how much of the day is this".
  *
- * `skip` is the hour a spring-forward day's clock skips (`clockSkipOnDay`). A run that joins across
- * it spans that hour on the axis though no time passed, so it is taken out of that run.
+ * A run measures from its first and last instants, so the hour a spring-forward day skips adds
+ * nothing and the hour a fall-back day repeats counts twice. Points placed without an instant fall
+ * back to wall-clock `x`, taking out `skip` (`clockSkipOnDay`) for a run that joins across it.
  */
 export function coveredMinutes(segments: StressSegment[], skip?: ClockSkip | null): number {
   // A lone bucket covers its own 30 minutes; a run covers its span plus that same half-bucket at
   // each end, which is what makes one reading and two adjacent readings differ by 30 rather than 0.
   return segments.reduce((n, seg) => {
+    const firstT = seg[0].t
+    const lastT = seg[seg.length - 1].t
+    if (firstT != null && lastT != null) return n + (lastT - firstT) / 60_000 + 30
     const first = seg[0].x
     const last = seg[seg.length - 1].x
     const skipped = skip && first < skip.fromMin && last >= skip.toMin ? skip.toMin - skip.fromMin : 0

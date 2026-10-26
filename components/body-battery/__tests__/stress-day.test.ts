@@ -130,6 +130,34 @@ describe('daylight-saving days in Sydney', () => {
     const skip = clockSkipOnDay(dateStrMidnightInTz('2026-10-04', SYD).getTime(), SYD);
     expect(coveredMinutes(segments, skip)).toBe(60);
   });
+
+  it('takes the skipped hour out of a run placed without instants', () => {
+    // 01:15, 01:45, 03:15, 03:45 on the clock face: 150 minutes apart on the axis, 90 in real time.
+    const segments = [[75, 105, 195, 225].map(x => ({ x, level: -0.1 }))];
+    expect(coveredMinutes(segments, { fromMin: 120, toMin: 180 })).toBe(120);
+  });
+
+  describe('the 25-hour day, 2027-04-04', () => {
+    // 03:00 AEDT (UTC+11) falls back to 02:00 AEST (UTC+10) at 16:00 UTC on 3 April.
+    const utc = (hh: number, mm: number) => Date.UTC(2027, 3, 3, hh, mm);
+
+    it('counts a fully measured day as 25 hours', () => {
+      // Local midnight is 13:00 UTC; 50 half-hour buckets fill the day to the next local midnight.
+      const buckets = Array.from({ length: 50 }, (_, k) => ({ t: utc(13, 15) + k * 1_800_000, level: -0.1 }));
+      const segments = toSegments(buckets, SYD);
+      expect(segments).toHaveLength(1);
+      expect(coveredMinutes(segments)).toBe(1500);
+    });
+
+    it('counts two adjacent buckets either side of the change as an hour: 02:45 AEDT → 02:15 AEST', () => {
+      expect(coveredMinutes(toSegments([{ t: utc(15, 45), level: -0.1 }, { t: utc(16, 15), level: -0.2 }], SYD))).toBe(60);
+    });
+
+    it('counts the repeated hour in a run that crosses it: 00:15 AEDT → 02:15 AEST is 3.5 h', () => {
+      const ts = [utc(13, 15), utc(13, 45), utc(14, 15), utc(14, 45), utc(15, 15), utc(15, 45), utc(16, 15)];
+      expect(coveredMinutes(toSegments(ts.map(t => ({ t, level: -0.1 })), SYD))).toBe(210);
+    });
+  });
 });
 
 describe('a day with no skipped hour', () => {
