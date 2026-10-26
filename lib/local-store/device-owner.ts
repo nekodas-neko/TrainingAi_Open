@@ -15,14 +15,26 @@ import { wipeDevice } from './data-epoch'
  * build uses) while the owner does not match, so nothing local is read, written, pulled or pushed,
  * and the wipe then reloads the page. This also covers plain account switching without a sign-out.
  *
- * **A device with no record is not adopted blindly.** Local rows carry no account id, so a phone
- * that never opened the app as the old user (it predates this record) cannot say whose rows it
- * holds. Adopting them hands a deleted account's rows, and its stranded unsynced workouts, to
- * whoever signs in next. So with no record the device looks: an empty store is claimed for the
- * signed-in account; a store with any rows is wiped first, because "we cannot tell whose it is"
- * means "do not adopt it". The cost is real: a phone upgrading with changes it never synced loses
- * them once, on the first launch of the version that records an owner. A look that fails (the
- * query throws) leaves the store closed and the next call tries again.
+ * **A device with no record is adopted only by the session that already held it.** Local rows carry
+ * no account id, so a phone with no record cannot say whose rows it holds. No shipped build wrote
+ * this record, so every install starts here on the first launch of the version that does, the
+ * owner's own phone included. The device looks at its store, and at how the session began:
+ *
+ * - **Empty store:** claimed for the signed-in account.
+ * - **Rows, and the session predates this update** (its token has no `signedInAt`, which is stamped
+ *   only at a sign-in made by a build that records one): **adopted, nothing wiped.** The rows came
+ *   from this very session, which carried over the update. Wiping would discard the outbox.
+ * - **Rows, and the session is a fresh sign-in** (it has a `signedInAt`): the delete-then-re-signup
+ *   case. The deleted account's session is dead, so whoever signed in is new to these rows. The
+ *   signed-in account's own queued writes are pushed first, best effort (an outbox entry names its
+ *   account, so another account's are never sent), and then everything is wiped and claimed.
+ * - **Cannot tell** (the store look or the session look fails): stay closed, ask again next call.
+ *
+ * The one place this adopts without proof is the first rule's session, and only because a session
+ * that was signed in before the update is the session that wrote the rows.
+ *
+ * Counted as data: the localStorage upload queues. Not counted: cached responses and the exercise
+ * catalogue, which a wipe clears with nothing lost.
  *
  * A falsy user id (no session yet) is ignored: it is never recorded as an owner, and a record that
  * holds the empty string counts as no record.
@@ -31,11 +43,18 @@ export const STORE_OWNER_KEY = 'ta_store_owner'
 /** sessionStorage: this tab already wiped for this owner, so a record that cannot be written cannot loop. */
 export const STORE_OWNER_WIPED_KEY = 'ta_store_owner_wiped'
 
+/** How long a push before a wipe may take; a hung one must not keep the store closed. */
+const PUSH_BEFORE_WIPE_MS = 10_000
+
 export interface OwnerDeps {
   read(): string | null
   write(userId: string): boolean
-  /** Does the local store hold any rows? Throws when it cannot tell. */
+  /** Does the local store hold any rows or queued uploads? Throws when it cannot tell. */
   hasData(): Promise<boolean>
+  /** Did this session begin before this update (no `signedInAt`)? Throws when the server cannot say. */
+  sessionPredatesOwnerRecord(): Promise<boolean>
+  /** Push this account's queued writes before a wipe. Best effort; never throws. */
+  pushOutbox(userId: string): Promise<void>
   readWiped(): string | null
   writeWiped(userId: string): void
   wipe(): Promise<void>
@@ -83,7 +102,8 @@ export function resolveStoreOwnerMismatch(userId: string, deps: OwnerDeps = brow
 }
 
 /**
- * A device with no owner record: claim it if the store is empty, wipe it first if it is not.
+ * A device with no owner record: claim it if the store is empty, adopt it if the session carried
+ * over the update, otherwise push what the account queued, wipe, and claim.
  * Nothing local is read or written meanwhile (`getLocalStore` answers null). One at a time.
  */
 export function resolveUnclaimedStore(userId: string, deps: OwnerDeps = browserDeps): Promise<void> {
@@ -92,8 +112,14 @@ export function resolveUnclaimedStore(userId: string, deps: OwnerDeps = browserD
   if (deps.readWiped() === userId) return Promise.resolve()
   resolving = (async () => {
     try {
-      if (await deps.hasData()) await wipeAndClaim(userId, deps)
-      else deps.write(userId)
+      if (!(await deps.hasData())) { deps.write(userId); return }
+      if (await deps.sessionPredatesOwnerRecord()) {
+        // The session that wrote these rows carried over the update: adopt them, keep the outbox.
+        if (deps.write(userId)) deps.reload()
+        return
+      }
+      await deps.pushOutbox(userId)
+      await wipeAndClaim(userId, deps)
     } catch {
       /* could not tell, or could not wipe: stay closed, and the next call tries again */
     } finally {
@@ -124,6 +150,19 @@ const browserDeps: OwnerDeps = {
     } catch { return false }
   },
   hasData: async () => (await import('./index')).deviceHasLocalData(),
+  sessionPredatesOwnerRecord: async () => {
+    const res = await fetch('/api/account/data-epoch', { cache: 'no-store' })
+    if (!res.ok) throw new Error(`session look failed: HTTP ${res.status}`)
+    const body = await res.json() as { signedInAt?: unknown }
+    if (body.signedInAt === null) return true
+    if (typeof body.signedInAt === 'number') return false
+    throw new Error('session look failed: unreadable answer')
+  },
+  pushOutbox: async userId => {
+    const { pushOwnOutboxBeforeWipe } = await import('./sync-engine')
+    // A push that hangs must not keep the store closed.
+    await Promise.race([pushOwnOutboxBeforeWipe(userId), new Promise<void>(r => setTimeout(r, PUSH_BEFORE_WIPE_MS))])
+  },
   readWiped: () => { try { return window.sessionStorage.getItem(STORE_OWNER_WIPED_KEY) } catch { return null } },
   writeWiped: userId => { try { window.sessionStorage.setItem(STORE_OWNER_WIPED_KEY, userId) } catch { /* unavailable */ } },
   wipe: wipeDevice,

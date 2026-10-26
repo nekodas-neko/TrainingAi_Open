@@ -306,6 +306,21 @@ export function getLocalStore(userId: string): LocalStore | null {
 }
 
 /**
+ * The store without the owner gate. Only the device-owner check uses it, to push the signed-in
+ * account's own queued writes before it wipes a store it cannot attribute (`device-owner.ts`).
+ * Everything else goes through `getLocalStore`.
+ */
+export function getUngatedLocalStore(userId: string): LocalStore | null {
+  if (typeof window === 'undefined' || !isSQLiteAvailable() || isLocalStoreDead()) return null;
+  if (!_stores.has(userId)) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { SQLiteLocalStore } = require('./sqlite-backend') as typeof import('./sqlite-backend');
+    _stores.set(userId, new SQLiteLocalStore());
+  }
+  return _stores.get(userId)!;
+}
+
+/**
  * Tables deliberately left alone on sign-out. Everything else is wiped, so a table added later is
  * cleared by default — the safe direction for a function whose whole job is not leaving one
  * account's data for the next.
@@ -351,12 +366,31 @@ export async function clearLocalStoreData(): Promise<void> {
   if (failed.length > 0) throw new Error(`local store: ${failed.length} table(s) were not cleared (${String(failed[0].reason)})`);
 }
 
+function uploadQueueHasItems(key: string): boolean {
+  let raw: string | null;
+  try { raw = window.localStorage.getItem(key); } catch { return false; }
+  if (!raw) return false;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return !Array.isArray(parsed) || parsed.length > 0;
+  } catch {
+    // A queue that holds something unreadable is not known to be empty.
+    return true;
+  }
+}
+
 /**
- * True when any table `clearLocalStoreData` would empty holds a row. Rows are not stamped with the
- * account that wrote them, so this is the only thing the device can say about a store whose owner
- * record is missing (`device-owner.ts`). A failed read throws: not knowing is not "empty".
+ * True when the device holds anything a wipe would discard: a row in any table `clearLocalStoreData`
+ * would empty, or an item in a localStorage upload queue (unsent changes are data, #3369). Rows are
+ * not stamped with the account that wrote them, so this is the only thing the device can say about a
+ * store whose owner record is missing (`device-owner.ts`). Cached responses (`api_cache`) and the
+ * exercise catalogue do not count: a wipe can clear them with nothing lost. A failed read throws:
+ * not knowing is not "empty".
  */
 export async function deviceHasLocalData(): Promise<boolean> {
+  // Dynamic: sign-out-storage pulls in the zustand stores, which reach back into this module.
+  const { UPLOAD_QUEUE_STORAGE } = await import('@/lib/sign-out-storage');
+  if (Object.keys(UPLOAD_QUEUE_STORAGE).some(uploadQueueHasItems)) return true;
   if (!isSQLiteAvailable()) return false;
   const tables = await querySQL<{ name: string }>(
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",

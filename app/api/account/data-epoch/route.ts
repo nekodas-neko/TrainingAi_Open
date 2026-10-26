@@ -23,7 +23,10 @@ export async function GET() {
   try {
     const user = await (await getRepository()).getUserById(userId)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    return NextResponse.json({ epoch: dataEpochOf(user.sessionsValidFrom) }, { headers: { 'Cache-Control': 'private, no-store' } })
+    // `signedInAt` is null for a session that began before the build that stamps it: the device uses
+    // that to tell a carried-over session from a fresh sign-in (`lib/local-store/device-owner.ts`).
+    const signedInAt = typeof session?.signedInAt === 'number' ? session.signedInAt : null
+    return NextResponse.json({ epoch: dataEpochOf(user.sessionsValidFrom), signedInAt }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (err) {
     reportServerError(err, { userId, url: '/api/account/data-epoch' })
     return NextResponse.json({ error: 'Could not read the account' }, { status: 500 })

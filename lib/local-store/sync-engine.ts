@@ -1,4 +1,4 @@
-import { getLocalStore } from './index';
+import { getLocalStore, getUngatedLocalStore, type LocalStore } from './index';
 import { reconcileDeadLetters } from './dead-letter-signal';
 import { verifyDataEpoch } from './data-epoch';
 import { resolveFailedOutboxIds, serverBackoffMs, buildWorkoutLogPayload } from './sync-helpers';
@@ -1001,9 +1001,25 @@ export function pushMutations(userId: string): Promise<PushResult> {
   return trailing;
 }
 
-async function pushMutationsOnce(userId: string): Promise<PushResult> {
-  const store = getLocalStore(userId);
+/**
+ * #3369: drain only this account's own queued writes, through the store before the owner gate has
+ * claimed it. The one caller is the device-owner check, which is about to wipe a store it cannot
+ * attribute and first tries to save what the signed-in account queued. **Skips the stranded-row
+ * sweeps below**: they re-queue local rows under `userId`, which on a store of unknown ownership is
+ * exactly the adoption the wipe exists to prevent. Never throws; a failed push loses nothing that
+ * the wipe was not going to lose anyway.
+ */
+export async function pushOwnOutboxBeforeWipe(userId: string): Promise<void> {
+  try {
+    const store = getUngatedLocalStore(userId);
+    if (store) await pushMutationsOnce(userId, store);
+  } catch { /* best effort */ }
+}
+
+async function pushMutationsOnce(userId: string, ungatedStore?: LocalStore): Promise<PushResult> {
+  const store = ungatedStore ?? getLocalStore(userId);
   if (!store) return null;
+  const outboxOnly = ungatedStore !== undefined;
 
   // K3: seed the dead-letter badge + fire a one-time toast for any workout that
   // dead-lettered. Runs before the backoff gate so the badge reflects reality even
@@ -1020,22 +1036,23 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
   // threw): pending locally, absent from the outbox. Grace period avoids racing
   // a direct POST that is still in flight.
   const strandedCutoff = new Date(Date.now() - 5 * 60_000).toISOString();
-  try {
-    const cutoff = strandedCutoff;
-    const stranded = await store.getStrandedPendingWorkouts(cutoff);
-    for (const h of stranded) {
-      for (const el of h.exerciseLogs) {
-        const { date, payload } = buildWorkoutLogPayload(h.session, el);
-        await store.queueMutation({ userId, domain: 'workout_log', date, payload });
+  if (!outboxOnly) {
+    try {
+      const stranded = await store.getStrandedPendingWorkouts(strandedCutoff);
+      for (const h of stranded) {
+        for (const el of h.exerciseLogs) {
+          const { date, payload } = buildWorkoutLogPayload(h.session, el);
+          await store.queueMutation({ userId, domain: 'workout_log', date, payload });
+        }
       }
-    }
-  } catch { /* sweep is best-effort; the normal queue still drains */ }
+    } catch { /* sweep is best-effort; the normal queue still drains */ }
+  }
 
   // Heal food logs stranded by the D-1 envelope drop: their food_item never
   // reached the server, so re-queue the item (ordered ahead) and re-open the log.
   // One-shot per row — a healed log leaves the 'failed' set, so this can't loop.
   try {
-    await store.requeueStrandedFoodItems(userId);
+    if (!outboxOnly) await store.requeueStrandedFoodItems(userId);
   } catch { /* best-effort; the normal queue still drains */ }
 
   // DV-8 heal: food-log DELETE tombstones left `pending` with their outbox entry already gone,
@@ -1047,7 +1064,7 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
   // Self-limiting rather than one-shot: a re-queued tombstone has an outbox entry, so the next
   // sweep does not see it. If its push fails the entry stays and it still is not re-swept.
   try {
-    await store.requeueStrandedFoodTombstones(userId, strandedCutoff);
+    if (!outboxOnly) await store.requeueStrandedFoodTombstones(userId, strandedCutoff);
   } catch { /* best-effort; the normal queue still drains */ }
 
   const pending = await store.getPendingMutations(userId);

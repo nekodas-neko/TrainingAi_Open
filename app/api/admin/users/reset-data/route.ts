@@ -7,7 +7,7 @@ import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 import { rateLimit, settleRateLimitFlushes } from '@/lib/rate-limit'
 import { readOuraGrantBestEffort, revokeOuraGrantAfterCommit } from '@/lib/account/revoke-oura-grant'
-import { resolveOwnerUserId } from '@/lib/admin-owner'
+import { resolveOwnerUserId, sameUserId } from '@/lib/admin-owner'
 import { clearSessionCookies } from '@/lib/auth/clear-session-cookies'
 import {
   ResetBodySchema, WIPE_MAX_BODY_BYTES, WIPE_RATE, auditActor, precheckWipe, wipeRateKey, wipeRefusalResponse,
@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
   const badId = invalidUuidResponse(userId)
   if (badId) return badId
   const ownerId = await resolveOwnerUserId(await getRepository())
+  // Ids are uuids; a differently cased copy of the caller's own is still the caller.
+  const selfReset = sameUserId(userId, adminId)
 
   let result
   let ouraToken: string | null = null
@@ -90,7 +92,7 @@ export async function POST(req: NextRequest) {
       reset: true,
       // The target's sessions are over; for a self-reset that is the caller's own, so the cookie is
       // expired here and the screen goes to the sign-in page.
-      signedOut: userId === adminId,
+      signedOut: selfReset,
       removedRows: Object.values(result.removed ?? {}).reduce((a, b) => a + b, 0),
       // False means the reset is done but the built-in styles could not be put back; reset again to seed them.
       defaultsSeeded: result.defaultsSeeded === true,
@@ -99,6 +101,6 @@ export async function POST(req: NextRequest) {
     },
     { headers: { 'Cache-Control': 'private, no-store' } },
   )
-  if (userId === adminId) clearSessionCookies(req, res)
+  if (selfReset) clearSessionCookies(req, res)
   return res
 }

@@ -1,5 +1,5 @@
 // #3369 — a wipe that only half worked must not report success, because success opens the gate.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const sql = vi.hoisted(() => ({
   tables: ['workout_sessions', 'food_logs', 'api_cache', 'exercise_library'],
@@ -24,7 +24,10 @@ vi.mock('@/lib/sqlite/sqlite-service', async () => ({
   }),
 }))
 vi.mock('@/lib/sqlite/cache', () => cache)
-vi.mock('@/lib/sign-out-storage', () => ({ clearAccountStorage: vi.fn() }))
+vi.mock('@/lib/sign-out-storage', () => ({
+  clearAccountStorage: vi.fn(),
+  UPLOAD_QUEUE_STORAGE: { 'detection-events-outbox': 'x', 'ta-cadence-captures': 'y' },
+}))
 
 import { clearLocalStoreData, deviceHasLocalData } from '../index'
 import { wipeDevice } from '../data-epoch'
@@ -68,5 +71,28 @@ describe('deviceHasLocalData', () => {
   it('is true as soon as any other table holds a row', async () => {
     sql.rows = { food_logs: 1 }
     expect(await deviceHasLocalData()).toBe(true)
+  })
+
+  describe('localStorage upload queues', () => {
+    let items: Record<string, string>
+    beforeEach(() => {
+      items = {}
+      vi.stubGlobal('window', { localStorage: { getItem: (k: string) => items[k] ?? null } })
+    })
+    afterEach(() => { vi.unstubAllGlobals() })
+
+    it('counts a queued upload as data even when every table is empty', async () => {
+      items['detection-events-outbox'] = '[{"a":1}]'
+      expect(await deviceHasLocalData()).toBe(true)
+    })
+    it('counts a queue it cannot read as data, not as empty', async () => {
+      items['ta-cadence-captures'] = '{not json'
+      expect(await deviceHasLocalData()).toBe(true)
+    })
+    it('does not count an empty queue, or cached responses alone', async () => {
+      items['detection-events-outbox'] = '[]'
+      sql.rows = { api_cache: 9 }
+      expect(await deviceHasLocalData()).toBe(false)
+    })
   })
 })

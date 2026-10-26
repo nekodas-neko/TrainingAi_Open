@@ -8,6 +8,8 @@ function deps(initial: string | null, over: Partial<OwnerDeps> = {}) {
     read: () => state.owner,
     write: vi.fn(u => { state.order.push('write'); state.owner = u; return true }),
     hasData: vi.fn(async () => true),
+    sessionPredatesOwnerRecord: vi.fn(async () => false),   // a fresh sign-in unless a test says otherwise
+    pushOutbox: vi.fn(async () => { state.order.push('push') }),
     readWiped: () => state.flag,
     writeWiped: vi.fn(u => { state.flag = u }),
     wipe: vi.fn(async () => { state.order.push('wipe'); state.owner = null }),   // the wipe clears the record too
@@ -34,7 +36,7 @@ describe('checkStoreOwner', () => {
     const { d } = deps('')
     expect(checkStoreOwner('new', d)).toBe('unclaimed')
   })
-  it('recognises its own owner', () => {
+  it('the same account keeps its data: a matching record is owned, nothing is read or wiped', () => {
     const { d } = deps('me')
     expect(checkStoreOwner('me', d)).toBe('owned')
     expect(d.write).not.toHaveBeenCalled()
@@ -72,18 +74,53 @@ describe('resolveStoreOwnerMismatch: delete, then re-signup under a new id', () 
   })
 })
 
-describe('resolveUnclaimedStore: a device that predates the owner record (delete, then re-signup)', () => {
-  it('wipes a store that holds rows before claiming it, then reloads', async () => {
+describe('resolveUnclaimedStore: a device that predates the owner record', () => {
+  it('an existing signed-in phone updating adopts its rows and outbox: no wipe, no push, one reload', async () => {
+    _resetStoreOwnerGate()
+    const { d, state } = deps(null, { sessionPredatesOwnerRecord: vi.fn(async () => true) })
+    await resolveUnclaimedStore('me', d)
+    expect(d.wipe).not.toHaveBeenCalled()
+    expect(d.pushOutbox).not.toHaveBeenCalled()
+    expect(state.owner).toBe('me')
+    expect(state.order).toEqual(['write', 'reload'])
+  })
+  it('a fresh sign-in on a recordless phone with rows pushes its own outbox, wipes, then claims', async () => {
     _resetStoreOwnerGate()
     const { d, state } = deps(null)
     await resolveUnclaimedStore('new', d)
-    expect(state.order).toEqual(['wipe', 'write', 'reload'])
+    expect(state.order).toEqual(['push', 'wipe', 'write', 'reload'])
     expect(state.owner).toBe('new')
   })
-  it('claims an empty store without wiping or reloading', async () => {
+  it('a fresh sign-in whose push fails still wipes: the old rows are never adopted', async () => {
+    _resetStoreOwnerGate()
+    const { d, state } = deps(null, { pushOutbox: vi.fn(async () => { /* best effort: swallowed */ }) })
+    await resolveUnclaimedStore('new', d)
+    expect(d.wipe).toHaveBeenCalledTimes(1)
+    expect(state.owner).toBe('new')
+  })
+  it('a session look that fails leaves the store closed and unwiped, and the next call asks again', async () => {
+    _resetStoreOwnerGate()
+    const { d, state } = deps(null, { sessionPredatesOwnerRecord: vi.fn(async () => { throw new Error('offline') }) })
+    await resolveUnclaimedStore('me', d)
+    await resolveUnclaimedStore('me', d)
+    expect(d.wipe).not.toHaveBeenCalled()
+    expect(d.pushOutbox).not.toHaveBeenCalled()
+    expect(state.owner).toBeNull()
+    expect(d.sessionPredatesOwnerRecord).toHaveBeenCalledTimes(2)
+  })
+  it('a carried-over session whose record cannot be written does not reload in a loop', async () => {
+    _resetStoreOwnerGate()
+    const { d } = deps(null, { sessionPredatesOwnerRecord: vi.fn(async () => true), write: vi.fn(() => false) })
+    await resolveUnclaimedStore('me', d)
+    expect(d.reload).not.toHaveBeenCalled()
+    expect(d.wipe).not.toHaveBeenCalled()
+  })
+  it('a fresh sign-in on an empty recordless phone claims it without a wipe, a push or a reload', async () => {
     _resetStoreOwnerGate()
     const { d, state } = deps(null, { hasData: vi.fn(async () => false) })
     await resolveUnclaimedStore('new', d)
+    expect(d.pushOutbox).not.toHaveBeenCalled()
+    expect(d.sessionPredatesOwnerRecord).not.toHaveBeenCalled()
     expect(d.wipe).not.toHaveBeenCalled()
     expect(d.reload).not.toHaveBeenCalled()
     expect(state.owner).toBe('new')
