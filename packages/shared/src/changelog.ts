@@ -6,6 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.502.0",
+    date: "2026-10-27",
+    changes: [
+      "Weights show in kg everywhere, so a dumbbell you enter in pounds reads in kg in History, records and the workout window. Pounds stay only on the wheel where you enter the weight.",
+      "The sleep header and Home's sleep line end at the time you woke, not when the ring stopped recording.",
+      "A day you mark as finished logging today says it counts toward your maintenance estimate from tomorrow.",
+      "Red, amber and green read as one bright colour each, in both apps.",
+      "TrainingAi Preview: pause a workout and the pause comes off its time; the picture-in-picture window follows your set, rest or pause; Energy shows your current level; the done screen writes a recap only when you ask; a set with no usable heart rate says so instead of failing; settings explain the rest alarm; you can answer an estimated meal from its row or its reminder; the ring's battery and battery health; when Oura last sent data; and the trophies you pin are saved to your account, so friends see them.",
+      "Admins can manage users, invites, feedback, errors, AI usage, exercises and data jobs from Preview, make or remove admins, and reset a user's data or delete an account that has data. Only the owner can remove an admin or touch the owner's account.",
+      "Behind the scenes: the Oura backfill tidies away sessions and workouts deleted in the Oura app, the Day screen reads heart rate once, a daylight-saving day ends at local midnight, a friend's meal library has its server side, the triage agent can read the data behind a feedback report, and more tests pin last week's fixes.",
+    ],
+  },
+  {
     version: "1.501.0",
     date: "2026-10-26",
     changes: [

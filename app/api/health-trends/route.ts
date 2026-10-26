@@ -13,6 +13,7 @@ import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { sessionEffort, type SessionRpeSource } from '@trainingai/shared/workout/derive-session-rpe'
 import { isPlausibleSessionDuration } from '@trainingai/shared/health/workout-energy'
+import { sessionActiveMin } from '@trainingai/shared/workout/active-duration'
 
 export interface TrendsResponse {
   view: string
@@ -160,7 +161,8 @@ export async function GET(req: Request) {
       .map(ws => {
         const effort = sessionEffort(ws.sessionRpe, ws.exercises.flatMap(e => e.sets.map(set => set.rpe)))
         if (!effort) return null
-        const durationMin = (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60_000
+        // #3266: the active span, less any pause, as every other duration surface reads it.
+        const durationMin = sessionActiveMin(ws.startedAt, ws.completedAt!, ws.pausedSec)
         // LA-21, owner-decided: a session left running is culled from statistics rather than clamped.
         // `sessionLoad` is `rpe × durationMin`, so one 14-hour row is a 10× point in a series that
         // feeds the acute:chronic ratio — and a ratio distorted upward reads as "you are training far
