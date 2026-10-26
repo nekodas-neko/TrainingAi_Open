@@ -20,7 +20,8 @@ const notFound = () => NextResponse.json({ error: 'Not found' }, { status: 404, 
  * `PATCH/DELETE /api/friends/[id]` (Next requires one slug name per level), not a user id: the server
  * works out who the friend is, so the client never names a user it may read.
  *
- * Only name, servings, ingredients and macros leave: no ids, no times eaten, no image, no tags. A
+ * Only name, servings, ingredients and macros leave, plus `mealId` (the saved meal's own id, for the
+ * copy to dedupe on) and `savedAt`: no times eaten, no image, no tags. A
  * copy goes through `saveSharedMealToLibrary` on the device, which is why nothing here is writable.
  * `savedAt` is `createdAt`, since `saved_meals` has no edit time.
  */

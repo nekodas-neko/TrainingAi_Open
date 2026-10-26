@@ -63,6 +63,8 @@ describe.skipIf(!canRun)('a friend\'s saved-meal library (#2217)', () => {
   })
 
   afterAll(async () => {
+    await pool.query(`DELETE FROM food_logs WHERE user_id = ANY($1)`, [users])
+    await pool.query(`DELETE FROM meal_types WHERE user_id = ANY($1)`, [users])
     await pool.query(`DELETE FROM saved_meals WHERE user_id = ANY($1)`, [users])
     await pool.query(`DELETE FROM food_items WHERE user_id = ANY($1)`, [users])
     await pool.query(`DELETE FROM friendships WHERE requester_id = ANY($1) OR addressee_id = ANY($1)`, [users])
@@ -72,6 +74,8 @@ describe.skipIf(!canRun)('a friend\'s saved-meal library (#2217)', () => {
   beforeEach(async () => {
     sessionUser = { id: ME }
     resetLimiter()
+    await pool.query(`DELETE FROM food_logs WHERE user_id = ANY($1)`, [users])
+    await pool.query(`DELETE FROM meal_types WHERE user_id = ANY($1)`, [users])
     await pool.query(`DELETE FROM saved_meals WHERE user_id = ANY($1)`, [users])
     await pool.query(`DELETE FROM food_items WHERE user_id = ANY($1)`, [users])
     for (const id of users) await setShare(id, undefined)
@@ -190,6 +194,25 @@ describe.skipIf(!canRun)('a friend\'s saved-meal library (#2217)', () => {
     expect(Object.keys(entry.meal.ingredients[0]).sort())
       .toEqual(['calories', 'carbsG', 'fatG', 'name', 'proteinG', 'weightG'])
     expect(JSON.stringify(body)).not.toContain(FRIEND)
+  })
+
+  it('keeps the same order however the friend eats: logging a meal does not reorder it', async () => {
+    const a = await seedMeal(FRIEND, 'Meal A', 1)
+    const b = await seedMeal(FRIEND, 'Meal B', 1)
+    await pool.query(`UPDATE saved_meals SET created_at = now() - interval '1 hour' WHERE id = $1`, [a.id])
+    await setShare(FRIEND, true)
+    const names = async () => (await call(friendship)).body.meals.map((m: { meal: { name: string } }) => m.meal.name)
+    expect(await names()).toEqual(['Meal B', 'Meal A'])
+
+    const mt = (await pool.query(`INSERT INTO meal_types (user_id, name) VALUES ($1,'Lunch') RETURNING id`, [FRIEND])).rows[0].id
+    const item = (await pool.query(`SELECT food_item_id FROM saved_meal_items WHERE saved_meal_id = $1`, [a.id])).rows[0].food_item_id
+    await pool.query(
+      `INSERT INTO food_logs (user_id, date, meal_type_id, food_item_id, saved_meal_id) VALUES ($1,'2026-10-20',$2,$3,$4)`,
+      [FRIEND, mt, item, a.id])
+    // The owner's own list moves A to the top (last eaten); the friend's view must not.
+    expect((await repo.listSavedMeals(FRIEND))[0].id).toBe(a.id)
+    expect(await names()).toEqual(['Meal B', 'Meal A'])
+    void b
   })
 
   it('401 without a session, 400 for a malformed id, 429 once the viewer is over the limit', async () => {

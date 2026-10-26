@@ -146,7 +146,10 @@ export async function listFriendSavedMeals(db: Db, friendshipId: string, viewerI
     .limit(1)
   if ((u?.preferences as UserPreferences | null | undefined)?.shareMealLibrary !== true) return null
 
-  return listSavedMeals(db, friendId)
+  // `listSavedMeals` orders by when the friend last ATE each meal, which would tell the viewer the
+  // order the friend ate in. Re-sort on the one thing the friend chose to share, when it was saved.
+  const meals = await listSavedMeals(db, friendId)
+  return meals.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 }
 
 export async function updateEquippedTitle(db: Db, userId: string, titleId: string | null): Promise<void> {
