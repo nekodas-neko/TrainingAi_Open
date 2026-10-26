@@ -18,10 +18,11 @@ How a metric may link to others: [`metric-links.md`](metric-links.md), including
   aerobic-threshold metric (DFA-α1) is not carded, and nothing here needs older beats.
 - Formatted ids follow the layer rule: the id says its cadence (`<thing>_per_<cadence>`).
 
-**Sources after the Oura API switch (#2808, #2820).** Cards 1, 6 and 8 read the ring's sleep through
-the Bluetooth rollup today. The switch brings no new Bluetooth nights, and the API's sleep document
-has 5-minute `heart_rate` and `hrv` series and `sleep_phase_5_min`, so each of those cards names
-both routes. Card 7 reads the chest strap and is unaffected.
+**Sources after the Oura API switch (#2808, #2820).** Cards 1, 6 and 8 read the ring's sleep. The
+Bluetooth source has had no new nights since 17 Oct, so the Oura API is the live route and each of
+those cards lists it first. The API's sleep document has 5-minute `heart_rate` and `hrv` series and
+`sleep_phase_5_min`. The Bluetooth rollup stays as the second route, for the nights it already
+holds. Card 7 reads the chest strap and is unaffected.
 
 **Order** (the owner's): 1 sleep regularity · 2 morning check-in · 3 session RPE · 4 alcohol and
 caffeine tags · 5 cycle-aware normals · 6 body-clock offset · 7 heart-rate cost of a set · 8 HRV in
@@ -40,9 +41,10 @@ had 20–48% lower all-cause mortality (Windred 2024, *Sleep* 47(1):zsad253). It
 against next-day readiness, so it is a slow, Level-type score and not a day-to-day swing.
 
 **Raw routes, best first:**
-1. Oura ring (Bluetooth rollup) → our own 5-minute sleep/wake epochs from the stager → fraction of
-   epochs whose state matches the epoch 24 h earlier, over the last 7 days.
-2. Oura API → `sleep_phase_5_min` → the same, with any stage other than awake counted as asleep.
+1. Oura API → `sleep_phase_5_min` → fraction of epochs whose state matches the epoch 24 h earlier,
+   over the last 7 days, with any stage other than awake counted as asleep.
+2. Oura ring (Bluetooth rollup, no new nights since 17 Oct) → our own 5-minute sleep/wake epochs from
+   the stager → the same fraction.
 3. Health Connect / Apple → sleep sessions with stages → epochs rebuilt from the stage intervals.
    Sessions with no stages give only start and end, which is too coarse; they leave this missing.
 
@@ -245,12 +247,12 @@ duration a second time: settling is the hours from the HR minimum to waking, so 
 bedtime or duration does.
 
 **Raw routes, best first:**
-1. Oura ring (Bluetooth rollup) → the smoothed overnight heart-rate minimum. `recovery-index.ts`
-   already finds it (`settledAt`, the smoothed minimum) every night and the rollup keeps only
-   `hoursToSettle`. **Storing the minimum's clock time is one new nullable column** (a migration in
-   its own PR, catalog-only, no default and no backfill).
-2. Oura API → the 5-minute `heart_rate` series of the sleep document → the time of the smoothed
-   minimum, with the same smoothing as route 1 so the two sources stay comparable.
+1. Oura API → the 5-minute `heart_rate` series of the sleep document → the time of the smoothed
+   minimum, with the same smoothing as route 2 so the two sources stay comparable.
+2. Oura ring (Bluetooth rollup, no new nights since 17 Oct) → the smoothed overnight heart-rate
+   minimum. `recovery-index.ts` already finds it (`settledAt`, the smoothed minimum) every night and
+   the rollup keeps only `hoursToSettle`. **Storing the minimum's clock time is one new nullable
+   column** (a migration in its own PR, catalog-only, no default and no backfill).
 
 **Scoring:** steady around the person's own usual HR-minimum time, circular in minutes from noon (as
 `minutesFromNoon` does for timing), with the offset from the sleep window's midpoint read beside it.
@@ -324,9 +326,9 @@ reading for the biggest single score. (This is a measurement argument. No citati
 next-day readiness, so the replay is the test.)
 
 **Raw routes, best first:**
-1. Oura ring (Bluetooth rollup) → the per-5-minute RMSSD and our stager's hypnogram, already built
-   together in the rollup → mean RMSSD over the deep epochs.
-2. Oura API → `hrv` (5-minute) and `sleep_phase_5_min` → the same mean.
+1. Oura API → `hrv` (5-minute) and `sleep_phase_5_min` → mean RMSSD over the deep epochs.
+2. Oura ring (Bluetooth rollup, no new nights since 17 Oct) → the per-5-minute RMSSD and our stager's
+   hypnogram, already built together in the rollup → the same mean.
 Our stager is a heuristic, not a measurement (`sleep-staging.ts`). The shadow model counts values
 from it as **estimated**, at half weight (#2833); the Oura API's phases are Oura's own.
 
