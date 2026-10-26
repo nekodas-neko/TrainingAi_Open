@@ -1549,6 +1549,115 @@ export async function getLatestOuraCloudHeartrateAt(db: Db, userId: string, sinc
   return row?.timestamp ?? null
 }
 
+/** The `source` of a battery row read from Oura Cloud's `ring_battery_level` (#3069). A Bluetooth poll has none. */
+export const OURA_CLOUD_BATTERY_SOURCE = 'oura_cloud'
+
+/** The newest `oura_cloud` battery reading at or after `since`; where the next read starts. */
+export async function getLatestOuraCloudBatteryAt(db: Db, userId: string, since: Date): Promise<Date | null> {
+  const [row] = await db.select({ measuredAt: s.ouraBleBatteryPoll.measuredAt }).from(s.ouraBleBatteryPoll)
+    .where(and(
+      eq(s.ouraBleBatteryPoll.userId, userId),
+      gte(s.ouraBleBatteryPoll.measuredAt, since),
+      eq(s.ouraBleBatteryPoll.source, OURA_CLOUD_BATTERY_SOURCE),
+    ))
+    .orderBy(desc(s.ouraBleBatteryPoll.measuredAt))
+    .limit(1)
+  return row?.measuredAt ?? null
+}
+
+/**
+ * Stores Oura Cloud battery readings beside the Bluetooth polls. The table has no unique key on the
+ * reading, so a re-read is made idempotent here: a reading whose instant is already stored for this
+ * user as `oura_cloud` is skipped. Returns the rows inserted.
+ *
+ * The check and the insert run in one transaction under a per-user advisory lock. Without it two
+ * catch-ups started together (a webhook and a connect backfill, or two events a second apart on
+ * different instances) each read "nothing stored" and both inserted the same instants. A unique
+ * index would be the stronger fix but is a migration; the lock needs none.
+ */
+export async function insertOuraCloudBatteryReadings(
+  db: Db, userId: string, readings: { measuredAt: Date; percent: number; charging: boolean | null }[],
+): Promise<number> {
+  if (readings.length === 0) return 0
+  const times = readings.map(r => r.measuredAt.getTime())
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`oura-cloud-battery:${userId}`}, 0))`)
+    const have = await tx.select({ measuredAt: s.ouraBleBatteryPoll.measuredAt }).from(s.ouraBleBatteryPoll)
+      .where(and(
+        eq(s.ouraBleBatteryPoll.userId, userId),
+        eq(s.ouraBleBatteryPoll.source, OURA_CLOUD_BATTERY_SOURCE),
+        gte(s.ouraBleBatteryPoll.measuredAt, new Date(Math.min(...times))),
+        lte(s.ouraBleBatteryPoll.measuredAt, new Date(Math.max(...times))),
+      ))
+    const stored = new Set(have.map(r => r.measuredAt.getTime()))
+    const seen = new Set<number>()
+    const fresh = readings.filter(r => {
+      const t = r.measuredAt.getTime()
+      if (stored.has(t) || seen.has(t)) return false
+      seen.add(t)
+      return true
+    })
+    for (let i = 0; i < fresh.length; i += 1000) {
+      await tx.insert(s.ouraBleBatteryPoll).values(fresh.slice(i, i + 1000).map(r => ({
+        userId, measuredAt: r.measuredAt, percent: r.percent, charging: r.charging, source: OURA_CLOUD_BATTERY_SOURCE,
+      })))
+    }
+    return fresh.length
+  })
+}
+
+/** The last stretch of the battery read that keeps every reading; older than this is one per hour. */
+export const RING_BATTERY_DETAIL_MS = 2 * 86_400_000
+
+/**
+ * Battery readings in a window, Bluetooth and Oura Cloud together, oldest first, at a bounded size.
+ *
+ * The table holds a reading every few minutes (Bluetooth polls every 5 min while connected, Oura
+ * Cloud more sparsely) and the chart reads 120 days on each foreground, which unbounded is tens of
+ * thousands of rows. So the last `RING_BATTERY_DETAIL_MS` (2 days) come back in full, and anything
+ * older as one reading per UTC hour: the last level of the hour, reported as charging if any reading
+ * in that hour was. Detail is measured back from `to`, not from the clock, so a caller choosing its
+ * window gets a deterministic cut.
+ *
+ * The hourly part also keeps every row that marks a charge: a row reported as charging, a row whose
+ * level rose from the one before, and the row before a rise. The summary infers a charge session from
+ * the first reading before a rise to the last rise, so "last of the hour" alone pushed both ends
+ * outward (a 45-minute charge read as ~90). The charge time is therefore exact in the hourly part
+ * too; the cost is a few dozen extra rows per charge, and the drain maths (neighbours up to 8 h
+ * apart, falls only) is unaffected by finer neighbours. This was chosen over sending only a summary
+ * because the series, the client's own maths and the preview all read the same readings.
+ */
+export async function getRingBatteryReadings(
+  db: Db, userId: string, from: Date, to: Date,
+): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>> {
+  const detailFrom = new Date(to.getTime() - RING_BATTERY_DETAIL_MS)
+  // The hour bucket is pinned to UTC so a session timezone with a half-hour offset cannot shift it.
+  const { rows } = await db.execute<{ measured_at: Date; percent: number; charging: boolean | null }>(sql`
+    SELECT measured_at, percent,
+           CASE WHEN rn = 1 THEN hour_charging ELSE charging END AS charging
+      FROM (
+        SELECT measured_at, percent, charging, prev_percent, next_percent,
+               bool_or(charging) OVER (PARTITION BY hr) AS hour_charging,
+               row_number() OVER (PARTITION BY hr ORDER BY measured_at DESC) AS rn
+          FROM (
+            SELECT measured_at, percent, charging,
+                   date_trunc('hour', measured_at, 'UTC') AS hr,
+                   lag(percent) OVER (ORDER BY measured_at) AS prev_percent,
+                   lead(percent) OVER (ORDER BY measured_at) AS next_percent
+              FROM oura_ble_battery_poll
+             WHERE user_id = ${userId} AND measured_at >= ${from.toISOString()}::timestamptz
+               AND measured_at <= ${to.toISOString()}::timestamptz
+          ) w
+      ) x
+     WHERE measured_at >= ${detailFrom.toISOString()}::timestamptz
+        OR rn = 1
+        OR charging IS TRUE
+        OR percent > prev_percent
+        OR next_percent > percent
+     ORDER BY measured_at ASC`)
+  return rows.map(r => ({ tsMs: new Date(r.measured_at).getTime(), percent: Number(r.percent), charging: r.charging }))
+}
+
 /** Writes the rows; returns the timestamps actually inserted or changed (a row the `setWhere` arm
  *  leaves alone is not returned), so a caller can tell new heart rate from a re-read (#3078). */
 async function writeHeartrateRows(
