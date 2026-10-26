@@ -23,7 +23,7 @@ describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#
   })
   const rows = async () => (await pool.query(
     `SELECT external_id, external_source, date::text, start_time::text, duration_min, title,
-            deleted_at IS NOT NULL AS deleted, updated_at
+            deleted_at IS NOT NULL AS deleted, deleted_reason, updated_at
        FROM activity_logs WHERE user_id = $1 ORDER BY start_time`, [USER],
   )).rows
 
@@ -87,11 +87,58 @@ describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#
     expect((await rows())[0].updated_at).toEqual(before.updated_at)
   })
 
+  const idOf = async () => (await pool.query(`SELECT id FROM activity_logs WHERE user_id = $1`, [USER])).rows[0].id as string
+
   it('a row deleted in the app stays deleted when the session is read again', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
+    await repo.deleteActivityLog(USER, await idOf())
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk({ durationMin: 45 }))).toBe('deleted')
+    expect(await rows()).toMatchObject([{ deleted: true, duration_min: 40, deleted_reason: 'app' }])
+  })
+
+  it('a tombstone from before deleted_reason existed (NULL) stays deleted', async () => {
     await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
     await pool.query(`UPDATE activity_logs SET deleted_at = now() WHERE user_id = $1`, [USER])
     expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk({ durationMin: 45 }))).toBe('deleted')
-    expect(await rows()).toMatchObject([{ deleted: true, duration_min: 40 }])
+    expect(await rows()).toMatchObject([{ deleted: true, duration_min: 40, deleted_reason: null }])
+  })
+
+  it('a swept session revives when its id reappears, and the revival is a change devices pull', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
+    await age()
+    expect(await repo.tombstoneHealthConnectActivityLogs(USER, { from: day, to: day, keep: [] })).toBe(1)
+    expect(await rows()).toMatchObject([{ deleted: true, deleted_reason: 'health_connect_sweep' }])
+    const swept = (await rows())[0].updated_at as Date
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk({ durationMin: 45, endTime: '12:45' }))).toBe('revived')
+    const [r] = await rows()
+    expect(r).toMatchObject({ deleted: false, deleted_reason: null, duration_min: 45, external_id: 'hc-1' })
+    expect((r.updated_at as Date).getTime()).toBeGreaterThanOrEqual(swept.getTime())
+    const delta = await repo.getSyncDelta(USER, new Date(swept.getTime() - 1))
+    expect((delta.activityLogs as { deletedAt?: string | null }[]).map(l => l.deletedAt ?? null)).toEqual([null])
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk({ durationMin: 45, endTime: '12:45' }))).toBe('unchanged')
+  })
+
+  it('a session removed by the deletion feed revives the same way', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
+    await repo.tombstoneHealthConnectActivityLogs(USER, { ids: ['hc-1'] })
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())).toBe('revived')
+    expect(await rows()).toMatchObject([{ deleted: false, deleted_reason: null }])
+  })
+
+  it('a swept session the owner then deletes in the app stays deleted', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
+    await repo.tombstoneHealthConnectActivityLogs(USER, { ids: ['hc-1'] })
+    await repo.deleteActivityLog(USER, await idOf())
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())).toBe('deleted')
+    expect(await rows()).toMatchObject([{ deleted: true, deleted_reason: 'app' }])
+  })
+
+  it('a revival onto a minute another row now holds is refused and the row stays swept', async () => {
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
+    await repo.tombstoneHealthConnectActivityLogs(USER, { ids: ['hc-1'] })
+    await repo.upsertHealthConnectActivityLog(USER, 'hc-2', walk({ startTime: '13:00', endTime: '13:40' }))
+    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk({ startTime: '13:00', endTime: '13:40' }))).toBe('taken')
+    expect(await rows()).toMatchObject([{ external_id: 'hc-1', deleted: true }, { external_id: 'hc-2', deleted: false }])
   })
 
   it('an in-app log at the same minute keeps it', async () => {
@@ -123,7 +170,7 @@ describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#
   it('tombstones by record id for a deletion feed, and never a hard delete', async () => {
     await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
     expect(await repo.tombstoneHealthConnectActivityLogs(USER, { ids: ['hc-1', 'unknown'] })).toBe(1)
-    expect(await rows()).toMatchObject([{ external_id: 'hc-1', deleted: true }])
+    expect(await rows()).toMatchObject([{ external_id: 'hc-1', deleted: true, deleted_reason: 'health_connect_sweep' }])
     expect(await repo.tombstoneHealthConnectActivityLogs(USER, { ids: [] })).toBe(0)
   })
 
@@ -152,7 +199,7 @@ describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#
     await age()
     await repo.tombstoneHealthConnectActivityLogs(USER, { from: day, to: day, keep: [] })
     expect(await repo.upsertHealthConnectActivityLog(USER, 'new', walk({ title: 'Walk again', durationMin: 35 }))).toBe('inserted')
-    expect(await rows()).toMatchObject([{ external_id: 'new', title: 'Walk again', duration_min: 35, deleted: false }])
+    expect(await rows()).toMatchObject([{ external_id: 'new', title: 'Walk again', duration_min: 35, deleted: false, deleted_reason: null }])
   })
 
   it('a takeover keeps the notes the owner wrote on the replaced row', async () => {
@@ -171,13 +218,6 @@ describe.skipIf(!canRun)('Health Connect activity logs keyed on the record id (#
     await repo.deleteActivityLog(USER, id)
     expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())).toBe('taken')
     expect(await rows()).toMatchObject([{ title: 'In-app walk', external_id: null, deleted: true }])
-  })
-
-  it('a re-created record id stays deleted: a tombstone under its own id wins', async () => {
-    await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())
-    await repo.tombstoneHealthConnectActivityLogs(USER, { ids: ['hc-1'] })
-    expect(await repo.upsertHealthConnectActivityLog(USER, 'hc-1', walk())).toBe('deleted')
-    expect(await rows()).toMatchObject([{ external_id: 'hc-1', deleted: true }])
   })
 
   it('an in-app save at a Health Connect row’s minute makes it the in-app log, which a sync then leaves alone', async () => {
