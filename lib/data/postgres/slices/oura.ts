@@ -2965,6 +2965,9 @@ export const DERIVED_COLS: Record<keyof OuraDailyDerivedPatch, string> = {
   resilienceDailyStress: 'resilience_daily_stress', resilienceDailyRestorativeTime: 'resilience_daily_restorative_time',
   resilienceDailySleepRecovery: 'resilience_daily_sleep_recovery', resilienceGranular: 'resilience_granular', resilienceConfidence: 'resilience_confidence',
   daytimeStressCoverageMin: 'daytime_stress_coverage_min', chronicStressGranularNights: 'chronic_stress_granular_nights',
+  // #2634. Server-only on the same terms as `acwr`: not in the device mirror, so a device never sends
+  // them and the COALESCE leaves the rollup's value alone.
+  stillRhrBpm: 'still_rhr_bpm', stillRhrCoverageMin: 'still_rhr_coverage_min',
   bdiDerived: 'bdi_derived',
   bodyComp: 'body_comp',
 }
@@ -3070,6 +3073,8 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
     resilienceConfidence: r.resilienceConfidence,
     daytimeStressCoverageMin: r.daytimeStressCoverageMin,
     chronicStressGranularNights: r.chronicStressGranularNights,
+    stillRhrBpm: r.stillRhrBpm,
+    stillRhrCoverageMin: r.stillRhrCoverageMin,
     bdiDerived: r.bdiDerived,
     bodyComp: r.bodyComp,
   }))

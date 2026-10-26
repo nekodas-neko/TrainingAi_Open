@@ -201,8 +201,8 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > generic HRV and RHR with sleep": {
-    "score": 59,
-    "readinessDisplayScore": 59,
+    "score": 58,
+    "readinessDisplayScore": 58,
     "label": "Moderate",
     "components": {
       "sleep": 21,
@@ -272,8 +272,8 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > RHR baseline only, no sleep: recovery signal without sleep": {
-    "score": 65,
-    "readinessDisplayScore": 65,
+    "score": 64,
+    "readinessDisplayScore": 64,
     "label": "Moderate",
     "components": {
       "sleep": 0,
@@ -351,9 +351,9 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > ring rollup composite": {
-    "score": 70,
-    "readinessDisplayScore": 70,
-    "label": "High",
+    "score": 69,
+    "readinessDisplayScore": 69,
+    "label": "Moderate",
     "components": {
       "sleep": 21,
       "hrv": 30,
@@ -413,8 +413,8 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > ring day with a Cloud row whose frozen readiness score is null": {
-    "score": 59,
-    "readinessDisplayScore": 59,
+    "score": 58,
+    "readinessDisplayScore": 58,
     "label": "Moderate",
     "components": {
       "sleep": 21,
@@ -546,8 +546,8 @@
     "label": "Low",
     "components": {
       "sleep": 0,
-      "hrv": 11,
-      "rhr": 15,
+      "hrv": 23,
+      "rhr": 17,
       "load": 0
     },
     "hasSufficientData": false,
@@ -697,8 +697,8 @@
     "label": "Low",
     "components": {
       "sleep": 0,
-      "hrv": 11,
-      "rhr": 15,
+      "hrv": 23,
+      "rhr": 17,
       "load": 0
     },
     "hasSufficientData": false,
