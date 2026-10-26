@@ -29,6 +29,9 @@ export interface OuraTokenStore {
   getOuraCloudTokens(userId: string): Promise<OuraCloudTokenRow | null>
   saveOuraCloudTokens(userId: string, input: SaveOuraCloudTokensInput): Promise<void>
   markOuraCloudReauthRequired(userId: string, unchangedSince: Date): Promise<boolean>
+  /** #2861: when the feed last spoke; see `freshness.ts`. */
+  touchOuraCloudWebhook(userId: string): Promise<void>
+  touchOuraCloudData(userId: string): Promise<void>
   deleteOuraCloudTokens(userId: string): Promise<boolean>
   getUserIdByOuraUserId(ouraUserId: string): Promise<string | null>
 }
@@ -128,6 +131,10 @@ export interface OuraConnection {
   connected: boolean
   scope: string | null
   expiresAt: string | null
+  /** #2861: when the last verified webhook event arrived (ISO), or null before the first. */
+  lastWebhookAt?: string | null
+  /** #2861: when Oura data was last written for the user (ISO), or null before the first. */
+  lastDataAt?: string | null
   /** Present (and `true`) only when Oura refused the grant (#3204): the user has to connect again. */
   reauthRequired?: true
 }
@@ -143,10 +150,13 @@ export async function getOuraConnection(store: OuraTokenStore, userId: string): 
     decryptOuraToken(row.accessToken, userId, 'access_token') !== null &&
     decryptOuraToken(row.refreshToken, userId, 'refresh_token') !== null
   if (stored && row.reauthRequiredAt) return { connected: false, scope: null, expiresAt: null, reauthRequired: true }
+  if (!row || !stored) return { connected: false, scope: null, expiresAt: null }
   return {
-    connected: stored,
-    scope: stored ? row.scope : null,
-    expiresAt: stored ? row.expiresAt?.toISOString() ?? null : null,
+    connected: true,
+    scope: row.scope,
+    expiresAt: row.expiresAt?.toISOString() ?? null,
+    lastWebhookAt: row.lastWebhookAt?.toISOString() ?? null,
+    lastDataAt: row.lastDataAt?.toISOString() ?? null,
   }
 }
 

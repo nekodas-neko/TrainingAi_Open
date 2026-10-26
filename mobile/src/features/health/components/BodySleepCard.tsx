@@ -5,6 +5,7 @@ import { AppButton, AppText, Badge, Stack } from '../../../shared/ui';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
 import { readinessSpec } from '../data/models';
+import { OuraStaleNote } from '../../devices/components/OuraStaleNote';
 import { sleepChips, sleepTimeRange } from '../data/body-view';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
 import { HealthMetricCard } from './HealthMetricCard';
@@ -47,6 +48,7 @@ export function BodySleepCard({ openDetail }: { openDetail: (detail: HealthDetai
               {range}
             </AppText>
           )}
+          <OuraStaleNote />
         </Stack>
         <Stack direction="row" align="center" gap="xs">
           {lastNight?.provisional && <Badge label="Still syncing" tone="checkin" />}

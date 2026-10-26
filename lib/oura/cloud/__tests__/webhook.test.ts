@@ -79,7 +79,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   const fetchMock = vi.fn<typeof fetch>()
   const savedKey = process.env.OURA_TOKEN_KEY
   let row: OuraCloudTokenRow | null
-  const writes = { daily: 0, sleep: 0, sessions: 0, tombstoned: [] as string[], workoutsTombstoned: [] as string[], sessionsTombstoned: [] as string[] }
+  const writes = { daily: 0, sleep: 0, sessions: 0, tombstoned: [] as string[], workoutsTombstoned: [] as string[], sessionsTombstoned: [] as string[], stamps: [] as string[] }
   const heartRate = vi.fn()
 
   function deps(): OuraWebhookDeps {
@@ -97,6 +97,8 @@ describe('handleOuraWebhookEvent (#2859)', () => {
           row = { ...row, reauthRequiredAt: row.reauthRequiredAt ?? new Date() }
           return true
         },
+        touchOuraCloudWebhook: async () => { writes.stamps.push('webhook') },
+        touchOuraCloudData: async () => { writes.stamps.push('data') },
         deleteOuraCloudTokens: async () => true,
         upsertOuraDaily: async (_u, rows) => { writes.daily += rows.length },
         upsertBodyMetrics: async () => {},
@@ -125,9 +127,9 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       accessToken: encryptOuraToken('acc', USER, 'access_token'),
       refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
       expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health',
-      ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null,
+      ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null, lastWebhookAt: null, lastDataAt: null,
     }
-    writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []; writes.workoutsTombstoned = []; writes.sessionsTombstoned = []
+    writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []; writes.workoutsTombstoned = []; writes.sessionsTombstoned = []; writes.stamps = []
     heartRate.mockReset()
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
@@ -148,6 +150,31 @@ describe('handleOuraWebhookEvent (#2859)', () => {
     expect(String(url)).toBe(`${OURA_API_BASE}/v2/usercollection/daily_readiness/rd-1`)
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer acc')
     expect(writes.daily).toBe(1)
+  })
+
+  // #2861: the Devices status says when the feed last spoke and when data last landed.
+  it('stamps the webhook, then the data, when a document is written', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.daily_readiness))
+    await handleOuraWebhookEvent(deps(), event())
+    expect(writes.stamps).toEqual(['webhook', 'data'])
+  })
+
+  it('stamps only the webhook when Oura has no document to write, and nothing for an unknown user or type', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 404 }))
+    await handleOuraWebhookEvent(deps(), event())
+    expect(writes.stamps).toEqual(['webhook'])
+    writes.stamps = []
+    await handleOuraWebhookEvent(deps(), event({ user_id: 'someone-else' }))
+    await handleOuraWebhookEvent(deps(), event({ data_type: 'tag' }))
+    expect(writes.stamps).toEqual([])
+  })
+
+  it('does not fail the delivery when a stamp cannot be written', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.daily_readiness))
+    const d = deps()
+    d.repo.touchOuraCloudWebhook = async () => { throw new Error('db down') }
+    d.repo.touchOuraCloudData = async () => { throw new Error('db down') }
+    expect(await handleOuraWebhookEvent(d, event())).toMatchObject({ result: 'written' })
   })
 
   // #2982: sessions are a newly read type; the `session` scope is already granted.
@@ -387,10 +414,12 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
         userId: USER,
         accessToken: encryptOuraToken('acc', USER, 'access_token'),
         refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-        expiresAt: new Date(Date.now() + 86_400_000), scope: 'heartrate', ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null,
+        expiresAt: new Date(Date.now() + 86_400_000), scope: 'heartrate', ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null, lastWebhookAt: null, lastDataAt: null,
       }),
       saveOuraCloudTokens: async () => {},
         markOuraCloudReauthRequired: async () => true,
+      touchOuraCloudWebhook: async () => {},
+      touchOuraCloudData: async () => {},
       deleteOuraCloudTokens: async () => true,
       upsertOuraDaily: async () => {},
       upsertBodyMetrics: async () => {},

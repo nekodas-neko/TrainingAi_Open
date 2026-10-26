@@ -30,12 +30,14 @@ function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
     userId: USER,
     accessToken: encryptOuraToken('acc', USER, 'access_token'),
     refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-    expiresAt: new Date(Date.now() + 86_400_000), scope, ouraUserId: 'o', updatedAt: new Date(), reauthRequiredAt: null,
+    expiresAt: new Date(Date.now() + 86_400_000), scope, ouraUserId: 'o', updatedAt: new Date(), reauthRequiredAt: null, lastWebhookAt: null, lastDataAt: null,
   } : null
   const repo: OuraBackfillDeps['repo'] = {
     getOuraCloudTokens: async () => row,
     saveOuraCloudTokens: async () => {},
     markOuraCloudReauthRequired: async () => { calls.push('marked'); return true },
+    touchOuraCloudWebhook: async () => { calls.push('stamp:webhook') },
+    touchOuraCloudData: async () => { calls.push('stamp:data') },
     deleteOuraCloudTokens: async () => true,
     getUserIdByOuraUserId: async () => (connected ? USER : null),
     upsertOuraDaily: async (_u, rows) => { calls.push(`daily:${rows.length}`) },
@@ -94,7 +96,7 @@ describe('backfillOuraCloud (#2859)', () => {
     expect(out.report.counts).toMatchObject({
       dailyRows: 1, bodyRows: 1, sleepWritten: 1, workouts: 1, heartRatePoints: 4, sleepPeriods: 1, cloudDays: 1, sessions: 1,
     })
-    expect(calls).toEqual(['daily:1', 'body:1', 'periods:1', 'sleep:1', 'workouts:1', 'cloudDaily:1', 'sessions:1', 'hr:2', 'hr:2'])
+    expect(calls).toEqual(['daily:1', 'body:1', 'periods:1', 'sleep:1', 'workouts:1', 'cloudDaily:1', 'sessions:1', 'stamp:data', 'hr:2', 'stamp:data', 'hr:2', 'stamp:data'])
     const first = new URL(String(fetchMock.mock.calls[0][0]))
     expect(first.href.startsWith(`${OURA_API_BASE}/v2/usercollection/daily_readiness`)).toBe(true)
     expect(Object.fromEntries(first.searchParams)).toEqual({ start_date: '2026-10-01', end_date: '2026-10-12' })

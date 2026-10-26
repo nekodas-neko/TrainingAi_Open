@@ -664,6 +664,10 @@ export interface WorkoutRepository {
   /** #3204: marks the caller's grant as refused by Oura, unless the row was saved after
    *  `unchangedSince`. True when marked (or already marked); false when there is no row or it moved on. */
   markOuraCloudReauthRequired(userId: string, unchangedSince: Date): Promise<boolean>
+  /** #2861: stamps the user's last verified webhook event on `oura_tokens`. No row, no-op. */
+  touchOuraCloudWebhook(userId: string): Promise<void>
+  /** #2861: stamps the last time Oura data was written for the user. No row, no-op. */
+  touchOuraCloudData(userId: string): Promise<void>
   /** True when the caller's row existed and is deleted now. */
   deleteOuraCloudTokens(userId: string): Promise<boolean>
   /** #2859: the user an Oura account is connected to, for routing a webhook event. Null if none. */
