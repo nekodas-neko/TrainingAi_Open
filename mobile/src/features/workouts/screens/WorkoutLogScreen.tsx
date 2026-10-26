@@ -19,6 +19,7 @@ import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { WorkoutSaveNotice } from '../components/WorkoutSaveNotice';
 import { GuidedWorkoutScreen } from './GuidedWorkoutScreen';
 import { workoutResult } from '../logging/summary';
+import { activeElapsedMs } from '../logging/workout';
 import { WorkoutLayout } from '../components/WorkoutLayout';
 import { ResourceCard } from '../components/ResourceCard';
 import { NextPrescription } from '../components/NextPrescription';
@@ -117,7 +118,7 @@ export function WorkoutLogScreen({
     );
   }
   const result = workoutResult(workout);
-  const duration = formatDuration((workout.completedAt! - workout.startedAt) / 1000);
+  const duration = formatDuration(activeElapsedMs(workout, workout.completedAt!) / 1000);
   const stats = [
     {
       label: 'Exercises',

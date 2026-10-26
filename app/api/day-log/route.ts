@@ -12,6 +12,7 @@ import { reportServerError } from '@/lib/observability'
 import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 import { dayStepCount } from '@trainingai/shared/health/activity-steps'
+import { sessionActiveMin } from '@trainingai/shared/workout/active-duration'
 
 export interface DayExercise {
   name: string;
@@ -220,7 +221,8 @@ export async function GET(req: NextRequest) {
     workoutDurationsById[ws.id] = {
       start: fmtMs(startMs),
       end:   fmtMs(endMs),
-      minutes: Math.round((endMs - startMs) / 60000),
+      // Active time: the span less any pause (#3266), the same figure every other screen shows.
+      minutes: Math.round(sessionActiveMin(new Date(startMs), new Date(endMs), ws.pausedSec)),
     };
   }
 

@@ -1104,9 +1104,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * such session for this user" and is an error; here the guard makes it mean "someone else got
    * there first", which is the normal idempotent path.
    */
-  async completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<boolean> {
+  async completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date, pausedSec?: number): Promise<boolean> {
     const rows = await this.db.update(s.workoutSessions)
-      .set({ completedAt })
+      // #3266: only a build that can pause sends it; an older one leaves the column NULL (never paused).
+      .set(pausedSec === undefined ? { completedAt } : { completedAt, pausedSec })
       .where(and(
         eq(s.workoutSessions.id, workoutSessionId),
         eq(s.workoutSessions.userId, userId),
@@ -1489,6 +1490,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       wasOverride: ws.wasOverride,
       intensityMode: (ws.intensityMode as 'full' | 'deload' | null) ?? null,
       sessionRpe: ws.sessionRpe ?? null,
+      pausedSec: ws.pausedSec ?? null,
       exercises: elRows
         .filter(e => e.workoutSessionId === ws.id)
         .map<ExerciseLog>(e => ({
@@ -1611,7 +1613,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [sessionRow] = await this.db
       .select({
         sessionCount: sql<number>`COUNT(*)`,
-        totalMinutes: sql<number>`COALESCE(SUM(EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60), 0)`,
+        // #3266: less the time paused, never more than the span itself.
+        totalMinutes: sql<number>`COALESCE(SUM(
+          EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60
+          - LEAST(COALESCE(${s.workoutSessions.pausedSec}, 0) / 60.0,
+                  GREATEST(EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60, 0))
+        ), 0)`,
       })
       .from(s.workoutSessions)
       .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from), isNull(s.workoutSessions.deletedAt)))
@@ -3816,6 +3823,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         startedAt: s.workoutSessions.startedAt,
         completedAt: s.workoutSessions.completedAt,
         warmupEndedAt: s.workoutSessions.warmupEndedAt,
+        pausedSec: s.workoutSessions.pausedSec,
       })
       .from(s.workoutSessions)
       .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, since), isNull(s.workoutSessions.deletedAt)))
@@ -3856,6 +3864,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         startedAt: r.startedAt.getTime(),
         completedAt: r.completedAt?.getTime() ?? null,
         warmupEndedAt: r.warmupEndedAt?.getTime() ?? null,
+        pausedSec: r.pausedSec ?? null,
       })),
       exercises: elRows.map(r => ({
         workoutSessionId: r.workoutSessionId,

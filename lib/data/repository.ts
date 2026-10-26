@@ -738,7 +738,7 @@ export interface WorkoutRepository {
   /** Q-473 — true when this call stamped `completed_at`, false when it was already stamped (a
    *  concurrent request or an outbox replay won). Callers derive idempotence from this, never from
    *  a read taken before the write. */
-  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<boolean>
+  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date, pausedSec?: number): Promise<boolean>
   /** Q-460 — true when a row was updated. Zero rows means no such session for this user, which is
    *  an error here (unlike `setWorkoutSessionWarmupEnd`, where zero rows means "already set"). */
   setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<boolean>
@@ -1403,7 +1403,7 @@ export interface WorkoutRepository {
   /** BF-144: has this program session been trained since `since`? Keyed on the id link, not names. */
   wasProgramSessionTrainedSince(userId: string, programSessionId: string, since: Date): Promise<boolean>
   getRecentSessionsOfType(userId: string, programSessionId: string, limit: number): Promise<Array<{
-    id: string; startedAt: Date; completedAt: Date | null; sessionName: string
+    id: string; startedAt: Date; completedAt: Date | null; sessionName: string; pausedSec?: number | null
   }>>
   getSetLogsForSessions(workoutSessionIds: string[]): Promise<Array<{
     workoutSessionId: string; exerciseName: string; setNumber: number;
