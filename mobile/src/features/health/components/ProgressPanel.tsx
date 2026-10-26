@@ -28,6 +28,7 @@ import { TREND_VIEW_NOTE } from '@trainingai/shared/health/trend-view-notes';
 import { HealthMetricCard } from './HealthMetricCard';
 import { RestPrescriptionSummary } from './RestPrescriptionSummary';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bandColor } from '../../../shared/theme/tokens';
 import {
   STRENGTH_BAR_MARKERS,
   STRENGTH_BAR_WIDTH,
@@ -267,7 +268,7 @@ function StrengthWorkingCard() {
                 <AppText variant="caption" numberOfLines={1} style={{ flex: 1 }}>
                   {exercise.exercise}
                 </AppText>
-                <StrengthBar pct={metric.pct} color={metric.color} />
+                <StrengthBar pct={metric.pct} color={bandColor(metric.color, theme.status)} />
                 <View style={{ width: theme.sizes.touchTarget + theme.spacing.lg, alignItems: 'flex-end' }}>
                   <AppText variant="label" style={{ fontVariant: ['tabular-nums'] }}>
                     {metric.label}
