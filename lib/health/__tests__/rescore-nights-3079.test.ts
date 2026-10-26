@@ -208,6 +208,7 @@ describe('writeOuraCloudData brackets a sleep write with the re-score', () => {
     upsertOuraWorkouts: async () => 0, tombstoneOuraWorkouts: async () => 0, tombstoneOuraWorkoutsAbsent: async () => 0,
     upsertOuraCloudHeartrate: async () => 0,
     upsertOuraCloudSleepPeriods: async () => 0, upsertOuraCloudDaily: async () => 0, upsertOuraSessions: async () => 0,
+    tombstoneOuraSessions: async () => 0, tombstoneOuraSessionsAbsent: async () => 0,
   } as unknown as OuraCloudWriter
   const empty: OuraCloudWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], retypedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] }
 

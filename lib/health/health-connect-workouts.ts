@@ -27,11 +27,13 @@ const MAX_SESSION_MIN = 1_440
  *   stored is skipped, and anything else is saved first-write-wins.
  *
  * A reason for every session not stored goes into `rejected`; one bad session never costs the rest.
+ * Returns how many swept sessions came back (#3309), for the route to report.
  */
 export async function storeHealthConnectWorkouts(
   repo: Repo, userId: string, sessions: readonly IncomingHealthConnectWorkout[], rejected: string[],
-): Promise<void> {
-  if (!sessions.length) return
+): Promise<{ revived: number }> {
+  let revived = 0
+  if (!sessions.length) return { revived }
 
   // Q-25: `activity_type` is a FK. The client maps Health Connect's exercise types to our slugs
   // and falls back to 'other', but that mapping is a *client-side* table — it drifts the moment
@@ -75,8 +77,10 @@ export async function storeHealthConnectWorkouts(
     if (s.recordId) {
       const outcome = await repo.upsertHealthConnectActivityLog(userId, s.recordId, log)
       if (outcome === 'taken') rejected.push(`exercise ${s.date} ${s.startTime}: another session already holds this start time`)
+      if (outcome === 'revived') revived++
     } else await repo.saveActivityLog(userId, log)
   }
+  return { revived }
 }
 
 /** The widest window a client can ask to sweep: a cold sync, or one history-import window. */

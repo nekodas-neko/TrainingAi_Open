@@ -328,6 +328,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['listRestDays', r => r.listRestDays(USER_A, FROM, TO)],
     // #2076. B's token is live (not rotated, not revoked, expiring in a month).
     ['listActiveNativeRefreshTokens', r => r.listActiveNativeRefreshTokens(USER_A)],
+    ['findNativeRefreshTokenById', r => r.findNativeRefreshTokenById(USER_A, bId('native_refresh_tokens'))],
     // PRs and estimates
     ['getExerciseEstimates', r => r.getExerciseEstimates(USER_A)],
     ['listRecentPersonalRecords', r => r.listRecentPersonalRecords(USER_A, FROM_TS, TO_TS)],
@@ -480,6 +481,11 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       userId: USER_A, id: bId('native_refresh_tokens'),
       newTokenHash: randomBytes(32).toString('hex') as import('@/lib/auth/refresh-token-hash').RefreshTokenHash,
       expiresAt: new Date(Date.now() + 86_400_000),
+    }), v => { expect(v).toBeNull() }],
+    ['regrantNativeRefreshToken', r => r.regrantNativeRefreshToken({
+      userId: USER_A, id: bId('native_refresh_tokens'),
+      newTokenHash: randomBytes(32).toString('hex') as import('@/lib/auth/refresh-token-hash').RefreshTokenHash,
+      expiresAt: new Date(Date.now() + 86_400_000), graceSeconds: 60,
     }), v => { expect(v).toBeNull() }],
     ['revokeNativeRefreshToken', r => r.revokeNativeRefreshToken(USER_A, bId('native_refresh_tokens'), 'user')],
     ['revokeNativeRefreshTokenFamily', r => r.revokeNativeRefreshTokenFamily(USER_A, bVal('native_refresh_tokens', 'family_id'), 'user')],
