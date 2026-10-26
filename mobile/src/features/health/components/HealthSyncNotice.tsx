@@ -3,7 +3,7 @@ import { useHealthData } from '../data/HealthDataProvider';
 
 export function HealthSyncNotice({ inline = false }: { inline?: boolean }) {
   const health = useHealthData();
-  const pending = health.operations.length + health.verdictResponses.length;
+  const pending = health.operations.length + health.verdictResponses.length + health.readinessResponses.length;
   if (inline) {
     return (
       <StatusIndicator

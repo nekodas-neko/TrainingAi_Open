@@ -6,7 +6,7 @@ import { getRepository } from '@/lib/data'
 import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
-import { weeklyVolumeTarget, phaseVolumeScale } from '@trainingai/shared/ai-periodization/volume-targets'
+import { weeklyVolumeTarget, phaseVolumeScale, trainedWeekPhases } from '@trainingai/shared/ai-periodization/volume-targets'
 
 export interface MuscleSetsEntry {
   muscle: string
@@ -111,9 +111,7 @@ export async function GET() {
   `) : { rows: [] as { program_session_id: string }[] }
   const periodization = program ? await repo.listSessionPeriodizationForProgram(userId, program.id) : []
   const phaseBySession = new Map(periodization.map(p => [p.programSessionId, p.phase as string]))
-  const weekPhases = phaseRows.rows
-    .map(r => phaseBySession.get(r.program_session_id))
-    .filter((p): p is string => !!p)
+  const weekPhases = trainedWeekPhases(phaseRows.rows.map(r => r.program_session_id), phaseBySession)
   const phase = phaseVolumeScale(weekPhases)
   const goal = program?.trainingGoal ?? 'strength'
 

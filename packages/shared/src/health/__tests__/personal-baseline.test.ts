@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  updateBaseline, seedOrUpdateBaseline, baselineMean, baselineDeviation, baselineZ, DEV_WARMUP_NIGHTS,
-  type Baseline,
+  updateBaseline, seedOrUpdateBaseline, baselineMean, baselineDeviation, baselineSd, baselineZ,
+  DEV_WARMUP_NIGHTS, MAD_TO_SD, type Baseline,
 } from '../personal-baseline'
 
 describe('updateBaseline', () => {
@@ -41,6 +41,36 @@ describe('updateBaseline', () => {
   })
 })
 
+// #2158. The fold keeps a mean absolute deviation; a z divides by the standard deviation it implies.
+describe('baselineZ denominator', () => {
+  it('converts the mean absolute deviation to a standard deviation with √(π/2)', () => {
+    expect(MAD_TO_SD).toBeCloseTo(1.2533, 4)
+    // A baseline whose mean absolute deviation is 8 implies σ = 8·√(π/2) ≈ 10.03.
+    const b: Baseline = { meanX8: 800, devX8: 64 }
+    expect(baselineSd(b)).toBeCloseTo(10.027, 3)
+    expect(baselineZ(b, 110)).toBeCloseTo(10 / (8 * Math.sqrt(Math.PI / 2)), 10)
+    expect(baselineZ(b, 90)).toBeCloseTo(-0.99736, 4)
+    // The old rule divided by the deviation itself and read 1.25 here.
+    expect(baselineZ(b, 110)).not.toBeCloseTo(10 / 8, 2)
+  })
+
+  it('reads one unit per standard deviation on a settled baseline over a known normal distribution', () => {
+    // Synthetic: mean 200, σ 20. Fold 400 nights, then score 2000 fresh draws against the settled
+    // baseline. A z in standard deviations has a spread of ~1 and its mean |z| is √(2/π).
+    const sd = 20
+    let b: Baseline | null = null
+    for (const [i, x] of normalSeries(41, 400, 200, sd).entries()) b = seedOrUpdateBaseline(b, x, i)
+    const zs = normalSeries(97, 2000, 200, sd).map(x => baselineZ(b!, x)!)
+    const meanZ = zs.reduce((a, z) => a + z, 0) / zs.length
+    const sdZ = Math.sqrt(zs.reduce((a, z) => a + (z - meanZ) ** 2, 0) / zs.length)
+    expect(sdZ).toBeGreaterThan(0.9)
+    expect(sdZ).toBeLessThan(1.1)
+    // The old rule, dividing by the deviation itself, spreads the same draws ~1.25× wider.
+    const oldSdZ = sdZ * MAD_TO_SD
+    expect(oldSdZ).toBeGreaterThan(1.15)
+  })
+})
+
 /** Deterministic normal samples, so the statistical cases below cannot flake. */
 function normalSeries(seed: number, n: number, mean: number, sd: number): number[] {
   let s = seed >>> 0
@@ -55,9 +85,13 @@ function normalSeries(seed: number, n: number, mean: number, sd: number): number
 const meanOnlySeed = (b: Baseline | null, sample: number, age: number): Baseline =>
   b == null ? { meanX8: sample << 3, devX8: 0 } : updateBaseline(b, sample, age)
 
-/** Mean |z| of night `n` against the baseline folded from nights 1..n-1, over many series. A
- *  baseline whose dev has settled scores ~1.0 here (the dev settles near the mean absolute
- *  deviation, so |z| ≈ E|x−μ| / dev). */
+/** E|z| for a standard normal. A z in true standard deviations averages this, not 1 (#2158). */
+const CALIBRATED_MEAN_ABS_Z = Math.sqrt(2 / Math.PI)
+
+/** Mean |z| of night `n` against the baseline folded from nights 1..n-1, over many series, as a
+ *  multiple of what a calibrated z gives. A baseline whose dev has settled scores ~1.0 here: the dev
+ *  settles near the mean absolute deviation and `baselineZ` divides by √(π/2) of it, so
+ *  |z| ≈ E|x−μ| / σ = √(2/π). */
 function meanAbsZAt(
   n: number,
   fold: (b: Baseline | null, s: number, age: number) => Baseline,
@@ -71,7 +105,7 @@ function meanAbsZAt(
     for (let i = 0; i < n - 1; i++) b = fold(b, xs[i], i)
     total += Math.abs(baselineZ(b!, xs[n - 1]) ?? 0)
   }
-  return total / runs
+  return total / runs / CALIBRATED_MEAN_ABS_Z
 }
 
 describe('seedOrUpdateBaseline', () => {

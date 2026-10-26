@@ -39,6 +39,19 @@ vi.mock('@/lib/data', () => ({
   getRepositoryAsync: async () => repo,
 }))
 
+// Pinned to V1 whatever `SLEEP_SCORE_V2_FROM` holds: these nights are dated relative to today, so a
+// cutover set at or before today would move their sleep scores and turn the goldens red. The constant
+// is read through the module's own binding, so the mock also defaults `computeSleepScore` to V1.
+vi.mock('@trainingai/shared/health/sleep-score', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@trainingai/shared/health/sleep-score')>()
+  return {
+    ...actual,
+    SLEEP_SCORE_V2_FROM: null,
+    computeSleepScore: ((session, tz, opts) =>
+      actual.computeSleepScore(session, tz, { v2From: null, ...opts })) as typeof actual.computeSleepScore,
+  }
+})
+
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 
@@ -187,8 +200,11 @@ describe('buildReadinessPayload characterization (issue 2151)', () => {
     await check()
   })
 
+  // #2158 shortened the bad stretch from seven nights to three. With z in standard deviations the
+  // seven-night version scored 45, on the gate's threshold, so the scenario stopped testing the gate
+  // firing. Three bad nights leave the baseline less time to follow them and still score 43.
   it('HRV baseline, poor sleep, high load: early deload fires (ai_dynamic)', async () => {
-    repo.listBodyMetrics.mockResolvedValue(bodyHistory(21, { hrv: true, rhr: true }).map((m, i) => (i < 7 ? { ...m, hrvMs: 10, restingHeartRate: 95, steps: 300, activeCalories: 10 } : { ...m, hrvMs: 70, restingHeartRate: 50 })))
+    repo.listBodyMetrics.mockResolvedValue(bodyHistory(21, { hrv: true, rhr: true }).map((m, i) => (i < 3 ? { ...m, hrvMs: 10, restingHeartRate: 95, steps: 300, activeCalories: 10 } : { ...m, hrvMs: 70, restingHeartRate: 50 })))
     repo.listSleepSessions.mockResolvedValue(sleepHistory(21, 1.5))
     repo.getWorkoutSessionsFrom.mockResolvedValue(sessions())
     repo.getActiveProgram.mockResolvedValue(program('ai_dynamic'))
@@ -204,7 +220,7 @@ describe('buildReadinessPayload characterization (issue 2151)', () => {
   })
 
   it('HRV baseline, poor sleep, high load, but manual mode: never recommended', async () => {
-    repo.listBodyMetrics.mockResolvedValue(bodyHistory(21, { hrv: true, rhr: true }).map((m, i) => (i < 7 ? { ...m, hrvMs: 10, restingHeartRate: 95, steps: 300, activeCalories: 10 } : { ...m, hrvMs: 70, restingHeartRate: 50 })))
+    repo.listBodyMetrics.mockResolvedValue(bodyHistory(21, { hrv: true, rhr: true }).map((m, i) => (i < 3 ? { ...m, hrvMs: 10, restingHeartRate: 95, steps: 300, activeCalories: 10 } : { ...m, hrvMs: 70, restingHeartRate: 50 })))
     repo.listSleepSessions.mockResolvedValue(sleepHistory(21, 1.5))
     repo.getWorkoutSessionsFrom.mockResolvedValue(sessions())
     repo.getActiveProgram.mockResolvedValue(program('manual'))
