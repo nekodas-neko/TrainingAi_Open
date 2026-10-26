@@ -124,6 +124,7 @@ import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_M
 import * as bodyBattery from './slices/body-battery'
 import * as agentActions from './slices/agent-actions'
 import * as accountDeletion from './slices/account-deletion'
+import * as adminGrants from './slices/admin-grants'
 import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
 import * as hcIntervals from './slices/health-connect-intervals'
@@ -828,10 +829,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.length > 0
   }
 
-  async setUserAdmin(userId: string, isAdmin: boolean): Promise<boolean> {
-    const rows = await this.db.update(s.users).set({ isAdmin })
-      .where(eq(s.users.id, userId)).returning({ id: s.users.id })
-    return rows.length > 0
+  async setUserAdmin(args: { actingAdminId: string; targetUserId: string; makeAdmin: boolean; ownerId: string | null }) {
+    return adminGrants.setUserAdmin(this.db, args)
   }
 
   async getUserById(userId: string): Promise<User | null> {

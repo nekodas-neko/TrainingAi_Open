@@ -9,6 +9,8 @@ import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
+import { rateLimit } from '@/lib/rate-limit'
+import { resolveOwnerUserId, judgeProtectedTarget, judgeRevokeAdmin } from '@/lib/admin-owner'
 
 /**
  * #2383 item 3 — the one self-check both mutating handlers share. Deleting or deactivating your own
@@ -74,24 +76,51 @@ export async function PATCH(req: NextRequest) {
   // with an empty body, filing the failing UPDATE statement into `error_events` as a server fault.
   const badId = invalidUuidResponse(userId)
   if (badId) return badId
+  // Every action here is an auth or access change; 30 a minute per admin is far above real use.
+  if (!rateLimit(`admin-users-patch:${session.user.id}`, 30, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
+  const ownerId = resolveOwnerUserId()
+  const repo = await getRepository()
+
   // Activating yourself is a no-op (you are signed in, so already active); only deactivation locks out.
   if (action === 'deactivate') {
     const self = refuseSelf(userId, session.user.id, 'deactivate')
     if (self) return self
+    // The owner's account is theirs alone to deactivate; with no resolvable owner no admin account is.
+    const target = await repo.getUserById(userId)
+    if (target) {
+      const refused = judgeProtectedTarget(session.user.id, userId, target.isAdmin === true, ownerId)
+      if (refused) return NextResponse.json({ error: 'Only the owner can deactivate this account' }, { status: 403 })
+    }
   }
 
-  // An admin can't remove their own admin, so there is always at least one. Granting yourself is a no-op.
-  if (action === 'revoke-admin') {
-    const self = refuseSelf(userId, session.user.id, 'remove admin from')
-    if (self) return self
+  if (action === 'grant-admin' || action === 'revoke-admin') {
+    // An admin can't remove their own admin, so there is always at least one. Granting yourself is a no-op.
+    if (action === 'revoke-admin') {
+      const self = refuseSelf(userId, session.user.id, 'remove admin from')
+      if (self) return self
+      // Only the owner removes admin. Checked again on the locked rows inside the transaction.
+      if (judgeRevokeAdmin(session.user.id, ownerId)) {
+        return NextResponse.json({ error: 'Only the owner can remove admin' }, { status: 403 })
+      }
+    }
+    const outcome = await repo.setUserAdmin({
+      actingAdminId: session.user.id, targetUserId: userId, makeAdmin: action === 'grant-admin', ownerId,
+    })
+    if (outcome.ok) return NextResponse.json({ ok: true })
+    switch (outcome.reason) {
+      case 'not-found': return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      case 'inactive-target': return NextResponse.json({ error: 'Only an active user can be made admin' }, { status: 400 })
+      case 'actor-not-admin': return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      default: return NextResponse.json({ error: 'Only the owner can remove admin' }, { status: 403 })
+    }
   }
 
-  const repo = await getRepository()
   // RV-48: an id that matched no user answered `200 {"ok":true}`, the same response a real
-  // activation gives. The row count decides every action, grant and revoke included.
-  const changed = action === 'activate' ? await repo.activateUser(userId)
-    : action === 'deactivate' ? await repo.deactivateUser(userId)
-    : await repo.setUserAdmin(userId, action === 'grant-admin')
+  // activation gives. The row count decides every action.
+  const changed = action === 'activate' ? await repo.activateUser(userId) : await repo.deactivateUser(userId)
   if (!changed) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
 }
