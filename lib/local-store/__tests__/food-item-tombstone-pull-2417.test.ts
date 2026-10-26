@@ -34,6 +34,11 @@ beforeEach(() => {
       id TEXT PRIMARY KEY, date TEXT, meal_type_id TEXT, food_item_id TEXT, saved_meal_id TEXT, meal_group_id TEXT,
       meal_group_name TEXT, quantity_multiplier REAL, logged_at TEXT, updated_at TEXT, deleted_at TEXT, sync_status TEXT);
     CREATE TABLE saved_meal_items (id TEXT PRIMARY KEY, saved_meal_id TEXT, food_item_id TEXT, quantity_multiplier REAL);
+    CREATE TABLE saved_meals (
+      id TEXT PRIMARY KEY, name TEXT, servings REAL, image_data_uri TEXT, created_at TEXT, updated_at TEXT,
+      deleted_at TEXT, sync_status TEXT);
+    CREATE TABLE saved_meal_meal_types (saved_meal_id TEXT, meal_type_id TEXT, PRIMARY KEY (saved_meal_id, meal_type_id));
+    CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT);
   `)
 })
 
@@ -78,5 +83,54 @@ describe('a pulled tombstoned food (#2417)', () => {
     await apply({ foodItems: [food('keeper'), food('extra', { deletedAt: '2026-10-03T00:00:00Z' })], foodLogs: [log('l1', 'keeper')] })
     expect(ids()).toEqual(['keeper'])
     expect(await new SQLiteLocalStore().getFoodLogsWithItems('2026-10-02')).toHaveLength(1)
+  })
+})
+
+// #3459. A retired food that something on the device still points at must not show in the catalog,
+// and must be dropped once nothing points at it, with no later tombstone to trigger that.
+describe('a retired food still held by a local reference (#3459)', () => {
+  const store = () => new SQLiteLocalStore()
+  const TOMB = '2026-10-03T00:00:00Z'
+  const savedMeal = (items: { id: string; foodItemId: string }[]) => ({
+    id: 'm1', name: 'Bowl', servings: 1, imageDataUri: null, createdAt: '2026-10-01T00:00:00Z',
+    items: items.map(i => ({ ...i, savedMealId: 'm1', quantityMultiplier: 1 })),
+  })
+
+  it('is hidden from search, barcode, calorie-match and recent foods at once, and removed once the saved meal is re-pointed', async () => {
+    await apply({ foodItems: [food('keeper', { barcode: '111' }), food('extra', { barcode: '111', updatedAt: '2026-10-02T00:00:00Z' })] })
+    db.current!.prepare(`INSERT INTO saved_meal_items VALUES ('i1','m1','extra',1)`).run()
+    await apply({ foodItems: [food('extra', { barcode: '111', deletedAt: TOMB })] })
+
+    expect(ids()).toEqual(['extra', 'keeper'])   // held by the ingredient
+    expect((await store().searchFoodItems('granola')).map(f => f.id)).toEqual(['keeper'])
+    expect((await store().searchFoodItems('')).map(f => f.id)).toEqual(['keeper'])
+    expect((await store().getFoodItemByBarcode('111'))?.id).toBe('keeper')
+    expect((await store().findFoodItemsByCalories(200)).map(f => f.id)).toEqual(['keeper'])
+
+    // The saved-meals sheet opens: the server list has the ingredient on the keeper.
+    await store().hydrateSavedMeals([savedMeal([{ id: 'i1', foodItemId: 'keeper' }])] as never)
+    expect(ids()).toEqual(['keeper'])
+    expect(await store().getSyncMeta('retiredFoodIds')).toBe('[]')
+  })
+
+  it('stays hidden while an unsynced log holds it, and goes at the pull that re-points the log', async () => {
+    await apply({ foodItems: [food('keeper'), food('extra')] })
+    db.current!.prepare(`INSERT INTO food_logs VALUES ('l1','2026-10-02','mt-1','extra',NULL,NULL,NULL,1,'2026-10-02T01:00:00Z','2026-10-02T01:00:00Z',NULL,'pending')`).run()
+    await apply({ foodItems: [food('extra', { deletedAt: TOMB })] })
+    expect(ids()).toEqual(['extra', 'keeper'])
+    expect((await store().searchFoodItems('granola')).map(f => f.id)).toEqual(['keeper'])
+    expect((await store().getRecentFoodItems(10)).map(f => f.id)).toEqual([])
+
+    // The log is pushed (synced), then a LATER pull carries it re-pointed. No tombstone arrives again.
+    db.current!.prepare(`UPDATE food_logs SET sync_status='synced' WHERE id='l1'`).run()
+    await apply({ foodLogs: [log('l1', 'keeper')] })
+    expect(ids()).toEqual(['keeper'])
+    expect(await store().getSyncMeta('retiredFoodIds')).toBe('[]')
+    expect(await store().getFoodLogsWithItems('2026-10-02')).toHaveLength(1)
+  })
+
+  it('a food that was never retired is not hidden', async () => {
+    await apply({ foodItems: [food('keeper'), food('other', { name: 'Other Granola' })] })
+    expect((await store().searchFoodItems('granola')).map(f => f.id).sort()).toEqual(['keeper', 'other'])
   })
 })
