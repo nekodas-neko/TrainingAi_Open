@@ -32,6 +32,7 @@ const apply = (rows: ReturnType<typeof serverRow>[]) =>
 beforeEach(() => {
   db.current = new DatabaseSync(':memory:')
   db.current.exec(`
+    CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE activity_logs (
       id TEXT PRIMARY KEY, date TEXT, activity_type TEXT, title TEXT, duration_min REAL, distance_km REAL,
       steps INTEGER, avg_hr INTEGER, max_hr INTEGER, calories_burned REAL, start_time TEXT, end_time TEXT,

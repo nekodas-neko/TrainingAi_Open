@@ -54,6 +54,7 @@ beforeEach(() => {
   _resetSyncBackoff()
   db.current = new DatabaseSync(':memory:')
   db.current.exec(`
+    CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE mutations_outbox (
       id TEXT PRIMARY KEY, user_id TEXT, domain TEXT, date TEXT, payload TEXT, created_at TEXT,
       attempts INTEGER, last_error TEXT, status TEXT, next_retry_at TEXT);
