@@ -1,4 +1,5 @@
-import { dateStrMidnightInTz, shiftDateStr } from '../date-utils'
+import { shiftDateStr } from '../date-utils'
+import { staleFinishedDays } from './finished-day-recheck'
 
 /** How many finished days back a read of today looks for a verdict still taken mid-day. */
 export const TRAINING_STRESS_RECHECK_DAYS = 7
@@ -25,17 +26,18 @@ export function staleTrainingStressDays(
   evaluatedAtByDay: ReadonlyMap<string, Date | null>,
   metChangedAtByDay: ReadonlyMap<string, Date> = new Map(),
 ): string[] {
-  const stale: string[] = []
+  // A verdict never taken, or taken before its day ended, is stale (#2400)...
+  const stale = new Set(staleFinishedDays(today, tz, evaluatedAtByDay, TRAINING_STRESS_RECHECK_DAYS))
+  // ...and so is one taken after the day ended but before Oura's MET for it last changed (#3079).
   for (let back = TRAINING_STRESS_RECHECK_DAYS; back >= 1; back--) {
     const day = shiftDateStr(today, -back)
-    const dayEnd = dateStrMidnightInTz(shiftDateStr(day, 1), tz)
     const evaluatedAt = evaluatedAtByDay.get(day) ?? null
-    if (evaluatedAt == null || evaluatedAt < dayEnd) { stale.push(day); continue }
+    if (evaluatedAt == null) continue
     const metChanged = [metChangedAtByDay.get(shiftDateStr(day, -1)), metChangedAtByDay.get(day)]
       .some(at => at != null && at > evaluatedAt)
-    if (metChanged) stale.push(day)
+    if (metChanged) stale.add(day)
   }
-  return stale
+  return [...stale].sort()
 }
 
 /** The look-back's first day, including the Oura day before it that its MET reads. */

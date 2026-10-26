@@ -98,7 +98,9 @@ describe.each([
     expect(out.sleepScore).not.toBeNull()
     const sleepDays = repo.upsertOuraDailyDerived.mock.calls.filter(([, , p]) => p.sleepScore !== undefined).map(([, day]) => day)
     expect(sleepDays).toEqual([])
-    expect(repo.upsertOuraDailyDerived.mock.calls.map(([, day]) => day)).not.toContain(shiftDateStr(today, -1))
+    // The Activity finalise (#2435) does store yesterday's activity-only row; nothing else may.
+    const otherThanActivity = repo.upsertOuraDailyDerived.mock.calls.filter(([, , p]) => p.activityContributors === undefined)
+    expect(otherThanActivity.map(([, day]) => day)).not.toContain(shiftDateStr(today, -1))
   })
 
   it("after the sync: writes today's row, and only today's", async () => {
