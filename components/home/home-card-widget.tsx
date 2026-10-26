@@ -29,7 +29,7 @@ const CollectionCard = dynamic(() => import('@/components/home/collection-card')
 // Type-only, so the cycle with `home-prefs` (which imports `CardSectionKey` back from here) is
 // erased at compile time and never exists at runtime.
 import type { CardWidgetKey } from '@/lib/home/home-prefs'
-import { formatKg } from '@trainingai/shared/format/units'
+import { formatHoursMinutes, formatKg } from '@trainingai/shared/format/units'
 import { SleepVerdictNote } from '@/components/home/sleep-verdict-note'
 import { sleepWindowLabel } from '@/components/home/sleep-window-label'
 
@@ -164,13 +164,13 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
             <div className="flex items-start justify-between mb-2">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--accent-purple)" }}>Sleep</p>
-                <p className="text-2xl font-bold tabular-nums leading-tight">{hrs != null ? `${hrs.toFixed(1)}h` : "—"}{hrs != null && <span className="text-sm font-normal text-muted-foreground ml-1">/ {sleepGoal}h goal</span>}</p>
+                <p className="text-2xl font-bold tabular-nums leading-tight">{hrs != null ? formatHoursMinutes(hrs * 60) : "—"}{hrs != null && <span className="text-sm font-normal text-muted-foreground ml-1">/ {sleepGoal}h goal</span>}</p>
                 {windowLabel && <p className="text-xs text-muted-foreground tabular-nums">{windowLabel}</p>}
               </div>
               <Moon className="h-6 w-6 flex-none" style={{ color: "var(--accent-purple)" }} />
             </div>
             {goalPct !== null && <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: "rgba(139,92,246,0.15)" }}><div className="h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none" style={{ transform: `scaleX(${goalPct / 100})`, background: "linear-gradient(90deg, #6366f1, #a78bfa)" }} /></div>}
-            {totalStageHrs > 0 && (<><div className="flex h-2 rounded-full overflow-hidden gap-px mb-1.5">{stages.filter(s => (s.hours ?? 0) > 0).map(s => <div key={s.label} style={{ flex: s.hours ?? 0, background: s.color }} />)}</div><div className="flex gap-3">{stages.map(s => <div key={s.label} className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} /><span className="text-xs text-muted-foreground">{s.label}</span><span className="text-xs font-bold">{s.hours != null ? `${s.hours.toFixed(1)}h` : "—"}</span></div>)}</div></>)}
+            {totalStageHrs > 0 && (<><div className="flex h-2 rounded-full overflow-hidden gap-px mb-1.5">{stages.filter(s => (s.hours ?? 0) > 0).map(s => <div key={s.label} style={{ flex: s.hours ?? 0, background: s.color }} />)}</div><div className="flex gap-3">{stages.map(s => <div key={s.label} className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} /><span className="text-xs text-muted-foreground">{s.label}</span><span className="text-xs font-bold">{s.hours != null ? formatHoursMinutes(s.hours * 60) : "—"}</span></div>)}</div></>)}
           </div>
           {/* TN-85 — OUTSIDE the card's own `role="button"`, because the note carries a button of
               its own and a button inside a button is what `check-nested-buttons.js` fails on. It is

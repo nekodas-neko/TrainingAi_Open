@@ -1,4 +1,54 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <!-- No widget is registered yet (#3268): the owner picks which ones first. Each widget adds its
-       receiver here when it is built. -->
+  <application>
+    <!-- The launcher draws each widget from the snapshot the app last wrote (HomeWidgetsModule);
+         nothing here calls the server (#3268). -->
+    <receiver
+      android:name="expo.modules.homewidgets.TodayWidgetProvider"
+      android:exported="false"
+      android:label="@string/home_widget_today_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/home_widget_today_info" />
+    </receiver>
+    <receiver
+      android:name="expo.modules.homewidgets.NextWorkoutWidgetProvider"
+      android:exported="false"
+      android:label="@string/home_widget_next_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/home_widget_next_info" />
+    </receiver>
+    <receiver
+      android:name="expo.modules.homewidgets.NutritionWidgetProvider"
+      android:exported="false"
+      android:label="@string/home_widget_nutrition_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/home_widget_nutrition_info" />
+    </receiver>
+    <!-- The +250 ml button. Not exported: only the widget's own PendingIntent reaches it. -->
+    <receiver
+      android:name="expo.modules.homewidgets.WaterTapReceiver"
+      android:exported="false" />
+    <!-- Redraws every widget when the day turns (an inexact alarm at the next local midnight, no
+         exact-alarm permission) and when the clock or time zone is changed. -->
+    <receiver
+      android:name="expo.modules.homewidgets.WidgetRefreshReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.DATE_CHANGED" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="android.intent.action.TIME_SET" />
+      </intent-filter>
+    </receiver>
+  </application>
 </manifest>

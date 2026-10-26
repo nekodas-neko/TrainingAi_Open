@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4 x 2. No updatePeriodMillis: the app redraws the widget when its data changes, and a timer could
+     only redraw the same snapshot while waking the phone; the midnight alarm covers the day turning. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+  android:description="@string/home_widget_nutrition_description"
+  android:initialLayout="@layout/home_widget_nutrition"
+  android:minWidth="250dp"
+  android:minHeight="110dp"
+  android:minResizeWidth="250dp"
+  android:minResizeHeight="110dp"
+  android:resizeMode="horizontal|vertical"
+  android:targetCellWidth="4"
+  android:targetCellHeight="2"
+  android:updatePeriodMillis="0"
+  android:widgetCategory="home_screen" />

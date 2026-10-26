@@ -18,7 +18,6 @@ export function MonthCalendar({
   onSelect,
   status,
   nativeStyle = false,
-  restLabel = false,
   topAligned = false,
   title,
 }: {
@@ -33,10 +32,7 @@ export function MonthCalendar({
   onSelect: (date: string) => void;
   status?: ReactNode;
   nativeStyle?: boolean;
-  // Name a past day with nothing on it "rest" where its dots would be (native style only), so a
-  // rest day reads differently from a day that was never recorded. Pass it once the month has loaded.
-  restLabel?: boolean;
-  /** Date at the top of its cell, leaving the bottom for the "rest" label. Fixed for the host's
+  /** Date at the top of its cell, leaving the bottom for the dots. Fixed for the host's
    *  lifetime (not tied to loading) so dates never move when data lands. */
   topAligned?: boolean;
   /** Heading drawn on the same row as the month controls, as the current app's calendar does. */
@@ -145,20 +141,18 @@ export function MonthCalendar({
           const date = `${month}-${String(day).padStart(2, '0')}`;
           const names = markers[date] ?? markers[date.replace(/-/g, '/')] ?? [];
           const colors = dots ? (dots[date] ?? dots[date.replace(/-/g, '/')] ?? []) : [];
-          const rest =
-            nativeStyle && restLabel && date <= today && !names.length && !colors.length;
           return (
             <View key={date} style={{ width: `${100 / 7}%`, height: theme.sizes.button }}>
               {nativeStyle ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`${date}${names.length ? ', ' + names.join(', ') : ''}${rest ? ', rest' : ''}`}
+                  accessibilityLabel={`${date}${names.length ? ', ' + names.join(', ') : ''}`}
                   accessibilityState={{ selected: date === selected }}
                   onPress={() => onSelect(date)}
                   style={({ pressed }) => ({
                     flex: 1,
                     alignItems: 'center',
-                    // The rest label sits under the date, so the date moves up to make room.
+                    // The dots sit under the date, so the date moves up to make room.
                     justifyContent: topAligned ? 'flex-start' : 'center',
                     paddingTop: topAligned ? theme.spacing.xxs : 0,
                     opacity: pressed ? 0.6 : 1,
@@ -215,16 +209,6 @@ export function MonthCalendar({
                   onPress={() => onSelect(date)}
                   style={{ height: '100%', paddingHorizontal: 0, paddingVertical: 0 }}
                 />
-              )}
-              {rest && (
-                <View
-                  pointerEvents="none"
-                  style={{ position: 'absolute', bottom: 0, alignSelf: 'center' }}
-                >
-                  <AppText variant="micro" tone="muted" style={{ textTransform: 'uppercase' }}>
-                    rest
-                  </AppText>
-                </View>
               )}
               {colors.length > 0 && (
                 <Stack

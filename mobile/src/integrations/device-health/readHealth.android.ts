@@ -10,6 +10,7 @@ import {
 } from '@trainingai/shared/validation/health-connect-import';
 import { DEFAULT_TZ, midnightDaysAgoInTz, todayInTz } from '@trainingai/shared/date-utils';
 import type { HealthSnapshot, HealthInspectionEntry } from '../../features/health/types';
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
 const labels = {
   SleepSession: 'Sleep',
   HeartRate: 'Heart rate',
@@ -100,7 +101,7 @@ export async function readHealthSnapshot(timezone = DEFAULT_TZ): Promise<HealthS
   const night = projection.sleep[0];
   const values: Record<string, { value: string | null; source?: string }> = {
     SleepSession: {
-      value: night ? `${night.durationHours.toFixed(1)} h` : null,
+      value: night ? formatHoursMinutes(night.durationHours * 60) : null,
       source: night?.sources[0]?.name,
     },
     HeartRate: { value: heart ? `${Math.round(heart.bpm)} bpm` : null, source: heart?.source },

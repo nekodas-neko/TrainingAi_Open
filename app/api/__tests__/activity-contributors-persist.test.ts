@@ -17,6 +17,9 @@
 // The property that makes this worth doing is not "six keys are present" but **the stored row
 // reproduces its own score**: the components reproduce `preTaper` under the model's weights
 // renormalised over whichever keys are present, and `acwr` is the taper's only input.
+//
+// #2435: the row is now written once a day has ended (`finaliseActivityDay`), not for today on every
+// read, so these read the finalised write for yesterday, a finished day.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { ACTIVITY_MODEL } from '@trainingai/shared/health/activity-score'
@@ -56,6 +59,7 @@ vi.mock('@/lib/data', () => ({
 
 import { GET } from '@/app/api/readiness-score/route'
 import { todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
+import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 
 const today = todayInTz(TZ)
 const day = (back: number) => shiftDateStr(today, -back)
@@ -73,8 +77,9 @@ const sessions = (n: number, volumeKg: number) =>
     exercises: [{ name: 'Squat', volume: volumeKg, sets: [] }],
   }))
 
+/** Yesterday's write: the readiness read finalises it before it answers. */
 const activityWrite = () =>
-  repo.upsertDerived.mock.calls.find(c => c[2]?.activityScore != null)
+  repo.upsertDerived.mock.calls.find(c => c[1] === day(1) && c[2]?.activityScore != null)
 
 beforeEach(() => {
   repo.bodyMetrics = []
@@ -114,7 +119,7 @@ describe('the persisted activity breakdown (Q-526)', () => {
 
     const stored = activityWrite()![2].activityContributors as Record<string, number | null>
     expect(Object.keys(stored)).toEqual(expect.arrayContaining(['base', 'adjustment', 'trained']))
-    expect(stored.trained).toBe(1)                 // a session was logged today
+    expect(stored.trained).toBe(1)                 // a session was logged that day
     expect(stored.adjustment).toBe(0)              // nothing to adjust — no Oura Cloud activity row
   })
 
@@ -196,16 +201,26 @@ describe('the persisted activity breakdown (Q-526)', () => {
     expect(Math.max(0, Math.min(100, Math.round(stored.preTaper * (1 - taper))))).toBe(score)
   })
 
-  // The route already serves these components to the client. Storing a *different* breakdown from
-  // the one it displays would be a second, drifting definition of what the score was made of.
-  it('stores exactly the breakdown it serves', async () => {
+  // The live screen and the finalise score a day with one function. Storing a *different*
+  // breakdown from the one that function gives for the day would be a second, drifting definition
+  // of what the score was made of.
+  it('stores exactly the breakdown the day scores to', async () => {
     repo.bodyMetrics = metrics(14)
     repo.workouts = sessions(3, 6000)
-    const served = await (await GET()).json()
+    await GET()
 
     const stored = activityWrite()![2].activityContributors as Record<string, number>
-    for (const [k, v] of Object.entries(served.activityContributors as Record<string, number>)) {
-      expect(stored[k], `${k} served ${v} but stored ${stored[k]}`).toBe(v)
+    const scored = await loadActivityDay(repoStub() as never, 'u1', TZ, day(1))
+    expect(Object.keys(scored.result!.components).length).toBeGreaterThan(0)
+    for (const [k, v] of Object.entries(scored.result!.components)) {
+      expect(stored[k], `${k} scored ${v} but stored ${stored[k]}`).toBe(v)
     }
+  })
+
+  it("never stores today's in-progress score", async () => {
+    repo.bodyMetrics = metrics(14)
+    repo.workouts = sessions(3, 6000)
+    await GET()
+    expect(repo.upsertDerived.mock.calls.filter(c => c[1] === today && c[2]?.activityScore !== undefined)).toEqual([])
   })
 })

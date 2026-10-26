@@ -171,7 +171,9 @@ export function computeActivityScore(input: ActivityScoreInput): ActivityScoreRe
 }
 
 /**
- * The rolling 7-day strength window for the local day `dayStr` in `tz` (inclusive of that day).
+ * The rolling 7-day strength window for the local day `dayStr` in `tz`: that day and the six local days
+ * before it, from the first one's local midnight (#2739). It used to start seven days back, which is
+ * eight calendar days and counted about one session too many against goals calibrated on a week.
  *
  * TN-77(a). Readiness's `prevDayActivity` contributor scores *yesterday* by calling
  * `computeActivityScore` a second time — and both call sites passed **today's** `sessions7d` and
@@ -193,7 +195,7 @@ export function strengthWindowEndingAt(
 ): { sessions7d: number; volume7dKg: number } {
   // Both edges are shifted on the date string, then turned into instants, so a clock change inside
   // the window does not move them off the user's local midnight (#3222).
-  const from = dateStrMidnightInTz(shiftDateStr(dayStr, -7), tz).getTime()
+  const from = dateStrMidnightInTz(shiftDateStr(dayStr, -6), tz).getTime()
   const to = dateStrMidnightInTz(shiftDateStr(dayStr, 1), tz).getTime() // exclusive: the day's own sessions count, later ones do not
   const rows = sessions.filter(ws => {
     const t = new Date(ws.startedAt).getTime()

@@ -11,7 +11,6 @@ const code = (src: string) => stripComments(src)
 
 const CONSOLES = [
   { route: '/admin/oura-ble',     page: 'app/admin/oura-ble/page.tsx' },
-  { route: '/admin/cadence',      page: 'app/admin/cadence/page.tsx' },
   { route: '/admin/data-capture', page: 'app/admin/data-capture/page.tsx' },
 ]
 

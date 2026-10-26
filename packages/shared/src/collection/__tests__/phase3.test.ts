@@ -10,7 +10,7 @@ import {
 import {
   BAND, FLYING_FROM_TIER, SIZE, penCatMotion, penCats, shownForWidth, slotOf, tagsForWidth,
 } from '../pen'
-import { collectionRules } from '../rules'
+import { collectionRowName, collectionRuleCaptions, collectionRules } from '../rules'
 import { shiftDateStr } from '../../date-utils'
 
 const today = '2026-10-20'
@@ -156,5 +156,24 @@ describe('how this works', () => {
     expect(paragraphs[6].find(s => s.style === 'em')?.text).toBe('your schedule')
     expect(text[5]).toMatch(/The days underneath still count\.$/)
     expect(text[4]).toMatch(/provisional and may be retuned\.$/)
+  })
+})
+
+describe('the four rule captions under the diagrams', () => {
+  const captions = collectionRuleCaptions()
+  it('has four, each with a lead and a sentence', () => {
+    expect(captions).toHaveLength(4)
+    expect(captions.every(c => c.lead.length > 0 && c.text.startsWith(' '))).toBe(true)
+  })
+  it('reads its names and costs from the ladders', () => {
+    const tank = collectionRowName('workout')
+    expect(captions[0].text).toContain(`gives the ${tank} row a ${V2_LADDERS.workout.tiers[0].name}`)
+    expect(captions[1].lead).toBe(`${V2_LADDERS.steps.tiers[1].mergeCost} make one.`)
+    expect(captions[1].text).toContain(V2_LADDERS.workout.tiers.slice(1).map(t => t.mergeCost).join(' · '))
+    expect(captions[3].text).toContain(`The ${tank} row's allowance`)
+  })
+  it('names the three bank rows once each', () => {
+    const banks = (['steps', 'health', 'cardio'] as const).map(collectionRowName)
+    for (const name of banks) expect(captions[0].text).toContain(name)
   })
 })
