@@ -10,6 +10,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-10-26",
     changes: [
       "Each day's Activity score is now worked out once the day is over and then kept, so a past day no longer changes with when you last opened the app, and readiness reads yesterday's finished score. The strength part counts the last 7 days, not 8.",
+      "A treadmill session's steps now count toward the day's steps everywhere, including the Activity score, readiness and achievements, not just the screens.",
       "On Oura days, the Activity score counts the hours you moved from Oura's own minute-by-minute activity, and zone minutes come only from heart rate dense enough to trust.",
       "Your night's HRV is worked out from Oura's 5-minute readings, the way the ring's was, and your sleep score and personal normals learn from the device you wear, so ring nights and Oura nights are no longer mixed.",
       "Readiness measures how far each reading is from your normal on a steadier scale, and the workout prescription budgets sets against the same weekly target the Training card shows.",
