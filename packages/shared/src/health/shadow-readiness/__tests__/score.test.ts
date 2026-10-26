@@ -16,7 +16,7 @@ import {
   type UnitObservation,
 } from '../score'
 import {
-  PILLAR_WEIGHTS,
+  PILLAR_POINTS,
   SHADOW_MODEL_VERSION,
   SHADOW_PILLARS,
   SHADOW_UNIT_IDS,
@@ -216,12 +216,12 @@ describe('shadow readiness — structural rules', () => {
     const r = scoreShadowReadiness({
       date: D,
       units: {
-        'activity.yesterday_movement': { today: { date: D, value: 9000, source: 'ring' }, history: [] },
+        'activity.yesterday_load': { today: { date: D, value: 9000, source: 'ring' }, history: [] },
         'body.daytime_stress': { today: yesterday(30), history: history(40, wobble(30, 5), shiftDateStr(D, -1)) },
       },
     })
-    expect(r.units['activity.yesterday_movement'].gap).toBe('unsettled')
-    expect(r.units['activity.yesterday_movement'].score).toBeNull()
+    expect(r.units['activity.yesterday_load'].gap).toBe('unsettled')
+    expect(r.units['activity.yesterday_load'].score).toBeNull()
     expect(r.inputsThrough).toBe(shiftDateStr(D, -1))
     expect(r.inputsThrough! < D).toBe(true)
   })
@@ -234,7 +234,7 @@ describe('shadow readiness — structural rules', () => {
     ]
     raw.derived = [{ day: D, stressHighMinutes: 300 }]
     const input = assembleShadowInputs(prepareShadowHistory(raw), D)
-    expect(input.units['activity.yesterday_movement']!.today).toMatchObject({ date: shiftDateStr(D, -1), value: 7000 })
+    expect(input.units['activity.yesterday_load']!.today).toMatchObject({ date: shiftDateStr(D, -1), value: 7000 })
     expect(input.units['body.spo2']!.today).toMatchObject({ date: shiftDateStr(D, -1), value: 96 })
     expect(input.units['body.daytime_stress']!.today).toBeNull()
     const r = scoreShadowReadiness(input)
@@ -268,7 +268,7 @@ describe('shadow readiness — structural rules', () => {
     expect(r.pillarDetail.heart.scored).toEqual({ 'heart.overnight_hrv': 0.538, 'heart.overnight_rhr': 0.462 })
     expect(r.pillarDetail.heart.dropped).toMatchObject({
       'heart.overnight_settling': 'missing',
-      'heart.daytime_rhr': 'unavailable',
+      'heart.daytime_rhr': 'missing',
       'heart.hr_recovery': 'missing',
     })
     // Only Heart scored, so readiness is Heart and Heart carries all the weight.
@@ -325,12 +325,14 @@ describe('shadow readiness — structural rules', () => {
     expect(robustSpread([0, 10, 20, 30, 40], 3)).toBeCloseTo(20 / 1.349, 5)
   })
 
-  it('weights: each pillar\'s units and the pillars sum to 100 as #2356 wrote them; renormalised shares sum to 1', () => {
+  it('points: pillar totals float (#2833) — a pillar is the sum of its units\' points; renormalised shares sum to 1', () => {
+    // Version 3's fixed 30 / 30 / 20 / 20 survives everywhere except Heart, which gave up 6.5 points
+    // when HRV and resting HR became one pattern with one 13-point budget (#2826).
+    expect(PILLAR_POINTS).toEqual({ sleep: 30, heart: 23.5, activity: 20, body: 20 })
     for (const p of SHADOW_PILLARS) {
-      const sum = SHADOW_UNIT_IDS.filter(id => UNIT_DEFS[id].pillar === p).reduce((s, id) => s + UNIT_DEFS[id].weight, 0)
-      expect(sum).toBe(100)
+      const sum = SHADOW_UNIT_IDS.filter(id => UNIT_DEFS[id].pillar === p).reduce((s, id) => s + UNIT_DEFS[id].points, 0)
+      expect(sum).toBeCloseTo(PILLAR_POINTS[p], 10)
     }
-    expect(Object.values(PILLAR_WEIGHTS).reduce((a, b) => a + b, 0)).toBe(100)
 
     const r = scoreShadowReadiness({
       date: D,
@@ -343,6 +345,7 @@ describe('shadow readiness — structural rules', () => {
     expect(eff).toBeCloseTo(1, 3)
     expect(r.pillarDetail.sleep.effectiveWeight).toBeCloseTo(0.6, 3)
     expect(r.pillarDetail.body.effectiveWeight).toBeCloseTo(0.4, 3)
+    expect(r.pillarDetail.sleep.points).toBe(30)
   })
 
   describe('sleep.deep_rem_share: steady around the person\'s own normal (issue 2635)', () => {
@@ -359,7 +362,7 @@ describe('shadow readiness — structural rules', () => {
 
     it('is a learned steady unit with no fixed band and keeps its 10 Sleep points', () => {
       const def = UNIT_DEFS[id]
-      expect(def).toMatchObject({ shape: 'steady', reference: 'learned', weight: 10 })
+      expect(def).toMatchObject({ shape: 'steady', reference: 'learned', points: 3 })
       expect(def.band).toBeUndefined()
       expect(def.unavailable).toBeUndefined()
       expect(SHADOW_MODEL_VERSION).toBeGreaterThanOrEqual(2)
@@ -422,8 +425,8 @@ describe('shadow readiness — structural rules', () => {
       },
     })
     expect(r.units['heart.hr_recovery'].stage).toBe('provisional')
-    expect(r.units['heart.hr_recovery'].weight).toBe(5)
-    expect(r.units['heart.overnight_hrv'].weight).toBe(35)
+    expect(r.units['heart.hr_recovery'].weight).toBe(1.5)
+    expect(r.units['heart.overnight_hrv'].weight).toBe(13)
   })
 
   it('null is "not scored", never 0: with no input at all nothing scores', () => {
@@ -443,7 +446,7 @@ describe('shadow readiness — structural rules', () => {
     const r = scoreShadowReadiness({ date: D, units: { 'sleep.duration': { today: night(8), history: [] } } })
     expect(Object.keys(r.units).sort()).toEqual([...SHADOW_UNIT_IDS].sort())
     expect(Object.keys(r.units['sleep.duration']).sort()).toEqual(
-      ['day', 'daytimeThrough', 'flags', 'gap', 'level', 'normal', 'note', 'provenance', 'score', 'stage', 'validDays', 'value', 'weight'].sort(),
+      ['day', 'daytimeThrough', 'flags', 'gap', 'level', 'normal', 'note', 'provenance', 'quality', 'reliability', 'score', 'spread', 'stage', 'validDays', 'value', 'weight'].sort(),
     )
   })
 })
@@ -487,7 +490,7 @@ describe('#2984: inputs carry their device, and temperature and breathing fall b
       { date: shiftDateStr(D, -1), steps: 8000, spo2Pct: 95, stepsSource: 'oura_cloud', spo2Source: 'oura_cloud' },
     ]
     const input = assembleShadowInputs(prepareShadowHistory(raw), D)
-    for (const [id, value] of [['activity.yesterday_movement', 8000], ['body.spo2', 95]] as const) {
+    for (const [id, value] of [['activity.yesterday_load', 8000], ['body.spo2', 95]] as const) {
       const u = input.units[id]!
       expect(u.today).toMatchObject({ value, source: 'oura_cloud' })
       expect(new Set(u.history.map(o => o.source))).toEqual(new Set(['oura_ble']))
@@ -501,7 +504,7 @@ describe('#2984: inputs carry their device, and temperature and breathing fall b
     const raw = emptyRaw('Australia/Brisbane')
     raw.bodyMetrics = [{ date: shiftDateStr(D, -1), steps: 8000, spo2Pct: 95 }]
     const input = assembleShadowInputs(prepareShadowHistory(raw), D)
-    expect(input.units['activity.yesterday_movement']!.today).toMatchObject({ source: 'body_metrics' })
+    expect(input.units['activity.yesterday_load']!.today).toMatchObject({ source: 'body_metrics' })
     expect(input.units['body.spo2']!.today).toMatchObject({ source: 'body_metrics' })
   })
 

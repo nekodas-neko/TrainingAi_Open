@@ -200,6 +200,20 @@ describe('applyDelta pull-clobber guards', () => {
     expect(sqlCalls().some(s => s.includes('INTO activity_logs'))).toBe(false)
   })
 
+  it('activity_logs: a swept row that comes back in a later pull is re-added, not left deleted (#3309)', async () => {
+    // The tombstone hard-deletes the synced row on the device, so the revival (the same id with
+    // `deletedAt` null and a newer updated_at) has to INSERT it again rather than update a row
+    // that is no longer there.
+    await store.applyDelta({ activityLogs: [{ ...activityLog, deletedAt: '2026-07-01T10:00:00.000Z' } as never] })
+    runSQL.mockClear()
+    await store.applyDelta({ activityLogs: [{ ...activityLog, deletedAt: null, updatedAt: '2026-07-02T10:00:00.000Z' } as never] })
+    const calls = runSQL.mock.calls.filter(c => String(c[0]).includes('INTO activity_logs'))
+    expect(calls).toHaveLength(1)
+    expect(String(calls[0][0])).toMatch(/INSERT INTO activity_logs[\s\S]*ON CONFLICT\(id\) DO UPDATE/)
+    expect(calls[0][1]).toContain('al-1')
+    expect(sqlCalls().some(s => s.includes('DELETE FROM activity_logs WHERE id'))).toBe(false)
+  })
+
   it('activity_logs upsert (applyDelta) carries GPS route/pace/elevation fields', async () => {
     await store.applyDelta({ activityLogs: [{
       ...activityLog,
