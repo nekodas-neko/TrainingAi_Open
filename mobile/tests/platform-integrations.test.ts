@@ -14,7 +14,7 @@ import {
   type Alert,
 } from '../src/features/platform/data/models.ts';
 import { PlatformStore } from '../src/features/platform/data/PlatformStore.ts';
-import { planAlerts } from '../src/features/platform/data/alert-plan.ts';
+import { planAlerts, wantsNotifications } from '../src/features/platform/data/alert-plan.ts';
 import { AlertScheduler } from '../src/features/platform/data/AlertScheduler.ts';
 import {
   CalendarStore,
@@ -48,7 +48,6 @@ function completed() {
 function settings(extra = {}) {
   return platformSchema.parse({
     scope: 'account-one',
-    restAlerts: true,
     walkCues: true,
     ...extra,
   });
@@ -99,26 +98,10 @@ test('rest deadlines reschedule one stable alert, and finished/skipped rests lea
     endsAt: now + 60000,
   };
   const first = planAlerts(settings(), [value], null, now);
-  assert.equal(
-    planAlerts(settings({ restAlerts: false }), [value], null, now, true).length,
-    1,
-  );
-  const background = planAlerts(
-    settings({ restAlerts: false }),
-    [value],
-    null,
-    now,
-    false,
-  );
-  assert.equal(background.length, 1);
-  assert.equal(alertSignature(background[0]), alertSignature(first[0]));
+  assert.equal(planAlerts(settings(), [value], null, now).length, 1);
+  assert.equal(alertSignature(planAlerts(settings(), [value], null, now)[0]), alertSignature(first[0]));
   value.timers.restCues = false;
-  assert.deepEqual(
-    planAlerts(settings({ restAlerts: false }), [value], null, now, false),
-    [],
-  );
-  assert.deepEqual(planAlerts(settings(), [value], null, now, true), []);
-  assert.equal(planAlerts(settings(), [value], null, now, false).length, 1);
+  assert.deepEqual(planAlerts(settings(), [value], null, now), [], 'the rest cue alone controls the alarm');
   value.timers.restCues = true;
   value.rest.endsAt += 30000;
   const next = planAlerts(settings(), [value], null, now);
@@ -146,9 +129,8 @@ test('a rest alarm fires at its end, follows length changes and is cleared by th
     };
     return value;
   };
-  for (const foreground of [true, false]) {
-    const quiet = settings({ restAlerts: false });
-    const [alert] = planAlerts(quiet, [resting()], null, now, foreground);
+  {
+    const [alert] = planAlerts(settings(), [resting()], null, now);
     assert.deepEqual(alert.trigger, { at: now + 90000 });
     assert.equal(alert.title, 'Rest complete');
     // The current app's wording: the set after the one just logged (#3142).
@@ -352,27 +334,27 @@ test('integration preferences persist per account and disk failures preserve the
     storage = await createLocalStorage(db.database);
   const account = storage.account('https://example.com', 'one');
   const store = new PlatformStore(account, () => 'one-scope');
-  await store.configure({ restAlerts: true, keepAwake: false });
+  await store.configure({ walkCues: true, keepAwake: false });
   const restored = new PlatformStore(account, () => 'unused-scope');
   await restored.initialize();
   assert.equal(restored.getSnapshot().settings.scope, 'one-scope');
-  assert.equal(restored.getSnapshot().settings.restAlerts, true);
+  assert.equal(restored.getSnapshot().settings.walkCues, true);
   const other = new PlatformStore(
     storage.account('https://example.com', 'two'),
     () => 'two-scope',
   );
   await other.initialize();
-  assert.equal(other.getSnapshot().settings.restAlerts, false);
+  assert.equal(other.getSnapshot().settings.walkCues, false);
   const disk = memory(),
     unsaved = new PlatformStore(disk, () => 'scope');
   await unsaved.initialize();
   disk.fail(true);
-  await assert.rejects(unsaved.configure({ restAlerts: true }));
-  assert.equal(unsaved.getSnapshot().settings.restAlerts, false);
+  await assert.rejects(unsaved.configure({ walkCues: true }));
+  assert.equal(unsaved.getSnapshot().settings.walkCues, false);
   disk.fail(false);
   await unsaved.retry();
   assert.equal(unsaved.getSnapshot().error, null);
-  assert.equal(unsaved.getSnapshot().settings.restAlerts, false);
+  assert.equal(unsaved.getSnapshot().settings.walkCues, false);
   db.connection.close();
 });
 function calendarFixture() {
@@ -502,4 +484,11 @@ test('automatic calendar sync starts at opt-in time and cancellation stops queue
   f.store.cancel();
   await pending;
   assert.equal(f.events.size, 0);
+});
+
+test('notification permission is wanted whenever the rest cue, a walk cue or a reminder is on', () => {
+  const quiet = settings({ walkCues: false });
+  assert.equal(wantsNotifications(quiet, false), false);
+  assert.equal(wantsNotifications(quiet, true), true, 'the rest cue alone is enough');
+  assert.equal(wantsNotifications(settings({ walkCues: true }), false), true);
 });

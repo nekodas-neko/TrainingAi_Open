@@ -15,7 +15,9 @@ import {
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { usePlatformIntegrations } from '../PlatformProvider';
+import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
 import { calendars } from '../../../integrations/calendar/platform';
+import { wantsNotifications } from '../data/alert-plan';
 import { reminderKinds, reminderLabels, reminderSchema, type Reminder } from '../data/models';
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -31,6 +33,7 @@ export function IntegrationSettings() {
     refresh,
   } = usePlatformIntegrations();
   const { theme } = useTheme();
+  const journal = useWorkoutJournal();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null);
   const [choices, setChoices] = useState<Awaited<ReturnType<typeof calendars>>>([]);
@@ -52,6 +55,11 @@ export function IntegrationSettings() {
     }
   }
   const settings = state?.settings;
+  // The rest cue drives the rest alarm (#3062), so refused notifications matter whenever it is on:
+  // as the remembered default for the next workout, or on a workout that is open now.
+  const restCueOn =
+    journal.data.preferences.timers.restCues ||
+    journal.data.workouts.some((x) => x.status === 'active' && x.timers.restCues);
   return (
     <Card>
       <AppText variant="heading">Alerts & calendar</AppText>
@@ -66,16 +74,6 @@ export function IntegrationSettings() {
             onValueChange={(keepAwake) => void run(() => store.configure({ keepAwake }))}
           />
           <SwitchRow
-            label="Rest complete alerts"
-            value={settings!.restAlerts}
-            disabled={busy}
-            onValueChange={(value) =>
-              void run(() =>
-                value ? enableAlerts('restAlerts') : store.configure({ restAlerts: false }),
-              )
-            }
-          />
-          <SwitchRow
             label="Guided activity cues"
             value={settings!.walkCues}
             disabled={busy}
@@ -85,10 +83,7 @@ export function IntegrationSettings() {
               )
             }
           />
-          {!permission &&
-            (settings!.restAlerts ||
-              settings!.walkCues ||
-              settings!.reminders.some((row) => row.enabled)) && (
+          {!permission && wantsNotifications(settings!, restCueOn) && (
               <AppButton
                 title="Enable notification permission"
                 variant="secondary"

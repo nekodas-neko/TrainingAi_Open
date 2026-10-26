@@ -8,15 +8,14 @@ export function planAlerts(
   workouts: WorkoutRecord[],
   activity: ActivitySession | null,
   now = Date.now(),
-  foreground = false,
 ): Alert[] {
   const scope = settings.scope;
   const result: Alert[] = [];
   for (const workout of workouts) {
-    // The rest cue's alarm must survive backgrounding (#3062); the Alerts setting adds one when
-    // the cue is off. The last set's rest on the exercise summary alarms too (#3111).
+    // The rest cue's alarm must survive backgrounding (#3062). The last set's rest on the
+    // exercise summary alarms too (#3111).
     if (
-      (workout.timers.restCues || (!foreground && settings.restAlerts)) &&
+      workout.timers.restCues &&
       workout.status === 'active' &&
       workout.rest &&
       workout.rest.endsAt > now
@@ -145,4 +144,9 @@ export function planAlerts(
     }
   }
   return result;
+}
+
+/** Whether anything the user has switched on needs notification permission to work. */
+export function wantsNotifications(settings: PlatformSettings, restCueOn: boolean) {
+  return restCueOn || settings.walkCues || settings.reminders.some((row) => row.enabled);
 }
