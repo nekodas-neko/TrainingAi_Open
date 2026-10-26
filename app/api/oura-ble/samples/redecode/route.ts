@@ -8,10 +8,10 @@ import { rateLimit } from '@/lib/rate-limit'
 import { reportRollupStepErrors } from '@/lib/oura-ble/report-step-errors'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { getRepositoryAsync } from '@/lib/data'
-import { redecodeJobKind, REDECODE_BUSY_FOR_BACKFILL_MESSAGE, REDECODE_BUSY_FOR_STRESS_MESSAGE } from '@/lib/oura-ble/redecode-job-kind'
+import { redecodeJobKind, REDECODE_BUSY_MESSAGE, REDECODE_BUSY_FOR_STRESS_MESSAGE } from '@/lib/oura-ble/redecode-job-kind'
 
 // Issue 2236: `?stressBackfill=1` adds the daytime-stress buckets history never got. Its own strict
-// schema: any other parameter (date, dump, allowStepsDecrease, a typo) is a 400 rather than ignored,
+// schema: any other parameter (date, dump, a typo) is a 400 rather than ignored,
 // so a request that mixes this mode with a redecode lever never runs as something it did not say.
 // `dryRun` is the dry run unless it is exactly `false`.
 const StressBackfillQuery = z.object({
@@ -38,12 +38,6 @@ export async function POST(req: Request) {
   // AND re-aggregates all history, which grows with weeks of data and times the request out at the
   // gateway ("upstream error") — that killed the per-night dump. dump mode keeps it fast.
   const dumpOnly = params.get('dump') === '1'
-  // ?allowStepsDecrease=1 — one-time owner-gated D0 backfill lever: skip the steps step's normal
-  // "only ever raise a stored day's count" guard so a corrected (lower) step_counter total can
-  // overwrite an old, inflated flat-30-estimate value. Never touches a higher-ranked `manual` entry
-  // (see aggregateOuraRawSamples's steps step / upsertBodyMetrics sourceMap merge). Requires the
-  // full-history redecode path (below) — irrelevant to dumpOnly, which writes nothing.
-  const allowStepsDecrease = params.get('allowStepsDecrease') === '1'
   // ?async=1 → start a job and return its id (Q-535). The full-history pass REQUIRES it: it runs
   // inside the one-at-a-time job slot (`oura_redecode_jobs`, migration 196), because two full-history
   // passes at once are the event-loop starvation that took production down on 2026-08-13. A request
@@ -133,20 +127,20 @@ export async function POST(req: Request) {
     )
   }
 
-  const opts: Record<string, unknown> = { debugDate: debugDate ?? null, fullHistory: true, allowStepsDecrease }
+  const opts: Record<string, unknown> = { debugDate: debugDate ?? null, fullHistory: true }
 
   // A job whose process died mid-run would otherwise hold the one-at-a-time slot forever. Reaped
   // here rather than by a sweeper — there is no cron layer in this app, and the only reader that
   // matters is the one asking whether it may start another.
   await repo.reapStaleRedecodeJobs(userId)
   const { job, alreadyRunning, refused } = await repo.startRedecodeJob(userId, opts)
-  // Issue 2383: a step backfill must never follow a run that will not apply the step correction.
+  // A redecode never follows a stress-bucket backfill, which writes none of what it writes.
   // Refused rather than queued — no hidden queue, and the owner presses again once it finishes.
   // Nothing was started and no row was written, so the caller has nothing to poll.
   if (refused) {
     return NextResponse.json(
       {
-        error: REDECODE_BUSY_FOR_BACKFILL_MESSAGE,
+        error: REDECODE_BUSY_MESSAGE,
         refused: true,
         runningJobId: job.id,
         runningKind: redecodeJobKind(job.opts),
@@ -170,7 +164,7 @@ export async function POST(req: Request) {
   // process, and the debounced ingest rollup fires the same way — what changes here is only that the
   // HTTP response no longer depends on it. `.catch` is exhaustive: a throw that never reached the
   // job row would leave it running until the reaper, which is a worse report than an error.
-  void runRedecodeOffLoop(userId, tz, { debugDate, fullHistory: true, allowStepsDecrease }, true)
+  void runRedecodeOffLoop(userId, tz, { debugDate, fullHistory: true }, true)
     .then(async phases => {
       if (phases.redecodeError) console.error('[oura-ble] redecode failed:', phases.redecodeError)
       if (phases.aggregateError) console.error('[oura-ble] re-aggregate failed:', phases.aggregateError)

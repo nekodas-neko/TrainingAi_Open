@@ -6650,8 +6650,8 @@ intended behavior, not a documented ambient feature — worth chasing, not dismi
    JS-side stop call — Android foreground services are independent of the JS/React lifecycle, so a
    killed app mid-workout could leave the ring's native burst loop running all night with nothing on
    the JS side left to tell it to stop.
-3. Lower likelihood, worth ruling out: a debug console (`components/oura-ble/live-hr-test-console.tsx`)
-   left running — admin-only surface, so unlikely for normal use, but has its own start/stop pairing
+3. Lower likelihood, worth ruling out: a debug console (`components/oura-ble/live-hr-test-console.tsx`,
+   **retired in #2862**) left running — admin-only surface, so unlikely for normal use, but has its own start/stop pairing
    worth double-checking against this same class of leak.
 
 **Not yet fixed — needs on-device diagnostics before a fix is scoped.** Check
@@ -8986,7 +8986,7 @@ days barely move; **07-24 −1,719**, **07-27 −1,059**, **07-28 −3,326**; tw
 07-13 +1,327). ⚠️ **Indicative only** — it buckets by `measured_at` while the rollup buckets by
 `dayForDs` via the mutable clock anchor, which has moved since; the two rising days are the likely
 artefacts. Run `/api/oura-ble/samples/step-backfill-preview` (rollup's own bucketing) before any
-destructive backfill — and note Q-22 §3: that preview is a hand-copied duplicate of the rollup block
+destructive backfill (**the preview route was retired in #2862**) — and note Q-22 §3: that preview is a hand-copied duplicate of the rollup block
 and should be collapsed into one function first.
 
 ### [activity] 🟠 Three days hold inflated step totals that cannot self-correct (found 2026-07-28, OPEN)
@@ -8995,7 +8995,7 @@ day can only ever rise. Verified against production by re-running the guarded me
 real frames: **2026-07-24 7,691 → 5,972**, **2026-07-27 6,981 → 5,922**, **2026-07-28 4,903 →
 1,578** (−6,103 total). Correcting them is destructive and already has an owner-gated lever
 (`?allowStepsDecrease=1` on the redecode route, with a read-only preview at
-`/api/oura-ble/samples/step-backfill-preview`) — awaiting an explicit decision. Note the wider
+`/api/oura-ble/samples/step-backfill-preview`) — awaiting an explicit decision. **Both the lever and the preview were retired in #2862, so a repair needs a new proposal.** Note the wider
 ring-era history is also suspect: phone-sourced days (to 07-08) averaged ~2,300/day against ~5,300
 for ring-sourced days, and the retired flat-30 estimate that produced 2026-07-09→22 is documented
 in-code as over-counting.

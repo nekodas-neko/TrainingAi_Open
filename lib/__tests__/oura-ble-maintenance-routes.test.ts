@@ -1,14 +1,13 @@
 /**
- * PS-39 — the two admin levers that REMOVE data: `oura-ble/samples/pack` and
- * `oura-ble/samples/backfill-null-decoded`.
+ * PS-39 — the admin lever that REMOVES data: `oura-ble/samples/pack`. (Its partner,
+ * `backfill-null-decoded`, was retired in #2862.)
  *
- * Batched because they are the destructive pair, and because the app's hardest standing rule sits
- * directly behind them: **`oura_raw_samples.body_hex` is the archival source of truth on the
- * server**, the ring's history buffer is finite, and its sync cursor only moves forward — so a
+ * The app's hardest standing rule sits directly behind it: **`oura_raw_samples.body_hex` is the
+ * archival source of truth on the server**, the ring's history buffer is finite, and its sync cursor only moves forward — so a
  * decoder fixed later can only back-fill by re-decoding stored hex. Anything that could remove it
  * is a one-way door.
  *
- * What each decides:
+ * What it decides:
  *
  *   · **`pack` is the only endpoint in the app that deletes archival frames.** It moves sealed
  *     buckets into one blob each and drops the hot rows only after re-reading the blob and proving
@@ -18,8 +17,6 @@
  *     answers, and the caller decides whether to press again from that difference.
  *   · **A refused bucket is a RESULT, not a throw** — a bucket whose frames did not match is
  *     reported and the run continues, because one mismatch must not abandon the rest.
- *   · **`backfill-null-decoded` clears the `decoded` JSONB and nothing else.** Every nulled row
- *     still decodes from `body_hex` on read, which is the only reason nulling is safe at all.
  *
  * Fixture discipline (the PS-39 note): every clamp fixture differs from the default, so a route
  * that ignored the body entirely could not pass by landing on the same number.
@@ -31,7 +28,6 @@ type Row = Record<string, unknown>
 const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const countPackableBuckets = vi.fn(async (_u: string) => ({ buckets: 0, sealBelowDs: null }) as Row)
 const packOuraRawBuckets = vi.fn(async (..._a: unknown[]) => ({ packed: 0, buckets: [] }) as Row)
-const nullHistoricalDecoded = vi.fn(async (..._a: unknown[]) => ({ nulled: 0, remaining: 0 }) as Row)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 
 let sessionUser: { id: string; isAdmin?: boolean } | null = { id: 'u-1', isAdmin: true }
@@ -40,42 +36,37 @@ vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...a: unknown[]) => rateLimit(.
 vi.mock('@/lib/data', () => {
   // One repo for both accessors — `requireAdmin` reaches for `getRepository`, the routes for
   // `getRepositoryAsync`, and the gate is real here rather than stubbed.
-  const repo = async () => ({ getUserById, countPackableBuckets, packOuraRawBuckets, nullHistoricalDecoded })
+  const repo = async () => ({ getUserById, countPackableBuckets, packOuraRawBuckets })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
 
 import { GET as packCount, POST as packRun } from '@/app/api/oura-ble/samples/pack/route'
-import { POST as backfill } from '@/app/api/oura-ble/samples/backfill-null-decoded/route'
 
 const post = (handler: (r: Request) => Promise<Response>, body: unknown, path: string) =>
   handler(new Request(`http://localhost${path}`, body === undefined
     ? { method: 'POST' }
     : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }))
 const pack = (b?: unknown) => post(packRun, b, '/api/oura-ble/samples/pack')
-const nullDecoded = (b?: unknown) => post(backfill, b, '/api/oura-ble/samples/backfill-null-decoded')
 
 beforeEach(() => {
-  for (const m of [getUserById, countPackableBuckets, packOuraRawBuckets, nullHistoricalDecoded, rateLimit]) m.mockClear()
+  for (const m of [getUserById, countPackableBuckets, packOuraRawBuckets, rateLimit]) m.mockClear()
   rateLimit.mockReturnValue(true)
   getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   countPackableBuckets.mockResolvedValue({ buckets: 0, sealBelowDs: null })
   packOuraRawBuckets.mockResolvedValue({ packed: 0, buckets: [] })
-  nullHistoricalDecoded.mockResolvedValue({ nulled: 0, remaining: 0 })
   sessionUser = { id: 'u-1', isAdmin: true }
 })
 
-describe('the gate on the destructive levers', () => {
+describe('the gate on the destructive lever', () => {
   const CALLS: [string, () => Promise<Response>][] = [
     ['pack GET', () => packCount()],
     ['pack POST', () => pack()],
-    ['backfill POST', () => nullDecoded()],
   ]
 
   it('refuses each of them without a session', async () => {
     sessionUser = null
     for (const [name, call] of CALLS) expect((await call()).status, name).toBe(401)
     expect(packOuraRawBuckets).not.toHaveBeenCalled()
-    expect(nullHistoricalDecoded).not.toHaveBeenCalled()
   })
 
   it('ignores a stale isAdmin claim on a route that DELETES', async () => {
@@ -86,7 +77,6 @@ describe('the gate on the destructive levers', () => {
     getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of CALLS) expect((await call()).status, name).toBe(403)
     expect(packOuraRawBuckets).not.toHaveBeenCalled()
-    expect(nullHistoricalDecoded).not.toHaveBeenCalled()
   })
 
   it('answers 503 when the admin check itself could not run (Q-548)', async () => {
@@ -95,7 +85,6 @@ describe('the gate on the destructive levers', () => {
     // The direction that matters: an outage must not let a destructive run through, and must not
     // read as a refusal either.
     expect(packOuraRawBuckets).not.toHaveBeenCalled()
-    expect(nullHistoricalDecoded).not.toHaveBeenCalled()
   })
 })
 
@@ -175,57 +164,5 @@ describe('POST /api/oura-ble/samples/pack', () => {
     expect(countPackableBuckets).toHaveBeenCalledWith('u-1')
     expect(rateLimit).not.toHaveBeenCalled()
     expect(packOuraRawBuckets).not.toHaveBeenCalled()
-  })
-})
-
-describe('POST /api/oura-ble/samples/backfill-null-decoded', () => {
-  it('clears the whole backlog by default, letting the repository choose its own batch size', async () => {
-    // `undefined`, not a number: the default lives in the repository, which batches at 500 rows per
-    // UPDATE so no single statement risks the pool's statement_timeout. A default invented here
-    // would silently override that.
-    await nullDecoded()
-    expect(nullHistoricalDecoded).toHaveBeenCalledWith('u-1', undefined)
-  })
-
-  it('accepts a positive row cap and refuses to invent one from anything else', async () => {
-    for (const [maxRows, expected] of [
-      [1000, 1000], [2_000_000, 1_000_000],
-      [0, undefined], [-5, undefined], [NaN, undefined], ['500', undefined], [null, undefined],
-    ] as [unknown, number | undefined][]) {
-      nullHistoricalDecoded.mockClear()
-      await nullDecoded({ maxRows })
-      expect(nullHistoricalDecoded.mock.calls[0][1], String(maxRows)).toBe(expected)
-    }
-  })
-
-  it('reports what it nulled and what is left', async () => {
-    nullHistoricalDecoded.mockResolvedValue({ nulled: 500, remaining: 12_000 })
-    expect(await (await nullDecoded()).json()).toEqual({ nulled: 500, remaining: 12_000 })
-  })
-
-  it('is limited more tightly than pack, because it is a full-table pass', async () => {
-    await nullDecoded()
-    expect(rateLimit).toHaveBeenCalledWith('oura-ble-backfill-null-decoded:u-1', 4, 60_000)
-
-    nullHistoricalDecoded.mockClear()
-    rateLimit.mockReturnValue(false)
-    expect((await nullDecoded()).status).toBe(429)
-    expect(nullHistoricalDecoded).not.toHaveBeenCalled()
-  })
-
-  it('reaches exactly one repository method — the one that leaves body_hex alone', async () => {
-    // The strongest thing a mocked test can say about the archival rule: this route calls
-    // `nullHistoricalDecoded` and nothing else. It cannot prove the SQL leaves `body_hex` alone —
-    // that lives in the repository slice — but it does prove the route asks for nothing further,
-    // so a future edit that added a delete beside it fails here.
-    await nullDecoded({ maxRows: 100 })
-    expect(nullHistoricalDecoded).toHaveBeenCalledTimes(1)
-    expect(packOuraRawBuckets).not.toHaveBeenCalled()
-    expect(countPackableBuckets).not.toHaveBeenCalled()
-  })
-
-  it('413s an oversized body rather than reading it', async () => {
-    expect((await nullDecoded({ maxRows: 10, pad: 'x'.repeat(5 * 1024) })).status).toBe(413)
-    expect(nullHistoricalDecoded).not.toHaveBeenCalled()
   })
 })

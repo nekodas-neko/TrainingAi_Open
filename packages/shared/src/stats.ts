@@ -45,12 +45,10 @@ export function iqrBand(values: number[], multiplier: number): { median: number;
  * The LOWER of the two middle values on an even count — `torch.median`'s definition, and an
  * actually-observed value rather than one invented between two. Empty → null.
  *
- * Not a lesser `median`, and not a copy that drifted: three callers want exactly this and each
+ * Not a lesser `median`, and not a copy that drifted: callers want exactly this and each
  * has a reason (LA-151). `lib/oura-models/daily-baselines.ts` and `lib/oura-models/cumulative-stress.ts`
  * mirror an external model whose goldens pin it — 46.923 over 14 symmetric values only comes out
- * of the lower middle. `/api/oura-ble/step-counter-export` is a diagnostic console reading back
- * decoded stride frequencies, where averaging [1, 2, 3, 4] into 2.5 Hz reports a cadence the ring
- * never produced.
+ * of the lower middle. (A third, the step-counter export console, was retired in #2862.)
  *
  * **Use `median` unless you can say which of those two reasons applies.** Where the number is a
  * summary rather than an observation, the average of the middles is the one you want.
