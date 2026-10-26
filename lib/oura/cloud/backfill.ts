@@ -49,6 +49,12 @@ export interface OuraBackfillOptions {
    * or `session` delete event. The daily reconcile sets it.
    */
   tombstoneAbsent?: boolean
+  /**
+   * #2861: stamp `last_data_at` when documents or heart-rate points land. Default true. The daily
+   * reconcile and the admin backfill pass false: they re-read days already stored, so what they
+   * return is not new data from the ring and must not make a stale ring look fresh.
+   */
+  stampData?: boolean
 }
 
 export interface OuraBackfillReport {
@@ -218,7 +224,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   const writes = mapOuraDocuments(docs)
   report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes, deps.rescore, deps.stillRhr)
   // #2861: documents that landed count as data received; an empty read does not.
-  if (!opts.dryRun && docs.length > 0) await stampOuraData(deps.repo, userId)
+  if (!opts.dryRun && opts.stampData !== false && docs.length > 0) await stampOuraData(deps.repo, userId)
   if (opts.tombstoneAbsent && !opts.dryRun) {
     for (const { type, ...range } of readWhole) {
       if (type === 'workout') report.workoutsTombstoned += await deps.repo.tombstoneOuraWorkoutsAbsent(userId, range)
@@ -238,7 +244,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
         if (!opts.dryRun && points.length > 0) {
           const write = await deps.repo.upsertOuraCloudHeartrate(userId, points, opts.tz)
           written = write.offered
-          if (written > 0) await stampOuraData(deps.repo, userId)
+          if (written > 0 && opts.stampData !== false) await stampOuraData(deps.repo, userId)
           await reattributeAfterHeartRate(deps.workoutHr, userId, write, opts.tz, 'backfill-heartrate:workouts')
           await refreshStillRhrAfterHeartRate(deps.stillRhr, userId, write, opts.tz)
         }
