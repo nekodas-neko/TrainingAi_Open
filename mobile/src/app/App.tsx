@@ -57,6 +57,7 @@ import { WalkScreen } from '../features/activities/screens/WalkScreen';
 import { BaselinesScreen } from '../features/activities/screens/BaselinesScreen';
 import { CardioScreen } from '../features/activities/screens/CardioScreen';
 import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
+import { WeighInBanner } from '../features/devices/components/WeighInBanner';
 import { AlertNavigation } from '../features/platform/components/AlertNavigation';
 import {
   WorkoutStatusAccountGuard,
@@ -547,6 +548,7 @@ function AppShell() {
       />
       <WorkoutStatusSync onWorkout={openWorkout} onWorkoutTab={() => selectTab('Workout')} />
       {!fullScreen && <TabBar selected={tab} onSelect={selectTab} />}
+      <WeighInBanner />
     </SafeAreaView>
   );
 }
