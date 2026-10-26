@@ -25,6 +25,8 @@ export type ScoreChipModel = {
   value: number | null;
   /** Shown instead of the rounded value: the night's hours when there is no sleep score. */
   display?: string;
+  /** What the figure counts when it is not a score: the heart chip is a bpm reading. */
+  unit?: string;
   /** Drawn with Home's info mark: the score rests on limited data. */
   qualified: boolean;
 };
@@ -50,6 +52,7 @@ export function homeScoreChips(
       label: resting ? 'Resting HR' : 'Heart Rate',
       shortLabel: resting ? 'Rest HR' : 'HR',
       value: data?.restingHrLastNight ?? data?.restingHr ?? data?.hrCurrent ?? null,
+      unit: 'bpm',
       qualified: false,
     },
     {

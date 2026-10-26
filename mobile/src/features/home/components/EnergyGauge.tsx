@@ -21,8 +21,6 @@ import {
   waterPath,
 } from '../data/energy-hero';
 
-const TRACK = 'rgba(255,255,255,0.11)';
-
 /**
  * Energy's gauge (#2989): the dial (D1) over the wallpaper, the tide (R1) when the wallpaper is
  * off. Same arc in both: the live level in the theme accent, the stretch it has fallen since the
@@ -50,6 +48,9 @@ export function EnergyGauge({
   const center = size / 2;
   const radius = center - stroke / 2 - gaugeMargin(size);
   const brand = theme.colors.brand;
+  // The dark mockups draw the track as white at 11%; light uses the theme's own track.
+  const trackColor = theme.mode === 'dark' ? 'rgba(255,255,255,0.11)' : theme.colors.track;
+  const mark = theme.colors.text;
   const track = arcPath(arc, center, radius, 0, 100);
   const fill = level === null ? null : arcPath(arc, center, radius, 0, level);
   const spent =
@@ -75,7 +76,7 @@ export function EnergyGauge({
         {track && (
           <Path
             d={track}
-            stroke={TRACK}
+            stroke={trackColor}
             strokeWidth={stroke}
             strokeLinecap="round"
             fill="none"
@@ -100,7 +101,7 @@ export function EnergyGauge({
             y1={bar.from.y}
             x2={bar.to.x}
             y2={bar.to.y}
-            stroke="#fff"
+            stroke={mark}
             strokeWidth={2.5}
             strokeLinecap="round"
           />
@@ -143,7 +144,7 @@ export function EnergyGauge({
                   y1={levelY(morning)}
                   x2={size}
                   y2={levelY(morning)}
-                  stroke="#fff"
+                  stroke={mark}
                   strokeWidth={2}
                   strokeDasharray="3 4"
                   strokeLinecap="round"

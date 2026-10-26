@@ -10,6 +10,7 @@ import {
   notch,
   polar,
 } from '../src/features/home/data/energy-hero.ts';
+import { homeScoreChips } from '../src/features/home/data/score-chips.ts';
 
 const battery = (over: Partial<Parameters<typeof energyHero>[0] & object> = {}) => ({
   hasData: true,
@@ -116,4 +117,10 @@ test('a full tide ring is drawn as an arc that stops just short of closing', () 
   assert.ok(path);
   const top = polar(108, 94, -90);
   assert.ok(path.startsWith(`M ${top.x} ${top.y}`));
+});
+
+test('the heart chip carries its unit so a bpm figure never reads as a score', () => {
+  const chips = homeScoreChips({ restingHr: 54 }, [], '2026-10-26');
+  assert.equal(chips.find((chip) => chip.key === 'heart')?.unit, 'bpm');
+  assert.equal(chips.find((chip) => chip.key === 'sleep')?.unit, undefined);
 });
