@@ -31,7 +31,7 @@ describe('Oura Cloud heart rate: zone minutes from dense stretches, moved hours 
     const start = at(0).getTime()
     return {
       startTimestampMs: start,
-      metsPerMinute: Array.from({ length: 24 * 60 }, (_, i) => {
+      metsPerMinute: Array.from<unknown, number | null>({ length: 24 * 60 }, (_, i) => {
         const h = Math.floor(i / 60)
         if (h < wornFrom || h >= wornTo) return null
         return movedHours.includes(h) ? 2.0 : 1.0
