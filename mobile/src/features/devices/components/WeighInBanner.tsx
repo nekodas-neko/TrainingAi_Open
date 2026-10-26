@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, Icon } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { useAccountContext } from '../../account/AccountProvider';
 import { useScale, useScaleHold } from '../scale/ScaleProvider';
 import { loggedBannerText, weighingBannerText } from '../scale/labels';
 
@@ -13,10 +15,13 @@ const LOGGED_MS = 4_000;
 // logged". Pending, declined and failed weigh-ins are answered on the Devices screen. Nothing is
 // captured with the app closed.
 export function WeighInBanner() {
-  useScaleHold('app');
+  // Signed out there is no outbox: a held link would request stored readings and drop them.
+  const { dataReader } = useAccountContext();
+  useScaleHold('app', dataReader !== null);
   const { state } = useScale();
   const { theme } = useTheme();
-  const [logged, setLogged] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
+  const [logged, setLogged] = useState<{ title: string; description?: string } | null>(null);
   const result = state.result;
   useEffect(() => {
     const text = loggedBannerText(result);
@@ -25,7 +30,9 @@ export function WeighInBanner() {
     const timer = setTimeout(() => setLogged(null), LOGGED_MS);
     return () => clearTimeout(timer);
   }, [result]);
-  const text = weighingBannerText(state) ?? logged;
+  const weighing = weighingBannerText(state);
+  const text = weighing ?? logged?.title ?? null;
+  const description = weighing ? undefined : logged?.description;
   if (!text) return null;
   return (
     <View
@@ -33,7 +40,7 @@ export function WeighInBanner() {
       accessibilityLiveRegion="polite"
       style={{
         position: 'absolute',
-        top: theme.spacing.sm,
+        top: insets.top + theme.spacing.sm,
         left: theme.spacing.lg,
         right: theme.spacing.lg,
         zIndex: 10,
@@ -49,9 +56,10 @@ export function WeighInBanner() {
       }}
     >
       <Icon name="scale" tone="brand" />
-      <AppText variant="label" style={{ flex: 1 }}>
-        {text}
-      </AppText>
+      <View style={{ flex: 1 }}>
+        <AppText variant="label">{text}</AppText>
+        {description ? <AppText variant="caption" tone="muted">{description}</AppText> : null}
+      </View>
     </View>
   );
 }

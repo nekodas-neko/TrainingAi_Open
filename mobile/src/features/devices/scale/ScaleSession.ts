@@ -177,7 +177,8 @@ export class ScaleSession {
   setOutbox(outbox: ScaleOutbox | null) {
     if (outbox === this.outbox) return;
     this.outbox = outbox;
-    this.publish({ queued: outbox?.pending() ?? 0 });
+    // `result` is device-scoped; a new account must not inherit the last weigh-in's banner.
+    this.publish({ queued: outbox?.pending() ?? 0, result: null });
     void outbox?.sync().then(() => this.publish({ queued: outbox.pending() }));
   }
 

@@ -103,10 +103,10 @@ export function weighingBannerText(state: ScaleState): string | null {
 }
 
 /** The banner's words once a weigh-in is filed; null for outcomes that are answered on the Devices screen. */
-export function loggedBannerText(result: WeighResult | null): string | null {
-  return result?.kind === 'logged' || result?.kind === 'skipped'
-    ? `${formatKg(result.weightKg)} logged`
-    : null;
+export function loggedBannerText(
+  result: WeighResult | null,
+): { title: string; description?: string } | null {
+  return result?.kind === 'logged' || result?.kind === 'skipped' ? resultText(result) : null;
 }
 
 /** One line on the scale's link, as the pairing card words it. */
@@ -125,6 +125,6 @@ export function scaleLinkLabel(state: ScaleState): string {
     case 'radioOff':
       return 'Bluetooth is off';
     default:
-      return 'Not connected — it connects while this screen is open';
+      return 'Not connected — it connects while Preview is open';
   }
 }

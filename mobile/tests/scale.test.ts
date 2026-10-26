@@ -765,15 +765,32 @@ test('the banner words match the current app: weighing with the reading, then th
     'Weighing you… 65.2 kg',
   );
   assert.equal(weighingBannerText({ phase: 'connected', weightKg: null } as never), null);
+  assert.deepEqual(loggedBannerText({ kind: 'logged', weightKg: 65.2, additional: false }), {
+    title: '65.2 kg logged',
+    description: undefined,
+  });
   assert.equal(
-    loggedBannerText({ kind: 'logged', weightKg: 65.2, additional: false }),
-    '65.2 kg logged',
+    loggedBannerText({ kind: 'logged', weightKg: 65.2, additional: true })?.description,
+    'Additional reading today',
   );
-  assert.equal(
-    loggedBannerText({ kind: 'skipped', weightKg: 65.2, reason: 'impedance' }),
-    '65.2 kg logged',
-  );
+  assert.deepEqual(loggedBannerText({ kind: 'skipped', weightKg: 65.2, reason: 'impedance' }), {
+    title: '65.2 kg logged',
+    description: 'Body composition skipped — stand barefoot on the plates',
+  });
   assert.equal(loggedBannerText({ kind: 'pending', weightKg: 90 }), null);
   assert.equal(loggedBannerText({ kind: 'failed' }), null);
   assert.equal(loggedBannerText(null), null);
+});
+
+test('switching account clears the last weigh-in result so the new banner does not show it', async () => {
+  const { session, outbox, ble } = await pairedSession();
+  session.hold('app', true);
+  ble.see();
+  await settle();
+  ble.notify(FINAL);
+  await settle();
+  await settle();
+  assert.equal(session.getSnapshot().result?.kind, 'logged');
+  session.setOutbox(outbox('u2'));
+  assert.equal(session.getSnapshot().result, null, 'u2 does not inherit u1’s result');
 });
