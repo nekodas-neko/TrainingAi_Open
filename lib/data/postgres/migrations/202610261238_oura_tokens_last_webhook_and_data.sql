@@ -3,8 +3,9 @@
 -- Nothing stores this today. `oura_tokens.updated_at` moves on a token refresh, not on data, and
 -- the document tables' `updated_at` cannot tell a webhook from a backfill. Two columns, both
 -- written server-side and read by `GET /api/oura/connection`:
---   - `last_webhook_at`: the last verified webhook event that resolved to this user, whatever its
---     data type (an ignored type still proves the subscription is delivering).
+--   - `last_webhook_at`: the last verified webhook event for a data type we store that resolved to
+--     this user, whatever came of it (a document Oura no longer has still proves the subscription is
+--     delivering).
 --   - `last_data_at`: the last time an Oura document or heart-rate batch was written for this
 --     user, from a webhook, a backfill or the daily reconciliation.
 -- Both are NULL for every existing row, which the screens read as "nothing received yet".
