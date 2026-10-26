@@ -44,6 +44,7 @@ const repoStub = () => ({
     getActiveProgram:         async () => repo.program,
     getHrForWindow:           async () => [],
     getObservedHrProfile: async () => computeObservedHr([]),
+    listFitnessTests:        async () => [],
     getOuraDailySummary:      async () => [],
     getOuraDailyDerived:      async () => [],
     getLatestOuraCloudVitals: async () => null,
