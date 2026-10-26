@@ -221,12 +221,17 @@ export class HealthStore {
       field === 'bodyFat' ? { bodyFatPct: payload.bodyFat } : payload,
     );
   }
-  async addWater(ml: number, date: string) {
+  /**
+   * `id` is for a log that may be applied twice (a home-screen widget tap read again after a
+   * crash): a change already holding that id is not added again.
+   */
+  async addWater(ml: number, date: string, id?: string) {
     const delta = validWaterMlDeltaOrNull(ml);
     if (delta === null) {
       throw new Error('Enter an amount greater than 0 and up to 5,000 ml.');
     }
-    await this.enqueue('body_metrics', date, { waterMlDelta: delta });
+    if (id && this.current.operations.some((operation) => operation.id === id)) return;
+    await this.enqueue('body_metrics', date, { waterMlDelta: delta }, undefined, id);
   }
   async saveNight(sleepStart: string, sleepEnd: string, timezone: string, id?: string) {
     const input = { id: id ?? this.uuid(), sleepStart, sleepEnd };
@@ -318,12 +323,13 @@ export class HealthStore {
     date: string,
     payload: Record<string, unknown>,
     response?: 'acknowledged' | 'corrected',
+    id?: string,
   ) {
     if (this.canceled || !this.current.ready || this.current.denied) {
       throw new Error('Check your account before logging health records.');
     }
     const change = operationSchema.parse({
-      id: this.uuid(),
+      id: id ?? this.uuid(),
       domain,
       date,
       payload,
