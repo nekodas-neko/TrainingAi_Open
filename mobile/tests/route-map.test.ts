@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { encodeRoute, decodeRoute } from '@trainingai/shared/activity/route-encoding';
 import { estimateDistanceKmAtTime, pointAtDistanceKm } from '@trainingai/shared/activity/scrub';
 import { routeFrame, tilesFor } from '../src/features/activities/data/route-shape.ts';
-import { tileFileName, tileUrl } from '../src/features/activities/data/map-tiles.ts';
+import { isPng, tileFileName, tileUrl } from '../src/features/activities/data/map-tiles.ts';
 import { activityHistorySpec } from '../src/features/health/data/models.ts';
 
 // A 1 km out-and-back loop in Brisbane: east along a street, north, then back west.
@@ -88,4 +88,11 @@ test('map tiles cover the box and line up with the drawn route', () => {
 test('a route with no extent asks for no tiles', () => {
   const still = routeFrame([loop[0], loop[0]], 300, 200, 20)!;
   assert.deepEqual(tilesFor(still, 300, 200), []);
+});
+
+test('a tile is kept only if it starts with the PNG signature', () => {
+  assert.equal(isPng(Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0])), true);
+  assert.equal(isPng(new TextEncoder().encode('<html>Sign in to the Wi-Fi</html>')), false);
+  assert.equal(isPng(new Uint8Array(0)), false);
+  assert.equal(isPng(Uint8Array.from([0x89, 0x50, 0x4e])), false);
 });
