@@ -96,12 +96,24 @@ describe('illnessFromSummaries', () => {
   }
 
   it('flags fever when tonight\'s skin temp is +3σ over baseline (mature history)', () => {
-    // 35.6 °C → z = (3560 − 3500) / 20 = 3.0 ≥ FEVER_TEMP_Z.
-    const current: IllnessSummaryInput = { ...prior, tempMeanC: 35.6, nHistory: 21 }
+    // The dev of 20 is a mean absolute deviation, so σ = 20·√(π/2) ≈ 25.07 (#2158).
+    // 35.76 °C → z = (3576 − 3500) / 25.07 = 3.03 ≥ FEVER_TEMP_Z.
+    const current: IllnessSummaryInput = { ...prior, tempMeanC: 35.76, nHistory: 21 }
     const r = illnessFromSummaries(prior, current)
     expect(r.flag).toBe('fever')
     expect(r.readinessSuppression).toBe(READINESS_SUPPRESSION.fever)
-    expect(r.biomarkers.temperature?.z).toBe(3)
+    expect(r.biomarkers.temperature?.z).toBe(3.03)
+  })
+
+  it('reads its z thresholds in standard deviations: three mean absolute deviations is no longer a fever', () => {
+    // #2158. 35.6 °C is 60 centi-°C over the mean, three times the dev. Under the old rule that read
+    // z = 3.0 and flagged fever; in standard deviations it is 2.39, under FEVER_TEMP_Z = 2.5.
+    const current: IllnessSummaryInput = { ...prior, tempMeanC: 35.6, nHistory: 21 }
+    const r = illnessFromSummaries(prior, current)
+    expect(r.biomarkers.temperature?.z).toBe(2.39)
+    expect(r.flag).not.toBe('fever')
+    // 2.5σ over the mean, the threshold itself, is a fever: 3500 + 2.5 × 25.07 = 3562.7 → 35.63 °C.
+    expect(illnessFromSummaries(prior, { ...prior, tempMeanC: 35.63, nHistory: 21 }).flag).toBe('fever')
   })
 
   it('stays "learning" on the same deviation before the baseline matures', () => {
@@ -119,7 +131,7 @@ describe('illnessFromSummaries', () => {
     const p: IllnessSummaryInput = { ...prior, breathBaseline: { meanX8: 1160, devX8: 40 }, breathAvgRpm: 14.5 }
     const current: IllnessSummaryInput = { ...p, breathAvgRpm: 16.0, nHistory: 21 }
     const r = illnessFromSummaries(p, current)
-    expect(r.biomarkers.breathing?.z).toBe(3) // (160 − 145) / 5
+    expect(r.biomarkers.breathing?.z).toBe(2.39) // (160 − 145) / (5 × √(π/2))
   })
 })
 

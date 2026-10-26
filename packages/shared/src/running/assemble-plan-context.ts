@@ -10,7 +10,8 @@ import { computeVolumeAcwr, computeMonotonyStrain, acwrBaselineDaysRemaining } f
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
 import { isLowerBodyMuscle } from '@trainingai/shared/running/lower-body'
 import { isPushSession, inferEnvironment } from '@trainingai/shared/running/push-sessions'
-import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
+import { liveReadinessForDay, isOwnReadinessSource } from '@trainingai/shared/health/live-readiness'
+import { BASELINE_MIN_NIGHTS, storedReadinessLearning } from '@trainingai/shared/health/readiness-composite'
 import { meanRestingHr, restingHrWindow } from '@trainingai/shared/health/resting-hr-mean'
 import { prescribeNextRun } from '@trainingai/shared/running/prescription'
 import { weekIndexSince } from '@trainingai/shared/running/week-index'
@@ -49,7 +50,14 @@ export async function assembleInputs(
   // "Provisional" means the baseline is genuinely still LEARNING (a summary row exists but n_history
   // is immature) — NOT that today's summary is simply absent (rollup not run yet). Absent data must
   // degrade to neutral, not silently soften the run (E2-8).
-  const readinessProvisional = summaries.length > 0 && (summaries[0]?.nHistory ?? 0) < 14
+  //
+  // #3169: learning is read from our stored composite's own contributors, as training stress does
+  // (#2992), so an Oura Cloud day (no ring summary) is judged on its own normals. A row that cannot
+  // say keeps the ring-summary rule.
+  const today = derivedRows.find(r => r.day === todayIso)
+  const readinessProvisional =
+    (isOwnReadinessSource(today?.readinessSource) ? storedReadinessLearning(today?.readinessContributors) : null) ??
+    (summaries.length > 0 && (summaries[0]?.nHistory ?? 0) < BASELINE_MIN_NIGHTS)
 
   // Concurrent-training interference: most recent heavy lower-body strength session.
   let hoursSinceLowerBodyStrength: number | null = null

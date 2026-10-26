@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.499.0",
+    date: "2026-10-26",
+    changes: [
+      "Behind the scenes: the database gets room to record when Oura revises a night, a daytime resting heart rate, sessions deleted in the Oura app, whether a workout's heart rate was dense enough to trust, and why a workout was deleted. Nothing you see changes until the next release uses them.",
+    ],
+  },
+  {
     version: "1.498.0",
     date: "2026-10-25",
     changes: [

@@ -560,8 +560,11 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
     expect(del.processed).toBe(1)
     expect(del.errors).toHaveLength(0)
 
-    const row = await pool.query(`SELECT deleted_at FROM activity_logs WHERE id = $1`, [id])
+    // #3309. A delete from either app's outbox is the owner's, so a Health Connect id coming back
+    // must not undo it.
+    const row = await pool.query(`SELECT deleted_at, deleted_reason FROM activity_logs WHERE id = $1`, [id])
     expect(row.rows[0].deleted_at).not.toBeNull()
+    expect(row.rows[0].deleted_reason).toBe('app')
 
     await pool.query(`DELETE FROM activity_logs WHERE id = $1`, [id])
   })
