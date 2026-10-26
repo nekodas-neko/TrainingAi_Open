@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { resolveOwnerUserId, sameUserId, isOwnerUserId } from '@/lib/admin-owner'
+import { resolveOwnerUserId, sameUserId, isOwnerUserId, judgeProtectedTarget } from '@/lib/admin-owner'
 
 // #3368 — the owner protection must not switch off quietly. A well-formed uuid is not enough: it
 // has to name an active admin, otherwise the rule protects nobody and nothing says so.
@@ -36,5 +36,20 @@ describe('id comparison', () => {
     expect(sameUserId(OWNER.toUpperCase(), OWNER)).toBe(true)
     expect(isOwnerUserId(` ${OWNER.toUpperCase()} `, OWNER)).toBe(true)
     expect(sameUserId(OWNER, '00000000-0000-4000-8000-000000000001')).toBe(false)
+  })
+})
+
+describe('judgeProtectedTarget', () => {
+  const OTHER = '00000000-0000-4000-8000-000000000002'
+  it('keeps protecting the named owner after they stop qualifying (demoted, so ownerId is null)', () => {
+    expect(judgeProtectedTarget(OTHER, OWNER, false, null, env(OWNER))).toBe('owner-protected')
+    expect(judgeProtectedTarget(OTHER, OWNER.toUpperCase(), false, null, env(OWNER))).toBe('owner-protected')
+  })
+  it('lets the verified owner act on their own account', () => {
+    expect(judgeProtectedTarget(OWNER, OWNER, true, OWNER, env(OWNER))).toBeNull()
+  })
+  it('refuses any admin target when nothing is configured, and allows a non-admin', () => {
+    expect(judgeProtectedTarget(OTHER, '00000000-0000-4000-8000-000000000003', true, null, {} as NodeJS.ProcessEnv)).toBe('owner-unresolved')
+    expect(judgeProtectedTarget(OTHER, '00000000-0000-4000-8000-000000000003', false, null, {} as NodeJS.ProcessEnv)).toBeNull()
   })
 })

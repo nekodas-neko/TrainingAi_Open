@@ -134,6 +134,14 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
     expect(await isAdmin(OTHER)).toBe(true)
   })
 
+  it('a demoted owner is still protected: another admin cannot deactivate them', async () => {
+    await pool.query('UPDATE users SET is_admin = false WHERE id = $1', [OWNER])
+    const { PATCH } = await import('@/app/api/admin/users/route')
+    expect((await PATCH(patch({ userId: OWNER, action: 'deactivate' }) as never)).status).toBe(403)
+    const stillActive = (await pool.query<{ is_active: boolean }>('SELECT is_active FROM users WHERE id = $1', [OWNER])).rows[0]?.is_active
+    expect(stillActive).toBe(true)
+  })
+
   it('an upper-case copy of your own id is still you: no self deactivation or self revoke', async () => {
     asUser(OWNER)
     const { PATCH } = await import('@/app/api/admin/users/route')

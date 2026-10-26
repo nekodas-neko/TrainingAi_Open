@@ -73,7 +73,13 @@ export function judgeRevokeAdmin(actingId: string, ownerId: string | null): Owne
  */
 export function judgeProtectedTarget(
   actingId: string, targetId: string, targetIsAdmin: boolean, ownerId: string | null,
-): OwnerRefusal | null {
+  env: NodeJS.ProcessEnv = process.env,
+): Exclude<OwnerRefusal, 'owner-only'> | null {
+  // The account the settings name stays protected even when it no longer qualifies as the owner
+  // (its admin flag was stripped, or it was deactivated): *authority* needs a verified owner, but
+  // *protection* must not lapse the moment the owner is demoted, or demote-then-wipe works.
+  const configured = parseConfiguredOwnerId(env)
+  if (configured && isOwnerUserId(targetId, configured) && !isOwnerUserId(actingId, ownerId)) return 'owner-protected'
   if (ownerId === null) return targetIsAdmin ? 'owner-unresolved' : null
   if (isOwnerUserId(targetId, ownerId) && !isOwnerUserId(actingId, ownerId)) return 'owner-protected'
   return null
