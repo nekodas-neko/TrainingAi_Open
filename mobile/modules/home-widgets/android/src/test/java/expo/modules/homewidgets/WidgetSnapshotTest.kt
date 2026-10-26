@@ -1,5 +1,8 @@
 package expo.modules.homewidgets
 
+import java.time.Instant
+import java.time.ZoneId
+import java.util.TimeZone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -104,5 +107,35 @@ class WidgetSnapshotTest {
     val snapshot = WidgetSnapshot.parse(json)!!
     assertFalse(WidgetSnapshot.isStale(snapshot, "2026-10-23"))
     assertTrue(WidgetSnapshot.isStale(snapshot, "2026-10-24"))
+  }
+
+  private val tokyoNoon = Instant.parse("2026-10-23T03:00:00Z") // 12:00 on the 23rd in Tokyo, 20:00 on the 22nd in Los Angeles
+
+  @Test fun `the zone is the profile's, not the phone's`() {
+    val snapshot = WidgetSnapshot.parse(json.replace("\"date\":\"2026-10-23\"", "\"date\":\"2026-10-23\",\"tz\":\"Asia/Tokyo\""))!!
+    assertEquals(ZoneId.of("Asia/Tokyo"), WidgetSnapshot.zoneOf(snapshot))
+    val previous = TimeZone.getDefault()
+    TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"))
+    try {
+      assertEquals("2026-10-23", WidgetSnapshot.today(snapshot, tokyoNoon))
+      assertFalse(WidgetSnapshot.isStale(snapshot, WidgetSnapshot.today(snapshot, tokyoNoon)))
+    } finally {
+      TimeZone.setDefault(previous)
+    }
+  }
+
+  @Test fun `a snapshot with no zone, or one the phone does not know, falls back to the phone's zone`() {
+    val previous = TimeZone.getDefault()
+    TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"))
+    try {
+      val older = WidgetSnapshot.parse(json)!!
+      assertNull(older.tz)
+      assertEquals("2026-10-22", WidgetSnapshot.today(older, tokyoNoon))
+      val unknown = WidgetSnapshot.parse(json.replace("\"date\":\"2026-10-23\"", "\"date\":\"2026-10-23\",\"tz\":\"Mars/Olympus\""))!!
+      assertEquals("2026-10-22", WidgetSnapshot.today(unknown, tokyoNoon))
+      assertEquals("2026-10-22", WidgetSnapshot.today(null, tokyoNoon))
+    } finally {
+      TimeZone.setDefault(previous)
+    }
   }
 }

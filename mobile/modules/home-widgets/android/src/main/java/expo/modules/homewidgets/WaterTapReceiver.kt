@@ -23,7 +23,7 @@ class WaterTapReceiver : BroadcastReceiver() {
         id = UUID.randomUUID().toString(),
         ml = tapMl,
         at = System.currentTimeMillis(),
-        date = WidgetRender.localToday(),
+        date = WidgetSnapshot.today(snapshot),
         user = snapshot.user,
       ),
     )

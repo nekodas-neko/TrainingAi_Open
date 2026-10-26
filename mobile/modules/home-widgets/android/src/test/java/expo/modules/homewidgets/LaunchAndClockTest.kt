@@ -3,6 +3,7 @@ package expo.modules.homewidgets
 import java.time.LocalDateTime
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -47,5 +48,13 @@ class MidnightClockTest {
     assertEquals(millis(LocalDateTime.of(2026, 10, 4, 0, 1), sydney), MidnightClock.nextMillis(before, sydney))
     val during = millis(LocalDateTime.of(2026, 10, 4, 12, 0), sydney)
     assertEquals(millis(LocalDateTime.of(2026, 10, 5, 0, 1), sydney), MidnightClock.nextMillis(during, sydney))
+  }
+
+  @Test fun `the next midnight is the profile's, whichever zone the phone is in`() {
+    val tokyo = ZoneId.of("Asia/Tokyo")
+    val losAngeles = ZoneId.of("America/Los_Angeles")
+    val now = millis(LocalDateTime.of(2026, 10, 23, 23, 30), tokyo)
+    assertEquals(millis(LocalDateTime.of(2026, 10, 24, 0, 1), tokyo), MidnightClock.nextMillis(now, tokyo))
+    assertNotEquals(MidnightClock.nextMillis(now, losAngeles), MidnightClock.nextMillis(now, tokyo))
   }
 }

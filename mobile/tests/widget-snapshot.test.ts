@@ -120,6 +120,7 @@ test('the snapshot is version 1 and carries every value already formatted', () =
   assert.equal(snapshot.v, 1);
   assert.equal(snapshot.user, 'user-one');
   assert.equal(snapshot.date, today);
+  assert.equal(snapshot.tz, 'Australia/Sydney', "the widget judges today in the profile's zone, so the snapshot names it");
   assert.equal(snapshot.updated, 'Updated 7:42 am');
   assert.deepEqual(snapshot.today.scores.map((s) => [s.label, s.value]), [['Readiness', '78'], ['Resting HR', '52'], ['Sleep', '84'], ['Activity', '61']]);
   assert.deepEqual(snapshot.today.scores[0]!.color, { dark: '#60a5fa', light: '#2563eb' });
