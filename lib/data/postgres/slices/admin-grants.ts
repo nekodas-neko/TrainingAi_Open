@@ -19,6 +19,8 @@ export type SetAdminOutcome =
  * - **Only the owner removes admin** (`judgeRevokeAdmin`), judged here and not only in the route.
  *   `ownerId` is passed in by the caller so tests can pin it; null refuses every removal.
  * - **A grant needs an active target.** A deactivated or pending account is not made an admin.
+ * - **A no-op writes nothing**: granting someone who is already admin (yourself included) returns ok
+ *   without an update or an audit row.
  * - **The audit row is written in the same transaction** (`agent_action_log`, the shape the admin
  *   wipes use), so a change that cannot be recorded does not happen. No email is recorded.
  *
@@ -46,6 +48,10 @@ export async function setUserAdmin(
     } else if (!target.is_active) {
       return { ok: false, reason: 'inactive-target' } as const
     }
+
+    // Nothing to change (already in that state, or granting yourself): no write and no audit row, so
+    // the log records changes only. A refused call returned above, so this is a success.
+    if (target.is_admin === makeAdmin) return { ok: true } as const
 
     const changed = await tx.execute(sql`
       UPDATE users SET is_admin = ${makeAdmin} WHERE id = ${targetUserId} RETURNING id`)

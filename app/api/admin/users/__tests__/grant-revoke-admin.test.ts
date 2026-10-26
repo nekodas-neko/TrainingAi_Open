@@ -110,7 +110,8 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
     expect(res.status).toBe(403)
     // A broken setting says so, instead of telling the owner they are not the owner.
     expect((await res.json()).error).toMatch(/not configured/)
-    expect(warn.mock.calls.filter(c => String(c[0]).includes('no owner is configured'))).toHaveLength(1)
+    // One refusal, one warning: the owner lookup itself stays quiet.
+    expect(warn).toHaveBeenCalledTimes(1)
     warn.mockRestore()
     expect(await isAdmin(OTHER)).toBe(true)
   })
@@ -224,6 +225,20 @@ describe.skipIf(!canRun)('PATCH /api/admin/users grant-admin and revoke-admin', 
       { job: 'admin-grant-admin', actor: `admin:${ADMIN}`, target_user_id: OTHER, outcome: 'succeeded' },
       { job: 'admin-revoke-admin', actor: `admin:${OWNER}`, target_user_id: OTHER, outcome: 'succeeded' },
     ])
+  })
+
+  it('a grant that changes nothing (already admin, or yourself) succeeds without an audit row', async () => {
+    const { PATCH } = await import('@/app/api/admin/users/route')
+    const since = (await pool.query<{ now: Date }>('SELECT clock_timestamp() AS now')).rows[0].now
+    const audited = async () => (await pool.query(
+      `SELECT 1 FROM agent_action_log WHERE job IN ('admin-grant-admin','admin-revoke-admin')
+          AND target_user_id = ANY($1::uuid[]) AND started_at >= $2`, [[ADMIN, OWNER], since])).rows.length
+    // ADMIN is already admin and grants themself; OWNER is already admin and ADMIN grants them.
+    expect((await PATCH(patch({ userId: ADMIN, action: 'grant-admin' }) as never)).status).toBe(200)
+    expect((await PATCH(patch({ userId: OWNER, action: 'grant-admin' }) as never)).status).toBe(200)
+    expect(await isAdmin(ADMIN)).toBe(true)
+    expect(await isAdmin(OWNER)).toBe(true)
+    expect(await audited()).toBe(0)
   })
 
   it('429 once an admin exceeds the rate limit', async () => {
