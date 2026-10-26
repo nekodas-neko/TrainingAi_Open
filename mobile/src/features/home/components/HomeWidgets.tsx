@@ -523,7 +523,7 @@ function HomeWidgetBody({
                         {row.label}
                       </AppText>
                       <AppText variant="caption" style={{ fontWeight: '700' }}>
-                        {row.hours == null ? '—' : row.hours.toFixed(1) + 'h'}
+                        {row.hours == null ? '—' : formatHoursMinutes(row.hours * 60)}
                       </AppText>
                     </Stack>
                   ))}
