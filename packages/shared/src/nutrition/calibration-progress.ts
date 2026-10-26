@@ -40,3 +40,13 @@ export function calibrationProgress(
     detail: `days marked · ${remaining} more ${remaining === 1 ? 'day' : 'days'} to calibrate your maintenance`,
   }
 }
+
+/**
+ * The line under a marked day (#3068). The counter is the days already in the maintenance estimate,
+ * and the estimate for a day D is calibrated on the completed days before D, so the day just marked
+ * is never in the figure shown on its own screen. The line says when it will be: from tomorrow for
+ * today, from the day after for a past day (whose counter also stops short of it).
+ */
+export function markedDayNote(isToday: boolean): string {
+  return `This day counts toward your maintenance estimate from ${isToday ? 'tomorrow' : 'the day after'}`
+}
