@@ -1512,7 +1512,7 @@ export interface WorkoutRepository {
   /** #3087: tombstones workouts deleted in the Oura app; never a hard delete. Returns rows newly tombstoned. */
   tombstoneOuraWorkouts(userId: string, ids: string[]): Promise<number>
   /** #3087: tombstones the workouts on `from`..`to` that Oura's full list for those days no longer has. */
-  tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }): Promise<number>
+  tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean }): Promise<number>
   /** #2859: Oura Cloud's HR series (`oura_cloud`). Never displaces or duplicates a ring or strap row. */
   upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string): Promise<OuraCloudHeartrateWrite>
   /** #2982: Oura's sleep periods as sent (series, hypnograms, flags); read by no screen. Returns rows written. */
@@ -1528,7 +1528,7 @@ export interface WorkoutRepository {
   /** #3153: tombstones sessions deleted in the Oura app; never a hard delete. Returns rows newly tombstoned. */
   tombstoneOuraSessions(userId: string, ids: string[]): Promise<number>
   /** #3153: tombstones the sessions on `from`..`to` that Oura's full list for those days no longer has. */
-  tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }): Promise<number>
+  tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean }): Promise<number>
   /** #2895: the newest `oura_cloud` HR point at or after `since`; where the next Cloud HR read starts. */
   getLatestOuraCloudHeartrateAt(userId: string, since: Date): Promise<Date | null>
   /** #3069: the newest `oura_cloud` ring-battery reading at or after `since`; where the next Cloud read starts. */

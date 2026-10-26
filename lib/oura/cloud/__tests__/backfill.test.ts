@@ -24,8 +24,8 @@ const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout
 
 function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
   const calls: string[] = []
-  const absent: { from: string; to: string; keepIds: string[] }[] = []
-  const absentSessions: { from: string; to: string; keepIds: string[] }[] = []
+  const absent: { from: string; to: string; keepIds: string[]; dryRun?: boolean }[] = []
+  const absentSessions: { from: string; to: string; keepIds: string[]; dryRun?: boolean }[] = []
   const row: OuraCloudTokenRow | null = connected ? {
     userId: USER,
     accessToken: encryptOuraToken('acc', USER, 'access_token'),
@@ -450,15 +450,23 @@ describe('backfillOuraCloud tombstoneAbsent: workouts (#3087)', () => {
     expect(absent).toEqual([])
   })
 
-  it('tombstones nothing unless asked, and nothing on a dry run', async () => {
+  it('tombstones nothing unless asked', async () => {
     oura()
     const plain = fakeRepo()
     await backfillOuraCloud({ repo: plain.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false })
     expect(plain.absent).toEqual([])
+    const plainDry = fakeRepo()
+    await backfillOuraCloud({ repo: plainDry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true })
+    expect(plainDry.absent).toEqual([])
+  })
+
+  // #3389: the agent job's dry run reports what the write would tombstone, and the sweep is asked to count only.
+  it('on a dry run asks for a count only, and reports it as the would-be tombstones', async () => {
+    oura()
     const dry = fakeRepo()
     const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsent: true })
-    expect(dry.absent).toEqual([])
-    expect(out.ok && out.report.workoutsTombstoned).toBe(0)
+    expect(dry.absent).toEqual([{ from: '2026-10-08', to: '2026-10-09', keepIds: ['wo-1'], dryRun: true }])
+    expect(out.ok && out.report.workoutsTombstoned).toBe(1)
   })
 
   // A list that was not read whole says nothing about what Oura still has.
@@ -508,13 +516,13 @@ describe('backfillOuraCloud tombstoneAbsent: sessions (#3153)', () => {
     expect(out.ok && out.report.workoutsTombstoned).toBe(1)
   })
 
-  it('tombstones no session unless asked, on a dry run, or from a chunk not read whole', async () => {
+  it('tombstones no session unless asked, or from a chunk not read whole', async () => {
     oura()
     const plain = fakeRepo()
     await backfillOuraCloud({ repo: plain.repo, config: CONFIG }, USER, { ...RANGE, dryRun: false })
     expect(plain.absentSessions).toEqual([])
     const dry = fakeRepo()
-    const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsent: true })
+    const out = await backfillOuraCloud({ repo: dry.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true })
     expect(dry.absentSessions).toEqual([])
     expect(out.ok && out.report.sessionsTombstoned).toBe(0)
 
@@ -566,6 +574,15 @@ describe('backfillOuraCloud tombstoneAbsent: a 404 is not a whole read (#3153)',
       expect(swept(f)).toEqual([])
       // What the first page held is still written.
       expect(out.ok && out.report.documents[type]).toBe(1)
+    })
+
+    // #3389: the agent job's dry run takes the same guard, so a cut list never shows a count.
+    it(`a ${type} read that 404s tombstones nothing on a dry run either, and counts none`, async () => {
+      oura(path => (path === type ? notFound() : null))
+      const f = fakeRepo()
+      const out = await backfillOuraCloud({ repo: f.repo, config: CONFIG }, USER, { ...RANGE, dryRun: true, tombstoneAbsent: true })
+      expect(swept(f)).toEqual([])
+      expect(out.ok && (type === 'workout' ? out.report.workoutsTombstoned : out.report.sessionsTombstoned)).toBe(0)
     })
   }
 })
