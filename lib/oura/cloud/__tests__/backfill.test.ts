@@ -1,4 +1,5 @@
 // The history read (#2859) with Oura mocked at `fetch` and a fake repository: ranges, a dry run,
+import { shiftDateStr } from '@trainingai/shared/date-utils'
 // and how it stops. The Postgres half (idempotency, provenance) is
 // `lib/data/postgres/__tests__/oura-cloud-ingest-2859.test.ts`.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -445,6 +446,29 @@ describe('backfillOuraCloud tombstoneAbsent: workouts (#3087)', () => {
     const { repo, absent } = fakeRepo()
     await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, dryRun: false, tombstoneAbsent: true })
     expect(absent).toEqual([{ from: '2026-10-08', to: '2026-10-09', keepIds: [] }])
+  })
+
+  // #3429: the chunks used to meet end to end, and each swept [from, to-1], so the last day of every
+  // 30-day chunk was swept by nothing. Overlapped by a day, only the range's own last day is left.
+  it('sweeps every day of a range over 30 days but the last, with no gap at a chunk boundary', async () => {
+    oura()
+    const { repo, absent } = fakeRepo()
+    const range = { ...RANGE, from: '2026-07-14', to: '2026-10-11' } // 90 days, as a connect reads
+    await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...range, dryRun: false, tombstoneAbsent: true })
+    const swept = new Set<string>()
+    for (const r of absent) for (let d = r.from; d <= r.to; d = shiftDateStr(d, 1)) swept.add(d)
+    const missed: string[] = []
+    for (let d = range.from; d < range.to; d = shiftDateStr(d, 1)) if (!swept.has(d)) missed.push(d)
+    expect(missed).toEqual([])
+    expect(swept.has(range.to)).toBe(false)
+  })
+
+  it('counts a document on the day two chunks share once', async () => {
+    oura()
+    const { repo } = fakeRepo()
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...RANGE, from: '2026-07-14', to: '2026-10-11', dryRun: false, tombstoneAbsent: true })
+    // Each chunk returns the same fixture workout; read three times, it is one workout.
+    expect(out.ok && out.report.documents.workout).toBe(1)
   })
 
   it('a one-day read tombstones nothing: its only day is the one it may not have read', async () => {
