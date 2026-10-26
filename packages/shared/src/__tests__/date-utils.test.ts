@@ -296,6 +296,22 @@ describe('user-local week window boundaries (AEST)', () => {
   })
 })
 
+describe('dateStrMidnightInTz in far-east zones and across a daylight-saving change (#3445)', () => {
+  // A noon-UTC probe is already the next day at UTC+12..+14.
+  it('is the start of the named day in Pacific/Auckland (UTC+13 in summer)', () => {
+    expect(dateStrMidnightInTz('2026-12-15', 'Pacific/Auckland').toISOString()).toBe('2026-12-14T11:00:00.000Z')
+  })
+
+  it('is the start of the named day in Pacific/Kiritimati (UTC+14)', () => {
+    expect(dateStrMidnightInTz('2026-12-15', 'Pacific/Kiritimati').toISOString()).toBe('2026-12-14T10:00:00.000Z')
+  })
+
+  it('bounds the 23 h spring-forward day in Sydney', () => {
+    const ms = dateStrMidnightInTz('2026-10-05', 'Australia/Sydney').getTime() - dateStrMidnightInTz('2026-10-04', 'Australia/Sydney').getTime()
+    expect(ms).toBe(23 * 3_600_000)
+  })
+})
+
 describe('dayKeyInTz (Q-163)', () => {
   // The calendar-day key the week strip, the streak card and the local-history fill all bucket by.
   // It existed as two copies hardcoded to DEFAULT_TZ, so a user outside Brisbane saw another zone's

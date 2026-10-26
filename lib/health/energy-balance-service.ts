@@ -6,8 +6,7 @@ import { countedEstimates } from '@trainingai/shared/nutrition/meal-estimate'
 import { countedIntakeKcal, countedEstimateTotal, type CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
 import { unrecordedMealEstimatesAllowed } from '@trainingai/shared/nutrition/meal-logging-status'
 import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
-import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
+import { shiftDateStr, ageFromDob, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { stepEnergyKcal, SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT } from '@trainingai/shared/health/daily-energy'
 import { type Sex } from '@trainingai/shared/health/workout-energy'
 import {
@@ -133,13 +132,6 @@ export interface EnergyBalanceResult {
   missingProfileFields: string[]
 }
 
-/** UTC instant of local midnight for a `YYYY-MM-DD` day in `tz`. */
-function localMidnightUtc(date: string, tz: string): Date {
-  const zoned = toZonedTime(new Date(`${date}T12:00:00Z`), tz)
-  zoned.setHours(0, 0, 0, 0)
-  return fromZonedTime(zoned, tz)
-}
-
 /**
  * Reads a caller doing several days in one request can share between them (`/api/body-metadata` does
  * a week): the plan and meal types are the same for every day, so they are fetched once, lazily, and
@@ -251,7 +243,7 @@ export async function computeEnergyBalance(
     repo.listBodyMetrics(userId, metricsStart, date).catch(() => []),
     repo.listFoodLogsSummary(userId, windowStart, date).catch(() => []),
     repo.listActivityLogs(userId, windowStart, date).catch(() => []),
-    repo.getWorkoutSessionsFrom(userId, localMidnightUtc(windowStart, tz)).catch(() => []),
+    repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(windowStart, tz)).catch(() => []),
     repo.getNutritionTargets(userId).catch(() => null),
     repo.getUserGoals(userId).catch(() => null),
     repo.getUserById(userId).catch(() => null),
@@ -299,7 +291,7 @@ export async function computeEnergyBalance(
   const movement = await budgetMovement(repo, userId, windowStart, date, tz, { activityLogs, sessions: workouts })
   const budgetActivities = [...movement.logs, ...movement.oura]
   const activeEnergyFor = (day: string) => activeEnergyForDay({
-    day, dayStartUtc: localMidnightUtc(day, tz), dayEndUtc: localMidnightUtc(shiftDateStr(day, 1), tz), profile: energyProfile,
+    day, dayStartUtc: dateStrMidnightInTz(day, tz), dayEndUtc: dateStrMidnightInTz(shiftDateStr(day, 1), tz), profile: energyProfile,
     workouts, avgBpmBySession, activities: budgetActivities, steps: metricByDate.get(day)?.steps ?? null,
   })
   const activeEnergy = activeEnergyFor(date)
