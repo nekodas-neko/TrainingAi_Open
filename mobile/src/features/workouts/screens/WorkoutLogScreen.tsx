@@ -20,9 +20,8 @@ import { WorkoutSaveNotice } from '../components/WorkoutSaveNotice';
 import { GuidedWorkoutScreen } from './GuidedWorkoutScreen';
 import { workoutResult } from '../logging/summary';
 import { WorkoutLayout } from '../components/WorkoutLayout';
-import { ResourceCard } from '../components/ResourceCard';
+import { RecapCard } from '../components/RecapCard';
 import { NextPrescription } from '../components/NextPrescription';
-import { recapSpec } from '../data/models';
 import { WorkoutTiming } from '../components/WorkoutTiming';
 import { WorkoutHrRecovery } from '../components/WorkoutHrRecovery';
 import { WorkoutEnergy } from '../components/WorkoutEnergy';
@@ -197,19 +196,13 @@ export function WorkoutLogScreen({
           ))}
         </Grid>
       </View>
+      <RecapCard workoutId={workout.id} disabled={workout.pending.length > 0} />
       <WorkoutTiming workout={workout} />
       <WorkoutEnergy workout={workout} />
       <View style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
         <WorkoutCalendarAction workout={workout} />
       </View>
 
-      <ResourceCard
-        title="Session recap"
-        spec={recapSpec(workout.id)}
-        disabled={workout.pending.length > 0}
-      >
-        {(data) => <AppText>{data.recap ?? 'No recap is available yet.'}</AppText>}
-      </ResourceCard>
       <WorkoutHrRecovery workout={workout} />
       <NextPrescription />
       <Stack style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
