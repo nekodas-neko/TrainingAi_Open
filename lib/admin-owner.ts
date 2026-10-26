@@ -18,8 +18,8 @@ import { resolveClaudeRoOwner } from '@/lib/data/postgres/claude-ro-owner'
  * a variable left over from another database) or a non-admin would otherwise be accepted, and the
  * rule would silently protect nobody. `resolveOwnerUserId` looks the user up; a missing or inactive
  * user, a non-admin, or a lookup that throws all count as unresolved. The audit views read the same
- * variables for a different job (`bootstrapClaudeRoOwner`), and the day-review export and the agent
- * key read `ADMIN_EXPORT_USER_ID ?? WEBHOOK_USER_ID` directly; neither uses this helper.
+ * variables for a different job, and the day-review export and the agent key read
+ * `ADMIN_EXPORT_USER_ID ?? WEBHOOK_USER_ID` directly; neither uses this helper.
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -35,10 +35,15 @@ export async function resolveOwnerUserId(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<string | null> {
   const owner = parseConfiguredOwnerId(env)
-  if (!owner) return null
+  if (!owner) {
+    console.warn('[admin-owner] no owner is configured (or the id is malformed); owner-only admin actions are refused')
+    return null
+  }
   try {
     const user = await repo.getUserById(owner)
-    return user && user.isAdmin === true && user.isActive === true ? owner : null
+    if (user && user.isAdmin === true && user.isActive === true) return owner
+    console.warn('[admin-owner] the configured owner is not an active admin; owner-only admin actions are refused')
+    return null
   } catch (err) {
     console.error('[admin-owner] owner lookup failed; treating the owner as unresolved', err)
     return null
@@ -53,6 +58,20 @@ export function isOwnerUserId(userId: string, ownerId: string | null): boolean {
 /** Ids are uuids, which Postgres treats case-insensitively, so compare them that way everywhere. */
 export function sameUserId(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
+/**
+ * What the admin is told. A refusal because the owner setting is broken is not "you are not the
+ * owner": the person reading it cannot fix it by being someone else, and needs to know to look at
+ * the setting.
+ */
+export function ownerRefusalMessage(refused: OwnerRefusal, action: 'remove admin' | 'deactivate this account'): string {
+  if (refused === 'owner-unresolved') {
+    return action === 'remove admin'
+      ? 'The owner account is not configured, so no one can remove admin.'
+      : 'The owner account is not configured, so no admin account can be deactivated.'
+  }
+  return `Only the owner can ${action}`
 }
 
 /** Why an admin action on an admin account was refused. */
