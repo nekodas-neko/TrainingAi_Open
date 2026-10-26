@@ -83,10 +83,10 @@ export function useScale() {
  * Holds the scale link while the calling screen is shown and the app is in the foreground. A phone
  * left on this screen in a pocket must not keep scanning.
  */
-export function useScaleHold(reason: ScaleHold) {
+export function useScaleHold(reason: ScaleHold, enabled = true) {
   const session = useContext(Context);
   useEffect(() => {
-    if (!session) return;
+    if (!session || !enabled) return;
     session.hold(reason, AppState.currentState === 'active');
     const listener = AppState.addEventListener('change', (state) =>
       session.hold(reason, state === 'active'),
@@ -95,5 +95,5 @@ export function useScaleHold(reason: ScaleHold) {
       listener.remove();
       session.hold(reason, false);
     };
-  }, [session, reason]);
+  }, [session, reason, enabled]);
 }

@@ -29,6 +29,19 @@ vi.mock('@/lib/data', () => ({
   getRepositoryAsync: async () => repo,
 }))
 
+// Pinned to V1 whatever `SLEEP_SCORE_V2_FROM` holds: these nights are dated relative to today, so a
+// cutover set at or before today would move their sleep scores and turn the goldens red. The constant
+// is read through the module's own binding, so the mock also defaults `computeSleepScore` to V1.
+vi.mock('@trainingai/shared/health/sleep-score', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@trainingai/shared/health/sleep-score')>()
+  return {
+    ...actual,
+    SLEEP_SCORE_V2_FROM: null,
+    computeSleepScore: ((session, tz, opts) =>
+      actual.computeSleepScore(session, tz, { v2From: null, ...opts })) as typeof actual.computeSleepScore,
+  }
+})
+
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { scoreSleepForDate } from '@trainingai/shared/health/sleep-score-for-date'
 import { todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
@@ -98,7 +111,9 @@ describe.each([
     expect(out.sleepScore).not.toBeNull()
     const sleepDays = repo.upsertOuraDailyDerived.mock.calls.filter(([, , p]) => p.sleepScore !== undefined).map(([, day]) => day)
     expect(sleepDays).toEqual([])
-    expect(repo.upsertOuraDailyDerived.mock.calls.map(([, day]) => day)).not.toContain(shiftDateStr(today, -1))
+    // The Activity finalise (#2435) does store yesterday's activity-only row; nothing else may.
+    const otherThanActivity = repo.upsertOuraDailyDerived.mock.calls.filter(([, , p]) => p.activityContributors === undefined)
+    expect(otherThanActivity.map(([, day]) => day)).not.toContain(shiftDateStr(today, -1))
   })
 
   it("after the sync: writes today's row, and only today's", async () => {

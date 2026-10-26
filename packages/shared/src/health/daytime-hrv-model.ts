@@ -155,9 +155,9 @@ export function evaluateDaytimeHrvModel(model: DaytimeHrvModel, hr: number, temp
 
 /**
  * Per-bucket dHRV estimates over `[fromMs, toMs)` — the one place buckets get built from raw
- * temp/met/hr windows and evaluated against the model. Shared by the production stress pipeline
- * (`buildDaytimeStressSeriesFromModel`, 30-min buckets) and the D6 comparison-harness adapter
- * (5-min buckets, to give a short admin spot-check window more than one or two points). Buckets
+ * temp/met/hr windows and evaluated against the model. Used by the production stress pipeline
+ * (`buildDaytimeStressSeriesFromModel`, 30-min buckets); the D6 comparison-harness adapter that
+ * took 5-min buckets was retired in #2862, but `bucketMs` stays a parameter. Buckets
  * are aligned to an ABSOLUTE epoch grid (`floor(fromMs/bucketMs)*bucketMs`), not to `fromMs`
  * itself — the harness merges this function's output against an independently-bucketed reference
  * series by bucket key, so both sides must land on the same grid regardless of the exact window
