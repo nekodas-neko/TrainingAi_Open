@@ -20,6 +20,7 @@ import { exchangeAuthorizationCode, fetchOuraUserId, OuraGrantRejectedError, Our
 import { grantedOuraScopes, type OuraOAuthConfig } from './config'
 import { decryptOuraToken, encryptOuraToken, OuraTokenKeyMissingError } from './token-cipher'
 import { startOuraConnectBackfill } from './backfill'
+import { clearRingBatteryBackoff } from './ring-battery-backoff'
 
 /** Refresh when less than this is left. Oura's access tokens last about a day. */
 export const REFRESH_MARGIN_MS = 10 * 60 * 1000
@@ -111,6 +112,7 @@ export async function storeOuraGrant(
       throw new OuraAccountInUseError()
     }
   }
+  clearRingBatteryBackoff(userId)
   afterConnect(userId)
 }
 
@@ -202,6 +204,7 @@ async function refreshNow(
     // A refresh answer may leave `scope` out. Writing that `null` would make the grant read as
     // "covers everything" and bring back the 401 stop on an unshared type (#2974), so keep the stored list.
     await store.saveOuraCloudTokens(userId, { ...encrypted(userId, grant), expiresAt: grant.expiresAt, scope: grant.scope ?? storedScope })
+    clearRingBatteryBackoff(userId)
     return grant.accessToken
   } catch (err) {
     if (!(err instanceof OuraGrantRejectedError) || err.oauthError !== 'invalid_grant') throw err

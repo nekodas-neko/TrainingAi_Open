@@ -1,33 +1,104 @@
 import { Pressable, View } from 'react-native';
 import { transitionSecForEquipment } from '@trainingai/shared/workout/duration-model';
-import { AppButton, AppText, ProgressBar, Stack } from '../../../shared/ui';
+import { AppButton, AppText, Icon, ProgressBar, Stack } from '../../../shared/ui';
 import { useClock, formatDuration } from '../../../shared/hooks/useClock';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
-import type { WorkoutExercise, WorkoutRecord } from '../logging/workout';
+import { workoutFlow } from '../logging/flow';
+import { usePipSourceRect } from '../pip/usePipSourceRect';
+import { activeElapsedMs, type WorkoutExercise, type WorkoutRecord } from '../logging/workout';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { RestRing } from './RestRing';
 
+/** Whether the exercises are under way: the warm-up and the review have nothing to pause (#3255). */
+export function canPauseWorkout(workout: WorkoutRecord) {
+  const stage = workoutFlow(workout).stage;
+  // A pause already open can always be ended, wherever the workout was left.
+  return (
+    workout.status === 'active' &&
+    (workout.pausedAt !== null || stage === 'exercise' || stage === 'summary')
+  );
+}
+
+/**
+ * The Total clock, which is also the pause control: tap it to freeze every clock, tap again to
+ * resume (#3255). It counts the time the workout was under way, so a pause is not in it.
+ */
 export function SessionTimer({ workout }: { workout: WorkoutRecord; ring?: boolean }) {
   const { theme } = useTheme();
-  const now = useClock(workout.status === 'active');
-  const elapsed = Math.max(0, ((workout.completedAt ?? now) - workout.startedAt) / 1000);
+  const journal = useWorkoutJournal();
+  const paused = workout.pausedAt !== null;
+  const now = useClock(workout.status === 'active' && !paused);
   if (!workout.timers.workoutElapsed) {
     return null;
   }
-  return (
+  const elapsed = activeElapsedMs(workout, now) / 1000;
+  const pausable = canPauseWorkout(workout);
+  const tint = paused ? theme.status.warning : theme.colors.brand;
+  const chip = (
     <View
       style={{
-        backgroundColor: theme.colors.brandSurface,
+        backgroundColor: paused ? `${theme.status.warning}33` : theme.colors.brandSurface,
         borderRadius: theme.radii.control,
         paddingHorizontal: theme.spacing.sm,
         paddingVertical: theme.spacing.xs,
       }}
     >
-      <AppText variant="micro" tone="muted">
-        Total
+      <Stack direction="row" align="center" gap="xs">
+        <View>
+          <AppText variant="micro" tone="muted">
+            {paused ? 'Paused' : 'Total'}
+          </AppText>
+          <AppText variant="caption" style={{ color: tint }}>
+            {formatDuration(elapsed)}
+          </AppText>
+        </View>
+        {pausable && <Icon name={paused ? 'play' : 'pause'} color={tint} size={14} />}
+      </Stack>
+    </View>
+  );
+  if (!pausable) {
+    return chip;
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={paused ? 'Resume workout' : 'Pause workout'}
+      disabled={journal.busy || !journal.controller}
+      hitSlop={theme.spacing.xs}
+      onPress={() => {
+        void (paused
+          ? journal.controller?.resume(workout.id)
+          : journal.controller?.pause(workout.id));
+      }}
+    >
+      {chip}
+    </Pressable>
+  );
+}
+/** The banner at the top of a paused workout, with how long it has been paused. */
+export function PausedBanner({ workout }: { workout: WorkoutRecord }) {
+  const { theme } = useTheme();
+  const now = useClock(workout.pausedAt !== null);
+  if (workout.pausedAt === null) {
+    return null;
+  }
+  return (
+    <View
+      accessibilityRole="alert"
+      style={{
+        alignSelf: 'stretch',
+        borderRadius: theme.radii.card,
+        borderWidth: 1,
+        borderColor: `${theme.status.warning}55`,
+        backgroundColor: `${theme.status.warning}1f`,
+        padding: theme.spacing.md,
+      }}
+    >
+      <AppText variant="caption" style={{ color: theme.status.warning, fontWeight: '700' }}>
+        Workout paused · {formatDuration(Math.max(0, (now - workout.pausedAt) / 1000))}
       </AppText>
-      <AppText variant="caption" tone="brand">
-        {formatDuration(elapsed)}
+      <AppText variant="micro" tone="muted">
+        Clocks are stopped. Paused time isn’t counted.
       </AppText>
     </View>
   );
@@ -88,7 +159,10 @@ export function ReadyProgress({
   workout: WorkoutRecord;
   exercise: WorkoutExercise;
 }) {
-  const now = useClock(workout.timers.setup && exercise.readyStartedAt !== null);
+  const clock = useClock(
+    workout.timers.setup && exercise.readyStartedAt !== null && workout.pausedAt === null,
+  );
+  const now = workout.pausedAt ?? clock;
   if (!workout.timers.setup || exercise.readyStartedAt === null) {
     return null;
   }
@@ -122,7 +196,11 @@ export function RestCard({
   controls?: boolean;
   onStartSet?: () => void;
 }) {
-  const now = useClock();
+  const clock = useClock(workout.pausedAt === null);
+  const source = usePipSourceRect();
+  const paused = workout.pausedAt !== null;
+  // Under a pause the rest stands where it was stopped; resuming moves its anchors on.
+  const now = workout.pausedAt ?? clock;
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
   if (!workout.rest) {
@@ -154,16 +232,30 @@ export function RestCard({
   // Whole seconds since the rest began, as the current app's useElapsedSec counts them.
   const elapsed = Math.max(0, Math.floor((now - workout.rest.startedAt) / 1000));
   const ringOvertime = elapsed > total;
-  const labelColor = ringOvertime ? theme.anatomy.injured : theme.colors.muted;
-  const ring = <RestRing elapsedSec={elapsed} targetSec={total} />;
+  const labelColor = paused
+    ? theme.status.warning
+    : ringOvertime
+      ? theme.anatomy.injured
+      : theme.colors.muted;
+  const ring = (
+    <View
+      ref={source.ref}
+      onLayout={source.onLayout}
+      collapsable={false}
+      style={{ opacity: paused ? 0.55 : 1 }}
+    >
+      <RestRing elapsedSec={elapsed} targetSec={total} />
+    </View>
+  );
+  const startable = onStartSet && !paused;
   return (
     <Stack align="center" gap="md">
       {/* The current app's RestTimer and LastSetRestTimer: a muted label that turns red in
           overtime, the shared ring, and the hint in the label's colour at 60% (#3142). */}
       <AppText variant="eyebrow" style={{ color: labelColor, fontWeight: '700' }}>
-        {ringOvertime ? 'OVERTIME' : onStartSet ? 'REST' : 'RESTING'}
+        {paused ? 'REST · PAUSED' : ringOvertime ? 'OVERTIME' : onStartSet ? 'REST' : 'RESTING'}
       </AppText>
-      {onStartSet ? (
+      {startable ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
@@ -178,7 +270,7 @@ export function RestCard({
       ) : (
         ring
       )}
-      {onStartSet && (
+      {startable && (
         <AppText variant="caption" style={{ color: labelColor, opacity: 0.6 }}>
           {ringOvertime ? 'Rest complete · Tap to start' : 'Tap to start early'}
         </AppText>
@@ -193,7 +285,7 @@ export function RestCard({
             <AppButton
               title="−30s"
               variant="surface"
-              disabled={journal.busy || total < 30}
+              disabled={journal.busy || paused || total < 30}
               onPress={() => {
                 void journal.controller?.adjustRest(workout.id, -30);
               }}
@@ -201,7 +293,7 @@ export function RestCard({
             <AppButton
               title="+30s"
               variant="surface"
-              disabled={journal.busy || total > 86370}
+              disabled={journal.busy || paused || total > 86370}
               onPress={() => {
                 void journal.controller?.adjustRest(workout.id, 30);
               }}

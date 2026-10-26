@@ -18,6 +18,7 @@ export function planAlerts(
     if (
       (workout.timers.restCues || (!foreground && settings.restAlerts)) &&
       workout.status === 'active' &&
+      workout.pausedAt == null &&
       workout.rest &&
       workout.rest.endsAt > now
     ) {

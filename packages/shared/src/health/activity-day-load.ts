@@ -15,7 +15,7 @@ const HISTORY_DAYS = 28
 
 type ActivityDayRepo = Pick<WorkoutRepository,
   'listBodyMetrics' | 'getOuraDaily' | 'getWorkoutSessionsFrom' | 'getHrForWindow' | 'getActiveProgram'
-  | 'getUserById' | 'getUserGoals' | 'getOuraCloudActivitySeries'>
+  | 'getUserById' | 'getUserGoals' | 'getOuraCloudActivitySeries' | 'listActivityLogs'>
 
 export interface LoadActivityDayOptions {
   /** The HR profile's ceiling, when the caller has already resolved it (once, not per day). Null is a
@@ -24,7 +24,12 @@ export interface LoadActivityDayOptions {
   /** The caller's resolved profile is a stand-in for a failed read (`maxHrIsUnread`). A finished day
    *  then refuses to score, so it is not stored final on an age-based ceiling. */
   maxHrUnread?: boolean
+  /** The day's HR rows (`getHrForWindow` over the local day), or the pending read of them, when the
+   *  caller has fetched them already: the day is then read once, not twice. Leave out to read here. */
+  hrRows?: HrRows | Promise<HrRows>
 }
+
+type HrRows = Awaited<ReturnType<WorkoutRepository['getHrForWindow']>>
 
 /** Scores one local day from its own inputs. Read-only. */
 export async function loadActivityDay(
@@ -37,11 +42,11 @@ export async function loadActivityDay(
   // default (#3347 review): the day stays un-finalised and the next pass retries. Today only loses
   // the input for this read.
   const finished = date < todayInTz(tz)
-  const [bodyMetrics, ouraRows, sessions, hrRows, program, user, userGoals, cloudActivity, hrProfile] = await Promise.all([
+  const [bodyMetrics, ouraRows, sessions, hrRows, program, user, userGoals, cloudActivity, activityLogs, hrProfile] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
     repo.getOuraDaily(userId, fromIso, date),
     repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(fromIso, tz)),
-    repo.getHrForWindow(userId, dayMid, nextMid),
+    options.hrRows ?? repo.getHrForWindow(userId, dayMid, nextMid),
     repo.getActiveProgram(userId),
     repo.getUserById(userId),
     // A swallowed goals read would score the day against the default step goal.
@@ -55,6 +60,9 @@ export async function loadActivityDay(
       if (finished) throw cause
       return []
     }),
+    // The day's treadmill steps join its step count (#3134). Thrown for a finished day like the reads
+    // above; today only loses the treadmill part.
+    finished ? repo.listActivityLogs(userId, date, date) : repo.listActivityLogs(userId, date, date).catch(() => []),
     // #2182: the same zone ceiling the live score uses.
     options.maxHr !== undefined
       ? Promise.resolve({ maxHr: options.maxHr })
@@ -79,6 +87,7 @@ export async function loadActivityDay(
     program,
     user,
     stepsGoal: userGoals?.stepsGoal ?? null,
+    activityLogs,
   })
 }
 

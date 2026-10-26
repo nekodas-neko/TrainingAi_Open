@@ -368,7 +368,8 @@ SELECT
   t.truncated,
   t.ok,
   t.error,
-  t.caller_ip
+  t.caller_ip,
+  t.scoped_user_id
 FROM public.db_query_log t;
 
 CREATE VIEW claude_ro.detection_events AS
@@ -893,7 +894,8 @@ SELECT
   t.user_id,
   t.measured_at,
   t.percent,
-  t.charging
+  t.charging,
+  t.source
 FROM public.oura_ble_battery_poll t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1261,6 +1263,8 @@ SELECT
   t.updated_at,
   t.oura_user_id,
   t.reauth_required_at,
+  t.last_webhook_at,
+  t.last_data_at,
   (t.personal_access_token IS NOT NULL) AS has_pat,
   (t.access_token IS NOT NULL) AS has_oauth_access,
   (t.refresh_token IS NOT NULL) AS has_oauth_refresh,
@@ -1921,7 +1925,8 @@ SELECT
   t.last_goal_review_at,
   t.timing_baseline_date,
   t.preferences,
-  t.sessions_valid_from
+  t.sessions_valid_from,
+  t.trophy_pins
 FROM public.users t
 WHERE t.id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1958,7 +1963,8 @@ SELECT
   t.intensity_mode,
   t.session_rpe,
   t.warmup_ended_at,
-  t.deleted_at
+  t.deleted_at,
+  t.paused_sec
 FROM public.workout_sessions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

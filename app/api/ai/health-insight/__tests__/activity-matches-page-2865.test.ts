@@ -127,4 +127,19 @@ describe.skipIf(!canRun)('Activity insight reads the page’s numbers (#2865)', 
     expect(text).toContain('4 session(s)')
     expect(text).toContain('14000 kg total volume')
   })
+
+  it("a past day: quotes the day's step count with a treadmill session's steps added (#3134)", async () => {
+    const yesterday = shiftDateStr(TODAY, -1)
+    await pool.query(
+      `INSERT INTO oura_daily_derived (user_id, day, activity_score) VALUES ($1, $2, 64)
+       ON CONFLICT (user_id, day) DO UPDATE SET activity_score = 64`,
+      [TEST_USER_ID, yesterday],
+    )
+    await pool.query(
+      `INSERT INTO activity_logs (user_id, date, activity_type, title, steps) VALUES ($1, $2, 'treadmill', 'Treadmill', 3500)`,
+      [TEST_USER_ID, yesterday],
+    )
+    // The device count for that day is 9000 (set above); the treadmill's 3500 joins it.
+    expect(await insight(yesterday)).toContain('12500')
+  })
 })

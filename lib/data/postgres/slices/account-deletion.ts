@@ -39,8 +39,8 @@ export const OUTSIDE_THE_CASCADE: Record<string, { disposition: 'anonymised' | '
   agent_action_log: { disposition: 'anonymised', how: 'target_user_id SET NULL by its FK; job, actor, approval link, times and counts stay' },
 
   // Owner, 2026-09-24: purged, because `sql_text` can carry the user's data and nulling a column
-  // does not anonymise a payload. It has no user column, so "theirs" is defined below.
-  db_query_log: { disposition: 'purged', how: 'every row when they are the claude_ro audit subject, else rows whose text names their id or email' },
+  // does not anonymise a payload. Its user column (scoped_user_id) is set only on a pivoted query, so "theirs" is defined below.
+  db_query_log: { disposition: 'purged', how: 'every row when they are the claude_ro audit subject, else rows whose text names their id or email, or whose scoped_user_id is them' },
   rate_limits: { disposition: 'purged', how: 'keys naming their id or email' },
   invited_emails: { disposition: 'purged', how: 'their own email address' },
   email_normalisation_preimage: { disposition: 'purged', how: 'rows recording their email address' },
@@ -346,7 +346,7 @@ async function erase(db: Db, userId: string, opts: EraseOpts): Promise<AccountDe
 
     const dbQueryLog = await tx.execute(subjects.has(id)
       ? sql`DELETE FROM db_query_log`
-      : sql`DELETE FROM db_query_log WHERE ${names('sql_text')} OR ${names('error')}`)
+      : sql`DELETE FROM db_query_log WHERE ${names('sql_text')} OR ${names('error')} OR scoped_user_id = ${userId}`)
     const nothing = { rowCount: 0, rows: [] }
     const invitedEmails = email
       ? await tx.execute(sql`DELETE FROM invited_emails WHERE lower(trim(email)) = ${email}`)

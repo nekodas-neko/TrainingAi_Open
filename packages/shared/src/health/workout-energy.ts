@@ -144,6 +144,8 @@ export function isPlausibleSessionDuration(durationMin: number | null | undefine
     && durationMin > 0 && durationMin <= MAX_PLAUSIBLE_SESSION_MIN
 }
 
+export { sessionActiveMin } from '../workout/active-duration'
+
 export interface WorkoutEnergyInput {
   durationMin: number
   ageYears: number

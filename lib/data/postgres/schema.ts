@@ -52,6 +52,8 @@ export const users = pgTable('users', {
   targetBfPct:      doublePrecision('target_bf_pct'),
   friendCode:       text('friend_code').unique(),
   equippedTitle:    text('equipped_title'),
+  /** Achievement ids the user pinned to their trophy case, in pin order; null = none pinned (friends then see the top three by XP). */
+  trophyPins:       text('trophy_pins').array(),
   activityLevel:    text('activity_level'),
   fitnessGoal:      text('fitness_goal'),
   lastGoalReviewAt: timestamp('last_goal_review_at', { withTimezone: true }),
@@ -244,6 +246,8 @@ export const workoutSessions = pgTable('workout_sessions', {
   /** DEAD — never written, never read. See the block comment above; do not start using it. */
   unusedProgramSessionId: uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
   sessionRpe:        integer('session_rpe'),
+  /** #3266: whole seconds the workout was paused; NULL means never paused, the same as 0. */
+  pausedSec:         integer('paused_sec'),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),
 })
@@ -1550,6 +1554,9 @@ export const ouraTokens = pgTable('oura_tokens', {
   webhookSigningKey:   text('webhook_signing_key'),    // HMAC key from Oura webhook subscription response
   // #3204: when Oura refused the grant (`invalid_grant`, or a fresh token refused). Cleared by new tokens.
   reauthRequiredAt:    timestamp('reauth_required_at', { withTimezone: true }),
+  // #2861: the last verified webhook event for this user, and the last Oura data written for them.
+  lastWebhookAt:       timestamp('last_webhook_at', { withTimezone: true }),
+  lastDataAt:          timestamp('last_data_at', { withTimezone: true }),
   createdAt:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -1832,6 +1839,8 @@ export const ouraBleBatteryPoll = pgTable('oura_ble_battery_poll', {
   measuredAt: timestamp('measured_at', { withTimezone: true }).notNull().defaultNow(),
   percent:    integer('percent').notNull(),
   charging:   boolean('charging'),
+  // Migration 202610252304: NULL = Bluetooth poll, 'oura_cloud' = Oura Cloud ring_battery_level (#3069).
+  source:     text('source'),
 })
 
 // TN-54 (migration 278). One row per `PolarStrapService` connection attempt or state change.

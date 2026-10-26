@@ -39,6 +39,8 @@ import TrendingDown from 'lucide-react-native/icons/trending-down';
 import X from 'lucide-react-native/icons/x';
 import Calculator from 'lucide-react-native/icons/calculator';
 import SkipForward from 'lucide-react-native/icons/skip-forward';
+import Pause from 'lucide-react-native/icons/pause';
+import Play from 'lucide-react-native/icons/play';
 import Check from 'lucide-react-native/icons/check';
 import Share from 'lucide-react-native/icons/share';
 import Copy from 'lucide-react-native/icons/copy';
@@ -140,6 +142,8 @@ const icons = {
   close: X,
   calculator: Calculator,
   skip: SkipForward,
+  pause: Pause,
+  play: Play,
   check: Check,
   share: Share,
   copy: Copy,

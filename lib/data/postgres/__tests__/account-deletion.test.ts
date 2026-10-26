@@ -179,6 +179,12 @@ describe.skipIf(!canRun)('account deletion (#2120)', () => {
        `no row for ${email(A).toUpperCase()} /* ${MARK} a-email */`,
        `SELECT * FROM claude_ro.users WHERE id = '${B}' /* ${MARK} b-id */`,
        `SELECT * FROM claude_ro.users WHERE email = 'j${email(A)}' /* ${MARK} longer-address */`])
+    // #2119: a pivoted query names its subject only in `scoped_user_id`, never in the text.
+    await pool.query(
+      `INSERT INTO db_query_log (sql_text, truncated, ok, scoped_user_id) VALUES
+         ($1, false, true, $3), ($2, false, true, $4)`,
+      [`SELECT count(*) FROM claude_ro.sleep_sessions /* ${MARK} scoped-a */`,
+       `SELECT count(*) FROM claude_ro.sleep_sessions /* ${MARK} scoped-b */`, A, B])
     await pool.query(
       `INSERT INTO rate_limits (key, count, window_start) VALUES
          ($1, 1, now()), ($2, 1, now()), ($3, 1, now()), ($4, 1, now()), ($5, 1, now())
@@ -271,12 +277,12 @@ describe.skipIf(!canRun)('account deletion (#2120)', () => {
     expect(u).toBeDefined()
   })
 
-  it('purges the db_query_log rows that name the user by id or address, and no others', async () => {
+  it('purges the db_query_log rows that name the user by id or address, or scoped to them, and no others', async () => {
     const { rows } = await pool.query<{ tag: string }>(
       `SELECT substring(coalesce(sql_text, '') || coalesce(error, '') from '${MARK} ([a-z-]+)') AS tag
        FROM db_query_log WHERE sql_text LIKE $1 OR error LIKE $1`, [`%${MARK}%`])
-    expect(rows.map(r => r.tag).sort()).toEqual(['b-id', 'longer-address'])
-    expect(result.purged.dbQueryLog).toBe(2)
+    expect(rows.map(r => r.tag).sort()).toEqual(['b-id', 'longer-address', 'scoped-b'])
+    expect(result.purged.dbQueryLog).toBe(3)
   })
 
   it('purges the user\'s rate-limit keys, invitation and email preimage, and nobody else\'s', async () => {

@@ -43,6 +43,16 @@ describe('buildRecapFacts', () => {
     expect(facts.prCount).toBe(2)
   })
 
+  it('reports active duration: time spent paused is not part of it (#3266)', () => {
+    const facts = buildRecapFacts({
+      session: makeSession({ pausedSec: 20 * 60 }),
+      recentDurationsMin: [],
+      restSecByStyleSet: new Map(),
+      prCount: 0,
+    })
+    expect(facts.durationMin).toBe(40)
+  })
+
   it('computes durationVsMedianPct only with >= 3 recent sessions', () => {
     const withTwo = buildRecapFacts({
       session: makeSession(),
