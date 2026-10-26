@@ -1081,6 +1081,31 @@ export const friendships = pgTable('friendships', {
   updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique().on(t.requesterId, t.addresseeId)])
 
+// #2300. A trainer is a relationship, not a flag on `users`: `isAdmin` is the operator role and is
+// never consulted for this. The friendship handshake with a direction — the trainer requests, the
+// trainee accepts, either party revokes. `(A trains B)` and `(B trains A)` are different rows.
+export const trainerRelationships = pgTable('trainer_relationships', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  trainerId: uuid('trainer_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  traineeId: uuid('trainee_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status:    text('status').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique('trainer_relationships_pair_key').on(t.trainerId, t.traineeId),
+  index('trainer_relationships_trainee_idx').on(t.traineeId),
+  check('trainer_relationships_status_check', sql`${t.status} IN ('pending', 'accepted', 'revoked')`),
+])
+
+// Provenance only: which program a trainer built for which trainee. The program is the trainee's
+// own row, so deleting it or revoking the relationship never changes the program itself.
+export const trainerProgramAssignments = pgTable('trainer_program_assignments', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  relationshipId: uuid('relationship_id').notNull().references(() => trainerRelationships.id, { onDelete: 'cascade' }),
+  programId:      uuid('program_id').notNull().unique().references(() => programs.id, { onDelete: 'cascade' }),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('trainer_program_assignments_relationship_idx').on(t.relationshipId)])
+
 export const seasons = pgTable('seasons', {
   id:        uuid('id').primaryKey().defaultRandom(),
   label:     text('label').notNull(),

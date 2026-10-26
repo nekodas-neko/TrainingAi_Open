@@ -1868,6 +1868,26 @@ SELECT
 FROM public.supplements t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.trainer_program_assignments AS
+SELECT
+  t.id,
+  t.relationship_id,
+  t.program_id,
+  t.created_at
+FROM public.trainer_program_assignments t
+WHERE EXISTS (SELECT 1 FROM public.trainer_relationships tr WHERE tr.id = t.relationship_id AND (tr.trainer_id = current_setting('app.claude_ro_owner', true)::uuid OR tr.trainee_id = current_setting('app.claude_ro_owner', true)::uuid));
+
+CREATE VIEW claude_ro.trainer_relationships AS
+SELECT
+  t.id,
+  t.trainer_id,
+  t.trainee_id,
+  t.status,
+  t.created_at,
+  t.updated_at
+FROM public.trainer_relationships t
+WHERE t.trainer_id = current_setting('app.claude_ro_owner', true)::uuid OR t.trainee_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.user_dietary_restrictions AS
 SELECT
   t.user_id,

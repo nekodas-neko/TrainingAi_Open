@@ -246,6 +246,8 @@ export const EXCLUDED: Record<string, Exclusion> = {
 
   // ── Jointly about another account. ───────────────────────────────────────────
   friendships: { category: 'third-party', reason: 'each row is also the other account\'s relationship record, and the counterparty is an opaque uuid here' },
+  trainer_relationships: { category: 'third-party', reason: 'each row is also the other account\'s relationship record, and the counterparty is an opaque uuid here' },
+  trainer_program_assignments: { category: 'third-party', reason: 'provenance of a program that is itself exported; the row names the other account only through its relationship' },
   invited_emails: { category: 'third-party', reason: 'other people\'s email addresses' },
   email_normalisation_preimage: { category: 'third-party', reason: 'LA-61\'s undo record: every account\'s pre-backfill email address' },
 }

@@ -40,6 +40,8 @@
     "food_items": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull. No delete path exists anywhere (server, device or API), so no tombstone is needed until one is added"},
     "food_logs": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull"},
     "friendships": {"class":"SERVER-ONLY","note":"social; writer: social.ts"},
+    "trainer_program_assignments": {"class":"SERVER-ONLY","note":"trainer role (#2300): which program a trainer built for which trainee; writer: slices/trainer.ts"},
+    "trainer_relationships": {"class":"SERVER-ONLY","note":"trainer role (#2300): trainer requests, trainee accepts, either revokes; writer: slices/trainer.ts"},
     "goal_recommendations": {"class":"SERVER-ONLY","note":"derived / AI; writer: adapter.ts"},
     "health_connect_history_import": {"class":"SERVER-ONLY","note":"explicit Import more history progress (oldest imported day); writer: slices/health-connect-history-import.ts"},
     "health_connect_intervals": {"class":"SERVER-ONLY","note":"sensor ingest -> server (Health Connect, which is itself the device copy); writer: slices/health-connect-intervals.ts"},
