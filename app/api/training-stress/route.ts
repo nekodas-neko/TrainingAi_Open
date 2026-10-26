@@ -114,7 +114,8 @@ async function evaluateTrainingStressDay(
   date: string,
 ): Promise<TrainingStressResponse> {
   const dayStart = dateStrMidnightInTz(date, tz);
-  const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+  // The next local midnight, not start + 24 h: a DST day is 23 or 25 hours long (#3388).
+  const dayEnd = dateStrMidnightInTz(shiftDateStr(date, 1), tz);
   const rhrWindowStart = shiftDateStr(date, -TRAINING_STRESS_RHR_WINDOW_DAYS);
   // #2115 v4: rung 1b converts active calories with the latest weight within 30 days.
   const weightWindowStart = shiftDateStr(date, -KCAL_MET_WEIGHT_WINDOW_DAYS);
