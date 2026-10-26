@@ -21,6 +21,7 @@ import type {
 } from './postgres/slices/meal-plans'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
 import type { AccountDeletionResult } from './postgres/slices/account-deletion'
+import type { SetAdminOutcome } from './postgres/slices/admin-grants'
 import type {
   NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput, RegrantNativeRefreshTokenInput,
 } from './postgres/slices/native-refresh-tokens'
@@ -617,6 +618,8 @@ export interface WorkoutRepository {
   /** True when a user row matched. RV-48 — false is a no-op the route answers 404 for. */
   activateUser(userId: string): Promise<boolean>
   deactivateUser(userId: string): Promise<boolean>
+  /** Make / Remove admin, owner-gated and audited in one transaction (see `slices/admin-grants.ts`). */
+  setUserAdmin(args: { actingAdminId: string; targetUserId: string; makeAdmin: boolean; ownerId: string | null }): Promise<SetAdminOutcome>
   getUserById(userId: string): Promise<User | null>
   getUserByOAuthSub(oauthSub: string): Promise<User | null>
   getUserByProvider(provider: AuthProvider, subject: string): Promise<User | null>

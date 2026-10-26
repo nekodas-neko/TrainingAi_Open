@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from 'sonner'
-import { UserCheck, UserX, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, ClipboardList } from 'lucide-react'
+import { UserCheck, UserX, ShieldCheck, ShieldOff, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, ClipboardList } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import type { User } from '@trainingai/shared/types'
 import { invalidateAdminPendingCount } from '@/lib/cache-groups'
@@ -43,6 +43,8 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
   // email, so each asks first. Both name what the row already shows, so no new detail is exposed.
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
   const [confirmRemoveInvite, setConfirmRemoveInvite] = useState<string | null>(null)
+  // #3368: granting or removing admin is auth, so both ask first.
+  const [confirmAdmin, setConfirmAdmin] = useState<{ user: User; grant: boolean } | null>(null)
 
   async function loadAll() {
     setLoading(true)
@@ -86,6 +88,27 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: action === 'activate' } : u))
       invalidateAdminPendingCount().catch(() => {})
       toast.success(action === 'activate' ? 'User activated' : 'User deactivated')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Action failed')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function setAdmin(userId: string, grant: boolean) {
+    setActionLoading(`admin-${userId}`)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, action: grant ? 'grant-admin' : 'revoke-admin' }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null) as { error?: unknown } | null
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Action failed')
+      }
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, isAdmin: grant } : u))
+      toast.success(grant ? 'Admin granted' : 'Admin removed')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Action failed')
     } finally {
@@ -245,6 +268,7 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
                     user={u}
                     isSelf={u.id === currentUserId}
                     onToggle={(id, action) => action === 'deactivate' ? setConfirmDeactivate(u) : toggleUser(id, action)}
+                    onToggleAdmin={() => setConfirmAdmin({ user: u, grant: !u.isAdmin })}
                     loadingId={actionLoading}
                   />
                 ))}
@@ -263,6 +287,22 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
                 const u = confirmDelete
                 setConfirmDelete(null)
                 if (u) deleteUser(u.id)
+              }}
+            />
+            <ConfirmDialog
+              open={!!confirmAdmin}
+              onOpenChange={o => { if (!o) setConfirmAdmin(null) }}
+              title={confirmAdmin?.grant ? 'Make admin?' : 'Remove admin?'}
+              message={confirmAdmin
+                ? confirmAdmin.grant
+                  ? `${userLabel(confirmAdmin.user)} will be able to manage users, invites and data from the admin console.`
+                  : `${userLabel(confirmAdmin.user)} will lose access to the admin console.`
+                : ''}
+              confirmLabel={confirmAdmin?.grant ? 'Make admin' : 'Remove admin'}
+              onConfirm={() => {
+                const c = confirmAdmin
+                setConfirmAdmin(null)
+                if (c) setAdmin(c.user.id, c.grant)
               }}
             />
             <ConfirmDialog
@@ -464,6 +504,7 @@ function UserRow({
   isSelf = false,
   onToggle,
   onDelete,
+  onToggleAdmin,
   loadingId,
 }: {
   user: AdminUser
@@ -471,10 +512,13 @@ function UserRow({
   isSelf?: boolean
   onToggle: (id: string, action: 'activate' | 'deactivate') => void
   onDelete?: (id: string) => void
+  /** Active rows only. Absent on your own row: the server refuses removing your own admin. */
+  onToggleAdmin?: () => void
   loadingId: string | null
 }) {
   const isToggleLoading = loadingId === user.id
   const isDeleteLoading = loadingId === `delete-${user.id}`
+  const isAdminLoading = loadingId === `admin-${user.id}`
   const initials = initialsOf(user.displayName || user.name || user.email)
 
   return (
@@ -497,6 +541,25 @@ function UserRow({
       )}>
         {user.isActive ? 'Active' : user.hasData === false ? 'Pending' : 'Deactivated'}
       </span>
+      {user.isAdmin && (
+        <span className="shrink-0 rounded-full bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-400">Admin</span>
+      )}
+      {onToggleAdmin && user.isActive && !(isSelf && user.isAdmin) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleAdmin}
+          disabled={isAdminLoading}
+          title={user.isAdmin ? 'Remove admin' : 'Make admin'}
+          aria-label={user.isAdmin ? 'Remove admin' : 'Make admin'}
+        >
+          {isAdminLoading
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : user.isAdmin
+              ? <ShieldOff className="h-4 w-4 text-destructive" />
+              : <ShieldCheck className="h-4 w-4 text-blue-400" />}
+        </Button>
+      )}
       {onDelete && !user.isActive && user.hasData === false && !isSelf && (
         <Button
           variant="ghost"
