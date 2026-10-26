@@ -64,9 +64,8 @@ export function describeRedecodeJob(job: RedecodeJob) {
     opts: job.opts,
     error: job.error,
     ...(job.result ?? {}),
-    // Issue 2383: what this run was asked to write, read from the row rather than from the
-    // request that is polling it. The step-backfill screen only says "Backfill applied" when
-    // this is 'step-backfill'. Placed after the spread so a result payload cannot shadow it.
+    // What this run was asked to write, read from the row rather than from the request that is
+    // polling it. Placed after the spread so a result payload cannot shadow it.
     kind: redecodeJobKind(job.opts),
   }
 }

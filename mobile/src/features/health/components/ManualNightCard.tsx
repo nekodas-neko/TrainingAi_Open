@@ -12,8 +12,8 @@ import {
 } from '../../../shared/ui';
 import { useHealthData } from '../data/HealthDataProvider';
 import { manualNightWindow } from '../data/manual-night';
-import { metricValue } from '../data/models';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { formatHoursMinutes } from '@trainingai/shared/format/units'
 
 export function ManualNightCard() {
   const health = useHealthData();
@@ -117,7 +117,7 @@ export function ManualNightCard() {
             {night.sleepEnd && msToHHMMInTz(night.sleepEnd, health.timezone)}
           </AppText>
           <AppText variant="caption" tone="muted">
-            {metricValue(night.durationHours, 'h', 2)}
+            {night.durationHours == null ? '—' : formatHoursMinutes(night.durationHours * 60)}
           </AppText>
           <Stack direction="row">
             <AppButton

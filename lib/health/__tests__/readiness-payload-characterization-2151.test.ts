@@ -39,6 +39,19 @@ vi.mock('@/lib/data', () => ({
   getRepositoryAsync: async () => repo,
 }))
 
+// Pinned to V1 whatever `SLEEP_SCORE_V2_FROM` holds: these nights are dated relative to today, so a
+// cutover set at or before today would move their sleep scores and turn the goldens red. The constant
+// is read through the module's own binding, so the mock also defaults `computeSleepScore` to V1.
+vi.mock('@trainingai/shared/health/sleep-score', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@trainingai/shared/health/sleep-score')>()
+  return {
+    ...actual,
+    SLEEP_SCORE_V2_FROM: null,
+    computeSleepScore: ((session, tz, opts) =>
+      actual.computeSleepScore(session, tz, { v2From: null, ...opts })) as typeof actual.computeSleepScore,
+  }
+})
+
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 

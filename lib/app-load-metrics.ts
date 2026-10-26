@@ -20,7 +20,8 @@
 //     next push, so a dropped measurement is strictly better than a delayed workout.
 //   - Never throws. A reporting failure that surfaced as an error would be worse than the slowness.
 //
-// Its ingest route is `POST /api/app-load` and the report is `GET /api/admin/app-load-report`.
+// Its ingest route is `POST /api/app-load`. The admin report route was retired in #2862; the rows
+// are still written and can be read from the table.
 
 /** Sub-millisecond floats are noise at the resolution this is read. Negative clamps to 0. */
 function ms(value: number | undefined | null): number | null {
