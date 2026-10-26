@@ -6,6 +6,7 @@ import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { clientIp } from '@trainingai/shared/http/client-ip'
 import { isUuid } from '@trainingai/shared/validation/uuid'
+import { z } from 'zod'
 
 // One SQL statement. The audit log truncates it at 20,000 characters, so 64 KB is generous past
 // anything that is meaningfully recorded.
@@ -28,11 +29,22 @@ const MAX_BODY_BYTES = 64 * 1024
  * so `userId` is honoured only for a user with a `feedback_submissions` row; every other value —
  * malformed, unknown, or a user who never filed — gets the same 404 body, so the route does not say
  * which ids exist. A named scope never falls back to the owner or to anything unscoped: it is applied
- * or the query does not run. Each pivoted query records the user in `db_query_log.scoped_user_id`.
+ * or the query does not run. Each pivoted query records the user in `db_query_log.scoped_user_id`,
+ * and that row is written BEFORE the query runs: if it cannot be written the route answers 503 and
+ * runs nothing, because another user's data must never leave without a trace. (An owner query's
+ * audit row stays best-effort and is written after.) An explicit `userId: null` is refused like any
+ * other bad value; only an absent `userId` means the owner.
+ *
+ * **What the scope limit is — and is not.** The feedback-only rule stops an accidental cross-user
+ * read. It does not stop a deliberate one: per #3360 a hand-written SELECT can re-scope itself with
+ * `set_config`, so anyone holding the token can read any user. Closing that is the owner's decision
+ * (#3360), not something this route claims to do.
  *
  * Disabled unless BOTH `CLAUDE_DB_QUERY_SECRET` and `CLAUDE_DB_READONLY_URL` are set — unset either
  * and the route rejects, never skips the check.
  */
+
+const bodySchema = z.object({ sql: z.string(), userId: z.unknown().optional() }).strict()
 
 /** Rows returned to the caller; one extra is fetched to detect truncation. */
 const MAX_ROWS = 1000
@@ -56,6 +68,37 @@ async function logQuery(entry: {
     )
   } catch (err) {
     console.error('[admin/db-query] audit log write failed:', err)
+  }
+}
+
+/**
+ * The audit row for a scoped read, written before the query. It starts as a not-ok "started" row so
+ * a crash between here and the answer still leaves the trace; {@link finishScopedLog} fills in the
+ * outcome. Throws on failure — the caller turns that into a 503 and runs nothing.
+ */
+async function startScopedLog(entry: { sql: string; ip: string; scopedUserId: string }): Promise<string | null> {
+  const { rows } = await getPool().query(
+    `INSERT INTO db_query_log (sql_text, row_count, duration_ms, truncated, ok, error, caller_ip, scoped_user_id)
+     VALUES ($1, NULL, NULL, false, false, 'started', $2, $3)
+     RETURNING id`,
+    [entry.sql.slice(0, 20_000), entry.ip, entry.scopedUserId],
+  )
+  return rows[0]?.id ?? null
+}
+
+/** Records how a scoped read ended. Best-effort: the row already exists, so a failure here only
+ *  leaves it saying "started". */
+async function finishScopedLog(id: string | null, outcome: {
+  rowCount: number | null; durationMs: number; truncated: boolean; ok: boolean; error: string | null
+}) {
+  if (!id) return
+  try {
+    await getPool().query(
+      `UPDATE db_query_log SET row_count = $2, duration_ms = $3, truncated = $4, ok = $5, error = $6 WHERE id = $1`,
+      [id, outcome.rowCount, outcome.durationMs, outcome.truncated, outcome.ok, outcome.error],
+    )
+  } catch (err) {
+    console.error('[admin/db-query] audit log update failed:', err)
   }
 }
 
@@ -87,10 +130,13 @@ export async function POST(req: NextRequest) {
       : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { sql, userId } = (read.body ?? {}) as { sql?: unknown; userId?: unknown }
-  if (typeof sql !== 'string' || !sql.trim()) {
+  // `userId` stays `unknown` on purpose: its refusals (including null) are one 404 body below, not a
+  // 400 from the schema, so a bad value can't be told apart from an unknown user.
+  const parsed = bodySchema.safeParse(read.body ?? {})
+  if (!parsed.success || !parsed.data.sql.trim()) {
     return NextResponse.json({ error: 'Body must be { sql: string }' }, { status: 400 })
   }
+  const { sql, userId } = parsed.data
   // One statement per request. The role already makes multi-statement harmless, but this keeps the
   // audit log honest — one logged row must correspond to exactly one executed query.
   if (sql.replace(/;\s*$/, '').includes(';')) {
@@ -100,11 +146,12 @@ export async function POST(req: NextRequest) {
   const ip = clientIp(req)
   const started = Date.now()
 
-  // Absent means the owner scope. Present means a named user or a refusal: an id that is not a uuid,
-  // not a user, or not a user with feedback is never quietly run as the owner, because the caller
-  // would read the owner's rows believing they were that user's.
+  // Absent means the owner scope. Present — null included — means a named user or a refusal: an id
+  // that is not a uuid, not a user, or not a user with feedback is never quietly run as the owner,
+  // because the caller would read the owner's rows believing they were that user's.
   let scopedUserId: string | undefined
-  if (userId !== undefined && userId !== null) {
+  let scopedLogId: string | null = null
+  if (userId !== undefined) {
     const requested = isUuid(userId) ? userId.toLowerCase() : null
     let allowed = false
     if (requested) {
@@ -123,7 +170,17 @@ export async function POST(req: NextRequest) {
       return scopeNotFound()
     }
     scopedUserId = requested!
+    try {
+      scopedLogId = await startScopedLog({ sql, ip, scopedUserId })
+    } catch (err) {
+      console.error('[admin/db-query] scoped audit write failed, query not run:', err)
+      return NextResponse.json({ error: 'Could not record the audit entry; nothing was run' }, { status: 503 })
+    }
   }
+
+  // An owner query logs after, best-effort; a scoped one already has its row and only finishes it.
+  const record = (entry: Parameters<typeof logQuery>[0]) =>
+    scopedUserId ? finishScopedLog(scopedLogId, entry) : logQuery(entry)
 
   try {
     // Wrapping in a subquery bounds ANY submitted query without parsing it. MAX_ROWS + 1 detects
@@ -140,14 +197,14 @@ export async function POST(req: NextRequest) {
 
     const payload = JSON.stringify(rows)
     if (payload.length > MAX_BYTES) {
-      await logQuery({ sql, rowCount: rows.length, durationMs, truncated, ok: false, error: 'payload too large', ip, scopedUserId })
+      await record({ sql, rowCount: rows.length, durationMs, truncated, ok: false, error: 'payload too large', ip, scopedUserId })
       return NextResponse.json(
         { error: `Result too large (${Math.round(payload.length / 1e6)} MB) — narrow the SELECT or add a LIMIT` },
         { status: 413 },
       )
     }
 
-    await logQuery({ sql, rowCount: rows.length, durationMs, truncated, ok: true, error: null, ip, scopedUserId })
+    await record({ sql, rowCount: rows.length, durationMs, truncated, ok: true, error: null, ip, scopedUserId })
     return NextResponse.json({
       rows,
       rowCount: rows.length,
@@ -157,7 +214,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await logQuery({ sql, rowCount: null, durationMs: Date.now() - started, truncated: false, ok: false, error: message, ip, scopedUserId })
+    await record({ sql, rowCount: null, durationMs: Date.now() - started, truncated: false, ok: false, error: message, ip, scopedUserId })
     // The DB error text is the useful part (permission denied, syntax, timeout) and this route is
     // admin-only, so it is surfaced rather than swallowed.
     return NextResponse.json({ error: message }, { status: 400 })

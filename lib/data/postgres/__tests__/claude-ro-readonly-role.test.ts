@@ -362,16 +362,6 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
       }
     })
 
-    /**
-     * **The defect itself, pinned — without this the three cases above prove nothing.** They only
-     * exercise `runScoped`, which did not exist before the fix, so they could never have run
-     * against the broken path and could not have failed. This one drives the OLD shape — a plain
-     * `pool.query` in autocommit, which is exactly what the route did — and shows the override
-     * surviving into the next query on the same connection.
-     *
-     * It asserts the leak on purpose. If Postgres ever stops behaving this way the test fails
-     * loudly, which is the right outcome: the wrapper's justification would have changed.
-     */
     // #2119. The scoped read: `ownerId` re-points the views at one user for one query.
     describe('a named scope (#2119)', () => {
       const sleepHours = async (opts?: { ownerId?: string }) =>
@@ -408,6 +398,16 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
       })
     })
 
+    /**
+     * **The defect itself, pinned — without this the three cases above prove nothing.** They only
+     * exercise `runScoped`, which did not exist before the fix, so they could never have run
+     * against the broken path and could not have failed. This one drives the OLD shape — a plain
+     * `pool.query` in autocommit, which is exactly what the route did — and shows the override
+     * surviving into the next query on the same connection.
+     *
+     * It asserts the leak on purpose. If Postgres ever stops behaving this way the test fails
+     * loudly, which is the right outcome: the wrapper's justification would have changed.
+     */
     it('leaks without the wrapper — which is why the wrapper exists', async () => {
       const bare = new Pool({ connectionString: roUrl(), max: 1 })
       try {

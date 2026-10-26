@@ -16,13 +16,15 @@ vi.mock('@/lib/rate-limit', () => ({ rateLimit: vi.fn(() => true) }))
 // statement: a SELECT is the check, anything else is an audit insert.
 const FEEDBACK_USER = '4a6f1c2e-8b3d-4e5f-9a7b-1c2d3e4f5a6b'
 let feedbackLookupFails = false
-const auditInsert = vi.fn(async (sql?: string, params?: unknown[]) => {
+const defaultAudit = async (sql?: string, params?: unknown[]) => {
   if (sql?.includes('feedback_submissions')) {
     if (feedbackLookupFails) throw new Error('db down')
     return { rows: params?.[0] === FEEDBACK_USER ? [{ '?column?': 1 }] : [] }
   }
-  return { rows: [] }
-})
+  // A scoped read inserts its audit row first and takes the id back to finish it (RETURNING id).
+  return { rows: sql?.includes('RETURNING id') ? [{ id: 'log-1' }] : [] }
+}
+const auditInsert = vi.fn(defaultAudit)
 vi.mock('@/lib/data/postgres/client', () => ({ getPool: () => ({ query: auditInsert }) }))
 
 // Typed with the sql it receives (RV-190). It was declared taking no arguments, so every
@@ -59,7 +61,7 @@ beforeEach(() => {
   authMock.mockReset().mockResolvedValue(null)
   getUserById.mockReset().mockResolvedValue({ id: 'admin-1', isActive: true, isAdmin: true })
   roQuery.mockReset().mockResolvedValue({ rows: [{ n: 1 }], fields: [{ name: 'n' }] })
-  auditInsert.mockClear()
+  auditInsert.mockReset().mockImplementation(defaultAudit)
   feedbackLookupFails = false
   process.env.CLAUDE_DB_QUERY_SECRET = SECRET
   process.env.ADMIN_EXPORT_USER_ID = 'admin-1'
@@ -161,6 +163,8 @@ describe('POST /api/admin/db-query — audit log', () => {
 
 describe('POST /api/admin/db-query — scoped user (#2119)', () => {
   const auditRows = () => auditInsert.mock.calls.filter(c => String(c[0]).includes('INSERT INTO db_query_log'))
+  // The scoped pre-insert binds (sql, ip, user); the owner/refusal insert binds eight values, user last.
+  const scopedUserOf = (row: unknown[]) => (row[1] as unknown[])[row[1]!.length === 3 ? 2 : 7]
 
   it('an owner query is unchanged: no scope is passed and none is logged', async () => {
     expect((await post('SELECT 1', withToken(SECRET))).status).toBe(200)
@@ -173,7 +177,7 @@ describe('POST /api/admin/db-query — scoped user (#2119)', () => {
     const res = await post('SELECT 1', withToken(SECRET), FEEDBACK_USER)
     expect(res.status).toBe(200)
     expect(roQuery.mock.calls[0][1]).toEqual({ ownerId: FEEDBACK_USER })
-    expect(auditRows()[0][1]![7]).toBe(FEEDBACK_USER)
+    expect(scopedUserOf(auditRows()[0])).toBe(FEEDBACK_USER)
   })
 
   it('refuses a user with no feedback row, with the not-found body, and runs nothing', async () => {
@@ -196,10 +200,44 @@ describe('POST /api/admin/db-query — scoped user (#2119)', () => {
     expect(roQuery).not.toHaveBeenCalled()
   })
 
-  it('treats an explicit null as no scope (the owner)', async () => {
+  it('refuses an explicit null like any other bad scope: only an absent userId means the owner', async () => {
     const res = await post('SELECT 1', withToken(SECRET), null)
-    expect(res.status).toBe(200)
-    expect(roQuery.mock.calls[0][1]?.ownerId).toBeUndefined()
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: 'Not found' })
+    expect(roQuery).not.toHaveBeenCalled()
+  })
+
+  it('writes the audit row BEFORE a scoped query runs', async () => {
+    let auditedBeforeRun = false
+    roQuery.mockImplementation(async () => {
+      auditedBeforeRun = auditRows().length === 1
+      return { rows: [{ n: 1 }], fields: [{ name: 'n' }] }
+    })
+    expect((await post('SELECT 1', withToken(SECRET), FEEDBACK_USER)).status).toBe(200)
+    expect(auditedBeforeRun).toBe(true)
+  })
+
+  it('returns 503 and runs nothing when a scoped read cannot be audited', async () => {
+    auditInsert.mockImplementation(async (sql?: string) => {
+      if (sql?.includes('feedback_submissions')) return { rows: [{ '?column?': 1 }] }
+      throw new Error('log table missing')
+    })
+    const res = await post('SELECT 1', withToken(SECRET), FEEDBACK_USER)
+    expect(res.status).toBe(503)
+    expect(roQuery).not.toHaveBeenCalled()
+  })
+
+  it('never looks up feedback for an unauthenticated caller', async () => {
+    const res = await post('SELECT 1', {}, FEEDBACK_USER)
+    expect(res.status).toBe(401)
+    expect(auditInsert).not.toHaveBeenCalled()
+  })
+
+  it('finishes the scoped row with the outcome instead of adding a second one', async () => {
+    await post('SELECT 1', withToken(SECRET), FEEDBACK_USER)
+    expect(auditRows()).toHaveLength(1)
+    const update = auditInsert.mock.calls.find(c => String(c[0]).startsWith('UPDATE db_query_log'))
+    expect(update?.[1]).toEqual(['log-1', 1, expect.any(Number), false, true, null])
   })
 
   it('fails closed when the feedback lookup errors: nothing runs', async () => {
@@ -219,7 +257,7 @@ describe('POST /api/admin/db-query — scoped user (#2119)', () => {
   it('logs the scope on a failed scoped query as well', async () => {
     roQuery.mockRejectedValue(new Error('boom'))
     await post('SELECT bad', withToken(SECRET), FEEDBACK_USER)
-    expect(auditRows()[0][1]![7]).toBe(FEEDBACK_USER)
+    expect(scopedUserOf(auditRows()[0])).toBe(FEEDBACK_USER)
   })
 
   it('does not let GET take a scope', async () => {
