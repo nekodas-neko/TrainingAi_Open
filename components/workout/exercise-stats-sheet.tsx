@@ -273,9 +273,9 @@ export function ExerciseStatsSheet({ exercise, isDoneToday, onClose, onRedo }: E
                     key={m}
                     className="text-[11px] rounded-lg px-2.5 py-1 font-medium"
                     style={{
-                      background: "color-mix(in oklch, #f59e0b 12%, transparent)",
-                      color: "#f59e0b",
-                      border: "1px solid color-mix(in oklch, #f59e0b 25%, transparent)",
+                      background: "color-mix(in oklch, var(--accent-amber) 12%, transparent)",
+                      color: "var(--accent-amber)",
+                      border: "1px solid color-mix(in oklch, var(--accent-amber) 25%, transparent)",
                     }}
                   >
                     {m}

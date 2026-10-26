@@ -21,7 +21,7 @@ import { TREND_COLOR } from '@trainingai/shared/health/strength-progress'
 
 const ROOT = path.resolve(__dirname, '../..')
 const SCAN = ['app', 'components', 'lib', 'packages/shared/src']
-const TRIAD = /#22c55e|#eab308|#ef4444|#f59e0b|rgba?\(\s*(?:34\s*,\s*197\s*,\s*94|234\s*,\s*179\s*,\s*8|239\s*,\s*68\s*,\s*68|245\s*,\s*158\s*,\s*11)\s*[,)]/i
+const TRIAD = /#22c55e|#eab308|#ef4444|#f59e0b|#f87171|rgba?\(\s*(?:34\s*,\s*197\s*,\s*94|234\s*,\s*179\s*,\s*8|239\s*,\s*68\s*,\s*68|245\s*,\s*158\s*,\s*11)\s*[,)]/i
 /** A ternary, an `if`, or a keyed state table on the same line is what separates a band from a tint. */
 const CONDITION = /\?|\bif\s*\(|\bup:|\bdown:|\bgood:|\bbad:|\bwarn:/
 
@@ -34,6 +34,7 @@ const IDENTITY = new Set([
   'components/profile/achievements-grid.tsx', // per-category identity colours
   'components/activity/activity-route-map.tsx', // map markers, canvas paint
   'components/health/body-cards/rhr-hrv-spo2-card.tsx', // per-metric identity colours
+  'app/health/day/day-detail-content.tsx', // the heart-rate cell's identity red
   'components/health/sleep-timing-trend-card.tsx', // the wake-time line, drawn on a canvas
   'packages/shared/src/health/hr-zones.ts', // the deliberate blue → red ramp
   'packages/shared/src/rarity-colors.ts', // identity

@@ -6,7 +6,7 @@ import { setColor, formatTime } from "./utils"
 import { useWorkoutStore } from "@/lib/stores/workout-store"
 
 const REST_COLOR = "#94a3b8"
-const OVER_COLOR = "#f87171"
+const OVER_COLOR = "var(--destructive)"
 const D = 144
 const CX = D / 2
 const CY = D / 2
