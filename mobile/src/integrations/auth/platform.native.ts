@@ -41,11 +41,15 @@ async function store() {
 export const authPlatform: AuthPlatform = {
   client,
   fetch: nativeFetch,
-  async revokeSession(origin, accessToken) {
+  async revokeSession(origin, accessToken, refreshToken) {
+    // The refresh token outlives the one-day access token, so it is what names the sign-in to end.
     await nativeFetch(`${origin}/api/auth/native-session/revoke`, {
       method: 'POST',
       credentials: 'omit',
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: refreshToken
+        ? { 'Content-Type': 'application/json' }
+        : { Authorization: `Bearer ${accessToken}` },
+      ...(refreshToken ? { body: JSON.stringify({ refreshToken }) } : {}),
       signal: AbortSignal.timeout(5000),
     });
   },

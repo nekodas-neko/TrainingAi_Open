@@ -65,7 +65,9 @@ export async function POST(_req: Request) {
     facts.prs = weekPrs.map(pr => describePersonalRecord(pr.exerciseName, pr.estimated1rm, typeByName.get(pr.exerciseName)))
   }
 
-  if (foodLogs.length > 0 && nutritionTargets) {
+  // A day with food but no targets row still gets the eaten-so-far line, without a budget or a
+  // protein target to set it against.
+  if (foodLogs.length > 0) {
     const totals = foodLogs.reduce((acc, l) => ({
       calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG,
       carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG,
@@ -73,9 +75,11 @@ export async function POST(_req: Request) {
     // #2071. The denominator is the day's budget — the number the end-of-day review this digest sits
     // in prints above it — not the typed goal (`nutritionTargets.calories`). Read only when there is
     // food to judge, and a failed read costs the figure rather than the digest.
-    const dayBudgetKcal = await computeEnergyBalance(repo, userId, tz, todayIso)
-      .then(r => r.balance?.budgetKcal ?? null)
-      .catch(() => null)
+    const dayBudgetKcal = nutritionTargets
+      ? await computeEnergyBalance(repo, userId, tz, todayIso)
+        .then(r => r.balance?.budgetKcal ?? null)
+        .catch(() => null)
+      : null
     const weeklyKg = dayBudgetKcal != null ? projectWeeklyWeightChangeKg(totals.calories - dayBudgetKcal) : null
 
     // Q-303: a single logged day looks exactly like a representative one, so the digest says how
@@ -87,7 +91,7 @@ export async function POST(_req: Request) {
       kcal: totals.calories,
       budgetKcal: dayBudgetKcal,
       proteinG: totals.proteinG,
-      proteinTargetG: nutritionTargets.proteinG ?? null,
+      proteinTargetG: nutritionTargets?.proteinG ?? null,
       weeklyKg,
       loggedDays: nutritionWindow.length,
       windowDays: DEFAULT_WINDOW_DAYS,

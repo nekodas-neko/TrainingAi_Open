@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   find: vi.fn(),
+  findById: vi.fn(),
   revoke: vi.fn(),
   auth: vi.fn(),
 }));
@@ -10,6 +11,7 @@ vi.mock('@/lib/data', () => ({
   getRepositoryAsync: async () => ({
     createNativeRefreshToken: mocks.create,
     findNativeRefreshTokenByHash: mocks.find,
+    findNativeRefreshTokenById: mocks.findById,
     revokeNativeRefreshTokenFamily: mocks.revoke,
   }),
 }));
@@ -19,6 +21,7 @@ import { POST } from '../route';
 import { issueNativeSession } from '@/lib/auth/mobile/session';
 import { bearerSession } from '@/lib/auth/bearer-session';
 import { sessionTokenFrom } from '@/lib/auth/session-token';
+const SESSION_ID = '5e551011-0000-4000-8000-000000002076';
 const user = {
   id: 'user',
   email: 'user@example.invalid',
@@ -31,9 +34,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('AUTH_SECRET', 'native-revocation-test-secret-long-enough');
   mocks.auth.mockResolvedValue({ user: { id: user.id } });
-  mocks.create.mockResolvedValue({});
-  mocks.find.mockResolvedValue({
-    id: 'session',
+  mocks.create.mockResolvedValue({ id: SESSION_ID, expiresAt: new Date(Date.now() + 60000) });
+  mocks.findById.mockResolvedValue({
+    id: SESSION_ID,
     userId: user.id,
     familyId: 'family',
     expiresAt: new Date(Date.now() + 60000),
@@ -47,6 +50,7 @@ describe('revocable native bearer sessions', () => {
     const issued = await issueNativeSession(user);
     expect(mocks.create.mock.calls[0][0].tokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(mocks.create.mock.calls[0][0].tokenHash).not.toBe(issued.accessToken);
+    expect(mocks.create.mock.calls[0][0].tokenHash).not.toBe(issued.refreshToken);
     const headers = new Headers({ authorization: `Bearer ${issued.accessToken}` });
     expect(await sessionTokenFrom(new Headers({ cookie: `authjs.session-token=${issued.accessToken}` }))).toBeNull();
     expect((await bearerSession(headers, async () => user))?.user.id).toBe(user.id);
@@ -60,8 +64,9 @@ describe('revocable native bearer sessions', () => {
         )
       ).status,
     ).toBe(200);
+    expect(mocks.findById).toHaveBeenCalledWith(user.id, SESSION_ID);
     expect(mocks.revoke).toHaveBeenCalledWith(user.id, 'family', 'sign_out');
-    mocks.find.mockResolvedValue({
+    mocks.findById.mockResolvedValue({
       userId: user.id,
       expiresAt: new Date(Date.now() + 60000),
       revokedAt: new Date(),
@@ -76,10 +81,10 @@ describe('revocable native bearer sessions', () => {
       { userId: 'other' },
       { userId: user.id, expiresAt: new Date(0) },
     ]) {
-      mocks.find.mockResolvedValue(stored);
+      mocks.findById.mockResolvedValue(stored);
       expect(await bearerSession(headers, async () => user)).toBeNull();
     }
-    mocks.find.mockRejectedValue(new Error('database offline'));
+    mocks.findById.mockRejectedValue(new Error('database offline'));
     await expect(bearerSession(headers, async () => user)).rejects.toThrow('temporarily unavailable');
     mocks.auth.mockResolvedValue(null);
     expect(
