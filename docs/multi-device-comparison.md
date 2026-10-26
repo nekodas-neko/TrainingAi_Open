@@ -4,6 +4,10 @@ _Written 2026-08-26 alongside the Colmi connector (PS-8). The owner now wears up
 and the point of the Colmi is comparison, so this is the reference for doing it without producing
 confident nonsense._
 
+> **Retired (#2862, 26 Oct 2026):** the `GET /api/admin/device-comparison` endpoint and
+> `lib/health/device-comparison.ts` described below were removed, along with the Polar H10 comparison
+> harness. The reasoning about what can honestly be matched still stands; the code does not exist.
+
 **Related:** [`2026-08-26-alternative-ring-colmi-testing.md`](superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md)
 (the connector) · [`device-agnostic-source-architecture.md`](device-agnostic-source-architecture.md)
 (raw-capable vs computed) · `GET /api/admin/device-comparison` · `lib/health/device-comparison.ts`

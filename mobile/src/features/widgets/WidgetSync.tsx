@@ -10,7 +10,7 @@ import { trainingDays } from '../home/data/models';
 import { homeRecommendationModel } from '../home/data/recommendation-model';
 import { homeScoreChips } from '../home/data/score-chips';
 import { trainingDaySpecs } from '../home/data/training-days';
-import { nutritionEnergyModel } from '../nutrition/data/energy-model';
+import { budgetEnergyModel, nutritionEnergyModel } from '../nutrition/data/energy-model';
 import { useNutrition } from '../nutrition/data/NutritionProvider';
 import { recordedIntakeOf } from '../nutrition/data/recorded-intake';
 import { usePassiveResource } from '../workouts/data/WorkoutDataProvider';
@@ -18,6 +18,7 @@ import { useWorkoutJournal } from '../workouts/logging/WorkoutJournalProvider';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
 import { useAccountContext } from '../account/AccountProvider';
 import { hasContent, snapshotIdentity, widgetSnapshot } from './snapshot';
+import { useWidgetWaterDrain } from './useWidgetWaterDrain';
 
 const DEBOUNCE_MS = 1_000;
 
@@ -27,7 +28,8 @@ const DEBOUNCE_MS = 1_000;
  * refreshes anything, so it adds no request at app start. A value not loaded yet stays null, and
  * hasContent() keeps the last snapshot until there is something to draw. It writes about a second
  * after the numbers settle, only when they changed, and at once when the app goes to the
- * background. Renders nothing; mounted only where the native module exists.
+ * background. It also records the +250 ml taps made on the home screen (useWidgetWaterDrain).
+ * Renders nothing; mounted only where the native module exists.
  */
 export function WidgetSync() {
   const userId = useAccountContext().dataReader?.userId ?? null;
@@ -38,6 +40,7 @@ export function WidgetSync() {
 
 const AccountWidgetSync = memo(function AccountWidgetSync({ userId }: { userId: string }) {
   const snapshot = useWidgetSnapshot(userId);
+  useWidgetWaterDrain(userId);
   const latest = useRef<{ json: string; identity: string } | null>(null);
   const written = useRef<string | null>(null);
   latest.current = snapshot;
@@ -128,11 +131,23 @@ function useWidgetSnapshot(userId: string) {
       today,
     ],
   );
+  const recordedIntake = recordedIntakeOf(nutrition, today, energyData?.balance).intake;
+  // "kcal left" is Home's nutrition card: the energy balance's budget alone, never the calorie
+  // target (budgetEnergyModel). The macro targets are the Nutrition screen's own.
+  const budget = useMemo(
+    () =>
+      budgetEnergyModel({
+        totals: nutrition.view.totals,
+        recordedIntake,
+        budgetKcal: energyData?.balance?.budgetKcal,
+      }),
+    [nutrition.data, nutrition.operations, energyData, today],
+  );
   const energy = useMemo(
     () =>
       nutritionEnergyModel({
         totals: nutrition.view.totals,
-        recordedIntake: recordedIntakeOf(nutrition, today, energyData?.balance).intake,
+        recordedIntake,
         budgetKcal: energyData?.balance?.budgetKcal,
         targetCalories: nutrition.view.targets.calories,
         targets: nutrition.view.targets,
@@ -153,10 +168,11 @@ function useWidgetSnapshot(userId: string) {
       battery: battery.data,
       recommendation,
       energy,
+      budget,
       water: { ml: waterMl, goalMl },
     });
     return hasContent(built) ? { built, identity: snapshotIdentity(built) } : null;
-  }, [userId, today, workout.timezone, scores, battery.data, recommendation, energy, waterMl, goalMl]);
+  }, [userId, today, workout.timezone, scores, battery.data, recommendation, energy, budget, waterMl, goalMl]);
   // Keyed on the identity string alone: the same numbers keep the same object, so the write
   // effect does not re-run when only the time would change.
   return useMemo(

@@ -94,10 +94,9 @@ describe('check-strict-request-schemas inert note (LA-88)', () => {
     expect(out).toContain('the strictness cannot fire')
   })
 
-  it('names the five routes that build their own object', () => {
+  it('names the four routes that build their own object', () => {
     for (const f of [
       'app/api/admin/ai-usage/route.ts',
-      'app/api/admin/app-load-report/route.ts',
       'app/api/coach/options/route.ts',
       'app/api/exercise-gif/route.ts',
       'app/api/nutrition/barcode/route.ts',
@@ -112,7 +111,7 @@ describe('check-strict-request-schemas inert note (LA-88)', () => {
     expect(out).not.toContain('app/api/running-plan/runs/[id]/route.ts')
   })
 
-  it('is a note, not a failure — these are five routes, not five bugs', () => {
+  it('is a note, not a failure — these are four routes, not four bugs', () => {
     // For a GET whose only input is one named param, dropping the rest is arguably right and
     // 400-ing on a cache-buster would be worse. The cost is the REPORT, not the routes.
     expect(() => run()).not.toThrow()

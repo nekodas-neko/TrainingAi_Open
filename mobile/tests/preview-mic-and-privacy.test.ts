@@ -46,6 +46,9 @@ test('the widget guard refuses writes after a clear until resume()', () => {
   const guarded = guardHomeWidgets({
     writeSnapshot: (json) => calls.push(`write:${json}`),
     clearSnapshot: () => calls.push('clear'),
+    peekPending: () => '[]',
+    ackPending: () => {},
+    takeLaunchTarget: () => null,
   });
   guarded.writeSnapshot('a');
   guarded.clearSnapshot();

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import {
-  CURRENT_VS_QUESTION,
   ILLNESS_CONTEXT_OPTIONS,
   storedOrderLabels,
 } from '@trainingai/shared/types/day-checkin';
@@ -17,23 +16,19 @@ import {
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useHealthData } from '../data/HealthDataProvider';
-import { checkinSpec, verdictSpec } from '../data/checkin';
+import { carriedVsNormal, checkinSpec, verdictSpec } from '../data/checkin';
 import { verdictCopy, type StoredSleepVerdict } from '@trainingai/shared/health/sleep-verdict-copy';
 import { saveSleepValue } from '@trainingai/shared/checkin/save-sleep-value';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 const draftSchema = z.object({
   correction: z.number().int().min(1).max(5).nullable(),
   acknowledged: z.boolean(),
-  vs: z.enum(['better', 'same', 'worse']).nullable(),
-  vsTouched: z.boolean().nullable(),
   illness: z.enum(['sick', 'alcohol', 'poor_sleep']).nullable(),
   edited: z.boolean(),
 });
 const initial: z.infer<typeof draftSchema> = {
   correction: null,
   acknowledged: false,
-  vs: 'same',
-  vsTouched: false,
   illness: null,
   edited: false,
 };
@@ -70,9 +65,6 @@ export function MorningCheckinSheet({ onClose }: { onClose: () => void }) {
               row.sleepQualityFeelTouched && typeof row.sleepQualityFeel === 'number'
                 ? row.sleepQualityFeel
                 : null,
-            vs: (row.vsNormal as typeof value.vs) ?? null,
-            vsTouched:
-              row.vsNormal != null ? ((row.vsNormalTouched as boolean | null) ?? null) : false,
             illness: (row.illnessContext as typeof value.illness) ?? null,
           },
     );
@@ -99,11 +91,7 @@ export function MorningCheckinSheet({ onClose }: { onClose: () => void }) {
           sleepQualityFeel: sleep.value,
           sleepQualityFeelTouched: sleep.touched,
           illnessContext: draft.value.illness,
-          vsNormal: draft.value.vs,
-          ...(draft.value.vs != null ? { vsQuestion: CURRENT_VS_QUESTION } : {}),
-          ...(draft.value.vs != null && draft.value.vsTouched != null
-            ? { vsNormalTouched: draft.value.vsTouched }
-            : {}),
+          ...carriedVsNormal(row),
           motivation: null,
           restingSoreness: null,
           wakeMood: null,
@@ -187,17 +175,6 @@ export function MorningCheckinSheet({ onClose }: { onClose: () => void }) {
               )}
             </Card>
           )}
-          <ChipPicker
-            label="Compared to normal"
-            value={draft.value.vs}
-            options={[
-              { label: 'Better', value: 'better' },
-              { label: 'About the same', value: 'same' },
-              { label: 'Worse', value: 'worse' },
-            ]}
-            disabled={!draft.ready}
-            onChange={(vs) => update({ vs, vsTouched: true })}
-          />
           <ChipPicker
             label="Anything affecting today?"
             value={draft.value.illness}

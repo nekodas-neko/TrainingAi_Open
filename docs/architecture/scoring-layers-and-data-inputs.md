@@ -170,14 +170,17 @@ decision.
 | Pillar (points) | Scores and their points possible |
 |---|---|
 | Sleep (30) | duration 9 · efficiency 6 · 7-night balance 4.5 · timing 4.5 · deep + REM share 3 · latency 3 |
-| Heart (30) | overnight HRV 10.5 · overnight resting HR 9 · settling 4.5 · HR recovery 3 · daytime resting HR 3 (not built) |
-| Activity (20) | yesterday's steps 7 · training load 6 · zone minutes 4 · block trend 3 (not built) |
+| Heart (23.5) | overnight HRV and resting HR 13 together (7 + 6, one budget) · settling 4.5 · HR recovery 3 · daytime resting HR 3 (not built) |
+| Activity (20) | yesterday's steps, scored as load 7 · training load 6 · zone minutes 4 · block trend 3 (not built) |
 | Body (20) | temperature 5 · breathing rate 4 · fuel 4 · SpO₂ 3 · daytime stress 2 · weight vs plan 2 |
 
-A score's points possible is its weight inside its pillar times the pillar's share of readiness:
-duration is 30% of Sleep, and Sleep is 30 points, so duration is worth 9. The code stores the two
-numbers separately (`UNIT_DEFS[...].weight` and `PILLAR_WEIGHTS` in
-`shadow-readiness/model.ts`); points possible is their product ÷ 100 (30 × 30 ÷ 100 = 9).
+A score's points possible is stored as is (`UNIT_DEFS[...].points` in `shadow-readiness/model.ts`),
+and **pillar totals float** (owner, 26 Oct, #2833): a pillar is worth the sum of its scores' points
+(`PILLAR_POINTS`), so adding, sharing or cutting a score moves its own pillar and nothing else.
+Through model version 3 the totals were fixed at 30 / 30 / 20 / 20. Version 4 gives Heart 23.5
+because overnight HRV and resting HR now count as one pattern with one 13-point budget (it was 19.5,
+owner, 26 Oct, #2826): if only one of them scored that night it carries all 13. Yesterday's activity
+is scored as load, steady around the person's own normal day, not as a step target to reach.
 
 - **Points earned** = score × points possible ÷ 100.
 - **Points lost** = points possible − points earned.
@@ -214,10 +217,13 @@ and the other pillars share its points.
 Today daytime resting HR and block trend aren't built, so their points are always shared by the rest
 of Heart and Activity. HR recovery is new, so it counts at half weight until its normal settles.
 
-**Proposed, not built:** two more factors that scale a weight down: **source quality** (an estimated
-value, such as stages from the phone's stager, counts less than a measured one) and **reliability**
-(a score that has been patchy lately counts less until it shows up most nights). Both would keep
-missing data at zero weight.
+**Built in version 4 (owner, 26 Oct, #2833):** two factors scale a score's weight down. **Quality**:
+an estimated value counts half as much as a measured one (today, deep + REM share from the ring's
+Bluetooth rollup, whose stages are our own stager's). **Reliability**: a score present on less than
+70% of the last 14 days counts in proportion, never under a quarter; a score with under a week
+behind it, or one that only has a value after an event (HR recovery), is not judged. Both keep
+missing data at zero weight, and a pillar's points are multiplied by the mean factor of the scores
+in it, so a pillar built from estimates is worth less. Health and Nutrition stay inside Body for now.
 
 ### 3.4 Red flags set a ceiling on readiness
 
@@ -232,11 +238,15 @@ every time a metric is added, and it can't guarantee how low readiness goes. A c
 depend on how many metrics there are. On 2026-10-12 the owner leaned towards the ceiling; its exact
 form and numbers are a tuning decision.
 
-**Proposed: graded.** For example, temperature +0.3 °C above normal sets a ceiling of 80, +0.5 °C
-sets 60 and +0.7 °C sets 40, with the ceiling interpolated between those points, so 37.9 °C and
-38.0 °C land a few points apart. When
-several flags fire, the lowest ceiling applies, and the proposal could lower it further when flags
-stack. The numbers below are today's proposal:
+**Built in version 4, graded (owner, 26 Oct, #2832):** temperature +0.3 °C above normal sets a
+ceiling of 80, +0.5 °C sets 60 and +0.7 °C sets 40, interpolated between those points (flat at 40
+beyond, no ceiling under +0.3), so 37.9 °C and 38.0 °C land a few points apart. When several flags
+fire, the lowest ceiling applies. Every number is a named constant (`CEILING` in `model.ts`). The
+stored `shadowReadiness` is the capped number; `pillar_detail.ceiling` keeps what fired and the
+weighted sum before it. The illness check is the live radar's rule (`computeIllnessRadar`) over
+temperature, breathing and one heart signal (the worse of HRV and resting HR, since they move
+together), and it needs two of the three. The temperature and illness caps wait for a cycle-aware
+normal when the cycle is tracked without one. The live score is untouched. The numbers:
 
 | Score | Red flag | Live readiness today | Shadow model (proposed ceiling) |
 |---|---|---|---|
@@ -647,8 +657,9 @@ and [`owner-manual.md`](../owner-manual.md).
 - **Red flags:** a graded ceiling on readiness (the owner's leaning, 2026-10-12), and its numbers
   (#2832).
 - **Source-quality and reliability factors** on weights: adopt them or not (#2833).
-- **Pillar weights:** keep Sleep 30 · Heart 30 · Activity 20 · Body 20, or let totals float with
-  splits (#2833)?
+- **Pillar weights:** decided for the shadow model (owner, 26 Oct, #2833): totals float with their
+  scores' points (section 3). What is open is whether the live score follows it, which is a
+  `type: tuning` proposal with the days it moves.
 - **New pillars:** split Health and Nutrition out of Body (#2833), and whether the morning check-in
   becomes its own wellness part of readiness (#2823).
 - **Training load:** count cardio and runs, through session RPE (#2823).

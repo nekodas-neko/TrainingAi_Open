@@ -141,7 +141,6 @@ for (const family of LEARNING_MODE) {
     //     Keep this list short and justify every entry. An entry that computes anything a user is
     //     shown as their own number belongs in rule (d), not here.
     const SANCTIONED_READERS = new Set([
-      'lib/oura-comparison-harness-adapters.ts',   // the comparison harness — the point of learning mode
       'components/settings/colmi-pairing.tsx',     // pair / sync UI: drives the device, computes nothing
       // Mounted in the tab shell so the ring syncs unattended. It TRIGGERS a sync and reads nothing:
       // the isolation protected here is that no scoring input is fed from the ring, and a caller

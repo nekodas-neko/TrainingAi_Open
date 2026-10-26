@@ -1,13 +1,15 @@
 import { dropSparseHrHours, isDenseHrSpan, DENSITY_GATED_HR_SOURCES } from '@trainingai/shared/health/intraday-hr-contributors'
-import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, type SQL } from 'drizzle-orm'
+import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
+import { overnightHrvFromSeries } from '@trainingai/shared/health/oura-sleep-detail'
 import type { OuraCloudHeartrateWrite, OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
 import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/shared/date-utils'
 import { shouldPrune } from '../retention-throttle'
+import { errorLog } from '@trainingai/shared/logger'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
 import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
@@ -263,9 +265,9 @@ const asJob = (r: {
  *
  * - it is returned with `alreadyRunning: true` if it writes everything `opts` asks for, so the
  *   caller can follow it;
- * - otherwise `refused: true` and nothing is inserted. Issue 2383: a step backfill used to follow a
- *   plain redecode, the step correction never ran, and the screen said it had. The rule is
- *   `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
+ * - otherwise `refused: true` and nothing is inserted. Issue 2383: a request used to follow a
+ *   redecode that did not write what it asked for (then the step backfill, retired in #2862), its
+ *   correction never ran, and the screen said it had. The rule is `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
  *
  * Two requests racing past the read both try the insert; the index lets one through and the other
  * gets no row back, then reads the winner and applies the same rule rather than surfacing a 500.
@@ -704,6 +706,8 @@ export async function upsertOuraCloudSleep(
     includeSameStart: true,
     sameSource: 'replace',
     write: async r => {
+      // #2210: read before anything below moves or replaces the night.
+      const before = await readLiveCloudNight(db, userId, r.ouraId!)
       const start = r.sleepStart.toISOString()
       const moved = await db.execute(sql`
         UPDATE sleep_sessions h
@@ -729,9 +733,64 @@ export async function upsertOuraCloudSleep(
       // settle loop, so a later period in the same batch sees it as an overlap (#3106 review: a batch
       // holding a stale and a new version of one night used to leave both live).
       await upsertOuraSleep(db, userId, [r], 'oura_cloud', { replaceOwnCloud: true })
+      if (before) await recordSleepRevision(db, userId, before)
     },
   })
   return { written: kept.length, skippedOverlap: skipped, yielded }
+}
+
+// ── #2210: a night Oura revised is recorded, not just replaced ─────────────────────────────────
+// The fields that make a night what it is. Not Oura's own `sleep_score` (never ours, and Oura
+// re-scores without changing the night; `rescore-nights.ts` leaves it out of its fingerprint too),
+// and not ids, stamps or provenance.
+const SLEEP_REVISION_FIELDS = [
+  'date', 'sleepStart', 'sleepEnd', 'durationHours', 'deepSleepHours', 'remSleepHours', 'lightSleepHours',
+  'awakHours', 'efficiency', 'onsetLatencySec', 'averageHrvMs', 'avgHeartRate', 'lowestHeartRate',
+  'restlessPeriods', 'respiratoryRate', 'sleepPhase5Min', 'timeInBedHours',
+] as const
+
+type SleepRevisionFields = Pick<typeof s.sleepSessions.$inferSelect, typeof SLEEP_REVISION_FIELDS[number]>
+export type StoredCloudNight = SleepRevisionFields & { id: string; ouraId: string | null }
+
+const revisionValue = (v: unknown) => (v instanceof Date ? v.toISOString() : v ?? null)
+
+/** The fields whose value differs between two reads of one night, as `{ field: { old, new } }`; null when none do. */
+export function sleepRevisionChanges(before: SleepRevisionFields, after: SleepRevisionFields): Record<string, { old: unknown; new: unknown }> | null {
+  const out: Record<string, { old: unknown; new: unknown }> = {}
+  for (const f of SLEEP_REVISION_FIELDS) {
+    const o = revisionValue(before[f]), n = revisionValue(after[f])
+    if (o !== n) out[f] = { old: o, new: n }
+  }
+  return Object.keys(out).length > 0 ? out : null
+}
+
+/** The live, non-manual night holding this Oura Cloud id, or null (a first write, or a tombstoned night coming back). */
+async function readLiveCloudNight(db: Db, userId: string, ouraId: string): Promise<StoredCloudNight | null> {
+  const t = s.sleepSessions
+  const [row] = await db.select().from(t)
+    .where(and(eq(t.userId, userId), eq(t.ouraId, ouraId), isNull(t.deletedAt), eq(t.manualEntry, false)))
+    .limit(1)
+  return row ?? null
+}
+
+/**
+ * After a replace: reads the night again and, if any tracked value differs from `before`, appends one
+ * `sleep_session_revisions` row. A re-delivery with the same values records nothing. A failure is
+ * logged and never fails the sleep write it follows.
+ */
+async function recordSleepRevision(db: Db, userId: string, before: StoredCloudNight): Promise<void> {
+  try {
+    const t = s.sleepSessions
+    const [after] = await db.select().from(t).where(and(eq(t.id, before.id), isNull(t.deletedAt))).limit(1)
+    if (!after) return
+    const changes = sleepRevisionChanges(before, after)
+    if (!changes) return
+    await db.insert(s.sleepSessionRevisions).values({
+      userId, sleepSessionId: after.id, ouraId: after.ouraId, day: after.date, source: 'oura_cloud', changes,
+    })
+  } catch (err) {
+    errorLog('[oura-sleep-revisions] could not record a revision:', err instanceof Error ? err.message : String(err))
+  }
 }
 
 /**
@@ -841,6 +900,16 @@ export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date;
   return { kept, yielded, skipped }
 }
 
+/** A day's main Oura Cloud period, as `body_metrics` reads it (#3080). */
+export interface MainSleepPeriod {
+  date: string
+  /** Oura's own per-night average, as stored on `sleep_sessions`. Kept beside ours, not used for the night. */
+  averageHrvMs: number | null
+  lowestHeartRate: number | null
+  /** #3075: our overnight HRV from the period's stored 5-minute series, or null when it holds none. */
+  overnightHrvMs: number | null
+}
+
 /**
  * #3080. Each wake date's main Oura Cloud period, the one whose HRV and resting heart rate stand for
  * the night in `body_metrics`: the longest live `long_sleep`, else the longest live `sleep` period
@@ -852,25 +921,29 @@ export async function settleNights<T extends { sleepStart: Date; sleepEnd: Date;
  */
 export async function getOuraMainSleepPeriods(
   db: Db, userId: string, dates: string[], tz: string,
-): Promise<{ date: string; averageHrvMs: number | null; lowestHeartRate: number | null }[]> {
+): Promise<MainSleepPeriod[]> {
   if (dates.length === 0) return []
   const rows = await db.execute<{
     date: string; sleep_type: string; sleep_start: Date; sleep_end: Date; duration_hours: number | null
-    average_hrv_ms: number | null; lowest_heart_rate: number | null
+    average_hrv_ms: number | null; lowest_heart_rate: number | null; hrv_series: s.OuraSampleSeries | null
   }>(sql`
-    SELECT s.date::text AS date, p.sleep_type, s.sleep_start, s.sleep_end, s.duration_hours, s.average_hrv_ms, s.lowest_heart_rate
+    SELECT s.date::text AS date, p.sleep_type, s.sleep_start, s.sleep_end, s.duration_hours, s.average_hrv_ms, s.lowest_heart_rate,
+           p.hrv AS hrv_series
       FROM sleep_sessions s
       JOIN oura_cloud_sleep_periods p ON p.user_id = s.user_id AND p.oura_id = s.oura_id
      WHERE s.user_id = ${userId} AND s.deleted_at IS NULL AND NOT s.manual_entry
        AND s.date IN (${sql.join(dates.map(d => sql`${d}::date`), sql`, `)})
        AND p.sleep_type IN ('long_sleep', 'sleep')
      ORDER BY s.date, (p.sleep_type = 'long_sleep') DESC, s.duration_hours DESC NULLS LAST, s.sleep_start`)
-  const out = new Map<string, { date: string; averageHrvMs: number | null; lowestHeartRate: number | null }>()
+  const out = new Map<string, MainSleepPeriod>()
   for (const r of rows.rows) {
     if (out.has(r.date)) continue
     const window = { sleepStart: new Date(r.sleep_start), sleepEnd: new Date(r.sleep_end), durationHours: r.duration_hours }
     if (r.sleep_type !== 'long_sleep' && !isNightWindow(window, tz)) continue
-    out.set(r.date, { date: r.date, averageHrvMs: r.average_hrv_ms, lowestHeartRate: r.lowest_heart_rate })
+    out.set(r.date, {
+      date: r.date, averageHrvMs: r.average_hrv_ms, lowestHeartRate: r.lowest_heart_rate,
+      overnightHrvMs: overnightHrvFromSeries(r.hrv_series),
+    })
   }
   return [...out.values()]
 }
@@ -1199,14 +1272,18 @@ export interface OuraSessionRow {
 }
 
 /** The user's Oura sessions (meditation, breathing, nap, rest …) on local days `[fromDay, toDay]`, by
- *  Oura's own `day`, oldest first (#3077: the timeline's source now that `oura_tags` has no writer). */
+ *  Oura's own `day`, oldest first (#3077: the timeline's source now that `oura_tags` has no writer).
+ *  A session deleted in the Oura app is tombstoned, and left out (#3153). */
 export async function listOuraSessions(db: Db, userId: string, fromDay: string, toDay: string) {
   return db.select({
     ouraId: s.ouraSessions.ouraId, sessionType: s.ouraSessions.sessionType, mood: s.ouraSessions.mood,
     startDatetime: s.ouraSessions.startDatetime, endDatetime: s.ouraSessions.endDatetime,
   })
     .from(s.ouraSessions)
-    .where(and(eq(s.ouraSessions.userId, userId), gte(s.ouraSessions.day, fromDay), lte(s.ouraSessions.day, toDay)))
+    .where(and(
+      eq(s.ouraSessions.userId, userId), gte(s.ouraSessions.day, fromDay), lte(s.ouraSessions.day, toDay),
+      isNull(s.ouraSessions.deletedAt),
+    ))
     .orderBy(asc(s.ouraSessions.startDatetime))
 }
 
@@ -1222,9 +1299,44 @@ export async function upsertOuraSessions(db: Db, userId: string, rows: OuraSessi
         startDatetime: sql`excluded.start_datetime`, endDatetime: sql`excluded.end_datetime`, mood: sql`excluded.mood`,
         heartRate: sql`excluded.heart_rate`, heartRateVariability: sql`excluded.heart_rate_variability`,
         motionCount: sql`excluded.motion_count`, updatedAt: sql`now()`,
+        // #3153: a session Oura sends again is live again, as a re-sent workout is (#3087).
+        deletedAt: sql`NULL`,
       },
     })
   return values.length
+}
+
+/**
+ * #3153: tombstones sessions the user deleted in the Oura app (a `session` delete event). The row is
+ * kept and marked, never deleted; `listOuraSessions` leaves it out. Only this user's rows. Moves
+ * `updated_at`, so anything pulling by it sees the change. Returns the rows newly tombstoned.
+ */
+export async function tombstoneOuraSessions(db: Db, userId: string, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  const t = s.ouraSessions
+  const rows = await db.update(t)
+    .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
+    .where(and(eq(t.userId, userId), inArray(t.ouraId, ids), isNull(t.deletedAt)))
+    .returning({ ouraId: t.ouraId })
+  return rows.length
+}
+
+/**
+ * #3153: tombstones this user's sessions on `from`..`to` (Oura's `day`) that are not in `keepIds`,
+ * the full list Oura just returned for those days: the catch-up for a missed delete event, the
+ * same sweep as `tombstoneOuraWorkoutsAbsent`. The caller passes only days it read completely.
+ */
+export async function tombstoneOuraSessionsAbsent(
+  db: Db, userId: string, range: { from: string; to: string; keepIds: string[] },
+): Promise<number> {
+  const t = s.ouraSessions
+  const conditions = [eq(t.userId, userId), gte(t.day, range.from), lte(t.day, range.to), isNull(t.deletedAt)]
+  if (range.keepIds.length > 0) conditions.push(sql`${t.ouraId} NOT IN (${sql.join(range.keepIds.map(id => sql`${id}`), sql`, `)})`)
+  const rows = await db.update(t)
+    .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
+    .where(and(...conditions))
+    .returning({ ouraId: t.ouraId })
+  return rows.length
 }
 
 /**
@@ -1472,9 +1584,22 @@ async function writeHeartrateRows(
   const now = Date.now()
   if (shouldPrune(lastHeartrateStorePrune, now, HR_PRUNE_THROTTLE_MS)) {
     lastHeartrateStorePrune = now
-    db.execute(sql`DELETE FROM oura_heartrate WHERE timestamp < now() - (${HR_RETENTION_DAYS} || ' days')::interval`).catch(err => recordPruneFailure(db, 'oura_heartrate', err))
+    pruneHeartrate(db).catch(err => recordPruneFailure(db, 'oura_heartrate', err))
   }
   return changed
+}
+
+/** Delete heart rate past `HR_RETENTION_DAYS`, first freezing the calorie gate's verdict for every
+ *  workout whose series is about to lose a reading (#3150). One transaction, so a series is never
+ *  deleted without its verdict stored; `now()` is the transaction's start, so both statements cut at
+ *  the same instant. Takes a transaction too (it nests as a savepoint), which is how its tests roll
+ *  the global delete back. */
+export async function pruneHeartrate(db: Db | Tx): Promise<void> {
+  const cutoff = sql`now() - (${HR_RETENTION_DAYS} || ' days')::interval`
+  await db.transaction(async tx => {
+    await freezeWorkoutHrDensity(tx, cutoff)
+    await tx.execute(sql`DELETE FROM oura_heartrate WHERE timestamp < ${cutoff}`)
+  })
 }
 
 // ── Coarse trend buckets (RRD ladder) ─────────────────────────────────────────
@@ -2103,30 +2228,23 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
  *
  * So is a session whose heart rate was too sparse to average (#3078), but only where #2437 already
  * holds a source to the density rule: a session whose every in-window reading comes from a
- * `DENSITY_GATED_HR_SOURCES` source (Health Connect, Apple Health, Oura Cloud; #3114) must pass
- * `isDenseHrSpan` (two readings at least, no gap over `HR_DENSE_MAX_GAP_MS`) between its start and
- * end, so an Oura-app workout's 5-second series keeps its average and scattered readings fall back
- * to METs. A session with any reading from the ring's BLE or the strap keeps its average, as before. Checked here, when the
- * estimate is made, so a snapshot computed before the rule is held to it too. A session with no
- * in-window reading left (past HR retention, or never any) keeps its snapshot: there is nothing to
- * check, and #3150 tracks what that means for a gated session once its series is pruned. Every
+ * `DENSITY_GATED_HR_SOURCES` source (Health Connect, Apple Health, Oura Cloud) must pass `isDenseHrSpan` (two
+ * readings at least, no gap over `HR_DENSE_MAX_GAP_MS`) between its start and end. A session with
+ * any reading from the ring's BLE or the strap keeps its average, as before; Oura Cloud is gated
+ * since #3114, so an Oura-app workout's dense 5-second series keeps its average and a scattered
+ * Oura-only session falls back to METs. Checked here, when the
+ * estimate is made, so a snapshot computed before the rule is held to it too. Once the prune reaches
+ * a session's series, the verdict stored just before it (`hr_dense`, `freezeWorkoutHrDensity`, #3150)
+ * decides instead, so a sparse gated session stays on METs after its heart rate is gone. A session
+ * with neither (no reading ever, or pruned before the freeze existed) keeps its snapshot. Every
  * calorie surface reads `avg_bpm` through here, so the gate is in one place.
  */
 export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: string[]): Promise<Map<string, number>> {
   if (sessionIds.length === 0) return new Map()
-  const gated = sql.join([...DENSITY_GATED_HR_SOURCES].map(g => sql`${g}`), sql`, `)
   const rows = await db
     .select({
       id: s.workoutHrStats.workoutSessionId, avgBpm: s.workoutHrStats.avgBpm, completedAt: s.workoutSessions.completedAt,
-      // The session's own series: how many readings, how many from a source the rule does not gate,
-      // and the longest gap between consecutive ones.
-      span: sql<{ n: number; ungated: number; max_gap_ms: number | null } | null>`(
-        SELECT json_build_object('n', count(*), 'ungated', count(*) FILTER (WHERE g.source IS NULL OR g.source NOT IN (${gated})), 'max_gap_ms', max(g.gap_ms)) FROM (
-          SELECT r.source, extract(epoch FROM r.timestamp - lag(r.timestamp) OVER (ORDER BY r.timestamp)) * 1000 AS gap_ms
-          FROM ${s.ouraHeartrate} r
-          WHERE r.user_id = ${userId}
-            AND r.timestamp >= ${s.workoutSessions.startedAt} AND r.timestamp <= ${s.workoutSessions.completedAt}
-        ) g)`,
+      hrDense: s.workoutHrStats.hrDense, span: workoutHrSpanSql(userId),
     })
     .from(s.workoutHrStats)
     .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.workoutHrStats.workoutSessionId))
@@ -2134,14 +2252,67 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
       eq(s.workoutHrStats.userId, userId),
       inArray(s.workoutHrStats.workoutSessionId, sessionIds),
     ))
-  const usable = (r: (typeof rows)[number]) => {
-    if (r.avgBpm == null || r.completedAt == null) return false
-    const n = Number(r.span?.n ?? 0)
-    // Nothing to check, or a source #2437 does not gate: the snapshot stands.
-    if (n === 0 || Number(r.span?.ungated ?? 0) > 0) return true
-    return isDenseHrSpan(n, r.span?.max_gap_ms == null ? null : Number(r.span.max_gap_ms))
-  }
+  // A frozen verdict wins: it was taken over the whole series, and what is left mid-prune is a part.
+  // Nothing to judge, live or frozen: the snapshot stands.
+  const usable = (r: (typeof rows)[number]) =>
+    r.avgBpm != null && r.completedAt != null && (r.hrDense ?? workoutHrSpanVerdict(r.span) ?? true)
   return new Map(rows.filter(usable).map(r => [r.id, r.avgBpm as number]))
+}
+
+/** A workout's own heart-rate series, start to end without the pads: how many readings, how many
+ *  from a source #2437 does not gate, and the longest gap between consecutive ones. Correlated on
+ *  `workout_sessions`; `userId` is a bound id or the session's own `user_id` column. The calorie gate
+ *  and the prune-time freeze both read this one query (#3150). */
+type WorkoutHrSpan = { n: number; ungated: number; max_gap_ms: number | null }
+function workoutHrSpanSql(userId: string | SQLWrapper): SQL<WorkoutHrSpan | null> {
+  const gated = sql.join([...DENSITY_GATED_HR_SOURCES].map(g => sql`${g}`), sql`, `)
+  return sql<WorkoutHrSpan | null>`(
+    SELECT json_build_object('n', count(*), 'ungated', count(*) FILTER (WHERE g.source IS NULL OR g.source NOT IN (${gated})), 'max_gap_ms', max(g.gap_ms)) FROM (
+      SELECT r.source, extract(epoch FROM r.timestamp - lag(r.timestamp) OVER (ORDER BY r.timestamp)) * 1000 AS gap_ms
+      FROM ${s.ouraHeartrate} r
+      WHERE r.user_id = ${userId}
+        AND r.timestamp >= ${s.workoutSessions.startedAt} AND r.timestamp <= ${s.workoutSessions.completedAt}
+    ) g)`
+}
+
+/** The calorie gate's verdict on one series (#3078): `null` with no reading to judge, `true` when any
+ *  reading comes from a source #2437 does not gate, else `isDenseHrSpan`. Read live by
+ *  `getAvgBpmBySession`, and stored by `freezeWorkoutHrDensity` before the prune deletes the series. */
+export function workoutHrSpanVerdict(span: WorkoutHrSpan | null): boolean | null {
+  const n = Number(span?.n ?? 0)
+  if (n === 0) return null
+  if (Number(span?.ungated ?? 0) > 0) return true
+  return isDenseHrSpan(n, span?.max_gap_ms == null ? null : Number(span.max_gap_ms))
+}
+
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
+
+/** Store `hr_dense` for every snapshot whose session has a reading older than `cutoff`, which the
+ *  prune is about to delete (#3150). Only where none is stored: the first prune to reach a session
+ *  sees its whole series (any earlier deletion of it would have frozen it then), and a later one
+ *  would judge only what is left. Returns how many verdicts it stored. */
+export async function freezeWorkoutHrDensity(tx: Db | Tx, cutoff: SQL): Promise<number> {
+  const rows = await tx
+    .select({ id: s.workoutHrStats.workoutSessionId, span: workoutHrSpanSql(s.workoutSessions.userId) })
+    .from(s.workoutHrStats)
+    .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.workoutHrStats.workoutSessionId))
+    .where(and(
+      isNull(s.workoutHrStats.hrDense),
+      isNotNull(s.workoutSessions.completedAt),
+      sql`${s.workoutSessions.startedAt} < ${cutoff}`,
+      sql`EXISTS (SELECT 1 FROM ${s.ouraHeartrate} r WHERE r.user_id = ${s.workoutSessions.userId}
+            AND r.timestamp >= ${s.workoutSessions.startedAt} AND r.timestamp <= ${s.workoutSessions.completedAt}
+            AND r.timestamp < ${cutoff})`,
+    ))
+  let stored = 0
+  for (const verdict of [true, false]) {
+    const ids = rows.filter(r => workoutHrSpanVerdict(r.span) === verdict).map(r => r.id)
+    if (ids.length === 0) continue
+    await tx.update(s.workoutHrStats).set({ hrDense: verdict })
+      .where(and(inArray(s.workoutHrStats.workoutSessionId, ids), isNull(s.workoutHrStats.hrDense)))
+    stored += ids.length
+  }
+  return stored
 }
 
 export async function getWorkoutHrStats(db: Db, userId: string, sessionId: string): Promise<WorkoutHrStatsRow | null> {
@@ -2810,6 +2981,9 @@ export const DERIVED_COLS: Record<keyof OuraDailyDerivedPatch, string> = {
   resilienceDailyStress: 'resilience_daily_stress', resilienceDailyRestorativeTime: 'resilience_daily_restorative_time',
   resilienceDailySleepRecovery: 'resilience_daily_sleep_recovery', resilienceGranular: 'resilience_granular', resilienceConfidence: 'resilience_confidence',
   daytimeStressCoverageMin: 'daytime_stress_coverage_min', chronicStressGranularNights: 'chronic_stress_granular_nights',
+  // #2634. Server-only on the same terms as `acwr`: not in the device mirror, so a device never sends
+  // them and the COALESCE leaves the rollup's value alone.
+  stillRhrBpm: 'still_rhr_bpm', stillRhrCoverageMin: 'still_rhr_coverage_min',
   bdiDerived: 'bdi_derived',
   bodyComp: 'body_comp',
 }
@@ -2915,6 +3089,8 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
     resilienceConfidence: r.resilienceConfidence,
     daytimeStressCoverageMin: r.daytimeStressCoverageMin,
     chronicStressGranularNights: r.chronicStressGranularNights,
+    stillRhrBpm: r.stillRhrBpm,
+    stillRhrCoverageMin: r.stillRhrCoverageMin,
     bdiDerived: r.bdiDerived,
     bodyComp: r.bodyComp,
   }))
@@ -2990,43 +3166,6 @@ export async function getOuraStorageStats(db: Db): Promise<import('../../reposit
       bodyHexBytes: Number(rawRow.body_hex_bytes ?? 0),
     },
   }
-}
-
-// Culling Lever 1b — one-off backfill nulling the `decoded` JSONB on rows written before Lever 1a
-// (which stops writing it going forward). DATA-DROPPING → admin-triggered only, never auto-run on
-// deploy/migration; the owner presses this deliberately, watching the G-2 footprint numbers drop.
-// body_hex is never touched (archival, untouched by definition) — every nulled row's decode path
-// already falls back to body_hex (proven in Lever 1a). No age cutoff: every row still carrying
-// `decoded` predates Lever 1a and is unconditionally safe to null.
-// Batched (500 rows/UPDATE, matching redecodeOuraRawSamples's page size) so no single statement can
-// exceed the pool's 15s statement_timeout — each batch commits independently (no wrapping
-// transaction), so a killed/interrupted run just leaves fewer rows remaining, never rolled back.
-// `maxRows` still bounds one call (owner explicitly asked for "all at once" — defaults high enough
-// to clear any realistic single-user backlog in one press, while keeping a finite ceiling rather
-// than a literal unbounded loop).
-export async function nullHistoricalDecoded(
-  db: Db, userId: string, maxRows = 1_000_000,
-): Promise<{ nulled: number; remaining: number }> {
-  const BATCH = 500
-  let nulled = 0
-  while (nulled < maxRows) {
-    const page = await db
-      .select({ id: s.ouraRawSamples.id })
-      .from(s.ouraRawSamples)
-      .where(and(eq(s.ouraRawSamples.userId, userId), isNotNull(s.ouraRawSamples.decoded)))
-      .orderBy(asc(s.ouraRawSamples.id))
-      .limit(Math.min(BATCH, maxRows - nulled))
-    if (page.length === 0) break
-    await db.update(s.ouraRawSamples)
-      .set({ decoded: null })
-      .where(inArray(s.ouraRawSamples.id, page.map(r => r.id)))
-    nulled += page.length
-  }
-  const [{ remaining }] = await db
-    .select({ remaining: sql<number>`count(*)::int` })
-    .from(s.ouraRawSamples)
-    .where(and(eq(s.ouraRawSamples.userId, userId), isNotNull(s.ouraRawSamples.decoded)))
-  return { nulled, remaining }
 }
 
 // Culling Lever 1c — physically reclaim the disk that Lever 1b freed only logically. Nulling the

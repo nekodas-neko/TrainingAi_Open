@@ -27,6 +27,7 @@ vi.mock('@/lib/data', () => ({
     listSleepSessions:       async () => repo.sleepSessions,
     getWorkoutSessionsFrom:  async () => [],
     getOuraDaily:            async () => repo.ouraDaily,
+    getOuraCloudActivitySeries: async () => [],
     getActiveProgram:        async () => null,
     getHrForWindow:          async () => [],
     getObservedHrProfile: async () => computeObservedHr([]),
@@ -98,7 +99,14 @@ describe('GET /api/readiness-score — degradation for non-ring users', () => {
     expect(d.limited).toBe(true)
     expect(d.scoreConfidence).toBe('minimal')
     expect(d.inputsAvailable).toEqual([])
-    expect(repo.upsertDerived).not.toHaveBeenCalled()
+    // Nothing readiness- or sleep-shaped is stored. A finished day with nothing to score is stamped
+    // final-but-empty (#2435) so it is not scored again on every read, and that carries no score.
+    for (const c of repo.upsertDerived.mock.calls) {
+      const patch = c[2] as Record<string, unknown>
+      expect(patch.readinessScore).toBeUndefined()
+      expect(patch.sleepScore).toBeUndefined()
+      expect(patch.activityScore ?? null).toBeNull()
+    }
   })
 
   it('produces a real readiness from the generic tables alone, flagged limited', async () => {

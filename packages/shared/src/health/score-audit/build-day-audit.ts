@@ -1,12 +1,8 @@
-import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, ageFromDob, todayInTz } from '@trainingai/shared/date-utils'
-import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
-import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
+import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
-import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
-import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
-import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
-import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
+import { finalisedPreTaper } from '@trainingai/shared/health/activity-day'
+import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -53,7 +49,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   const yesterdayIso = shiftDateStr(date, -1)
 
   const [
-    bodyMetrics, sleepSessions, workoutSessions, ouraRows, program,
+    bodyMetrics, sleepSessions, workoutSessions, ouraRows,
     hrRows, summaries, derivedRows, mood, user, activityLogs, nutrition, morningCheckin, userGoals,
     ouraCloudContributors, switchDay,
   ] = await Promise.all([
@@ -62,7 +58,6 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     // ACWR needs the full chronic window ending at the audited day, not at today.
     repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(fromIso, tz)),
     repo.getOuraDaily(userId, fromIso, date),
-    repo.getActiveProgram(userId),
     repo.getHrForWindow(userId, dayMid, nextMid),
     repo.getOuraDailySummary(userId, fromIso, date),
     repo.getOuraDailyDerived(userId, fromIso, date),
@@ -118,45 +113,19 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     activityLevel: user?.activityLevel ?? null,
     stepsGoal: userGoals?.stepsGoal ?? null,
   }
-  const goals = getDailyGoals(goalProfile)
-
-  const load = computeVolumeAcwr(
-    sessionsUpToDay.map(ws => ({
-      startedAt: ws.startedAt,
-      volumeKg: ws.exercises.reduce((s, ex) => s + (ex.volume ?? 0), 0),
-    })),
-    dayMid,
-    { tz },
-  )
-  const programTooNew = acwrBaselineDaysRemaining(program, dayMid) > 0
-  const acwr = programTooNew ? null : load.acwr
-  const acwrExcludedReason = programTooNew
+  // The Activity pillar's inputs are the shared scorer's own (#2435): the audited day is scored by
+  // `loadActivityDay`, the function the live screen and the finalise use, so `storedMatchesRecompute`
+  // cannot disagree with them. The HR profile is resolved there too.
+  const activityDay = await loadActivityDay(repo, userId, tz, date)
+  const { load, signals } = activityDay
+  const acwr = activityDay.acwr
+  const acwrExcludedReason = acwr == null && load.acwr != null
     ? 'program is younger than 28 days, so the chronic-load baseline is not yet valid'
-    : load.acwr == null
+    : acwr == null
       ? 'not enough training history to form an acute:chronic ratio'
       : null
 
-  const sessions7dRows = sessionsUpToDay.filter(ws => new Date(ws.startedAt).getTime() >= dateStrMidnightInTz(from7dIso, tz).getTime())
-  const volume7dKg = sessions7dRows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0)
-
-  // ── Zone minutes / moved hours from the audited day's intraday HR ──
-  // The live payload's computation, so the audit and the score cannot disagree (#2437 density rule).
-  let zoneMinutes: number | null = null
-  let moveHours: number | null = null
-  let moveGoal: number | null = null
-  // #3114: Oura's per-minute MET decides the move lane (its activity day starts at 4 a.m., hence the day before).
-  const metGrid = ouraCloudMetGrid(
-    await (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(date, -1), date))().catch(() => []),
-    dayMid.getTime(), nextMid.getTime(),
-  )
-  if (baselineRhr != null && (hrRows.length > 0 || metGrid.metsPerMinute.some(m => m != null))) {
-    // #2182: the same ceiling as the live score (the HR profile's), so the audit cannot disagree.
-    const maxHr = (await resolveHrProfile(repo, userId, tz).catch(() => null))?.maxHr ?? hrMaxFromAge(ageYears)
-    const c = intradayHrContributors({ hrRows, maxHr, restingHr: baselineRhr, tz, dateIso: date, metGrid, dayIsOver: date < todayInTz(tz) })
-    zoneMinutes = c.zoneMinutes
-    moveHours = c.moveHours
-    moveGoal = c.moveHoursGoal
-  }
+  const goals = activityDay.goals
 
   const pillars: PillarAudit[] = []
   const safe = (label: string, fn: () => PillarAudit) => {
@@ -177,26 +146,18 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   })()
   if (sleep) pillars.push(sleep)
 
-  // Readiness reads the PRE-taper activity score, so compute the activity result first.
   const activityInput = {
     date, goals, goalProfile,
     steps: dayMetrics?.steps ?? null,
     activeCalories: dayMetrics?.activeCalories ?? null,
-    zoneMinutes, moveHours, moveHoursGoal: moveGoal,
-    strengthSessionToday: sessionsUpToDay.some(ws => new Date(ws.startedAt).getTime() >= dayMid.getTime()),
-    sessions7d: sessions7dRows.length,
-    volume7dKg,
+    zoneMinutes: signals.zoneMinutes, moveHours: signals.moveHours, moveHoursGoal: signals.moveHoursGoal,
+    strengthSessionToday: signals.strengthSessionToday,
+    sessions7d: signals.sessions7d,
+    volume7dKg: signals.volume7dKg,
     typicalSessionVolumeKg: load.typicalSessionVolumeKg,
     acwr, acwrExcludedReason,
     derived: derivedForDay,
   }
-  const preTaperActivity = computeActivityScore({
-    steps: activityInput.steps, activeCalories: activityInput.activeCalories,
-    zoneMinutes, moveHours, moveHoursGoal: moveGoal,
-    strengthSessionToday: activityInput.strengthSessionToday,
-    sessions7d: activityInput.sessions7d, volume7dKg,
-    goals, acwr,
-  })?.preTaperScore ?? null
 
   // TN-77(a): the audit shares readiness's defect, so it shares the fix — yesterday's contributor
   // is scored on yesterday's window, not the day being audited.
@@ -209,11 +170,21 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
       })?.preTaperScore ?? null
     : null
 
+  // #2435: readiness's activity balance is the previous COMPLETED day's score, as the live payload
+  // reads it: the stored final value when that day was finalised, else that day scored from its own
+  // inputs by the same loader the finalise stores from.
+  const prevCompletedDayActivity = finalisedPreTaper(derivedRows.find(r => r.day === yesterdayIso)?.activityContributors)
+    ?? (await loadActivityDay(repo, userId, tz, yesterdayIso).catch(err => {
+      warnings.push(`Previous day's activity could not be scored: ${err instanceof Error ? err.message : String(err)}`)
+      return null
+    }))?.result?.preTaperScore
+    ?? null
+
   const nightsAll = nightSessions(sleepSessions, tz)
   safe('Readiness', () => buildReadinessAudit({
     date, summary, priorSummary,
     sleepScore: sleep?.score ?? null,
-    activityScore: preTaperActivity,
+    activityScore: prevCompletedDayActivity,
     prevDayActivityScore,
     ouraDaily: ouraToday,
     derived: derivedForDay,
