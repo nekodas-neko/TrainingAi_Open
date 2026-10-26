@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { encodeRoute, decodeRoute } from '@trainingai/shared/activity/route-encoding';
 import { estimateDistanceKmAtTime, pointAtDistanceKm } from '@trainingai/shared/activity/scrub';
-import { routeFrame } from '../src/features/activities/data/route-shape.ts';
+import { routeFrame, tilesFor } from '../src/features/activities/data/route-shape.ts';
+import { isPng, tileFileName, tileUrl } from '../src/features/activities/data/map-tiles.ts';
 import { activityHistorySpec } from '../src/features/health/data/models.ts';
 
 // A 1 km out-and-back loop in Brisbane: east along a street, north, then back west.
@@ -65,4 +66,33 @@ test('scrubbing the chart places the marker along the route by the pace series',
   assert.ok(marker.lat > -27.47 && marker.lat < -27.4695, `lat ${marker.lat}`);
   // At the start the marker sits on the green start dot.
   assert.deepEqual(pointAtDistanceKm(points, estimateDistanceKmAtTime(paceSeries, 0)), points[0]);
+});
+
+test('map tiles cover the box and line up with the drawn route', () => {
+  const frame = routeFrame(loop, 344, 224, 20)!;
+  const tiles = tilesFor(frame, 344, 224);
+  assert.ok(tiles.length >= 1 && tiles.length <= 16);
+  assert.ok(tiles.every((t) => t.z === tiles[0].z && t.size <= 512 + 1e-6 && t.size > 128));
+  // Together they span the whole box.
+  assert.ok(Math.min(...tiles.map((t) => t.left)) <= 0);
+  assert.ok(Math.min(...tiles.map((t) => t.top)) <= 0);
+  assert.ok(Math.max(...tiles.map((t) => t.left + t.size)) >= 344);
+  assert.ok(Math.max(...tiles.map((t) => t.top + t.size)) >= 224);
+  // The tile holding the first fix really contains its pixel.
+  const { x, y } = frame.project(loop[0]);
+  assert.ok(tiles.some((t) => x >= t.left && x <= t.left + t.size && y >= t.top && y <= t.top + t.size));
+  assert.equal(tileUrl({ z: 17, x: 120, y: 75 }), 'https://tile.openstreetmap.org/17/120/75.png');
+  assert.equal(tileFileName({ z: 17, x: 120, y: 75 }), '17-120-75.png');
+});
+
+test('a route with no extent asks for no tiles', () => {
+  const still = routeFrame([loop[0], loop[0]], 300, 200, 20)!;
+  assert.deepEqual(tilesFor(still, 300, 200), []);
+});
+
+test('a tile is kept only if it starts with the PNG signature', () => {
+  assert.equal(isPng(Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0])), true);
+  assert.equal(isPng(new TextEncoder().encode('<html>Sign in to the Wi-Fi</html>')), false);
+  assert.equal(isPng(new Uint8Array(0)), false);
+  assert.equal(isPng(Uint8Array.from([0x89, 0x50, 0x4e])), false);
 });

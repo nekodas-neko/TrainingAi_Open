@@ -52,6 +52,7 @@ test('muscle counts agree with their number and read "3 / 13 sets"', () => {
   assert.equal(muscleSetsLabel(3, null), '3 sets');
   assert.equal(muscleSetsLabel(3, 13), '3 / 13 sets');
   assert.equal(muscleSetsLabel(1, 9), '1 / 9 sets');
+  assert.equal(muscleSetsLabel(1, 1), '1 / 1 sets');
 });
 
 test('a periodization row counts its sessions and says Yesterday', () => {

@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
-import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz, shiftDateStr, todayInTz } from "@trainingai/shared/date-utils";
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { toZonedTime } from "date-fns-tz";
 import type { ActivityLog } from "@trainingai/shared/types";
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { reportServerError } from '@/lib/observability'
+import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 
@@ -267,7 +269,7 @@ export async function GET(req: NextRequest) {
   // Sleep, scores and the HR trace are each independently optional — one missing source must
   // never blank the rest of the day, so they settle rather than reject.
   const dayMid = dateStrMidnightInTz(pgDate, tz);
-  const nextMid = new Date(dayMid.getTime() + 86_400_000);
+  const nextMid = dateStrMidnightInTz(shiftDateStr(pgDate, 1), tz);
   const [sleepRes, scoresRes, hrRes] = await Promise.allSettled([
     repo.listSleepSessions(userId, pgDate, pgDate),
     repo.getDerivedScoresForDay(userId, pgDate),
@@ -308,8 +310,22 @@ export async function GET(req: NextRequest) {
       }
     : null;
 
-  const scores: DayScores | null = derived
-    ? { readiness: derived.readinessScore, sleep: derived.sleepScore, activity: derived.activityScore }
+  // #2435: today's Activity score is no longer stored (a day is stored once it has ended), so for
+  // today it is scored live, by the same function the Activity screen uses. Without this the Move
+  // cell would be blank all day.
+  const liveActivity = pgDate === todayInTz(tz)
+    ? await loadActivityDay(repo, userId, tz, pgDate).then(d => d.result?.score ?? null).catch(e => {
+        // A failed live score falls back to the stored value, but must leave an error_events row.
+        reportServerError(e, { userId, url: '/api/day-log' })
+        return null
+      })
+    : null;
+  const scores: DayScores | null = derived || liveActivity != null
+    ? {
+        readiness: derived?.readinessScore ?? null,
+        sleep: derived?.sleepScore ?? null,
+        activity: liveActivity ?? derived?.activityScore ?? null,
+      }
     : null;
 
   // Bucket the per-minute series by mean bpm. Bucketing by mean, not by sample-at-boundary, so a

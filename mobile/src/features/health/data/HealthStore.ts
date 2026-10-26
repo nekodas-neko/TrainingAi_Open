@@ -70,6 +70,10 @@ const verdictResponseSchema = z.object({
   date: z.string(),
   state: z.enum(['acknowledged', 'corrected']),
 });
+const readinessResponseSchema = z.object({
+  date: z.string(),
+  state: z.enum(['rated', 'dismissed']),
+});
 const savedSchema = z.object({
   version: z.literal(1),
   origin: z.string(),
@@ -82,6 +86,7 @@ const savedSchema = z.object({
   operations: z.array(operationSchema),
   checkins: z.record(z.string(), checkinSchema.nullable()).default({}),
   verdictResponses: z.array(verdictResponseSchema).default([]),
+  readinessResponses: z.array(readinessResponseSchema).default([]),
 });
 export type HealthState = {
   ready: boolean;
@@ -99,6 +104,7 @@ export type HealthState = {
   stale: boolean;
   checkins: Record<string, z.infer<typeof checkinSchema> | null>;
   verdictResponses: z.infer<typeof verdictResponseSchema>[];
+  readinessResponses: z.infer<typeof readinessResponseSchema>[];
 };
 export const emptyHealthState: HealthState = {
   ready: false,
@@ -116,6 +122,7 @@ export const emptyHealthState: HealthState = {
   stale: false,
   checkins: {},
   verdictResponses: [],
+  readinessResponses: [],
 };
 const key = 'health-records.v1';
 export class HealthStore {
@@ -221,12 +228,17 @@ export class HealthStore {
       field === 'bodyFat' ? { bodyFatPct: payload.bodyFat } : payload,
     );
   }
-  async addWater(ml: number, date: string) {
+  /**
+   * `id` is for a log that may be applied twice (a home-screen widget tap read again after a
+   * crash): a change already holding that id is not added again.
+   */
+  async addWater(ml: number, date: string, id?: string) {
     const delta = validWaterMlDeltaOrNull(ml);
     if (delta === null) {
       throw new Error('Enter an amount greater than 0 and up to 5,000 ml.');
     }
-    await this.enqueue('body_metrics', date, { waterMlDelta: delta });
+    if (id && this.current.operations.some((operation) => operation.id === id)) return;
+    await this.enqueue('body_metrics', date, { waterMlDelta: delta }, undefined, id);
   }
   async saveNight(sleepStart: string, sleepEnd: string, timezone: string, id?: string) {
     const input = { id: id ?? this.uuid(), sleepStart, sleepEnd };
@@ -283,6 +295,23 @@ export class HealthStore {
     }));
     void this.sync();
   }
+  /**
+   * Records that the owner answered or skipped the readiness question, queued like a sleep
+   * verdict response so a tap made offline is sent later. It records that the question was
+   * answered, never that the score was right; the answer itself is the check-in's `vsNormal`.
+   */
+  async respondToReadiness(date: string, state: 'rated' | 'dismissed') {
+    if (this.canceled || !this.current.ready || this.current.denied) {
+      throw new Error('Check your account before answering the readiness question.');
+    }
+    await this.write((current) => ({
+      readinessResponses: [
+        ...current.readinessResponses.filter((r) => r.date !== date),
+        { date, state },
+      ],
+    }));
+    void this.sync();
+  }
   async readCheckin(date: string) {
     const generation = this.generation;
     const revision = this.revision;
@@ -318,12 +347,13 @@ export class HealthStore {
     date: string,
     payload: Record<string, unknown>,
     response?: 'acknowledged' | 'corrected',
+    id?: string,
   ) {
     if (this.canceled || !this.current.ready || this.current.denied) {
       throw new Error('Check your account before logging health records.');
     }
     const change = operationSchema.parse({
-      id: this.uuid(),
+      id: id ?? this.uuid(),
       domain,
       date,
       payload,
@@ -539,6 +569,17 @@ export class HealthStore {
           }
           await this.write((state) => ({
             verdictResponses: state.verdictResponses.filter((r) => r !== response),
+          }));
+          this.invalidate();
+        }
+        while (generation === this.generation && this.current.readinessResponses.length) {
+          const response = this.current.readinessResponses[0];
+          await this.connection.post('/api/readiness-verdict', response);
+          if (generation !== this.generation) {
+            return;
+          }
+          await this.write((state) => ({
+            readinessResponses: state.readinessResponses.filter((r) => r !== response),
           }));
           this.invalidate();
         }

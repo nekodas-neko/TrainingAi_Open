@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="home_widget_today_label">Today</string>
+  <string name="home_widget_today_description">Your four scores from Home</string>
+  <string name="home_widget_next_label">Next workout</string>
+  <string name="home_widget_next_description">Today\'s recommended session</string>
+  <string name="home_widget_nutrition_label">Nutrition and water</string>
+  <string name="home_widget_nutrition_description">Calories and macros left, and a water button</string>
+  <string name="home_widget_today_title">Today</string>
+  <string name="home_widget_battery_title">Body Battery</string>
+  <string name="home_widget_nutrition_title">Nutrition</string>
+  <string name="home_widget_nutrition_subtitle">Today</string>
+  <string name="home_widget_water_title">Water</string>
+  <string name="home_widget_empty">Open TrainingAi to fill this widget</string>
+  <string name="home_widget_stale">Open to update</string>
+  <string name="home_widget_start">Start</string>
+  <string name="home_widget_checkin">Check in</string>
+  <string name="home_widget_sessions">Sessions</string>
+  <string name="home_widget_train_instead">Train instead</string>
+  <string name="home_widget_add_water">+250 ml</string>
+  <string name="home_widget_add_water_description">Add 250 millilitres of water</string>
+  <string name="home_widget_water_queued">+%1$d ml waiting for the app</string>
+</resources>

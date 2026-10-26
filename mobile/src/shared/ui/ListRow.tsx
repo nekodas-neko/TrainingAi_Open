@@ -8,6 +8,7 @@ import { Icon } from './Icon';
 
 export function ListRow({
   title,
+  titleTone,
   subtitle,
   subtitleColor,
   trailing,
@@ -20,6 +21,8 @@ export function ListRow({
   checked,
 }: {
   title: string;
+  /** 'danger' draws the title red, for a destructive row. */
+  titleTone?: 'danger';
   subtitle?: string;
   subtitleColor?: string;
   trailing?: ReactNode;
@@ -49,7 +52,9 @@ export function ListRow({
     <>
       {leading}
       <Stack gap="xs" style={{ flex: 1 }}>
-        <AppText variant="label">{title}</AppText>
+        <AppText variant="label" tone={titleTone}>
+          {title}
+        </AppText>
         {subtitle && (
           <AppText
             variant="caption"
