@@ -20,6 +20,10 @@ import type {
   CreateMealPlanInput, UpdateMealPlanInput, UpdateMealInput, ReplaceStructureInput, PlanMealAnswer, EstimateToStore,
 } from './postgres/slices/meal-plans'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
+import type {
+  TrainerRelationship, TrainerRelationships, AssignedProgramSummary, ReceivedProgramAssignment,
+} from '@trainingai/shared/types/trainer'
+import type { AssignProgramBody } from '@trainingai/shared/validation/trainer'
 import type { AccountDeletionResult } from './postgres/slices/account-deletion'
 import type {
   NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput, RegrantNativeRefreshTokenInput,
@@ -1176,6 +1180,17 @@ export interface WorkoutRepository {
   removeFriend(friendshipId: string, userId: string): Promise<void>
   getFriendIds(userId: string): Promise<string[]>
   updateEquippedTitle(userId: string, titleId: string | null): Promise<void>
+
+  // ── Trainer role (#2300) ───────────────────────────────────────────────────
+  requestTrainee(trainerId: string, emailOrCode: string): Promise<TrainerRelationship>
+  acceptTrainer(relationshipId: string, traineeId: string): Promise<TrainerRelationship>
+  revokeTrainerRelationship(relationshipId: string, userId: string): Promise<TrainerRelationship>
+  listTrainerRelationships(userId: string): Promise<TrainerRelationships>
+  /** Id of the ACCEPTED relationship in which `trainerId` trains `traineeId`, else null. Read from the table every call. */
+  acceptedTrainerRelationshipId(trainerId: string, traineeId: string): Promise<string | null>
+  assignProgramToTrainee(trainerId: string, traineeId: string, program: AssignProgramBody['program']): Promise<{ assignmentId: string; program: Program }>
+  listProgramsAssignedBy(trainerId: string, traineeId: string): Promise<AssignedProgramSummary[]>
+  listProgramsAssignedTo(traineeId: string): Promise<ReceivedProgramAssignment[]>
 
   // ── Seasons ────────────────────────────────────────────────────────────────
   listSeasonsWithResults(userId: string): Promise<Season[]>

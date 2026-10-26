@@ -106,6 +106,8 @@ import type { Supplement, SupplementWithStatus, SupplementDose, SupplementVial }
 import * as n from './slices/nutrition'
 import * as mp from './slices/meal-plans'
 import * as social from './slices/social'
+import * as trainer from './slices/trainer'
+import type { AssignProgramBody } from '@trainingai/shared/validation/trainer'
 import * as prog from './slices/programs'
 import * as period from './slices/periodization'
 import * as userStatsSlice from './slices/user-stats'
@@ -4848,6 +4850,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async declineFriendRequest(friendshipId: string, userId: string) { return social.declineFriendRequest(this.db, friendshipId, userId) }
   async removeFriend(friendshipId: string, userId: string) { return social.removeFriend(this.db, friendshipId, userId) }
   async getFriendIds(userId: string) { return social.getFriendIds(this.db, userId) }
+
+  // ── Trainer role (delegated to slices/trainer.ts, #2300) ──────────────────
+  async requestTrainee(trainerId: string, emailOrCode: string) { return trainer.requestTrainee(this.db, trainerId, emailOrCode) }
+  async acceptTrainer(relationshipId: string, traineeId: string) { return trainer.acceptTrainer(this.db, relationshipId, traineeId) }
+  async revokeTrainerRelationship(relationshipId: string, userId: string) { return trainer.revokeTrainerRelationship(this.db, relationshipId, userId) }
+  async listTrainerRelationships(userId: string) { return trainer.listTrainerRelationships(this.db, userId) }
+  async acceptedTrainerRelationshipId(trainerId: string, traineeId: string) { return trainer.acceptedTrainerRelationshipId(this.db, trainerId, traineeId) }
+  async assignProgramToTrainee(trainerId: string, traineeId: string, program: AssignProgramBody['program']) { return trainer.assignProgramToTrainee(this.db, trainerId, traineeId, program) }
+  async listProgramsAssignedBy(trainerId: string, traineeId: string) { return trainer.listProgramsAssignedBy(this.db, trainerId, traineeId) }
+  async listProgramsAssignedTo(traineeId: string) { return trainer.listProgramsAssignedTo(this.db, traineeId) }
   async updateEquippedTitle(userId: string, titleId: string | null) { return social.updateEquippedTitle(this.db, userId, titleId) }
   async listSeasonsWithResults(userId: string) { return social.listSeasonsWithResults(this.db, userId) }
 
