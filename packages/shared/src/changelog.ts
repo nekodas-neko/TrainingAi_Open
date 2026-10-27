@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.506.0",
+    date: "2026-10-27",
+    changes: [
+      "TrainingAi Preview: the home-screen widgets show today and roll over at midnight in your profile's timezone, not the phone's.",
+      "TrainingAi Preview: a change the server refuses stays on your phone, and its notice waits until you have seen it. A patchy-network error no longer throws away a good change, and an answer for a day with no verdict no longer holds up the rest.",
+      "Behind the scenes: an admin job can merge look-alike foods in My Foods, with a dry run first. It runs only when the owner approves. The web stress chart's line and measured time are right on daylight-saving days, the phone's database finishes opening before the first read, and a few broken characters are fixed.",
+    ],
+  },
+  {
     version: "1.505.0",
     date: "2026-10-27",
     changes: [
