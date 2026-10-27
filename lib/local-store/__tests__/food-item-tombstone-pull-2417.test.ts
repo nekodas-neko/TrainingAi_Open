@@ -184,6 +184,27 @@ describe('a retired food that is revived (#3468)', () => {
     expect(JSON.parse((await retiredMeta())!)).toEqual(['extra2'])
   })
 
+  it('the last word on an id wins: a tombstone then a live entry in one delta keeps the row (#3482)', async () => {
+    await apply({ foodItems: [food('keeper'), food('extra')] })
+    await apply({ foodItems: [food('extra', { deletedAt: TOMB }), food('extra', { deletedAt: null })] })
+    expect(ids()).toEqual(['extra', 'keeper'])
+    expect(await retiredMeta()).toBe('[]')
+    // and the other order still drops it
+    await apply({ foodItems: [food('extra', { deletedAt: null }), food('extra', { deletedAt: TOMB })] })
+    expect(ids()).toEqual(['keeper'])
+  })
+
+  it('does not rewrite the retired list when a pull leaves it unchanged (#3482)', async () => {
+    await apply({ foodItems: [food('keeper'), food('extra')] })
+    holdBySavedMeal()
+    await apply({ foodItems: [food('extra', { deletedAt: TOMB })] })
+    const spy = vi.spyOn(SQLiteLocalStore.prototype, 'setSyncMeta')
+    await apply({ foodItems: [food('keeper')] })
+    await apply({ foodItems: [food('extra', { deletedAt: TOMB })] })
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
   it('a malformed or missing stored list reads as empty and a pull still works', async () => {
     expect(await store().getRetiredFoodIds()).toEqual([])
     for (const bad of ['not json', '{"a":1}', '"extra"', '[1,null,"x"]']) {

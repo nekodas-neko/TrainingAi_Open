@@ -82,7 +82,9 @@ PR. Account deletion still removes the rows by cascade.
 On a device, a retired food that a local log or saved-meal ingredient still points at keeps its row
 until that reference moves. The local table has no `deleted_at`, so its id is remembered in
 `sync_meta` (`retiredFoodIds`, #3459): hidden from the local catalog reads, and dropped by the next
-pull or saved-meals hydrate once nothing points at it.
+pull or saved-meals hydrate once nothing points at it. A pull that carries the food live again
+(`deletedAt: null`) forgets the id, so a revived food is searchable again (#3468); the last entry for an id
+within one pull decides, and a pull that leaves the list unchanged does not rewrite it.
 
 **`sleep_sessions` had a server hard delete that devices never heard about. Fixed (#2546).**
 Every rollup pass that wrote a night first deleted that day's BLE rows and reinserted them with new

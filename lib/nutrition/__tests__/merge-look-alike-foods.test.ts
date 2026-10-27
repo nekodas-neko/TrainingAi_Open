@@ -197,7 +197,9 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
     })
 
     it("only: 'exact' merges the automatic groups and leaves the others alone, dry run and write alike", async () => {
-      const sameA = await addFood({ name: 'Same A' }); const sameB = await addFood({ name: 'Same A' })
+      // Explicit times: two inserts can share a millisecond, and then the random id decides the keeper.
+      const sameA = await addFood({ name: 'Same A', createdAt: '2026-10-01T00:00:00Z' })
+      const sameB = await addFood({ name: 'Same A', createdAt: '2026-10-01T00:00:01Z' })
       const { keeper, extra } = await roundingPair()
       const plan = await merge(db, USER, { dryRun: true, only: 'exact' })
       if (!plan.ok) throw new Error(plan.error)
@@ -248,6 +250,7 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
     const same = out.report.groups.find(g => g.name === 'Test Granola')!
     expect(same).toMatchObject({ kind: 'same-per-100g', automatic: true, keeperChosenBy: 'most-logged' })
     expect(same.keeper.id).toBe(a)
+    expect(same.keeper).toMatchObject({ fiberG: null, sugarG: null, sodiumMg: null, satFatG: null })
     expect(same.extras[0]).toMatchObject({ id: b, logsToMove: 1, factor: 0.45 })
     expect(out.report.groups.find(g => g.name === 'Other')).toMatchObject({ kind: 'differs', automatic: false })
     void d
@@ -382,6 +385,27 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
       if (!out.ok) throw new Error(out.error)
       expect(out.report.totals).toMatchObject({ groups: 1, automatic: 0, needsReview: 1 })
       expect(out.report.groups[0]).toMatchObject({ quantityOutOfRange: true, automatic: false })
+    })
+
+    it("under only: 'exact' the skip names the real reason, and each extra carries the flag", async () => {
+      const { extra, log } = await setup()
+      const before = await snapshot()
+      const plan = await merge(db, USER, { dryRun: true, only: 'exact' })
+      if (!plan.ok) throw new Error(plan.error)
+      expect(plan.report.groups).toEqual([])
+      expect(plan.report.skipped).toEqual([expect.objectContaining({ reason: expect.stringContaining('outside the range') })])
+      expect(plan.report.skipped[0].reason).not.toContain('owner review')
+
+      const out = await merge(db, USER, { dryRun: false, only: 'exact' })
+      if (!out.ok) throw new Error(out.error)
+      expect(out.report.failedGroups).toBe(0)
+      expect(await snapshot()).toEqual(before)
+      const { rows } = await pool.query(`SELECT food_item_id, quantity_multiplier FROM food_logs WHERE id = $1`, [log])
+      expect(rows[0]).toMatchObject({ food_item_id: extra, quantity_multiplier: 1 })
+
+      const all = await dry()
+      if (!all.ok) throw new Error(all.error)
+      expect(all.report.groups[0].extras[0]).toMatchObject({ id: extra, quantityOutOfRange: true })
     })
 
     it('the write leaves the group untouched, in any mode, and says why', async () => {

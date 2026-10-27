@@ -5919,9 +5919,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           if (p.deleted) {
             await this.deleteFoodLog(String(p.id), userId)
           } else {
-            // Matches the web route's `quantityMultiplier must be between 0.01 and 100`
-            // check — without it a corrupted local payload could push an out-of-range
-            // value straight past the push path.
+            // Matches the web route's quantityMultiplier range check (`QUANTITY_MULTIPLIER_MIN` to
+            // `QUANTITY_MULTIPLIER_MAX`, packages/shared/src/nutrition/quantity-bounds.ts) —
+            // without it a corrupted local payload could push an out-of-range value straight
+            // past the push path.
             const qm = p.quantityMultiplier ?? 1.0
             if (!quantityMultiplierInRange(qm)) {
               errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: `quantityMultiplier must be between ${QUANTITY_MULTIPLIER_MIN} and ${QUANTITY_MULTIPLIER_MAX}` })

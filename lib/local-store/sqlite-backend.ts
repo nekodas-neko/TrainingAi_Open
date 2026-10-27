@@ -1497,7 +1497,11 @@ export class SQLiteLocalStore implements LocalStore {
   private async updateRetiredFoods(add: string[], forget: string[]): Promise<void> {
     const all = new Set([...await this.getRetiredFoodIds(), ...add]);
     for (const id of forget) all.delete(id);
-    await this.setSyncMeta(RETIRED_FOOD_IDS_KEY, JSON.stringify([...all]));
+    const next = JSON.stringify([...all]);
+    // A pull with live foods that were never retired changes nothing: skip the write. Comparing the
+    // stored text also rewrites a malformed value.
+    if (next === await this.getSyncMeta(RETIRED_FOOD_IDS_KEY)) return;
+    await this.setSyncMeta(RETIRED_FOOD_IDS_KEY, next);
   }
 
   /** Re-runs the guarded DELETE for every remembered id and forgets the ones whose row is gone. */
@@ -2213,10 +2217,12 @@ export class SQLiteLocalStore implements LocalStore {
     // other row first, because a log in this same delta (or one still waiting to push) may point at
     // it and a log whose food is missing is not drawn. It is dropped after the logs below, and only
     // if nothing local still points at it.
-    const mergedAwayFoodIds: string[] = [];
+    // The last word on an id wins, as in `applyDelta`: a food that ends the loop live is not dropped.
+    const mergedAwayFoodIds = new Set<string>();
     for (const r of delta.foodItems ?? []) {
       await this.upsertFoodItemWith(tx.run, r);
-      if (r.deletedAt) mergedAwayFoodIds.push(r.id);
+      if (r.deletedAt) mergedAwayFoodIds.add(r.id);
+      else mergedAwayFoodIds.delete(r.id);
     }
 
     for (const r of delta.foodLogs ?? []) {

@@ -18,7 +18,7 @@
 //   4. each extra gets `deleted_at`. The row is never deleted: a device that has not synced may
 //      still log against it, and that log must keep working.
 //
-// Only groups whose merge leaves every moved log's calories and macros unchanged are `automatic`
+// Only groups whose merge leaves every moved log's eight nutrition fields unchanged are `automatic`
 // (see `food-merge.ts`); `only: 'exact'` merges just those. The rest are the owner's review.
 //
 // A group where a rescaled quantity would leave the push range (0.01 to 100, `quantity-bounds.ts`) is
@@ -42,6 +42,10 @@ export interface MergeReportFood {
   proteinG: number
   carbsG: number
   fatG: number
+  fiberG: number | null
+  sugarG: number | null
+  sodiumMg: number | null
+  satFatG: number | null
   liveLogs: number
 }
 
@@ -53,9 +57,9 @@ export interface MergeReportGroup {
   automatic: boolean
   keeperChosenBy: 'most-logged' | 'owner'
   keeper: MergeReportFood
-  /** The worst change to any moved log's calories, macros, fibre, sugar, sodium and saturated fat (kcal whole, the rest 0.1 g). All zero for an automatic group. */
+  /** The worst change to any moved log's eight nutrition fields: calories, macros, fibre, sugar, sodium and saturated fat (kcal whole, the rest 0.1 g). All zero for an automatic group. */
   worstChange: WorstChange
-  extras: (MergeReportFood & { factor: number; logsToMove: number; mealItemsToMove: number; tombstone: boolean; worstChange: WorstChange })[]
+  extras: (MergeReportFood & { factor: number; logsToMove: number; mealItemsToMove: number; tombstone: boolean; worstChange: WorstChange; quantityOutOfRange: boolean })[]
   /** A moved quantity would fall outside the range the push accepts, so the group needs review and a write skips it. */
   quantityOutOfRange: boolean
   /** Set after a write: what the transaction did, why it rolled back, or why it was left alone. */
@@ -70,9 +74,9 @@ export interface MergeReport {
     automatic: number
     /** Same serving, same numbers. */
     identical: number
-    /** Same per 100 g, and every moved log's calories and macros come out exactly as before. */
+    /** Same per 100 g, and every moved log's eight nutrition fields come out exactly as before. */
     sameExact: number
-    /** Everything else: a non-zero change in calories or macros, or the foods genuinely differ. */
+    /** Everything else: a non-zero change in any of the eight fields, or the foods genuinely differ. */
     needsReview: number
     extras: number
     logsToMove: number
@@ -148,7 +152,12 @@ export async function mergeLookAlikeFoods(
   if (opts.only === 'exact') {
     plan.groups = plan.groups.filter(g => {
       if (g.automatic) return true
-      skipped.push({ groupKey: g.groupKey, reason: 'needs owner review (only: exact)' })
+      skipped.push({
+        groupKey: g.groupKey,
+        reason: g.quantityOutOfRange
+          ? 'a rescaled quantity would fall outside the range a device can push (0.01 to 100)'
+          : 'needs owner review (only: exact)',
+      })
       return false
     })
   }
@@ -156,7 +165,9 @@ export async function mergeLookAlikeFoods(
   const byId = new Map(foods.map(f => [f.id, f]))
   const describe = (f: MergeFood): MergeReportFood => ({
     id: f.id, servingSizeG: f.servingSizeG, calories: f.calories,
-    proteinG: f.proteinG, carbsG: f.carbsG, fatG: f.fatG, liveLogs: f.liveLogs,
+    proteinG: f.proteinG, carbsG: f.carbsG, fatG: f.fatG,
+    fiberG: f.fiberG ?? null, sugarG: f.sugarG ?? null, sodiumMg: f.sodiumMg ?? null, satFatG: f.satFatG ?? null,
+    liveLogs: f.liveLogs,
   })
   const groups: MergeReportGroup[] = plan.groups.map(g => {
     const keeper = byId.get(g.keeperId)!
@@ -167,6 +178,7 @@ export async function mergeLookAlikeFoods(
       extras: g.extras.map(e => ({
         ...describe(byId.get(e.id)!),
         factor: e.factor, logsToMove: e.logsToMove, mealItemsToMove: e.mealItemsToMove, tombstone: e.tombstone, worstChange: e.worstChange,
+        quantityOutOfRange: e.quantityOutOfRange,
       })),
     }
   })
