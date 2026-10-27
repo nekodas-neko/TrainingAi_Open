@@ -9,7 +9,7 @@ import { deadLettered, discardRow, retryRow, type QueueList } from './sync-healt
 import { msToHHMMInTz, toAestDay } from '@trainingai/shared/date-utils';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { ApiError } from '../../account/api/client.ts';
+import { isRefusedByServer } from '../../account/api/client.ts';
 import {
   activityPayload,
   activityTypeSchema,
@@ -703,15 +703,10 @@ export class ActivityStore {
               run.payload,
             );
           } catch (failure) {
-            // A 4xx other than 429 counts against this run, so one run cannot hold the ones behind
+            // Our own JSON 4xx (not a 429) counts against this run, so one run cannot hold the ones behind
             // it. A 5xx (the server's own trouble, as with pushes), a 429 or a lost connection says
-            // nothing about it: it is not counted and is retried on the next sync.
-            if (
-              failure instanceof ApiError &&
-              failure.status >= 400 &&
-              failure.status < 500 &&
-              failure.status !== 429
-            ) {
+            // nothing about it: it is not counted and is retried on the next sync, as is a 4xx from a proxy.
+            if (isRefusedByServer(failure)) {
               if (generation !== this.generation) {
                 return;
               }
@@ -770,14 +765,9 @@ export class ActivityStore {
             ],
           });
         } catch (failure) {
-          // A 4xx other than 429 refused the request itself, so it counts against this row, as the
-          // current app does. A 429, a 5xx or a lost connection says nothing about it and retries.
-          if (
-            failure instanceof ApiError &&
-            failure.status >= 400 &&
-            failure.status < 500 &&
-            failure.status !== 429
-          ) {
+          // Our own JSON 4xx other than 429 refused the request itself, so it counts against this row, as the
+          // current app does. A 429, a 5xx, a proxy's 4xx or a lost connection says nothing about it and retries.
+          if (isRefusedByServer(failure)) {
             if (generation !== this.generation) {
               return;
             }
