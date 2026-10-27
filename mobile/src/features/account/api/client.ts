@@ -37,6 +37,21 @@ export function isValidationRejection(error: unknown): boolean {
   return error instanceof ApiError && error.status === 400 && error.validation;
 }
 /**
+ * The server answered a write with a 4xx in its own JSON error, so it refused this request itself:
+ * 400 and 413 from the validation, 404 for a row it does not hold, 401 and 403 from the auth gates.
+ * 429 is the rate limit, which says nothing about the write. A 4xx from a proxy or gateway (an HTML
+ * or empty body) is not this and is retried without counting.
+ */
+export function isRefusedByServer(error: unknown): error is ApiError {
+  return (
+    error instanceof ApiError &&
+    error.validation &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 429
+  );
+}
+/**
  * The server will never take this write, so retrying it only blocks the queue: its own validation
  * 400, a 422, or a push it answered 200 with this item's rejection. A 400 from anything else (an
  * HTML proxy page, an empty body) says nothing about the write and is retried like any failure.

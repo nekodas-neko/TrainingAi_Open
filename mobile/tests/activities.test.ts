@@ -580,8 +580,9 @@ function runFixture(patch: (path: string, body: unknown) => Promise<unknown>) {
 const accepted = async (_: string, body: unknown) => ({
   run: { ...(body as object), activityLogId: null, completedAs: null },
 });
-const failing = (status: number) => async () => {
-  throw new ApiError(status);
+// `json` is whether the body was our own `{ error }`; an HTML page from a proxy is not.
+const failing = (status: number, json = true) => async () => {
+  throw new ApiError(status, undefined, undefined, undefined, json);
 };
 const runRow = (store: ActivityStore, runId: string) =>
   store.getSnapshot().runs.find((row) => row.payload.id === runId)!;
@@ -640,6 +641,38 @@ test('a run that answers 404, or fails its readback, is counted and the next run
     assert.equal(runRow(store, runB).pending, false);
   }
 });
+test('a proxy HTML 400 or 404 on a run PATCH is retried without counting', async () => {
+  for (const status of [400, 404]) {
+    const { f, store, patched } = runFixture(async (path, body) =>
+      (body as { id: string }).id === runA ? failing(status, false)() : accepted(path, body),
+    );
+    await store.initialize();
+    await store.completeRun('2026-10-12', runBody(runA));
+    await store.completeRun('2026-10-12', runBody(runB));
+    for (let i = 0; i < 7; i++) {
+      await store.sync();
+      f.advance(2 * HOUR);
+    }
+    assert.equal(runRow(store, runA).rejected, undefined);
+    assert.equal(deadLettered(runRow(store, runA)), false);
+    assert.equal(runRow(store, runA).pending, true);
+    assert.equal(runRow(store, runB).pending, false);
+    assert.equal(patched.filter((runId) => runId === runA).length >= 7, true);
+  }
+});
+test('a JSON 400 on a run PATCH is counted against the item', async () => {
+  const { f, store } = runFixture(async (path, body) =>
+    (body as { id: string }).id === runA ? failing(400)() : accepted(path, body),
+  );
+  await store.initialize();
+  await store.completeRun('2026-10-12', runBody(runA));
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    await store.sync();
+    f.advance(2 * HOUR);
+  }
+  assert.equal(runRow(store, runA).rejected!.attempts, 5);
+  assert.equal(deadLettered(runRow(store, runA)), true);
+});
 test('a run PATCH answering 429 or 503, or a lost connection, is not counted', async () => {
   for (const bad of [
     failing(429),
@@ -673,7 +706,7 @@ test('a run completes while an activity backs off', async () => {
 });
 
 // A push the server answers with a non-200 status.
-async function refusedWith(status: number) {
+async function refusedWith(status: number, json = true) {
   const f = fixture();
   f.online();
   let calls = 0;
@@ -684,7 +717,7 @@ async function refusedWith(status: number) {
       return accept(path, body);
     }
     calls++;
-    throw new ApiError(status);
+    throw new ApiError(status, undefined, undefined, undefined, json);
   };
   const store = f.create();
   await store.initialize();
@@ -699,6 +732,29 @@ test('a 400 push is counted against the item and the next one uploads', async ()
   assert.equal(rows.find((row) => row.payload.id === id)!.rejected!.attempts, 1);
   assert.match(rows.find((row) => row.payload.id === id)!.rejected!.error, /HTTP 400/);
   assert.equal(rows.find((row) => row.payload.id === second)!.pending, false);
+});
+test('every status our push route answers in JSON is counted against the item', async () => {
+  for (const status of [400, 401, 403, 413]) {
+    const { store, calls } = await refusedWith(status);
+    const attempts = () => store.getSnapshot().rows.find((row) => row.payload.id === id)!;
+    assert.equal(attempts().rejected!.attempts, 1);
+    assert.equal(calls(), 1);
+  }
+});
+test('a proxy 4xx on a push is not counted and retries', async () => {
+  for (const status of [400, 404]) {
+    const { store, calls } = await refusedWith(status, false);
+    const row = () => store.getSnapshot().rows.find((r) => r.payload.id === id)!;
+    assert.equal(row().rejected, undefined);
+    assert.equal(row().pending, true);
+    const before = calls();
+    for (let i = 0; i < 7; i++) {
+      await store.sync();
+    }
+    assert.equal(row().rejected, undefined);
+    assert.equal(deadLettered(row()), false);
+    assert.equal(calls() >= before + 7, true);
+  }
 });
 test('a 429 or a 5xx push is not counted and retries', async () => {
   for (const status of [429, 503]) {
