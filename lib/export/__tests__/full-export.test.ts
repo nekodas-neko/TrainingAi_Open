@@ -150,23 +150,49 @@ describe.skipIf(!canRun)('full export (Q-288)', () => {
     await pool.query(`DELETE FROM food_items WHERE user_id = $1`, [A])
   })
 
+  // Cleanup sits in a `finally` so a failed assertion on a persistent local database does not leave rows
+  // that poison later runs.
+  const mkRetiredFood = async (user: string, name: string) => (await pool.query(
+    `INSERT INTO food_items (user_id, name, serving_size_g, calories, protein_g, carbs_g, fat_g, source, region, deleted_at)
+     VALUES ($1, $2, 100, 100, 1, 1, 1, 'manual', 'AU', now()) RETURNING id`, [user, name])).rows[0].id as string
+  const mkMealNaming = async (user: string, foodId: string) => {
+    const { rows: [meal] } = await pool.query(`INSERT INTO saved_meals (user_id, name) VALUES ($1, 'Export meal') RETURNING id`, [user])
+    await pool.query(`INSERT INTO saved_meal_items (saved_meal_id, food_item_id, quantity_multiplier) VALUES ($1, $2, 1)`, [meal.id, foodId])
+  }
+  const foodIds = async (user: string) =>
+    (await collect(user)).filter(l => l.domain === 'food_items').map(l => (l.row as { id: string }).id)
+  const cleanFoodAndMeals = async () => {
+    await pool.query(`DELETE FROM saved_meals WHERE user_id = ANY($1::uuid[])`, [[A, B]])
+    await pool.query(`DELETE FROM food_items WHERE user_id = ANY($1::uuid[])`, [[A, B]])
+  }
+
   it('exports a retired food that a saved-meal ingredient still points at, for its owner only (#3482)', async () => {
-    const mk = async (user: string, name: string) => (await pool.query(
-      `INSERT INTO food_items (user_id, name, serving_size_g, calories, protein_g, carbs_g, fat_g, source, region, deleted_at)
-       VALUES ($1, $2, 100, 100, 1, 1, 1, 'manual', 'AU', now()) RETURNING id`, [user, name])).rows[0].id as string
-    const inMeal = await mk(A, 'export-retired-in-meal')
-    const bare = await mk(A, 'export-retired-bare-2')
-    const { rows: [meal] } = await pool.query(`INSERT INTO saved_meals (user_id, name) VALUES ($1, 'Export meal') RETURNING id`, [A])
-    await pool.query(`INSERT INTO saved_meal_items (saved_meal_id, food_item_id, quantity_multiplier) VALUES ($1, $2, 1)`, [meal.id, inMeal])
+    try {
+      const inMeal = await mkRetiredFood(A, 'export-retired-in-meal')
+      const bare = await mkRetiredFood(A, 'export-retired-bare-2')
+      await mkMealNaming(A, inMeal)
 
-    const ids = (await collect(A)).filter(l => l.domain === 'food_items').map(l => (l.row as { id: string }).id)
-    expect(ids).toContain(inMeal)
-    expect(ids).not.toContain(bare)
-    // Another user's export does not pick the food up, whoever's meal names it.
-    const others = (await collect(B)).filter(l => l.domain === 'food_items').map(l => (l.row as { id: string }).id)
-    expect(others).not.toContain(inMeal)
+      const ids = await foodIds(A)
+      expect(ids).toContain(inMeal)
+      expect(ids).not.toContain(bare)
+      // Another user's export does not pick the food up, whoever's meal names it.
+      expect(await foodIds(B)).not.toContain(inMeal)
+    } finally {
+      await cleanFoodAndMeals()
+    }
+  })
 
-    await pool.query(`DELETE FROM saved_meals WHERE user_id = $1`, [A])
-    await pool.query(`DELETE FROM food_items WHERE user_id = $1`, [A])
+  it("does not export A's retired food because B's saved meal names it (#3484)", async () => {
+    try {
+      const food = await mkRetiredFood(A, 'export-retired-named-by-b')
+      await mkMealNaming(B, food)
+
+      // A's food is retired and only B's meal names it: A has no reference of their own, and B's export
+      // is scoped to B's food, so it appears in neither.
+      expect(await foodIds(A)).not.toContain(food)
+      expect(await foodIds(B)).not.toContain(food)
+    } finally {
+      await cleanFoodAndMeals()
+    }
   })
 })

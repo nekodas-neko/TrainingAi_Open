@@ -13,6 +13,7 @@ import { TTL_LONG, NUTRITION_FOOD_LOGS_TTL } from '@trainingai/shared/cache-ttl'
 import { NUMBER_INPUT_RESET } from '@/components/ui/input'
 import { useEnergyBalanceToday } from '@/app/health/hooks/use-health-calcs'
 import { countedIntakeKcal } from '@trainingai/shared/nutrition/counted-intake'
+import { QUANTITY_MULTIPLIER_MAX } from '@trainingai/shared/nutrition/quantity-bounds'
 import { useCountedEstimateRows } from '@/app/nutrition/use-estimated-meals'
 
 interface Props {
@@ -146,7 +147,7 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
             step={0.1}
             min={0.1}
             value={quantity}
-            onChange={e => setQuantity(Math.min(100, parseFloat(e.target.value) || 1))}
+            onChange={e => setQuantity(Math.min(QUANTITY_MULTIPLIER_MAX, parseFloat(e.target.value) || 1))}
             // `!text-sm`, not `text-sm`: `globals.css` sets `input { font-size: 16px !important }`
             // under 640px to stop iOS zoom, so the plain class was silently doing nothing and the
             // value rendered 16px beside 14px chips — which is the "differently proportioned" half

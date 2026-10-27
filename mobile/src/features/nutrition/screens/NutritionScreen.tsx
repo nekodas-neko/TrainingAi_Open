@@ -9,6 +9,7 @@ import {
   shiftDateStr,
 } from '@trainingai/shared/date-utils';
 import { mealTypeForHour } from '@trainingai/shared/nutrition/meal-type-for-time';
+import { QUANTITY_MULTIPLIER_MAX, QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, View } from 'react-native';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -549,8 +550,8 @@ export function NutritionScreen({
             <NumericStepper
               label="Servings"
               value={quantity}
-              min={0.01}
-              max={100}
+              min={QUANTITY_MULTIPLIER_MIN}
+              max={QUANTITY_MULTIPLIER_MAX}
               step={0.5}
               onChange={setQuantity}
             />
@@ -607,8 +608,8 @@ export function NutritionScreen({
             <NumericStepper
               label="Scale this meal"
               value={groupScale}
-              min={0.01}
-              max={100}
+              min={QUANTITY_MULTIPLIER_MIN}
+              max={QUANTITY_MULTIPLIER_MAX}
               step={0.5}
               onChange={setGroupScale}
             />

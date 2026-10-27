@@ -2,7 +2,8 @@
 // apply AFTER the pull that carried the tombstone. Its live entry forgets the retired id and the
 // duplicate shows again. What heals it is the cursor: `setLastSyncAt` is unconditional, so the stale
 // pull moves it back to its own `syncedAt`, and the next pull re-delivers the tombstone. This pins
-// that, because it is the reason no guard is built.
+// that. (#3484 later serialised the apply-and-cursor section so overlapping pulls cannot interleave
+// their writes; this file still pins the self-heal for pulls that land in sequence.)
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/sqlite/sqlite-service', () => import('./parity/node-sqlite-service'))

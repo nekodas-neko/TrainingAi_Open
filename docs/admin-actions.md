@@ -292,7 +292,7 @@ run**, which writes nothing and lists every group with its `groupKey`, `kind` (`
 `same-per-100g` or `differs`), `automatic`, `worstChange`, keeper, extras and how many logs move per extra, with totals broken into `identical`, `sameExact` (same per 100 g, no change) and `needsReview`; (3) the
 owner approves the automatic groups (`only: 'exact'`) and names a different keeper for any of the `differs` groups on #2417, and the write passes those
 as `keepers` (a key that names no group, or a food that is not in it, refuses the whole run, dry or
-not); (4) the write, with the owner's approval link. A group the dry run flags `quantityOutOfRange` is one
+not); (4) the write, with the owner's approval link, and not while the owner's app is mid-sync (a pull that reads during the write's transaction can miss the tombstones; see #3484). A group the dry run flags `quantityOutOfRange` is one
 where a moved log or ingredient would be rescaled outside 0.01 to 100 (`QUANTITY_MULTIPLIER_MIN/MAX` in
 `packages/shared/src/nutrition/quantity-bounds.ts`): the write never touches it (its `result` is
 `skipped`; under `only: 'exact'` it is listed in `skipped` with that reason). Naming a different keeper
