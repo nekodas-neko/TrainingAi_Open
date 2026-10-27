@@ -54,6 +54,28 @@ const base = (over: Partial<NightInputSources> = {}): NightInputSources => ({
   today: TODAY, summaries: [], bodyMetrics: [], nights: [], ouraDaily: [], ouraCloudContributors: [], ...over,
 })
 
+// #2265: a night the owner marked partial has no hours to balance, but its breathing is real.
+describe('resolveReadinessNightInputs — a marked partial night', () => {
+  const MARK = '2026-10-18T01:00:00.000Z'
+  const nights = (markTonight: boolean) => sleepNights('oura_cloud', 20).map(n =>
+    n.date === TODAY ? { ...n, durationHours: 3.2, ...(markTonight ? { partialNightAt: MARK } : {}) } : n)
+  const resolve = (markTonight: boolean) => resolveReadinessNightInputs(base({
+    bodyMetrics: bodyNights('oura_cloud', 20), nights: nights(markTonight), ouraDaily: ouraTemps(20),
+  }))
+
+  it('drops sleep balance for the marked night and keeps breathing and HRV', () => {
+    const unmarked = resolve(false)
+    expect(unmarked.inputs.sleepBalance?.z).not.toBeNull()
+
+    const marked = resolve(true)
+    // No hours for tonight, so there is nothing to balance: the input is absent, not a bad night.
+    expect(marked.inputs.sleepBalance).toBeUndefined()
+    expect(marked.inputs.breathing).toEqual(unmarked.inputs.breathing)
+    expect(marked.inputs.breathing?.z).not.toBeNull()
+    expect(marked.inputs.hrvBalance).toEqual(unmarked.inputs.hrvBalance)
+  })
+})
+
 describe('resolveReadinessNightInputs — per input, not per row', () => {
   it('a partial ring row plus a full Oura night takes every input from Oura', () => {
     const r = resolveReadinessNightInputs(base({

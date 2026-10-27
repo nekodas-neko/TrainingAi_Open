@@ -72,7 +72,7 @@ import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibili
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
 import { PartialNightPayloadSchema } from '@trainingai/shared/health/partial-night'
-import { withNightRescore } from '@/lib/health/rescore-nights'
+import { withNightRescore, partialNightRescore } from '@/lib/health/rescore-nights'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { averagePaceSecPerKm } from '@trainingai/shared/activity/route-summary'
 import { HEALTH_CONNECT_SOURCE } from '@trainingai/shared/health/health-connect-workouts'
@@ -3779,7 +3779,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * `not_found`, never a success. It writes this one column and `updated_at`, which the delta pull
    * carries; it never goes through `mergeSet`/`source_map`.
    */
-  async setPartialNight(userId: string, id: string, at: Date | null): Promise<'ok' | 'not_found'> {
+  async setPartialNight(userId: string, id: string, at: Date | null): Promise<{ date: string } | 'not_found'> {
     const t = s.sleepSessions
     return this.db.transaction(async tx => {
       const [own] = await tx.select({ date: t.date }).from(t)
@@ -3790,7 +3790,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .set({ partialNightAt: at, updatedAt: new Date() })
         .where(and(eq(t.userId, userId), eq(t.date, own.date), eq(t.manualEntry, false), isNull(t.deletedAt)))
         .returning({ id: t.id })
-      return hit.length > 0 ? 'ok' : 'not_found'
+      return hit.length > 0 ? { date: own.date } : 'not_found'
     })
   }
 
@@ -6526,8 +6526,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             throw new Error(`partial_night: ${describeZodFailure(parsedMark.error)}`)
           }
           const saved = await withNightRescore(this, userId, () =>
-            this.setPartialNight(userId, parsedMark.data.id, parsedMark.data.partial ? new Date() : null))
-          if (saved !== 'ok') {
+            this.setPartialNight(userId, parsedMark.data.id, parsedMark.data.partial ? new Date() : null),
+          partialNightRescore)
+          if (saved === 'not_found') {
             throw new Error(`partial_night: no device night ${parsedMark.data.id}`)
           }
           processed++

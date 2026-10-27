@@ -273,14 +273,15 @@ export class HealthStore {
     await this.enqueue('manual_sleep', date, { id, deleted: true });
   }
   // #2265: queued like any health write and shown at once by overlaySleep.
-  async markNightPartial(id: string, date: string, partial: boolean) {
+  async markNightPartial(id: string, partial: boolean) {
     const night = overlaySleep(this.current.sleep ?? [], this.current.operations).find(
       (row) => row.id === id,
     );
     if (!night || night.manualEntry || night.localOnly) {
       throw new Error('Only a night your ring or phone measured can be marked partial.');
     }
-    await this.enqueue('partial_night', date, { id, partial });
+    // The night's own date, never the caller's: the overlay matches rows by date, the server by id.
+    await this.enqueue('partial_night', night.date, { id, partial });
   }
   async rememberBedtime(date: string, at: string | null) {
     if (

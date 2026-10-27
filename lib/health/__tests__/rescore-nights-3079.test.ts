@@ -11,7 +11,7 @@ import type { OuraDailyDerivedPatch, OuraDailyDerivedRow } from '@/lib/data/repo
 import { writeOuraCloudData, type OuraCloudWriter } from '@/lib/oura/cloud/ingest'
 import type { OuraCloudWrites } from '@/lib/oura/cloud/documents'
 import {
-  withNightRescore, changedNightDates, scoreNightForDate, RESCORE_WINDOW_DAYS, type NightRescoreRepo,
+  withNightRescore, changedNightDates, scoreNightForDate, RESCORE_WINDOW_DAYS, partialNightRescore, type NightRescoreRepo,
 } from '@/lib/health/rescore-nights'
 
 const TZ = 'Australia/Brisbane'
@@ -115,6 +115,55 @@ describe('re-scoring a night Oura changed (#3079)', () => {
     // A finished day's battery is left to the re-derive.
     expect(battery.get(yesterday)).toBe('readiness')
     expect(repo.releaseBodyBatteryAnchor).not.toHaveBeenCalled()
+  })
+
+  // #2265: the owner's own mark re-scores its night wherever it falls, and frees today's anchor.
+  describe("the owner's partial-night mark", () => {
+    const mark = (date: string, at: Date | null) => (s: SleepSession[]) => s.map(n => (n.date === date ? { ...n, partialNightAt: at } : n))
+    const all = (repo: { listSleepSessions: (u: string, f: string, t: string) => Promise<SleepSession[]> }) =>
+      repo.listSleepSessions('u1', shiftDateStr(today, -60), today)
+
+    it('re-scores a night older than the ingest window, and unmarking brings the original back', async () => {
+      const { repo, calls, derived, setSessions } = makeRepo(today)
+      const old = shiftDateStr(today, -(RESCORE_WINDOW_DAYS + 5))
+      const original = scoreNightForDate(await all(repo), old, TZ)!.score
+      derived.set(old, { sleepScore: original })
+
+      await withNightRescore(repo, 'u1', async () => { setSessions(mark(old, new Date())); return { date: old } }, partialNightRescore)
+      expect(derived.get(old)?.sleepScore).toBeNull()
+
+      await withNightRescore(repo, 'u1', async () => { setSessions(mark(old, null)); return { date: old } }, partialNightRescore)
+      expect(calls.upserts.filter(u => u.day === old).at(-1)?.patch.sleepScore).toBe(original)
+      // Only the marked night moved.
+      expect(calls.upserts.every(u => u.day === old)).toBe(true)
+    })
+
+    it('without the owner hint an old night is left alone, as an ingest revision of it is', async () => {
+      const { repo, calls, derived, setSessions } = makeRepo(today)
+      const old = shiftDateStr(today, -(RESCORE_WINDOW_DAYS + 5))
+      derived.set(old, { sleepScore: 70 })
+      await withNightRescore(repo, 'u1', async () => { setSessions(mark(old, new Date())) })
+      expect(calls.upserts).toEqual([])
+      expect(derived.get(old)?.sleepScore).toBe(70)
+    })
+
+    it("marking last night releases today's frozen Body Battery anchor, and unmarking does too", async () => {
+      const { repo, battery, setSessions } = makeRepo(today)
+      battery.set(today, 'readiness')
+      await withNightRescore(repo, 'u1', async () => { setSessions(mark(today, new Date())); return { date: today } }, partialNightRescore)
+      expect(battery.get(today)).toBe('default')
+
+      battery.set(today, 'readiness')
+      await withNightRescore(repo, 'u1', async () => { setSessions(mark(today, null)); return { date: today } }, partialNightRescore)
+      expect(battery.get(today)).toBe('default')
+    })
+
+    it("marking a finished day's night leaves that day's anchor for the re-derive", async () => {
+      const { repo, battery, setSessions } = makeRepo(today)
+      battery.set(yesterday, 'readiness')
+      await withNightRescore(repo, 'u1', async () => { setSessions(mark(yesterday, new Date())); return { date: yesterday } }, partialNightRescore)
+      expect(battery.get(yesterday)).toBe('readiness')
+    })
   })
 
   it('a night that arrives late for today is scored at once, and releases an anchor frozen without it', async () => {

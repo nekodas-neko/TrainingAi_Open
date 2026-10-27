@@ -5,7 +5,7 @@ import { readJsonLimited } from "@trainingai/shared/http/request-guards"
 import { PartialNightPayloadSchema } from "@trainingai/shared/health/partial-night"
 import { rateLimit } from "@/lib/rate-limit"
 import { invalidBodyResponse, withRouteErrors } from "@/lib/api/route-errors"
-import { withNightRescore } from "@/lib/health/rescore-nights"
+import { withNightRescore, partialNightRescore } from "@/lib/health/rescore-nights"
 
 const MAX_BODY_BYTES = 1024
 
@@ -45,7 +45,8 @@ export async function POST(req: Request) {
   return withRouteErrors(async () => {
     const repo = await getRepositoryAsync()
     const outcome = await withNightRescore(repo, userId, () =>
-      repo.setPartialNight(userId, parsed.data.id, parsed.data.partial ? new Date() : null))
+      repo.setPartialNight(userId, parsed.data.id, parsed.data.partial ? new Date() : null),
+    partialNightRescore)
     if (outcome === 'not_found') return NextResponse.json({ error: "Night not found" }, { status: 404 })
     return NextResponse.json(
       { ok: true, partial: parsed.data.partial },

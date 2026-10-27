@@ -5,7 +5,7 @@ import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/healt
 import { scoreSleepForDate } from '@trainingai/shared/health/sleep-score-for-date'
 import { aggregateNight, groupSleepPeriods, nightSessions } from '@trainingai/shared/health/sleep-night'
 import { sleepDurationTrend, sleepScoreTrend } from '@trainingai/shared/health/sleep-trend'
-import { toVerdictNights } from '@trainingai/shared/health/sleep-verdict'
+import { toVerdictNights, sleepVerdictForNight, VERDICT_BASELINE_NIGHTS } from '@trainingai/shared/health/sleep-verdict'
 import { sleepAverages } from '@trainingai/shared/profile/measured-overview'
 import {
   PARTIAL_NIGHT_DROPPED_FIELDS, PartialNightPayloadSchema, isPartialNight, nightsWithDuration, scoredNights,
@@ -32,13 +32,13 @@ function fullNight(date: string, over: Partial<SleepSession> = {}): SleepSession
   }
 }
 
-/** The ring went on at 04:23 and the night ran to 08:03: 3 h 5 m, with healthy physiology. */
+/** The ring went on at 04:40 and the night ran to 07:55: 3 h 15 m, with healthy physiology. */
 function partialNight(date: string, over: Partial<SleepSession> = {}): SleepSession {
   return fullNight(date, {
-    sleepStart: new Date(`${date}T04:23:00+10:00`), sleepEnd: new Date(`${date}T08:03:00+10:00`),
-    durationHours: 3.08, timeInBedHours: 3.6, efficiency: 84, onsetLatencySec: 1800, restlessPeriods: 1,
+    sleepStart: new Date(`${date}T04:40:00+10:00`), sleepEnd: new Date(`${date}T07:55:00+10:00`),
+    durationHours: 3.25, timeInBedHours: 3.6, efficiency: 84, onsetLatencySec: 1800, restlessPeriods: 1,
     deepSleepHours: 0.6, remSleepHours: 0.7, lightSleepHours: 1.8, awakHours: 0.5,
-    averageHrvMs: 61, avgHeartRate: 53, lowestHeartRate: 53, respiratoryRate: 9.1,
+    averageHrvMs: 47, avgHeartRate: 59, lowestHeartRate: 55, respiratoryRate: 13.4,
     ...over,
   })
 }
@@ -57,7 +57,7 @@ describe('withoutPartialDuration', () => {
     const kept = withoutPartialDuration(marked)
     for (const f of PARTIAL_NIGHT_DROPPED_FIELDS) expect(kept[f], f).toBeUndefined()
     expect(kept).toMatchObject({
-      averageHrvMs: 61, avgHeartRate: 53, lowestHeartRate: 53, respiratoryRate: 9.1,
+      averageHrvMs: 47, avgHeartRate: 59, lowestHeartRate: 55, respiratoryRate: 13.4,
       sleepStart: marked.sleepStart, sleepEnd: marked.sleepEnd, partialNightAt: MARK,
     })
   })
@@ -206,7 +206,7 @@ describe('trends and averages that are about hours', () => {
     const [n] = toVerdictNights([partialNight('2026-10-20', { partialNightAt: MARK })], TZ)
     expect(n).toEqual({ date: '2026-10-20', durationHours: null, onsetMinutes: null, efficiency: null })
     const [plain] = toVerdictNights([partialNight('2026-10-20')], TZ)
-    expect(plain.durationHours).toBe(3.08)
+    expect(plain.durationHours).toBe(3.25)
   })
 
   it('average the owner\'s measured nights without its hours, keeping its heart rate and breathing', () => {
@@ -220,5 +220,23 @@ describe('trends and averages that are about hours', () => {
     expect(avg).toMatchObject({ nights: 3, durationHours: 8, efficiency: 92 })
     expect(avg!.lowestHeartRate).toBeCloseTo((50 + 50 + 56) / 3, 6)
     expect(avg!.respiratoryRate).toBeCloseTo((14 + 14 + 9) / 3, 6)
+  })
+})
+
+describe('the sleep verdict of a marked night', () => {
+  const history = dates(VERDICT_BASELINE_NIGHTS).map(d => fullNight(d))
+  const target = shiftDateStr(history.at(-1)!.date, 1)
+  const verdictFor = (mark: boolean) => {
+    const short = partialNight(target, mark ? { partialNightAt: MARK } : {})
+    const nights = toVerdictNights([...history, short], TZ)
+    return sleepVerdictForNight(nights.find(n => n.date === target)!, nights)
+  }
+
+  it('is no verdict at all, not "normal", when the owner marked the night', () => {
+    expect(verdictFor(true)).toBeNull()
+  })
+
+  it('is unchanged when the same short night is not marked: poor', () => {
+    expect(verdictFor(false)?.verdict).toBe('poor')
   })
 })

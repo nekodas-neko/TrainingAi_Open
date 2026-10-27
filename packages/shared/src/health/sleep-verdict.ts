@@ -226,6 +226,10 @@ export function sleepVerdictForNight(
 
   if (Object.keys(bands).length === 0) return null
 
+  // #2265: a night with no component to judge (the owner marked it partial) has no verdict. Saying
+  // "normal" about it would announce a judgement nothing was measured for.
+  if (SLEEP_COMPONENTS.every(c => components[c] === null)) return null
+
   // A poor signal outranks a good one. A long night that started two hours late is a night worth
   // flagging, and the owner can disagree in one tap — which is the data point this exists for.
   const verdict: SleepVerdict = triggered.length > 0 ? 'poor' : goodSignals > 0 ? 'good' : 'normal'

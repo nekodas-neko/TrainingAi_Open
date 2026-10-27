@@ -876,9 +876,10 @@ export interface WorkoutRepository {
   setManualSleepStart(userId: string, date: string, at: Date | null): Promise<boolean>
   /**
    * #2265 — mark (`at`) or unmark (`null`) the night the row `id` belongs to as partial. Covers every
-   * live device row with that wake date. `not_found` when `id` is not the caller's live device night.
+   * live device row with that wake date. Returns that wake date so the caller can re-score the night
+   * wherever it falls; `not_found` when `id` is not the caller's live device night.
    */
-  setPartialNight(userId: string, id: string, at: Date | null): Promise<'ok' | 'not_found'>
+  setPartialNight(userId: string, id: string, at: Date | null): Promise<{ date: string } | 'not_found'>
   /**
    * #2338 — store a night the user entered by hand (`manual_entry = true`). The natural key is
    * (user, wake date): a second entry for the same night EDITS the first, never adds a row, so a

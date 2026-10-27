@@ -35,9 +35,9 @@ describe.skipIf(!canRun)('marking a night partial (#2265)', () => {
   const seed = async (userId: string, date: string, start: string, end: string, hours: number, ouraId: string, manual = false) =>
     (await pool.query(
       `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, efficiency, average_hrv_ms, oura_id, manual_entry, source_map)
-       VALUES ($1,$2,$3,$4,$5,90,61,$6,$7,$8) RETURNING id`,
+       VALUES ($1,$2,$3,$4,$5,90,47,$6,$7,$8) RETURNING id`,
       [userId, date, start, end, hours, ouraId, manual, JSON.stringify({ duration_hours: 'oura_cloud' })])).rows[0].id as string
-  const night = (ouraId = 'cloud-2265') => seed(USER, DATE, '2026-10-06T18:23:00Z', '2026-10-06T22:03:00Z', 3.1, ouraId)
+  const night = (ouraId = 'cloud-2265') => seed(USER, DATE, '2026-10-06T18:40:00Z', '2026-10-06T21:55:00Z', 3.25, ouraId)
 
   beforeAll(async () => {
     const { getPool } = await import('@/lib/data/postgres/client')
@@ -98,12 +98,12 @@ describe.skipIf(!canRun)('marking a night partial (#2265)', () => {
       expect(marked.headers.get('Cache-Control')).toBe('private, no-store')
       const after = (await rows())[0]
       expect(after.partial_night_at).toBeInstanceOf(Date)
-      expect(after).toMatchObject({ id, duration_hours: 3.1, average_hrv_ms: 61, deleted_at: null })
+      expect(after).toMatchObject({ id, duration_hours: 3.25, average_hrv_ms: 47, deleted_at: null })
       expect((after.updated_at as Date).getTime()).toBeGreaterThanOrEqual((before.updated_at as Date).getTime())
 
       expect((await post({ id, partial: false })).status).toBe(200)
       expect(await markOf(id)).toBeNull()
-      expect((await rows())[0]).toMatchObject({ id, duration_hours: 3.1, average_hrv_ms: 61 })
+      expect((await rows())[0]).toMatchObject({ id, duration_hours: 3.25, average_hrv_ms: 47 })
     })
 
     it('is idempotent both ways', async () => {
@@ -146,8 +146,8 @@ describe.skipIf(!canRun)('marking a night partial (#2265)', () => {
       await post({ id, partial: true })
       const [row] = await repo.listSleepSessions(USER, DATE, DATE)
       expect(row.partialNightAt).toBeInstanceOf(Date)
-      expect(row.durationHours).toBe(3.1)
-      expect(row.averageHrvMs).toBe(61)
+      expect(row.durationHours).toBe(3.25)
+      expect(row.averageHrvMs).toBe(47)
     })
 
     it('/api/sleep-sessions returns it as an ISO string', async () => {
@@ -156,7 +156,7 @@ describe.skipIf(!canRun)('marking a night partial (#2265)', () => {
       const sleepRoute = await import('@/app/api/sleep-sessions/route')
       const res = await sleepRoute.GET()
       const body = await res.json() as { id: string; partialNightAt: string | null; durationHours: number | null }[]
-      expect(body.find(r => r.id === id)).toMatchObject({ partialNightAt: expect.stringMatching(/^2026-10-07T/), durationHours: 3.1 })
+      expect(body.find(r => r.id === id)).toMatchObject({ partialNightAt: expect.stringMatching(/^2026-10-07T/), durationHours: 3.25 })
     })
 
     it('re-scores the stored Sleep Score: cleared while marked, back to the original on unmarking', async () => {
@@ -173,13 +173,27 @@ describe.skipIf(!canRun)('marking a night partial (#2265)', () => {
       expect(await stored()).toBe(expected)
     })
 
+    it('re-scores a night older than the ingest window, and unmarking brings the original back', async () => {
+      const old = '2026-09-25' // 12 days before NOW, outside the 7-day ingest window
+      const id = await seed(USER, old, '2026-09-24T12:30:00Z', '2026-09-24T20:30:00Z', 8, 'cloud-old')
+      const { scoreNightForDate } = await import('@/lib/health/rescore-nights')
+      const original = scoreNightForDate(await repo.listSleepSessions(USER, '2026-08-01', DATE), old, TZ)!.score
+      await repo.upsertOuraDailyDerived(USER, old, { sleepScore: original })
+      const stored = async () => (await repo.getOuraDailyDerived(USER, old, old))[0]?.sleepScore ?? null
+
+      expect((await post({ id, partial: true })).status).toBe(200)
+      expect(await stored()).toBeNull()
+      expect((await post({ id, partial: false })).status).toBe(200)
+      expect(await stored()).toBe(original)
+    })
+
     it('a device write that re-delivers the night does not clear the mark', async () => {
       const id = await night('cloud-redeliver')
       await post({ id, partial: true })
       const { upsertOuraSleep } = await import('@/lib/data/postgres/slices/oura')
       const { getDb } = await import('@/lib/data/postgres/client')
       await upsertOuraSleep(getDb(), USER, [{
-        date: DATE, sleepStart: new Date('2026-10-06T18:23:00Z'), sleepEnd: new Date('2026-10-06T22:03:00Z'),
+        date: DATE, sleepStart: new Date('2026-10-06T18:40:00Z'), sleepEnd: new Date('2026-10-06T21:55:00Z'),
         durationHours: 3.2, ouraId: 'cloud-redeliver', averageHrvMs: 62,
       }] as never, 'oura_cloud', { replaceOwnCloud: true })
       expect(await markOf(id)).toBeInstanceOf(Date)
