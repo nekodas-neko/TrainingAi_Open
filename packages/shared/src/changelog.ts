@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.510.0",
+    date: "2026-10-28",
+    changes: [
+      "Behind the scenes: the database gets room to mark a night as partial, ready for keeping a night you only partly wore the ring out of your sleep stats. Nothing you see changes until a later release uses it.",
+    ],
+  },
+  {
     version: "1.509.0",
     date: "2026-10-27",
     changes: [
