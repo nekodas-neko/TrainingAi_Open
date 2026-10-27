@@ -477,7 +477,7 @@ export interface AggregatableSleep extends SleepWindow {
   respiratoryRate?: number | null
   timeInBedHours?: number | null
   /** #2265: the owner's partial-night mark. A reassembled night is marked when any window is. */
-  partialNightAt?: Date | null
+  partialNightAt?: Date | string | null
 }
 
 const sum = (xs: (number | null | undefined)[]): number | null => {

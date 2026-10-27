@@ -154,7 +154,7 @@ describe.skipIf(!canRun)('marking a night partial (#2265)', () => {
       const id = await night()
       await post({ id, partial: true })
       const sleepRoute = await import('@/app/api/sleep-sessions/route')
-      const res = await sleepRoute.GET(new Request(`http://localhost/api/sleep-sessions?to=${DATE}`))
+      const res = await sleepRoute.GET()
       const body = await res.json() as { id: string; partialNightAt: string | null; durationHours: number | null }[]
       expect(body.find(r => r.id === id)).toMatchObject({ partialNightAt: expect.stringMatching(/^2026-10-07T/), durationHours: 3.1 })
     })
