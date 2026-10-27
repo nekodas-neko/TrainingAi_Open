@@ -1463,8 +1463,17 @@ export class SQLiteLocalStore implements LocalStore {
   async applyDelta(delta: Parameters<LocalStore['applyDelta']>[0]): Promise<void> {
     // #3459. A pulled tombstone is remembered BEFORE the transaction, so a crash between the two
     // cannot lose it; the sweep after it drops whatever is no longer referenced and forgets those ids.
-    const tombstoned = (delta.foodItems ?? []).filter(r => r.deletedAt).map(r => r.id);
-    if (tombstoned.length) await this.rememberRetiredFoods(tombstoned);
+    // #3468. The reverse: a pull that carries the food live again (`deletedAt` explicitly null) forgets
+    // it, or a revived food would stay hidden. Only `=== null` counts. The day-list hydrate
+    // (`toLocalFoodItems`) sends foods with no `deletedAt` at all, and that is not the server saying
+    // the food is live, so it neither remembers nor forgets. Within one delta the last word on an id wins.
+    const retire = new Set<string>();
+    const revive = new Set<string>();
+    for (const r of delta.foodItems ?? []) {
+      if (r.deletedAt) { retire.add(r.id); revive.delete(r.id); }
+      else if (r.deletedAt === null) { revive.add(r.id); retire.delete(r.id); }
+    }
+    if (retire.size || revive.size) await this.updateRetiredFoods([...retire], [...revive]);
     await withTransaction(tx => this.applyDeltaBody(delta, tx));
     await this.sweepRetiredFoods();
   }
@@ -1476,7 +1485,7 @@ export class SQLiteLocalStore implements LocalStore {
   // DELETE is re-run after each pull and each saved-meals hydrate until the row is gone.
   // The sweep runs after the pull's transaction rather than inside `applyDeltaBody` because a
   // `SQLTransaction` can only write; it needs to read, and it then sees the pulled logs as committed.
-  private async retiredFoodIds(): Promise<string[]> {
+  async getRetiredFoodIds(): Promise<string[]> {
     const raw = await this.getSyncMeta(RETIRED_FOOD_IDS_KEY);
     if (!raw) return [];
     try {
@@ -1485,14 +1494,15 @@ export class SQLiteLocalStore implements LocalStore {
     } catch { return []; }
   }
 
-  private async rememberRetiredFoods(ids: string[]): Promise<void> {
-    const all = new Set([...await this.retiredFoodIds(), ...ids]);
+  private async updateRetiredFoods(add: string[], forget: string[]): Promise<void> {
+    const all = new Set([...await this.getRetiredFoodIds(), ...add]);
+    for (const id of forget) all.delete(id);
     await this.setSyncMeta(RETIRED_FOOD_IDS_KEY, JSON.stringify([...all]));
   }
 
   /** Re-runs the guarded DELETE for every remembered id and forgets the ones whose row is gone. */
   private async sweepRetiredFoods(): Promise<void> {
-    const ids = await this.retiredFoodIds();
+    const ids = await this.getRetiredFoodIds();
     if (!ids.length) return;
     for (const id of ids) {
       await runSQL(
@@ -1513,7 +1523,7 @@ export class SQLiteLocalStore implements LocalStore {
 
   /** `AND <col> NOT IN (...)` for the catalog reads; empty when nothing is retired. */
   private async excludeRetiredFoods(col: string): Promise<{ sql: string; params: string[] }> {
-    const ids = await this.retiredFoodIds();
+    const ids = await this.getRetiredFoodIds();
     return ids.length ? { sql: ` AND ${col} NOT IN (${ids.map(() => '?').join(',')})`, params: ids } : { sql: '', params: [] };
   }
 

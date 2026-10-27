@@ -57,8 +57,12 @@ export function toLocalFoodLogs(
 
 /** The `foodItems` half of the same hydrate. Unchanged by BF-72; extracted with its sibling so the
  *  two payloads stay side by side rather than one moving out of view of the other. */
-export function toLocalFoodItems(server: readonly FoodLogWithItem[], nowIso: string) {
-  return server.map(l => ({
+export function toLocalFoodItems(server: readonly FoodLogWithItem[], nowIso: string, retiredFoodIds: readonly string[] = []) {
+  // #3468. This upsert carries no `deletedAt`, so it cannot tell a retired (merged-away) food from a
+  // live one. A server log that still points at a retired food would re-create the row the device
+  // dropped or hid, and `applyDelta` would then have no reason to forget the id. Skip those ids.
+  const retired = new Set(retiredFoodIds)
+  return server.filter(l => !retired.has(l.foodItemId)).map(l => ({
     id: l.foodItemId,
     name: l.foodItem.name,
     brand: l.foodItem.brand ?? null,

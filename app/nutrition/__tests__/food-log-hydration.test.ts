@@ -82,4 +82,14 @@ describe('food-log hydration carries the meal grouping', () => {
     const [row] = toLocalFoodItems([log()], '2026-08-31T08:00:00.000Z')
     expect(row).toMatchObject({ id: 'item-1', name: 'Peanut Butter', calories: 120, proteinG: 5, carbsG: 3, fatG: 10 })
   })
+
+  it('skips a food whose id is retired, so a server log cannot re-create its row (#3468)', () => {
+    const rows = toLocalFoodItems(
+      [log(), log({ id: 'log-2', foodItemId: 'item-2' })],
+      '2026-08-31T08:00:00.000Z',
+      ['item-1'],
+    )
+    expect(rows.map(r => r.id)).toEqual(['item-2'])
+    expect(toLocalFoodItems([log()], '2026-08-31T08:00:00.000Z')).toHaveLength(1)
+  })
 })

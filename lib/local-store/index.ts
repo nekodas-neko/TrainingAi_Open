@@ -278,6 +278,9 @@ export interface LocalStore {
   /** A value in `sync_meta` by key, or null. */
   getSyncMeta(key: string): Promise<string | null>;
   setSyncMeta(key: string, value: string): Promise<void>;
+  /** #3468. Ids of foods the server merged away (#2417) that this device has not finished dropping. A
+   *  malformed or missing stored value reads as none. */
+  getRetiredFoodIds(): Promise<string[]>;
   /** #2752: delete the synced ring (`ble:`) sleep rows whose id the server no longer holds. Only rows
    *  whose `updated_at` is before `before` are considered, so a row pulled after the server read its
    *  id list is never taken for a ghost. Never touches a pending or manual row. Returns the count. */
