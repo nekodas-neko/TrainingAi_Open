@@ -106,12 +106,17 @@ describe.skipIf(!canRun)('marking a night partial (#2265)', () => {
       expect((await rows())[0]).toMatchObject({ id, duration_hours: 3.25, average_hrv_ms: 47 })
     })
 
-    it('is idempotent both ways', async () => {
+    it('is idempotent both ways, and a repeat keeps the first mark and writes nothing', async () => {
       const id = await night()
       expect((await post({ id, partial: false })).status).toBe(200)
+      expect(await markOf(id)).toBeNull()
       expect((await post({ id, partial: true })).status).toBe(200)
+      const first = (await rows())[0]
+      expect(first.partial_night_at).toBeInstanceOf(Date)
       expect((await post({ id, partial: true })).status).toBe(200)
-      expect(await markOf(id)).toBeInstanceOf(Date)
+      const again = (await rows())[0]
+      expect((again.partial_night_at as Date).getTime()).toBe((first.partial_night_at as Date).getTime())
+      expect((again.updated_at as Date).getTime()).toBe((first.updated_at as Date).getTime())
     })
 
     it('marks every device row of the wake date and no other date, so a split night is never half marked', async () => {

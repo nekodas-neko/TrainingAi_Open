@@ -3778,19 +3778,29 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * duration is typed, not measured), and so is a removed row. Affected rows are counted: zero is
    * `not_found`, never a success. It writes this one column and `updated_at`, which the delta pull
    * carries; it never goes through `mergeSet`/`source_map`.
+   *
+   * A repeat (a double tap, a replayed outbox op, a second device) writes nothing and reports
+   * `changed: false`, so the caller's re-score and today's anchor are left alone and a mark keeps
+   * the time it was first made. `changed` is whether the night as readers see it (partial when any
+   * window is) flipped; a split night with one window still unmarked is tidied without counting.
    */
-  async setPartialNight(userId: string, id: string, at: Date | null): Promise<{ date: string } | 'not_found'> {
+  async setPartialNight(userId: string, id: string, at: Date | null): Promise<{ date: string; changed: boolean } | 'not_found'> {
     const t = s.sleepSessions
     return this.db.transaction(async tx => {
       const [own] = await tx.select({ date: t.date }).from(t)
         .where(and(eq(t.id, id), eq(t.userId, userId), eq(t.manualEntry, false), isNull(t.deletedAt)))
         .limit(1)
       if (!own) return 'not_found'
+      const night = and(eq(t.userId, userId), eq(t.date, own.date), eq(t.manualEntry, false), isNull(t.deletedAt))
+      const windows = await tx.select({ partialNightAt: t.partialNightAt }).from(t).where(night)
+      const wasMarked = windows.some(w => w.partialNightAt != null)
+      const settled = windows.every(w => (w.partialNightAt != null) === (at != null))
+      if (settled) return { date: own.date, changed: false }
       const hit = await tx.update(t)
         .set({ partialNightAt: at, updatedAt: new Date() })
-        .where(and(eq(t.userId, userId), eq(t.date, own.date), eq(t.manualEntry, false), isNull(t.deletedAt)))
+        .where(night)
         .returning({ id: t.id })
-      return hit.length > 0 ? { date: own.date } : 'not_found'
+      return hit.length > 0 ? { date: own.date, changed: wasMarked !== (at != null) } : 'not_found'
     })
   }
 

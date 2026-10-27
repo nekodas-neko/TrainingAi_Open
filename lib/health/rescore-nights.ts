@@ -212,7 +212,11 @@ export async function withNightRescore<T>(
   })
 }
 
-/** `ownerChanged` for {@link withNightRescore} around `setPartialNight`: the marked night's wake date. */
-export function partialNightRescore(result: { date: string } | 'not_found'): string[] {
-  return result === 'not_found' ? [] : [result.date]
+/**
+ * `ownerChanged` for {@link withNightRescore} around `setPartialNight`: the marked night's wake date,
+ * only when the mark really flipped. A repeat tap or a replayed op re-scores nothing and never moves
+ * today's frozen anchor (#3085: no anchor moves in the evening for a non-change).
+ */
+export function partialNightRescore(result: { date: string; changed: boolean } | 'not_found'): string[] {
+  return result === 'not_found' || !result.changed ? [] : [result.date]
 }
