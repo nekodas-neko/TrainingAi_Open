@@ -85,9 +85,11 @@ type ActionError = { title: string; message: string };
 export function OuraScreen({
   onBack,
   initialReturn = null,
+  openSignedInDevices,
 }: {
   onBack: () => void;
   initialReturn?: string | null;
+  openSignedInDevices?: () => void;
 }) {
   const { theme } = useTheme();
   const account = useAccountContext();
@@ -324,6 +326,17 @@ export function OuraScreen({
           )}
           <ChestStrapCard />
           <ScaleCard />
+          {openSignedInDevices && connection && (
+            <Card padded={false}>
+              <ListRow
+                title="Signed-in devices"
+                subtitle="See where you are signed in, and sign other devices out"
+                leading={<Icon name="lock" />}
+                onPress={openSignedInDevices}
+                divider={false}
+              />
+            </Card>
+          )}
         </Stack>
       </TabPanel>
     </PageLayout>

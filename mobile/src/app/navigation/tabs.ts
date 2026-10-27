@@ -27,6 +27,7 @@ export type MoreDetail =
   | 'more-data'
   | 'more-about'
   | 'more-devices'
+  | 'more-signed-in-devices'
   | 'more-account'
   | 'more-admin'
   | 'year-review'

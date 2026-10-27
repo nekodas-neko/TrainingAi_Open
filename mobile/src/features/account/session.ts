@@ -1,5 +1,5 @@
 import { ApiError, backendOrigin, createApiClient, REFRESH_TOKEN_RE } from './api/client.ts';
-import type { AccountProfile, SessionToken } from './api/client.ts';
+import type { AccountProfile, DeviceInfo, SessionToken } from './api/client.ts';
 import { failureNotice } from '../../core/reporting/index.ts';
 import {
   DEVICE_RECORD_KEY,
@@ -81,6 +81,9 @@ export type AuthPlatform = {
   set(key: string, value: string): Promise<void>;
   remove(key: string): Promise<void>;
   random(): Promise<string>;
+  /** This install's label and random id, sent at sign-in so the account can list its devices
+   *  (#3280). Optional: without it the device is listed as "Native app". */
+  device?(): Promise<DeviceInfo>;
   challenge(verifier: string): Promise<string>;
   open(url: string): Promise<{ type: string; url?: string }>;
   appleSignIn?(
@@ -765,7 +768,9 @@ export class AccountSession {
         return;
       }
       this.record('exchange_started');
-      const token = await this.api.exchange(result.token, pending.verifier);
+      // A device the platform cannot name is still signed in; it just lists under the default.
+      const device = await this.platform.device?.().catch(() => undefined);
+      const token = await this.api.exchange(result.token, pending.verifier, device);
       this.record('exchange_succeeded');
       if (generation !== this.generation) {
         return;

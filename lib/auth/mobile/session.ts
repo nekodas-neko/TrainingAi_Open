@@ -79,7 +79,15 @@ function response(
   };
 }
 
-export async function issueNativeSession(user: User): Promise<NativeSessionResponse> {
+/** What the app says about the device it signs in on (#3280). Both are optional: an app from before
+ *  this sends neither and is listed as "Native app". Validated by `DeviceInfo` in the routes. */
+export type NativeDeviceInfo = { label?: string; id?: string };
+export const DEFAULT_DEVICE_LABEL = 'Native app';
+
+export async function issueNativeSession(
+  user: User,
+  device: NativeDeviceInfo = {},
+): Promise<NativeSessionResponse> {
   if (!user.isActive || !process.env.AUTH_SECRET) {
     throw new Error('Cannot issue session');
   }
@@ -89,7 +97,8 @@ export async function issueNativeSession(user: User): Promise<NativeSessionRespo
   ).createNativeRefreshToken({
     userId: user.id,
     tokenHash: refresh.hash,
-    deviceLabel: 'Native app',
+    deviceLabel: device.label ?? DEFAULT_DEVICE_LABEL,
+    deviceId: device.id ?? null,
     expiresAt: refreshExpiry(),
   });
   return response(await accessTokenFor(user, row.id), refresh.raw, row.expiresAt);

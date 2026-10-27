@@ -261,6 +261,30 @@ describe.skipIf(!canRun)('native_refresh_tokens (#2076)', () => {
     for (const t of live) expect(Object.keys(t)).not.toContain('tokenHash')
   })
 
+  it('lists one signed-in device per live family, dated from the sign-in and not the last rotation (#3280)', async () => {
+    await raw(`DELETE FROM native_refresh_tokens WHERE user_id = $1`, [USER_A])
+    const phone = await create(USER_A, { deviceLabel: 'Galaxy S25 Ultra' })
+    await raw(`UPDATE native_refresh_tokens SET created_at = now() - interval '20 days' WHERE id = $1`, [phone.id])
+    const refreshed = await repo.rotateNativeRefreshToken({ userId: USER_A, id: phone.id, newTokenHash: newHash(), expiresAt: inDays(30) })
+    const tablet = await create(USER_A, { deviceLabel: 'Galaxy Tab S9' })
+    await raw(`UPDATE native_refresh_tokens SET created_at = now() - interval '3 days' WHERE id = $1`, [tablet.id])
+    const gone = await create(USER_A, { deviceLabel: 'Pixel 8' })
+    await repo.revokeNativeRefreshTokenFamily(USER_A, gone.familyId, 'user')
+    const other = await create(USER_B, { deviceLabel: 'B phone' })
+
+    const devices = await repo.listNativeDevices(USER_A)
+    expect(devices.map(d => d.deviceLabel)).toEqual(['Galaxy Tab S9', 'Galaxy S25 Ultra'])
+    const [, s25] = devices
+    expect(s25.familyId).toBe(phone.familyId)
+    // Signed in 20 days ago; the live token is the refresh issued just now.
+    expect(Date.now() - s25.signedInAt.getTime()).toBeGreaterThan(19 * DAY)
+    expect(s25.lastUsedAt.getTime()).toBe(refreshed!.createdAt.getTime())
+    expect((await repo.listNativeDevices(USER_B)).map(d => d.familyId)).toEqual([other.familyId])
+    const text = JSON.stringify(devices)
+    expect(text).not.toContain('tokenHash')
+    expect(Object.keys(devices[0]).sort()).toEqual(['deviceLabel', 'familyId', 'lastUsedAt', 'signedInAt'])
+  })
+
   it('is scoped to the user: B cannot list, rotate or revoke A\'s tokens or family', async () => {
     const a = await create(USER_A)
     expect((await repo.listActiveNativeRefreshTokens(USER_B)).map(t => t.id)).not.toContain(a.id)

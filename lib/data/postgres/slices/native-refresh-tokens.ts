@@ -13,7 +13,7 @@
 // `findNativeRefreshTokenByHash`: a presented refresh token is how the server learns WHO is asking,
 // so there is no user to scope by yet. The hash is the secret; the row it finds names the user,
 // and every later call for that request (rotate, revoke) takes that user id.
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -264,4 +264,34 @@ export async function listActiveNativeRefreshTokens(db: Db, userId: string): Pro
     ))
     .orderBy(desc(t.createdAt), desc(t.id))
   return rows.map(toToken)
+}
+
+/** A signed-in device, for the Signed-in devices screen (#3280). One per live family. */
+export interface NativeDevice {
+  familyId: string
+  deviceLabel: string
+  /** When the family's first token was issued: the sign-in, not the latest rotation. */
+  signedInAt: Date
+  /** The live token's last use, else when it was issued, which is the last refresh. */
+  lastUsedAt: Date
+}
+
+/** The caller's signed-in devices, newest sign-in first: one per family that still has a live token.
+ *  Carries no token id and no hash. */
+export async function listNativeDevices(db: Db, userId: string): Promise<NativeDevice[]> {
+  const live = await listActiveNativeRefreshTokens(db, userId)
+  if (live.length === 0) return []
+  const rows = await db.select({ familyId: t.familyId, signedInAt: sql<Date>`min(${t.createdAt})` })
+    .from(t)
+    .where(and(eq(t.userId, userId), inArray(t.familyId, live.map(r => r.familyId))))
+    .groupBy(t.familyId)
+  const first = new Map(rows.map(r => [r.familyId, new Date(r.signedInAt)]))
+  return live
+    .map(r => ({
+      familyId: r.familyId,
+      deviceLabel: r.deviceLabel,
+      signedInAt: first.get(r.familyId) ?? r.createdAt,
+      lastUsedAt: r.lastUsedAt ?? r.createdAt,
+    }))
+    .sort((a, b) => b.signedInAt.getTime() - a.signedInAt.getTime())
 }

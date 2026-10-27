@@ -8,6 +8,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { readJsonLimited } from '@trainingai/shared/http/request-guards';
 import { clientIp } from '@trainingai/shared/http/client-ip';
 import { issueNativeSession } from '@/lib/auth/mobile/session';
+import { DeviceId, DeviceLabel } from '@/lib/auth/mobile/device-info';
 
 const MAX_EXCHANGE_BODY_BYTES = 8 * 1024;
 const COOKIE_CHUNK_SIZE = 3936;
@@ -30,6 +31,8 @@ export async function POST(req: NextRequest) {
     token?: unknown;
     verifier?: unknown;
     responseType?: unknown;
+    deviceLabel?: unknown;
+    deviceId?: unknown;
   } | null;
   const token = typeof body?.token === 'string' ? body.token : undefined;
   const verifier = typeof body?.verifier === 'string' ? body.verifier : undefined;
@@ -42,6 +45,12 @@ export async function POST(req: NextRequest) {
     body.responseType !== 'token'
   ) {
     return json({ error: 'Invalid response type' }, 400);
+  }
+  // Before the code is consumed: a malformed label must not cost the user their one-time code.
+  const label = body?.deviceLabel === undefined ? undefined : DeviceLabel.safeParse(body.deviceLabel);
+  const deviceId = body?.deviceId === undefined ? undefined : DeviceId.safeParse(body.deviceId);
+  if (label?.success === false || deviceId?.success === false) {
+    return json({ error: 'Invalid device' }, 400);
   }
   const entry = consumeMobileAuthToken(token);
   if (!entry || !verifyPkce(verifier, entry.challenge)) {
@@ -63,7 +72,7 @@ export async function POST(req: NextRequest) {
   if (body?.responseType === 'token') {
     const user = await (await getRepositoryAsync()).getUserById(session.userId);
     if (!user?.isActive) return json({ error: 'Invalid or expired session' }, 401);
-    return json(await issueNativeSession(user));
+    return json(await issueNativeSession(user, { label: label?.data, id: deviceId?.data }));
   }
 
   const secure = process.env.NODE_ENV === 'production';
