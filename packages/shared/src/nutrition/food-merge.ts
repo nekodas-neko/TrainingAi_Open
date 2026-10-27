@@ -62,19 +62,27 @@ export interface MergeFood {
   quantities?: number[]
 }
 
-/** The largest change a merge makes to any one log or ingredient, at stored precision. */
+/**
+ * The largest change a merge makes to any one log or ingredient, as the app shows it. Fibre, sugar,
+ * sodium and saturated fat count the same as calories and macros: a moved log that loses its fibre
+ * has changed on screen. A food with no value for one of them is read as 0 (see `micro`).
+ */
 export interface WorstChange {
   kcal: number
   proteinG: number
   carbsG: number
   fatG: number
+  fiberG: number
+  sugarG: number
+  sodiumMg: number
+  satFatG: number
 }
 
 /**
  * How alike a group's rows are.
  * - `identical`: same serving size and every number equal.
- * - `same-per-100g`: calories, protein, carbs and fat agree per 100 g within the rounding the stored
- *   numbers already carry, at different serving sizes.
+ * - `same-per-100g`: calories, protein, carbs, fat, fibre, sugar, sodium and saturated fat agree per
+ *   100 g within the rounding the stored numbers already carry, at different serving sizes.
  * - `differs`: they disagree per 100 g. The owner may name the keeper.
  */
 export type GroupKind = 'identical' | 'same-per-100g' | 'differs'
@@ -130,6 +138,11 @@ const KCAL_HALF_UNIT = 0.5
 const GRAM_HALF_UNIT = 0.05
 const EPS = 1e-9
 
+// A food with no fibre (sugar, sodium, saturated fat) recorded is read as 0. The app does the same
+// wherever it adds these up (the food logger sheet uses `?? 0`), and a log with the value missing shows
+// nothing where a 0 shows "0": null against 0 is no change, null against a real value is.
+const micro = (v: number | null | undefined) => v ?? 0
+
 const usableServing = (g: number) => Number.isFinite(g) && g > 0
 
 function samePer100g(a: MergeFood, b: MergeFood): boolean {
@@ -139,11 +152,16 @@ function samePer100g(a: MergeFood, b: MergeFood): boolean {
   return near(a.calories, b.calories, KCAL_HALF_UNIT) &&
     near(a.proteinG, b.proteinG, GRAM_HALF_UNIT) &&
     near(a.carbsG, b.carbsG, GRAM_HALF_UNIT) &&
-    near(a.fatG, b.fatG, GRAM_HALF_UNIT)
+    near(a.fatG, b.fatG, GRAM_HALF_UNIT) &&
+    near(micro(a.fiberG), micro(b.fiberG), GRAM_HALF_UNIT) &&
+    near(micro(a.sugarG), micro(b.sugarG), GRAM_HALF_UNIT) &&
+    near(micro(a.sodiumMg), micro(b.sodiumMg), GRAM_HALF_UNIT) &&
+    near(micro(a.satFatG), micro(b.satFatG), GRAM_HALF_UNIT)
 }
 
-const ZERO: WorstChange = { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 }
-// The app's own per-log rounding (computeLogMacros): kcal whole, macros to 0.1 g, no epsilon.
+const ZERO: WorstChange = { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, sodiumMg: 0, satFatG: 0 }
+// The app's own per-log rounding (computeLogMacros): kcal whole; macros, fibre, sugar, sodium and
+// saturated fat to 0.1 g; no epsilon.
 const shownKcal = (v: number) => Math.round(v)
 const shownG = (v: number) => Math.round(v * 10) / 10
 const clean = (v: number) => Math.round(v * 1e6) / 1e6
@@ -161,11 +179,19 @@ export function worstChangeOf(extra: MergeFood, keeper: MergeFood, factor: numbe
     worst.proteinG = Math.max(worst.proteinG, Math.abs(shownG(keeper.proteinG * moved) - shownG(extra.proteinG * q)))
     worst.carbsG = Math.max(worst.carbsG, Math.abs(shownG(keeper.carbsG * moved) - shownG(extra.carbsG * q)))
     worst.fatG = Math.max(worst.fatG, Math.abs(shownG(keeper.fatG * moved) - shownG(extra.fatG * q)))
+    for (const f of MICROS) {
+      worst[f] = Math.max(worst[f], Math.abs(shownG(micro(keeper[f]) * moved) - shownG(micro(extra[f]) * q)))
+    }
   }
-  return { kcal: clean(worst.kcal), proteinG: clean(worst.proteinG), carbsG: clean(worst.carbsG), fatG: clean(worst.fatG) }
+  return {
+    kcal: clean(worst.kcal), proteinG: clean(worst.proteinG), carbsG: clean(worst.carbsG), fatG: clean(worst.fatG),
+    fiberG: clean(worst.fiberG), sugarG: clean(worst.sugarG), sodiumMg: clean(worst.sodiumMg), satFatG: clean(worst.satFatG),
+  }
 }
 
-const isZero = (w: WorstChange) => w.kcal === 0 && w.proteinG === 0 && w.carbsG === 0 && w.fatG === 0
+const MICROS = ['fiberG', 'sugarG', 'sodiumMg', 'satFatG'] as const
+
+const isZero = (w: WorstChange) => Object.values(w).every(v => v === 0)
 
 const optionalEqual = (x: number | null | undefined, y: number | null | undefined) =>
   (x ?? null) === (y ?? null)
@@ -260,6 +286,8 @@ export function planLookAlikeMerge(foods: MergeFood[], keepers: Record<string, s
     const worst = planned.reduce<WorstChange>((w, e) => ({
       kcal: Math.max(w.kcal, e.worstChange.kcal), proteinG: Math.max(w.proteinG, e.worstChange.proteinG),
       carbsG: Math.max(w.carbsG, e.worstChange.carbsG), fatG: Math.max(w.fatG, e.worstChange.fatG),
+      fiberG: Math.max(w.fiberG, e.worstChange.fiberG), sugarG: Math.max(w.sugarG, e.worstChange.sugarG),
+      sodiumMg: Math.max(w.sodiumMg, e.worstChange.sodiumMg), satFatG: Math.max(w.satFatG, e.worstChange.satFatG),
     }), { ...ZERO })
     groups.push({
       groupKey,

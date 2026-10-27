@@ -115,6 +115,38 @@ describe('planLookAlikeMerge', () => {
   })
 
   describe('automatic means calories and macros come out exactly as before', () => {
+    it('is not automatic when the extra carries fibre and sodium the keeper lacks (#3472)', () => {
+      const k = food({ liveLogs: 5 })
+      const e = food({ liveLogs: 1, fiberG: 4, sodiumMg: 300, quantities: [1] })
+      const [g] = planLookAlikeMerge([k, e]).groups
+      expect(g.automatic).toBe(false)
+      expect(g.worstChange).toMatchObject({ kcal: 0, fiberG: 4, sodiumMg: 300, sugarG: 0, satFatG: 0 })
+      expect(g.extras[0].worstChange.fiberG).toBe(4)
+    })
+
+    it('the keeper carrying the value the extra lacks is a change too', () => {
+      const k = food({ liveLogs: 5, sugarG: 2.5, satFatG: 0.4 })
+      const e = food({ liveLogs: 1, quantities: [2] })
+      const [g] = planLookAlikeMerge([k, e]).groups
+      expect(g.automatic).toBe(false)
+      expect(g.worstChange).toMatchObject({ sugarG: 5, satFatG: 0.8 })
+    })
+
+    it('null against 0 is no change, since the app totals a missing value as 0', () => {
+      const k = food({ liveLogs: 5, fiberG: null, sodiumMg: 0 })
+      const e = food({ liveLogs: 1, fiberG: 0, sodiumMg: null, quantities: [1, 2] })
+      const [g] = planLookAlikeMerge([k, e]).groups
+      expect(g.automatic).toBe(true)
+    })
+
+    it('equal micronutrients at another serving size stay automatic when they scale exactly', () => {
+      const k = food({ servingSizeG: 100, fiberG: 4, sodiumMg: 300, liveLogs: 5 })
+      const e = food({ servingSizeG: 50, calories: 30, proteinG: 5, carbsG: 2, fatG: 0.25, fiberG: 2, sodiumMg: 150, liveLogs: 1, quantities: [1, 3] })
+      const [g] = planLookAlikeMerge([k, e]).groups
+      expect(g.kind).toBe('same-per-100g')
+      expect(g.automatic).toBe(true)
+    })
+
     it('a same-per-100g group is not automatic when a moved log changes by a kcal', () => {
       const k = food({ servingSizeG: 30, calories: 16, proteinG: 1, carbsG: 3, fatG: 0.5, liveLogs: 5 })
       const e = food({ servingSizeG: 100, calories: 52, proteinG: 3.3, carbsG: 10, fatG: 1.7, liveLogs: 1, quantities: [1] })
@@ -140,7 +172,7 @@ describe('planLookAlikeMerge', () => {
       const e = food({ servingSizeG: 45, calories: 90, proteinG: 4.5, carbsG: 11.25, fatG: 2.25, liveLogs: 2, quantities: [0.5, 1, 3.25] })
       const [g] = planLookAlikeMerge([k, e]).groups
       expect(g.automatic).toBe(true)
-      expect(g.worstChange).toEqual({ kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 })
+      expect(g.worstChange).toEqual({ kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, sodiumMg: 0, satFatG: 0 })
     })
 
     it('the same rounding disagreement is invisible when the only logs are at a quantity that hides it', () => {

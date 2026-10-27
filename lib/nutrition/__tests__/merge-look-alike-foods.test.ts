@@ -193,7 +193,7 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
       const out = await dry()
       if (!out.ok) throw new Error(out.error)
       expect(out.report.totals).toMatchObject({ groups: 3, automatic: 2, identical: 1, sameExact: 1, needsReview: 1 })
-      expect(out.report.groups.find(g => g.name === 'Scaled')!.worstChange).toEqual({ kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 })
+      expect(out.report.groups.find(g => g.name === 'Scaled')!.worstChange).toEqual({ kcal: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, sodiumMg: 0, satFatG: 0 })
     })
 
     it("only: 'exact' merges the automatic groups and leaves the others alone, dry run and write alike", async () => {
