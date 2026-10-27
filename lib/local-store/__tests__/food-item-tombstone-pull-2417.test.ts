@@ -134,3 +134,63 @@ describe('a retired food still held by a local reference (#3459)', () => {
     expect((await store().searchFoodItems('granola')).map(f => f.id).sort()).toEqual(['keeper', 'other'])
   })
 })
+
+// #3468. Nothing used to take an id off the retired list, so a food the server brought back stayed
+// hidden. Only a pulled row with an explicit `deletedAt: null` forgets; the day-list hydrate sends
+// foods with no `deletedAt` and must not.
+describe('a retired food that is revived (#3468)', () => {
+  const store = () => new SQLiteLocalStore()
+  const TOMB = '2026-10-03T00:00:00Z'
+  const holdBySavedMeal = () => db.current!.prepare(`INSERT INTO saved_meal_items VALUES ('i1','m1','extra',1)`).run()
+  const retiredMeta = () => store().getSyncMeta('retiredFoodIds')
+
+  it('is searchable again and leaves the list when a pull carries it live', async () => {
+    await apply({ foodItems: [food('keeper'), food('extra')] })
+    holdBySavedMeal()
+    await apply({ foodItems: [food('extra', { deletedAt: TOMB })] })
+    expect((await store().searchFoodItems('granola')).map(f => f.id)).toEqual(['keeper'])
+    expect(JSON.parse((await retiredMeta())!)).toEqual(['extra'])
+
+    await apply({ foodItems: [food('extra', { deletedAt: null })] })
+    expect((await store().searchFoodItems('granola')).map(f => f.id).sort()).toEqual(['extra', 'keeper'])
+    expect(await retiredMeta()).toBe('[]')
+  })
+
+  it('is no longer deleted at the next pull once nothing references it', async () => {
+    await apply({ foodItems: [food('keeper'), food('extra')] })
+    holdBySavedMeal()
+    await apply({ foodItems: [food('extra', { deletedAt: TOMB })] })
+    await apply({ foodItems: [food('extra', { deletedAt: null })] })
+    db.current!.prepare(`DELETE FROM saved_meal_items`).run()
+    await apply({ foodLogs: [] })
+    expect(ids()).toEqual(['extra', 'keeper'])
+  })
+
+  it('a pull with no deletedAt key (the day-list upsert) does not forget, and does not re-create a dropped row', async () => {
+    await apply({ foodItems: [food('keeper'), food('extra')] })
+    holdBySavedMeal()
+    await apply({ foodItems: [food('extra', { deletedAt: TOMB })] })
+    const { deletedAt: _omit, ...noDeletedAt } = food('extra')
+    await apply({ foodItems: [noDeletedAt] })
+    expect(JSON.parse((await retiredMeta())!)).toEqual(['extra'])
+    expect((await store().searchFoodItems('granola')).map(f => f.id)).toEqual(['keeper'])
+  })
+
+  it('forgets only the revived id, keeps the others', async () => {
+    await apply({ foodItems: [food('keeper'), food('extra'), food('extra2')] })
+    db.current!.prepare(`INSERT INTO saved_meal_items VALUES ('i1','m1','extra',1), ('i2','m1','extra2',1)`).run()
+    await apply({ foodItems: [food('extra', { deletedAt: TOMB }), food('extra2', { deletedAt: TOMB })] })
+    await apply({ foodItems: [food('extra', { deletedAt: null })] })
+    expect(JSON.parse((await retiredMeta())!)).toEqual(['extra2'])
+  })
+
+  it('a malformed or missing stored list reads as empty and a pull still works', async () => {
+    expect(await store().getRetiredFoodIds()).toEqual([])
+    for (const bad of ['not json', '{"a":1}', '"extra"', '[1,null,"x"]']) {
+      db.current!.prepare(`INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('retiredFoodIds', ?)`).run(bad)
+      await apply({ foodItems: [food('extra', { deletedAt: null })] })
+      expect(JSON.parse((await retiredMeta())!)).toEqual([])   // the sweep also drops 'x': no such row
+    }
+    expect((await store().searchFoodItems('granola')).map(f => f.id)).toEqual(['extra'])
+  })
+})

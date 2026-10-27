@@ -98,7 +98,7 @@ export function useFoodLogsLoader({ userId, logsDateRef, selectedDateRef, setLog
       // re-read and rendered the stripped copy. Nothing typed catches that, because every field is
       // optional going in; a named function with a test that lists the columns does.
       await store.applyDelta({
-        foodItems: toLocalFoodItems(server, nowIso),
+        foodItems: toLocalFoodItems(server, nowIso, await store.getRetiredFoodIds()),
         foodLogs: toLocalFoodLogs(server, today, nowIso),
       });
       applyLogs(await store.getFoodLogsWithItems(today));
