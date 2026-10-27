@@ -428,7 +428,7 @@ test('a readiness answer the server rejects with a 400 is set aside, a 500 holds
   assert.equal(store.getSnapshot().verdictResponses.length, 0);
   assert.equal(store.getSnapshot().readinessResponses.length, 0);
   assert.deepEqual(f.readinessAnswers, [{ date, state: 'rated' }]);
-  assert.match(store.getSnapshot().error ?? '', /kept on this phone only/);
+  assert.match(store.getSnapshot().setAside ?? '', /kept on this phone only/);
 });
 
 test('a readiness answer rejected with a 400 is set aside even when the sleep answer ahead of it posts fine (#3392)', async () => {
@@ -450,7 +450,7 @@ test('a readiness answer rejected with a 400 is set aside even when the sleep an
   await store.sync();
   assert.equal(store.getSnapshot().verdictResponses.length, 0);
   assert.equal(store.getSnapshot().readinessResponses.length, 0);
-  assert.match(store.getSnapshot().error ?? '', /kept on this phone only/);
+  assert.match(store.getSnapshot().setAside ?? '', /kept on this phone only/);
 });
 
 const rejection = (m: { id: string }, retryable: boolean) => ({
@@ -487,7 +487,7 @@ test('a Health push answered 200 with a rejected item sets it aside and the acce
   const state = store.getSnapshot();
   assert.equal(state.operations.length, 0);
   assert.equal(pushes, 6);
-  assert.match(state.error ?? '', /kept on this phone only/);
+  assert.match(state.setAside ?? '', /kept on this phone only/);
 });
 
 test('a set-aside weight stays what the person logged until the next refresh replaces it (#3392)', async () => {
@@ -543,7 +543,7 @@ test('a rejected change followed by a transient failure keeps the notice through
   assert.match(store.getSnapshot().setAside ?? '', /kept on this phone only/);
   const reopened = f.store();
   await reopened.initialize();
-  assert.match(reopened.getSnapshot().error ?? '', /kept on this phone only/);
+  assert.match(reopened.getSnapshot().setAside ?? '', /kept on this phone only/);
 });
 
 test('a rejected change with a refusal that is not final is counted and kept (#3392)', async () => {
@@ -593,19 +593,24 @@ test('the Health set-aside notice survives a sync and a restart, and clears once
   for (let attempt = 0; attempt < 5; attempt++) {
     await store.sync();
   }
-  const notice = store.getSnapshot().error;
+  const notice = store.getSnapshot().setAside;
+  assert.equal(store.getSnapshot().error, null); // a saved notice is not a live failure
   assert.match(notice ?? '', /kept on this phone only/);
   await store.sync();
-  assert.equal(store.getSnapshot().error, notice);
+  assert.equal(store.getSnapshot().setAside, notice);
+  assert.equal(store.getSnapshot().error, null);
   const reopened = f.store();
   await reopened.initialize();
-  assert.equal(reopened.getSnapshot().error, notice);
-  await reopened.sync();
-  assert.equal(reopened.getSnapshot().error, notice);
-  await reopened.acknowledgeSetAside();
+  assert.equal(reopened.getSnapshot().setAside, notice);
   assert.equal(reopened.getSnapshot().error, null);
+  await reopened.sync();
+  assert.equal(reopened.getSnapshot().setAside, notice);
+  assert.equal(reopened.getSnapshot().error, null);
+  await reopened.acknowledgeSetAside();
+  assert.equal(reopened.getSnapshot().setAside, null);
   const again = f.store();
   await again.initialize();
+  assert.equal(again.getSnapshot().setAside, null);
   assert.equal(again.getSnapshot().error, null);
 });
 
@@ -638,7 +643,7 @@ for (const status of [401, 403]) {
     state = store.getSnapshot();
     assert.equal(state.verdictResponses.length, 1);
     assert.equal(state.readinessResponses.length, 1);
-    assert.doesNotMatch(state.error ?? '', /kept on this phone only/);
+    assert.doesNotMatch(state.setAside ?? '', /kept on this phone only/);
   });
 }
 
@@ -663,7 +668,7 @@ for (const route of ['/api/sleep-verdict', '/api/readiness-verdict']) {
     assert.equal(store.getSnapshot().verdictResponses.length, 0);
     assert.equal(store.getSnapshot().readinessResponses.length, 0);
     assert.equal(store.getSnapshot().setAside, null);
-    assert.doesNotMatch(store.getSnapshot().error ?? '', /kept on this phone only/);
+    assert.doesNotMatch(store.getSnapshot().setAside ?? '', /kept on this phone only/);
   });
 
   test(`a ${route} 404 that is not the server's JSON (a proxy page, or no route) holds the answer (#3392)`, async () => {
@@ -691,3 +696,39 @@ for (const route of ['/api/sleep-verdict', '/api/readiness-verdict']) {
     assert.equal(store.getSnapshot().setAside, null);
   });
 }
+
+test('a saved Health set-aside notice opens as a ready store with no live error, and a live failure beside it keeps both (#3477)', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.addWater(250, date);
+  await store.sync();
+  f.setOnline(true);
+  const post = (f.connection as { post: (path: string, body: unknown) => Promise<unknown> }).post;
+  (f.connection as { post: unknown }).post = async (_path: string, body: unknown) =>
+    rejection((body as { mutations: { id: string }[] }).mutations[0], false);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await store.sync();
+  }
+  const notice = store.getSnapshot().setAside;
+  assert.match(notice ?? '', /kept on this phone only/);
+
+  const reopened = f.store();
+  await reopened.initialize();
+  const opened = reopened.getSnapshot();
+  assert.equal(opened.ready, true);
+  assert.equal(opened.setAside, notice);
+  assert.equal(opened.error, null);
+
+  // A later live failure sits in `error`; the notice is untouched, and acknowledging it leaves the failure.
+  f.setOnline(false);
+  await reopened.addWater(250, date);
+  (f.connection as { post: unknown }).post = post;
+  await reopened.sync();
+  const live = reopened.getSnapshot();
+  assert.equal(live.setAside, notice);
+  await reopened.acknowledgeSetAside();
+  assert.equal(reopened.getSnapshot().setAside, null);
+  assert.equal(reopened.getSnapshot().error, live.error);
+});

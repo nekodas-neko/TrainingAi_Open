@@ -2397,26 +2397,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   /**
-   * RV-63 — the dates on which a faucet signal was RECORDED, for the collection replay.
-   *
-   * `/api/collection` used to read `listBodyMetrics` / `listSleepSessions` in full and immediately
-   * project to `.map(m => m.date)`: 36 columns of `body_metrics` and 25 of `sleep_sessions` (176
-   * and 144 bytes a row, measured) to take one field each, over ALL history, on every home paint —
-   * `cachedFetch` revalidates regardless of TTL (Q-262). These select only the columns they need
-   * (a date, plus steps where a total is built) and apply the `> 0` predicate in SQL, so the width
-   * no longer grows with the schema. `/api/collection` derives its step days from `listStepTotals`
-   * rather than calling this, so the route reads steps once.
-   *
-   * The predicate is "recorded", not "above a bar" — see `ladder.ts`, and the measurement behind it:
-   * only 35 of the owner's 130 step-days reach 8,000, so a threshold would decay the steps ladder
-   * most weeks.
-   */
-  async listStepDayKeys(userId: string, from: string, to: string): Promise<string[]> {
-    const totals = await this.dayStepTotals(userId, from, to)
-    return totals.map(r => r.date).sort((x, y) => y.localeCompare(x))
-  }
-
-  /**
    * #3370 — each day's steps as every other surface reads them: the device total plus the treadmill
    * session's (`dayStepCountsByDate`, #3134), so the steps ladder and the bank agree with
    * achievements. A treadmill-only day counts. Days at zero are dropped, ascending by date.
@@ -2450,7 +2430,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .sort((x, y) => x.date.localeCompare(y.date))
   }
 
-  /** RV-63 — see `listStepDayKeys`. Nights with a recorded duration, dates only. */
+  /**
+   * RV-63 — the dates on which a nightly sleep duration was RECORDED, for the collection replay.
+   *
+   * It selects only the date and applies the `> 0` predicate in SQL, so the width no longer grows
+   * with the schema (the route once read `listSleepSessions` in full, 25 columns, to take one field).
+   * `/api/collection` derives its step days from `listStepTotals`, so the route reads steps once.
+   * The predicate is "recorded", not "above a bar" — see `ladder.ts`: only 35 of the owner's 130
+   * step-days reach 8,000, so a threshold would decay the ladder most weeks.
+   */
   async listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]> {
     const rows = await this.db.select({ date: s.sleepSessions.date }).from(s.sleepSessions)
       .where(and(

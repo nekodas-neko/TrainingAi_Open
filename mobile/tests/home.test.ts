@@ -14,7 +14,7 @@ import {
   adminSignupCount,
 } from '../src/features/home/data/admin-pending-counts.ts';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
-import { setAsideShown } from '../src/features/home/data/set-aside-seen.ts';
+import { setAsideShown, storeHeaderMessages } from '../src/features/home/data/set-aside-seen.ts';
 import { ApiError } from '../src/features/account/api/client.ts';
 import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
 import { bannerTone } from '../src/features/home/data/banner-data.ts';
@@ -802,7 +802,7 @@ test('a preference the server rejects with a 400 is set aside and does not block
   assert.equal(state.operations.length, 0);
   assert.equal(f.rests.has(day), true);
   assert.equal((state.preferences as Record<string, unknown>).energyHeroSize, 'large');
-  assert.match(state.error ?? '', /kept on this phone only/);
+  assert.match(state.setAside ?? '', /kept on this phone only/);
 });
 
 test('a 400 that is not the server\'s validation error holds the queue and is retried (#3392)', async () => {
@@ -839,23 +839,27 @@ test('the set-aside notice survives a sync and a restart, and clears once shown 
   await store.initialize();
   await store.savePreferences({ energyHeroSize: 'large' } as never);
   await store.sync();
-  const notice = store.getSnapshot().error;
+  const notice = store.getSnapshot().setAside;
+  assert.equal(store.getSnapshot().error, null); // a saved notice is not a live failure
   assert.match(notice ?? '', /kept on this phone only/);
   await store.sync(); // nothing left to send: it used to clear the notice
-  assert.equal(store.getSnapshot().error, notice);
+  assert.equal(store.getSnapshot().setAside, notice);
+  assert.equal(store.getSnapshot().error, null);
   const reopened = f.make();
   await reopened.initialize();
-  assert.equal(reopened.getSnapshot().error, notice);
+  assert.equal(reopened.getSnapshot().setAside, notice);
+  assert.equal(reopened.getSnapshot().error, null);
   await reopened.sync();
-  assert.equal(reopened.getSnapshot().error, notice);
+  assert.equal(reopened.getSnapshot().setAside, notice);
+  assert.equal(reopened.getSnapshot().error, null);
   await reopened.acknowledgeSetAside();
-  assert.equal(reopened.getSnapshot().error, null);
+  assert.equal(reopened.getSnapshot().setAside, null);
   await reopened.sync();
-  assert.equal(reopened.getSnapshot().error, null);
+  assert.equal(reopened.getSnapshot().setAside, null);
   const again = f.make();
   await again.initialize();
-  assert.equal(again.getSnapshot().error, null);
   assert.equal(again.getSnapshot().setAside, null);
+  assert.equal(again.getSnapshot().error, null);
 });
 
 test('a Mood push answered 200 with a rejected item sets it aside and the rest go through (#3392)', async () => {
@@ -891,7 +895,7 @@ test('a Mood push answered 200 with a rejected item sets it aside and the rest g
   assert.equal(state.operations.length, 0);
   assert.deepEqual(f.sent.map((m) => m.date), ['2026-10-13']);
   assert.equal(state.moods[day]?.energyLevel, 'low');
-  assert.match(state.error ?? '', /kept on this phone only/);
+  assert.match(state.setAside ?? '', /kept on this phone only/);
 });
 
 test('a rejected op followed by a transient failure keeps the notice through a reopen (#3392)', async () => {
@@ -918,8 +922,8 @@ test('a rejected op followed by a transient failure keeps the notice through a r
   assert.match(store.getSnapshot().setAside ?? '', /kept on this phone only/);
   const reopened = f.make();
   await reopened.initialize();
-  assert.match(reopened.getSnapshot().error ?? '', /kept on this phone only/);
-  assert.equal(reopened.getSnapshot().setAside, reopened.getSnapshot().error);
+  assert.match(reopened.getSnapshot().setAside ?? '', /kept on this phone only/);
+  assert.equal(reopened.getSnapshot().error, null);
 });
 
 test('a cancel while the set-aside is being written leaves the disk alone afterwards (#3392)', async () => {
@@ -1000,7 +1004,7 @@ for (const status of [401, 403]) {
       ['preferences', 'rest'],
     );
     assert.equal(state.denied, true);
-    assert.doesNotMatch(state.error ?? '', /kept on this phone only/);
+    assert.doesNotMatch(state.setAside ?? '', /kept on this phone only/);
   });
 }
 
@@ -1054,17 +1058,52 @@ test('a ring night\'s Woke up from the server also reads the time you woke (#342
   assert.equal(other[0].timeMs, server.timeMs);
 });
 
-test('the set-aside notice counts as seen only for a store whose notice is still its error (#3392)', () => {
+test('the set-aside notice counts as seen for each store that holds one while the header is up (#3392)', () => {
   const notice = 'One change was kept on this phone only; the server did not accept it.';
-  const none = { setAside: null, error: null };
-  const shown = { setAside: notice, error: notice };
-  const overwritten = { setAside: notice, error: 'Could not sync.' };
+  const none = { setAside: null };
+  const shown = { setAside: notice };
   assert.deepEqual(setAsideShown(true, shown, none), { home: true, health: false });
   assert.deepEqual(setAsideShown(true, none, shown), { home: false, health: true });
   assert.deepEqual(setAsideShown(true, shown, shown), { home: true, health: true });
-  // A later 500 hid the notice: nothing is seen, so nothing is acknowledged.
-  assert.deepEqual(setAsideShown(true, overwritten, none), { home: false, health: false });
-  // Health's notice is on screen while Home's was overwritten: only Health is acknowledged.
-  assert.deepEqual(setAsideShown(true, overwritten, shown), { home: false, health: true });
+  assert.deepEqual(setAsideShown(true, none, none), { home: false, health: false });
+  // A live failure beside the notice does not hide it any more, so it still counts as seen.
+  assert.deepEqual(
+    setAsideShown(true, { setAside: notice, error: 'Could not sync.' } as never, none),
+    { home: true, health: false },
+  );
+  // No header, no acknowledgement.
   assert.deepEqual(setAsideShown(false, shown, shown), { home: false, health: false });
+});
+
+test('the header lists a saved set-aside notice beside live errors, and a listed notice is the one counted as seen (#3477)', () => {
+  const notice = 'One change was kept on this phone only; the server did not accept it.';
+  const home = { error: null, setAside: notice, errors: {} };
+  const health = { error: 'Could not sync.', setAside: null };
+  const listed = storeHeaderMessages(home, health);
+  assert.ok(listed.includes(notice));
+  assert.ok(listed.includes('Could not sync.'));
+  // A live failure beside the notice leaves it listed, so it is still acknowledged once shown.
+  assert.deepEqual(setAsideShown(true, home, health), { home: true, health: false });
+  // Nothing saved, nothing listed.
+  assert.deepEqual(
+    storeHeaderMessages({ error: null, setAside: null, errors: {} }, { error: null, setAside: null }).filter(Boolean),
+    [],
+  );
+});
+
+test('a saved set-aside notice is not a live error on a store that opens with it (#3477)', async () => {
+  const f = fixture();
+  f.connection.patch = async () => {
+    throw validation400();
+  };
+  const store = f.make();
+  await store.initialize();
+  await store.savePreferences({ energyHeroSize: 'large' } as never);
+  await store.sync();
+  const reopened = f.make();
+  await reopened.initialize();
+  const state = reopened.getSnapshot();
+  assert.equal(state.ready, true);
+  assert.match(state.setAside ?? '', /kept on this phone only/);
+  assert.equal(state.error, null);
 });
