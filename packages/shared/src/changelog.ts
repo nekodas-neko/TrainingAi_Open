@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.507.0",
+    date: "2026-10-27",
+    changes: [
+      "TrainingAi Preview: a network or gateway error page no longer throws away a queued weigh-in, chest-strap heart rate, activity, Apple Health import or Health Connect import. Only the server's own refusal does; anything else is tried again.",
+      "TrainingAi Preview: the \"kept on this phone only\" notice stays in Home's header until you have seen it, and the Health screens no longer treat it as an error.",
+      "Behind the scenes: before the look-alike foods merge calls a group exact, it now also checks fibre, sugar, sodium and saturated fat, and it leaves alone any group that would push a quantity outside 0.01 to 100. Your data export keeps a merged-away food that a log or saved meal still names. The merge still runs only when the owner approves.",
+      "Behind the scenes: food quantities use one range across the app, the server and the phone, and the phone brings back a merged-away food if the server restores it.",
+    ],
+  },
+  {
     version: "1.506.0",
     date: "2026-10-27",
     changes: [
