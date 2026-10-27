@@ -49,7 +49,7 @@ export interface MergeReportGroup {
   automatic: boolean
   keeperChosenBy: 'most-logged' | 'owner'
   keeper: MergeReportFood
-  /** The worst change to any moved log's calories and macros (kcal whole, macros 0.1 g). All zero for an automatic group. */
+  /** The worst change to any moved log's calories, macros, fibre, sugar, sodium and saturated fat (kcal whole, the rest 0.1 g). All zero for an automatic group. */
   worstChange: WorstChange
   extras: (MergeReportFood & { factor: number; logsToMove: number; mealItemsToMove: number; tombstone: boolean; worstChange: WorstChange })[]
   /** Set after a write: what the transaction did, or why it rolled back. */
