@@ -149,4 +149,24 @@ describe.skipIf(!canRun)('full export (Q-288)', () => {
     await pool.query(`DELETE FROM food_logs WHERE user_id = $1`, [A])
     await pool.query(`DELETE FROM food_items WHERE user_id = $1`, [A])
   })
+
+  it('exports a retired food that a saved-meal ingredient still points at, for its owner only (#3482)', async () => {
+    const mk = async (user: string, name: string) => (await pool.query(
+      `INSERT INTO food_items (user_id, name, serving_size_g, calories, protein_g, carbs_g, fat_g, source, region, deleted_at)
+       VALUES ($1, $2, 100, 100, 1, 1, 1, 'manual', 'AU', now()) RETURNING id`, [user, name])).rows[0].id as string
+    const inMeal = await mk(A, 'export-retired-in-meal')
+    const bare = await mk(A, 'export-retired-bare-2')
+    const { rows: [meal] } = await pool.query(`INSERT INTO saved_meals (user_id, name) VALUES ($1, 'Export meal') RETURNING id`, [A])
+    await pool.query(`INSERT INTO saved_meal_items (saved_meal_id, food_item_id, quantity_multiplier) VALUES ($1, $2, 1)`, [meal.id, inMeal])
+
+    const ids = (await collect(A)).filter(l => l.domain === 'food_items').map(l => (l.row as { id: string }).id)
+    expect(ids).toContain(inMeal)
+    expect(ids).not.toContain(bare)
+    // Another user's export does not pick the food up, whoever's meal names it.
+    const others = (await collect(B)).filter(l => l.domain === 'food_items').map(l => (l.row as { id: string }).id)
+    expect(others).not.toContain(inMeal)
+
+    await pool.query(`DELETE FROM saved_meals WHERE user_id = $1`, [A])
+    await pool.query(`DELETE FROM food_items WHERE user_id = $1`, [A])
+  })
 })

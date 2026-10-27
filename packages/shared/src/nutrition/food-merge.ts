@@ -15,17 +15,18 @@
 // A log stores `quantityMultiplier` against ITS food's serving size, so the grams eaten are
 // `servingSizeG x quantityMultiplier`. Pointing the log at a keeper with another serving size would
 // change what it means unless the multiplier is rescaled by `extra.servingSizeG / keeper.servingSizeG`.
-// With that factor the grams are the same by construction, and so are the calories and macros
+// With that factor the grams are the same by construction, and so are all eight nutrition fields (calories, protein,
+// carbs, fat, fibre, sugar, sodium, saturated fat)
 // whenever the two foods agree per 100 g. When they do NOT agree (the groups the owner reviews) the
 // grams still hold and the numbers become the keeper's: that is the owner's choice, not an error.
 //
 // ## What "automatic" means
 //
-// The owner made a group automatic because the merge leaves calories and macros exactly unchanged
+// The owner made a group automatic because the merge leaves all eight nutrition fields exactly unchanged
 // (#2417, 2026-10-09). "Same per 100 g" within rounding does NOT guarantee that: a 30 g / 16 kcal
 // keeper and a 100 g / 52 kcal extra agree within rounding, yet a 1x log of the extra moves from 52
 // to 53 kcal. So each extra's worst per-log change is computed from the quantities actually logged,
-// at the precision the numbers are stored in (kcal whole, macros 0.1 g), and a group is automatic
+// at the precision the numbers are stored in (kcal whole, the rest 0.1 g), and a group is automatic
 // only when every one of those changes is zero.
 
 import { text as norm } from './food-item-identity'
@@ -97,7 +98,7 @@ export interface PlannedExtra {
   mealItemsToMove: number
   /** False for a row already tombstoned that only has stragglers left to move. */
   tombstone: boolean
-  /** Worst change to a moved log's calories and macros once rescaled onto the keeper. All zero when exact. */
+  /** Worst change to any of a moved log's eight nutrition fields once rescaled onto the keeper. All zero when exact. */
   worstChange: WorstChange
   /**
    * True when a moved log or ingredient's rescaled quantity would fall outside the range the push
@@ -110,7 +111,7 @@ export interface PlannedGroup {
   groupKey: string
   kind: GroupKind
   /**
-   * True only when no moved log changes in calories or macros (`worstChange` is zero for every
+   * True only when no moved log changes in any of the eight fields (`worstChange` is zero for every
    * extra). Every `identical` group is; a `same-per-100g` group is only when the rounding happens to
    * cancel at the quantities logged. Anything else is the owner's review.
    */

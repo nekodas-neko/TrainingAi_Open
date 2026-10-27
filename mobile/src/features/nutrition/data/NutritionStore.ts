@@ -45,11 +45,12 @@ import {
   type Supplement,
 } from './models.ts';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
+import { QUANTITY_MULTIPLIER_MAX, QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds';
 const logBody = z.object({
   id: z.uuid(),
   mealTypeId: z.uuid(),
   foodItemId: z.uuid(),
-  quantityMultiplier: z.number().min(0.01).max(100),
+  quantityMultiplier: z.number().min(QUANTITY_MULTIPLIER_MIN).max(QUANTITY_MULTIPLIER_MAX),
   loggedAt: z.string().datetime({ offset: true }),
   savedMealId: z.string().nullable().optional(),
   mealGroupId: z.string().nullable().optional(),
