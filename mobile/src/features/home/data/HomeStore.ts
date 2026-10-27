@@ -122,7 +122,7 @@ export class HomeStore {
             throw new Error('Wrong account cache.');
           }
           if (generation === this.generation) {
-            this.publish({ ...(saved ?? {}), ready: true, error: saved?.setAside ?? null });
+            this.publish({ ...(saved ?? {}), ready: true, error: null });
           }
         } catch (failure) {
           if (generation === this.generation) {
@@ -326,7 +326,6 @@ export class HomeStore {
     }
     await this.write((state) => ({
       setAside: null,
-      error: state.error === state.setAside ? null : state.error,
     }));
   }
   sync(): Promise<void> {
@@ -453,15 +452,15 @@ export class HomeStore {
           await this.write((state) => ({
             operations: state.operations.filter((x) => x.id !== op.id),
             ...(notice ? { setAside: notice } : {}),
-            error: notice ?? state.setAside,
+            error: null,
           }));
           if (accepted) {
             this.changed(op.kind);
           }
         }
         if (generation === this.generation) {
-          // A notice not yet seen outlasts a sync that sets nothing aside.
-          this.publish({ error: this.current.setAside });
+          // The set-aside notice has its own field and outlasts the sync; `error` is for live failures.
+          this.publish({ error: null });
         }
       } catch (cause) {
         if (generation === this.generation) {

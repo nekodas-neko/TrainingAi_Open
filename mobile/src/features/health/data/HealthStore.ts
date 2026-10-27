@@ -188,7 +188,7 @@ export class HealthStore {
         if (generation !== this.generation) {
           return;
         }
-        this.publish({ ...(saved ?? {}), ready: true, error: saved?.setAside ?? null });
+        this.publish({ ...(saved ?? {}), ready: true, error: null });
         this.policyDay = toAestDay(
           new Date(saved?.bodyAt || this.now()),
           this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -519,7 +519,6 @@ export class HealthStore {
     }
     await this.write((state) => ({
       setAside: null,
-      error: state.error === state.setAside ? null : state.error,
     }));
   }
   sync() {
@@ -592,7 +591,6 @@ export class HealthStore {
                 ...keepLocally(state, change, today),
                 operations: state.operations.filter((op) => op.id !== change.id),
                 setAside: notice,
-                error: notice,
               }));
               continue;
             }
@@ -636,7 +634,7 @@ export class HealthStore {
           }
           await this.write((state) => ({
             verdictResponses: state.verdictResponses.filter((r) => r !== response),
-            ...(notice ? { setAside: notice, error: notice } : {}),
+            ...(notice ? { setAside: notice } : {}),
           }));
           this.invalidate();
         }
@@ -664,13 +662,13 @@ export class HealthStore {
           }
           await this.write((state) => ({
             readinessResponses: state.readinessResponses.filter((r) => r !== response),
-            ...(notice ? { setAside: notice, error: notice } : {}),
+            ...(notice ? { setAside: notice } : {}),
           }));
           this.invalidate();
         }
         if (generation === this.generation) {
-          // A notice not yet seen outlasts a sync that sets nothing aside.
-          this.publish({ error: this.current.setAside });
+          // The set-aside notice has its own field and outlasts the sync; `error` is for live failures.
+          this.publish({ error: null });
         }
       } catch (failure) {
         if (generation === this.generation) {
