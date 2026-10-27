@@ -366,4 +366,55 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
       expect(delta.foodItems?.find(f => f.id === keeper)?.deletedAt ?? null).toBeNull()
     })
   })
+
+  describe('a rescaled quantity outside the push range (#3476)', () => {
+    const setup = async () => {
+      const keeper = await addFood({ ...dense(5) })
+      const extra = await addFood({ ...dense(1000) })
+      await addLog(keeper, 1); await addLog(keeper, 1)
+      const log = await addLog(extra, 1)
+      return { keeper, extra, log }
+    }
+
+    it('the dry run reports the group as needing review', async () => {
+      await setup()
+      const out = await dry()
+      if (!out.ok) throw new Error(out.error)
+      expect(out.report.totals).toMatchObject({ groups: 1, automatic: 0, needsReview: 1 })
+      expect(out.report.groups[0]).toMatchObject({ quantityOutOfRange: true, automatic: false })
+    })
+
+    it('the write leaves the group untouched, in any mode, and says why', async () => {
+      const { extra, log } = await setup()
+      const before = await snapshot()
+      const out = await write()
+      if (!out.ok) throw new Error(out.error)
+      expect(out.report.failedGroups).toBe(0)
+      expect(out.report.groups[0].result).toEqual({ skipped: expect.stringContaining('outside the range') })
+      expect(await snapshot()).toEqual(before)
+      const { rows } = await pool.query(`SELECT food_item_id, quantity_multiplier FROM food_logs WHERE id = $1`, [log])
+      expect(rows[0]).toMatchObject({ food_item_id: extra, quantity_multiplier: 1 })
+    })
+
+    it('other groups still merge in the same run', async () => {
+      await setup()
+      const k2 = await addFood({ ...dense(100, 'Other Oats') }); const e2 = await addFood({ ...dense(100, 'Other Oats') })
+      await addLog(k2, 1); await addLog(k2, 1); await addLog(e2, 1)
+      const out = await write()
+      if (!out.ok) throw new Error(out.error)
+      expect(out.report.groups.filter(g => 'logsMoved' in (g.result ?? {}))).toHaveLength(1)
+      const { rows } = await pool.query(`SELECT count(*)::int AS n FROM food_logs WHERE food_item_id = $1`, [e2])
+      expect(rows[0].n).toBe(0)
+    })
+
+    it('a quantity landing exactly on 100x is written', async () => {
+      const keeper = await addFood({ ...dense(5) }); const extra = await addFood({ ...dense(500) })
+      await addLog(keeper, 1); await addLog(keeper, 1)
+      const log = await addLog(extra, 1)
+      const out = await write()
+      if (!out.ok) throw new Error(out.error)
+      const { rows } = await pool.query(`SELECT food_item_id, quantity_multiplier FROM food_logs WHERE id = $1`, [log])
+      expect(rows[0]).toMatchObject({ food_item_id: keeper, quantity_multiplier: 100 })
+    })
+  })
 })

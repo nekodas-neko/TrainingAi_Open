@@ -7,6 +7,7 @@ import type { AuthProvider } from '@/lib/auth/identity'
 import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { normalizeEmail } from '@trainingai/shared/validation/email'
+import { QUANTITY_MULTIPLIER_MIN, QUANTITY_MULTIPLIER_MAX, quantityMultiplierInRange } from '@trainingai/shared/nutrition/quantity-bounds'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
@@ -5934,8 +5935,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // check — without it a corrupted local payload could push an out-of-range
             // value straight past the push path.
             const qm = p.quantityMultiplier ?? 1.0
-            if (typeof qm !== 'number' || qm < 0.01 || qm > 100) {
-              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'quantityMultiplier must be between 0.01 and 100' })
+            if (!quantityMultiplierInRange(qm)) {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: `quantityMultiplier must be between ${QUANTITY_MULTIPLIER_MIN} and ${QUANTITY_MULTIPLIER_MAX}` })
               continue
             }
             // BF-39. Typed rather than String()-coerced: `String(undefined)` is the literal

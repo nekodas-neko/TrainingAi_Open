@@ -154,4 +154,34 @@ describe('planLookAlikeMerge', () => {
       expect(planLookAlikeMerge([k, e]).groups[0]).toMatchObject({ kind: 'differs', automatic: false })
     })
   })
+
+  describe('a rescaled quantity the push would refuse (#3476)', () => {
+    const big = (over: Partial<MergeFood> = {}) => food({ servingSizeG: 1000, calories: 2000, proteinG: 100, carbsG: 250, fatG: 50, ...over })
+    const small = (over: Partial<MergeFood> = {}) => food({ servingSizeG: 5, calories: 10, proteinG: 0.5, carbsG: 1.25, fatG: 0.25, ...over })
+
+    it('a 1000 g extra into a 5 g keeper with a 1x log lands at 200x: needs review', () => {
+      const g = planLookAlikeMerge([small({ liveLogs: 3 }), big({ liveLogs: 1, quantities: [1] })]).groups[0]
+      expect(g.extras[0].quantityOutOfRange).toBe(true)
+      expect(g).toMatchObject({ quantityOutOfRange: true, automatic: false })
+    })
+    it('a 5 g extra into a 1000 g keeper with a 1x log lands at 0.005x: needs review', () => {
+      const g = planLookAlikeMerge([big({ liveLogs: 3 }), small({ liveLogs: 1, quantities: [1] })]).groups[0]
+      expect(g).toMatchObject({ quantityOutOfRange: true, automatic: false })
+    })
+    it('the range is inclusive: exactly 100x and 0.01x are fine', () => {
+      const hi = planLookAlikeMerge([small({ liveLogs: 3 }), food({ servingSizeG: 500, calories: 1000, proteinG: 50, carbsG: 125, fatG: 25, liveLogs: 1, quantities: [1] })]).groups[0]
+      expect(hi.quantityOutOfRange).toBe(false)
+      const lo = planLookAlikeMerge([food({ servingSizeG: 500, calories: 1000, proteinG: 50, carbsG: 125, fatG: 25, liveLogs: 3 }), small({ servingSizeG: 5, calories: 10, proteinG: 0.5, carbsG: 1.25, fatG: 0.25, liveLogs: 1, quantities: [1] })]).groups[0]
+      // 5/500 = 0.01 x 1
+      expect(lo.quantityOutOfRange).toBe(false)
+    })
+    it('a saved-meal ingredient quantity counts too, and one bad quantity among good ones is enough', () => {
+      const g = planLookAlikeMerge([small({ liveLogs: 3 }), big({ liveLogs: 2, mealItems: 1, quantities: [0.1, 1, 0.2] })]).groups[0]
+      expect(g.quantityOutOfRange).toBe(true)
+    })
+    it('equal serving sizes never trip it, even for a quantity already out of range', () => {
+      const g = planLookAlikeMerge([food({ liveLogs: 3 }), food({ liveLogs: 1, quantities: [250] })]).groups[0]
+      expect(g).toMatchObject({ quantityOutOfRange: false, automatic: true })
+    })
+  })
 })

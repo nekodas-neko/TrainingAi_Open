@@ -21,6 +21,10 @@
 // Only groups whose merge leaves every moved log's calories and macros unchanged are `automatic`
 // (see `food-merge.ts`); `only: 'exact'` merges just those. The rest are the owner's review.
 //
+// A group where a rescaled quantity would leave the push range (0.01 to 100, `quantity-bounds.ts`) is
+// reported as needing review and is not written, in any mode: the owner picks a keeper whose serving
+// size keeps every quantity in range.
+//
 // A group that fails rolls back alone and is reported; the others still run. Run again, a merged
 // group plans nothing. Run after a straggler (a log an unsynced device pushed against a retired row)
 // and the straggler moves, which is why a tombstoned row with logs still pointing at it is planned.
@@ -52,8 +56,10 @@ export interface MergeReportGroup {
   /** The worst change to any moved log's calories and macros (kcal whole, macros 0.1 g). All zero for an automatic group. */
   worstChange: WorstChange
   extras: (MergeReportFood & { factor: number; logsToMove: number; mealItemsToMove: number; tombstone: boolean; worstChange: WorstChange })[]
-  /** Set after a write: what the transaction did, or why it rolled back. */
-  result?: { logsMoved: number; mealItemsMoved: number; tombstoned: number } | { failed: string }
+  /** A moved quantity would fall outside the range the push accepts, so the group needs review and a write skips it. */
+  quantityOutOfRange: boolean
+  /** Set after a write: what the transaction did, why it rolled back, or why it was left alone. */
+  result?: { logsMoved: number; mealItemsMoved: number; tombstoned: number } | { failed: string } | { skipped: string }
 }
 
 export interface MergeReport {
@@ -156,7 +162,7 @@ export async function mergeLookAlikeFoods(
     const keeper = byId.get(g.keeperId)!
     return {
       groupKey: g.groupKey, name: keeper.name, brand: keeper.brand,
-      kind: g.kind, automatic: g.automatic, worstChange: g.worstChange, keeperChosenBy: g.keeperChosenBy,
+      kind: g.kind, automatic: g.automatic, quantityOutOfRange: g.quantityOutOfRange, worstChange: g.worstChange, keeperChosenBy: g.keeperChosenBy,
       keeper: describe(keeper),
       extras: g.extras.map(e => ({
         ...describe(byId.get(e.id)!),
@@ -187,6 +193,12 @@ export async function mergeLookAlikeFoods(
   const dates = new Set<string>()
   for (const planned of plan.groups) {
     const out = groups.find(g => g.groupKey === planned.groupKey)!
+    if (planned.quantityOutOfRange) {
+      // A log stored past the push range is dead-lettered the next time a device edits it, so the
+      // group is left whole for the owner rather than written.
+      out.result = { skipped: 'a rescaled quantity would fall outside the range a device can push (0.01 to 100)' }
+      continue
+    }
     try {
       const done = await applyGroup(db, userId, planned, byId)
       for (const d of done.dates) dates.add(d)

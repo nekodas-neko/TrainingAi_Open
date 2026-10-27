@@ -29,6 +29,7 @@
 // only when every one of those changes is zero.
 
 import { text as norm } from './food-item-identity'
+import { quantityMultiplierInRange } from './quantity-bounds'
 
 /** The columns the plan reads. A superset is fine. */
 export interface MergeFood {
@@ -90,6 +91,11 @@ export interface PlannedExtra {
   tombstone: boolean
   /** Worst change to a moved log's calories and macros once rescaled onto the keeper. All zero when exact. */
   worstChange: WorstChange
+  /**
+   * True when a moved log or ingredient's rescaled quantity would fall outside the range the push
+   * accepts, so a later edit of it on a device would be dead-lettered. The group is not written.
+   */
+  quantityOutOfRange: boolean
 }
 
 export interface PlannedGroup {
@@ -101,6 +107,8 @@ export interface PlannedGroup {
    * cancel at the quantities logged. Anything else is the owner's review.
    */
   automatic: boolean
+  /** Some extra's rescaled quantity falls outside the push range (see `PlannedExtra`): needs review, and the write skips it. */
+  quantityOutOfRange: boolean
   /** The worst of the extras' `worstChange`, per field. */
   worstChange: WorstChange
   keeperId: string
@@ -255,17 +263,21 @@ export function planLookAlikeMerge(foods: MergeFood[], keepers: Record<string, s
           mealItemsToMove: e.mealItems,
           tombstone: !e.tombstoned,
           worstChange: kind === 'identical' ? { ...ZERO } : worstChangeOf(e, keeper, factor),
+          // A factor of 1 leaves every quantity as it was, so it cannot be what pushes one out of range.
+          quantityOutOfRange: factor !== 1 && (e.quantities ?? []).some(q => !quantityMultiplierInRange(q * factor)),
         }
       })
     const worst = planned.reduce<WorstChange>((w, e) => ({
       kcal: Math.max(w.kcal, e.worstChange.kcal), proteinG: Math.max(w.proteinG, e.worstChange.proteinG),
       carbsG: Math.max(w.carbsG, e.worstChange.carbsG), fatG: Math.max(w.fatG, e.worstChange.fatG),
     }), { ...ZERO })
+    const quantityOutOfRange = planned.some(e => e.quantityOutOfRange)
     groups.push({
       groupKey,
       kind,
+      quantityOutOfRange,
       // A `differs` group changes numbers by definition, even if the quantities logged hide it.
-      automatic: kind !== 'differs' && isZero(worst),
+      automatic: kind !== 'differs' && isZero(worst) && !quantityOutOfRange,
       worstChange: worst,
       keeperId: keeper.id,
       keeperChosenBy: named ? 'owner' : 'most-logged',
