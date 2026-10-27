@@ -80,6 +80,24 @@ function mergeSyncedDomains(into: SyncedDomains, from: SyncedDomains): void {
   }
 }
 
+// Overlapping pulls fetch concurrently but apply one at a time (#3484). Unserialised, a stale pull's
+// shorter post-apply chain could write the cursor before a newer pull's longer one, leaving the
+// cursor at the newer time with the stale rows on top: a retired food searchable again, and no
+// later pull re-delivering its tombstone. The tail is released in a `finally` and never rejects, so
+// a failed pull cannot block the next.
+let applyTail: Promise<void> = Promise.resolve();
+async function withApplyLock<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = applyTail;
+  let release!: () => void;
+  applyTail = new Promise<void>(resolve => { release = resolve; });
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
 // `fullResync` re-pulls from epoch (since=0) instead of the incremental cursor. The delta
 // cursor is monotonic, so once `lastSyncAt` passes a change it is never re-carried — which
 // leaves the on-device program mirror holding stale session ids after an edit that a later
@@ -732,13 +750,15 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   let prunedPrograms = 0;
   let prunedBests = 0;
   try {
-    await store!.applyDelta(delta);
-    // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
-    // server's roster. Only when the server sent one — an absent roster must never read as "none".
-    const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
-    prunedPrograms = await store!.pruneProgramStructure(asIds(raw.programRoster), asIds(raw.progressionStyleRoster));
-    if (bestsComplete) prunedBests = await store!.prunePersonalRecords(serverBests.map(b => b.exerciseName));
-    await store!.setLastSyncAt(raw.syncedAt);
+    await withApplyLock(async () => {
+      await store!.applyDelta(delta);
+      // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
+      // server's roster. Only when the server sent one — an absent roster must never read as "none".
+      const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
+      prunedPrograms = await store!.pruneProgramStructure(asIds(raw.programRoster), asIds(raw.progressionStyleRoster));
+      if (bestsComplete) prunedBests = await store!.prunePersonalRecords(serverBests.map(b => b.exerciseName));
+      await store!.setLastSyncAt(raw.syncedAt);
+    });
   } catch (err) {
     // A broken local schema throws here, not at the fetch — and this used to propagate straight
     // out of pullDelta into a bare .catch(() => null), so the owner saw "Sync failed" with no

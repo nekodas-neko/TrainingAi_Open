@@ -1,6 +1,7 @@
 import { feedback } from '../../../integrations/feedback/haptics';
 import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload';
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals';
+import { QUANTITY_MULTIPLIER_MAX, QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds';
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
 import { foodLine } from '../data/display';
 import { openingDraft } from '../data/opening-draft';
@@ -828,8 +829,8 @@ export function FoodLogger({
                   ? String(Number(d.quantity) * Number(d.fields.servingSizeG))
                   : d.quantity
               }
-              min={0.01}
-              max={unit === 'g' ? 5000 : 100}
+              min={QUANTITY_MULTIPLIER_MIN}
+              max={unit === 'g' ? 5000 : QUANTITY_MULTIPLIER_MAX}
               step={unit === 'g' ? 5 : 0.5}
               onChange={(raw) => {
                 const q = qtyFromInput(raw, unit, Number(d.fields.servingSizeG));

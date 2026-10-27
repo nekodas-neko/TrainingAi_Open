@@ -30,10 +30,14 @@
 // and the straggler moves, which is why a tombstoned row with logs still pointing at it is planned.
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { planLookAlikeMerge, type GroupKind, type MergeFood, type PlannedGroup, type WorstChange } from '@trainingai/shared/nutrition/food-merge'
+import { QUANTITY_MULTIPLIER_MAX, QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds'
 import type { getDb } from '@/lib/data/postgres/client'
 import * as s from '@/lib/data/postgres/schema'
 
 type Db = ReturnType<typeof getDb>
+
+const QUANTITY_OUT_OF_RANGE_REASON =
+  `a rescaled quantity would fall outside the range a device can push (${QUANTITY_MULTIPLIER_MIN} to ${QUANTITY_MULTIPLIER_MAX})`
 
 export interface MergeReportFood {
   id: string
@@ -155,7 +159,7 @@ export async function mergeLookAlikeFoods(
       skipped.push({
         groupKey: g.groupKey,
         reason: g.quantityOutOfRange
-          ? 'a rescaled quantity would fall outside the range a device can push (0.01 to 100)'
+          ? QUANTITY_OUT_OF_RANGE_REASON
           : 'needs owner review (only: exact)',
       })
       return false
@@ -208,7 +212,7 @@ export async function mergeLookAlikeFoods(
     if (planned.quantityOutOfRange) {
       // A log stored past the push range is dead-lettered the next time a device edits it, so the
       // group is left whole for the owner rather than written.
-      out.result = { skipped: 'a rescaled quantity would fall outside the range a device can push (0.01 to 100)' }
+      out.result = { skipped: QUANTITY_OUT_OF_RANGE_REASON }
       continue
     }
     try {

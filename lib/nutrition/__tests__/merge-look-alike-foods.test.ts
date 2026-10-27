@@ -162,7 +162,7 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
     expect(await complete()).toBe(true)
   })
 
-  describe('exact versus review (calories and macros)', () => {
+  describe('exact versus review (the eight nutrition fields)', () => {
     // 30 g / 16 kcal and 100 g / 52 kcal agree within rounding, but a 1x log of the 100 g row is 52 kcal
     // and becomes 53 on the 30 g keeper.
     const roundingPair = async () => {
