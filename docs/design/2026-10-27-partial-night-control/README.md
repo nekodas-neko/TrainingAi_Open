@@ -10,7 +10,7 @@ commit them there).
 | File | Shows |
 |---|---|
 | `a-off.png` | **Recommended, A:** a switch row at the foot of the night card, off |
-| `a-on.png` | A once marked, which is also **how any marked night reads afterwards**: a *Partial night* badge, "3h 5m recorded", a one-line reason, hours/stages/efficiency dimmed, heart rate, HRV and breathing at full strength |
+| `a-on.png` | A once marked, which is also **how any marked night reads afterwards**: a *Partial night* badge, "3h 15m recorded", a one-line reason, hours/stages/efficiency dimmed, heart rate, HRV and breathing at full strength |
 | `b-menu.png` | **B:** a `...` button in the card header opens a menu |
 | `b-confirm.png` | B: the confirmation sheet that explains what changes |
 | `b-marked.png` | B: the marked night with an undo sheet |
