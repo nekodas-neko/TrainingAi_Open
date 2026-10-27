@@ -7,6 +7,7 @@ import { normalizeMealGroupName } from '@trainingai/shared/nutrition/meal-group-
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { isUuid } from '@trainingai/shared/validation/uuid'
+import { QUANTITY_MULTIPLIER_MIN, QUANTITY_MULTIPLIER_MAX, quantityMultiplierInRange } from '@trainingai/shared/nutrition/quantity-bounds'
 
 // A date, two ids and a multiplier. 8 KB is generous for four fields.
 const MAX_BODY_BYTES = 8 * 1024
@@ -51,8 +52,8 @@ export async function POST(req: Request) {
   const date = normalizeDateParamIso(String(rawBodyDate))
   if (!date) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
   const qm = quantityMultiplier ?? 1.0
-  if (typeof qm !== 'number' || qm < 0.01 || qm > 100) {
-    return NextResponse.json({ error: 'quantityMultiplier must be between 0.01 and 100' }, { status: 400 })
+  if (!quantityMultiplierInRange(qm)) {
+    return NextResponse.json({ error: `quantityMultiplier must be between ${QUANTITY_MULTIPLIER_MIN} and ${QUANTITY_MULTIPLIER_MAX}` }, { status: 400 })
   }
   // BF-39. Both are optional and both are ids, so both are typed before they reach the DB — a
   // non-string here would otherwise go straight into a uuid column as a driver-level error.
