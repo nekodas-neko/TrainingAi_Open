@@ -15,6 +15,27 @@ export function monthGrid(month: string) {
  */
 export const STACK_CALENDAR_TITLE_ABOVE = 1.1;
 
+/** Before the row is measured: stack by text scale alone, as the first paint has no widths yet. */
 export function stackCalendarTitle(scale: number): boolean {
   return scale > STACK_CALENDAR_TITLE_ABOVE;
+}
+
+export interface CalendarTitleFit {
+  /** Width of the whole calendar block. */
+  rowWidth: number;
+  /** Width of the month controls plus the status slot. */
+  controlsWidth: number;
+  /** Width the title takes on one line. */
+  titleWidth: number;
+  /** Breathing room kept between the title and the controls. */
+  gap: number;
+}
+
+/**
+ * Stack the title above the controls whenever the controls leave it less than its one-line width,
+ * so "TRAINING CALENDAR" is never cut or broken mid-word, at any text scale or phone width. Once
+ * measured this decides alone; the text scale only matters for the first paint.
+ */
+export function stackCalendarTitleToFit(fit: CalendarTitleFit): boolean {
+  return fit.rowWidth - fit.controlsWidth - fit.gap < fit.titleWidth;
 }
