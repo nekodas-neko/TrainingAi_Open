@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.508.0",
+    date: "2026-10-27",
+    changes: [
+      "Behind the scenes: two syncs that overlap on the phone now apply one after the other, so an older one can no longer undo a newer one, and signing out while a sync is waiting no longer lets it write the old account's data back.",
+      "Behind the scenes: once look-alike foods are merged, a merged-away food stays out of food search on every device, while a meal another device logged against it still shows in that day's diary.",
+    ],
+  },
+  {
     version: "1.507.0",
     date: "2026-10-27",
     changes: [
