@@ -8,18 +8,6 @@ export function monthGrid(month: string) {
   return { first, count, cells, rows: cells / 7 };
 }
 
-/**
- * The title and the month controls share a row until text grows past this: at 384 px the controls
- * (two 48 px arrows, the w-24 month and the status slot) leave the title about 78 px, which holds
- * "TRAINING" and "CALENDAR" on two lines only up to about this scale.
- */
-export const STACK_CALENDAR_TITLE_ABOVE = 1.1;
-
-/** Before the row is measured: stack by text scale alone, as the first paint has no widths yet. */
-export function stackCalendarTitle(scale: number): boolean {
-  return scale > STACK_CALENDAR_TITLE_ABOVE;
-}
-
 export interface CalendarTitleFit {
   /** Width of the whole calendar block. */
   rowWidth: number;
@@ -33,9 +21,17 @@ export interface CalendarTitleFit {
 
 /**
  * Stack the title above the controls whenever the controls leave it less than its one-line width,
- * so "TRAINING CALENDAR" is never cut or broken mid-word, at any text scale or phone width. Once
- * measured this decides alone; the text scale only matters for the first paint.
+ * so "TRAINING CALENDAR" is never cut or broken mid-word, at any text scale or phone width.
  */
 export function stackCalendarTitleToFit(fit: CalendarTitleFit): boolean {
   return fit.rowWidth - fit.controlsWidth - fit.gap < fit.titleWidth;
+}
+
+/**
+ * Whether the title sits above the controls. Until the block, the controls and the title are all
+ * measured it stacks: on a phone the controls leave the title too little room at every text scale,
+ * so the first paint is already the final layout and nothing jumps.
+ */
+export function calendarTitleStacked(fit: CalendarTitleFit | null): boolean {
+  return fit === null || stackCalendarTitleToFit(fit);
 }
