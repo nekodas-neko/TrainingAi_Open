@@ -127,27 +127,29 @@ describe.skipIf(!canRun)('full export (Q-288)', () => {
   })
 
   it('exports a retired food that a live log still points at, and no other retired food (#3476)', async () => {
-    const { rows: [mt] } = await pool.query(`INSERT INTO meal_types (user_id, name) VALUES ($1, 'Lunch') RETURNING id`, [A])
-    const mk = async (name: string, deleted: boolean) => (await pool.query(
-      `INSERT INTO food_items (user_id, name, serving_size_g, calories, protein_g, carbs_g, fat_g, source, region, deleted_at)
-       VALUES ($1, $2, 100, 100, 1, 1, 1, 'manual', 'AU', ${deleted ? 'now()' : 'NULL'}) RETURNING id`, [A, name])).rows[0].id as string
-    const live = await mk('export-live', false)
-    const retiredStraggler = await mk('export-retired-with-log', true)
-    const retiredDeadLog = await mk('export-retired-deleted-log', true)
-    const retiredBare = await mk('export-retired-bare', true)
-    const log = (food: string, deleted: boolean) => pool.query(
-      `INSERT INTO food_logs (user_id, date, meal_type_id, food_item_id, quantity_multiplier, deleted_at)
-       VALUES ($1, '2026-10-01', $2, $3, 1, ${deleted ? 'now()' : 'NULL'})`, [A, mt.id, food])
-    await log(live, false); await log(retiredStraggler, false); await log(retiredDeadLog, true)
+    try {
+      const { rows: [mt] } = await pool.query(`INSERT INTO meal_types (user_id, name) VALUES ($1, 'Lunch') RETURNING id`, [A])
+      const mk = async (name: string, deleted: boolean) => (await pool.query(
+        `INSERT INTO food_items (user_id, name, serving_size_g, calories, protein_g, carbs_g, fat_g, source, region, deleted_at)
+         VALUES ($1, $2, 100, 100, 1, 1, 1, 'manual', 'AU', ${deleted ? 'now()' : 'NULL'}) RETURNING id`, [A, name])).rows[0].id as string
+      const live = await mk('export-live', false)
+      const retiredStraggler = await mk('export-retired-with-log', true)
+      const retiredDeadLog = await mk('export-retired-deleted-log', true)
+      const retiredBare = await mk('export-retired-bare', true)
+      const log = (food: string, deleted: boolean) => pool.query(
+        `INSERT INTO food_logs (user_id, date, meal_type_id, food_item_id, quantity_multiplier, deleted_at)
+         VALUES ($1, '2026-10-01', $2, $3, 1, ${deleted ? 'now()' : 'NULL'})`, [A, mt.id, food])
+      await log(live, false); await log(retiredStraggler, false); await log(retiredDeadLog, true)
 
-    const ids = (await collect(A)).filter(l => l.domain === 'food_items').map(l => (l.row as { id: string }).id)
-    expect(ids).toContain(live)
-    expect(ids).toContain(retiredStraggler)
-    expect(ids).not.toContain(retiredDeadLog)
-    expect(ids).not.toContain(retiredBare)
-
-    await pool.query(`DELETE FROM food_logs WHERE user_id = $1`, [A])
-    await pool.query(`DELETE FROM food_items WHERE user_id = $1`, [A])
+      const ids = (await collect(A)).filter(l => l.domain === 'food_items').map(l => (l.row as { id: string }).id)
+      expect(ids).toContain(live)
+      expect(ids).toContain(retiredStraggler)
+      expect(ids).not.toContain(retiredDeadLog)
+      expect(ids).not.toContain(retiredBare)
+    } finally {
+      await pool.query(`DELETE FROM food_logs WHERE user_id = $1`, [A])
+      await pool.query(`DELETE FROM food_items WHERE user_id = $1`, [A])
+    }
   })
 
   // Cleanup sits in a `finally` so a failed assertion on a persistent local database does not leave rows

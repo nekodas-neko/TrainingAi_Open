@@ -300,6 +300,10 @@ for it can bring the rescale back inside the range, so check the extras' `quanti
 next dry run. The most-logged row keeps by default, the newest
 on a tie. One transaction per group, so a failure rolls that group back and the rest run. **The report
 holds the owner's food history: post the counts on the issue, not the report.**
+The run record (`agent_action_log`) has no column for skipped groups: `finish` in `lib/agent-actions/jobs.ts`
+records `succeeded` with `affected_rows` and `days_moved` only, and a run that skipped groups still reads
+`succeeded`. Read `report.groups[].result.skipped` (and `report.skipped` under `only: 'exact'`) when
+posting a run's counts (#3486).
 
 `stress-backfill` answers **202** with a job id; poll `GET /api/agent-actions?job=stress-backfill&jobId=N`
 (same key). Its log row is finished when the job ends. The job slot rules hold: another kind

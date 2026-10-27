@@ -61,6 +61,11 @@ export function toLocalFoodItems(server: readonly FoodLogWithItem[], nowIso: str
   // #3468. This upsert carries no `deletedAt`, so it cannot tell a retired (merged-away) food from a
   // live one. A server log that still points at a retired food would re-create the row the device
   // dropped or hid, and `applyDelta` would then have no reason to forget the id. Skip those ids.
+  // #3486. The remembered ids are forgotten once the local row is gone, so they cannot protect a
+  // device that dropped the food and then met a log on it from another device. The server's own
+  // `deletedAt` is carried instead of skipping the food: `applyDelta` then remembers the id (out of
+  // search) but keeps the row while the straggler log points at it, so that log still draws, and
+  // the sweep drops the row once a later merge moves the log.
   const retired = new Set(retiredFoodIds)
   return server.filter(l => !retired.has(l.foodItemId)).map(l => ({
     id: l.foodItemId,
@@ -82,5 +87,6 @@ export function toLocalFoodItems(server: readonly FoodLogWithItem[], nowIso: str
     barcode: l.foodItem.barcode ?? null,
     source: l.foodItem.source,
     updatedAt: nowIso,
+    ...(l.foodItem.deletedAt ? { deletedAt: new Date(l.foodItem.deletedAt).toISOString() } : {}),
   }))
 }

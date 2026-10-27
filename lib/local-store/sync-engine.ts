@@ -122,6 +122,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   // Fall back to Dexie for the authoritative timestamp (survives page refresh)
   const lastSync = fullResync ? new Date(0) : await store.getLastSyncAt();
 
+  // Set when the store was cleared (sign-out) while this pull waited for the apply lock. Not a network
+  // failure, so it must not start a backoff for whoever signs in next.
+  let abandoned = false;
+
   async function pullPage(sinceIso: string): Promise<{
     count: number; domains: SyncedDomains; syncedAt: string; hasMore: boolean;
   } | null> {
@@ -299,21 +303,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   // the ones that differ from the local copy count as changes, or every pull would read as news.
   // `personalRecordsComplete` also means a best missing from the set is gone on the server.
   // A reply that carries the flag but no array is malformed, and must not read as "the server has none".
+  // The diff against the local copy is read inside the apply lock (below), not here: read before it, a
+  // stale pull queued behind a newer one would diff against bests the newer pull has not yet written.
   const bestsComplete = raw.personalRecordsComplete === true && Array.isArray(raw.personalRecords);
   let personalRecords = serverBests;
-  if (bestsComplete) {
-    try {
-      const local = new Map((await store!.getPersonalRecords()).map(b => [b.exerciseName, b]));
-      personalRecords = serverBests.filter(b => {
-        const have = local.get(b.exerciseName);
-        return !have || have.estimated1rm !== b.estimated1rm || have.achievedAt !== b.achievedAt || have.exerciseId !== b.exerciseId;
-      });
-    } catch (err) {
-      // Same as the applyDelta failure below: a broken local schema throws here, so report a failed page.
-      console.error('[pullDelta] reading local bests failed — local store may be out of schema:', err);
-      return null;
-    }
-  }
 
   const ouraDaily = ((raw.ouraDaily ?? []) as Record<string, unknown>[]).map(r => ({
     day:                  String(r.day),
@@ -743,14 +736,32 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     workoutSessions, activityLogs, fitnessTests, prescribedRuns, programs, programSessions, sessionExercises,
     schedules, scheduleDays, progressionStyles, styleSets,
     foodItems, foodLogs, supplements, supplementLogs, injuries,
-    exerciseLogs, setLogs, personalRecords, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
+    exerciseLogs, setLogs, personalRecords: serverBests, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
     mealPlans, mealPlanVariants, mealPlanMeals, planMealAnswers };
-  const count = Object.values(delta).reduce((n, rows) => n + rows.length, 0);
 
   let prunedPrograms = 0;
   let prunedBests = 0;
+  let bestsReadFailed = false;
   try {
     await withApplyLock(async () => {
+      // Waiting for the lock can outlast a sign-out: `clearLocalStoreData` empties the tables and
+      // drops the cached store, so this pull would write the old account's rows back under the wipe.
+      if (getLocalStore(userId) !== store) { abandoned = true; return; }
+      if (bestsComplete) {
+        try {
+          const local = new Map((await store!.getPersonalRecords()).map(b => [b.exerciseName, b]));
+          personalRecords = serverBests.filter(b => {
+            const have = local.get(b.exerciseName);
+            return !have || have.estimated1rm !== b.estimated1rm || have.achievedAt !== b.achievedAt || have.exerciseId !== b.exerciseId;
+          });
+          delta.personalRecords = personalRecords;
+        } catch (err) {
+          // Same as the applyDelta failure below: a broken local schema throws here, so report a failed page.
+          console.error('[pullDelta] reading local bests failed — local store may be out of schema:', err);
+          bestsReadFailed = true;
+          return;
+        }
+      }
       await store!.applyDelta(delta);
       // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
       // server's roster. Only when the server sent one — an absent roster must never read as "none".
@@ -767,6 +778,8 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     console.error('[pullDelta] applyDelta failed — local store may be out of schema:', err);
     return null;
   }
+  if (abandoned || bestsReadFailed) return null;
+  const count = Object.values(delta).reduce((n, rows) => n + rows.length, 0);
 
   return {
     count: count + prunedPrograms + prunedBests,
@@ -815,6 +828,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       // Only a first-page failure is a "dead network" signal worth backing off —
       // a later-page failure mid-pagination keeps its partial progress (already
       // persisted via setLastSyncAt inside pullPage) and retries promptly next time.
+      if (abandoned) return null;
       if (pageN === 0) {
         consecutivePullFailures += 1;
         pullBackoffUntil = Date.now() + serverBackoffMs(consecutivePullFailures);
