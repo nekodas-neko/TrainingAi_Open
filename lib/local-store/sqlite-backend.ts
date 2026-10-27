@@ -121,6 +121,9 @@ function mapSupplementLogRow(r: Record<string, unknown>): LocalSupplementLog {
   };
 }
 
+/** `sync_meta` key: JSON array of food ids the server merged away that this device still holds a row for (#3459). */
+const RETIRED_FOOD_IDS_KEY = 'retiredFoodIds';
+
 export class SQLiteLocalStore implements LocalStore {
   async getBodyMetrics(cutoffDate: string): Promise<LocalBodyMetric[]> {
     const rows = await querySQL<Record<string, unknown>>(
@@ -1458,7 +1461,60 @@ export class SQLiteLocalStore implements LocalStore {
   }
 
   async applyDelta(delta: Parameters<LocalStore['applyDelta']>[0]): Promise<void> {
+    // #3459. A pulled tombstone is remembered BEFORE the transaction, so a crash between the two
+    // cannot lose it; the sweep after it drops whatever is no longer referenced and forgets those ids.
+    const tombstoned = (delta.foodItems ?? []).filter(r => r.deletedAt).map(r => r.id);
+    if (tombstoned.length) await this.rememberRetiredFoods(tombstoned);
     await withTransaction(tx => this.applyDeltaBody(delta, tx));
+    await this.sweepRetiredFoods();
+  }
+
+  // #3459. A merged-away food that a local log or saved-meal ingredient still points at keeps its row
+  // (a log whose food is missing is not drawn). The server later re-points that log, but the delta
+  // cursor is past the tombstone and nothing would look at the row again. So the ids are kept here,
+  // in `sync_meta` (no local schema change): hidden from the catalog reads at once, and the guarded
+  // DELETE is re-run after each pull and each saved-meals hydrate until the row is gone.
+  // The sweep runs after the pull's transaction rather than inside `applyDeltaBody` because a
+  // `SQLTransaction` can only write; it needs to read, and it then sees the pulled logs as committed.
+  private async retiredFoodIds(): Promise<string[]> {
+    const raw = await this.getSyncMeta(RETIRED_FOOD_IDS_KEY);
+    if (!raw) return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+    } catch { return []; }
+  }
+
+  private async rememberRetiredFoods(ids: string[]): Promise<void> {
+    const all = new Set([...await this.retiredFoodIds(), ...ids]);
+    await this.setSyncMeta(RETIRED_FOOD_IDS_KEY, JSON.stringify([...all]));
+  }
+
+  /** Re-runs the guarded DELETE for every remembered id and forgets the ones whose row is gone. */
+  private async sweepRetiredFoods(): Promise<void> {
+    const ids = await this.retiredFoodIds();
+    if (!ids.length) return;
+    for (const id of ids) {
+      await runSQL(
+        `DELETE FROM food_items
+          WHERE id = ?
+            AND NOT EXISTS (SELECT 1 FROM food_logs WHERE food_item_id = food_items.id AND deleted_at IS NULL)
+            AND NOT EXISTS (SELECT 1 FROM saved_meal_items WHERE food_item_id = food_items.id)`,
+        [id],
+      );
+    }
+    const left = await querySQL<{ id: string }>(
+      `SELECT id FROM food_items WHERE id IN (${ids.map(() => '?').join(',')})`, ids,
+    );
+    const still = new Set(left.map(r => String(r.id)));
+    const kept = ids.filter(id => still.has(id));
+    if (kept.length !== ids.length) await this.setSyncMeta(RETIRED_FOOD_IDS_KEY, JSON.stringify(kept));
+  }
+
+  /** `AND <col> NOT IN (...)` for the catalog reads; empty when nothing is retired. */
+  private async excludeRetiredFoods(col: string): Promise<{ sql: string; params: string[] }> {
+    const ids = await this.retiredFoodIds();
+    return ids.length ? { sql: ` AND ${col} NOT IN (${ids.map(() => '?').join(',')})`, params: ids } : { sql: '', params: [] };
   }
 
   private async applyDeltaBody(delta: Parameters<LocalStore['applyDelta']>[0], tx: SQLTransaction): Promise<void> {
@@ -2143,8 +2199,14 @@ export class SQLiteLocalStore implements LocalStore {
       );
     }
 
+    // #2417. A food the server merged into a keeper arrives with `deletedAt`. It is written like any
+    // other row first, because a log in this same delta (or one still waiting to push) may point at
+    // it and a log whose food is missing is not drawn. It is dropped after the logs below, and only
+    // if nothing local still points at it.
+    const mergedAwayFoodIds: string[] = [];
     for (const r of delta.foodItems ?? []) {
       await this.upsertFoodItemWith(tx.run, r);
+      if (r.deletedAt) mergedAwayFoodIds.push(r.id);
     }
 
     for (const r of delta.foodLogs ?? []) {
@@ -2193,6 +2255,16 @@ export class SQLiteLocalStore implements LocalStore {
            r.loggedAt, r.updatedAt, r.deletedAt],
         );
       }
+    }
+
+    for (const id of mergedAwayFoodIds) {
+      await tx.run(
+        `DELETE FROM food_items
+          WHERE id = ?
+            AND NOT EXISTS (SELECT 1 FROM food_logs WHERE food_item_id = food_items.id AND deleted_at IS NULL)
+            AND NOT EXISTS (SELECT 1 FROM saved_meal_items WHERE food_item_id = food_items.id)`,
+        [id],
+      );
     }
 
     for (const r of delta.supplements ?? []) {
@@ -2689,15 +2761,16 @@ export class SQLiteLocalStore implements LocalStore {
   // Empty query returns the most-recent items (the "browse all" path).
   async searchFoodItems(query: string): Promise<FoodItem[]> {
     const q = query.trim().toLowerCase();
+    const hide = await this.excludeRetiredFoods('id');
     const rows = q
       ? await querySQL<Record<string, unknown>>(
-          `SELECT * FROM food_items WHERE lower(name) LIKE ? ESCAPE '\\'
+          `SELECT * FROM food_items WHERE lower(name) LIKE ? ESCAPE '\\'${hide.sql}
             ORDER BY updated_at DESC LIMIT 20`,
-          [`%${q.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`],
+          [`%${q.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`, ...hide.params],
         )
       : await querySQL<Record<string, unknown>>(
-          `SELECT * FROM food_items ORDER BY updated_at DESC LIMIT 20`,
-          [],
+          `SELECT * FROM food_items WHERE 1=1${hide.sql} ORDER BY updated_at DESC LIMIT 20`,
+          hide.params,
         );
     return rows.map(foodItemRowToItem);
   }
@@ -2710,9 +2783,10 @@ export class SQLiteLocalStore implements LocalStore {
   async getFoodItemByBarcode(barcode: string): Promise<FoodItem | null> {
     const code = barcode.trim();
     if (!code) return null;
+    const hide = await this.excludeRetiredFoods('id');
     const rows = await querySQL<Record<string, unknown>>(
-      `SELECT * FROM food_items WHERE barcode = ? ORDER BY updated_at DESC LIMIT 1`,
-      [code],
+      `SELECT * FROM food_items WHERE barcode = ?${hide.sql} ORDER BY updated_at DESC LIMIT 1`,
+      [code, ...hide.params],
     );
     return rows.length ? foodItemRowToItem(rows[0]) : null;
   }
@@ -2727,9 +2801,10 @@ export class SQLiteLocalStore implements LocalStore {
   // which would make the check silently weaker on the device than on the web. Unbounded here on
   // purpose — the whole table is a few hundred rows and a calorie match is a handful of them.
   async findFoodItemsByCalories(calories: number): Promise<FoodItem[]> {
+    const hide = await this.excludeRetiredFoods('id');
     const rows = await querySQL<Record<string, unknown>>(
-      `SELECT * FROM food_items WHERE calories = ? ORDER BY updated_at ASC`,
-      [Math.round(calories)],
+      `SELECT * FROM food_items WHERE calories = ?${hide.sql} ORDER BY updated_at ASC`,
+      [Math.round(calories), ...hide.params],
     );
     return rows.map(foodItemRowToItem);
   }
@@ -2753,15 +2828,16 @@ export class SQLiteLocalStore implements LocalStore {
   /** One body for both, so the de-duplication and the 100-row window cannot drift from the
    *  server's. Mirrors `recentFoodItems` in `slices/nutrition.ts`. */
   private async recentFoodItems(limit: number, mealTypeId?: string): Promise<FoodItem[]> {
+    const hide = await this.excludeRetiredFoods('fi.id');
     const rows = await querySQL<Record<string, unknown>>(
       `SELECT fi.id, fi.name, fi.brand, fi.serving_size_g, fi.calories, fi.protein_g,
               fi.carbs_g, fi.fat_g, fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g,
               fi.source, fi.image_data_uri, fi.updated_at
          FROM food_logs fl
          JOIN food_items fi ON fi.id = fl.food_item_id
-        WHERE ${mealTypeId ? 'fl.meal_type_id = ? AND ' : ''}fl.deleted_at IS NULL
+        WHERE ${mealTypeId ? 'fl.meal_type_id = ? AND ' : ''}fl.deleted_at IS NULL${hide.sql}
         ORDER BY fl.logged_at DESC LIMIT 100`,
-      mealTypeId ? [mealTypeId] : [],
+      [...(mealTypeId ? [mealTypeId] : []), ...hide.params],
     );
     const seen = new Set<string>();
     const items: FoodItem[] = [];
@@ -3081,6 +3157,8 @@ export class SQLiteLocalStore implements LocalStore {
         await runSQL(`DELETE FROM saved_meals WHERE id=?`, [row.id]);
       }
     }
+    // #3459. The ingredients above now point at the keeper, so a retired food they held can go.
+    await this.sweepRetiredFoods();
   }
 
   async getSupplements(): Promise<LocalSupplement[]> {

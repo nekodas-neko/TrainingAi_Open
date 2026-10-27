@@ -79,6 +79,11 @@ ACTION foreign keys and a device that has not synced may still log against it. T
 alone, first, with nothing reading it; the list reads, the pull and the merge job follow in their own
 PR. Account deletion still removes the rows by cascade.
 
+On a device, a retired food that a local log or saved-meal ingredient still points at keeps its row
+until that reference moves. The local table has no `deleted_at`, so its id is remembered in
+`sync_meta` (`retiredFoodIds`, #3459): hidden from the local catalog reads, and dropped by the next
+pull or saved-meals hydrate once nothing points at it.
+
 **`sleep_sessions` had a server hard delete that devices never heard about. Fixed (#2546).**
 Every rollup pass that wrote a night first deleted that day's BLE rows and reinserted them with new
 random ids, so each re-roll left the device holding the old row next to the new one, and a night the

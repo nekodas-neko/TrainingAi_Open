@@ -324,7 +324,10 @@ export async function createFoodItem(
     // normalisation in SQL would be the same formula in two languages, drifting from the day it
     // was written. `findDuplicateFoodItem` is the only thing that decides.
     const sameCalories = await db.select().from(s.foodItems)
-      .where(and(eq(s.foodItems.userId, userId), eq(s.foodItems.calories, identityCalories(rest.calories))))
+      // #2417: a food merged into its keeper is no longer a candidate, or a fresh scan of it would
+      // resolve to the retired row and the merge would have to be done again.
+      .where(and(eq(s.foodItems.userId, userId), isNull(s.foodItems.deletedAt),
+        eq(s.foodItems.calories, identityCalories(rest.calories))))
       .orderBy(asc(s.foodItems.createdAt))
     const duplicate = findDuplicateFoodItem(rest, sameCalories.map(rowToFoodItem))
     if (duplicate) {
@@ -374,6 +377,7 @@ export async function searchFoodItems(db: Db, userId: string, query: string): Pr
   const rows = await db.select().from(s.foodItems)
     .where(and(
       eq(s.foodItems.userId, userId),
+      isNull(s.foodItems.deletedAt),   // #2417: My Foods lists live rows only
       sql`lower(${s.foodItems.name}) like ${'%' + query.toLowerCase().replace(/%/g, '\\%').replace(/_/g, '\\_') + '%'} escape '\\'`,
     ))
     .orderBy(desc(s.foodItems.createdAt))
@@ -384,8 +388,9 @@ export async function searchFoodItems(db: Db, userId: string, query: string): Pr
 /**
  * One food item by id, for the native client to read back what it uploaded under a client-minted
  * id. Scoped on `userId` in the WHERE, so another user's id and an unknown id are the same empty
- * result — the caller answers both 404 and ownership does not leak. `food_items` has no
- * `deleted_at` (a food is hard-deleted), so there is no tombstone to report.
+ * result — the caller answers both 404 and ownership does not leak. A food merged into its keeper
+ * (#2417) IS returned, still carrying its own values: this is a read by id, not a catalog listing,
+ * and a log that points at the retired row has to keep rendering from it.
  */
 export async function getFoodItemById(db: Db, userId: string, id: string): Promise<FoodItem | null> {
   const [row] = await db.select().from(s.foodItems)
@@ -571,6 +576,8 @@ export async function foodLogRefsValid(
   const [mt] = await db.select({ id: s.mealTypes.id }).from(s.mealTypes)
     .where(and(eq(s.mealTypes.id, mealTypeId), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt))).limit(1)
   if (!mt) return false
+  // No `deletedAt` filter, on purpose (#2417): a device that has not yet pulled a merge still logs
+  // against the retired row, and refusing that would drop the log. The merge job re-points it.
   const [fi] = await db.select({ id: s.foodItems.id }).from(s.foodItems)
     .where(and(eq(s.foodItems.id, foodItemId), eq(s.foodItems.userId, userId))).limit(1)
   if (!fi) return false
@@ -690,6 +697,9 @@ async function recentFoodItems(db: Db, userId: string, limit: number, mealTypeId
       eq(s.foodLogs.userId, userId),
       mealTypeId ? eq(s.foodLogs.mealTypeId, mealTypeId) : undefined,
       isNull(s.foodLogs.deletedAt),
+      // #2417: a suggestion list, so a merged-away food is not offered. The diary reads above keep
+      // joining it, so a log that still points there is not dropped.
+      isNull(s.foodItems.deletedAt),
     ))
     .orderBy(desc(s.foodLogs.loggedAt))
     .limit(100)

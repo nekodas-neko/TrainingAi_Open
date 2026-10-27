@@ -548,6 +548,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     // A food item's definition is near-immutable, so its creation time is the honest ordering key.
     // Giving the server a real `updated_at` is a migration, and a migration ships alone.
     updatedAt:    toIso(r.createdAt),
+    deletedAt:    r.deletedAt ? toIso(r.deletedAt) : null,
   } satisfies LocalFoodItem));
 
   const foodLogs = ((raw.foodLogs ?? []) as Record<string, unknown>[]).map(r => ({

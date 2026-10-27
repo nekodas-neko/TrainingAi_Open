@@ -516,6 +516,11 @@ export interface LocalFoodItem {
   /** BF-35. The capped thumbnail, mirrored so a food row draws its picture with no network. */
   imageDataUri: string | null;
   updatedAt:    string;
+  /**
+   * #2417. Set on a PULLED row the server merged into a keeper. It is never stored: the pull drops
+   * the row once no local log or saved meal points at it. There is no local column for it.
+   */
+  deletedAt?:   string | null;
 }
 
 // Meal Plan (Q-186). Names and macros live on the row so the Nutrition section renders offline —

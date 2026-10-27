@@ -17,6 +17,8 @@ import { backfillOuraCloud, CONNECT_BACKFILL_DAYS, validBackfillRange, type Oura
 import { stillRhrRefresher } from '@/lib/oura/cloud/still-rhr'
 import { runOuraWebhookRenewal } from '@/lib/oura/cloud/renewal'
 import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import { getDb } from '@/lib/data/postgres/client'
+import { mergeLookAlikeFoods } from '@/lib/nutrition/merge-look-alike-foods'
 
 /**
  * The agent key's allow-list (issue 2381, part b). A job is reachable with the key only if it is
@@ -73,6 +75,14 @@ const OuraCloudBackfillParams = z.object({
   to: DateParam.optional(),
   heartRate: z.boolean().optional(),
   dryRun: z.boolean(),
+}).strict()
+
+const MergeLookAlikeFoodsParams = z.object({
+  dryRun: z.boolean(),
+  /** `{groupKey: foodItemId}`: the owner's pick of keeper for a group, from the dry run's `groupKey`. */
+  keepers: z.record(z.string().max(300), z.string().uuid()).refine(m => Object.keys(m).length <= 100, 'at most 100 keepers').optional(),
+  /** `'exact'`: merge only the groups that leave every moved log's calories and macros unchanged. */
+  only: z.literal('exact').optional(),
 }).strict()
 
 export const AGENT_JOBS = {
@@ -318,6 +328,35 @@ export const AGENT_JOBS = {
       }
     },
   } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+
+  /**
+   * #2417. Merges look-alike `food_items` (same name and brand) into one keeper: the most-logged row,
+   * or the one the owner names in `keepers`. A write re-points the extras' food logs and saved-meal
+   * ingredients to the keeper with the quantity rescaled so the grams eaten do not change, then
+   * tombstones the extras (`deleted_at`, never a delete). Grams never change; calories and macros
+   * stay exactly as they were only for the groups the dry run marks `automatic` (`only: 'exact'`
+   * merges just those). A group with any non-zero change, or whose foods differ, is the owner's
+   * review. It also fills a keeper's missing barcode and picture from its extras (add-only). It rewrites what the owner ate, so a write
+   * needs an approval, and a verified snapshot comes first. Idempotent: a second run finds nothing.
+   * A dry run writes nothing and lists every group.
+   */
+  'merge-look-alike-foods': {
+    params: MergeLookAlikeFoodsParams,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await mergeLookAlikeFoods(getDb(), ctx.userId, { dryRun: p.dryRun, keepers: p.keepers, only: p.only })
+      if (!result.ok) return { status: 400, body: { error: result.error }, finish: { outcome: 'refused', error: result.error } }
+      const { report } = result
+      const t = report.totals
+      const moved = report.groups.reduce((n, g) => n + (g.result && 'logsMoved' in g.result ? g.result.logsMoved + g.result.mealItemsMoved + g.result.tombstoned : 0), 0)
+      return {
+        status: 200,
+        body: { report },
+        finish: { outcome: report.failedGroups > 0 ? 'failed' : 'succeeded', affectedRows: p.dryRun ? 0 : moved, daysMoved: p.dryRun ? 0 : report.datesTouched.length,
+          error: report.failedGroups > 0 ? `${report.failedGroups} of ${t.groups} group(s) rolled back` : null },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof MergeLookAlikeFoodsParams>>,
 } as const
 
 export type AgentJobId = keyof typeof AGENT_JOBS
@@ -365,6 +404,7 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('recompute-hrr1-best'),
   requestSchema('oura-cloud-backfill'),
   requestSchema('oura-webhook-subscriptions'),
+  requestSchema('merge-look-alike-foods'),
 ])
 export type AgentActionRequest = z.infer<typeof AgentActionRequest>
 
