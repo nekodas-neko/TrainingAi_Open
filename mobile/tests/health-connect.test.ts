@@ -408,7 +408,7 @@ test('#2828 N3: a batch the server refuses with a 400 is dropped instead of bloc
   f.connection.post = async (path: string, body: unknown) => {
     if (refuse && !(body as { rebuild?: boolean }).rebuild) {
       f.uploads.push(body);
-      throw new ApiError(400);
+      throw new ApiError(400, undefined, undefined, undefined, true);
     }
     return post(path, body);
   };
@@ -425,6 +425,18 @@ test('#2828 N3: a batch the server refuses with a 400 is dropped instead of bloc
   await store.run(true);
   await store.run(true);
   assert.equal(f.remote.get('steps-two')?.value, 1200);
+});
+test('a 400 that is not our JSON error (a proxy page) keeps the batch for retry', async () => {
+  const f = fixture();
+  f.connection.post = async () => {
+    throw new ApiError(400);
+  };
+  const store = f.make();
+  await store.setEnabled(true);
+  await store.run(true);
+  assert.ok(store.getSnapshot().pending);
+  assert.equal(store.getSnapshot().skipped, 0);
+  assert.equal((await savedDisk(f)).queue[0].records[0].id, record.id);
 });
 test('a server failure other than a 400 keeps the batch for retry', async () => {
   const f = fixture();

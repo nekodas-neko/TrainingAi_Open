@@ -30,6 +30,13 @@ export class UploadRejected extends Error {
   }
 }
 /**
+ * A 400 in our own validation shape (JSON with a string `error`). The one rule every queue uses to
+ * decide that a 400 is the server refusing this write; a 400 from a proxy or gateway is not.
+ */
+export function isValidationRejection(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 400 && error.validation;
+}
+/**
  * The server will never take this write, so retrying it only blocks the queue: its own validation
  * 400, a 422, or a push it answered 200 with this item's rejection. A 400 from anything else (an
  * HTML proxy page, an empty body) says nothing about the write and is retried like any failure.
@@ -37,8 +44,8 @@ export class UploadRejected extends Error {
 export function isRejectedForGood(error: unknown): boolean {
   return (
     error instanceof UploadRejected ||
-    (error instanceof ApiError &&
-      ((error.status === 400 && error.validation) || error.status === 422))
+    isValidationRejection(error) ||
+    (error instanceof ApiError && error.status === 422)
   );
 }
 /**

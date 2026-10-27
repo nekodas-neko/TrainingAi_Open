@@ -361,7 +361,7 @@ test('#3045: a batch the server refuses with a 400 is dropped instead of blockin
   const store = refusingStore(
     f,
     async (body) => {
-      if (refuse) throw new ApiError(400);
+      if (refuse) throw new ApiError(400, undefined, undefined, undefined, true);
       const batch = appleImportBatch.parse(body);
       for (const row of batch.samples) stored.add(row.id);
       return { accepted: batch.samples.length, deleted: batch.deleted.length };
@@ -375,6 +375,20 @@ test('#3045: a batch the server refuses with a 400 is dropped instead of blockin
   refuse = false;
   await store.run(true);
   assert.deepEqual([...stored], [later.id]);
+});
+test('a 400 that is not our JSON error (a proxy page) keeps the batch for retry', async () => {
+  const f = fixture();
+  const store = refusingStore(
+    f,
+    async () => {
+      throw new ApiError(400);
+    },
+    [[sample]],
+  );
+  await store.run(true);
+  assert.ok(store.getSnapshot().pending);
+  assert.equal(store.getSnapshot().skipped, 0);
+  assert.equal(JSON.parse(f.disk.get('apple-health-import.v1')!).queue[0].samples[0].id, sample.id);
 });
 for (const status of [500, 429]) {
   test(`#3045: a ${status} keeps the batch for retry`, async () => {
