@@ -124,10 +124,8 @@ describe('overlapping pulls apply one at a time (#3484)', () => {
   it('a pull that throws while applying does not block the pull waiting behind it', async () => {
     await seedKeeperAndExtra()
     const s = store.current!
-    let fetches = 0
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (!url.startsWith('/api/sync/pull')) return other
-      fetches += 1
       return respond({ syncedAt: T_NEW, foodItems: [food('extra', T_MERGE)] })
     }))
     const realApply = s.applyDelta.bind(s)
