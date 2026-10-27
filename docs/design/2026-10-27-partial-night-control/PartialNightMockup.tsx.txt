@@ -1,13 +1,15 @@
-// #2265 mockups: the control that marks a night partial. Static data, nothing is wired up.
+// #2265 mockups: the control that marks a night partial. Static, invented data, nothing is wired up.
+// Option B uses Preview's real Sheet and ActionMenu, the way the night card opens in the app: the
+// night is inside a Sheet titled "Sleep", and the menu is a second Sheet on top of it.
 import { View } from 'react-native';
-import { AppButton, AppText, Badge, Card, Grid, Icon, IconButton, MetricTile, Stack, SwitchRow } from '../shared/ui';
+import { ActionMenu, AppButton, AppText, Badge, Card, Grid, Icon, IconButton, MetricTile, Sheet, Stack, SwitchRow } from '../shared/ui';
 import { useTheme } from '../shared/theme/ThemeProvider';
 
 type Tile = [label: string, value: string, counted: boolean];
 const TILES: Tile[] = [
-  ['Deep', '0h 36m', false], ['REM', '0h 42m', false], ['Light', '1h 48m', false], ['Awake', '0h 30m', false],
-  ['Efficiency', '84%', false], ['HRV (overnight)', '61 ms', true], ['Average HR', '57 bpm', true],
-  ['Lowest HR', '53 bpm', true], ['Breathing rate', '9.1 br/min', true],
+  ['Deep', '0h 24m', false], ['REM', '0h 48m', false], ['Light', '1h 39m', false], ['Awake', '0h 24m', false],
+  ['Efficiency', '79%', false], ['HRV (overnight)', '47 ms', true], ['Average HR', '62 bpm', true],
+  ['Lowest HR', '55 bpm', true], ['Breathing rate', '13.4 br/min', true],
 ];
 
 function Frame({ children }: { children: React.ReactNode }) {
@@ -26,8 +28,8 @@ function NightCard({ marked, header, footer, hint }: { marked: boolean; header?:
         {header}
       </Stack>
       <AppText variant="caption" tone="muted">Oura · Ring</AppText>
-      <AppText variant="title">{marked ? '3h 5m recorded' : '3h 5m'}</AppText>
-      <AppText variant="caption" tone="muted">4:23 am → 8:03 am</AppText>
+      <AppText variant="title">{marked ? '3h 15m recorded' : '3h 15m'}</AppText>
+      <AppText variant="caption" tone="muted">4:40 am → 7:55 am</AppText>
       {marked && (
         <AppText variant="caption" tone="muted">
           Kept out of your sleep score and averages. Heart rate, HRV and breathing still count.
@@ -46,15 +48,6 @@ function NightCard({ marked, header, footer, hint }: { marked: boolean; header?:
   );
 }
 
-function Sheet({ children }: { children: React.ReactNode }) {
-  const { theme } = useTheme();
-  return (
-    <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: theme.spacing.lg, backgroundColor: theme.colors.raised, borderTopLeftRadius: 20, borderTopRightRadius: 20, gap: theme.spacing.md, paddingBottom: theme.spacing.xl }}>
-      {children}
-    </View>
-  );
-}
-
 export function MockupApp({ screen }: { screen: string }) {
   const { theme } = useTheme();
   const toggle = (on: boolean) => (
@@ -67,40 +60,34 @@ export function MockupApp({ screen }: { screen: string }) {
   );
   if (screen === 'a-off') return <Frame><NightCard marked={false} footer={toggle(false)} /></Frame>;
   if (screen === 'a-on') return <Frame><NightCard marked footer={toggle(true)} /></Frame>;
+  const more = <IconButton icon="more" label="Night options" onPress={() => {}} />;
+  // The night card inside the Sheet it opens in.
+  const inSleepSheet = (marked: boolean, children?: React.ReactNode) => (
+    <Frame>
+      <Sheet visible title="Sleep" onClose={() => {}}>
+        <NightCard marked={marked} header={more} />
+      </Sheet>
+      {children}
+    </Frame>
+  );
   if (screen === 'b-menu')
-    return (
-      <Frame>
-        <NightCard marked={false} header={<IconButton icon="more" label="Night options" onPress={() => {}} />} />
-        <View style={{ position: 'absolute', top: 64, right: 24, width: 230, backgroundColor: theme.colors.raised, borderRadius: 12, padding: theme.spacing.md, gap: theme.spacing.sm }}>
-          <AppText variant="body">Mark as partial night</AppText>
-          <AppText variant="body" tone="muted">Log bedtime by hand</AppText>
-        </View>
-      </Frame>
-    );
+    return inSleepSheet(false, (
+      <ActionMenu visible title="Night options" onClose={() => {}} actions={[{ title: 'Mark as partial night', icon: 'moon', run: () => {} }]} />
+    ));
   if (screen === 'b-confirm')
-    return (
-      <Frame>
-        <NightCard marked={false} header={<IconButton icon="more" label="Night options" onPress={() => {}} />} />
-        <Sheet>
-          <AppText variant="title">Mark as a partial night?</AppText>
-          <AppText variant="body" tone="muted">
-            Use this when the ring came off or went on late. Hours, efficiency, time to fall asleep and bedtime stay out of your sleep score and averages. Heart rate, HRV and breathing still count. You can undo it any time.
-          </AppText>
-          <AppButton title="Mark as partial night" onPress={() => {}} />
-          <AppButton title="Cancel" variant="surface" onPress={() => {}} />
-        </Sheet>
-      </Frame>
-    );
+    return inSleepSheet(false, (
+      <Sheet visible title="Mark as a partial night?" onClose={() => {}}>
+        <AppText variant="body" tone="muted">
+          Use this when the ring came off or went on late. Hours, efficiency, time to fall asleep and bedtime stay out of your sleep score and averages. Heart rate, HRV and breathing still count. You can undo it any time.
+        </AppText>
+        <AppButton title="Mark as partial night" onPress={() => {}} />
+        <AppButton title="Cancel" variant="surface" onPress={() => {}} />
+      </Sheet>
+    ));
   if (screen === 'b-marked')
-    return (
-      <Frame>
-        <NightCard marked header={<IconButton icon="more" label="Night options" onPress={() => {}} />} />
-        <Sheet>
-          <AppText variant="body">Partial night marked</AppText>
-          <AppButton title="Count the whole night again" variant="surface" onPress={() => {}} />
-        </Sheet>
-      </Frame>
-    );
+    return inSleepSheet(true, (
+      <ActionMenu visible title="Night options" onClose={() => {}} actions={[{ title: 'Count the whole night again', icon: 'moon', run: () => {} }]} />
+    ));
   if (screen === 'c-prompt')
     return (
       <Frame>
