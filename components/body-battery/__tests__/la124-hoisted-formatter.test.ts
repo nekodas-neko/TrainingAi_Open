@@ -13,10 +13,10 @@
 import { describe, it, expect } from 'vitest'
 import { toSegments, minutesIntoDay } from '../stress-day'
 
-/** One bucket every 30 minutes across a UTC day — the shape a full day of coverage has. */
+/** One bucket every 30 minutes across one Brisbane local day (from local midnight) — the shape a full day of coverage has. */
 const fullDay = () =>
   Array.from({ length: 48 }, (_, i) => ({
-    t: Date.UTC(2026, 8, 20, 0, 0) + i * 30 * 60_000,
+    t: Date.UTC(2026, 8, 19, 14, 0) + i * 30 * 60_000,
     level: -0.4,
   }))
 

@@ -627,11 +627,11 @@ export function GuidedWorkoutScreen({
               max={30}
             />
             <AppText variant="heading" tone="brand">
-              Estimated 1RM �{' '}
+              Estimated 1RM ·{' '}
               {Number(calcWeight) > 0 && Number(calcReps) > 0
                 ? displayOneRm(calc1RM(Number(calcWeight), Number(calcReps)), 'weighted')
                     .text
-                : '�'}
+                : '—'}
             </AppText>
           </>
         ) : null}

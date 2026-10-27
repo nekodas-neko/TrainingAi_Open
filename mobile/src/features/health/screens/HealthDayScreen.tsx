@@ -187,7 +187,7 @@ export function DayReadThrough({
     return (
       <>
         <AppText tone="muted">
-          The day�s server records could not be loaded. Use the header to retry.
+          The day's server records could not be loaded. Use the header to retry.
         </AppText>
         <ActivityDay logs={[]} date={date} />
       </>

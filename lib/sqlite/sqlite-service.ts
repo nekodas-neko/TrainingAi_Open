@@ -203,7 +203,8 @@ async function reconcileSchema(db: SQLiteDBConnection): Promise<boolean> {
  * `_db`-null check below turns it into the thrown error the write sites catch.
  */
 async function awaitOpen(): Promise<void> {
-  if (_db || !_initPromise) return;
+  // Not `_db ||`: `_db` is assigned at createConnection, before `open()` has finished.
+  if (!_initPromise) return;
   try { await _initPromise; } catch { /* init failed; handled by the _db check at the call site */ }
 }
 
