@@ -1,7 +1,9 @@
 // #3484 item 1. Two overlapping `pullDelta` calls fetch concurrently but must apply one at a time.
 // Unserialised, the stale pull's shorter post-apply chain wrote the cursor before the newer pull's
 // longer one: the cursor ended at the newer time with the stale rows (the retired food live) on top,
-// so no later pull re-delivered the tombstone. Drives the real `pullDelta` and the real write queue.
+// so no later pull re-delivered its tombstone. Drives the real `pullDelta` against the real SQLite store
+// backend; `sqlite-service` is mocked with the node:sqlite parity layer, so the device's own write
+// queue is not exercised.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/sqlite/sqlite-service', () => import('./parity/node-sqlite-service'))
@@ -162,5 +164,61 @@ describe('overlapping pulls apply one at a time (#3484)', () => {
     _resetSyncBackoff()
     expect(await pullDelta('u', true)).not.toBeNull()
     expect(await s.getRetiredFoodIds()).toEqual(['extra'])
+  })
+
+  it('reads the local bests inside the lock, after the pull ahead has written (#3486)', async () => {
+    const s = store.current!
+    const events: string[] = []
+    const realApply = s.applyDelta.bind(s)
+    const realBests = s.getPersonalRecords.bind(s)
+    s.getPersonalRecords = async () => { events.push('read'); return realBests() }
+    s.applyDelta = async (delta) => { events.push('apply'); await sleep(20); return realApply(delta) }
+    const best = (kg: number) => ({ exerciseName: 'Squat', exerciseId: null, estimated1rm: kg, achievedAt: T_MERGE, updatedAt: T_MERGE })
+    let fetches = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (!url.startsWith('/api/sync/pull')) return other
+      fetches += 1
+      return respond({ syncedAt: T_NEW, personalRecordsComplete: true, personalRecords: [best(100 + fetches)] })
+    }))
+    await Promise.all([pullDelta('u', true), pullDelta('u', true)])
+    // Read before the lock, both pulls would diff against the same stale local copy: read, read, apply, apply.
+    expect(events).toEqual(['read', 'apply', 'read', 'apply'])
+  })
+
+  it('a pull queued behind another applies nothing once the store has been cleared by a sign-out (#3486)', async () => {
+    const s = store.current!
+    const releaseA = deferred()
+    const aHoldsLock = deferred()
+    let fetches = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (!url.startsWith('/api/sync/pull')) return other
+      fetches += 1
+      return respond({ syncedAt: T_NEW, foodItems: [food(fetches === 1 ? 'first' : 'second', null)] })
+    }))
+    const realApply = s.applyDelta.bind(s)
+    const realPrune = s.pruneProgramStructure.bind(s)
+    let applies = 0
+    s.applyDelta = async (delta) => { applies += 1; return realApply(delta) }
+    let prunes = 0
+    s.pruneProgramStructure = async (...args) => {
+      prunes += 1
+      if (prunes === 1) { aHoldsLock.resolve(); await releaseA.promise }   // pull A holds the lock after writing
+      return realPrune(...args)
+    }
+
+    const pullA = pullDelta('u', true)
+    await aHoldsLock.promise
+    const pullB = pullDelta('u', true)                        // fetched, now queued behind A's apply
+    await sleep(30)
+    // Sign-out: the tables are emptied and the cached store is dropped (`clearLocalStoreData`).
+    await runSQL(`DELETE FROM food_items`, [])
+    store.current = null
+    releaseA.resolve()
+
+    expect(await pullA).not.toBeNull()
+    expect(await pullB).toBeNull()
+    expect(fetches).toBe(2)
+    expect(applies).toBe(1)                                   // B never reached the store
+    expect(await s.searchFoodItems('granola')).toEqual([])
   })
 })

@@ -92,4 +92,11 @@ describe('food-log hydration carries the meal grouping', () => {
     expect(rows.map(r => r.id)).toEqual(['item-2'])
     expect(toLocalFoodItems([log()], '2026-08-31T08:00:00.000Z')).toHaveLength(1)
   })
+
+  it('skips a food the server has retired, even when no retired id is remembered (#3486)', () => {
+    const retired = log({ id: 'log-2', foodItemId: 'item-2', foodItem: { ...log().foodItem, deletedAt: '2026-10-10T10:05:00.000Z' } })
+    const live = log({ id: 'log-3', foodItemId: 'item-3', foodItem: { ...log().foodItem, deletedAt: null } })
+    const rows = toLocalFoodItems([log(), retired, live], '2026-08-31T08:00:00.000Z')
+    expect(rows.map(r => r.id)).toEqual(['item-1', 'item-3'])
+  })
 })

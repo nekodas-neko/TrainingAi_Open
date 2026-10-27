@@ -470,7 +470,9 @@ export async function listFoodLogs(db: Db, userId: string, date: string): Promis
       // BF-97. A scan's group is named from here rather than from a saved meal it does not have.
       mealGroupName: mealGroupName ?? null,
       quantityMultiplier: logQty, loggedAt,
-      foodItem,
+      // #3486. Lets a second device's hydrate skip a food the server has retired, whether or not
+      // that device still remembers the id.
+      foodItem: { ...foodItem, deletedAt: item.deletedAt ?? null },
       ...computeLogMacros(foodItem, logQty),
     }
   })
