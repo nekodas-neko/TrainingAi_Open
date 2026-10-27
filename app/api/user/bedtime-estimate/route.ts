@@ -6,6 +6,7 @@ import { subDays } from 'date-fns'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { computeSleepStartConsistency } from '@trainingai/shared/health/sleep-consistency'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 
 const FALLBACK_HOUR = 22
 const FALLBACK_MINUTE = 0
@@ -39,7 +40,11 @@ export async function GET() {
   // that. The aggregate carries the field through from its first window, so the night it lands on is
   // the night the user answered about.
   const { meanMinutesFromNoon } = computeSleepStartConsistency(
-    nightSessions(sleepSessions, tz).map(s => (s.manualSleepStart ?? s.sleepStart).toISOString()),
+    // #2265: a night the owner marked partial has the wrong bedtime unless they also remembered the
+    // real one (`manualSleepStart`), in which case that is the bedtime. Otherwise it is skipped.
+    nightSessions(sleepSessions, tz)
+      .filter(s => !isPartialNight(s) || s.manualSleepStart != null)
+      .map(s => (s.manualSleepStart ?? s.sleepStart).toISOString()),
     tz,
   )
 

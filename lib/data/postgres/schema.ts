@@ -672,6 +672,13 @@ export const sleepSessions = pgTable('sleep_sessions', {
   // is ever tombstoned (`deleteManualSleepNight`); every reader skips a tombstoned row, and the
   // delta pull carries it so the device hides it too. A device night is never removed this way.
   deletedAt:        timestamp('deleted_at', { withTimezone: true }),
+  // #2265 (migration 202610272023) — when the owner marked this night partial: the ring came off or
+  // went on late, so the numbers that depend on how long it recorded are not a verdict on the sleep.
+  // NULL is not marked, which is every row until the owner taps. Non-null keeps the physiology (HRV,
+  // heart rate, breathing) and takes the duration-derived metrics out of the sleep score and every
+  // baseline: `packages/shared/src/health/partial-night.ts` is the one place that says which. Never
+  // set by a device write or by detection, and never part of the per-field `source_map` merge.
+  partialNightAt:   timestamp('partial_night_at', { withTimezone: true }),
   sourceMap:        jsonb('source_map').$type<Record<string, string>>(),   // per-field provenance (migration 120)
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

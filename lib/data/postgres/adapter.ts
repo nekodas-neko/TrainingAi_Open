@@ -71,6 +71,8 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
+import { PartialNightPayloadSchema } from '@trainingai/shared/health/partial-night'
+import { withNightRescore } from '@/lib/health/rescore-nights'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { averagePaceSecPerKm } from '@trainingai/shared/activity/route-summary'
 import { HEALTH_CONNECT_SOURCE } from '@trainingai/shared/health/health-connect-workouts'
@@ -3641,6 +3643,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       timeInBedHours:  r.timeInBedHours  ?? undefined,
       manualSleepStart: r.manualSleepStart ?? null,
       manualEntry:     r.manualEntry,
+      partialNightAt:  r.partialNightAt ?? null,
       ...nightSources(r),
       ouraSleepType:   r.ouraSleepType   ?? null,
     }))
@@ -3764,6 +3767,31 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .where(and(eq(s.sleepSessions.userId, userId), eq(s.sleepSessions.date, date), isNull(s.sleepSessions.deletedAt)))
       .returning({ id: s.sleepSessions.id })
     return updated.length > 0
+  }
+
+  /**
+   * #2265 — see the interface. Marks (`at`) or unmarks (`null`) the night the row `id` belongs to.
+   *
+   * The caller's id picks the night; the write covers every live device row with that wake date, so a
+   * night split by a wake-up cannot be half marked and an unmark clears every window the mark was on.
+   * Readers treat a night as partial when any of its windows is. A manual night is refused (its
+   * duration is typed, not measured), and so is a removed row. Affected rows are counted: zero is
+   * `not_found`, never a success. It writes this one column and `updated_at`, which the delta pull
+   * carries; it never goes through `mergeSet`/`source_map`.
+   */
+  async setPartialNight(userId: string, id: string, at: Date | null): Promise<'ok' | 'not_found'> {
+    const t = s.sleepSessions
+    return this.db.transaction(async tx => {
+      const [own] = await tx.select({ date: t.date }).from(t)
+        .where(and(eq(t.id, id), eq(t.userId, userId), eq(t.manualEntry, false), isNull(t.deletedAt)))
+        .limit(1)
+      if (!own) return 'not_found'
+      const hit = await tx.update(t)
+        .set({ partialNightAt: at, updatedAt: new Date() })
+        .where(and(eq(t.userId, userId), eq(t.date, own.date), eq(t.manualEntry, false), isNull(t.deletedAt)))
+        .returning({ id: t.id })
+      return hit.length > 0 ? 'ok' : 'not_found'
+    })
   }
 
   /**
@@ -6487,6 +6515,20 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           const saved = await this.setManualSleepStart(userId, mut.date.replace(/\//g, '-'), at)
           if (!saved) {
             throw new Error(`manual_bedtime: no sleep session for ${mut.date}`)
+          }
+          processed++
+        } else if (mut.domain === 'partial_night') {
+          // #2265. The same `setPartialNight` the web route calls. A night that is not the caller's
+          // live device night is a permanent failure, not a transient one, so it quarantines.
+          const p = clean as Record<string, unknown>
+          const parsedMark = PartialNightPayloadSchema.safeParse(p)
+          if (!parsedMark.success) {
+            throw new Error(`partial_night: ${describeZodFailure(parsedMark.error)}`)
+          }
+          const saved = await withNightRescore(this, userId, () =>
+            this.setPartialNight(userId, parsedMark.data.id, parsedMark.data.partial ? new Date() : null))
+          if (saved !== 'ok') {
+            throw new Error(`partial_night: no device night ${parsedMark.data.id}`)
           }
           processed++
         } else if (mut.domain === 'manual_sleep') {

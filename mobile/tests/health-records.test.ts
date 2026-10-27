@@ -305,6 +305,38 @@ test('remembered bedtime changes only its own field and survives an offline save
   assert.equal(night.durationHours, 7);
   assert.equal(night.avgHeartRate, 58);
 });
+test('a partial-night mark shows at once, survives offline, and leaves the measurements alone', async () => {
+  const f = fixture();
+  const get = f.connection.get;
+  const measured = sleepSchema.parse({
+    id: id(21),
+    date,
+    sleepStart: '2026-10-09T18:23:00Z',
+    sleepEnd: '2026-10-09T22:03:00Z',
+    durationHours: 3.1,
+    averageHrvMs: 61,
+    manualEntry: false,
+  });
+  const typed = sleepSchema.parse({ id: id(22), date: '2026-10-09', durationHours: 8, manualEntry: true });
+  f.connection.get = async (path) =>
+    path === '/api/sleep-sessions' ? [measured, typed] : get(path);
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.markNightPartial(id(21), date, true);
+  await store.sync();
+  const read = () => overlaySleep(store.getSnapshot().sleep!, store.getSnapshot().operations);
+  const marked = read().find((row) => row.id === id(21))!;
+  assert.notEqual(marked.partialNightAt, null);
+  assert.equal(marked.durationHours, 3.1);
+  assert.equal(marked.averageHrvMs, 61);
+  assert.equal(read().find((row) => row.id === id(22))!.partialNightAt ?? null, null);
+  assert.equal(store.getSnapshot().operations.length, 1);
+  await store.markNightPartial(id(21), date, false);
+  assert.equal(read().find((row) => row.id === id(21))!.partialNightAt, null);
+  await assert.rejects(store.markNightPartial(id(22), '2026-10-09', true));
+  await assert.rejects(store.markNightPartial(id(99), date, true));
+});
 test('closing an account stops pending health uploads without discarding them', async () => {
   const f = fixture();
   const store = f.store();

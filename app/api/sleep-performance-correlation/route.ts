@@ -5,6 +5,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { bucketize, correlationInsight, buildExercise1rmBaseline, sessionMean1RmPct, type BucketDef, type CorrelationStats, type WithheldReason } from '@trainingai/shared/health/correlation'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightsWithDuration } from '@trainingai/shared/health/partial-night'
 
 export interface SleepCorrelationResponse {
   insight: string
@@ -48,7 +49,7 @@ export async function GET() {
   // position, so naps drop out and a night split by a wake-up (2026-05-29: 2.5 h + 4.0 h) comes back
   // as the one ~6.5 h night it was.
   const sleepByDate = new Map<string, number>()
-  for (const s of nightSessions(sleepSessions, tz)) {
+  for (const s of nightsWithDuration(nightSessions(sleepSessions, tz))) {
     if (s.durationHours != null) {
       sleepByDate.set(s.date, s.durationHours)
     }

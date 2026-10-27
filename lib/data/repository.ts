@@ -875,6 +875,11 @@ export interface WorkoutRepository {
    *  column rather than a `manual`-ranked write to `sleep_start`. */
   setManualSleepStart(userId: string, date: string, at: Date | null): Promise<boolean>
   /**
+   * #2265 — mark (`at`) or unmark (`null`) the night the row `id` belongs to as partial. Covers every
+   * live device row with that wake date. `not_found` when `id` is not the caller's live device night.
+   */
+  setPartialNight(userId: string, id: string, at: Date | null): Promise<'ok' | 'not_found'>
+  /**
    * #2338 — store a night the user entered by hand (`manual_entry = true`). The natural key is
    * (user, wake date): a second entry for the same night EDITS the first, never adds a row, so a
    * replayed outbox mutation or a double-tapped save is a no-op. The row id is `night.id` when the

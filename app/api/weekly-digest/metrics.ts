@@ -14,6 +14,7 @@ import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { computeSleepScoreSeries } from '@trainingai/shared/health/sleep-score'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
@@ -122,7 +123,7 @@ export async function computeWeeklyDigestMetrics(
   // Hours from every sleep session including naps — deliberately NOT nightSessions, which is what
   // the score below uses. That asymmetry predates this and is left alone here.
   const sleepHoursOf = (from: string, to: string) =>
-    meanOrNull(sleepSessions.filter(s => s.date >= from && s.date <= to && s.durationHours != null).map(s => s.durationHours!))
+    meanOrNull(sleepSessions.filter(s => s.date >= from && s.date <= to && s.durationHours != null && !isPartialNight(s)).map(s => s.durationHours!))
 
   // Quality, not just hours: our own 0-100 sleep score per night (efficiency/stages/
   // latency/restfulness — computeSleepScore, the same formula the readiness route uses).
@@ -230,7 +231,7 @@ export async function computeWeeklyDigestMetrics(
       week: sleepHoursOf(isoWeekKey, recapWeekEndIso),
       priorWeek: sleepHoursOf(from14dIso, priorWeekEndIso),
       byDay: seriesFrom(sleepSessions
-        .filter(s => s.durationHours != null)
+        .filter(s => s.durationHours != null && !isPartialNight(s))
         .map(s => [s.date, s.durationHours!] as [string, number])),
     },
     stressHighMinutes: {

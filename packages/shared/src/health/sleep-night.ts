@@ -476,6 +476,8 @@ export interface AggregatableSleep extends SleepWindow {
   restlessPeriods?: number | null
   respiratoryRate?: number | null
   timeInBedHours?: number | null
+  /** #2265: the owner's partial-night mark. A reassembled night is marked when any window is. */
+  partialNightAt?: Date | null
 }
 
 const sum = (xs: (number | null | undefined)[]): number | null => {
@@ -542,6 +544,9 @@ export function aggregateNight<T extends AggregatableSleep>(period: SleepPeriod<
     })(),
     // Every gap is by definition a wake-up, on top of whatever each window already counted.
     restlessPeriods: (sum(w.map(x => x.restlessPeriods)) ?? 0) + period.gapHours.length,
+    // #2265: the mark is on the night, not on a window. Added only when set, so an unmarked night is
+    // exactly the object it was before the mark existed.
+    ...(w.some(x => x.partialNightAt != null) ? { partialNightAt: w.find(x => x.partialNightAt != null)!.partialNightAt } : {}),
   }
 }
 

@@ -17,6 +17,7 @@ import { acwrBaselineDaysRemaining, computeVolumeAcwr, type ProgramAgeInput } fr
 import { activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-minutes'
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { nightSessions, canonicalNightForDate, type AggregatableSleep } from '@trainingai/shared/health/sleep-night'
+import { isPartialNight, withoutPartialDuration } from '@trainingai/shared/health/partial-night'
 import { isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { hrr60Candidates, nightlyCandidates } from '@trainingai/shared/inputs/adapters'
@@ -143,7 +144,12 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     const n = canonicalNightForDate(nights, d, tz)
     if (n) nightByDate.set(d, n)
   }
-  const nightList = [...nightByDate.entries()].sort(([a], [b]) => a.localeCompare(b))
+  // #2265: a night the owner marked partial keeps its physiology and loses its hours, efficiency,
+  // latency and stage shares. The canonical night is chosen above on the raw rows, so the mark
+  // never changes which night stands for a date.
+  const nightList = [...nightByDate.entries()]
+    .map(([d, n]) => [d, withoutPartialDuration(n)] as [string, typeof n])
+    .sort(([a], [b]) => a.localeCompare(b))
   // #2984: a night is labelled by the device that measured it, so a switch of device restarts the
   // sleep normals instead of mixing two devices' nights. A night from before provenance keeps the
   // table label.
@@ -227,7 +233,7 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     'sleep.deep_rem_share': compact(nightList.map(([d, n]) =>
       obs(d, deepRemSharePct(n), sleepSrc(n), STAGER_SOURCES.has(sleepSrc(n)) ? 'estimated' : null))),
     'sleep.latency': compact(nightList.map(([d, n]) => obs(d, n.onsetLatencySec == null ? null : n.onsetLatencySec / 60, sleepSrc(n)))),
-    'sleep.timing': compact(nightList.map(([d, n]) =>
+    'sleep.timing': compact(nightList.filter(([, n]) => !isPartialNight(n)).map(([d, n]) =>
       obs(d, minutesFromNoon(new Date((n.sleepStart.getTime() + n.sleepEnd.getTime()) / 2).toISOString(), tz), sleepSrc(n)))),
     'sleep.balance': balance,
     'heart.overnight_hrv': nightlySeries(raw.bodyMetrics, 'hrvMs', 'HRV/night', 'night_hrv', wearByDate),

@@ -9,6 +9,7 @@ import { energyBalanceByDay } from '@trainingai/shared/health/energy-balance'
 import { median as medianOfValues } from '@trainingai/shared/stats'
 import { sorenessVsVolumePoints } from '@trainingai/shared/health/soreness-volume'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightsWithDuration } from '@trainingai/shared/health/partial-night'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { sessionEffort, type SessionRpeSource } from '@trainingai/shared/workout/derive-session-rpe'
@@ -367,7 +368,7 @@ export async function GET(req: Request) {
     // Nights, not rows (Q-76) — an evening nap's `sleepStart` sits minutes after dinner and carries
     // its own efficiency, which is the single strongest way to manufacture a "late meal ruins your
     // sleep" gradient out of nothing.
-    for (const sleep of nightSessions(sleepSessions, tz)) {
+    for (const sleep of nightsWithDuration(nightSessions(sleepSessions, tz))) {
       if (sleep.efficiency == null) continue
       const prevDate = shiftDateStr(toAestDay(sleep.sleepStart, tz), -1)
       const candidates = [mealByDate.get(sleep.date), mealByDate.get(prevDate)].filter((d): d is Date => d != null)
@@ -402,7 +403,7 @@ export async function GET(req: Request) {
     const sleepSessions = await repo.listSleepSessions(userId, from90dIso, todayIso)
     const points: { x: number; y: number }[] = []
     const control: number[] = []
-    for (const night of nightSessions(sleepSessions, tz)) {
+    for (const night of nightsWithDuration(nightSessions(sleepSessions, tz))) {
       if (night.durationHours == null) continue
       points.push({ x: minutesFromNoon(night.sleepStart.toISOString(), tz), y: night.durationHours })
       control.push(dayIndex(night.date))

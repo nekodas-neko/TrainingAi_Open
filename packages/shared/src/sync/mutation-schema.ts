@@ -32,6 +32,11 @@ export const SYNCED_MUTATION_DOMAINS = [
   // `sleep_session` (a night the ring measured). Payload is `{ id, sleepStart, sleepEnd }`; the server
   // derives the wake date and calls the same write as `POST /api/sleep-sessions/manual`.
   'manual_sleep',
+  // #2265. The owner marking a measured night partial, or unmarking it. Payload is
+  // `{ id, partial }` (`PartialNightPayloadSchema`), `id` a `sleep_sessions.id`; the server calls the
+  // same `setPartialNight` as `POST /api/sleep-sessions/partial`. Distinct from `manual_sleep` (a night
+  // the user typed) and `manual_bedtime` (one field corrected): it writes one nullable timestamp.
+  'partial_night',
 ] as const
 
 export type SyncedMutationDomain = (typeof SYNCED_MUTATION_DOMAINS)[number]
