@@ -1494,14 +1494,30 @@ export class SQLiteLocalStore implements LocalStore {
     } catch { return []; }
   }
 
+  // #3489. The retired list is one JSON value, so every change to it is a read-modify-write, and the
+  // pull (under the sync apply lock) and the day-list hydrate (not under it) both change it. Two
+  // overlapping updates each read the old list and the later write dropped the other's id, which
+  // leaves a retired food in search for good. The mutex lives here, around only the read and the write,
+  // so no caller can skip it and it never waits on anything but its own two statements: it cannot
+  // deadlock with the sync lock. Instance-level on purpose: one store is the one writer of its table.
+  private retiredListTail: Promise<void> = Promise.resolve();
+
   private async updateRetiredFoods(add: string[], forget: string[]): Promise<void> {
-    const all = new Set([...await this.getRetiredFoodIds(), ...add]);
-    for (const id of forget) all.delete(id);
-    const next = JSON.stringify([...all]);
-    // A pull with live foods that were never retired changes nothing: skip the write. Comparing the
-    // stored text also rewrites a malformed value.
-    if (next === await this.getSyncMeta(RETIRED_FOOD_IDS_KEY)) return;
-    await this.setSyncMeta(RETIRED_FOOD_IDS_KEY, next);
+    const previous = this.retiredListTail;
+    let release!: () => void;
+    this.retiredListTail = new Promise<void>(resolve => { release = resolve; });
+    await previous;
+    try {
+      const all = new Set([...await this.getRetiredFoodIds(), ...add]);
+      for (const id of forget) all.delete(id);
+      const next = JSON.stringify([...all]);
+      // A pull with live foods that were never retired changes nothing: skip the write. Comparing the
+      // stored text also rewrites a malformed value.
+      if (next === await this.getSyncMeta(RETIRED_FOOD_IDS_KEY)) return;
+      await this.setSyncMeta(RETIRED_FOOD_IDS_KEY, next);
+    } finally {
+      release();
+    }
   }
 
   /** Re-runs the guarded DELETE for every remembered id and forgets the ones whose row is gone. */
@@ -1521,8 +1537,10 @@ export class SQLiteLocalStore implements LocalStore {
       `SELECT id FROM food_items WHERE id IN (${ids.map(() => '?').join(',')})`, ids,
     );
     const still = new Set(left.map(r => String(r.id)));
-    const kept = ids.filter(id => still.has(id));
-    if (kept.length !== ids.length) await this.setSyncMeta(RETIRED_FOOD_IDS_KEY, JSON.stringify(kept));
+    // Forgotten through the same locked update, not by writing back the list read above: an id added
+    // since that read must survive (#3489).
+    const gone = ids.filter(id => !still.has(id));
+    if (gone.length) await this.updateRetiredFoods([], gone);
   }
 
   /** `AND <col> NOT IN (...)` for the catalog reads; empty when nothing is retired. */

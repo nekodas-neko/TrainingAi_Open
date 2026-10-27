@@ -350,6 +350,11 @@ const KEEP_ON_SIGN_OUT = new Set([
  */
 export async function clearLocalStoreData(): Promise<void> {
   if (!isSQLiteAvailable()) return;
+  // #3489. Dropped BEFORE the DELETEs: a pull that takes the sync lock while they run re-checks that
+  // `getLocalStore` still answers its own store, and finding a new one it applies nothing. Cleared
+  // after them, the old store stayed reachable through the whole wipe and the pull wrote the old
+  // account's rows back. A same-account re-init just builds a fresh store on its next call.
+  _stores.clear();
   const tables = await querySQL<{ name: string }>(
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
     [],
@@ -364,7 +369,6 @@ export async function clearLocalStoreData(): Promise<void> {
       // and safe here: every value comes from sqlite_master, never from user input.
       .map(name => runSQL(`DELETE FROM ${name}`, [])),
   );
-  _stores.clear();
   const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
   if (failed.length > 0) throw new Error(`local store: ${failed.length} table(s) were not cleared (${String(failed[0].reason)})`);
 }
