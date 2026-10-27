@@ -177,7 +177,9 @@ export interface ClockSkip { fromMin: number; toMin: number }
  * or null on any other day. A series on `wallClockMinuteReader` minutes jumps by that much across the
  * transition though no time passed, so a "no data for N minutes" test must close the skip first
  * (`closeClockSkip`). A fall-back day needs nothing: its minutes only step backward, never a false gap.
- * `dayStartMs` is the day's local midnight.
+ * `dayStartMs` is the day's local midnight. Where the change falls at midnight itself (Havana, 00:00 →
+ * 01:00) there is no such instant: `dateStrMidnightInTz` returns the hour before, which does not read
+ * 00:00 on the clock, and the skip is the day's first hour (`{ fromMin: 0, toMin: 60 }`).
  */
 export function clockSkipOnDay(dayStartMs: number, tz = DEFAULT_TZ): ClockSkip | null {
   const startOffset = utcOffsetMin(dayStartMs, tz)
@@ -188,6 +190,7 @@ export function clockSkipOnDay(dayStartMs: number, tz = DEFAULT_TZ): ClockSkip |
     const offset = utcOffsetMin(t, tz)
     if (offset !== before) {
       if (offset < before) return null
+      if (formatInTimeZone(new Date(dayStartMs), tz, 'HH:mm') !== '00:00') return { fromMin: 0, toMin: offset - before }
       return { fromMin: Math.floor((t - dayStartMs) / 60_000) + (before - startOffset), toMin: Math.floor((t - dayStartMs) / 60_000) + (offset - startOffset) }
     }
   }

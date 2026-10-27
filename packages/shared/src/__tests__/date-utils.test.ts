@@ -418,6 +418,10 @@ describe('clockSkipOnDay / closeClockSkip (#3445)', () => {
     expect(clockSkipOnDay(start('2027-04-04', 'Australia/Sydney'), 'Australia/Sydney')).toBeNull()
     expect(clockSkipOnDay(start('2026-10-04', 'Australia/Brisbane'), 'Australia/Brisbane')).toBeNull()
   })
+  it('names the first hour as the skip where the change falls at midnight (Havana, #3466)', () => {
+    expect(clockSkipOnDay(start('2026-03-08', 'America/Havana'), 'America/Havana')).toEqual({ fromMin: 0, toMin: 60 })
+    expect(clockSkipOnDay(start('2026-03-09', 'America/Havana'), 'America/Havana')).toBeNull()
+  })
   it('finds the half-hour skip of Lord Howe', () => {
     expect(clockSkipOnDay(start('2026-10-04', 'Australia/Lord_Howe'), 'Australia/Lord_Howe')).toEqual({ fromMin: 120, toMin: 150 })
   })

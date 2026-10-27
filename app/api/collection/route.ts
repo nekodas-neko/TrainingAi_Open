@@ -34,7 +34,7 @@ import {
  * **RV-63 proposed a date floor and it is deliberately NOT taken.** `replayCollection` walks every
  * recorded day forward from the beginning; a floor would silently change what the ladder reports for
  * anyone with history behind it, which is a behaviour change wearing a performance fix's clothes.
- * The growth the entry is right to worry about is addressed by the reads being one column wide
+ * The growth the entry is right to worry about is addressed by the reads being two columns wide (date and steps)
  * rather than by seeing less history — see `listStepTotals`.
  */
 const HISTORY_START = '2000-01-01'
