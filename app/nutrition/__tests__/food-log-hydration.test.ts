@@ -93,10 +93,14 @@ describe('food-log hydration carries the meal grouping', () => {
     expect(toLocalFoodItems([log()], '2026-08-31T08:00:00.000Z')).toHaveLength(1)
   })
 
-  it('skips a food the server has retired, even when no retired id is remembered (#3486)', () => {
+  it('carries the server\'s retirement of a food, so applyDelta hides it but its log still draws (#3486)', () => {
     const retired = log({ id: 'log-2', foodItemId: 'item-2', foodItem: { ...log().foodItem, deletedAt: '2026-10-10T10:05:00.000Z' } })
     const live = log({ id: 'log-3', foodItemId: 'item-3', foodItem: { ...log().foodItem, deletedAt: null } })
     const rows = toLocalFoodItems([log(), retired, live], '2026-08-31T08:00:00.000Z')
-    expect(rows.map(r => r.id)).toEqual(['item-1', 'item-3'])
+    expect(rows.map(r => r.id)).toEqual(['item-1', 'item-2', 'item-3'])
+    expect(rows[1].deletedAt).toBe('2026-10-10T10:05:00.000Z')
+    // A live food carries no `deletedAt` key, so the upsert never reads it as a revival.
+    expect('deletedAt' in rows[0]).toBe(false)
+    expect('deletedAt' in rows[2]).toBe(false)
   })
 })

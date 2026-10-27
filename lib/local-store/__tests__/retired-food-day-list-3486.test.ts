@@ -4,7 +4,8 @@
 // #3474 protects nothing once the device has dropped the food. If another device then logs against
 // the retired food, opening that day re-created it as a live row, and no later pull re-sent its
 // tombstone (its `deleted_at` never changed, and the food query follows logs, which now point at the
-// keeper). The server's day list now carries each food's `deletedAt`, and the hydrate skips it.
+// keeper). The server's day list now carries each food's `deletedAt`, and the hydrate passes it on,
+// so `applyDelta` hides the food but keeps its row while the straggler log points at it.
 //
 // End to end: the real merge job, `getSyncDelta`, `listFoodLogs`, `pullDelta` and the day-list
 // hydrate against the shipped `SQLiteLocalStore` on in-memory node:sqlite. Only the HTTP hop is
@@ -111,12 +112,15 @@ describe.skipIf(!canRun)('a retired food does not return through the day-list hy
     // 2. Another device, still holding the old food, pushes a log on it.
     const straggler = await addLog(extra)
 
-    // 3. Device B opens that day. The day list carries the food's retirement, and the hydrate skips it.
+    // 3. Device B opens that day. The day list carries the food's retirement and the hydrate passes it
+    // on: the food stays out of search, but its row is kept so the straggler log still draws.
     const server = await openDay(store)
     const row = server.find(l => l.id === straggler)!
     expect(row.foodItem.deletedAt).toBeTruthy()
     expect(server.find(l => l.foodItemId === keeper)!.foodItem.deletedAt).toBeNull()
     expect((await store.searchFoodItems('granola')).map(f => f.id)).toEqual([keeper])
+    expect((await store.getFoodLogsWithItems(DAY)).map(l => l.id)).toContain(straggler)
+    expect(await store.getRetiredFoodIds()).toEqual([extra])
 
     // 4. A second merge moves the straggler; device B pulls it. Search still shows only the keeper.
     await sleep(10)
@@ -126,6 +130,8 @@ describe.skipIf(!canRun)('a retired food does not return through the day-list hy
     await pullDelta(USER, true)
     await openDay(store)
     expect((await store.searchFoodItems('granola')).map(f => f.id)).toEqual([keeper])
+    expect(await store.getRetiredFoodIds()).toEqual([])
+    expect((await store.getFoodLogsWithItems(DAY)).map(l => l.id)).toContain(straggler)
     const { rows: [moved] } = await pool.query(`SELECT food_item_id FROM food_logs WHERE id = $1`, [straggler])
     expect(moved.food_item_id).toBe(keeper)
   })
