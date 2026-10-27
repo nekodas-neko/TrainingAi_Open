@@ -305,6 +305,11 @@ records `succeeded` with `affected_rows` and `days_moved` only, and a run that s
 `succeeded`. Read `report.groups[].result.skipped` (and `report.skipped` under `only: 'exact'`) when
 posting a run's counts (#3486).
 
+**Rolling a merge back by hand (#3489).** Clearing `food_items.deleted_at` in SQL puts the food back on
+the server only. A device that already pulled the tombstone keeps the food hidden, and a stale day list
+can retire it again, until the food is re-sent live (a pull that carries it with `deletedAt: null`).
+Nothing in the app clears `deleted_at`, so this only arises from a manual rollback.
+
 `stress-backfill` answers **202** with a job id; poll `GET /api/agent-actions?job=stress-backfill&jobId=N`
 (same key). Its log row is finished when the job ends. The job slot rules hold: another kind
 running is a **409**, logged as `refused`.
