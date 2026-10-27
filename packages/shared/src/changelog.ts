@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.509.0",
+    date: "2026-10-27",
+    changes: [
+      "Behind the scenes: the phone's list of merged-away foods can no longer lose an entry when a sync and a day's food list update it at the same moment, and signing out now stops a waiting sync before the wipe starts.",
+    ],
+  },
+  {
     version: "1.508.0",
     date: "2026-10-27",
     changes: [
