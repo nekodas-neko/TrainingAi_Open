@@ -1747,7 +1747,8 @@ SELECT
   t.source_map,
   t.manual_sleep_start,
   t.manual_entry,
-  t.deleted_at
+  t.deleted_at,
+  t.partial_night_at
 FROM public.sleep_sessions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
