@@ -13,7 +13,7 @@ test('every Home card tint is the current app default', async () => {
     new URL('../../app/session-select/constants.ts', import.meta.url),
     'utf8',
   );
-  const block = web.slice(web.indexOf('CARD_DEFAULT_COLORS'));
+  const block = web.slice(web.indexOf('weightSparkline'));
   const expected = Object.fromEntries(
     [...block.matchAll(/^\s*(\w+):\s*"([^"]+)"/gm)].map((m) => [m[1], m[2]]),
   );
