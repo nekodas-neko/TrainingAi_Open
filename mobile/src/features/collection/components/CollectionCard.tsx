@@ -54,9 +54,6 @@ export function CollectionCard({
               <AppText
                 variant="caption"
                 tone="brand"
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.85}
                 style={{ fontWeight: '600' }}
               >
                 {model.restless}

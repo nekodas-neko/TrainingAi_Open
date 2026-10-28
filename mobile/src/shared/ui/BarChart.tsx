@@ -36,6 +36,7 @@ export function BarChart({
   tickCount,
   formatTick,
   labelGap = 0,
+  labelWeight,
 }: {
   label: string;
   height?: number;
@@ -54,6 +55,8 @@ export function BarChart({
   formatTick?: (value: number) => string;
   /** Space between the bars and their labels (chart.js pads its x ticks by a few px). */
   labelGap?: number;
+  /** Weight of the bar labels; unset keeps the text variant's own. */
+  labelWeight?: '400' | '500' | '600' | '700';
   bars: readonly {
     label: string;
     /** What a screen reader says for this bar when the visible label is not enough ("M" → "Monday"). */
@@ -146,7 +149,7 @@ export function BarChart({
             <AppText
               variant={readable ? 'caption' : 'micro'}
               tone={bar.selected ? 'brand' : readable ? 'text' : 'muted'}
-              style={{ textAlign: 'center', marginTop: labelGap }}
+              style={{ textAlign: 'center', marginTop: labelGap, ...(labelWeight ? { fontWeight: labelWeight } : null) }}
             >
               {bar.label}
               {bar.annotation ? ` (${bar.annotation})` : ''}

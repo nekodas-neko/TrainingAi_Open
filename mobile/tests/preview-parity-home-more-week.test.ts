@@ -4,10 +4,10 @@ import { test } from 'node:test';
 
 const read = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
 
-test('Week in review draws the Recovery sparklines as straight segments with dots (#2935)', () => {
+test('Week in review draws the Recovery sparklines gently curved, with dots (#2935)', () => {
   const tile = read('features/health/components/WeekMetricTile.tsx');
   assert.match(tile, /dots="all"/);
-  assert.doesNotMatch(tile, /^\s*smooth\s*$/m);
+  assert.match(tile, /tension=\{0\.3\}/);
 });
 
 test('the Training chart sets its weekday letters off the bars and in the web chart\'s muted 10 px', () => {
@@ -15,11 +15,13 @@ test('the Training chart sets its weekday letters off the bars and in the web ch
   const chart = screen.slice(screen.indexOf('<BarChart'), screen.indexOf('/>', screen.indexOf('<BarChart')));
   assert.match(chart, /labelGap=/);
   assert.doesNotMatch(chart, /readable/);
+  assert.match(chart, /labelGap=\{11\}/);
+  assert.match(chart, /labelWeight="400"/);
 });
 
 test('Muscle volume\'s title is the small-capitals card title', () => {
   const screen = read('features/health/screens/HealthWeekScreen.tsx');
-  assert.match(screen, /variant="cardTitle" tone="muted" style=\{\{ flex: 1 \}\}>\s*Muscle volume this week/);
+  assert.match(screen, /variant="cardTitle" tone="muted" accessibilityRole="header" style=\{\{ flex: 1 \}\}>\s*Muscle volume this week/);
 });
 
 test('Achievements uses the right-pointing chevron that turns down when open (#2902)', () => {
@@ -29,10 +31,10 @@ test('Achievements uses the right-pointing chevron that turns down when open (#2
   assert.match(icon, /'forward'/);
 });
 
-test('the More setup rows are single-line, like the current app\'s', () => {
+test('the device health row is single-line; Devices & connections keeps its caption (#3074)', () => {
   const more = read('features/settings/screens/MoreScreen.tsx');
   assert.doesNotMatch(more, /subtitle="Connection, permissions/);
-  assert.doesNotMatch(more, /subtitle="Oura account/);
+  assert.match(more, /subtitle="Oura account, heart-rate strap"/);
 });
 
 test('the Home heart-rate line is neutral unless the card has a colour (#2903)', () => {
@@ -41,7 +43,12 @@ test('the Home heart-rate line is neutral unless the card has a colour (#2903)',
   assert.match(card, /color=\{hrColor\}/);
 });
 
-test('the Collection card\'s restless note stays on one line (#2903)', () => {
+test('the Collection card\'s restless note wraps rather than cutting off (#2903)', () => {
   const card = read('features/collection/components/CollectionCard.tsx');
-  assert.match(card, /numberOfLines=\{1\}\s*adjustsFontSizeToFit/);
+  assert.doesNotMatch(card, /adjustsFontSizeToFit/);
+  assert.doesNotMatch(card, /minimumFontScale/);
+});
+
+test('the muscle volume rows keep the web\'s 48 px touch floor', () => {
+  assert.match(read('features/health/components/MuscleVolumeFigure.tsx'), /minHeight: theme\.sizes\.touchTarget/);
 });
