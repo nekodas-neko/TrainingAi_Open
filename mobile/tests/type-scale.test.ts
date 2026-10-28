@@ -117,6 +117,12 @@ const currentApp: Record<string, Expected> = {
     source: 'text-[10px] font-semibold uppercase tracking-widest (more-row.tsx group labels)',
   },
   body: { fontSize: 14, lineHeight: 20, fontWeight: undefined, source: 'text-sm' },
+  bodyRelaxed: {
+    fontSize: 14,
+    lineHeight: 22.75,
+    fontWeight: undefined,
+    source: 'week-detail-content.tsx Your week paragraph, text-sm leading-relaxed',
+  },
   label: { fontSize: 14, lineHeight: 20, fontWeight: '400', source: 'more-row.tsx row label, text-sm' },
   button: {
     fontSize: 14,

@@ -130,6 +130,8 @@ export const typography = {
   },
   // text-sm: body copy and descriptions.
   body: { fontSize: 14, lineHeight: 20 },
+  // text-sm leading-relaxed: a flowed paragraph, 1.625 x 14 px (the "Your week" digest).
+  bodyRelaxed: { fontSize: 14, lineHeight: 22.75 },
   // Typed text: the current app forces 16 px on every input (globals.css) so focusing never zooms.
   input: { fontSize: 16, lineHeight: 24 },
   // text-sm: a row or list label, at regular weight as the current app draws it.
