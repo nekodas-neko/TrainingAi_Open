@@ -26,3 +26,12 @@ test('a failure shows its message, and another day shows the today-only line', (
   assert.equal(digestCardText({ ...base, error: 'Could not load the day’s summary.' }), 'Could not load the day’s summary.');
   assert.equal(digestCardText({ ...base, isToday: false, answered: true }), DIGEST_TODAY_ONLY);
 });
+
+test('a summary already on screen survives a later failure, and another day never shows one', () => {
+  assert.equal(digestCardText({ ...base, digest: 'x', error: 'Could not load the day’s summary.' }), null);
+  assert.equal(digestCardText({ ...base, isToday: false, digest: 'x' }), DIGEST_TODAY_ONLY);
+});
+
+test('a failure after an empty answer shows the failure', () => {
+  assert.equal(digestCardText({ ...base, answered: true, error: 'Could not load the day’s summary.' }), 'Could not load the day’s summary.');
+});

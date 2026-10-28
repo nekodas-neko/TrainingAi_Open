@@ -152,7 +152,9 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
         const cached = await resources.draft(`nutrition-day-digest:${date}`, schema);
         if (active && cached) {
           setDigest(cached.digest);
-          setDigestAnswered(true);
+          // A cached summary is a real answer; a cached empty one may be stale (a meal logged
+          // since), so only the server's reply may say there is nothing to summarise.
+          if (cached.digest) setDigestAnswered(true);
         }
         const response = schema.parse(await resources.connection.post('/api/daily-digest', {}));
         if (response.date !== date) {
@@ -206,6 +208,12 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
     scales: input.scales,
     soreMuscles: input.soreMuscles,
   });
+  const digestLine = digestCardText({
+    isToday: date === n.today,
+    answered: digestAnswered,
+    digest,
+    error: digestError,
+  });
   return (
     <>
       <Sheet
@@ -252,17 +260,10 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
                 Your day
               </AppText>
               <ScrollView nestedScrollEnabled style={{ flex: 1 }}>
-                {digest && date === n.today ? (
-                  <MarkdownText>{digest}</MarkdownText>
+                {digestLine === null ? (
+                  <MarkdownText>{digest ?? ''}</MarkdownText>
                 ) : (
-                  <AppText tone="muted">
-                    {digestCardText({
-                      isToday: date === n.today,
-                      answered: digestAnswered,
-                      digest,
-                      error: digestError,
-                    })}
-                  </AppText>
+                  <AppText tone="muted">{digestLine}</AppText>
                 )}
               </ScrollView>
             </Card>
