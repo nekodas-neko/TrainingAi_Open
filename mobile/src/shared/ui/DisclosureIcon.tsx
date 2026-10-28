@@ -4,7 +4,16 @@ import { Icon } from './Icon';
 import { useReducedMotion } from './useReducedMotion';
 import { useTheme } from '../theme/ThemeProvider';
 
-export function DisclosureIcon({ expanded, size }: { expanded: boolean; size?: number }) {
+/** `collapsed="right"` is the current app's ChevronRight that turns to point down when open. */
+export function DisclosureIcon({
+  expanded,
+  size,
+  collapsed = 'down',
+}: {
+  expanded: boolean;
+  size?: number;
+  collapsed?: 'down' | 'right';
+}) {
   const { theme } = useTheme();
   const reduced = useReducedMotion();
   const rotation = useRef(new Animated.Value(expanded ? 1 : 0)).current;
@@ -24,13 +33,13 @@ export function DisclosureIcon({ expanded, size }: { expanded: boolean; size?: n
           {
             rotate: rotation.interpolate({
               inputRange: [0, 1],
-              outputRange: ['0deg', '180deg'],
+              outputRange: collapsed === 'right' ? ['0deg', '90deg'] : ['0deg', '180deg'],
             }),
           },
         ],
       }}
     >
-      <Icon name="expand" size={size ?? theme.sizes.iconSmall} tone="muted" />
+      <Icon name={collapsed === 'right' ? 'forward' : 'expand'} size={size ?? theme.sizes.iconSmall} tone="muted" />
     </Animated.View>
   );
 }

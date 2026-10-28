@@ -238,7 +238,6 @@ export function MoreScreen({
                   density="snug"
                   divider={false}
                   title={deviceHealthName}
-                  subtitle="Connection, permissions and data sources"
                   leading={<Icon name="health" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openAppleHealth}
                 />
@@ -246,7 +245,6 @@ export function MoreScreen({
                   density="snug"
                   divider={false}
                   title="Devices & connections"
-                  subtitle="Oura account, heart-rate strap"
                   leading={<Icon name="bluetooth" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openDevices}
                 />

@@ -51,7 +51,14 @@ export function CollectionCard({
           <>
             <CollectionPen collections={collections} />
             {model.restless && (
-              <AppText variant="caption" tone="brand" style={{ fontWeight: '600' }}>
+              <AppText
+                variant="caption"
+                tone="brand"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+                style={{ fontWeight: '600' }}
+              >
                 {model.restless}
               </AppText>
             )}
