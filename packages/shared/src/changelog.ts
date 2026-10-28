@@ -10,6 +10,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-10-28",
     changes: [
       "TrainingAi Preview: Health → Training's calendar title no longer gets cut off; it sits above the month controls.",
+      "TrainingAi Preview: the explainer cards on Readiness, Sleep and Heart rate now look like the current app's, with the same headings, coloured badges and bullet layout.",
       "Behind the scenes: a night can now be marked partial, which keeps its length out of your sleep score and averages while its heart rate, HRV and breathing still count. The button to mark one comes in a later release.",
     ],
   },
