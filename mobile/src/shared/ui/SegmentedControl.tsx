@@ -165,7 +165,7 @@ export function SegmentedControl<T extends string>({
             tone={value === option.value ? 'brand' : 'muted'}
             numberOfLines={1}
             adjustsFontSizeToFit
-            minimumFontScale={0.85}
+            minimumFontScale={0.7}
           >
             {option.label}
           </AppText>

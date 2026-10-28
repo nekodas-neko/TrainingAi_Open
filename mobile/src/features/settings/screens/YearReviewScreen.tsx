@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import { todayInTz } from '@trainingai/shared/date-utils';
 import { lastTwelveMonthLabels } from '../data/year-months';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import {
   AppText,
   Card,
@@ -41,9 +43,10 @@ const schema = z.object({
 });
 export function YearReviewScreen({ onBack }: { onBack: () => void }) {
   const state = useWorkoutResource({ path: '/api/year-review', ttl: 1800000, schema }),
-    { theme } = useTheme();
+    { theme } = useTheme(),
+    { timezone } = useWorkoutContext();
   const data = state.data;
-  const months = lastTwelveMonthLabels(new Date());
+  const months = lastTwelveMonthLabels(todayInTz(timezone));
   return (
     <PageLayout
       title="Your Year"

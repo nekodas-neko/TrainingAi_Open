@@ -11,6 +11,7 @@ export function AppButton({
   busy = false,
   icon,
   iconSize,
+  iconColor,
   disabled = false,
   textVariant = 'button',
   style,
@@ -21,6 +22,8 @@ export function AppButton({
   busy?: boolean;
   icon?: IconName;
   iconSize?: number;
+  /** Colour of the icon when it should differ from the label (the web's muted End of Day moon). */
+  iconColor?: string;
   textVariant?: TextVariant;
 }) {
   const { theme } = useTheme();
@@ -74,7 +77,7 @@ export function AppButton({
       <Stack direction="row" align="center">
         {busy && <ActivityIndicator color={foreground} />}
         {icon && !busy && (
-          <Icon name={icon} color={foreground} size={iconSize ?? theme.sizes.iconSmall} />
+          <Icon name={icon} color={blocked ? foreground : (iconColor ?? foreground)} size={iconSize ?? theme.sizes.iconSmall} />
         )}
         {title.length > 0 && (
           <AppText

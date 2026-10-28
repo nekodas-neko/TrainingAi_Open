@@ -102,7 +102,12 @@ export function SupplementsSection({ date }: { date: string }) {
             Supplements
           </AppText>
           <Stack direction="row" align="center" gap="none">
-            {statusShown && <StatusIndicator label="Supplements" error={error} busy={n.syncing} />}
+            {statusShown && (
+              // The indicator's 48 dp slot mounts only while syncing; drawn over the row's spacing so a tick never moves the rows below.
+              <View style={{ marginVertical: -theme.spacing.sm }}>
+                <StatusIndicator label="Supplements" error={error} busy={n.syncing} />
+              </View>
+            )}
             {/* text-[10px] with a 12 px gear; the hit area is the 48 px floor, drawn over the row's
                 spacing so the header keeps the current app's height. */}
             <Pressable
@@ -197,7 +202,7 @@ export function SupplementsSection({ date }: { date: string }) {
                     borderLeftColor: theme.colors.border,
                   }}
                 >
-                  <Icon name="syringe" tone="muted" size={theme.sizes.iconSmall} />
+                  <Icon name="syringe" tone="muted" size={theme.sizes.iconCompact} />
                 </Pressable>
               )}
             </View>

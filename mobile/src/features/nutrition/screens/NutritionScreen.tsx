@@ -491,6 +491,8 @@ export function NutritionScreen({
               <AppButton
                 title="End of Day"
                 icon="moon"
+                iconSize={theme.sizes.iconCompact}
+                iconColor={theme.colors.muted}
                 variant="surface"
                 onPress={() => setModal('review')}
               />

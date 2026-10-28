@@ -160,7 +160,7 @@ export function ActiveMealPlan({
   }
   return (
     <>
-      {overdue && plan && (
+      {overdue && (
         <Card>
           <AppText variant="heading">Time to review your meal plan</AppText>
           <AppText tone="muted">
@@ -188,7 +188,7 @@ export function ActiveMealPlan({
           </Stack>
         </Card>
       )}
-      {plan && variant && onLogFood && (
+      {onLogFood && (
         <EstimatedMeals
           date={date}
           n={n}
@@ -199,149 +199,147 @@ export function ActiveMealPlan({
         />
       )}
       <Card>
-        {plan && variant ? (
-          <>
-            <Stack direction="row" align="center" justify="space-between">
-              <AppText variant="heading" style={{ flex: 1 }}>
-                {plan.name}
-              </AppText>
-              <StatusIndicator
-                label="Active meal plan"
-                busy={busy || state.loading}
-                error={error ?? state.error}
-                onRetry={state.refresh}
-              />
-            </Stack>
-            <MacroLine
-              value={{
-                calories: variant.targetCalories,
-                proteinG: variant.targetProteinG,
-                carbsG: variant.targetCarbsG,
-                fatG: variant.targetFatG,
-              }}
-            />
-            {plan.variants.some((v) => v.dayType !== 'all') && (
-              <AppText variant="caption" tone="muted">
-                {knownTraining === undefined
-                  ? 'Day type unknown · showing rest-day plan'
-                  : knownTraining
-                    ? 'Training-day plan'
-                    : 'Rest-day plan'}
-              </AppText>
-            )}
-            <AppText variant="caption" tone="muted">
-              Planned meals count only when you confirm what you ate. Unrecorded and skipped
-              meals are excluded.
+        <>
+          <Stack direction="row" align="center" justify="space-between">
+            <AppText variant="heading" style={{ flex: 1 }}>
+              {plan.name}
             </AppText>
-            {!!eligible.length && (
-              <AppButton
-                title="Log planned meals I ate"
-                variant="secondary"
-                busy={busy}
-                onPress={() =>
-                  void action(async () => {
-                    for (const m of eligible) {
-                      await logPlanMeal(n, m, date, plan);
-                    }
-                  })
-                }
-              />
-            )}
-            <AppButton
-              title={expanded ? 'Hide planned meals' : 'Show planned meals'}
-              variant="surface"
-              onPress={() => setExpanded(!expanded)}
+            <StatusIndicator
+              label="Active meal plan"
+              busy={busy || state.loading}
+              error={error ?? state.error}
+              onRetry={state.refresh}
             />
-            {expanded &&
-              variant.meals.map((m) => {
-                const saved = m.id ? (n.view.planLinks[m.id] ?? m.savedMealId) : m.savedMealId;
-                return (
-                  <Card key={m.id ?? m.position}>
-                    <AppText variant="label">{m.name}</AppText>
-                    <AppText variant="caption" tone="muted">
-                      {m.suggestedTime ?? ''} · {m.targetCalories} kcal target
-                    </AppText>
-                    <Badge
-                      label={
-                        logged(m)
-                          ? 'Logged'
-                          : skipped(m)
-                            ? 'Skipped'
-                            : declined(m)
-                              ? 'Not this meal'
-                              : answer(m)?.answer === 'estimated'
-                                ? 'Not recorded · estimated'
-                                : 'Planned'
+          </Stack>
+          <MacroLine
+            value={{
+              calories: variant.targetCalories,
+              proteinG: variant.targetProteinG,
+              carbsG: variant.targetCarbsG,
+              fatG: variant.targetFatG,
+            }}
+          />
+          {plan.variants.some((v) => v.dayType !== 'all') && (
+            <AppText variant="caption" tone="muted">
+              {knownTraining === undefined
+                ? 'Day type unknown · showing rest-day plan'
+                : knownTraining
+                  ? 'Training-day plan'
+                  : 'Rest-day plan'}
+            </AppText>
+          )}
+          <AppText variant="caption" tone="muted">
+            Planned meals count only when you confirm what you ate. Unrecorded and skipped
+            meals are excluded.
+          </AppText>
+          {!!eligible.length && (
+            <AppButton
+              title="Log planned meals I ate"
+              variant="secondary"
+              busy={busy}
+              onPress={() =>
+                void action(async () => {
+                  for (const m of eligible) {
+                    await logPlanMeal(n, m, date, plan);
+                  }
+                })
+              }
+            />
+          )}
+          <AppButton
+            title={expanded ? 'Hide planned meals' : 'Show planned meals'}
+            variant="surface"
+            onPress={() => setExpanded(!expanded)}
+          />
+          {expanded &&
+            variant.meals.map((m) => {
+              const saved = m.id ? (n.view.planLinks[m.id] ?? m.savedMealId) : m.savedMealId;
+              return (
+                <Card key={m.id ?? m.position}>
+                  <AppText variant="label">{m.name}</AppText>
+                  <AppText variant="caption" tone="muted">
+                    {m.suggestedTime ?? ''} · {m.targetCalories} kcal target
+                  </AppText>
+                  <Badge
+                    label={
+                      logged(m)
+                        ? 'Logged'
+                        : skipped(m)
+                          ? 'Skipped'
+                          : declined(m)
+                            ? 'Not this meal'
+                            : answer(m)?.answer === 'estimated'
+                              ? 'Not recorded · estimated'
+                              : 'Planned'
+                    }
+                  />
+                  <Stack direction="row" wrap>
+                    <AppButton
+                      title={logged(m) ? 'Logged' : 'I ate this'}
+                      variant="secondary"
+                      busy={busy}
+                      disabled={logged(m) || skipped(m) || !m.ingredients.length}
+                      onPress={() => void action(() => logPlanMeal(n, m, date, plan))}
+                    />
+                    <AppButton
+                      title={declined(m) ? 'Undo decline' : 'Not this meal'}
+                      variant="ghost"
+                      busy={busy}
+                      disabled={logged(m) || !m.id}
+                      onPress={() =>
+                        void action(() =>
+                          n.store!.enqueue([
+                            {
+                              domain: 'plan_meal_answers',
+                              date,
+                              payload: {
+                                planMealId: m.id!,
+                                logDate: date,
+                                ...(declined(m) ? { deleted: true } : {}),
+                              },
+                            },
+                          ]),
+                        )
                       }
                     />
-                    <Stack direction="row" wrap>
-                      <AppButton
-                        title={logged(m) ? 'Logged' : 'I ate this'}
-                        variant="secondary"
-                        busy={busy}
-                        disabled={logged(m) || skipped(m) || !m.ingredients.length}
-                        onPress={() => void action(() => logPlanMeal(n, m, date, plan))}
-                      />
-                      <AppButton
-                        title={declined(m) ? 'Undo decline' : 'Not this meal'}
-                        variant="ghost"
-                        busy={busy}
-                        disabled={logged(m) || !m.id}
-                        onPress={() =>
-                          void action(() =>
-                            n.store!.enqueue([
-                              {
-                                domain: 'plan_meal_answers',
-                                date,
-                                payload: {
-                                  planMealId: m.id!,
-                                  logDate: date,
-                                  ...(declined(m) ? { deleted: true } : {}),
-                                },
-                              },
-                            ]),
-                          )
-                        }
-                      />
-                      <AppButton
-                        title={
-                          saved && n.view.meals.some((x) => x.id === saved)
-                            ? 'In My Foods'
-                            : 'Save'
-                        }
-                        variant="ghost"
-                        busy={busy}
-                        disabled={!!saved && n.view.meals.some((x) => x.id === saved)}
-                        onPress={() => void action(() => savePlanMeal(n, m))}
-                      />
-                    </Stack>
-                    <Disclosure title="Ingredients">
-                      {m.ingredients.map((i, index) => (
-                        <AppText key={index} variant="caption">
-                          {i.name} · {i.weightG} g
-                        </AppText>
-                      ))}
-                    </Disclosure>
-                  </Card>
-                );
-              })}
-            {expanded && (
-              <AppButton
-                title="Save all to My Foods"
-                variant="secondary"
-                busy={busy}
-                onPress={() =>
-                  void action(async () => {
-                    for (const m of variant.meals) {
-                      await savePlanMeal(n, m);
-                    }
-                  })
-                }
-              />
-            )}
-            <AppButton title="Manage plan" variant="surface" onPress={() => onManage(plan)} />
-          </>
-        ) : null}
+                    <AppButton
+                      title={
+                        saved && n.view.meals.some((x) => x.id === saved)
+                          ? 'In My Foods'
+                          : 'Save'
+                      }
+                      variant="ghost"
+                      busy={busy}
+                      disabled={!!saved && n.view.meals.some((x) => x.id === saved)}
+                      onPress={() => void action(() => savePlanMeal(n, m))}
+                    />
+                  </Stack>
+                  <Disclosure title="Ingredients">
+                    {m.ingredients.map((i, index) => (
+                      <AppText key={index} variant="caption">
+                        {i.name} · {i.weightG} g
+                      </AppText>
+                    ))}
+                  </Disclosure>
+                </Card>
+              );
+            })}
+          {expanded && (
+            <AppButton
+              title="Save all to My Foods"
+              variant="secondary"
+              busy={busy}
+              onPress={() =>
+                void action(async () => {
+                  for (const m of variant.meals) {
+                    await savePlanMeal(n, m);
+                  }
+                })
+              }
+            />
+          )}
+          <AppButton title="Manage plan" variant="surface" onPress={() => onManage(plan)} />
+        </>
       </Card>
     </>
   );
@@ -392,6 +390,7 @@ function BuildPlanPrompt({
           style={{
             minHeight: theme.sizes.touchTarget,
             justifyContent: 'center',
+            alignItems: 'center',
             paddingHorizontal: theme.spacing.lg,
           }}
         >
