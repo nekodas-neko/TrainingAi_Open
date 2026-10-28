@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { AppText, Card, Stack, ZoneGauge } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { BULLET_GLYPH, bulletLayout, explainerBadge } from '../data/explainer-card';
+import { scaleAlpha } from '../../../shared/theme/alpha';
+import { BULLET_GLYPH, bulletLayout, explainerBadge, explainerShape } from '../data/explainer-card';
 
 // The explainer the current app shows under a score (contributor-details.tsx and
 // contributor-detail.tsx): one card per factor with its name, a coloured band badge, a zone gauge,
@@ -11,6 +12,7 @@ import { BULLET_GLYPH, bulletLayout, explainerBadge } from '../data/explainer-ca
 export function ExplainerCard({
   label,
   score,
+  learning = false,
   gauge,
   measures,
   against,
@@ -20,8 +22,10 @@ export function ExplainerCard({
   footer,
 }: {
   label: string;
-  /** The factor's 0-100 score; null when it is learning or unscored (no badge, no gauge). */
+  /** The factor's 0-100 score; null when nothing was recorded (no badge, no gauge, no meaning heading). */
   score: number | null;
+  /** A scored factor still settling against its baseline: no badge or gauge, but it keeps its heading. */
+  learning?: boolean;
   /** Gauge marker 0-100 for a middle-is-best metric; omitted draws a toward-high gauge from the score. */
   gauge?: number;
   measures: string;
@@ -33,11 +37,12 @@ export function ExplainerCard({
   footer?: string;
 }) {
   const { theme } = useTheme();
-  const badge = explainerBadge(score, theme.status);
+  const shape = explainerShape({ score, learning, gauge });
+  const badge = shape.badge ? explainerBadge(score, theme.status) : null;
   return (
     <Card>
       <Stack direction="row" justify="space-between" align="baseline">
-        <AppText variant="subheading" style={{ flex: 1 }}>
+        <AppText variant="subheading" accessibilityRole="header" style={{ flex: 1 }}>
           {label}
         </AppText>
         {badge && (
@@ -46,19 +51,27 @@ export function ExplainerCard({
           </AppText>
         )}
       </Stack>
-      {gauge != null ? <ZoneGauge centered value={gauge} /> : badge ? <ZoneGauge value={score!} /> : null}
+      {shape.gauge === 'centered' ? (
+        <ZoneGauge centered value={gauge!} />
+      ) : shape.gauge === 'toward-high' ? (
+        <ZoneGauge value={score!} />
+      ) : null}
       <View style={{ gap: theme.spacing.snug }}>
         <Field title="What it measures">{measures}</Field>
         <Field title="Measured against">{against}</Field>
-        {extra && <Field title="Your values">{extra}</Field>}
-        {score != null ? (
+        {extra && (
+          <Field title="Your values" tabular>
+            {extra}
+          </Field>
+        )}
+        {shape.meaningHeading ? (
           <Field title="What your score means">{meaning}</Field>
         ) : (
           <AppText variant="explainerBody" tone="muted">
             {meaning}
           </AppText>
         )}
-        <View style={{ gap: theme.spacing.xxs }}>
+        <View style={{ gap: theme.spacing.xs }}>
           <AppText variant="explainerLabel" tone="muted">
             How to improve it
           </AppText>
@@ -69,7 +82,8 @@ export function ExplainerCard({
           </View>
         </View>
         {footer && (
-          <AppText variant="explainerBody" tone="muted">
+          // readiness-breakdown.tsx: text-[10px] text-muted-foreground/70.
+          <AppText variant="explainerFooter" style={{ color: scaleAlpha(theme.colors.muted, 0.7) }}>
             {footer}
           </AppText>
         )}
@@ -78,14 +92,26 @@ export function ExplainerCard({
   );
 }
 
-function Field({ title, children }: { title: string; children: ReactNode }) {
+function Field({
+  title,
+  children,
+  tabular = false,
+}: {
+  title: string;
+  children: ReactNode;
+  tabular?: boolean;
+}) {
   const { theme } = useTheme();
   return (
     <View style={{ gap: theme.spacing.xxs }}>
       <AppText variant="explainerLabel" tone="muted">
         {title}
       </AppText>
-      <AppText variant="explainerBody" tone="muted">
+      <AppText
+        variant="explainerBody"
+        tone="muted"
+        style={tabular ? { fontVariant: ['tabular-nums'] } : undefined}
+      >
         {children}
       </AppText>
     </View>
@@ -98,7 +124,10 @@ function Bullet({ children }: { children: ReactNode }) {
   const layout = bulletLayout(theme.spacing.lg);
   return (
     <View style={layout.row}>
-      <AppText variant="explainerBody" tone="muted" style={layout.dot} accessibilityElementsHidden>
+      <AppText variant="explainerBody" tone="muted" style={layout.dot}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
         {BULLET_GLYPH}
       </AppText>
       <AppText variant="explainerBody" tone="muted" style={layout.text}>
