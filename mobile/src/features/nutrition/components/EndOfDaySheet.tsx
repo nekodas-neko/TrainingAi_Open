@@ -39,6 +39,7 @@ import { DayReviewTrends, MealBackfill } from './DayReviewDetails';
 import { FoodLogger } from './FoodLogger';
 import { DayTotals } from './DayTotals';
 import { aiFailureText } from '../../account/api/client';
+import { digestCardText } from '../data/day-digest';
 import { failureNotice } from '../../../core/reporting/index.ts';
 const scalesSchema = z.object({
   physicalTiredness: z.number().min(1).max(5),
@@ -77,6 +78,7 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
   const [index, setIndex] = useState(0);
   const [logger, setLogger] = useState<string | null>(null);
   const [digest, setDigest] = useState<string | null>(null);
+  const [digestAnswered, setDigestAnswered] = useState(false);
   const [digestError, setDigestError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -150,6 +152,7 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
         const cached = await resources.draft(`nutrition-day-digest:${date}`, schema);
         if (active && cached) {
           setDigest(cached.digest);
+          setDigestAnswered(true);
         }
         const response = schema.parse(await resources.connection.post('/api/daily-digest', {}));
         if (response.date !== date) {
@@ -158,6 +161,7 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
         await resources.saveDraft(`nutrition-day-digest:${date}`, response);
         if (active) {
           setDigest(response.digest);
+          setDigestAnswered(true);
         }
       } catch (cause) {
         if (active) {
@@ -248,13 +252,16 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
                 Your day
               </AppText>
               <ScrollView nestedScrollEnabled style={{ flex: 1 }}>
-                {digest ? (
+                {digest && date === n.today ? (
                   <MarkdownText>{digest}</MarkdownText>
                 ) : (
                   <AppText tone="muted">
-                    {date !== n.today
-                      ? 'The daily digest is available for today.'
-                      : (digestError ?? 'Preparing your day’s summary…')}
+                    {digestCardText({
+                      isToday: date === n.today,
+                      answered: digestAnswered,
+                      digest,
+                      error: digestError,
+                    })}
                   </AppText>
                 )}
               </ScrollView>
