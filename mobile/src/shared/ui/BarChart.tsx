@@ -147,6 +147,9 @@ export function BarChart({
               )}
             </Svg>
             <AppText
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
               variant={readable ? 'caption' : 'micro'}
               tone={bar.selected ? 'brand' : readable ? 'text' : 'muted'}
               style={{ textAlign: 'center', marginTop: labelGap, ...(labelWeight ? { fontWeight: labelWeight } : null) }}

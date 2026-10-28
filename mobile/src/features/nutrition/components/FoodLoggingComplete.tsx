@@ -60,10 +60,10 @@ export function FoodLoggingComplete({
     <Card>
       {complete ? (
         <Stack direction="row" align="center">
-          <Icon name="check" color={theme.colors.brand} />
+          <Icon name="check" color={theme.colors.brand} size={theme.sizes.iconSmall} />
           <Stack gap="xs" style={{ flex: 1 }}>
-            <AppText variant="label">Logging finished{isToday ? ' for today' : ''}</AppText>
-            <AppText variant="caption" tone="muted">
+            <AppText variant="subheading">Logging finished{isToday ? ' for today' : ''}</AppText>
+            <AppText variant="explainerBody" tone="muted">
               {markedDayNote(isToday)}
               {time ? ` · marked ${time}` : ''}
             </AppText>
@@ -73,12 +73,12 @@ export function FoodLoggingComplete({
       ) : (
         <>
           <Stack direction="row" align="flex-start">
-            <Icon name="sets" tone="muted" />
+            <Icon name="sets" tone="muted" size={theme.sizes.iconSmall} />
             <Stack gap="xs" style={{ flex: 1 }}>
-              <AppText variant="label">
+              <AppText variant="subheading">
                 Finished logging{isToday ? ' for today' : ' this day'}?
               </AppText>
-              <AppText variant="caption" tone="muted">
+              <AppText variant="explainerBody" tone="muted">
                 Only days you mark are used to work out what you burn. A day you stop logging
                 halfway through would otherwise look like a light day and drag the estimate down.
               </AppText>
@@ -86,6 +86,7 @@ export function FoodLoggingComplete({
           </Stack>
           <AppButton
             title={loaded ? 'I’ve finished logging' : ''}
+            variant="neutral"
             busy={busy || !loaded}
             onPress={() => void set(true)}
           />
@@ -104,9 +105,9 @@ export function FoodLoggingComplete({
             paddingTop: theme.spacing.sm,
           }}
         >
-          <AppText variant="caption" tone="muted">
+          <AppText variant="explainerBody" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
             <AppText
-              variant="caption"
+              variant="explainerBody"
               style={{ fontWeight: theme.typography.subheading.fontWeight }}
             >
               {progress.count}

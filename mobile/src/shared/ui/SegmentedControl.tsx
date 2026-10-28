@@ -150,7 +150,8 @@ export function SegmentedControl<T extends string>({
           style={{
             flex: 1,
             minHeight: theme.sizes.control,
-            padding: theme.spacing.sm,
+            paddingVertical: theme.spacing.sm,
+            paddingHorizontal: theme.spacing.xs,
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: theme.radii.small,
@@ -158,7 +159,14 @@ export function SegmentedControl<T extends string>({
               !animated && value === option.value ? theme.colors.brandSurface : 'transparent',
           }}
         >
-          <AppText variant="subheading" tone={value === option.value ? 'brand' : 'muted'}>
+          {/* One line whatever the label: three equal cells leave "Feature Request" about 100 px. */}
+          <AppText
+            variant="subheading"
+            tone={value === option.value ? 'brand' : 'muted'}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
             {option.label}
           </AppText>
         </Pressable>

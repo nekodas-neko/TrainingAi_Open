@@ -149,6 +149,15 @@ export const typography = {
     textTransform: 'uppercase',
   },
   metric: { fontSize: 24, lineHeight: 30, fontWeight: '700' },
+  // energy-card.tsx: the calorie ring's centre, text-[22px] font-bold leading-none tracking-tight over
+  // a text-[9.5px] uppercase tracking-wider caption.
+  energyRingValue: { fontSize: 22, lineHeight: 22, fontWeight: '700', letterSpacing: -0.55 },
+  energyRingCaption: {
+    fontSize: 9.5,
+    lineHeight: 14.25,
+    letterSpacing: 0.475,
+    textTransform: 'uppercase',
+  },
   // bottom-nav.tsx: text-[10px] font-medium.
   tab: { fontSize: 10, lineHeight: 15, fontWeight: '500' },
   // screen-header.tsx: text-xl font-bold, the title of every tab page.
