@@ -4,6 +4,7 @@
 import type { SleepSession } from '@trainingai/shared/types/body'
 import { computeSleepScoreSeries } from '@trainingai/shared/health/sleep-score'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightsWithDuration } from '@trainingai/shared/health/partial-night'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 // Ratio of the newest-3 values to the mean of the next-up-to-7 older values.
@@ -35,7 +36,8 @@ function newestFirst(sessions: SleepSession[]): SleepSession[] {
  * replaced, and it manufactured exactly the deficit it was supposed to detect.
  */
 export function sleepDurationTrend(sessions: SleepSession[], tz: string = DEFAULT_TZ): number | null {
-  return ratioTrend(newestFirst(nightSessions(sessions, tz)).map(s => s.durationHours ?? 0))
+  // #2265: a night the owner marked partial has no hours to trend, so it is skipped, not read as short.
+  return ratioTrend(newestFirst(nightsWithDuration(nightSessions(sessions, tz))).map(s => s.durationHours ?? 0))
 }
 
 /** Quality trend over our own 0–100 sleep score (efficiency/stages/latency/

@@ -595,6 +595,20 @@ export async function invalidateRestDayChoice(): Promise<void> {
   clearLegacyHomeSeeds()
 }
 
+/** #2265 — a night marked partial, or unmarked. It changes what the night's score and every normal
+ *  built from it say, so it moves what a changed night moves: the sleep list, readiness and what
+ *  derives from it, the day's read-through. */
+export async function invalidatePartialNightWrite(): Promise<void> {
+  await Promise.all([
+    invalidateManualSleepWrite(),
+    // stored-score readers of the night: the trend views, the sparkline summary, and the day's
+    // sleep verdict card (a verdict already stored stays; the read behind it is what refreshes)
+    invalidateCache('health-trends:'),
+    invalidateCache('health-trends-summary'),
+    invalidateCache('sleep-verdict:'),
+  ])
+}
+
 /** #2338 — a night the user entered by hand (`saveManualNight`). It is a sleep row like any other,
  *  so everything a synced night moves moves here too: the sleep list, readiness and what derives from
  *  it, the sleep streak, the collection's sleep ladder, and the day's read-through. */

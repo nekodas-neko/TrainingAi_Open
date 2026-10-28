@@ -21,6 +21,7 @@ import { readPushAnswer } from '../../../core/sync/push-answer.ts';
 import { toAestDay, weekStartForDay } from '@trainingai/shared/date-utils';
 import { morningSchema, checkinSchema } from './checkin.ts';
 import { dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin';
+import { PartialNightPayloadSchema } from '@trainingai/shared/health/partial-night';
 import {
   bodySpec,
   sleepSpec,
@@ -34,7 +35,7 @@ import { withLoggedDeviceSteps } from '@trainingai/shared/health/activity-steps'
 
 const operationSchema = MutationSchema.extend({
   id: z.uuid(),
-  domain: z.enum(['body_metrics', 'manual_sleep', 'manual_bedtime', 'day_checkins']),
+  domain: z.enum(['body_metrics', 'manual_sleep', 'manual_bedtime', 'partial_night', 'day_checkins']),
   acknowledged: z.boolean().default(false),
   attempted: z.boolean().default(true),
   /** Server refusals of this push so far; set aside once they reach MAX_MUTATION_ATTEMPTS. */
@@ -42,7 +43,9 @@ const operationSchema = MutationSchema.extend({
 }).superRefine((operation, context) => {
   const p = operation.payload;
   const valid =
-    operation.domain === 'day_checkins'
+    operation.domain === 'partial_night'
+      ? PartialNightPayloadSchema.safeParse(p).success
+      : operation.domain === 'day_checkins'
       ? morningSchema.safeParse(p).success && dayCheckinHasAnswers(p)
       : operation.domain === 'manual_bedtime'
         ? z
@@ -268,6 +271,17 @@ export class HealthStore {
       throw new Error('Only a night entered by hand can be removed.');
     }
     await this.enqueue('manual_sleep', date, { id, deleted: true });
+  }
+  // #2265: queued like any health write and shown at once by overlaySleep.
+  async markNightPartial(id: string, partial: boolean) {
+    const night = overlaySleep(this.current.sleep ?? [], this.current.operations).find(
+      (row) => row.id === id,
+    );
+    if (!night || night.manualEntry || night.localOnly) {
+      throw new Error('Only a night your ring or phone measured can be marked partial.');
+    }
+    // The night's own date, never the caller's: the overlay matches rows by date, the server by id.
+    await this.enqueue('partial_night', night.date, { id, partial });
   }
   async rememberBedtime(date: string, at: string | null) {
     if (
@@ -783,11 +797,24 @@ export function overlayBody(
   }
   return result;
 }
+const PENDING_MARK = '1970-01-01T00:00:00.000Z';
 export function overlaySleep(base: SleepRow[], operations: HealthOperation[]): SleepRow[] {
   let rows = [...base];
   for (const op of operations.filter(
-    (op) => op.domain === 'manual_sleep' || op.domain === 'manual_bedtime',
+    (op) =>
+      op.domain === 'manual_sleep' ||
+      op.domain === 'manual_bedtime' ||
+      op.domain === 'partial_night',
   )) {
+    if (op.domain === 'partial_night') {
+      // The server marks every device row of the wake date; the instant is a placeholder.
+      rows = rows.map((row) =>
+        row.date === op.date && !row.manualEntry
+          ? { ...row, partialNightAt: op.payload.partial === true ? PENDING_MARK : null }
+          : row,
+      );
+      continue;
+    }
     if (op.domain === 'manual_bedtime') {
       rows = rows.map((row) =>
         row.date === op.date

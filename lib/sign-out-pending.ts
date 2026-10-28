@@ -45,7 +45,7 @@ const OUTBOX_GROUP: Record<SyncedMutationDomain, OutboxGroup> = {
   session_rpe: 'workout', complete_workout: 'workout', rest_days: 'workout', exercise_log_edit: 'workout',
   exercise_log_delete: 'workout', workout_session_delete: 'workout',
   oura_daily_summary: 'sleep-ring', oura_daily_derived: 'sleep-ring', sleep_session: 'sleep-ring',
-  manual_bedtime: 'sleep-ring', manual_sleep: 'sleep-ring',
+  manual_bedtime: 'sleep-ring', manual_sleep: 'sleep-ring', partial_night: 'sleep-ring',
 }
 
 export interface UnsentChanges {

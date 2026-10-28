@@ -24,6 +24,7 @@ import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { latestRestingHrRow } from '@trainingai/shared/health/latest-resting-hr'
 import { rowsOfDeviceInUse } from '@trainingai/shared/health/per-device-normal'
 import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
@@ -457,7 +458,10 @@ export async function buildReadinessPayload(
   // reassembles fragmented nights, so a wake-up in the middle no longer splits one night into two.
   const nights = nightSessions(sleepSessions, tz)
   const lastSleep  = canonicalLatestNight(nights, tz)
-  const sleepHours = lastSleep?.durationHours ?? null
+  // #2265: a night the owner marked partial is present but unscored: it has no hours to read as short
+  // (the legacy 0–40 sleep term and `hasSufficientData` both work from hours), and no Sleep Score.
+  const lastNightPartial = isPartialNight(lastSleep)
+  const sleepHours = lastNightPartial ? null : lastSleep?.durationHours ?? null
   // Our own 0–100 Sleep Score (recovered open_health weights + contributor curves). Feeds both
   // the standalone Sleep chip (0–100) and the readiness composite's internal 0–40 sleep term.
   // Falls back to the crude duration-only estimate when there's no session to score at all.
@@ -714,7 +718,7 @@ export async function buildReadinessPayload(
   // the chip hide itself.
   const readinessDisplayScore = (baselineHrv != null || baselineRhr != null || ownComposite != null) ? score : null
 
-  const hasSufficientData = sleepHours != null && (baselineHrv != null || baselineRhr != null || ownComposite != null)
+  const hasSufficientData = (sleepHours != null || lastNightPartial) && (baselineHrv != null || baselineRhr != null || ownComposite != null)
 
   // Early deload — the periodization modes the app drives, and not already in deload.
   //

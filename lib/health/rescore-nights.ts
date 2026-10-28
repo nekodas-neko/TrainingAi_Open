@@ -37,6 +37,12 @@
  * A re-read of identical documents (the daily reconciliation, a webhook repeat) changes no
  * fingerprint and so writes nothing. Changes older than {@link RESCORE_WINDOW_DAYS} are not acted
  * on, which bounds the work and keeps a 90-day connect backfill from rewriting history on its own.
+ *
+ * **The owner's own mark is the exception on both counts (#2265).** Marking or unmarking a night
+ * partial is the owner's action on one named night, so that night is re-scored wherever it falls
+ * (`ownerChanged`, below), not only inside the window: trends, the day log and the week view read the
+ * stored score of an old night. And when the night is today's, today's frozen Body Battery anchor is
+ * released the way an arriving night releases it, because the anchor was built from that night.
  * Best-effort throughout: a failure here is logged and never fails the ingest that triggered it.
  */
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -132,12 +138,16 @@ export async function watchNights(repo: NightRescoreRepo, userId: string): Promi
 }
 
 /** After the write: re-scores every recent day whose night changed. See the file header for what each pillar gets. */
-export async function rescoreChangedNights(repo: NightRescoreRepo, watch: NightWatch, now: Date = new Date()): Promise<RescoreOutcome> {
+export async function rescoreChangedNights(
+  repo: NightRescoreRepo, watch: NightWatch, now: Date = new Date(), ownerChanged: readonly string[] = [],
+): Promise<RescoreOutcome> {
   const { userId, tz, today } = watch
   const from = windowFrom(today)
-  const sessions = await repo.listSleepSessions(userId, shiftDateStr(from, -SLEEP_SCORE_HISTORY_DAYS), today)
+  const ownerDates = ownerChanged.filter(d => d <= today)
+  const earliest = [from, ...ownerDates].reduce((a, b) => (a < b ? a : b))
+  const sessions = await repo.listSleepSessions(userId, shiftDateStr(earliest, -SLEEP_SCORE_HISTORY_DAYS), today)
   const after = nightFingerprints(sessions, tz, from, today)
-  const changed = changedNightDates(watch.before, after)
+  const changed = [...new Set([...changedNightDates(watch.before, after), ...ownerDates])].sort()
   const out: RescoreOutcome = { changed, sleepRescored: [], sleepCleared: [], readinessCleared: [], readinessMarked: [], batteryReleased: [] }
   if (changed.length === 0) return out
 
@@ -161,7 +171,9 @@ export async function rescoreChangedNights(repo: NightRescoreRepo, watch: NightW
       // delete and a re-create in two webhooks must not release an anchor frozen while the night was
       // there. Only deleted rows count; a live nap or rest row on the day leaves a late night an arrival.
       const arrived = !watch.before.has(day) && after.has(day) && !watch.hadDeletedOuraNight.has(day)
-      if (arrived && await repo.releaseBodyBatteryAnchor(userId, day)) out.batteryReleased.push(day)
+      // #2265: the owner's mark on today's night changes what today's anchor was built from.
+      const ownerMarked = ownerDates.includes(day) && after.has(day)
+      if ((arrived || ownerMarked) && await repo.releaseBodyBatteryAnchor(userId, day)) out.batteryReleased.push(day)
     } else if (stored.get(day)?.readinessScore != null) {
       await repo.upsertOuraDailyDerived(userId, day, { modelVersions: { readinessNightRevisedAt: now.toISOString() } })
       out.readinessMarked.push(day)
@@ -174,7 +186,11 @@ export async function rescoreChangedNights(repo: NightRescoreRepo, watch: NightW
  * Brackets one Oura sleep write: fingerprints before, re-scores after. Never throws; a failure on
  * either side is logged and the write's own result is returned untouched.
  */
-export async function withNightRescore<T>(repo: NightRescoreRepo | undefined, userId: string, write: () => Promise<T>): Promise<T> {
+export async function withNightRescore<T>(
+  repo: NightRescoreRepo | undefined, userId: string, write: () => Promise<T>,
+  /** Wake dates the write changed by the owner's own hand, from its result: re-scored outside the window too. */
+  ownerChanged?: (result: T) => string[],
+): Promise<T> {
   if (!repo) return write()
   return repo.withOuraSleepWriteLock(userId, async () => {
     let watch: NightWatch | null = null
@@ -186,7 +202,7 @@ export async function withNightRescore<T>(repo: NightRescoreRepo | undefined, us
     const result = await write()
     if (watch) {
       try {
-        const outcome = await rescoreChangedNights(repo, watch)
+        const outcome = await rescoreChangedNights(repo, watch, new Date(), ownerChanged?.(result) ?? [])
         if (outcome.changed.length > 0) console.info(`[rescore-nights] nights changed: ${JSON.stringify(outcome)}`)
       } catch (err) {
         console.error('[rescore-nights] re-scoring the changed nights failed:', err)
@@ -194,4 +210,13 @@ export async function withNightRescore<T>(repo: NightRescoreRepo | undefined, us
     }
     return result
   })
+}
+
+/**
+ * `ownerChanged` for {@link withNightRescore} around `setPartialNight`: the marked night's wake date,
+ * only when the mark really flipped. A repeat tap or a replayed op re-scores nothing and never moves
+ * today's frozen anchor (#3085: no anchor moves in the evening for a non-change).
+ */
+export function partialNightRescore(result: { date: string; changed: boolean } | 'not_found'): string[] {
+  return result === 'not_found' || !result.changed ? [] : [result.date]
 }
