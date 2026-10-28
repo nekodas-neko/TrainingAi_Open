@@ -3,11 +3,12 @@ import { Pressable, View } from 'react-native';
 import { guideFor } from '@trainingai/shared/health/contributor-guide';
 import { scoreBand } from '@trainingai/shared/health/score-band';
 import { contributorNote } from '@trainingai/shared/health/score-gap-copy';
-import { AppText, Badge, Card, Icon, Legend, ProgressBar, Stack, ZoneGauge } from '../../../shared/ui';
+import { AppText, Card, Icon, Legend, ProgressBar, Stack } from '../../../shared/ui';
 import { useHealthAnchor } from '../../../shared/ui/HealthDetailLayout';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { contributorFactors, type ContributorFactor } from '../data/contributor-factors';
 import { weakestFactor } from '../data/week-view';
+import { ExplainerCard } from './ExplainerCard';
 export function ContributorDetails({
   factors,
   title = 'What each factor means',
@@ -19,14 +20,13 @@ export function ContributorDetails({
 }) {
   return (
     <>
-      <AppText variant="eyebrow" tone="muted">
+      <AppText variant="explainerLabel" tone="muted">
         {title}
       </AppText>
       {factors
         .filter((f) => guideFor(f.key))
         .map((f) => {
           const guide = guideFor(f.key)!;
-          const band = f.score != null && !f.learning ? scoreBand(f.score) : null;
           return (
             <View
               key={f.key}
@@ -39,55 +39,24 @@ export function ContributorDetails({
                 }
               }}
             >
-              <Card>
-                <Stack direction="row" justify="space-between">
-                  <AppText variant="label" style={{ flex: 1 }}>
-                    {f.label}
-                  </AppText>
-                  {band && <Badge label={`${band.label} · ${f.score}`} />}
-                </Stack>
-                {f.gauge != null ? (
-                  <ZoneGauge centered value={f.gauge} />
-                ) : band ? (
-                  <ZoneGauge value={f.score!} />
-                ) : null}
-                <AppText variant="micro" tone="muted">
-                  What it measures
-                </AppText>
-                <AppText variant="caption">{guide.measures}</AppText>
-                <AppText variant="micro" tone="muted">
-                  Measured against
-                </AppText>
-                <AppText variant="caption">{guide.against}</AppText>
-                <AppText variant="micro" tone="muted">
-                  What your score means
-                </AppText>
-                <AppText variant="caption">
-                  {(f.provisional ? contributorNote(f) : null) ??
-                    (f.score != null && f.score < 50 ? guide.low : guide.high)}
-                </AppText>
-                {f.extra && (
-                  <>
-                    <AppText variant="micro" tone="muted">
-                      Your values
-                    </AppText>
-                    <AppText variant="caption">{f.extra}</AppText>
-                  </>
-                )}
-                <AppText variant="micro" tone="muted">
-                  How to improve it
-                </AppText>
-                {guide.remediate.map((text) => (
-                  <AppText key={text} variant="caption">
-                    • {text}
-                  </AppText>
-                ))}
-                {f.weight != null && (
-                  <AppText variant="micro" tone="muted">
-                    Weighted {Math.round(f.weight * 100)}% of your readiness score.
-                  </AppText>
-                )}
-              </Card>
+              <ExplainerCard
+                label={f.label}
+                score={f.score != null && !f.learning ? f.score : null}
+                gauge={f.gauge}
+                measures={guide.measures}
+                against={guide.against}
+                meaning={
+                  (f.provisional ? contributorNote(f) : null) ??
+                  (f.score != null && f.score < 50 ? guide.low : guide.high)
+                }
+                extra={f.extra}
+                remediate={guide.remediate}
+                footer={
+                  f.weight != null
+                    ? `Weighted ${Math.round(f.weight * 100)}% of your readiness score.`
+                    : undefined
+                }
+              />
             </View>
           );
         })}
