@@ -61,10 +61,10 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
               : [{ share: 1, color: theme.colors.brand }]
           }
         >
-          <AppText variant="metric">
+          <AppText variant="energyRingValue">
             {total ? Math.round(total.calories).toLocaleString() : '—'}
           </AppText>
-          <AppText variant="micro" tone="muted">
+          <AppText variant="energyRingCaption" tone="muted">
             {goal != null ? `of ${Math.round(goal).toLocaleString()}` : 'kcal'}
           </AppText>
         </SegmentRing>

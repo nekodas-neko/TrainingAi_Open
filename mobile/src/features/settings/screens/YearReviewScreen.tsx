@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { lastTwelveMonthLabels } from '../data/year-months';
 import {
   AppText,
   Card,
@@ -42,11 +43,7 @@ export function YearReviewScreen({ onBack }: { onBack: () => void }) {
   const state = useWorkoutResource({ path: '/api/year-review', ttl: 1800000, schema }),
     { theme } = useTheme();
   const data = state.data;
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - 11 + i, 1);
-    return date.toLocaleDateString('en-AU', { month: 'short' });
-  });
+  const months = lastTwelveMonthLabels(new Date());
   return (
     <PageLayout
       title="Your Year"

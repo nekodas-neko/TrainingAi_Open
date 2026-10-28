@@ -38,6 +38,7 @@ import TrendingUp from 'lucide-react-native/icons/trending-up';
 import TrendingDown from 'lucide-react-native/icons/trending-down';
 import X from 'lucide-react-native/icons/x';
 import Calculator from 'lucide-react-native/icons/calculator';
+import Syringe from 'lucide-react-native/icons/syringe';
 import SkipForward from 'lucide-react-native/icons/skip-forward';
 import Pause from 'lucide-react-native/icons/pause';
 import Play from 'lucide-react-native/icons/play';
@@ -141,6 +142,7 @@ const icons = {
   lower: TrendingDown,
   close: X,
   calculator: Calculator,
+  syringe: Syringe,
   skip: SkipForward,
   pause: Pause,
   play: Play,

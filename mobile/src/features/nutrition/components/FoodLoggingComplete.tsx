@@ -86,6 +86,7 @@ export function FoodLoggingComplete({
           </Stack>
           <AppButton
             title={loaded ? 'I’ve finished logging' : ''}
+            variant="neutral"
             busy={busy || !loaded}
             onPress={() => void set(true)}
           />

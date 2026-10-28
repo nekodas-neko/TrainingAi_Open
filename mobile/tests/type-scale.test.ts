@@ -181,6 +181,21 @@ const currentApp: Record<string, Expected> = {
     fontWeight: '700',
     source: 'week-metric-card.tsx value, text-xl font-bold',
   },
+  energyRingValue: {
+    fontSize: 22,
+    lineHeight: 22,
+    fontWeight: '700',
+    letterSpacing: -0.55,
+    source: 'energy-card.tsx ring value, text-[22px] font-bold leading-none tracking-tight',
+  },
+  energyRingCaption: {
+    fontSize: 9.5,
+    lineHeight: 14.25,
+    letterSpacing: 0.475,
+    uppercase: true,
+    fontWeight: undefined,
+    source: 'energy-card.tsx ring caption, text-[9.5px] uppercase tracking-wider',
+  },
   weekTileDelta: {
     fontSize: 11,
     lineHeight: 16.5,

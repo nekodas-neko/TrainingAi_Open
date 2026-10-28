@@ -12,6 +12,7 @@ import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time'
 import type { MealType } from '@trainingai/shared/types/nutrition';
 import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { z } from 'zod';
 import {
   AppButton,
@@ -19,9 +20,11 @@ import {
   Badge,
   Card,
   Disclosure,
+  Icon,
   Stack,
   StatusIndicator,
 } from '../../../shared/ui';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { energySpec } from '../../health/data/models';
 import { MacroLine } from '../../nutrition/components/NutritionElements';
 import { planSpec, type MealPlan } from '../../nutrition/data/models';
@@ -152,6 +155,9 @@ export function ActiveMealPlan({
   const overdue = last
     ? daysBetweenDateStrs(toAestDay(new Date(last), n.timezone), n.today) >= 28
     : false;
+  if (!plan || !variant) {
+    return <BuildPlanPrompt onSetup={() => onSetup()} onStepByStep={onStepByStep} />;
+  }
   return (
     <>
       {overdue && plan && (
@@ -335,27 +341,69 @@ export function ActiveMealPlan({
             )}
             <AppButton title="Manage plan" variant="surface" onPress={() => onManage(plan)} />
           </>
-        ) : (
-          <>
-            <AppButton
-              title="Build a meal plan"
-              icon="foods"
-              variant="surface"
-              onPress={() => onSetup()}
-            />
-            <AppText variant="caption" tone="muted">
-              Talk it through with your coach. It already knows your target and when you train.
-            </AppText>
-            {onStepByStep && (
-              <AppButton
-                title="Prefer the step-by-step setup?"
-                variant="ghost"
-                onPress={onStepByStep}
-              />
-            )}
-          </>
-        )}
+        ) : null}
       </Card>
     </>
+  );
+}
+
+/** meal-plan-section.tsx with no plan: a compact dashed card, and the stepper as an underlined link. */
+function BuildPlanPrompt({
+  onSetup,
+  onStepByStep,
+}: {
+  onSetup: () => void;
+  onStepByStep?: () => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <Stack gap="xs">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Build a meal plan"
+        onPress={onSetup}
+        style={({ pressed }) => ({
+          minHeight: theme.sizes.touchTarget,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.md,
+          padding: theme.spacing.lg,
+          borderRadius: theme.radii.card,
+          borderWidth: 1,
+          borderStyle: 'dashed',
+          borderColor: theme.colors.border,
+          backgroundColor: `${theme.colors.raised}66`,
+          opacity: pressed ? 0.8 : 1,
+        })}
+      >
+        <Icon name="foods" tone="muted" size={theme.sizes.iconCompact} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <AppText variant="subheading">Build a meal plan</AppText>
+          <AppText variant="weekTileDelta" tone="muted">
+            Talk it through with your coach — it already knows your target and when you train
+          </AppText>
+        </View>
+      </Pressable>
+      {onStepByStep && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Prefer the step-by-step setup?"
+          onPress={onStepByStep}
+          style={{
+            minHeight: theme.sizes.touchTarget,
+            justifyContent: 'center',
+            paddingHorizontal: theme.spacing.lg,
+          }}
+        >
+          <AppText
+            variant="weekTileDelta"
+            tone="muted"
+            style={{ textDecorationLine: 'underline' }}
+          >
+            Prefer the step-by-step setup?
+          </AppText>
+        </Pressable>
+      )}
+    </Stack>
   );
 }

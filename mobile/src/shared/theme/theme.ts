@@ -39,6 +39,9 @@ export type ThemeColors = {
   brand: string;
   brandText: string;
   onBrand: string;
+  /** The current app's default button: --primary / --primary-foreground, a neutral that flips with the theme. */
+  primary: string;
+  onPrimary: string;
   brandSurface: string;
   brandBorder: string;
   text: string;
@@ -126,6 +129,9 @@ export function createTheme(
   const base = {
     ...palettes[brand][mode],
     text: mode === 'dark' ? '#fafafa' : '#121212',
+    // app/globals.css: oklch(0.922 0 0) on dark, oklch(0.205 0 0) on light, and the foreground the other way.
+    primary: mode === 'dark' ? '#e5e5e5' : '#171717',
+    onPrimary: mode === 'dark' ? '#171717' : '#fafafa',
     muted: mode === 'dark' ? '#b2b8b3' : '#666666',
     border: mode === 'dark' ? '#ffffff18' : '#e8e8e8',
     danger: statusColors[mode].danger,

@@ -236,7 +236,7 @@ export function NutritionScreen({
   }
   return (
     <PageLayout
-      landing
+      fillBottom
       title="Nutrition"
       titleVariant="nutritionTitle"
       subtitle={
@@ -475,17 +475,22 @@ export function NutritionScreen({
                 calibrated={energy.data?.maintenance?.source === 'calibrated'}
                 gapMessage={energy.data?.maintenance?.gapMessage ?? null}
               />
-              <Card>
-                <WeeklyNutrition
-                  onDay={setDate}
-                  calorieTarget={
-                    energy.data?.date === date ? (energy.data.balance?.budgetKcal ?? null) : null
-                  }
-                />
+              {/* day-tools-section.tsx: the week's chart and the supplements share one bordered box,
+                  and the supplement rows run edge to edge under hairlines. */}
+              <Card padded={false}>
+                <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
+                  <WeeklyNutrition
+                    onDay={setDate}
+                    calorieTarget={
+                      energy.data?.date === date ? (energy.data.balance?.budgetKcal ?? null) : null
+                    }
+                  />
+                </View>
                 {date === n.today && <SupplementsSection date={date} />}
               </Card>
               <AppButton
                 title="End of Day"
+                icon="moon"
                 variant="surface"
                 onPress={() => setModal('review')}
               />

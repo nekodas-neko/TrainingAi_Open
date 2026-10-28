@@ -17,7 +17,7 @@ export function AppButton({
   ...props
 }: Omit<PressableProps, 'children'> & {
   title: string;
-  variant?: 'primary' | 'secondary' | 'surface' | 'ghost' | 'danger' | 'warning';
+  variant?: 'primary' | 'neutral' | 'secondary' | 'surface' | 'ghost' | 'danger' | 'warning';
   busy?: boolean;
   icon?: IconName;
   iconSize?: number;
@@ -29,22 +29,26 @@ export function AppButton({
     ? theme.colors.disabled
     : variant === 'primary' || variant === 'warning'
       ? theme.colors.onBrand
-      : variant === 'danger'
-        ? theme.colors.danger
-        : variant === 'surface'
-          ? theme.colors.text
-          : theme.colors.brandText;
+      : variant === 'neutral'
+        ? theme.colors.onPrimary
+        : variant === 'danger'
+          ? theme.colors.danger
+          : variant === 'surface'
+            ? theme.colors.text
+            : theme.colors.brandText;
   const background = blocked
     ? theme.colors.raised
     : variant === 'primary'
       ? theme.colors.brand
-      : variant === 'warning'
-        ? theme.status.warning
-        : variant === 'secondary'
-          ? theme.colors.brandSurface
-          : variant === 'surface'
-            ? theme.colors.surface
-            : 'transparent';
+      : variant === 'neutral'
+        ? theme.colors.primary
+        : variant === 'warning'
+          ? theme.status.warning
+          : variant === 'secondary'
+            ? theme.colors.brandSurface
+            : variant === 'surface'
+              ? theme.colors.surface
+              : 'transparent';
   return (
     <Pressable
       {...props}
