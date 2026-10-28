@@ -1,3 +1,4 @@
+import { statusVisible } from '../health/data/status-visible';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { displayOneRm, displayOneRmSeries, oneRmLabel } from '@trainingai/shared/1rm';
@@ -76,7 +77,7 @@ export function StrengthScreen({
           )}
           {exercise ? (
             <Card>
-              <Stack direction="row" justify="space-between">
+              <Stack direction="row" justify="space-between" align="center">
                 <AppText
                   variant="cardTitle"
                   tone="muted"
@@ -84,10 +85,12 @@ export function StrengthScreen({
                   Strength Trend
                 </AppText>
                 <Stack direction="row" align="center" gap="none">
-                  <AppText variant="micro" tone="muted">
+                  <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
                     90 days
                   </AppText>
-                  {embedded && (
+                  {/* The status slot is 48 px even when idle, which made this card's title row three
+                      times the current app's and pushed "90 days" in from the edge. */}
+                  {embedded && statusVisible(strength) && (
                     <ResourceStatus
                       inline
                       label="Strength trend"
@@ -104,11 +107,11 @@ export function StrengthScreen({
                   onPress={currentIndex > 0 ? () => setIndex(currentIndex - 1) : undefined}
                 />
                 <Stack align="center" style={{ flex: 1, minWidth: 0 }}>
-                  <AppText variant="label" numberOfLines={1}>
+                  <AppText variant="subheading" numberOfLines={1}>
                     {exercise.name}
                   </AppText>
-                  <Stack direction="row" align="center">
-                    <AppText variant="hero" tone="brand">
+                  <Stack direction="row" align="center" justify="center">
+                    <AppText variant="trendValue" tone="brand" style={{ fontVariant: ['tabular-nums'] }}>
                       {displayOneRm(exercise.currentRm, exercise.exerciseType).text}
                     </AppText>
                     {exercise.gainPct !== null && (

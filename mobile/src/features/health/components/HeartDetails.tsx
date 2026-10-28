@@ -103,7 +103,7 @@ export function TodayTile({ label, value, unit }: { label: string; value: number
       <AppText variant="weekTileValue" style={{ marginTop: theme.spacing.xs, fontVariant: ['tabular-nums'] }}>
         {metricValue(value)}
         {has && (
-          <AppText variant="caption" tone="muted">
+          <AppText variant="caption" tone="muted" style={{ fontWeight: '400' }}>
             {' '}
             {unit}
           </AppText>

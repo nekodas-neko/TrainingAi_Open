@@ -195,6 +195,12 @@ export const typography = {
   factorLabel: { fontSize: 11, lineHeight: 13.75 },
   factorValue: { fontSize: 11, lineHeight: 16.5, fontWeight: '600' },
   statUnit: { fontSize: 9, lineHeight: 13.5 },
+  // strength-progress-card.tsx: a row's value is text-xs font-bold leading-tight over a
+  // text-[9px] font-semibold leading-tight delta.
+  strengthRowValue: { fontSize: 12, lineHeight: 15, fontWeight: '700' },
+  strengthRowDelta: { fontSize: 9, lineHeight: 11.25, fontWeight: '600' },
+  // strength-trend-card.tsx: the exercise's current 1RM, text-lg font-black.
+  trendValue: { fontSize: 18, lineHeight: 28, fontWeight: '900' },
   // contributor-detail.tsx: a text-[10px] font-semibold uppercase tracking-wider sub-heading
   // (What it measures, Measured against, How to improve it) over text-[11px] leading-snug body.
   explainerLabel: {
@@ -205,6 +211,8 @@ export const typography = {
     textTransform: 'uppercase',
   },
   explainerBody: { fontSize: 11, lineHeight: 15.125 },
+  // readiness-breakdown.tsx: the weight footer, text-[10px].
+  explainerFooter: { fontSize: 10, lineHeight: 15 },
   // contributor-details.tsx: the factor badge, text-[10px] font-bold uppercase tracking-wide.
   explainerBadge: {
     fontSize: 10,
