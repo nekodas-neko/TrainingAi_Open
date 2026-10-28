@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.511.0",
+    date: "2026-10-28",
+    changes: [
+      "TrainingAi Preview: Health → Training's calendar title no longer gets cut off; it sits above the month controls.",
+      "Behind the scenes: a night can now be marked partial, which keeps its length out of your sleep score and averages while its heart rate, HRV and breathing still count. The button to mark one comes in a later release.",
+    ],
+  },
+  {
     version: "1.510.0",
     date: "2026-10-28",
     changes: [
@@ -4213,7 +4221,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "1.322.2",
     date: "2026-08-18",
     changes: [
-      "On Health \u2192 Training Load, a deload or testing day is now marked inline next to the day name \u2014 \u201cMon (D)\u201d \u2014 instead of on a line of its own. The flag used to add a whole extra row to that day, which pushed its bar about 12 pixels higher than the others and made it collide with the heading above: two days with the same volume drew at visibly different heights on a chart whose whole job is comparing them.",
+      "On Health → Training Load, a deload or testing day is now marked inline next to the day name \u2014 \u201cMon (D)\u201d \u2014 instead of on a line of its own. The flag used to add a whole extra row to that day, which pushed its bar about 12 pixels higher than the others and made it collide with the heading above: two days with the same volume drew at visibly different heights on a chart whose whole job is comparing them.",
     ],
   },
   {
