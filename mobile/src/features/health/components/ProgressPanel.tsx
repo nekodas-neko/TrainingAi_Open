@@ -251,7 +251,7 @@ function StrengthWorkingCard() {
         </Stack>
       )}
       {groups.map(({ session, rows }) => (
-        <Stack key={session}>
+        <Stack key={session} gap="lg">
           <AppText
             variant="micro"
             style={{ color: theme.progress.strength, textTransform: 'uppercase', letterSpacing: 0.6 }}
@@ -264,17 +264,21 @@ function StrengthWorkingCard() {
               trendDown: theme.progress.trendDown,
             });
             return (
-              <Stack key={exercise.exercise} direction="row" align="center">
+              <Stack key={exercise.exercise} direction="row" align="center" gap="md">
                 <AppText variant="caption" numberOfLines={1} style={{ flex: 1 }}>
                   {exercise.exercise}
                 </AppText>
                 <StrengthBar pct={metric.pct} color={bandColor(metric.color, theme.status)} />
                 <View style={{ width: theme.sizes.touchTarget + theme.spacing.lg, alignItems: 'flex-end' }}>
-                  <AppText variant="label" style={{ fontVariant: ['tabular-nums'] }}>
+                  {/* strength-progress-card.tsx: text-xs font-bold leading-tight over a text-[9px] font-semibold delta. */}
+                  <AppText variant="strengthRowValue" style={{ fontVariant: ['tabular-nums'] }}>
                     {metric.label}
                   </AppText>
                   {delta && (
-                    <AppText variant="micro" style={{ color: delta.color }}>
+                    <AppText
+                      variant="strengthRowDelta"
+                      style={{ color: delta.color, fontVariant: ['tabular-nums'] }}
+                    >
                       {delta.text}
                     </AppText>
                   )}

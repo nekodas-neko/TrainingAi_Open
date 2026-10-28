@@ -40,3 +40,43 @@ test('Sleep, Readiness and Heart rate share one explainer card', async () => {
   assert.match(contributor, /<ExplainerCard/);
   assert.doesNotMatch(contributor, /What it measures/, 'the sub-headings live only in ExplainerCard');
 });
+
+// #3514: the pure decisions the card renders from. The suite has no React renderer, so the card's
+// tree is covered by these and by the source-level checks below, not by a render.
+test('a scored, settled factor has a badge, a gauge and the meaning heading', async () => {
+  const { explainerShape } = await import('../src/features/health/data/explainer-card.ts');
+  assert.deepEqual(explainerShape({ score: 82 }), { badge: true, gauge: 'toward-high', meaningHeading: true });
+});
+
+test('a learning factor with a score keeps its heading but not its badge or gauge', async () => {
+  const { explainerShape } = await import('../src/features/health/data/explainer-card.ts');
+  assert.deepEqual(explainerShape({ score: 64, learning: true }), {
+    badge: false,
+    gauge: null,
+    meaningHeading: true,
+  });
+});
+
+test('an unscored factor has no badge, gauge or heading, and a middle-is-best gauge still draws', async () => {
+  const { explainerShape } = await import('../src/features/health/data/explainer-card.ts');
+  assert.deepEqual(explainerShape({ score: null }), { badge: false, gauge: null, meaningHeading: false });
+  assert.deepEqual(explainerShape({ score: null, gauge: 50 }), {
+    badge: false,
+    gauge: 'centered',
+    meaningHeading: false,
+  });
+});
+
+test('the card is accessible and styled as the current app is', async () => {
+  const card = await readFile(new URL('../src/features/health/components/ExplainerCard.tsx', import.meta.url), 'utf8');
+  assert.match(card, /importantForAccessibility="no-hide-descendants"/, 'TalkBack skips the bullet dot');
+  assert.match(card, /variant="subheading" accessibilityRole="header"/, 'the factor name is a header');
+  assert.match(card, /variant="explainerFooter"/);
+  assert.match(card, /<Field title="Your values" tabular>/);
+  assert.match(card, /gap: theme\.spacing\.xs \}\}>\s*<AppText variant="explainerLabel" tone="muted">\s*How to improve it/);
+  const contributor = await readFile(
+    new URL('../src/features/health/components/ContributorCard.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(contributor, /score=\{f\.score \?\? null\}\s*learning=\{f\.learning\}/);
+});

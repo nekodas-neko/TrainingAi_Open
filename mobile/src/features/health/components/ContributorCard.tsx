@@ -41,7 +41,8 @@ export function ContributorDetails({
             >
               <ExplainerCard
                 label={f.label}
-                score={f.score != null && !f.learning ? f.score : null}
+                score={f.score ?? null}
+                learning={f.learning}
                 gauge={f.gauge}
                 measures={guide.measures}
                 against={guide.against}

@@ -24,3 +24,22 @@ export function bulletLayout(indent: number) {
   };
 }
 export const BULLET_GLYPH = '•';
+
+// What an explainer card draws for a factor, as the current app decides it (contributor-details.tsx).
+// `score` is the factor's own score, null when nothing was recorded; `learning` is a factor with a
+// score that is still settling against its baseline. The heading follows the score alone (a learning
+// factor keeps "What your score means" over its note), while the badge and gauge wait until the
+// score is settled (#3514).
+export function explainerShape(input: {
+  score: number | null | undefined;
+  learning?: boolean;
+  gauge?: number;
+}): { badge: boolean; gauge: 'centered' | 'toward-high' | null; meaningHeading: boolean } {
+  const hasScore = input.score != null;
+  const settled = hasScore && !input.learning;
+  return {
+    badge: settled,
+    gauge: input.gauge != null ? 'centered' : settled ? 'toward-high' : null,
+    meaningHeading: hasScore,
+  };
+}

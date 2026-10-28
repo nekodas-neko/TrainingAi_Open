@@ -181,6 +181,30 @@ const currentApp: Record<string, Expected> = {
     fontWeight: '700',
     source: 'week-metric-card.tsx value, text-xl font-bold',
   },
+  explainerFooter: {
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: undefined,
+    source: 'readiness-breakdown.tsx footer, text-[10px]',
+  },
+  strengthRowValue: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '700',
+    source: 'strength-progress-card.tsx row value, text-xs font-bold leading-tight',
+  },
+  strengthRowDelta: {
+    fontSize: 9,
+    lineHeight: 11.25,
+    fontWeight: '600',
+    source: 'strength-progress-card.tsx row delta, text-[9px] font-semibold leading-tight',
+  },
+  trendValue: {
+    fontSize: 18,
+    lineHeight: 28,
+    fontWeight: '900',
+    source: 'strength-trend-card.tsx current 1RM, text-lg font-black',
+  },
   weekTileDelta: {
     fontSize: 11,
     lineHeight: 16.5,
