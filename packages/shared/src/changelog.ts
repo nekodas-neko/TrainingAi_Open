@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.513.0",
+    date: "2026-10-28",
+    changes: [
+      "TrainingAi Preview: Nutrition, Progress, Heart rate, Home, More and Week in review now match the current app more closely, from type sizes and spacing to the small icons and the Recovery chart curves.",
+      "TrainingAi Preview: the supplement list no longer jumps while a tick saves, Your Year's months follow your timezone and never wrap, and \"Feature Request\" fits on one line in Feedback.",
+      "TrainingAi Preview: the explainer cards read better with TalkBack, and a factor that is still learning keeps its heading.",
+    ],
+  },
+  {
     version: "1.512.0",
     date: "2026-10-28",
     changes: [
