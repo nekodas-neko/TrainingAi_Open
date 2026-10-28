@@ -62,7 +62,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                 Your week
               </AppText>
             </Stack>
-            <MarkdownText>{flowDigest(state.data.digest)}</MarkdownText>
+            <MarkdownText bodyVariant="bodyRelaxed">{flowDigest(state.data.digest)}</MarkdownText>
           </Card>
         )}
         {m && training && (

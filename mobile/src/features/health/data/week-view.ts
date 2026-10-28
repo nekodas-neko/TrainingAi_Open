@@ -76,12 +76,13 @@ export function volumeTickLabel(value: number) {
 }
 
 // "Your week" as the current app flows it: the digest's lines (bullets included) run together as one
-// paragraph rather than one line each.
+// paragraph rather than one line each. The shared builder writes every point as "• …"; the "•" stays
+// as the separator between points, so a list marker of any kind is normalised to it, not dropped.
 export function flowDigest(digest: string) {
   return digest
     .split(/\r?\n/)
     .filter((line) => !/^\s*#{1,6}\s/.test(line))
-    .map((line) => line.replace(/^\s*[-*•]\s+/, '').trim())
+    .map((line) => line.replace(/^\s*[-*•]\s+/, '• ').trim())
     .filter(Boolean)
     .join(' ');
 }

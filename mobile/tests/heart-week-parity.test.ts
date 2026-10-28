@@ -25,11 +25,16 @@ test('the training chart writes thousands as 4k / 2k over a bare 0', () => {
   assert.equal(volumeTickLabel(1000), '1k');
 });
 
-test('the digest flows bullets and headings into one paragraph', () => {
+test('the digest flows bullets and headings into one paragraph, keeping the "•" between points', () => {
   assert.equal(
     flowDigest('## Week\n- You trained **5** times.\n\n* Sleep held at 7 h.\n• HRV rose.'),
-    'You trained **5** times. Sleep held at 7 h. HRV rose.',
+    '• You trained **5** times. • Sleep held at 7 h. • HRV rose.',
   );
+  // Four points: a separator before each, none after the last.
+  const flowed = flowDigest('• One.\n• Two.\n• Three.\n• Four.');
+  assert.equal(flowed, '• One. • Two. • Three. • Four.');
+  assert.equal(flowed.split('•').length - 1, 4);
+  assert.ok(!flowed.endsWith('•'));
   assert.equal(flowDigest('One line.'), 'One line.');
   assert.equal(flowDigest(''), '');
 });
