@@ -238,7 +238,6 @@ export function MoreScreen({
                   density="snug"
                   divider={false}
                   title={deviceHealthName}
-                  subtitle="Connection, permissions and data sources"
                   leading={<Icon name="health" tone="muted" size={theme.sizes.iconCompact} />}
                   onPress={openAppleHealth}
                 />

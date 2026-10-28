@@ -9,6 +9,7 @@ import { noHrDataCopy } from '@trainingai/shared/health/hr-source-copy';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { AppText, Card, Legend, LineChart } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { scaleAlpha } from '../../../shared/theme/alpha';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { daySpec } from '../../workouts/data/models';
 import { useHealthData } from '../data/HealthDataProvider';
@@ -99,7 +100,9 @@ export function HrDayCard({
     );
   }
   const lineColor = color === 'transparent' ? undefined : color;
-  const hrColor = lineColor ?? theme.tones.heart.foreground;
+  // hr-day-chart.tsx: with no card colour the line is neutral, white at 75% on dark, slate at 70% on light.
+  const hrColor =
+    lineColor ?? scaleAlpha(theme.colors.text, theme.mode === 'dark' ? 0.75 : 0.7);
   const hasWorkout = bands.some((b) => b.label === 'Workout');
   // The legend names what the chart draws, as the current app's does; it carries no source chips.
   const legend = [
@@ -125,7 +128,7 @@ export function HrDayCard({
         />
       )}
       <LineChart
-        color={lineColor}
+        color={hrColor}
         points={points}
         xDomain={[0, 1440]}
         domain={domain}

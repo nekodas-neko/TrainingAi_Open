@@ -88,7 +88,9 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
               <BarChart
                 label="Weekly training volume"
                 height={theme.sizes.weekVolumeChart}
-                readable
+                // chart.js: tickLength 8 + padding 3 under the bars, at regular weight.
+                labelGap={11}
+                labelWeight="400"
                 yAxis
                 tickCount={4}
                 formatTick={volumeTickLabel}
@@ -173,7 +175,8 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
             {!!m.muscleSets.length && (
               <Card>
                 <Stack direction="row" justify="space-between" align="baseline">
-                  <AppText variant="heading" style={{ flex: 1 }}>
+                  {/* weekly-muscle-sets-card.tsx: text-xs font-semibold uppercase tracking-widest. */}
+                  <AppText variant="cardTitle" tone="muted" accessibilityRole="header" style={{ flex: 1 }}>
                     Muscle volume this week
                   </AppText>
                   <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
