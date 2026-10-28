@@ -193,6 +193,28 @@ const currentApp: Record<string, Expected> = {
     fontWeight: '600',
     source: 'contributor-chart.tsx FactorBar value, text-[11px] font-semibold',
   },
+  explainerLabel: {
+    fontSize: 10,
+    lineHeight: 13.75,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    uppercase: true,
+    source: 'contributor-detail.tsx Field label, text-[10px] font-semibold uppercase tracking-wider leading-snug',
+  },
+  explainerBody: {
+    fontSize: 11,
+    lineHeight: 15.125,
+    source: 'contributor-detail.tsx body, text-[11px] leading-snug',
+  },
+  explainerBadge: {
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '700',
+    letterSpacing: 0.25,
+    uppercase: true,
+    source: 'contributor-details.tsx badge, text-[10px] font-bold uppercase tracking-wide',
+  },
+  gaugeLabel: { fontSize: 9, lineHeight: 13.5, source: 'zone-gauge.tsx labels, text-[9px]' },
   input: { fontSize: 16, lineHeight: 24, source: 'globals.css forces 16 px on input, textarea, select' },
 };
 

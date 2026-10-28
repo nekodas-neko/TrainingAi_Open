@@ -184,6 +184,26 @@ export const typography = {
   factorLabel: { fontSize: 11, lineHeight: 13.75 },
   factorValue: { fontSize: 11, lineHeight: 16.5, fontWeight: '600' },
   statUnit: { fontSize: 9, lineHeight: 13.5 },
+  // contributor-detail.tsx: a text-[10px] font-semibold uppercase tracking-wider sub-heading
+  // (What it measures, Measured against, How to improve it) over text-[11px] leading-snug body.
+  explainerLabel: {
+    fontSize: 10,
+    lineHeight: 13.75,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  explainerBody: { fontSize: 11, lineHeight: 15.125 },
+  // contributor-details.tsx: the factor badge, text-[10px] font-bold uppercase tracking-wide.
+  explainerBadge: {
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '700',
+    letterSpacing: 0.25,
+    textTransform: 'uppercase',
+  },
+  // zone-gauge.tsx: the Needs work / Optimal labels under the gauge, text-[9px].
+  gaugeLabel: { fontSize: 9, lineHeight: 13.5 },
   // home-nutrition-card.tsx: the ring's centre, text-[9px] font-extrabold over a text-[7px] word.
   ringValue: { fontSize: 9, lineHeight: 9, fontWeight: '800' },
   ringWord: { fontSize: 7, lineHeight: 7 },
