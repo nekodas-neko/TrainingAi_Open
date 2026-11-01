@@ -1,8 +1,8 @@
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { ActivityStore, ROUTE_CHECKPOINT_MS } from '../src/features/activities/data/ActivityStore.ts';
+import { ActivityStore, ROUTE_CHECKPOINT_MS, liveRouteReadout } from '../src/features/activities/data/ActivityStore.ts';
 import {
-  BACKGROUND_DENIED_NOTICE,
+  BACKGROUND_FAILED_NOTICE,
   backgroundNotification,
   isActivityServiceRunning,
   runBackgroundRecording,
@@ -15,6 +15,12 @@ import {
   deliverBackgroundLocations,
   setBackgroundFixSink,
 } from '../src/integrations/location/background-fixes.ts';
+import {
+  GPS_LOST_AFTER_MS,
+  gpsStatus,
+  runServiceRecording,
+  type RouteWatchState,
+} from '../src/features/activities/data/route-recording.ts';
 import type { AccountConnection } from '../src/features/account/session.ts';
 
 const timezone = 'Australia/Brisbane';
@@ -32,7 +38,7 @@ class FakeService implements BackgroundRecorder {
   stops = 0;
   options: Parameters<BackgroundRecorder['start']>[0] | null = null;
   private release: ((started: BackgroundStarted) => void) | null = null;
-  constructor(private answer: 'on' | 'denied' | 'skipped' | 'wait' = 'on') {}
+  constructor(private answer: 'on' | 'failed' | 'skipped' | 'wait' = 'on') {}
   start(options: Parameters<BackgroundRecorder['start']>[0]) {
     this.starts++;
     this.options = options;
@@ -142,8 +148,8 @@ test('ending the activity while the permission question is open stops the servic
   f.done();
 });
 
-test('permission denied or unavailable leaves screen-on recording, and says so only for a denial', async () => {
-  for (const answer of ['denied', 'skipped'] as const) {
+test('a service Android refuses leaves screen-on recording and says so; nothing to start says nothing', async () => {
+  for (const answer of ['failed', 'skipped'] as const) {
     const f = fixture(),
       store = await begun(f),
       log = states();
@@ -155,8 +161,7 @@ test('permission denied or unavailable leaves screen-on recording, and says so o
     assert.equal(store.appendFix({ ...origin, t: f.now() }), true);
     f.done();
   }
-  assert.match(BACKGROUND_DENIED_NOTICE, /screen is on/);
-  assert.match(BACKGROUND_DENIED_NOTICE, /Allow all the time/);
+  assert.equal(BACKGROUND_FAILED_NOTICE, 'Recording continues only while the screen is on.');
 });
 
 test('a start that throws falls back rather than failing the activity', async () => {
@@ -166,7 +171,7 @@ test('a start that throws falls back rather than failing the activity', async ()
     broken: BackgroundRecorder = { start: () => Promise.reject(new Error('no service')) };
   runBackgroundRecording(broken, store, backgroundNotification(store.getSnapshot().session!), log.on);
   await settle();
-  assert.deepEqual(log.seen, ['pending', 'skipped']);
+  assert.deepEqual(log.seen, ['pending', 'failed']);
   f.done();
 });
 
@@ -209,4 +214,56 @@ test('fixes arriving with no activity open are dropped, and the task has a name'
     0,
   );
   assert.equal(BACKGROUND_LOCATION_TASK, 'trainingai-activity-location');
+});
+
+test('the GPS status and live pace follow the service\'s fixes while the screen-on watcher is down', async () => {
+  mock.timers.enable({ apis: ['setInterval', 'Date'], now: midday });
+  try {
+    const f = fixture(),
+      store = await begun(f),
+      service = new FakeService('on');
+    // What the hook holds: the watch state from before Start, and the clock the store uses.
+    let watch: RouteWatchState = { problem: null, lastFixMs: null, now: Date.now() };
+    const stop = runServiceRecording(
+      service,
+      store,
+      backgroundNotification(store.getSnapshot().session!),
+      () => {},
+      (next) => (watch = next),
+      f.now,
+    );
+    await settle();
+    const readout = () => {
+      const { session, route } = store.getSnapshot();
+      return {
+        status: gpsStatus({
+          problem: watch.problem,
+          paused: session!.pauseStartMs != null,
+          points: route.length,
+          lastFixMs: watch.lastFixMs,
+          now: watch.now,
+        }),
+        stats: liveRouteReadout(session!, route, watch.now),
+      };
+    };
+    // Ten minutes, a fix every five seconds, 0.95 km.
+    for (let i = 1; i <= 120; i++) {
+      f.advance(5000);
+      mock.timers.tick(5000);
+      service.options!.fix({ lat: metresNorth((950 * i) / 120), lng: origin.lng, t: f.now() });
+    }
+    const live = readout();
+    assert.equal(live.status, 'tracking');
+    assert.ok(Math.abs(live.stats.distanceKm! - 0.95) < 0.02);
+    assert.ok(live.stats.paceSecPerKm! > 600 && live.stats.paceSecPerKm! < 720, `pace ${live.stats.paceSecPerKm}`);
+    // The service goes quiet: the tick alone moves the clock, so the lost-signal state can show.
+    const quietFor = GPS_LOST_AFTER_MS + 5000;
+    f.advance(quietFor);
+    mock.timers.tick(quietFor);
+    assert.equal(readout().status, 'lost');
+    stop();
+    f.done();
+  } finally {
+    mock.timers.reset();
+  }
 });

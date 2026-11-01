@@ -4,9 +4,8 @@ import { routeLocation } from '../../../integrations/location/route-location';
 import { useActivities } from './ActivityProvider';
 import { liveRouteReadout } from './ActivityStore';
 import {
-  BACKGROUND_DENIED_NOTICE,
+  BACKGROUND_FAILED_NOTICE,
   backgroundNotification,
-  runBackgroundRecording,
   type BackgroundState,
 } from './background-recording';
 import {
@@ -15,6 +14,7 @@ import {
   recordsRoute,
   routeEligible,
   watchRoute,
+  runServiceRecording,
   type LocationSource,
   type RouteWatchState,
 } from './route-recording';
@@ -22,8 +22,9 @@ import {
 // Watches GPS while a route-recording activity runs on screen, as the current app's active
 // screens do (`active-activity-screen.tsx`, `walk-active.tsx`): the watcher stops on pause and
 // starts again on resume. With the phone locked, a foreground service keeps the fixes coming for the
-// whole activity, pauses included (#2846); if the walker will not allow that, or the build has no
-// service, recording stays on the screen-on watcher with a notice.
+// whole activity, pauses included (#2846). It needs only foreground location permission; if it
+// cannot start, or the build has no service, recording stays on the screen-on watcher (with a
+// notice when Android refused it).
 export function useRouteRecording(source: LocationSource = routeLocation) {
   const activity = useActivities(),
     store = activity.store,
@@ -45,7 +46,15 @@ export function useRouteRecording(source: LocationSource = routeLocation) {
     if (!serviceWanted || !store || !notification || !source.background) {
       return;
     }
-    const stop = runBackgroundRecording(source.background, store, notification, setBackground);
+    // While the service delivers, the screen-on watcher is down, so the service's fixes feed the
+    // GPS status and the live pace too.
+    const stop = runServiceRecording(
+      source.background,
+      store,
+      notification,
+      setBackground,
+      setWatch,
+    );
     return () => {
       stop();
       setBackground('off');
@@ -87,6 +96,6 @@ export function useRouteRecording(source: LocationSource = routeLocation) {
   const stats = session
     ? liveRouteReadout(session, activity.route, watch.now)
     : liveRouteStats(activity.route, 0);
-  const notice = eligible && background === 'denied' ? BACKGROUND_DENIED_NOTICE : null;
+  const notice = eligible && background === 'failed' ? BACKGROUND_FAILED_NOTICE : null;
   return { eligible, status, notice, background, ...stats };
 }

@@ -64,11 +64,11 @@ test('the merged manifest declares what recording with the screen locked needs (
     (manifest['uses-permission'] ?? []).map((p: { $: Record<string, string> }) => p.$['android:name']),
   );
   for (const name of [
-    'android.permission.ACCESS_BACKGROUND_LOCATION',
     'android.permission.FOREGROUND_SERVICE',
     'android.permission.FOREGROUND_SERVICE_LOCATION',
-    'android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE',
   ]) {
     assert.ok(names.has(name), `${name} is missing from the merged manifest`);
   }
+  // The foreground service needs no "Allow all the time", so the app does not declare it.
+  assert.ok(!names.has('android.permission.ACCESS_BACKGROUND_LOCATION'));
 });

@@ -35,10 +35,6 @@ const mobileConfig = ({ config }) => {
         'android.permission.health.READ_WEIGHT',
         'android.permission.health.READ_EXERCISE',
         'android.permission.health.READ_HEALTH_DATA_HISTORY',
-        // Android 14+ asks each foreground-service type to be declared. The activity service is
-        // `location`, added by the expo-location plugin; this one is for the heart-rate strap held
-        // under it while the phone is locked (#3527).
-        'android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE',
       ],
       intentFilters: [
         {

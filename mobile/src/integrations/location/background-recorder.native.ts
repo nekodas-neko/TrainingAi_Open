@@ -1,27 +1,12 @@
 import { requireOptionalNativeModule } from 'expo';
-import { Alert, Platform } from 'react-native';
-import {
-  BACKGROUND_RATIONALE,
-  type BackgroundRecorder,
-} from '../../features/activities/data/background-recording';
+import { Platform } from 'react-native';
+import type { BackgroundRecorder } from '../../features/activities/data/background-recording';
 import { BACKGROUND_LOCATION_TASK, setBackgroundFixSink } from './background-fixes';
 
-// Android only. Asks for "Allow all the time" at the moment an activity starts, after saying why,
-// then starts a location task with a foreground service. Anything short of a running service
-// returns without one, and the screen-on watcher records as before.
-const rationale = () =>
-  new Promise<boolean>((resolve) =>
-    Alert.alert(
-      BACKGROUND_RATIONALE.title,
-      BACKGROUND_RATIONALE.message,
-      [
-        { text: BACKGROUND_RATIONALE.skip, style: 'cancel', onPress: () => resolve(false) },
-        { text: BACKGROUND_RATIONALE.allow, onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    ),
-  );
-
+// Android only. Starts a location task with a foreground service whenever foreground location
+// permission is held; the service needs no "Allow all the time" (expo-location skips that check
+// when `foregroundService` is set). Without permission there is nothing to start ('skipped': the
+// screen-on watcher reports it); if Android refuses the start it returns 'failed' so the walker is told.
 export const backgroundRecorder: BackgroundRecorder | undefined =
   Platform.OS === 'android'
     ? {
@@ -45,16 +30,6 @@ export const backgroundRecorder: BackgroundRecorder | undefined =
           ) {
             return { result: 'skipped' };
           }
-          let always = await location.getBackgroundPermissionsAsync();
-          if (!always.granted) {
-            if (!always.canAskAgain || !(await rationale())) {
-              return { result: 'denied' };
-            }
-            always = await location.requestBackgroundPermissionsAsync();
-            if (!always.granted) {
-              return { result: 'denied' };
-            }
-          }
           try {
             // A service left by a crashed session would deliver to nobody.
             if (await location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)) {
@@ -74,7 +49,7 @@ export const backgroundRecorder: BackgroundRecorder | undefined =
             });
           } catch {
             setBackgroundFixSink(null);
-            return { result: 'skipped' };
+            return { result: 'failed' };
           }
           return {
             result: 'on',

@@ -52,7 +52,7 @@
         {
           "locationWhenInUsePermission": "TrainingAi uses your location to show local weather and to record the route of a walk or run.",
           "isIosBackgroundLocationEnabled": false,
-          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": true
         }
       ],
@@ -71,7 +71,7 @@
       [
         "react-native-ble-plx",
         {
-          "isBackgroundEnabled": true,
+          "isBackgroundEnabled": false,
           "neverForLocation": true,
           "bluetoothAlwaysPermission": "TrainingAi connects to your heart-rate strap to show and save your heart rate during workouts."
         }
