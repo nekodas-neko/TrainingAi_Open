@@ -99,7 +99,7 @@ export function SignedInDevicesScreen({ onBack }: { onBack: () => void }) {
                 ) : (
                   <AppButton
                     title="Revoke"
-                    variant="ghost"
+                    variant="danger"
                     textVariant="label"
                     accessibilityLabel={`Revoke ${device.label}`}
                     onPress={() => {
