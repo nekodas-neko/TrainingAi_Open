@@ -141,7 +141,21 @@ export function runServiceRecording(
   clock: () => number = Date.now,
 ) {
   const feed = watchServiceFixes(onWatch, clock);
-  const stop = runBackgroundRecording(recorder, sink, notification, onBackground, feed.fix);
+  // When the service does not start, the screen-on watcher drives the watch state. The feed's own
+  // tick would keep overwriting it with an empty state, flipping the status and clearing the problem
+  // the AppState retry keys on.
+  const stop = runBackgroundRecording(
+    recorder,
+    sink,
+    notification,
+    (state) => {
+      if (state === 'failed' || state === 'skipped') {
+        feed.stop();
+      }
+      onBackground(state);
+    },
+    feed.fix,
+  );
   return () => {
     feed.stop();
     stop();

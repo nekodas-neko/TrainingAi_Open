@@ -17,6 +17,7 @@ import {
 } from '../src/integrations/location/background-fixes.ts';
 import {
   GPS_LOST_AFTER_MS,
+  ROUTE_CLOCK_TICK_MS,
   gpsStatus,
   runServiceRecording,
   type RouteWatchState,
@@ -261,6 +262,63 @@ test('the GPS status and live pace follow the service\'s fixes while the screen-
     f.advance(quietFor);
     mock.timers.tick(quietFor);
     assert.equal(readout().status, 'lost');
+    stop();
+    f.done();
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+for (const answer of ['failed', 'skipped'] as const) {
+  test(`the service feed stops driving the watch state once the service is ${answer}`, async () => {
+    mock.timers.enable({ apis: ['setInterval', 'Date'], now: midday });
+    try {
+      const f = fixture(),
+        store = await begun(f),
+        service = new FakeService(answer),
+        states: BackgroundState[] = [];
+      let watchCalls = 0;
+      const stop = runServiceRecording(
+        service,
+        store,
+        backgroundNotification(store.getSnapshot().session!),
+        (state) => states.push(state),
+        () => watchCalls++,
+        f.now,
+      );
+      await settle();
+      assert.ok(states.includes(answer));
+      const before = watchCalls;
+      mock.timers.tick(ROUTE_CLOCK_TICK_MS * 3);
+      assert.equal(watchCalls, before, 'the screen-on watcher is the only writer now');
+      stop();
+      f.done();
+    } finally {
+      mock.timers.reset();
+    }
+  });
+}
+
+test('the service feed keeps driving the watch state while the service is on', async () => {
+  mock.timers.enable({ apis: ['setInterval', 'Date'], now: midday });
+  try {
+    const f = fixture(),
+      store = await begun(f),
+      service = new FakeService('on');
+    let watchCalls = 0;
+    const stop = runServiceRecording(
+      service,
+      store,
+      backgroundNotification(store.getSnapshot().session!),
+      () => {},
+      () => watchCalls++,
+      f.now,
+    );
+    await settle();
+    mock.timers.tick(ROUTE_CLOCK_TICK_MS);
+    assert.equal(watchCalls, 1, 'the clock tick still publishes');
+    service.options!.fix({ lat: origin.lat, lng: origin.lng, t: f.now() });
+    assert.equal(watchCalls, 2, 'a fix still feeds the watch');
     stop();
     f.done();
   } finally {
