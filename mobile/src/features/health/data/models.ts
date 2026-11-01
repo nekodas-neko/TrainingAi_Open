@@ -209,6 +209,9 @@ export const readinessSpec = (date: string) => ({
       inputsMissing: z.array(z.string()).optional(),
       illnessAdvisory: text,
       illnessFlag: text,
+      // The health anomaly alerts read these two (#2843).
+      label: text,
+      hasSufficientData: z.boolean().optional(),
       illnessSuppression: n,
       earlyDeloadRecommended: z.boolean().optional(),
       earlyDeload: z

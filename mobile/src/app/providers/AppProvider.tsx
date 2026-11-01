@@ -10,6 +10,7 @@ import { NutritionProvider } from '../../features/nutrition/data/NutritionProvid
 import { HistoryDownloadProvider } from '../../features/settings/data/HistoryDownloadProvider';
 import { ActivityProvider } from '../../features/activities/data/ActivityProvider';
 import { HomeProvider } from '../../features/home/data/HomeProvider';
+import { HealthAlerts } from '../../features/health/HealthAlerts';
 import { PlatformProvider } from '../../features/platform/PlatformProvider';
 import { OuraHandoffProvider } from '../../features/health/OuraHandoffProvider';
 import { OuraFeedProvider } from '../../features/devices/OuraFeedProvider';
@@ -35,6 +36,7 @@ export function AppProvider({ children }: PropsWithChildren) {
                               <OuraFeedProvider>
                                 <ReportsProvider>
                                   {homeWidgets && <WidgetSync />}
+                                  <HealthAlerts />
                                   {children}
                                 </ReportsProvider>
                               </OuraFeedProvider>
