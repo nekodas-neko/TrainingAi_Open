@@ -1,4 +1,5 @@
 import { budgetProvenance, budgetProvenanceText } from '@trainingai/shared/nutrition/calorie-balance';
+import { movementSummary } from '@trainingai/shared/nutrition/movement-breakdown';
 
 type Balance = {
   restingBaseKcal?: number | null;
@@ -8,6 +9,8 @@ type Balance = {
   deficitKcal?: unknown;
   stepCreditKcal?: unknown;
   ownTargetKcal?: unknown;
+  /** The three addends of `activeKcal`; the workouts clause is built from them. */
+  activeBreakdown?: { workoutKcal?: number; activityKcal?: number; stepsKcal?: number } | null;
 };
 export type BudgetProvenance = ReturnType<typeof budgetProvenance>;
 
@@ -40,5 +43,12 @@ export function budgetLine(provenance: BudgetProvenance, balance?: Balance | nul
   return budgetProvenanceText(provenance, {
     restingBaseKcal: balance?.restingBaseKcal,
     targetNetKcal: typeof balance?.targetNetKcal === 'number' ? balance.targetNetKcal : null,
+    movementParts: balance?.activeBreakdown
+      ? movementSummary({
+          workoutKcal: balance.activeBreakdown.workoutKcal ?? 0,
+          activityKcal: balance.activeBreakdown.activityKcal ?? 0,
+          stepsKcal: balance.activeBreakdown.stepsKcal ?? 0,
+        })
+      : null,
   });
 }

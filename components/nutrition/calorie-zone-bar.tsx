@@ -3,7 +3,7 @@
 import { memo } from 'react'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { CalorieProgressBar } from '@/components/nutrition/calorie-progress-bar'
-import { movementSummary } from '@/components/nutrition/movement-breakdown'
+import { movementSummary } from '@trainingai/shared/nutrition/movement-breakdown'
 
 /**
  * The day's calorie progress, and a line saying where the budget came from.

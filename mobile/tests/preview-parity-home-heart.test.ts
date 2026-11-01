@@ -33,6 +33,25 @@ test('a budget held at its floor reads as the web does', () => {
   assert.equal(balanceProvenance({ restingBaseKcal: 1500, activeKcal: null, targetNetKcal: 0 }), null);
 });
 
+test('the budget line ends with the workouts clause the web shows, from the shared builder', () => {
+  const input = {
+    restingBaseKcal: 1500,
+    activeKcal: 547,
+    targetNetKcal: 0,
+    restingRateKcal: 1500,
+    deficitKcal: 0,
+    stepCreditKcal: 0,
+  };
+  const p = balanceProvenance(input)!;
+  const line = budgetLine(p, {
+    ...input,
+    activeBreakdown: { workoutKcal: 320, activityKcal: 0, stepsKcal: 227 },
+  });
+  assert.match(line, /earned from movement \(320 kcal workouts · 227 kcal steps\)$/);
+  // No breakdown on the payload, or nothing earned: no clause, as before.
+  assert.doesNotMatch(budgetLine(p, input), /\(/);
+});
+
 test('Home and the Nutrition tab print the budget line from the same function', async () => {
   for (const file of [
     'features/home/components/HomeWidgets.tsx',
