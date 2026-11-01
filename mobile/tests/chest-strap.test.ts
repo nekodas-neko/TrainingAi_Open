@@ -18,6 +18,7 @@ import {
   UPLOAD_BATCH,
   type StrapSample,
 } from '../src/features/devices/strap/HrOutbox.ts';
+import { liveBpmWaitingText, noStrapHint, strapLinkLabel } from '../src/features/devices/strap/labels.ts';
 import { StrapSession } from '../src/features/devices/strap/StrapSession.ts';
 import { ApiError } from '../src/features/account/api/client.ts';
 import type {
@@ -702,4 +703,26 @@ test('the firmware revision is recorded once, after pairing', async () => {
   await clock.advance(1);
   assert.equal(session.getSnapshot().paired?.firmware, '3.0.35');
   assert.equal(JSON.parse(storage.values.get('paired-hr-strap.v1')!).firmware, '3.0.35');
+});
+
+test('the live-bpm line words each link state, never "connecting" for a Bluetooth or permission fault', async () => {
+  const { session } = await pairedSession();
+  const base = session.getSnapshot();
+  const labels = (['connected', 'connecting', 'waiting', 'radioOff', 'idle'] as const).map((link) =>
+    liveBpmWaitingText({ ...base, link }),
+  );
+  assert.equal(labels[0], 'Waiting for a reading…');
+  assert.equal(labels[3], 'Bluetooth is off');
+  assert.equal(labels[2], 'Strap not reachable — retrying');
+  for (const [i, link] of (['connecting', 'waiting', 'radioOff', 'idle'] as const).entries())
+    assert.equal(labels[i + 1], strapLinkLabel({ ...base, link }));
+  assert.equal(new Set(labels).size, 5);
+});
+
+test('the prescribed-run card hints at pairing only when no strap is paired', async () => {
+  const { session } = await pairedSession();
+  const base = session.getSnapshot();
+  assert.ok(base.paired);
+  assert.equal(noStrapHint(base), null);
+  assert.match(noStrapHint({ ...base, paired: null })!, /Pair a chest strap/);
 });

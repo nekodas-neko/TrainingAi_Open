@@ -47,6 +47,16 @@ export function strapLinkLabel(state: StrapState): string {
   }
 }
 
+/** What the live-bpm line says while the strap has no reading to show, worded per link state. */
+export function liveBpmWaitingText(state: StrapState): string {
+  return state.link === 'connected' ? 'Waiting for a reading…' : strapLinkLabel(state);
+}
+
+/** The prescribed-run card's heart-rate hint: only when no strap is paired, so it never contradicts a live reading. */
+export function noStrapHint(state: StrapState): string | null {
+  return state.paired ? null : 'Pair a chest strap in Devices for live heart rate.';
+}
+
 /**
  * The rest-screen Live HR card, as the current app's `LiveHrChart` computes it: the rest window of
  * the workout's plausible readings, a 3-sample rolling median, the last smoothed value as the big

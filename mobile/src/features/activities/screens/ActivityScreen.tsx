@@ -29,6 +29,8 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { z } from 'zod';
 import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { useStrap } from '../../devices/strap/StrapProvider';
+import { noStrapHint } from '../../devices/strap/labels';
 import { LiveStrapBpm } from '../components/LiveStrapBpm';
 import { useRouteRecording } from '../data/useRouteRecording';
 import { gpsStatusText, routeEligible } from '../data/route-recording';
@@ -53,6 +55,7 @@ function ManualActivityScreen({
         )
       : null;
   const { theme } = useTheme();
+  const strapHint = noStrapHint(useStrap().state);
   const gps = useRouteRecording();
   // The done screen shows what will be saved: the same builder the save uses. Only built there;
   // while recording, the live readout comes from `useRouteRecording`.
@@ -273,9 +276,11 @@ function ManualActivityScreen({
                 {session.target.minutes == null ? '' : `${session.target.minutes} min · `}
                 {session.target.hrLow}–{session.target.hrHigh} bpm target
               </AppText>
-              <AppText variant="micro" tone="muted">
-                Live heart rate is not connected.
-              </AppText>
+              {strapHint && (
+                <AppText variant="micro" tone="muted">
+                  {strapHint}
+                </AppText>
+              )}
             </Card>
           )}
         </Stack>

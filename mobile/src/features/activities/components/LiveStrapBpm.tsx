@@ -2,7 +2,7 @@ import { AppText, Icon, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useClock } from '../../../shared/hooks/useClock';
 import { useStrap } from '../../devices/strap/StrapProvider';
-import { liveHrView } from '../../devices/strap/labels';
+import { liveBpmWaitingText, liveHrView } from '../../devices/strap/labels';
 
 /**
  * The strap's heart rate while a walk, run or guided walk is recording (#3527). Shown only with a
@@ -20,7 +20,7 @@ export function LiveStrapBpm() {
       <Icon name="health" color={theme.colors.brand} />
       {view.bpm === null ? (
         <AppText variant="caption" tone="muted">
-          {state.link === 'connected' ? 'Waiting for a reading…' : 'Connecting to your strap…'}
+          {liveBpmWaitingText(state)}
         </AppText>
       ) : (
         <>
