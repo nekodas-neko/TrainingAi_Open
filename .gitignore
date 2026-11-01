@@ -113,3 +113,6 @@ __check_fixture__/
 
 # Logs from scripts/agent-runner.mjs
 .agent-runs/
+
+# Switch-over backups of the installed APK (scripts/native-switch-over/install.mjs)
+native-switch-over-backups/

@@ -403,6 +403,9 @@ and the checks start.
   scale or the strap. The Implementer installs it once, with your OK; **uninstalling it is
   harmless**, unlike the real app. Details:
   [`canonical-runtime-android.md`](canonical-runtime-android.md#trainingai-dev--unreleased-code-on-the-phone-2367).
+- **Switching to the native app, or rolling back:** follow
+  [`runbooks/native-switch-over.md`](runbooks/native-switch-over.md). It installs with one wrapper that
+  refuses to uninstall and needs your explicit yes.
 
 ### The agent key: turning it on, rotating it, turning it off (issue 2381)
 
