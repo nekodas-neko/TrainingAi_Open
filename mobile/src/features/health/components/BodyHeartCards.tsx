@@ -308,7 +308,7 @@ export function TrainingLoadCard() {
         <AppText variant="eyebrow" tone="muted">
           Training Load (ACWR)
         </AppText>
-        <ResourceStatus inline label="Training Load" state={load} refresh={load.refresh} />
+        <ResourceStatus inline whenActive label="Training Load" state={load} refresh={load.refresh} />
       </Stack>
       {baselining ? (
         <AppText variant="heading">Baselining new routine</AppText>

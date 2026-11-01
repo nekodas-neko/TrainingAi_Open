@@ -80,7 +80,7 @@ export function HealthScreen({
   }
   return (
     <PageLayout
-      landing
+      fillBottom
       title="Health"
       subtitle="Body & training"
       actions={

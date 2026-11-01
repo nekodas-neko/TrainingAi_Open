@@ -1,4 +1,3 @@
-import { statusVisible } from '../health/data/status-visible';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { displayOneRm, displayOneRmSeries, oneRmLabel } from '@trainingai/shared/1rm';
@@ -90,9 +89,10 @@ export function StrengthScreen({
                   </AppText>
                   {/* The status slot is 48 px even when idle, which made this card's title row three
                       times the current app's and pushed "90 days" in from the edge. */}
-                  {embedded && statusVisible(strength) && (
+                  {embedded && (
                     <ResourceStatus
                       inline
+                      whenActive
                       label="Strength trend"
                       state={strength}
                       refresh={strength.refresh}
@@ -198,6 +198,7 @@ export function StrengthScreen({
                 </AppText>
                 <ResourceStatus
                   inline
+                  whenActive
                   label="Strength trend"
                   state={strength}
                   refresh={strength.refresh}

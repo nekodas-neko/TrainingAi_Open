@@ -255,6 +255,7 @@ export function ActivityTrendCharts() {
               status={
                 <ResourceStatus
                   inline
+                  whenActive
                   label="Activity trends"
                   state={state}
                   refresh={state.refresh}
