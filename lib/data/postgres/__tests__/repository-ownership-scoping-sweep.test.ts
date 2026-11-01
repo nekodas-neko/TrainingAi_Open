@@ -299,7 +299,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       v => { expect(leaked(v)).toEqual([]); expect(Object.values(v as object).flat()).toEqual([]) }],
     ['getSessionExercise1rms', r => r.getSessionExercise1rms(USER_A, bId('workout_sessions'))],
     // day keys and body metrics
-    ['listStepDayKeys', r => r.listStepDayKeys(USER_A, FROM, TO)],
     ['listSleepDayKeys', r => r.listSleepDayKeys(USER_A, FROM, TO)],
     ['listStepTotals', r => r.listStepTotals(USER_A, FROM, TO)],
     ['listFoodLogDayKeys', r => r.listFoodLogDayKeys(USER_A, FROM, TO)],

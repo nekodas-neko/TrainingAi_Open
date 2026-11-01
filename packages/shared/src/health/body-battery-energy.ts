@@ -36,14 +36,11 @@ export type EnergyHero =
 const clamp = (value: number) => Math.max(0, Math.min(100, value))
 
 /**
- * The figure the hero draws before it is held under the morning mark.
- *
- * THE ONE LINE TO CHANGE if the owner picks "show the live level" on #2989: return
- * `data.current`. Today's rule (owner, 26 Oct, "drawn down-only") is the lowest the day has been,
- * because Body Battery recharges at rest and the hero must not climb back.
+ * The figure the hero draws before it is held under the morning mark: Body Battery's current
+ * level (owner, 26 Oct, on #2989). It rises after a nap or a quiet hour, up to the morning mark.
  */
 function figureShown(data: BodyBatteryEnergyInput): number {
-  return Math.min(data.anchor, data.current, ...data.series.map((point) => point.v))
+  return data.current
 }
 
 export function energyHero(data: BodyBatteryEnergyInput | null | undefined): EnergyHero {

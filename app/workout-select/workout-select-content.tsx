@@ -365,7 +365,7 @@ export default function WorkoutSelectContent() {
           onTouchEnd={handleTouchEnd}
         >
           <div
-            className={cn("h-full rounded-2xl border p-4 flex flex-col gap-3 overflow-hidden", p.bgClass, p.borderClass, trainedToday && "ring-1 ring-green-500/40")}
+            className={cn("h-full rounded-2xl border p-4 flex flex-col gap-3 overflow-hidden", p.bgClass, p.borderClass, trainedToday && "ring-1 ring-accent-green/40")}
             style={{ willChange: 'transform' }}
           >
 
@@ -415,7 +415,7 @@ export default function WorkoutSelectContent() {
                         </p>
                       )}
                       {currentSessionPhase?.isDeloadActive && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                        <p className="text-xs text-accent-amber">
                           {currentSessionPhase.phase.phaseType === 'deload' ? 'Deload Week' : 'Recovery Week'}
                         </p>
                       )}
@@ -475,7 +475,7 @@ export default function WorkoutSelectContent() {
                 onClick={() => currentSession && handleStart(currentSession)}
                 className={cn(
                   "flex-none w-full rounded-xl py-3 text-sm font-bold hover:opacity-90 active:scale-95 transition-transform",
-                  trainedToday ? "bg-muted border border-green-500/40 text-foreground" : "text-brand-foreground",
+                  trainedToday ? "bg-muted border border-accent-green/40 text-foreground" : "text-brand-foreground",
                 )}
                 style={!trainedToday ? { background: "var(--color-brand)" } : {}}
               >

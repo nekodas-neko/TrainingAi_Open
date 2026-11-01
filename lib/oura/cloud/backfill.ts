@@ -14,9 +14,10 @@ import { dateStrMidnightInTz, daysBetweenDateStrs, DEFAULT_TZ, isCalendarDate, s
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { OuraUnavailableError } from './client'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
-import { fetchOuraDocuments, fetchOuraHeartRate, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
-import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType } from './documents'
-import { NO_WRITES, plannedCounts, reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
+import { fetchOuraDocuments, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
+import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, mapRingBatteryRows, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType, type OuraSeriesType } from './documents'
+import { NO_WRITES, plannedCounts, reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraBatteryStore, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
+import { stampOuraData } from './freshness'
 import { stillRhrRefresher, type StillRhrRefresh } from './still-rhr'
 import { reportOuraCloudIssue } from './report'
 import type { NightRescoreRepo } from '@/lib/health/rescore-nights'
@@ -40,14 +41,23 @@ export interface OuraBackfillOptions {
   dryRun: boolean
   /** Also read the heart-rate series. */
   heartRate: boolean
+  /** #3069: also read the ring's battery (`ring_battery_level`) into `oura_ble_battery_poll`. */
+  ringBattery?: boolean
   /** The user's timezone: day boundaries for the heart-rate window. */
   tz: string
   /**
    * #3087, #3153: tombstone a stored workout or session on a day whose list of that type was read
    * completely when Oura's list for that day no longer has it: the catch-up for a missed `workout`
-   * or `session` delete event. The daily reconcile sets it.
+   * or `session` delete event. The daily reconcile sets it, and so does the `oura-cloud-backfill` agent
+   * job (#3389). On a dry run nothing is written and the report counts what would be tombstoned.
    */
   tombstoneAbsent?: boolean
+  /**
+   * #2861: stamp `last_data_at` when documents or heart-rate points land. Default true. The daily
+   * reconcile and the admin backfill pass false: they re-read days already stored, so what they
+   * return is not new data from the ring and must not make a stale ring look fresh.
+   */
+  stampData?: boolean
 }
 
 export interface OuraBackfillReport {
@@ -55,14 +65,14 @@ export interface OuraBackfillReport {
   from: string
   to: string
   /** Documents read per type. */
-  documents: Partial<Record<OuraDocumentType | 'heartrate', number>>
+  documents: Partial<Record<OuraDocumentType | OuraSeriesType, number>>
   /** Documents that did not match the spec and were left out. */
   dropped: number
   /** Written (or, for a dry run, planned). A dry run cannot know how many sleep periods overlap. */
   counts: OuraCloudWriteCounts
-  /** #3087: stored workouts tombstoned because Oura's list for their day no longer has them. */
+  /** #3087: stored workouts tombstoned because Oura's list for their day no longer has them (on a dry run, would be). */
   workoutsTombstoned: number
-  /** #3153: stored sessions tombstoned the same way. */
+  /** #3153: stored sessions tombstoned the same way (on a dry run, would be). */
   sessionsTombstoned: number
   /** Types Oura refused (403: membership or consent), and why the run stopped early, if it did. */
   forbidden: string[]
@@ -81,7 +91,7 @@ export interface OuraBackfillReport {
 }
 
 export type OuraBackfillDeps = {
-  repo: OuraCloudWriter & OuraTokenStore
+  repo: OuraCloudWriter & OuraTokenStore & Partial<OuraBatteryStore>
   config: OuraOAuthConfig
   /** How a Retry-After is waited out; replaceable for tests. */
   wait?: (ms: number) => Promise<void>
@@ -97,11 +107,13 @@ export type OuraBackfillResult =
   | { ok: true; report: OuraBackfillReport }
   | { ok: false; error: 'not_connected' | 'reauth' | 'invalid_range' }
 
-function chunks(from: string, to: string, size: number): [string, string][] {
+/** `overlap` starts every chunk after the first that many days early, so its first day is also the
+ *  last day of the chunk before (#3429). */
+function chunks(from: string, to: string, size: number, overlap = 0): [string, string][] {
   const days = daysBetweenDateStrs(from, to) + 1
   const out: [string, string][] = []
   // A day count, never a string-compared loop bound (see `shiftDateStr`).
-  for (let i = 0; i < days; i += size) out.push([shiftDateStr(from, i), shiftDateStr(from, Math.min(i + size, days) - 1)])
+  for (let i = 0; i < days; i += size) out.push([shiftDateStr(from, i === 0 ? 0 : i - overlap), shiftDateStr(from, Math.min(i + size, days) - 1)])
   return out
 }
 
@@ -183,14 +195,22 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   // Each chunk's last day is left out too: the pinned spec does not say whether `end_date` is
   // inclusive, and if it is not, that day was never read. It is checked by a later read instead (the
   // reconcile runs daily over three days, so a day reaches the middle of the window the next morning).
+  // Chunks overlap by a day, so a day one chunk leaves out is the first day, surely read, of the next;
+  // only the range's own last day is left to the reconcile (#3429). A document on the shared day comes
+  // back twice and is kept once.
   const readWhole: { type: AbsentTombstoneType; from: string; to: string; keepIds: string[] }[] = []
+  const seenDocs = new Set<string>()
   read: for (const type of OURA_DOCUMENT_TYPE_NAMES) {
     if (!isOuraTypeShared(granted, type)) { report.notShared.push(type); continue }
-    for (const [from, to] of chunks(opts.from, opts.to, DOC_CHUNK_DAYS)) {
+    for (const [from, to] of chunks(opts.from, opts.to, DOC_CHUNK_DAYS, 1)) {
       try {
         const got = await withRetry(() => fetchOuraDocuments(token, type, from, to))
-        docs.push(...got.docs)
-        report.documents[type] = (report.documents[type] ?? 0) + got.docs.length
+        const fresh = got.docs.filter(d => {
+          const id = (d.doc as { id?: string }).id
+          return id == null || !seenDocs.has(`${d.type}:${id}`) && !!seenDocs.add(`${d.type}:${id}`)
+        })
+        docs.push(...fresh)
+        report.documents[type] = (report.documents[type] ?? 0) + fresh.length
         report.dropped += got.dropped
         if (isAbsentTombstoneType(type) && got.complete && got.dropped === 0 && daysBetweenDateStrs(from, to) > 0) {
           readWhole.push({ type, from, to: shiftDateStr(to, -1), keepIds: got.docs.flatMap(d => d.type === type ? [d.doc.id] : []) })
@@ -216,8 +236,11 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   }
   const writes = mapOuraDocuments(docs)
   report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes, deps.rescore, deps.stillRhr)
-  if (opts.tombstoneAbsent && !opts.dryRun) {
-    for (const { type, ...range } of readWhole) {
+  // #2861: documents that landed count as data received; an empty read does not.
+  if (!opts.dryRun && opts.stampData !== false && docs.length > 0) await stampOuraData(deps.repo, userId)
+  if (opts.tombstoneAbsent) {
+    for (const { type, ...whole } of readWhole) {
+      const range = opts.dryRun ? { ...whole, dryRun: true } : whole
       if (type === 'workout') report.workoutsTombstoned += await deps.repo.tombstoneOuraWorkoutsAbsent(userId, range)
       else report.sessionsTombstoned += await deps.repo.tombstoneOuraSessionsAbsent(userId, range)
     }
@@ -235,6 +258,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
         if (!opts.dryRun && points.length > 0) {
           const write = await deps.repo.upsertOuraCloudHeartrate(userId, points, opts.tz)
           written = write.offered
+          if (written > 0 && opts.stampData !== false) await stampOuraData(deps.repo, userId)
           await reattributeAfterHeartRate(deps.workoutHr, userId, write, opts.tz, 'backfill-heartrate:workouts')
           await refreshStillRhrAfterHeartRate(deps.stillRhr, userId, write, opts.tz)
         }
@@ -254,6 +278,35 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
         }
         if (stop(err)) break
         throw err
+      }
+    }
+  }
+  // #3069: the ring's battery, 7 days a request like the heart rate. Written only on a real run.
+  if (opts.ringBattery && !report.stoppedEarly && deps.repo.insertOuraCloudBatteryReadings) {
+    if (!isOuraTypeShared(granted, 'ring_battery')) report.notShared.push('ring_battery')
+    else {
+      for (const [from, to] of chunks(opts.from, opts.to, HR_CHUNK_DAYS)) {
+        try {
+          const got = await withRetry(() => fetchOuraRingBattery(token, dateStrMidnightInTz(from, opts.tz), dateStrMidnightInTz(shiftDateStr(to, 1), opts.tz)))
+          report.documents.ring_battery = (report.documents.ring_battery ?? 0) + got.rows.length
+          report.dropped += got.dropped
+          if (!opts.dryRun) await deps.repo.insertOuraCloudBatteryReadings(userId, mapRingBatteryRows(got.rows))
+        } catch (err) {
+          if (err instanceof OuraForbiddenError) { report.forbidden.push('ring_battery'); break }
+          if (err instanceof OuraUnauthorizedError) {
+            let why: true | OuraRefusalVerdict
+            try {
+              why = await refusedTypeOnly('ring_battery')
+            } catch (probeErr) {
+              if (stop(probeErr)) break
+              throw probeErr
+            }
+            if (why !== true) stop(err, why)
+            break
+          }
+          if (stop(err)) break
+          throw err
+        }
       }
     }
   }
@@ -303,7 +356,7 @@ export function startOuraConnectBackfill(userId: string): void {
       const to = todayInTz(tz)
       const { workoutHrReattributor } = await import('@/lib/workout/post-completion-hr')
       const result = await backfillOuraCloud({ repo, config, rescore: repo, workoutHr: workoutHrReattributor(repo), stillRhr: stillRhrRefresher(repo) }, userId, {
-        from: shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1)), to, dryRun: false, heartRate: true, tz,
+        from: shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1)), to, dryRun: false, heartRate: true, ringBattery: true, tz,
       })
       // A connect whose history did not arrive is otherwise invisible: the account reads connected.
       if (!result.ok) {

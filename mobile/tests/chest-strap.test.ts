@@ -231,11 +231,11 @@ test('the outbox survives a restart, keeps to its own account and drops only una
     ...account,
     post: async () => Promise.reject(new Error('offline')),
   }).append(samples(2));
-  const statuses = [429, 400];
+  const failures = [new ApiError(429), new ApiError(400, undefined, undefined, undefined, true)];
   const reopened = new HrOutbox(storage, {
     ...account,
     post: async () => {
-      throw new ApiError(statuses.shift()!);
+      throw failures.shift()!;
     },
   });
   await reopened.sync();
@@ -254,6 +254,25 @@ test('the outbox survives a restart, keeps to its own account and drops only una
   });
   await other.sync();
   assert.equal(other.pending(), 0);
+});
+
+test('a 400 that is not our JSON error (a proxy page) keeps the batch for retry', async () => {
+  const storage = memoryStorage();
+  let html = true;
+  const outbox = new HrOutbox(storage, {
+    origin: 'https://example.test',
+    userId: 'u1',
+    post: async () => {
+      if (html) throw new ApiError(400);
+      return {};
+    },
+  });
+  await outbox.append(samples(2));
+  await outbox.sync();
+  assert.equal(outbox.pending(), 2);
+  html = false;
+  await outbox.sync();
+  assert.equal(outbox.pending(), 0);
 });
 
 test('the outbox caps what it keeps through a long outage', async () => {

@@ -579,8 +579,10 @@ export async function aggregateSignals(
 
   // SpO2 trend — same recent-3-vs-older-baseline pattern, reusing the bodyMetrics
   // already fetched for HRV above. A drop can flag illness/altitude/poor recovery.
+  // #3383: both stretches from the device in use — the ring's uncalibrated SpO2 is never compared with
+  // Oura's — and unknown (null) until that device alone has the four nights the comparison needs.
   let spo2Trend: number | null = null
-  const spo2Rows = bodyMetrics.filter(m => m.spo2Pct != null && m.spo2Pct > 0)
+  const spo2Rows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.spo2Pct != null && m.spo2Pct > 0), m => m.spo2Pct, m => m.spo2Source)
   if (spo2Rows.length >= 4) {
     const sorted = [...spo2Rows].sort((a, b) => b.date.localeCompare(a.date))
     const recent3 = sorted.slice(0, 3)

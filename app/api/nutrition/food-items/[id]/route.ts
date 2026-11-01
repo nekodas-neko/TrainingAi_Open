@@ -11,7 +11,8 @@ const NO_STORE = { 'Cache-Control': 'private, no-store' }
  * the sync endpoint stored. The list route stops at 20 names and cannot answer this.
  *
  * Another user's id and an unknown id answer the same 404, so the route cannot be used to probe
- * which ids exist. `food_items` has no `deleted_at`, so there is no tombstone state to report.
+ * which ids exist. A tombstoned `food_items` row (#2417) still
+ * answers: a log from a device that has not synced must keep resolving it.
  * The body is the same `FoodItem` the list route returns.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

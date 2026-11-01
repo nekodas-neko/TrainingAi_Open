@@ -145,9 +145,9 @@ export default function CalibrationCard({
           </div>
 
           {data.notes.length > 0 && (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 space-y-1">
+            <div className="rounded-lg border border-accent-amber/40 bg-accent-amber/10 p-3 space-y-1">
               {data.notes.map((n, i) => (
-                <p key={i} className="text-xs text-amber-700 dark:text-amber-400">{n}</p>
+                <p key={i} className="text-xs text-accent-amber">{n}</p>
               ))}
             </div>
           )}

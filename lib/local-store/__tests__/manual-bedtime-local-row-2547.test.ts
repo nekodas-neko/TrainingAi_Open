@@ -30,6 +30,7 @@ const BEDTIME = '2026-10-05T13:15:00.000Z'
 beforeEach(() => {
   db.current = new DatabaseSync(':memory:')
   db.current.exec(`
+    CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE mutations_outbox (id TEXT PRIMARY KEY, user_id TEXT, domain TEXT, date TEXT, payload TEXT);
     CREATE TABLE sleep_sessions (
       id TEXT PRIMARY KEY, date TEXT, duration_hours REAL, deep_sleep_hours REAL, rem_sleep_hours REAL,

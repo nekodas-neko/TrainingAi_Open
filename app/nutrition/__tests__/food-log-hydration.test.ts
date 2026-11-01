@@ -82,4 +82,25 @@ describe('food-log hydration carries the meal grouping', () => {
     const [row] = toLocalFoodItems([log()], '2026-08-31T08:00:00.000Z')
     expect(row).toMatchObject({ id: 'item-1', name: 'Peanut Butter', calories: 120, proteinG: 5, carbsG: 3, fatG: 10 })
   })
+
+  it('skips a food whose id is retired, so a server log cannot re-create its row (#3468)', () => {
+    const rows = toLocalFoodItems(
+      [log(), log({ id: 'log-2', foodItemId: 'item-2' })],
+      '2026-08-31T08:00:00.000Z',
+      ['item-1'],
+    )
+    expect(rows.map(r => r.id)).toEqual(['item-2'])
+    expect(toLocalFoodItems([log()], '2026-08-31T08:00:00.000Z')).toHaveLength(1)
+  })
+
+  it('carries the server\'s retirement of a food, so applyDelta hides it but its log still draws (#3486)', () => {
+    const retired = log({ id: 'log-2', foodItemId: 'item-2', foodItem: { ...log().foodItem, deletedAt: '2026-10-10T10:05:00.000Z' } })
+    const live = log({ id: 'log-3', foodItemId: 'item-3', foodItem: { ...log().foodItem, deletedAt: null } })
+    const rows = toLocalFoodItems([log(), retired, live], '2026-08-31T08:00:00.000Z')
+    expect(rows.map(r => r.id)).toEqual(['item-1', 'item-2', 'item-3'])
+    expect(rows[1].deletedAt).toBe('2026-10-10T10:05:00.000Z')
+    // A live food carries no `deletedAt` key, so the upsert never reads it as a revival.
+    expect('deletedAt' in rows[0]).toBe(false)
+    expect('deletedAt' in rows[2]).toBe(false)
+  })
 })

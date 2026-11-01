@@ -30,7 +30,7 @@ export async function auth(): Promise<Session | null> {
     if (!session.user?.id) {
       return null
     }
-    const claims = await refreshIsActiveClaim({ userId: session.user.id, isActive: session.isActive, isAdmin: session.user.isAdmin }, lookupUser)
+    const claims = await refreshIsActiveClaim({ userId: session.user.id, isActive: session.isActive, isAdmin: session.user.isAdmin, signedInAt: session.signedInAt }, lookupUser)
     if (!claims.isActive) {
       return null
     }

@@ -1,6 +1,7 @@
 import type { MacroTotals } from '@trainingai/shared/nutrition/meal-macro-fit'
 import type { SharedMeal, SharedMealIngredient } from '@trainingai/shared/nutrition/label-payload'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
+import { QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds'
 import { saveMealToLibrary } from './save-meal'
 
 /**
@@ -131,6 +132,6 @@ export function sharedIngredientToEntry(ing: SharedMealIngredient): {
     },
     // The saved-meal schema floors a multiplier at 0.01, and a 0.5 g pinch rounds to 0.00 two
     // decimals in — which would drop it from the meal entirely.
-    quantityMultiplier: Math.max(0.01, Math.round((ing.weightG / 100) * 100) / 100),
+    quantityMultiplier: Math.max(QUANTITY_MULTIPLIER_MIN, Math.round((ing.weightG / 100) * 100) / 100),
   }
 }

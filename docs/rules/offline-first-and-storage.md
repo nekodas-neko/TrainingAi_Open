@@ -63,6 +63,19 @@ depends on column <col>`, and that is the statement someone pastes during an inc
 rebuild recreates the view from `claude-ro-views.sql`. Check the table against that file; tables
 with no view need no `DROP VIEW`.
 
+**A column added to `schema.ts` is load-bearing from the release that adds it** (#3435). Drizzle selects
+every column in the table's definition, so once `schema.ts` names the column, every full-row
+`select()` of that table selects it (projected reads do not), and a migration that has not run (or
+failed) breaks every full-row `select()` of the table, not only the feature that uses the column.
+The migration comment "an older build that never reads the column behaves exactly as before"
+(`202610260017_users_sessions_valid_from.sql`) is therefore wrong for the release that ships the
+schema change together with the migration: it holds for a build that predates the column, not for
+the one that adds it. That comment sits in an applied migration and is not edited; this is the
+correction. Read it as "so no code reads a column that is not there", which
+holds only once the migration has run before the code that names the column. Ship the migration
+alone and apply it before the code that names the column (CLAUDE.md: a migration never rides in a
+batch), and treat a failed migration as a failed release for every user.
+
 **⚠ The generator reads `LOCAL_DATABASE_URL`, not `DATABASE_URL`** (LA-161). The wrong one does not
 fail: it reads the session's dev database, and anything hand-applied there reaches the file. Build a
 scratch database (`CREATE DATABASE` + `node scripts/local-db/migrate.js`) if in doubt.
@@ -95,3 +108,79 @@ The `pg` Pool in `lib/data/postgres/client.ts` MUST keep its `pool.on('error', �
 **Accepted risk — TLS `rejectUnauthorized: false` (SEC-I6):** the prod SSL config is encrypted-but-unauthenticated TLS to Postgres. This is deliberate and is Railway's standard pattern (its managed Postgres uses self-signed certs, so certificate verification would fail). The app↔DB link is on Railway's private network. Do **not** cargo-cult this setting into any other outbound connection (external APIs, webhooks) — it belongs only on this Railway-internal DB link. If Railway ever exposes the instance CA, pin it via `ssl.ca` and flip `rejectUnauthorized` back on.
 
 ---
+
+## A reset, a deletion or a different account must not let old rows come back (#3369)
+
+The stores are offline-first, so an admin's reset of a user's data is undone by the next upload from
+any device that still holds the old rows. The guarantees, and where each lives:
+
+- **Every write carries the device's data epoch, and the server refuses a stale one with 409.**
+  `middleware.ts` (via `lib/auth/data-epoch-gate.ts`) is the one place; no route is edited and a new
+  route is covered. The account's epoch rides in the session token (`userClaims` → `dataEpoch`); the
+  device's rides in `X-Data-Epoch` (Preview) or the `ta_data_epoch` cookie (the Capacitor app, whose
+  Kotlin ring service forwards the WebView's cookies). Reads, `/api/auth/*` and `DELETE /api/account`
+  are never gated. `fetch` is wrapped once at the root (`lib/data-epoch-fetch.ts`): a 409 wipes and reloads.
+- **A device records which user id owns its local store** (`lib/local-store/device-owner.ts`;
+  Preview: `src/features/account/device-record.ts`). Signing in as a different id wipes before any read or sync.
+  `getLocalStore` answers null while another account's rows are there. This is what covers delete then re-signup.
+  **A device with no record** (every install, on the first launch of the version that records one)
+  looks at its store and at how the session began. Empty: claimed. Rows, and the session predates the
+  update (its token has no `signedInAt`, so it is the session that wrote them): **adopted, nothing
+  wiped, outbox kept.** Rows, and a fresh sign-in (it has `signedInAt`): the same account signing in
+  again after an expired or lost cookie, or delete then re-signup. The outbox tells them apart: **an
+  entry stamped with the signed-in `user_id`, of any status (pending, in backoff, failed), proves the
+  rows are that account's, so the device adopts them and wipes nothing.** A replacement account never
+  has its new id in the outbox. With no such entry, the account's own queued writes are pushed first
+  (best effort; outbox only, no stranded-row sweep), the outbox is checked again, and only if it still
+  holds nothing for the account is everything wiped and claimed. The push is capped at 10 s: at the
+  cap it is aborted and waited for, so a push never runs alongside the wipe, and if it will not stop
+  the wipe does not happen. If any look fails the store stays closed and the next call asks again
+  after a short doubling backoff (5 s up to 60 s), not on every call; a record that cannot be written
+  is treated the same way. `/api/account/data-epoch` leaves `signedInAt` out for a bearer request
+  (a native token is re-stamped on every rotation), which the device reads as "cannot tell". Preview, a
+  phone with no record that also holds another account's scope: only the other accounts' scopes are
+  wiped; the signed-in account's scope and outbox stay, and it is not signed out (#3396). Queued
+  localStorage uploads count as data; cached responses do not. An empty
+  user id is never recorded as an owner.
+- **Neither app pushes the previous owner's unsent writes before an account change (#3435).** The web
+  wipes straight away on a known different owner (`resolveStoreOwnerMismatch` → `wipeAndClaim`); its
+  push-before-wipe (`pushOwnOutboxBeforeWipe`, on a recordless device) only drains the signed-in
+  account's own entries. Preview holds one session slot: sign-out removes the saved session from secure storage, and a
+  sign-out the person chose also revokes its tokens on the server, so by the time another account
+  signs in nobody holds a credential that could send the previous owner's queue (`HistoryOutbox`, the
+  journal, the strap and scale outboxes, the Health Connect queue). Signing in as anyone but the
+  recorded owner (`reconcileDevice`, `device-record.ts`) then wipes every account scope. **What is
+  lost:** whatever that previous owner had logged on this phone and not yet synced when they signed
+  out, and it is lost at the new account's sign-in, not at sign-out. Their synced data is on the
+  server and returns on their next sign-in. Nothing is lost when the same account signs back in with
+  no admin reset since (after a reset that account's own scope is wiped too). A phone with no record
+  loses every other account's scope, since it cannot tell which are orphans. No push is invented for
+  this in either app: it would need a flush before sign-out clears the session, which is a new
+  feature, not parity with the web, and not a change to the wipe. Until that exists, the wipe stays, because the scopes it
+  removes belong to a person who is not the one holding the phone.
+- **Device-scoped state that describes the previous owner is reset when the owner changes.** The wipe
+  leaves the `device` scope alone, so state in it that means "this person's situation" outlives the
+  account. `reconcileDevice` calls `ownerChanged` after a wipe for a different owner (and after
+  clearing other accounts on a recordless phone), and Preview uses it to set the ring battery alert's
+  `fired` flag back to false so the next account's first low reading alerts. The level and the on/off
+  the person chose are kept. It is best effort; a failure never blocks the sign-in. A same-owner
+  reset does not call it. Any new device-scoped key with such a flag joins that hook.
+- **A wipe that fails opens nothing.** The epoch record, and the cookie the server's gate reads, are
+  written only after every clear (each SQLite table, the cache) succeeded. A partial wipe keeps the
+  gate closed and the next launch wipes again; the clears raise instead of being swallowed.
+- **A covered write holds off a reset and a reset holds off a covered write**
+  (`lib/data/postgres/user-write-barrier.ts`, an advisory lock). The sync push and the ring-sample
+  ingest use it; the other upload paths rely on the 409 gate alone. **Pool cost (#3435):** each
+  covered write holds one pooled connection for its whole duration, and the pool is 10, so roughly ten
+  covered writes at once would leave the rest waiting out `connectionTimeoutMillis` (5 s) and failing.
+  That is not realistic for the few users today, and there is no cheap fix: the shared lock lives on the
+  session, so the connection cannot be returned early. After a deploy that touches either path, watch
+  `error_events` for pool-timeout errors; if they appear, the answer is fewer concurrent covered writes
+  per user (the push is one request per sync), not a bigger pool, which `client.ts` deliberately cannot raise.
+- **A new upload path needs nothing to be covered by the gate**, but a new queue of unsent writes must
+  be wiped by `clearAccountStorage` (web) or live under the account scope (Preview), the same census as sign-out.
+- **The phone's `oura_raw.db` is deliberately NOT wiped** by a reset, a sign-out or an account change.
+  Nothing re-uploads its old rows (only newly drained batches are POSTed), and clearing it resets the
+  ring cursor to 0, which would re-drain and re-upload the ring's whole buffer, i.e. bring pre-reset
+  history back. Its cursor is tied to the ring's BLE key and pairing, which no wipe may touch.
+  Not covered: ring events recorded before a reset that the phone had not yet drained still arrive afterwards. Likewise Health Connect's history window is imported again on the next sync, and Oura Cloud returns on reconnect; the admin dialogs say so (`packages/shared/src/admin-wipe-copy.ts`).

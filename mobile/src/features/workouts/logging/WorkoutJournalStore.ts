@@ -20,7 +20,9 @@ import {
   endRest,
   finishWorkout,
   mutationFor,
+  pauseWorkout,
   readJournal,
+  resumeWorkout,
   setValues,
   type WorkoutJournal,
   type WorkoutRecord,
@@ -42,6 +44,13 @@ export type JournalState = {
 };
 const key = 'workout-journal.v1';
 
+/** What cannot happen under a pause: logging, starting a set, moving on or retiming the rest. */
+function running(workout: WorkoutRecord) {
+  if (workout.pausedAt !== null) {
+    throw new Error('This workout is paused. Resume it first.');
+  }
+  return workout;
+}
 function replaceWorkout(
   data: WorkoutJournal,
   id: string,
@@ -481,6 +490,7 @@ export class WorkoutJournalStore {
         if (!workout.rest || workout.status !== 'active' || !Number.isInteger(seconds)) {
           throw new Error('There is no timed rest to adjust.');
         }
+        running(workout);
         const endsAt = workout.rest.endsAt + seconds * 1000;
         if (
           endsAt < workout.rest.startedAt ||
@@ -570,7 +580,7 @@ export class WorkoutJournalStore {
         if (workout.runningSet) {
           throw new Error('Record the running set first.');
         }
-        const next = replaceSet(endRest(workout, now), exerciseId, setId, (set) => {
+        const next = replaceSet(endRest(running(workout), now), exerciseId, setId, (set) => {
           if (set.completedAt !== null) {
             throw new Error('This set is already recorded.');
           }
@@ -597,7 +607,7 @@ export class WorkoutJournalStore {
         }
         let restSeconds = 0;
         const next = replaceSet(
-          endRest(workout, now, false),
+          endRest(running(workout), now, false),
           exerciseId,
           setId,
           (set) => {
@@ -671,7 +681,20 @@ export class WorkoutJournalStore {
   skipRest = (workoutId: string) => {
     const now = this.now();
     return this.action((data) =>
-      replaceWorkout(data, workoutId, (workout) => endRest(workout, now)),
+      replaceWorkout(data, workoutId, (workout) => endRest(running(workout), now)),
+    );
+  };
+  /** Freezes every clock until `resume`; the pause is in the journal, so it survives a kill (#3266). */
+  pause = (workoutId: string) => {
+    const now = this.now();
+    return this.action((data) =>
+      replaceWorkout(data, workoutId, (workout) => pauseWorkout(workout, now)),
+    );
+  };
+  resume = (workoutId: string) => {
+    const now = this.now();
+    return this.action((data) =>
+      replaceWorkout(data, workoutId, (workout) => resumeWorkout(workout, now)),
     );
   };
   beginExercises = (workoutId: string) => {
@@ -705,8 +728,9 @@ export class WorkoutJournalStore {
         if (workout.status !== 'active' || workout.runningSet) {
           throw new Error('Record the running set before moving on.');
         }
+        running(workout);
         const flow = nextExerciseFlow(workout);
-        const rested = endRest(workout, now);
+        const rested = endRest(running(workout), now);
         return {
           ...rested,
           flow,
@@ -727,7 +751,7 @@ export class WorkoutJournalStore {
         if (workout.status !== 'active' || workout.runningSet || !exercise) {
           throw new Error('Record the running set before choosing another exercise.');
         }
-        const rested = endRest(workout, now);
+        const rested = endRest(running(workout), now);
         return {
           ...rested,
           warmupEndedAt: workout.warmupEndedAt ?? now,
@@ -792,8 +816,8 @@ export class WorkoutJournalStore {
           })),
         };
         return {
-          ...endRest(workout, now),
-          exercises: [...endRest(workout, now).exercises, clone],
+          ...endRest(running(workout), now),
+          exercises: [...endRest(running(workout), now).exercises, clone],
           soloExerciseId: clone.id,
           flow: { stage: 'exercise', exerciseId: clone.id },
         };
@@ -867,7 +891,7 @@ export class WorkoutJournalStore {
             suggestionHandled: false,
           })),
         };
-        const rested = endRest(workout, now);
+        const rested = endRest(running(workout), now);
         return {
           ...rested,
           exercises: [
@@ -890,7 +914,7 @@ export class WorkoutJournalStore {
         }
         const flow = workoutFlow(workout);
         return {
-          ...endRest(workout, now),
+          ...endRest(running(workout), now),
           soloExerciseId: null,
           hubReturnStage: flow.stage === 'review' ? workout.hubReturnStage : flow.stage,
           flow: { stage: 'review', exerciseId: flow.exerciseId },
@@ -936,7 +960,7 @@ export class WorkoutJournalStore {
         }
         const flow = workoutFlow(workout);
         const next = nextExerciseFlow(workout);
-        const rested = endRest(workout, now);
+        const rested = endRest(running(workout), now);
         return {
           ...rested,
           runningSet: null,

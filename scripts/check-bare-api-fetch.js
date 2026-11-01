@@ -35,6 +35,7 @@ const EXEMPT_ENDPOINTS = new Map([
   ['/api/scale-ble/today', 'live pairing handshake, same as above'],
   ['/api/oura-ble/rollup-watermark', 'gates an on-device write (#2579): a cached watermark could mark rows the server has not folded, and the raw-store pass must fail closed on any non-2xx rather than read a stale seed'],
   ['/api/health-connect/history-import', 'the resume point of an import (issue 2169): the run reads the account\'s oldest imported day to decide which 30 days to read next, so a cached day would send it back over history it already imported; it is also rewritten after every window by the run itself'],
+  ['/api/account/data-epoch', 'the admin-reset gate (#3369): it asks whether this device is behind a reset before it pushes, so a cached answer would let stale rows through; it fails closed on any non-2xx and is already read with cache: no-store'],
   ['/api/sync/pull','the sync engine itself; caching a delta is a correctness bug, not a staleness one'],
   ['/api/sync/sleep-ids', 'the ghost-night sweep (#2752) deletes local rows missing from this list, so it must be the server\'s list as of now: a cached copy would delete nights pulled since it was stored'],
   ['/api/oura-ble/rollup-state', 'device rollup state during a sync; already passes cache: no-store'],

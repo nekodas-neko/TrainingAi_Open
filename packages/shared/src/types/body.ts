@@ -273,6 +273,12 @@ export interface SleepSession {
    */
   manualEntry?: boolean
   /**
+   * #2265 — when the owner marked this night partial (the ring came off or went on late). Non-null
+   * keeps the night's physiology in the scores and normals and takes its duration-derived metrics
+   * out; see `packages/shared/src/health/partial-night.ts`. Null or absent: not marked.
+   */
+  partialNightAt?: Date | null
+  /**
    * #3057 — Oura Cloud's type for this period (`oura_cloud_sleep_periods.sleep_type`, joined on
    * `oura_id`): `long_sleep`, `sleep`, `late_nap`. Null on every row that is not from the Cloud feed.
    * Read only by `ouraSecondaryPeriods`, which keeps a non-`long_sleep` period beside a `long_sleep` out of

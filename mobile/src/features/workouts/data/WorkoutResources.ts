@@ -558,6 +558,7 @@ export class WorkoutResources {
     path: string,
     body: unknown,
     invalidate: string[] = [],
+    query?: Record<string, string>,
   ) {
     const generation = this.generation;
     const result = this.writes.then(async () => {
@@ -575,7 +576,12 @@ export class WorkoutResources {
       if (!operation) {
         throw new Error('This account connection does not support this action.');
       }
-      const response = await operation(path, body);
+      const response =
+        method === 'DELETE' && this.connection.delete
+          ? await this.connection.delete(path, body, query)
+          : method === 'POST'
+            ? await this.connection.post(path, body, query)
+            : await operation(path, body);
       if (generation !== this.generation) {
         throw new Error('The account changed.');
       }

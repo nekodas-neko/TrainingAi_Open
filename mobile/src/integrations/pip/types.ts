@@ -10,6 +10,16 @@ export type PictureInPicture = {
    * its clocks. `setColor` is the running set's arc colour.
    */
   setPhase(phase: PipPhase, status: WorkoutStatusPayload | null, setColor: string | null): void;
+  /**
+   * Where the window shrinks out of, in dp from the top left of the window, or nulls for none. It
+   * only shapes the enter animation (the system's source rect hint).
+   */
+  setSourceRect(
+    left: number | null,
+    top: number | null,
+    right: number | null,
+    bottom: number | null,
+  ): void;
   addListener(event: 'onModeChange', listener: (event: { active: boolean }) => void): Subscription;
   addListener(event: 'onAction', listener: (event: { action: PipAction }) => void): Subscription;
 };

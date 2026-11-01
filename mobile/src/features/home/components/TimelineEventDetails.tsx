@@ -2,6 +2,7 @@ import { formatDateDisplay, formatTimeOfDay, toAestDay } from '@trainingai/share
 import { AppText, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { TimelineEvent } from '../data/timeline';
+import { sleepWokeEnd } from '../../health/data/body-view';
 import type { SleepRow } from '../../health/data/models';
 import { timelineMetrics } from '../data/timeline-presentation';
 
@@ -18,6 +19,7 @@ export function TimelineEventDetails({
 }) {
   const { theme } = useTheme();
   const source = event.subtitle || night?.sourceLabel;
+  const woke = night ? sleepWokeEnd(night) : null;
   const rows = [
     {
       label: 'When',
@@ -32,11 +34,11 @@ export function TimelineEventDetails({
           },
         ]
       : []),
-    ...(night?.sleepEnd
+    ...(night && woke
       ? [
           {
             label: 'Woke up',
-            value: `${formatDateDisplay(night.date, 'short')} · ${formatTimeOfDay(night.sleepEnd, timezone)}`,
+            value: `${formatDateDisplay(night.date, 'short')} · ${formatTimeOfDay(woke, timezone)}`,
           },
         ]
       : []),

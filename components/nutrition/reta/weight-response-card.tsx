@@ -28,10 +28,10 @@ import { PREFERENCE_STORAGE } from "@trainingai/shared/user/preferences";
  */
 
 const TONE: Record<ResponseVerdict, { chip: string; label: string }> = {
-  too_fast: { chip: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'Faster than your band' },
-  in_band: { chip: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', label: 'In your band' },
-  too_slow: { chip: 'bg-amber-500/15 text-amber-400 border-amber-500/30', label: 'Slower than your band' },
-  gaining: { chip: 'bg-amber-500/15 text-amber-400 border-amber-500/30', label: 'Gaining' },
+  too_fast: { chip: 'bg-destructive/15 text-destructive border-destructive/30', label: 'Faster than your band' },
+  in_band: { chip: 'bg-accent-green/15 text-accent-green border-accent-green/30', label: 'In your band' },
+  too_slow: { chip: 'bg-accent-amber/15 text-accent-amber border-accent-amber/30', label: 'Slower than your band' },
+  gaining: { chip: 'bg-accent-amber/15 text-accent-amber border-accent-amber/30', label: 'Gaining' },
 }
 
 const UNDECIDED = 'bg-muted text-muted-foreground border-border'

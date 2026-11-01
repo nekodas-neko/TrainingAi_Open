@@ -7,10 +7,13 @@ import type { WorkoutExercise, WorkoutRecord } from '../logging/workout.ts';
 // components/workout-screen.tsx. What the window shows is the workout status payload, drawn natively
 // by modules/picture-in-picture.
 
-/** Only the four active phases open the window on leave; the shell starts in, and returns to, idle. */
-export type PipPhase = 'idle' | 'pre' | 'set' | 'rest' | 'complete' | 'summary' | 'done';
-export const ACTIVE_PIP_PHASES: readonly PipPhase[] = ['set', 'rest', 'complete', 'summary'];
-export type PipAction = 'repsDown' | 'repsUp' | 'log';
+/**
+ * Only the active phases open the window on leave; the shell starts in, and returns to, idle. A
+ * paused workout keeps a window of its own (#3255), with one button: Resume.
+ */
+export type PipPhase = 'idle' | 'pre' | 'set' | 'rest' | 'complete' | 'summary' | 'done' | 'paused';
+export const ACTIVE_PIP_PHASES: readonly PipPhase[] = ['set', 'rest', 'complete', 'summary', 'paused'];
+export type PipAction = 'repsDown' | 'repsUp' | 'log' | 'restPlus' | 'pause' | 'resume';
 
 export function allowsPip(phase: PipPhase) {
   return ACTIVE_PIP_PHASES.includes(phase);
@@ -26,6 +29,12 @@ const done = (exercise: WorkoutExercise) =>
 
 /** The phase of the workout on screen; null (nothing open) is idle. */
 export function pipPhaseFor(workout: WorkoutRecord | null): PipPhase {
+  const phase = workoutPhaseOf(workout);
+  return workout?.pausedAt != null && ACTIVE_PIP_PHASES.includes(phase) ? 'paused' : phase;
+}
+
+/** What the workout is doing, pause aside: the screen a pause interrupted, and returns to. */
+export function workoutPhaseOf(workout: WorkoutRecord | null): PipPhase {
   if (!workout || workout.status !== 'active') return 'idle';
   const { flow, exercise } = current(workout);
   if (flow.stage === 'review') return 'done';
@@ -53,17 +62,30 @@ function repsOf(set: WorkoutSet, first?: WorkoutSet) {
  * same one the notification reads (#3266).
  */
 export function pipSetColor(workout: WorkoutRecord | null): string | null {
-  if (!workout || pipPhaseFor(workout) !== 'set') return null;
+  if (!workout || workoutPhaseOf(workout) !== 'set') return null;
   const { exercise } = current(workout);
   if (!exercise) return null;
-  const color = categoricalColor(done(exercise));
-  // Past the six-colour table the palette is oklch, which Android cannot parse.
-  return /^#[\da-f]{6}$/i.test(color)
-    ? color
-    : CATEGORICAL_PALETTE[done(exercise) % CATEGORICAL_PALETTE.length];
+  return hexColor(done(exercise));
+}
+
+/** Each set's colour in order, for the window's dots; the running set's is `pipSetColor`. */
+export function pipSetColors(workout: WorkoutRecord | null): string[] | null {
+  if (!workout || !allowsPip(pipPhaseFor(workout))) return null;
+  const { exercise } = current(workout);
+  if (!exercise) return null;
+  return exercise.sets.map((_, index) => hexColor(index));
+}
+
+// Past the six-colour table the palette is oklch, which Android cannot parse.
+function hexColor(index: number) {
+  const color = categoricalColor(index);
+  return /^#[\da-f]{6}$/i.test(color) ? color : CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length];
 }
 
 export type PipCommand =
+  | { type: 'restPlus' }
+  | { type: 'pause' }
+  | { type: 'resume' }
   | { type: 'reps'; exerciseId: string; setId: string; value: string }
   | { type: 'record'; exerciseId: string; setId: string }
   | { type: 'start'; exerciseId: string; setId: string }
@@ -73,8 +95,14 @@ export type PipCommand =
 export function pipCommand(workout: WorkoutRecord | null, action: PipAction): PipCommand | null {
   const phase = pipPhaseFor(workout);
   if (!workout || !allowsPip(phase)) return null;
+  // A paused workout answers to Resume alone; the rest of its buttons are waiting behind it.
+  if (phase === 'paused') return action === 'resume' ? { type: 'resume' } : null;
+  if (action === 'resume') return null;
   const { exercise } = current(workout);
   if (!exercise) return null;
+  if (action === 'pause') return phase === 'set' || phase === 'rest' ? { type: 'pause' } : null;
+  // +30 s moves a timed rest's end; an untimed rest has none to move.
+  if (action === 'restPlus') return phase === 'rest' && workout.rest ? { type: 'restPlus' } : null;
   if (phase === 'set') {
     const set = exercise.sets.find((x) => x.id === workout.runningSet?.setId);
     if (!set) return null;

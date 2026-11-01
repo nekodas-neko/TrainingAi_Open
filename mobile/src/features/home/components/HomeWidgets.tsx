@@ -23,7 +23,9 @@ import {
   AppButton,
 } from '../../../shared/ui';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
+import { OuraStaleNote } from '../../devices/components/OuraStaleNote';
 import { useHealthData } from '../../health/data/HealthDataProvider';
+import { sleepWokeEnd } from '../../health/data/body-view';
 import { useOuraHandoff, type OuraHandoffStatus } from '../../health/OuraHandoffProvider';
 import { hasLastNight } from '../../health/data/oura-handoff';
 import {
@@ -42,6 +44,7 @@ import { CollectionCard } from '../../collection/components/CollectionCard';
 import { metricLabels } from '../data/models';
 import { budgetEnergyModel } from '../../nutrition/data/energy-model';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bandColor } from '../../../shared/theme/tokens';
 import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { DEFAULT_SLEEP_GOAL_HOURS } from '@trainingai/shared/health/daily-goals';
 import { formatHoursMinutes } from '@trainingai/shared/format/units'
@@ -480,9 +483,10 @@ function HomeWidgetBody({
                 {night?.sleepStart && night.sleepEnd && (
                   <AppText variant="caption" tone="muted">
                     {formatTimeOfDay(night.sleepStart, health.timezone)} →{' '}
-                    {formatTimeOfDay(night.sleepEnd, health.timezone)}
+                    {formatTimeOfDay(sleepWokeEnd(night) ?? night.sleepEnd, health.timezone)}
                   </AppText>
                 )}
+                <OuraStaleNote />
               </Stack>
               <Icon name="moon" color={theme.scores.sleep} />
             </Stack>
@@ -749,7 +753,7 @@ function HomeWidgetBody({
                     {Math.round(row.pct)}%
                   </AppText>
                 </Stack>
-                <ProgressBar value={row.pct / 100} color={recoveryBand(row.pct).color} />
+                <ProgressBar value={row.pct / 100} color={bandColor(recoveryBand(row.pct).color, theme.status)} />
               </Stack>
             ))
           ) : (

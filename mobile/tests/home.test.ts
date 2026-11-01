@@ -14,6 +14,7 @@ import {
   adminSignupCount,
 } from '../src/features/home/data/admin-pending-counts.ts';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
+import { setAsideShown, storeHeaderMessages } from '../src/features/home/data/set-aside-seen.ts';
 import { ApiError } from '../src/features/account/api/client.ts';
 import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
 import { bannerTone } from '../src/features/home/data/banner-data.ts';
@@ -38,6 +39,8 @@ import { loggingFixture } from './logging-fixture.ts';
 import { createWorkout } from '../src/features/workouts/logging/workout.ts';
 
 const day = '2026-10-12';
+/** The server's own validation answer: a 400 with its JSON `{ error }` body. */
+const validation400 = () => new ApiError(400, undefined, undefined, undefined, true);
 const cardTexts = (event: Parameters<typeof timelineCardContent>[0]) =>
   timelineCardContent(event).metrics.map((metric) => metric.text);
 
@@ -644,6 +647,8 @@ test('an unsynced completed workout enters Home timeline and a lost-reply server
   const events = localTimeline([], [pending], [], day, 'Australia/Brisbane');
   assert.equal(events.length, 1);
   assert.equal(events[0].durationMin, 30);
+  const paused = localTimeline([], [{ ...pending, pausedMs: 10 * 60_000 }], [], day, 'Australia/Brisbane');
+  assert.equal(paused[0].durationMin, 20, 'time spent paused is not part of the duration');
   assert.equal(localTimeline(events, [pending], [], day, 'Australia/Brisbane').length, 1);
 });
 
@@ -786,7 +791,7 @@ test('a Home card turned on goes before Metric Tiles, with or without a saved or
 test('a preference the server rejects with a 400 is set aside and does not block later Home writes', async () => {
   const f = fixture();
   f.connection.patch = async () => {
-    throw new ApiError(400);
+    throw validation400();
   };
   const store = f.make();
   await store.initialize();
@@ -797,7 +802,170 @@ test('a preference the server rejects with a 400 is set aside and does not block
   assert.equal(state.operations.length, 0);
   assert.equal(f.rests.has(day), true);
   assert.equal((state.preferences as Record<string, unknown>).energyHeroSize, 'large');
-  assert.match(state.error ?? '', /kept on this phone only/);
+  assert.match(state.setAside ?? '', /kept on this phone only/);
+});
+
+test('a 400 that is not the server\'s validation error holds the queue and is retried (#3392)', async () => {
+  const f = fixture();
+  let proxyPage = true;
+  (f.connection as { patch: unknown }).patch = async (_path: string, body: unknown) => {
+    if (proxyPage) {
+      throw new ApiError(400);
+    }
+    return body;
+  };
+  const store = f.make();
+  await store.initialize();
+  await store.savePreferences({ energyHeroSize: 'large' } as never);
+  await store.sync();
+  assert.deepEqual(
+    store.getSnapshot().operations.map((op) => op.kind),
+    ['preferences'],
+  );
+  assert.match(store.getSnapshot().error ?? '', /Could not sync/);
+  assert.equal(store.getSnapshot().setAside, null);
+  proxyPage = false;
+  await store.sync();
+  assert.equal(store.getSnapshot().operations.length, 0);
+  assert.equal(store.getSnapshot().error, null);
+});
+
+test('the set-aside notice survives a sync and a restart, and clears once shown (#3392)', async () => {
+  const f = fixture();
+  f.connection.patch = async () => {
+    throw validation400();
+  };
+  const store = f.make();
+  await store.initialize();
+  await store.savePreferences({ energyHeroSize: 'large' } as never);
+  await store.sync();
+  const notice = store.getSnapshot().setAside;
+  assert.equal(store.getSnapshot().error, null); // a saved notice is not a live failure
+  assert.match(notice ?? '', /kept on this phone only/);
+  await store.sync(); // nothing left to send: it used to clear the notice
+  assert.equal(store.getSnapshot().setAside, notice);
+  assert.equal(store.getSnapshot().error, null);
+  const reopened = f.make();
+  await reopened.initialize();
+  assert.equal(reopened.getSnapshot().setAside, notice);
+  assert.equal(reopened.getSnapshot().error, null);
+  await reopened.sync();
+  assert.equal(reopened.getSnapshot().setAside, notice);
+  assert.equal(reopened.getSnapshot().error, null);
+  await reopened.acknowledgeSetAside();
+  assert.equal(reopened.getSnapshot().setAside, null);
+  await reopened.sync();
+  assert.equal(reopened.getSnapshot().setAside, null);
+  const again = f.make();
+  await again.initialize();
+  assert.equal(again.getSnapshot().setAside, null);
+  assert.equal(again.getSnapshot().error, null);
+});
+
+test('a Mood push answered 200 with a rejected item sets it aside and the rest go through (#3392)', async () => {
+  const f = fixture();
+  const post = f.connection.post;
+  let pushes = 0;
+  (f.connection as { post: unknown }).post = async (path: string, body: unknown) => {
+    if (path === '/api/sync/push' && pushes++ < 5) {
+      const m = (body as { mutations: { id: string; domain: string; date: string }[] }).mutations[0];
+      return {
+        processed: 0,
+        errors: [
+          { id: m.id, domain: m.domain, date: m.date, error: 'Rejected by the sync schema at payload: invalid', retryable: false },
+        ],
+      };
+    }
+    return post(path, body);
+  };
+  const store = f.make();
+  await store.initialize();
+  f.online(false);
+  await store.saveMood(day, { energyLevel: 'low', soreMuscles: [], bodyState: [] });
+  await store.saveMood('2026-10-13', { energyLevel: 'good', soreMuscles: [], bodyState: [] });
+  f.online(true);
+  // Each refusal counts; the queue waits behind it until the fifth, then the rest go through.
+  for (let attempt = 1; attempt < 5; attempt++) {
+    await store.sync();
+    assert.equal(store.getSnapshot().operations.length, 2);
+    assert.equal(store.getSnapshot().setAside, null);
+  }
+  await store.sync();
+  const state = store.getSnapshot();
+  assert.equal(state.operations.length, 0);
+  assert.deepEqual(f.sent.map((m) => m.date), ['2026-10-13']);
+  assert.equal(state.moods[day]?.energyLevel, 'low');
+  assert.match(state.setAside ?? '', /kept on this phone only/);
+});
+
+test('a rejected op followed by a transient failure keeps the notice through a reopen (#3392)', async () => {
+  const f = fixture();
+  f.connection.patch = async () => {
+    throw validation400();
+  };
+  const post = f.connection.post;
+  f.connection.post = async (path: string, body: unknown) => {
+    if (path === '/api/log-rest-day') {
+      throw new ApiError(500);
+    }
+    return post(path, body);
+  };
+  const store = f.make();
+  await store.initialize();
+  await store.savePreferences({ energyHeroSize: 'large' } as never);
+  await store.chooseRestDay(day, true);
+  await store.sync();
+  assert.deepEqual(
+    store.getSnapshot().operations.map((op) => op.kind),
+    ['rest'],
+  );
+  assert.match(store.getSnapshot().setAside ?? '', /kept on this phone only/);
+  const reopened = f.make();
+  await reopened.initialize();
+  assert.match(reopened.getSnapshot().setAside ?? '', /kept on this phone only/);
+  assert.equal(reopened.getSnapshot().error, null);
+});
+
+test('a cancel while the set-aside is being written leaves the disk alone afterwards (#3392)', async () => {
+  const f = fixture();
+  f.connection.patch = async () => {
+    throw validation400();
+  };
+  const store = f.make();
+  await store.initialize();
+  await store.savePreferences({ energyHeroSize: 'large' } as never);
+  let writes = 0;
+  let canceledAt = -1;
+  const set = f.storage.set;
+  f.storage.set = async (key: string, value: string) => {
+    await set(key, value);
+    writes++;
+    if (JSON.parse(value).operations.length === 0 && canceledAt < 0) {
+      canceledAt = writes;
+      store.cancel(); // a sign-out lands while the op is being dropped
+    }
+  };
+  await store.sync();
+  assert.ok(canceledAt > 0);
+  assert.equal(writes, canceledAt);
+});
+
+test('a Mood push answered 200 with a retryable error holds the queue (#3392)', async () => {
+  const f = fixture();
+  (f.connection as { post: unknown }).post = async (_path: string, body: unknown) => {
+    const m = (body as { mutations: { id: string; domain: string; date: string }[] }).mutations[0];
+    return {
+      processed: 0,
+      errors: [{ id: m.id, domain: m.domain, date: m.date, error: 'database down', retryable: true }],
+    };
+  };
+  const store = f.make();
+  await store.initialize();
+  await store.saveMood(day, { energyLevel: 'low', soreMuscles: [], bodyState: [] });
+  await store.sync();
+  assert.equal(store.getSnapshot().operations.length, 1);
+  assert.match(store.getSnapshot().error ?? '', /Could not sync/);
+  assert.equal(store.getSnapshot().setAside, null);
 });
 
 test('a 500 on a preference holds the queue so later writes wait behind it', async () => {
@@ -817,4 +985,125 @@ test('a 500 on a preference holds the queue so later writes wait behind it', asy
   );
   assert.equal(f.rests.has(day), false);
   assert.match(state.error ?? '', /Could not sync/);
+});
+
+for (const status of [401, 403]) {
+  test(`a ${status} on a preference keeps it queued, with the queue behind it, and marks Home denied (#3392)`, async () => {
+    const f = fixture();
+    f.connection.patch = async () => {
+      throw new ApiError(status);
+    };
+    const store = f.make();
+    await store.initialize();
+    await store.savePreferences({ energyHeroSize: 'large' } as never);
+    await store.chooseRestDay(day, true);
+    await store.sync();
+    const state = store.getSnapshot();
+    assert.deepEqual(
+      state.operations.map((op) => op.kind),
+      ['preferences', 'rest'],
+    );
+    assert.equal(state.denied, true);
+    assert.doesNotMatch(state.setAside ?? '', /kept on this phone only/);
+  });
+}
+
+test('the timeline Woke up event is the time you woke, not the recorded window end (#3426)', () => {
+  const night = sleepSchema.parse({
+    date: '2026-10-17',
+    localOnly: true,
+    sleepStart: '2026-10-16T12:00:00.000Z',
+    sleepEnd: '2026-10-16T20:23:00.000Z',
+    phaseWindowStart: '2026-10-16T12:00:00.000Z',
+    phaseWindowEnd: '2026-10-16T20:23:00.000Z',
+    sleepPhase5Min: '4' + '2'.repeat(96) + '4444',
+  });
+  const events = localTimeline([], [], [night], '2026-10-17', 'Australia/Brisbane');
+  const woke = events.find((event) => event.type === 'wakeup');
+  assert.equal(woke?.timeMs, Date.parse('2026-10-16T20:05:00.000Z'));
+  assert.equal(woke?.time.replace(/\s/g, ' '), '6:05 am');
+  // Still after falling asleep, so the day's order does not change.
+  assert.deepEqual(events.map((event) => event.type), ['wakeup', 'sleep']);
+});
+
+test('a ring night\'s Woke up from the server also reads the time you woke (#3426)', () => {
+  const night = sleepSchema.parse({
+    date: '2026-10-17',
+    sleepStart: '2026-10-16T12:00:00.000Z',
+    sleepEnd: '2026-10-16T20:23:00.000Z',
+    phaseWindowStart: '2026-10-16T12:00:00.000Z',
+    phaseWindowEnd: '2026-10-16T20:23:00.000Z',
+    sleepPhase5Min: '4' + '2'.repeat(96) + '4444',
+  });
+  const server = timelineEventSchema.parse({
+    type: 'wakeup',
+    time: '6:23 am',
+    timeMs: Date.parse('2026-10-16T20:23:00.000Z'),
+    title: 'Woke up',
+    day: 'today',
+    date: '2026-10-17',
+  });
+  const nap = sleepSchema.parse({
+    date: '2026-10-17',
+    sleepStart: '2026-10-17T04:00:00.000Z',
+    sleepEnd: '2026-10-17T04:40:00.000Z',
+  });
+  const events = localTimeline([server], [], [nap, night], '2026-10-17', 'Australia/Brisbane');
+  const woke = events.filter((event) => event.type === 'wakeup');
+  assert.equal(woke.length, 1);
+  assert.equal(woke[0].timeMs, Date.parse('2026-10-16T20:05:00.000Z'));
+  assert.equal(woke[0].time.replace(/\s/g, ' '), '6:05 am');
+  // A night that doesn't match the event's recorded end leaves it alone.
+  const other = localTimeline([server], [], [nap], '2026-10-17', 'Australia/Brisbane');
+  assert.equal(other[0].timeMs, server.timeMs);
+});
+
+test('the set-aside notice counts as seen for each store that holds one while the header is up (#3392)', () => {
+  const notice = 'One change was kept on this phone only; the server did not accept it.';
+  const none = { setAside: null };
+  const shown = { setAside: notice };
+  assert.deepEqual(setAsideShown(true, shown, none), { home: true, health: false });
+  assert.deepEqual(setAsideShown(true, none, shown), { home: false, health: true });
+  assert.deepEqual(setAsideShown(true, shown, shown), { home: true, health: true });
+  assert.deepEqual(setAsideShown(true, none, none), { home: false, health: false });
+  // A live failure beside the notice does not hide it any more, so it still counts as seen.
+  assert.deepEqual(
+    setAsideShown(true, { setAside: notice, error: 'Could not sync.' } as never, none),
+    { home: true, health: false },
+  );
+  // No header, no acknowledgement.
+  assert.deepEqual(setAsideShown(false, shown, shown), { home: false, health: false });
+});
+
+test('the header lists a saved set-aside notice beside live errors, and a listed notice is the one counted as seen (#3477)', () => {
+  const notice = 'One change was kept on this phone only; the server did not accept it.';
+  const home = { error: null, setAside: notice, errors: {} };
+  const health = { error: 'Could not sync.', setAside: null };
+  const listed = storeHeaderMessages(home, health);
+  assert.ok(listed.includes(notice));
+  assert.ok(listed.includes('Could not sync.'));
+  // A live failure beside the notice leaves it listed, so it is still acknowledged once shown.
+  assert.deepEqual(setAsideShown(true, home, health), { home: true, health: false });
+  // Nothing saved, nothing listed.
+  assert.deepEqual(
+    storeHeaderMessages({ error: null, setAside: null, errors: {} }, { error: null, setAside: null }).filter(Boolean),
+    [],
+  );
+});
+
+test('a saved set-aside notice is not a live error on a store that opens with it (#3477)', async () => {
+  const f = fixture();
+  f.connection.patch = async () => {
+    throw validation400();
+  };
+  const store = f.make();
+  await store.initialize();
+  await store.savePreferences({ energyHeroSize: 'large' } as never);
+  await store.sync();
+  const reopened = f.make();
+  await reopened.initialize();
+  const state = reopened.getSnapshot();
+  assert.equal(state.ready, true);
+  assert.match(state.setAside ?? '', /kept on this phone only/);
+  assert.equal(state.error, null);
 });

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
+import { loadLabel } from '../../workouts/logging/preferences.ts';
 import type { WorkoutRecord } from '../../workouts/logging/workout.ts';
 import type { PlatformSettings } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
@@ -31,7 +32,7 @@ export function workoutCalendarEvent(workout: WorkoutRecord): CalendarEvent {
           (exercise) =>
             `${exercise.name}: ${exercise.sets
               .filter((set) => set.completedAt !== null)
-              .map((set) => `${set.weight} kg × ${set.reps}`)
+              .map((set) => `${loadLabel(set.weight)} × ${set.reps}`)
               .join(', ')}`,
         ),
     ].join('\n'),

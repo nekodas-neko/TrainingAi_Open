@@ -28,14 +28,14 @@ function Row({ s }: { s: LatestSample }) {
   const undecoded = s.decoded === null
   const label = s.eventName === 'unknown' ? `unknown_${tagHex(s.tag)}` : s.eventName
   return (
-    <div className={`rounded-md border ${undecoded ? 'border-amber-500/40 bg-amber-500/5' : 'border-border'}`}>
+    <div className={`rounded-md border ${undecoded ? 'border-accent-amber/40 bg-accent-amber/5' : 'border-border'}`}>
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"
         aria-expanded={open}
       >
         {open ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
-        {undecoded && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
+        {undecoded && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-accent-amber" />}
         <span className="font-mono">{label}</span>
         <span className="ml-auto shrink-0 text-muted-foreground">{fmt(s.measuredAt)}</span>
       </button>

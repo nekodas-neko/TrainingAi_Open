@@ -58,7 +58,7 @@ export function AchievementsSection({
           <AppText variant="micro" tone="brand">
             {counts ? `${counts.unlocked} / ${counts.total}` : '— / —'}
           </AppText>
-          <DisclosureIcon expanded={expanded} />
+          <DisclosureIcon expanded={expanded} collapsed="right" size={theme.sizes.iconCompact} />
         </Stack>
       </Pressable>
       {loading && !rewards ? (

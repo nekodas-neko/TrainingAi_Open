@@ -27,7 +27,6 @@ export type Reminder = z.infer<typeof reminderSchema>;
 export const platformSchema = z
   .object({
     scope: z.string().min(1),
-    restAlerts: z.boolean().default(false),
     walkCues: z.boolean().default(false),
     keepAwake: z.boolean().default(true),
     reminders: z.array(reminderSchema).max(12).default([]),
@@ -61,6 +60,8 @@ export type Alert = {
   target: 'workout' | 'walk' | 'nutrition' | 'health' | 'review' | 'week';
   recordId?: string;
   restCueId?: string;
+  /** A meal reminder that carries the answer actions (#2123): the plan meal and its local day. */
+  mealEstimate?: { planMealId: string; date: string };
   zone?: string;
   trigger: { at: number } | { hour: number; minute: number; weekday?: number };
 };

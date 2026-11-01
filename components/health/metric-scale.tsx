@@ -2,7 +2,7 @@
 
 import { rangePositions, rangeZones, type RangeOptimal } from '@trainingai/shared/health/range-stats'
 
-const ZONE_COLOR = { bad: '#ef4444', warn: '#f59e0b', good: '#22c55e' } as const
+const ZONE_COLOR = { bad: 'var(--destructive)', warn: 'var(--accent-amber)', good: 'var(--accent-green)' } as const
 
 /**
  * A horizontal scale showing where a single value sits within a recent range (min…max),

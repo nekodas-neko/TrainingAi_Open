@@ -5,6 +5,8 @@ import { capitalize } from '@trainingai/shared/format/capitalize';
 import { MOBILE_CALLBACKS } from '../../features/account/session';
 import type { AuthPlatform, MobileClient } from '../../features/account/session';
 import { homeWidgets } from '../widgets/platform';
+import { openLocalStorage } from '../../core/storage/open';
+import { RING_ALERT_KEY, clearRingAlertFired } from '../../features/devices/data/ring-battery';
 
 const applicationId =
   Platform.OS === 'android'
@@ -141,6 +143,25 @@ export const authPlatform: AuthPlatform = {
   },
   clearAccountData() {
     homeWidgets?.clearSnapshot();
+  },
+  async wipeAccountData(origin, userId) {
+    const storage = await openLocalStorage();
+    if (userId === null) await storage.clearAllAccounts();
+    else await storage.clearAccount(origin, userId);
+    homeWidgets?.clearSnapshot();
+  },
+  async wipeOtherAccountData(origin, userId) {
+    await (await openLocalStorage()).clearOtherAccounts(origin, userId);
+    homeWidgets?.clearSnapshot();
+  },
+  async deviceOwnerChanged() {
+    const device = (await openLocalStorage()).device();
+    const raw = await device.get(RING_ALERT_KEY);
+    const next = clearRingAlertFired(raw);
+    if (next !== null && next !== raw) await device.set(RING_ALERT_KEY, next);
+  },
+  async holdsOtherAccountData(origin, userId) {
+    return (await openLocalStorage()).holdsOtherAccounts(origin, userId);
   },
   dismiss() {
     const browser = requireOptionalNativeModule<{ dismissAuthSession(): void }>(

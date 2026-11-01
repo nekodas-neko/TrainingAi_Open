@@ -47,6 +47,7 @@ export function EnergyDay({
   }
   const timeline = buildEnergyTimeline({
     dayStartMs: dateStrMidnightInTz(date, timezone).getTime(),
+    tz: timezone,
     restingHr: profile.data?.restingHr ?? Infinity,
     restingBaseKcal: balance.restingBaseKcal,
     activeKcal: balance.activeKcal,

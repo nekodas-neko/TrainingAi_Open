@@ -24,7 +24,7 @@ function fakeStore(initial: OuraCloudTokenRow | null = null) {
       row = {
         userId, accessToken: input.accessToken, refreshToken: input.refreshToken, expiresAt: input.expiresAt,
         scope: input.scope, ouraUserId: input.ouraUserId ?? row?.ouraUserId ?? null, updatedAt: new Date(NOW + ++tick),
-        reauthRequiredAt: null,
+        reauthRequiredAt: null, lastWebhookAt: null, lastDataAt: null,
       }
     },
     // As the slice does: only a row not saved since `since`, and an earlier mark is kept.
@@ -33,6 +33,8 @@ function fakeStore(initial: OuraCloudTokenRow | null = null) {
       row = { ...row, reauthRequiredAt: row.reauthRequiredAt ?? new Date(NOW) }
       return true
     },
+    async touchOuraCloudWebhook(userId) { if (row && row.userId === userId) row = { ...row, lastWebhookAt: new Date(NOW) } },
+    async touchOuraCloudData(userId) { if (row && row.userId === userId) row = { ...row, lastDataAt: new Date(NOW) } },
     async deleteOuraCloudTokens(userId) { const had = row?.userId === userId; row = null; return had },
     async getUserIdByOuraUserId(ouraUserId) { return row && row.ouraUserId === ouraUserId ? row.userId : null },
   }
@@ -45,7 +47,7 @@ function storedRow(access: string, refresh: string, expiresAt: number): OuraClou
     accessToken: encryptOuraToken(access, USER, 'access_token'),
     refreshToken: encryptOuraToken(refresh, USER, 'refresh_token'),
     expiresAt: new Date(expiresAt), scope: 'daily', ouraUserId: 'oura-u1', updatedAt: new Date(NOW - 60_000),
-    reauthRequiredAt: null,
+    reauthRequiredAt: null, lastWebhookAt: null, lastDataAt: null,
   }
 }
 
@@ -348,7 +350,7 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
   it('leaves an unmarked connection as it was, with no reauthRequired field', async () => {
     const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
     const connection = await getOuraConnection(store, USER)
-    expect(connection).toEqual({ connected: true, scope: 'daily', expiresAt: new Date(NOW + 86400_000).toISOString() })
+    expect(connection).toEqual({ connected: true, scope: 'daily', expiresAt: new Date(NOW + 86400_000).toISOString(), lastWebhookAt: null, lastDataAt: null })
     expect('reauthRequired' in connection).toBe(false)
   })
 
@@ -361,6 +363,17 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
       expiresAt: new Date(NOW + 86400_000), scope: 'daily', ouraUserId: 'oura-u1',
     })
     expect(await getOuraConnection(store, USER)).toMatchObject({ connected: true, scope: 'daily' })
+  })
+
+  // #2861: the Devices status reads when the feed last spoke; a refused or missing grant reports none.
+  it('reports when the feed last spoke, null before it has', async () => {
+    const store = fakeStore(storedRow('acc-1', 'ref-1', NOW + 86400_000))
+    expect(await getOuraConnection(store, USER)).toMatchObject({ connected: true, lastWebhookAt: null, lastDataAt: null })
+    await store.touchOuraCloudWebhook(USER)
+    await store.touchOuraCloudData(USER)
+    expect(await getOuraConnection(store, USER)).toMatchObject({
+      connected: true, lastWebhookAt: new Date(NOW).toISOString(), lastDataAt: new Date(NOW).toISOString(),
+    })
   })
 
   it('disconnect revokes at Oura and deletes the row', async () => {

@@ -102,6 +102,8 @@ export const sleepSchema = z
     // No `sleepScore` (#3011): a night's stored score could only be Oura's.
     sleepPhase5Min: text,
     manualEntry: z.boolean().optional(),
+    /** #2265: when the owner marked the night partial; null or absent when not. */
+    partialNightAt: text,
     provisional: z.boolean().optional(),
     localOnly: z.boolean().optional(),
     sourceLabel: text,

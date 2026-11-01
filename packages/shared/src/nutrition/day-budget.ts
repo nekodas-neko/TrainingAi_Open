@@ -9,7 +9,7 @@
 
 import { shiftDateStr, ageFromDob, dateStrMidnightInTz } from '../date-utils'
 import { computeActiveEnergy, stepEnergyKcal, STEP_BASE_CREDIT, type ActiveEnergyResult } from '../health/daily-energy'
-import type { Sex } from '../health/workout-energy'
+import { sessionActiveMin, type Sex } from '../health/workout-energy'
 import { mifflinStJeorBmr } from './goal-recommendation'
 import { personalRmr, bodyComposition, type BodyComposition } from '../health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '../health/body-fat-calibration'
@@ -150,6 +150,7 @@ export interface BudgetWorkout {
   startedAt: Date
   completedAt?: Date | null
   sessionRpe?: number | null
+  pausedSec?: number | null
 }
 
 export interface BudgetActivity {
@@ -163,10 +164,12 @@ export interface BudgetActivity {
 }
 
 /** The day's measured movement: completed strength sessions that started that local day, the day's
- *  logged activities and its pedometer steps. `dayStartUtc` is the day's local midnight. */
+ *  logged activities and its pedometer steps. `dayStartUtc` is the day's local midnight and
+ *  `dayEndUtc` the next one, so a 23- or 25-hour daylight-saving day is windowed exactly (#3406). */
 export function activeEnergyForDay(input: {
   day: string
   dayStartUtc: Date
+  dayEndUtc: Date
   profile: { ageYears: number | null; weightKg: number | null; sex: Sex | null }
   workouts: readonly BudgetWorkout[]
   avgBpmBySession: ReadonlyMap<string, number>
@@ -174,7 +177,7 @@ export function activeEnergyForDay(input: {
   steps: number | null
 }): ActiveEnergyResult {
   const start = input.dayStartUtc
-  const end = new Date(start.getTime() + 86_400_000)
+  const end = input.dayEndUtc
   return computeActiveEnergy({
     profile: input.profile,
     strengthSessions: input.workouts
@@ -182,7 +185,7 @@ export function activeEnergyForDay(input: {
       // `id` threads through so `workoutKcalBySession` can come back keyed by the session (Q-391).
       .map(ws => ({
         id: ws.id,
-        durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000,
+        durationMin: sessionActiveMin(ws.startedAt, ws.completedAt!, ws.pausedSec),
         rpe: ws.sessionRpe ?? null,
         avgBpm: input.avgBpmBySession.get(ws.id) ?? null,
       })),
@@ -253,7 +256,8 @@ export function calorieBudgetsByDay(input: PastDayBudgetInput): Map<string, numb
     })
     const energyProfile = { ageYears, weightKg: body.latestWeightKg, sex: input.sex }
     const active = activeEnergyForDay({
-      day, dayStartUtc: dateStrMidnightInTz(day, input.tz), profile: energyProfile,
+      day, dayStartUtc: dateStrMidnightInTz(day, input.tz), dayEndUtc: dateStrMidnightInTz(shiftDateStr(day, 1), input.tz),
+      profile: energyProfile,
       workouts: input.workouts, avgBpmBySession: input.avgBpmBySession, activities: input.activities,
       steps: metricByDate.get(day)?.steps ?? null,
     })

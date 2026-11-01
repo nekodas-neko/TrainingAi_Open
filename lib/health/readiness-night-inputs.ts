@@ -30,6 +30,7 @@ import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { trailingBaselineZ } from '@/lib/health/score-availability'
 import { canonicalNightForDate, type DatedNight } from '@trainingai/shared/health/sleep-night'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 
 /**
  * The window start dates readiness and the night-temperature loader both read, shifted on the local
@@ -80,6 +81,8 @@ export interface NightInputSources {
     respiratoryRate?: number | null
     durationSource?: string | null
     respiratoryRateSource?: string | null
+    /** #2265: a night the owner marked partial has no hours to balance; its breathing still counts. */
+    partialNightAt?: Date | string | null
   }[]
   /** `oura_daily` rows: Oura's own temperature deviation, already relative to Oura's baseline. */
   ouraDaily: readonly { date: string; temperatureDeviation?: number | null }[]
@@ -188,7 +191,7 @@ export function resolveReadinessNightInputs(src: NightInputSources): ReadinessNi
       src.ouraDaily.filter(d => !isPreRekey(d.date)).map(d => ({ date: d.date, value: d.temperatureDeviation, source: 'oura_cloud' })),
       nightDate, 100),
     sleepBalance: () => genericInput(
-      src.nights.map(n => ({ date: n.date, value: n.durationHours, source: n.durationSource })),
+      src.nights.filter(n => !isPartialNight(n)).map(n => ({ date: n.date, value: n.durationHours, source: n.durationSource })),
       nightDate, 60),
     breathing: () => genericInput(
       src.nights.map(n => ({ date: n.date, value: n.respiratoryRate, source: n.respiratoryRateSource })),

@@ -53,7 +53,7 @@ class NutritionWidgetProvider : BaseWidgetProvider() {
     val taps = WidgetStore.pending(context)
     if (stale) {
       // The total on file is from an earlier day; say so, and show only the taps made since.
-      val queued = PendingWater.waiting(taps, snapshot.user, WidgetRender.localToday()) * water.tapMl
+      val queued = PendingWater.waiting(taps, snapshot.user, WidgetSnapshot.today(snapshot)) * water.tapMl
       views.setTextViewText(
         R.id.home_widget_water_text,
         if (queued > 0) context.getString(R.string.home_widget_water_queued, queued) else context.getString(R.string.home_widget_stale),

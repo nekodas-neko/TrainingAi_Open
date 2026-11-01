@@ -95,6 +95,25 @@ export function trophySlots<T extends { id: string }>(
   })
 }
 
+/**
+ * The trophy ids a profile shows: the owner's saved pins that are still unlocked, in pin order, or
+ * the three highest-XP unlocks when nothing usable is pinned. The profile route is the one caller,
+ * so what a friend sees is decided here and nowhere else.
+ */
+export function shownTrophyIds(
+  unlocked: readonly { id: string; xpReward: number }[],
+  pins: readonly string[] | null | undefined,
+): string[] {
+  const earned = new Set(unlocked.map(a => a.id))
+  const pinned = [...new Set(pins ?? [])].filter(id => earned.has(id)).slice(0, TROPHY_SLOTS)
+  if (pinned.length > 0) return pinned
+  return unlocked
+    .slice()
+    .sort((a, b) => b.xpReward - a.xpReward)
+    .slice(0, TROPHY_SLOTS)
+    .map(a => a.id)
+}
+
 export function unpinTrophy(pinned: readonly string[], id: string): string[] {
   return pinned.filter(p => p !== id)
 }

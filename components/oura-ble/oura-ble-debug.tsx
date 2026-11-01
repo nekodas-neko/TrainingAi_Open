@@ -528,8 +528,8 @@ export function OuraBleDebug() {
         {/* Battery-optimization exemption — Samsung kills unexempted background
             services, which stops overnight sync. One-time setup. */}
         {batteryExempt === false && (
-          <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs">
-            <Zap className="h-4 w-4 shrink-0 text-amber-500" />
+          <div className="flex items-center gap-2 rounded-md border border-accent-amber/40 bg-accent-amber/5 p-2.5 text-xs">
+            <Zap className="h-4 w-4 shrink-0 text-accent-amber" />
             <span className="text-muted-foreground">Background running is restricted — sync may stop when the app is closed.</span>
             <Button size="sm" variant="outline" className="ml-auto shrink-0" onClick={requestBatteryOpt}>Allow</Button>
           </div>
@@ -576,7 +576,7 @@ export function OuraBleDebug() {
         {summary && summary.byEventName.length > 0 && (
           <div id={eventListId} className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
             {(showAllEvents ? summary.byEventName : summary.byEventName.slice(0, 8)).map((b) => (
-              <span key={`${b.tag}-${b.eventName}`} className={b.eventName === 'unknown' ? 'text-amber-500' : 'text-muted-foreground'}>
+              <span key={`${b.tag}-${b.eventName}`} className={b.eventName === 'unknown' ? 'text-accent-amber' : 'text-muted-foreground'}>
                 {eventLabel(b.tag, b.eventName)}×{b.count}
               </span>
             ))}

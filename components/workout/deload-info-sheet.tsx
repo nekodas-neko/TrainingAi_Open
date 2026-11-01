@@ -46,13 +46,13 @@ export function DeloadInfoSheet({ exercise, onClose, onToggleRevert }: DeloadInf
       <SheetContent side="bottom">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <BatteryLowIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <BatteryLowIcon className="h-5 w-5 text-accent-amber" />
             {exercise?.name}
           </SheetTitle>
         </SheetHeader>
         {exercise && (
           <div className="space-y-4 px-1 pb-2">
-            <p className="text-sm text-amber-700 dark:text-amber-400">
+            <p className="text-sm text-accent-amber">
               {/* #2405. A neutral label, not a guess: this used to claim a sore muscle for every deloaded row
                 with no note, which a sick day, a high-load day and a deload phase all hit. */}
               {exercise.deloadNote ?? "Deload"}

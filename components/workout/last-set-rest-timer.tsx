@@ -32,7 +32,7 @@ export function LastSetRestTimer() {
     <div className="flex flex-col items-center py-2">
       <p
         className="text-[10px] font-bold uppercase tracking-widest mb-2"
-        style={{ color: isRestOvertime ? "#ef4444" : "var(--color-muted-foreground)" }}
+        style={{ color: isRestOvertime ? "var(--destructive)" : "var(--color-muted-foreground)" }}
       >
         {isRestOvertime ? "Overtime" : "Resting"}
       </p>

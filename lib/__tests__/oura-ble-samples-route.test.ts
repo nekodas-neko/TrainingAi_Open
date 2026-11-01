@@ -21,6 +21,12 @@ let sessionUser: { id: string; timezone?: string; isAdmin?: boolean } | null =
   { id: 'u-1', timezone: 'Australia/Brisbane', isAdmin: true }
 let adminAllowed = true
 
+// The write barrier needs a real database; these tests mock the repository, so it passes straight through.
+vi.mock('@/lib/data/postgres/user-write-barrier', () => ({
+  CUT_OFF: Symbol('cut-off'),
+  withUserWriteBarrier: async (_u: string, _s: unknown, run: () => Promise<unknown>) => run(),
+}))
+
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
 vi.mock('@/lib/admin', () => ({
   requireAdmin: async () => { if (!adminAllowed) throw new Error('not admin') },

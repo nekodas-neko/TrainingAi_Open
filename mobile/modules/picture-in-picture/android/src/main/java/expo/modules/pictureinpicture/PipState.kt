@@ -5,13 +5,49 @@ package expo.modules.pictureinpicture
 // natively (PipWindowView): React Native stops applying UI updates while the activity is paused,
 // and an activity in PiP is paused.
 
-/** The current app's PipPolicy: only these phases open the window when the app is left (#2908). */
+/** The current app's PipPolicy, grown for the phase card (#3266): which phases open the window. */
 object PipPolicy {
   const val IDLE = "idle"
-  private val ACTIVE_PHASES = setOf("rest", "set", "complete", "summary")
+  private val ACTIVE_PHASES = setOf("rest", "set", "complete", "summary", "paused")
+
+  /**
+   * The phases the system enters picture-in-picture from on its own, with the smooth shrink: a set,
+   * a rest, and a pause (which holds a set or a rest). The others still open the window from
+   * onUserLeaveHint, as before, so no phase that opened a window stops opening one.
+   */
+  private val AUTO_ENTER_PHASES = setOf("set", "rest", "paused")
+
+  /** The most buttons the system shows (`config_pictureInPictureMaxNumberOfActions`). */
+  const val MAX_ACTIONS = 3
 
   fun isActivePhase(phase: String?): Boolean = phase in ACTIVE_PHASES
+
+  fun autoEnters(phase: String?): Boolean = phase in AUTO_ENTER_PHASES
+
+  /** `Build.VERSION_CODES.S`: auto-enter exists from here. */
+  private const val SDK_S = 31
+
+  /**
+   * Whether leaving the app should open the window by hand. From Android 12 the phases that
+   * auto-enter are entered by the system with the shrink animation, and a manual entry would
+   * pre-empt it; every other active phase, and every phase before Android 12, still enters here.
+   */
+  fun entersOnLeave(phase: String?, sdk: Int): Boolean =
+    isActivePhase(phase) && !(sdk >= SDK_S && autoEnters(phase))
+
+  /** The window's width : height. Portrait while lifting, square for everything else. */
+  fun aspect(phase: String?): Pair<Int, Int> = if (phase == "set") 3 to 4 else 1 to 1
 }
+
+/** The strap's latest reading, as JS sends it (`PipHeartRate` in usePictureInPicture.ts). */
+data class PipHeartRate(
+  val bpm: Int,
+  val zoneName: String?,
+  /** `#rrggbb`, or null for no zone colour. */
+  val zoneColor: String?,
+  /** When the strap sent it, in wall time. */
+  val at: Long,
+)
 
 /**
  * The workout status payload (`workoutStatusFor` in workout-status.ts), the same one the ongoing
@@ -30,78 +66,206 @@ data class PipStatus(
   val setStartedAt: Long? = null,
   val restStartedAt: Long? = null,
   val restEndsAt: Long? = null,
+  /** When the current pause began; null unless the workout is paused. */
+  val pausedAt: Long? = null,
+  /** The exercise Next moves to, from the exercise summary; null when Next ends the workout. */
+  val nextUp: String? = null,
+  /** The strap's reading; null with no strap, in which case the window shows no heart rate. */
+  val hr: PipHeartRate? = null,
+  /** `#rrggbb` per set of this exercise, in order, for the set dots. */
+  val setColors: List<String> = emptyList(),
 )
+
+/** The heart-rate line: `bpm` is null once the reading is too old to show. */
+data class PipHeartView(val bpm: Int?, val zoneName: String?, val zoneColor: String?)
+
+/** One of the window's buttons. `icon` names a drawable; `action` is what JS is told. */
+data class PipButton(val action: String, val label: String, val icon: String)
 
 /** One frame of the window. Clocks are anchors in wall time; the view's chronometers count. */
 sealed class PipFrame {
-  data class Placeholder(val name: String, val hint: Boolean) : PipFrame()
+  data class Placeholder(val name: String, val hint: Boolean, val nextUp: String? = null) : PipFrame()
 
-  data class Timer(
+  /** A running set: the portrait card (3:4). */
+  data class Working(
     val name: String,
-    val rest: Boolean,
-    /** What the big clock counts up from; null shows 0:00 standing still. */
-    val countsFrom: Long?,
-    /** The rest's target, "/ 1:30", or null with no target or during a set. */
-    val target: String?,
-    /** Past the target: the caption counts up from the rest's end, "+0:10". */
-    val overFrom: Long?,
-    /** How much of the ring is drawn, 0–1. */
-    val fraction: Float,
-    val label: String,
-    /** Shown only during a set, and only when known. */
-    val load: String?,
-    /** The running set's arc colour, `#rrggbb`, or null for the rest colour. */
+    /** "Set 3 of 4". */
+    val setLabel: String,
+    /** "80" and "kg", the load's big part; null when the load is not a weight. */
+    val weight: String?,
+    val unit: String?,
+    /** "× 8" or "8 reps"; null when unknown. */
+    val reps: String?,
+    val sets: Int,
+    val setsDone: Int,
+    val setColors: List<String>,
+    /** The running set's own colour, which pulses. */
     val setColor: String?,
-  ) : PipFrame() {
-    val overTime get() = overFrom != null
-  }
+    /** What the set clock counts up from; null stands at 0:00. */
+    val countsFrom: Long?,
+    val hr: PipHeartView?,
+  ) : PipFrame()
+
+  /** A rest: the square (1:1) with its ring. */
+  data class Resting(
+    val name: String,
+    /** "REST · NEXT 3/4", "REST OVER", "REST · DONE". */
+    val eyebrow: String,
+    /** What the clock counts from (the rest's start); null stands still. */
+    val countsFrom: Long?,
+    /** The rest's length in seconds, counted down to; null counts up from the start. */
+    val targetSec: Long?,
+    /** Past the target: the clock reads "+0:12" and the ring is red and full. */
+    val over: Boolean,
+    /** How much of the ring is left: 1 at the start, 0 at the target; 1 once over. */
+    val fraction: Float,
+    /** The next set's load, "80 kg × 8"; null when unknown. */
+    val load: String?,
+    val hr: PipHeartView?,
+  ) : PipFrame()
+
+  /** A pause: how long it has lasted, and what it is holding. */
+  data class Paused(
+    val countsFrom: Long?,
+    val caption: String,
+  ) : PipFrame()
 }
 
 object PipPresenter {
-  private const val SET_ARC_SEC = 180f
+  /** A reading older than this is "—", as the strap's own stale limit (STALE_MS in StrapSession.ts). */
+  const val HR_STALE_MS = 8_000L
 
   /**
-   * pip-view.tsx's window for the workout at one instant. A phase with no timer (the summary once
-   * Next has nothing to time, the workout done, no data yet) shows the placeholder, never a blank
-   * window; "Tap Next" only where the window has a Next button.
+   * The window for the workout at one instant. A phase with no timer (the summary once Next has
+   * nothing to time, the workout done, no data yet) shows the placeholder, never a blank window;
+   * "Tap Next" only where the window has a Next button.
    */
   fun present(phase: String, status: PipStatus?, setColor: String?, nowMs: Long): PipFrame {
     if (status == null) return PipFrame.Placeholder("", false)
-    val timed = phase == "set" || phase == "rest" || phase == "complete" ||
-      (phase == "summary" && status.phase == "resting")
-    if (!timed) return PipFrame.Placeholder(status.exerciseName, phase == "summary")
-    if (phase == "set") {
-      val elapsed = seconds(status.setStartedAt, nowMs)
-      return PipFrame.Timer(
-        name = status.exerciseName,
-        rest = false,
-        countsFrom = status.setStartedAt,
-        target = null,
-        overFrom = null,
-        // A set grows to a three-minute visual cap.
-        fraction = minOf(elapsed / SET_ARC_SEC, 1f),
-        label = "set ${status.setsDone + 1}/${status.sets}",
-        load = status.load,
-        setColor = setColor,
-      )
+    return when {
+      phase == "paused" -> paused(status, nowMs)
+      phase == "set" -> working(status, setColor, nowMs)
+      phase == "rest" || phase == "complete" || (phase == "summary" && status.phase == "resting") ->
+        resting(status, nowMs)
+      phase == "summary" -> PipFrame.Placeholder(status.exerciseName, true, status.nextUp)
+      else -> PipFrame.Placeholder(status.exerciseName, false)
     }
+  }
+
+  private fun working(status: PipStatus, setColor: String?, nowMs: Long): PipFrame.Working {
+    val parts = splitLoad(status.load)
+    return PipFrame.Working(
+      name = status.exerciseName,
+      setLabel = "Set ${minOf(status.setsDone + 1, maxOf(status.sets, 1))} of ${status.sets}",
+      weight = parts.weight,
+      unit = parts.unit,
+      reps = parts.reps,
+      sets = status.sets,
+      setsDone = status.setsDone,
+      setColors = status.setColors,
+      setColor = setColor,
+      countsFrom = status.setStartedAt,
+      hr = heartView(status.hr, nowMs),
+    )
+  }
+
+  private fun resting(status: PipStatus, nowMs: Long): PipFrame.Resting {
     val start = status.restStartedAt
     val end = status.restEndsAt
     val targetSec = if (start != null && end != null) maxOf(0L, (end - start) / 1000) else 0L
+    val timed = targetSec > 0
     val elapsed = seconds(start, nowMs)
-    val over = targetSec > 0 && elapsed >= targetSec
-    return PipFrame.Timer(
+    val over = timed && elapsed >= targetSec
+    val done = status.setsDone >= status.sets
+    return PipFrame.Resting(
       name = status.exerciseName,
-      rest = true,
+      eyebrow = when {
+        over -> "REST OVER"
+        done -> "REST · DONE"
+        else -> "REST · NEXT ${status.setsDone + 1}/${status.sets}"
+      },
       countsFrom = start,
-      target = if (targetSec > 0) "/ ${formatTime(targetSec)}" else null,
-      overFrom = if (over) start!! + targetSec * 1000 else null,
-      // Rest fills toward its target and stays full.
-      fraction = if (targetSec > 0) minOf(elapsed.toFloat() / targetSec, 1f) else 0f,
-      label = if (status.setsDone >= status.sets) "done" else "rest · ${status.setsDone}/${status.sets}",
-      load = null,
-      setColor = null,
+      targetSec = if (timed) targetSec else null,
+      over = over,
+      // The ring empties as the rest runs out, and sits full and red once it is over.
+      fraction = when {
+        !timed -> 0f
+        over -> 1f
+        else -> 1f - elapsed.toFloat() / targetSec
+      },
+      load = if (done) null else status.load,
+      hr = heartView(status.hr, nowMs),
     )
+  }
+
+  private fun paused(status: PipStatus, nowMs: Long): PipFrame.Paused {
+    val end = status.restEndsAt
+    val at = status.pausedAt
+    // What is left of the rest, as it was when the workout stopped.
+    val left = if (end != null && at != null && end > at) (end - at + 999) / 1000 else null
+    return PipFrame.Paused(
+      countsFrom = at,
+      caption = if (left != null) "${status.exerciseName} · rest ${formatTime(left)} left" else status.exerciseName,
+    )
+  }
+
+  /** Null with no strap; a bpm of null once the reading is stale, which the window draws as "—". */
+  fun heartView(hr: PipHeartRate?, nowMs: Long): PipHeartView? {
+    if (hr == null) return null
+    val fresh = nowMs - hr.at <= HR_STALE_MS
+    return PipHeartView(if (fresh) hr.bpm else null, hr.zoneName, hr.zoneColor)
+  }
+
+  /** What a load string splits into: the weight (big) and its unit, and the reps (smaller). */
+  data class LoadParts(val weight: String?, val unit: String?, val reps: String?)
+
+  /**
+   * "80 kg × 8" → 80 / kg / × 8; "80 kg" → 80 / kg; "8 reps" → reps only. Nothing is made up: a
+   * load that is none of these shows whole as the weight line.
+   */
+  fun splitLoad(load: String?): LoadParts {
+    val text = load?.trim()?.takeIf { it.isNotEmpty() } ?: return LoadParts(null, null, null)
+    val cross = text.indexOf(" × ")
+    val left = if (cross >= 0) text.substring(0, cross).trim() else text
+    val reps = if (cross >= 0) "× " + text.substring(cross + 3).trim() else null
+    if (cross < 0 && text.endsWith(" reps")) return LoadParts(null, null, text)
+    val weight = Regex("^(-?[0-9][0-9.,]*)\\s*(kg|lb)$").find(left)
+    return if (weight != null) LoadParts(weight.groupValues[1], weight.groupValues[2], reps)
+    else LoadParts(left, null, reps)
+  }
+
+  /** The buttons for a phase, at most `PipPolicy.MAX_ACTIONS`; the middle one is the main one. */
+  fun buttons(phase: String, status: PipStatus?): List<PipButton> {
+    val list = when (phase) {
+      "set" -> listOf(
+        PipButton("repsDown", "Reps -", "minus"),
+        PipButton("log", "Log set", "log"),
+        PipButton("repsUp", "Reps +", "plus"),
+      )
+      "rest" -> listOfNotNull(
+        // +30 s moves a timed rest's end; an untimed rest has none to move.
+        if (status?.restEndsAt != null) PipButton("restPlus", "+30 s", "plus30") else null,
+        PipButton("log", "Start set", "start"),
+        PipButton("pause", "Pause", "pause"),
+      )
+      "paused" -> listOf(PipButton("resume", "Resume", "resume"))
+      "complete" -> listOf(PipButton("log", "Complete", "log"))
+      "summary" -> listOf(PipButton("log", "Next", "start"))
+      else -> emptyList()
+    }
+    return list.take(PipPolicy.MAX_ACTIONS)
+  }
+
+  /** The window's title for the system: the exercise, or the session while there is none. */
+  fun title(status: PipStatus?): String? = status?.exerciseName?.takeIf { it.isNotBlank() }
+
+  /** The line under the title: where the set is, or that the workout is held. */
+  fun subtitle(phase: String, status: PipStatus?): String? = when {
+    status == null -> null
+    phase == "paused" -> "Paused"
+    phase == "set" -> "Set ${minOf(status.setsDone + 1, maxOf(status.sets, 1))} of ${status.sets}"
+    phase == "rest" -> "Resting"
+    else -> null
   }
 
   /** Whole seconds since `fromMs`, never negative; 0 with nothing to count from. */
@@ -117,6 +281,13 @@ object PipPresenter {
   fun formatTime(seconds: Long): String {
     val s = maxOf(0L, seconds)
     return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
+  }
+
+  /** What the rest clock reads: the time left, then "+0:12" once past the target; up with none. */
+  fun restClockText(elapsedSec: Long, targetSec: Long?): String = when {
+    targetSec == null -> formatTime(elapsedSec)
+    elapsedSec >= targetSec -> "+" + formatTime(elapsedSec - targetSec)
+    else -> formatTime(targetSec - elapsedSec)
   }
 
   /** Reads the JS payload; anything malformed yields null rather than a broken window. */
@@ -135,10 +306,26 @@ object PipPresenter {
       setStartedAt = long("setStartedAt"),
       restStartedAt = long("restStartedAt"),
       restEndsAt = long("restEndsAt"),
+      pausedAt = long("pausedAt"),
+      nextUp = (map["nextUp"] as? String)?.takeIf { it.isNotBlank() },
+      hr = heartRate(map["hr"]),
+      setColors = (map["setColors"] as? List<*>)?.mapNotNull { color(it) } ?: emptyList(),
     )
   }
 
-  /** The arc colour JS sends; anything Android cannot parse falls back to the rest colour. */
+  private fun heartRate(value: Any?): PipHeartRate? {
+    val map = value as? Map<*, *> ?: return null
+    val bpm = (map["bpm"] as? Number)?.toInt() ?: return null
+    val at = (map["at"] as? Number)?.toLong() ?: return null
+    return PipHeartRate(
+      bpm = bpm,
+      zoneName = (map["zoneName"] as? String)?.takeIf { it.isNotBlank() },
+      zoneColor = color(map["zoneColor"]),
+      at = at,
+    )
+  }
+
+  /** The arc colour JS sends; anything Android cannot parse falls back to the default colour. */
   fun color(value: Any?): String? = (value as? String)?.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) }
 }
 

@@ -20,9 +20,9 @@ interface Props {
 }
 
 const SEVERITY_CHIP: Record<string, string> = {
-  mild: "bg-green-500/15 text-green-500",
-  moderate: "bg-amber-500/15 text-amber-500",
-  severe: "bg-red-500/15 text-red-500",
+  mild: "bg-accent-green/15 text-accent-green",
+  moderate: "bg-accent-amber/15 text-accent-amber",
+  severe: "bg-destructive/15 text-destructive",
 }
 
 export const InjuryCard = memo(function InjuryCard({ injuries, loading, onInjuriesChange, userId, recoveryMuscles = [] }: Props) {
@@ -86,9 +86,9 @@ export const InjuryCard = memo(function InjuryCard({ injuries, loading, onInjuri
         </div>
         {recoveryMuscles.length > 0 && (
           <div className="flex items-center gap-3 mb-3 text-[10px] text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#22c55e' }} />Recovered</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#f59e0b' }} />Recovering</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#ef4444' }} />Injured</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: 'var(--accent-green)' }} />Recovered</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: 'var(--accent-amber)' }} />Recovering</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: 'var(--destructive)' }} />Injured</span>
           </div>
         )}
 

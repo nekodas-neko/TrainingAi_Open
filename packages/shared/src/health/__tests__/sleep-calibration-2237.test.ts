@@ -38,6 +38,14 @@ describe('the V2 calibration curve', () => {
   })
 })
 
+describe('the model stamps', () => {
+  it('both name the per-device baselines, and differ from each other (#3387)', () => {
+    expect(SLEEP_SCORE_MODEL_VERSIONS.v1).toContain('per-device-baselines')
+    expect(SLEEP_SCORE_MODEL_VERSIONS.v2).toBe('v2:even-gain:per-device-baselines:2026-10-26')
+    expect(SLEEP_SCORE_MODEL_VERSIONS.v1).not.toBe(SLEEP_SCORE_MODEL_VERSIONS.v2)
+  })
+})
+
 describe('the cutover constant', () => {
   // Release prep sets it, so the test must hold on both sides: it only pins the shape.
   it('is null or an ISO date', () => {

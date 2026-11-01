@@ -9,6 +9,7 @@ import {
   shiftDateStr,
 } from '@trainingai/shared/date-utils';
 import { mealTypeForHour } from '@trainingai/shared/nutrition/meal-type-for-time';
+import { QUANTITY_MULTIPLIER_MAX, QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, View } from 'react-native';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -40,6 +41,7 @@ import { ActiveMealPlan, MealPlansSheet } from '../../meal-plans/components/Meal
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { EndOfDaySheet } from '../components/EndOfDaySheet';
 import { FoodLogger } from '../components/FoodLogger';
+import type { EstimateRequest } from '../../meal-plans/data/estimated-meals';
 import { FoodLoggingComplete } from '../components/FoodLoggingComplete';
 import { MealSectionHeader } from '../components/MealSectionHeader';
 import { MacroLine, NutritionStatus, foodAmount } from '../components/NutritionElements';
@@ -63,11 +65,14 @@ export function NutritionScreen({
   openSettings,
   reviewRequest = 0,
   dateRequest,
+  estimateRequest,
 }: {
   openCoach?: () => void;
   openSettings: () => void;
   reviewRequest?: number;
   dateRequest?: { date: string; count: number };
+  /** A reminder's action on an estimated meal (#2123); shown on its own day. */
+  estimateRequest?: (EstimateRequest & { date: string }) | null;
 }) {
   const n0 = useNutrition();
   const [date, setDate] = useState(n0.today);
@@ -89,6 +94,14 @@ export function NutritionScreen({
       setModal(null);
     }
   }, [dateRequest]);
+  const handledEstimate = useRef<string | null>(null);
+  useEffect(() => {
+    if (estimateRequest && handledEstimate.current !== estimateRequest.id) {
+      handledEstimate.current = estimateRequest.id;
+      setDate(estimateRequest.date);
+      setModal(null);
+    }
+  }, [estimateRequest]);
   useEffect(() => {
     if (reviewRequest > handledReview.current) {
       handledReview.current = reviewRequest;
@@ -97,6 +110,7 @@ export function NutritionScreen({
     }
   }, [reviewRequest, n0.today]);
   const [logger, setLogger] = useState<string | null>(null);
+  const [loggerTab, setLoggerTab] = useState<'search' | undefined>();
   const [library, setLibrary] = useState(false);
   const [edit, setEdit] = useState<FoodLog | null>(null);
   const [quantity, setQuantity] = useState('1');
@@ -222,7 +236,7 @@ export function NutritionScreen({
   }
   return (
     <PageLayout
-      landing
+      fillBottom
       title="Nutrition"
       titleVariant="nutritionTitle"
       subtitle={
@@ -343,6 +357,12 @@ export function NutritionScreen({
                   />
                   <ActiveMealPlan
                     date={date}
+                    estimateRequest={estimateRequest?.date === date ? estimateRequest : null}
+                    onLogFood={(mealTypeId, tab) => {
+                      setLibrary(false);
+                      setLoggerTab(tab);
+                      setLogger(mealTypeId);
+                    }}
                     onManage={(plan) => {
                       setPlanSeed(plan ?? null);
                       setSetupPlan(false);
@@ -455,17 +475,24 @@ export function NutritionScreen({
                 calibrated={energy.data?.maintenance?.source === 'calibrated'}
                 gapMessage={energy.data?.maintenance?.gapMessage ?? null}
               />
-              <Card>
-                <WeeklyNutrition
-                  onDay={setDate}
-                  calorieTarget={
-                    energy.data?.date === date ? (energy.data.balance?.budgetKcal ?? null) : null
-                  }
-                />
+              {/* day-tools-section.tsx: the week's chart and the supplements share one bordered box,
+                  and the supplement rows run edge to edge under hairlines. */}
+              <Card padded={false}>
+                <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
+                  <WeeklyNutrition
+                    onDay={setDate}
+                    calorieTarget={
+                      energy.data?.date === date ? (energy.data.balance?.budgetKcal ?? null) : null
+                    }
+                  />
+                </View>
                 {date === n.today && <SupplementsSection date={date} />}
               </Card>
               <AppButton
                 title="End of Day"
+                icon="moon"
+                iconSize={theme.sizes.iconCompact}
+                iconColor={theme.colors.muted}
                 variant="surface"
                 onPress={() => setModal('review')}
               />
@@ -487,7 +514,11 @@ export function NutritionScreen({
           date={date}
           mealTypeId={logger}
           library={library}
-          onClose={() => setLogger(null)}
+          initialTab={loggerTab}
+          onClose={() => {
+            setLogger(null);
+            setLoggerTab(undefined);
+          }}
           onRecipes={(meal) => {
             setRecipeSelected(meal ?? null);
             setLogger(null);
@@ -526,8 +557,8 @@ export function NutritionScreen({
             <NumericStepper
               label="Servings"
               value={quantity}
-              min={0.01}
-              max={100}
+              min={QUANTITY_MULTIPLIER_MIN}
+              max={QUANTITY_MULTIPLIER_MAX}
               step={0.5}
               onChange={setQuantity}
             />
@@ -584,8 +615,8 @@ export function NutritionScreen({
             <NumericStepper
               label="Scale this meal"
               value={groupScale}
-              min={0.01}
-              max={100}
+              min={QUANTITY_MULTIPLIER_MIN}
+              max={QUANTITY_MULTIPLIER_MAX}
               step={0.5}
               onChange={setGroupScale}
             />

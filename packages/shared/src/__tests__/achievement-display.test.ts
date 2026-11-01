@@ -4,6 +4,7 @@ import {
   getBadgeTier,
   getLevelLabel,
   levelProgress,
+  shownTrophyIds,
 } from '../achievement-display'
 
 describe('levelProgress', () => {
@@ -32,5 +33,33 @@ describe('level ladder', () => {
   })
   it('puts a badge in a tier by its reward', () => {
     expect([49, 50, 199, 200].map(getBadgeTier)).toEqual(['bronze', 'silver', 'silver', 'gold'])
+  })
+})
+
+describe('shownTrophyIds', () => {
+  const unlocked = [
+    { id: 'small', xpReward: 10 },
+    { id: 'big', xpReward: 750 },
+    { id: 'mid', xpReward: 200 },
+    { id: 'huge', xpReward: 900 },
+  ]
+
+  it('shows the pins in pin order, not XP order', () => {
+    expect(shownTrophyIds(unlocked, ['small', 'big'])).toEqual(['small', 'big'])
+  })
+
+  it('falls back to the top three by XP when nothing is pinned', () => {
+    expect(shownTrophyIds(unlocked, null)).toEqual(['huge', 'big', 'mid'])
+    expect(shownTrophyIds(unlocked, [])).toEqual(['huge', 'big', 'mid'])
+    expect(shownTrophyIds(unlocked, undefined)).toEqual(['huge', 'big', 'mid'])
+  })
+
+  it('drops a pin that is no longer unlocked, and falls back if none is left', () => {
+    expect(shownTrophyIds(unlocked, ['gone', 'mid'])).toEqual(['mid'])
+    expect(shownTrophyIds(unlocked, ['gone'])).toEqual(['huge', 'big', 'mid'])
+  })
+
+  it('never shows more than three, or the same one twice', () => {
+    expect(shownTrophyIds(unlocked, ['big', 'big', 'mid', 'small', 'huge'])).toEqual(['big', 'mid', 'small'])
   })
 })

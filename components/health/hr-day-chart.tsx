@@ -2,7 +2,7 @@
 
 import { memo, useRef, useMemo } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { dateStrMidnightInTz } from '@trainingai/shared/date-utils'
+import { clockSkipOnDay, closeClockSkip, dateStrMidnightInTz, wallClockMinuteReader, type ClockSkip } from '@trainingai/shared/date-utils'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -32,48 +32,48 @@ ChartJS.register(LineElement, PointElement, LinearScale, Filler, Tooltip)
 
 interface TimeWindow { start: number; end: number }
 
-function toMinutes(timestamp: string, midnightMs: number): number {
-  return (new Date(timestamp).getTime() - midnightMs) / 60_000
-}
+// The wall-clock minute of the user's day (#3445), so the axis is the clock face on a 23- or 25-hour day.
+type MinuteOf = (atMs: number) => number
+const toMinutes = (timestamp: string, minuteOf: MinuteOf): number => minuteOf(new Date(timestamp).getTime())
 
 // Average readings into N-minute buckets for a smooth line
-function toBuckets(readings: Reading[], midnightMs: number, bucketMin = 10): { x: number; y: number }[] {
-  return bucketAverage(readings.map(r => ({ x: toMinutes(r.timestamp, midnightMs), bpm: r.bpm })), bucketMin)
+function toBuckets(readings: Reading[], minuteOf: MinuteOf, bucketMin = 10): { x: number; y: number }[] {
+  return bucketAverage(readings.map(r => ({ x: toMinutes(r.timestamp, minuteOf), bpm: r.bpm })), bucketMin)
 }
 
 // Find contiguous source windows (sleep/rest from Oura source field)
 // Oura tags individual "rest" readings even for brief stillness, so require
 // at least 20 minutes to avoid phantom bands from a few scattered readings.
-function findSourceWindows(readings: Reading[], midnightMs: number, sources: string[]): TimeWindow[] {
+function findSourceWindows(readings: Reading[], minuteOf: MinuteOf, sources: string[], skip: ClockSkip | null): TimeWindow[] {
   const MIN_DURATION = 20
   const result: TimeWindow[] = []
   let start: number | null = null
   let last: number | null = null
 
   for (const r of readings) {
-    const min = toMinutes(r.timestamp, midnightMs)
+    const min = toMinutes(r.timestamp, minuteOf)
     const match = r.source != null && sources.includes(r.source)
 
     if (match) {
       if (start === null) start = min
       last = min
-    } else if (start !== null && last !== null && min - last > 15) {
-      if (last - start >= MIN_DURATION) result.push({ start, end: last })
+    } else if (start !== null && last !== null && closeClockSkip(min, skip) - closeClockSkip(last, skip) > 15) {
+      if (closeClockSkip(last, skip) - closeClockSkip(start, skip) >= MIN_DURATION) result.push({ start, end: last })
       start = null; last = null
     }
   }
-  if (start !== null && last !== null && last - start >= MIN_DURATION) result.push({ start, end: last })
+  if (start !== null && last !== null && closeClockSkip(last, skip) - closeClockSkip(start, skip) >= MIN_DURATION) result.push({ start, end: last })
   return result
 }
 
 // Convert logged workout sessions to minute-offset windows with names
-function workoutWindows(sessions: WorkoutSession[], midnightMs: number): (TimeWindow & { name: string })[] {
+function workoutWindows(sessions: WorkoutSession[], minuteOf: MinuteOf): (TimeWindow & { name: string })[] {
   return sessions
     .filter(s => s.completedAt != null)
     .map(s => ({
       name:  s.sessionName,
-      start: (new Date(s.startedAt).getTime() - midnightMs) / 60_000,
-      end:   (new Date(s.completedAt!).getTime() - midnightMs) / 60_000,
+      start: minuteOf(new Date(s.startedAt).getTime()),
+      end:   minuteOf(new Date(s.completedAt!).getTime()),
     }))
     .filter(w => w.end > w.start)
 }
@@ -114,18 +114,20 @@ function HrDayChartBase({ readings, date, workoutSessions = [], compact = false,
   // is minutes since that midnight, so a device in another zone shifted every reading, the sleep
   // band and the workout windows by the difference.
   const midnightMs = dateStrMidnightInTz(date, tz).getTime()
+  const minuteOf = wallClockMinuteReader(midnightMs, tz)
+  const skip = clockSkipOnDay(midnightMs, tz)
 
-  const smoothed     = toBuckets(readings, midnightMs, bucketMinutes)
+  const smoothed     = toBuckets(readings, minuteOf, bucketMinutes)
   const yDomain      = hrChartDomain(smoothed.map(p => p.y))
-  const backfill     = showBackfill ? interpolateGaps(smoothed) : []
+  const backfill     = showBackfill ? interpolateGaps(smoothed, 20, 120, skip) : []
   // Prefer the real sleep-session interval (one contiguous overnight block, present
   // whenever the ring recorded sleep). Fall back to the per-reading `source` heuristic
   // only when no sleep session was returned — kept at ['sleep'] (never 'rest') so PR
   // #185's no-daytime-phantom fix is preserved.
   const sleepWindows: TimeWindow[] = sleepWindow
     ? [{ start: sleepWindow.startMin, end: sleepWindow.endMin }]
-    : findSourceWindows(readings, midnightMs, ['sleep'])
-  const gymWindows   = workoutWindows(workoutSessions, midnightMs)
+    : findSourceWindows(readings, minuteOf, ['sleep'], skip)
+  const gymWindows   = workoutWindows(workoutSessions, minuteOf)
 
   const windowDefs: WindowDef[] = [
     ...sleepWindows.map(w => ({ window: w, fill: 'rgba(99,102,241,0.14)', stroke: 'rgba(99,102,241,0.6)', label: 'Sleep',   name: 'Sleep' })),
@@ -153,7 +155,7 @@ function HrDayChartBase({ readings, date, workoutSessions = [], compact = false,
   const data: ChartData<'line'> = {
     datasets: [
       {
-        data:            withGapBreaks(smoothed),
+        data:            withGapBreaks(smoothed, 20, skip),
         borderColor:     resolvedLineColor,
         backgroundColor: 'rgba(99, 102, 241, 0.07)',
         pointRadius:     0,

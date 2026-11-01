@@ -8,7 +8,7 @@ import {
 import { gainColor } from '../src/features/health/progressPresentation.ts';
 import { moreCopy } from '../src/features/settings/data/profile.ts';
 import { compactToggleLayout } from '../src/shared/ui/compactToggleLayout.ts';
-import { stackCalendarTitle } from '../src/shared/ui/monthGrid.ts';
+import { calendarTitleStacked } from '../src/shared/ui/monthGrid.ts';
 import { sizes, spacing } from '../src/shared/theme/tokens.ts';
 
 // Behaviour of the pure helpers behind the parity round for #2934, #2900, #2901 and #2902. What a
@@ -56,11 +56,8 @@ test('a gain reads up, down or flat from the shared rule, and colours from the s
   assert.equal(gainColor(null, status), null);
 });
 
-test('the calendar title moves above its controls once text outgrows the shared row (#2900)', () => {
-  assert.equal(stackCalendarTitle(1), false);
-  assert.equal(stackCalendarTitle(1.1), false);
-  assert.equal(stackCalendarTitle(1.15), true);
-  assert.equal(stackCalendarTitle(1.3), true);
+test('the calendar title starts above its controls until the row is measured (#2900, #3501)', () => {
+  assert.equal(calendarTitleStacked(null), true);
 });
 
 test('More words its rows and actions as the current app does (#2902)', () => {

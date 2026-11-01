@@ -5,6 +5,7 @@ import { DEFAULT_TZ, todayInTz, startOfWeekInTz, aestMidnight, toAestDay, shiftD
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
 import { computeWeightRateKgPerWeek } from "@trainingai/shared/health/long-term-goal-progress";
 import { nightSessions, canonicalLatestNight, recordsSleep } from "@trainingai/shared/health/sleep-night";
+import { isPartialNight, nightsWithDuration } from "@trainingai/shared/health/partial-night";
 
 export interface ProgressSummaryResponse {
   // #2337: `thisWeekHours` is null when no night this week has a duration — "0 h" against a sleep
@@ -56,11 +57,13 @@ export async function GET() {
   // last night. Naps drop out of the weekly total too — the card says "sleep", and a nights-only
   // total is the number that lines up with the nightly figure above it.
   const nights = nightSessions(sleepSessions, tz);
-  const lastNightHours = canonicalLatestNight(nights, tz)?.durationHours ?? null;
+  // #2265: a night the owner marked partial has no hours to report, neither as last night nor in the week.
+  const lastNight = canonicalLatestNight(nights, tz);
+  const lastNightHours = isPartialNight(lastNight) ? null : lastNight?.durationHours ?? null;
   // Missing is not zero (#2337): a week with no measured night has no total, and summing nothing into
   // 0 told a user with no sleep source they had slept 0 h. A night that recorded nothing
   // (`recordsSleep`) is left out rather than counted as 0; it never moved a real week's total.
-  const weekNightHours = nights
+  const weekNightHours = nightsWithDuration(nights)
     .filter(ss => ss.date >= weekStartStr)
     .map(ss => ss.durationHours)
     .filter((h): h is number => recordsSleep(h));

@@ -22,15 +22,15 @@ import { volumeVerdict } from '../health/volume-band'
 const ROOT = path.resolve(__dirname, '../..')
 const code = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
-// `components/health/training-load-card.tsx` is deliberately absent. Its ACWR headline takes its
-// colour from `acwr.ts` (shared package, #2148) while `monotonyColor` sits beside it, so migrating
-// only the monotony half would put two greens on one card. It moves with `acwr.ts`.
+// `training-load-card.tsx` joined with `acwr.ts` (#2148): its ACWR headline and `monotonyColor` sit
+// side by side, so they had to move together.
 const FILES = [
   'app/health/health-sections.tsx',
   'app/session-select/components/deload-banner.tsx',
   'app/session-select/components/streak-card.tsx',
   'components/exercise-history-sheet.tsx',
   'components/health/body-fat-card.tsx',
+  'components/health/training-load-card.tsx',
   'components/health/trends-section.tsx',
   'components/health/weekly-muscle-sets-card.tsx',
   'components/health/volume-band.ts',
@@ -45,7 +45,7 @@ const TOKEN = /var\(--(?:accent-green|accent-amber|destructive)\)/
 describe('LB-152 — band colours read the accent token', () => {
   it('finds the files it is scanning', () => {
     // A rename that makes readFileSync throw is loud; this makes an emptied list loud too.
-    expect(FILES.length).toBe(8)
+    expect(FILES.length).toBe(9)
     for (const f of FILES) expect(code(f).length, f).toBeGreaterThan(0)
   })
 

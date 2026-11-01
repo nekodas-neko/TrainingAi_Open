@@ -698,7 +698,7 @@ export function ProgramEditorSheet({
                               data={{ type: 'exercise', sessionKey: sess.key }}
                               className={cn(
                                 "flex gap-2 items-start rounded-xl p-2 bg-background",
-                                styleIsMissing ? "border border-amber-400" : "",
+                                styleIsMissing ? "border border-accent-amber" : "",
                                 group != null ? "border-l-4 border-l-brand" : "",
                               )}
                             >
@@ -780,7 +780,7 @@ export function ProgramEditorSheet({
                                           ))}
                                         </select>
                                         {styleIsMissing && (
-                                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                                          <p className="text-xs text-accent-amber">
                                             Style &ldquo;{ex.styleName}&rdquo; not found — please reassign
                                           </p>
                                         )}

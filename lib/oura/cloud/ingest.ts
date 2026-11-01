@@ -57,6 +57,9 @@ export async function refreshStillRhrAfterHeartRate(
 }
 
 /** The slice of the repository the writer needs, so tests can hand it a fake. */
+/** #3069: where the ring-battery readings go, and where the next read starts. */
+export type OuraBatteryStore = Pick<WorkoutRepository, 'getLatestOuraCloudBatteryAt' | 'insertOuraCloudBatteryReadings'>
+
 export type OuraCloudWriter = Pick<WorkoutRepository,
   'upsertOuraDaily' | 'upsertBodyMetrics' | 'upsertOuraCloudSleep' | 'tombstoneOuraCloudSleep' | 'syncOuraMainSleepBodyMetrics' |
   'upsertOuraWorkouts' | 'tombstoneOuraWorkouts' | 'tombstoneOuraWorkoutsAbsent' | 'upsertOuraCloudHeartrate' |

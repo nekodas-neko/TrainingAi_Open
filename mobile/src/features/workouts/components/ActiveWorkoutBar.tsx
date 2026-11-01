@@ -4,7 +4,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useClock, formatDuration } from '../../../shared/hooks/useClock';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { workoutActivity } from '../logging/activity-summary';
-import type { WorkoutRecord } from '../logging/workout';
+import { activeElapsedMs, type WorkoutRecord } from '../logging/workout';
 
 function WorkoutBar({
   workout,
@@ -14,7 +14,9 @@ function WorkoutBar({
   onResume: (id: string) => void;
 }) {
   const { theme } = useTheme();
-  const now = useClock();
+  const clock = useClock(workout.pausedAt === null);
+  // Under a pause every clock stands where it stopped.
+  const now = workout.pausedAt ?? clock;
   const activity = workoutActivity(workout, now);
   return (
     <Pressable
@@ -37,6 +39,7 @@ function WorkoutBar({
             {workout.sessionName}
           </AppText>
           <AppText variant="micro" tone="muted" numberOfLines={1}>
+            {workout.pausedAt === null ? '' : 'Paused · '}
             {activity.label}
             {activity.seconds === null
               ? ''
@@ -45,7 +48,7 @@ function WorkoutBar({
         </View>
         {workout.timers.workoutElapsed && (
           <AppText variant="caption" tone="brand">
-            Total {formatDuration((now - workout.startedAt) / 1000)}
+            Total {formatDuration(activeElapsedMs(workout, now) / 1000)}
           </AppText>
         )}
         <Icon name="forward" tone="brand" />

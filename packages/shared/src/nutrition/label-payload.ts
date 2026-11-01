@@ -317,6 +317,28 @@ function recipeIngredients(meal: SavedMeal): SharedMealIngredient[] {
   return out
 }
 
+/**
+ * A saved meal as a `SharedMeal` with **no byte budget**: every ingredient named, nothing rolled up.
+ *
+ * The QR path trims to fit paper; a friend's library travels as JSON and has no such limit, so a
+ * 20-ingredient meal arrives whole. Built from the same `recipeIngredients` the label encodes, so the
+ * two paths cannot disagree about a meal's figures, and `servings` is carried for the same reason as
+ * on the label: a copy is the batch the author cooks, not one plate.
+ *
+ * **Not `savedMealToIngredients`.** That one answers a different question — one PORTION, as per-100 g
+ * densities for the plan scaler. A `SharedMeal` is the WHOLE recipe at its real weights, and
+ * `saveSharedMealToLibrary` divides nothing, so feeding it portion figures would shrink every copy
+ * by its servings.
+ */
+export function sharedMealFromSaved(meal: SavedMeal): SharedMeal {
+  return {
+    name: meal.name,
+    servings: Number(meal.servings) > 0 ? Number(meal.servings) : 1,
+    ingredients: recipeIngredients(meal),
+    rolled: 0,
+  }
+}
+
 /** Positional, because the field names would be a third of the payload. */
 function toWire(meal: SharedMeal): string {
   const rows = meal.ingredients.map(i => [i.name, i.weightG, i.calories, i.proteinG, i.carbsG, i.fatG])

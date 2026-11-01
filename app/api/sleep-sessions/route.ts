@@ -53,6 +53,8 @@ export async function GET() {
     manualSleepStart: r.manualSleepStart ? r.manualSleepStart.toISOString() : null,
     // #2338. Only true on a night no device recorded — `listSleepSessions` already dropped the rest.
     manualEntry: r.manualEntry ?? false,
+    // #2265. The owner's partial-night mark, so a screen can show it and an average can leave the night out.
+    partialNightAt: r.partialNightAt ? r.partialNightAt.toISOString() : null,
     // #3057. `mergeByDate` keeps an Oura period beside a `long_sleep` out of the night. Since #3080 it
     // returns the night the Sleep Score scores, so the card and the score describe the same night.
     ouraSleepType: r.ouraSleepType ?? null,

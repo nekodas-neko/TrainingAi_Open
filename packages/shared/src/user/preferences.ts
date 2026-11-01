@@ -74,6 +74,12 @@ export const UserPreferencesSchema = z.object({
   healthAlerts:       z.boolean().optional(),
   dayReviewReminders: z.boolean().optional(),
   calendarSync:       z.boolean().optional(),
+
+  // ── Sharing ───────────────────────────────────────────────────────────────────
+  /** A statement to other people, not a display setting: when true, accepted friends can browse and
+   *  copy this user's saved meals (`GET /api/friends/[id]/saved-meals`). Absent means off, and the
+   *  route reads it on the server, so what a device has cached never widens who can see a meal. */
+  shareMealLibrary:   z.boolean().optional(),
 }).strict()
 
 /**
@@ -110,6 +116,7 @@ export const PREFERENCE_STORAGE: Readonly<Record<
   healthAlerts:       { key: 'ta_pref_health_alerts',       encoding: 'boolean' },
   dayReviewReminders: { key: 'ta_pref_day_review_reminders', encoding: 'boolean' },
   calendarSync:       { key: 'ta_pref_calendar_sync',       encoding: 'boolean' },
+  shareMealLibrary:   { key: 'ta_pref_share_meal_library',  encoding: 'boolean' },
 })
 
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>

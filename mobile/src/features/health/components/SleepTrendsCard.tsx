@@ -15,6 +15,7 @@ import {
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHealthData } from '../data/HealthDataProvider';
+import { sleepTrendAt } from '../data/body-view';
 export function SleepTrendsCard() {
   const health = useHealthData();
   const { theme } = useTheme();
@@ -25,7 +26,7 @@ export function SleepTrendsCard() {
     .flatMap((night) => (night.sleepStart ? [night.sleepStart] : []));
   const consistency = computeSleepStartConsistency(starts, health.timezone);
   const points = nights.map((night) => {
-    const at = view === 'bedtime' ? night.sleepStart : night.sleepEnd;
+    const at = sleepTrendAt(night, view === 'bedtime' ? 'bedtime' : 'wake');
     const value = at ? minutesFromNoon(at, health.timezone) : null;
     return {
       label: night.date,

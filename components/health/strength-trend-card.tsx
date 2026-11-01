@@ -13,7 +13,7 @@ interface Props {
   loading: boolean;
 }
 
-const GAIN_COLOR = { up: "#22c55e", down: "#ef4444", flat: "#f59e0b" } as const;
+const GAIN_COLOR = { up: "var(--accent-green)", down: "var(--destructive)", flat: "var(--accent-amber)" } as const;
 
 function gainColor(gainPct: number | null): string {
   const tone = gainTone(gainPct);
@@ -80,7 +80,7 @@ export const StrengthTrendCard = memo(function StrengthTrendCard({ exercises, lo
                 → ~{displayOneRm(projection.projectedRm, ex.exerciseType).value}{unitSuffix} in 30d
               </span>
               {isRmPlateau(ex.history) && (
-                <span className="text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-amber-500/15 text-amber-500">
+                <span className="text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-accent-amber/15 text-accent-amber">
                   Plateau
                 </span>
               )}

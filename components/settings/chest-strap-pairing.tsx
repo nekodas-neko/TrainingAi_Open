@@ -169,7 +169,7 @@ export function ChestStrapPairing() {
         workouts; the ring takes over automatically whenever it isn&apos;t.
       </p>
       {/* A-9: sole failure surface for pairing — was near-invisible in light theme. */}
-      {error && <p className="text-[10px] text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-[10px] text-destructive">{error}</p>}
     </div>
   )
 }

@@ -217,7 +217,7 @@ export function WarmupRampProgress({
         })}
       </div>
       {allWarmupDone && (
-        <p className="text-center text-[10px] font-semibold text-green-500 mt-1.5">✓ Warm-up complete — ready to go!</p>
+        <p className="text-center text-[10px] font-semibold text-accent-green mt-1.5">✓ Warm-up complete — ready to go!</p>
       )}
     </div>
   );
@@ -255,7 +255,7 @@ export function RestTimer({
       overtimeSec={overtimeSec}
     />
   );
-  const labelColor = isRestOvertime ? "#ef4444" : "var(--color-muted-foreground)";
+  const labelColor = isRestOvertime ? "var(--destructive)" : "var(--color-muted-foreground)";
   return (
     <>
       <p

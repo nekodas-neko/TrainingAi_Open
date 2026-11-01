@@ -26,6 +26,12 @@ export function displayLoad(kg: string | number, unit: 'kg' | 'lb') {
   return String(Math.round(value * 100) / 100);
 }
 
+/** A load as read anywhere but the entry wheel: always kilograms, whatever unit the exercise is typed in. */
+export function loadLabel(kg: string | number) {
+  const text = displayLoad(kg, 'kg');
+  return text === '' ? '' : `${text} kg`;
+}
+
 export function storedLoad(value: string, unit: 'kg' | 'lb') {
   if (!/^-?\d+(\.\d+)?$/.test(value.trim())) {
     return value;

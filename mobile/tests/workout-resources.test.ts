@@ -11,7 +11,7 @@ import { workoutFixture } from './workout-fixture.ts';
 import { buildCatalog } from '../src/features/workouts/catalog.ts';
 import { builderSteps, generatedDraft } from '../src/features/programs/builder-model.ts';
 import { programPayload } from '../src/features/programs/editor-model.ts';
-import { daySpec, streakDataSpec } from '../src/features/workouts/data/models.ts';
+import { daySpec, recapSpec, streakDataSpec } from '../src/features/workouts/data/models.ts';
 import { homeStreak, trainingDays } from '../src/features/home/data/models.ts';
 import { streakRestGapFor } from '@trainingai/shared/workout/day-streak';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
@@ -408,4 +408,31 @@ test('deleting a session removes its day from the long streak window and the str
   assert.equal(after[deleted], undefined);
   assert.ok(after[today]);
   assert.ok(streakBefore > homeStreak(after, today, null));
+});
+
+test('the done screen makes no recap request until the recap is asked for (#2111)', async (t) => {
+  const db = sqliteFixture();
+  t.after(() => db.connection.close());
+  const storage = await createLocalStorage(db.database);
+  const paths: string[] = [];
+  const connection = {
+    origin: 'https://example.com',
+    userId: 'one',
+    timezone: null,
+    get: async (path: string) => {
+      paths.push(path);
+      return { recap: 'Solid session.' };
+    },
+    post: async () => ({}),
+  };
+  const resources = new WorkoutResources(storage.account(connection.origin, 'one'), connection);
+  const spec = recapSpec('workout-1');
+  // What the card does on every render before the button is pressed.
+  await resources.load(spec, false, true);
+  assert.deepEqual(paths, []);
+  assert.equal(resources.state(spec).data, null);
+  // Pressing "Write me a recap".
+  await resources.load(spec, false, false);
+  assert.deepEqual(paths, ['/api/workout-sessions/workout-1/recap']);
+  assert.equal(resources.state(spec).data?.recap, 'Solid session.');
 });

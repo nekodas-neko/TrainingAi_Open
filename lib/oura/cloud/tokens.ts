@@ -20,6 +20,7 @@ import { exchangeAuthorizationCode, fetchOuraUserId, OuraGrantRejectedError, Our
 import { grantedOuraScopes, type OuraOAuthConfig } from './config'
 import { decryptOuraToken, encryptOuraToken, OuraTokenKeyMissingError } from './token-cipher'
 import { startOuraConnectBackfill } from './backfill'
+import { clearRingBatteryBackoff } from './ring-battery-backoff'
 
 /** Refresh when less than this is left. Oura's access tokens last about a day. */
 export const REFRESH_MARGIN_MS = 10 * 60 * 1000
@@ -29,6 +30,9 @@ export interface OuraTokenStore {
   getOuraCloudTokens(userId: string): Promise<OuraCloudTokenRow | null>
   saveOuraCloudTokens(userId: string, input: SaveOuraCloudTokensInput): Promise<void>
   markOuraCloudReauthRequired(userId: string, unchangedSince: Date): Promise<boolean>
+  /** #2861: when the feed last spoke; see `freshness.ts`. */
+  touchOuraCloudWebhook(userId: string): Promise<void>
+  touchOuraCloudData(userId: string): Promise<void>
   deleteOuraCloudTokens(userId: string): Promise<boolean>
   getUserIdByOuraUserId(ouraUserId: string): Promise<string | null>
 }
@@ -111,6 +115,7 @@ export async function storeOuraGrant(
       throw new OuraAccountInUseError()
     }
   }
+  clearRingBatteryBackoff(userId)
   afterConnect(userId)
 }
 
@@ -128,6 +133,10 @@ export interface OuraConnection {
   connected: boolean
   scope: string | null
   expiresAt: string | null
+  /** #2861: when the last verified webhook event arrived (ISO), or null before the first. */
+  lastWebhookAt?: string | null
+  /** #2861: when Oura data was last written for the user (ISO), or null before the first. */
+  lastDataAt?: string | null
   /** Present (and `true`) only when Oura refused the grant (#3204): the user has to connect again. */
   reauthRequired?: true
 }
@@ -143,10 +152,13 @@ export async function getOuraConnection(store: OuraTokenStore, userId: string): 
     decryptOuraToken(row.accessToken, userId, 'access_token') !== null &&
     decryptOuraToken(row.refreshToken, userId, 'refresh_token') !== null
   if (stored && row.reauthRequiredAt) return { connected: false, scope: null, expiresAt: null, reauthRequired: true }
+  if (!row || !stored) return { connected: false, scope: null, expiresAt: null }
   return {
-    connected: stored,
-    scope: stored ? row.scope : null,
-    expiresAt: stored ? row.expiresAt?.toISOString() ?? null : null,
+    connected: true,
+    scope: row.scope,
+    expiresAt: row.expiresAt?.toISOString() ?? null,
+    lastWebhookAt: row.lastWebhookAt?.toISOString() ?? null,
+    lastDataAt: row.lastDataAt?.toISOString() ?? null,
   }
 }
 
@@ -202,6 +214,7 @@ async function refreshNow(
     // A refresh answer may leave `scope` out. Writing that `null` would make the grant read as
     // "covers everything" and bring back the 401 stop on an unshared type (#2974), so keep the stored list.
     await store.saveOuraCloudTokens(userId, { ...encrypted(userId, grant), expiresAt: grant.expiresAt, scope: grant.scope ?? storedScope })
+    clearRingBatteryBackoff(userId)
     return grant.accessToken
   } catch (err) {
     if (!(err instanceof OuraGrantRejectedError) || err.oauthError !== 'invalid_grant') throw err
@@ -293,4 +306,26 @@ export async function disconnectOuraAccount(store: OuraTokenStore, userId: strin
   const revoked = accessToken ? await revokeAccessToken(accessToken) : false
   const deleted = await store.deleteOuraCloudTokens(userId)
   return { deleted, revoked }
+}
+
+/**
+ * The plaintext access token to revoke later, read WITHOUT deleting the row. A wipe (account
+ * deletion, an admin reset) reads this first, runs its transaction, and revokes at Oura only after
+ * the commit: the revoke cannot be undone, the wipe can fail and roll back, and a rolled-back wipe
+ * must not leave the person disconnected from Oura. Null when there is no connection or no usable key.
+ */
+export async function readOuraAccessTokenForRevoke(store: OuraTokenStore, userId: string): Promise<string | null> {
+  const row = await store.getOuraCloudTokens(userId)
+  if (!row) return null
+  try {
+    return decryptOuraToken(row.accessToken, userId, 'access_token')
+  } catch (err) {
+    if (!(err instanceof OuraTokenKeyMissingError)) throw err
+    return null
+  }
+}
+
+/** Revokes a token read by `readOuraAccessTokenForRevoke`. The row is already gone with the wipe. */
+export async function revokeOuraAccessToken(accessToken: string): Promise<boolean> {
+  return revokeAccessToken(accessToken)
 }

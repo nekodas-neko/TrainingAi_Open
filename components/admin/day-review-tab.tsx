@@ -105,9 +105,9 @@ export default function DayReviewTab() {
       {audit && !loading && (
         <>
           {audit.warnings.length > 0 && (
-            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 space-y-1">
+            <div className="rounded-xl border border-accent-amber/40 bg-accent-amber/10 p-3 space-y-1">
               {audit.warnings.map((w, i) => (
-                <p key={i} className="text-xs text-amber-700 dark:text-amber-400">{w}</p>
+                <p key={i} className="text-xs text-accent-amber">{w}</p>
               ))}
             </div>
           )}
@@ -151,7 +151,7 @@ function PillarCard({ pillar, expanded, onToggle }: { pillar: PillarAudit; expan
           <p className="text-sm font-semibold">{pillar.label}</p>
           <p className="text-[11px] text-muted-foreground truncate">{pillar.source}</p>
         </div>
-        {drifted && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" aria-label="stored score differs" />}
+        {drifted && <AlertTriangle className="h-4 w-4 shrink-0 text-accent-amber" aria-label="stored score differs" />}
         <span className="shrink-0 text-2xl font-bold tabular-nums">
           {pillar.score ?? '—'}
         </span>
@@ -170,7 +170,7 @@ function PillarCard({ pillar, expanded, onToggle }: { pillar: PillarAudit; expan
             <div className="space-y-1">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Missing inputs</p>
               {pillar.gaps.map((g, i) => (
-                <p key={i} className="text-[11px] text-amber-700 dark:text-amber-400">• {g}</p>
+                <p key={i} className="text-[11px] text-accent-amber">• {g}</p>
               ))}
             </div>
           )}
@@ -199,7 +199,7 @@ function PillarCard({ pillar, expanded, onToggle }: { pillar: PillarAudit; expan
           <div className="text-[11px] text-muted-foreground">
             Stored for this day: <span className="font-medium">{pillar.stored.score ?? '—'}</span>
             {pillar.stored.source ? ` (${pillar.stored.source})` : ''}
-            {drifted && <span className="ml-1 text-amber-600 dark:text-amber-400">— differs from this recompute</span>}
+            {drifted && <span className="ml-1 text-accent-amber">— differs from this recompute</span>}
           </div>
         </div>
       )}
@@ -216,7 +216,7 @@ function ContributorRow({ c }: { c: AuditContributor }) {
       <div className="flex items-baseline gap-2 text-[11px]">
         <span className="min-w-0 flex-1 truncate">
           {c.label}
-          {c.provisional && <span className="ml-1 text-[9px] uppercase tracking-wide text-amber-600 dark:text-amber-400">neutral</span>}
+          {c.provisional && <span className="ml-1 text-[9px] uppercase tracking-wide text-accent-amber">neutral</span>}
         </span>
         <span className="shrink-0 tabular-nums text-muted-foreground">
           {c.input.value === null ? '—' : String(c.input.value)}{c.input.unit ? ` ${c.input.unit}` : ''}

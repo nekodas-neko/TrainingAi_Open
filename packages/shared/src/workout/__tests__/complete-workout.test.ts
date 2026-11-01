@@ -4,7 +4,7 @@ const getWorkoutSessionById         = vi.fn()
 // Q-473: the real implementation returns whether *this* call stamped `completed_at` — the guarded
 // UPDATE's affected-row count. The mock must honour that, because it is now what decides
 // idempotence; a mock returning undefined would make every completion look like a replay.
-const completeWorkoutSession        = vi.fn<(id: string, userId: string, at: Date) => Promise<boolean>>(async () => true)
+const completeWorkoutSession        = vi.fn<(id: string, userId: string, at: Date, pausedSec?: number) => Promise<boolean>>(async () => true)
 const getWorkoutSessionProgramSessionId = vi.fn()
 const updatePrescriptionStatus      = vi.fn(async () => {})
 const incrementSessionsInPhase      = vi.fn(async () => {})
@@ -112,6 +112,47 @@ describe('completeWorkoutFromPayload', () => {
     await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1', completedAtMs })
 
     expect(completeWorkoutSession).toHaveBeenCalledWith('ws-1', 'u1', new Date(completedAtMs))
+  })
+
+  describe('how long the workout was paused (#3266)', () => {
+    const startedAt = new Date(Date.now() - 2 * 60 * 60_000)
+    const completedAtMs = startedAt.getTime() + 60 * 60_000
+
+    it('stores the phone\'s paused seconds with the completion', async () => {
+      getWorkoutSessionById.mockResolvedValue({ id: 'ws-1', startedAt, completedAt: null })
+      getWorkoutSessionProgramSessionId.mockResolvedValue(null)
+
+      await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1', completedAtMs, pausedSec: 600 })
+
+      expect(completeWorkoutSession).toHaveBeenCalledWith('ws-1', 'u1', new Date(completedAtMs), 600)
+    })
+
+    it('leaves it unset for a build that cannot pause, rather than writing a zero', async () => {
+      getWorkoutSessionById.mockResolvedValue({ id: 'ws-1', startedAt, completedAt: null })
+      getWorkoutSessionProgramSessionId.mockResolvedValue(null)
+
+      await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1', completedAtMs })
+
+      expect(completeWorkoutSession.mock.calls[0]).toHaveLength(3)
+    })
+
+    it('cuts a pause longer than the session to the session, as a bad clock reading', async () => {
+      getWorkoutSessionById.mockResolvedValue({ id: 'ws-1', startedAt, completedAt: null })
+      getWorkoutSessionProgramSessionId.mockResolvedValue(null)
+
+      await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1', completedAtMs, pausedSec: 86_400 })
+
+      expect(completeWorkoutSession).toHaveBeenCalledWith('ws-1', 'u1', new Date(completedAtMs), 3_600)
+    })
+
+    it('refuses a negative, fractional or day-plus pause at the payload', async () => {
+      const { CompleteWorkoutPayloadSchema } = await import('../complete-payload')
+      const id = '3f9d6c2e-7b1a-4c58-9a4e-2d5b8f1c0a77'
+      expect(CompleteWorkoutPayloadSchema.safeParse({ workoutSessionId: id, pausedSec: 0 }).success).toBe(true)
+      for (const pausedSec of [-1, 1.5, 86_401, Number.NaN]) {
+        expect(CompleteWorkoutPayloadSchema.safeParse({ workoutSessionId: id, pausedSec }).success).toBe(false)
+      }
+    })
   })
 
   it('falls back to server-receipt time when completedAtMs is absent (legacy client)', async () => {

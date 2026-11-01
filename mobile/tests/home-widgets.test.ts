@@ -229,7 +229,7 @@ test('the widgets\' colours are the app\'s: values and values-night mirror the t
   assert.deepEqual([light.water, dark.water], [progressColors.light.goals.Water, progressColors.dark.goals.Water]);
   assert.deepEqual([light.good, dark.good], [statusColors.light.success, statusColors.dark.success]);
   assert.deepEqual([light.drained, dark.drained], [statusColors.light.danger, statusColors.dark.danger]);
-  assert.deepEqual([light.low, dark.low], [domainTones.light.checkin.foreground, domainTones.dark.checkin.foreground]);
+  assert.deepEqual([light.low, dark.low], [domainTones.light.checkin.foreground, statusColors.dark.warning]);
 });
 
 test('the rest-day card offers "Train instead", which Home answers with its own override', async () => {

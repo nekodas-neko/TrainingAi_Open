@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { actualSleepWindow } from '../actual-sleep-window'
+import { actualSleepWindow, wokeTime } from '../actual-sleep-window'
 
 describe('actualSleepWindow', () => {
   it('trims leading awake into onset but keeps the ring\'s recorded wake time', () => {
@@ -57,5 +57,39 @@ describe('actualSleepWindow', () => {
 
   it('returns null for an all-awake string (nothing to show)', () => {
     expect(actualSleepWindow({ sleepPhase5Min: '4444', phaseWindowStart: '2026-07-08T22:00:00.000Z', phaseWindowEnd: '2026-07-08T22:20:00.000Z', sleepStart: null })).toBeNull()
+  })
+})
+
+describe('wokeTime', () => {
+  const base = '2026-10-12T13:37:00.000Z'
+
+  it('ends at the last non-awake epoch, before the awake stretch in bed after waking', () => {
+    // 2 awake, 6 asleep, then 4 awake epochs (20 min lying still) up to the recorded end.
+    const win = {
+      sleepPhase5Min: '44' + '222233' + '4444',
+      phaseWindowStart: base,
+      phaseWindowEnd: '2026-10-12T14:37:00.000Z',
+    }
+    expect(wokeTime(win)).toBe('2026-10-12T14:17:00.000Z') // 8 epochs = 40 min after base
+    // The recorded window, which feeds the totals and the ribbon, is untouched.
+    expect(actualSleepWindow(win)!.end).toBe('2026-10-12T14:37:00.000Z')
+  })
+
+  it('equals the recorded end when the night finishes asleep', () => {
+    expect(wokeTime({ sleepPhase5Min: '4222', phaseWindowStart: base, phaseWindowEnd: '2026-10-12T13:52:00.000Z' })).toBe('2026-10-12T13:52:00.000Z')
+  })
+
+  it('is held to the recorded end when the phase string is padded past it', () => {
+    expect(wokeTime({ sleepPhase5Min: '2222', phaseWindowStart: base, phaseWindowEnd: '2026-10-12T13:55:00.000Z' })).toBe('2026-10-12T13:55:00.000Z')
+  })
+
+  it('falls back to sleepStart as the anchor when there is no phase window', () => {
+    expect(wokeTime({ sleepPhase5Min: '2244', sleepStart: base, sleepEnd: '2026-10-12T14:00:00.000Z' })).toBe('2026-10-12T13:47:00.000Z')
+  })
+
+  it('is null with no hypnogram, no recorded end, or nothing but awake', () => {
+    expect(wokeTime({ sleepPhase5Min: null, sleepStart: base, sleepEnd: '2026-10-12T14:00:00.000Z' })).toBeNull()
+    expect(wokeTime({ sleepPhase5Min: '22', phaseWindowStart: base, sleepEnd: null })).toBeNull()
+    expect(wokeTime({ sleepPhase5Min: '444', phaseWindowStart: base, phaseWindowEnd: '2026-10-12T13:52:00.000Z' })).toBeNull()
   })
 })

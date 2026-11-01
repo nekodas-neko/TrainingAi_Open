@@ -332,6 +332,24 @@
       }
     },
     {
+      "name": "a queued partial-night mark is pushed as queued and leaves the outbox",
+      "kind": "domain", "covers": "partial_night",
+      "guarantee": "A partial_night mutation queued by the app reaches the push with its date and night id and is removed once accepted; no local row is touched (the current app has no local marker column).",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "sleep_sessions": [{ "id": "ss-1", "date": "2026-09-30", "updated_at": "2026-09-30T21:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "partial_night", "date": "2026-09-30", "payload": { "id": "6f1c2a4e-0b7d-4c1e-9a55-2265aa000001", "partial": true } }] },
+        { "op": "push", "responses": [{}] }
+      ],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "sync_status"], "rows": [{ "id": "ss-1", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "partial_night", "date": "2026-09-30", "payload": { "id": "6f1c2a4e-0b7d-4c1e-9a55-2265aa000001", "partial": true } }]
+      }
+    },
+    {
       "name": "a hand-entered night is written locally as pending, pushed, and marked synced",
       "kind": "domain", "covers": "manual_sleep",
       "guarantee": "upsertManualSleepLocally writes a manual_entry=1 pending row with its window and no measured fields; the queued manual_sleep mutation reaches the push with its id and window, and once accepted the row is synced and the outbox is empty.",

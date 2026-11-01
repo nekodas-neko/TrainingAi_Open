@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computeActiveEnergy, ouraIdForActivityType, stepEnergyKcal, SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT, STEPS_PER_KM,
 } from './daily-energy'
+import { sessionActiveMin } from './workout-energy'
 // Relative, not `@/` — this file sits under packages/shared/src (not in a `__tests__` folder, so
 // the package's own tsconfig compiles it) and that tsconfig has no path mapping into the app root.
 import { hasRealConstants } from '../../../../lib/oura-models/__fixtures__/real-constants'
@@ -158,4 +159,26 @@ describe('daily-energy', () => {
     expect(r.activityKcal).toBeGreaterThan(0)
     expect(r.stepsKcal).toBeGreaterThan(0)
   })
+})
+
+describe('a paused workout is not burned off (#3266)', () => {
+  const startedAt = new Date('2026-10-20T08:00:00Z')
+  const completedAt = new Date('2026-10-20T09:00:00Z')
+
+  it('takes the paused time out of the session\'s minutes', () => {
+    expect(sessionActiveMin(startedAt, completedAt, 600)).toBe(50)
+    expect(sessionActiveMin(startedAt, completedAt, 0)).toBe(60)
+  })
+
+  it('leaves every session saved before pause existed as it was', () => {
+    expect(sessionActiveMin(startedAt, completedAt, null)).toBe(60)
+    expect(sessionActiveMin(startedAt, completedAt, undefined)).toBe(60)
+  })
+
+  it('never takes off more than the span, and ignores a bad figure', () => {
+    expect(sessionActiveMin(startedAt, completedAt, 999_999)).toBe(0)
+    expect(sessionActiveMin(startedAt, completedAt, -300)).toBe(60)
+    expect(sessionActiveMin(startedAt, completedAt, Number.NaN)).toBe(60)
+  })
+
 })

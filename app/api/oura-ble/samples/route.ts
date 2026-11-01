@@ -5,6 +5,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { rateLimit } from '@/lib/rate-limit'
+import { withUserWriteBarrier, CUT_OFF } from '@/lib/data/postgres/user-write-barrier'
 import { historyEventFromHex } from '@/lib/oura-ble/decode'
 import { shouldDropRawEvent } from '@/lib/oura-ble/raw-storage'
 import { runRollupOffLoop } from '@/lib/oura-ble/rollup-worker'
@@ -116,7 +117,9 @@ export async function POST(req: Request) {
   }
 
   const repo = await getRepositoryAsync()
-  const stored = await repo.insertOuraRawSamples(userId, rows)
+  // #3369 (e): see the barrier. The rollup below runs after it is released, over what was stored.
+  const stored = await withUserWriteBarrier(userId, session.signedInAt, () => repo.insertOuraRawSamples(userId, rows))
+  if (stored === CUT_OFF) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Roll new biometric samples up into the product tables (sleep_sessions /
   // body_metrics) so the health screens see BLE data without a separate step.

@@ -144,7 +144,7 @@ test('the outbox keeps readings through an outage, drops only refused ones, and 
     connection(async (_path, body) => {
       const weight = (body as ScaleReading).weightKg;
       if (mode === 'offline') throw new Error('offline');
-      if (mode === 'refuse' && weight === 61) throw new ApiError(400);
+      if (mode === 'refuse' && weight === 61) throw new ApiError(400, undefined, undefined, undefined, true);
       sent.push(weight);
       return { status: 'confirmed' };
     }),
@@ -159,6 +159,27 @@ test('the outbox keeps readings through an outage, drops only refused ones, and 
   await outbox.sync();
   assert.deepEqual(sent, [60, 62]);
   assert.deepEqual(outcomes, ['verdict', 'rejected', 'verdict']);
+  assert.equal(outbox.pending(), 0);
+});
+
+test('a 400 that is not our JSON error (a proxy page) keeps the reading for retry', async () => {
+  let html = true;
+  const sent: number[] = [];
+  const outbox = new ScaleOutbox(
+    memoryStorage(),
+    connection(async (_path, body) => {
+      if (html) throw new ApiError(400);
+      sent.push((body as ScaleReading).weightKg);
+      return { status: 'confirmed' };
+    }),
+    () => {},
+  );
+  await outbox.append(reading({ weightKg: 60 }));
+  await outbox.sync();
+  assert.equal(outbox.pending(), 1);
+  html = false;
+  await outbox.sync();
+  assert.deepEqual(sent, [60]);
   assert.equal(outbox.pending(), 0);
 });
 

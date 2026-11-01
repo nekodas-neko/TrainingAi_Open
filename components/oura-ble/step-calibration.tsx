@@ -259,7 +259,7 @@ export function StepCalibration({ onSync }: { onSync: () => Promise<void> }) {
               <div className="font-medium">
                 {c.label}
                 {c.expectedSteps != null && <span className="text-muted-foreground"> · real {c.expectedSteps}</span>}
-                <span className={c.expectedSteps === 0 && c.estimatedSteps > 0 ? 'text-red-500' : 'text-muted-foreground'}>
+                <span className={c.expectedSteps === 0 && c.estimatedSteps > 0 ? 'text-destructive' : 'text-muted-foreground'}>
                   {' '}· est {c.estimatedSteps} ({c.walkingWindows}/{c.pairs.length} walking)
                 </span>
                 {c.stats && (

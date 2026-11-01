@@ -101,7 +101,7 @@ export function ProfileOverview({
   const nights = health.sleep.filter((x) => !x.provisional);
   const sleep = sleepAverages(nights);
   const bedtime = circularMeanMinutes(
-    nights.map((x) => x.sleepStart),
+    nights.filter((x) => x.partialNightAt == null).map((x) => x.sleepStart),
     (iso) => {
       const [h, m] = msToHHMMInTz(iso, health.timezone).split(':').map(Number);
       return h * 60 + m;

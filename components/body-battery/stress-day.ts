@@ -11,16 +11,22 @@
  * the parts worth pinning.
  */
 
+import type { ClockSkip } from '@trainingai/shared/date-utils'
+
 /** A measured bucket: midpoint in epoch ms, level ∈ [−1,+1] with negative meaning stressed. */
 export interface StressBucket {
   t: number
   level: number
 }
 
-/** One point placed on the axis. `x` is minutes since local midnight, 0–1440. */
+/**
+ * One point placed on the axis. `x` is minutes since local midnight, 0–1440. `t` is the bucket's
+ * instant, kept so a run's measured time is real elapsed time on a 23- or 25-hour day.
+ */
 export interface PlacedPoint {
   x: number
   level: number
+  t?: number
 }
 
 /**
@@ -75,26 +81,44 @@ export function minutesIntoDay(t: number, tz: string): number {
  */
 export function toSegments(buckets: StressBucket[], tz: string): StressSegment[] {
   const fmt = clockFormat(tz)
+  // Sorted and gap-tested on the instant, not on wall-clock minutes: on a spring-forward day the
+  // clock skips an hour, so 01:55 → 03:00 reads as 65 minutes apart when it is really five.
   const placed = buckets
-    .map(b => ({ x: minutesFrom(fmt, b.t), level: b.level }))
-    .sort((a, b) => a.x - b.x)
+    .map(b => ({ t: b.t, x: minutesFrom(fmt, b.t), level: b.level }))
+    .sort((a, b) => a.t - b.t)
 
   const segments: StressSegment[] = []
   let run: StressSegment = []
-  for (const p of placed) {
-    if (run.length && p.x - run[run.length - 1].x > GAP_MINUTES) {
+  let prevT = 0
+  for (const { t, x, level } of placed) {
+    if (run.length && (t - prevT) / 60_000 > GAP_MINUTES) {
       segments.push(run)
       run = []
     }
-    run.push(p)
+    run.push({ x, level, t })
+    prevT = t
   }
   if (run.length) segments.push(run)
   return segments
 }
 
-/** Total minutes covered by measured runs — the honest denominator for "how much of the day is this". */
-export function coveredMinutes(segments: StressSegment[]): number {
+/**
+ * Total minutes covered by measured runs — the honest denominator for "how much of the day is this".
+ *
+ * A run measures from its first and last instants, so the hour a spring-forward day skips adds
+ * nothing and the hour a fall-back day repeats counts twice. Points placed without an instant fall
+ * back to wall-clock `x`, taking out `skip` (`clockSkipOnDay`) for a run that joins across it.
+ */
+export function coveredMinutes(segments: StressSegment[], skip?: ClockSkip | null): number {
   // A lone bucket covers its own 30 minutes; a run covers its span plus that same half-bucket at
   // each end, which is what makes one reading and two adjacent readings differ by 30 rather than 0.
-  return segments.reduce((n, seg) => n + (seg[seg.length - 1].x - seg[0].x) + 30, 0)
+  return segments.reduce((n, seg) => {
+    const firstT = seg[0].t
+    const lastT = seg[seg.length - 1].t
+    if (firstT != null && lastT != null) return n + (lastT - firstT) / 60_000 + 30
+    const first = seg[0].x
+    const last = seg[seg.length - 1].x
+    const skipped = skip && first < skip.fromMin && last >= skip.toMin ? skip.toMin - skip.fromMin : 0
+    return n + (last - first) - skipped + 30
+  }, 0)
 }

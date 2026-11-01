@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { clockSkipOnDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils';
 import { minutesIntoDay, toSegments, coveredMinutes } from '../stress-day';
 
 const TZ = 'Australia/Brisbane'; // UTC+10, no DST — the owner's zone.
@@ -73,5 +74,98 @@ describe('how much of the day was actually measured', () => {
     // that swallowed gaps would make a sparse day look complete.
     const segments = toSegments([at(6, 15, -0.2), at(6, 45, -0.3), at(13, 15, -0.6)], TZ);
     expect(coveredMinutes(segments)).toBe(60 + 30);
+  });
+});
+
+describe('daylight-saving days in Sydney', () => {
+  const SYD = 'Australia/Sydney';
+  // 2026-10-04 spring forward: 02:00 AEST (UTC+10) becomes 03:00 AEDT (UTC+11).
+  const aest = (d: number, hh: number, mm: number) => Date.UTC(2026, 9, d, hh, mm) - 10 * 3600_000;
+  const aedt = (d: number, hh: number, mm: number) => Date.UTC(2026, 9, d, hh, mm) - 11 * 3600_000;
+
+  it('keeps one line across the skipped hour: 01:55 → 03:00 is five minutes, not 65', () => {
+    const segments = toSegments(
+      [{ t: aest(4, 1, 55), level: -0.1 }, { t: aedt(4, 3, 0), level: -0.2 }, { t: aedt(4, 3, 30), level: -0.3 }],
+      SYD,
+    );
+    expect(segments).toHaveLength(1);
+    expect(segments[0].map(p => p.x)).toEqual([115, 180, 210]);
+  });
+
+  it('keeps one line where wall-clock minutes read 100 apart but only 40 passed: 01:40 → 03:20', () => {
+    // 100 > GAP_MINUTES on the clock face, 40 in real time. This is the case the old code split.
+    expect(toSegments([{ t: aest(4, 1, 40), level: -0.1 }, { t: aedt(4, 3, 20), level: -0.2 }], SYD)).toHaveLength(1);
+  });
+
+  it('still splits a real 90-minute gap on that day', () => {
+    expect(toSegments([{ t: aedt(4, 10, 0), level: -0.1 }, { t: aedt(4, 11, 30), level: -0.2 }], SYD)).toHaveLength(2);
+  });
+
+  it('splits where the skipped hour hides a real gap: 01:00 → 03:30 is 90 minutes of silence', () => {
+    expect(toSegments([{ t: aest(4, 1, 0), level: -0.1 }, { t: aedt(4, 3, 30), level: -0.2 }], SYD)).toHaveLength(2);
+  });
+
+  it('keeps one line over the repeated hour on 2027-04-04, in real time order', () => {
+    // 03:00 AEDT (UTC+11) falls back to 02:00 AEST (UTC+10): 02:10 happens twice.
+    const first = Date.UTC(2027, 3, 3, 15, 10); // 02:10 AEDT
+    const second = Date.UTC(2027, 3, 3, 16, 10); // 02:10 AEST, an hour later
+    const segments = toSegments([{ t: second, level: -0.2 }, { t: first, level: -0.1 }], SYD);
+    expect(segments).toHaveLength(1);
+    expect(segments[0].map(p => p.level)).toEqual([-0.1, -0.2]);
+  });
+
+  it('does not count the skipped hour as measured: four contiguous buckets either side of it are 2 h', () => {
+    const segments = toSegments(
+      [aest(4, 1, 15), aest(4, 1, 45), aedt(4, 3, 15), aedt(4, 3, 45)].map(t => ({ t, level: -0.1 })),
+      SYD,
+    );
+    expect(segments).toHaveLength(1);
+    const skip = clockSkipOnDay(dateStrMidnightInTz('2026-10-04', SYD).getTime(), SYD);
+    expect(skip).toEqual({ fromMin: 120, toMin: 180 });
+    expect(coveredMinutes(segments, skip)).toBe(120);
+  });
+
+  it('leaves a run that ends before the skipped hour alone', () => {
+    const segments = toSegments([aest(4, 0, 15), aest(4, 0, 45)].map(t => ({ t, level: -0.1 })), SYD);
+    const skip = clockSkipOnDay(dateStrMidnightInTz('2026-10-04', SYD).getTime(), SYD);
+    expect(coveredMinutes(segments, skip)).toBe(60);
+  });
+
+  it('takes the skipped hour out of a run placed without instants', () => {
+    // 01:15, 01:45, 03:15, 03:45 on the clock face: 150 minutes apart on the axis, 90 in real time.
+    const segments = [[75, 105, 195, 225].map(x => ({ x, level: -0.1 }))];
+    expect(coveredMinutes(segments, { fromMin: 120, toMin: 180 })).toBe(120);
+  });
+
+  describe('the 25-hour day, 2027-04-04', () => {
+    // 03:00 AEDT (UTC+11) falls back to 02:00 AEST (UTC+10) at 16:00 UTC on 3 April.
+    const utc = (hh: number, mm: number) => Date.UTC(2027, 3, 3, hh, mm);
+
+    it('counts a fully measured day as 25 hours', () => {
+      // Local midnight is 13:00 UTC; 50 half-hour buckets fill the day to the next local midnight.
+      const buckets = Array.from({ length: 50 }, (_, k) => ({ t: utc(13, 15) + k * 1_800_000, level: -0.1 }));
+      const segments = toSegments(buckets, SYD);
+      expect(segments).toHaveLength(1);
+      expect(coveredMinutes(segments)).toBe(1500);
+    });
+
+    it('counts two adjacent buckets either side of the change as an hour: 02:45 AEDT → 02:15 AEST', () => {
+      expect(coveredMinutes(toSegments([{ t: utc(15, 45), level: -0.1 }, { t: utc(16, 15), level: -0.2 }], SYD))).toBe(60);
+    });
+
+    it('counts the repeated hour in a run that crosses it: 00:15 AEDT → 02:15 AEST is 3.5 h', () => {
+      const ts = [utc(13, 15), utc(13, 45), utc(14, 15), utc(14, 45), utc(15, 15), utc(15, 45), utc(16, 15)];
+      expect(coveredMinutes(toSegments(ts.map(t => ({ t, level: -0.1 })), SYD))).toBe(210);
+    });
+  });
+});
+
+describe('a day with no skipped hour', () => {
+  it('measures the same with Brisbane\'s null skip as without one', () => {
+    const skip = clockSkipOnDay(dateStrMidnightInTz('2026-10-04', TZ).getTime(), TZ);
+    expect(skip).toBeNull();
+    const segments = toSegments([at(1, 15, -0.1), at(1, 45, -0.1), at(3, 15, -0.1), at(3, 45, -0.1)], TZ);
+    expect(coveredMinutes(segments, skip)).toBe(coveredMinutes(segments));
+    expect(coveredMinutes(segments, skip)).toBe(60 + 60);
   });
 });

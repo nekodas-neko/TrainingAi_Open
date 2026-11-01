@@ -71,10 +71,20 @@ local SQLite migration, a Postgres migration and a `claude-ro-views.sql` regener
 alone in its own batch. When it lands, its line in `scripts/table-residency.json` changes name in
 the same PR. The check will fail until it does.
 
-**`food_items` has no delete path, so it needs no tombstone yet.** Nothing deletes a food item: no
-API route, no repository method, no local-store write, no outbox branch. Only account deletion
-removes them, by cascade, and that wipes the device too. Whoever adds a delete must add `deleted_at`
-first.
+**`food_items` has a tombstone, and only the look-alike merge sets it (#2417).** There is still no
+delete button, no API delete route and no local-store delete: nothing a user does removes a food.
+`deleted_at` (migration `202610262031`) marks a row that the admin merge job retired in favour of a
+keeper. The row stays, because `food_logs.food_item_id` and `saved_meal_items.food_item_id` are NO
+ACTION foreign keys and a device that has not synced may still log against it. The column ships
+alone, first, with nothing reading it; the list reads, the pull and the merge job follow in their own
+PR. Account deletion still removes the rows by cascade.
+
+On a device, a retired food that a local log or saved-meal ingredient still points at keeps its row
+until that reference moves. The local table has no `deleted_at`, so its id is remembered in
+`sync_meta` (`retiredFoodIds`, #3459): hidden from the local catalog reads, and dropped by the next
+pull or saved-meals hydrate once nothing points at it. A pull that carries the food live again
+(`deletedAt: null`) forgets the id, so a revived food is searchable again (#3468); the last entry for an id
+within one pull decides, and a pull that leaves the list unchanged does not rewrite it.
 
 **`sleep_sessions` had a server hard delete that devices never heard about. Fixed (#2546).**
 Every rollup pass that wrote a night first deleted that day's BLE rows and reinserted them with new
@@ -172,7 +182,7 @@ the code. Do not edit between the markers; CI compares this block with a fresh r
 | `exercise_media` | SERVER-ONLY | — | — | excluded (catalogue) | not-user-data | reference catalog (media); writer: route.ts, route.ts, route.ts |
 | `feedback_submissions` | SERVER-ONLY | — | — | excluded (ops) | cascade | ops / owner inbox; writer: adapter.ts |
 | `fitness_tests` | DEVICE-FIRST | `fitness_tests` | yes | exported | cascade | local write + outbox push + delta pull |
-| `food_items` | DEVICE-FIRST | `food_items` | — | exported | cascade | local write + outbox push + delta pull. No delete path exists anywhere (server, device or API), so no tombstone is needed until one is added |
+| `food_items` | DEVICE-FIRST | `food_items` | yes | exported | cascade | local write + outbox push + delta pull. No user-facing delete path. `deleted_at` (#2417) marks a look-alike merged into its keeper; set only by the admin merge job |
 | `food_logs` | DEVICE-FIRST | `food_logs` | yes | exported | cascade | local write + outbox push + delta pull |
 | `friendships` | SERVER-ONLY | — | — | excluded (third-party) | cascade | social; writer: social.ts |
 | `goal_recommendations` | SERVER-ONLY | — | — | exported | cascade | derived / AI; writer: adapter.ts |

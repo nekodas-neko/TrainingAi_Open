@@ -861,7 +861,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
                                       <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 min-w-0">
                                           <p className="font-semibold text-sm">{ps.name}</p>
-                                          {ps.isDefault && <span className="text-[10px] rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/20 px-2 py-0.5 font-medium shrink-0">Default</span>}
+                                          {ps.isDefault && <span className="text-[10px] rounded-full bg-accent-amber/15 text-accent-amber border border-accent-amber/20 px-2 py-0.5 font-medium shrink-0">Default</span>}
                                         </div>
                                         <div className="flex gap-1 ml-3 flex-none">
                                           {ps.isDefault ? (

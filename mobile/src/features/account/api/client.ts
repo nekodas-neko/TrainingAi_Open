@@ -9,25 +9,76 @@ export class ApiError extends Error {
   notice?: string;
   /** The `/api/` path that failed, when the client made the request. */
   path?: string;
-  constructor(status: number, code?: string, notice?: string, path?: string) {
+  /**
+   * A 400 whose body is our own validation error (JSON with a string `error`, the shape every route
+   * answers a failed schema with). A 400 without it is a proxy or gateway page, not the server.
+   */
+  validation: boolean;
+  constructor(status: number, code?: string, notice?: string, path?: string, validation = false) {
     super(`TrainingAi request failed (${status}).`);
     this.status = status;
     this.code = code;
     this.notice = notice;
     this.path = path;
+    this.validation = validation;
   }
 }
-/** A 400 or 422 means the server will never take this write, so retrying it only blocks the queue. */
+/** The server took a push but refused this item for good, in the body of a 200. */
+export class UploadRejected extends Error {
+  constructor() {
+    super('Upload not accepted.');
+  }
+}
+/**
+ * A 400 in our own validation shape (JSON with a string `error`). The one rule every queue uses to
+ * decide that a 400 is the server refusing this write; a 400 from a proxy or gateway is not.
+ */
+export function isValidationRejection(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 400 && error.validation;
+}
+/**
+ * The server answered a write with a 4xx in its own JSON error, so it refused this request itself:
+ * 400 and 413 from the validation, 404 for a row it does not hold, 401 and 403 from the auth gates.
+ * 429 is the rate limit, which says nothing about the write. A 4xx from a proxy or gateway (an HTML
+ * or empty body) is not this and is retried without counting.
+ */
+export function isRefusedByServer(error: unknown): error is ApiError {
+  return (
+    error instanceof ApiError &&
+    error.validation &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 429
+  );
+}
+/**
+ * The server will never take this write, so retrying it only blocks the queue: its own validation
+ * 400, a 422, or a push it answered 200 with this item's rejection. A 400 from anything else (an
+ * HTML proxy page, an empty body) says nothing about the write and is retried like any failure.
+ */
 export function isRejectedForGood(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === 400 || error.status === 422);
+  return (
+    error instanceof UploadRejected ||
+    isValidationRejection(error) ||
+    (error instanceof ApiError && error.status === 422)
+  );
+}
+/**
+ * The server answered, in its own JSON, that there is nothing to answer: /api/sleep-verdict and
+ * /api/readiness-verdict send a 404 `{ error }` when no verdict was announced for that date. Waiting
+ * will not change it. An HTML or empty 404 (a proxy, or a server without the route) is not this.
+ */
+export function isNothingToAnswer(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404 && error.validation;
 }
 /**
  * The error for a failed response whose body (already parsed, or null) may be the paused notice.
  * Only the fixed sentence is kept, never the body's own text.
  */
 function failedRequest(path: string, status: number, body: unknown, code?: string) {
+  const error = (body as { error?: unknown } | null)?.error;
   return aiPausedMessage(status, body) === null
-    ? new ApiError(status, code, undefined, path)
+    ? new ApiError(status, code, undefined, path, typeof error === 'string' && error.length > 0)
     : new ApiError(status, AI_PAUSED_CODE, AI_PAUSED_MESSAGE, path);
 }
 /** The paused sentence for an AI failure, else the caller's own line. Never any other server text. */
@@ -81,8 +132,17 @@ export function createApiClient(
   getToken: () => Promise<string | null>,
   fetcher?: typeof fetch,
   renew?: (stale: string) => Promise<string | null>,
+  /**
+   * #3369. `dataEpoch` is the `X-Data-Epoch` value this phone claims for the signed-in account
+   * (`device-record.ts`); every write carries it. `onDataEpochStale` runs when the server answers a
+   * write 409 `data-epoch-stale`: an admin reset the account since this phone last wiped.
+   */
+  epoch?: { dataEpoch?: () => string | null; onDataEpochStale?: () => void },
 ) {
   const base = backendOrigin(baseUrl);
+  const staleEpoch = (status: number, value: { error?: unknown } | null) => {
+    if (status === 409 && value?.error === 'data-epoch-stale') epoch?.onDataEpochStale?.();
+  };
   async function request(
     path: string,
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
@@ -111,10 +171,22 @@ export function createApiClient(
       '/api/exercises/generate',
       '/api/workout-review/session/',
       '/api/ai-periodization/session/',
+      // The admin data jobs read and rewrite history in one request; a client timeout would read as
+      // a failure while the server went on to commit.
+      '/api/admin/backfill-',
+      '/api/admin/rederive-',
+      '/api/admin/reencode-',
+      '/api/admin/recompute-',
     ].some((prefix) => path.startsWith(prefix));
+    // An admin reset or delete runs one transaction whose statements the server allows 120 s each (a
+    // ring-heavy account cascades through hundreds of thousands of rows in one statement), so the
+    // whole request can take longer. Cut off sooner, it would read as a failure while the server
+    // went on to commit, and a self-reset would never sign out.
+    const wipe =
+      path === '/api/admin/users/reset-data' || (path === '/api/admin/users' && method === 'DELETE');
     const timeout = setTimeout(
       () => controller.abort(),
-      path === '/api/export' ? 120000 : slow ? 65_000 : 15_000,
+      path === '/api/export' ? 120000 : wipe ? 130_000 : slow ? 65_000 : 15_000,
     );
     try {
       const url = new URL(path, base);
@@ -136,6 +208,7 @@ export function createApiClient(
                   : 'application/json',
             ...(body ? { 'Content-Type': 'application/json' } : {}),
             ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+            ...(method !== 'GET' && epoch?.dataEpoch?.() ? { 'X-Data-Epoch': epoch.dataEpoch()! } : {}),
           },
           body: body ? JSON.stringify(body) : undefined,
           signal: controller.signal,
@@ -153,6 +226,7 @@ export function createApiClient(
         let value: { error?: unknown } | null = null;
         if (response.headers.get('content-type')?.includes('application/json')) {
           value = (await response.json().catch(() => null)) as { error?: unknown } | null;
+          staleEpoch(response.status, value);
           if (typeof value?.error === 'string' && /^[a-z_]{1,64}$/.test(value.error)) {
             code = value.error;
           }
@@ -220,6 +294,7 @@ export function createApiClient(
             Accept: 'text/event-stream',
             'Content-Type': 'application/json',
             Authorization: `Bearer ${bearer}`,
+            ...(epoch?.dataEpoch?.() ? { 'X-Data-Epoch': epoch.dataEpoch()! } : {}),
           },
           body: JSON.stringify(body),
           signal,
@@ -233,7 +308,9 @@ export function createApiClient(
         }
       }
       if (!response.ok) {
-        throw failedRequest('/api/coach', response.status, await response.json().catch(() => null));
+        const failure = await response.json().catch(() => null);
+        staleEpoch(response.status, failure as { error?: unknown } | null);
+        throw failedRequest('/api/coach', response.status, failure);
       }
       if (
         !response.headers.get('content-type')?.includes('text/event-stream') ||
@@ -249,8 +326,8 @@ export function createApiClient(
     get(path: string, query?: Record<string, string>) {
       return request(path, 'GET', undefined, true, query);
     },
-    post(path: string, body: unknown) {
-      return request(path, 'POST', body, true);
+    post(path: string, body: unknown, query?: Record<string, string>) {
+      return request(path, 'POST', body, true, query);
     },
     put(path: string, body: unknown) {
       return request(path, 'PUT', body, true);
@@ -367,6 +444,23 @@ export function createApiClient(
         link,
       )) as Record<string, unknown> | null;
       return sessionResponse(value);
+    },
+    /** The moment an admin last reset this account, in whole seconds (0 when never). */
+    async dataEpoch(): Promise<number> {
+      let value: { epoch?: unknown } | null;
+      try {
+        value = (await request('/api/account/data-epoch', 'GET')) as { epoch?: unknown } | null;
+      } catch (error) {
+        // A server from before #3369 has no such route, and the route ships with the only thing that
+        // can reset an account, so that server has never reset it: nothing to wipe. A Preview build
+        // installed ahead of the server update then still signs in. Any other failure still throws.
+        if (error instanceof ApiError && error.status === 404) return 0;
+        throw error;
+      }
+      if (typeof value?.epoch !== 'number' || !Number.isSafeInteger(value.epoch) || value.epoch < 0) {
+        throw new Error('Invalid data epoch response.');
+      }
+      return value.epoch;
     },
     async profile(): Promise<AccountProfile> {
       const value = (await request('/api/user/profile', 'GET')) as {

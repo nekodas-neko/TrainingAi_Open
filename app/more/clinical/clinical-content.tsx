@@ -71,7 +71,7 @@ export function ClinicalContent() {
               {latestRmr.ffmKgAtTest != null && ` · at ${latestRmr.ffmKgAtTest} kg fat-free mass`}
             </p>
             {latestRmr.ffmKgAtTest == null && (
-              <p className="text-[12px] text-amber-600 dark:text-amber-400">
+              <p className="text-[12px] text-accent-amber">
                 No fat-free mass recorded, so this cannot be re-scaled as your lean mass changes.
               </p>
             )}

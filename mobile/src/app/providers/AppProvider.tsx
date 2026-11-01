@@ -12,6 +12,7 @@ import { ActivityProvider } from '../../features/activities/data/ActivityProvide
 import { HomeProvider } from '../../features/home/data/HomeProvider';
 import { PlatformProvider } from '../../features/platform/PlatformProvider';
 import { OuraHandoffProvider } from '../../features/health/OuraHandoffProvider';
+import { OuraFeedProvider } from '../../features/devices/OuraFeedProvider';
 import { DevicesProvider } from '../../features/devices/DevicesProvider';
 import { WidgetSync } from '../../features/widgets/WidgetSync';
 import { homeWidgets } from '../../integrations/widgets/platform';
@@ -31,10 +32,12 @@ export function AppProvider({ children }: PropsWithChildren) {
                         <ActivityProvider>
                           <PlatformProvider>
                             <OuraHandoffProvider>
-                              <ReportsProvider>
-                                {homeWidgets && <WidgetSync />}
-                                {children}
-                              </ReportsProvider>
+                              <OuraFeedProvider>
+                                <ReportsProvider>
+                                  {homeWidgets && <WidgetSync />}
+                                  {children}
+                                </ReportsProvider>
+                              </OuraFeedProvider>
                             </OuraHandoffProvider>
                           </PlatformProvider>
                         </ActivityProvider>

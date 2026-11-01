@@ -80,7 +80,8 @@ export function MeasuredOverviewSection({ userId, serverRecent }: Props) {
   const bedtime = Array.isArray(nights)
     // The minutes-of-day are computed in the USER's zone before the circular mean, not the device's
     // — a bare `getHours()` here renders a Brisbane bedtime as a New York one.
-    ? circularMeanMinutes(nights.map(n => n.sleepStart), iso => {
+    // #2265: a marked night's bedtime is when the ring went on, not when the owner went to bed.
+    ? circularMeanMinutes(nights.filter(n => n.partialNightAt == null).map(n => n.sleepStart), iso => {
         const hhmm = formatInTimeZone(new Date(iso), tz, 'HH:mm')
         const [h, m] = hhmm.split(':').map(Number)
         return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null

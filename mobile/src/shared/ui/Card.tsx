@@ -1,9 +1,10 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { StyleSheet, View, type ViewProps } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
 import type { Tone } from '../theme/theme';
 import { nativeColor } from './ColorSwatches';
+import { washSize, type WashSize } from './card-wash';
 
 export function Card({
   tone = 'neutral',
@@ -22,6 +23,7 @@ export function Card({
 }) {
   const { theme } = useTheme();
   const gradientId = useId().replace(/:/g, '');
+  const [wash, setWash] = useState<WashSize | null>(null);
   const palette = theme.tones[tone];
   const color = nativeColor(accent);
   const tinted = color !== undefined && color !== 'transparent';
@@ -54,23 +56,32 @@ export function Card({
       ]}
     >
       {tinted && (
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <Svg width="100%" height="100%">
-            <Defs>
-              <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-                {faint
-                  ? [
-                      <Stop key="from" offset="0" stopColor={color} stopOpacity="0.06" />,
-                      <Stop key="to" offset="1" stopColor={color} stopOpacity="0.02" />,
-                    ]
-                  : [
-                      <Stop key="from" offset="0" stopColor={color} stopOpacity="0.3" />,
-                      <Stop key="to" offset="1" stopColor={color} stopOpacity="0.12" />,
-                    ]}
-              </LinearGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill={`url(#${gradientId})`} />
-          </Svg>
+        <View
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            setWash((previous) => washSize(width, height, previous));
+          }}
+        >
+          {wash && (
+            <Svg width={wash.width} height={wash.height}>
+              <Defs>
+                <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+                  {faint
+                    ? [
+                        <Stop key="from" offset="0" stopColor={color} stopOpacity="0.06" />,
+                        <Stop key="to" offset="1" stopColor={color} stopOpacity="0.02" />,
+                      ]
+                    : [
+                        <Stop key="from" offset="0" stopColor={color} stopOpacity="0.3" />,
+                        <Stop key="to" offset="1" stopColor={color} stopOpacity="0.12" />,
+                      ]}
+                </LinearGradient>
+              </Defs>
+              <Rect width={wash.width} height={wash.height} fill={`url(#${gradientId})`} />
+            </Svg>
+          )}
         </View>
       )}
       {children}

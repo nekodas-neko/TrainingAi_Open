@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <!-- "+30" from bars, so the button reads +30 s without a text label. -->
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M2,11.25h4v1.5H2zM3.25,9.5h1.5v5h-1.5z"/>
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M8,8h5v1.5H8zM9,11.25h4v1.5H9zM8,14.5h5V16H8zM11.5,8H13v8h-1.5z"/>
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M15,8h5v1.5h-5zM15,14.5h5V16h-5zM15,8h1.5v8H15zM18.5,8H20v8h-1.5z"/>
+</vector>

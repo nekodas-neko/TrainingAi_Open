@@ -1,5 +1,6 @@
-import { getLocalStore } from './index';
+import { getLocalStore, getUngatedLocalStore, type LocalStore } from './index';
 import { reconcileDeadLetters } from './dead-letter-signal';
+import { verifyDataEpoch } from './data-epoch';
 import { resolveFailedOutboxIds, serverBackoffMs, buildWorkoutLogPayload } from './sync-helpers';
 import type { SyncDelta } from '@/lib/data/repository';
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
@@ -79,6 +80,24 @@ function mergeSyncedDomains(into: SyncedDomains, from: SyncedDomains): void {
   }
 }
 
+// Overlapping pulls fetch concurrently but apply one at a time (#3484). Unserialised, a stale pull's
+// shorter post-apply chain could write the cursor before a newer pull's longer one, leaving the
+// cursor at the newer time with the stale rows on top: a retired food searchable again, and no
+// later pull re-delivering its tombstone. The tail is released in a `finally` and never rejects, so
+// a failed pull cannot block the next.
+let applyTail: Promise<void> = Promise.resolve();
+async function withApplyLock<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = applyTail;
+  let release!: () => void;
+  applyTail = new Promise<void>(resolve => { release = resolve; });
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
 // `fullResync` re-pulls from epoch (since=0) instead of the incremental cursor. The delta
 // cursor is monotonic, so once `lastSyncAt` passes a change it is never re-carried — which
 // leaves the on-device program mirror holding stale session ids after an edit that a later
@@ -92,11 +111,20 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   // calls this with force=true, bypassing the interval throttle below).
   if (Date.now() < pullBackoffUntil) return null;
 
+  // #3369: a pull would write the server's (reset) state under local rows that predate the reset,
+  // and the push below would send those rows back. Settle whether this device is behind a reset
+  // first; if it is, it wipes and reloads, and neither happens.
+  if (await verifyDataEpoch(userId) !== 'ok') return null;
+
   // Throttle to once every 5 minutes (bypassed when force = true)
   if (!force && Date.now() - lastSyncMs < MIN_SYNC_INTERVAL_MS) return null;
 
   // Fall back to Dexie for the authoritative timestamp (survives page refresh)
   const lastSync = fullResync ? new Date(0) : await store.getLastSyncAt();
+
+  // Set when the store was cleared (sign-out) while this pull waited for the apply lock. Not a network
+  // failure, so it must not start a backoff for whoever signs in next.
+  let abandoned = false;
 
   async function pullPage(sinceIso: string): Promise<{
     count: number; domains: SyncedDomains; syncedAt: string; hasMore: boolean;
@@ -275,21 +303,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   // the ones that differ from the local copy count as changes, or every pull would read as news.
   // `personalRecordsComplete` also means a best missing from the set is gone on the server.
   // A reply that carries the flag but no array is malformed, and must not read as "the server has none".
+  // The diff against the local copy is read inside the apply lock (below), not here: read before it, a
+  // stale pull queued behind a newer one would diff against bests the newer pull has not yet written.
   const bestsComplete = raw.personalRecordsComplete === true && Array.isArray(raw.personalRecords);
   let personalRecords = serverBests;
-  if (bestsComplete) {
-    try {
-      const local = new Map((await store!.getPersonalRecords()).map(b => [b.exerciseName, b]));
-      personalRecords = serverBests.filter(b => {
-        const have = local.get(b.exerciseName);
-        return !have || have.estimated1rm !== b.estimated1rm || have.achievedAt !== b.achievedAt || have.exerciseId !== b.exerciseId;
-      });
-    } catch (err) {
-      // Same as the applyDelta failure below: a broken local schema throws here, so report a failed page.
-      console.error('[pullDelta] reading local bests failed — local store may be out of schema:', err);
-      return null;
-    }
-  }
 
   const ouraDaily = ((raw.ouraDaily ?? []) as Record<string, unknown>[]).map(r => ({
     day:                  String(r.day),
@@ -542,6 +559,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     // A food item's definition is near-immutable, so its creation time is the honest ordering key.
     // Giving the server a real `updated_at` is a migration, and a migration ships alone.
     updatedAt:    toIso(r.createdAt),
+    deletedAt:    r.deletedAt ? toIso(r.deletedAt) : null,
   } satisfies LocalFoodItem));
 
   const foodLogs = ((raw.foodLogs ?? []) as Record<string, unknown>[]).map(r => ({
@@ -718,20 +736,40 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     workoutSessions, activityLogs, fitnessTests, prescribedRuns, programs, programSessions, sessionExercises,
     schedules, scheduleDays, progressionStyles, styleSets,
     foodItems, foodLogs, supplements, supplementLogs, injuries,
-    exerciseLogs, setLogs, personalRecords, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
+    exerciseLogs, setLogs, personalRecords: serverBests, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
     mealPlans, mealPlanVariants, mealPlanMeals, planMealAnswers };
-  const count = Object.values(delta).reduce((n, rows) => n + rows.length, 0);
 
   let prunedPrograms = 0;
   let prunedBests = 0;
+  let bestsReadFailed = false;
   try {
-    await store!.applyDelta(delta);
-    // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
-    // server's roster. Only when the server sent one — an absent roster must never read as "none".
-    const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
-    prunedPrograms = await store!.pruneProgramStructure(asIds(raw.programRoster), asIds(raw.progressionStyleRoster));
-    if (bestsComplete) prunedBests = await store!.prunePersonalRecords(serverBests.map(b => b.exerciseName));
-    await store!.setLastSyncAt(raw.syncedAt);
+    await withApplyLock(async () => {
+      // Waiting for the lock can outlast a sign-out: `clearLocalStoreData` empties the tables and
+      // drops the cached store, so this pull would write the old account's rows back under the wipe.
+      if (getLocalStore(userId) !== store) { abandoned = true; return; }
+      if (bestsComplete) {
+        try {
+          const local = new Map((await store!.getPersonalRecords()).map(b => [b.exerciseName, b]));
+          personalRecords = serverBests.filter(b => {
+            const have = local.get(b.exerciseName);
+            return !have || have.estimated1rm !== b.estimated1rm || have.achievedAt !== b.achievedAt || have.exerciseId !== b.exerciseId;
+          });
+          delta.personalRecords = personalRecords;
+        } catch (err) {
+          // Same as the applyDelta failure below: a broken local schema throws here, so report a failed page.
+          console.error('[pullDelta] reading local bests failed — local store may be out of schema:', err);
+          bestsReadFailed = true;
+          return;
+        }
+      }
+      await store!.applyDelta(delta);
+      // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
+      // server's roster. Only when the server sent one — an absent roster must never read as "none".
+      const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
+      prunedPrograms = await store!.pruneProgramStructure(asIds(raw.programRoster), asIds(raw.progressionStyleRoster));
+      if (bestsComplete) prunedBests = await store!.prunePersonalRecords(serverBests.map(b => b.exerciseName));
+      await store!.setLastSyncAt(raw.syncedAt);
+    });
   } catch (err) {
     // A broken local schema throws here, not at the fetch — and this used to propagate straight
     // out of pullDelta into a bare .catch(() => null), so the owner saw "Sync failed" with no
@@ -740,6 +778,8 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     console.error('[pullDelta] applyDelta failed — local store may be out of schema:', err);
     return null;
   }
+  if (abandoned || bestsReadFailed) return null;
+  const count = Object.values(delta).reduce((n, rows) => n + rows.length, 0);
 
   return {
     count: count + prunedPrograms + prunedBests,
@@ -788,6 +828,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       // Only a first-page failure is a "dead network" signal worth backing off —
       // a later-page failure mid-pagination keeps its partial progress (already
       // persisted via setLastSyncAt inside pullPage) and retries promptly next time.
+      if (abandoned) return null;
       if (pageN === 0) {
         consecutivePullFailures += 1;
         pullBackoffUntil = Date.now() + serverBackoffMs(consecutivePullFailures);
@@ -995,9 +1036,28 @@ export function pushMutations(userId: string): Promise<PushResult> {
   return trailing;
 }
 
-async function pushMutationsOnce(userId: string): Promise<PushResult> {
-  const store = getLocalStore(userId);
+/**
+ * #3369: drain only this account's own queued writes, through the store before the owner gate has
+ * claimed it. The one caller is the device-owner check, which is about to wipe a store it cannot
+ * attribute and first tries to save what the signed-in account queued. **Skips the stranded-row
+ * sweeps below**: they re-queue local rows under `userId`, which on a store of unknown ownership is
+ * exactly the adoption the wipe exists to prevent. Never throws; a failed push loses nothing that
+ * the wipe was not going to lose anyway.
+ *
+ * `signal` is the caller's cap: no new request starts once it aborts, and an in-flight one is
+ * cancelled. The caller waits for this to return before it wipes, so it never overlaps the wipe.
+ */
+export async function pushOwnOutboxBeforeWipe(userId: string, signal?: AbortSignal): Promise<void> {
+  try {
+    const store = getUngatedLocalStore(userId);
+    if (store) await pushMutationsOnce(userId, store, signal);
+  } catch { /* best effort */ }
+}
+
+async function pushMutationsOnce(userId: string, ungatedStore?: LocalStore, signal?: AbortSignal): Promise<PushResult> {
+  const store = ungatedStore ?? getLocalStore(userId);
   if (!store) return null;
+  const outboxOnly = ungatedStore !== undefined;
 
   // K3: seed the dead-letter badge + fire a one-time toast for any workout that
   // dead-lettered. Runs before the backoff gate so the badge reflects reality even
@@ -1006,26 +1066,31 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
 
   if (Date.now() < push5xxUntil) return null;
 
+  // #3369: before anything is read from the outbox. A device that holds data from before an admin
+  // reset wipes it here, outbox included, instead of sending it under the fresh sign-in.
+  if (await verifyDataEpoch(userId) !== 'ok') return null;
+
   // Re-queue workouts stranded by a double failure (POST threw AND queueMutation
   // threw): pending locally, absent from the outbox. Grace period avoids racing
   // a direct POST that is still in flight.
   const strandedCutoff = new Date(Date.now() - 5 * 60_000).toISOString();
-  try {
-    const cutoff = strandedCutoff;
-    const stranded = await store.getStrandedPendingWorkouts(cutoff);
-    for (const h of stranded) {
-      for (const el of h.exerciseLogs) {
-        const { date, payload } = buildWorkoutLogPayload(h.session, el);
-        await store.queueMutation({ userId, domain: 'workout_log', date, payload });
+  if (!outboxOnly) {
+    try {
+      const stranded = await store.getStrandedPendingWorkouts(strandedCutoff);
+      for (const h of stranded) {
+        for (const el of h.exerciseLogs) {
+          const { date, payload } = buildWorkoutLogPayload(h.session, el);
+          await store.queueMutation({ userId, domain: 'workout_log', date, payload });
+        }
       }
-    }
-  } catch { /* sweep is best-effort; the normal queue still drains */ }
+    } catch { /* sweep is best-effort; the normal queue still drains */ }
+  }
 
   // Heal food logs stranded by the D-1 envelope drop: their food_item never
   // reached the server, so re-queue the item (ordered ahead) and re-open the log.
   // One-shot per row — a healed log leaves the 'failed' set, so this can't loop.
   try {
-    await store.requeueStrandedFoodItems(userId);
+    if (!outboxOnly) await store.requeueStrandedFoodItems(userId);
   } catch { /* best-effort; the normal queue still drains */ }
 
   // DV-8 heal: food-log DELETE tombstones left `pending` with their outbox entry already gone,
@@ -1037,7 +1102,7 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
   // Self-limiting rather than one-shot: a re-queued tombstone has an outbox entry, so the next
   // sweep does not see it. If its push fails the entry stays and it still is not re-swept.
   try {
-    await store.requeueStrandedFoodTombstones(userId, strandedCutoff);
+    if (!outboxOnly) await store.requeueStrandedFoodTombstones(userId, strandedCutoff);
   } catch { /* best-effort; the normal queue still drains */ }
 
   const pending = await store.getPendingMutations(userId);
@@ -1053,11 +1118,13 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
   let anyRequestOk = false;
 
   for (let i = 0; i < pending.length; i += PUSH_CHUNK_SIZE) {
+    if (signal?.aborted) break;
     const chunk = pending.slice(i, i + PUSH_CHUNK_SIZE);
     let res: Response;
     try {
       res = await fetch('/api/sync/push', {
         method: 'POST',
+        signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mutations: await Promise.all(

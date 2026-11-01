@@ -206,7 +206,7 @@ export default function ExerciseUnitFix() {
                   )}
                 </Button>
               ) : (
-                <p className="text-sm text-green-600">Applied — {result.logs.length} session(s) converted.</p>
+                <p className="text-sm text-accent-green">Applied — {result.logs.length} session(s) converted.</p>
               )}
             </>
           )}

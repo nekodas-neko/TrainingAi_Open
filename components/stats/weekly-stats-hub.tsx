@@ -138,7 +138,7 @@ export function WeeklyStatsHub({ data, loading, sessions = [], error, onRetry }:
                   {(day.isDeload || day.isTesting) && (
                     <>
                       {" ("}
-                      {day.isDeload && <span className="font-bold text-amber-500">D</span>}
+                      {day.isDeload && <span className="font-bold text-accent-amber">D</span>}
                       {/* Both flags can be true at once — they are independent fields, so this had
                           to have a defined combined form rather than being met for the first time on
                           a testing week. "Mon (D·T)" is 9 characters in a ~51 dp column at the S25

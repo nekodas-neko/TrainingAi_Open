@@ -47,6 +47,12 @@ export type SleepRow = {
    * optional because a row pulled before v53, and a payload from before #3057, has none.
    */
   ouraSleepType?: string | null;
+  /**
+   * #2265 — when the owner marked the night partial (ISO), or null. A merged night carries the mark
+   * when any of its windows has it. Optional so a payload from before it existed still parses. The
+   * row still shows what the ring recorded; the scores and averages are what leave the night out.
+   */
+  partialNightAt?: string | null;
 };
 
 /** A row as a window the night grouping can read: its times as instants, the row itself carried along. */
@@ -143,6 +149,7 @@ export function mergeByDate(rows: SleepRow[], tz: string = DEFAULT_TZ): SleepRow
       // The ribbon is the main window's phase string, which spans only that window; say which, so
       // the hypnogram can position itself inside the wider night.
       sleepPhase5Min: main.row.sleepPhase5Min,
+      partialNightAt: period.windows.find(w => w.row.partialNightAt != null)?.row.partialNightAt ?? null,
       phaseWindowStart: main.row.sleepPhase5Min ? main.row.sleepStart : null,
       phaseWindowEnd: main.row.sleepPhase5Min ? main.row.sleepEnd : null,
     })

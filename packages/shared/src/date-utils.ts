@@ -137,6 +137,71 @@ export function dateStrMidnightInTz(dateStr: string, tz = DEFAULT_TZ): Date {
   return fromZonedTime(`${dateStr}T00:00:00`, tz)
 }
 
+/** Minutes the zone sits ahead of UTC at an instant (`formatInTimeZone`, i.e. Intl, is exact at a
+ *  transition; date-fns-tz's `getTimezoneOffset` is not). */
+function utcOffsetMin(atMs: number, tz: string): number {
+  const m = /^([+-])(\d{2}):(\d{2})$/.exec(formatInTimeZone(new Date(atMs), tz, 'xxx'))
+  return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : 0
+}
+
+/**
+ * Reads an instant as the wall-clock minute of the local day it falls on (minutes since the clock read
+ * 00:00), where `dayStartMs` is that day's local midnight. Minutes elapsed since midnight are an hour
+ * out after a daylight-saving change, so a chart whose x-axis is the clock face needs this one. A
+ * 25-hour day reads its repeated hour twice (the same minute value) and a 23-hour day skips the missing
+ * one. An instant outside the day lands outside 0–1439, as it does in elapsed minutes. Only a day that
+ * is not 24 hours long pays for the zone lookup.
+ */
+export function wallClockMinuteReader(dayStartMs: number, tz = DEFAULT_TZ): (atMs: number) => number {
+  const startOffset = utcOffsetMin(dayStartMs, tz)
+  if (utcOffsetMin(dayStartMs + 86_400_000, tz) === startOffset) {
+    return atMs => Math.floor((atMs - dayStartMs) / 60_000)
+  }
+  const byQuarterHour = new Map<number, number>()
+  return atMs => {
+    const key = Math.floor(atMs / 900_000)
+    let offset = byQuarterHour.get(key)
+    if (offset === undefined) {
+      offset = utcOffsetMin(atMs, tz)
+      byQuarterHour.set(key, offset)
+    }
+    return Math.floor((atMs - dayStartMs) / 60_000) + (offset - startOffset)
+  }
+}
+
+/** The wall-clock minutes a day's clock jumps over: `[fromMin, toMin)` never reads on the clock. */
+export interface ClockSkip { fromMin: number; toMin: number }
+
+/**
+ * The hour the clock skips on a spring-forward day (02:00 → 03:00 reads `{ fromMin: 120, toMin: 180 }`),
+ * or null on any other day. A series on `wallClockMinuteReader` minutes jumps by that much across the
+ * transition though no time passed, so a "no data for N minutes" test must close the skip first
+ * (`closeClockSkip`). A fall-back day needs nothing: its minutes only step backward, never a false gap.
+ * `dayStartMs` is the day's local midnight. Where the change falls at midnight itself (Havana, 00:00 →
+ * 01:00) there is no such instant: `dateStrMidnightInTz` returns the hour before, which does not read
+ * 00:00 on the clock, and the skip is the day's first hour (`{ fromMin: 0, toMin: 60 }`).
+ */
+export function clockSkipOnDay(dayStartMs: number, tz = DEFAULT_TZ): ClockSkip | null {
+  const startOffset = utcOffsetMin(dayStartMs, tz)
+  if (utcOffsetMin(dayStartMs + 86_400_000, tz) === startOffset) return null
+  const STEP = 900_000 // transitions fall on a quarter hour
+  const before = startOffset
+  for (let t = dayStartMs + STEP; t <= dayStartMs + 26 * 3_600_000; t += STEP) {
+    const offset = utcOffsetMin(t, tz)
+    if (offset !== before) {
+      if (offset < before) return null
+      if (formatInTimeZone(new Date(dayStartMs), tz, 'HH:mm') !== '00:00') return { fromMin: 0, toMin: offset - before }
+      return { fromMin: Math.floor((t - dayStartMs) / 60_000) + (before - startOffset), toMin: Math.floor((t - dayStartMs) / 60_000) + (offset - startOffset) }
+    }
+  }
+  return null
+}
+
+/** A wall-clock minute with the skipped hour taken out, so a difference of two is the time elapsed. */
+export function closeClockSkip(minute: number, skip: ClockSkip | null | undefined): number {
+  return skip && minute >= skip.toMin ? minute - (skip.toMin - skip.fromMin) : minute
+}
+
 /** The instant a local wall-clock "HH:MM" on `dateStr` names in `tz` (so DST-correct), or null when
  *  `hhmm` is not a time of day. The inverse of `msToHHMMInTz` for a known date. */
 export function localClockTimeToDate(dateStr: string, hhmm: string | null | undefined, tz = DEFAULT_TZ): Date | null {

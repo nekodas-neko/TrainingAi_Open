@@ -17,6 +17,8 @@ import { backfillOuraCloud, CONNECT_BACKFILL_DAYS, validBackfillRange, type Oura
 import { stillRhrRefresher } from '@/lib/oura/cloud/still-rhr'
 import { runOuraWebhookRenewal } from '@/lib/oura/cloud/renewal'
 import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import { getDb } from '@/lib/data/postgres/client'
+import { mergeLookAlikeFoods } from '@/lib/nutrition/merge-look-alike-foods'
 
 /**
  * The agent key's allow-list (issue 2381, part b). A job is reachable with the key only if it is
@@ -73,6 +75,14 @@ const OuraCloudBackfillParams = z.object({
   to: DateParam.optional(),
   heartRate: z.boolean().optional(),
   dryRun: z.boolean(),
+}).strict()
+
+const MergeLookAlikeFoodsParams = z.object({
+  dryRun: z.boolean(),
+  /** `{groupKey: foodItemId}`: the owner's pick of keeper for a group, from the dry run's `groupKey`. */
+  keepers: z.record(z.string().max(300), z.string().uuid()).refine(m => Object.keys(m).length <= 100, 'at most 100 keepers').optional(),
+  /** `'exact'`: merge only the groups that leave every moved log's calories and macros unchanged. */
+  only: z.literal('exact').optional(),
 }).strict()
 
 export const AGENT_JOBS = {
@@ -253,6 +263,11 @@ export const AGENT_JOBS = {
    * `backfillOuraCloud`, the code a new connection runs. Idempotent. A write can replace a stored
    * value whose source ranks at or below `oura_cloud` (a legacy row with no source, Health Connect),
    * so it needs an approval; the ring's BLE values and manual entries outrank it and never move.
+   * It also tombstones stored workouts and sessions Oura's list no longer has over the range, as the
+   * daily reconcile does for 3 days (#3389), under the same guard: only days read whole, never after
+   * a 404, a dropped document or a refusal. A dry run reports `workoutsTombstoned` and
+   * `sessionsTombstoned` as would-be counts and writes nothing. A tombstone is reversible: a session
+   * Oura sends again clears it.
    */
   'oura-cloud-backfill': {
     params: OuraCloudBackfillParams,
@@ -265,12 +280,13 @@ export const AGENT_JOBS = {
       if (!from || !to) return { status: 400, body: { error: 'Invalid date' }, finish: { outcome: 'refused', error: 'invalid date' } }
       if (!validBackfillRange(from, to)) return { status: 400, body: { error: 'invalid_range' }, finish: { outcome: 'refused', error: 'invalid_range' } }
       const run = backfillOuraCloud({ repo: ctx.repo, config, rescore: ctx.repo, workoutHr: workoutHrReattributor(ctx.repo), stillRhr: stillRhrRefresher(ctx.repo) }, ctx.userId, {
-        from, to, dryRun: p.dryRun, heartRate: p.heartRate ?? true, tz: ctx.tz,
+        from, to, dryRun: p.dryRun, heartRate: p.heartRate ?? true, tz: ctx.tz, tombstoneAbsent: true, stampData: false,
       })
       const finish = (result: OuraBackfillResult): FinishAgentActionInput => {
         if (!result.ok) return { outcome: 'refused', error: result.error }
         const { counts, stoppedEarly } = result.report
-        const written = p.dryRun ? 0 : counts.dailyRows + counts.bodyRows + counts.sleepWritten + counts.sleepTombstoned + counts.workouts + counts.heartRatePoints
+        const written = p.dryRun ? 0 : counts.dailyRows + counts.bodyRows + counts.sleepWritten + counts.sleepTombstoned + counts.workouts + counts.heartRatePoints +
+          result.report.workoutsTombstoned + result.report.sessionsTombstoned
         return { outcome: stoppedEarly ? 'failed' : 'succeeded', affectedRows: written, daysMoved: p.dryRun ? 0 : counts.dailyRows, error: stoppedEarly }
       }
       // A write can take tens of Oura requests (#2895 review, nit 10), so it runs after the answer
@@ -312,6 +328,35 @@ export const AGENT_JOBS = {
       }
     },
   } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+
+  /**
+   * #2417. Merges look-alike `food_items` (same name and brand) into one keeper: the most-logged row,
+   * or the one the owner names in `keepers`. A write re-points the extras' food logs and saved-meal
+   * ingredients to the keeper with the quantity rescaled so the grams eaten do not change, then
+   * tombstones the extras (`deleted_at`, never a delete). Grams never change; calories and macros
+   * stay exactly as they were only for the groups the dry run marks `automatic` (`only: 'exact'`
+   * merges just those). A group with any non-zero change, or whose foods differ, is the owner's
+   * review. It also fills a keeper's missing barcode and picture from its extras (add-only). It rewrites what the owner ate, so a write
+   * needs an approval, and a verified snapshot comes first. Idempotent: a second run finds nothing.
+   * A dry run writes nothing and lists every group.
+   */
+  'merge-look-alike-foods': {
+    params: MergeLookAlikeFoodsParams,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await mergeLookAlikeFoods(getDb(), ctx.userId, { dryRun: p.dryRun, keepers: p.keepers, only: p.only })
+      if (!result.ok) return { status: 400, body: { error: result.error }, finish: { outcome: 'refused', error: result.error } }
+      const { report } = result
+      const t = report.totals
+      const moved = report.groups.reduce((n, g) => n + (g.result && 'logsMoved' in g.result ? g.result.logsMoved + g.result.mealItemsMoved + g.result.tombstoned : 0), 0)
+      return {
+        status: 200,
+        body: { report },
+        finish: { outcome: report.failedGroups > 0 ? 'failed' : 'succeeded', affectedRows: p.dryRun ? 0 : moved, daysMoved: p.dryRun ? 0 : report.datesTouched.length,
+          error: report.failedGroups > 0 ? `${report.failedGroups} of ${t.groups} group(s) rolled back` : null },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof MergeLookAlikeFoodsParams>>,
 } as const
 
 export type AgentJobId = keyof typeof AGENT_JOBS
@@ -359,6 +404,7 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('recompute-hrr1-best'),
   requestSchema('oura-cloud-backfill'),
   requestSchema('oura-webhook-subscriptions'),
+  requestSchema('merge-look-alike-foods'),
 ])
 export type AgentActionRequest = z.infer<typeof AgentActionRequest>
 

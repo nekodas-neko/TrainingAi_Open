@@ -46,8 +46,9 @@ describe('reconcileOuraCloud', () => {
       const [deps, userId, opts] = calls[i]
       const to = toAestDay(NOW, tz)
       expect(userId).toBe(`u${i + 1}`)
+      // #2861: and a re-read is not new data from the ring, so it never stamps last_data_at.
       // #3087, #3153: and tombstones a workout or session gone from Oura's list for a day it re-read.
-      expect(opts).toEqual({ from: shiftDateStr(to, -(RECONCILE_DAYS - 1)), to, dryRun: false, heartRate: true, tz, tombstoneAbsent: true })
+      expect(opts).toEqual({ from: shiftDateStr(to, -(RECONCILE_DAYS - 1)), to, dryRun: false, heartRate: true, tz, tombstoneAbsent: true, stampData: false })
       expect(deps.rescore).toBe(repo)
       // #3078: the reconciliation's heart rate re-attributes the workouts it changed.
       expect(deps.workoutHr).toBeTypeOf('function')

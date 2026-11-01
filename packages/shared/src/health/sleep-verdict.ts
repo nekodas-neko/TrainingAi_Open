@@ -21,6 +21,7 @@
 // value writes `touched: false`, and only a correction writes `touched: true` (TN-57).
 
 import { iqrBand } from '@trainingai/shared/stats'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { msToHHMMInTz, toAestDay, daysBetweenDateStrs, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 /**
@@ -147,6 +148,8 @@ export interface SleepSessionLike {
   sleepStart: Date | string | number
   durationHours?: number | null
   efficiency?: number | null
+  /** #2265: the owner's partial-night mark. */
+  partialNightAt?: Date | string | null
 }
 
 /**
@@ -157,12 +160,16 @@ export interface SleepSessionLike {
  * offset, and it is the only place that needs the timezone.
  */
 export function toVerdictNights(sessions: readonly SleepSessionLike[], tz: string): VerdictNight[] {
-  return sessions.map(s => ({
-    date: s.date,
-    durationHours: s.durationHours ?? null,
-    onsetMinutes: onsetMinutesForNight(s.sleepStart, s.date, tz),
-    efficiency: s.efficiency ?? null,
-  }))
+  // #2265: all three components (hours, bedtime, efficiency) depend on how long the ring recorded,
+  // so a night the owner marked partial contributes none: it is never judged and never a baseline.
+  return sessions.map(s => isPartialNight(s)
+    ? { date: s.date, durationHours: null, onsetMinutes: null, efficiency: null }
+    : {
+        date: s.date,
+        durationHours: s.durationHours ?? null,
+        onsetMinutes: onsetMinutesForNight(s.sleepStart, s.date, tz),
+        efficiency: s.efficiency ?? null,
+      })
 }
 
 /**
@@ -218,6 +225,10 @@ export function sleepVerdictForNight(
   }
 
   if (Object.keys(bands).length === 0) return null
+
+  // #2265: a night with no component to judge (the owner marked it partial) has no verdict. Saying
+  // "normal" about it would announce a judgement nothing was measured for.
+  if (SLEEP_COMPONENTS.every(c => components[c] === null)) return null
 
   // A poor signal outranks a good one. A long night that started two hours late is a night worth
   // flagging, and the owner can disagree in one tap — which is the data point this exists for.

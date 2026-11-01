@@ -16,6 +16,7 @@ import { meanRestingHr, restingHrWindow } from '@trainingai/shared/health/restin
 import { prescribeNextRun } from '@trainingai/shared/running/prescription'
 import { weekIndexSince } from '@trainingai/shared/running/week-index'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightsWithDuration } from '@trainingai/shared/health/partial-night'
 import type { RecoveryGateInputs } from '@trainingai/shared/running/recovery-gate'
 import type { FitnessSnapshot, RunType, RunningGoal } from '@trainingai/shared/running/types'
 import type { RunningPlan } from '@/lib/data/repository'
@@ -100,7 +101,7 @@ export async function assembleInputs(
   // Over nights, not rows (Q-76). `Math.max` already made a nap harmless here, but the reverse case
   // is not: a night split by a wake-up reads as its longer half (4.0 h of a real 6.5 h night on
   // 2026-05-29), which trips the short-sleep guard and softens a run that needed no softening.
-  const lastNight = nightSessions(sleepSessions, tz).filter(s => s.date === todayIso).map(s => s.durationHours ?? 0)
+  const lastNight = nightsWithDuration(nightSessions(sleepSessions, tz)).filter(s => s.date === todayIso).map(s => s.durationHours ?? 0)
   const sleepHoursLastNight = lastNight.length ? Math.max(...lastNight) || null : null
 
   // Only COMPLETED runs count toward the week's 80/20 sequence — a never-run pending row (created

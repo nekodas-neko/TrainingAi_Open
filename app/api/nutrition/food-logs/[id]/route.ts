@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidUuidResponse, withRouteErrors } from '@/lib/api/route-errors'
+import { QUANTITY_MULTIPLIER_MIN, QUANTITY_MULTIPLIER_MAX, quantityMultiplierInRange } from '@trainingai/shared/nutrition/quantity-bounds'
 
 // One number. 4 KB is already two orders of magnitude of headroom.
 const MAX_BODY_BYTES = 4 * 1024
@@ -23,8 +24,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
   const { quantityMultiplier } = (read.body ?? {}) as { quantityMultiplier?: unknown }
-  if (typeof quantityMultiplier !== 'number' || quantityMultiplier < 0.01 || quantityMultiplier > 100) {
-    return NextResponse.json({ error: 'quantityMultiplier must be between 0.01 and 100' }, { status: 400 })
+  if (!quantityMultiplierInRange(quantityMultiplier)) {
+    return NextResponse.json({ error: `quantityMultiplier must be between ${QUANTITY_MULTIPLIER_MIN} and ${QUANTITY_MULTIPLIER_MAX}` }, { status: 400 })
   }
   const repo = await getRepository()
   // RV-33: `updateFoodLog` throws `NotFoundError` for an id that is not the caller's — the correct

@@ -1,5 +1,5 @@
 import { acknowledgedUpload, isDeferredUpload } from './health-upload';
-import { ApiError } from '../../account/api/client.ts';
+import { isValidationRejection } from '../../account/api/client.ts';
 import { z } from 'zod';
 import {
   healthConnectBatch,
@@ -390,7 +390,7 @@ export class HealthConnectImportStore {
         // #2828 N3: a 400 is the server refusing this batch's shape, and it refuses it the same way
         // every time. Left at the head of the queue it blocked every later upload for good, so it is
         // dropped and counted as skipped. Any other failure keeps it for retry.
-        if (!('rebuild' in item) && error instanceof ApiError && error.status === 400) {
+        if (!('rebuild' in item) && isValidationRejection(error)) {
           await this.write({
             ...this.disk,
             queue: this.disk.queue.slice(1),

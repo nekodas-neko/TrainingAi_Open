@@ -24,7 +24,12 @@ export interface LoadActivityDayOptions {
   /** The caller's resolved profile is a stand-in for a failed read (`maxHrIsUnread`). A finished day
    *  then refuses to score, so it is not stored final on an age-based ceiling. */
   maxHrUnread?: boolean
+  /** The day's HR rows (`getHrForWindow` over the local day), or the pending read of them, when the
+   *  caller has fetched them already: the day is then read once, not twice. Leave out to read here. */
+  hrRows?: HrRows | Promise<HrRows>
 }
+
+type HrRows = Awaited<ReturnType<WorkoutRepository['getHrForWindow']>>
 
 /** Scores one local day from its own inputs. Read-only. */
 export async function loadActivityDay(
@@ -41,7 +46,7 @@ export async function loadActivityDay(
     repo.listBodyMetrics(userId, fromIso, date),
     repo.getOuraDaily(userId, fromIso, date),
     repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(fromIso, tz)),
-    repo.getHrForWindow(userId, dayMid, nextMid),
+    options.hrRows ?? repo.getHrForWindow(userId, dayMid, nextMid),
     repo.getActiveProgram(userId),
     repo.getUserById(userId),
     // A swallowed goals read would score the day against the default step goal.

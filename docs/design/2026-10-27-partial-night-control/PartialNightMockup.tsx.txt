@@ -1,0 +1,109 @@
+// #2265 mockups: the control that marks a night partial. Static, invented data, nothing is wired up.
+// Option B uses Preview's real Sheet and ActionMenu, the way the night card opens in the app: the
+// night is inside a Sheet titled "Sleep", and the menu is a second Sheet on top of it.
+import { View } from 'react-native';
+import { ActionMenu, AppButton, AppText, Badge, Card, Grid, Icon, IconButton, MetricTile, Sheet, Stack, SwitchRow } from '../shared/ui';
+import { useTheme } from '../shared/theme/ThemeProvider';
+
+type Tile = [label: string, value: string, counted: boolean];
+const TILES: Tile[] = [
+  ['Deep', '0h 24m', false], ['REM', '0h 48m', false], ['Light', '1h 39m', false], ['Awake', '0h 24m', false],
+  ['Efficiency', '79%', false], ['HRV (overnight)', '47 ms', true], ['Average HR', '62 bpm', true],
+  ['Lowest HR', '55 bpm', true], ['Breathing rate', '13.4 br/min', true],
+];
+
+function Frame({ children }: { children: React.ReactNode }) {
+  const { theme } = useTheme();
+  return <View style={{ flex: 1, backgroundColor: theme.colors.background, padding: theme.spacing.lg, gap: theme.spacing.md }}>{children}</View>;
+}
+
+function NightCard({ marked, header, footer, hint }: { marked: boolean; header?: React.ReactNode; footer?: React.ReactNode; hint?: React.ReactNode }) {
+  return (
+    <Card tone="sleep">
+      <Stack direction="row" align="center" justify="space-between">
+        <Stack direction="row" align="center" wrap>
+          <AppText variant="eyebrow" tone="muted">2026-10-27</AppText>
+          {marked && <Badge label="Partial night" tone="sleep" />}
+        </Stack>
+        {header}
+      </Stack>
+      <AppText variant="caption" tone="muted">Oura · Ring</AppText>
+      <AppText variant="title">{marked ? '3h 15m recorded' : '3h 15m'}</AppText>
+      <AppText variant="caption" tone="muted">4:40 am → 7:55 am</AppText>
+      {marked && (
+        <AppText variant="caption" tone="muted">
+          Kept out of your sleep score and averages. Heart rate, HRV and breathing still count.
+        </AppText>
+      )}
+      {hint}
+      <Grid columns={2}>
+        {TILES.map(([label, value, counted]) => (
+          <View key={label} style={{ opacity: marked && !counted ? 0.4 : 1 }}>
+            <MetricTile label={label} value={value} tone="sleep" />
+          </View>
+        ))}
+      </Grid>
+      {footer}
+    </Card>
+  );
+}
+
+export function MockupApp({ screen }: { screen: string }) {
+  const { theme } = useTheme();
+  const toggle = (on: boolean) => (
+    <View style={{ borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.md, gap: theme.spacing.xs }}>
+      <SwitchRow label="The ring was off for part of this night" value={on} onValueChange={() => {}} />
+      <AppText variant="caption" tone="muted">
+        {on ? 'Turn off to count the whole night again.' : 'Keeps hours, efficiency and bedtime out of your scores and averages.'}
+      </AppText>
+    </View>
+  );
+  if (screen === 'a-off') return <Frame><NightCard marked={false} footer={toggle(false)} /></Frame>;
+  if (screen === 'a-on') return <Frame><NightCard marked footer={toggle(true)} /></Frame>;
+  const more = <IconButton icon="more" label="Night options" onPress={() => {}} />;
+  // The night card inside the Sheet it opens in.
+  const inSleepSheet = (marked: boolean, children?: React.ReactNode) => (
+    <Frame>
+      <Sheet visible title="Sleep" onClose={() => {}}>
+        <NightCard marked={marked} header={more} />
+      </Sheet>
+      {children}
+    </Frame>
+  );
+  if (screen === 'b-menu')
+    return inSleepSheet(false, (
+      <ActionMenu visible title="Night options" onClose={() => {}} actions={[{ title: 'Mark as partial night', icon: 'moon', run: () => {} }]} />
+    ));
+  if (screen === 'b-confirm')
+    return inSleepSheet(false, (
+      <Sheet visible title="Mark as a partial night?" onClose={() => {}}>
+        <AppText variant="body" tone="muted">
+          Use this when the ring came off or went on late. Hours, efficiency, time to fall asleep and bedtime stay out of your sleep score and averages. Heart rate, HRV and breathing still count. You can undo it any time.
+        </AppText>
+        <AppButton title="Mark as partial night" onPress={() => {}} />
+        <AppButton title="Cancel" variant="surface" onPress={() => {}} />
+      </Sheet>
+    ));
+  if (screen === 'b-marked')
+    return inSleepSheet(true, (
+      <ActionMenu visible title="Night options" onClose={() => {}} actions={[{ title: 'Count the whole night again', icon: 'moon', run: () => {} }]} />
+    ));
+  if (screen === 'c-prompt')
+    return (
+      <Frame>
+        <NightCard
+          marked={false}
+          hint={
+            <Card tone="brand">
+              <Stack direction="row" gap="sm" align="center"><Icon name="info" tone="muted" /><AppText variant="body">Short night. Was the ring off for part of it?</AppText></Stack>
+              <Stack direction="row" gap="sm">
+                <AppButton title="Yes, mark partial" onPress={() => {}} />
+                <AppButton title="No" variant="surface" onPress={() => {}} />
+              </Stack>
+            </Card>
+          }
+        />
+      </Frame>
+    );
+  return <Frame><NightCard marked={false} /></Frame>;
+}

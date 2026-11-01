@@ -7,6 +7,7 @@ import type { AuthProvider } from '@/lib/auth/identity'
 import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { normalizeEmail } from '@trainingai/shared/validation/email'
+import { QUANTITY_MULTIPLIER_MIN, QUANTITY_MULTIPLIER_MAX, quantityMultiplierInRange } from '@trainingai/shared/nutrition/quantity-bounds'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
@@ -37,6 +38,7 @@ export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
 import { classifyClockRegression, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
+import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 import { rowsOfDeviceInUse, fillMissingNightSources } from '@trainingai/shared/health/per-device-normal'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
@@ -69,6 +71,8 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
+import { PartialNightPayloadSchema } from '@trainingai/shared/health/partial-night'
+import { withNightRescore, partialNightRescore } from '@/lib/health/rescore-nights'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { averagePaceSecPerKm } from '@trainingai/shared/activity/route-summary'
 import { HEALTH_CONNECT_SOURCE } from '@trainingai/shared/health/health-connect-workouts'
@@ -122,6 +126,7 @@ import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_M
 import * as bodyBattery from './slices/body-battery'
 import * as agentActions from './slices/agent-actions'
 import * as accountDeletion from './slices/account-deletion'
+import * as adminGrants from './slices/admin-grants'
 import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
 import * as hcIntervals from './slices/health-connect-intervals'
@@ -438,11 +443,6 @@ const AI_CALL_LOG_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 let lastStepWindowPrune = 0
 const STEP_WINDOW_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 
-// Live battery-poll retention (migration 133): 90 days of 5-min-while-connected samples is
-// ample for drain-rate analytics; throttled once/24h.
-let lastBatteryPollPrune = 0
-const BATTERY_POLL_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
-
 // oura_accel_chunks retention (7-day recount/calibration window). Was awaited on every insert (H-5c)
 // — a transient delete lock would 500 an accel POST that already succeeded semantically; now
 // throttled + fire-and-forget like its siblings.
@@ -528,6 +528,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       activityLevel: (r.activityLevel as ActivityLevel | null) ?? undefined,
       fitnessGoal: (r.fitnessGoal as FitnessGoal | null) ?? undefined,
       lastGoalReviewAt: r.lastGoalReviewAt ?? undefined,
+      sessionsValidFrom: r.sessionsValidFrom ?? null,
     }
   }
 
@@ -826,6 +827,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.length > 0
   }
 
+  async setUserAdmin(args: { actingAdminId: string; targetUserId: string; makeAdmin: boolean; ownerId: string | null }) {
+    return adminGrants.setUserAdmin(this.db, args)
+  }
+
   async getUserById(userId: string): Promise<User | null> {
     const [r] = await this.db.select().from(s.users).where(eq(s.users.id, userId)).limit(1)
     return r ? this.rowToUser(r) : null
@@ -862,8 +867,36 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return r ? { ...this.rowToUser(r), passwordHash: r.passwordHash ?? undefined } : null
   }
 
-  async deleteAccount(userId: string, opts: { onlyIfNoData?: boolean } = {}): Promise<AccountDeletionResult> {
+  async deleteAccount(
+    userId: string,
+    opts: { onlyIfNoData?: boolean; guard?: accountDeletion.AdminWipeGuard; audit?: accountDeletion.AdminWipeAudit } = {},
+  ): Promise<AccountDeletionResult> {
     return accountDeletion.deleteAccount(this.db, userId, opts)
+  }
+
+  /** #3369: an admin's reset — everything an account holds goes, the account and its sign-ins stay. */
+  async resetAccountData(
+    userId: string,
+    opts: { guard: accountDeletion.AdminWipeGuard; audit: accountDeletion.AdminWipeAudit },
+  ): Promise<AccountDeletionResult> {
+    const result = await accountDeletion.resetAccountData(this.db, userId, opts)
+    if (result.deleted) {
+      // A new signup is seeded with the built-in progression styles, phase sets and a friend code by
+      // `ensureUserDefaults`, which runs when the row is created. A reset is a fresh start, and the
+      // person's next sign-in finds the existing row and seeds nothing, so seed here. It is
+      // idempotent, and it is outside the reset's transaction on purpose: a failure must not undo a
+      // reset that already happened. The caller is told, and a second reset seeds again.
+      try {
+        const user = await this.getUserById(userId)
+        if (!user) throw new Error('reset account not found after commit')
+        await this.ensureUserDefaults(user)
+        result.defaultsSeeded = true
+      } catch (err) {
+        console.error('[account reset] seeding the defaults failed', err instanceof Error ? err.name : 'unknown')
+        result.defaultsSeeded = false
+      }
+    }
+    return result
   }
 
   /** issue 2695: which of these accounts hold data (the admin Users screen's Pending / Deactivated split). */
@@ -886,6 +919,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraCloudTokens(userId: string) { return ouraCloudTokens.getOuraCloudTokens(this.db, userId) }
   async saveOuraCloudTokens(userId: string, input: ouraCloudTokens.SaveOuraCloudTokensInput) { return ouraCloudTokens.saveOuraCloudTokens(this.db, userId, input) }
   async markOuraCloudReauthRequired(userId: string, unchangedSince: Date) { return ouraCloudTokens.markOuraCloudReauthRequired(this.db, userId, unchangedSince) }
+  async touchOuraCloudWebhook(userId: string) { return ouraCloudTokens.touchOuraCloudWebhook(this.db, userId) }
+  async touchOuraCloudData(userId: string) { return ouraCloudTokens.touchOuraCloudData(this.db, userId) }
   async deleteOuraCloudTokens(userId: string) { return ouraCloudTokens.deleteOuraCloudTokens(this.db, userId) }
   async getUserIdByOuraUserId(ouraUserId: string) { return ouraCloudTokens.getUserIdByOuraUserId(this.db, ouraUserId) }
   async getOuraCloudSwitchDay(userId: string) { return ouraCloudTokens.getOuraCloudSwitchDay(this.db, userId) }
@@ -1105,9 +1140,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * such session for this user" and is an error; here the guard makes it mean "someone else got
    * there first", which is the normal idempotent path.
    */
-  async completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<boolean> {
+  async completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date, pausedSec?: number): Promise<boolean> {
     const rows = await this.db.update(s.workoutSessions)
-      .set({ completedAt })
+      // #3266: only a build that can pause sends it; an older one leaves the column NULL (never paused).
+      .set(pausedSec === undefined ? { completedAt } : { completedAt, pausedSec })
       .where(and(
         eq(s.workoutSessions.id, workoutSessionId),
         eq(s.workoutSessions.userId, userId),
@@ -1490,6 +1526,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       wasOverride: ws.wasOverride,
       intensityMode: (ws.intensityMode as 'full' | 'deload' | null) ?? null,
       sessionRpe: ws.sessionRpe ?? null,
+      pausedSec: ws.pausedSec ?? null,
       exercises: elRows
         .filter(e => e.workoutSessionId === ws.id)
         .map<ExerciseLog>(e => ({
@@ -1612,7 +1649,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [sessionRow] = await this.db
       .select({
         sessionCount: sql<number>`COUNT(*)`,
-        totalMinutes: sql<number>`COALESCE(SUM(EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60), 0)`,
+        // #3266: less the time paused, never more than the span itself.
+        totalMinutes: sql<number>`COALESCE(SUM(
+          EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60
+          - LEAST(COALESCE(${s.workoutSessions.pausedSec}, 0) / 60.0,
+                  GREATEST(EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60, 0))
+        ), 0)`,
       })
       .from(s.workoutSessions)
       .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from), isNull(s.workoutSessions.deletedAt)))
@@ -2359,31 +2401,48 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   /**
-   * RV-63 — the dates on which a faucet signal was RECORDED, for the collection replay.
-   *
-   * `/api/collection` used to read `listBodyMetrics` / `listSleepSessions` in full and immediately
-   * project to `.map(m => m.date)`: 36 columns of `body_metrics` and 25 of `sleep_sessions` (176
-   * and 144 bytes a row, measured) to take one field each, over ALL history, on every home paint —
-   * `cachedFetch` revalidates regardless of TTL (Q-262). These select the one column and apply the
-   * `> 0` predicate in SQL, so the width no longer grows with the schema.
-   *
-   * The predicate is "recorded", not "above a bar" — see `ladder.ts`, and the measurement behind it:
-   * only 35 of the owner's 130 step-days reach 8,000, so a threshold would decay the steps ladder
-   * most weeks.
+   * #3370 — each day's steps as every other surface reads them: the device total plus the treadmill
+   * session's (`dayStepCountsByDate`, #3134), so the steps ladder and the bank agree with
+   * achievements. A treadmill-only day counts. Days at zero are dropped, ascending by date.
    */
-  async listStepDayKeys(userId: string, from: string, to: string): Promise<string[]> {
-    const rows = await this.db.select({ date: s.bodyMetrics.date }).from(s.bodyMetrics)
-      .where(and(
-        eq(s.bodyMetrics.userId, userId),
-        gte(s.bodyMetrics.date, from),
-        lte(s.bodyMetrics.date, to),
-        gt(s.bodyMetrics.steps, 0),
-      ))
-      .orderBy(desc(s.bodyMetrics.date))
-    return rows.map(r => r.date)
+  private async dayStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]> {
+    const [metrics, activities] = await Promise.all([
+      this.db.select({ date: s.bodyMetrics.date, steps: s.bodyMetrics.steps }).from(s.bodyMetrics)
+        .where(and(
+          eq(s.bodyMetrics.userId, userId),
+          gte(s.bodyMetrics.date, from),
+          lte(s.bodyMetrics.date, to),
+          gt(s.bodyMetrics.steps, 0),
+          isNull(s.bodyMetrics.deletedAt),
+        )),
+      this.db.select({ date: s.activityLogs.date, activityType: s.activityLogs.activityType, steps: s.activityLogs.steps })
+        .from(s.activityLogs)
+        .where(and(
+          eq(s.activityLogs.userId, userId),
+          gte(s.activityLogs.date, from),
+          lte(s.activityLogs.date, to),
+          gt(s.activityLogs.steps, 0),
+          isNull(s.activityLogs.deletedAt),
+        )),
+    ])
+    return [...dayStepCountsByDate(
+      metrics.map(r => ({ date: String(r.date), steps: r.steps == null ? null : Number(r.steps) })),
+      activities.map(r => ({ date: String(r.date), activityType: r.activityType, steps: r.steps == null ? null : Number(r.steps) })),
+    )]
+      .filter(([, steps]) => steps > 0)
+      .map(([date, steps]) => ({ date, steps }))
+      .sort((x, y) => x.date.localeCompare(y.date))
   }
 
-  /** RV-63 — see `listStepDayKeys`. Nights with a recorded duration, dates only. */
+  /**
+   * RV-63 — the dates on which a nightly sleep duration was RECORDED, for the collection replay.
+   *
+   * It selects only the date and applies the `> 0` predicate in SQL, so the width no longer grows
+   * with the schema (the route once read `listSleepSessions` in full, 25 columns, to take one field).
+   * `/api/collection` derives its step days from `listStepTotals`, so the route reads steps once.
+   * The predicate is "recorded", not "above a bar" — see `ladder.ts`: only 35 of the owner's 130
+   * step-days reach 8,000, so a threshold would decay the ladder most weeks.
+   */
   async listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]> {
     const rows = await this.db.select({ date: s.sleepSessions.date }).from(s.sleepSessions)
       .where(and(
@@ -2399,16 +2458,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   /** PS-49 — per-day step totals for the Ranger's bank. */
   async listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]> {
-    const rows = await this.db.select({ date: s.bodyMetrics.date, steps: s.bodyMetrics.steps }).from(s.bodyMetrics)
-      .where(and(
-        eq(s.bodyMetrics.userId, userId),
-        gte(s.bodyMetrics.date, from),
-        lte(s.bodyMetrics.date, to),
-        gt(s.bodyMetrics.steps, 0),
-        isNull(s.bodyMetrics.deletedAt),
-      ))
-      .orderBy(asc(s.bodyMetrics.date))
-    return rows.map(r => ({ date: r.date, steps: Number(r.steps) }))
+    return this.dayStepTotals(userId, from, to)
   }
 
   /** PS-49 — days with at least one live food log (a Health cat point). */
@@ -3594,6 +3644,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       timeInBedHours:  r.timeInBedHours  ?? undefined,
       manualSleepStart: r.manualSleepStart ?? null,
       manualEntry:     r.manualEntry,
+      partialNightAt:  r.partialNightAt ?? null,
       ...nightSources(r),
       ouraSleepType:   r.ouraSleepType   ?? null,
     }))
@@ -3720,6 +3771,41 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   /**
+   * #2265 — see the interface. Marks (`at`) or unmarks (`null`) the night the row `id` belongs to.
+   *
+   * The caller's id picks the night; the write covers every live device row with that wake date, so a
+   * night split by a wake-up cannot be half marked and an unmark clears every window the mark was on.
+   * Readers treat a night as partial when any of its windows is. A manual night is refused (its
+   * duration is typed, not measured), and so is a removed row. Affected rows are counted: zero is
+   * `not_found`, never a success. It writes this one column and `updated_at`, which the delta pull
+   * carries; it never goes through `mergeSet`/`source_map`.
+   *
+   * A repeat (a double tap, a replayed outbox op, a second device) writes nothing and reports
+   * `changed: false`, so the caller's re-score and today's anchor are left alone and a mark keeps
+   * the time it was first made. `changed` is whether the night as readers see it (partial when any
+   * window is) flipped; a split night with one window still unmarked is tidied without counting.
+   */
+  async setPartialNight(userId: string, id: string, at: Date | null): Promise<{ date: string; changed: boolean } | 'not_found'> {
+    const t = s.sleepSessions
+    return this.db.transaction(async tx => {
+      const [own] = await tx.select({ date: t.date }).from(t)
+        .where(and(eq(t.id, id), eq(t.userId, userId), eq(t.manualEntry, false), isNull(t.deletedAt)))
+        .limit(1)
+      if (!own) return 'not_found'
+      const night = and(eq(t.userId, userId), eq(t.date, own.date), eq(t.manualEntry, false), isNull(t.deletedAt))
+      const windows = await tx.select({ partialNightAt: t.partialNightAt }).from(t).where(night)
+      const wasMarked = windows.some(w => w.partialNightAt != null)
+      const settled = windows.every(w => (w.partialNightAt != null) === (at != null))
+      if (settled) return { date: own.date, changed: false }
+      const hit = await tx.update(t)
+        .set({ partialNightAt: at, updatedAt: new Date() })
+        .where(night)
+        .returning({ id: t.id })
+      return hit.length > 0 ? { date: own.date, changed: wasMarked !== (at != null) } : 'not_found'
+    })
+  }
+
+  /**
    * Issue 2606 — see the interface. One UPDATE whose predicate carries the whole rule (the caller's
    * row, a manual night, not yet removed), so an affected-row count of 1 is the answer. Only a 0 is
    * read back, to tell a replay from a device night from an id that is not the caller's — and that
@@ -3817,6 +3903,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         startedAt: s.workoutSessions.startedAt,
         completedAt: s.workoutSessions.completedAt,
         warmupEndedAt: s.workoutSessions.warmupEndedAt,
+        pausedSec: s.workoutSessions.pausedSec,
       })
       .from(s.workoutSessions)
       .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, since), isNull(s.workoutSessions.deletedAt)))
@@ -3857,6 +3944,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         startedAt: r.startedAt.getTime(),
         completedAt: r.completedAt?.getTime() ?? null,
         warmupEndedAt: r.warmupEndedAt?.getTime() ?? null,
+        pausedSec: r.pausedSec ?? null,
       })),
       exercises: elRows.map(r => ({
         workoutSessionId: r.workoutSessionId,
@@ -4849,7 +4937,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async declineFriendRequest(friendshipId: string, userId: string) { return social.declineFriendRequest(this.db, friendshipId, userId) }
   async removeFriend(friendshipId: string, userId: string) { return social.removeFriend(this.db, friendshipId, userId) }
   async getFriendIds(userId: string) { return social.getFriendIds(this.db, userId) }
+  async listFriendSavedMeals(friendshipId: string, viewerId: string) { return social.listFriendSavedMeals(this.db, friendshipId, viewerId) }
   async updateEquippedTitle(userId: string, titleId: string | null) { return social.updateEquippedTitle(this.db, userId, titleId) }
+  async getTrophyPins(userId: string) { return social.getTrophyPins(this.db, userId) }
+  async updateTrophyPins(userId: string, pins: string[] | null) { return social.updateTrophyPins(this.db, userId, pins) }
   async listSeasonsWithResults(userId: string) { return social.listSeasonsWithResults(this.db, userId) }
 
   // ── AI Health Insights ────────────────────────────────────────────────────
@@ -5152,6 +5243,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // storing bytes rather than a URL.
       imageDataUri: s.foodItems.imageDataUri,
       createdAt: s.foodItems.createdAt,
+      // #2417. The device drops a tombstoned row once no local log or saved meal needs it.
+      deletedAt: s.foodItems.deletedAt,
     }
 
     const [programs, progressionStyles, bodyMetrics, sleepSessions,
@@ -5333,9 +5426,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.db.selectDistinct(foodItemCols).from(s.foodItems)
         .innerJoin(s.foodLogs, eq(s.foodLogs.foodItemId, s.foodItems.id))
         .where(and(eq(s.foodLogs.userId, userId), gt(s.foodLogs.updatedAt, effectiveSince))),
-      // plus items the user created since the cutoff but hasn't logged yet
+      // plus items the user created since the cutoff but hasn't logged yet, and items merged away
+      // since it (#2417: the row's own `deleted_at` is the only clock a tombstone has, because
+      // `food_items` has no `updated_at`)
       this.db.select(foodItemCols).from(s.foodItems)
-        .where(and(eq(s.foodItems.userId, userId), gt(s.foodItems.createdAt, effectiveSince))),
+        .where(and(eq(s.foodItems.userId, userId), or(
+          gt(s.foodItems.createdAt, effectiveSince),
+          gt(s.foodItems.deletedAt, effectiveSince),
+        ))),
       // Phase-2 A1: oura_daily_summary backup pull (device-computed nightly physiology + rolling
       // EMA baselines). Server `date` → client `day`; cursor on `updated_at`. Selects every column
       // so the local mirror (incl. the *_baseline_*_x8 + n_history EMA state) restores intact.
@@ -5860,12 +5958,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           if (p.deleted) {
             await this.deleteFoodLog(String(p.id), userId)
           } else {
-            // Matches the web route's `quantityMultiplier must be between 0.01 and 100`
-            // check — without it a corrupted local payload could push an out-of-range
-            // value straight past the push path.
+            // Matches the web route's quantityMultiplier range check (`QUANTITY_MULTIPLIER_MIN` to
+            // `QUANTITY_MULTIPLIER_MAX`, packages/shared/src/nutrition/quantity-bounds.ts) —
+            // without it a corrupted local payload could push an out-of-range value straight
+            // past the push path.
             const qm = p.quantityMultiplier ?? 1.0
-            if (typeof qm !== 'number' || qm < 0.01 || qm > 100) {
-              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'quantityMultiplier must be between 0.01 and 100' })
+            if (!quantityMultiplierInRange(qm)) {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: `quantityMultiplier must be between ${QUANTITY_MULTIPLIER_MIN} and ${QUANTITY_MULTIPLIER_MAX}` })
               continue
             }
             // BF-39. Typed rather than String()-coerced: `String(undefined)` is the literal
@@ -6429,6 +6528,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             throw new Error(`manual_bedtime: no sleep session for ${mut.date}`)
           }
           processed++
+        } else if (mut.domain === 'partial_night') {
+          // #2265. The same `setPartialNight` the web route calls. A night that is not the caller's
+          // live device night is a permanent failure, not a transient one, so it quarantines.
+          const p = clean as Record<string, unknown>
+          const parsedMark = PartialNightPayloadSchema.safeParse(p)
+          if (!parsedMark.success) {
+            throw new Error(`partial_night: ${describeZodFailure(parsedMark.error)}`)
+          }
+          const saved = await withNightRescore(this, userId, () =>
+            this.setPartialNight(userId, parsedMark.data.id, parsedMark.data.partial ? new Date() : null),
+          partialNightRescore)
+          if (saved === 'not_found') {
+            throw new Error(`partial_night: no device night ${parsedMark.data.id}`)
+          }
+          processed++
         } else if (mut.domain === 'manual_sleep') {
           // #2338. The same parse and the same `saveManualSleepNight` the web route calls, so the two
           // write paths cannot drift. The date is derived from the wake time in the user's timezone,
@@ -6938,12 +7052,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async insertOuraBatteryPoll(userId: string, percent: number, charging: boolean | null): Promise<void> {
+    // Unpruned, like `strap_status`. This table once pruned at 90 days, with no source or user filter,
+    // which would have eroded the Bluetooth history the ring battery health chart reads back through
+    // (120 days) and the Oura Cloud rows beside it (#3069). The read bounds what it returns instead
+    // (`getRingBatteryReadings` downsamples); a retention delete is the owner's call.
     await this.db.insert(s.ouraBleBatteryPoll).values({ userId, percent, charging })
-    const now = Date.now()
-    if (shouldPrune(lastBatteryPollPrune, now, BATTERY_POLL_PRUNE_THROTTLE_MS)) {
-      lastBatteryPollPrune = now
-      this.db.execute(sql`DELETE FROM oura_ble_battery_poll WHERE measured_at < now() - interval '90 days'`).catch(err => console.error('[prune] oura_ble_battery_poll failed:', err))
-    }
   }
 
   // #2469. Unpruned, like `strap_status`: the client posts at most hourly while the app is open, so
@@ -7014,6 +7127,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.ouraBleBatteryPoll.userId, userId),
         gte(s.ouraBleBatteryPoll.measuredAt, from),
         lte(s.ouraBleBatteryPoll.measuredAt, to),
+        // Bluetooth polls only (#3069): Oura Cloud readings share the table and read through getRingBatteryReadings.
+        sql`${s.ouraBleBatteryPoll.source} IS DISTINCT FROM ${oura.OURA_CLOUD_BATTERY_SOURCE}`,
       ))
       .orderBy(asc(s.ouraBleBatteryPoll.measuredAt))
     return rows.map(r => ({ tsMs: r.measuredAt.getTime(), percent: r.percent, charging: r.charging }))
@@ -8206,16 +8321,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async withOuraSleepWriteLock<T>(userId: string, run: () => Promise<T>) { return withUserLock(getPool(), `oura-sleep-write:${userId}`, run, { label: 'oura sleep write' }) }
   async upsertOuraWorkouts(userId: string, rows: oura.OuraWorkoutUpsertRow[]) { return oura.upsertOuraWorkouts(this.db, userId, rows) }
   async tombstoneOuraWorkouts(userId: string, ids: string[]) { return oura.tombstoneOuraWorkouts(this.db, userId, ids) }
-  async tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }) { return oura.tombstoneOuraWorkoutsAbsent(this.db, userId, range) }
+  async tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean }) { return oura.tombstoneOuraWorkoutsAbsent(this.db, userId, range) }
   async upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string) { return oura.upsertOuraCloudHeartrate(this.db, userId, rows, tz) }
   async upsertOuraCloudSleepPeriods(userId: string, rows: oura.OuraCloudSleepPeriodRow[]) { return oura.upsertOuraCloudSleepPeriods(this.db, userId, rows) }
   async upsertOuraCloudDaily(userId: string, rows: oura.OuraCloudDailyRow[]) { return oura.upsertOuraCloudDaily(this.db, userId, rows) }
   async upsertOuraSessions(userId: string, rows: oura.OuraSessionRow[]) { return oura.upsertOuraSessions(this.db, userId, rows) }
   async tombstoneOuraSessions(userId: string, ids: string[]) { return oura.tombstoneOuraSessions(this.db, userId, ids) }
-  async tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }) { return oura.tombstoneOuraSessionsAbsent(this.db, userId, range) }
+  async tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean }) { return oura.tombstoneOuraSessionsAbsent(this.db, userId, range) }
   async getOuraCloudActivitySeries(userId: string, from: string, to: string) { return oura.getOuraCloudActivitySeries(this.db, userId, from, to) }
   async getOuraCloudMetChangedAt(userId: string, from: string, to: string) { return oura.getOuraCloudMetChangedAt(this.db, userId, from, to) }
   async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }
+  async getLatestOuraCloudBatteryAt(userId: string, since: Date) { return oura.getLatestOuraCloudBatteryAt(this.db, userId, since) }
+  async insertOuraCloudBatteryReadings(userId: string, readings: { measuredAt: Date; percent: number; charging: boolean | null }[]) { return oura.insertOuraCloudBatteryReadings(this.db, userId, readings) }
+  async getRingBatteryReadings(userId: string, from: Date, to: Date) { return oura.getRingBatteryReadings(this.db, userId, from, to) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
   async dropZoneMinutesFrom(userId: string, fromDay: string, tz: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay, tz) }

@@ -71,6 +71,7 @@ export function LineChart({
   niceBounds = false,
   stretch = false,
   smooth = false,
+  tension,
   zone,
 }: {
   points: readonly { label: string; value: number | null; x?: number }[];
@@ -115,6 +116,8 @@ export function LineChart({
   stretch?: boolean;
   /** Curve the line through its readings (chart.js tension 0.4), as the current app's 14-day charts do. */
   smooth?: boolean;
+  /** Curve the line at this chart.js tension (the week-in-review sparklines use 0.3); implies `smooth`. */
+  tension?: number;
   /** A shaded horizontal band between two values, each edge a gridline named in a left column. */
   zone?: { from: number; to: number; fromLabel: string; toLabel: string };
 }) {
@@ -131,6 +134,7 @@ export function LineChart({
   const axisVariant = compactAxisLabels || denseAxis ? 'axisTick' : labelVariant;
   const plotHeight = height ?? theme.sizes.chartHeight;
   const target = drawableTarget(targetProp);
+  const curve = tension ?? (smooth ? 0.4 : undefined);
   const guides = gridlines || yAxis || zone !== undefined || target !== undefined;
   const valid = points.filter(
     (point): point is typeof point & { value: number } =>
@@ -319,10 +323,10 @@ export function LineChart({
             .filter((segment) => segment.length > 1)
             .map((segment, index) =>
               fill ? (
-                smooth ? (
+                curve !== undefined ? (
                   <Path
                     key={'fill' + index}
-                    d={`M${segment[0].x},${floorY} L${smoothPath(segment).slice(1)} L${segment.at(-1)!.x},${floorY} Z`}
+                    d={`M${segment[0].x},${floorY} L${smoothPath(segment, curve).slice(1)} L${segment.at(-1)!.x},${floorY} Z`}
                     fill={fillColor ?? theme.tones[tone].background}
                   />
                 ) : (
@@ -337,10 +341,10 @@ export function LineChart({
           {segments
             .filter((segment) => segment.length > 1)
             .map((segment, index) =>
-              smooth ? (
+              curve !== undefined ? (
                 <Path
                   key={index}
-                  d={smoothPath(segment)}
+                  d={smoothPath(segment, curve)}
                   fill="none"
                   stroke={color}
                   strokeWidth={2}

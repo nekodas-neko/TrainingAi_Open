@@ -2,6 +2,7 @@ import Svg, { Rect } from 'react-native-svg';
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { stageValue } from '../data/stage-value';
+import { sleepWokeEnd } from '../data/body-view';
 import {
   hypnogramSegments,
   STAGE_LEVEL,
@@ -34,6 +35,9 @@ export function SleepNight({
   const segments = night.sleepPhase5Min ? hypnogramSegments(night.sleepPhase5Min) : [];
   const phaseStart = night.phaseWindowStart ?? night.sleepStart;
   const phaseEnd = night.phaseWindowEnd ?? night.sleepEnd;
+  // The range ends when you woke; the stage minutes and the ribbon keep the recorded window (#2830).
+  const woke = sleepWokeEnd(night);
+  const windowEnd = woke && phaseEnd && Date.parse(phaseEnd) - Date.parse(woke) >= 60_000 ? phaseEnd : null;
   const duration = Math.max(
     1,
     phaseStart && phaseEnd
@@ -111,7 +115,8 @@ export function SleepNight({
       {night.sleepStart && night.sleepEnd && (
         <AppText variant="caption" tone="muted">
           {formatTimeOfDay(night.sleepStart, timezone)} →{' '}
-          {formatTimeOfDay(night.sleepEnd, timezone)}
+          {formatTimeOfDay(woke ?? night.sleepEnd, timezone)}
+          {windowEnd ? ` · window to ${formatTimeOfDay(windowEnd, timezone)}` : ''}
         </AppText>
       )}
       {chart}

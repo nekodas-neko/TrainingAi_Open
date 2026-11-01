@@ -3,6 +3,7 @@ import { AppText, Icon, Stack, type IconName } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import type { ResourceState } from '../../workouts/data/WorkoutResources';
+import { statusVisible } from '../data/status-visible';
 
 export function HealthResourceHeader({
   title,
@@ -12,6 +13,7 @@ export function HealthResourceHeader({
   iconColor,
   caption,
   trailing,
+  status = 'when-active',
 }: {
   title: string;
   /** A brand-coloured glyph before the title, as the current app's AI Periodization card has. */
@@ -23,6 +25,8 @@ export function HealthResourceHeader({
   trailing?: ReactNode;
   state: ResourceState & { connected?: boolean };
   refresh: () => void;
+  /** 'when-active' (the default) keeps the status's 48 px slot out of the row until it is loading or has failed; the current app's card headers have none. */
+  status?: 'always' | 'when-active';
 }) {
   const { theme } = useTheme();
   return (
@@ -44,7 +48,9 @@ export function HealthResourceHeader({
         </AppText>
       )}
       {trailing}
-      <ResourceStatus inline label={title} state={state} refresh={refresh} />
+      {(status === 'always' || statusVisible(state)) && (
+        <ResourceStatus inline label={title} state={state} refresh={refresh} />
+      )}
     </Stack>
   );
 }

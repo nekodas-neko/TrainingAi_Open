@@ -95,7 +95,9 @@ const backgroundPassInFlight = new Set<string>()
 export function runBackgroundFinalise(userId: string, pass: () => Promise<void>): boolean {
   if (backgroundPassInFlight.has(userId)) return false
   backgroundPassInFlight.add(userId)
-  void pass()
+  // `Promise.resolve().then(pass)`: a synchronous throw from `pass` becomes a rejection the guard
+  // releases on, instead of escaping with the user's id left in the set for good.
+  void Promise.resolve().then(pass)
     .catch(err => reportServerError(new Error('[activity-finalise] background pass failed', { cause: err }), { userId }))
     .finally(() => { backgroundPassInFlight.delete(userId) })
   return true

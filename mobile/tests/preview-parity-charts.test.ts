@@ -55,5 +55,6 @@ test('Nutrition: plain macro columns, a whole-track ramp on the budget bar, a sh
   assert.match(bar, /gradientUnits="userSpaceOnUse"/, 'the ramp spans the track, not the fill');
   const supplements = await read('features/nutrition/components/SupplementsSection.tsx');
   assert.match(supplements, /supplementSubtitle\(s\)/);
-  assert.match(supplements, /density="snug"/);
+  assert.match(supplements, /borderTopWidth: 1/, 'rows run edge to edge under hairlines');
+  assert.match(supplements, /paddingVertical: theme\.spacing\.md/, 'py-3 rows, as the current app\'s');
 });

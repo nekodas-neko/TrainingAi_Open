@@ -24,6 +24,7 @@ import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { latestRestingHrRow } from '@trainingai/shared/health/latest-resting-hr'
 import { rowsOfDeviceInUse } from '@trainingai/shared/health/per-device-normal'
 import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
@@ -393,7 +394,7 @@ export async function buildReadinessPayload(
   // #3114: Oura's per-minute MET decides the move lane (its activity day starts at 4 a.m., hence the
   // day before). Today's live read may go without it; a finalised day may not (`loadActivityDay`).
   const cloudActivityP = (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay, stepActivityLogs] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay, stepActivityLogs, metChangedAt] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -417,6 +418,10 @@ export async function buildReadinessPayload(
     // #3134: today's and yesterday's treadmill steps join the device count in the Activity score. A failed
     // read costs those steps only, so the score is served on the device count, as before this read existed.
     (async () => repo.listActivityLogs(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => []),
+    // #3079: a finished day whose Oura MET changed after its stamp is scored once more, as the
+    // training-stress re-check does. A failed read only loses that trigger for this read. Read here
+    // with the rest rather than after them (#3392): it adds no round trip to the read.
+    (async () => repo.getOuraCloudMetChangedAt(userId, metLookbackFrom(todayIso, ACTIVITY_FINALISE_DAYS), shiftDateStr(todayIso, -1)))().catch(() => []),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -453,7 +458,10 @@ export async function buildReadinessPayload(
   // reassembles fragmented nights, so a wake-up in the middle no longer splits one night into two.
   const nights = nightSessions(sleepSessions, tz)
   const lastSleep  = canonicalLatestNight(nights, tz)
-  const sleepHours = lastSleep?.durationHours ?? null
+  // #2265: a night the owner marked partial is present but unscored: it has no hours to read as short
+  // (the legacy 0–40 sleep term and `hasSufficientData` both work from hours), and no Sleep Score.
+  const lastNightPartial = isPartialNight(lastSleep)
+  const sleepHours = lastNightPartial ? null : lastSleep?.durationHours ?? null
   // Our own 0–100 Sleep Score (recovered open_health weights + contributor curves). Feeds both
   // the standalone Sleep chip (0–100) and the readiness composite's internal 0–40 sleep term.
   // Falls back to the crude duration-only estimate when there's no session to score at all.
@@ -556,11 +564,6 @@ export async function buildReadinessPayload(
   // older day in the look-back still holding a partial value is finalised behind the read.
   const nowDate = new Date()
   const activityStamps = new Map(derivedTodayRows.map(r => [r.day, activityFinalisedAt(r.activityContributors)]))
-  // #3079: a finished day whose Oura MET changed after its stamp is scored once more, as the
-  // training-stress re-check does. A failed read only loses that trigger for this read.
-  const metChangedAt = await (async () =>
-    repo.getOuraCloudMetChangedAt(userId, metLookbackFrom(todayIso, ACTIVITY_FINALISE_DAYS), shiftDateStr(todayIso, -1)))()
-    .catch(() => [])
   const staleActivityDays = staleFinishedDays(
     todayIso, tz, activityStamps, ACTIVITY_FINALISE_DAYS, activityFinalGrace(nowDate),
     new Map(metChangedAt.map(r => [r.date, r.changedAt])),
@@ -715,7 +718,7 @@ export async function buildReadinessPayload(
   // the chip hide itself.
   const readinessDisplayScore = (baselineHrv != null || baselineRhr != null || ownComposite != null) ? score : null
 
-  const hasSufficientData = sleepHours != null && (baselineHrv != null || baselineRhr != null || ownComposite != null)
+  const hasSufficientData = (sleepHours != null || lastNightPartial) && (baselineHrv != null || baselineRhr != null || ownComposite != null)
 
   // Early deload — the periodization modes the app drives, and not already in deload.
   //

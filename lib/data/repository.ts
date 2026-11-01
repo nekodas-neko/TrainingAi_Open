@@ -20,7 +20,8 @@ import type {
   CreateMealPlanInput, UpdateMealPlanInput, UpdateMealInput, ReplaceStructureInput, PlanMealAnswer, EstimateToStore,
 } from './postgres/slices/meal-plans'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
-import type { AccountDeletionResult } from './postgres/slices/account-deletion'
+import type { AccountDeletionResult, AdminWipeGuard, AdminWipeAudit } from './postgres/slices/account-deletion'
+import type { SetAdminOutcome } from './postgres/slices/admin-grants'
 import type {
   NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, NativeDevice, RotateNativeRefreshTokenInput, RegrantNativeRefreshTokenInput,
 } from './postgres/slices/native-refresh-tokens'
@@ -617,6 +618,8 @@ export interface WorkoutRepository {
   /** True when a user row matched. RV-48 — false is a no-op the route answers 404 for. */
   activateUser(userId: string): Promise<boolean>
   deactivateUser(userId: string): Promise<boolean>
+  /** Make / Remove admin, owner-gated and audited in one transaction (see `slices/admin-grants.ts`). */
+  setUserAdmin(args: { actingAdminId: string; targetUserId: string; makeAdmin: boolean; ownerId: string | null }): Promise<SetAdminOutcome>
   getUserById(userId: string): Promise<User | null>
   getUserByOAuthSub(oauthSub: string): Promise<User | null>
   getUserByProvider(provider: AuthProvider, subject: string): Promise<User | null>
@@ -629,7 +632,12 @@ export interface WorkoutRepository {
   getUserCredentials(userId: string): Promise<(User & { passwordHash?: string }) | null>
   /** #2120. Deletes the account and everything that cascades from it, in one transaction; the
    *  one path for both self-service and admin deletion. `deleted: false` means no row matched. */
-  deleteAccount(userId: string, opts?: { onlyIfNoData?: boolean }): Promise<AccountDeletionResult>
+  deleteAccount(
+    userId: string,
+    opts?: { onlyIfNoData?: boolean; guard?: AdminWipeGuard; audit?: AdminWipeAudit },
+  ): Promise<AccountDeletionResult>
+  /** #3369: erase everything an account holds and keep the account, its sign-ins and its admin/active flags. */
+  resetAccountData(userId: string, opts: { guard: AdminWipeGuard; audit: AdminWipeAudit }): Promise<AccountDeletionResult>
   usersWithData(userIds: readonly string[]): Promise<Set<string>>
 
   // ── Native app refresh tokens (#2076) ─────────────────────────────────────
@@ -666,6 +674,10 @@ export interface WorkoutRepository {
   /** #3204: marks the caller's grant as refused by Oura, unless the row was saved after
    *  `unchangedSince`. True when marked (or already marked); false when there is no row or it moved on. */
   markOuraCloudReauthRequired(userId: string, unchangedSince: Date): Promise<boolean>
+  /** #2861: stamps the user's last verified webhook event on `oura_tokens`. No row, no-op. */
+  touchOuraCloudWebhook(userId: string): Promise<void>
+  /** #2861: stamps the last time Oura data was written for the user. No row, no-op. */
+  touchOuraCloudData(userId: string): Promise<void>
   /** True when the caller's row existed and is deleted now. */
   deleteOuraCloudTokens(userId: string): Promise<boolean>
   /** #2859: the user an Oura account is connected to, for routing a webhook event. Null if none. */
@@ -740,7 +752,7 @@ export interface WorkoutRepository {
   /** Q-473 — true when this call stamped `completed_at`, false when it was already stamped (a
    *  concurrent request or an outbox replay won). Callers derive idempotence from this, never from
    *  a read taken before the write. */
-  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<boolean>
+  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date, pausedSec?: number): Promise<boolean>
   /** Q-460 — true when a row was updated. Zero rows means no such session for this user, which is
    *  an error here (unlike `setWorkoutSessionWarmupEnd`, where zero rows means "already set"). */
   setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<boolean>
@@ -864,6 +876,13 @@ export interface WorkoutRepository {
    *  estimate — see `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for why it is its own
    *  column rather than a `manual`-ranked write to `sleep_start`. */
   setManualSleepStart(userId: string, date: string, at: Date | null): Promise<boolean>
+  /**
+   * #2265 — mark (`at`) or unmark (`null`) the night the row `id` belongs to as partial. Covers every
+   * live device row with that wake date. Returns that wake date so the caller can re-score the night
+   * wherever it falls, and whether the mark actually changed (a repeat writes nothing and is
+   * `changed: false`); `not_found` when `id` is not the caller's live device night.
+   */
+  setPartialNight(userId: string, id: string, at: Date | null): Promise<{ date: string; changed: boolean } | 'not_found'>
   /**
    * #2338 — store a night the user entered by hand (`manual_entry = true`). The natural key is
    * (user, wake date): a second entry for the same night EDITS the first, never adds a row, so a
@@ -1054,10 +1073,7 @@ export interface WorkoutRepository {
   setRestDay(userId: string, date: string, resting: boolean): Promise<void>
   /** Whether this user chose to rest on this date. */
   isRestDayChosen(userId: string, date: string): Promise<boolean>
-  /** RV-63 — dates with a recorded step count, for the collection replay. Dates only: the full-width
-   *  read was 36 columns for one field, over all history, on every home paint. */
-  listStepDayKeys(userId: string, from: string, to: string): Promise<string[]>
-  /** RV-63 — dates with a recorded sleep duration. See `listStepDayKeys`. */
+  /** RV-63 — dates with a recorded sleep duration. Narrow on purpose: a date, not the full-width row. */
   listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** PS-49 — the collection v2 faucets. Narrow on purpose (RV-63): a date, and steps where needed. */
   listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]>
@@ -1177,7 +1193,17 @@ export interface WorkoutRepository {
   declineFriendRequest(friendshipId: string, userId: string): Promise<void>
   removeFriend(friendshipId: string, userId: string): Promise<void>
   getFriendIds(userId: string): Promise<string[]>
+  /**
+   * The saved meals of the other end of `friendshipId`, or `null` — one answer for every refusal
+   * (no such friendship, not mine, still pending, friend has not opted in), so a caller cannot tell
+   * them apart.
+   */
+  listFriendSavedMeals(friendshipId: string, viewerId: string): Promise<SavedMeal[] | null>
   updateEquippedTitle(userId: string, titleId: string | null): Promise<void>
+  /** The pinned trophy ids saved on the account; null when nothing is pinned. */
+  getTrophyPins(userId: string): Promise<string[] | null>
+  /** Save the pinned trophy ids (null clears them). False when the user row does not exist. */
+  updateTrophyPins(userId: string, pins: string[] | null): Promise<boolean>
 
   // ── Seasons ────────────────────────────────────────────────────────────────
   listSeasonsWithResults(userId: string): Promise<Season[]>
@@ -1405,7 +1431,7 @@ export interface WorkoutRepository {
   /** BF-144: has this program session been trained since `since`? Keyed on the id link, not names. */
   wasProgramSessionTrainedSince(userId: string, programSessionId: string, since: Date): Promise<boolean>
   getRecentSessionsOfType(userId: string, programSessionId: string, limit: number): Promise<Array<{
-    id: string; startedAt: Date; completedAt: Date | null; sessionName: string
+    id: string; startedAt: Date; completedAt: Date | null; sessionName: string; pausedSec?: number | null
   }>>
   getSetLogsForSessions(workoutSessionIds: string[]): Promise<Array<{
     workoutSessionId: string; exerciseName: string; setNumber: number;
@@ -1507,7 +1533,7 @@ export interface WorkoutRepository {
   /** #3087: tombstones workouts deleted in the Oura app; never a hard delete. Returns rows newly tombstoned. */
   tombstoneOuraWorkouts(userId: string, ids: string[]): Promise<number>
   /** #3087: tombstones the workouts on `from`..`to` that Oura's full list for those days no longer has. */
-  tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }): Promise<number>
+  tombstoneOuraWorkoutsAbsent(userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean }): Promise<number>
   /** #2859: Oura Cloud's HR series (`oura_cloud`). Never displaces or duplicates a ring or strap row. */
   upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string): Promise<OuraCloudHeartrateWrite>
   /** #2982: Oura's sleep periods as sent (series, hypnograms, flags); read by no screen. Returns rows written. */
@@ -1523,9 +1549,15 @@ export interface WorkoutRepository {
   /** #3153: tombstones sessions deleted in the Oura app; never a hard delete. Returns rows newly tombstoned. */
   tombstoneOuraSessions(userId: string, ids: string[]): Promise<number>
   /** #3153: tombstones the sessions on `from`..`to` that Oura's full list for those days no longer has. */
-  tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[] }): Promise<number>
+  tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean }): Promise<number>
   /** #2895: the newest `oura_cloud` HR point at or after `since`; where the next Cloud HR read starts. */
   getLatestOuraCloudHeartrateAt(userId: string, since: Date): Promise<Date | null>
+  /** #3069: the newest `oura_cloud` ring-battery reading at or after `since`; where the next Cloud read starts. */
+  getLatestOuraCloudBatteryAt(userId: string, since: Date): Promise<Date | null>
+  /** #3069: Oura Cloud battery readings into `oura_ble_battery_poll` as source `oura_cloud`; a stored instant is skipped. Returns rows inserted. */
+  insertOuraCloudBatteryReadings(userId: string, readings: { measuredAt: Date; percent: number; charging: boolean | null }[]): Promise<number>
+  /** #3069: every ring-battery reading in a window, Bluetooth and Oura Cloud together, oldest first. */
+  getRingBatteryReadings(userId: string, from: Date, to: Date): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
   /** A platform aggregator's (Health Connect's) HR series into the shared HR table. Never displaces
    *  a device row at the same timestamp; device rows win at read time (#2168). `tz` dates the

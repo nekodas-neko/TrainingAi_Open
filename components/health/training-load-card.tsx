@@ -8,7 +8,7 @@ import { TrainingStressLine } from '@/components/health/training-stress-line'
 import type { TrainingLoadResponse } from '@/app/api/training-load/route'
 
 function monotonyColor(m: number): string {
-  return m > 2 ? '#ef4444' : m > 1.5 ? '#f59e0b' : '#22c55e'
+  return m > 2 ? 'var(--destructive)' : m > 1.5 ? 'var(--accent-amber)' : 'var(--accent-green)'
 }
 
 // Monotony meter — where daily-load sameness sits on a 0→2.5 scale. Low (varied) is good;
@@ -23,9 +23,9 @@ function MonotonyMeter({ monotony, strain }: { monotony: number; strain: number 
           <span className="font-semibold tabular-nums" style={{ color: monotonyColor(monotony) }}>{monotony.toFixed(2)}</span>
         </div>
         <div className="relative flex h-2 overflow-hidden rounded-full">
-          <div className="bg-green-500/30" style={{ width: '60%' }} />
-          <div className="bg-amber-500/30" style={{ width: '20%' }} />
-          <div className="bg-red-500/30" style={{ width: '20%' }} />
+          <div className="bg-accent-green/30" style={{ width: '60%' }} />
+          <div className="bg-accent-amber/30" style={{ width: '20%' }} />
+          <div className="bg-destructive/30" style={{ width: '20%' }} />
           <div className="absolute top-1/2 h-3.5 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground shadow" style={{ left: `${pct}%` }} />
         </div>
         <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground">

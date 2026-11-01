@@ -54,7 +54,7 @@ export function SleepVsPerformanceCard({ sleepCorr }: { sleepCorr: SleepCorrelat
                 const positive = b.avgPctChange >= 0
                 const barFrac = Math.abs(b.avgPctChange) / maxAbs
                 const barPx = Math.round(barFrac * 34)
-                const color = positive ? 'var(--color-brand)' : '#ef4444'
+                const color = positive ? 'var(--color-brand)' : 'var(--destructive)'
                 return (
                   <div key={b.label} className="flex flex-1 flex-col items-center gap-1">
                     {/* value above bar */}

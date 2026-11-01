@@ -335,7 +335,7 @@ export async function invalidateCache(keyPrefix: string): Promise<void> {
   notifyInvalidated(keyPrefix);
 }
 
-export async function clearAllCache(): Promise<void> {
+export async function clearAllCache(opts: { throwOnError?: boolean } = {}): Promise<void> {
   inFlightRequests.clear();
   inFlightStartSeq.clear();
   if (typeof window !== 'undefined') {
@@ -349,7 +349,11 @@ export async function clearAllCache(): Promise<void> {
   if (isSQLiteAvailable()) {
     try {
       await runSQL('DELETE FROM api_cache', []);
-    } catch { /* cache-only; the localStorage/sessionStorage mirrors are already cleared */ }
+    } catch (err) {
+      // Cache-only for a sign-out, whose mirrors are already cleared. A wipe that goes on to record
+      // "this device is clean" asks for the failure instead (`throwOnError`).
+      if (opts.throwOnError) throw err;
+    }
     return;
   }
   // localStorage `ta_cache:*` already cleared above

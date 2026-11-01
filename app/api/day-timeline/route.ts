@@ -10,6 +10,7 @@ import {
 } from '@/lib/activity/detection-thresholds'
 import type { SleepSession } from '@trainingai/shared/types/body'
 import { pickPrimarySleep } from '@/lib/sleep/primary-sleep'
+import { sessionActiveMin } from '@trainingai/shared/workout/active-duration'
 
 export type TimelineEventType = 'wakeup' | 'sleep' | 'workout' | 'meal' | 'walk' | 'bedtime' | 'tag'
 
@@ -154,8 +155,9 @@ export async function GET(req: Request) {
     // with no logged exercises has nothing to show.
     if (ws.exercises.length === 0) continue
     const sets = ws.exercises.reduce((n, ex) => n + ex.sets.length, 0)
+    // Active minutes, as the day log and the phone's own timeline count them: a pause comes out.
     const durationMin = ws.completedAt
-      ? Math.round((ws.completedAt.getTime() - t) / 60_000)
+      ? Math.round(sessionActiveMin(ws.startedAt, ws.completedAt, ws.pausedSec))
       : undefined
     events.push({
       type: 'workout',

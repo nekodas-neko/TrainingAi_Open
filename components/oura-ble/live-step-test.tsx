@@ -336,12 +336,12 @@ export function LiveStepTest() {
             {saveState === 'saved' ? 'Saved' : saveState === 'saving' ? 'Saving…' : 'Save result'}
           </Button>
           {saveState === 'failed' && (
-            <span className="text-xs text-amber-500">Save failed — queued, will retry on next open.</span>
+            <span className="text-xs text-accent-amber">Save failed — queued, will retry on next open.</span>
           )}
         </div>
       )}
       {pendingCount > 0 && (
-        <div className="text-xs text-amber-500">{pendingCount} unsaved window(s) queued for retry.</div>
+        <div className="text-xs text-accent-amber">{pendingCount} unsaved window(s) queued for retry.</div>
       )}
       {!running && accelJson && (
         <div className="space-y-2">

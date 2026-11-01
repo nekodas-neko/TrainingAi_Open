@@ -124,4 +124,11 @@ object WorkoutStatusPolicy {
 
   /** A tap is honoured once: its nonce (the post time) must be newer than the last one acted on. */
   fun isFreshOpen(nonce: Long, lastConsumed: Long) = nonce > lastConsumed
+
+  /**
+   * The nonce a notification's intents carry. The Resume button is one newer than the body tap that
+   * shares its post time: `isFreshOpen` takes only a newer nonce, so a body tap handled first would
+   * otherwise make a later Resume tap look like a replay and be ignored.
+   */
+  fun openNonce(postedAtMs: Long, resume: Boolean) = if (resume) postedAtMs + 1 else postedAtMs
 }

@@ -13,6 +13,7 @@ import {
   sleepComponentsToContributors,
 } from '@trainingai/shared/health/sleep-score'
 import { scoreBand } from '@trainingai/shared/health/score-band'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 
 import type { SleepSession } from '@trainingai/shared/types/body'
@@ -62,7 +63,7 @@ export function buildSleepAudit(input: SleepAuditInput): PillarAudit {
   const baselines = sleepScoreBaselines(prior, tz, night ?? undefined)
   const hrvBaselineMs = baselines.hrvBaselineMs
   const priorHrv = prior
-    .filter(s => (s.durationHours ?? 0) >= MAIN_SLEEP_MIN_HOURS)
+    .filter(s => isPartialNight(s) || (s.durationHours ?? 0) >= MAIN_SLEEP_MIN_HOURS)
     // #3001: only the nights of the device that measured this one count toward its HRV normal.
     .filter(s => !night || deviceOf(s.hrvSource) === deviceOf(night.hrvSource))
     .map(s => s.averageHrvMs).filter((v): v is number => v != null && v > 0)
@@ -77,6 +78,7 @@ export function buildSleepAudit(input: SleepAuditInput): PillarAudit {
   const components = result?.components ?? null
 
   if (!night) gaps.push(`No sleep session recorded with wake day ${date}.`)
+  else if (isPartialNight(night)) gaps.push('Night marked partial by the owner: it keeps its HRV and heart rate in the normals and has no Sleep Score of its own.')
   else if (!result) gaps.push('Sleep session exists but carries no duration, so nothing could be scored.')
 
   const midpointLocal = night

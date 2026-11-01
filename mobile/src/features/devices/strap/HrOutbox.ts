@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { ApiError } from '../../account/api/client.ts';
+import { ApiError, isValidationRejection } from '../../account/api/client.ts';
 
 // Strap samples are saved on the phone first, then sent to `/api/hr-ingest`, the route the current
 // app's strap service posts to. The server stores them in `oura_heartrate` as `chest_strap` and
@@ -104,7 +104,7 @@ export class HrOutbox {
       } catch (error) {
         // A 400 or 413 would fail the same way forever; dropping it keeps the queue moving. The
         // route already filters implausible values per sample, so this is a malformed batch.
-        drop = error instanceof ApiError && (error.status === 400 || error.status === 413);
+        drop = isValidationRejection(error) || (error instanceof ApiError && error.status === 413);
         if (!drop) break;
       } finally {
         if (drop) {

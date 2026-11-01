@@ -35,16 +35,21 @@ class WorkoutStatusModule : Module() {
       val ctx = context ?: return@OnNewIntent
       val id = intent.getStringExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)
       val nonce = intent.getLongExtra(WorkoutStatusNotifier.EXTRA_NONCE, 0)
+      val resume = intent.getBooleanExtra(WorkoutStatusNotifier.EXTRA_RESUME, false)
       intent.removeExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)
-      WorkoutStatusNotifier.consumeOpen(ctx, id, nonce)?.let { sendEvent("onOpen", mapOf("workoutId" to it)) }
+      intent.removeExtra(WorkoutStatusNotifier.EXTRA_RESUME)
+      WorkoutStatusNotifier.consumeOpen(ctx, id, nonce)
+        ?.let { sendEvent("onOpen", mapOf("workoutId" to it, "resume" to resume)) }
     }
     Function("takeOpenRequest") {
       val ctx = context ?: return@Function null
       val intent = appContext.currentActivity?.intent ?: return@Function null
       val id = intent.getStringExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)
       val nonce = intent.getLongExtra(WorkoutStatusNotifier.EXTRA_NONCE, 0)
+      val resume = intent.getBooleanExtra(WorkoutStatusNotifier.EXTRA_RESUME, false)
       intent.removeExtra(WorkoutStatusNotifier.EXTRA_WORKOUT_ID)
-      WorkoutStatusNotifier.consumeOpen(ctx, id, nonce)
+      intent.removeExtra(WorkoutStatusNotifier.EXTRA_RESUME)
+      WorkoutStatusNotifier.consumeOpen(ctx, id, nonce)?.let { mapOf("workoutId" to it, "resume" to resume) }
     }
   }
 

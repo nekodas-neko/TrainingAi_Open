@@ -7,7 +7,7 @@ export type WorkoutStatusPayload = {
   sessionName: string;
   /** The exercise on screen, or the session's name in the warm-up and the review. */
   exerciseName: string;
-  /** "ready" is between sets with no timer. "paused" is reserved: the journal has no pause yet. */
+  /** "ready" is between sets with no timer. "paused" is a pause the workout is held in (#3255). */
   phase: 'working' | 'resting' | 'ready' | 'paused';
   /** The set in progress or next, 1-based; 0 when there is none to name. */
   nextSet: number;
@@ -28,8 +28,15 @@ export type WorkoutStatusPayload = {
   setsDone: number;
   /** The exercise Next moves to, from the exercise summary; null when Next ends the workout. */
   nextUp: string | null;
-  /** The strap's latest reading. Nothing fills it yet: the window shows no heart rate. */
-  hr: { bpm: number; zoneColor: string; at: number } | null;
+  /** `#rrggbb` per set of this exercise, for the window's dots; the window's copy alone, like `hr`. */
+  setColors: string[] | null;
+  /** When the current pause began; null unless `phase` is "paused". */
+  pausedAt: number | null;
+  /**
+   * The strap's latest reading, for the window only: the notification never reads it, and
+   * `workoutStatusFor` leaves it null so a reading every second is not a status change.
+   */
+  hr: { bpm: number; zoneName: string | null; zoneColor: string | null; at: number } | null;
 };
 
 /** What the system did with the notification, read back from it (Kotlin's promotionReport). */
@@ -47,7 +54,13 @@ export type WorkoutStatusModule = {
   update(status: WorkoutStatusPayload): boolean;
   clear(): void;
   promotion(): PromotionReport;
-  /** The workout a tap on the notification started the app for, once; null otherwise. */
-  takeOpenRequest(): string | null;
-  addListener(event: 'onOpen', listener: (event: { workoutId: string }) => void): Subscription;
+  /**
+   * The workout a tap on the notification started the app for, once; null otherwise. `resume` is
+   * set when the tap was on the paused notification's Resume button.
+   */
+  takeOpenRequest(): { workoutId: string; resume: boolean } | null;
+  addListener(
+    event: 'onOpen',
+    listener: (event: { workoutId: string; resume: boolean }) => void,
+  ): Subscription;
 };

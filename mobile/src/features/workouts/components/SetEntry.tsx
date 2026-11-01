@@ -13,7 +13,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from '../logging/workout';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { isAmrap, weightStep } from '../logging/targets';
-import { displayLoad, storedLoad } from '../logging/preferences';
+import { displayLoad, loadLabel, storedLoad } from '../logging/preferences';
 import { EffortPicker } from './EffortPicker';
 import { VoiceLogButton } from './VoiceLogButton';
 import { applyHeardSet } from '../voice/voice';
@@ -171,7 +171,7 @@ export function SetEntry({
             title={
               Number(set.weight) === 0
                 ? 'Add load / assistance'
-                : `${Number(set.weight) > 0 ? '+' : ''}${displayLoad(set.weight, unit)} ${unit} load / assistance`
+                : `${Number(set.weight) > 0 ? '+' : ''}${loadLabel(set.weight)} load / assistance`
             }
           >
             {units}

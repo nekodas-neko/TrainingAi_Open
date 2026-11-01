@@ -1,0 +1,184 @@
+// #2217 mockups: a friend's meal library and the opt-in. Static data, nothing is wired up.
+import { useState } from 'react';
+import { View } from 'react-native';
+import {
+  AppButton,
+  AppText,
+  Avatar,
+  Badge,
+  Card,
+  Icon,
+  ListRow,
+  PageLayout,
+  Stack,
+  SwitchRow,
+} from '../shared/ui';
+import { useTheme } from '../shared/theme/ThemeProvider';
+
+type Ing = [name: string, g: number];
+const MEALS: { name: string; servings: number; kcal: number; p: number; c: number; f: number; have?: boolean; ings: Ing[] }[] = [
+  { name: 'Chicken burrito bowl', servings: 2, kcal: 640, p: 52, c: 61, f: 17, ings: [['Chicken breast', 300], ['Basmati rice, cooked', 300], ['Black beans', 120], ['Corn', 80], ['Salsa', 60], ['Cheddar', 30]] },
+  { name: 'Protein ice cream', servings: 2, kcal: 310, p: 38, c: 24, f: 6, have: true, ings: [['Whey, vanilla', 60], ['Milk, skim', 300], ['Xanthan gum', 2]] },
+  { name: 'Overnight oats', servings: 1, kcal: 480, p: 29, c: 62, f: 11, ings: [['Rolled oats', 60], ['Greek yoghurt', 150], ['Chia seeds', 10], ['Blueberries', 80]] },
+  { name: 'Beef chilli', servings: 4, kcal: 520, p: 41, c: 38, f: 21, have: true, ings: [['Beef mince 5%', 600], ['Kidney beans', 400], ['Tomatoes, tinned', 800], ['Onion', 150]] },
+  { name: 'Salmon and greens', servings: 1, kcal: 560, p: 42, c: 14, f: 36, ings: [['Salmon fillet', 180], ['Broccolini', 150], ['Olive oil', 10]] },
+];
+const NEW_COUNT = MEALS.filter((m) => !m.have).length;
+
+function Frame({ children }: { children: React.ReactNode }) {
+  const { theme } = useTheme();
+  return <View style={{ flex: 1, backgroundColor: theme.colors.background }}>{children}</View>;
+}
+
+function MealRow({ m, open, onToggle }: { m: (typeof MEALS)[number]; open: boolean; onToggle: () => void }) {
+  const { theme } = useTheme();
+  return (
+    <View style={{ borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+      <ListRow
+        divider={false}
+        density="compact"
+        title={m.name}
+        subtitle={`${m.servings > 1 ? `${m.servings} portions · ` : ''}${m.kcal} kcal · P ${m.p} C ${m.c} F ${m.f} per portion`}
+        onPress={onToggle}
+        trailing={<Icon name={open ? 'up' : 'down'} tone="muted" />}
+      />
+      {open && (
+        <Stack gap="xs" style={{ paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.sm }}>
+          {m.ings.map(([n, g]) => (
+            <Stack key={n} direction="row" justify="space-between">
+              <AppText variant="caption" tone="muted">{n}</AppText>
+              <AppText variant="caption" tone="muted">{g} g</AppText>
+            </Stack>
+          ))}
+        </Stack>
+      )}
+      <Stack direction="row" justify="space-between" align="center" style={{ paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.md }}>
+        {m.have ? <Badge label="In your meals" tone="brand" /> : <View />}
+        <AppButton title={m.have ? 'Add again' : 'Add to my meals'} icon="plus" variant={m.have ? 'surface' : 'secondary'} onPress={() => {}} />
+      </Stack>
+    </View>
+  );
+}
+
+function Library({ done = false }: { done?: boolean }) {
+  const { theme } = useTheme();
+  const [open, setOpen] = useState<string | null>('Chicken burrito bowl');
+  return (
+    <PageLayout title="Sam's meals" onBack={() => {}} scroll>
+      <Stack gap="md">
+        <Card tone="brand">
+          <Stack gap="sm">
+            <AppText variant="label">{MEALS.length} meals · you have {MEALS.length - NEW_COUNT} of them</AppText>
+            <AppText variant="caption" tone="muted">Copies are yours. If Sam edits a meal later, yours does not change.</AppText>
+            <AppButton title={done ? `Added ${NEW_COUNT} meals · skipped ${MEALS.length - NEW_COUNT}` : `Add all ${NEW_COUNT} new meals`} icon={done ? 'check' : 'plus'} variant="primary" onPress={done ? undefined : () => {}} />
+          </Stack>
+        </Card>
+        <Card padded={false}>
+          {MEALS.map((m) => (
+            <MealRow key={m.name} m={m} open={open === m.name} onToggle={() => setOpen(open === m.name ? null : m.name)} />
+          ))}
+        </Card>
+        <AppText variant="caption" tone="muted">Shows name, portions, ingredients and macros only. “In your meals” is a name match, a hint rather than a link.</AppText>
+      </Stack>
+    </PageLayout>
+  );
+}
+
+function ProfileRow() {
+  const { theme } = useTheme();
+  return (
+    <PageLayout title="Profile" onBack={() => {}} scroll>
+      <Stack gap="md">
+        <Stack align="center" gap="sm">
+          <Avatar name="Sam" size={theme.sizes.scoreChip} />
+          <AppText variant="hero">Sam</AppText>
+          <AppText variant="micro" tone="muted">K7QM-29</AppText>
+          <Card tone="brand"><AppText variant="label">Level 14 · Lifter</AppText><AppText variant="micro" tone="muted">9,420 XP total</AppText></Card>
+        </Stack>
+        <Card padded={false}>
+          <ListRow leading={<Icon name="nutrition" tone="brand" />} title="Meals" subtitle="5 saved meals you can copy" trailing={<Icon name="forward" tone="muted" />} onPress={() => {}} divider={false} />
+        </Card>
+        <AppText variant="caption" tone="muted">The Meals row appears only when Sam has turned sharing on. Otherwise this profile looks exactly as it does today, and nothing says a library exists.</AppText>
+        <Card><AppText variant="eyebrow" tone="muted">Trophy Case</AppText><AppText variant="caption" tone="muted">No trophies showcased yet.</AppText></Card>
+      </Stack>
+    </PageLayout>
+  );
+}
+
+function Sharing({ on }: { on: boolean }) {
+  return (
+    <Card>
+      <Stack gap="sm">
+        <AppText variant="heading">Sharing</AppText>
+        <SwitchRow label="Let friends see and copy my saved meals" value={on} onValueChange={() => {}} />
+        <AppText variant="caption" tone="muted">
+          Accepted friends can see each saved meal’s name, ingredients and macros. They can’t see what you eat or when, and they only get copies. Off unless you turn it on. Turn it off any time.
+        </AppText>
+      </Stack>
+    </Card>
+  );
+}
+
+function OptInA() {
+  return (
+    <PageLayout title="Nutrition settings" onBack={() => {}} scroll>
+      <Stack gap="md">
+        <Card><AppText variant="heading">Calorie goal</AppText><AppText variant="caption" tone="muted">2,400 kcal · Maintain</AppText></Card>
+        <Card><AppText variant="heading">Meal times</AppText><AppText variant="caption" tone="muted">Breakfast, Lunch, Dinner, Snack</AppText></Card>
+        <Sharing on />
+      </Stack>
+    </PageLayout>
+  );
+}
+
+function OptInB() {
+  const { theme } = useTheme();
+  return (
+    <PageLayout title="Friends" scroll>
+      <View style={{ flex: 1, justifyContent: 'flex-end', minHeight: 560 }}>
+        <Card style={{ borderTopLeftRadius: theme.radii.lg, borderTopRightRadius: theme.radii.lg }}>
+          <Stack gap="md">
+            <AppText variant="heading">Manage friends</AppText>
+            <Sharing on={false} />
+            <Card padded={false}><ListRow title="Sam" subtitle="Friends" divider={false} /></Card>
+            <Card padded={false}><ListRow title="Alex" subtitle="Request received" divider={false} /></Card>
+          </Stack>
+        </Card>
+      </View>
+    </PageLayout>
+  );
+}
+
+function LibrarySheet() {
+  const { theme } = useTheme();
+  return (
+    <View style={{ flex: 1 }}>
+      <ProfileRow />
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: 140, backgroundColor: theme.colors.surface, borderTopLeftRadius: theme.radii.lg, borderTopRightRadius: theme.radii.lg, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing.md }}>
+        <Stack gap="sm">
+          <AppText variant="heading">Sam’s meals</AppText>
+          <AppButton title={`Add all ${NEW_COUNT} new meals`} icon="plus" variant="primary" onPress={() => {}} />
+          <Card padded={false}>
+            {MEALS.slice(0, 3).map((m) => (
+              <ListRow key={m.name} divider density="compact" title={m.name} subtitle={`${m.kcal} kcal per portion`} trailing={m.have ? <Badge label="In your meals" tone="brand" /> : <Icon name="plus" tone="brand" />} onPress={() => {}} />
+            ))}
+          </Card>
+        </Stack>
+      </View>
+    </View>
+  );
+}
+
+export const SCREENS: Record<string, () => React.ReactElement> = {
+  'profile-row': () => <ProfileRow />,
+  'library': () => <Library />,
+  'library-done': () => <Library done />,
+  'library-sheet': () => <LibrarySheet />,
+  'optin-a': () => <OptInA />,
+  'optin-b': () => <OptInB />,
+};
+
+export function MockupApp({ screen }: { screen: string }) {
+  const Render = SCREENS[screen] ?? SCREENS.library;
+  return <Frame><Render /></Frame>;
+}

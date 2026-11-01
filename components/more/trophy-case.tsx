@@ -1,24 +1,17 @@
 "use client";
 
-import { useId, useState, useEffect } from "react";
+import { useId, useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import type { AchievementResult } from "@/components/profile/achievements-grid";
 import { ACHIEVEMENT_ICONS, CATEGORY_COLORS } from "@/components/profile/achievements-grid";
 import { Dumbbell, Lock } from "lucide-react";
 import { pinTrophy, trophySlots, unpinTrophy } from '@trainingai/shared/achievement-display';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-const TROPHY_KEY = "ta_trophy_case";
-
-function loadTrophy(): string[] {
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(TROPHY_KEY) : null;
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function saveTrophy(ids: string[]) {
-  try { localStorage.setItem(TROPHY_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
-}
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { TROPHY_PINS_TTL } from "@trainingai/shared/cache-ttl";
+import {
+  TROPHY_PINS_KEY, TROPHY_PINS_URL, carryOverLegacyPins, readAccountPins, savePins,
+} from "@/lib/trophy/trophy-pins-client";
 
 interface TrophyCaseProps {
   achievements: AchievementResult[]
@@ -78,34 +71,99 @@ function BadgeSlot({ achievement, onUnpin }: { achievement?: AchievementResult; 
   );
 }
 
-export function TrophyCase({ achievements, readOnly = false, pinnedIds: externalPinnedIds }: TrophyCaseProps) {
-  const [pinnedIds, setPinnedIds] = useState<string[]>(() => externalPinnedIds ?? loadTrophy());
+/**
+ * Your own trophy case: the pins are on the account, which is also what friends see. A friend's
+ * case (`pinnedIds` given) is shown as it is and fetches nothing.
+ */
+export function TrophyCase({ achievements, readOnly = false, pinnedIds }: TrophyCaseProps) {
+  if (pinnedIds !== undefined) {
+    return <TrophyCaseView achievements={achievements} readOnly={readOnly} pinnedIds={pinnedIds} />;
+  }
+  return <OwnTrophyCase achievements={achievements} readOnly={readOnly} />;
+}
+
+function OwnTrophyCase({ achievements, readOnly }: { achievements: AchievementResult[]; readOnly: boolean }) {
+  const account = useCachedValue<{ pins: string[] | null }>(
+    TROPHY_PINS_KEY, TROPHY_PINS_URL, TROPHY_PINS_TTL,
+    { onError: () => {} },
+  );
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const unlockedKey = achievements.filter(a => a.unlocked).map(a => a.id).join(",");
+
+  // The account's pins replace whatever is shown once they arrive, and again after a save refetches.
+  useEffect(() => {
+    if (account) setPinnedIds(account.pins ?? []);
+  }, [account]);
+
+  // The account's pins read from the server now. The cached value above paints at once but can be
+  // older than a change made on another device, and a failed read leaves nothing known at all.
+  const [confirmed, setConfirmed] = useState<{ pins: string[] | null } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void readAccountPins().then(read => { if (alive) setConfirmed(read); });
+    return () => { alive = false; };
+  }, []);
+
+  // Edit opens as soon as either read is in (`known` below), so the fresh read fills the case when
+  // the cached one has failed or not landed yet; otherwise Edit would start from three empty slots and
+  // a save would overwrite the account's real pins.
+  useEffect(() => {
+    if (confirmed && !account) setPinnedIds(confirmed.pins ?? []);
+  }, [confirmed, account]);
+
+  // The list this browser kept before pins lived on the account moves over once, and only after that
+  // fresh read says the account has none; a cached `{ pins: null }` is not that.
+  const carried = useRef(false);
+  useEffect(() => {
+    if (readOnly || !confirmed || carried.current || unlockedKey === "") return;
+    carried.current = true;
+    void carryOverLegacyPins(confirmed.pins, new Set(unlockedKey.split(",")));
+  }, [readOnly, confirmed, unlockedKey]);
+
+  // An edit saves the whole list, so it is held back while the account's pins are unknown: the
+  // read failed and nothing is cached, which would otherwise show three empty slots to edit from.
+  const known = account !== null || confirmed !== null;
+
+  const change = async (next: string[]) => {
+    const before = pinnedIds;
+    setPinnedIds(next);
+    if ((await savePins(next)) !== "saved") {
+      setPinnedIds(before);
+      toast.error("Couldn't save your trophy case");
+    }
+  };
+
+  return (
+    <TrophyCaseView
+      achievements={achievements}
+      readOnly={readOnly || !known}
+      pinnedIds={pinnedIds}
+      onPin={id => void change(pinTrophy(pinnedIds, id))}
+      onUnpin={id => void change(unpinTrophy(pinnedIds, id))}
+    />
+  );
+}
+
+function TrophyCaseView({ achievements, readOnly, pinnedIds, onPin, onUnpin }: {
+  achievements: AchievementResult[]
+  readOnly: boolean
+  pinnedIds: string[]
+  onPin?: (id: string) => void
+  onUnpin?: (id: string) => void
+}) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerId = useId();
-
-  useEffect(() => {
-    if (!externalPinnedIds) {
-      const loaded = loadTrophy();
-      setPinnedIds(loaded);
-    }
-  }, [externalPinnedIds]);
 
   const unlockedAchievements = achievements.filter(a => a.unlocked);
   const slots = trophySlots(achievements, pinnedIds);
 
   const pin = (id: string) => {
     if (pinnedIds.includes(id)) return;
-    const next = pinTrophy(pinnedIds, id);
-    setPinnedIds(next);
-    saveTrophy(next);
+    onPin?.(id);
     setPickerOpen(false);
   };
 
-  const unpin = (id: string) => {
-    const next = unpinTrophy(pinnedIds, id);
-    setPinnedIds(next);
-    saveTrophy(next);
-  };
+  const unpin = (id: string) => onUnpin?.(id);
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card/50 p-4">

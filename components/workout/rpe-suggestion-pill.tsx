@@ -28,12 +28,12 @@ interface Props {
 export const RpeSuggestionPill = memo(function RpeSuggestionPill({ weightKg, note, onAccept, onDismiss }: Props) {
   return (
     <div
-      className="mx-3 mb-2 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2"
+      className="mx-3 mb-2 flex items-center gap-2 rounded-xl border border-accent-amber/30 bg-accent-amber/10 px-3 py-2"
       role="group"
       aria-label="Load suggestion from your last set"
     >
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-amber-500">Drop to {weightKg} kg?</p>
+        <p className="text-xs font-semibold text-accent-amber">Drop to {weightKg} kg?</p>
         {/* The engine's sentence. Deliberately not paraphrased: the card and next week's
             prescription must give one reason, not two wordings of it. */}
         <p className="truncate text-2xs text-muted-foreground">{note}</p>

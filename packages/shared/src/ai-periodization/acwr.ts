@@ -1,4 +1,5 @@
 import { median } from '@trainingai/shared/stats'
+import { BAND_COLOR } from '@trainingai/shared/health/score-band'
 import { DEFAULT_TZ, dateStrMidnightInTz, midnightDaysAgoInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 
 export interface AcwrSession { startedAt: Date; volumeKg: number }
@@ -297,9 +298,9 @@ export const ACWR_THRESHOLDS = { veryLowMax: 0.6, lowMax: 0.8, optimalMax: 1.3, 
 // the Health explainer copy, and the readiness-score modifier all disagreed).
 export function acwrBand(acwr: number): AcwrBand {
   if (acwr < ACWR_THRESHOLDS.lowMax) return { key: 'low', label: 'Undertraining', color: '#94a3b8' }
-  if (acwr <= ACWR_THRESHOLDS.optimalMax) return { key: 'optimal', label: 'Optimal', color: '#22c55e' }
-  if (acwr <= ACWR_THRESHOLDS.highMax) return { key: 'high', label: 'High', color: '#f59e0b' }
-  return { key: 'very_high', label: 'Very High', color: '#ef4444' }
+  if (acwr <= ACWR_THRESHOLDS.optimalMax) return { key: 'optimal', label: 'Optimal', color: BAND_COLOR.good }
+  if (acwr <= ACWR_THRESHOLDS.highMax) return { key: 'high', label: 'High', color: BAND_COLOR.warning }
+  return { key: 'very_high', label: 'Very High', color: BAND_COLOR.bad }
 }
 
 // For clients that only have the server-reported interpretation key (e.g. from

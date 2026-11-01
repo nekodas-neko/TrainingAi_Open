@@ -4,7 +4,7 @@ import { getRepository } from "@/lib/data";
 import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { classifyDay, isDeloadSession } from "./classify-day";
-import { MAX_PLAUSIBLE_SESSION_MIN } from '@trainingai/shared/health/workout-energy';
+import { MAX_PLAUSIBLE_SESSION_MIN, sessionActiveMin } from '@trainingai/shared/health/workout-energy';
 
 // The bound is shared (LA-21) — it was declared identically in three files, with two different
 // behaviours attached to it. This site EXCLUDES and falls back to the exercise-log span, which is
@@ -90,7 +90,7 @@ export async function GET() {
     // understated (it excludes warm-up and the final rest, and collapses to ~0 when sets are
     // logged in a burst), which is why a true 55-min session read as ~28 min.
     const wallMin = ws.completedAt != null
-      ? (ws.completedAt.getTime() - ws.startedAt.getTime()) / 60000
+      ? sessionActiveMin(ws.startedAt, ws.completedAt, ws.pausedSec)
       : null;
     if (wallMin != null && wallMin > 0 && wallMin <= MAX_PLAUSIBLE_SESSION_MIN) {
       durationSum += wallMin;

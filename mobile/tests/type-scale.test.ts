@@ -117,6 +117,12 @@ const currentApp: Record<string, Expected> = {
     source: 'text-[10px] font-semibold uppercase tracking-widest (more-row.tsx group labels)',
   },
   body: { fontSize: 14, lineHeight: 20, fontWeight: undefined, source: 'text-sm' },
+  bodyRelaxed: {
+    fontSize: 14,
+    lineHeight: 22.75,
+    fontWeight: undefined,
+    source: 'week-detail-content.tsx Your week paragraph, text-sm leading-relaxed',
+  },
   label: { fontSize: 14, lineHeight: 20, fontWeight: '400', source: 'more-row.tsx row label, text-sm' },
   button: {
     fontSize: 14,
@@ -175,6 +181,45 @@ const currentApp: Record<string, Expected> = {
     fontWeight: '700',
     source: 'week-metric-card.tsx value, text-xl font-bold',
   },
+  energyRingValue: {
+    fontSize: 22,
+    lineHeight: 22,
+    fontWeight: '700',
+    letterSpacing: -0.55,
+    source: 'energy-card.tsx ring value, text-[22px] font-bold leading-none tracking-tight',
+  },
+  energyRingCaption: {
+    fontSize: 9.5,
+    lineHeight: 14.25,
+    letterSpacing: 0.475,
+    uppercase: true,
+    fontWeight: undefined,
+    source: 'energy-card.tsx ring caption, text-[9.5px] uppercase tracking-wider',
+  },
+  explainerFooter: {
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: undefined,
+    source: 'readiness-breakdown.tsx footer, text-[10px]',
+  },
+  strengthRowValue: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '700',
+    source: 'strength-progress-card.tsx row value, text-xs font-bold leading-tight',
+  },
+  strengthRowDelta: {
+    fontSize: 9,
+    lineHeight: 11.25,
+    fontWeight: '600',
+    source: 'strength-progress-card.tsx row delta, text-[9px] font-semibold leading-tight',
+  },
+  trendValue: {
+    fontSize: 18,
+    lineHeight: 28,
+    fontWeight: '900',
+    source: 'strength-trend-card.tsx current 1RM, text-lg font-black',
+  },
   weekTileDelta: {
     fontSize: 11,
     lineHeight: 16.5,
@@ -193,6 +238,28 @@ const currentApp: Record<string, Expected> = {
     fontWeight: '600',
     source: 'contributor-chart.tsx FactorBar value, text-[11px] font-semibold',
   },
+  explainerLabel: {
+    fontSize: 10,
+    lineHeight: 13.75,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    uppercase: true,
+    source: 'contributor-detail.tsx Field label, text-[10px] font-semibold uppercase tracking-wider leading-snug',
+  },
+  explainerBody: {
+    fontSize: 11,
+    lineHeight: 15.125,
+    source: 'contributor-detail.tsx body, text-[11px] leading-snug',
+  },
+  explainerBadge: {
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '700',
+    letterSpacing: 0.25,
+    uppercase: true,
+    source: 'contributor-details.tsx badge, text-[10px] font-bold uppercase tracking-wide',
+  },
+  gaugeLabel: { fontSize: 9, lineHeight: 13.5, source: 'zone-gauge.tsx labels, text-[9px]' },
   input: { fontSize: 16, lineHeight: 24, source: 'globals.css forces 16 px on input, textarea, select' },
 };
 

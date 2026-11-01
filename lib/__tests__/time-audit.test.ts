@@ -130,6 +130,15 @@ describe('decomposeSessions', () => {
     expect(d.unaccountedSec).toBe(3600 - 600 - 120 - 240 - 240)
   })
 
+  it('takes paused time off the total, so a pause is not unaccounted time (#3266)', () => {
+    const t0 = 1_000_000_000_000
+    const sessions: TimingSessionRow[] = [{
+      workoutSessionId: 'ws1', startedAt: t0, completedAt: t0 + 3_600_000, warmupEndedAt: t0 + 600_000, pausedSec: 900,
+    }]
+    const [d] = decomposeSessions(sessions, [], [])
+    expect(d.totalSec).toBe(2700)
+  })
+
   it('excludes a negative inter_exercise_rest_sec from the transition sum instead of subtracting it', () => {
     const t0 = 1_000_000_000_000
     const sessions: TimingSessionRow[] = [{

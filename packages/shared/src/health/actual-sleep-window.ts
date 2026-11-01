@@ -40,3 +40,32 @@ export function actualSleepWindow(r: {
     end: new Date(endMs).toISOString(),
   };
 }
+
+// The time you WOKE: the end of the last non-awake 5-min epoch, which is where the awake stretch
+// after waking (lying in bed before getting up) begins. A header or Home line that prints a wake
+// time shows this; the totals and the ribbon keep the recorded window that actualSleepWindow()
+// returns (#2830), so only the printed end moves, never a stage minute.
+//
+// Held to the recorded end for the same padding reason as above: base + epochs can overshoot it by
+// up to ~5 min. Returns null when there is no hypnogram or it is all awake, so callers fall back to
+// actualSleepWindow()'s end, then the raw sleepEnd.
+export function wokeTime(r: {
+  sleepPhase5Min?: string | null;
+  phaseWindowStart?: string | null;
+  phaseWindowEnd?: string | null;
+  sleepStart?: string | null;
+  sleepEnd?: string | null;
+}): string | null {
+  const base = r.phaseWindowStart ?? r.sleepStart;
+  const recordedEnd = r.phaseWindowEnd ?? r.sleepEnd;
+  if (!r.sleepPhase5Min || !base || !recordedEnd) return null;
+  const codes = [...r.sleepPhase5Min];
+  let last = codes.length - 1;
+  while (last >= 0 && codes[last] === "4") last--;
+  if (last < 0) return null;
+  const wokeMs = Math.min(
+    new Date(base).getTime() + (last + 1) * 5 * 60000,
+    new Date(recordedEnd).getTime(),
+  );
+  return new Date(wokeMs).toISOString();
+}

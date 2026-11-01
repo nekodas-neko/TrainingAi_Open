@@ -174,3 +174,9 @@ describe('onsetMinutesForNight', () => {
     expect(onsetMinutesForNight('not-a-date', '2026-09-26', TZ)).toBeNull()
   })
 })
+
+describe('a night with nothing to judge', () => {
+  it('has no verdict, rather than "normal", when every component of the night is null (#2265)', () => {
+    expect(sleepVerdictForNight(night({ durationHours: null, onsetMinutes: null, efficiency: null }), ordinaryNights())).toBeNull()
+  })
+})

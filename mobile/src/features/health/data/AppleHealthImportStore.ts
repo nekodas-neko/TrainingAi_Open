@@ -1,5 +1,5 @@
 import { acknowledgedUpload, isDeferredUpload } from './health-upload';
-import { ApiError } from '../../account/api/client';
+import { isValidationRejection } from '../../account/api/client';
 import { z } from 'zod';
 import {
   appleImportBatch,
@@ -211,7 +211,7 @@ export class AppleHealthImportStore {
               // #3045: a 400 is the server refusing this batch's shape, the same way every time. Left at
               // the head of the queue it blocked every later upload for good, so it is dropped and
               // counted as skipped. Any other failure (5xx, 429, offline) keeps it for retry.
-              if (!('rebuild' in item) && error instanceof ApiError && error.status === 400) {
+              if (!('rebuild' in item) && isValidationRejection(error)) {
                 await this.write({
                   ...this.disk,
                   queue: this.disk.queue.slice(1),

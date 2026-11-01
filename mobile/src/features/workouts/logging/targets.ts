@@ -14,7 +14,7 @@ import {
 } from '@trainingai/shared/workout/load-rounding';
 import type { ExercisePreview, SetPreview } from '../catalog';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from './workout';
-import { displayLoad } from './preferences';
+import { loadLabel } from './preferences';
 
 export function weightStep(equipment: string[] = []) {
   return weightStepFor(equipment);
@@ -67,7 +67,7 @@ export function formatSetLoad(
   }
   const prefix =
     exercise.exerciseType === 'bodyweight' && Number(set.weight) > 0 ? '+' : '';
-  return `${prefix}${displayLoad(set.weight, 'kg')} kg × ${set.reps} reps`;
+  return `${prefix}${loadLabel(set.weight)} × ${set.reps} reps`;
 }
 
 export function loadSuggestion(
@@ -140,7 +140,7 @@ export function loadBasis(exercise: WorkoutExercise, set: WorkoutSet) {
       : exercise.target80 !== null || exercise.estimated1rm !== null
         ? `Suggested from the saved strength target, rounded to ${step} kg increments.`
         : exercise.latestWeight !== null
-          ? `Starting suggestion from the last saved load (${exercise.latestWeight} kg), rounded to equipment increments.`
+          ? `Starting suggestion from the last saved load (${loadLabel(exercise.latestWeight)}), rounded to equipment increments.`
           : 'Default starting load; no personalised strength or previous-load basis is available. Choose a suitable load.';
   return `${basis} Your edits change this workout's entered load; the original prescription stays saved.`;
 }

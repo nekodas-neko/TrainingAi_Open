@@ -94,7 +94,7 @@ export function WeekMetricCard({ label, metric, unit = '', decimals = 0, higherI
         {week != null && unit && <span className="ml-0.5 text-xs font-normal text-muted-foreground">{unit}</span>}
       </p>
       <p
-        className={`text-[11px] tabular-nums ${delta.cue === 'good' ? 'text-green-500' : delta.cue === 'bad' ? 'text-amber-500' : 'text-muted-foreground'}`}
+        className={`text-[11px] tabular-nums ${delta.cue === 'good' ? 'text-accent-green' : delta.cue === 'bad' ? 'text-accent-amber' : 'text-muted-foreground'}`}
       >
         {delta.text}
       </p>

@@ -87,7 +87,7 @@ function ConsequenceLine({ drivesLoad, action }: { drivesLoad: boolean; action: 
   // Bold rather than a second amber panel: the low-confidence warning above already owns that shape
   // in this block, and two stacked panels read as one thing to scroll past.
   return (
-    <p className="text-[11px] font-semibold leading-relaxed text-amber-700 dark:text-amber-300">
+    <p className="text-[11px] font-semibold leading-relaxed text-accent-amber">
       Start the workout without {action === 'move' ? 'choosing' : 'accepting'} and you&apos;ll train the
       program&apos;s normal loads, not these.
     </p>
@@ -201,19 +201,19 @@ export function AiPrescriptionCard({
     <div className={cn(
       "rounded-xl border px-4 py-3 space-y-2 transition-all",
       isDismissed ? "border-border/40 opacity-50" : "border-brand/30 bg-brand/8",
-      (isAccepted || isAutoApplied) && "border-green-500/40 bg-green-500/8",
+      (isAccepted || isAutoApplied) && "border-accent-green/40 bg-accent-green/8",
     )}>
       <Collapsible open={expanded} onOpenChange={setExpanded}>
       <CollapsibleTrigger className="w-full flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <SparklesIcon className={cn(
             "h-4 w-4 flex-none",
-            isDismissed ? "text-muted-foreground" : (isAccepted || isAutoApplied) ? "text-green-500" : "text-brand",
+            isDismissed ? "text-muted-foreground" : (isAccepted || isAutoApplied) ? "text-accent-green" : "text-brand",
           )} />
           <div className="text-left min-w-0">
             <p className={cn(
               "text-sm font-semibold truncate",
-              isDismissed ? "text-muted-foreground" : (isAccepted || isAutoApplied) ? "text-green-600 dark:text-green-400" : "text-brand",
+              isDismissed ? "text-muted-foreground" : (isAccepted || isAutoApplied) ? "text-accent-green" : "text-brand",
             )}>
               AI Prescription · {runsFull ? "Full" : (phaseLabel[prescription.phase] ?? prescription.phase)}
               {isAutoApplied && " · Auto-applied"}
@@ -386,7 +386,7 @@ export function AiPrescriptionCard({
                     </p>
                   )}
                   {ex.deloaded && (
-                    <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                    <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-accent-amber">
                       <BatteryLowIcon className="h-3 w-3" />
                       {ex.deloadNote ?? "Deload"}
                     </p>
@@ -504,9 +504,9 @@ export function AiPrescriptionCard({
           {isPending && !isTransitionRecommended && !isDeloadRecommended && (
             <div className="space-y-1.5 pt-1">
               {isLowConfidence && (
-                <div className="flex items-start gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2">
-                  <AlertTriangleIcon className="h-3.5 w-3.5 text-amber-500 flex-none mt-0.5" />
-                  <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                <div className="flex items-start gap-1.5 rounded-lg border border-accent-amber/40 bg-accent-amber/10 px-2.5 py-2">
+                  <AlertTriangleIcon className="h-3.5 w-3.5 text-accent-amber flex-none mt-0.5" />
+                  <p className="text-[11px] text-accent-amber">
                     Low confidence ({Math.round(prescription.confidence * 100)}%){reasons.length > 0 ? ' — see the factors above' : ''}. Review before applying.
                   </p>
                 </div>
@@ -519,8 +519,8 @@ export function AiPrescriptionCard({
                   className={cn(
                     "flex-1 h-8 text-xs",
                     isLowConfidence && confirmLow
-                      ? "border-red-500/60 text-red-600 dark:text-red-400 hover:bg-red-500/10"
-                      : "border-green-500/50 text-green-600 dark:text-green-400 hover:bg-green-500/10",
+                      ? "border-destructive/60 text-destructive hover:bg-destructive/10"
+                      : "border-accent-green/50 text-accent-green hover:bg-accent-green/10",
                   )}
                   disabled={loading}
                   onClick={() => {

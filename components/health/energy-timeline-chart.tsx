@@ -17,6 +17,7 @@ import type { CountedEstimateRow } from '@trainingai/shared/nutrition/counted-in
 
 interface Props {
   dayStartMs: number
+  tz?: string
   restingHr: number | null
   restingBaseKcal: number
   activeKcal: number
@@ -31,11 +32,12 @@ const W = 100
 const H = 46
 
 export const EnergyTimelineChart = memo(function EnergyTimelineChart(
-  { dayStartMs, restingHr, restingBaseKcal, activeKcal, hr, intake, estimates, intakeMealTypeIds }: Props,
+  { dayStartMs, tz, restingHr, restingBaseKcal, activeKcal, hr, intake, estimates, intakeMealTypeIds }: Props,
 ) {
   const timeline = useMemo(
     () => buildEnergyTimeline({
       dayStartMs,
+      tz,
       // Without a profile there is no elevation to measure against, so the day flattens to BMR
       // shape rather than inventing one.
       restingHr: restingHr ?? Number.POSITIVE_INFINITY,
@@ -46,7 +48,7 @@ export const EnergyTimelineChart = memo(function EnergyTimelineChart(
       estimates,
       intakeMealTypeIds,
     }),
-    [dayStartMs, restingHr, restingBaseKcal, activeKcal, hr, intake, estimates, intakeMealTypeIds],
+    [dayStartMs, tz, restingHr, restingBaseKcal, activeKcal, hr, intake, estimates, intakeMealTypeIds],
   )
 
   const { buckets, totals, hrGapBuckets } = timeline

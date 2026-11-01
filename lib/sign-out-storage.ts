@@ -89,6 +89,7 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   ta_rest_duration: 'default rest', ta_food_region: 'food database region',
   ta_pref_meal_reminders: 'reminder toggle', ta_pref_health_alerts: 'alert toggle',
   ta_pref_day_review_reminders: 'reminder toggle', ta_pref_calendar_sync: 'calendar toggle',
+  ta_pref_share_meal_library: 'meal-library sharing toggle — cleared so the next account never inherits this one\'s consent',
   ta_prefs_unsynced: 'preference names whose PATCH is unacknowledged — kept, they would be re-sent to the NEXT account\'s server bag',
   // Goals seeded from the server (Q-241).
   ta_steps_goal: 'goal', ta_steps_goal_type: 'goal', ta_sleep_goal_hours: 'goal',
@@ -107,6 +108,12 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   ta_evening_reminder_date: 'reminder dedupe', ta_weekly_recap_reminder_sunday: 'reminder dedupe',
   ta_health_alert_notified_today: 'alert dedupe', ta_supplement_reminder_notified_today: 'reminder dedupe',
   ta_workout_reminder_notified_today: 'reminder dedupe', ta_deadletter_notified_v1: 'failed-sync notices shown',
+  // #3369: which admin reset this device has wiped for. A sign-out empties the device anyway, and the
+  // next sign-in then has nothing old to wipe, so the record goes with the account.
+  ta_data_epoch: 'the admin-reset moment this device last saw (userId:seconds); a newer server value wipes the device',
+  ta_store_owner: 'the user id whose rows fill this device\'s local store; signing in as anyone else wipes the device before any read or sync (#3369)',
+  ta_store_owner_wiped: 'sessionStorage: this tab session already wiped for that owner, so a failed record cannot loop',
+  ta_data_epoch_wiped: 'sessionStorage: this tab session already wiped for that epoch, so a failed record cannot loop',
   // Sync cursors and upload queues. A queue left behind would POST under the next account.
   ta_hc_last_sync: 'Health Connect cursor — the next account backfills the window for itself',
   ta_hc_first_hand_skipped_since: 'Health Connect rewind marker — the next account starts without one',

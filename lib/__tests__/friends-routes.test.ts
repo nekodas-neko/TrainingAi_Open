@@ -358,6 +358,21 @@ describe('GET /api/profile/[userId]', () => {
     expect(body.unlockedAchievementIds).not.toContain('marathon')
   })
 
+  it('shows the pins the friend saved, in pin order, instead of the top three', async () => {
+    getFriendIds.mockResolvedValue([FRIEND])
+    dbResults = [[userRow({ trophyPins: ['first-lift', 'century'] })]]
+    const body = await (await profile(FRIEND)).json()
+    expect(body.trophyCase).toEqual(['first-lift', 'century'])
+  })
+
+  it('does not show a pin that is locked, and falls back to the top three if none is usable', async () => {
+    getFriendIds.mockResolvedValue([FRIEND])
+    dbResults = [[userRow({ trophyPins: ['marathon', 'iron-will'] })]]
+    expect((await (await profile(FRIEND)).json()).trophyCase).toEqual(['iron-will'])
+    dbResults = [[userRow({ trophyPins: ['marathon'] })]]
+    expect((await (await profile(FRIEND)).json()).trophyCase).toEqual(['century', 'iron-will', 'first-lift'])
+  })
+
   it('computes achievements for the profile being viewed, in the VIEWER\'s timezone', async () => {
     // The viewer reads the page, so the day boundaries are theirs — the subject's stored timezone
     // is in the row above and must not be the one used.

@@ -1,7 +1,11 @@
+import { sessionActiveMin } from '../workout/active-duration'
+
 export interface DaySession {
   startedAt: Date
   completedAt: Date | null
   volumeKg: number
+  /** Seconds the session spent paused (#3266); absent or null takes nothing off. */
+  pausedSec?: number | null
 }
 
 export interface DayWorkoutMetrics {
@@ -20,7 +24,7 @@ export function aggregateWorkoutDay(sessions: DaySession[]): DayWorkoutMetrics {
   for (const s of sessions) {
     if (!s.completedAt) continue
     hasCompleted = true
-    durationMin += (s.completedAt.getTime() - s.startedAt.getTime()) / 60_000
+    durationMin += sessionActiveMin(s.startedAt, s.completedAt, s.pausedSec)
     volumeKg += s.volumeKg
   }
 

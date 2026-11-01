@@ -51,7 +51,7 @@ export function MuscleVolumeFigure({
       {/* weekly-muscle-sets-card.tsx: space-y-2 rows, each a text-xs label, mb-0.5, then an h-2 bar. */}
       <Stack gap="sm">
         {rows.map((row) => (
-          <Stack key={row.muscle} gap="xxs">
+          <Stack key={row.muscle} gap="xxs" style={{ minHeight: theme.sizes.touchTarget }}>
             <Stack direction="row" justify="space-between" align="center">
               <AppText variant="calendarDay" style={{ flex: 1 }}>
                 {capitalize(row.muscle)}

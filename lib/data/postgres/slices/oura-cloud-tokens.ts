@@ -25,6 +25,10 @@ export interface OuraCloudTokenRow {
   updatedAt: Date
   /** #3204: when Oura refused the grant; null while none is known. New tokens clear it. */
   reauthRequiredAt: Date | null
+  /** #2861: the last verified webhook event for this user; null until one arrives. */
+  lastWebhookAt: Date | null
+  /** #2861: the last time Oura data was written for this user; null until some is. */
+  lastDataAt: Date | null
 }
 
 export interface SaveOuraCloudTokensInput {
@@ -43,7 +47,7 @@ export async function getOuraCloudTokens(db: Db, userId: string): Promise<OuraCl
     .select({
       userId: t.userId, accessToken: t.accessToken, refreshToken: t.refreshToken,
       expiresAt: t.expiresAt, scope: t.scope, ouraUserId: t.ouraUserId, updatedAt: t.updatedAt,
-      reauthRequiredAt: t.reauthRequiredAt,
+      reauthRequiredAt: t.reauthRequiredAt, lastWebhookAt: t.lastWebhookAt, lastDataAt: t.lastDataAt,
     })
     .from(t)
     .where(eq(t.userId, userId))
@@ -91,6 +95,19 @@ export async function markOuraCloudReauthRequired(db: Db, userId: string, unchan
     .where(and(eq(t.userId, userId), sql`${t.updatedAt} < ${unchangedSince.toISOString()}::timestamptz + interval '1 millisecond'`))
     .returning({ userId: t.userId })
   return marked.length > 0
+}
+
+/**
+ * #2861: stamps the user's last verified webhook event. `updated_at` is left alone: it is when tokens
+ * were last saved, and the reauth guard above reads it. A user with no row is a no-op.
+ */
+export async function touchOuraCloudWebhook(db: Db, userId: string): Promise<void> {
+  await db.update(t).set({ lastWebhookAt: sql`now()` }).where(eq(t.userId, userId))
+}
+
+/** #2861: stamps the last time Oura data was written for the user. As above, `updated_at` is left alone. */
+export async function touchOuraCloudData(db: Db, userId: string): Promise<void> {
+  await db.update(t).set({ lastDataAt: sql`now()` }).where(eq(t.userId, userId))
 }
 
 /** True when the caller had a row and it is gone now. */

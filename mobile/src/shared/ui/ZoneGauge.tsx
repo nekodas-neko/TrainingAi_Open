@@ -22,6 +22,8 @@ export function ZoneGauge({
   const colors = centered
     ? [theme.anatomy.secondary, theme.anatomy.main, theme.anatomy.secondary]
     : [theme.anatomy.injured, theme.anatomy.secondary, theme.anatomy.main];
+  // zone-gauge.tsx: the label over the healthy zone is text-accent-green font-medium.
+  const good = { color: theme.status.success, fontWeight: '500' as const };
   return (
     <View
       accessibilityLabel={`Position ${Math.round(value)} of 100; ${centered ? 'aim for the middle' : 'higher score is better'}`}
@@ -40,15 +42,15 @@ export function ZoneGauge({
         />
       </Svg>
       <Stack direction="row" justify="space-between">
-        <AppText variant="micro" tone="muted">
+        <AppText variant="gaugeLabel" tone="muted">
           {lowLabel ?? (centered ? 'Below' : 'Needs work')}
         </AppText>
         {centered && (
-          <AppText variant="micro" tone="muted">
+          <AppText variant="gaugeLabel" style={good}>
             {midLabel ?? 'Baseline'}
           </AppText>
         )}
-        <AppText variant="micro" tone="muted">
+        <AppText variant="gaugeLabel" tone="muted" style={centered ? undefined : good}>
           {highLabel ?? (centered ? 'Elevated' : 'Optimal')}
         </AppText>
       </Stack>

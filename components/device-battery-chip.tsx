@@ -87,7 +87,7 @@ export function DeviceBatteryChip({ devices }: { devices: DeviceBattery[] }) {
         const Icon = charging
           ? BatteryChargingIcon
           : percent >= 60 ? BatteryFullIcon : percent >= 25 ? BatteryMediumIcon : BatteryLowIcon
-        const tone = charging || percent >= 60 ? 'text-green-400' : percent >= 25 ? 'text-amber-400' : 'text-red-400'
+        const tone = charging || percent >= 60 ? 'text-accent-green' : percent >= 25 ? 'text-accent-amber' : 'text-destructive'
 
         return (
           <span

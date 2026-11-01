@@ -33,9 +33,12 @@ export interface TimingSessionRow {
   startedAt: number            // epoch ms
   completedAt: number | null   // epoch ms
   warmupEndedAt: number | null // epoch ms
+  /** Seconds the session spent paused (#3266); absent or null takes nothing off. */
+  pausedSec?: number | null
 }
 
 import { median, quantile } from '@trainingai/shared/stats'
+import { sessionActiveMin } from './active-duration'
 export { median } from '@trainingai/shared/stats'
 
 // Below this many kept samples, a median is a guess, not a signal — the UI dims
@@ -394,15 +397,20 @@ export function resolveTransitionSec(
   return transitionSecForEquipment(equipment)
 }
 
+// A session's time under way: its span less the time it spent paused (#3266), so a pause is not
+// counted as unaccounted time.
+const activeSec = (ws: TimingSessionRow) =>
+  sessionActiveMin(new Date(ws.startedAt), new Date(ws.completedAt!), ws.pausedSec) * 60
+
 export function decomposeSessions(
   sessions: TimingSessionRow[],
   sets: TimingSetRow[],
   exercises: TimingExerciseRow[],
 ): SessionDecomposition[] {
   return sessions
-    .filter(ws => ws.completedAt != null && (ws.completedAt - ws.startedAt) / 1000 >= MIN_SESSION_SEC)
+    .filter(ws => ws.completedAt != null && activeSec(ws) >= MIN_SESSION_SEC)
     .map(ws => {
-      const totalSec = Math.round((ws.completedAt! - ws.startedAt) / 1000)
+      const totalSec = Math.round(activeSec(ws))
       const wsSets = sets.filter(s => s.workoutSessionId === ws.workoutSessionId)
       const firstSetStart = wsSets
         .map(s => s.setStartMs)

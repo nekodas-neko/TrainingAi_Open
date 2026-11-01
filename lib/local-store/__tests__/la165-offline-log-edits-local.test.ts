@@ -23,6 +23,7 @@ const store = () => new SQLiteLocalStore()
 beforeEach(() => {
   db.current = new DatabaseSync(':memory:')
   db.current.exec(`
+    CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE mutations_outbox (id TEXT PRIMARY KEY, domain TEXT, payload TEXT);
     CREATE TABLE workout_sessions (id TEXT PRIMARY KEY, sync_status TEXT, updated_at TEXT, deleted_at TEXT);
     CREATE TABLE exercise_logs (id TEXT PRIMARY KEY, workout_session_id TEXT, sync_status TEXT, updated_at TEXT, deleted_at TEXT);

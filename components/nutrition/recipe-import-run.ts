@@ -2,6 +2,7 @@ import type { FoodItem, NutritionIngredient } from '@trainingai/shared/types/nut
 import { ingredientToEntry } from '@trainingai/shared/nutrition/log-plan-meal'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { readAiPausedMessage } from '@/lib/ai-paused-notice'
+import { QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds'
 import type { RecipeCandidate } from './recipe-candidates'
 
 export interface ImportedRecipe {
@@ -71,7 +72,7 @@ export async function runRecipeImport(
       const entry = ingredientToEntry(ing)
       const item = await createFoodItem(entry, userId)
       // The schema floor is 0.01, and a sub-gram garnish rounds to 0.00 two decimals in.
-      entries.push({ item, qty: Math.max(0.01, entry.quantityMultiplier) })
+      entries.push({ item, qty: Math.max(QUANTITY_MULTIPLIER_MIN, entry.quantityMultiplier) })
     }
     return {
       kind: 'imported',

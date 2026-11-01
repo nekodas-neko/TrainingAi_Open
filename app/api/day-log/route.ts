@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
-import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz, shiftDateStr, todayInTz } from "@trainingai/shared/date-utils";
+import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz, shiftDateStr, todayInTz, wallClockMinuteReader } from "@trainingai/shared/date-utils";
 import { ringValueStands } from '@trainingai/shared/health/source-rank'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
@@ -12,6 +12,7 @@ import { reportServerError } from '@/lib/observability'
 import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 import { dayStepCount } from '@trainingai/shared/health/activity-steps'
+import { sessionActiveMin } from '@trainingai/shared/workout/active-duration'
 
 export interface DayExercise {
   name: string;
@@ -86,7 +87,8 @@ export interface DayScores {
 
 /** One bucket of the day's HR trace. Deliberately coarse — see DAY_HR_BUCKET_MIN. */
 export interface DayHrPoint {
-  /** Minutes past local midnight at the START of the bucket. */
+  /** Local wall-clock minute of the day (0–1439) at the START of the bucket. On a 25-hour day the
+   *  repeated hour's readings share one bucket (their mean); a 23-hour day has none for its missing hour. */
   minute: number;
   bpm: number;
 }
@@ -220,7 +222,8 @@ export async function GET(req: NextRequest) {
     workoutDurationsById[ws.id] = {
       start: fmtMs(startMs),
       end:   fmtMs(endMs),
-      minutes: Math.round((endMs - startMs) / 60000),
+      // Active time: the span less any pause (#3266), the same figure every other screen shows.
+      minutes: Math.round(sessionActiveMin(new Date(startMs), new Date(endMs), ws.pausedSec)),
     };
   }
 
@@ -270,10 +273,26 @@ export async function GET(req: NextRequest) {
   // never blank the rest of the day, so they settle rather than reject.
   const dayMid = dateStrMidnightInTz(pgDate, tz);
   const nextMid = dateStrMidnightInTz(shiftDateStr(pgDate, 1), tz);
-  const [sleepRes, scoresRes, hrRes] = await Promise.allSettled([
-    repo.listSleepSessions(userId, pgDate, pgDate),
-    repo.getDerivedScoresForDay(userId, pgDate),
-    repo.getHrForWindow(userId, dayMid, nextMid),
+
+  // #2435: today's Activity score is no longer stored (a day is stored once it has ended), so for
+  // today it is scored live, by the same function the Activity screen uses. Without this the Move
+  // cell would be blank all day. It runs inside this batch (#3388), sharing the day's HR read with
+  // the trace below instead of fetching it a second time.
+  const hrRead = repo.getHrForWindow(userId, dayMid, nextMid);
+  const liveRead = pgDate === todayInTz(tz)
+    ? loadActivityDay(repo, userId, tz, pgDate, { hrRows: hrRead }).then(d => d.result?.score ?? null).catch(e => {
+        // A failed live score falls back to the stored value, but must leave an error_events row.
+        reportServerError(e, { userId, url: '/api/day-log' })
+        return null
+      })
+    : Promise.resolve(null);
+  const [[sleepRes, scoresRes, hrRes], liveActivity] = await Promise.all([
+    Promise.allSettled([
+      repo.listSleepSessions(userId, pgDate, pgDate),
+      repo.getDerivedScoresForDay(userId, pgDate),
+      hrRead,
+    ]),
+    liveRead,
   ]);
 
   // Q-274: this was `sleepRes.value[0]`. `listSleepSessions` orders by DATE only, so within a date
@@ -310,16 +329,6 @@ export async function GET(req: NextRequest) {
       }
     : null;
 
-  // #2435: today's Activity score is no longer stored (a day is stored once it has ended), so for
-  // today it is scored live, by the same function the Activity screen uses. Without this the Move
-  // cell would be blank all day.
-  const liveActivity = pgDate === todayInTz(tz)
-    ? await loadActivityDay(repo, userId, tz, pgDate).then(d => d.result?.score ?? null).catch(e => {
-        // A failed live score falls back to the stored value, but must leave an error_events row.
-        reportServerError(e, { userId, url: '/api/day-log' })
-        return null
-      })
-    : null;
   const scores: DayScores | null = derived || liveActivity != null
     ? {
         readiness: derived?.readinessScore ?? null,
@@ -333,8 +342,11 @@ export async function GET(req: NextRequest) {
   const hr: DayHrPoint[] = [];
   if (hrRes.status === "fulfilled" && hrRes.value.length > 0) {
     const sums = new Map<number, { total: number; n: number }>();
+    const wallMinute = wallClockMinuteReader(dayMid.getTime(), tz);
     for (const row of hrRes.value) {
-      const mins = Math.floor((row.timestamp.getTime() - dayMid.getTime()) / 60_000);
+      // The clock-face minute, not minutes elapsed: on a 23- or 25-hour day the two part ways by an
+      // hour after the change, and the trace (and its x-axis) read the clock (#3428).
+      const mins = wallMinute(row.timestamp.getTime());
       if (mins < 0 || mins >= 1440) continue;
       const bucket = Math.floor(mins / DAY_HR_BUCKET_MIN) * DAY_HR_BUCKET_MIN;
       const cur = sums.get(bucket) ?? { total: 0, n: 0 };

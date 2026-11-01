@@ -19,6 +19,8 @@ const repo = {
   getUserIdByOuraUserId: vi.fn(async (id: string) => (id === OURA_USER && row ? USER : null)),
   getOuraCloudTokens: vi.fn(async (id: string) => (row?.userId === id ? row : null)),
   saveOuraCloudTokens: vi.fn(async () => {}),
+  touchOuraCloudWebhook: vi.fn(async () => {}),
+  touchOuraCloudData: vi.fn(async () => {}),
   deleteOuraCloudTokens: vi.fn(async () => true),
   upsertOuraDaily: vi.fn(async (_u: string, rows: { date: string }[]) => { written.push(...rows.map(r => `daily:${r.date}`)) }),
   upsertBodyMetrics: vi.fn(async () => {}),
@@ -79,7 +81,7 @@ describe('/api/oura/webhook (#2859)', () => {
       userId: USER,
       accessToken: encryptOuraToken('acc', USER, 'access_token'),
       refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-      expiresAt: new Date(Date.now() + 86_400_000), scope: 'daily', ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000), scope: 'daily', ouraUserId: OURA_USER, updatedAt: new Date(), reauthRequiredAt: null, lastWebhookAt: null, lastDataAt: null,
     }
     written.length = 0
     rateLimit.mockReturnValue(true)

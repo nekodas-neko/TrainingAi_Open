@@ -15,11 +15,11 @@ import { shiftDateStr } from '@trainingai/shared/date-utils'
 const listTrainedDayKeys = vi.fn(async () => [] as string[])
 const listRestDays = vi.fn(async () => [] as string[])
 const getActiveProgram = vi.fn(async () => null as unknown)
-// RV-63 — these were `listBodyMetrics`/`listSleepSessions` read in full and projected to `.date`.
+// RV-63 — step days now come from `listStepTotals` (one read, not two). The step and sleep reads
+// were `listBodyMetrics`/`listSleepSessions` read in full and projected to `.date`.
 // The `> 0` predicate moved into SQL with them, so the two cases below that used to prove it at
 // this layer now prove it in `lib/data/postgres/__tests__/rv63-collection-day-keys.test.ts`
 // against a real Postgres. The guarantee moved with the code rather than being dropped.
-const listStepDayKeys = vi.fn(async () => [] as string[])
 const listSleepDayKeys = vi.fn(async () => [] as string[])
 const listStepTotals = vi.fn(async () => [] as { date: string; steps: number }[])
 const listFoodLogDayKeys = vi.fn(async () => [] as string[])
@@ -28,7 +28,7 @@ const listCardioSessionCounts = vi.fn(async () => [] as { date: string; sessions
 
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u-1', timezone: 'Australia/Brisbane' } }) }))
 vi.mock('@/lib/data', () => ({
-  getRepository: async () => ({ listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys, listStepTotals, listFoodLogDayKeys, listWeightDayKeys, listCardioSessionCounts }),
+  getRepository: async () => ({ listTrainedDayKeys, listRestDays, getActiveProgram, listSleepDayKeys, listStepTotals, listFoodLogDayKeys, listWeightDayKeys, listCardioSessionCounts }),
 }))
 
 import { GET } from '@/app/api/collection/route'
@@ -58,11 +58,11 @@ const runTo = (endExclusiveOffset: number, n: number, today: string) => {
 }
 
 beforeEach(() => {
-  for (const m of [listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys, listCardioSessionCounts]) m.mockClear()
+  for (const m of [listTrainedDayKeys, listRestDays, getActiveProgram, listSleepDayKeys, listCardioSessionCounts]) m.mockClear()
   listTrainedDayKeys.mockResolvedValue([])
   listRestDays.mockResolvedValue([])
   getActiveProgram.mockResolvedValue(null)
-  listStepDayKeys.mockResolvedValue([])
+  listStepTotals.mockResolvedValue([])
   listSleepDayKeys.mockResolvedValue([])
   listCardioSessionCounts.mockResolvedValue([])
 })
@@ -151,7 +151,7 @@ describe('GET /api/collection assembles what the fold needs', () => {
   it('spawns one cat per day it is given, with no threshold of its own', async () => {
     const today = (await body()).today
     const [d1, d2] = runTo(0, 2, today)
-    listStepDayKeys.mockResolvedValue([d1, d2])
+    listStepTotals.mockResolvedValue([d1, d2].map(date => ({ date, steps: 1 })))
     listSleepDayKeys.mockResolvedValue([d1, d2])
 
     const json = await body()
@@ -160,7 +160,7 @@ describe('GET /api/collection assembles what the fold needs', () => {
   })
 
   it('spawns nothing when the reads return no recorded days', async () => {
-    listStepDayKeys.mockResolvedValue([])
+    listStepTotals.mockResolvedValue([])
     listSleepDayKeys.mockResolvedValue([])
 
     const json = await body()
@@ -176,7 +176,7 @@ describe('GET /api/collection assembles what the fold needs', () => {
     const today = json0.today
     // A gap one wider than the allowance decays exactly once.
     const days = [runTo(0, 1, today)[0], runTo(STEPS_MAX_REST_GAP + 2, 1, today)[0]].sort()
-    listStepDayKeys.mockResolvedValue(days)
+    listStepTotals.mockResolvedValue(days.map(date => ({ date, steps: 1 })))
 
     const json = await body()
     expect(json.collections.steps.decayEvents).toBe(1)

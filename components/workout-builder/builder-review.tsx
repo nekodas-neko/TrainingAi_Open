@@ -557,7 +557,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                             <ChevronDown className={cn('h-2.5 w-2.5 transition-transform', roleOpen === swapKey && 'rotate-180')} />
                           </button>
                           {ex.exerciseRole === 'primary' && (ex.mainMuscles.length + ex.secondaryMuscles.length) <= 1 && (
-                            <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-500"><TriangleAlert className="w-2.5 h-2.5" /> isolation</span>
+                            <span className="flex items-center gap-0.5 text-[10px] font-semibold text-accent-amber"><TriangleAlert className="w-2.5 h-2.5" /> isolation</span>
                           )}
                           <span className="text-[10px] text-muted-foreground">
                             {ex.mainMuscles.join(', ')}

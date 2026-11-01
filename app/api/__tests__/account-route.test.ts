@@ -151,13 +151,14 @@ describe('DELETE /api/account (#2120)', () => {
       })
     }
 
-    it('revokes a connected user\'s grant once, then deletes the account', async () => {
+    it('deletes the account, then revokes a connected user\'s grant once', async () => {
       connected()
       const res = await del({ confirm: 'DELETE' })
       expect(res.status).toBe(200)
       expect(fetchMock).toHaveBeenCalledTimes(1)
       expect(String(fetchMock.mock.calls[0][0])).toContain('/oauth/revoke')
-      expect(fetchMock.mock.invocationCallOrder[0]).toBeLessThan(deleteAccount.mock.invocationCallOrder[0])
+      // Revoked only after the deletion committed, so a failed deletion leaves Oura connected.
+      expect(deleteAccount.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0])
       expect(deleteAccount).toHaveBeenCalledWith(sessionUser)
     })
 
@@ -179,7 +180,7 @@ describe('DELETE /api/account (#2120)', () => {
 
     it('still deletes when the token store throws, and logs no token', async () => {
       connected()
-      deleteOuraCloudTokens.mockRejectedValue(new Error('connection terminated'))
+      getOuraCloudTokens.mockRejectedValue(new Error('connection terminated'))
       const logged = vi.mocked(console.error).mock.calls.length
       const res = await del({ confirm: 'DELETE' })
       expect(res.status).toBe(200)
@@ -187,6 +188,15 @@ describe('DELETE /api/account (#2120)', () => {
       expect(reportServerError).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ userId: sessionUser }))
       const lines = vi.mocked(console.error).mock.calls.slice(logged).flat().map(String).join(' ')
       expect(lines).not.toContain(ACCESS)
+    })
+
+    it('a failed deletion leaves the Oura grant alone: no revoke, tokens not touched', async () => {
+      connected()
+      deleteAccount.mockRejectedValueOnce(new Error('deadlock detected'))
+      const res = await del({ confirm: 'DELETE' })
+      expect(res.status).toBe(500)
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(deleteOuraCloudTokens).not.toHaveBeenCalled()
     })
 
     it('makes no call to Oura for a user with no grant', async () => {

@@ -218,7 +218,7 @@ export function PreWorkoutScreen({
       </header>
 
       {phaseStatus?.isDeloadActive && (
-        <div className="mx-4 mt-3 rounded-xl bg-amber-500/15 border border-amber-500/30 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
+        <div className="mx-4 mt-3 rounded-xl bg-accent-amber/15 border border-accent-amber/30 px-4 py-2 text-sm text-accent-amber">
           {phaseStatus.phase.phaseType === 'deload'
             ? phaseStatus.openEnded
               ? `Deload — ${phaseStatus.phase.name} · Session ${phaseStatus.phaseSessionNumber}`
@@ -328,7 +328,7 @@ export function PreWorkoutScreen({
         ) : (
           <div className="space-y-2">
             {prescriptionGenTimedOut ? (
-              <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-accent-amber/30 bg-accent-amber/10 px-3 py-2 text-xs text-accent-amber">
                 <TriangleAlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 <span>Couldn&apos;t generate your AI prescription just now — showing your base program. Tap refresh to try again.</span>
               </div>
@@ -351,7 +351,7 @@ export function PreWorkoutScreen({
                       while a fresh plan is being prepared: that heading already says the numbers are
                       about to be replaced, and two provenance claims on one line read as neither. */}
                   {sourceLabel && (
-                    <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium normal-case tracking-normal text-amber-600 dark:text-amber-400">
+                    <span className="rounded-full border border-accent-amber/30 bg-accent-amber/10 px-2 py-0.5 text-xs font-medium normal-case tracking-normal text-accent-amber">
                       {sourceLabel}
                     </span>
                   )}
@@ -366,7 +366,7 @@ export function PreWorkoutScreen({
                   className={cn(
                     "w-full flex items-center justify-between rounded-xl px-3 py-3 transition-all border",
                     doneToday
-                      ? "border-green-500/30 bg-green-500/10"
+                      ? "border-accent-green/30 bg-accent-green/10"
                       : "border-border bg-muted/80",
                   )}
                   style={!doneToday ? { background: "linear-gradient(135deg, color-mix(in oklch, var(--color-brand) 15%, transparent), color-mix(in oklch, var(--color-brand) 5%, transparent))", borderColor: "color-mix(in oklch, var(--color-brand) 35%, transparent)" } : {}}
@@ -378,7 +378,7 @@ export function PreWorkoutScreen({
                     >
                       <p className="flex items-center gap-2 min-w-0 font-medium">
                         <span className="truncate">{ex.name}</span>
-                        {doneToday && <CheckIcon className="h-4 w-4 text-green-500 flex-none" />}
+                        {doneToday && <CheckIcon className="h-4 w-4 text-accent-green flex-none" />}
                       </p>
                       {((ex.mainMuscles?.length ?? 0) + (ex.secondaryMuscles?.length ?? 0) > 0) && (
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -395,7 +395,7 @@ export function PreWorkoutScreen({
                         </div>
                       )}
                       {ex.styleName && !ex.progressionStyle && (
-                        <p className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 mt-0.5"><TriangleAlertIcon className="w-3 h-3" /> Style not found</p>
+                        <p className="flex items-center gap-1 text-xs text-accent-amber mt-0.5"><TriangleAlertIcon className="w-3 h-3" /> Style not found</p>
                       )}
                       {ex.lastDate ? (
                         <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
@@ -437,7 +437,7 @@ export function PreWorkoutScreen({
                           // meant for it — the failure mode Q-160 measured on the carousel dots.
                           "tap-dense mt-1.5 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-medium",
                           ex.deloaded
-                            ? "border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                            ? "border-accent-amber/30 bg-accent-amber/15 text-accent-amber"
                             : "border-border bg-muted text-muted-foreground",
                         )}
                       >
@@ -473,7 +473,7 @@ export function PreWorkoutScreen({
           // earlier today, or app restarted). The green "Complete Workout" CTA here
           // would complete a freshly-minted, never-created session id → 404 + a
           // dead-lettering outbox mutation + an empty done screen. Show a done state.
-          <div className="flex h-14 w-full items-center justify-center rounded-md bg-green-500/10 text-base font-semibold text-green-600">
+          <div className="flex h-14 w-full items-center justify-center rounded-md bg-accent-green/10 text-base font-semibold text-accent-green">
             <CheckIcon className="mr-2 h-5 w-5" />
             Done for today
           </div>

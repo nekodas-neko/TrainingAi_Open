@@ -29,5 +29,6 @@ export type MoreDetail =
   | 'more-devices'
   | 'more-signed-in-devices'
   | 'more-account'
+  | 'more-admin'
   | 'year-review'
   | 'collection';

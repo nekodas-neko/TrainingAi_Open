@@ -1,11 +1,10 @@
-import type { ReactNode } from 'react';
-import { PixelRatio, Pressable, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, View } from 'react-native';
 import { AppButton } from './AppButton';
 import { AppText } from './AppText';
 import { IconButton } from './IconButton';
 import { Stack } from './Stack';
-import { monthGrid, stackCalendarTitle } from './monthGrid';
-import { textScale } from '../theme/text-scale';
+import { calendarTitleStacked, monthGrid } from './monthGrid';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function MonthCalendar({
@@ -35,11 +34,16 @@ export function MonthCalendar({
   /** Date at the top of its cell, leaving the bottom for the dots. Fixed for the host's
    *  lifetime (not tied to loading) so dates never move when data lands. */
   topAligned?: boolean;
-  /** Heading drawn on the same row as the month controls, as the current app's calendar does. */
+  /** Heading over the month controls, or beside them when the row has room for it on one line. */
   title?: string;
 }) {
   const { theme } = useTheme();
   const [year, number] = month.split('-').map(Number);
+  // Measured widths decide whether the title fits beside the controls; until all three land it
+  // stacks, which is where a phone ends up anyway.
+  const [rowWidth, setRowWidth] = useState<number | null>(null);
+  const [controlsWidth, setControlsWidth] = useState<number | null>(null);
+  const [titleWidth, setTitleWidth] = useState<number | null>(null);
   const { first, count, cells } = monthGrid(month);
   function move(offset: number) {
     const date = new Date(Date.UTC(year, number - 1 + offset, 1));
@@ -66,7 +70,15 @@ export function MonthCalendar({
   );
   // The current app's w-24 month label between the arrows, 4 px apart.
   const controls = (
-    <Stack direction="row" align="center" gap="xs" style={{ flexShrink: 0 }}>
+    <Stack
+      direction="row"
+      align="center"
+      gap="xs"
+      // flex-start keeps the measured width natural once stacked, where a column would stretch it
+      // to the block and pin the title above for good.
+      style={{ flexShrink: 0, alignSelf: 'flex-start' }}
+      onLayout={(event) => setControlsWidth(event.nativeEvent.layout.width)}
+    >
       {back}
       <AppText
         variant="calendarDay"
@@ -83,11 +95,30 @@ export function MonthCalendar({
       {forward}
     </Stack>
   );
-  const stacked = !!title && stackCalendarTitle(textScale(PixelRatio.getFontScale()));
+  // The gap is the shared row's own (Stack's default, sm).
+  const stacked =
+    !!title &&
+    calendarTitleStacked(
+      rowWidth !== null && controlsWidth !== null && titleWidth !== null
+        ? { rowWidth, controlsWidth, titleWidth, gap: theme.spacing.sm }
+        : null,
+    );
   return (
-    <Stack>
+    <Stack onLayout={title ? (event) => setRowWidth(event.nativeEvent.layout.width) : undefined}>
       {title ? (
         <Stack gap={stacked ? 'xs' : 'none'}>
+          {/* Invisible one-line copy of the title, to learn the width it needs. */}
+          <AppText
+            variant="groupTitle"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            pointerEvents="none"
+            numberOfLines={1}
+            onLayout={(event) => setTitleWidth(Math.ceil(event.nativeEvent.layout.width))}
+            style={{ position: 'absolute', opacity: 0, alignSelf: 'flex-start' }}
+          >
+            {title}
+          </AppText>
           <Stack direction="row" align="center" justify="space-between">
             <AppText
               variant="groupTitle"

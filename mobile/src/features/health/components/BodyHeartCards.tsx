@@ -4,6 +4,7 @@ import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr';
 import { rangeStats } from '@trainingai/shared/health/range-stats';
 import { AppButton, AppText, Card, Disclosure, Grid, LineChart, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { bandColor } from '../../../shared/theme/tokens';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { blockTrendView, type BlockTrendView } from '../data/block-trend-view';
@@ -287,6 +288,7 @@ function BlockTrend({ view, loaded }: { view: BlockTrendView; loaded: boolean })
  * as in the current app.
  */
 export function TrainingLoadCard() {
+  const { theme } = useTheme();
   const load = useWorkoutResource(loadSpec);
   const interpretation = load.data?.interpretation;
   const insufficient =
@@ -324,7 +326,7 @@ export function TrainingLoadCard() {
             variant="title"
             style={{
               fontVariant: ['tabular-nums'],
-              color: bandKey ? acwrBandByKey(bandKey).color : undefined,
+              color: bandKey ? bandColor(acwrBandByKey(bandKey).color, theme.status) : undefined,
             }}
           >
             {load.data!.acwr!.toFixed(2)}

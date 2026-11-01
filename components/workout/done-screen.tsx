@@ -284,7 +284,7 @@ export function DoneScreen({
             </p>
           )}
           {calendarAdded && (
-            <p className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center justify-center gap-1.5">
+            <p className="mt-2 text-xs text-accent-green flex items-center justify-center gap-1.5">
               <CalendarIcon className="h-3 w-3" />
               Added to Google Calendar
             </p>
@@ -471,7 +471,7 @@ export function DoneScreen({
                         <span className="truncate">{ex.exerciseName}</span>
                         <span className="flex-none opacity-60">&nbsp;· {ex.sampleCount}/{ex.totalSets} sets</span>
                       </span>
-                      <span className={ex.adequate === false ? 'text-red-400' : ex.adequate ? 'text-green-400' : 'text-muted-foreground'}>
+                      <span className={ex.adequate === false ? 'text-destructive' : ex.adequate ? 'text-accent-green' : 'text-muted-foreground'}>
                         {formatRecoveryRate(ex.medianHrr1)}
                         {ex.adequate === true ? ' ✓' : ex.adequate === false ? ' ✗' : ''}
                       </span>
@@ -481,7 +481,7 @@ export function DoneScreen({
               </>
             ) : hrError ? (
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] text-red-400">Couldn&apos;t load HR data.</p>
+                <p className="text-[10px] text-destructive">Couldn&apos;t load HR data.</p>
                 <button
                   type="button"
                   onClick={loadHr}

@@ -5,6 +5,7 @@ import { CompleteWorkoutPayloadSchema } from '@trainingai/shared/workout/complet
 import { EditedAtSchema } from '@trainingai/shared/sync/edited-at';
 import type { PendingWrite } from '../../../core/sync/pushMutation.ts';
 import type { CatalogIdentity, SessionPreview } from '../catalog.ts';
+import { workoutFlow } from './flow.ts';
 import { measuredExerciseTiming } from './timing.ts';
 import { expectedRpe, initialWeight, prescribedWeight } from './targets.ts';
 import {
@@ -97,6 +98,11 @@ const workoutSchema = z.object({
       exerciseId: z.uuid(),
     })
     .optional(),
+  // A pause (#3266): `pausedAt` is when the current one began, `pausedMs` the total of the ones
+  // already ended. Resuming moves the rest and running-set anchors forward by the pause, so every
+  // clock that reads "now minus an anchor" has stood still without being told about it.
+  pausedAt: timestamp.nullable().default(null),
+  pausedMs: z.number().int().min(0).max(86_400_000).default(0),
   completedAt: timestamp.nullable(),
   status: z.enum(['active', 'completed', 'discarded']),
   exercises: z.array(exerciseSchema).min(1),
@@ -341,6 +347,8 @@ export function mutationFor(
       payload: CompleteWorkoutPayloadSchema.parse({
         workoutSessionId: workout.id,
         completedAtMs: workout.completedAt,
+        // Only a workout that was paused says so: the rest stay as they were before pause existed.
+        ...(workout.pausedMs > 0 ? { pausedSec: Math.round(workout.pausedMs / 1000) } : {}),
       }),
     };
   }
@@ -423,9 +431,77 @@ export function mutationFor(
   return { id: item.id, domain: item.domain, date: workout.date, payload };
 }
 
+/**
+ * How long the workout has been under way: its span less the time it spent paused. Frozen while a
+ * pause is open, and the figure the Total clock, the energy estimate and the saved duration read.
+ */
+export function activeElapsedMs(workout: WorkoutRecord, now: number): number {
+  const end = workout.completedAt ?? workout.pausedAt ?? now;
+  return Math.max(0, end - workout.startedAt - workout.pausedMs);
+}
+
+/** Pauses the exercises: not the warm-up or the review, which have nothing to freeze (#3266). */
+export function pauseWorkout(workout: WorkoutRecord, now: number): WorkoutRecord {
+  if (workout.status !== 'active') {
+    throw new Error('This workout is already finished.');
+  }
+  if (workout.pausedAt !== null) {
+    throw new Error('This workout is already paused.');
+  }
+  const stage = workoutFlow(workout).stage;
+  if (stage === 'warmup' || stage === 'review') {
+    throw new Error('A workout can be paused during its exercises.');
+  }
+  return { ...workout, pausedAt: Math.max(now, workout.startedAt) };
+}
+
+/**
+ * Ends a pause. The rest, the running set and a waiting exercise's preparation each move forward
+ * by the pause, so what had elapsed when it began is what has elapsed now.
+ */
+export function resumeWorkout(workout: WorkoutRecord, now: number): WorkoutRecord {
+  if (workout.status !== 'active') {
+    throw new Error('This workout is already finished.');
+  }
+  if (workout.pausedAt === null) {
+    throw new Error('This workout is not paused.');
+  }
+  const length = Math.max(0, now - workout.pausedAt);
+  const later = (at: number) => at + length;
+  return {
+    ...workout,
+    pausedAt: null,
+    pausedMs: Math.min(86_400_000, workout.pausedMs + length),
+    rest: workout.rest
+      ? { ...workout.rest, startedAt: later(workout.rest.startedAt), endsAt: later(workout.rest.endsAt) }
+      : null,
+    restAnchor: workout.restAnchor
+      ? { ...workout.restAnchor, startedAt: later(workout.restAnchor.startedAt) }
+      : null,
+    exercises: workout.exercises.map((exercise) => {
+      const waiting =
+        exercise.readyStartedAt !== null &&
+        !exercise.sets.some((set) => set.startedAt !== null || set.completedAt !== null);
+      return {
+        ...exercise,
+        readyStartedAt: waiting ? later(exercise.readyStartedAt!) : exercise.readyStartedAt,
+        sets: exercise.sets.map((set) =>
+          set.id === workout.runningSet?.setId && set.startedAt !== null
+            ? { ...set, startedAt: later(set.startedAt) }
+            : set,
+        ),
+      };
+    }),
+  };
+}
+
 export function finishWorkout(workout: WorkoutRecord, now: number): WorkoutRecord {
   if (workout.status !== 'active') {
     throw new Error('This workout is already finished.');
+  }
+  // Finishing from a pause ends it at the finish, so the time stays out of the duration.
+  if (workout.pausedAt !== null) {
+    workout = resumeWorkout(workout, now);
   }
   if (workout.runningSet) {
     throw new Error('Record the running set before finishing.');

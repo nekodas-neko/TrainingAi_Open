@@ -120,6 +120,7 @@ test('the snapshot is version 1 and carries every value already formatted', () =
   assert.equal(snapshot.v, 1);
   assert.equal(snapshot.user, 'user-one');
   assert.equal(snapshot.date, today);
+  assert.equal(snapshot.tz, 'Australia/Sydney', "the widget judges today in the profile's zone, so the snapshot names it");
   assert.equal(snapshot.updated, 'Updated 7:42 am');
   assert.deepEqual(snapshot.today.scores.map((s) => [s.label, s.value]), [['Readiness', '78'], ['Resting HR', '52'], ['Sleep', '84'], ['Activity', '61']]);
   assert.deepEqual(snapshot.today.scores[0]!.color, { dark: '#60a5fa', light: '#2563eb' });
@@ -314,7 +315,7 @@ test('kcal is null when the calorie target gives a remaining but the energy budg
 });
 
 test("the widget's Body Battery is the figure and band Home's Energy hero draws", () => {
-  // Woke at 80, fell to 22, recharged to 64: the hero draws the day's low, so the widget must too.
+  // Woke at 80, fell to 22, recharged to 64: the hero draws the current level, so the widget must too.
   const data = {
     hasData: true,
     current: 64,
@@ -332,7 +333,7 @@ test("the widget's Body Battery is the figure and band Home's Energy hero draws"
     value: String(hero.level),
     label: `${hero.label} · Charging`,
     level: hero.level,
-    band: 'drained',
+    band: 'good',
   });
-  assert.equal(battery!.value, '22');
+  assert.equal(battery!.value, '64');
 });

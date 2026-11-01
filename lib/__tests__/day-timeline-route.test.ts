@@ -231,6 +231,12 @@ describe('/api/day-timeline — workouts', () => {
     expect(earlier.exerciseNames).toEqual(['Press', 'Row'])
   })
 
+  it('reports active minutes, with a pause taken out', async () => {
+    getWorkoutSessionsFrom.mockResolvedValue([workout({ pausedSec: 1200 })])
+    const [ev] = await eventsOf('workout')
+    expect(ev.durationMin).toBe(40)
+  })
+
   // The repository is asked from yesterday's start, so it can return older rows; the route's own
   // window is what keeps them off the timeline.
   it('drops a session outside the two days it draws', async () => {

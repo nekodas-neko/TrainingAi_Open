@@ -68,10 +68,10 @@ export function ObservedHrCard() {
           <span className="tabular-nums">{data.restingHr}</span>.
         </p>
         {maxNote.detail && (
-          <p className="text-amber-600 dark:text-amber-400">{maxNote.detail}</p>
+          <p className="text-accent-amber">{maxNote.detail}</p>
         )}
         {!obs.isReliable && !maxNote.standIn && (
-          <p className="text-amber-600 dark:text-amber-400">
+          <p className="text-accent-amber">
             Not enough monitored heart-rate data yet for a confident max — a few harder sessions with
             heart rate recorded will sharpen it. Using the age estimate for now.
           </p>
@@ -87,7 +87,7 @@ export function ObservedHrCard() {
           </p>
         )}
         {obs.outOfBandRejected > 0 && (
-          <p className="text-amber-600 dark:text-amber-400">
+          <p className="text-accent-amber">
             {obs.outOfBandRejected} reading{obs.outOfBandRejected === 1 ? " was" : "s were"} discarded as
             impossible (outside 30&ndash;220&nbsp;bpm) — worth a look if that count keeps climbing.
           </p>

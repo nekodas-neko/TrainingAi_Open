@@ -176,7 +176,7 @@ export function VoiceLogButton({ onResult }: { onResult: (weight?: number, reps?
           hint, no first-run text. One example, always on the line the error uses, so the layout
           does not shift when a parse fails. */}
       {error
-        ? <p className="text-[10px] text-red-600 dark:text-red-400">{error}</p>
+        ? <p className="text-[10px] text-destructive">{error}</p>
         : <p className="text-[10px] text-muted-foreground">{listening ? 'Say the weight and reps' : `Say "${VOICE_LOG_EXAMPLE}"`}</p>}
     </div>
   )

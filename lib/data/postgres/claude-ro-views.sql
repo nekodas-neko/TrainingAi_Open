@@ -602,6 +602,7 @@ SELECT
   t.barcode,
   t.region,
   t.created_at,
+  t.deleted_at,
   octet_length(t.image_data_uri) AS image_bytes
 FROM public.food_items t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
@@ -1746,7 +1747,8 @@ SELECT
   t.source_map,
   t.manual_sleep_start,
   t.manual_entry,
-  t.deleted_at
+  t.deleted_at,
+  t.partial_night_at
 FROM public.sleep_sessions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

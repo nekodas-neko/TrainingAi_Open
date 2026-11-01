@@ -303,5 +303,5 @@ test('an unknown load shows nothing, never an invented 60 kg × 10 (#3266)', () 
   base.runningSet = { exerciseId: ids.bench, setId: ids.set(2) };
   base.exercises[0].weightUnit = 'lb';
   base.exercises[0].sets[1] = { ...base.exercises[0].sets[1], weight: '7.5', reps: '8' };
-  assert.equal(loadOf(), '16.53 lb × 8', 'a pound exercise shows the kg weight converted, as the wheel');
+  assert.equal(loadOf(), '7.5 kg × 8', 'a pound exercise still reads in kg; only the entry wheel shows pounds');
 });

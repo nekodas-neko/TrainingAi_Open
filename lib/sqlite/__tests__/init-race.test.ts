@@ -84,3 +84,117 @@ describe('runSQL during the initSQLite window', () => {
     expect(run).not.toHaveBeenCalled()
   })
 })
+
+// #3435: `querySQL` answers [] for a database that is not open, so a caller that reads "no rows" as
+// "nothing to lose" (`deviceHasLocalData`) takes `querySQLOpen`, which throws instead.
+describe('querySQLOpen', () => {
+  beforeEach(() => {
+    native = true
+    query.mockClear()
+    open.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('throws, where querySQL answers [], when init was never started', async () => {
+    vi.useFakeTimers()
+    try {
+      const svc = await freshService()
+      await expect(svc.querySQL('SELECT 1')).resolves.toEqual([])
+      const read = expect(svc.querySQLOpen('SELECT 1')).rejects.toThrow(/not open/)
+      await vi.advanceTimersByTimeAsync(3_100)
+      await read
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // #3445: the store-owner check can ask on a first launch before init has been called.
+  it('waits briefly for init to begin, then reads, rather than throwing', async () => {
+    vi.useFakeTimers()
+    try {
+      const svc = await freshService()
+      query.mockResolvedValue({ values: [{ x: 1 }] })
+      const read = svc.querySQLOpen('SELECT 1 AS x')
+      await vi.advanceTimersByTimeAsync(500)
+      void svc.initSQLite([])
+      await vi.advanceTimersByTimeAsync(100)
+      await expect(read).resolves.toEqual([{ x: 1 }])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not wait when init already failed: that is a known answer, not a late start', async () => {
+    const svc = await freshService()
+    open.mockRejectedValue(new Error('upgrade failed'))
+    await expect(svc.initSQLite([])).rejects.toThrow()
+    vi.useFakeTimers()
+    try {
+      let settled = false
+      const read = svc.querySQLOpen('SELECT 1').catch(e => { settled = true; return e })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(settled).toBe(true)
+      expect((await read).message).toMatch(/not open/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('throws when the DB failed to open', async () => {
+    const svc = await freshService()
+    open.mockRejectedValue(new Error('upgrade failed'))
+    await expect(svc.initSQLite([])).rejects.toThrow()
+    await expect(svc.querySQLOpen('SELECT 1')).rejects.toThrow(/not open/)
+  })
+
+  it('waits for an in-flight open and then reads', async () => {
+    const svc = await freshService()
+    query.mockResolvedValue({ values: [{ x: 1 }] })
+    let releaseOpen: () => void = () => {}
+    const opened = new Promise<void>(res => { releaseOpen = res })
+    open.mockImplementation(() => opened)
+    const init = svc.initSQLite([])
+    const read = svc.querySQLOpen('SELECT 1 AS x')
+    releaseOpen()
+    await init
+    await expect(read).resolves.toEqual([{ x: 1 }])
+  })
+
+  // #3456: `_db` is assigned at createConnection, before `open()` has finished, so a wait that keys
+  // on `_db` lets a read through to an unopened connection.
+  it('does not run a read before open() resolves, even once the connection object exists', async () => {
+    const svc = await freshService()
+    query.mockClear()
+    query.mockResolvedValue({ values: [{ x: 1 }] })
+    let releaseOpen: () => void = () => {}
+    const opened = new Promise<void>(res => { releaseOpen = res })
+    open.mockImplementation(() => opened)
+    const init = svc.initSQLite([])
+    await new Promise(r => setTimeout(r, 20)) // createConnection has resolved; open() has not
+    const read = svc.querySQL('SELECT 1 AS x')
+    await new Promise(r => setTimeout(r, 20))
+    expect(query).not.toHaveBeenCalled()
+    releaseOpen()
+    await init
+    await expect(read).resolves.toEqual([{ x: 1 }])
+  })
+
+  it('does not poll for init once it has begun', async () => {
+    const svc = await freshService()
+    query.mockResolvedValue({ values: [{ x: 1 }] })
+    let releaseOpen: () => void = () => {}
+    const opened = new Promise<void>(res => { releaseOpen = res })
+    open.mockImplementation(() => opened)
+    const init = svc.initSQLite([])
+    await new Promise(r => setTimeout(r, 20))
+    const timers = vi.spyOn(globalThis, 'setTimeout')
+    try {
+      const read = svc.querySQLOpen('SELECT 1 AS x')
+      releaseOpen()
+      await init
+      await expect(read).resolves.toEqual([{ x: 1 }])
+      expect(timers).not.toHaveBeenCalled()
+    } finally {
+      timers.mockRestore()
+    }
+  })
+})

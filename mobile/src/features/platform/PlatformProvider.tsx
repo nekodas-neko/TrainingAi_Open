@@ -21,6 +21,7 @@ import { PlatformStore } from './data/PlatformStore';
 import { CalendarStore } from './data/CalendarStore';
 import { AlertScheduler } from './data/AlertScheduler';
 import { planAlerts } from './data/alert-plan';
+import { useMealEstimateReminders } from '../meal-plans/useMealEstimateReminders';
 import {
   nativeAlerts,
   alertPermission,
@@ -33,7 +34,7 @@ const Context = createContext<{
   calendar: CalendarStore | null;
   alertError: string | null;
   permission: boolean;
-  enableAlerts: (key?: 'restAlerts' | 'walkCues') => Promise<void>;
+  enableAlerts: (key?: 'walkCues') => Promise<void>;
   refresh: () => void;
   opened: Record<string, unknown> | null;
 } | null>(null);
@@ -47,6 +48,11 @@ export function PlatformProvider({ children }: PropsWithChildren) {
   const [alertError, setAlertError] = useState<string | null>(null);
   const [opened, setOpened] = useState<Record<string, unknown> | null>(null);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  // Null while the day's meals cannot be known yet: the last answer stands, so a reminder already
+  // on screen is not cancelled by an app start that has not loaded its meals.
+  const mealReminders = useMealEstimateReminders();
+  const lastMealReminders = useRef<NonNullable<typeof mealReminders>>([]);
+  if (mealReminders) lastMealReminders.current = mealReminders;
   const requestedRestPermission = useRef<string | null>(null);
   const mounted = useRef(false);
   useEffect(() => {
@@ -107,8 +113,9 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       unsubscribe?.();
     };
   }, []);
+  // A paused workout's rest is not running down: no cue, until Resume moves its end on (#3255).
   const restWorkout = journal.data.workouts.find(
-    (x) => x.status === 'active' && x.rest && x.timers.restCues,
+    (x) => x.status === 'active' && x.rest && x.timers.restCues && x.pausedAt == null,
   );
   const restDeadline = restWorkout?.rest?.endsAt;
   const restCueId = restWorkout?.rest
@@ -163,7 +170,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
             journal.data.workouts,
             activity.session,
             Date.now(),
-            foreground,
+            lastMealReminders.current,
           ),
         )
       : '[]';
@@ -193,7 +200,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       void stores.calendar?.sync(journal.data.workouts, state.settings).catch(() => {});
   }, [state, stores.calendar, journal.ready, journal.data.workouts, tick]);
   const enableAlerts = useCallback(
-    async (key?: 'restAlerts' | 'walkCues') => {
+    async (key?: 'walkCues') => {
       if (!stores.settings) throw new Error('Sign in to enable alerts.');
       const allowed = await alertPermission(true);
       setPermission(allowed);

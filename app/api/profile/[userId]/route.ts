@@ -6,6 +6,7 @@ import { sql, eq } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { computeAchievements } from '@/lib/achievements'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { shownTrophyIds } from '@trainingai/shared/achievement-display'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ userId: string }> }) {
@@ -45,11 +46,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ userId:
 
   const unlocked = achievementsResult.achievements.filter(a => a.unlocked)
   const unlockedAchievementIds = unlocked.map(a => a.id)
-  const trophyCase = unlocked
-    .slice()
-    .sort((a, b) => b.xpReward - a.xpReward)
-    .slice(0, 3)
-    .map(a => a.id)
+  const trophyCase = shownTrophyIds(unlocked, user.trophyPins)
 
   return NextResponse.json({
     id: user.id,

@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { useStressDay } from '@/lib/hooks/use-stress-day'
-import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
+import { todayInTz, msToHHMMInTz, clockSkipOnDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { toSegments, coveredMinutes } from './stress-day'
 import { placeEvents, measuredCount, type DayEvent } from './stress-at-events'
 
@@ -77,7 +77,10 @@ export function StressDayChart(
 
   const series = data?.series
   const segments = useMemo(() => toSegments(series ?? [], tz), [series, tz])
-  const covered = useMemo(() => coveredMinutes(segments), [segments])
+  const covered = useMemo(
+    () => coveredMinutes(segments, clockSkipOnDay(dateStrMidnightInTz(day.replace(/\//g, '-'), tz).getTime(), tz)),
+    [segments, day, tz],
+  )
   // TN-35 — the day's events placed on the same axis. The owner's goal is attribution: the chart
   // answers WHEN a stressed window happened, and this answers what was happening then.
   const placed = useMemo(() => placeEvents(events ?? [], segments, tz), [events, segments, tz])

@@ -115,7 +115,7 @@ export function DeloadExplanation({ recommendation }: { recommendation: NextSess
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Your options</p>
             <Option color="#fbbf24" label="Deload" desc="Same session, lighter loads (~10–20% off). Keeps the movement and blood flow without adding fatigue." />
             <Option color="#818cf8" label="Rest" desc="Skip training. Full recovery — best when readiness is low or you feel run down." />
-            <Option color="#22c55e" label="Full" desc="Train as prescribed. Choose this if you feel good despite the signals above." />
+            <Option color="var(--accent-green)" label="Full" desc="Train as prescribed. Choose this if you feel good despite the signals above." />
           </div>
         </div>
       </CollapsibleContent>

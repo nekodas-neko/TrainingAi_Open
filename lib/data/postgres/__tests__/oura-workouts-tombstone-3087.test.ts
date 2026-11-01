@@ -70,6 +70,12 @@ describe.skipIf(!canRun)('oura_workouts tombstones (#3087)', () => {
     expect(await ids()).toEqual(['t3087-c'])
   })
 
+  it('a dry run counts what the sweep would tombstone and writes nothing (#3389)', async () => {
+    expect(await repo.tombstoneOuraWorkoutsAbsent(USER, { from: '2026-10-08', to: '2026-10-10', keepIds: ['t3087-a'], dryRun: true })).toBe(1)
+    expect(await ids()).toEqual(['t3087-a', 't3087-b', 't3087-c'])
+    expect((await stored()).every(r => r.deleted_at === null)).toBe(true)
+  })
+
   it('a workout Oura sends again is live again', async () => {
     await repo.tombstoneOuraWorkouts(USER, ['t3087-b'])
     await repo.upsertOuraWorkouts(USER, [workout('t3087-b', '2026-10-09')])

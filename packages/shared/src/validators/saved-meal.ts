@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { QUANTITY_MULTIPLIER_MIN, QUANTITY_MULTIPLIER_MAX } from '../nutrition/quantity-bounds'
 import { rejectMealImage, mealImageRejectionMessage } from '../nutrition/meal-image'
 
 export const SavedMealSchema = z.object({
@@ -8,7 +9,7 @@ export const SavedMealSchema = z.object({
   name: z.string().min(1).max(120),
   items: z.array(z.object({
     foodItemId: z.string().uuid(),
-    quantityMultiplier: z.number().min(0.01).max(100),
+    quantityMultiplier: z.number().min(QUANTITY_MULTIPLIER_MIN).max(QUANTITY_MULTIPLIER_MAX),
   })).max(100).default([]),
   // Portions the recipe makes. Bounded because it divides — a zero would make one portion infinite,
   // and nobody batch-cooks fifty. Defaults to 1 so an older client that does not send it is

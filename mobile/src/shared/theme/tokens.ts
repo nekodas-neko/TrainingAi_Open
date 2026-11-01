@@ -1,5 +1,4 @@
 import type { TextStyle } from 'react-native';
-import { TREND_COLOR } from '@trainingai/shared/health/strength-progress';
 
 export const spacing = {
   none: 0,
@@ -131,6 +130,8 @@ export const typography = {
   },
   // text-sm: body copy and descriptions.
   body: { fontSize: 14, lineHeight: 20 },
+  // text-sm leading-relaxed: a flowed paragraph, 1.625 x 14 px (the "Your week" digest).
+  bodyRelaxed: { fontSize: 14, lineHeight: 22.75 },
   // Typed text: the current app forces 16 px on every input (globals.css) so focusing never zooms.
   input: { fontSize: 16, lineHeight: 24 },
   // text-sm: a row or list label, at regular weight as the current app draws it.
@@ -148,6 +149,15 @@ export const typography = {
     textTransform: 'uppercase',
   },
   metric: { fontSize: 24, lineHeight: 30, fontWeight: '700' },
+  // energy-card.tsx: the calorie ring's centre, text-[22px] font-bold leading-none tracking-tight over
+  // a text-[9.5px] uppercase tracking-wider caption.
+  energyRingValue: { fontSize: 22, lineHeight: 22, fontWeight: '700', letterSpacing: -0.55 },
+  energyRingCaption: {
+    fontSize: 9.5,
+    lineHeight: 14.25,
+    letterSpacing: 0.475,
+    textTransform: 'uppercase',
+  },
   // bottom-nav.tsx: text-[10px] font-medium.
   tab: { fontSize: 10, lineHeight: 15, fontWeight: '500' },
   // screen-header.tsx: text-xl font-bold, the title of every tab page.
@@ -185,6 +195,34 @@ export const typography = {
   factorLabel: { fontSize: 11, lineHeight: 13.75 },
   factorValue: { fontSize: 11, lineHeight: 16.5, fontWeight: '600' },
   statUnit: { fontSize: 9, lineHeight: 13.5 },
+  // strength-progress-card.tsx: a row's value is text-xs font-bold leading-tight over a
+  // text-[9px] font-semibold leading-tight delta.
+  strengthRowValue: { fontSize: 12, lineHeight: 15, fontWeight: '700' },
+  strengthRowDelta: { fontSize: 9, lineHeight: 11.25, fontWeight: '600' },
+  // strength-trend-card.tsx: the exercise's current 1RM, text-lg font-black.
+  trendValue: { fontSize: 18, lineHeight: 28, fontWeight: '900' },
+  // contributor-detail.tsx: a text-[10px] font-semibold uppercase tracking-wider sub-heading
+  // (What it measures, Measured against, How to improve it) over text-[11px] leading-snug body.
+  explainerLabel: {
+    fontSize: 10,
+    lineHeight: 13.75,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  explainerBody: { fontSize: 11, lineHeight: 15.125 },
+  // readiness-breakdown.tsx: the weight footer, text-[10px].
+  explainerFooter: { fontSize: 10, lineHeight: 15 },
+  // contributor-details.tsx: the factor badge, text-[10px] font-bold uppercase tracking-wide.
+  explainerBadge: {
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '700',
+    letterSpacing: 0.25,
+    textTransform: 'uppercase',
+  },
+  // zone-gauge.tsx: the Needs work / Optimal labels under the gauge, text-[9px].
+  gaugeLabel: { fontSize: 9, lineHeight: 13.5 },
   // home-nutrition-card.tsx: the ring's centre, text-[9px] font-extrabold over a text-[7px] word.
   ringValue: { fontSize: 9, lineHeight: 9, fontWeight: '800' },
   ringWord: { fontSize: 7, lineHeight: 7 },
@@ -246,13 +284,29 @@ export const typography = {
 } satisfies Record<string, TextStyle>;
 export type Space = keyof typeof spacing;
 export type TextVariant = keyof typeof typography;
-// The four status colours. Dark values are the ones the app has always drawn (Tailwind 500 steps);
-// the light ones are darker steps that reach 4.5:1 for text on every light card background
-// (tests/light-contrast.test.ts). `info` is the cool step for a state that is neither good nor bad.
+// The four status colours. The first three are the current app's good / warning / bad tokens
+// (`--accent-green`, `--accent-amber`, `--destructive` in app/globals.css) as sRGB, so a band reads
+// the same in both apps (#2148). The light ones are darker steps that reach 4.5:1 for text on every
+// light card background (tests/light-contrast.test.ts); the web's light tokens miss that on the
+// tinted cards, so light keeps its own step. `info` is the cool step for a state that is neither good nor bad.
 export const statusColors = {
   light: { success: '#177a3c', warning: '#b04e06', danger: '#b91c1c', info: '#1d4ed8' },
-  dark: { success: '#22c55e', warning: '#f59e0b', danger: '#ef4444', info: '#60a5fa' },
+  dark: { success: '#56ee66', warning: '#efaf00', danger: '#ff6467', info: '#60a5fa' },
 };
+// The shared band modules (`acwr.ts`, `calorie-balance.ts`, `strength-progress.ts`, `score-band.ts`)
+// return the web tokens as `var(--…)`, which React Native cannot paint. This maps them to the status
+// colours for the theme in use and passes any other colour through untouched.
+const BAND_TOKEN = {
+  'var(--accent-green)': 'success',
+  'var(--accent-amber)': 'warning',
+  'var(--destructive)': 'danger',
+} as const;
+export function bandColor(color: string, status: typeof statusColors.dark): string;
+export function bandColor(color: string | undefined, status: typeof statusColors.dark): string | undefined;
+export function bandColor(color: string | undefined, status: typeof statusColors.dark) {
+  const key = color ? BAND_TOKEN[color as keyof typeof BAND_TOKEN] : undefined;
+  return key ? status[key] : color;
+}
 // home-day-timeline.tsx TYPE_ICON_COLOR: the 400 steps of indigo, blue, orange and green on a dark
 // card; a light card takes the darker steps so an icon stays readable.
 export const timelineHues = {
@@ -277,9 +331,9 @@ export const anatomyColors = {
     outline: 'rgba(128,128,128,0.3)',
   },
   dark: {
-    main: '#22c55e',
-    secondary: '#f59e0b',
-    injured: '#ef4444',
+    main: statusColors.dark.success,
+    secondary: statusColors.dark.warning,
+    injured: statusColors.dark.danger,
     untrained: '#3f3f3f',
     head: '#bebebe',
     outline: 'rgba(128,128,128,0.3)',
@@ -473,8 +527,8 @@ export const rewardColors = {
 export const progressColors = {
   light: {
     strength: '#7e22ce',
-    trendUp: '#166534',
-    trendDown: '#b91c1c',
+    trendUp: statusColors.light.success,
+    trendDown: statusColors.light.danger,
     // trends-section.tsx accentCardStyle('#8b5cf6'): the Trends card's tint.
     trends: '#8b5cf6',
     goals: {
@@ -487,8 +541,8 @@ export const progressColors = {
   },
   dark: {
     strength: '#bf5fff',
-    trendUp: TREND_COLOR.up,
-    trendDown: TREND_COLOR.down,
+    trendUp: statusColors.dark.success,
+    trendDown: statusColors.dark.danger,
     trends: '#8b5cf6',
     goals: {
       Steps: '#22c55e',

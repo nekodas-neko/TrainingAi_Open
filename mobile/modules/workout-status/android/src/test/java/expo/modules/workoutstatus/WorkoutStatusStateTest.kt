@@ -136,6 +136,11 @@ class WorkoutStatusStateTest {
     assertTrue(WorkoutStatusPolicy.isFreshOpen(now, 0))
     assertFalse(WorkoutStatusPolicy.isFreshOpen(now, now))
     assertFalse(WorkoutStatusPolicy.isFreshOpen(now - 1, now))
+    // A body tap, then Resume on the same notification: Resume is still fresh.
+    val tap = WorkoutStatusPolicy.openNonce(now, resume = false)
+    val resume = WorkoutStatusPolicy.openNonce(now, resume = true)
+    assertTrue(WorkoutStatusPolicy.isFreshOpen(resume, tap))
+    assertFalse(WorkoutStatusPolicy.isFreshOpen(tap, resume))
     assertTrue(WorkoutStatusPolicy.isFreshOpen(now + 1, now))
   }
 }

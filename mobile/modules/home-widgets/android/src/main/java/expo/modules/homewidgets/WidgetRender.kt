@@ -4,7 +4,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import java.time.LocalDate
 
 /** What every widget needs to draw itself. */
 internal object WidgetRender {
@@ -14,9 +13,6 @@ internal object WidgetRender {
   fun isNight(context: Context): Boolean =
     context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
       Configuration.UI_MODE_NIGHT_YES
-
-  /** The date on the phone's clock, the same one the snapshot's date is compared with. */
-  fun localToday(): String = LocalDate.now().toString()
 
   /**
    * Opens the app, asking it to go to `target` (src/features/widgets/launch-target.ts). Each target

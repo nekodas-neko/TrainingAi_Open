@@ -161,7 +161,7 @@ export function DataCaptureConsole() {
                 {probe.kind === 'client' && <span className="ml-1 text-[10px] text-[color:var(--muted-foreground)]">on-device</span>}
               </span>
               {r && r !== 'running' && !r.ok && (
-                <span className="max-w-[45%] truncate text-[11px] text-red-600 dark:text-red-400" title={r.error}>{r.error}</span>
+                <span className="max-w-[45%] truncate text-[11px] text-destructive" title={r.error}>{r.error}</span>
               )}
               {r && r !== 'running' && (
                 <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--muted-foreground)]">{r.ms}ms</span>
@@ -195,6 +195,6 @@ function StatusIcon({ r }: { r: ProbeResult | 'running' | undefined }) {
   const cls = 'h-4 w-4 shrink-0'
   if (r === 'running') return <Loader2 className={`${cls} animate-spin text-[color:var(--muted-foreground)]`} aria-label="running" />
   if (!r) return <span className={`${cls} rounded-full border`} style={{ borderColor: 'var(--border)' }} aria-label="not run" />
-  if (r.ok) return <CheckCircle2 className={`${cls} text-emerald-600 dark:text-emerald-400`} aria-label="ok" />
-  return <XCircle className={`${cls} text-red-600 dark:text-red-400`} aria-label="failed" />
+  if (r.ok) return <CheckCircle2 className={`${cls} text-accent-green`} aria-label="ok" />
+  return <XCircle className={`${cls} text-destructive`} aria-label="failed" />
 }

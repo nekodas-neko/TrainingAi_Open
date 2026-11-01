@@ -6,6 +6,119 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.513.0",
+    date: "2026-10-28",
+    changes: [
+      "TrainingAi Preview: Nutrition, Progress, Heart rate, Home, More and Week in review now match the current app more closely, from type sizes and spacing to the small icons and the Recovery chart curves.",
+      "TrainingAi Preview: the supplement list no longer jumps while a tick saves, Your Year's months follow your timezone and never wrap, and \"Feature Request\" fits on one line in Feedback.",
+      "TrainingAi Preview: the explainer cards read better with TalkBack, and a factor that is still learning keeps its heading.",
+    ],
+  },
+  {
+    version: "1.512.0",
+    date: "2026-10-28",
+    changes: [
+      "TrainingAi Preview: End of Day says there is nothing to summarise yet on a day with nothing logged, instead of waiting forever.",
+      "TrainingAi Preview: Home's tinted cards are coloured all the way to their bottom edge.",
+    ],
+  },
+  {
+    version: "1.511.0",
+    date: "2026-10-28",
+    changes: [
+      "TrainingAi Preview: Health → Training's calendar title no longer gets cut off; it sits above the month controls.",
+      "TrainingAi Preview: the explainer cards on Readiness, Sleep and Heart rate now look like the current app's, with the same headings, coloured badges and bullet layout.",
+      "TrainingAi Preview: Week in review's \"Your week\" paragraph keeps a bullet between its points.",
+      "Behind the scenes: a night can now be marked partial, which keeps its length out of your sleep score and averages while its heart rate, HRV and breathing still count. The button to mark one comes in a later release.",
+    ],
+  },
+  {
+    version: "1.510.0",
+    date: "2026-10-28",
+    changes: [
+      "Behind the scenes: the database gets room to mark a night as partial, ready for keeping a night you only partly wore the ring out of your sleep stats. Nothing you see changes until a later release uses it.",
+    ],
+  },
+  {
+    version: "1.509.0",
+    date: "2026-10-27",
+    changes: [
+      "Behind the scenes: the phone's list of merged-away foods can no longer lose an entry when a sync and a day's food list update it at the same moment, and signing out now stops a waiting sync before the wipe starts.",
+    ],
+  },
+  {
+    version: "1.508.0",
+    date: "2026-10-27",
+    changes: [
+      "Behind the scenes: two syncs that overlap on the phone now apply one after the other, so an older one can no longer undo a newer one, and signing out while a sync is waiting no longer lets it write the old account's data back.",
+      "Behind the scenes: once look-alike foods are merged, a merged-away food stays out of food search on every device, while a meal another device logged against it still shows in that day's diary.",
+    ],
+  },
+  {
+    version: "1.507.0",
+    date: "2026-10-27",
+    changes: [
+      "TrainingAi Preview: a network or gateway error page no longer throws away a queued weigh-in, chest-strap heart rate, activity, Apple Health import or Health Connect import. Only the server's own refusal does; anything else is tried again.",
+      "TrainingAi Preview: the \"kept on this phone only\" notice stays in Home's header until you have seen it, and the Health screens no longer treat it as an error.",
+      "Behind the scenes: before the look-alike foods merge calls a group exact, it now also checks fibre, sugar, sodium and saturated fat, and it leaves alone any group that would push a quantity outside 0.01 to 100. Your data export keeps a merged-away food that a log or saved meal still names. The merge still runs only when the owner approves.",
+      "Behind the scenes: food quantities use one range across the app, the server and the phone, and the phone brings back a merged-away food if the server restores it.",
+    ],
+  },
+  {
+    version: "1.506.0",
+    date: "2026-10-27",
+    changes: [
+      "TrainingAi Preview: the home-screen widgets show today and roll over at midnight in your profile's timezone, not the phone's.",
+      "TrainingAi Preview: a change the server refuses stays on your phone, and its notice waits until you have seen it. A patchy-network error no longer throws away a good change, and an answer for a day with no verdict no longer holds up the rest.",
+      "Behind the scenes: an admin job can merge look-alike foods in My Foods, with a dry run first. It runs only when the owner approves. The web stress chart's line and measured time are right on daylight-saving days, the phone's database finishes opening before the first read, and a few broken characters are fixed.",
+    ],
+  },
+  {
+    version: "1.505.0",
+    date: "2026-10-27",
+    changes: [
+      "Behind the scenes: the database gets room to mark a food as retired, ready for merging look-alike foods in My Foods. Nothing you see changes until a later release uses it.",
+    ],
+  },
+  {
+    version: "1.504.0",
+    date: "2026-10-27",
+    changes: [
+      "Treadmill steps now count in the collection's steps too, as they already do everywhere else.",
+      "The current app's remaining warnings, done ticks and over-budget figures use the same bright red, amber and green as the rest of the app.",
+      "TrainingAi Preview: on a daylight-saving day, Home's heart rate card follows the clock and no longer marks the skipped hour as not recorded.",
+      "Behind the scenes: the workout prescription compares SpO2 only within the device you wear, a movement log that runs past midnight and the energy balance day follow the clock on daylight-saving days, and a first launch waits for the phone's database before checking whose it is.",
+    ],
+  },
+  {
+    version: "1.503.0",
+    date: "2026-10-27",
+    changes: [
+      "TrainingAi Preview: admins can reset a user's data or delete their account from the Users screen, the timeline's Woke up and the Wake Time trend use the time you woke, the picture-in-picture window uses the app's colours, and a low ring battery alert is no longer held back by the phone's previous account.",
+      "Behind the scenes: on a daylight-saving day, active energy and the heart rate graph follow the clock, the Oura backfill tidies every day of its range, and an admin reset has a written runbook.",
+    ],
+  },
+  {
+    version: "1.502.0",
+    date: "2026-10-27",
+    changes: [
+      "Weights show in kg everywhere, so a dumbbell you enter in pounds reads in kg in History, records and the workout window. Pounds stay only on the wheel where you enter the weight.",
+      "The sleep header and Home's sleep line end at the time you woke, not when the ring stopped recording.",
+      "A day you mark as finished logging today says it counts toward your maintenance estimate from tomorrow.",
+      "Red, amber and green read as one bright colour each, in both apps.",
+      "TrainingAi Preview: pause a workout and the pause comes off its time; the picture-in-picture window follows your set, rest or pause; Energy shows your current level; the done screen writes a recap only when you ask; a set with no usable heart rate says so instead of failing; settings explain the rest alarm; you can answer an estimated meal from its row or its reminder; the ring's battery and battery health; when Oura last sent data; and the trophies you pin are saved to your account, so friends see them.",
+      "Admins can manage users, invites, feedback, errors, AI usage, exercises and data jobs from Preview, make or remove admins, and reset a user's data or delete an account that has data. Only the owner can remove an admin or touch the owner's account.",
+      "Behind the scenes: the Oura backfill tidies away sessions and workouts deleted in the Oura app, the Day screen reads heart rate once, a daylight-saving day ends at local midnight, a friend's meal library has its server side, the triage agent can read the data behind a feedback report, and more tests pin last week's fixes.",
+    ],
+  },
+  {
+    version: "1.501.0",
+    date: "2026-10-26",
+    changes: [
+      "Behind the scenes: the database gets room to record how long a workout was paused, where a ring battery reading came from, which account a read-only check looked at, when an account's sign-ins were last reset, the trophies you pin, and when Oura last sent data. Nothing you see changes until the next release uses them.",
+    ],
+  },
+  {
     version: "1.500.0",
     date: "2026-10-26",
     changes: [
@@ -4127,7 +4240,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "1.322.2",
     date: "2026-08-18",
     changes: [
-      "On Health \u2192 Training Load, a deload or testing day is now marked inline next to the day name \u2014 \u201cMon (D)\u201d \u2014 instead of on a line of its own. The flag used to add a whole extra row to that day, which pushed its bar about 12 pixels higher than the others and made it collide with the heading above: two days with the same volume drew at visibly different heights on a chart whose whole job is comparing them.",
+      "On Health → Training Load, a deload or testing day is now marked inline next to the day name \u2014 \u201cMon (D)\u201d \u2014 instead of on a line of its own. The flag used to add a whole extra row to that day, which pushed its bar about 12 pixels higher than the others and made it collide with the heading above: two days with the same volume drew at visibly different heights on a chart whose whole job is comparing them.",
     ],
   },
   {

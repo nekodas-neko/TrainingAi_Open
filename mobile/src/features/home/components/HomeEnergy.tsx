@@ -52,7 +52,6 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
   const color = hero.hasData
     ? batteryColor(hero.label, {
         colors: theme.colors,
-        tones: theme.tones,
         status: theme.status,
       })
     : theme.colors.muted;

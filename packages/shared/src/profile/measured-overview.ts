@@ -120,6 +120,8 @@ export interface SleepNight {
   sleepStart: string | null
   lowestHeartRate: number | null
   respiratoryRate: number | null
+  /** #2265: the owner's partial-night mark; such a night keeps its heart rate and breathing in the averages. */
+  partialNightAt?: string | null
 }
 
 export interface SleepAverages {
@@ -134,11 +136,14 @@ export interface SleepAverages {
 
 export function sleepAverages(nights: SleepNight[]): SleepAverages | null {
   if (nights.length === 0) return null
+  // #2265: a night marked partial keeps its physiology in the averages and loses its hours,
+  // efficiency and bedtime. It is still a night, so it still counts in `nights`.
+  const full = nights.filter(n => n.partialNightAt == null)
   return {
     nights: nights.length,
-    durationHours: mean(nights.map(n => n.durationHours)),
-    efficiency: mean(nights.map(n => n.efficiency)),
-    bedtimeMinutes: circularMeanMinutes(nights.map(n => n.sleepStart)),
+    durationHours: mean(full.map(n => n.durationHours)),
+    efficiency: mean(full.map(n => n.efficiency)),
+    bedtimeMinutes: circularMeanMinutes(full.map(n => n.sleepStart)),
     lowestHeartRate: mean(nights.map(n => n.lowestHeartRate)),
     respiratoryRate: mean(nights.map(n => n.respiratoryRate)),
   }

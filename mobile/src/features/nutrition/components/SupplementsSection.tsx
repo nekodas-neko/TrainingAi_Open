@@ -2,7 +2,7 @@ import { definitionDose, hasFreeTextBesideAmount } from '@trainingai/shared/nutr
 import { supplementSubtitle } from '@trainingai/shared/nutrition/supplement-subtitle';
 import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
-import { Switch, View } from 'react-native';
+import { Pressable, Switch, View } from 'react-native';
 import { z } from 'zod';
 import {
   AppButton,
@@ -22,6 +22,7 @@ import {
   TextField,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { scaleAlpha } from '../../../shared/theme/alpha';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { deleteSupplement } from '../data/supplement-delete';
@@ -83,32 +84,75 @@ export function SupplementsSection({ date }: { date: string }) {
       setToggling(new Set(inFlight.current));
     }
   }
+  const { theme } = useTheme();
+  const statusShown = !!error || n.syncing;
+  // supplements-section.tsx grouped: the header, then rows that run edge to edge under hairlines.
   return (
     <>
-      <Stack direction="row" align="center" justify="space-between">
-        <AppText variant="eyebrow" tone="muted">
-          Supplements
-        </AppText>
-        <StatusIndicator label="Supplements" error={error} busy={n.syncing} />
-        <AppButton title="Manage" variant="ghost" onPress={() => setManage(true)} />
-      </Stack>
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+          paddingHorizontal: theme.spacing.lg,
+          paddingTop: theme.spacing.md,
+        }}
+      >
+        <Stack direction="row" align="center" justify="space-between">
+          <AppText variant="eyebrow" tone="muted">
+            Supplements
+          </AppText>
+          <Stack direction="row" align="center" gap="none">
+            {statusShown && (
+              // The indicator's 48 dp slot mounts only while syncing; drawn over the row's spacing so a tick never moves the rows below.
+              <View style={{ marginVertical: -theme.spacing.sm }}>
+                <StatusIndicator label="Supplements" error={error} busy={n.syncing} />
+              </View>
+            )}
+            {/* text-[10px] with a 12 px gear; the hit area is the 48 px floor, drawn over the row's
+                spacing so the header keeps the current app's height. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Manage supplements"
+              onPress={() => setManage(true)}
+              style={{
+                minHeight: theme.sizes.touchTarget,
+                marginVertical: -theme.spacing.sm,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+                paddingLeft: theme.spacing.md,
+              }}
+            >
+              <Icon name="settings" tone="muted" size={12} />
+              <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
+                Manage
+              </AppText>
+            </Pressable>
+          </Stack>
+        </Stack>
+      </View>
       {active.length ? (
-        active.map((s) => (
-          <Stack key={s.id} direction="row" align="center">
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <ListRow
-                title={s.name}
-                checked={s.loggedToday}
-                leading={<Tick done={s.loggedToday} busy={toggling.has(s.id)} />}
-                trailing={false}
-                density="snug"
-                subtitle={
-                  s.loggedAmount?.mixedUnits
-                    ? 'Taken · multiple units; total unavailable'
-                    : (supplementSubtitle(s) ?? undefined)
-                }
+        active.map((s) => {
+          const subtitle = s.loggedAmount?.mixedUnits
+            ? 'Taken · multiple units; total unavailable'
+            : supplementSubtitle(s);
+          return (
+            <View
+              key={s.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'stretch',
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+              }}
+            >
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityLabel={s.name}
+                accessibilityHint={subtitle ?? undefined}
+                accessibilityState={{ checked: s.loggedToday, disabled: toggling.has(s.id) }}
+                disabled={toggling.has(s.id)}
                 onPress={() => {
-                  if (toggling.has(s.id)) return;
                   if (s.dosePrompt && !s.loggedToday) {
                     setPrompt(s);
                     setAmount(s.defaultAmount == null ? '' : String(s.defaultAmount));
@@ -116,23 +160,62 @@ export function SupplementsSection({ date }: { date: string }) {
                     void toggle(s);
                   }
                 }}
-              />
+                style={({ pressed }) => ({
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: theme.sizes.touchTarget,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.lg,
+                  paddingVertical: theme.spacing.md,
+                  backgroundColor: pressed ? `${theme.colors.raised}99` : undefined,
+                })}
+              >
+                <Tick done={s.loggedToday} busy={toggling.has(s.id)} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <AppText
+                    variant="label"
+                    tone={s.loggedToday ? 'muted' : undefined}
+                    style={{ fontWeight: '500' }}
+                  >
+                    {s.name}
+                  </AppText>
+                  {subtitle && (
+                    <AppText variant="caption" tone="muted">
+                      {subtitle}
+                    </AppText>
+                  )}
+                </View>
+              </Pressable>
+              {isMilligramDosed(s) && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Vial and dose calculator for ${s.name}`}
+                  onPress={() => setVial(s)}
+                  style={{
+                    minWidth: theme.sizes.touchTarget,
+                    paddingHorizontal: theme.spacing.lg,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderLeftWidth: 1,
+                    borderLeftColor: theme.colors.border,
+                  }}
+                >
+                  <Icon name="syringe" tone="muted" size={theme.sizes.iconCompact} />
+                </Pressable>
+              )}
             </View>
-            {isMilligramDosed(s) && (
-              <IconButton
-                icon="calculator"
-                label={`Vial and dose calculator for ${s.name}`}
-                onPress={() => setVial(s)}
-              />
-            )}
-          </Stack>
-        ))
+          );
+        })
       ) : (
-        <AppButton
-          title="No supplements added yet · Add some"
-          variant="surface"
-          onPress={() => setManage(true)}
-        />
+        <View style={{ padding: theme.spacing.lg }}>
+          <AppButton
+            title="No supplements added yet · Add some"
+            variant="surface"
+            onPress={() => setManage(true)}
+          />
+        </View>
       )}
       {manage && <SupplementManager date={date} onClose={() => setManage(false)} />}
       <Sheet
@@ -173,7 +256,7 @@ function Tick({ done, busy }: { done: boolean; busy: boolean }) {
         height: theme.sizes.iconSmall,
         borderRadius: theme.radii.pill,
         borderWidth: 2,
-        borderColor: done ? theme.colors.brand : theme.colors.muted,
+        borderColor: done ? theme.colors.brand : scaleAlpha(theme.colors.muted, 0.4),
         backgroundColor: done ? theme.colors.brand : 'transparent',
         alignItems: 'center',
         justifyContent: 'center',

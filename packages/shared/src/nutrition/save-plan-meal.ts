@@ -1,6 +1,7 @@
 import type { MealPlanMeal, NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { ingredientToEntry } from '@trainingai/shared/nutrition/log-plan-meal'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
+import { QUANTITY_MULTIPLIER_MIN } from './quantity-bounds'
 import { todayInTz } from '../date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
@@ -41,7 +42,7 @@ export async function savePlanMealToLibrary(meal: PlanMealToSave, userId?: strin
   for (const entry of entries) {
     const item = await createFoodItem(entry, userId)
     // The schema floor is 0.01, and a sub-gram garnish rounds to 0.00 two decimals in.
-    items.push({ foodItemId: item.id, quantityMultiplier: Math.max(0.01, entry.quantityMultiplier) })
+    items.push({ foodItemId: item.id, quantityMultiplier: Math.max(QUANTITY_MULTIPLIER_MIN, entry.quantityMultiplier) })
   }
 
   const mealId = crypto.randomUUID()

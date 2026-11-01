@@ -362,6 +362,42 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
       }
     })
 
+    // #2119. The scoped read: `ownerId` re-points the views at one user for one query.
+    describe('a named scope (#2119)', () => {
+      const sleepHours = async (opts?: { ownerId?: string }) =>
+        (await runScoped(roPool, 'SELECT DISTINCT duration_hours::float AS h FROM claude_ro.sleep_sessions ORDER BY h', opts)).rows.map(r => r.h)
+
+      it('an owner query is unchanged: it sees the owner and nobody else', async () => {
+        expect(await sleepHours()).toEqual([8])
+      })
+
+      it('a scoped query sees only that user\'s rows', async () => {
+        expect(await sleepHours({ ownerId: OTHER_ID })).toEqual([7])
+      })
+
+      it('a scope that names nobody reads nothing, not everyone', async () => {
+        expect(await sleepHours({ ownerId: '22222222-2222-2222-2222-222222222222' })).toEqual([])
+      })
+
+      it('does not leak the scope into the next query on the same connection', async () => {
+        // `max: 1`: the second query reuses the backend that just ran as OTHER_ID.
+        await sleepHours({ ownerId: OTHER_ID })
+        expect(await sleepHours()).toEqual([8])
+        const { rows } = await runScoped(roPool, `SELECT current_setting('app.claude_ro_owner', true) AS owner`)
+        expect(rows[0].owner).toBe(OWNER_ID)
+      })
+
+      it('does not leak the scope after a scoped query fails', async () => {
+        await expect(runScoped(roPool, 'SELECT 1/0', { ownerId: OTHER_ID })).rejects.toThrow()
+        expect(await sleepHours()).toEqual([8])
+      })
+
+      it('refuses a scope that is not a uuid without running anything', async () => {
+        await expect(runScoped(roPool, 'SELECT 1', { ownerId: `${OTHER_ID}'; --` })).rejects.toThrow(/uuid/)
+        expect(await sleepHours()).toEqual([8])
+      })
+    })
+
     /**
      * **The defect itself, pinned — without this the three cases above prove nothing.** They only
      * exercise `runScoped`, which did not exist before the fix, so they could never have run

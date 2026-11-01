@@ -178,3 +178,8 @@ export const DAY_REVIEW_WEEK_WINDOW_TTL = TTL_MEDIUM;
  * loads first pays for it and the other paints from cache.
  */
 export const WEEKLY_DIGEST_TTL = TTL_LONG;
+
+/** /api/user/trophy-pins, keyed `trophy-pins` — the trophies the user pinned, which friends see.
+ *  Changes only when the user edits their trophy case, and that write clears it through
+ *  invalidateTrophyPins(). */
+export const TROPHY_PINS_TTL = TTL_MEDIUM;

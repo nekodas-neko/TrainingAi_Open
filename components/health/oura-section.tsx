@@ -123,12 +123,12 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
     ? Math.max(0, secondsSinceLocalMidnight() - daily.nonWearTimeSec)
     : null
   const batteryIcon = battery?.charging
-    ? <BatteryChargingIcon className="w-4 h-4 text-green-400" />
+    ? <BatteryChargingIcon className="w-4 h-4 text-accent-green" />
     : battery != null && battery.level >= 60
-      ? <BatteryFullIcon className="w-4 h-4 text-green-400" />
+      ? <BatteryFullIcon className="w-4 h-4 text-accent-green" />
       : battery != null && battery.level >= 25
-        ? <BatteryMediumIcon className="w-4 h-4 text-amber-400" />
-        : <BatteryLowIcon className="w-4 h-4 text-red-400" />
+        ? <BatteryMediumIcon className="w-4 h-4 text-accent-amber" />
+        : <BatteryLowIcon className="w-4 h-4 text-destructive" />
 
   return (
     <div className="space-y-3">

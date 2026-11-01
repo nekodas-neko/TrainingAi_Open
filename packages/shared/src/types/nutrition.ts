@@ -59,7 +59,12 @@ export interface FoodLog {
 }
 
 export interface FoodLogWithItem extends FoodLog {
-  foodItem: FoodItem
+  /**
+   * #3486. `deletedAt` is when the server retired the food (merged into a keeper, #2417). A day list
+   * still returns logs that point at a retired food, and a device hydrating them must not re-create
+   * it. Only the day list sets it; absent elsewhere. A string once it has crossed JSON.
+   */
+  foodItem: FoodItem & { deletedAt?: Date | string | null }
   calories: number
   proteinG: number
   carbsG: number

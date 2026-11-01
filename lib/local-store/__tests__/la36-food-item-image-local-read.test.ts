@@ -18,6 +18,7 @@ const PIC = 'data:image/webp;base64,UklGRg=='
 beforeEach(() => {
   db.current = new DatabaseSync(':memory:')
   db.current.exec(`
+    CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE food_items (
       id TEXT PRIMARY KEY, name TEXT, brand TEXT, serving_size_g REAL, calories REAL, protein_g REAL,
       carbs_g REAL, fat_g REAL, fiber_g REAL, sugar_g REAL, sodium_mg REAL, sat_fat_g REAL,

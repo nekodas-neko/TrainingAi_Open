@@ -14,6 +14,7 @@
 // work for loss, gain, recomp and maintenance without branching.
 
 import { KCAL_PER_G } from './atwater'
+import { BAND_COLOR } from '../health/score-band'
 import { KCAL_PER_KG, CALORIE_FLOOR_KCAL } from './tdee-adaptation'
 import { calorieBudget, validOwnTarget } from './calorie-budget'
 
@@ -45,11 +46,11 @@ export interface ZoneMeta {
 }
 
 const ZONE_META: Record<BalanceZone, Omit<ZoneMeta, 'zone'>> = {
-  far_under: { label: 'Well under', color: '#ef4444' },
+  far_under: { label: 'Well under', color: BAND_COLOR.bad },
   under:     { label: 'Under',      color: '#f97316' },
-  on_target: { label: 'On target',  color: '#22c55e' },
+  on_target: { label: 'On target',  color: BAND_COLOR.good },
   over:      { label: 'Over',       color: '#f97316' },
-  far_over:  { label: 'Well over',  color: '#ef4444' },
+  far_over:  { label: 'Well over',  color: BAND_COLOR.bad },
 }
 
 /** Band a deviation-from-target (kcal; negative = ate less than the goal calls for). */

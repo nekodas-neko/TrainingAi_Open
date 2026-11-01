@@ -353,7 +353,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
           </div>
 
           {!heightCm && treadmillDistKm && (
-            <p className="mt-1 text-xs text-amber-400">
+            <p className="mt-1 text-xs text-accent-amber">
               Add your height in Profile to get step count.
             </p>
           )}

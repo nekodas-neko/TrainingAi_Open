@@ -23,6 +23,7 @@ import { HealthMetricCard } from '../components/HealthMetricCard';
 import { ContributorCard } from '../components/ContributorCard';
 import { ResilienceNote } from '../components/ResilienceNote';
 import { ManualNightCard } from '../components/ManualNightCard';
+import { OuraStaleNote } from '../../devices/components/OuraStaleNote';
 import { SleepNight } from '../components/SleepNight';
 import { HealthSyncNotice } from '../components/HealthSyncNotice';
 import { HrDayCard } from '../components/HrDayCard';
@@ -175,6 +176,7 @@ export function HealthDetailScreen({
         </>
       }
     >
+      {(detail === 'readiness' || detail === 'sleep') && <OuraStaleNote />}
       <HealthViewReady view={detail}>
         {detail === 'heart-rate' ? (
           <>

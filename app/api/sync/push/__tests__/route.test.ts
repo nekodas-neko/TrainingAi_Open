@@ -13,6 +13,12 @@ const { pushMutations, reportServerError } = vi.hoisted(() => ({
   reportServerError: vi.fn(),
 }))
 
+// The write barrier needs a real database; these tests mock the repository, so it passes straight through.
+vi.mock('@/lib/data/postgres/user-write-barrier', () => ({
+  CUT_OFF: Symbol('cut-off'),
+  withUserWriteBarrier: async (_u: string, _s: unknown, run: () => Promise<unknown>) => run(),
+}))
+
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u1', timezone: 'Australia/Brisbane' } }) }))
 vi.mock('@/lib/data', () => ({ getRepository: async () => ({ pushMutations }) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))

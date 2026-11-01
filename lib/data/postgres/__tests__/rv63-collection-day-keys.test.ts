@@ -1,9 +1,12 @@
 /**
  * RV-63 — the `> 0` predicate that used to live in `/api/collection`, asserted where it now lives.
+ * (Steps count the device total plus treadmill steps, #3370; the route derives its step days from
+ * `listStepTotals`, whose dates are what the step cases below read.)
  *
  * The route read `listBodyMetrics` / `listSleepSessions` in FULL — 36 and 25 columns, 176 and 144
  * bytes a row, over all history, on every home paint — and immediately projected to `.map(x =>
- * x.date)`. The reads are one column wide now and carry the predicate in SQL.
+ * x.date)`. The reads select only what they need now (a date, plus steps for the totals) and carry
+ * the predicate in SQL.
  *
  * **Two route-level tests changed because of that, and this file is why that is not a loss.** They
  * asserted that a LOW day still spawns a cat (400 steps, 3.5 h) — "recorded, not above a bar", which
@@ -56,13 +59,15 @@ describe.skipIf(!canRun)('RV-63 — collection day keys', () => {
       [USER, date, new Date(`${date}T12:00:00Z`), new Date(`${date}T19:00:00Z`), h])
 
   const ALL = ['2000-01-01', '2099-12-31'] as const
+  const stepDays = async (userId: string, from: string, to: string) =>
+    (await repo.listStepTotals(userId, from, to)).map(r => r.date)
 
   /** THE case the route can no longer make: a low day is still a recorded day. */
   it('keeps a low step count — recorded, not above a bar', async () => {
     await steps('2026-09-10', 12_000)
     await steps('2026-09-11', 400)
 
-    expect((await repo.listStepDayKeys(USER, ...ALL)).sort())
+    expect((await stepDays(USER, ...ALL)).sort())
       .toEqual(['2026-09-10', '2026-09-11'])
   })
 
@@ -84,7 +89,7 @@ describe.skipIf(!canRun)('RV-63 — collection day keys', () => {
     await steps('2026-09-10', 5_000)
     await steps('2026-09-11', value as number | null)
 
-    expect(await repo.listStepDayKeys(USER, ...ALL)).toEqual(['2026-09-10'])
+    expect(await stepDays(USER, ...ALL)).toEqual(['2026-09-10'])
   })
 
   it.each([
@@ -97,20 +102,42 @@ describe.skipIf(!canRun)('RV-63 — collection day keys', () => {
     expect(await repo.listSleepDayKeys(USER, ...ALL)).toEqual(['2026-09-10'])
   })
 
+  // #3370 — the collection reads a day's steps the way achievements do: device total plus treadmill.
+  const treadmill = (date: string, n: number) =>
+    pool.query(`INSERT INTO activity_logs (user_id, date, activity_type, title, steps) VALUES ($1,$2,'treadmill','Treadmill',$3)`, [USER, date, n])
+
+  it('adds a treadmill session to the day total, so a day under the bar on raw steps clears it (#3370)', async () => {
+    await steps('2026-09-10', 5_000)
+    await treadmill('2026-09-10', 4_000)
+
+    expect(await repo.listStepTotals(USER, ...ALL)).toEqual([{ date: '2026-09-10', steps: 9_000 }])
+  })
+
+  it('counts a treadmill-only day, and ignores an outdoor walk the device already counted (#3370)', async () => {
+    await treadmill('2026-09-10', 6_000)
+    await steps('2026-09-11', 5_000)
+    await pool.query(`INSERT INTO activity_logs (user_id, date, activity_type, title, steps) VALUES ($1,'2026-09-11','walk','Walk',3000)`, [USER])
+
+    expect(await repo.listStepTotals(USER, ...ALL)).toEqual([
+      { date: '2026-09-10', steps: 6_000 }, { date: '2026-09-11', steps: 5_000 },
+    ])
+    expect((await stepDays(USER, ...ALL)).sort()).toEqual(['2026-09-10', '2026-09-11'])
+  })
+
   /** The window still bounds, even though the caller passes all history — a floor that silently
    *  ignored `from`/`to` would pass every case above. */
   it('honours the from/to bounds', async () => {
     await steps('2026-09-01', 5_000)
     await steps('2026-09-10', 5_000)
 
-    expect(await repo.listStepDayKeys(USER, '2026-09-05', '2026-09-30')).toEqual(['2026-09-10'])
+    expect(await stepDays(USER, '2026-09-05', '2026-09-30')).toEqual(['2026-09-10'])
   })
 
   /** Scoped to the caller: another user's recorded day is not this user's. */
   it('returns nothing for a user with no rows', async () => {
     await steps('2026-09-10', 5_000)
 
-    expect(await repo.listStepDayKeys('00000000-0000-4000-8000-0000000006ff', ...ALL)).toEqual([])
+    expect(await stepDays('00000000-0000-4000-8000-0000000006ff', ...ALL)).toEqual([])
   })
 
   /**

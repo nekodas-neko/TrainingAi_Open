@@ -15,9 +15,23 @@ import { DERIVED_DOMAINS, EXPORTED, EXCLUDED, SOFT_DELETED, WITHHELD_COLUMNS, ty
  *  60k-row table is ~12 round trips rather than 600. */
 const CHUNK = 5_000
 
+/**
+ * A tombstoned row that is still exported when a row that is exported points at it. The look-alike
+ * merge (#2417) retires a food and leaves a straggler log or saved-meal ingredient on it until the
+ * next merge run, and that row would otherwise export without the food it names. The predicate is
+ * over `t`, the retired row. `saved_meals` has no soft delete, so any ingredient of the user's meal is live.
+ */
+const KEPT_WHILE_REFERENCED: Record<string, string> = {
+  food_items: `(EXISTS (SELECT 1 FROM public.food_logs fl WHERE fl.food_item_id = t.id AND fl.user_id = $1 AND fl.deleted_at IS NULL)`
+    + ` OR EXISTS (SELECT 1 FROM public.saved_meal_items smi JOIN public.saved_meals sm ON sm.id = smi.saved_meal_id WHERE smi.food_item_id = t.id AND sm.user_id = $1))`,
+}
+
 function whereFor(scope: ExportScope, table: string): { predicate: string } {
   const soft = SOFT_DELETED[table]
-  const softClause = soft ? ` AND t.${quoteIdent(soft)} IS NULL` : ''
+  const referenced = KEPT_WHILE_REFERENCED[table]
+  const softClause = soft
+    ? referenced ? ` AND (t.${quoteIdent(soft)} IS NULL OR ${referenced})` : ` AND t.${quoteIdent(soft)} IS NULL`
+    : ''
   switch (scope.kind) {
     case 'user_id': return { predicate: `t.user_id = $1${softClause}` }
     case 'own_row': return { predicate: `t.id = $1${softClause}` }
@@ -92,7 +106,7 @@ export function buildManifest(): ExportLine {
       derivedDomains: Object.entries(DERIVED_DOMAINS)
         .map(([domain, d]) => ({ domain, sourceTables: d.sourceTables, reason: d.reason }))
         .sort((a, b) => a.domain.localeCompare(b.domain)),
-      note: 'Rows soft-deleted in the app are omitted. Excluded tables are listed above with the reason for each. '
+      note: 'Rows soft-deleted in the app are omitted, except a food retired by the look-alike merge while a log or saved-meal ingredient of yours still names it. Excluded tables are listed above with the reason for each. '
         + 'The last line of a complete file is {"_complete":true}; a last line of {"_error":…}, or any other last line, means the file is incomplete.',
     },
   }

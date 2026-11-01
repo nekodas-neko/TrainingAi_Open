@@ -2,6 +2,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { SleepSession } from '@trainingai/shared/types/body'
 import { perDeviceNormal, deviceOf } from '@trainingai/shared/health/per-device-normal'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 
 // Our own 0–100 Sleep Score. The weights are the ecore combiner weights recovered by
 // open_health (`Th0rgal/open_health`, docs/algorithms/score-weights.md) by regressing an
@@ -271,11 +272,12 @@ export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:2026-10-26'
 /**
  * The stamp for each calibration (#2237): `v1` is the stamp above, `v2` the even-gain curve on the
  * same night definition. `sleepScoreCalibrationFor` picks by wake date, so the stamp always names
- * the curve that produced the stored score.
+ * the curve that produced the stored score. Both normals-learning rules apply to both curves, so
+ * `v2` carries the per-device mark too (#3387); no V2 row exists while `SLEEP_SCORE_V2_FROM` is null.
  */
 export const SLEEP_SCORE_MODEL_VERSIONS = {
   v1: SLEEP_SCORE_MODEL_VERSION,
-  v2: 'v2:even-gain:oura-long-sleep-night',
+  v2: 'v2:even-gain:per-device-baselines:2026-10-26',
 } as const
 
 /**
@@ -450,6 +452,8 @@ export interface BaselineSessionInput {
   durationSource?: string | null
   hrvSource?: string | null
   avgHeartRateSource?: string | null
+  /** #2265: set when the owner marked the night partial; see `partial-night.ts`. */
+  partialNightAt?: Date | string | null
 }
 
 /** The night being scored, as far as `sleepScoreBaselines` needs it: which devices measured it. */
@@ -479,7 +483,10 @@ export function sleepScoreBaselines(
   tz: string = DEFAULT_TZ,
   scored?: ScoredNightDevices,
 ): SleepScoreBaselines {
-  const allNights = priorSessions.filter(s => (s.durationHours ?? 0) >= MAIN_SLEEP_MIN_HOURS)
+  // #2265: a night the owner marked partial is a night by their word, however short the ring saw it,
+  // so it joins the autonomic normals (HRV and heart rate are real measurements). It never joins the
+  // schedule or awake-fraction normals below, whose inputs are the hours and clock times it lacks.
+  const allNights = priorSessions.filter(s => isPartialNight(s) || (s.durationHours ?? 0) >= MAIN_SLEEP_MIN_HOURS)
   const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
 
   // #3001: each normal is learned from the device that measured the night being scored (the same
@@ -493,7 +500,8 @@ export function sleepScoreBaselines(
     : null
   const nightDevice = scored ? deviceOf(scored.durationSource) : newestNight ? deviceOf(newestNight.durationSource) : null
   // Schedule and awake-fraction baselines are the nights of the device that measured the window.
-  const nights = nightDevice == null ? allNights : allNights.filter(s => deviceOf(s.durationSource) === nightDevice)
+  const nights = (nightDevice == null ? allNights : allNights.filter(s => deviceOf(s.durationSource) === nightDevice))
+    .filter(s => !isPartialNight(s))
 
   // Trailing window, newest last — see SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS for why these two
   // are not an all-time mean. The min-nights gates still count the windowed sample. The order is the
@@ -541,6 +549,9 @@ export function computeSleepScore(
   tz: string = DEFAULT_TZ,
   opts: SleepScoreOptions = {},
 ): SleepScoreResult | null {
+  // #2265: a night the owner marked partial has no sleep to score, only physiology. Its own score
+  // would be built from HRV and heart rate alone, which is not a sleep score.
+  if (isPartialNight(session)) return null
   const duration = session.durationHours
   if (duration == null || duration <= 0) return null
 
