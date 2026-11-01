@@ -4,7 +4,7 @@ import { backgroundRecorder } from './background-recorder';
 
 // The screen-on route watcher for TrainingAi Preview (#2845 phase 1), plus the foreground-service
 // recorder that keeps recording with the screen locked (#2846). The recorder is used when the
-// walker allows "all the time" location; this watcher is the fallback and records as it always did.
+// service starts; this watcher is the fallback and records as it always did.
 // Every fix is passed on: the current app's 5 m filter is applied by the recorder (`keepsFix`),
 // so a walker who has stopped still shows a live signal.
 export const routeLocation: LocationSource = {
