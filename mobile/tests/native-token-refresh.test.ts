@@ -315,6 +315,48 @@ test('a 401 followed by a refresh the server could not serve keeps the session',
   assert.equal(f.calls.filter((c) => c.path === '/api/x').length, 1);
 });
 
+const htmlPage = (status: number) =>
+  new Response('<html><body>Please sign in to the Wi-Fi</body></html>', {
+    status,
+    headers: { 'content-type': 'text/html' },
+  });
+
+test('a profile 401 plus an HTML refresh 401 on refresh() keeps the session', async () => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedIn');
+  f.valid.delete('access-0');
+  f.server.refresh = async () => htmlPage(401);
+  await f.controller.refresh();
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.equal(f.controller.state.hasSession, true);
+  assert.doesNotMatch(f.controller.state.message ?? '', /Sign in again|session ended/);
+  assert.equal(f.stored().refreshToken, refreshToken(0));
+});
+
+test('an HTML 401 on the profile with a working refresh keeps the session', async () => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  f.server.profile = async () => htmlPage(401);
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.equal(f.controller.state.hasSession, true);
+  assert.doesNotMatch(f.controller.state.message ?? '', /Sign in again|session ended/);
+});
+
+test('our own JSON 401 on the profile with a JSON 401 refused refresh signs out', async () => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedIn');
+  f.valid.delete('access-0');
+  f.server.refresh = async () => json({ error: 'invalid_refresh_token' }, 401);
+  await f.controller.refresh();
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.equal(f.storage.has(KEY), false);
+});
+
 test('after a failed early renewal, requests use the live token without refreshing again for a while', async () => {
   const f = fixture(renewable(120));
   f.valid.add('access-0');

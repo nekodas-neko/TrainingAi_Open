@@ -852,7 +852,9 @@ export class AccountSession {
       if (generation !== this.generation) {
         return;
       }
-      if (error instanceof ApiError && error.status === 401) {
+      // Only our own JSON 401 (`{ error: 'Unauthorized' }`) ends the session; a proxy or captive
+      // portal answering 401 with an HTML or empty page does not.
+      if (error instanceof ApiError && error.status === 401 && error.validation) {
         await this.signOut('Your session ended. Sign in again.');
       } else {
         this.publish(
