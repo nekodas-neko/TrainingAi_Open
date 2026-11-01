@@ -8,6 +8,13 @@ import {
   SCALE_SERVICE,
 } from '@trainingai/shared/devices/scale-protocol';
 import {
+  buildAccStartCommand,
+  buildAccStopCommand,
+  PMD_CONTROL_POINT,
+  PMD_DATA,
+  PMD_SERVICE,
+} from '@trainingai/shared/devices/polar-pmd';
+import {
   BATTERY_LEVEL,
   BATTERY_SERVICE,
   DEVICE_INFO_SERVICE,
@@ -20,6 +27,9 @@ import {
 } from './types';
 
 const CONNECT_TIMEOUT_MS = 15_000;
+// The PMD accelerometer frames are far larger than the default 23-byte ATT payload, so the strap
+// link asks for the same MTU the current app does (`PolarProtocol.PREFERRED_MTU`).
+const STRAP_MTU = 247;
 // The scale was seen advertising a moment ago, so a connect that takes longer has missed its window
 // (the current app's `ScaleGattClient.CONNECT_TIMEOUT_MS`).
 const SCALE_CONNECT_TIMEOUT_MS = 5_000;
@@ -124,7 +134,10 @@ export const bleAdapter: BleAdapter = {
   async connect(id, onDisconnected) {
     const manager = ble();
     // Direct connect, no autoConnect: Samsung's stack does not honour it (polar-h10-ble skill §5).
-    const device = await manager.connectToDevice(id, { timeout: CONNECT_TIMEOUT_MS });
+    const device = await manager.connectToDevice(id, {
+      timeout: CONNECT_TIMEOUT_MS,
+      requestMTU: STRAP_MTU,
+    });
     let dropped = false;
     const drop = manager.onDeviceDisconnected(id, () => {
       if (dropped) return;
@@ -173,6 +186,64 @@ export const bleAdapter: BleAdapter = {
       },
       readBattery: () => read(BATTERY_SERVICE, BATTERY_LEVEL),
       readFirmware: () => read(DEVICE_INFO_SERVICE, FIRMWARE_REVISION),
+      async startAccelerometer(listener, onFailed) {
+        // Rejects when the strap exposes no PMD service, so the caller can say so.
+        await manager.characteristicsForDevice(id, PMD_SERVICE);
+        // The Control Point indicates and Data notifies; both are enabled before the start command
+        // (as `PolarGattClient.startAccStream` queues them), and the operations run in order.
+        // Removing a subscription ourselves reports a cancellation error, which is no failure.
+        let ended = false;
+        let failed = false;
+        const fail = (error: unknown) => {
+          if (ended || failed || !error) return failed;
+          failed = true;
+          onFailed();
+          return true;
+        };
+        const control = manager.monitorCharacteristicForDevice(
+          id,
+          PMD_SERVICE,
+          PMD_CONTROL_POINT,
+          (error) => {
+            fail(error);
+          },
+        );
+        const data = manager.monitorCharacteristicForDevice(
+          id,
+          PMD_SERVICE,
+          PMD_DATA,
+          (error, characteristic) => {
+            if (ended || fail(error)) return;
+            const value = decodeBase64(characteristic?.value);
+            if (value) listener(value);
+          },
+        );
+        const write = (command: Uint8Array) =>
+          manager.writeCharacteristicWithResponseForDevice(
+            id,
+            PMD_SERVICE,
+            PMD_CONTROL_POINT,
+            encodeBase64(command),
+          );
+        try {
+          await write(buildAccStartCommand());
+        } catch (error) {
+          ended = true;
+          data.remove();
+          control.remove();
+          throw error;
+        }
+        return () => {
+          if (ended) return;
+          ended = true;
+          data.remove();
+          // The stop command goes out before the Control Point subscription ends. A subscription
+          // that already failed means the link is going; the stop is then best effort.
+          void write(buildAccStopCommand())
+            .catch(() => {})
+            .finally(() => control.remove());
+        };
+      },
       async disconnect() {
         dropped = true;
         drop.remove();

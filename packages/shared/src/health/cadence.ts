@@ -254,6 +254,15 @@ export function cadenceFromStrideHz(
  * reported as a confident 71.4 spm on a real 102 spm walk (owner capture 2026-07-27). Band
  * edges must never be reachable answers — see the boundary rejection in `bandAutocorrPeak`.
  */
+/** A strap reading older than this is no longer "live" and stops being shown or preferred. */
+export const STRAP_STALE_MS = 5_000
+
+/**
+ * Rolling accelerometer window the strap DSP runs over. Long enough for the DSP's 3 s minimum plus
+ * margin, short enough to track a pace change rather than average it away.
+ */
+export const STRAP_WINDOW_SEC = 6
+
 export const CADENCE_MIN_HZ = 0.9
 export const CADENCE_MAX_HZ = 3.9
 

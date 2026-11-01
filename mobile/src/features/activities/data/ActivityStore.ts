@@ -29,6 +29,7 @@ import {
 } from './guidance.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
 import { summariseRoute } from '@trainingai/shared/activity/route-summary';
+import { WalkPace } from './walk-pace.ts';
 import {
   keepsFix,
   liveRouteStats,
@@ -151,6 +152,7 @@ export function sessionPayload(
   session: ActivitySession,
   timezone: string,
   route: RoutePoint[] = [],
+  pace: WalkPace | null = null,
 ): ActivityPayload {
   if (session.mode !== 'done' || session.startMs === null || session.endMs === null) {
     throw new Error('Finish this activity before saving.');
@@ -177,12 +179,17 @@ export function sessionPayload(
     ...(distanceKm !== undefined ? { distanceKm } : {}),
     ...routeFields,
     ...(session.guidance?.kind === 'walk'
-      ? {
-          segments: walkSegments(
+      ? (() => {
+          const segments = walkSegments(
             session.guidance.config,
             elapsedMs(session, session.endMs) / 1000,
-          ),
-        }
+          );
+          // A walk paced from the strap stores its cadence and each block's adherence, as the
+          // current app's walk does (#2242); a walk with none stores what it did before.
+          return pace && pace.startMs === session.startMs
+            ? { segments: pace.segments(segments), ...pace.cadencePayload() }
+            : { segments };
+        })()
       : {}),
     ...(session.notes.trim() ? { notes: session.notes.trim() } : {}),
   });
@@ -248,6 +255,9 @@ export function confirmedActivity(payload: ActivityPayload, rows: Record<string,
   );
 }
 export class ActivityStore {
+  // The guided walk's live pacer and what it has recorded. Kept in memory and tied to the walk by its
+  // start time; a kill mid-walk loses the cadence of that walk, not the walk (#3525).
+  pace: WalkPace | null = null;
   private current: ActivityState = emptyActivity;
   private listeners = new Set<() => void>();
   private writes: Promise<unknown> = Promise.resolve();
@@ -509,7 +519,15 @@ export class ActivityStore {
           },
     );
   }
+  /** The pacer for the running guided walk, created on first use and dropped with the walk. */
+  paceFor(session: ActivitySession): WalkPace | null {
+    if (session.guidance?.kind !== 'walk' || session.startMs === null) return null;
+    if (this.pace?.startMs !== session.startMs)
+      this.pace = new WalkPace(session.startMs, session.guidance.config);
+    return this.pace;
+  }
   async discard() {
+    this.pace = null;
     await this.write((data) => ({ ...data, session: null }));
     await this.clearRoute();
   }
@@ -571,7 +589,13 @@ export class ActivityStore {
       if (elapsedMs(session, this.now()) < 60_000) {
         throw new Error('This walk is too short to save.');
       }
-      const payload = sessionPayload(session, timezone, this.current.route);
+      // The pacer's numbers are extra: if they ever fail the save schema, the walk is still saved.
+      let payload: ActivityPayload;
+      try {
+        payload = sessionPayload(session, timezone, this.current.route, this.pace);
+      } catch {
+        payload = sessionPayload(session, timezone, this.current.route);
+      }
       return {
         ...data,
         session: { ...session, guidance: { ...session.guidance, saved: true } },

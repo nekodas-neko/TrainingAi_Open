@@ -12,12 +12,13 @@ import { AppState } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
-import { useActivityStrapHold } from '../../devices/strap/StrapProvider';
+import { useActivityStrapHold, useStrapSession } from '../../devices/strap/StrapProvider';
+import { walkPlan } from './guidance';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { healthReadPaths } from '../../../core/sync/health-invalidation';
-import { ActivityStore, emptyActivity, sameActivityValue } from './ActivityStore';
+import { ActivityStore, elapsedMs, emptyActivity, sameActivityValue } from './ActivityStore';
 import { activityHistorySpec } from '../../health/data/models';
 import { overlayCalories } from './models';
 import { failedItems, waitingCount } from './sync-health';
@@ -91,8 +92,36 @@ export function ActivityStateProvider({
 }
 /** The chest strap is held, and its heart rate saved, from the activity's start to its end (#3527). */
 function ActivityStrapHold() {
-  const { session } = useActivities();
+  const { session, store } = useActivities();
+  const strap = useStrapSession();
   useActivityStrapHold(session?.mode === 'active');
+  // A guided walk also streams the strap's accelerometer for live cadence, for the walk only
+  // (#3525). It lives here, not on the screen, so leaving the screen does not lose readings.
+  const startMs = session?.mode === 'active' && session.guidance?.kind === 'walk' ? session.startMs : null;
+  useEffect(() => {
+    if (!strap || !store || startMs === null) return;
+    const current = store.getSnapshot().session;
+    const pace = current ? store.paceFor(current) : null;
+    if (!pace || current?.guidance?.kind !== 'walk') return;
+    const segments = walkPlan(current.guidance.config).segments;
+    strap.setAccelerometer(true);
+    const stop = strap.onAccelerometer((batch) => pace.onBatch(batch));
+    // One tick per wall-clock second, from its own timer (see `WalkPace.tick`).
+    const timer = setInterval(() => {
+      const at = Date.now();
+      const running = store.getSnapshot().session;
+      const seconds = running ? elapsedMs(running, at) / 1000 : 0;
+      pace.tick(
+        at,
+        segments.find((block) => seconds >= block.startSec && seconds < block.endSec),
+      );
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+      stop();
+      strap.setAccelerometer(false);
+    };
+  }, [strap, store, startMs]);
   return null;
 }
 export function useActivities() {

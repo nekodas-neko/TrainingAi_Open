@@ -27,6 +27,8 @@ import { getPolarBle, type PolarAccelBatch } from '@/lib/polar-ble/plugin'
 import type { PluginListenerHandle } from '@capacitor/core'
 import {
   detectCadence,
+  STRAP_STALE_MS,
+  STRAP_WINDOW_SEC,
   cadenceFromStrideHz,
   compareCadence,
   summarizeCadence,
@@ -37,14 +39,12 @@ import {
   type CadenceSummary,
 } from '@trainingai/shared/health/cadence'
 
-/** A reading older than this is no longer "live" and stops being shown or preferred. */
-export const STRAP_STALE_MS = 5_000
+// STRAP_STALE_MS and STRAP_WINDOW_SEC live in `packages/shared/src/health/cadence.ts`, where
+// Preview's strap pacer reads them too.
+export { STRAP_STALE_MS, STRAP_WINDOW_SEC }
+
 /** Ring gait windows land every ~30 s, so tolerate two missed windows before going stale. */
 export const RING_STALE_MS = 75_000
-
-/** Rolling accelerometer window the strap DSP runs over. Long enough for the DSP's 3 s
- *  minimum plus margin, short enough to track a pace change rather than average it away. */
-export const STRAP_WINDOW_SEC = 6
 
 /**
  * Minimum wall-clock spacing between ring readings that reach the activity average.

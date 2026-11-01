@@ -6,6 +6,12 @@ import {
 } from '@trainingai/shared/devices/heart-rate-measurement';
 import { decideLowBatteryAlert } from '@trainingai/shared/devices/low-battery';
 import { isPlausibleHrSample } from '@trainingai/shared/health/hr-smoothing';
+import {
+  ACC_EMIT_AT_COUNT,
+  ACC_SAMPLE_RATE_HZ,
+  accMagnitudes,
+  parseAccFrame,
+} from '@trainingai/shared/devices/polar-pmd';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type {
   BleAdapter,
@@ -53,6 +59,13 @@ export type PairedStrap = z.infer<typeof pairedSchema>;
 export type StrapHold = 'workout' | 'activity' | 'settings';
 /** The holds that save the strap's readings: a gym workout, or a walk, run or guided walk (#3527). */
 const RECORDING_HOLDS: StrapHold[] = ['workout', 'activity'];
+/**
+ * The accelerometer stream behind live cadence: off, asked for and waiting (no link yet, or no
+ * frame yet), delivering frames, or not possible on this strap (no PMD service, or it refused).
+ */
+export type AccelPhase = 'off' | 'starting' | 'streaming' | 'unavailable';
+/** About a second of magnitudes, as the current app's bridge batches them. */
+export type AccelBatch = { magnitudes: number[]; sampleRate: number; at: number };
 export type StrapState = {
   ready: boolean;
   available: boolean;
@@ -67,6 +80,7 @@ export type StrapState = {
   /** False once the strap has reported no chest contact for the grace period. */
   worn: boolean;
   recording: boolean;
+  accel: AccelPhase;
   /** This workout's plausible readings, for the rest-screen trace. Cleared when a workout starts. */
   trace: { at: number; bpm: number }[];
   scanning: boolean;
@@ -93,6 +107,11 @@ export class StrapSession {
   private generation = 0;
   private link: StrapLink | null = null;
   private stopHr: Unsubscribe | null = null;
+  private stopAccel: Unsubscribe | null = null;
+  private accelWanted = false;
+  private accelStarting = false;
+  private accelBuffer: number[] = [];
+  private accelListeners = new Set<(batch: AccelBatch) => void>();
   private stopRadio: Unsubscribe | null = null;
   private stopScan: Unsubscribe | null = null;
   private waitTimer: unknown = null;
@@ -127,6 +146,7 @@ export class StrapSession {
       bpmAt: null,
       worn: true,
       recording: false,
+      accel: 'off',
       trace: [],
       scanning: false,
       scanned: false,
@@ -209,6 +229,86 @@ export class StrapSession {
     // A workout inside an activity (or the reverse) keeps one trace and one flush timer running.
     if (recording !== this.current.recording) this.setRecording(recording);
     this.updateWanted();
+  }
+
+  /**
+   * Asks for the PMD accelerometer stream while true, over the link a hold keeps open. Only a
+   * guided walk asks, and it asks again with false when the walk ends: left running the stream
+   * drains the strap and the phone. A link that drops and comes back restarts it.
+   */
+  setAccelerometer(on: boolean) {
+    if (on === this.accelWanted) return;
+    this.accelWanted = on;
+    this.accelBuffer = [];
+    if (on) {
+      this.publish({ accel: 'starting' });
+      this.startAccelerometer();
+      return;
+    }
+    this.endAccelerometer();
+    this.publish({ accel: 'off' });
+  }
+
+  /** Magnitude batches of about a second, for as long as the stream runs. */
+  onAccelerometer(listener: (batch: AccelBatch) => void): Unsubscribe {
+    this.accelListeners.add(listener);
+    return () => {
+      this.accelListeners.delete(listener);
+    };
+  }
+
+  private startAccelerometer() {
+    const link = this.link;
+    if (!this.accelWanted || !link || this.stopAccel || this.accelStarting) return;
+    const generation = this.generation;
+    this.accelStarting = true;
+    link
+      .startAccelerometer(
+        (frame) => this.onAccelFrame(frame, generation),
+        () => {
+          // A stream that fails mid-walk is not retried: the walk shows cadence as unavailable.
+          if (generation !== this.generation) return;
+          this.endAccelerometer();
+          this.publish({ accel: 'unavailable' });
+        },
+      )
+      .then((stop) => {
+        this.accelStarting = false;
+        if (generation !== this.generation || !this.accelWanted || this.link !== link) {
+          stop();
+          return;
+        }
+        this.stopAccel = stop;
+      })
+      .catch(() => {
+        this.accelStarting = false;
+        if (generation === this.generation && this.accelWanted)
+          this.publish({ accel: 'unavailable' });
+      });
+  }
+
+  private endAccelerometer() {
+    const stop = this.stopAccel;
+    this.stopAccel = null;
+    this.accelBuffer = [];
+    try {
+      stop?.();
+    } catch {}
+  }
+
+  private onAccelFrame(frame: Uint8Array, generation: number) {
+    if (generation !== this.generation || !this.accelWanted) return;
+    const decoded = parseAccFrame(frame);
+    if (!decoded) return;
+    this.accelBuffer.push(...accMagnitudes(decoded));
+    if (this.current.accel !== 'streaming') this.publish({ accel: 'streaming' });
+    if (this.accelBuffer.length < ACC_EMIT_AT_COUNT) return;
+    const batch = {
+      magnitudes: this.accelBuffer.splice(0),
+      sampleRate: ACC_SAMPLE_RATE_HZ,
+      at: this.now(),
+    };
+    this.accelListeners.forEach((listener) => listener(batch));
   }
 
   private setRecording(on: boolean) {
@@ -323,6 +423,7 @@ export class StrapSession {
         this.step({ type: 'connected' });
         if (this.link !== link) return;
         this.pollBattery(link, generation);
+        this.startAccelerometer();
         if (this.current.paired?.firmware === null) void this.readFirmware(link, generation);
       })
       .catch(() => {
@@ -333,6 +434,12 @@ export class StrapSession {
   private detach() {
     this.stopHr?.();
     this.stopHr = null;
+    // The stream belongs to the link: stopping it over a dead link is best effort, and a new link
+    // restarts it.
+    this.endAccelerometer();
+    this.accelStarting = false;
+    if (this.accelWanted && this.current.accel !== 'unavailable')
+      this.publish({ accel: 'starting' });
     this.link = null;
     if (this.batteryTimer !== null) this.timers.clear(this.batteryTimer);
     this.batteryTimer = null;
@@ -481,6 +588,8 @@ export class StrapSession {
     this.endScan();
     this.holds.clear();
     this.setRecording(false);
+    this.accelWanted = false;
+    this.accelListeners.clear();
     this.step({ type: 'unwant' });
     this.release();
     this.stopRadio?.();
