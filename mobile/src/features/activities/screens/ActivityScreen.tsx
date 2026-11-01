@@ -229,6 +229,11 @@ function ManualActivityScreen({
                 ? 'Recording'
                 : 'Paused'}
           </AppText>
+          {gps.notice && (
+            <AppText variant="micro" tone="muted">
+              {gps.notice}
+            </AppText>
+          )}
           {gps.eligible && (
             <Stack gap="sm" style={{ width: '100%' }}>
               <Stack direction="row">

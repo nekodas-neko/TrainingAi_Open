@@ -115,7 +115,7 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 - [ ] Retrospective detected-activity review, confirm/edit/reject and Home notices. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
 
-- [ ] Sustained recording and workout/activity status while locked or outside the app. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
+- [ ] Sustained recording and workout/activity status while locked or outside the app. Built, device check pending: a walk, run or guided walk keeps recording GPS with the screen locked, through an Android foreground service (`expo-location` background updates with a notification, `expo-task-manager`) that runs from Start to Finish or Discard and asks for "Allow all the time" location when the activity starts; if that is refused it falls back to screen-on recording with a notice. Not built: a live elapsed time in the notification (the current app's is static text too), the heart-rate strap staying connected while locked (waits on the `'activity'` strap hold, [#3527](https://github.com/nekodas-neko/TrainingAi_Open/issues/3527); it reads `useActivityServiceRunning`), and the OS live status for activities. Device check: a 10+ minute walk with the phone locked in a pocket. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
 
 - [ ] Picture-in-picture, exact-alarm rest timers and Android Now Bar presentation. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
 

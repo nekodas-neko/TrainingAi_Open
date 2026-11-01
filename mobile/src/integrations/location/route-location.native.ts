@@ -1,11 +1,14 @@
 import { requireOptionalNativeModule } from 'expo';
 import type { LocationSource } from '../../features/activities/data/route-recording';
+import { backgroundRecorder } from './background-recorder';
 
-// Foreground-only route watcher for TrainingAi Preview (#2845 phase 1). Recording with the
-// screen locked needs a foreground service and background permission, which is #2846.
+// The screen-on route watcher for TrainingAi Preview (#2845 phase 1), plus the foreground-service
+// recorder that keeps recording with the screen locked (#2846). The recorder is used when the
+// walker allows "all the time" location; this watcher is the fallback and records as it always did.
 // Every fix is passed on: the current app's 5 m filter is applied by the recorder (`keepsFix`),
 // so a walker who has stopped still shows a live signal.
 export const routeLocation: LocationSource = {
+  background: backgroundRecorder,
   async watch(handlers) {
     if (!requireOptionalNativeModule('ExpoLocation')) {
       handlers.problem('unavailable');

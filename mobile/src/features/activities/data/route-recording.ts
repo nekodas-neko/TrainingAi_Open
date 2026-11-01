@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { BackgroundRecorder } from './background-recording';
 import type { RoutePoint } from '@trainingai/shared/activity/route-encoding';
 import {
   haversineDistanceKm,
@@ -24,6 +25,8 @@ export type LocationSource = {
     fix(point: RoutePoint): void;
     problem(problem: LocationProblem): void;
   }): Promise<() => void>;
+  // Recording with the screen locked, where the build has it (#2846). Absent in the browser preview.
+  background?: BackgroundRecorder;
 };
 
 // The current app's watcher drops fixes under 5 m from the last one (`distanceFilter: 5` in
