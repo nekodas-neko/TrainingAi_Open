@@ -36,11 +36,11 @@ export function SettingsScreen() {
         <AppText variant="heading">Preferences</AppText>
         <FeatureRow
           title="Health anomaly alerts"
-          subtitle="Notification scheduling is deferred"
+          subtitle="Server-triggered alerts are not built yet"
         />
         <FeatureRow
-          title="Live workout & activity status"
-          subtitle="Lock-screen status remains deferred"
+          title="Live workout status"
+          subtitle="Shown as an Android Live Update while a workout runs"
         />
       </Card>
       <AccountPanel />
