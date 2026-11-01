@@ -29,6 +29,7 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { z } from 'zod';
 import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { LiveStrapBpm } from '../components/LiveStrapBpm';
 import { useRouteRecording } from '../data/useRouteRecording';
 import { gpsStatusText, routeEligible } from '../data/route-recording';
 import { RouteMap } from '../components/RouteMap';
@@ -229,6 +230,7 @@ function ManualActivityScreen({
                 ? 'Recording'
                 : 'Paused'}
           </AppText>
+          <LiveStrapBpm />
           {gps.eligible && (
             <Stack gap="sm" style={{ width: '100%' }}>
               <Stack direction="row">

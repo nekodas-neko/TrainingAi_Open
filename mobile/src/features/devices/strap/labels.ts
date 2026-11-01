@@ -43,7 +43,7 @@ export function strapLinkLabel(state: StrapState): string {
     case 'radioOff':
       return 'Bluetooth is off';
     default:
-      return 'Not connected — it connects during workouts';
+      return 'Not connected — it connects during workouts and activities';
   }
 }
 

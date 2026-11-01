@@ -437,6 +437,47 @@ test('a workout connects the paired strap, shows live bpm and uploads what it re
   assert.ok(ble.log.includes('disconnect'));
 });
 
+test('an activity connects the strap, records its readings and releases at the end (#3527)', async () => {
+  const { session, ble, clock, posts } = await pairedSession();
+  session.hold('activity', true);
+  await settle();
+  assert.equal(session.getSnapshot().link, 'connected');
+  assert.equal(session.getSnapshot().recording, true);
+  ble.beat(bytes(0x16, 101, 0x00, 0x02));
+  assert.equal(session.getSnapshot().bpm, 101);
+  await clock.advance(10_000);
+  assert.deepEqual(posts, [[{ at: 0, bpm: 101, rr: [500] }]]);
+  // Readings between the last flush and the end are saved when the activity ends.
+  ble.beat(bytes(0x06, 104));
+  session.hold('activity', false);
+  await settle();
+  assert.equal(session.getSnapshot().recording, false);
+  assert.equal(session.getSnapshot().link, 'idle');
+  assert.ok(ble.log.includes('disconnect'));
+  assert.deepEqual(
+    posts.map((batch) => batch.map((x) => x.bpm)),
+    [[101], [104]],
+  );
+});
+
+test('a workout and an activity share one recording; the link stays until both end', async () => {
+  const { session, ble, clock } = await pairedSession();
+  session.hold('workout', true);
+  await settle();
+  ble.beat(bytes(0x06, 90));
+  session.hold('activity', true);
+  // The workout's trace is not cleared by an activity starting inside it.
+  assert.equal(session.getSnapshot().trace.length, 1);
+  session.hold('workout', false);
+  assert.equal(session.getSnapshot().recording, true);
+  assert.equal(session.getSnapshot().link, 'connected');
+  session.hold('activity', false);
+  await settle();
+  assert.equal(session.getSnapshot().recording, false);
+  assert.equal(session.getSnapshot().link, 'idle');
+  await clock.advance(1);
+});
+
 test('the Devices screen holds the link without recording', async () => {
   const { session, ble, clock, posts } = await pairedSession();
   session.hold('settings', true);
