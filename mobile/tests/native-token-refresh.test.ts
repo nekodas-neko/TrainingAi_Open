@@ -206,6 +206,41 @@ test('a refused refresh signs out cleanly and clears secure storage', async () =
   assert.equal(f.revoked.length, 0);
 });
 
+test('our own JSON 400 from the refresh route (a refused token body) signs out', async () => {
+  const f = fixture(renewable(60));
+  f.server.refresh = async () => json({ error: 'Invalid request' }, 400);
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.equal(f.storage.has(KEY), false);
+});
+
+test('a proxy or captive-portal 4xx on refresh keeps the session and retries later', async () => {
+  for (const [status, body, type] of [
+    [403, '<html><body>Please sign in to the Wi-Fi</body></html>', 'text/html'],
+    [400, '<html>Bad Request</html>', 'text/html'],
+    [401, '', 'text/plain'],
+    [403, '{"message":"blocked"}', 'application/json'],
+  ] as const) {
+    const f = fixture(renewable(60));
+    f.valid.add('access-0');
+    f.server.refresh = async () => new Response(body, { status, headers: { 'content-type': type } });
+    await f.controller.initialize(null);
+    assert.equal(f.controller.state.status, 'signedIn', `${status} ${type}`);
+    assert.equal(f.controller.state.hasSession, true);
+    assert.doesNotMatch(f.controller.state.message ?? '', /Sign in again/);
+    assert.equal(f.stored().refreshToken, refreshToken(0));
+    assert.equal(f.revoked.length, 0);
+    assert.equal(f.refreshes().length, 1);
+  }
+});
+
+test('our own JSON 403 from the refresh route signs out', async () => {
+  const f = fixture(renewable(60));
+  f.server.refresh = async () => json({ error: 'forbidden' }, 403);
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedOut');
+});
+
 test('a renewal that lands while the profile is loading is not overwritten by the profile save', async () => {
   const f = fixture(renewable(86_000));
   f.valid.add('access-0');
