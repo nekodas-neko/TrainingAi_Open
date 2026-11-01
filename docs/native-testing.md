@@ -34,11 +34,11 @@ Two consequences:
 | Build | App ID | Signed with | Gets its data from | Who uses it |
 |---|---|---|---|---|
 | TrainingAi Dev, the current app's dev flavour (exists) | `com.trainingai.app.dev` | the stable key | the laptop's `pnpm dev` over `adb reverse` | the Implementer's device passes on the current app ([`canonical-runtime-android.md`](canonical-runtime-android.md)) |
-| Native development (`development`, `android-development` profiles; ID still to change, see below) | `com.trainingai.app.nativedev` | a dev key | a local or test server; code from a laptop's Metro | jsboiss, and the Implementer's device pass |
+| Native development (`development`, `android-development` profiles; shares the Dev ID, see below) | `com.trainingai.app.dev` | the stable key | a local or test server; code from a laptop's Metro | jsboiss, and the Implementer's device pass |
 | TrainingAi Preview, the side-by-side build (#2878; `native-side-by-side.yml`) | `com.trainingai.app.preview` | its own key (see *Installing TrainingAi Preview*) | production, signed in as the owner | the owner, next to the current app |
-| Release (`android-preview`, `android-production`) | `com.trainingai.app` | the release key | production | everyone, but only from the switch-over |
+| Release (`native-release.yml`, the `android-preview` profile as an APK) | `com.trainingai.app` | the stable release key | production | everyone, but only from the switch-over |
 
-- **Separate app IDs** let Android treat each build as its own app. A `.nativedev` or `.preview`
+- **Separate app IDs** let Android treat each build as its own app. A `.dev` or `.preview`
   build installs next to the current app and never touches it, its data or the ring key. All four
   can sit on one phone.
 - **⚠ The native development profiles still build `com.trainingai.app.dev` with the release key.**
@@ -86,8 +86,8 @@ what makes comparing them possible, and it is also why these rules exist:
      `pnpm dev` or a test server.
    - Cloud agents use `pnpm --dir mobile web` for a rough preview and `pnpm dev` for the API.
 2. **Device check (Implementer, on the owner's machine).** Install the development build on the
-   owner's phone and run it against the machine's local server. Use `.nativedev` and `.preview`
-   builds only. Results go on the device-check issue.
+   owner's phone and run it against the machine's local server. Use `.preview` builds, and
+   `.dev` builds only on a phone where TrainingAi Dev is not installed. Results go on the device-check issue.
 3. **Merge.**
    - Server changes ship at the next release (cadence below).
    - App changes (`mobile/**`, `packages/shared/**`) rebuild TrainingAi Preview and publish it.
@@ -140,17 +140,53 @@ notes give the commit and build date.
 
 ## Builds and signing (owner, 13 Oct)
 
-- **Builds run on a GitHub runner**, using `eas build --local` with a pinned `eas-cli` version, so
-  the signing key never leaves GitHub's secret store.
+- **Builds run on a GitHub runner**, so the signing key never leaves GitHub's secret store (owner,
+  2 Nov, #3526). The release build is `.github/workflows/native-release.yml`, below. `mobile-build.yml`
+  (Expo's cloud build) is **not used for the switch-over**.
 - **Before publishing any release build**, check its signing certificate's SHA-256 against the
   installed app.
 - **Development and side-by-side builds use their own key**, never the release key. TrainingAi
   Preview's is described under *Installing TrainingAi Preview*. It's built with `expo prebuild`
-  and Gradle rather than `eas build --local`: that's the same result without an Expo login.
+  and Gradle, as the release build is, with no Expo login.
 - **Keep an offline copy of the release key** outside GitHub. GitHub never shows a stored secret
   again.
 - **At store release, enroll in Play App Signing.** Google then holds the app's key, and builds only
   carry an upload key that Google can reset. From then on, Expo's cloud builds are fine.
+
+## Building the release APK (`native-release.yml`)
+
+The APK that replaces the current app: ID `com.trainingai.app`, the `android-preview` profile as an
+APK (not the AAB), arm64 only, JavaScript embedded, talking to production. It is the same path as
+TrainingAi Preview: `expo prebuild`, Gradle `assembleRelease`, then `apksigner`.
+
+**Running it** (the Orchestrator, after review; never an agent on its own):
+1. Read the installed app's version code from the phone (the Implementer does this with
+   `apkanalyzer` or `adb shell dumpsys package com.trainingai.app`). Use a number above it.
+2. Actions → **Native release build** → Run workflow, from `main`. Give `version_code` and, if
+   not `main`, the `ref` to build. The workflow file itself must come from `main`.
+3. The APK is the `trainingai-release-apk` artifact on the run, kept 14 days.
+
+**What it does**
+- Signs with the **stable key the installed app uses**: the `ANDROID_DEBUG_KEYSTORE_B64` repository
+  secret (the legacy name for that key), decoded the way `android.yml` decodes it. The key is read
+  only by the signing step, after the build, and deleted straight after.
+- Fails the job, and keeps no APK, unless all of these hold:
+  - the package is `com.trainingai.app`;
+  - the certificate SHA-256 equals `android.yml`'s `EXPECTED_CERT_SHA256`;
+  - the version code equals the input;
+  - the merged manifest has `android:fullBackupContent` and `android:dataExtractionRules`, and the
+    packaged XML (all three lists) excludes everything in `private-backups.cjs`: SecureStore, the
+    widget and workout-status preferences, the WebView, and the health database
+    (`fitnessai.sqlite`, kept in `filesDir/SQLite`).
+  The check is `mobile/scripts/verify-release-apk.mjs`.
+- **Publishes nothing.** It is a workflow artifact only, with read-only permissions. It never touches
+  `apk-latest` (which `lib/github-release.ts` offers to the installed app as an update) or any
+  release. `lib/__tests__/native-release-workflow.test.ts` pins that.
+- Installing it is the owner's switch-over step (checklist above), with `adb install -r` only.
+
+**If it fails on the certificate:** the secret isn't the installed app's key. Don't work around it
+and never uninstall. Compare with `mobile/scripts/verify-android-upgrade.mjs --existing <the
+installed APK>`.
 
 ## Release cadence during the native move
 

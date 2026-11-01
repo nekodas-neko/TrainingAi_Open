@@ -1,0 +1,169 @@
+name: Native release build
+
+# Builds the native app (mobile/) as the REAL app, com.trainingai.app, for the switch-over that
+# replaces the Capacitor app (#2840, #2849; owner's decision on #3526: build on GitHub's own
+# runners, so the signing key never leaves GitHub). docs/native-testing.md has the process.
+#
+# Run by hand, with a version code ABOVE the installed app's (the Implementer reads it from the
+# phone). The same path as native-side-by-side.yml, which has built Preview many times: `expo
+# prebuild`, Gradle `assembleRelease`, then apksigner. It is the `android-preview` profile (an
+# APK, not the AAB), arm64 only, JavaScript embedded, talking to production.
+#
+# Signed with the stable key android.yml signs the installed app with (the repository secret
+# ANDROID_DEBUG_KEYSTORE_B64, the legacy name of that key). Its certificate is checked against the
+# installed app's before the APK is kept.
+#
+# The APK is a WORKFLOW ARTIFACT ONLY. This workflow never publishes to `apk-latest` or any
+# release: lib/github-release.ts offers the first `.apk` on `apk-latest` to the installed app as
+# an update, and an install over the real app is the owner's switch-over step, not an automatic one.
+# lib/__tests__/native-release-workflow.test.ts pins that.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'versionCode, an integer above the installed app''s'
+        type: string
+        required: true
+      ref:
+        description: 'Branch, tag or commit to build'
+        type: string
+        required: false
+        default: main
+
+# Read-only. Nothing in this workflow writes to the repository or its releases.
+permissions:
+  contents: read
+
+concurrency:
+  group: native-release
+  cancel-in-progress: false
+
+env:
+  PACKAGE: com.trainingai.app
+  APK_NAME: TrainingAi.apk
+  # The certificate of the stable key the installed app is signed with: the same digest as
+  # EXPECTED_CERT_SHA256 in android.yml. Change both together if that key is ever rotated on purpose.
+  EXPECTED_CERT_SHA256: d390062e367da6eee52ee74ca18632eae7686e5edb9c0c25e2fc98a3744d893c
+
+jobs:
+  build:
+    name: Build and check the release APK
+    # The workflow file itself must come from main: a copy edited on another branch could be
+    # dispatched to sign anything. `ref` below is only the code that gets built.
+    if: github.ref == 'refs/heads/main' && github.repository == 'nekodas-neko/TrainingAi_Open'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      CI: '1'
+      EXPO_NO_DOTENV: '1'
+      # Not development, not side-by-side: app.config.js then gives the real ID.
+      EAS_BUILD_PROFILE: android-preview
+      EXPO_PUBLIC_API_URL: https://trainingai-production.up.railway.app
+    steps:
+      - name: Check the version code
+        working-directory: .
+        env:
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          set -euo pipefail
+          # Android stores it as a signed 32-bit integer.
+          if ! [[ "$VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]] || [ "$VERSION_CODE" -gt 2100000000 ]; then
+            echo "::error::version_code must be a positive integer up to 2100000000, got '$VERSION_CODE'."
+            exit 1
+          fi
+          echo "ANDROID_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          version: 10.33.0
+          package_json_file: mobile/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: mobile/pnpm-lock.yaml
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec expo prebuild --platform android --no-install
+
+      # The generated project must be the real app, at the version code that was asked for.
+      - name: Check the generated project
+        run: |
+          set -euo pipefail
+          grep -q "applicationId '$PACKAGE'" android/app/build.gradle || {
+            echo "::error::The generated project is not $PACKAGE:"; grep -n applicationId android/app/build.gradle; exit 1; }
+          grep -q "versionCode $ANDROID_VERSION_CODE\$" android/app/build.gradle || {
+            echo "::error::The generated project's versionCode is not $ANDROID_VERSION_CODE:"; grep -n versionCode android/app/build.gradle; exit 1; }
+
+      - name: Compile the release APK
+        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+        working-directory: mobile/android
+
+      # The key is read only from here on, after every step that runs the checked-out code's build.
+      # It goes through `env`, not into the script text, and is deleted as soon as it has signed.
+      - name: Sign with the stable release key
+        env:
+          KEY_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEY_B64" ]; then
+            echo "::error::ANDROID_DEBUG_KEYSTORE_B64 is not set. Without the installed app's key this APK could not install over it."
+            exit 1
+          fi
+          KS="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$KEY_B64" | base64 -d > "$KS"
+          if [ ! -s "$KS" ]; then
+            echo "::error::The decoded keystore is empty: the secret is set but malformed."
+            exit 1
+          fi
+          BT="$ANDROID_HOME/build-tools/$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort -V | tail -1)"
+          echo "BT=$BT" >> "$GITHUB_ENV"
+          # The legacy key's alias and passwords (mobile/scripts/android-signing.mjs, the same as
+          # android/app/build.gradle's debugStable). assembleRelease signs with the template's debug
+          # key; apksigner replaces that signature.
+          "$BT/apksigner" sign --ks "$KS" --ks-pass pass:android --ks-key-alias androiddebugkey \
+            --key-pass pass:android --out "$RUNNER_TEMP/$APK_NAME" \
+            android/app/build/outputs/apk/release/app-release.apk
+          rm -f "$KS"
+
+      # Fails the job on any mismatch, so nothing is uploaded that could not replace the real app.
+      - name: Check the package, certificate, version code and backup rules
+        env:
+          BUILT_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          TOOLS="$(dirname "$(find "$ANDROID_HOME/cmdline-tools" -name apkanalyzer -type f | sort -V | tail -1)")"
+          [ -x "$TOOLS/apkanalyzer" ] || { echo "::error::apkanalyzer is not on this runner."; exit 1; }
+          node scripts/verify-release-apk.mjs \
+            --apk "$RUNNER_TEMP/$APK_NAME" \
+            --package "$PACKAGE" \
+            --version-code "$ANDROID_VERSION_CODE" \
+            --cert "$EXPECTED_CERT_SHA256" \
+            --apksigner "$BT/apksigner" \
+            --apkanalyzer "$TOOLS/apkanalyzer" \
+            --aapt2 "$BT/aapt2" | tee "$RUNNER_TEMP/verified.json"
+          {
+            echo "**$PACKAGE**, version code $ANDROID_VERSION_CODE, built from \`$BUILT_REF\`, $(du -h "$RUNNER_TEMP/$APK_NAME" | cut -f1)."
+            echo "Signed by the installed app's certificate \`$EXPECTED_CERT_SHA256\`; the backup rules keep SecureStore and the health database out of Google backups."
+            echo "This is a workflow artifact only. Nothing was published."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: trainingai-release-apk
+          path: ${{ runner.temp }}/${{ env.APK_NAME }}
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: error
