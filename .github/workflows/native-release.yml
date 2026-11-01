@@ -26,7 +26,7 @@ on:
         type: string
         required: true
       ref:
-        description: 'Branch, tag or commit to build'
+        description: 'What to build: main, or a v* release tag'
         type: string
         required: false
         default: main
@@ -45,6 +45,19 @@ env:
   # The certificate of the stable key the installed app is signed with: the same digest as
   # EXPECTED_CERT_SHA256 in android.yml. Change both together if that key is ever rotated on purpose.
   EXPECTED_CERT_SHA256: d390062e367da6eee52ee74ca18632eae7686e5edb9c0c25e2fc98a3744d893c
+  # The backup exclusions the built APK must carry, as `domain:path`. Pinned HERE, not only in the
+  # ref's private-backups.cjs: the workflow file comes from the dispatching branch (main) while
+  # `ref` may be older code, and the built APK is held to this list whatever that code says. The
+  # session token, the Oura key and the health database (the SQLite folder) stay out of Google
+  # backups. A test pins this list against private-backups.cjs.
+  REQUIRED_BACKUP_EXCLUSIONS: |
+    root:app_webview
+    file:SQLite
+    sharedpref:oura_ble.xml
+    sharedpref:SecureStore
+    sharedpref:SecureStore.xml
+    sharedpref:trainingai_home_widgets.xml
+    sharedpref:workout-status.xml
 
 jobs:
   build:
@@ -64,6 +77,28 @@ jobs:
       EAS_BUILD_PROFILE: android-preview
       EXPO_PUBLIC_API_URL: https://trainingai-production.up.railway.app
     steps:
+      # First, before any checked-out code exists: only main or a release tag may be built, so no
+      # other branch's code runs ahead of the signing step. It uses no repository files.
+      - name: Check the ref
+        working-directory: .
+        env:
+          REF: ${{ inputs.ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "$REF" = "main" ]; then
+            exit 0
+          fi
+          if ! [[ "$REF" =~ ^v[0-9A-Za-z._-]+$ ]]; then
+            echo "::error::ref must be 'main' or a v* release tag, got '$REF'."
+            exit 1
+          fi
+          # A branch could also be named v-something: the name must be an existing tag.
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$REF" --silent || {
+            echo "::error::'$REF' is not a tag in $GITHUB_REPOSITORY."
+            exit 1
+          }
+
       - name: Check the version code
         working-directory: .
         env:
@@ -79,7 +114,7 @@ jobs:
 
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.ref }}
+          ref: refs/${{ inputs.ref == 'main' && 'heads' || 'tags' }}/${{ inputs.ref }}
           persist-credentials: false
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
@@ -153,7 +188,8 @@ jobs:
             --cert "$EXPECTED_CERT_SHA256" \
             --apksigner "$BT/apksigner" \
             --apkanalyzer "$TOOLS/apkanalyzer" \
-            --aapt2 "$BT/aapt2" | tee "$RUNNER_TEMP/verified.json"
+            --aapt2 "$BT/aapt2" \
+            --require-exclusions "$REQUIRED_BACKUP_EXCLUSIONS" | tee "$RUNNER_TEMP/verified.json"
           {
             echo "**$PACKAGE**, version code $ANDROID_VERSION_CODE, built from \`$BUILT_REF\`, $(du -h "$RUNNER_TEMP/$APK_NAME" | cut -f1)."
             echo "Signed by the installed app's certificate \`$EXPECTED_CERT_SHA256\`; the backup rules keep SecureStore and the health database out of Google backups."

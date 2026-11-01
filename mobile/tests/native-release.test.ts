@@ -7,6 +7,8 @@ import {
   backupProblems,
   excludedPaths,
   manifestReference,
+  mergeExclusions,
+  parseExclusions,
   xmlResourceName,
   xmlResourcePath,
 } from '../scripts/verify-release-apk.mjs';
@@ -103,4 +105,20 @@ test('references and paths are read from apkanalyzer and aapt2 output', () => {
   assert.equal(xmlResourcePath('trainingai_data_extraction_rules', dump), 'res/Bb.xml');
   assert.equal(xmlResourcePath('missing', dump), null);
   assert.deepEqual(excludedPaths('<exclude path="x" domain="file" /><exclude domain="root"/>'), ['file:x']);
+});
+
+test('the workflow\'s required exclusions are parsed and held on top of the built code\'s own', () => {
+  assert.deepEqual(parseExclusions('file:SQLite, sharedpref:SecureStore.xml\nroot:app_webview'), [
+    ['file', 'SQLite'],
+    ['sharedpref', 'SecureStore.xml'],
+    ['root', 'app_webview'],
+  ]);
+  assert.throws(() => parseExclusions('SQLite'));
+  // A ref whose plugin dropped SQLite still fails: the required floor is merged in.
+  const lowered = exclusions.filter(([, path]: string[]) => path !== 'SQLite');
+  const merged = mergeExclusions(parseExclusions('file:SQLite'), lowered);
+  assert.ok(merged.some(([d, p]: string[]) => d === 'file' && p === 'SQLite'));
+  assert.equal(merged.length, lowered.length + 1);
+  const problems = backupProblems({ manifest: MANIFEST, fullBackupXml: FULL.replaceAll('<exclude domain="file" path="SQLite"/>', ''), extractionXml: EXTRACTION, exclusions: merged });
+  assert.ok(problems.some((p: string) => p.includes('SQLite')));
 });

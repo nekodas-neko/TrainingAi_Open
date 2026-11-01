@@ -4,7 +4,11 @@
 // session token and the health database to Google.
 //
 //   node scripts/verify-release-apk.mjs --apk app.apk --package com.trainingai.app \
-//     --version-code 123 --cert <sha256>
+//     --version-code 123 --cert <sha256> --require-exclusions "root:app_webview file:SQLite ..."
+//
+// --require-exclusions is the floor the workflow pins itself (`domain:path`, separated by spaces,
+// commas or newlines): the APK must carry all of them in all three lists, on top of whatever the
+// built code's private-backups.cjs lists. It is required, so a ref cannot lower the floor.
 //
 // Tools come from --apksigner / --apkanalyzer / --aapt2 or APKSIGNER / APKANALYZER / AAPT2.
 import { createRequire } from 'node:module';
@@ -62,6 +66,25 @@ export function section(xml, name) {
   return xml.match(new RegExp(`<${name}\\b[\\s\\S]*?</${name}>`))?.[0] ?? '';
 }
 
+/** `domain:path` entries (separated by whitespace or commas) as [domain, path] pairs. */
+export function parseExclusions(text) {
+  return String(text ?? '')
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map((entry) => {
+      const at = entry.indexOf(':');
+      if (at < 1 || at === entry.length - 1) throw new Error(`Bad required exclusion '${entry}', expected domain:path.`);
+      return [entry.slice(0, at), entry.slice(at + 1)];
+    });
+}
+
+/** The required exclusions plus the built code's own, without repeats. */
+export function mergeExclusions(required, own) {
+  const seen = new Map();
+  for (const [domain, path] of [...required, ...own]) seen.set(`${domain}:${path}`, [domain, path]);
+  return [...seen.values()];
+}
+
 /** The problems with a packaged backup configuration; empty when every exclusion is in all three lists. */
 export function backupProblems({ manifest, fullBackupXml, extractionXml, exclusions }) {
   const problems = [];
@@ -93,6 +116,8 @@ function main() {
   const signer = option('--apksigner', process.env.APKSIGNER ?? 'apksigner');
   const analyzer = option('--apkanalyzer', process.env.APKANALYZER ?? 'apkanalyzer');
   const aapt2 = option('--aapt2', process.env.AAPT2 ?? 'aapt2');
+  const required = parseExclusions(option('--require-exclusions', ''));
+  if (!required.length) throw new Error('--require-exclusions is required: the workflow pins the backup floor.');
   if (!Number.isSafeInteger(expectedCode) || expectedCode < 1) throw new Error('--version-code must be a positive integer.');
   if (!/^[A-F0-9]{64}$/.test(expectedCert)) throw new Error('--cert must be a SHA-256 digest.');
 
@@ -111,7 +136,8 @@ function main() {
     const path = name && xmlResourcePath(name, resources);
     return path ? invoke(analyzer, ['files', 'cat', '--file', path, apk]) : '';
   };
-  const { exclusions } = require('../src/integrations/auth/private-backups.cjs');
+  const { exclusions: own } = require('../src/integrations/auth/private-backups.cjs');
+  const exclusions = mergeExclusions(required, own);
   failures.push(
     ...backupProblems({
       manifest,

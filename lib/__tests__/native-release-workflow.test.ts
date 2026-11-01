@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { NATIVE_CALLBACKS } from '@/lib/auth/mobile/native-transaction'
-import { MOBILE_CALLBACKS } from '../../mobile/src/features/account/session'
 
 // .github/workflows/native-release.yml builds the REAL app's APK (#2840). lib/github-release.ts
 // offers the first `.apk` on the `apk-latest` release to the installed app as an update, so a
@@ -49,7 +48,51 @@ describe('native-release.yml', () => {
 
 describe('the real app\'s sign-in callback', () => {
   it('is the same on the server and in the app', () => {
-    expect(MOBILE_CALLBACKS.android).toBe('com.trainingai.app:/auth/callback')
-    expect(NATIVE_CALLBACKS.android).toBe(MOBILE_CALLBACKS.android)
+    // Read as text: importing the app's module would make Vite load mobile/tsconfig.json, which
+    // extends expo's base config, and that is not installed in the root-only CI install. The
+    // mobile suite (native-release.test.ts) covers MOBILE_CALLBACKS itself.
+    const session = readFileSync(new URL('../../mobile/src/features/account/session.ts', import.meta.url), 'utf8')
+    expect(session).toContain("android: 'com.trainingai.app:/auth/callback'")
+    expect(NATIVE_CALLBACKS.android).toBe('com.trainingai.app:/auth/callback')
+  })
+})
+
+describe('the ref and the backup floor', () => {
+  const steps = code.split(/^ {6}- /m)
+  const stepNamed = (name: string) => steps.find(s => s.includes(`name: ${name}`)) ?? ''
+
+  it('only builds main or a v* tag, checked before any code is checked out', () => {
+    const check = stepNamed('Check the ref')
+    expect(check).toContain('REF: ${{ inputs.ref }}')
+    expect(check).toContain('"$REF" = "main"')
+    expect(check).toContain('^v[0-9A-Za-z._-]+$')
+    expect(check).toContain('exit 1')
+    expect(code.indexOf('name: Check the ref')).toBeLessThan(code.indexOf('actions/checkout@'))
+    expect(code.indexOf('name: Check the ref')).toBeLessThan(code.indexOf('actions/setup-node@'))
+    expect(code).toMatch(/ref: refs\/\$\{\{ inputs\.ref == 'main' && 'heads' \|\| 'tags' \}\}\/\$\{\{ inputs\.ref \}\}/)
+  })
+
+  const pinned = () => {
+    const block = workflow.match(/REQUIRED_BACKUP_EXCLUSIONS: \|\n((?: {4}\S+\n)+)/)?.[1] ?? ''
+    return block.split('\n').map(l => l.trim()).filter(Boolean)
+  }
+
+  it('pins the required exclusions in the workflow and hands them to the verifier', () => {
+    expect([...pinned()].sort()).toEqual([
+      'file:SQLite',
+      'root:app_webview',
+      'sharedpref:SecureStore',
+      'sharedpref:SecureStore.xml',
+      'sharedpref:oura_ble.xml',
+      'sharedpref:trainingai_home_widgets.xml',
+      'sharedpref:workout-status.xml',
+    ])
+    expect(code).toContain('--require-exclusions "$REQUIRED_BACKUP_EXCLUSIONS"')
+  })
+
+  it('matches what the app\'s own backup plugin excludes', () => {
+    const plugin = readFileSync(new URL('../../mobile/src/integrations/auth/private-backups.cjs', import.meta.url), 'utf8')
+    const own = [...plugin.matchAll(/\['(\w+)', '([^']+)'\]/g)].map(m => `${m[1]}:${m[2]}`)
+    expect([...own].sort()).toEqual([...pinned()].sort())
   })
 })
