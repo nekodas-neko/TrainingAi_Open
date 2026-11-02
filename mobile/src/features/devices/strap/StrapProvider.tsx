@@ -75,6 +75,11 @@ export function StrapProvider({ children }: PropsWithChildren) {
   return <Context.Provider value={session}>{children}</Context.Provider>;
 }
 
+/** The strap session where one is provided, else null: for features that use the strap only if present. */
+export function useStrapSession() {
+  return useContext(Context);
+}
+
 export function useStrap() {
   const session = useContext(Context);
   if (!session) throw new Error('StrapProvider is required.');

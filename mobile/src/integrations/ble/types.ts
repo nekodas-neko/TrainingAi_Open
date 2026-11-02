@@ -15,6 +15,17 @@ export type StrapLink = {
   readBattery(): Promise<Uint8Array | null>;
   /** Firmware Revision (0x2A26), raw bytes; null when the strap does not expose it. */
   readFirmware(): Promise<Uint8Array | null>;
+  /**
+   * Starts the strap's PMD accelerometer stream (50 Hz, cadence's raw material) and delivers each
+   * data frame's raw bytes. Resolves with the stop function once the start command is written;
+   * stopping writes the stop command and ends the subscriptions. Rejects when the strap has no PMD
+   * service or refuses the write. `onFailed` fires once if the subscription fails after starting.
+   * Only a guided walk asks for this, and it stops when the walk does.
+   */
+  startAccelerometer(
+    listener: (frame: Uint8Array) => void,
+    onFailed: () => void,
+  ): Promise<Unsubscribe>;
   disconnect(): Promise<void>;
 };
 

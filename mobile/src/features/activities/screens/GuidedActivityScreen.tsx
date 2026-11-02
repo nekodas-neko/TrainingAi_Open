@@ -27,6 +27,7 @@ import { profileSpec, healthDaySpec, healthDaySchema } from '../../health/data/m
 import { baselinesSpec } from '../data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
+import { WalkPacingCard } from '../components/WalkPacingCard';
 import { LiveStrapBpm } from '../components/LiveStrapBpm';
 import { useRouteRecording } from '../data/useRouteRecording';
 import { gpsProblemText, routeEligible } from '../data/route-recording';
@@ -257,17 +258,18 @@ export function GuidedActivityScreen({
             {clock(seconds)} elapsed · {clock(total)} total
           </AppText>
           <LiveStrapBpm />
-          {guidance.kind === 'walk' && segment && ['fast', 'slow'].includes(segment.kind) && (
-            <Card>
-              <AppText variant="caption">
-                {segment.kind === 'fast'
-                  ? `Fast target ≥ ${guidance.config.fastCadenceSpm} spm`
-                  : `Slow target ≤ ${guidance.config.slowCadenceSpm} spm`}
-              </AppText>
-              <AppText variant="micro" tone="muted">
-                Live pacing is unavailable until a sensor is connected.
-              </AppText>
-            </Card>
+          {guidance.kind === 'walk' && segment && (segment.kind === 'fast' || segment.kind === 'slow') && (
+            <WalkPacingCard
+              kind={segment.kind}
+              target={
+                segment.kind === 'fast'
+                  ? guidance.config.fastCadenceSpm
+                  : guidance.config.slowCadenceSpm
+              }
+              pace={activity.store?.pace ?? null}
+              now={now}
+              segment={segment}
+            />
           )}
           {gps.eligible &&
             (gps.distanceKm != null && gps.distanceKm > 0 ? (
