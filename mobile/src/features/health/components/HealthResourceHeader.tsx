@@ -3,7 +3,6 @@ import { AppText, Icon, Stack, type IconName } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import type { ResourceState } from '../../workouts/data/WorkoutResources';
-import { statusVisible } from '../data/status-visible';
 
 export function HealthResourceHeader({
   title,
@@ -48,9 +47,13 @@ export function HealthResourceHeader({
         </AppText>
       )}
       {trailing}
-      {(status === 'always' || statusVisible(state)) && (
-        <ResourceStatus inline label={title} state={state} refresh={refresh} />
-      )}
+      <ResourceStatus
+        inline
+        whenActive={status !== 'always'}
+        label={title}
+        state={state}
+        refresh={refresh}
+      />
     </Stack>
   );
 }
