@@ -107,7 +107,7 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 ## Deferred activity and platform integrations
 
-- [ ] GPS routes, distance/pace/elevation and interruption recovery. Recording while the app is open is built; recording through a locked screen or an interruption is not (see #2846). [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
+- [ ] GPS routes, distance/pace/elevation and interruption recovery. Recording while the app is open and with the screen locked is built (foreground service, device check pending, see #2846); recovery after an interruption is not. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
 
 - [x] Recorded route maps and linked chart scrubbing. Built, device check pending. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
 
@@ -117,7 +117,7 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 - [x] Workout status while locked or outside the app, as an Android Live Update (#3249, #3251, #3272). Built, device check pending. [#2846]
 
-- [ ] Sustained route recording and activity status while locked or outside the app. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
+- [ ] Sustained route recording and activity status while locked or outside the app. Built, device check pending: a walk, run or guided walk keeps recording GPS with the screen locked, through an Android foreground service (`expo-location` background updates with a notification, `expo-task-manager`) that runs from Start to Finish or Discard and needs only foreground location permission (expo-location skips the "all the time" check for a foreground service); if Android refuses the service it falls back to screen-on recording with a notice. Not built: a live elapsed time in the notification (the current app's is static text too), the heart-rate strap staying connected while locked (waits on the `'activity'` strap hold, [#3527](https://github.com/nekodas-neko/TrainingAi_Open/issues/3527); it reads `useActivityServiceRunning`), and the OS live status for activities. Device check: a 10+ minute walk with the phone locked in a pocket. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
 
 - [x] Picture-in-picture and exact-alarm rest timers. Built, device check pending. [#2846]
 

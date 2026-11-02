@@ -57,3 +57,18 @@ test('the widget guard refuses writes after a clear until resume()', () => {
   guarded.writeSnapshot('b');
   assert.deepEqual(calls, ['write:a', 'clear', 'write:b']);
 });
+
+test('the merged manifest declares what recording with the screen locked needs (#2846)', async () => {
+  const manifest = await mergedManifest();
+  const names = new Set<string>(
+    (manifest['uses-permission'] ?? []).map((p: { $: Record<string, string> }) => p.$['android:name']),
+  );
+  for (const name of [
+    'android.permission.FOREGROUND_SERVICE',
+    'android.permission.FOREGROUND_SERVICE_LOCATION',
+  ]) {
+    assert.ok(names.has(name), `${name} is missing from the merged manifest`);
+  }
+  // The foreground service needs no "Allow all the time", so the app does not declare it.
+  assert.ok(!names.has('android.permission.ACCESS_BACKGROUND_LOCATION'));
+});

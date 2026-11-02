@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  runBackgroundRecording,
+  type BackgroundNotification,
+  type BackgroundRecorder,
+  type BackgroundState,
+} from './background-recording';
 import type { RoutePoint } from '@trainingai/shared/activity/route-encoding';
 import {
   haversineDistanceKm,
@@ -24,6 +30,8 @@ export type LocationSource = {
     fix(point: RoutePoint): void;
     problem(problem: LocationProblem): void;
   }): Promise<() => void>;
+  // Recording with the screen locked, where the build has it (#2846). Absent in the browser preview.
+  background?: BackgroundRecorder;
 };
 
 // The current app's watcher drops fixes under 5 m from the last one (`distanceFilter: 5` in
@@ -86,6 +94,71 @@ export function watchRoute(
     cancelled = true;
     stop?.();
     clearInterval(timer);
+  };
+}
+
+/**
+ * The watch state while the foreground service is the source of fixes. The screen-on watcher stands
+ * down then, so nothing else would move `lastFixMs`: the status would stay "searching" and the
+ * pace tile at zero for the whole walk. Each fix the service delivers goes through `fix`, and the
+ * clock tick lets "GPS signal lost" show when the service goes quiet.
+ */
+export function watchServiceFixes(
+  onState: (state: RouteWatchState) => void,
+  clock: () => number = Date.now,
+) {
+  let stopped = false,
+    state: RouteWatchState = { problem: null, lastFixMs: null, now: clock() };
+  const publish = (patch: Partial<RouteWatchState>) => {
+    if (!stopped) {
+      state = { ...state, ...patch };
+      onState(state);
+    }
+  };
+  const timer = setInterval(() => publish({ now: clock() }), ROUTE_CLOCK_TICK_MS);
+  return {
+    fix() {
+      const at = clock();
+      publish({ problem: null, lastFixMs: at, now: at });
+    },
+    stop() {
+      stopped = true;
+      clearInterval(timer);
+    },
+  };
+}
+
+/**
+ * The service run `useRouteRecording` mounts: the service's fixes reach the store and also feed the
+ * watch state. Returns the stop function.
+ */
+export function runServiceRecording(
+  recorder: BackgroundRecorder,
+  sink: { appendFix(point: RoutePoint): unknown },
+  notification: BackgroundNotification,
+  onBackground: (state: BackgroundState) => void,
+  onWatch: (state: RouteWatchState) => void,
+  clock: () => number = Date.now,
+) {
+  const feed = watchServiceFixes(onWatch, clock);
+  // When the service does not start, the screen-on watcher drives the watch state. The feed's own
+  // tick would keep overwriting it with an empty state, flipping the status and clearing the problem
+  // the AppState retry keys on.
+  const stop = runBackgroundRecording(
+    recorder,
+    sink,
+    notification,
+    (state) => {
+      if (state === 'failed' || state === 'skipped') {
+        feed.stop();
+      }
+      onBackground(state);
+    },
+    feed.fix,
+  );
+  return () => {
+    feed.stop();
+    stop();
   };
 }
 

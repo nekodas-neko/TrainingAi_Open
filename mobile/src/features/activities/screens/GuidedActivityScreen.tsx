@@ -271,6 +271,11 @@ export function GuidedActivityScreen({
               segment={segment}
             />
           )}
+          {gps.notice && (
+            <AppText variant="micro" tone="muted">
+              {gps.notice}
+            </AppText>
+          )}
           {gps.eligible &&
             (gps.distanceKm != null && gps.distanceKm > 0 ? (
               <AppText variant="caption" tone="muted">

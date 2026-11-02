@@ -234,6 +234,11 @@ function ManualActivityScreen({
                 : 'Paused'}
           </AppText>
           <LiveStrapBpm />
+          {gps.notice && (
+            <AppText variant="micro" tone="muted">
+              {gps.notice}
+            </AppText>
+          )}
           {gps.eligible && (
             <Stack gap="sm" style={{ width: '100%' }}>
               <Stack direction="row">
