@@ -3,6 +3,9 @@ const { mkdirSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');
 const exclusions = [
   ['root', 'app_webview'],
+  // The health database: expo-sqlite opens fitnessai.sqlite (and its -wal and -shm) in
+  // filesDir/SQLite. The owner chose to keep it out of Google backups.
+  ['file', 'SQLite'],
   ['sharedpref', 'oura_ble.xml'],
   ['sharedpref', 'SecureStore'],
   ['sharedpref', 'SecureStore.xml'],
