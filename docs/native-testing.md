@@ -106,6 +106,8 @@ what makes comparing them possible, and it is also why these rules exist:
    - A rollback Capacitor build is ready, signed with the same key and carrying an even higher
      version code, because Android won't downgrade without an uninstall.
    - The install uses `adb install -r` only.
+   - The day itself, in order, and the rollback: [`runbooks/native-switch-over.md`](runbooks/native-switch-over.md).
+     Use its wrapper (`scripts/native-switch-over/install.mjs`) for the install.
 6. **Later.**
    - Over-the-air updates, so screen fixes don't need a reinstall.
    - The minimum-version check (#2847).
