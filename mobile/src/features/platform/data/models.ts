@@ -37,6 +37,9 @@ export const platformSchema = z
     // Morning hand-off to the Oura app (#2896): the setting, the local day it last ran, and the
     // day TrainingAi could not come back from Oura (which turned the setting off). Off by default
     // until the hand-off is proven on the phone and the ring has moved to the Oura API (#2808).
+    // Illness / high-stress / low-readiness alerts on app open and resume. On by default, as in the
+    // current app (#2843).
+    healthAlerts: z.boolean().default(true),
     ouraMorningSync: z.boolean().default(false),
     ouraHandoffDay: z.string().nullable().default(null),
     ouraHandoffStrandedDay: z.string().nullable().default(null),
