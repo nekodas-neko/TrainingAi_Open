@@ -6,6 +6,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.514.0",
+    date: "2026-11-02",
+    changes: [
+      "TrainingAi Preview: see which phones are signed in and sign one out, under More → Devices & connections → Signed-in devices.",
+      "TrainingAi Preview: walks, runs and guided walks now record your chest strap's heart rate and show it live.",
+      "TrainingAi Preview: the interval walk paces you by your step rate from the chest strap, and saves how well you kept to each block's pace.",
+      "TrainingAi Preview: walks, runs and guided walks keep recording your route with the phone locked.",
+      "TrainingAi Preview: the illness, high-stress and low-readiness alerts from the current app, with a switch in Settings.",
+      "TrainingAi Preview: mark a night as partial from its sleep card when the ring was off for part of it.",
+      "TrainingAi Preview: all 22 session icons in the picker, and Coach replies show links, tables, italics and numbered lists.",
+      "TrainingAi Preview: the calorie line shows what came from workouts and steps, card headers no longer keep an empty status slot, and Health's header has its divider back.",
+      "TrainingAi Preview: a captive portal or a proxy error page no longer signs you out.",
+      "Behind the scenes: the readiness model comparison now counts days from 29 Oct, the first full day on the new readiness code, and the tools for moving to the new app (its release build and a safe install step) are in place.",
+    ],
+  },
+  {
     version: "1.513.0",
     date: "2026-10-28",
     changes: [
