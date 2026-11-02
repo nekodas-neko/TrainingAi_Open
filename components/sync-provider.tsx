@@ -13,6 +13,7 @@ import { reconcileSupplementReminders } from '@/lib/supplement-reminders';
 import { localSupplementsToStatus } from '@/lib/supplements/local-status';
 import type { SupplementWithStatus } from '@trainingai/shared/types/supplement';
 import { reconcileHealthAlerts } from '@/lib/health-alerts';
+import { healthAlertInput } from '@trainingai/shared/health/health-alerts';
 import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route';
 import type { BodyBatteryResponse } from '@/app/api/body-battery/route';
 import { todayInTz } from '@trainingai/shared/date-utils';
@@ -446,14 +447,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
           cachedFetchToday<BodyBatteryResponse>('body-battery', '/api/body-battery', BODY_BATTERY_TTL, d => { box.battery = d; }).catch(() => {}),
         ]);
         if (!box.readiness && !box.battery) return; // no cache, no network — retry next open/resume
-        await reconcileHealthAlerts({
-          illnessFlag: box.readiness?.illnessFlag ?? null,
-          illnessAdvisory: box.readiness?.illnessAdvisory ?? null,
-          readinessLabel: box.readiness?.label ?? null,
-          readinessHasData: box.readiness?.hasSufficientData ?? false,
-          stressHighMinutes: box.battery?.stress?.highMinutes ?? null,
-          stressCurrent: box.battery?.stress?.current ?? null,
-        });
+        await reconcileHealthAlerts(healthAlertInput({ readiness: box.readiness, battery: box.battery }));
       } catch {
         // Network unavailable — skip
       }

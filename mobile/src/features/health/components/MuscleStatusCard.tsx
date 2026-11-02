@@ -73,6 +73,7 @@ export function MuscleStatusCard() {
           </AppText>
           <ResourceStatus
             inline
+            whenActive
             label="Muscle status"
             state={{
               ...injuries,

@@ -206,6 +206,41 @@ test('a refused refresh signs out cleanly and clears secure storage', async () =
   assert.equal(f.revoked.length, 0);
 });
 
+test('our own JSON 400 from the refresh route (a refused token body) signs out', async () => {
+  const f = fixture(renewable(60));
+  f.server.refresh = async () => json({ error: 'Invalid request' }, 400);
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.equal(f.storage.has(KEY), false);
+});
+
+test('a proxy or captive-portal 4xx on refresh keeps the session and retries later', async () => {
+  for (const [status, body, type] of [
+    [403, '<html><body>Please sign in to the Wi-Fi</body></html>', 'text/html'],
+    [400, '<html>Bad Request</html>', 'text/html'],
+    [401, '', 'text/plain'],
+    [403, '{"message":"blocked"}', 'application/json'],
+  ] as const) {
+    const f = fixture(renewable(60));
+    f.valid.add('access-0');
+    f.server.refresh = async () => new Response(body, { status, headers: { 'content-type': type } });
+    await f.controller.initialize(null);
+    assert.equal(f.controller.state.status, 'signedIn', `${status} ${type}`);
+    assert.equal(f.controller.state.hasSession, true);
+    assert.doesNotMatch(f.controller.state.message ?? '', /Sign in again/);
+    assert.equal(f.stored().refreshToken, refreshToken(0));
+    assert.equal(f.revoked.length, 0);
+    assert.equal(f.refreshes().length, 1);
+  }
+});
+
+test('our own JSON 403 from the refresh route signs out', async () => {
+  const f = fixture(renewable(60));
+  f.server.refresh = async () => json({ error: 'forbidden' }, 403);
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedOut');
+});
+
 test('a renewal that lands while the profile is loading is not overwritten by the profile save', async () => {
   const f = fixture(renewable(86_000));
   f.valid.add('access-0');
@@ -278,6 +313,48 @@ test('a 401 followed by a refresh the server could not serve keeps the session',
   await assert.rejects(reader.get('/api/x'), (e: { status?: number }) => e.status === 503);
   assert.equal(f.controller.state.hasSession, true);
   assert.equal(f.calls.filter((c) => c.path === '/api/x').length, 1);
+});
+
+const htmlPage = (status: number) =>
+  new Response('<html><body>Please sign in to the Wi-Fi</body></html>', {
+    status,
+    headers: { 'content-type': 'text/html' },
+  });
+
+test('a profile 401 plus an HTML refresh 401 on refresh() keeps the session', async () => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedIn');
+  f.valid.delete('access-0');
+  f.server.refresh = async () => htmlPage(401);
+  await f.controller.refresh();
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.equal(f.controller.state.hasSession, true);
+  assert.doesNotMatch(f.controller.state.message ?? '', /Sign in again|session ended/);
+  assert.equal(f.stored().refreshToken, refreshToken(0));
+});
+
+test('an HTML 401 on the profile with a working refresh keeps the session', async () => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  f.server.profile = async () => htmlPage(401);
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.equal(f.controller.state.hasSession, true);
+  assert.doesNotMatch(f.controller.state.message ?? '', /Sign in again|session ended/);
+});
+
+test('our own JSON 401 on the profile with a JSON 401 refused refresh signs out', async () => {
+  const f = fixture(renewable(86_000));
+  f.valid.add('access-0');
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedIn');
+  f.valid.delete('access-0');
+  f.server.refresh = async () => json({ error: 'invalid_refresh_token' }, 401);
+  await f.controller.refresh();
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.equal(f.storage.has(KEY), false);
 });
 
 test('after a failed early renewal, requests use the live token without refreshing again for a while', async () => {

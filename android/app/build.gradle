@@ -16,10 +16,28 @@ def appVersionName = new groovy.json.JsonSlurper()
 // Android needs a monotonically increasing integer, and refuses to install an APK whose code is
 // lower than the installed one. major·1,000,000 + minor·1,000 + patch keeps it ordered and leaves
 // room for 999 minors and 999 patches; the ceiling (2,100,000,000) is far away.
+//
+// Optional override (#2840): the native app will take over com.trainingai.app with its own, higher
+// code, and a rollback to this Capacitor app can only install if its code is higher still. So a
+// build may set `-PversionCodeOverride=<n>` or ANDROID_VERSION_CODE_OVERRIDE=<n>. Unset or empty
+// (what every push, PR and tagged release gives) the formula above applies unchanged.
+def versionCodeCeiling = 2_100_000_000L
+def versionCodeOverride = (project.findProperty('versionCodeOverride') ?: System.getenv('ANDROID_VERSION_CODE_OVERRIDE'))?.toString()?.trim()
 def appVersionCode = { ->
+    if (versionCodeOverride) {
+        if (!(versionCodeOverride ==~ /[1-9][0-9]{0,9}/) || versionCodeOverride.toLong() > versionCodeCeiling) {
+            throw new GradleException("versionCodeOverride '${versionCodeOverride}' must be a whole number from 1 to ${versionCodeCeiling}")
+        }
+        return versionCodeOverride.toInteger()
+    }
     def parts = appVersionName.tokenize('.').collect { it.toInteger() }
     parts[0] * 1_000_000 + parts[1] * 1_000 + parts[2]
 }()
+
+// CI reads this to prove the override is honoured and the default is unchanged.
+tasks.register('printVersionCode') {
+    doLast { println "versionCode=${appVersionCode}" }
+}
 
 android {
     namespace = "com.trainingai.app"

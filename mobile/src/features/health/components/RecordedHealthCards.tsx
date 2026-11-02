@@ -130,6 +130,7 @@ export function SleepPerformanceCard() {
       status={
         <ResourceStatus
           inline
+          whenActive
           label="Sleep vs Performance"
           state={state}
           refresh={state.refresh}
