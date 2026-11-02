@@ -25,8 +25,8 @@ import {
 import { MAX_SAVED_SAMPLES, type HrOutbox, type StrapSample } from './HrOutbox.ts';
 
 // One chest strap per phone, reached over the standard Heart Rate Service. The link is held only
-// while something wants it: an active workout (which also records) or the Devices screen (which
-// shows the link and battery). The current app's equivalents are `lib/live-hr/chest-strap-source.ts`
+// while something wants it: an active workout or activity (which also record) or the Devices
+// screen (which shows the link and battery). The current app's equivalents are `lib/live-hr/chest-strap-source.ts`
 // and `PolarStrapService.kt`; the timings below match them.
 const PAIRED_KEY = 'paired-hr-strap.v1';
 const BATTERY_ALERT_KEY = 'strap-battery-alert.v1';
@@ -50,7 +50,9 @@ const pairedSchema = z.object({
   firmware: z.string().nullable().default(null),
 });
 export type PairedStrap = z.infer<typeof pairedSchema>;
-export type StrapHold = 'workout' | 'settings';
+export type StrapHold = 'workout' | 'activity' | 'settings';
+/** The holds that save the strap's readings: a gym workout, or a walk, run or guided walk (#3527). */
+const RECORDING_HOLDS: StrapHold[] = ['workout', 'activity'];
 export type StrapState = {
   ready: boolean;
   available: boolean;
@@ -203,7 +205,9 @@ export class StrapSession {
     if (on === this.holds.has(reason)) return;
     if (on) this.holds.add(reason);
     else this.holds.delete(reason);
-    if (reason === 'workout') this.setRecording(on);
+    const recording = RECORDING_HOLDS.some((hold) => this.holds.has(hold));
+    // A workout inside an activity (or the reverse) keeps one trace and one flush timer running.
+    if (recording !== this.current.recording) this.setRecording(recording);
     this.updateWanted();
   }
 

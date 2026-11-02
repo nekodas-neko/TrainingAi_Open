@@ -19,7 +19,7 @@ import { StrapSession, type StrapHold } from './StrapSession';
 
 const Context = createContext<StrapSession | null>(null);
 
-/** The chest strap, connected while a workout is active (#2844). */
+/** The chest strap, connected while a workout or an activity is active (#2844, #3527). */
 export function StrapProvider({ children }: PropsWithChildren) {
   const storage = useLocalStorage();
   const connection = useAccountContext().dataReader;
@@ -46,7 +46,7 @@ export function StrapProvider({ children }: PropsWithChildren) {
       connection
         ? new HrOutbox(storage.account(connection.origin, connection.userId), connection, () => {
             // The recap computes from these samples on read. During the workout nothing shows it.
-            if (!session.getSnapshot().recording) resources?.invalidate(['/api/oura/hr-data']);
+            if (!session.getSnapshot().recording) resources?.invalidate(['/api/oura/hr-data', '/api/oura/hr-window']);
           })
         : null,
     [storage, connection, resources, session],
@@ -80,6 +80,20 @@ export function useStrap() {
   if (!session) throw new Error('StrapProvider is required.');
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
   return { state, session };
+}
+
+/**
+ * Holds the strap link, and records its readings, for the whole of a walk, run or guided walk.
+ * Unlike a screen hold it is not dropped when the app goes to the background: a walk with the
+ * phone in a pocket keeps recording until the activity ends.
+ */
+export function useActivityStrapHold(active: boolean) {
+  const session = useContext(Context);
+  useEffect(() => {
+    if (!session || !active) return;
+    session.hold('activity', true);
+    return () => session.hold('activity', false);
+  }, [session, active]);
 }
 
 /**

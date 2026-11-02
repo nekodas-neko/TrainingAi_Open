@@ -222,3 +222,25 @@ export async function deviceAlert(title: string, body: string) {
     trigger: Platform.OS === 'android' ? { channelId: 'device-alerts' } : null,
   });
 }
+
+/**
+ * A health anomaly alert (illness, high stress, low readiness), shown now (#2843). Not one of the
+ * scheduler's alerts, so reconciling the planned ones never cancels it. True once it was posted;
+ * false when notifications are off, so the caller does not count it as sent.
+ */
+export async function healthAlert(type: string, title: string, body: string) {
+  if (!(await alertPermission(false))) return false;
+  const notifications = await sdk();
+  if (Platform.OS === 'android')
+    await notifications.setNotificationChannelAsync('health-alerts', {
+      name: 'Health alerts',
+      importance: notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      vibrationPattern: [0, 250, 150, 250],
+    });
+  await notifications.scheduleNotificationAsync({
+    content: { title, body, sound: 'default', data: { healthAlert: type } },
+    trigger: Platform.OS === 'android' ? { channelId: 'health-alerts' } : null,
+  });
+  return true;
+}

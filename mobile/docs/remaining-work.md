@@ -83,7 +83,7 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 ## Deferred health and device integrations
 
-- [ ] Health-anomaly alerts driven by changing health data, including server-triggered delivery. [#2843](https://github.com/nekodas-neko/TrainingAi_Open/issues/2843)
+- [ ] Server-triggered (push) delivery of health-anomaly alerts. Local alerts on app open and resume are built in Preview. [#2843](https://github.com/nekodas-neko/TrainingAi_Open/issues/2843)
 
 - [ ] Background health reading/import for Apple Health and Health Connect. [#2843](https://github.com/nekodas-neko/TrainingAi_Open/issues/2843)
 

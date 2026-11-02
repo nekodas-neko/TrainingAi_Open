@@ -6,7 +6,7 @@ function option(name, fallback) {
   const index = process.argv.indexOf(name);
   return index < 0 ? fallback : process.argv[index + 1];
 }
-function invoke(tool, args) {
+export function invoke(tool, args) {
   const options = { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] };
   try {
     if (tool.endsWith('.jar')) return execFileSync('java', ['-jar', tool, ...args], options);
@@ -27,7 +27,7 @@ function invoke(tool, args) {
     );
   }
 }
-function inspect(apk, signer, analyzer) {
+export function inspect(apk, signer, analyzer) {
   if (!apk || !existsSync(apk)) throw new Error('Provide an existing APK file.');
   const output = invoke(signer, ['verify', '--print-certs', resolve(apk)]);
   const certificates = [
