@@ -18,6 +18,7 @@ import {
   UPLOAD_BATCH,
   type StrapSample,
 } from '../src/features/devices/strap/HrOutbox.ts';
+import { liveBpmWaitingText, noStrapHint, strapLinkLabel } from '../src/features/devices/strap/labels.ts';
 import { StrapSession } from '../src/features/devices/strap/StrapSession.ts';
 import { ApiError } from '../src/features/account/api/client.ts';
 import type {
@@ -320,10 +321,18 @@ function fakeTimers() {
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
-type FakeOptions = { battery?: number; firmware?: string; permission?: BlePermission };
+type FakeOptions = {
+  battery?: number;
+  firmware?: string;
+  permission?: BlePermission;
+  /** False: the strap has no PMD service, so the accelerometer cannot start. */
+  noPmd?: boolean;
+};
 function fakeBle(options: FakeOptions = {}) {
   let permission: BlePermission = options.permission ?? 'granted';
   let hrFailed: (() => void) | null = null;
+  let accel: ((frame: Uint8Array) => void) | null = null;
+  let accelFailed: (() => void) | null = null;
   let radioListener: ((radio: BleRadio) => void) | null = null;
   const log: string[] = [];
   let fail = 0;
@@ -361,6 +370,16 @@ function fakeBle(options: FakeOptions = {}) {
           options.firmware === undefined
             ? null
             : new Uint8Array([...options.firmware].map((c) => c.charCodeAt(0)).concat([0, 0])),
+        startAccelerometer: async (listener, onFailed) => {
+          if (options.noPmd) throw new Error('no PMD service');
+          log.push('acc start');
+          accel = listener;
+          accelFailed = onFailed;
+          return () => {
+            log.push('acc stop');
+            accel = null;
+          };
+        },
         disconnect: async () => {
           log.push('disconnect');
         },
@@ -384,6 +403,8 @@ function fakeBle(options: FakeOptions = {}) {
       permission = next;
     },
     failNotifications: () => hrFailed?.(),
+    accelFrame: (frame: Uint8Array) => accel?.(frame),
+    failAccelerometer: () => accelFailed?.(),
   };
 }
 
@@ -435,6 +456,47 @@ test('a workout connects the paired strap, shows live bpm and uploads what it re
   await settle();
   assert.equal(session.getSnapshot().link, 'idle');
   assert.ok(ble.log.includes('disconnect'));
+});
+
+test('an activity connects the strap, records its readings and releases at the end (#3527)', async () => {
+  const { session, ble, clock, posts } = await pairedSession();
+  session.hold('activity', true);
+  await settle();
+  assert.equal(session.getSnapshot().link, 'connected');
+  assert.equal(session.getSnapshot().recording, true);
+  ble.beat(bytes(0x16, 101, 0x00, 0x02));
+  assert.equal(session.getSnapshot().bpm, 101);
+  await clock.advance(10_000);
+  assert.deepEqual(posts, [[{ at: 0, bpm: 101, rr: [500] }]]);
+  // Readings between the last flush and the end are saved when the activity ends.
+  ble.beat(bytes(0x06, 104));
+  session.hold('activity', false);
+  await settle();
+  assert.equal(session.getSnapshot().recording, false);
+  assert.equal(session.getSnapshot().link, 'idle');
+  assert.ok(ble.log.includes('disconnect'));
+  assert.deepEqual(
+    posts.map((batch) => batch.map((x) => x.bpm)),
+    [[101], [104]],
+  );
+});
+
+test('a workout and an activity share one recording; the link stays until both end', async () => {
+  const { session, ble, clock } = await pairedSession();
+  session.hold('workout', true);
+  await settle();
+  ble.beat(bytes(0x06, 90));
+  session.hold('activity', true);
+  // The workout's trace is not cleared by an activity starting inside it.
+  assert.equal(session.getSnapshot().trace.length, 1);
+  session.hold('workout', false);
+  assert.equal(session.getSnapshot().recording, true);
+  assert.equal(session.getSnapshot().link, 'connected');
+  session.hold('activity', false);
+  await settle();
+  assert.equal(session.getSnapshot().recording, false);
+  assert.equal(session.getSnapshot().link, 'idle');
+  await clock.advance(1);
 });
 
 test('the Devices screen holds the link without recording', async () => {
@@ -661,4 +723,117 @@ test('the firmware revision is recorded once, after pairing', async () => {
   await clock.advance(1);
   assert.equal(session.getSnapshot().paired?.firmware, '3.0.35');
   assert.equal(JSON.parse(storage.values.get('paired-hr-strap.v1')!).firmware, '3.0.35');
+});
+
+test('the live-bpm line words each link state, never "connecting" for a Bluetooth or permission fault', async () => {
+  const { session } = await pairedSession();
+  const base = session.getSnapshot();
+  const labels = (['connected', 'connecting', 'waiting', 'radioOff', 'idle'] as const).map((link) =>
+    liveBpmWaitingText({ ...base, link }),
+  );
+  assert.equal(labels[0], 'Waiting for a reading…');
+  assert.equal(labels[3], 'Bluetooth is off');
+  assert.equal(labels[2], 'Strap not reachable — retrying');
+  for (const [i, link] of (['connecting', 'waiting', 'radioOff', 'idle'] as const).entries())
+    assert.equal(labels[i + 1], strapLinkLabel({ ...base, link }));
+  assert.equal(new Set(labels).size, 5);
+});
+
+test('the prescribed-run card hints at pairing only when no strap is paired', async () => {
+  const { session } = await pairedSession();
+  const base = session.getSnapshot();
+  assert.ok(base.paired);
+  assert.equal(noStrapHint(base), null);
+  assert.match(noStrapHint({ ...base, paired: null })!, /Pair a chest strap/);
+});
+
+// A raw PMD ACC frame (type 0x00): 10-byte header, then n samples of int16 LE x, y, z. Every sample
+// is (0, 0, `mg`), so its magnitude is `mg`.
+function accFrame(count: number, mg = 1000) {
+  const out = [0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0x00];
+  for (let i = 0; i < count; i++) out.push(0, 0, 0, 0, mg & 0xff, (mg >> 8) & 0xff);
+  return new Uint8Array(out);
+}
+
+test('the accelerometer starts on a guided walk, batches a second of magnitudes and stops after (#3525)', async () => {
+  const { session, ble, clock } = await pairedSession();
+  const batches: { magnitudes: number[]; sampleRate: number; at: number }[] = [];
+  session.onAccelerometer((batch) => batches.push(batch));
+  session.hold('activity', true);
+  await settle();
+  assert.equal(session.getSnapshot().accel, 'off');
+  session.setAccelerometer(true);
+  await settle();
+  assert.deepEqual(ble.log.filter((x) => x.startsWith('acc')), ['acc start']);
+  assert.equal(session.getSnapshot().accel, 'starting', 'asked for, no frame yet');
+  ble.accelFrame(accFrame(36));
+  assert.equal(session.getSnapshot().accel, 'streaming');
+  assert.equal(batches.length, 0, 'under a second of samples is held back');
+  await clock.advance(700);
+  ble.accelFrame(accFrame(36));
+  assert.equal(batches.length, 1);
+  assert.equal(batches[0].magnitudes.length, 72);
+  assert.deepEqual(batches[0].magnitudes.slice(0, 2), [1000, 1000]);
+  assert.equal(batches[0].sampleRate, 50);
+  assert.equal(batches[0].at, 700);
+  session.setAccelerometer(false);
+  assert.deepEqual(ble.log.filter((x) => x.startsWith('acc')), ['acc start', 'acc stop']);
+  assert.equal(session.getSnapshot().accel, 'off');
+  ble.accelFrame(accFrame(60));
+  assert.equal(batches.length, 1, 'nothing after the walk');
+  // The heart-rate hold carries on: the activity is not over.
+  assert.equal(session.getSnapshot().link, 'connected');
+});
+
+test('the accelerometer waits for the link and restarts after a drop', async () => {
+  const { session, ble, clock } = await pairedSession();
+  session.setAccelerometer(true);
+  assert.equal(session.getSnapshot().accel, 'starting');
+  assert.deepEqual(ble.log.filter((x) => x.startsWith('acc')), [], 'no link yet');
+  session.hold('activity', true);
+  await settle();
+  assert.deepEqual(ble.log.filter((x) => x.startsWith('acc')), ['acc start']);
+  ble.drop();
+  assert.equal(session.getSnapshot().accel, 'starting', 'still wanted, waiting for the new link');
+  await clock.advance(2_000);
+  await settle();
+  assert.deepEqual(
+    ble.log.filter((x) => x.startsWith('acc')),
+    ['acc start', 'acc stop', 'acc start'],
+  );
+  ble.accelFrame(accFrame(20));
+  assert.equal(session.getSnapshot().accel, 'streaming');
+});
+
+test('a strap without PMD, or a stream that fails, reports the accelerometer unavailable', async () => {
+  const none = await pairedSession({ noPmd: true });
+  none.session.hold('activity', true);
+  await settle();
+  none.session.setAccelerometer(true);
+  await settle();
+  assert.equal(none.session.getSnapshot().accel, 'unavailable');
+  assert.equal(none.session.getSnapshot().link, 'connected', 'heart rate is unaffected');
+  none.session.setAccelerometer(false);
+  assert.equal(none.session.getSnapshot().accel, 'off');
+
+  const failing = await pairedSession();
+  failing.session.hold('activity', true);
+  await settle();
+  failing.session.setAccelerometer(true);
+  await settle();
+  failing.ble.failAccelerometer();
+  assert.equal(failing.session.getSnapshot().accel, 'unavailable');
+  assert.ok(failing.ble.log.includes('acc stop'));
+});
+
+test('a malformed frame is ignored and releasing the walk stops the stream', async () => {
+  const { session, ble } = await pairedSession();
+  session.hold('activity', true);
+  await settle();
+  session.setAccelerometer(true);
+  await settle();
+  ble.accelFrame(new Uint8Array([0x02, 1, 2]));
+  assert.equal(session.getSnapshot().accel, 'starting');
+  session.dispose();
+  assert.ok(ble.log.includes('acc stop'));
 });

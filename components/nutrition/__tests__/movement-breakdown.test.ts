@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { movementParts, movementSummary } from '../movement-breakdown'
+import { movementParts, movementSummary } from '@trainingai/shared/nutrition/movement-breakdown'
 import { computeActiveEnergy } from '@trainingai/shared/health/daily-energy'
 import { STEP_BASE_CREDIT } from '@trainingai/shared/health/energy-baseline'
 import { stripComments } from '../../../scripts/lib/strip-comments.js'
@@ -141,7 +141,7 @@ describe('the threshold is gone, and no copy re-states it', () => {
       'components/nutrition/calorie-zone-bar.tsx',
       'components/nutrition/calorie-balance-bar.tsx',
       'components/nutrition/energy-card.tsx',
-      'components/nutrition/movement-breakdown.ts',
+      'packages/shared/src/nutrition/movement-breakdown.ts',
     ]) {
       expect(code(rel), rel).not.toMatch(/steps? (count |above )/i)
       expect(code(rel), rel).not.toMatch(/STEP_BASELINE/)
@@ -150,7 +150,7 @@ describe('the threshold is gone, and no copy re-states it', () => {
 
   it('does not import the shared module into the client bundle', () => {
     // The import is what broke; a comment explaining it is not, so comments go and imports stay.
-    expect(codeWithImports('components/nutrition/movement-breakdown.ts')).not.toMatch(/daily-energy/)
+    expect(codeWithImports('packages/shared/src/nutrition/movement-breakdown.ts')).not.toMatch(/daily-energy/)
   })
 
   /**

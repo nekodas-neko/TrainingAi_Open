@@ -1,6 +1,7 @@
 import { fetch as nativeFetch } from 'expo/fetch';
 import { isRunningInExpoGo, requireOptionalNativeModule } from 'expo';
 import { Platform } from 'react-native';
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { MOBILE_CALLBACKS } from '../../features/account/session';
 import type { AuthPlatform, MobileClient } from '../../features/account/session';
 import { homeWidgets } from '../widgets/platform';
@@ -36,6 +37,25 @@ export function nativeAppleAuthAvailable() {
     !isRunningInExpoGo() &&
     !!requireOptionalNativeModule('ExpoAppleAuthentication')
   );
+}
+const DEVICE_KEY = 'fitnessai.device.v1';
+const DEVICE_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+/** "Samsung SM-S938B": Android gives the maker and the model code, not the marketing name. */
+function deviceLabel() {
+  const constants = Platform.constants as { Manufacturer?: string; Model?: string } | undefined;
+  const maker = constants?.Manufacturer?.trim() ?? '';
+  const model = constants?.Model?.trim() ?? '';
+  const name =
+    maker && model && !model.toLowerCase().startsWith(maker.toLowerCase())
+      ? `${capitalize(maker)} ${model}`
+      : model || maker;
+  // The table refuses control characters and anything past 80.
+  const clean = Array.from(name)
+    .filter((char) => char >= ' ' && char !== '\u007f')
+    .join('')
+    .slice(0, 80)
+    .trim();
+  return clean || (Platform.OS === 'ios' ? 'iPhone' : 'Android phone');
 }
 async function store() {
   return import('expo-secure-store');
@@ -76,6 +96,15 @@ export const authPlatform: AuthPlatform = {
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
+  },
+  async device() {
+    // A random id made once per install; it identifies nothing about the hardware.
+    let id = await this.get(DEVICE_KEY).catch(() => null);
+    if (!id || !DEVICE_ID_RE.test(id)) {
+      id = await this.random();
+      await this.set(DEVICE_KEY, id).catch(() => undefined);
+    }
+    return { label: deviceLabel(), id };
   },
   async challenge(verifier) {
     const crypto = await import('expo-crypto');

@@ -142,7 +142,7 @@ export function EnergyBalanceCard() {
             </AppText>
             {provenance && (
               <AppText variant="caption" tone="muted">
-                {budgetLine(provenance, balance)}.
+                {budgetLine(provenance, balance, energy.data?.activeBreakdown)}.
               </AppText>
             )}
             <AppText variant="caption" tone="muted">
@@ -255,6 +255,7 @@ export function ActivityTrendCharts() {
               status={
                 <ResourceStatus
                   inline
+                  whenActive
                   label="Activity trends"
                   state={state}
                   refresh={state.refresh}

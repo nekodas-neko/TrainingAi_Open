@@ -39,7 +39,7 @@ export function TrainingCalendarCard({ openDay }: { openDay: (date: string) => v
         title="Training Calendar"
         nativeStyle
         status={
-          <ResourceStatus inline label="Calendar records" state={state} refresh={state.refresh} />
+          <ResourceStatus inline whenActive label="Calendar records" state={state} refresh={state.refresh} />
         }
         today={today}
         month={month}

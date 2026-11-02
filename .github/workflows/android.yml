@@ -52,6 +52,14 @@ on:
         description: 'The existing v* release to attach the APK to (e.g. v1.486.11)'
         type: string
         required: true
+      # #2840. Leave blank for a normal build (major*1e6 + minor*1e3 + patch from package.json).
+      # Set it only to build a rollback that must sit above the native app's version code. The APK
+      # is then attached under its own name and never replaces the tag's regular APK.
+      version_code:
+        description: 'Rollback builds only: override the versionCode (1 to 2100000000). Leave blank normally.'
+        type: string
+        required: false
+        default: ''
 
 concurrency:
   # The release's call gets its own group. Sharing `main`'s would let an ordinary native push
@@ -65,6 +73,11 @@ jobs:
     name: Android (Kotlin tests + debug APK)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # #2840. Read by android/app/build.gradle. `inputs.version_code` exists only on a manual run;
+    # on push, pull_request and the release's workflow_call it is empty, so the default formula applies.
+    # Passed through env, never interpolated into a script.
+    env:
+      ANDROID_VERSION_CODE_OVERRIDE: ${{ inputs.version_code }}
     # #2408. Read-only: this job runs on every native PR, so it never holds a token that can write
     # releases. Publishing is the `publish` job below, which runs only on push and release calls.
     permissions:
@@ -153,6 +166,22 @@ jobs:
         working-directory: android
         run: ./gradlew :app:verifyDevDebugFlavour :app:verifyProdDebugFlavour --no-daemon
 
+      # #2840. The override must be honoured, and with it unset the code must be exactly the
+      # formula that shipped before. Gradle only configures here (no build), so it is cheap enough
+      # to run on every native PR. A malformed override fails the build.
+      - name: Check the versionCode rule (default unchanged, override honoured)
+        working-directory: android
+        run: |
+          set -euo pipefail
+          read -r major minor patch < <(node -p "require('../package.json').version.split('.').join(' ')")
+          formula=$(( major * 1000000 + minor * 1000 + patch ))
+          got=$(env -u ANDROID_VERSION_CODE_OVERRIDE ./gradlew -q --no-daemon :app:printVersionCode | sed -n 's/^versionCode=//p')
+          [ "$got" = "$formula" ] || { echo "::error::default versionCode is '$got', expected $formula"; exit 1; }
+          probe=$(env -u ANDROID_VERSION_CODE_OVERRIDE ./gradlew -q --no-daemon -PversionCodeOverride=2000000000 :app:printVersionCode | sed -n 's/^versionCode=//p')
+          [ "$probe" = "2000000000" ] || { echo "::error::override ignored: got '$probe'"; exit 1; }
+          echo "default $got matches the formula; override honoured."
+          echo "ANDROID_EXPECTED_VERSION_CODE=${ANDROID_VERSION_CODE_OVERRIDE:-$formula}" >> "$GITHUB_ENV"
+
       - name: Assemble both debug APKs
         working-directory: android
         run: ./gradlew :app:assembleProdDebug :app:assembleDevDebug --no-daemon
@@ -165,6 +194,17 @@ jobs:
           set -euo pipefail
           cp android/app/build/outputs/apk/prod/debug/app-prod-debug.apk app-debug.apk
           cp android/app/build/outputs/apk/dev/debug/app-dev-debug.apk app-dev-debug.apk
+
+      # #2840. The built APK carries the code we meant: the formula, or the override.
+      - name: Check the built APKs' versionCode
+        run: |
+          set -euo pipefail
+          AAPT2="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/aapt2"
+          for apk in app-debug.apk app-dev-debug.apk; do
+            got=$("$AAPT2" dump badging "$apk" | sed -n "s/^package:.* versionCode='\([0-9]*\)'.*/\1/p")
+            [ "$got" = "$ANDROID_EXPECTED_VERSION_CODE" ] || { echo "::error::$apk has versionCode '$got', expected $ANDROID_EXPECTED_VERSION_CODE"; exit 1; }
+          done
+          echo "Both APKs carry versionCode $ANDROID_EXPECTED_VERSION_CODE."
 
       # Published builds only (the key is not restored on a PR, RV-198). The installed app is signed
       # with this certificate, and an APK signed by anything else cannot install over it — the way
@@ -287,7 +327,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release_tag }}
+          VERSION_CODE: ${{ inputs.version_code }}
         run: |
           set -euo pipefail
-          cp app-debug.apk "app-${TAG}.apk"
-          gh release upload "$TAG" "app-${TAG}.apk" --clobber
+          # #2840. A rollback build with an overridden code gets its own asset name and no --clobber,
+          # so it can never replace the tag's regular APK.
+          if [ -n "$VERSION_CODE" ]; then
+            cp app-debug.apk "app-${TAG}-versioncode-${VERSION_CODE}.apk"
+            gh release upload "$TAG" "app-${TAG}-versioncode-${VERSION_CODE}.apk"
+          else
+            cp app-debug.apk "app-${TAG}.apk"
+            gh release upload "$TAG" "app-${TAG}.apk" --clobber
+          fi

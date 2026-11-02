@@ -6,15 +6,15 @@ Outstanding work following [PR #2836](https://github.com/nekodas-neko/TrainingAi
 
 ## Core functionality
 
-- [ ] Add resumable downloads of supported account history for offline use, with progress and account isolation. [#2837](https://github.com/nekodas-neko/TrainingAi_Open/issues/2837)
+- [x] Add resumable downloads of supported account history for offline use, with progress and account isolation. Built, device check pending. [#2837](https://github.com/nekodas-neko/TrainingAi_Open/issues/2837)
 
 ## Deferred UI work
 
-- [ ] Expand the session icon picker to all 22 original fitness icons with readable labels. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
+- [x] Expand the session icon picker to all 22 original fitness icons with readable labels. Built, device check pending. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
 
-- [ ] Add Markdown links, tables, italics, code and richer lists to Coach and generated explanations. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
+- [x] Add Markdown links, tables, italics, code and richer lists to Coach and generated explanations. Built, device check pending. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
 
-- [ ] Add About source credits and release notes; show native app/build, app-code and backend versions distinctly. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
+- [ ] Add About source credits and release notes; show native app/build, app-code and backend versions distinctly. The Open Food Facts credit, release notes and the app version are built; app-code and backend versions are not shown separately yet. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
 
 ## Backend follow-ups
 
@@ -65,25 +65,25 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 ## Deferred rewards
 
-- [ ] Own XP, levels and progress to the next level. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [x] Own XP, levels and progress to the next level. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Achievement browser, criteria, progress and details. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [x] Achievement browser, criteria, progress and details. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Personal trophy case. Built, device check pending. Pins stay on the phone, as in the current app; whether friends should see them is [#3125](https://github.com/nekodas-neko/TrainingAi_Open/issues/3125). [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [x] Personal trophy case. Built, device check pending. Pins stay on the phone, as in the current app; whether friends should see them is [#3125](https://github.com/nekodas-neko/TrainingAi_Open/issues/3125). [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Equip and clear unlocked titles. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [x] Equip and clear unlocked titles. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Current/past season results and badges. Built, device check pending. The current app shows only the badges for seasons with a result. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [x] Current/past season results and badges. Built, device check pending. The current app shows only the badges for seasons with a result. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Collection inventories, ladder progression, merging and decay explanations. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [x] Collection inventories, ladder progression, merging and decay explanations. Built, device check pending. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Animated Home collection and interactions. Built, device check pending. The cats walk; their on-the-spot movement is an owner decision, [#3139](https://github.com/nekodas-neko/TrainingAi_Open/issues/3139). [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [x] Animated Home collection and interactions. Built, device check pending. The cats walk; their on-the-spot movement is an owner decision, [#3139](https://github.com/nekodas-neko/TrainingAi_Open/issues/3139). [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
-- [ ] Post-workout XP, unlock feedback and reward-state refresh. Built, device check pending. The current app has no unlock list after a workout, only the XP badge and the shimmer on new badges. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
+- [x] Post-workout XP, unlock feedback and reward-state refresh. Built, device check pending. The current app has no unlock list after a workout, only the XP badge and the shimmer on new badges. [#2842](https://github.com/nekodas-neko/TrainingAi_Open/issues/2842)
 
 ## Deferred health and device integrations
 
-- [ ] Health-anomaly alerts driven by changing health data, including server-triggered delivery. [#2843](https://github.com/nekodas-neko/TrainingAi_Open/issues/2843)
+- [ ] Server-triggered (push) delivery of health-anomaly alerts. Local alerts on app open and resume are built in Preview. [#2843](https://github.com/nekodas-neko/TrainingAi_Open/issues/2843)
 
 - [ ] Background health reading/import for Apple Health and Health Connect. [#2843](https://github.com/nekodas-neko/TrainingAi_Open/issues/2843)
 
@@ -95,7 +95,7 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 - [ ] Direct Oura Bluetooth capture/sync/reconnect, carrying over the existing `oura_ble.xml` pairing key and history cursor before replacement. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 
-- [ ] Polar/chest-strap pairing and live heart rate. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
+- [x] Polar/chest-strap pairing and live heart rate. Built, device check pending. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 
 - [ ] Bluetooth scale connection, composition readings and calibration: pairing, live weigh-in while the Devices screen is open, the pending and declined lists. Built, device check pending; background capture with the app closed is not built. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 
@@ -107,17 +107,21 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 ## Deferred activity and platform integrations
 
-- [ ] GPS routes, distance/pace/elevation and interruption recovery. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
+- [ ] GPS routes, distance/pace/elevation and interruption recovery. Recording while the app is open and with the screen locked is built (foreground service, device check pending, see #2846); recovery after an interruption is not. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
 
-- [ ] Recorded route maps and linked chart scrubbing. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
+- [x] Recorded route maps and linked chart scrubbing. Built, device check pending. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
 
 - [ ] Live cadence and gait feedback. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
 
 - [ ] Retrospective detected-activity review, confirm/edit/reject and Home notices. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
 
-- [ ] Sustained recording and workout/activity status while locked or outside the app. Built, device check pending: a walk, run or guided walk keeps recording GPS with the screen locked, through an Android foreground service (`expo-location` background updates with a notification, `expo-task-manager`) that runs from Start to Finish or Discard and needs only foreground location permission (expo-location skips the "all the time" check for a foreground service); if Android refuses the service it falls back to screen-on recording with a notice. Not built: a live elapsed time in the notification (the current app's is static text too), the heart-rate strap staying connected while locked (waits on the `'activity'` strap hold, [#3527](https://github.com/nekodas-neko/TrainingAi_Open/issues/3527); it reads `useActivityServiceRunning`), and the OS live status for activities. Device check: a 10+ minute walk with the phone locked in a pocket. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
+- [x] Workout status while locked or outside the app, as an Android Live Update (#3249, #3251, #3272). Built, device check pending. [#2846]
 
-- [ ] Picture-in-picture, exact-alarm rest timers and Android Now Bar presentation. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
+- [ ] Sustained route recording and activity status while locked or outside the app. Built, device check pending: a walk, run or guided walk keeps recording GPS with the screen locked, through an Android foreground service (`expo-location` background updates with a notification, `expo-task-manager`) that runs from Start to Finish or Discard and needs only foreground location permission (expo-location skips the "all the time" check for a foreground service); if Android refuses the service it falls back to screen-on recording with a notice. Not built: a live elapsed time in the notification (the current app's is static text too), the heart-rate strap staying connected while locked (waits on the `'activity'` strap hold, [#3527](https://github.com/nekodas-neko/TrainingAi_Open/issues/3527); it reads `useActivityServiceRunning`), and the OS live status for activities. Device check: a 10+ minute walk with the phone locked in a pocket. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
+
+- [x] Picture-in-picture and exact-alarm rest timers. Built, device check pending. [#2846]
+
+- [ ] Android Now Bar presentation. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
 
 - [ ] Native media-saving actions and photo-library permission handling. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
 

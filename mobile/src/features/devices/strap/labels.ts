@@ -43,8 +43,18 @@ export function strapLinkLabel(state: StrapState): string {
     case 'radioOff':
       return 'Bluetooth is off';
     default:
-      return 'Not connected — it connects during workouts';
+      return 'Not connected — it connects during workouts and activities';
   }
+}
+
+/** What the live-bpm line says while the strap has no reading to show, worded per link state. */
+export function liveBpmWaitingText(state: StrapState): string {
+  return state.link === 'connected' ? 'Waiting for a reading…' : strapLinkLabel(state);
+}
+
+/** The prescribed-run card's heart-rate hint: only when no strap is paired, so it never contradicts a live reading. */
+export function noStrapHint(state: StrapState): string | null {
+  return state.paired ? null : 'Pair a chest strap in Devices for live heart rate.';
 }
 
 /**

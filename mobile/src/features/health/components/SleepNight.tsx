@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
@@ -15,11 +17,20 @@ import {
   Grid,
   MetricTile,
   KeyValueGrid,
+  Notice,
   Stack,
+  SwitchRow,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHealthData } from '../data/HealthDataProvider';
 import { metricValue, type SleepRow } from '../data/models';
+import {
+  canMarkPartial,
+  isPartialNight,
+  PARTIAL_COPY,
+  PARTIAL_DIMMED_FIELDS,
+  partialErrorMessage,
+} from '../data/partial-night-view';
 
 export function SleepNight({
   night,
@@ -30,8 +41,27 @@ export function SleepNight({
   compact?: boolean;
   stagesOnly?: boolean;
 }) {
-  const { timezone } = useHealthData();
+  const { timezone, store } = useHealthData();
   const { theme } = useTheme();
+  const [saving, setSaving] = useState(false);
+  const [partialError, setPartialError] = useState<string | null>(null);
+  const partial = isPartialNight(night);
+  // The mark is offered on the full night card only, and only for a measured night.
+  const markable = !compact && !!store && canMarkPartial(night);
+  async function setPartial(next: boolean) {
+    if (!store || !night.id || saving) {
+      return;
+    }
+    setSaving(true);
+    setPartialError(null);
+    try {
+      await store.markNightPartial(night.id, next);
+    } catch (error) {
+      setPartialError(partialErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
   const segments = night.sleepPhase5Min ? hypnogramSegments(night.sleepPhase5Min) : [];
   const phaseStart = night.phaseWindowStart ?? night.sleepStart;
   const phaseEnd = night.phaseWindowEnd ?? night.sleepEnd;
@@ -98,6 +128,7 @@ export function SleepNight({
         <AppText variant="eyebrow" tone="muted">
           {compact ? 'Sleep' : night.date}
         </AppText>
+        {partial && <Badge label={PARTIAL_COPY.badge} tone="sleep" />}
         {night.manualEntry && <Badge label="Logged by hand" tone="sleep" />}
         {night.provisional && <Badge label="Still updating" tone="sleep" />}
       </Stack>
@@ -111,12 +142,18 @@ export function SleepNight({
       )}
       <AppText variant="title">
         {night.durationHours === null ? '—' : formatHoursMinutes(night.durationHours * 60)}
+        {partial && night.durationHours !== null ? ' recorded' : ''}
       </AppText>
       {night.sleepStart && night.sleepEnd && (
         <AppText variant="caption" tone="muted">
           {formatTimeOfDay(night.sleepStart, timezone)} →{' '}
           {formatTimeOfDay(woke ?? night.sleepEnd, timezone)}
           {windowEnd ? ` · window to ${formatTimeOfDay(windowEnd, timezone)}` : ''}
+        </AppText>
+      )}
+      {partial && (
+        <AppText variant="caption" tone="muted">
+          {PARTIAL_COPY.reason}
         </AppText>
       )}
       {chart}
@@ -158,17 +195,21 @@ export function SleepNight({
           )
             .filter(([field]) => night[field] !== null)
             .map(([field, label, unit]) => (
-              <MetricTile
+              <View
                 key={field}
-                label={label}
-                value={stageValue(night[field], unit)}
-                tone="sleep"
-              />
+                style={{ opacity: partial && PARTIAL_DIMMED_FIELDS.has(field) ? 0.4 : 1 }}
+              >
+                <MetricTile label={label} value={stageValue(night[field], unit)} tone="sleep" />
+              </View>
             ))}
         </Grid>
       )}
       {night.onsetLatencySec != null && (
-        <AppText variant="caption" tone="muted">
+        <AppText
+          variant="caption"
+          tone="muted"
+          style={partial ? { opacity: 0.4 } : undefined}
+        >
           Time to fall asleep · {metricValue(night.onsetLatencySec / 60, 'min')}
         </AppText>
       )}
@@ -176,6 +217,29 @@ export function SleepNight({
         <AppText variant="caption" tone="muted">
           Sleep stages, efficiency and heart metrics weren’t measured for this entry.
         </AppText>
+      )}
+      {markable && (
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+            paddingTop: theme.spacing.md,
+            gap: theme.spacing.xs,
+          }}
+        >
+          <SwitchRow
+            label={PARTIAL_COPY.label}
+            value={partial}
+            disabled={saving}
+            onValueChange={(next) => {
+              void setPartial(next);
+            }}
+          />
+          <AppText variant="caption" tone="muted">
+            {partial ? PARTIAL_COPY.hintOn : PARTIAL_COPY.hintOff}
+          </AppText>
+          {partialError && <Notice title="Partial night" message={partialError} error />}
+        </View>
       )}
     </Card>
   );

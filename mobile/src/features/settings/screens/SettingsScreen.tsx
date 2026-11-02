@@ -2,6 +2,7 @@ import { AppearancePanel } from '../components/AppearancePanel';
 import { BackgroundSettings } from '../../weather/components/BackgroundSettings';
 import { WeatherSettings } from '../../weather/components/WeatherSettings';
 import { IntegrationSettings } from '../../platform/components/IntegrationSettings';
+import { HealthAlertsSetting } from '../../health/components/HealthAlertsSetting';
 import { OuraMorningSyncSetting } from '../../health/components/OuraMorningSyncSetting';
 import { AppText, AppButton, Card } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
@@ -34,13 +35,10 @@ export function SettingsScreen() {
       </Card>
       <Card>
         <AppText variant="heading">Preferences</AppText>
+        <HealthAlertsSetting />
         <FeatureRow
-          title="Health anomaly alerts"
-          subtitle="Notification scheduling is deferred"
-        />
-        <FeatureRow
-          title="Live workout & activity status"
-          subtitle="Lock-screen status remains deferred"
+          title="Live workout status"
+          subtitle="Shown as an Android Live Update while a workout runs"
         />
       </Card>
       <AccountPanel />

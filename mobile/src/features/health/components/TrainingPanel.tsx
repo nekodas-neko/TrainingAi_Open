@@ -184,7 +184,7 @@ export function TrainingPanel({
   const density = trendSeries(trends.data?.trends, (day) => day.workoutDensity);
   const phaseColors: Record<string, string> = theme.training.phases;
   const trendStatus = (
-    <ResourceStatus inline label="Workout trends" state={trends} refresh={trends.refresh} />
+    <ResourceStatus inline whenActive label="Workout trends" state={trends} refresh={trends.refresh} />
   );
   return (
     <>
@@ -202,7 +202,7 @@ export function TrainingPanel({
           readable
           data={weekly.data}
           status={
-            <ResourceStatus inline label="Training load" state={weekly} refresh={weekly.refresh} />
+            <ResourceStatus inline whenActive label="Training load" state={weekly} refresh={weekly.refresh} />
           }
         />
       )}
@@ -308,6 +308,7 @@ export function TrainingPanel({
           )}
           <ResourceStatus
             inline
+            whenActive
             label="Activities This Week"
             state={activity}
             refresh={activity.refresh}
