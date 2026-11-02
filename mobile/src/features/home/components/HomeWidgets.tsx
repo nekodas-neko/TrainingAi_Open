@@ -312,7 +312,7 @@ function HomeWidgetBody({
               <ProgressBar value={eaten !== null && goal ? eaten / goal : 0} />
               {provenance && (
                 <AppText variant="micro" tone="muted" style={{ fontWeight: '400' }}>
-                  {budgetLine(provenance, energy?.data?.balance)}
+                  {budgetLine(provenance, energy?.data?.balance, energy?.data?.activeBreakdown)}
                 </AppText>
               )}
               <Stack gap="xxs">

@@ -145,7 +145,7 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
           <CalorieProgress intake={total?.calories ?? null} budget={goal} />
           {provenance && (
             <AppText variant="micro" tone="muted">
-              {budgetLine(provenance, b)}
+              {budgetLine(provenance, b, data?.activeBreakdown)}
             </AppText>
           )}
           {info && (

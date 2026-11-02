@@ -14,7 +14,7 @@
  * `lib/oura-models/constants` also reaches `node:fs/promises`, and BF-87 took the whole Nutrition tab
  * to a 500 importing `STEP_BASELINE` for a line of **copy**. No client component had ever imported
  * `daily-energy`, so nothing had tripped it before. The stopgap was a second copy of the number in
- * `components/nutrition/movement-breakdown.ts`.
+ * `packages/shared/src/nutrition/movement-breakdown.ts`.
  *
  * **So the other three moved here rather than into a new file.** LB-43 proposed
  * `energy-constants.ts`; this module already was that module, created for the same failure one

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { energySpec } from '../src/features/health/data/models.ts';
 import { budgetLine, balanceProvenance } from '../src/features/nutrition/data/budget-line.ts';
 import { buildCatalog } from '../src/features/workouts/catalog.ts';
 import {
@@ -31,6 +32,44 @@ test('a budget held at its floor reads as the web does', () => {
   );
   assert.equal(balanceProvenance(null), null);
   assert.equal(balanceProvenance({ restingBaseKcal: 1500, activeKcal: null, targetNetKcal: 0 }), null);
+});
+
+test('the budget line ends with the workouts clause, from the server-shaped payload', () => {
+  // The shape /api/nutrition/energy-balance sends: activeBreakdown beside balance, not inside it.
+  const payload = energySpec('2026-11-01').schema.parse({
+    date: '2026-11-01',
+    balance: {
+      intakeKcal: 0,
+      expenditureKcal: 2047,
+      remainingKcal: 2047,
+      activeKcal: 547,
+      restingBaseKcal: 1500,
+      restingRateKcal: 1500,
+      netKcal: 0,
+      budgetKcal: 2047,
+      targetNetKcal: 0,
+      deficitKcal: 0,
+      stepCreditKcal: 0,
+    },
+    activeBreakdown: { workoutKcal: 320, activityKcal: 0, stepsKcal: 227 },
+  });
+  const p = balanceProvenance(payload.balance)!;
+  // Called exactly as the three call sites do.
+  const line = budgetLine(p, payload.balance, payload.activeBreakdown);
+  assert.match(line, /earned from movement \(320 kcal workouts · 227 kcal steps\)$/);
+  // No breakdown on the payload: no clause.
+  assert.doesNotMatch(budgetLine(p, payload.balance, null), /\(/);
+  const bare = energySpec('2026-11-01').schema.parse({ date: '2026-11-01', balance: payload.balance });
+  assert.doesNotMatch(budgetLine(p, bare.balance, bare.activeBreakdown), /\(/);
+});
+
+test('every call site passes the response root activeBreakdown', async () => {
+  const expected: Record<string, RegExp> = {
+    'features/home/components/HomeWidgets.tsx': /budgetLine\(provenance, energy\?\.data\?\.balance, energy\?\.data\?\.activeBreakdown\)/,
+    'features/nutrition/components/NutritionEnergyCard.tsx': /budgetLine\(provenance, b, data\?\.activeBreakdown\)/,
+    'features/health/components/BodyActivityCards.tsx': /budgetLine\(provenance, balance, energy\.data\?\.activeBreakdown\)/,
+  };
+  for (const [file, re] of Object.entries(expected)) assert.match(await source(file), re, file);
 });
 
 test('Home and the Nutrition tab print the budget line from the same function', async () => {
