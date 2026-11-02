@@ -316,9 +316,12 @@ export class AccountSession {
       token = await this.api.refreshSession(presented);
     } catch (error) {
       this.record('renew_failed', error);
-      // Only the server saying no ends the session. Offline, a timeout, 429 or 5xx keep it.
+      // Only our own refresh route saying no ends the session: a 400, 401 or 403 carrying its JSON
+      // `{ error }` body (`validation`). Offline, a timeout, 429, 5xx, and a 4xx from a proxy or
+      // captive portal (an HTML or empty body) keep the session and retry after the backoff.
       if (
         error instanceof ApiError &&
+        error.validation &&
         [400, 401, 403].includes(error.status) &&
         this.session?.refreshToken === presented
       ) {
@@ -849,7 +852,9 @@ export class AccountSession {
       if (generation !== this.generation) {
         return;
       }
-      if (error instanceof ApiError && error.status === 401) {
+      // Only our own JSON 401 (`{ error: 'Unauthorized' }`) ends the session; a proxy or captive
+      // portal answering 401 with an HTML or empty page does not.
+      if (error instanceof ApiError && error.status === 401 && error.validation) {
         await this.signOut('Your session ended. Sign in again.');
       } else {
         this.publish(
