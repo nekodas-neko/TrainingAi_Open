@@ -495,7 +495,12 @@ export class HealthStore {
       return revision === this.revision;
     } catch (error) {
       if (generation === this.generation) {
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        // Only our JSON 401/403 is a refusal; a proxy's HTML page is transient and keeps the records.
+        if (
+          error instanceof ApiError &&
+          error.validation &&
+          (error.status === 401 || error.status === 403)
+        ) {
           this.publish({ denied: true, error: 'Check your account to access health records.' });
         }
         this.publish(

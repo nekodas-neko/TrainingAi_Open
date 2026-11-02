@@ -242,7 +242,7 @@ test('authorization failures hide cached data; transient failures retain it', as
       ...f.reader,
       get: async (path: string, query?: Record<string, string>) => {
         if (fail) {
-          throw new ApiError(status);
+          throw new ApiError(status, undefined, undefined, '/api/workout-data', status !== 500);
         }
         return f.reader.get(path, query);
       },
@@ -257,6 +257,31 @@ test('authorization failures hide cached data; transient failures retain it', as
     assert.equal(controller.getSnapshot().status, status === 500 ? 'ready' : 'unauthorized');
     assert.equal(controller.getSnapshot().catalog === null, status !== 500);
   }
+});
+
+test('a proxy 403 page is transient for the catalog: the saved program stays', async (t) => {
+  const db = sqliteFixture();
+  t.after(() => db.connection.close());
+  const storage = await createLocalStorage(db.database);
+  const f = workoutFixture();
+  let fail = false;
+  const reader = {
+    ...f.reader,
+    get: async (path: string, query?: Record<string, string>) => {
+      if (fail) {
+        throw new ApiError(403);
+      }
+      return f.reader.get(path, query);
+    },
+  };
+  const controller = new WorkoutCatalogStore(storage.account(reader.origin, reader.userId), reader);
+  await controller.initialize();
+  const saved = controller.getSnapshot().catalog;
+  assert.notEqual(saved, null);
+  fail = true;
+  await controller.refresh();
+  assert.equal(controller.getSnapshot().status, 'ready');
+  assert.deepEqual(controller.getSnapshot().catalog, saved);
 });
 
 test('cancelled responses cannot populate the cache or continue requesting session details', async () => {

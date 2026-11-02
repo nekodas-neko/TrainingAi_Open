@@ -218,8 +218,11 @@ export class WorkoutCatalogStore {
       if (generation !== this.generation) {
         return;
       }
+      // Only our JSON 401/403 is a refusal; a proxy's HTML page is transient and keeps the program.
       const unauthorized =
-        error instanceof ApiError && (error.status === 401 || error.status === 403);
+        error instanceof ApiError &&
+        error.validation &&
+        (error.status === 401 || error.status === 403);
       const catalog = unauthorized ? null : this.current.catalog;
       if (revision === this.revision) {
         this.freshness.failed();
