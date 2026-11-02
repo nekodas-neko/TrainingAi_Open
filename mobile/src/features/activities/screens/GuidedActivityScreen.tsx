@@ -27,6 +27,7 @@ import { profileSpec, healthDaySpec, healthDaySchema } from '../../health/data/m
 import { baselinesSpec } from '../data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
+import { LiveStrapBpm } from '../components/LiveStrapBpm';
 import { useRouteRecording } from '../data/useRouteRecording';
 import { gpsProblemText, routeEligible } from '../data/route-recording';
 export function GuidedActivityScreen({
@@ -255,6 +256,7 @@ export function GuidedActivityScreen({
           <AppText variant="caption">
             {clock(seconds)} elapsed · {clock(total)} total
           </AppText>
+          <LiveStrapBpm />
           {guidance.kind === 'walk' && segment && ['fast', 'slow'].includes(segment.kind) && (
             <Card>
               <AppText variant="caption">

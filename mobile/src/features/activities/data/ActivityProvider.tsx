@@ -12,6 +12,7 @@ import { AppState } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
+import { useActivityStrapHold } from '../../devices/strap/StrapProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
@@ -81,7 +82,18 @@ export function ActivityStateProvider({
       store?.cancel();
     };
   }, [store]);
-  return <Context.Provider value={store}>{children}</Context.Provider>;
+  return (
+    <Context.Provider value={store}>
+      <ActivityStrapHold />
+      {children}
+    </Context.Provider>
+  );
+}
+/** The chest strap is held, and its heart rate saved, from the activity's start to its end (#3527). */
+function ActivityStrapHold() {
+  const { session } = useActivities();
+  useActivityStrapHold(session?.mode === 'active');
+  return null;
 }
 export function useActivities() {
   const store = useContext(Context);
