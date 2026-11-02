@@ -18,7 +18,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 // The admin route reads `req.nextUrl.searchParams`, which a plain Request does not have.
 import { NextRequest } from 'next/server'
-import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
 const listDayCheckins = vi.fn(async (..._a: unknown[]) => [] as unknown[])
 const getBodyBatteryHistory = vi.fn(async (..._a: unknown[]) => [] as unknown[])
@@ -70,6 +70,12 @@ const samplesIn = (body: unknown): number => {
   return buckets.reduce((sum, b) => sum + (b.count ?? 0), 0)
 }
 
+// The routes read a rolling window ending today, so the fixture days must be recent, not fixed.
+const recentDays = () => {
+  const today = todayInTz('Australia/Brisbane')
+  return [-4, -3, -2, -1].map(k => shiftDateStr(today, k))
+}
+
 describe('the battery-recovery calibration stops fitting to a seed', () => {
   const load = async () => {
     const { GET } = await import('@/app/api/admin/battery-recovery-calibration/route')
@@ -77,7 +83,7 @@ describe('the battery-recovery calibration stops fitting to a seed', () => {
     expect(res.status).toBe(200)
     return res.json()
   }
-  const days = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04']
+  const days = recentDays()
   const battery = () => days.map((d, i) => ({ date: d, endValue: 30 + i * 15 }))
 
   it('pairs nothing from untouched rows', async () => {
@@ -98,7 +104,7 @@ describe('the subjective-recovery correlation stops plotting a seed', () => {
   const readinessRows = (days: string[]) => days.map((d, i) => ({ day: d, readinessScore: 60 + i * 5 }))
 
   it('has no paired points when nothing was answered', async () => {
-    const days = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04']
+    const days = recentDays()
     listDayCheckins.mockResolvedValue(days.map(d => checkin(d)))
     getOuraDailyDerived.mockResolvedValue(readinessRows(days))
 
@@ -108,7 +114,7 @@ describe('the subjective-recovery correlation stops plotting a seed', () => {
   })
 
   it('plots the days that were answered', async () => {
-    const days = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04']
+    const days = recentDays()
     listDayCheckins.mockResolvedValue(
       days.map((d, i) => checkin(d, { perceivedRecovery: 1 + i, perceivedRecoveryTouched: true })))
     getOuraDailyDerived.mockResolvedValue(readinessRows(days))
