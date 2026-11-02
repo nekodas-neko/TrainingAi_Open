@@ -1,6 +1,7 @@
 import { capitalize } from '@trainingai/shared/format/capitalize';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ExerciseChooser } from './ExerciseChooser';
+import { DEFAULT_SESSION_ICON, SessionIconPicker } from './SessionIconPicker';
 import { randomUUID } from 'expo-crypto';
 import {
   AppButton,
@@ -194,15 +195,9 @@ export function SessionEditor({
               value={session.name}
               onChangeText={(name) => update({ name })}
             />
-            <View style={{ width: theme.sizes.touchTarget * 1.5 }}>
-              <Picker
-                compact
-                label="Icon"
-                value={session.icon ?? '💪'}
-                options={['💪', '🏋️', '🦵', '🏃', '🤸', '⚡', '🔥', '🎯', '🧘'].map((icon) => ({
-                  value: icon,
-                  label: icon,
-                }))}
+            <View style={{ width: theme.sizes.touchTarget * 2 }}>
+              <SessionIconPicker
+                value={session.icon ?? DEFAULT_SESSION_ICON}
                 onChange={(icon) => update({ icon })}
               />
             </View>

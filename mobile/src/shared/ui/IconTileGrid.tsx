@@ -8,10 +8,12 @@ import { useTheme } from '../theme/ThemeProvider';
 export function IconTileGrid<T extends string>({
   options,
   onSelect,
+  selectedId,
   disabled = false,
 }: {
   options: readonly { id: T; label: string; icon: IconName }[];
   onSelect: (id: T) => void;
+  selectedId?: T;
   disabled?: boolean;
 }) {
   const { theme } = useTheme();
@@ -24,11 +26,11 @@ export function IconTileGrid<T extends string>({
           onPress={() => onSelect(option.id)}
           accessibilityRole="button"
           accessibilityLabel={option.label}
-          accessibilityState={{ disabled }}
+          accessibilityState={{ disabled, selected: option.id === selectedId }}
           style={{
             minHeight: theme.sizes.button + theme.spacing.md,
             borderWidth: 1,
-            borderColor: theme.colors.border,
+            borderColor: option.id === selectedId ? theme.colors.brand : theme.colors.border,
             borderRadius: theme.radii.control,
             padding: theme.spacing.xs,
             justifyContent: 'center',

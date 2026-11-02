@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { SESSION_ICON_CHOICES } from '@trainingai/shared/session-icons'
 import {
   Dumbbell,
   Footprints,
@@ -74,29 +75,12 @@ export function getSessionIcon(emoji: string | null | undefined, palettePosition
   return Dumbbell
 }
 
-// FITNESS_ICONS: ordered list matching the old FITNESS_EMOJIS array in program-editor-sheet
-// Used to populate the icon picker in the config screen
-export const FITNESS_ICONS: Array<{ emoji: string; Icon: LucideIcon; label: string }> = [
-  { emoji: '💪', Icon: Dumbbell,   label: 'Strength'   },
-  { emoji: '🏋️', Icon: Dumbbell,   label: 'Weights'    },
-  { emoji: '🦵', Icon: Footprints, label: 'Legs'       },
-  { emoji: '🏃', Icon: Activity,   label: 'Cardio'     },
-  { emoji: '🤸', Icon: Activity,   label: 'Gymnastics' },
-  { emoji: '⚡', Icon: Zap,        label: 'Power'      },
-  { emoji: '🔥', Icon: Flame,      label: 'Intensity'  },
-  { emoji: '🎯', Icon: Target,     label: 'Focus'      },
-  { emoji: '🏅', Icon: Award,      label: 'Medal'      },
-  { emoji: '🧘', Icon: Brain,      label: 'Mind'       },
-  { emoji: '🚴', Icon: Bike,       label: 'Cycling'    },
-  { emoji: '🏊', Icon: Waves,      label: 'Swimming'   },
-  { emoji: '🤼', Icon: Users,      label: 'Sparring'   },
-  { emoji: '🥊', Icon: Swords,     label: 'Boxing'     },
-  { emoji: '🧗', Icon: Mountain,   label: 'Climbing'   },
-  { emoji: '⛹️', Icon: Dumbbell,   label: 'Sport'      },
-  { emoji: '🤾', Icon: Dumbbell,   label: 'Handball'   },
-  { emoji: '🎽', Icon: Dumbbell,   label: 'Athletics'  },
-  { emoji: '🦾', Icon: Zap,        label: 'Machine'    },
-  { emoji: '🏇', Icon: Wind,       label: 'Speed'      },
-  { emoji: '🔺', Icon: TrendingUp,   label: 'Upper'   },
-  { emoji: '🔻', Icon: TrendingDown, label: 'Lower'   },
-]
+// FITNESS_ICONS: the icon picker's options in the config screen. The emoji + label list is shared
+// with the native app (packages/shared/src/session-icons.ts); only the glyph is chosen here.
+// The picker has always drawn the machine arm as a bolt, though a stored 🦾 renders as a dumbbell.
+export const FITNESS_ICONS: Array<{ emoji: string; Icon: LucideIcon; label: string }> =
+  SESSION_ICON_CHOICES.map(({ emoji, label }) => ({
+    emoji,
+    label,
+    Icon: emoji === '🦾' ? Zap : getSessionIcon(emoji),
+  }))

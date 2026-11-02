@@ -37,8 +37,8 @@ export function SettingsScreen() {
         <AppText variant="heading">Preferences</AppText>
         <HealthAlertsSetting />
         <FeatureRow
-          title="Live workout & activity status"
-          subtitle="Lock-screen status remains deferred"
+          title="Live workout status"
+          subtitle="Shown as an Android Live Update while a workout runs"
         />
       </Card>
       <AccountPanel />
