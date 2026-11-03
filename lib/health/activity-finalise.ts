@@ -14,6 +14,7 @@ import { reportServerError } from '@/lib/observability'
 import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { activityContributorsRow, type ActivityDay } from '@trainingai/shared/health/activity-day'
 import { loadActivityDay, type LoadActivityDayOptions } from '@trainingai/shared/health/activity-day-load'
+import { ACTIVITY_MODEL_VERSION } from '@trainingai/shared/health/activity-score'
 import type { FinalGrace } from '@trainingai/shared/health/finished-day-recheck'
 
 /** How many finished days back a read of today looks for an Activity score that is not final. */
@@ -64,6 +65,8 @@ export async function storeFinishedActivityDay(
   await repo.upsertOuraDailyDerived(userId, date, {
     activityScore: day.result?.score ?? null,
     activityContributors: activityContributorsRow(day, now.getTime()),
+    // Which model scored the stored value (#3388), so a day keeps the rule it was scored on.
+    modelVersions: { activity: ACTIVITY_MODEL_VERSION },
   })
 }
 

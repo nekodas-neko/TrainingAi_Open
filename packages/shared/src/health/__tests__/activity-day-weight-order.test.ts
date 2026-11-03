@@ -12,7 +12,7 @@ const input = (bodyMetrics: ActivityDayInput['bodyMetrics']): ActivityDayInput =
   date: DAY,
   tz: 'Australia/Brisbane',
   bodyMetrics,
-  restingHrBaseline: null,
+  restingHr: null,
   hrRows: [],
   maxHr: null,
   sessions: [],
