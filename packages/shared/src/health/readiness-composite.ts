@@ -265,8 +265,14 @@ function plainScore(v: number | null): ReadinessContributor {
  *  hours still win where tonight's ring summary has them; a night with no usable series keeps the contributor.
  *  v14: the Sleep Score behind the sleep term reads when sleep began and ended on an Oura Cloud night with a
  *  usable hypnogram, not the bed window (#3075 stage 3). Same readiness inputs, so a night moves only through that term.
+ *  v15 is reserved for another change built in parallel, so this label skips it.
+ *  v16: #3075 stages 4 and 5, from any source that sends them. The Sleep Score behind the sleep term takes a
+ *  restlessness penalty from the source's movement series; a night the source says it recorded incompletely
+ *  reads as partial (no sleep score, no hours in the sleep-balance normal), as the owner's mark does; and each
+ *  per-night normal is learned from one (source, algorithm version), so a source that changes its algorithm
+ *  starts its normals again. A night with none of the three is scored exactly as under v14.
  */
-export const READINESS_MODEL_VERSION = 'v14:own-sleep-onset-wake:2026-11-03'
+export const READINESS_MODEL_VERSION = 'v16:restlessness-recording-flags:2026-11-04'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.

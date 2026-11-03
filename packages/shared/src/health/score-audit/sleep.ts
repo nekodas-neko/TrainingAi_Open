@@ -1,5 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz'
-import { deviceOf } from '../per-device-normal'
+import { rowsInNormalGroup } from '../per-device-normal'
 import {
   computeSleepScore,
   sleepScoreBaselines,
@@ -10,6 +10,7 @@ import {
   SLEEP_SCHEDULE_MIN_NIGHTS,
   SLEEP_AWAKE_FRACTION_BASELINE_MIN_NIGHTS,
   MAIN_SLEEP_MIN_HOURS,
+  restlessFractionOf,
   sleepComponentsToContributors,
 } from '@trainingai/shared/health/sleep-score'
 import { scoreBand } from '@trainingai/shared/health/score-band'
@@ -62,10 +63,12 @@ export function buildSleepAudit(input: SleepAuditInput): PillarAudit {
   // scored never contributes to the bar it's judged against. Same rule the readiness route applies.
   const baselines = sleepScoreBaselines(prior, tz, night ?? undefined)
   const hrvBaselineMs = baselines.hrvBaselineMs
-  const priorHrv = prior
-    .filter(s => isPartialNight(s) || (s.durationHours ?? 0) >= MAIN_SLEEP_MIN_HOURS)
-    // #3001: only the nights of the device that measured this one count toward its HRV normal.
-    .filter(s => !night || deviceOf(s.hrvSource) === deviceOf(night.hrvSource))
+  const mainPrior = prior.filter(s => isPartialNight(s) || (s.durationHours ?? 0) >= MAIN_SLEEP_MIN_HOURS)
+  // #3001: only the nights of the device that measured this one count toward its HRV normal, and
+  // #3075 stage 5: under the same algorithm version, by the rule the score itself keys by.
+  const priorHrv = (night
+    ? rowsInNormalGroup(mainPrior, s => s.hrvSource, s => s.sourceAlgorithmVersion, { source: night.hrvSource, algorithmVersion: night.sourceAlgorithmVersion })
+    : mainPrior)
     .map(s => s.averageHrvMs).filter((v): v is number => v != null && v > 0)
   if (hrvBaselineMs == null) {
     gaps.push(
@@ -218,7 +221,9 @@ export function buildSleepAudit(input: SleepAuditInput): PillarAudit {
         unit: 'awake fraction of the sleep window',
         source: 'derived from sleep_sessions.awake_hours + duration_hours',
         note: `Base is efficiency (${night?.efficiency ?? SLEEP_MODEL.restfulnessFallbackBase}), less an ` +
-          'awake-fraction penalty. `restless_periods` is NOT scored — the column holds Oura\'s ' +
+          'awake-fraction penalty, less a restlessness penalty from the source\'s movement series (#3075 stage 4; ' +
+          `this night's share of its sleep window spent moving: ${night && restlessFractionOf(night) != null ? Math.round(restlessFractionOf(night)! * 1000) / 1000 : 'no usable series'}). ` +
+          '`restless_periods` is NOT scored — the column holds Oura\'s ' +
           'restlessness measure on Cloud nights and a 0–5 awakenings count on BLE nights, which no ' +
           `single curve can serve (finding Q-3). This night's raw value: ${night?.restlessPeriods ?? '—'}.`,
       },

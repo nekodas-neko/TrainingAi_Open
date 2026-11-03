@@ -18,6 +18,14 @@
  *   switch, and `provisional` when there is no previous device at all, so a first-time user still
  *   gets a number from what they have.
  *
+ * #3075 stage 5: a normal is keyed by (source, the source's algorithm version), not by source alone.
+ * A source that changes how it turns its raw signal into a night has changed its ruler as surely as
+ * a device switch does, so its normal restarts and the previous version's carries over exactly as
+ * another device's would. Any source can send a version (Oura's `sleep_algorithm_version` is the
+ * first). A reading with no version is not evidence of a change: it joins the newest version its
+ * source has sent, so a history written before the version was stored does not split from the
+ * nights after it. A caller that passes no versions gets exactly the per-source normal it had.
+ *
  * A leaf module: imports nothing, so a client bundle may take it.
  */
 
@@ -32,6 +40,8 @@ export interface DeviceReading {
   date: string
   value: number | null | undefined
   source?: string | null
+  /** #3075 stage 5: the source's algorithm version for this reading, when it said. */
+  algorithmVersion?: string | null
 }
 
 export interface DeviceNormalOptions {
@@ -46,6 +56,11 @@ export interface DeviceNormalOptions {
    * the source of the newest reading.
    */
   device?: string
+  /**
+   * #3075 stage 5: the algorithm version to learn for, with `device`. Absent or null: the newest
+   * version that device has sent.
+   */
+  algorithmVersion?: string | null
 }
 
 export interface DeviceNormal {
@@ -65,6 +80,46 @@ export interface DeviceNormal {
 }
 
 const sourceOf = (r: { source?: string | null }) => deviceOf(r.source)
+
+/**
+ * #3075 stage 5. Every row's (source, algorithm version) group, for rows given OLDEST FIRST: a row
+ * with no version takes the newest version its source has sent anywhere in `rows`, so an unversioned
+ * stretch joins the versioned one rather than reading as a version of its own.
+ */
+function groupKeys<T>(
+  rows: readonly T[],
+  source: (r: T) => string | null | undefined,
+  version: (r: T) => string | null | undefined,
+): { keyOf: (r: T) => string; keyFor: (source: string | null | undefined, version?: string | null) => string } {
+  const newest = new Map<string, string>()
+  for (const r of rows) {
+    const v = version(r)
+    if (v != null) newest.set(deviceOf(source(r)), v)
+  }
+  const keyFor = (src: string | null | undefined, v?: string | null) => {
+    const device = deviceOf(src)
+    const effective = v ?? newest.get(device) ?? null
+    return effective == null ? device : `${device}\u0000${effective}`
+  }
+  return { keyOf: r => keyFor(source(r), version(r)), keyFor }
+}
+
+/**
+ * #3075 stage 5. The rows of one (source, algorithm version) group, in the order given, which must be
+ * OLDEST FIRST. For a caller that filters its own rows to the scored night's normal (the sleep score's
+ * schedule normal, readiness's per-night inputs) by the same rule {@link perDeviceNormal} keys by.
+ * `group.algorithmVersion` absent or null: the newest version the source has sent.
+ */
+export function rowsInNormalGroup<T>(
+  rows: readonly T[],
+  source: (r: T) => string | null | undefined,
+  version: (r: T) => string | null | undefined,
+  group: { source: string | null | undefined; algorithmVersion?: string | null },
+): T[] {
+  const { keyOf, keyFor } = groupKeys(rows, source, version)
+  const key = keyFor(group.source, group.algorithmVersion)
+  return rows.filter(r => keyOf(r) === key)
+}
 
 function combine(values: number[], how: 'mean' | 'median'): number {
   if (how === 'mean') return values.reduce((a, b) => a + b, 0) / values.length
@@ -104,16 +159,20 @@ export function perDeviceNormal(readings: readonly DeviceReading[], opts: Device
   if (rows.length === 0) return { source: opts.device ?? null, nights: 0, value: null, provisional: null, carriedOver: null }
 
   const device = opts.device ?? sourceOf(rows[rows.length - 1])
-  const own = rows.filter(r => sourceOf(r) === device)
+  // #3075 stage 5: the group is (device, algorithm version); see the module note.
+  const { keyOf, keyFor } = groupKeys(rows, r => r.source, r => r.algorithmVersion)
+  const ownKey = opts.device != null ? keyFor(opts.device, opts.algorithmVersion) : keyOf(rows[rows.length - 1])
+  const own = rows.filter(r => keyOf(r) === ownKey)
   const windowed = opts.window != null ? own.slice(-opts.window) : own
   const provisional = windowed.length ? combine(windowed.map(r => r.value), how) : null
 
-  // The other devices, most recently measured first; the first that is mature on its own carries over.
-  const lastSeen = new Map<string, string>()
-  for (const r of rows) if (sourceOf(r) !== device) lastSeen.set(sourceOf(r), r.date)
+  // The other groups (another device, or an earlier algorithm version of this one), most recently
+  // measured first; the first that is mature on its own carries over.
+  const lastSeen = new Map<string, { source: string; date: string }>()
+  for (const r of rows) if (keyOf(r) !== ownKey) lastSeen.set(keyOf(r), { source: sourceOf(r), date: r.date })
   let carriedOver: DeviceNormal['carriedOver'] = null
-  for (const [source] of [...lastSeen.entries()].sort((a, b) => b[1].localeCompare(a[1]))) {
-    const theirs = rows.filter(r => sourceOf(r) === source)
+  for (const [key, { source }] of [...lastSeen.entries()].sort((a, b) => b[1].date.localeCompare(a[1].date))) {
+    const theirs = rows.filter(r => keyOf(r) === key)
     const theirWindow = opts.window != null ? theirs.slice(-opts.window) : theirs
     if (theirWindow.length >= opts.minNights) {
       carriedOver = { source, nights: theirWindow.length, value: combine(theirWindow.map(r => r.value), how) }
