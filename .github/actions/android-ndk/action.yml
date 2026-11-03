@@ -26,13 +26,16 @@ runs:
           echo "::error::The generated project pins a different NDK than React Native's $version:"; echo "$pinned"; exit 1
         fi
         echo "version=$version" >> "$GITHUB_OUTPUT"
+        # ANDROID_HOME is a runner variable, which the `env` expression context does not see, so
+        # the cache path is worked out here.
+        echo "dir=$ANDROID_HOME/ndk/$version" >> "$GITHUB_OUTPUT"
         echo "NDK_VERSION=$version" >> "$GITHUB_ENV"
 
     - name: Restore the NDK cache
       id: cache
       uses: actions/cache@v4
       with:
-        path: ${{ env.ANDROID_HOME }}/ndk/${{ steps.version.outputs.version }}
+        path: ${{ steps.version.outputs.dir }}
         key: android-ndk-${{ runner.os }}-${{ steps.version.outputs.version }}
 
     # A dropped or corrupt download is caught and retried here. An install counts only if the
