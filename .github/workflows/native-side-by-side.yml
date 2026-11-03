@@ -87,6 +87,11 @@ jobs:
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "ANDROID_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
 
+      # The commit being built (for the release, the checked-out ref, not the workflow's own sha);
+      # the JS bundle inlines it for the About screen.
+      - name: Record the built commit
+        run: echo "EXPO_PUBLIC_BUILD_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec expo prebuild --platform android --no-install
 
