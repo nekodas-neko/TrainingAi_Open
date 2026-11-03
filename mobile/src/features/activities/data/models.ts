@@ -33,6 +33,21 @@ const quota = z.object({
   trainingDoneMin: number,
   trainingRemainingMin: number,
 });
+const walkKindAggregate = z
+  .object({
+    count: z.number(),
+    avgHr: z.number().nullish(),
+    avgPaceSecPerKm: z.number().nullish(),
+    avgCadenceSpm: z.number().nullish(),
+    avgDistanceKm: z.number().nullish(),
+  })
+  .passthrough();
+/** The walker's past fast and slow blocks: the walk screen's history card, and the pacer's speed targets. */
+export const walkSegmentStatsSpec = {
+  path: '/api/guided-walk/segment-stats',
+  ttl: 900000,
+  schema: z.object({ fast: walkKindAggregate, slow: walkKindAggregate }),
+};
 export const cardioWeekSpec = (today: string) => ({
   path: '/api/cardio-week',
   partition: today,

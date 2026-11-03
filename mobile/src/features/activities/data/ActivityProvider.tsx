@@ -13,14 +13,16 @@ import { randomUUID } from 'expo-crypto';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { useActivityStrapHold, useStrapSession } from '../../devices/strap/StrapProvider';
+import { speedTargetsFromHistory, walkHrTargets } from '@trainingai/shared/walking/walk-pacer';
 import { walkPlan } from './guidance';
-import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
+import { paceSignals } from './walk-pace';
+import { useWorkoutResource, useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { healthReadPaths } from '../../../core/sync/health-invalidation';
 import { ActivityStore, elapsedMs, emptyActivity, sameActivityValue } from './ActivityStore';
-import { activityHistorySpec } from '../../health/data/models';
-import { overlayCalories } from './models';
+import { activityHistorySpec, hrProfileSpec } from '../../health/data/models';
+import { overlayCalories, walkSegmentStatsSpec } from './models';
 import { failedItems, waitingCount } from './sync-health';
 import type { HealthActivity } from '../../health/components/ActivityDetails';
 
@@ -98,12 +100,32 @@ function ActivityStrapHold() {
   // A guided walk also streams the strap's accelerometer for live cadence, for the walk only
   // (#3525). It lives here, not on the screen, so leaving the screen does not lose readings.
   const startMs = session?.mode === 'active' && session.guidance?.kind === 'walk' ? session.startMs : null;
+  // The pacer's fallback rungs (#3549). Speed is paced against the walker's own past blocks, heart
+  // rate against a band off their max. Both stay off until they are known, and neither is fetched
+  // unless a guided walk is running.
+  const stats = useWorkoutResource(walkSegmentStatsSpec, startMs !== null).data;
+  const hrProfile = useWorkoutResource(hrProfileSpec, startMs !== null).data;
+  const speedTargets = useMemo(() => speedTargetsFromHistory(stats), [stats]);
+  const hrTargets = useMemo(
+    () =>
+      hrProfile?.maxHr != null && hrProfile.restingHr != null
+        ? walkHrTargets(hrProfile.maxHr, hrProfile.restingHr)
+        : null,
+    [hrProfile?.maxHr, hrProfile?.restingHr],
+  );
+  const targets = useRef({ speed: speedTargets, hr: hrTargets });
+  targets.current = { speed: speedTargets, hr: hrTargets };
+  useEffect(() => {
+    store?.pace?.setTargets({ speed: speedTargets, hr: hrTargets });
+  }, [store, startMs, speedTargets, hrTargets]);
   useEffect(() => {
     if (!strap || !store || startMs === null) return;
     const current = store.getSnapshot().session;
     const pace = current ? store.paceFor(current) : null;
     if (!pace || current?.guidance?.kind !== 'walk') return;
-    const segments = walkPlan(current.guidance.config).segments;
+    const config = current.guidance.config;
+    const segments = walkPlan(config).segments;
+    pace.setTargets(targets.current);
     strap.setAccelerometer(true);
     const stop = strap.onAccelerometer((batch) => pace.onBatch(batch));
     // One tick per wall-clock second, from its own timer (see `WalkPace.tick`).
@@ -114,7 +136,15 @@ function ActivityStrapHold() {
       pace.tick(
         at,
         segments.find((block) => seconds >= block.startSec && seconds < block.endSec),
+        paceSignals({
+          route: store.getSnapshot().route,
+          treadmill: config.treadmill,
+          strap: strap.getSnapshot(),
+          nowMs: at,
+        }),
       );
+      // The tally goes to the checkpoint, so a kill keeps this walk's adherence (#3549).
+      store.pacerUpdated();
     }, 1000);
     return () => {
       clearInterval(timer);

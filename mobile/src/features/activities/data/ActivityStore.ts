@@ -29,7 +29,7 @@ import {
 } from './guidance.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
 import { summariseRoute } from '@trainingai/shared/activity/route-summary';
-import { WalkPace } from './walk-pace.ts';
+import { WalkPace, type PaceSnapshot } from './walk-pace.ts';
 import {
   keepsFix,
   liveRouteStats,
@@ -112,6 +112,29 @@ const routeSchema = z.object({
   startMs: z.number(),
   points: z.array(routePointSchema),
 });
+// The guided walk's pacer tally and cadence readings, written with the route at each checkpoint and
+// tied to the recording the same way, so a kill mid-walk keeps its adherence and cadence (#3549).
+const bandCounts = z.object({
+  green: z.number(),
+  amber: z.number(),
+  red: z.number(),
+  stopped: z.number(),
+});
+const paceSchema = z.object({
+  version: z.literal(1),
+  origin: z.string(),
+  userId: z.string(),
+  startMs: z.number(),
+  tallies: z.record(
+    z.string(),
+    z.object({
+      cadence: bandCounts.optional(),
+      speed: bandCounts.optional(),
+      hr: bandCounts.optional(),
+    }),
+  ),
+  readings: z.array(z.tuple([z.number(), z.number()])),
+});
 type Data = Pick<z.infer<typeof savedSchema>, 'session' | 'rows' | 'tests' | 'runs'>;
 export type ActivityState = Data & {
   route: RoutePoint[];
@@ -131,6 +154,7 @@ export const emptyActivity: ActivityState = {
 };
 const key = 'activities.v1';
 const routeKey = 'activities.route.v1';
+const paceKey = 'activities.pace.v1';
 // At most this long between route checkpoints, so a kill loses a few seconds of points at most.
 export const ROUTE_CHECKPOINT_MS = 5000;
 export function elapsedMs(session: ActivitySession, now: number) {
@@ -261,6 +285,8 @@ export class ActivityStore {
   // The guided walk's live pacer and what it has recorded. Kept in memory and tied to the walk by its
   // start time; a kill mid-walk loses the cadence of that walk, not the walk (#3525).
   pace: WalkPace | null = null;
+  // What a kill left of the walk's pacer, held until the walk's own pacer is created and restored.
+  private savedPace: PaceSnapshot | null = null;
   private current: ActivityState = emptyActivity;
   private listeners = new Set<() => void>();
   private writes: Promise<unknown> = Promise.resolve();
@@ -299,7 +325,9 @@ export class ActivityStore {
         throw new Error('Wrong account.');
       }
       const route = await this.loadRoute(data?.session?.startMs ?? null);
+      const savedPace = await this.loadPace(data?.session?.startMs ?? null);
       if (generation === this.generation) {
+        this.savedPace = savedPace;
         this.publish({
           ready: true,
           session: data?.session ?? null,
@@ -344,6 +372,27 @@ export class ActivityStore {
     }
     return [];
   }
+  // The same rule for the pacer's tally: only this recording's, only this account's.
+  private async loadPace(startMs: number | null) {
+    const raw = await this.storage.get(paceKey);
+    let saved: ReturnType<typeof paceSchema.safeParse> | null = null;
+    try {
+      saved = raw ? paceSchema.safeParse(JSON.parse(raw)) : null;
+    } catch {}
+    if (
+      saved?.success &&
+      startMs !== null &&
+      saved.data.startMs === startMs &&
+      saved.data.origin === this.connection.origin &&
+      saved.data.userId === this.connection.userId
+    ) {
+      return { startMs, tallies: saved.data.tallies, readings: saved.data.readings };
+    }
+    if (raw) {
+      await this.storage.remove(paceKey);
+    }
+    return null;
+  }
   // Records one fix from the location adapter. Kept only while a route-recording activity is
   // running and not paused, and only past the current app's 5 m filter.
   appendFix(point: RoutePoint) {
@@ -359,6 +408,11 @@ export class ActivityStore {
       return false;
     }
     this.publish({ route: [...this.current.route, point] });
+    this.scheduleCheckpoint();
+    return true;
+  }
+  // At most one checkpoint per ROUTE_CHECKPOINT_MS: now if the last is old enough, else on a timer.
+  private scheduleCheckpoint() {
     if (this.now() - this.routeSavedMs >= ROUTE_CHECKPOINT_MS) {
       void this.checkpoint().catch(() => {});
     } else if (!this.routeTimer) {
@@ -370,7 +424,13 @@ export class ActivityStore {
         ROUTE_CHECKPOINT_MS - (this.now() - this.routeSavedMs),
       );
     }
-    return true;
+  }
+  // The guided walk's pacer has counted another second. A walk with no route (a treadmill) has no
+  // fixes to trigger a checkpoint, so the tally asks for one here.
+  pacerUpdated() {
+    const session = this.current.session;
+    if (this.current.ready && session?.mode === 'active' && this.pace?.startMs === session.startMs)
+      this.scheduleCheckpoint();
   }
   // Writes the route as it stands. Called on a timer while recording, and on pause, finish and the
   // app leaving the foreground, so the points survive the app being killed or the phone restarting.
@@ -398,6 +458,23 @@ export class ActivityStore {
           }),
         ),
       );
+      // The pacer's tally rides along, and a failure to keep it never costs the route above.
+      const pace = this.pace;
+      if (pace && pace.startMs === session.startMs && pace.hasData) {
+        await this.storage
+          .set(
+            paceKey,
+            JSON.stringify(
+              paceSchema.parse({
+                version: 1,
+                origin: this.connection.origin,
+                userId: this.connection.userId,
+                ...pace.snapshot(),
+              }),
+            ),
+          )
+          .catch(() => {});
+      }
     });
     this.routeWrites = result.catch(() => undefined);
     return result;
@@ -411,7 +488,10 @@ export class ActivityStore {
     if (this.current.route.length) {
       this.publish({ route: [] });
     }
-    const result = this.routeWrites.then(() => this.storage.remove(routeKey));
+    const result = this.routeWrites.then(async () => {
+      await this.storage.remove(routeKey);
+      await this.storage.remove(paceKey);
+    });
     this.routeWrites = result.catch(() => undefined);
     return result;
   }
@@ -525,8 +605,12 @@ export class ActivityStore {
   /** The pacer for the running guided walk, created on first use and dropped with the walk. */
   paceFor(session: ActivitySession): WalkPace | null {
     if (session.guidance?.kind !== 'walk' || session.startMs === null) return null;
-    if (this.pace?.startMs !== session.startMs)
+    if (this.pace?.startMs !== session.startMs) {
       this.pace = new WalkPace(session.startMs, session.guidance.config);
+      // A walk resumed after a kill carries on with what it had counted.
+      if (this.savedPace?.startMs === session.startMs) this.pace.restore(this.savedPace);
+      this.savedPace = null;
+    }
     return this.pace;
   }
   async discard() {

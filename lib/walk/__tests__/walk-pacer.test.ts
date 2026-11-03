@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  bandFor, readPacer, resolveCadenceTargets, speedTargetsFromHistory, kmhFromPace,
+  bandFor, readPacer, resolveCadenceTargets, speedTargetsFromHistory, kmhFromPace, walkHrTargets,
   BAND_TOLERANCE, STOPPED_SPM, STOPPED_KMH, MIN_SEGMENTS_FOR_SPEED_TARGET, DEFAULT_CADENCE_TARGETS,
   type TargetPair,
 } from '../walk-pacer'
@@ -201,5 +201,12 @@ describe('kmhFromPace', () => {
     expect(kmhFromPace(0)).toBeNull()
     expect(kmhFromPace(-1)).toBeNull()
     expect(kmhFromPace(null)).toBeNull()
+  })
+})
+
+describe('walkHrTargets (#3549)', () => {
+  it('is the TN-25 band off max HR with a reserve-fraction slow ceiling, for both apps', () => {
+    // 168 max, 55 resting: 0.60 and 0.70 of max, and resting + 0.40 of the 113 bpm reserve.
+    expect(walkHrTargets(168, 55)).toEqual({ fast: 101, fastMax: 118, slow: 100 })
   })
 })

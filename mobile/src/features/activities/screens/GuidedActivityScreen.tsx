@@ -269,6 +269,8 @@ export function GuidedActivityScreen({
               pace={activity.store?.pace ?? null}
               now={now}
               segment={segment}
+              route={activity.route}
+              treadmill={guidance.config.treadmill}
             />
           )}
           {gps.notice && (
