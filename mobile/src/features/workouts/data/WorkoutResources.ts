@@ -2,7 +2,7 @@ import type { ZodType } from 'zod';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { ApiError, aiFailureText } from '../../account/api/client.ts';
+import { aiFailureText, isAuthRefusal } from '../../account/api/client.ts';
 import { overlayHistory, type HistoryOperation } from './HistoryOutbox.ts';
 import { TrainingStore } from './TrainingStore.ts';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
@@ -324,8 +324,7 @@ export class WorkoutResources {
       if (generation !== this.generation) {
         return;
       }
-      const denied =
-        error instanceof ApiError && (error.status === 401 || error.status === 403);
+      const denied = isAuthRefusal(error);
       if (denied) {
         entry.denied = true;
       }

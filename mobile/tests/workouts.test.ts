@@ -231,18 +231,25 @@ test('a removed active program replaces the old cache without loading session de
   assert.equal(restored.getSnapshot().catalog?.program, null);
 });
 
-test('authorization failures hide cached data; transient failures retain it', async (t) => {
+test('our own JSON 401/403 hides cached data; a proxy page or a 500 retains it', async (t) => {
   const db = sqliteFixture();
   t.after(() => db.connection.close());
   const storage = await createLocalStorage(db.database);
   const f = workoutFixture();
-  for (const status of [500, 401, 403]) {
+  const cases: [string, number, boolean][] = [
+    ['500', 500, false],
+    ['JSON 401', 401, true],
+    ['JSON 403', 403, true],
+    ['HTML 401', 401, false],
+    ['HTML 403', 403, false],
+  ];
+  for (const [name, status, ours] of cases) {
     let fail = false;
     const reader = {
       ...f.reader,
       get: async (path: string, query?: Record<string, string>) => {
         if (fail) {
-          throw new ApiError(status);
+          throw new ApiError(status, undefined, undefined, undefined, ours);
         }
         return f.reader.get(path, query);
       },
@@ -254,8 +261,8 @@ test('authorization failures hide cached data; transient failures retain it', as
     await controller.initialize();
     fail = true;
     await controller.refresh();
-    assert.equal(controller.getSnapshot().status, status === 500 ? 'ready' : 'unauthorized');
-    assert.equal(controller.getSnapshot().catalog === null, status !== 500);
+    assert.equal(controller.getSnapshot().status, ours ? 'unauthorized' : 'ready', name);
+    assert.equal(controller.getSnapshot().catalog === null, ours, name);
   }
 });
 

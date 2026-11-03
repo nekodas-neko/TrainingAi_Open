@@ -13,6 +13,7 @@ import type { AccountConnection } from '../../account/session.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import {
   ApiError,
+  isAuthRefusal,
   UploadRejected,
   isNothingToAnswer,
   isRejectedForGood,
@@ -495,7 +496,7 @@ export class HealthStore {
       return revision === this.revision;
     } catch (error) {
       if (generation === this.generation) {
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        if (isAuthRefusal(error)) {
           this.publish({ denied: true, error: 'Check your account to access health records.' });
         }
         this.publish(

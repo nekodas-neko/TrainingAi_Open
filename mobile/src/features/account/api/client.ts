@@ -52,6 +52,16 @@ export function isRefusedByServer(error: unknown): error is ApiError {
   );
 }
 /**
+ * The server's own auth gate said no: a 401 or 403 carrying its JSON error. A 401 or 403 from a
+ * proxy or captive portal (an HTML or empty body) is not this, and a store must treat it as a
+ * transient failure: keep what it holds and retry on the next refresh.
+ */
+export function isAuthRefusal(error: unknown): error is ApiError {
+  return (
+    error instanceof ApiError && error.validation && (error.status === 401 || error.status === 403)
+  );
+}
+/**
  * The server will never take this write, so retrying it only blocks the queue: its own validation
  * 400, a 422, or a push it answered 200 with this item's rejection. A 400 from anything else (an
  * HTML proxy page, an empty body) says nothing about the write and is retried like any failure.
