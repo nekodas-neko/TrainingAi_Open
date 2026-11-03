@@ -103,6 +103,30 @@ test('apksigner output: the Signer #N form', () => {
   assert.deepEqual(parseSignerCertificates(out), [CERT]);
 });
 
+// Captured from apksigner 0.9 (build-tools 37.0.0) on the published Preview APK and on test signs
+// with a throwaway key, 3 Nov 2026. Digests replaced; `-v` adds the key lines.
+test('apksigner output: the build-tools 37 "V3.0 Signer:" and "V2 Signer:" forms', () => {
+  const pubKey = 'c'.repeat(64);
+  const v3 = [
+    'Verifies',
+    'Verified using v3 scheme (APK Signature Scheme v3): true',
+    'Number of signers: 1',
+    'V3.0 Signer: certificate DN: CN=Android Debug, O=Android, C=US',
+    `V3.0 Signer: certificate SHA-256 digest: ${CERT_HEX}`,
+    'V3.0 Signer: certificate SHA-1 digest: aa',
+    'V3.0 Signer: key algorithm: RSA',
+    `V3.0 Signer: public key SHA-256 digest: ${pubKey}`,
+    '',
+  ].join('\n');
+  assert.deepEqual(parseSignerCertificates(v3), [CERT]);
+  const v2 = `V2 Signer: certificate DN: CN=x\nV2 Signer: certificate SHA-256 digest: ${CERT_HEX}\n`;
+  assert.deepEqual(parseSignerCertificates(v2), [CERT]);
+  assert.throws(
+    () => parseSignerCertificates(`Source Stamp Signer: certificate SHA-256 digest: ${CERT_HEX}\n`),
+    /Could not identify/,
+  );
+});
+
 test('apksigner output: the Signer (minSdkVersion, maxSdkVersion) form, with colons or upper case', () => {
   const colon = CERT.match(/../g)!.join(':');
   const out = [

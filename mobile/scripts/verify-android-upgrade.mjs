@@ -27,11 +27,13 @@ export function invoke(tool, args) {
     );
   }
 }
-// apksigner prints one "<signer> certificate SHA-256 digest: <hex>" line per signer, where <signer>
-// is "Signer #N" (v1/v2), "Signer (minSdkVersion=X, maxSdkVersion=Y)" (v3/v3.1), and the digest
-// can be lower or upper case, with or without colons. A "Source Stamp Signer" line describes the
-// stamp, not the APK signer, so it is skipped.
-const SIGNER_DIGEST = /^\s*Signer\b.*?\bcertificate SHA-256 digest:\s*([0-9a-f:]+)\s*$/i;
+// apksigner prints one "<signer> certificate SHA-256 digest: <hex>" line per signer. <signer> depends
+// on the build-tools version: "V3.0 Signer:" or "V2 Signer:" (apksigner 0.9 in build-tools 37, as on
+// the GitHub runners in Nov 2026), "Signer #N" (older apksigner), or "Signer (minSdkVersion=X,
+// maxSdkVersion=Y)" (v3.1 rotation). The digest can be lower or upper case, with or without colons.
+// A "Source Stamp Signer" line describes the stamp, not the APK signer, so the line has to start with
+// the signer itself. "public key SHA-256 digest" lines (verbose output) are not certificates.
+const SIGNER_DIGEST = /^\s*(?:V\d+(?:\.\d+)?\s+)?Signer\b.*?\bcertificate SHA-256 digest:\s*([0-9a-f:]+)\s*$/i;
 export function parseSignerCertificates(output) {
   const lines = String(output).split(/\r?\n/);
   const certificates = [

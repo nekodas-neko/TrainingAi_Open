@@ -166,7 +166,9 @@ jobs:
           PKG="$(sed -nE "s/^package: name='([^']+)'.*/\1/p" <<< "$BADGING")"
           CODE="$(sed -nE "s/^package: .*versionCode='([0-9]+)'.*/\1/p" <<< "$BADGING")"
           LABEL="$(sed -nE "s/^application-label:'(.*)'/\1/p" <<< "$BADGING")"
-          CERT="$("$BT/apksigner" verify --print-certs "$APK" | grep -E '^[[:space:]]*Signer' | sed -nE 's/.*certificate SHA-256 digest: ([0-9A-Fa-f:]+).*/\1/p' | tr -d ':' | tr 'A-F' 'a-f' | sort -u)"
+          # "V3.0 Signer: certificate SHA-256 digest: <hex>" (build-tools 37) or "Signer #1 …" (older).
+          CERT="$("$BT/apksigner" verify --print-certs "$APK" | grep -E '^[[:space:]]*(V[0-9.]+[[:space:]]+)?Signer[^[:alnum:]]' | sed -nE 's/.*certificate SHA-256 digest: ([0-9A-Fa-f:]+).*/\1/p' | tr -d ':' | tr 'A-F' 'a-f' | sort -u || true)"
+          [[ "$CERT" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::Could not read one signing certificate from apksigner (got '${CERT:-nothing}'). Nothing is published."; exit 1; }
           [ "$PKG" = "$PACKAGE" ] || { echo "::error::The APK is $PKG, not $PACKAGE. Nothing is published."; exit 1; }
           [ "$CODE" = "${{ steps.version.outputs.code }}" ] || { echo "::error::Version code $CODE, expected ${{ steps.version.outputs.code }}."; exit 1; }
           # The real app's certificate (android.yml). Signing with it would let this build stand in
