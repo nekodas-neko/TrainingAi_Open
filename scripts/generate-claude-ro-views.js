@@ -151,6 +151,8 @@ const VIA = {
   // whose account was deleted is unlinked (SET NULL) and shows as global; the migration keeps
   // personal data out of `parameters` for exactly that reason.
   agent_action_log:       t => `${t}.target_user_id IS NULL OR ${t}.target_user_id = $OWNER`,
+  trainer_relationships:  t => `${t}.trainer_id = $OWNER OR ${t}.trainee_id = $OWNER`,
+  trainer_program_assignments: t => `EXISTS (SELECT 1 FROM public.trainer_relationships tr WHERE tr.id = ${t}.relationship_id AND (tr.trainer_id = $OWNER OR tr.trainee_id = $OWNER))`,
   friendships:            t => `${t}.requester_id = $OWNER OR ${t}.addressee_id = $OWNER`,
 }
 
