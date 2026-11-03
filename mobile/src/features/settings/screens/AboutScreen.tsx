@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CHANGELOG } from '@trainingai/shared/changelog';
 import { OFF_ATTRIBUTION } from '@trainingai/shared/nutrition/open-food-facts';
-import { nativeAppVersion } from '../../../integrations/app-info/platform';
+import {
+  appCodeSha,
+  nativeAppVersion,
+  nativeBuildCode,
+} from '../../../integrations/app-info/platform';
+import {
+  appVersionLine,
+  codeVersionLine,
+  fetchServerVersion,
+  serverVersionLine,
+} from '../../../integrations/app-info/versions';
 import {
   AppButton,
   AppText,
@@ -20,13 +30,32 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
   const { theme } = useTheme(),
     account = useAccountContext();
   const [modal, setModal] = useState<'feedback' | 'delete' | 'signout' | null>(null);
+  // undefined while the one fetch is out, null when it failed.
+  const [serverVersion, setServerVersion] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let active = true;
+    void fetchServerVersion(process.env.EXPO_PUBLIC_API_URL).then((version) => {
+      if (active) setServerVersion(version);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   return (
     <PageLayout title="About" onBack={onBack}>
       <TabPanel>
         <Stack style={{ paddingHorizontal: theme.spacing.lg }}>
           <Card>
             <AppText variant="hero">TrainingAi</AppText>
-            <AppText>Version {nativeAppVersion}</AppText>
+            <AppText variant="caption" tone="muted">
+              {appVersionLine(nativeAppVersion, nativeBuildCode)}
+            </AppText>
+            <AppText variant="caption" tone="muted">
+              {codeVersionLine(appCodeSha)}
+            </AppText>
+            <AppText variant="caption" tone="muted">
+              {serverVersion === undefined ? 'Server …' : serverVersionLine(serverVersion)}
+            </AppText>
             <AppText variant="caption" tone="muted">
               Your training, nutrition and health in one place.
             </AppText>
