@@ -258,8 +258,12 @@ function plainScore(v: number | null): ReadinessContributor {
  *  today's partial one (#2435). The weights are unchanged; the input means something else.
  *  v11: the night's HRV input is the median of Oura's 5-minute series, not Oura's per-night average
  *  (#3075 stage 1a). The definition changes under the same `oura_cloud` label, so the HRV normal mixes
- *  averages and medians until the Oura Cloud backfill from 17 Oct has rewritten those nights. */
-export const READINESS_MODEL_VERSION = 'v11:own-overnight-hrv:2026-10-26'
+ *  averages and medians until the Oura Cloud backfill from 17 Oct has rewritten those nights.
+ *  v12 is reserved for the pending proposal on #3358, so this label skips it.
+ *  v13: on an Oura Cloud night with a usable heart-rate series, the recovery index is scored from hours we
+ *  compute from that series (the hours curve), not from Oura's 0-100 contributor (#3075 stage 2). The ring's
+ *  hours still win where tonight's ring summary has them; a night with no usable series keeps the contributor. */
+export const READINESS_MODEL_VERSION = 'v13:own-recovery-index:2026-11-03'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.

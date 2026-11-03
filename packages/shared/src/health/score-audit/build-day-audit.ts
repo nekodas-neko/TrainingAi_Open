@@ -52,7 +52,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   const [
     bodyMetrics, sleepSessions, workoutSessions, ouraRows,
     hrRows, summaries, derivedRows, mood, user, activityLogsTwoDays, nutrition, morningCheckin, userGoals,
-    ouraCloudContributors, switchDay,
+    ouraCloudContributors, switchDay, ouraCloudRecoveryHours,
   ] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
     repo.listSleepSessions(userId, fromIso, date),
@@ -77,6 +77,8 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     repo.getOuraCloudReadinessContributors(userId, fromIso, date).catch(() => []),
     // A failed lookup reads as no switch, so the ring's value stands (as the live payload does).
     repo.getOuraCloudSwitchDay(userId).catch(() => null),
+    // #3075 stage 2: the live score's own-hours input, so the audit explains the same recovery index.
+    repo.getOuraCloudRecoveryIndexHours(userId, Array.from({ length: 8 }, (_, i) => shiftDateStr(date, -i)), tz).catch(() => []),
   ])
 
   // Everything below is scoped to the audited day, never "today".
@@ -199,6 +201,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
       nights: canonicalNightsByDate(nightsAll, tz),
       ouraDaily: ouraRows,
       ouraCloudContributors,
+      ouraCloudRecoveryHours,
     },
   }))
 

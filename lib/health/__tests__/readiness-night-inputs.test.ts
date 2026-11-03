@@ -243,3 +243,54 @@ describe('the recovery-index contributor on its own scale', () => {
     expect(c.contributors.recoveryIndex.scale).toBeUndefined()
   })
 })
+
+// #3075 stage 2: an Oura Cloud night's recovery index is scored from our own hours where the heart-rate
+// series is usable, and from Oura's contributor where it is not. The ring's hours still win.
+describe('recovery index on an Oura Cloud night (#3075 stage 2)', () => {
+  const contributors = [{ date: TODAY, readinessContributors: { recovery_index: 82 } as Record<string, number | null> }]
+  const cloud = (over: Partial<NightInputSources> = {}) => base({
+    bodyMetrics: bodyNights('oura_cloud', 20), nights: sleepNights('oura_cloud', 20), ouraDaily: ouraTemps(20),
+    ouraCloudContributors: contributors, ...over,
+  })
+  const score = (r: ReturnType<typeof resolveReadinessNightInputs>) => computeReadinessComposite({
+    ...compositeNightFields(r), previousNightScore: 80, prevDayActivityScore: 70, activityBalanceScore: 70, nHistory: 61,
+  }).contributors.recoveryIndex
+
+  it('a night with a usable series takes our hours, scored on the hours curve, not the contributor', () => {
+    const r = resolveReadinessNightInputs(cloud({ ouraCloudRecoveryHours: [{ date: TODAY, hours: 4 }] }))
+    expect(r.recoveryIndex).toEqual({ hours: 4, source: 'oura_cloud' })
+    const c = score(r)
+    expect(c.input).toBe(4)
+    expect(c.scale).toBeUndefined() // the hours curve, not 'oura_contributor'
+    expect(c.source).toBe('oura_cloud')
+    expect(c.score).not.toBe(82)
+  })
+
+  it('a night with no series falls back to the contributor, as before', () => {
+    for (const ouraCloudRecoveryHours of [undefined, [], [{ date: day(1), hours: 4 }]]) {
+      const r = resolveReadinessNightInputs(cloud({ ouraCloudRecoveryHours }))
+      expect(r.recoveryIndex).toEqual({ contributor: 82, source: 'oura_cloud' })
+      expect(score(r)).toMatchObject({ score: 82, scale: 'oura_contributor' })
+    }
+  })
+
+  it('a night with neither is missing, never dropped to zero', () => {
+    const r = resolveReadinessNightInputs(cloud({ ouraCloudContributors: [] }))
+    expect(r.recoveryIndex).toBeNull()
+  })
+
+  it('a ring-era night keeps the ring hours even when the cloud has some', () => {
+    const r = resolveReadinessNightInputs(base({
+      summaries: [fullRing(day(1)), fullRing(TODAY)], ouraCloudContributors: contributors,
+      ouraCloudRecoveryHours: [{ date: TODAY, hours: 2 }],
+    }))
+    expect(r.recoveryIndex).toEqual({ hours: 4.5, source: RING_SUMMARY_SOURCE })
+  })
+
+  it('a partial ring row does not hide the cloud hours', () => {
+    const r = resolveReadinessNightInputs(cloud({
+      summaries: [fullRing(day(1)), partialRing(TODAY)], ouraCloudRecoveryHours: [{ date: TODAY, hours: 3.5 }],
+    }))
+    expect(r.recoveryIndex).toEqual({ hours: 3.5, source: 'oura_cloud' })
+  })
+})

@@ -394,7 +394,7 @@ export async function buildReadinessPayload(
   // #3114: Oura's per-minute MET decides the move lane (its activity day starts at 4 a.m., hence the
   // day before). Today's live read may go without it; a finalised day may not (`loadActivityDay`).
   const cloudActivityP = (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay, stepActivityLogs, metChangedAt] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay, stepActivityLogs, metChangedAt, ouraCloudRecoveryHours] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -422,6 +422,9 @@ export async function buildReadinessPayload(
     // training-stress re-check does. A failed read only loses that trigger for this read. Read here
     // with the rest rather than after them (#3392): it adds no round trip to the read.
     (async () => repo.getOuraCloudMetChangedAt(userId, metLookbackFrom(todayIso, ACTIVITY_FINALISE_DAYS), shiftDateStr(todayIso, -1)))().catch(() => []),
+    // #3075 stage 2: recovery-index hours from Oura's 5-minute heart-rate series, for the last week of
+    // wake dates (tonight's is the one scored). A failed read leaves Oura's contributor standing.
+    (async () => repo.getOuraCloudRecoveryIndexHours(userId, Array.from({ length: 8 }, (_, i) => shiftDateStr(todayIso, -i)), tz))().catch(() => []),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -641,6 +644,7 @@ export async function buildReadinessPayload(
     nights: canonicalNightsByDate(nights, tz),
     ouraDaily: ouraRows,
     ouraCloudContributors,
+    ouraCloudRecoveryHours,
   })
 
   // Temp deviation for display: tonight's ring value, else Oura's own for the same night.

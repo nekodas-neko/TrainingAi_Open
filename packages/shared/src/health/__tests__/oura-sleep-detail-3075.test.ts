@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { overnightHrvFromSeries } from '../oura-sleep-detail'
+import { overnightHrvFromSeries, overnightRecoveryIndexHoursFromSeries, RECOVERY_SERIES_MIN_SAMPLES } from '../oura-sleep-detail'
+import { computeRecoveryIndex } from '../recovery-index'
 import { hrvMsFromSamples } from '../night-vitals'
 
 // #3075 stage 1: the night's HRV is the median of Oura's 5-minute HRV series, the ring-era definition.
@@ -38,5 +39,57 @@ describe('overnightHrvFromSeries', () => {
   it('does not depend on the interval', () => {
     expect(overnightHrvFromSeries(series([50, 60, 70], 0))).toBe(60)
     expect(overnightHrvFromSeries(series([50, 60, 70], 600))).toBe(60)
+  })
+})
+
+// #3075 stage 2: recovery-index hours from the 5-minute heart-rate series. Brisbane is UTC+10 all year.
+describe('overnightRecoveryIndexHoursFromSeries', () => {
+  const SLEEP_START = new Date('2026-10-17T22:30:00+10:00')
+  const SLEEP_END = new Date('2026-10-18T06:30:00+10:00') // 8 h = 96 five-minute slots
+  const window = { sleepStart: SLEEP_START, sleepEnd: SLEEP_END }
+  const hr = (items: (number | null)[]) => ({ interval: 300, items, timestamp: SLEEP_START.toISOString() })
+  /** A night that falls from 70 to 50 bpm by 02:30 (slot 48), then drifts back up to 58 by waking. */
+  const fullNight = () => Array.from({ length: 96 }, (_, i) => (i <= 48 ? 70 - (20 * i) / 48 : 50 + (8 * (i - 48)) / 47))
+
+  it('gives the hours from the lowest point to waking for a full series', () => {
+    // The minimum is at slot 48 = 02:30, four hours before the 06:30 wake.
+    expect(overnightRecoveryIndexHoursFromSeries(hr(fullNight()), window)).toBeCloseTo(4, 5)
+  })
+
+  it('is exactly what the ring-era function gives for the same bins', () => {
+    const items = fullNight()
+    const hrSeries = items.map((bpm, i) => ({ timestamp: new Date(SLEEP_START.getTime() + i * 300_000), bpm }))
+    expect(overnightRecoveryIndexHoursFromSeries(hr(items), window))
+      .toBe(computeRecoveryIndex({ hrSeries, wakeTime: SLEEP_END })!.hoursToSettle)
+  })
+
+  it('leaves out slots Oura did not measure and keeps their place in time', () => {
+    const items = fullNight().map((v, i) => (i % 5 === 3 ? null : v))
+    expect(overnightRecoveryIndexHoursFromSeries(hr(items), window)).toBeCloseTo(4, 0)
+  })
+
+  it('is null with no series, no start time, or nothing measured', () => {
+    expect(overnightRecoveryIndexHoursFromSeries(null, window)).toBeNull()
+    expect(overnightRecoveryIndexHoursFromSeries({ interval: 300, items: fullNight() }, window)).toBeNull()
+    expect(overnightRecoveryIndexHoursFromSeries(hr([]), window)).toBeNull()
+    expect(overnightRecoveryIndexHoursFromSeries(hr(Array(96).fill(null)), window)).toBeNull()
+  })
+
+  it('refuses a short series: under an hour of samples says nothing about the night', () => {
+    const items = fullNight()
+    expect(overnightRecoveryIndexHoursFromSeries(hr(items.slice(0, RECOVERY_SERIES_MIN_SAMPLES - 1)), { ...window, sleepEnd: new Date(SLEEP_START.getTime() + 11 * 300_000) })).toBeNull()
+    expect(overnightRecoveryIndexHoursFromSeries(hr(items.slice(0, RECOVERY_SERIES_MIN_SAMPLES)), { ...window, sleepEnd: new Date(SLEEP_START.getTime() + 12 * 300_000) })).not.toBeNull()
+  })
+
+  it('refuses a partial series: plenty of samples covering under half the night', () => {
+    // 40 of 96 slots (42%): the ring came off at 01:50. The minimum of that stretch is not the night's.
+    expect(overnightRecoveryIndexHoursFromSeries(hr(fullNight().slice(0, 40)), window)).toBeNull()
+    // 48 of 96 slots is exactly half and is accepted.
+    expect(overnightRecoveryIndexHoursFromSeries(hr(fullNight().slice(0, 48)), window)).not.toBeNull()
+  })
+
+  it('never goes negative when the lowest point is at or after waking', () => {
+    const lateMin = Array.from({ length: 96 }, (_, i) => 80 - i * 0.2)
+    expect(overnightRecoveryIndexHoursFromSeries(hr(lateMin), window)).toBeGreaterThanOrEqual(0)
   })
 })
