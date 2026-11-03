@@ -177,6 +177,20 @@ provenance bug before it was made required).
   through this same function.
 - **If your source only has stage *durations*, no interval boundaries**, omit `sleepPhase5Min`
   entirely rather than fabricating a flat/guessed hypnogram.
+- **What the source says about its own recording of the night** (#3075 stages 4 and 5), in the
+  generic shapes of `packages/shared/src/health/sleep-recording.ts`, each optional, each computed on
+  read by the source's reader and never stored by us:
+  - a `MovementSeries` (`{ epochSec, startAt, levels }`, our 0-3 scale, `null` for an unmeasured
+    epoch), which `restlessnessFromMovement` turns into `restlessMin` / `movementMeasuredMin` on the
+    night for the Sleep Score's restlessness penalty. Oura maps `movement_30_sec`; Fitbit's per-minute
+    sleep levels (`restless`, `awake`) or any accelerometer epoch count would map the same way;
+  - `recordingIncomplete: true` when the source says it did not record the whole night (Oura maps
+    `low_battery_alert`). The night is partial through `isPartialNight`, exactly as the owner's mark;
+  - `sourceAlgorithmVersion`, the label of the source's own sleep algorithm (Oura maps
+    `sleep_algorithm_version`). Normals are keyed by (source, version), so a source that changes its
+    algorithm restarts its normals (`per-device-normal.ts`).
+  The Oura mapping is `lib/oura/cloud/sleep-recording-map.ts`; a source that sends none of them
+  leaves its nights exactly as they were.
 
 ### 3c. Daily body/activity scalars — **one row per user per day, sparse columns**
 
