@@ -7,7 +7,7 @@
  * The v6 end values below were captured from this same fixture on `main` before the change
  * (characterization), so the test states exactly which days move and by how much.
  */
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import type { BodyBatteryDailyRow, WorkoutRepository } from '@/lib/data/repository'
 import { todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
@@ -94,17 +94,24 @@ describe('Body Battery waking-rest offset and its re-derive (issue 2235)', () =>
   let from: string
   let to: string
   beforeAll(() => {
+    // #3495: the re-derive leaves days before the v8 sign-off (17 Oct 2026) alone, so the window is
+    // pinned past it rather than rolling with the real clock. This fixture has no workouts and no
+    // steps, so v8 walks it exactly as v7 did.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-01T02:00:00Z'))
     to = shiftDateStr(todayInTz(TZ), -1)
     from = shiftDateStr(to, -(DAYS - 1))
     dates = Array.from({ length: DAYS }, (_, i) => shiftDateStr(from, i))
   })
 
+  afterAll(() => { vi.useRealTimers() })
+
   type Day = { action: string; recomputed: { endValue: number } }
 
-  it('stamps v7 with the 9 bpm offset in the model version', async () => {
+  it('stamps the 9 bpm offset in the model version (v7, carried into v8)', async () => {
     const { BODY_BATTERY_MODEL_VERSION, WAKING_REST_OFFSET_BPM } = await import('@/lib/health/body-battery-day')
     expect(WAKING_REST_OFFSET_BPM).toBe(9)
-    expect(BODY_BATTERY_MODEL_VERSION).toBe('v7:rest+9bpm:chg0.12:drn0.08:str0.02:hrmax-observed:oura-rule:oura-stress')
+    expect(BODY_BATTERY_MODEL_VERSION).toBe('v8:rest+9bpm:chg0.12:drn0.08:str0.02:hrmax-observed:oura-rule:oura-stress:exw0.5:exs0.45:cap1.5:pm0.8')
   })
 
   it('moves exactly the days the offset reaches, by the pinned amounts', async () => {
@@ -136,7 +143,7 @@ describe('Body Battery waking-rest offset and its re-derive (issue 2235)', () =>
     const first = await call(`from=${from}&to=${to}&dryRun=false`)
     expect(first.summary.written).toBe(DAYS)
     expect(r.writes()).toBe(DAYS)
-    expect([...r.stored.values()].every(x => x.modelVersion.startsWith('v7:rest+9bpm:'))).toBe(true)
+    expect([...r.stored.values()].every(x => x.modelVersion.startsWith('v8:rest+9bpm:'))).toBe(true)
     // Frozen anchors are kept, not re-chosen.
     expect([...r.stored.values()].every(x => x.anchor === 60)).toBe(true)
 

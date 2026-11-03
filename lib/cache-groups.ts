@@ -213,6 +213,8 @@ export async function invalidateGoalRecommendations(): Promise<void> {
     // The key belongs to this group rather than one of its own because saving an RMR is a goal
     // input, not a separate domain — the same reason `body-metadata` is here.
     invalidateCache('measured-rmr'),
+    // #3495: the step goal is what Body Battery's exercise drain measures the day's steps against.
+    invalidateCache('body-battery'),
   ])
 }
 
