@@ -2,6 +2,7 @@
 // (computed on read from the 30-second hypnogram, no column), and omits them for every other night.
 // Runs only against a real local dev Postgres — skips cleanly everywhere else.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { formatInTimeZone } from 'date-fns-tz'
 
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-000000358200'
@@ -15,7 +16,7 @@ describe.skipIf(!canRun)('getSyncDelta sleep onset (#3582)', () => {
 
   async function seed(daysBack: number, hours: number, ouraId: string, restless: number, hypnogram: string | null) {
     const e = end(daysBack); const s = new Date(e.getTime() - hours * HOUR)
-    const date = e.toISOString().slice(0, 10)
+    const date = formatInTimeZone(e, 'Australia/Brisbane', 'yyyy-MM-dd')
     await pool.query(
       `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, oura_id, restless_periods, source_map)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'{}'::jsonb)`, [USER, date, s, e, hours, ouraId, restless])
