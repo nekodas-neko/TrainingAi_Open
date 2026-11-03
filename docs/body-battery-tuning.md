@@ -157,6 +157,29 @@ time hrMax was re-estimated. The rates are unchanged; the stamp is `v7:rest+9bpm
   place (one row per user and day), so the snapshot is the only copy of the v6 values.
 - Not shared with the Activity score's move hours or the HR grade, which stay on 0.05 HRR (issue 2743).
 
+## ✅ v8 — goal-based exercise drain, 2026-11 (issue 3495)
+
+Owner sign-off 2026-11-03, with the condition that every source is interchangeable. The walk is
+v7's; on top of it `packages/shared/src/health/body-battery-exercise.ts` adds:
+
+- **Workouts:** each finished workout costs `WORKOUT_DRAIN_SHARE` (0.5) of the morning level per
+  session-volume goal of volume, drawn across the workout's own span.
+- **Steps:** the day's step count (`dayStepCount`) costs `STEP_DRAIN_SHARE` (0.45) of the morning
+  level per step goal, spread over the waking span (a day's total has no times).
+- Past the goal, up to `GOAL_RATIO_CAP` (1.5) times it.
+- **The gate is capability, never source or date:** a workout drains only when a per-minute
+  heart-rate series (readings ≤ 90 s apart) covers less than 80% of it; the steps only when one
+  covers less than 80% of the waking day. Where the walk can see the training it keeps it.
+- **Rest does not refill training** (the proposal's question 2): on a day with any exercise drain the
+  walk's level is held at or under the morning mark before the drain comes off. A day with no
+  exercise drain is v7 exactly.
+- **History:** the re-derive leaves every stored day before `BODY_BATTERY_RESCORE_SIGNED_OFF_FROM`
+  (2026-10-17) as it is, reported `before-sign-off`. Before the switch the ring's daytime heart rate
+  was not per-minute either, so the capability gate alone would have moved those days.
+- ⚠ The shares are set from the owner's 19 Aug checkpoints (everything hit ends near 0, a workout
+  alone keeps a reserve), not fitted. The proposal's pass tests are run on a replay before release.
+  Stamp: `v8:rest+9bpm:…:exw0.5:exs0.45:cap1.5:pm0.8`.
+
 ## Open follow-up
 
 - **[ ] Re-run analysis #1 against v5 once ~2 weeks of v5 days exist.** It failed on v4

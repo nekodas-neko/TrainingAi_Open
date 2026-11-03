@@ -29,9 +29,23 @@ import { isMeasuredBatteryDay } from '@/lib/data/postgres/slices/body-battery'
 
 export const REDERIVE_BODY_BATTERY_MAX_RANGE_DAYS = 31
 
+/**
+ * The first day the current model's sign-off covers (#3495, owner 2026-11-03: v8's exercise drain
+ * from 17 Oct on). A re-derive leaves every stored day before it as it is, so a day keeps what the
+ * owner was shown under the model it was scored with.
+ *
+ * This is a guard on rewriting HISTORY, not a gate on the drain. The drain is gated on capability
+ * alone (`body-battery-exercise.ts`): it applies wherever a per-minute heart-rate series does not
+ * cover the training. Before the switch the ring's daytime heart rate was not per-minute either, so
+ * a recompute would drain those days too, and the owner signed off on none of them. Only the
+ * re-derive ever recomputes a past day (the live route computes today), so this is the one place
+ * the floor is needed. Move it with the next model's sign-off.
+ */
+export const BODY_BATTERY_RESCORE_SIGNED_OFF_FROM = '2026-10-17'
+
 interface DayOutcome {
   date: string
-  action: 'written' | 'kept' | 'unchanged' | 'no-row' | 'today'
+  action: 'written' | 'kept' | 'unchanged' | 'no-row' | 'today' | 'before-sign-off'
   stored?: { endValue: number; modelVersion: string | null }
   recomputed?: { endValue: number; charged: number; drained: number; hrSampleCount: number }
   error?: string
@@ -75,6 +89,10 @@ async function buildReport(input: RederiveBodyBatteryInput, start: string, end: 
     if (d >= today) { days.push({ date: d, action: 'today' }); continue }
     const stored = storedByDate.get(d)
     if (!stored) { days.push({ date: d, action: 'no-row' }); continue }
+    if (d < BODY_BATTERY_RESCORE_SIGNED_OFF_FROM) {
+      days.push({ date: d, action: 'before-sign-off', stored: { endValue: stored.endValue, modelVersion: stored.modelVersion } })
+      continue
+    }
     try {
       const { snapshot } = await computeBodyBatteryDay({
         repo, userId, tz, date: d,
@@ -122,6 +140,7 @@ async function buildReport(input: RederiveBodyBatteryInput, start: string, end: 
       kept: days.filter(x => x.action === 'kept').length,
       unchanged: days.filter(x => x.action === 'unchanged').length,
       noRow: days.filter(x => x.action === 'no-row' && !x.error).length,
+      beforeSignOff: days.filter(x => x.action === 'before-sign-off').length,
       failed: days.filter(x => x.error).length,
       endValueDelta: { mean: mean(deltas), meanAbs: mean(deltas.map(Math.abs)), min: deltas.length ? Math.min(...deltas) : null, max: deltas.length ? Math.max(...deltas) : null },
       recomputedEnd: { mean: mean(ends), atZero: ends.filter(v => v === 0).length, atHundred: ends.filter(v => v === 100).length },

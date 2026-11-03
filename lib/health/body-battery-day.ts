@@ -17,6 +17,12 @@ import { buildDaytimeStressSeriesFromModel, summarizeStressDay, type StressPoint
 import { resolveAnchor, type AnchorSource } from '@/lib/health/body-battery-anchor'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { metricAvailability, type MetricAvailability } from '@/lib/health/score-availability'
+import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
+import { dayStepCount } from '@trainingai/shared/health/activity-steps'
+import {
+  exerciseDrain, levelWithExerciseDrain,
+  WORKOUT_DRAIN_SHARE, STEP_DRAIN_SHARE, GOAL_RATIO_CAP, PER_MINUTE_COVERAGE_MIN,
+} from '@trainingai/shared/health/body-battery-exercise'
 
 /**
  * One day of Body Battery, computed from stored inputs. Extracted from `/api/body-battery` for TN-72
@@ -64,6 +70,19 @@ export interface BodyBatteryResponse {
    * surface says nothing rather than guessing.
    */
   availability?: MetricAvailability[]
+  /**
+   * The exercise drain (#3495, v8): training and steps the heart-rate walk could not see, measured
+   * against the user's goals. Already inside `current` and `drained`. Optional: a cached payload
+   * from before v8 has none.
+   */
+  exercise?: {
+    drained: number
+    workoutDrained: number
+    stepDrained: number
+    workoutsCounted: number
+    workoutsSeenByHr: number
+    stepsCounted: boolean
+  }
 }
 
 // ── Tuning constants ─────────────────────────────────────────────────────────
@@ -121,7 +140,12 @@ const STRESS_DRAIN_RATE = 0.020 // battery points per minute at a full (100%) be
 // `rest+9bpm` replaces `rest0.05` so a reader can tell the two boundary forms apart from the stamp.
 // `oura-stress` (#2985): the stress drain can come from Oura's `stress_high`, and Oura's scores no
 // longer anchor the day.
-export const BODY_BATTERY_MODEL_VERSION = `v7:rest+${WAKING_REST_OFFSET_BPM}bpm:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule:oura-stress`
+// v8 (#3495, owner sign-off 2026-11-03): the goal-based exercise drain
+// (`body-battery-exercise.ts`) — finished workouts against the session-volume goal and steps
+// against the step goal, wherever a per-minute heart-rate series does not cover them. `exw`/`exs`
+// are the workout and step shares of the morning level, `cap` the goal-ratio cap, `pm` the per-minute
+// coverage the walk needs to see a span. The walk's own constants are v7's.
+export const BODY_BATTERY_MODEL_VERSION = `v8:rest+${WAKING_REST_OFFSET_BPM}bpm:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule:oura-stress:exw${WORKOUT_DRAIN_SHARE}:exs${STEP_DRAIN_SHARE}:cap${GOAL_RATIO_CAP}:pm${PER_MINUTE_COVERAGE_MIN}`
 
 export interface BodyBatteryDayInput {
   repo: WorkoutRepository
@@ -151,7 +175,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   const from28dIso = shiftDateStr(date, -28)
   const fromPeakWindowIso = shiftDateStr(date, -HR_PEAK_WINDOW_DAYS)
 
-  const [ouraRows, derivedRows, bodyMetrics, sleepSessions, hrRows, user, daytimeSignals, snapshotHistory, ouraCloudFrom] = await Promise.all([
+  const [ouraRows, derivedRows, bodyMetrics, sleepSessions, hrRows, user, daytimeSignals, snapshotHistory, ouraCloudFrom, daySessions, userGoals, dayActivityLogs] = await Promise.all([
     repo.getOuraDaily(userId, date, date),
     repo.getOuraDailyDerived(userId, date, date),
     repo.listBodyMetrics(userId, from28dIso, date),
@@ -163,6 +187,11 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
     // AND the daily HR peaks the reserve is now resolved from.
     repo.getBodyBatteryHistory(userId, fromPeakWindowIso, date),
     repo.getOuraCloudSwitchDay(userId),
+    // #3495: the exercise drain's inputs. A failed read costs that input only, so the day falls back
+    // to the walk alone (v7's arithmetic) rather than failing the card.
+    (async () => repo.getWorkoutSessionsFrom(userId, dayMid))().catch(() => []),
+    (async () => repo.getUserGoals(userId))().catch(() => null),
+    (async () => repo.listActivityLogs(userId, date, date))().catch(() => []),
   ])
 
   const ouraDay = ouraRows[0] ?? null
@@ -367,11 +396,34 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
       stressAt,
     },
   )
-  const battery = walk.battery
+  // ── Exercise drain (#3495, v8) ────────────────────────────────────────────
+  // Finished workouts against the session-volume goal and the day's steps against the step goal,
+  // wherever the heart-rate series is too thin for the walk above to have seen them. The goals and
+  // the step count come through the same helpers the Activity score uses.
+  const goals = getDailyGoals({ activityLevel: user?.activityLevel ?? null, stepsGoal: userGoals?.stepsGoal ?? null })
+  const dayMetrics = bodyMetrics.find(m => m.date === date) ?? null
+  const exercise = exerciseDrain({
+    anchor, wakeTime, until: now.getTime(),
+    hrTimes: hrRows.map(r => r.timestamp.getTime()),
+    workouts: daySessions
+      .filter(ws => ws.completedAt != null && new Date(ws.startedAt).getTime() >= dayMid.getTime())
+      .map(ws => ({
+        startMs: new Date(ws.startedAt).getTime(),
+        endMs: new Date(ws.completedAt!).getTime(),
+        volumeKg: ws.exercises.reduce((s, ex) => s + (ex.volume ?? 0), 0),
+      })),
+    steps: dayStepCount(dayMetrics?.steps, dayActivityLogs.filter(a => a.date === date)),
+    goals,
+  })
+  const exerciseDrained = exercise.workoutDrained + exercise.stepDrained
+  const hasExerciseDrain = exerciseDrained > 0
+  const battery = levelWithExerciseDrain(walk.battery, anchor, exerciseDrained, hasExerciseDrain)
   const charged = walk.charged
-  const drained = walk.drained
+  const drained = walk.drained + exerciseDrained
   const stressDrained = walk.stressDrained
-  const series: BodyBatteryPoint[] = walk.series
+  const series: BodyBatteryPoint[] = hasExerciseDrain
+    ? walk.series.map(p => ({ t: p.t, v: Math.round(levelWithExerciseDrain(p.v, anchor, exercise.drainedBy(p.t), true)) }))
+    : walk.series
   const wakingRowCount = walk.sampleCount
 
   const hasData = wakingRowCount > 0
@@ -463,6 +515,14 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
         }
       : null,
     availability: [metricAvailability('daytimeStress', stressSeries.length > 0 ? stressSeries.length : ouraStressHighMin)],
+    exercise: {
+      drained: Math.round(exerciseDrained),
+      workoutDrained: Math.round(exercise.workoutDrained),
+      stepDrained: Math.round(exercise.stepDrained),
+      workoutsCounted: exercise.workoutsCounted,
+      workoutsSeenByHr: exercise.workoutsSeenByHr,
+      stepsCounted: exercise.stepsCounted,
+    },
   }
 
   return { response, snapshot, hadPersistedAnchor: daySnapshot != null }
