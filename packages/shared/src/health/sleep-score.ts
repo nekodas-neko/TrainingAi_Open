@@ -266,8 +266,10 @@ export const MAIN_SLEEP_MIN_HOURS = 4
  * weight, curve, baseline rule or the choice of which periods make the night changes.
  * 2026-10-26 (#3001): each baseline is learned from the device that measured the night, so an Oura
  * night re-scored per device no longer carries the stamp of its pooled score.
+ * 2026-11-03 (#3075 stage 3): on an Oura Cloud night with a usable hypnogram the `timing` and `schedule`
+ * terms and the habitual bed and wake hours read when sleep began and ended, not the bed window.
  */
-export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:2026-10-26'
+export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:own-sleep-onset-wake:2026-11-03'
 
 /**
  * The stamp for each calibration (#2237): `v1` is the stamp above, `v2` the even-gain curve on the
@@ -277,7 +279,7 @@ export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:2026-10-26'
  */
 export const SLEEP_SCORE_MODEL_VERSIONS = {
   v1: SLEEP_SCORE_MODEL_VERSION,
-  v2: 'v2:even-gain:per-device-baselines:2026-10-26',
+  v2: 'v2:even-gain:per-device-baselines:own-sleep-onset-wake:2026-11-03',
 } as const
 
 /**
@@ -340,6 +342,13 @@ function midpointHourOf(at: Date, tz: string): number {
   const [h, m] = formatInTimeZone(at, tz, 'HH:mm').split(':').map(Number)
   return h + m / 60
 }
+
+/**
+ * #3075 stage 3. The night's bed and wake instants as the timing and schedule terms read them: when
+ * sleep began and ended where Oura's hypnogram says so, else the bed window.
+ */
+const bedAt = (s: { sleepStart: Date; onsetAt?: Date | null }) => s.onsetAt ?? s.sleepStart
+const wakeAt = (s: { sleepEnd: Date; finalWakeAt?: Date | null }) => s.finalWakeAt ?? s.sleepEnd
 
 /** Local hour-of-day (0–24, fractional) of the sleep midpoint, in the user's timezone. */
 function midpointHour(start: Date, end: Date, tz: string): number {
@@ -444,6 +453,9 @@ export interface SleepScoreBaselines {
 export interface BaselineSessionInput {
   sleepStart: Date
   sleepEnd: Date
+  /** #3075 stage 3: when sleep really began and ended, where the night has a usable hypnogram. */
+  onsetAt?: Date | null
+  finalWakeAt?: Date | null
   durationHours?: number | null
   averageHrvMs?: number | null
   avgHeartRate?: number | null
@@ -532,8 +544,8 @@ export function sleepScoreBaselines(
   return {
     hrvBaselineMs: autonomic(s => s.averageHrvMs, s => s.hrvSource, scored?.hrvSource, SLEEP_HRV_BASELINE_MIN_NIGHTS),
     hrBaselineBpm: autonomic(s => s.avgHeartRate, s => s.avgHeartRateSource, scored?.avgHeartRateSource, SLEEP_HR_BASELINE_MIN_NIGHTS),
-    habitualBedHour: nights.length >= SLEEP_SCHEDULE_MIN_NIGHTS ? circularMeanHour(nights.map(s => localHour(s.sleepStart))) : null,
-    habitualWakeHour: nights.length >= SLEEP_SCHEDULE_MIN_NIGHTS ? circularMeanHour(nights.map(s => localHour(s.sleepEnd))) : null,
+    habitualBedHour: nights.length >= SLEEP_SCHEDULE_MIN_NIGHTS ? circularMeanHour(nights.map(s => localHour(bedAt(s)))) : null,
+    habitualWakeHour: nights.length >= SLEEP_SCHEDULE_MIN_NIGHTS ? circularMeanHour(nights.map(s => localHour(wakeAt(s)))) : null,
     awakeFractionBaselineMean,
     awakeFractionBaselineSd,
   }
@@ -565,7 +577,7 @@ export function computeSleepScore(
   if (session.deepSleepHours != null) add('deep', SLEEP_WEIGHTS.deep, interp(session.deepSleepHours, DEEP))
   if (session.onsetLatencySec != null) add('latency', SLEEP_WEIGHTS.latency, interp(session.onsetLatencySec / 60, LATENCY))
 
-  add('timing', SLEEP_WEIGHTS.timing, interp(circularDist(midpointHour(session.sleepStart, session.sleepEnd, tz), IDEAL_MIDPOINT_HOUR), TIMING))
+  add('timing', SLEEP_WEIGHTS.timing, interp(circularDist(midpointHour(bedAt(session), wakeAt(session), tz), IDEAL_MIDPOINT_HOUR), TIMING))
 
   // Overnight HRV vs the personal baseline — the strongest recovery signal, opt-in via a supplied
   // baseline so it never fabricates a value for callers/nights that lack one.
@@ -583,8 +595,8 @@ export function computeSleepScore(
   // the early awakening that a duration-only view hides (7.00 h looks fine; waking at 05:19 against a
   // 06:35 habit does not). Circular distance, so a post-midnight bedtime doesn't read as ~24 h off.
   if (opts.habitualBedHour != null && opts.habitualWakeHour != null) {
-    const lateBed = signedHourDelta(midpointHourOf(session.sleepStart, tz), opts.habitualBedHour)
-    const earlyWake = -signedHourDelta(midpointHourOf(session.sleepEnd, tz), opts.habitualWakeHour)
+    const lateBed = signedHourDelta(midpointHourOf(bedAt(session), tz), opts.habitualBedHour)
+    const earlyWake = -signedHourDelta(midpointHourOf(wakeAt(session), tz), opts.habitualWakeHour)
     add('schedule', SLEEP_WEIGHTS.schedule, interp(Math.max(0, lateBed, earlyWake), SCHEDULE_DEV))
   }
 

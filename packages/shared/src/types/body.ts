@@ -285,4 +285,14 @@ export interface SleepSession {
    * the night.
    */
   ouraSleepType?: string | null
+  /**
+   * #3075 stage 3 — READ-ONLY, computed on read, never stored. When sleep began and ended on an Oura
+   * Cloud night, from its 30-second hypnogram (first and last non-awake epoch); `sleepStart` and
+   * `sleepEnd` stay the bed window, which is what the row's unique key and the night grouping use.
+   * Absent on every row without a usable hypnogram, which keeps the bed window.
+   */
+  onsetAt?: Date
+  finalWakeAt?: Date
+  /** #3075 stage 3 — awake runs between onset and final wake, computed from the same hypnogram. Absent likewise. */
+  computedAwakenings?: number
 }

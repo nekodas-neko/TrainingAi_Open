@@ -262,8 +262,11 @@ function plainScore(v: number | null): ReadinessContributor {
  *  v12 is reserved for the pending proposal on #3358, so this label skips it.
  *  v13: on an Oura Cloud night with a usable heart-rate series, the recovery index is scored from hours we
  *  compute from that series (the hours curve), not from Oura's 0-100 contributor (#3075 stage 2). The ring's
- *  hours still win where tonight's ring summary has them; a night with no usable series keeps the contributor. */
-export const READINESS_MODEL_VERSION = 'v13:own-recovery-index:2026-11-03'
+ *  hours still win where tonight's ring summary has them; a night with no usable series keeps the contributor.
+ *  v14: the Sleep Score behind the sleep term reads when sleep began and ended on an Oura Cloud night with a
+ *  usable hypnogram, not the bed window (#3075 stage 3). Same readiness inputs, so a night moves only through that term.
+ */
+export const READINESS_MODEL_VERSION = 'v14:own-sleep-onset-wake:2026-11-03'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.

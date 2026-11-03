@@ -197,7 +197,8 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   const nights = nightSessions(sleepSessions, tz)
   const daySleep = nightWokenFrom(nights, date, tz) ?? undefined
   const firstHrTime = hrRows.length ? hrRows[0].timestamp.getTime() : null
-  const rawWakeTime = daySleep?.sleepEnd?.getTime()
+  // #3075 stage 3: where the night has a usable hypnogram, the wake is when sleep ended, not when the bed window closed.
+  const rawWakeTime = (daySleep?.finalWakeAt ?? daySleep?.sleepEnd)?.getTime()
     ?? firstHrTime
     ?? (dayMid.getTime() + 7 * 3_600_000)   // default 07:00
   // A wake time in the future (the route runs before the night's recorded end — the ring stamps a

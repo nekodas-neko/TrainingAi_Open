@@ -70,6 +70,7 @@ import {
 } from '@trainingai/shared/validation/body-metrics'
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
+import { sleepShapeFromHypnogram } from '@trainingai/shared/health/oura-sleep-detail'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
 import { PartialNightPayloadSchema } from '@trainingai/shared/health/partial-night'
 import { withNightRescore, partialNightRescore } from '@/lib/health/rescore-nights'
@@ -310,6 +311,16 @@ async function renameSessionExercises(tx: SqlTx, oldName: string, newName: strin
 // volume/intensity figures by the same factor. The per-exercise personal
 // record is then recomputed as the max estimated1rm across both the
 // (rescaled) in-range logs and the untouched out-of-range logs.
+/**
+ * #3075 stage 3. The real onset, final wake and awakenings of an Oura Cloud row, from its period's
+ * 30-second hypnogram. Nothing for a row with no usable hypnogram (a ring, manual or Health Connect
+ * row joins no period), so those rows are exactly what they were; `sleepStart` and `sleepEnd` stay the bed window.
+ */
+function cloudNightShape(r: { sleepPhase30Sec: string | null; bedtimeStart: Date | null }) {
+  const shape = sleepShapeFromHypnogram(r.sleepPhase30Sec, r.bedtimeStart)
+  return shape ? { onsetAt: shape.sleepOnset, finalWakeAt: shape.finalWake, computedAwakenings: shape.awakenings } : {}
+}
+
 function computeLbsToKgFix(
   exerciseNames: string[],
   allLogs: LbsToKgLogRow[],
@@ -3593,7 +3604,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // #3057: Oura's period type rides along so `ouraSecondaryPeriods` can keep a non-`long_sleep`
     // period out of the night. It lives on the Cloud period table, keyed (user_id, oura_id), so a
     // row from any other source joins nothing and reads null.
-    const rows = await this.db.select({ ...getTableColumns(s.sleepSessions), ouraSleepType: s.ouraCloudSleepPeriods.sleepType })
+    const rows = await this.db.select({
+      ...getTableColumns(s.sleepSessions), ouraSleepType: s.ouraCloudSleepPeriods.sleepType,
+      // #3075 stage 3: the period's 30-second hypnogram, read here only to date the night's real onset and wake.
+      sleepPhase30Sec: s.ouraCloudSleepPeriods.sleepPhase30Sec, bedtimeStart: s.ouraCloudSleepPeriods.bedtimeStart,
+    })
       .from(s.sleepSessions)
       .leftJoin(s.ouraCloudSleepPeriods, and(
         eq(s.ouraCloudSleepPeriods.userId, s.sleepSessions.userId),
@@ -3647,6 +3662,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       partialNightAt:  r.partialNightAt ?? null,
       ...nightSources(r),
       ouraSleepType:   r.ouraSleepType   ?? null,
+      ...cloudNightShape(r),
     }))
   }
 
