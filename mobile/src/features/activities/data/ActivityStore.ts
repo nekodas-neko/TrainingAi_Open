@@ -461,16 +461,19 @@ export class ActivityStore {
       // The pacer's tally rides along, and a failure to keep it never costs the route above.
       const pace = this.pace;
       if (pace && pace.startMs === session.startMs && pace.hasData) {
-        await this.storage
-          .set(
-            paceKey,
-            JSON.stringify(
-              paceSchema.parse({
-                version: 1,
-                origin: this.connection.origin,
-                userId: this.connection.userId,
-                ...pace.snapshot(),
-              }),
+        // Built inside the guard too: a bad number in the snapshot must not reject the checkpoint.
+        await Promise.resolve()
+          .then(() =>
+            this.storage.set(
+              paceKey,
+              JSON.stringify(
+                paceSchema.parse({
+                  version: 1,
+                  origin: this.connection.origin,
+                  userId: this.connection.userId,
+                  ...pace.snapshot(),
+                }),
+              ),
             ),
           )
           .catch(() => {});

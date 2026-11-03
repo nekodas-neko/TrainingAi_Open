@@ -6,6 +6,7 @@ import {
   noSignals,
   paceSignals,
   pacingView,
+  PaceTicker,
 } from '../src/features/activities/data/walk-pace.ts';
 import { defaultWalk, walkPlan } from '../src/features/activities/data/guidance.ts';
 import { ActivityStore } from '../src/features/activities/data/ActivityStore.ts';
@@ -115,7 +116,7 @@ test('the card shows the rung in use, and a missing strap no longer hides GPS or
   assert.ok(speed.state === 'live' && speed.unit === 'km/h' && speed.value === 6.5);
   const none = pacingView({ paired: false, link: 'off', accel: 'off', spm: null, reading: null } as never);
   assert.equal(none.state, 'none');
-  assert.match((none as { note: string }).note, /GPS speed, then heart rate/);
+  assert.match((none as { note: string }).note, /GPS speed or heart rate/);
 });
 
 function storeFixture(values = new Map<string, string>(), startAt = Date.parse('2026-11-02T08:00:00+10:00')) {
@@ -237,4 +238,51 @@ test('another recording’s or another account’s tally is not attached, and fi
   assert.ok(third.values.has('activities.pace.v1'));
   await third.store.discard();
   assert.equal(third.values.has('activities.pace.v1'), false);
+});
+
+// Fixes 5 m apart each second, about 18 km/h, so a fresh pair reads fast.
+const fix = (t: number, i: number) => ({ lat: -27 + i * 0.000045, lng: 153, t });
+const tickStep = (ticker: PaceTicker, pace: WalkPace, at: number, paused: boolean, route: ReturnType<typeof fix>[]) =>
+  ticker.step({ pace, paused, at, segment: slowBlock, route, treadmill: false, strap: null });
+
+test('a pause with no cadence adds no ticks and leaves adherence alone', () => {
+  const pace = walker();
+  const ticker = new PaceTicker();
+  const route = [fix(0, 0), fix(1000, 1)];
+  tickStep(ticker, pace, 2000, false, route);
+  const before = JSON.stringify(pace.snapshot());
+  for (let s = 3; s < 63; s++) assert.equal(tickStep(ticker, pace, s * 1000, true, route), false);
+  assert.equal(JSON.stringify(pace.snapshot()), before);
+});
+
+test('after a resume the first fix is not read as stopped', () => {
+  const pace = walker();
+  const ticker = new PaceTicker();
+  tickStep(ticker, pace, 2000, false, [fix(0, 0), fix(1000, 1)]);
+  tickStep(ticker, pace, 3000, true, [fix(0, 0), fix(1000, 1)]);
+  // Resumed a minute later; the first fix is far in time from the last one before the pause.
+  const resumed = 63_000;
+  const route = [fix(0, 0), fix(1000, 1), fix(resumed + 500, 1)];
+  const before = JSON.stringify(pace.snapshot());
+  tickStep(ticker, pace, resumed, false, route);
+  tickStep(ticker, pace, resumed + 1000, false, route);
+  assert.equal(JSON.stringify(pace.snapshot()), before, 'one fresh fix gives no speed, so nothing is tallied');
+  assert.equal(paceSignals({ route, treadmill: false, strap: null, nowMs: resumed, freshSinceMs: resumed }).speedKmh, null);
+});
+
+test('cadence coming back within a block switches to the cadence rung', () => {
+  const pace = walker();
+  assert.equal(pace.reading(0, fastBlock, { speedKmh: 6.5, bpm: 110 })!.signal, 'speed');
+  feedCadence(pace, 125, 8, 1000);
+  assert.equal(pace.reading(9000, fastBlock, { speedKmh: 6.5, bpm: 110 })!.signal, 'cadence');
+});
+
+test('a NaN in the pace snapshot still lets checkpoint resolve and keeps the route', async () => {
+  const f = storeFixture();
+  await startedWalk(f);
+  const pace = await walkIt(f, 'slow');
+  pace.snapshot = () => ({ startMs: pace.startMs, tallies: {}, readings: [[Number.NaN, 100]] });
+  await assert.doesNotReject(f.store.checkpoint());
+  assert.ok(f.values.has('activities.route.v1'), 'the route was kept');
+  assert.equal(f.values.has('activities.pace.v1'), false, 'the bad tally was not written');
 });

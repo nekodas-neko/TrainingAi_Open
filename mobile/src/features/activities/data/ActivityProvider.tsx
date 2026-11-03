@@ -15,7 +15,7 @@ import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { useActivityStrapHold, useStrapSession } from '../../devices/strap/StrapProvider';
 import { speedTargetsFromHistory, walkHrTargets } from '@trainingai/shared/walking/walk-pacer';
 import { walkPlan } from './guidance';
-import { paceSignals } from './walk-pace';
+import { PaceTicker } from './walk-pace';
 import { useWorkoutResource, useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
@@ -129,22 +129,22 @@ function ActivityStrapHold() {
     strap.setAccelerometer(true);
     const stop = strap.onAccelerometer((batch) => pace.onBatch(batch));
     // One tick per wall-clock second, from its own timer (see `WalkPace.tick`).
+    const ticker = new PaceTicker();
     const timer = setInterval(() => {
       const at = Date.now();
       const running = store.getSnapshot().session;
       const seconds = running ? elapsedMs(running, at) / 1000 : 0;
-      pace.tick(
+      const counted = ticker.step({
+        pace,
+        paused: running?.pauseStartMs != null,
         at,
-        segments.find((block) => seconds >= block.startSec && seconds < block.endSec),
-        paceSignals({
-          route: store.getSnapshot().route,
-          treadmill: config.treadmill,
-          strap: strap.getSnapshot(),
-          nowMs: at,
-        }),
-      );
+        segment: segments.find((block) => seconds >= block.startSec && seconds < block.endSec),
+        route: store.getSnapshot().route,
+        treadmill: config.treadmill,
+        strap: strap.getSnapshot(),
+      });
       // The tally goes to the checkpoint, so a kill keeps this walk's adherence (#3549).
-      store.pacerUpdated();
+      if (counted) store.pacerUpdated();
     }, 1000);
     return () => {
       clearInterval(timer);

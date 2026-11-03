@@ -53,12 +53,59 @@ export function paceSignals(input: {
   treadmill: boolean;
   strap: StrapState | null;
   nowMs: number;
+  /** Fixes before this are ignored, so a speed is never read across a pause. */
+  freshSinceMs?: number | null;
 }): PaceSignals {
+  const route =
+    input.freshSinceMs == null ? input.route : input.route.filter((p) => p.t >= input.freshSinceMs!);
   const view = input.strap ? liveHrView(input.strap, input.nowMs, null, null) : null;
   return {
-    speedKmh: input.treadmill ? null : windowedSpeedKmh(input.route),
+    speedKmh: input.treadmill ? null : windowedSpeedKmh(route),
     bpm: view && view.live ? view.bpm : null,
   };
+}
+
+/**
+ * The once-a-second pacer step, with the pause handled (#3553). Nothing is counted while the walk
+ * is paused (the clock and the speed both stand still, so every second would tally the same
+ * reading). After a resume, speed is read only from fixes taken since, so the gap is never a
+ * stretch walked at near 0 km/h; until two fresh fixes arrive the speed rung has no reading.
+ */
+export class PaceTicker {
+  private wasPaused = false;
+  private freshSinceMs: number | null = null;
+
+  /** Returns true when a second was counted. */
+  step(input: {
+    pace: WalkPace;
+    paused: boolean;
+    at: number;
+    segment: PlanSegment | undefined;
+    route: RoutePoint[];
+    treadmill: boolean;
+    strap: StrapState | null;
+  }): boolean {
+    if (input.paused) {
+      this.wasPaused = true;
+      return false;
+    }
+    if (this.wasPaused) {
+      this.wasPaused = false;
+      this.freshSinceMs = input.at;
+    }
+    input.pace.tick(
+      input.at,
+      input.segment,
+      paceSignals({
+        route: input.route,
+        treadmill: input.treadmill,
+        strap: input.strap,
+        nowMs: input.at,
+        freshSinceMs: this.freshSinceMs,
+      }),
+    );
+    return true;
+  }
 }
 
 /** What survives an app kill: the tally and the cadence readings behind the saved series (#3549). */
@@ -267,7 +314,7 @@ export function pacingView(input: {
   if (!input.paired)
     return {
       state: 'none',
-      note: 'No chest strap paired. Pair one in Devices to pace by cadence; until then the walk paces by GPS speed, then heart rate.',
+      note: 'No chest strap paired. Pair one in Devices to pace by cadence; without it the walk paces by what it can read: GPS speed or heart rate.',
     };
   if (input.accel === 'unavailable')
     return {
