@@ -13,6 +13,8 @@
 // The log is append-only, so its rows cannot be cleaned up: every assertion filters on this run's
 // own actor name.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
+import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { BODY_BATTERY_RESCORE_SIGNED_OFF_FROM } from '@/lib/health/rederive-body-battery'
 
 const canRun = !!process.env.DATABASE_URL
 const OWNER = '00000000-0000-4000-8000-000000238111'
@@ -179,7 +181,8 @@ describe.skipIf(!canRun)('/api/agent-actions (issue 2381)', () => {
   })
 
   describe('rederive-body-battery (#2409)', () => {
-    const day = '2026-09-20'
+    // A day the re-derive may rewrite: days before the signed-off floor are never touched (#3495).
+    const day = shiftDateStr(BODY_BATTERY_RESCORE_SIGNED_OFF_FROM, 3)
     beforeEach(async () => {
       await pool.query(`DELETE FROM body_battery_daily WHERE user_id = $1`, [OWNER])
       // An old-model, unmeasured day: the recompute (also unmeasured) differs only in model version.
