@@ -250,14 +250,17 @@ function StrengthWorkingCard() {
           )}
         </Stack>
       )}
+      {/* strength-progress-card.tsx: groups space-y-5 (xl), heading mb-3 (md), rows space-y-4 (lg). */}
+      <Stack gap="xl">
       {groups.map(({ session, rows }) => (
-        <Stack key={session} gap="lg">
+        <Stack key={session} gap="md">
           <AppText
             variant="micro"
             style={{ color: theme.progress.strength, textTransform: 'uppercase', letterSpacing: 0.6 }}
           >
             {session}
           </AppText>
+          <Stack gap="lg">
           {rows.map(({ exercise, metric }) => {
             const delta = strengthDelta(metric, {
               trendUp: theme.progress.trendUp,
@@ -286,8 +289,10 @@ function StrengthWorkingCard() {
               </Stack>
             );
           })}
+          </Stack>
         </Stack>
       ))}
+      </Stack>
       {state.data && !groups.length && (
         <AppText variant="caption" tone="muted">
           No strength readings yet

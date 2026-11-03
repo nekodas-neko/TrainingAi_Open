@@ -41,6 +41,12 @@ test('the Progress exercise rows and the Strength Trend value use the web sizes 
   assert.match(read('features/progress/StrengthScreen.tsx'), /variant="trendValue"/);
 });
 
+test('the Estimated 1RM spacing matches the current app: groups 20, heading to row 12, rows 16 (#3521)', () => {
+  const panel = read('features/health/components/ProgressPanel.tsx');
+  assert.match(panel, /<Stack gap="xl">\s*\{groups\.map\(\(\{ session, rows \}\) => \(\s*<Stack key=\{session\} gap="md">/);
+  assert.match(panel, /<Stack gap="lg">\s*\{rows\.map/);
+});
+
 test('the page gradient keeps its last colour underneath, so a tall page never shows the teal app background (#2933)', () => {
   assert.match(read('shared/ui/PageGradient.tsx'), /backgroundColor: base/);
 });
