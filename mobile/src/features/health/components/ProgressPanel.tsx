@@ -410,7 +410,7 @@ function GoalsCard() {
 export function ProgressPanel() {
   return (
     <>
-      <StrengthScreen embedded section="trend" onBack={() => {}} />
+      <StrengthScreen section="trend" />
       <TrendsCard />
       <StrengthWorkingCard />
       <GoalsCard />

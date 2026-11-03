@@ -16,27 +16,18 @@ import {
 } from '../../shared/ui';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
-import { WorkoutLayout } from '../workouts/components/WorkoutLayout';
 import { ResourceStatus } from '../workouts/components/ResourceStatus';
 import { useWorkoutResource } from '../workouts/data/WorkoutDataProvider';
-import { recordsSpec, strengthSpec, weeklySpec, librarySpec } from '../workouts/data/models';
+import { recordsSpec, strengthSpec, librarySpec } from '../workouts/data/models';
 import { ExerciseHistory } from '../workouts/components/ExerciseHistory';
 import { gainColor } from '../health/progressPresentation';
-import { WeeklyTrainingCard } from './WeeklyTrainingCard';
 
-export function StrengthScreen({
-  onBack,
-  embedded = false,
-  section = 'all',
-}: {
-  onBack: () => void;
-  embedded?: boolean;
-  section?: 'all' | 'trend' | 'records';
-}) {
+// Drawn inside the Progress panel (trend) and the profile overview (records); it has no screen of
+// its own.
+export function StrengthScreen({ section }: { section: 'trend' | 'records' }) {
   const { timezone } = useWorkoutContext();
   const { theme } = useTheme();
   const strength = useWorkoutResource(strengthSpec);
-  const weekly = useWorkoutResource(weeklySpec, section === 'all');
   const records = useWorkoutResource(recordsSpec, section !== 'trend');
   const library = useWorkoutResource(librarySpec, section !== 'trend');
   const [index, setIndex] = useState(0);
@@ -56,24 +47,10 @@ export function StrengthScreen({
           exercise.history.map((point) => ({ ...point, date: point.date.replace(/\//g, '-') })),
         )
       : null;
-  const content = (
+  return (
     <>
-      {section === 'all' && (
-        <>
-          <ResourceStatus state={weekly} refresh={weekly.refresh} />
-          {weekly.data && <WeeklyTrainingCard data={weekly.data} />}
-        </>
-      )}
       {section !== 'records' && (
         <>
-          {!embedded && (
-            <ResourceStatus
-              inline={embedded}
-              label="Strength trend"
-              state={strength}
-              refresh={strength.refresh}
-            />
-          )}
           {exercise ? (
             <Card>
               <Stack direction="row" justify="space-between" align="center">
@@ -89,15 +66,13 @@ export function StrengthScreen({
                   </AppText>
                   {/* The status slot is 48 px even when idle, which made this card's title row three
                       times the current app's and pushed "90 days" in from the edge. */}
-                  {embedded && (
-                    <ResourceStatus
-                      inline
-                      whenActive
-                      label="Strength trend"
-                      state={strength}
-                      refresh={strength.refresh}
-                    />
-                  )}
+                  <ResourceStatus
+                    inline
+                    whenActive
+                    label="Strength trend"
+                    state={strength}
+                    refresh={strength.refresh}
+                  />
                 </Stack>
               </Stack>
               <Stack direction="row" align="center" justify="space-between">
@@ -190,7 +165,7 @@ export function StrengthScreen({
                 />
               )}
             </Card>
-          ) : embedded ? (
+          ) : (
             <Card>
               <Stack direction="row" align="center" justify="space-between">
                 <AppText variant="cardTitle" tone="muted">
@@ -210,8 +185,6 @@ export function StrengthScreen({
                   : 'Your strength history is unavailable.'}
               </AppText>
             </Card>
-          ) : (
-            strength.data && <AppText tone="muted">No strength history recorded yet.</AppText>
           )}
         </>
       )}
@@ -257,28 +230,5 @@ export function StrengthScreen({
         {selected && <ExerciseHistory name={selected} />}
       </Sheet>
     </>
-  );
-  return embedded ? (
-    content
-  ) : (
-    <WorkoutLayout
-      title="Strength progress"
-      onBack={onBack}
-      actions={
-        <IconButton
-          icon="refresh"
-          label="Refresh progress"
-          busy={strength.refreshing || weekly.refreshing || records.refreshing}
-          onPress={() => {
-            strength.refresh();
-            weekly.refresh();
-            records.refresh();
-            library.refresh();
-          }}
-        />
-      }
-    >
-      {content}
-    </WorkoutLayout>
   );
 }

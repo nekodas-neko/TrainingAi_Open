@@ -10,8 +10,6 @@ export type DetailScreen =
   | 'programs'
   | 'program-builder'
   | 'exercise-library'
-  | 'workout-history'
-  | 'strength-progress'
   | 'clinical'
   | 'health-day'
   | 'health-week'

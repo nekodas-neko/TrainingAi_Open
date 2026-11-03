@@ -2,26 +2,22 @@ import { useState } from 'react';
 import { Pressable } from 'react-native';
 import { ExerciseHistory } from '../components/ExerciseHistory';
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
-import { toAestDay } from '@trainingai/shared/date-utils';
 import {
   AppButton,
   AppText,
   Card,
   ConfirmationCard,
   IconButton,
-  ListRow,
   Notice,
   NumericStepper,
-  MonthCalendar,
   Sheet,
   Stack,
   StatusIndicator,
 } from '../../../shared/ui';
 import { loadLabel } from '../logging/preferences';
-import { WorkoutLayout } from '../components/WorkoutLayout';
 import { ResourceStatus } from '../components/ResourceStatus';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
-import { calendarSpec, daySpec, type DayExercise } from '../data/models';
+import { daySpec, type DayExercise } from '../data/models';
 import { useHistoryQueue } from '../data/HistoryQueueProvider';
 import { overlayHistory } from '../data/HistoryOutbox';
 import { useWorkoutContext } from '../WorkoutProvider';
@@ -393,91 +389,5 @@ export function HistoryDay({
         )}
       </Sheet>
     </>
-  );
-}
-export function WorkoutHistoryScreen({
-  onBack,
-  openWorkout,
-}: {
-  onBack: () => void;
-  openWorkout: (id: string) => void;
-}) {
-  const { timezone } = useWorkoutContext();
-  const journal = useWorkoutJournal();
-  const today = toAestDay(new Date(), timezone);
-  const [month, setMonth] = useState(today.slice(0, 7));
-  const [selected, setSelected] = useState<string | null>(null);
-  const [year, number] = month.split('-').map(Number);
-  const state = useWorkoutResource(calendarSpec(year, number));
-  const local = journal.data.workouts.filter(
-    (workout) => workout.status === 'completed' && workout.date.startsWith(month),
-  );
-  const markers: Record<string, string[]> = {};
-  for (const [date, names] of Object.entries(state.data?.trainedDays ?? {})) {
-    markers[date.replace(/\//g, '-')] = names;
-  }
-  for (const workout of local) {
-    markers[workout.date] = [
-      ...new Set([...(markers[workout.date] ?? []), workout.sessionName]),
-    ];
-  }
-  return (
-    <WorkoutLayout
-      title="Workout history"
-      onBack={onBack}
-      actions={
-        <IconButton
-          icon="refresh"
-          label="Refresh workout history"
-          busy={state.refreshing}
-          onPress={state.refresh}
-        />
-      }
-    >
-      <Card>
-        <MonthCalendar
-          status={
-            <ResourceStatus
-              inline
-              whenActive
-              label="Calendar records"
-              state={state}
-              refresh={state.refresh}
-            />
-          }
-          month={month}
-          today={today}
-          selected={selected ?? undefined}
-          onMonthChange={setMonth}
-          onSelect={setSelected}
-          markers={markers}
-        />
-      </Card>
-      {local.length > 0 && (
-        <>
-          <AppText variant="eyebrow" tone="muted">
-            Saved on this phone
-          </AppText>
-          {local
-            .slice()
-            .reverse()
-            .map((workout) => (
-              <ListRow
-                key={workout.id}
-                title={workout.sessionName}
-                subtitle={`${workout.date} · ${workout.pending.length ? 'Upload pending' : 'Uploaded'}`}
-                onPress={() => openWorkout(workout.id)}
-              />
-            ))}
-        </>
-      )}
-      <Sheet
-        visible={selected !== null}
-        title={selected ?? 'Workouts'}
-        onClose={() => setSelected(null)}
-      >
-        {selected && <HistoryDay key={selected} date={selected} />}
-      </Sheet>
-    </WorkoutLayout>
   );
 }
