@@ -109,6 +109,7 @@ export class StrapSession {
   private stopHr: Unsubscribe | null = null;
   private stopAccel: Unsubscribe | null = null;
   private accelWanted = false;
+  private accelHolders = 0;
   private accelStarting = false;
   private accelBuffer: number[] = [];
   private accelListeners = new Set<(batch: AccelBatch) => void>();
@@ -232,9 +233,28 @@ export class StrapSession {
   }
 
   /**
-   * Asks for the PMD accelerometer stream while true, over the link a hold keeps open. Only a
-   * guided walk asks, and it asks again with false when the walk ends: left running the stream
-   * drains the strap and the phone. A link that drops and comes back restarts it.
+   * Asks for the accelerometer stream on behalf of one reader, and returns the function that gives
+   * the request back. The stream runs while anyone holds it and stops with the last release, so a
+   * guided walk's pacer and the live cadence readout can both ask without one switching the other
+   * off. Releasing twice is harmless.
+   */
+  holdAccelerometer(): () => void {
+    let held = true;
+    this.accelHolders += 1;
+    this.setAccelerometer(true);
+    return () => {
+      if (!held) return;
+      held = false;
+      this.accelHolders = Math.max(0, this.accelHolders - 1);
+      if (this.accelHolders === 0) this.setAccelerometer(false);
+    };
+  }
+
+  /**
+   * Switches the PMD accelerometer stream, over the link a hold keeps open. Readers go through
+   * `holdAccelerometer`, which counts them; they release when the activity pauses or ends, because
+   * left running the stream drains the strap and the phone. A link that drops and comes back
+   * restarts it.
    */
   setAccelerometer(on: boolean) {
     if (on === this.accelWanted) return;
@@ -593,6 +613,7 @@ export class StrapSession {
     this.holds.clear();
     this.setRecording(false);
     this.accelWanted = false;
+    this.accelHolders = 0;
     this.accelListeners.clear();
     this.step({ type: 'unwant' });
     this.release();

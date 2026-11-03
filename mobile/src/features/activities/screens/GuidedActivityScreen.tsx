@@ -29,6 +29,7 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
 import { WalkPacingCard } from '../components/WalkPacingCard';
 import { LiveStrapBpm } from '../components/LiveStrapBpm';
+import { wantsLiveCadence } from '../data/live-cadence';
 import { useRouteRecording } from '../data/useRouteRecording';
 import { gpsProblemText, routeEligible } from '../data/route-recording';
 export function GuidedActivityScreen({
@@ -257,7 +258,7 @@ export function GuidedActivityScreen({
           <AppText variant="caption">
             {clock(seconds)} elapsed · {clock(total)} total
           </AppText>
-          <LiveStrapBpm />
+          <LiveStrapBpm cadence={!!session && wantsLiveCadence(session)} />
           {guidance.kind === 'walk' && segment && (segment.kind === 'fast' || segment.kind === 'slow') && (
             <WalkPacingCard
               kind={segment.kind}

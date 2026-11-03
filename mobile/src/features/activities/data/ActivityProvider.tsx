@@ -126,8 +126,6 @@ function ActivityStrapHold() {
     const config = current.guidance.config;
     const segments = walkPlan(config).segments;
     pace.setTargets(targets.current);
-    strap.setAccelerometer(true);
-    const stop = strap.onAccelerometer((batch) => pace.onBatch(batch));
     // One tick per wall-clock second, from its own timer (see `WalkPace.tick`).
     const ticker = new PaceTicker();
     const timer = setInterval(() => {
@@ -148,10 +146,26 @@ function ActivityStrapHold() {
     }, 1000);
     return () => {
       clearInterval(timer);
-      stop();
-      strap.setAccelerometer(false);
     };
   }, [strap, store, startMs]);
+  // The pacer's own request for the accelerometer stream, given back while the walk is paused so
+  // the strap and phone are not drained for readings nothing counts. A resume drops the old window
+  // so the gap is not read as steps. The strap session counts holders, so the cadence readout on
+  // the walk screen asks for the same stream without the two switching each other off.
+  const paused = session?.pauseStartMs != null;
+  useEffect(() => {
+    if (!strap || !store || startMs === null || paused) return;
+    const current = store.getSnapshot().session;
+    const pace = current ? store.paceFor(current) : null;
+    if (!pace || current?.guidance?.kind !== 'walk') return;
+    pace.resetCadence();
+    const release = strap.holdAccelerometer();
+    const stop = strap.onAccelerometer((batch) => pace.onBatch(batch));
+    return () => {
+      stop();
+      release();
+    };
+  }, [strap, store, startMs, paused]);
   return null;
 }
 export function useActivities() {

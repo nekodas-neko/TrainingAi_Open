@@ -18,6 +18,7 @@ import type { RoutePoint } from '@trainingai/shared/activity/route-encoding';
 import {
   readPacer,
   resolveCadenceTargets,
+  type CadenceStatus,
   windowedSpeedKmh,
   type PacerReading,
   type TargetPair,
@@ -34,9 +35,57 @@ type PlanSegment = {
   endSec: number;
 };
 
-/** The two rungs below cadence: GPS speed and heart rate, read now. Null is "no reading". */
-export type PaceSignals = { speedKmh: number | null; bpm: number | null };
+/**
+ * The two rungs below cadence, GPS speed and heart rate, read now (null is "no reading"), and what
+ * the strap is doing about cadence, which words the fallback note.
+ */
+export type PaceSignals = {
+  speedKmh: number | null;
+  bpm: number | null;
+  cadenceStatus?: CadenceStatus;
+};
 export const noSignals: PaceSignals = { speedKmh: null, bpm: null };
+
+/** What the strap is doing about step pacing, from its link and accelerometer phase. */
+export function cadenceStatusOf(strap: StrapState | null): CadenceStatus {
+  if (!strap || !strap.paired) return 'none';
+  if (strap.accel === 'unavailable') return 'unavailable';
+  if (strap.link !== 'connected') return 'none';
+  return strap.accel === 'starting' || strap.accel === 'streaming' ? 'reading' : 'none';
+}
+
+/**
+ * The live step rate from the strap's accelerometer batches: the one derivation of cadence, used by
+ * the guided walk's pacer and by the readout on every other walk, run and treadmill. It keeps the
+ * last few seconds of magnitudes, finds the stride frequency with `detectCadence`, and treats a
+ * reading older than `STRAP_STALE_MS` as gone.
+ */
+export class CadenceMeter {
+  private magnitudes: number[] = [];
+  private latest: { spm: number; atMs: number } | null = null;
+
+  /** One batch of magnitudes (about a second at 50 Hz). Returns the cadence it produced, if any. */
+  push(batch: { magnitudes: number[]; sampleRate: number; at: number }): CadenceReading | null {
+    const rate = batch.sampleRate > 0 ? batch.sampleRate : 50;
+    this.magnitudes.push(...batch.magnitudes);
+    const cap = Math.round(STRAP_WINDOW_SEC * rate);
+    if (this.magnitudes.length > cap) this.magnitudes.splice(0, this.magnitudes.length - cap);
+    const estimate = detectCadence(this.magnitudes, rate);
+    this.latest = estimate === null ? null : { spm: estimate.cadenceSpm, atMs: batch.at };
+    return this.latest ? { atMs: batch.at, spm: this.latest.spm, source: 'strap' } : null;
+  }
+
+  /** The latest cadence, unless it has gone stale. */
+  live(nowMs: number): number | null {
+    return this.latest && nowMs - this.latest.atMs <= STRAP_STALE_MS ? this.latest.spm : null;
+  }
+
+  /** Forgets the window, so a gap (a pause) is not read across. */
+  reset() {
+    this.magnitudes = [];
+    this.latest = null;
+  }
+}
 
 /**
  * The speed and heart-rate readings the pacer may fall back to, as the current app's walk screen
@@ -62,6 +111,7 @@ export function paceSignals(input: {
   return {
     speedKmh: input.treadmill ? null : windowedSpeedKmh(route),
     bpm: view && view.live ? view.bpm : null,
+    cadenceStatus: cadenceStatusOf(input.strap),
   };
 }
 
@@ -126,9 +176,7 @@ export type PaceSnapshot = {
  * rate. A walk with no signal on any rung shows no band and records no adherence, never a false zero.
  */
 export class WalkPace {
-  private magnitudes: number[] = [];
-  private sampleRate = 50;
-  private strap: { spm: number; atMs: number } | null = null;
+  private meter = new CadenceMeter();
   private readings: CadenceReading[] = [];
   private tallies: Record<number, PacerSegmentTally> = {};
   readonly targets: TargetPair;
@@ -153,19 +201,18 @@ export class WalkPace {
 
   /** One batch of accelerometer magnitudes (about a second at 50 Hz). */
   onBatch(batch: { magnitudes: number[]; sampleRate: number; at: number }) {
-    const rate = batch.sampleRate > 0 ? batch.sampleRate : 50;
-    this.sampleRate = rate;
-    this.magnitudes.push(...batch.magnitudes);
-    const cap = Math.round(STRAP_WINDOW_SEC * rate);
-    if (this.magnitudes.length > cap) this.magnitudes.splice(0, this.magnitudes.length - cap);
-    const estimate = detectCadence(this.magnitudes, rate);
-    this.strap = estimate === null ? null : { spm: estimate.cadenceSpm, atMs: batch.at };
-    if (this.strap) this.readings.push({ atMs: batch.at, spm: this.strap.spm, source: 'strap' });
+    const reading = this.meter.push(batch);
+    if (reading) this.readings.push(reading);
+  }
+
+  /** Drops the cadence window, for a resume after a pause. */
+  resetCadence() {
+    this.meter.reset();
   }
 
   /** The cadence to show now: the strap's latest reading, unless it has gone stale. */
   live(nowMs: number): number | null {
-    return this.strap && nowMs - this.strap.atMs <= STRAP_STALE_MS ? this.strap.spm : null;
+    return this.meter.live(nowMs);
   }
 
   /** The pacer's reading for a fast or slow block; null in other blocks or with no cadence. */
@@ -184,6 +231,7 @@ export class WalkPace {
       cadenceTargets: this.targets,
       speedTargets: this.speedTargets,
       hrTargets: this.hrTargets ?? { fast: 0, slow: 0 },
+      cadenceStatus: signals.cadenceStatus,
     });
   }
 

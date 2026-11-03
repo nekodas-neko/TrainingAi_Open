@@ -32,6 +32,7 @@ import { failureNotice } from '../../../core/reporting/index.ts';
 import { useStrap } from '../../devices/strap/StrapProvider';
 import { noStrapHint } from '../../devices/strap/labels';
 import { LiveStrapBpm } from '../components/LiveStrapBpm';
+import { wantsLiveCadence } from '../data/live-cadence';
 import { useRouteRecording } from '../data/useRouteRecording';
 import { gpsStatusText, routeEligible } from '../data/route-recording';
 import { RouteMap } from '../components/RouteMap';
@@ -233,7 +234,7 @@ function ManualActivityScreen({
                 ? 'Recording'
                 : 'Paused'}
           </AppText>
-          <LiveStrapBpm />
+          <LiveStrapBpm cadence={wantsLiveCadence(session)} />
           {gps.notice && (
             <AppText variant="micro" tone="muted">
               {gps.notice}

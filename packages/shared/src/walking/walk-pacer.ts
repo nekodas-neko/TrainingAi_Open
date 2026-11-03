@@ -119,12 +119,27 @@ export interface PacerInput {
   cadenceTargets: TargetPair
   speedTargets: TargetPair | null
   hrTargets: TargetPair
+  /** The strap's cadence state, for the fallback note. Absent reads as no strap. */
+  cadenceStatus?: CadenceStatus
 }
 
-const FALLBACK_NOTE: Record<PacingSignal, string | null> = {
-  cadence: null,
-  speed: 'No cadence source — pacing by speed. Wear the strap for step pacing.',
-  hr: 'No cadence or GPS — pacing by heart rate. Wear the strap for step pacing.',
+/**
+ * What the strap is doing about step pacing, which decides what the fallback line says:
+ * `none` (no strap, or its link is down), `reading` (connected and the accelerometer is starting or
+ * streaming, with no cadence yet) or `unavailable` (the strap would not stream it).
+ */
+export type CadenceStatus = 'none' | 'reading' | 'unavailable'
+
+/** The line under a speed or heart-rate reading, saying why cadence is not the signal. */
+export function fallbackNoteFor(signal: PacingSignal, status: CadenceStatus = 'none'): string | null {
+  if (signal === 'cadence') return null
+  const by = signal === 'speed' ? 'speed' : 'heart rate'
+  if (status === 'reading') return `Reading your steps… pacing by ${by} until they arrive.`
+  if (status === 'unavailable')
+    return `The strap isn’t sending step data — another app connected to it may be holding it. Pacing by ${by}.`
+  return signal === 'speed'
+    ? 'No cadence source — pacing by speed. Wear the strap for step pacing.'
+    : 'No cadence or GPS — pacing by heart rate. Wear the strap for step pacing.'
 }
 
 function format(signal: PacingSignal, value: number): string {
@@ -170,7 +185,7 @@ export function readPacer(input: PacerInput): PacerReading | null {
     return null
   }
 
-  const fallbackNote = FALLBACK_NOTE[signal]
+  const fallbackNote = fallbackNoteFor(signal, input.cadenceStatus)
   const floor = stoppedFloor(signal)
   if (floor != null && value < floor) {
     return { signal, band: 'stopped', mark: '•', message: 'Stopped — start walking', progress: 0, fallbackNote }
