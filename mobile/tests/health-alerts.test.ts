@@ -151,11 +151,49 @@ test('a health alert carries the owner, scope and target a tap needs to open the
   const read = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
   const { ALERT_OWNER, HEALTH_ALERT_TARGET } = await import('../src/features/platform/data/models.ts');
   assert.equal(HEALTH_ALERT_TARGET, 'health-readiness');
-  // observeAlerts drops a notification that is not the app's own, and AlertNavigation drops one for
-  // another scope, so the posted data needs all three.
-  assert.match(read('integrations/notifications/platform.native.ts'), /owner: ALERT_OWNER, scope, target: HEALTH_ALERT_TARGET/);
+  // observeAlerts routes it by its marker and AlertNavigation drops one for another scope.
+  assert.match(read('integrations/notifications/platform.native.ts'), /healthAlert: type, scope, target: HEALTH_ALERT_TARGET/);
   assert.match(read('features/health/HealthAlerts.tsx'), /healthAlert\(type, title, body, scope\)/);
   assert.match(read('features/platform/components/AlertNavigation.tsx'), /HEALTH_ALERT_TARGET\) onHealthDetail\('readiness'\)/);
   assert.match(read('app/App.tsx'), /onHealthDetail=\{[\s\S]*selectTab\('Health'\);[\s\S]*setHealthDetail\(next\)/);
   assert.equal(typeof ALERT_OWNER, 'string');
+});
+
+test('a presented health alert survives an AlertScheduler reconcile, and its tap still routes (#3541)', async () => {
+  const { AlertScheduler } = await import('../src/features/platform/data/AlertScheduler.ts');
+  const { isSchedulerAlert, isRoutableAlert, HEALTH_ALERT_TARGET, ALERT_OWNER } = await import(
+    '../src/features/platform/data/models.ts'
+  );
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(
+    new URL('../src/integrations/notifications/platform.native.ts', import.meta.url),
+    'utf8',
+  );
+  const health = { healthAlert: 'illness', scope: 'a', target: HEALTH_ALERT_TARGET };
+  assert.doesNotMatch(source.slice(source.indexOf('export async function healthAlert')), /owner:/);
+  // The tray: the same filter nativeAlerts.list() applies.
+  const tray = new Map<string, Record<string, unknown>>([
+    ['health-1', health],
+    ['planned-1', { owner: ALERT_OWNER, signature: 'old' }],
+  ]);
+  const cancelled: string[] = [];
+  const scheduler = new AlertScheduler({
+    list: async () =>
+      [...tray].filter(([, data]) => isSchedulerAlert(data)).map(([id, data]) => ({ id, signature: String(data.signature ?? '') })),
+    schedule: async () => {},
+    cancel: async (id) => {
+      cancelled.push(id);
+      tray.delete(id);
+    },
+  });
+  await scheduler.reconcile([]);
+  assert.deepEqual(cancelled, ['planned-1']);
+  assert.ok(tray.has('health-1'));
+  assert.equal(isRoutableAlert(health), true);
+  assert.equal(isRoutableAlert({ target: 'workout' }), false);
+  // AlertNavigation opens a tap only for the matching account.
+  assert.match(
+    readFileSync(new URL('../src/features/platform/components/AlertNavigation.tsx', import.meta.url), 'utf8'),
+    /opened\.scope !== state\.settings\.scope/,
+  );
 });

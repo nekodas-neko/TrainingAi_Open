@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type PropsWithChildren,
@@ -16,7 +17,7 @@ import { bleAdapter } from '../../../integrations/ble/platform';
 import { deviceAlert } from '../../../integrations/notifications/platform';
 import { HrOutbox } from './HrOutbox';
 import { useActivityServiceRunning } from '../../activities/data/background-recording';
-import { activityHoldWanted } from './activity-hold';
+import { holdStrapForActivity } from './activity-hold';
 import { StrapSession, type StrapHold } from './StrapSession';
 
 const Context = createContext<StrapSession | null>(null);
@@ -97,17 +98,23 @@ export function useStrap() {
 export function useActivityStrapHold(active: boolean) {
   const session = useContext(Context);
   const serviceRunning = useActivityServiceRunning();
+  const holdRef = useRef<ReturnType<typeof holdStrapForActivity> | null>(null);
+  const serviceRef = useRef(serviceRunning);
+  serviceRef.current = serviceRunning;
+  // Held for the walk only: the service starting or stopping goes through `update` below and must
+  // not release the hold, which would drop the link and reset the trace.
   useEffect(() => {
     if (!session || !active) return;
-    session.hold('activity', activityHoldWanted(serviceRunning, AppState.currentState));
-    const listener = AppState.addEventListener('change', (state) =>
-      session.hold('activity', activityHoldWanted(serviceRunning, state)),
-    );
+    const hold = holdStrapForActivity(session, AppState, serviceRef.current);
+    holdRef.current = hold;
     return () => {
-      listener.remove();
-      session.hold('activity', false);
+      holdRef.current = null;
+      hold.release();
     };
-  }, [session, active, serviceRunning]);
+  }, [session, active]);
+  useEffect(() => {
+    holdRef.current?.update(serviceRunning);
+  }, [serviceRunning]);
 }
 
 /**
