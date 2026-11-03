@@ -296,6 +296,8 @@ export function pacingView(input: {
   spm: number | null;
   reading: PacerReading | null;
   signals?: PaceSignals;
+  /** Treadmill walks have no GPS speed to fall back on. */
+  treadmill?: boolean;
 }): PacingView {
   const signals = input.signals ?? noSignals;
   const reading = input.reading;
@@ -314,7 +316,9 @@ export function pacingView(input: {
   if (!input.paired)
     return {
       state: 'none',
-      note: 'No chest strap paired. Pair one in Devices to pace by cadence; without it the walk paces by what it can read: GPS speed or heart rate.',
+      note: input.treadmill
+        ? 'No chest strap paired, so there is nothing to pace by on a treadmill. Pair one in Devices.'
+        : 'No chest strap paired. This walk paces by GPS speed. Pair one in Devices to pace by cadence or heart rate.',
     };
   if (input.accel === 'unavailable')
     return {

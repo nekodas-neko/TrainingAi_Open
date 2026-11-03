@@ -39,6 +39,7 @@ export function WalkPacingCard({
     spm: pace?.live(now) ?? null,
     reading,
     signals,
+    treadmill,
   });
   const band =
     view.state === 'live'

@@ -116,7 +116,10 @@ test('the card shows the rung in use, and a missing strap no longer hides GPS or
   assert.ok(speed.state === 'live' && speed.unit === 'km/h' && speed.value === 6.5);
   const none = pacingView({ paired: false, link: 'off', accel: 'off', spm: null, reading: null } as never);
   assert.equal(none.state, 'none');
-  assert.match((none as { note: string }).note, /GPS speed or heart rate/);
+  assert.match((none as { note: string }).note, /paces by GPS speed/);
+  const treadmill = pacingView({ paired: false, link: 'off', accel: 'off', spm: null, reading: null, treadmill: true } as never);
+  assert.equal(treadmill.state, 'none');
+  assert.match((treadmill as { note: string }).note, /nothing to pace by on a treadmill/);
 });
 
 function storeFixture(values = new Map<string, string>(), startAt = Date.parse('2026-11-02T08:00:00+10:00')) {
