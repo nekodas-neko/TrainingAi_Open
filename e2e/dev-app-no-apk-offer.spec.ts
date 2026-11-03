@@ -33,7 +33,10 @@ async function asApp(page: Page, appId: string) {
 }
 
 const downloadRow = (page: Page) => page.getByText('Download Android App', { exact: true })
-const updateCard = (page: Page) => page.getByText(/Android build|New Android build/)
+// The card's own header, either state of it: exactly "Android build", or "New Android build — v…".
+// Anchored, because the About page also shows the newest changelog entry, and a release note that
+// merely mentions Android builds (1.516.0's did) is not the card.
+const updateCard = (page: Page) => page.getByText(/^(Android build|New Android build — v.*)$/)
 
 test('the Dev app offers neither the update card nor the APK download', async ({ page }) => {
   await asApp(page, 'com.trainingai.app.dev')
