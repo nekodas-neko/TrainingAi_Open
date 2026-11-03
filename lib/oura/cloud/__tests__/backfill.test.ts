@@ -22,7 +22,7 @@ const CONFIG: OuraOAuthConfig = { clientId: 'cid', clientSecret: 'cs', redirectU
 const fetchMock = vi.fn<typeof fetch>()
 
 /** Everything we ask for, as Oura spells it in the token answer. */
-const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health'
+const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health extapi:ring_configuration'
 
 function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
   const calls: string[] = []
@@ -116,6 +116,17 @@ describe('backfillOuraCloud (#2859)', () => {
     const out = await backfillOuraCloud({ repo: { ...repo, getLatestOuraCloudBatteryAt: async () => null, insertOuraCloudBatteryReadings: async () => 0 }, config: CONFIG }, USER, { ...OPTS, dryRun: false, ringBattery: true })
     expect(fetchMock.mock.calls.some(c => String(c[0]).includes('ring_battery_level'))).toBe(false)
     expect(out.ok && out.report.notShared).toContain('ring_battery')
+  })
+
+  // #3578: the owner's grant from before ring_configuration was requested. It covers `daily` and the
+  // rest, so the battery lands in notShared (until they connect again), not in a refused-despite-grant error.
+  it('does not read ring_battery_level on an old grant that has daily but not ring_configuration', async () => {
+    oura()
+    const { repo } = fakeRepo(true, 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health')
+    const out = await backfillOuraCloud({ repo: { ...repo, getLatestOuraCloudBatteryAt: async () => null, insertOuraCloudBatteryReadings: async () => 0 }, config: CONFIG }, USER, { ...OPTS, dryRun: false, ringBattery: true })
+    expect(fetchMock.mock.calls.some(c => String(c[0]).includes('ring_battery_level'))).toBe(false)
+    expect(out.ok && out.report.notShared).toContain('ring_battery')
+    expect(out.ok && out.report.refusedDespiteGrant).toEqual([])
   })
 
   it('reads every type over the range and writes once', async () => {

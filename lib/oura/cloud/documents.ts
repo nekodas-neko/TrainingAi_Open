@@ -354,9 +354,11 @@ export const OURA_SCOPE_FOR: Record<OuraDocumentType | OuraSeriesType, OuraScope
   workout: 'workout',
   session: 'session',
   heartrate: 'heartrate',
-  // A guess (#3069). The spec names no scope for `ring_battery_level`, and it is a ring-status reading
-  // beside the daily ones. A 401 on a grant that covers `daily` lands in `refusedDespiteGrant`.
-  ring_battery: 'daily',
+  // Named by Oura itself, not the spec (which lists none for `ring_battery_level`): on 2026-11-02
+  // production logged `Oura answered 401: Token is not authorized access ring_configuration scope.`
+  // (#3565, #3069, #3578). A grant stored before this scope was requested lacks it, so the battery
+  // reads as not shared (backfill `notShared`) until the user connects again.
+  ring_battery: 'ring_configuration',
 }
 
 /** True when the grant covers `type`. A `null` grant (no scope string stored) covers everything. */
