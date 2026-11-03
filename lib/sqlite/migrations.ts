@@ -402,6 +402,11 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'sleep_sessions', column: 'deleted_at',        ddl: `ALTER TABLE sleep_sessions ADD COLUMN deleted_at TEXT` },
   // #3060 (v53). Oura's period type; NULL on every existing row until the server re-sends it.
   { table: 'sleep_sessions', column: 'oura_sleep_type',   ddl: `ALTER TABLE sleep_sessions ADD COLUMN oura_sleep_type TEXT` },
+  // #3582 (v54). The real onset, final wake and awakenings of an Oura Cloud night, computed by the
+  // server on read and carried in the pull; NULL on every existing row and on any row without a usable hypnogram.
+  { table: 'sleep_sessions', column: 'onset_at',            ddl: `ALTER TABLE sleep_sessions ADD COLUMN onset_at TEXT` },
+  { table: 'sleep_sessions', column: 'final_wake_at',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN final_wake_at TEXT` },
+  { table: 'sleep_sessions', column: 'computed_awakenings', ddl: `ALTER TABLE sleep_sessions ADD COLUMN computed_awakenings INTEGER` },
   // oura_daily gains sync_status so the applyDelta pull can clobber-guard a device-authored
   // (BLE rollup) row against a stale server pull — the D4 finding. Default 'synced' (existing
   // rows are server-mirrored); the device-write path that sets 'pending' lands with D2.
@@ -1764,6 +1769,19 @@ export const MIGRATIONS: UpgradeStatement[] = [
     toVersion: 53,
     statements: [
       `ALTER TABLE sleep_sessions ADD COLUMN oura_sleep_type TEXT`,
+    ],
+  },
+  {
+    // #3582 (stage 3 of #3075's follow-up). The server dates an Oura Cloud night's real onset, final
+    // wake and awakenings from its 30-second hypnogram on read (no Postgres column), and the delta
+    // pull carries them. Local-only schema step, same shape as v53: the ALTERs reach fresh installs
+    // and upgraded devices alike, RECONCILE_COLUMNS covers a half-applied upgrade. No backfill: a row
+    // pulled before v54 reads NULL, which every reader treats as "use the bed window and Oura's count".
+    toVersion: 54,
+    statements: [
+      `ALTER TABLE sleep_sessions ADD COLUMN onset_at TEXT`,
+      `ALTER TABLE sleep_sessions ADD COLUMN final_wake_at TEXT`,
+      `ALTER TABLE sleep_sessions ADD COLUMN computed_awakenings INTEGER`,
     ],
   },
 ];

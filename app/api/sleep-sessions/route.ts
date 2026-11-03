@@ -60,6 +60,9 @@ export async function GET() {
     // #3057. `mergeByDate` keeps an Oura period beside a `long_sleep` out of the night. Since #3080 it
     // returns the night the Sleep Score scores, so the card and the score describe the same night.
     ouraSleepType: r.ouraSleepType ?? null,
+    // #3582. When sleep really began and ended on an Oura Cloud night; the bed window above is unchanged.
+    onsetAt:      r.onsetAt ? r.onsetAt.toISOString() : null,
+    finalWakeAt:  r.finalWakeAt ? r.finalWakeAt.toISOString() : null,
   })), tz);
 
   // A night the rollup has not yet derived past is still growing, and saying so is the whole of
