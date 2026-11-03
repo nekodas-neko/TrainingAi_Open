@@ -23,22 +23,13 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
 import { useActivities } from '../data/ActivityProvider';
 import { defaultWalk, walkConfigSchema, walkPlan } from '../data/guidance';
-import { cardioWeekSpec } from '../data/models';
+import { cardioWeekSpec, walkSegmentStatsSpec } from '../data/models';
 const schema = z.object({
   config: walkConfigSchema,
   custom: walkConfigSchema.nullable(),
   selected: z.string(),
 });
 const initial = { config: defaultWalk, custom: null, selected: 'Long' };
-const aggregate = z
-  .object({
-    count: z.number(),
-    avgHr: z.number().nullish(),
-    avgPaceSecPerKm: z.number().nullish(),
-    avgCadenceSpm: z.number().nullish(),
-    avgDistanceKm: z.number().nullish(),
-  })
-  .passthrough();
 export function WalkScreen({
   onBack,
   openActivity,
@@ -49,11 +40,7 @@ export function WalkScreen({
   const { today } = useHealthData(),
     { theme } = useTheme();
   const week = useWorkoutResource(cardioWeekSpec(today));
-  const stats = useWorkoutResource({
-    path: '/api/guided-walk/segment-stats',
-    ttl: 900000,
-    schema: z.object({ fast: aggregate, slow: aggregate }),
-  });
+  const stats = useWorkoutResource(walkSegmentStatsSpec);
   const draft = useWorkoutDraft('walk-config', schema, initial),
     action = useWorkoutAction(),
     activity = useActivities();

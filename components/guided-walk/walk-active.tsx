@@ -8,7 +8,6 @@ import { useGuidedWalkStore, MIN_WALK_SEC } from '@/lib/stores/guided-walk-store
 import { buildIntervalPlan, segmentAt } from '@/lib/walk/interval-plan'
 import { scheduleWalkCues, cancelWalkCues } from '@/lib/walk/walk-cues'
 import { getLiveHrManager } from '@/lib/live-hr/manager'
-import { hrReserveTarget, walkFastBandBpm } from '@trainingai/shared/health/hr-zones'
 import { hapticSuccess, hapticLight } from '@/lib/haptics'
 import type { LiveHrSample } from '@/lib/live-hr/types'
 import { LeaveWalkDialog } from './leave-walk-dialog'
@@ -25,7 +24,7 @@ import type { KindAggregate } from '@/lib/walk/segment-stats'
 import { WalkPacerBar } from './walk-pacer-bar'
 import { PhaseChangeFlash } from './phase-change-flash'
 import { shouldCuePhaseChange, phaseCueHaptic } from '@/lib/walk/walk-phase-cue'
-import { resolveCadenceTargets, speedTargetsFromHistory } from '@/lib/walk/walk-pacer'
+import { resolveCadenceTargets, speedTargetsFromHistory, walkHrTargets } from '@/lib/walk/walk-pacer'
 import type { PacerSignal, PacerBand as PaceBand } from '@trainingai/shared/health/pacer-adherence'
 
 const ActivityRouteMap = dynamic(
@@ -85,10 +84,7 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
   // here and was met on 0 of 44 blocks against a measured mean of 98.5, so the pacer read "push" on
   // every fast interval. The slow ceiling keeps its reserve fraction: it was met on 78% of blocks,
   // so nothing in the data says it is wrong.
-  const targets = useMemo(() => {
-    const [fast, fastMax] = walkFastBandBpm(hrMax)
-    return { fast, fastMax, slow: hrReserveTarget(0.40, userProfile.restingHr, hrMax) }
-  }, [userProfile.restingHr, hrMax])
+  const targets = useMemo(() => walkHrTargets(hrMax, userProfile.restingHr), [userProfile.restingHr, hrMax])
   const cadenceTargets = useMemo(() => resolveCadenceTargets(config), [config])
 
   // The speed rung's targets are the walker's own past fast/slow blocks, not a third thing to
