@@ -78,7 +78,9 @@ export function liveHrView(
     state.bpm !== null && state.bpm >= HR_MIN_PLAUSIBLE && state.bpm <= HR_MAX_PLAUSIBLE
       ? state.bpm
       : null;
-  const bpm = smoothed.length ? smoothed[smoothed.length - 1] : raw;
+  // Whole beats: the median of three can land on a half, and no strap reading is that precise.
+  const median = smoothed.length ? smoothed[smoothed.length - 1] : raw;
+  const bpm = median === null ? null : Math.round(median);
   const live =
     bpm !== null &&
     state.bpmAt !== null &&
@@ -91,7 +93,7 @@ export function liveHrView(
     live,
     stale: bpm !== null && !live,
     zone,
-    points: samples.map((x, index) => ({ at: x.at, bpm: smoothed[index] })),
+    points: samples.map((x, index) => ({ at: x.at, bpm: Math.round(smoothed[index]) })),
     message: live ? 'Reading…' : bpm !== null ? 'Holding last reading…' : 'Waiting for your strap…',
   };
 }

@@ -786,6 +786,28 @@ test('the accelerometer starts on a guided walk, batches a second of magnitudes 
   assert.equal(session.getSnapshot().link, 'connected');
 });
 
+test('the accelerometer is reference-counted: the last release stops it, an early one does not (#3594)', async () => {
+  const { session, ble } = await pairedSession();
+  session.hold('activity', true);
+  await settle();
+  const pacer = session.holdAccelerometer();
+  const readout = session.holdAccelerometer();
+  await settle();
+  assert.deepEqual(ble.log.filter((x) => x.startsWith('acc')), ['acc start'], 'one stream for two readers');
+  pacer();
+  pacer(); // a second release of the same hold counts for nothing
+  assert.equal(session.getSnapshot().accel, 'starting', 'the readout still holds it');
+  assert.deepEqual(ble.log.filter((x) => x.startsWith('acc')), ['acc start']);
+  readout();
+  assert.equal(session.getSnapshot().accel, 'off');
+  assert.deepEqual(ble.log.filter((x) => x.startsWith('acc')), ['acc start', 'acc stop']);
+  // A fresh hold after the last release starts it again.
+  const again = session.holdAccelerometer();
+  await settle();
+  assert.deepEqual(ble.log.filter((x) => x.startsWith('acc')), ['acc start', 'acc stop', 'acc start']);
+  again();
+});
+
 test('the accelerometer waits for the link and restarts after a drop', async () => {
   const { session, ble, clock } = await pairedSession();
   session.setAccelerometer(true);
