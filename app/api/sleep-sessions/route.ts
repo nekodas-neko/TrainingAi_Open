@@ -40,7 +40,9 @@ export async function GET() {
     averageHrvMs:    r.averageHrvMs    ?? null,
     avgHeartRate:    r.avgHeartRate    ?? null,
     lowestHeartRate: r.lowestHeartRate ?? null,
-    restlessPeriods: r.restlessPeriods ?? null,
+    // #3075 stage 3: an Oura Cloud night counts awakenings from its own hypnogram (the ring-era rule);
+    // Oura's restlessness value stays on the row and is the fallback. A ring night has no computed count.
+    restlessPeriods: r.computedAwakenings ?? r.restlessPeriods ?? null,
     respiratoryRate: r.respiratoryRate ?? null,
     sleepPhase5Min:  r.sleepPhase5Min  ?? null,
     sleepStart:      r.sleepStart.toISOString(),

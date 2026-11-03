@@ -476,6 +476,10 @@ export interface AggregatableSleep extends SleepWindow {
   restlessPeriods?: number | null
   respiratoryRate?: number | null
   timeInBedHours?: number | null
+  /** #3075 stage 3: when sleep really began and ended (computed, never stored); see `SleepSession`. */
+  onsetAt?: Date | null
+  finalWakeAt?: Date | null
+  computedAwakenings?: number | null
   /** #2265: the owner's partial-night mark. A reassembled night is marked when any window is. */
   partialNightAt?: Date | string | null
 }
@@ -544,6 +548,13 @@ export function aggregateNight<T extends AggregatableSleep>(period: SleepPeriod<
     })(),
     // Every gap is by definition a wake-up, on top of whatever each window already counted.
     restlessPeriods: (sum(w.map(x => x.restlessPeriods)) ?? 0) + period.gapHours.length,
+    // #3075 stage 3: the night's real onset is its first window's and its real wake its last's, each
+    // only where that window has one; the bed window above stays the whole span. Added only when set,
+    // so a night with no hypnogram is exactly the object it was.
+    ...(first.onsetAt != null ? { onsetAt: first.onsetAt } : {}),
+    ...(last.finalWakeAt != null ? { finalWakeAt: last.finalWakeAt } : {}),
+    ...(w.some(x => x.computedAwakenings != null)
+      ? { computedAwakenings: (sum(w.map(x => x.computedAwakenings)) ?? 0) + period.gapHours.length } : {}),
     // #2265: the mark is on the night, not on a window. Added only when set, so an unmarked night is
     // exactly the object it was before the mark existed.
     ...(w.some(x => x.partialNightAt != null) ? { partialNightAt: w.find(x => x.partialNightAt != null)!.partialNightAt } : {}),

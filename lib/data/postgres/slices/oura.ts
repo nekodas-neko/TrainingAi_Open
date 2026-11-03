@@ -3,7 +3,7 @@ import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, 
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
-import { overnightHrvFromSeries, overnightRecoveryIndexHoursFromSeries } from '@trainingai/shared/health/oura-sleep-detail'
+import { overnightHrvFromSeries, overnightRecoveryIndexHoursFromSeries, sleepShapeFromHypnogram, type OuraSleepShape } from '@trainingai/shared/health/oura-sleep-detail'
 import type { OuraCloudHeartrateWrite, OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
@@ -910,6 +910,8 @@ export interface MainSleepPeriod {
   overnightHrvMs: number | null
   /** #3075 stage 2: recovery-index hours from the period's stored 5-minute heart-rate series, or null when it is missing or not usable. */
   overnightRecoveryIndexHours: number | null
+  /** #3075 stage 3: the period's own onset, final wake, awakenings and WASO from its 30-second hypnogram, or null when it is missing or not usable. */
+  sleepShape: OuraSleepShape | null
 }
 
 /**
@@ -928,10 +930,10 @@ export async function getOuraMainSleepPeriods(
   const rows = await db.execute<{
     date: string; sleep_type: string; sleep_start: Date; sleep_end: Date; duration_hours: number | null
     average_hrv_ms: number | null; lowest_heart_rate: number | null; hrv_series: s.OuraSampleSeries | null
-    hr_series: s.OuraSampleSeries | null
+    hr_series: s.OuraSampleSeries | null; sleep_phase_30_sec: string | null; bedtime_start: Date | null
   }>(sql`
     SELECT s.date::text AS date, p.sleep_type, s.sleep_start, s.sleep_end, s.duration_hours, s.average_hrv_ms, s.lowest_heart_rate,
-           p.hrv AS hrv_series, p.heart_rate AS hr_series
+           p.hrv AS hrv_series, p.heart_rate AS hr_series, p.sleep_phase_30_sec, p.bedtime_start
       FROM sleep_sessions s
       JOIN oura_cloud_sleep_periods p ON p.user_id = s.user_id AND p.oura_id = s.oura_id
      WHERE s.user_id = ${userId} AND s.deleted_at IS NULL AND NOT s.manual_entry
@@ -947,6 +949,7 @@ export async function getOuraMainSleepPeriods(
       date: r.date, averageHrvMs: r.average_hrv_ms, lowestHeartRate: r.lowest_heart_rate,
       overnightHrvMs: overnightHrvFromSeries(r.hrv_series),
       overnightRecoveryIndexHours: overnightRecoveryIndexHoursFromSeries(r.hr_series, window),
+      sleepShape: sleepShapeFromHypnogram(r.sleep_phase_30_sec, r.bedtime_start),
     })
   }
   return [...out.values()]
