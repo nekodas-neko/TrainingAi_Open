@@ -1,4 +1,4 @@
-import { isCalendarDate } from '@trainingai/shared/date-utils';
+import { daysBetweenDateStrs, isCalendarDate } from '@trainingai/shared/date-utils';
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -19,6 +19,7 @@ import {
   TextField,
 } from '../../../shared/ui';
 import { useHealthData } from '../../health/data/HealthDataProvider';
+import { bodyTrendSpec } from '../../health/data/models';
 import {
   useWorkoutResource,
   useWorkoutResources,
@@ -412,8 +413,11 @@ function VialResponses({
     ttl: 300000,
     schema: inputsSchema,
   });
+  // The shared `weightTrend` covers 30 days; a vial can be older, so ask for its whole period (#2179).
+  const vialDays = since ? Math.max(30, daysBetweenDateStrs(since, health.today) + 1) : 30;
+  const trend = useWorkoutResource(bodyTrendSpec(health.today, vialDays));
   const result = weightResponse({
-    points: (health.body?.weightTrend ?? health.body?.recent ?? []).filter(
+    points: (trend.data?.weightTrend ?? health.body?.weightTrend ?? health.body?.recent ?? []).filter(
       (p) => since && p.date >= since,
     ),
     bandPctPerWeek: band,

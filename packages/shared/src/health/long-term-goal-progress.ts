@@ -141,8 +141,8 @@ export const WEIGHT_TREND_WINDOW_DAYS = 30
  * Calendar arithmetic on the date string, never `now − N × 86,400,000`, so the window starts at a
  * local midnight on both sides of a DST change.
  */
-export function weightTrendWindowStart(today: string): string {
-  return shiftDateStr(today, -(WEIGHT_TREND_WINDOW_DAYS - 1))
+export function weightTrendWindowStart(today: string, days: number = WEIGHT_TREND_WINDOW_DAYS): string {
+  return shiftDateStr(today, -(days - 1))
 }
 
 export type GoalBandStatus = 'at_goal' | 'on_track' | 'too_slow' | 'too_fast' | 'wrong_direction'
