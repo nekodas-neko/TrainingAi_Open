@@ -32,6 +32,7 @@ const panels = [
 export type HealthPanel = (typeof panels)[number]['id'];
 export function HealthScreen({
   openDetail,
+  openDevices,
   openPrograms,
   openSettings,
   panel,
@@ -41,6 +42,7 @@ export function HealthScreen({
   sleepRequest,
 }: {
   openDetail: (detail: HealthDetail) => void;
+  openDevices: () => void;
   openPrograms: () => void;
   openSettings: () => void;
   panel?: HealthPanel;
@@ -143,7 +145,7 @@ export function HealthScreen({
               {visited.has(panel.id) && (
                 <HealthViewReady view={panel.id}>
                   {panel.id === 'body' ? (
-                    <BodyPanel openDetail={openDetail} />
+                    <BodyPanel openDetail={openDetail} openDevices={openDevices} />
                   ) : panel.id === 'training' ? (
                     <TrainingPanel
                       openPrograms={openPrograms}

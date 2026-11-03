@@ -6,8 +6,23 @@ import { formatHoursMinutes } from '@trainingai/shared/format/units';
 // alert level and its state stay on this phone.
 export const RING_ALERT_KEY = 'ring-battery-alert.v1';
 export const RING_ALERT_LEVELS = [10, 15, 20, 25, 30] as const;
-/** A reading older than this is not news: opening the app after a day away must not alert. */
-export const MAX_ALERT_AGE_MIN = 24 * 60;
+/**
+ * A reading older than this is stale (#3557): the card stops showing it as the ring's current level,
+ * and opening the app after a day away must not alert from it.
+ */
+export const STALE_READING_MIN = 24 * 60;
+
+/** Whether a reading of this age (minutes) is too old to present as current. */
+export const isReadingStale = (ageMinutes: number) => ageMinutes > STALE_READING_MIN;
+
+/** What the ring card shows: no reading at all, a current one, or one too old to call current. */
+export function readingState(
+  latest: { tsMs: number } | null,
+  nowMs: number,
+): 'none' | 'fresh' | 'stale' {
+  if (!latest) return 'none';
+  return isReadingStale((nowMs - latest.tsMs) / 60_000) ? 'stale' : 'fresh';
+}
 
 const alertSchema = z.object({
   enabled: z.boolean().catch(true),
@@ -40,7 +55,7 @@ export function checkRingAlert(
   settings: RingAlertSettings,
   reading: { percent: number; charging: boolean; ageMinutes: number } | null,
 ): { notify: boolean; settings: RingAlertSettings } {
-  if (!reading || reading.ageMinutes > MAX_ALERT_AGE_MIN) return { notify: false, settings };
+  if (!reading || isReadingStale(reading.ageMinutes)) return { notify: false, settings };
   const decision = decideLowBatteryAlert(
     reading.percent,
     reading.charging,

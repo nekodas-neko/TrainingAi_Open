@@ -33,7 +33,13 @@ function GroupTitle({ children }: { children: string }) {
     </AppText>
   );
 }
-export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) => void }) {
+export function BodyPanel({
+  openDetail,
+  openDevices,
+}: {
+  openDetail: (detail: HealthDetail) => void;
+  openDevices: () => void;
+}) {
   const health = useHealthData();
   const imported = useAppleImport();
   const goals = useWorkoutResource(goalsSpec);
@@ -181,7 +187,8 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
       <RingCards openDetail={openDetail} />
       <FeatureRow
         title="Devices & integrations"
-        subtitle="Direct ring connections remain deferred"
+        subtitle="Oura account, heart-rate strap"
+        onPress={openDevices}
       />
       {log && (
         <MetricLogSheet
