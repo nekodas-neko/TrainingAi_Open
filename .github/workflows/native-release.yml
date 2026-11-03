@@ -147,6 +147,9 @@ jobs:
           grep -q "versionCode $ANDROID_VERSION_CODE\$" android/app/build.gradle || {
             echo "::error::The generated project's versionCode is not $ANDROID_VERSION_CODE:"; grep -n versionCode android/app/build.gradle; exit 1; }
 
+      - name: Android NDK
+        uses: ./.github/actions/android-ndk
+
       - name: Compile the release APK
         run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
         working-directory: mobile/android

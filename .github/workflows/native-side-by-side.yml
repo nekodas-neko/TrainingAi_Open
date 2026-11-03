@@ -22,12 +22,14 @@ on:
       - 'mobile/**'
       - 'packages/shared/**'
       - '.github/workflows/native-side-by-side.yml'
+      - '.github/actions/android-ndk/**'
   pull_request:
     branches: [main]
     paths:
       - 'mobile/**'
       - 'packages/shared/**'
       - '.github/workflows/native-side-by-side.yml'
+      - '.github/actions/android-ndk/**'
   workflow_dispatch:
 
 permissions:
@@ -94,6 +96,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec expo prebuild --platform android --no-install
+
+      # Before Gradle, so it never downloads the NDK itself (#3573).
+      - name: Android NDK
+        uses: ./.github/actions/android-ndk
 
       # The one thing this workflow must never do is build the real app's ID.
       - name: Check the build is the side-by-side app

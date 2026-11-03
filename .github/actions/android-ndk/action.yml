@@ -1,0 +1,64 @@
+name: Android NDK
+description: >
+  Installs the NDK that the generated Expo project's Gradle build asks for, from a cache when it
+  can, so Gradle never downloads it (about 1 GB) in the middle of a build. Run it after
+  `expo prebuild` and before any Gradle step. Used by native-side-by-side.yml, native-release.yml
+  and mobile.yml (#3573).
+
+runs:
+  using: composite
+  steps:
+    # One source for the version: React Native's own version catalog, which is what the generated
+    # project's `rootProject.ext.ndkVersion` resolves to. A project that pins a different one in
+    # its Gradle files is caught here, not discovered as a mid-build download.
+    - name: Read the NDK version the project asks for
+      id: version
+      shell: bash
+      run: |
+        set -euo pipefail
+        catalog="$GITHUB_WORKSPACE/mobile/node_modules/react-native/gradle/libs.versions.toml"
+        version="$(sed -nE 's/^ndkVersion[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$catalog" | head -n 1)"
+        [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+          echo "::error::Could not read ndkVersion from $catalog (got '${version:-nothing}')."; exit 1; }
+        pinned="$(grep -rhE '^[[:space:]]*(ndkVersion|ext\.ndkVersion)[[:space:]]*[=(]?[[:space:]]*["'"'"'][0-9]' \
+          "$GITHUB_WORKSPACE/mobile/android" --include='*.gradle' || true)"
+        if [ -n "$pinned" ] && ! grep -qF "$version" <<< "$pinned"; then
+          echo "::error::The generated project pins a different NDK than React Native's $version:"; echo "$pinned"; exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "NDK_VERSION=$version" >> "$GITHUB_ENV"
+
+    - name: Restore the NDK cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.ANDROID_HOME }}/ndk/${{ steps.version.outputs.version }}
+        key: android-ndk-${{ runner.os }}-${{ steps.version.outputs.version }}
+
+    # A dropped or corrupt download is caught and retried here. An install counts only if the
+    # NDK's source.properties exists afterwards; a partial folder is removed between attempts.
+    - name: Install the NDK
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -uo pipefail
+        dir="$ANDROID_HOME/ndk/$NDK_VERSION"
+        for attempt in 1 2 3; do
+          echo "Installing ndk;$NDK_VERSION (attempt $attempt of 3)"
+          rm -rf "$dir"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" || true
+          if [ -f "$dir/source.properties" ]; then
+            echo "NDK $NDK_VERSION installed."; exit 0
+          fi
+          echo "::warning::NDK install attempt $attempt did not leave $dir/source.properties."
+        done
+        rm -rf "$dir"
+        echo "::error::Could not install ndk;$NDK_VERSION after 3 attempts."
+        exit 1
+
+    # A restored cache is checked the same way, so a damaged one fails here, clearly.
+    - name: Check the NDK is whole
+      shell: bash
+      run: |
+        [ -f "$ANDROID_HOME/ndk/$NDK_VERSION/source.properties" ] || {
+          echo "::error::$ANDROID_HOME/ndk/$NDK_VERSION/source.properties is missing."; exit 1; }

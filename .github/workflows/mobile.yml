@@ -7,6 +7,7 @@ on:
       - 'mobile/**'
       - 'packages/shared/**'
       - '.github/workflows/mobile.yml'
+      - '.github/actions/android-ndk/**'
   workflow_dispatch:
 
 permissions:
@@ -70,6 +71,8 @@ jobs:
           java-version: '21'
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec expo prebuild --platform android --no-install
+      - name: Android NDK
+        uses: ./.github/actions/android-ndk
       - name: Compile unpublished development APK
         run: ./gradlew :app:assembleDebug --no-daemon
         working-directory: mobile/android
