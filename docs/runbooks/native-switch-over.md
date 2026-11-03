@@ -1,9 +1,9 @@
 # Runbook: switching `com.trainingai.app` to the native app, and rolling back
 
 _For #2840 and #2849. Rules come from [`native-testing.md`](../native-testing.md) step 5 and
-[`canonical-runtime-android.md`](../canonical-runtime-android.md). The native release workflow
-isn't built yet (it waits on the owner's choice on #3526). This runbook covers what happens once a
-signed native build exists._
+[`canonical-runtime-android.md`](../canonical-runtime-android.md). The release APK is built by
+`native-release.yml` (#3532; how to run it: [`native-testing.md`](../native-testing.md), "Building the
+release APK"). Its first clean run was 41603532003 on 3 Nov 2026, a test build with versionCode 1._
 
 ## The one rule
 
@@ -15,8 +15,11 @@ downgrade"), **stop and tell the Orchestrator**. Never work around it.
 ## Before the day (checklist)
 
 - ☐ The ring is on the Oura API (#2808), so there's no ring key to carry over.
+- ☐ The owner holds an offline copy of the signing key (`debug-signing.keystore`, kept outside the
+  repo on the owner's PC). Never upload or post it.
 - ☐ A native release APK exists, signed with the installed app's certificate (SHA-256
-  `d390062e…893c`, the `EXPECTED_CERT_SHA256` in `android.yml`) and with a higher `versionCode`.
+  `d390062e…893c`, the `EXPECTED_CERT_SHA256` in `android.yml`) and with a higher `versionCode`
+  (see *Version codes* below). Build it within 14 days of the switch: the artifact expires then.
 - ☐ The rollback build exists (see *Rollback*), with a code **above** the native app's.
 - ☐ The owner has said yes on the switch-over issue.
 
@@ -47,7 +50,12 @@ downgrade"), **stop and tell the Orchestrator**. Never work around it.
 6. **Sign in** on the phone with the owner's account.
 7. **Smoke checks** (see [`device-smoke-checklist.md`](../device-smoke-checklist.md)): today's
    data shows, a workout log saves and appears on the server, Health Connect sync runs, a
-   reminder fires. Report results on the switch-over issue, naming what wasn't checked.
+   reminder fires. More → About shows the expected app version and build, the commit it was built
+   from, and the live server version. Report results on the switch-over issue, naming what wasn't
+   checked.
+8. **Re-grant what the new install doesn't inherit.** Settings → Oura → "Open Display over other
+   apps", allow it (the owner said yes on #3561), then turn the morning Oura fetch back on.
+   Notification permission is asked for on first use.
 
 The wrapper never runs in CI.
 
@@ -69,7 +77,17 @@ rollback has to carry a code **above** whatever is installed (the native app's).
 The code stays above the native app's from then on: a later Capacitor release needs the same
 override, so the weekly formula (`major*1e6 + minor*1e3 + patch`) can't be used until it overtakes it.
 
+## Version codes
+
+Android installs only a higher `versionCode` over a lower one. The installed Capacitor app is
+**1492000** (1.492.0, read from the phone on 3 Nov 2026).
+
+- **Native release:** `2,000,000 + minor × 1,000 + patch` of the `main` version it is cut at
+  (cut at 1.515.0 → `2515000`; a second native build at the same version adds 1). This clears every
+  code the Capacitor formula (`major × 1e6 + minor × 1e3 + patch`, all below 2,000,000 for 1.x) can make.
+- **Rollback build:** the installed native code **+ 500**, built from the last Capacitor tag.
+- The Orchestrator decided this on 3 Nov 2026 (#2849). Change it only with a note there.
+
 ## What this does not cover
 
-Device behaviour of the native app itself, and the build workflow for the native release, which
-waits on #3526.
+Device behaviour of the native app itself.
