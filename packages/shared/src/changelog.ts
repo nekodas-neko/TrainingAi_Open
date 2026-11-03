@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.517.0",
+    date: "2026-11-05",
+    changes: [
+      "Both apps: Body Battery drops when you train and walk. When your heart-rate data is too sparse to show a workout or your steps, they now count against your session and step goals, so a full day ends near empty and a rest day holds.",
+      "Both apps: readiness counts yesterday's activity once, from its finished Activity score, instead of twice.",
+      "Both apps: the Sleep Score counts restlessness again from your device's movement data, and a night your device says it recorded incompletely counts as a partial night. When a device changes its sleep algorithm, its normals start again.",
+      "Both apps: the Activity score's move-every-hour part works before you have a resting heart rate, and its zone minutes, your heart-rate zones and Body Battery now share one resting-heart-rate rule.",
+      "Both apps: your average bedtime uses when you actually fell asleep, and the heart-rate recovery card no longer drops sets from early on the first day of its window.",
+      "Current app: the phone keeps each night's real sleep start, wake and awakenings, so the Health sheet shows the same awakenings offline as online.",
+      "Oura: the app now asks Oura for permission to read the ring's battery. Reconnect Oura once in Preview (More → Devices & connections) to grant it.",
+      "TrainingAi Preview: every walk, run and treadmill recording shows your step rate from the strap, and the strap stays connected with the screen off on treadmill and indoor activities.",
+      "Behind the scenes: a night's heart-rate variability now records whether it came from the full series or the device's own average; the readiness comparison model's weights are updated; and the rule that every device is just a source is written into the project's guides.",
+    ],
+  },
+  {
     version: "1.516.0",
     date: "2026-11-04",
     changes: [
