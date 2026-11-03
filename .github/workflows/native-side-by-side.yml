@@ -166,7 +166,7 @@ jobs:
           PKG="$(sed -nE "s/^package: name='([^']+)'.*/\1/p" <<< "$BADGING")"
           CODE="$(sed -nE "s/^package: .*versionCode='([0-9]+)'.*/\1/p" <<< "$BADGING")"
           LABEL="$(sed -nE "s/^application-label:'(.*)'/\1/p" <<< "$BADGING")"
-          CERT="$("$BT/apksigner" verify --print-certs "$APK" | sed -nE 's/.*certificate SHA-256 digest: ([0-9a-f]{64}).*/\1/p' | sort -u)"
+          CERT="$("$BT/apksigner" verify --print-certs "$APK" | grep -E '^[[:space:]]*Signer' | sed -nE 's/.*certificate SHA-256 digest: ([0-9A-Fa-f:]+).*/\1/p' | tr -d ':' | tr 'A-F' 'a-f' | sort -u)"
           [ "$PKG" = "$PACKAGE" ] || { echo "::error::The APK is $PKG, not $PACKAGE. Nothing is published."; exit 1; }
           [ "$CODE" = "${{ steps.version.outputs.code }}" ] || { echo "::error::Version code $CODE, expected ${{ steps.version.outputs.code }}."; exit 1; }
           # The real app's certificate (android.yml). Signing with it would let this build stand in

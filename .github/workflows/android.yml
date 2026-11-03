@@ -221,7 +221,7 @@ jobs:
           set -euo pipefail
           APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
           for apk in app-debug.apk app-dev-debug.apk; do
-            got=$("$APKSIGNER" verify --print-certs "$apk" | grep -oE 'certificate SHA-256 digest: [0-9a-f]{64}' | awk '{print $NF}' | sort -u)
+            got=$("$APKSIGNER" verify --print-certs "$apk" | grep -E '^[[:space:]]*Signer' | grep -oiE 'certificate SHA-256 digest: [0-9a-f:]+' | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f' | sort -u)
             if [ "$got" != "$EXPECTED_CERT_SHA256" ]; then
               echo "::error::$apk is signed by '${got:-nothing}', not the installed app's certificate ($EXPECTED_CERT_SHA256). Nothing was published."
               exit 1
