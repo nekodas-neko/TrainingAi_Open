@@ -17,7 +17,7 @@ import { SupplementLogSchema } from '@trainingai/shared/validation/supplement';
 import { z } from 'zod';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
-import { ApiError } from '../../account/api/client.ts';
+import { ApiError, isAuthRefusal } from '../../account/api/client.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { normaliseFood, type FoodEntry } from './food-values.ts';
 import {
@@ -696,7 +696,7 @@ export class NutritionStore {
             });
             return;
           }
-          const denied = cause instanceof ApiError && [401, 403].includes(cause.status);
+          const denied = isAuthRefusal(cause);
           if (denied) {
             this.denialRevision++;
           }
@@ -1250,7 +1250,7 @@ export class NutritionStore {
         this.publish({ error: null });
       } catch (cause) {
         if (generation === this.generation) {
-          const denied = cause instanceof ApiError && [401, 403].includes(cause.status);
+          const denied = isAuthRefusal(cause);
           if (denied) {
             this.denialRevision++;
           }

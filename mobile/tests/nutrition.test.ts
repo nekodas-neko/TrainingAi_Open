@@ -504,12 +504,22 @@ test('authorization denial hides cached nutrition and stops writes', async () =>
   const f = fixture();
   const store = await ready(f);
   f.connection.get = async () => {
-    throw new ApiError(403, 'inactive_account');
+    throw new ApiError(403, 'inactive_account', undefined, undefined, true);
   };
   await store.refresh('logs', date, true);
   assert.equal(store.getSnapshot().denied, true);
   assert.equal(store.view(date).mealTypes.length, 0);
   await assert.rejects(store.logFoods([{ ...food, quantityMultiplier: 1 }], date, mealType.id));
+});
+test("a proxy's HTML 403 does not hide cached nutrition or stop writes", async () => {
+  const f = fixture();
+  const store = await ready(f);
+  f.connection.get = async () => {
+    throw new ApiError(403);
+  };
+  await store.refresh('logs', date, true);
+  assert.equal(store.getSnapshot().denied, false);
+  await store.logFoods([{ ...food, quantityMultiplier: 1 }], date, mealType.id);
 });
 test('food identity reuse preserves quantities and does not add duplicate library rows', async () => {
   const f = fixture();
