@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatInTimeZone } from 'date-fns-tz'
-import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz, midnightDaysAgoInTz, clockSkipOnDay, closeClockSkip } from '../date-utils'
+import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz, midnightDaysAgoInTz, clockSkipOnDay, closeClockSkip, wallClockMinuteReader } from '../date-utils'
 
 describe('ageFromDob', () => {
   const today = new Date('2026-07-22T00:00:00Z')
@@ -430,5 +430,42 @@ describe('clockSkipOnDay / closeClockSkip (#3445)', () => {
     expect(closeClockSkip(105, skip)).toBe(105)
     expect(closeClockSkip(180, skip) - closeClockSkip(105, skip)).toBe(15)
     expect(closeClockSkip(500, null)).toBe(500)
+  })
+})
+
+describe('wallClockMinuteReader anchor (#3470)', () => {
+  const start = (day: string, tz: string) => dateStrMidnightInTz(day, tz).getTime()
+  const read = (day: string, tz: string, iso: string) => wallClockMinuteReader(start(day, tz), tz)(Date.parse(iso))
+
+  it('reads 01:00 on the clock as minute 60 where the change falls at midnight (Havana)', () => {
+    // The day starts at 04:00Z, which reads 23:00 on the 7th; 05:00Z is 01:00 on the 8th.
+    expect(read('2026-03-08', 'America/Havana', '2026-03-08T04:00:00Z')).toBe(-60)
+    expect(read('2026-03-08', 'America/Havana', '2026-03-08T05:00:00Z')).toBe(60)
+    expect(read('2026-03-08', 'America/Havana', '2026-03-08T16:00:00Z')).toBe(12 * 60) // noon (UTC-4)
+  })
+  it('still takes the skip out of elapsed time in Havana (#3469)', () => {
+    const tz = 'America/Havana'
+    const skip = clockSkipOnDay(start('2026-03-08', tz), tz)
+    const a = closeClockSkip(read('2026-03-08', tz, '2026-03-08T04:30:00Z'), skip)
+    const b = closeClockSkip(read('2026-03-08', tz, '2026-03-08T05:00:00Z'), skip)
+    expect(b - a).toBe(30)
+  })
+  it('leaves an ordinary Brisbane day unchanged', () => {
+    expect(read('2026-03-08', 'Australia/Brisbane', '2026-03-07T14:00:00Z')).toBe(0)
+    expect(read('2026-03-08', 'Australia/Brisbane', '2026-03-08T02:00:00Z')).toBe(12 * 60)
+  })
+  it('leaves an ordinary 02:00 spring-forward unchanged (New York)', () => {
+    const tz = 'America/New_York'
+    expect(read('2026-03-08', tz, '2026-03-08T05:00:00Z')).toBe(0)
+    expect(read('2026-03-08', tz, '2026-03-08T06:59:00Z')).toBe(119) // 01:59 EST
+    expect(read('2026-03-08', tz, '2026-03-08T07:00:00Z')).toBe(180) // 03:00 EDT
+  })
+  it('leaves a fall-back day unchanged (Sydney, April)', () => {
+    const tz = 'Australia/Sydney'
+    expect(read('2027-04-04', tz, '2027-04-03T13:00:00Z')).toBe(0)
+    expect(read('2027-04-04', tz, '2027-04-03T15:30:00Z')).toBe(150) // 02:30 AEDT, first pass
+    expect(read('2027-04-04', tz, '2027-04-03T16:30:00Z')).toBe(150) // 02:30 AEST, repeated hour
+    expect(read('2027-04-04', tz, '2027-04-03T17:30:00Z')).toBe(210) // 03:30 AEST
+    expect(read('2027-04-04', tz, '2027-04-04T02:00:00Z')).toBe(12 * 60)
   })
 })
