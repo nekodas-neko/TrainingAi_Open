@@ -27,18 +27,36 @@ export function invoke(tool, args) {
     );
   }
 }
+// apksigner prints one "<signer> certificate SHA-256 digest: <hex>" line per signer. <signer> depends
+// on the build-tools version: "V3.0 Signer:" or "V2 Signer:" (apksigner 0.9 in build-tools 37, as on
+// the GitHub runners in Nov 2026), "Signer #N" (older apksigner), or "Signer (minSdkVersion=X,
+// maxSdkVersion=Y)" (v3.1 rotation). The digest can be lower or upper case, with or without colons.
+// A "Source Stamp Signer" line describes the stamp, not the APK signer, so the line has to start with
+// the signer itself. "public key SHA-256 digest" lines (verbose output) are not certificates.
+const SIGNER_DIGEST = /^\s*(?:V\d+(?:\.\d+)?\s+)?Signer\b.*?\bcertificate SHA-256 digest:\s*([0-9a-f:]+)\s*$/i;
+export function parseSignerCertificates(output) {
+  const lines = String(output).split(/\r?\n/);
+  const certificates = [
+    ...new Set(
+      lines
+        .map((line) => SIGNER_DIGEST.exec(line))
+        .filter(Boolean)
+        .map((match) => match[1].replace(/:/g, '').toUpperCase()),
+    ),
+  ].sort();
+  if (!certificates.length || certificates.some((value) => !/^[A-F0-9]{64}$/.test(value))) {
+    const seen = lines.filter((line) => /certificate|signer/i.test(line)).map((line) => line.trim());
+    throw new Error(
+      'Could not identify the verified APK signing certificates. apksigner printed these lines mentioning "certificate" or "Signer":\n' +
+        (seen.length ? seen.join('\n') : '(none)'),
+    );
+  }
+  return certificates;
+}
 export function inspect(apk, signer, analyzer) {
   if (!apk || !existsSync(apk)) throw new Error('Provide an existing APK file.');
   const output = invoke(signer, ['verify', '--print-certs', resolve(apk)]);
-  const certificates = [
-    ...new Set(
-      [...output.matchAll(/Signer #\d+ certificate SHA-256 digest:\s*([a-f0-9]+)/gi)].map(
-        (match) => match[1].toUpperCase(),
-      ),
-    ),
-  ].sort();
-  if (!certificates.length || certificates.some((value) => !/^[A-F0-9]{64}$/.test(value)))
-    throw new Error('Could not identify the verified APK signing certificates.');
+  const certificates = parseSignerCertificates(output);
   const versionCode = Number(
     invoke(analyzer, ['manifest', 'version-code', resolve(apk)]).trim(),
   );

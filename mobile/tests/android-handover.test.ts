@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { verifyUpgrade } from '../scripts/verify-android-upgrade.mjs';
+import { parseSignerCertificates, verifyUpgrade } from '../scripts/verify-android-upgrade.mjs';
 import { resolveAndroidSigning } from '../scripts/android-signing.mjs';
 
 test('native CI reuses the old signing key and never silently substitutes it for incomplete explicit credentials', () => {
@@ -93,4 +93,78 @@ test('legacy inventory is read-only, filters scoped rows, and prints no private 
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+const CERT_HEX = 'd390062e367da6eee52ee74ca18632eae7686e5edb9c0c25e2fc98a3744d893c';
+const CERT = CERT_HEX.toUpperCase();
+
+test('apksigner output: the Signer #N form', () => {
+  const out = `Verifies\nSigner #1 certificate DN: CN=Android Debug\nSigner #1 certificate SHA-256 digest: ${CERT_HEX}\nSigner #1 certificate SHA-1 digest: aa\n`;
+  assert.deepEqual(parseSignerCertificates(out), [CERT]);
+});
+
+// Captured from apksigner 0.9 (build-tools 37.0.0) on the published Preview APK and on test signs
+// with a throwaway key, 3 Nov 2026. Digests replaced; `-v` adds the key lines.
+test('apksigner output: the build-tools 37 "V3.0 Signer:" and "V2 Signer:" forms', () => {
+  const pubKey = 'c'.repeat(64);
+  const v3 = [
+    'Verifies',
+    'Verified using v3 scheme (APK Signature Scheme v3): true',
+    'Number of signers: 1',
+    'V3.0 Signer: certificate DN: CN=Android Debug, O=Android, C=US',
+    `V3.0 Signer: certificate SHA-256 digest: ${CERT_HEX}`,
+    'V3.0 Signer: certificate SHA-1 digest: aa',
+    'V3.0 Signer: key algorithm: RSA',
+    `V3.0 Signer: public key SHA-256 digest: ${pubKey}`,
+    '',
+  ].join('\n');
+  assert.deepEqual(parseSignerCertificates(v3), [CERT]);
+  const v2 = `V2 Signer: certificate DN: CN=x\nV2 Signer: certificate SHA-256 digest: ${CERT_HEX}\n`;
+  assert.deepEqual(parseSignerCertificates(v2), [CERT]);
+  assert.throws(
+    () => parseSignerCertificates(`Source Stamp Signer: certificate SHA-256 digest: ${CERT_HEX}\n`),
+    /Could not identify/,
+  );
+});
+
+test('apksigner output: the Signer (minSdkVersion, maxSdkVersion) form, with colons or upper case', () => {
+  const colon = CERT.match(/../g)!.join(':');
+  const out = [
+    'Verifies',
+    'Signer (minSdkVersion=24, maxSdkVersion=2147483647) certificate DN: CN=x',
+    `Signer (minSdkVersion=24, maxSdkVersion=2147483647) certificate SHA-256 digest: ${colon}`,
+    '',
+  ].join('\r\n');
+  assert.deepEqual(parseSignerCertificates(out), [CERT]);
+});
+
+test('apksigner output: v3.1 plus v3 signers with the same certificate dedupe to one', () => {
+  const out = [
+    `Signer (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: ${CERT_HEX}`,
+    `Signer (minSdkVersion=24, maxSdkVersion=32) certificate SHA-256 digest: ${CERT_HEX}`,
+    `Signer #1 certificate SHA-256 digest: ${CERT_HEX}`,
+  ].join('\n');
+  assert.deepEqual(parseSignerCertificates(out), [CERT]);
+});
+
+test('apksigner output: a source stamp digest is not an APK signer', () => {
+  const stamp = 'b'.repeat(64);
+  const out = `Signer #1 certificate SHA-256 digest: ${CERT_HEX}\nSource Stamp Signer certificate SHA-256 digest: ${stamp}\n`;
+  assert.deepEqual(parseSignerCertificates(out), [CERT]);
+  assert.throws(
+    () => parseSignerCertificates(`Source Stamp Signer certificate SHA-256 digest: ${stamp}\n`),
+    /Could not identify/,
+  );
+});
+
+test('apksigner output: garbage fails and quotes the certificate and Signer lines', () => {
+  const out = 'Verifies\nSigner #1 certificate SHA-256 digest: nothex\nSigner weird certificate line\nunrelated\n';
+  assert.throws(
+    () => parseSignerCertificates(out),
+    (error: Error) =>
+      /Could not identify/.test(error.message) &&
+      error.message.includes('Signer #1 certificate SHA-256 digest: nothex') &&
+      error.message.includes('Signer weird certificate line') &&
+      !error.message.includes('unrelated'),
+  );
 });
