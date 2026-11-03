@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.515.0",
+    date: "2026-11-03",
+    changes: [
+      "Both apps: the low-readiness alert no longer follows an illness or high-stress alert you already had that day.",
+      "TrainingAi Preview: rows for features that work no longer say \"Coming soon\", and Health → Body → Devices & integrations opens your devices.",
+      "TrainingAi Preview: the Oura Ring card says when the last battery reading came in, instead of showing an old one as the current charge.",
+      "TrainingAi Preview: About shows the app version and build, the code it was built from, and the server's version.",
+      "TrainingAi Preview: the interval walk paces you by speed, then heart rate, when the strap gives no step rate, and keeps its tally if the walk restarts.",
+      "TrainingAi Preview: a dose's weight response covers the whole vial.",
+      "TrainingAi Preview: your workout program and health records stay put when a captive portal or proxy answers in the server's place.",
+      "Behind the scenes: when Oura refuses a data type, its reason is now recorded so the missing permission can be found; clock minutes are right in time zones whose daylight-saving change falls at midnight; and the new app's release build checks itself correctly.",
+    ],
+  },
+  {
     version: "1.514.0",
     date: "2026-11-02",
     changes: [
