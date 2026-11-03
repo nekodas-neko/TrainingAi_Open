@@ -27,7 +27,7 @@ import {
 
 const FULL: ReadinessCompositeInputs = {
   rhrZ: -0.8, hrvZ: 1.1, tempZ: 0.3, sleepBalanceZ: -0.4,
-  previousNightScore: 81, prevDayActivityScore: 64, activityBalanceScore: 72,
+  previousNightScore: 81, activityBalanceScore: 72,
   nHistory: BASELINE_MIN_NIGHTS + 6, recoveryIndexHours: 3.2,
 }
 
@@ -43,7 +43,6 @@ describe('every contributor records the number it was computed from', () => {
   it('records the 0-100 value for the pass-through terms', () => {
     const c = computeReadinessComposite(FULL).contributors
     expect(c.previousNight.input).toBe(81)
-    expect(c.prevDayActivity.input).toBe(64)
     expect(c.activityBalance.input).toBe(72)
   })
 
@@ -98,9 +97,9 @@ describe('a persisted row can be re-derived from itself', () => {
       { ...FULL, nHistory: 2 },                                   // every z term neutral
       { ...FULL, rhrZ: -3, hrvZ: 4, tempZ: -2.5, sleepBalanceZ: 3 }, // clamped at both ends
       { ...FULL, recoveryIndexHours: RECOVERY_INDEX_OPTIMAL_HOURS * 3 }, // clamped hours
-      { ...FULL, previousNightScore: 0, prevDayActivityScore: 100, activityBalanceScore: 0 },
+      { ...FULL, previousNightScore: 0, activityBalanceScore: 0 },
       { rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null, previousNightScore: null,
-        prevDayActivityScore: null, activityBalanceScore: null, nHistory: 0 },  // nothing at all
+        activityBalanceScore: null, nHistory: 0 },  // nothing at all
     ]
     for (const input of cases) {
       const result = computeReadinessComposite(input)

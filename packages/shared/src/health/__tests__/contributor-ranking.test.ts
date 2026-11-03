@@ -26,7 +26,6 @@ describe('readiness wording', () => {
       hrvBalance: 'HRV balance',
       temperature: 'Body temperature',
       sleepBalance: 'Sleep balance',
-      prevDayActivity: 'Previous day activity',
       recoveryIndex: 'Recovery index',
       activityBalance: 'Activity balance',
     }

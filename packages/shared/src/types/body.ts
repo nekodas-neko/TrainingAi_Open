@@ -1,3 +1,5 @@
+import type { NightHrvMethod } from '../health/night-hrv-method'
+
 export interface BodyMetrics {
   id: string
   userId: string
@@ -51,6 +53,9 @@ export interface BodyMetrics {
    * the same reason as `bodyFatSource`.
    */
   hrvSource?: string
+  /** #3376. READ-ONLY: how `hrvMs` was reached — the median of a series, or the source's own nightly
+   *  average when it sent no usable series (`night-hrv-method.ts`). Undefined when unmarked. Never written. */
+  hrvMethod?: NightHrvMethod
   restingHeartRateSource?: string
   /** #2825. READ-ONLY provenance for `steps` and `spo2Pct` (`source_map->>'steps'`,
    *  `source_map->>'spo2_pct'`), for the same per-device normal. Never written. */

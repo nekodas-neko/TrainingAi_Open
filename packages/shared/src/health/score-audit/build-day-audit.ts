@@ -1,7 +1,5 @@
 import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
-import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
-import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { finalisedPreTaper } from '@trainingai/shared/health/activity-day'
 import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
@@ -88,7 +86,6 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   const ouraToday = ouraRows.find(r => r.date === date) ?? null
   const derivedForDay = derivedRows.find(r => r.day === date) ?? null
   const dayMetrics = bodyMetrics.find(m => m.date === date) ?? null
-  const yesterdayMetrics = bodyMetrics.find(m => m.date === yesterdayIso) ?? null
 
   const summariesUpToDay = summaries.filter(s => s.date <= date)
   const summary = summariesUpToDay.find(s => s.date === date) ?? null
@@ -165,18 +162,6 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     derived: derivedForDay,
   }
 
-  // TN-77(a): the audit shares readiness's defect, so it shares the fix — yesterday's contributor
-  // is scored on yesterday's window, not the day being audited.
-  const prevWindow = strengthWindowEndingAt(sessionsUpToDay, yesterdayIso, tz)
-  const yesterdaySteps = dayStepCount(yesterdayMetrics?.steps, activityLogsTwoDays.filter(a => a.date === yesterdayIso))
-  const prevDayActivityScore = (yesterdayMetrics || yesterdaySteps != null || prevWindow.sessions7d > 0)
-    ? computeActivityScore({
-        steps: yesterdaySteps,
-        activeCalories: yesterdayMetrics?.activeCalories ?? null,
-        sessions7d: prevWindow.sessions7d, volume7dKg: prevWindow.volume7dKg, goals,
-      })?.preTaperScore ?? null
-    : null
-
   // #2435: readiness's activity balance is the previous COMPLETED day's score, as the live payload
   // reads it: the stored final value when that day was finalised, else that day scored from its own
   // inputs by the same loader the finalise stores from.
@@ -192,7 +177,6 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     date, summary, priorSummary,
     sleepScore: sleep?.score ?? null,
     activityScore: prevCompletedDayActivity,
-    prevDayActivityScore,
     ouraDaily: ouraToday,
     derived: derivedForDay,
     switchDay,

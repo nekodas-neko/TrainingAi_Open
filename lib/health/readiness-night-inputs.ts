@@ -35,6 +35,7 @@ import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { trailingBaselineZ } from '@/lib/health/score-availability'
 import { canonicalNightForDate, type DatedNight } from '@trainingai/shared/health/sleep-night'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
+import { hrvNightInNormal, type NightHrvMethod } from '@trainingai/shared/health/night-hrv-method'
 import { deviceOf, rowsInNormalGroup } from '@trainingai/shared/health/per-device-normal'
 
 /**
@@ -77,6 +78,8 @@ export interface NightInputSources {
     hrvMs?: number | null
     restingHeartRate?: number | null
     hrvSource?: string | null
+    /** #3376: series median or the source's own average; `hrvNightInNormal` decides if it joins the normal. */
+    hrvMethod?: NightHrvMethod | null
     restingHeartRateSource?: string | null
   }[]
   /** One canonical night per wake date. */
@@ -146,7 +149,7 @@ function latestDate(dates: (string | null | undefined)[]): string | null {
  * summary's own baselines. Without it a 0.3 °C deviation would round to zero.
  */
 function genericInput(
-  obs: readonly { date: string; value: number | null | undefined; source: string | null | undefined; algorithmVersion?: string | null }[],
+  obs: readonly { date: string; value: number | null | undefined; source: string | null | undefined; inNormal?: boolean; algorithmVersion?: string | null }[],
   nightDate: string,
   scale = 1,
 ): NightInput | null {
@@ -157,8 +160,10 @@ function genericInput(
   const upToTonight = obs
     .filter(o => o.date <= nightDate && o.value != null && Number.isFinite(o.value))
     .sort((a, b) => a.date.localeCompare(b.date))
+  // #3376: a night marked out of the normal (`inNormal: false`) still scores tonight; it only stays out
+  // of later nights' normals. Nothing is marked out today (`hrvNightInNormal` returns true).
   const priors = rowsInNormalGroup(upToTonight, o => o.source, o => o.algorithmVersion, { source, algorithmVersion: tonight.algorithmVersion })
-    .filter(o => o.date < nightDate)
+    .filter(o => o.date < nightDate && o.inNormal !== false)
   // `trailingBaselineZ` holds back a z until the normal has BASELINE_MIN_NIGHTS nights, so a young
   // normal never yields a fabricated extreme; the night count says why it is missing.
   const z = trailingBaselineZ([...priors.map(o => o.value! * scale), tonight.value! * scale])
@@ -208,7 +213,11 @@ export function resolveReadinessNightInputs(src: NightInputSources): ReadinessNi
       src.bodyMetrics.map(m => ({ date: m.date, value: (m.restingHeartRate ?? 0) > 0 ? m.restingHeartRate : null, source: m.restingHeartRateSource, algorithmVersion: versionOn(m.date, m.restingHeartRateSource) })),
       nightDate),
     hrvBalance: () => genericInput(
-      src.bodyMetrics.map(m => ({ date: m.date, value: (m.hrvMs ?? 0) > 0 ? m.hrvMs : null, source: m.hrvSource, algorithmVersion: versionOn(m.date, m.hrvSource) })),
+      src.bodyMetrics.map(m => ({
+        date: m.date, value: (m.hrvMs ?? 0) > 0 ? m.hrvMs : null, source: m.hrvSource,
+        algorithmVersion: versionOn(m.date, m.hrvSource),
+        inNormal: hrvNightInNormal(m.hrvMethod ?? undefined),
+      })),
       nightDate),
     // Oura's deviation is already relative to Oura's own baseline, so it is judged as a deviation
     // against the person's normal of Oura deviations, never as an absolute temperature. Only the

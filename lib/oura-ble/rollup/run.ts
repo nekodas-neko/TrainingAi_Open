@@ -1167,7 +1167,7 @@ export async function runOuraRollup(
         const { rhrZ, hrvZ } = illnessZScores(prior, latest)
         const comp = computeReadinessComposite({
           rhrZ, hrvZ, tempZ: null, sleepBalanceZ: null, previousNightScore: null,
-          prevDayActivityScore: null, activityBalanceScore: null,
+          activityBalanceScore: null,
           nHistory: latest.nHistory, recoveryIndexHours: latest.recoveryIndexHours,
         })
         const sr = sleepByDate.get(day)

@@ -27,8 +27,8 @@ const rhr = (today: number): UnitInput => ({ today: night(today), history: histo
 const temp = (excess: number): UnitInput => ({ today: night(excess), history: history(40, wobble(0, 0.05)) })
 
 describe('version 4: points, the shared budget and yesterday as load', () => {
-  it('is version 4', () => {
-    expect(SHADOW_MODEL_VERSION).toBe(5)
+  it('is version 5 or later (version 6 is #2826 item 4, shadow-v6.test.ts)', () => {
+    expect(SHADOW_MODEL_VERSION).toBeGreaterThanOrEqual(5)
   })
 
   it('HRV and resting HR share one 13-point budget (was 19.5)', () => {
@@ -45,12 +45,13 @@ describe('version 4: points, the shared budget and yesterday as load', () => {
   })
 
   it('pillar totals float: Heart is worth what its units sum to, and readiness weighs pillars by it', () => {
-    expect(PILLAR_POINTS.heart).toBeCloseTo(23.5, 10)
+    // 23.5 in version 5; 21 since version 6 moved overnight settling from 4.5 to 2 points.
+    expect(PILLAR_POINTS.heart).toBeCloseTo(21, 10)
     const r = run({ ...strongSleep(), 'heart.overnight_hrv': hrv(60) })
-    // Sleep 30 points against Heart 23.5: 30 / 53.5.
-    expect(r.pillarDetail.sleep.effectiveWeight).toBeCloseTo(30 / 53.5, 3)
-    expect(r.pillarDetail.heart.effectiveWeight).toBeCloseTo(23.5 / 53.5, 3)
-    expect(r.pillarDetail.heart.points).toBeCloseTo(23.5, 10)
+    // Sleep 30 points against Heart 21: 30 / 51.
+    expect(r.pillarDetail.sleep.effectiveWeight).toBeCloseTo(30 / 51, 3)
+    expect(r.pillarDetail.heart.effectiveWeight).toBeCloseTo(21 / 51, 3)
+    expect(r.pillarDetail.heart.points).toBeCloseTo(21, 10)
   })
 
   describe('activity.yesterday_load', () => {

@@ -30,9 +30,12 @@ export const READINESS_WEIGHTS = {
   hrvBalance:       0.15 / WEIGHT_WITHOUT_CHECKIN,
   temperature:      0.10 / WEIGHT_WITHOUT_CHECKIN,
   sleepBalance:     0.10 / WEIGHT_WITHOUT_CHECKIN,
-  prevDayActivity:  0.09 / WEIGHT_WITHOUT_CHECKIN,
   recoveryIndex:    0.09 / WEIGHT_WITHOUT_CHECKIN,
-  activityBalance:  0.06 / WEIGHT_WITHOUT_CHECKIN,
+  // #3358 (v15): yesterday's activity is one input. `prevDayActivity` (0.09) was a cut-down second
+  // copy of yesterday's Activity score — steps, energy and strength only, judged on today's goals —
+  // beside this one, the finished score itself (0.06). The finished score takes both shares, so
+  // yesterday's weight is unchanged and the other seven inputs keep theirs.
+  activityBalance:  (0.09 + 0.06) / WEIGHT_WITHOUT_CHECKIN,
 } as const
 
 export interface ReadinessCompositeInputs {
@@ -48,10 +51,9 @@ export interface ReadinessCompositeInputs {
   sleepBalanceZ: number | null
   /** Our own 0-100 sleep score for last night (lib/health/sleep-score.ts). */
   previousNightScore: number | null
-  /** Our own 0-100 activity score for the day before last night. */
-  prevDayActivityScore: number | null
   /** Our own 0-100 PRE-taper activity score for the previous completed day (#2435). It read today's
-   *  partial score until then, so a morning readiness saw a near-empty day. */
+   *  partial score until then, so a morning readiness saw a near-empty day. Since v15 (#3358) it is
+   *  the composite's only activity input. */
   activityBalanceScore: number | null
   /** Nights of baseline history accrued (oura_daily_summary.n_history). */
   nHistory: number
@@ -259,18 +261,22 @@ function plainScore(v: number | null): ReadinessContributor {
  *  v11: the night's HRV input is the median of Oura's 5-minute series, not Oura's per-night average
  *  (#3075 stage 1a). The definition changes under the same `oura_cloud` label, so the HRV normal mixes
  *  averages and medians until the Oura Cloud backfill from 17 Oct has rewritten those nights.
- *  v12 is reserved for the pending proposal on #3358, so this label skips it.
+ *  v12 was reserved for the #3358 proposal and is left unused; that change shipped as v15.
  *  v13: on an Oura Cloud night with a usable heart-rate series, the recovery index is scored from hours we
  *  compute from that series (the hours curve), not from Oura's 0-100 contributor (#3075 stage 2). The ring's
  *  hours still win where tonight's ring summary has them; a night with no usable series keeps the contributor.
  *  v14: the Sleep Score behind the sleep term reads when sleep began and ended on an Oura Cloud night with a
  *  usable hypnogram, not the bed window (#3075 stage 3). Same readiness inputs, so a night moves only through that term.
- *  v15 is reserved for another change built in parallel, so this label skips it.
+ *  v15: yesterday's activity is one input, the previous completed day's finalised Activity score, at the
+ *  0.15 the two activity inputs held between them (#3358). The cut-down `prevDayActivity` copy is gone, so a
+ *  day moves by 0.10 × (finished − copy) before rounding. Stored rows keep their `prevDayActivity` key and
+ *  their v14 stamp. Also v15: a night whose HRV is the source's own nightly average, not a series median,
+ *  is marked (#3376); it scores exactly as before.
  *  v16: #3075 stages 4 and 5, from any source that sends them. The Sleep Score behind the sleep term takes a
  *  restlessness penalty from the source's movement series; a night the source says it recorded incompletely
  *  reads as partial (no sleep score, no hours in the sleep-balance normal), as the owner's mark does; and each
  *  per-night normal is learned from one (source, algorithm version), so a source that changes its algorithm
- *  starts its normals again. A night with none of the three is scored exactly as under v14.
+ *  starts its normals again. A night with none of the three is scored exactly as under v15.
  */
 export const READINESS_MODEL_VERSION = 'v16:restlessness-recording-flags:2026-11-04'
 
@@ -340,7 +346,6 @@ export const READINESS_MODEL = {
     temperature: 'closer-better',
     sleepBalance: 'higher-better',
     previousNight: 'passthrough',
-    prevDayActivity: 'passthrough',
     recoveryIndex: 'hours-curve',
     activityBalance: 'passthrough',
   },
@@ -356,7 +361,6 @@ export function computeReadinessComposite(input: ReadinessCompositeInputs): Read
     temperature:       baseline('temperature', input.tempZ, 'closer-better'),
     sleepBalance:      baseline('sleepBalance', input.sleepBalanceZ, 'higher-better'),
     previousNight:     plainScore(input.previousNightScore),
-    prevDayActivity:   plainScore(input.prevDayActivityScore),
     // Calibrated from Recovery-Index hours (anchored on Oura's public "≥6 h = good recovery"),
     // replacing the former dead NEUTRAL that made 10% of readiness a frozen 50. Flagged provisional
     // (approximation) and falls back to neutral when there's no overnight HR series.

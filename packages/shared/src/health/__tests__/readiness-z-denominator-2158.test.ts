@@ -6,7 +6,7 @@ import { illnessZScores, type IllnessSummaryInput } from '../illness-radar'
 import { MAD_TO_SD } from '../personal-baseline'
 
 const empty = {
-  tempZ: null, sleepBalanceZ: null, previousNightScore: null, prevDayActivityScore: null,
+  tempZ: null, sleepBalanceZ: null, previousNightScore: null, 
   activityBalanceScore: null, nHistory: 30,
 }
 

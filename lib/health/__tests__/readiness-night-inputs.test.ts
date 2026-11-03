@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { updateBaseline, type Baseline } from '@trainingai/shared/health/personal-baseline'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
-import { computeReadinessComposite, rederiveReadinessFromStored, BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
+import { computeReadinessComposite, rederiveReadinessFromStored, BASELINE_MIN_NIGHTS, READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite'
 import { computeIllnessRadar } from '@trainingai/shared/health/illness-radar'
 import {
   resolveReadinessNightInputs, compositeNightFields, illnessNightFields, RING_SUMMARY_SOURCE,
@@ -94,9 +94,9 @@ describe('resolveReadinessNightInputs — per input, not per row', () => {
     expect(r.recoveryIndex).toEqual({ contributor: 82, source: 'oura_cloud' })
     expect(r.temperatureDeviation).toEqual({ value: 0.4, source: 'cloud' })
 
-    const composite = computeReadinessComposite({ ...compositeNightFields(r), previousNightScore: 80, prevDayActivityScore: 70, activityBalanceScore: 70, nHistory: 61 })
+    const composite = computeReadinessComposite({ ...compositeNightFields(r), previousNightScore: 80, activityBalanceScore: 70, nHistory: 61 })
     const present = Object.values(composite.contributors).filter(c => c.gap !== 'no_input')
-    expect(present).toHaveLength(8)
+    expect(present).toHaveLength(Object.keys(READINESS_WEIGHTS).length)
     expect(composite.contributors.recoveryIndex).toMatchObject({ score: 82, scale: 'oura_contributor', source: 'oura_cloud' })
     expect(composite.contributors.hrvBalance.source).toBe('oura_cloud')
   })
@@ -124,7 +124,7 @@ describe('resolveReadinessNightInputs — per input, not per row', () => {
     const { baselineNights, sources, ...fields } = compositeNightFields(r)
     expect(Object.values(baselineNights!)).toEqual([60, 60, 60, 60])
     expect(Object.values(sources!).every(s => s === RING_SUMMARY_SOURCE)).toBe(true)
-    const day0 = { previousNightScore: 80, prevDayActivityScore: 70, activityBalanceScore: 70, nHistory: 60 }
+    const day0 = { previousNightScore: 80, activityBalanceScore: 70, nHistory: 60 }
     const now = computeReadinessComposite({ ...fields, baselineNights, ...day0 })
     const before = computeReadinessComposite({ ...fields, recoveryIndexHours: ring.recoveryIndexHours, ...day0 })
     expect(now.score).toBe(before.score)
@@ -173,7 +173,7 @@ describe('normals re-learn per device', () => {
       bodyMetrics: [...bodyNights('oura_ble', 25, false), ...bodyNights('oura_cloud', 0)],
     }))
     expect(r.inputs.hrvBalance).toEqual({ z: null, nights: 0, source: 'oura_cloud' })
-    const c = computeReadinessComposite({ ...compositeNightFields(r), previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null, nHistory: 61 })
+    const c = computeReadinessComposite({ ...compositeNightFields(r), previousNightScore: null, activityBalanceScore: null, nHistory: 61 })
     expect(c.contributors.hrvBalance).toMatchObject({ score: 50, provisional: true, gap: 'awaiting_baseline', source: 'oura_cloud' })
   })
 
@@ -226,7 +226,7 @@ describe('the illness radar reads the composite\'s own z-scores (PS-42)', () => 
 describe('the recovery-index contributor on its own scale', () => {
   it('re-derives from the stored row without going through the hours curve', () => {
     const c = computeReadinessComposite({
-      rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null, previousNightScore: null, prevDayActivityScore: null,
+      rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null, previousNightScore: null, 
       activityBalanceScore: null, nHistory: 0, recoveryIndexContributor: 71, sources: { recoveryIndex: 'oura_cloud' },
     })
     expect(c.contributors.recoveryIndex).toMatchObject({ score: 71, input: 71, scale: 'oura_contributor', provisional: true, gap: null })
@@ -236,7 +236,7 @@ describe('the recovery-index contributor on its own scale', () => {
 
   it('hours still win when the ring has them', () => {
     const c = computeReadinessComposite({
-      rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null, previousNightScore: null, prevDayActivityScore: null,
+      rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null, previousNightScore: null, 
       activityBalanceScore: null, nHistory: 0, recoveryIndexHours: 5, recoveryIndexContributor: 10,
     })
     expect(c.contributors.recoveryIndex.score).toBe(100)
@@ -253,7 +253,7 @@ describe('recovery index on an Oura Cloud night (#3075 stage 2)', () => {
     ouraCloudContributors: contributors, ...over,
   })
   const score = (r: ReturnType<typeof resolveReadinessNightInputs>) => computeReadinessComposite({
-    ...compositeNightFields(r), previousNightScore: 80, prevDayActivityScore: 70, activityBalanceScore: 70, nHistory: 61,
+    ...compositeNightFields(r), previousNightScore: 80, activityBalanceScore: 70, nHistory: 61,
   }).contributors.recoveryIndex
 
   it('a night with a usable series takes our hours, scored on the hours curve, not the contributor', () => {
@@ -292,5 +292,25 @@ describe('recovery index on an Oura Cloud night (#3075 stage 2)', () => {
       summaries: [fullRing(day(1)), partialRing(TODAY)], ouraCloudRecoveryHours: [{ date: TODAY, hours: 3.5 }],
     }))
     expect(r.recoveryIndex).toEqual({ hours: 3.5, source: 'oura_cloud' })
+  })
+})
+
+// #3376: a night whose HRV is the source's own average (no usable series) is marked, and still counts:
+// tonight is scored, and every marked night stays in the HRV normal until `hrvNightInNormal` says otherwise.
+describe('resolveReadinessNightInputs — a night marked source_average', () => {
+  const mark = (rows: ReturnType<typeof bodyNights>, every: number) =>
+    rows.map((m, i) => (i % every === 0 ? { ...m, hrvMethod: 'source_average' as const } : { ...m, hrvMethod: 'series_median' as const }))
+
+  it('scores and counts exactly as an unmarked night', () => {
+    const plain = resolveReadinessNightInputs(base({ bodyMetrics: bodyNights('health_connect', 20) }))
+    const marked = resolveReadinessNightInputs(base({ bodyMetrics: mark(bodyNights('health_connect', 20), 3) }))
+    expect(marked.inputs.hrvBalance).toEqual(plain.inputs.hrvBalance)
+    expect(marked.inputs.hrvBalance?.nights).toBe(20)
+    expect(marked.inputs.hrvBalance?.z).not.toBeNull()
+  })
+
+  it('tonight marked is still tonight', () => {
+    const rows = bodyNights('oura_cloud', 20).map(m => (m.date === TODAY ? { ...m, hrvMethod: 'source_average' as const } : m))
+    expect(resolveReadinessNightInputs(base({ bodyMetrics: rows })).inputs.hrvBalance?.z).not.toBeNull()
   })
 })

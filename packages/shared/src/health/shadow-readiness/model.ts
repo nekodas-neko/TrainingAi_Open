@@ -39,8 +39,14 @@ import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/sh
  *  - a unit's weight is scaled by a quality factor (an estimated value counts less than a measured
  *    one) and a reliability factor (a patchy score counts less); missing data stays at zero weight;
  *  - a graded readiness ceiling: the lowest cap among the red flags limits the final number.
+ * Version 6 = #2826 item 4 (owner, 3 Nov):
+ *  - overnight settling 4.5 → 2 points until it is validated (no peer-reviewed support was found);
+ *    Heart is worth 21 (was 23.5);
+ *  - last night's sleep duration counts in Activity too, 3 points, as capacity to train
+ *    (`activity.sleep_capacity`); Activity is worth 23 (was 20). It reads the same generic night
+ *    duration as `sleep.duration`, whichever source wrote it.
  */
-export const SHADOW_MODEL_VERSION = 5
+export const SHADOW_MODEL_VERSION = 6
 
 // ── Unit ids ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -66,6 +72,7 @@ export const SHADOW_UNIT_IDS = [
   'activity.zone_minutes_week',
   'activity.training_load',
   'activity.block_trend',
+  'activity.sleep_capacity',
   'body.temperature',
   'body.breathing_rate',
   'body.spo2',
@@ -266,7 +273,9 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
     minMeaningfulChange: 2,
   },
   'heart.overnight_settling': {
-    id: 'heart.overnight_settling', pillar: 'heart', shape: 'directional', reference: 'learned', points: 4.5, daytime: false,
+    id: 'heart.overnight_settling', pillar: 'heart', shape: 'directional', reference: 'learned', points: 2, daytime: false,
+    // 4.5 → 2 in version 6 (#2826 item 4): no peer-reviewed support was found for it, so it carries
+    // little until it is validated against the check-in.
     direction: 'up',
     // Recovery index, hours from the overnight HR minimum to wake. No published norm
     // (component-references), so no Level: learned only.
@@ -285,6 +294,7 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
   },
 
   // ── Activity: yesterday's movement 35 · training load 7:28 30 · zone minutes (week) 20 · block trend 28:90 15
+  //    (#2356's percentages; version 5 moved to points, and version 6 adds sleep capacity, 3 points)
   'activity.yesterday_movement': {
     id: 'activity.yesterday_movement', pillar: 'activity', shape: 'sweet_spot', reference: 'guarded', points: 0, daytime: true,
     unavailable:
@@ -317,6 +327,14 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
     unavailable:
       'The 28:90 ratio and its band are #2340, still open: the tuning proposal that sets the band '
       + 'has not been written, and no shared function computes a 28:90 ratio. Needs #2340.',
+  },
+  'activity.sleep_capacity': {
+    id: 'activity.sleep_capacity', pillar: 'activity', shape: 'sweet_spot', reference: 'guarded', points: 3, daytime: false,
+    // Version 6 (#2826 item 4): last night's sleep as capacity to train today, a small share beside the
+    // Sleep pillar's own duration unit. Same night, same guarded 7–9 h band and spans as
+    // `sleep.duration`, so the two cannot disagree about what a short night is.
+    band: { lo: 7, hi: 9, belowSpan: 2.5, aboveSpan: 3 },
+    minMeaningfulChange: 0.5,
   },
 
   // ── Body: temperature 25 · breathing rate 20 · fuel 20 · SpO₂ 15 · daytime stress 10 · weight vs plan 10

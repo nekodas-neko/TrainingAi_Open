@@ -1,4 +1,6 @@
 import * as healthConnect from './slices/health-connect'
+import { stampNightHrvMethod } from './slices/night-hrv-method'
+import { chooseNightHrv, nightHrvMethodFromProvenance, type NightHrvMethod } from '@trainingai/shared/health/night-hrv-method'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
 import * as appleHealth from './slices/apple-health'
 import * as authData from './slices/auth'
@@ -2559,6 +2561,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       restingHeartRate: r.restingHeartRate ?? undefined,
       hrvMs: r.hrvMs ?? undefined,
       hrvSource: r.sourceMap?.hrv_ms ?? undefined,
+      hrvMethod: nightHrvMethodFromProvenance(r.sourceMap),
       restingHeartRateSource: r.sourceMap?.resting_heart_rate ?? undefined,
       spo2Pct: r.spo2Pct ?? undefined,
       spo2Source: r.sourceMap?.spo2_pct ?? undefined,
@@ -8351,6 +8354,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * (the ring-era definition), not Oura's per-night average. Oura's average stays on
    * `sleep_sessions.average_hrv_ms` beside it. A period with no usable series keeps Oura's average
    * rather than losing the night. Resting HR is still Oura's (a later stage).
+   *
+   * #3376: the series-or-average choice is the generic `chooseNightHrv`, and the row is marked with the
+   * method it took (`stampNightHrvMethod`), so a normal can tell the two rulers apart.
    */
   async syncOuraMainSleepBodyMetrics(userId: string, touched: { days: string[]; ouraIds: string[] }) {
     const dates = [...new Set([...touched.days, ...await oura.getOuraCloudSleepDatesForIds(this.db, userId, touched.ouraIds)])].sort()
@@ -8358,10 +8364,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const tz = (await this.getUserById(userId))?.timezone ?? DEFAULT_TZ
     const main = new Map((await oura.getOuraMainSleepPeriods(this.db, userId, dates, tz)).map(m => [m.date, m]))
     const values: { date: string; hrvMs?: number; restingHeartRate?: number }[] = []
+    const methods: { date: string; method: NightHrvMethod }[] = []
     let cleared = 0
     for (const date of dates) {
       const m = main.get(date)
-      const hrvMs = m?.overnightHrvMs ?? m?.averageHrvMs ?? null
+      const hrv = chooseNightHrv(m?.overnightHrvMs, m?.averageHrvMs)
+      const hrvMs = hrv?.hrvMs ?? null
+      if (hrv) methods.push({ date, method: hrv.method })
       const restingHeartRate = m?.lowestHeartRate ?? null
       if (hrvMs != null || restingHeartRate != null) {
         values.push({ date, ...(hrvMs != null ? { hrvMs } : {}), ...(restingHeartRate != null ? { restingHeartRate } : {}) })
@@ -8370,6 +8379,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       if (restingHeartRate == null && await oura.clearOuraCloudBodyField(this.db, userId, date, 'resting_heart_rate')) cleared++
     }
     await this.upsertBodyMetrics(userId, values, 'oura_cloud')
+    for (const { date, method } of methods) await stampNightHrvMethod(this.db, userId, date, 'oura_cloud', method)
     return { written: values.length, cleared }
   }
   async listDeletedOuraCloudSleepDates(userId: string, from: string, to: string, tz: string) { return oura.listDeletedOuraCloudSleepDates(this.db, userId, from, to, tz) }

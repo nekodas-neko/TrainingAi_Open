@@ -197,7 +197,7 @@ describe('buildActivityAudit', () => {
 
 describe('buildReadinessAudit', () => {
   const common = {
-    date: '2026-07-24', sleepScore: 82, activityScore: 70, prevDayActivityScore: 65,
+    date: '2026-07-24', sleepScore: 82, activityScore: 70, 
     ouraDaily: null, derived: null,
   }
 
@@ -354,15 +354,18 @@ describe('buildReadinessAudit', () => {
       const live = buildReadinessAudit(withPrior).persist!.contributors as Record<string, { score: number }>
       const oldWeights: Record<string, number> = {
         restingHeartRate: 0.15, previousNight: 0.16, hrvBalance: 0.15, temperature: 0.10,
-        sleepBalance: 0.10, prevDayActivity: 0.09, recoveryIndex: 0.09, activityBalance: 0.06,
+        sleepBalance: 0.10, recoveryIndex: 0.09, activityBalance: 0.06,
       }
       const checkin = { score: 88, provisional: false, input: 88, gap: null }
+      // The row also carries `prevDayActivity`, which left the model in #3358 (v15).
+      const prevDayActivity = { score: 61, provisional: false, input: 61, gap: null }
       const oldScore = Math.round(
-        Object.entries(oldWeights).reduce((sum, [k, w]) => sum + live[k].score * w, 0) + checkin.score * 0.10)
+        Object.entries(oldWeights).reduce((sum, [k, w]) => sum + live[k].score * w, 0)
+          + prevDayActivity.score * 0.09 + checkin.score * 0.10)
       const derived = {
         day: '2026-07-24', readinessScore: oldScore, readinessSource: 'ble-derived',
         modelVersions: { readiness: 'v4:tail20:2026-09-23' },
-        readinessContributors: storedContributors({ checkin }),
+        readinessContributors: storedContributors({ checkin, prevDayActivity }),
       } as never
       const audit = buildReadinessAudit({ ...withPrior, derived })
       expect(audit.stored.rederived!.score).not.toBe(oldScore)

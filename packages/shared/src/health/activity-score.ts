@@ -195,7 +195,9 @@ export function computeActivityScore(input: ActivityScoreInput): ActivityScoreRe
  * happened yet.
  *
  * Shared rather than inlined twice because the two call sites are the same computation, and this
- * entry exists because they drifted from their own intent in identical ways.
+ * entry exists because they drifted from their own intent in identical ways. #3358 retired that
+ * readiness contributor (readiness reads yesterday's finished score instead); the day scorer and the
+ * health insight still read the window through here.
  */
 export function strengthWindowEndingAt(
   sessions: { startedAt: string | Date; exercises: { volume?: number | null }[] }[],
