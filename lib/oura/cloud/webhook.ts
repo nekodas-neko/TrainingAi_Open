@@ -18,7 +18,7 @@ import type { OuraOAuthConfig } from './config'
 import { OuraUnavailableError } from './client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
-import { fetchOuraDocument, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbiddenError, OuraUnauthorizedError } from './data'
+import { describeRefusal, fetchOuraDocument, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbiddenError, OuraUnauthorizedError } from './data'
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, mapRingBatteryRows, OURA_DELETE_TYPES, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
 import { isRingBatteryBackedOff, markRingBatteryRefused, resetRingBatteryBackoff } from './ring-battery-backoff'
@@ -326,8 +326,8 @@ export function startOuraCloudHeartRateCatchUp(deps: Pick<OuraWebhookDeps, 'repo
   heartRateLastRun.set(userId, now)
   catchUpOuraCloudHeartRate(deps, userId, now).catch(err => {
     // A refusal is final for this read, but it is why no heart rate lands, so it is reported (#2982).
-    const refused = err instanceof OuraUnauthorizedError ? 'Oura answered 401'
-      : err instanceof OuraForbiddenError ? 'Oura answered 403'
+    const refused = err instanceof OuraUnauthorizedError ? `Oura answered ${describeRefusal(401, err.reason)}`
+      : err instanceof OuraForbiddenError ? `Oura answered ${describeRefusal(403, err.reason)}`
       : err instanceof OuraReauthRequiredError ? 'the connection needs the user to connect again'
       : null
     if (refused) {
@@ -405,8 +405,8 @@ export function startOuraCloudRingBatteryCatchUp(deps: Pick<OuraWebhookDeps, 're
   ringBatteryLastRun.set(userId, now)
   catchUpOuraCloudRingBattery(deps, userId, now).catch(err => {
     // The scope for this read is a guess (`OURA_SCOPE_FOR.ring_battery`), so a refusal is reported, never silent.
-    const refused = err instanceof OuraUnauthorizedError ? 'Oura answered 401'
-      : err instanceof OuraForbiddenError ? 'Oura answered 403'
+    const refused = err instanceof OuraUnauthorizedError ? `Oura answered ${describeRefusal(401, err.reason)}`
+      : err instanceof OuraForbiddenError ? `Oura answered ${describeRefusal(403, err.reason)}`
       : err instanceof OuraReauthRequiredError ? 'the connection needs the user to connect again'
       : null
     if (refused) {
