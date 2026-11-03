@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { settleRouteBoundary, suppressMorningCheckin } from './fixtures'
 
 /**
  * OR-162's unmeasured question: **how many canvases are actually mounted across the five tabs at
@@ -16,6 +17,12 @@ const TABS = ['Health', 'Nutrition', 'More', 'Workout', 'Home'] as const
 
 /** The dev overlay's `<nextjs-portal>` covers the bottom corner and eats taps on the bottom nav. */
 test.beforeEach(async ({ page }) => {
+  // The first-open-of-day Morning Check-in is a modal sheet that sets `pointer-events: none` on
+  // <body>. It opens after an async read, so whether it lands before the first nav click is a race:
+  // when it does, Radix sets `aria-hidden` on everything outside it, `getByRole` stops resolving the
+  // nav links, and `locator.click` waits out its whole timeout (CI run 40604354996: 'waiting for
+  // locator' with no 'resolved to' line, on Nutrition and then on More in the retry).
+  await suppressMorningCheckin(page)
   await page.addInitScript(() => {
     const paint = () => {
       const style = document.createElement('style')
@@ -31,12 +38,16 @@ test('OR-162 — census: canvases mounted per tab, and how many are hidden at an
   await page.setViewportSize({ width: 384, height: 854 })
   await page.goto('/')
   await page.waitForSelector('[data-tab-active]', { timeout: 30_000 })
+  await settleRouteBoundary(page)
 
   // Visit every tab so each panel has mounted and fetched; TabShell keeps them alive afterwards.
   for (const label of TABS) {
     const link = page.locator('nav').getByRole('link', { name: label, exact: true })
     if (!(await link.count())) { console.info(`OR-162 census: no nav link for ${label}, skipped`); continue }
-    await link.click()
+    // Visible first, then clicked: a link that has left the accessibility tree fails here with a
+    // named assertion instead of burning the whole 45 s test timeout inside `click`.
+    await expect(link).toBeVisible({ timeout: 30_000 })
+    await link.click({ timeout: 30_000 })
     // Charts fetch before they draw; a short settle is what makes this a census of the steady
     // state rather than of whatever had loaded by the time the click returned.
     await page.waitForTimeout(2500)

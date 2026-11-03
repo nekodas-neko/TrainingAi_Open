@@ -56,6 +56,7 @@ test('the row fills the width, and Log clears the icon at every tile count', asy
   // down, so a measurement spread over several awaits sees tile 3 on a different y from tile 1 and
   // counts a two-tile "row" (CI run 38672389846 retry: 232 px against 352). Wait until the count and
   // every rect are identical across two animation frames, then read everything from that one snapshot.
+  await page.evaluate(() => document.fonts.ready)
   const snapshot = () => page.evaluate(sel => {
     const els = [...document.querySelectorAll(sel)]
     const parent = els[0]?.parentElement
@@ -94,11 +95,20 @@ test('the row fills the width, and Log clears the icon at every tile count', asy
     .toBeGreaterThan(snap.parent - 2)
 
   // ── Log clears the icon, on every tile ────────────────────────────────────────────────────────
-  for (let i = 0; i < count; i++) {
-    const tile = tiles.nth(i)
-    const log = tile.locator('button[aria-label^="Log "]')
-    const icon = tile.locator('svg').first()
-    const [lb, ib] = [await log.boundingBox(), await icon.boundingBox()]
+  // Every rect for every tile is read inside ONE evaluate. Reading each with its own `boundingBox()`
+  // await let late content above the row (readiness chips, Body Battery) shift the page between the
+  // Log read and the icon read, so two correct boxes taken a frame apart looked like an overlap.
+  await page.evaluate(() => document.fonts.ready)
+  const boxes = await page.evaluate(sel => [...document.querySelectorAll(sel)].map(tile => {
+    const box = (el: Element | null) => {
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      return { x: r.x, y: r.y, width: r.width, height: r.height }
+    }
+    return { log: box(tile.querySelector('button[aria-label^="Log "]')), icon: box(tile.querySelector('svg')) }
+  }), TILES)
+  expect(boxes).toHaveLength(count)
+  boxes.forEach(({ log: lb, icon: ib }, i) => {
     expect(lb, `tile ${i} has no Log control`).not.toBeNull()
     expect(ib, `tile ${i} has no icon`).not.toBeNull()
     const overlaps = lb!.x < ib!.x + ib!.width && ib!.x < lb!.x + lb!.width
@@ -109,5 +119,5 @@ test('the row fills the width, and Log clears the icon at every tile count', asy
     // And the 44 px floor survives — the original defect was the position, not the size, so a
     // regression that shrinks the control to avoid the overlap must fail here.
     expect(lb!.height, `tile ${i}: the Log tap target dropped below 44 px`).toBeGreaterThanOrEqual(44)
-  }
+  })
 })
