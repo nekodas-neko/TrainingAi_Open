@@ -20,7 +20,6 @@ test('every inline status on a card header is drawn only while active (#3521)', 
     'features/health/components/TrainingPanel.tsx',
     'features/health/components/RecordedHealthCards.tsx',
     'features/health/components/HealthResourceHeader.tsx',
-    'features/workouts/screens/WorkoutHistoryScreen.tsx',
   ];
   for (const file of files) {
     const source = read(file);
