@@ -28,7 +28,8 @@ import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
-import { scoreActivityForDay, restingHrBaseline, carriedOverRestingHr, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
+import { restingHrOnDay } from '@trainingai/shared/health/resting-hr-mean'
+import { scoreActivityForDay, restingHrBaseline, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
 import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
 import { staleFinishedDays, metLookbackFrom } from '@trainingai/shared/health/finished-day-recheck'
 import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, runBackgroundFinalise, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
@@ -525,10 +526,8 @@ export async function buildReadinessPayload(
     date: todayIso,
     tz,
     bodyMetrics,
-    restingHrBaseline: baselineRhr,
-    // #3001: after a device switch the baseline is null for the first nights; the zone lane then reads
-    // the profile's resting HR, which is the previous device's mean, as the HR zones already do.
-    restingHrCarriedOver: baselineRhr == null && carriedOverRestingHr(bodyMetrics) != null ? hrProfile?.restingHr ?? null : null,
+    // #3388: the one resting-HR rule the HR zones and Body Battery read, so a day's zone minutes agree.
+    restingHr: restingHrOnDay(bodyMetrics, todayIso),
     hrRows: todayHrRows,
     metGrid: ouraCloudMetGrid(await cloudActivityP, todayMid.getTime(), tomorrowMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,

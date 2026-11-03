@@ -6,16 +6,16 @@ import { hrMaxFromAge } from './hr-zones'
 import { latestWeightKg } from './latest-weight'
 import { intradayHrContributors, type MetGridInput } from './intraday-hr-contributors'
 import { excludeLowWearDays } from './wear-confidence'
-import { rowsOfDeviceInUse, perDeviceNormal } from './per-device-normal'
-import { BASELINE_MIN_NIGHTS } from './readiness-composite'
+import { rowsOfDeviceInUse } from './per-device-normal'
 import { dayStepCount } from './activity-steps'
 
 /** Qualifying days before the 28-day resting-HR mean is trusted (the readiness payload's rule). */
 const RESTING_HR_BASELINE_MIN_DAYS = 5
 
 /**
- * The 28-day resting-HR baseline, low-wear days excluded: the floor of the zone-minute lane, and the
- * readiness payload's own `baselineRhr`. One definition, so the live score and a finalised day agree.
+ * The 28-day resting-HR baseline, low-wear days excluded: the readiness payload's `baselineRhr`, the
+ * reference its resting-HR score and the high/low flag read. It is NOT what the zone lane uses: the
+ * lane reads `restingHrOnDay` (`resting-hr-mean.ts`), the one rule the HR zones share (#3388).
  *
  * Per device (#3001): the rows are those of the device that measured the newest night, so an Oura
  * week is never judged against a baseline pooled with the ring's differently measured nights. Until
@@ -32,39 +32,19 @@ export function restingHrBaseline<T extends { date: string; restingHeartRate?: n
     : null
 }
 
-/**
- * The resting HR the zone lane reads while the device in use has no baseline of its own yet: the
- * previous device's mature mean (the one the HR zones already hold still on), or null when there is
- * no previous device. Without it the zone minutes and move hours drop for the first nights on a new
- * device. Only for the zone lane; the displayed baseline stays null while the device warms up.
- */
-export function carriedOverRestingHr(
-  bodyMetrics: readonly { date: string; restingHeartRate?: number | null; restingHeartRateSource?: string | null }[],
-): number | null {
-  const carried = perDeviceNormal(
-    bodyMetrics.map(m => ({
-      date: m.date,
-      value: m.restingHeartRate != null && m.restingHeartRate > 0 ? m.restingHeartRate : null,
-      source: m.restingHeartRateSource,
-    })),
-    { minNights: BASELINE_MIN_NIGHTS },
-  ).carriedOver
-  return carried == null ? null : Math.round(carried.value)
-}
-
 export interface ActivityDayInput {
   /** The local day being scored, `YYYY-MM-DD`. */
   date: string
   tz: string
   /** Body-metric rows ending on `date`; rows after it are ignored. */
   bodyMetrics: readonly { date: string; steps?: number | null; activeCalories?: number | null; weightKg?: number | null }[]
-  /** `restingHrBaseline` over the 28 days ending on `date`. */
-  restingHrBaseline: number | null
-  /** `carriedOverRestingHr` when the device in use has no baseline yet; the zone lane reads it then. */
-  restingHrCarriedOver?: number | null
+  /** `restingHrOnDay(bodyMetrics, date)`: the one resting-HR rule, shared with the HR zones and Body
+   *  Battery. Only the zone-minutes lane needs it; null leaves that lane out and the move lane still runs. */
+  restingHr: number | null
   /** The day's intraday heart rate, `[local midnight, next local midnight)`. */
   hrRows: readonly { timestamp: Date; bpm: number; source?: string | null }[]
-  /** Oura's per-minute MET (`ouraCloudMetGrid`) covering `date`: it decides the move lane (#3114). Null for none. */
+  /** The source's per-minute movement (MET) series covering `date` (`MetGridInput`; the connector maps its own
+   *  into it): it decides the move lane (#3114). Null for none. */
   metGrid?: MetGridInput | null
   /** The HR profile's ceiling; null falls back to the age formula. */
   maxHr: number | null
@@ -140,15 +120,16 @@ export function scoreActivityForDay(input: ActivityDayInput): ActivityDay {
   let zoneMinutes: number | null = null
   let moveHours: number | null = null
   let moveHoursGoal: number | null = null
-  // #3114: Oura's MET decides the move lane, so a day with MET and no heart rate still counts. A
-  // finished day also drops its non-wear waking hours from the goal (`dayIsOver`).
+  // #3114: the per-minute movement series decides the move lane, so a day with movement and no heart
+  // rate still counts. It needs no resting HR (#3388): only the zone-minutes lane waits for one, so a
+  // user with no resting-HR baseline yet keeps the move lane. A finished day also drops its non-wear
+  // waking hours from the goal (`dayIsOver`).
   const hasMet = input.metGrid?.metsPerMinute.some(m => m != null) ?? false
-  const zoneRestingHr = input.restingHrBaseline ?? input.restingHrCarriedOver ?? null
-  if (zoneRestingHr != null && (input.hrRows.length > 0 || hasMet)) {
+  if (input.hrRows.length > 0 || hasMet) {
     const c = intradayHrContributors({
       hrRows: input.hrRows,
       maxHr: input.maxHr ?? hrMaxFromAge(ageYears),
-      restingHr: zoneRestingHr,
+      restingHr: input.restingHr,
       tz,
       dateIso: date,
       metGrid: input.metGrid ?? null,

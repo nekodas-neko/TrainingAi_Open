@@ -70,6 +70,15 @@ function interp(x: number, pts: readonly (readonly [number, number])[]): number 
 const STRENGTH_FREQ_CURVE = [[0, 0], [0.34, 50], [0.67, 80], [1.0, 100], [1.5, 100]] as const
 
 /**
+ * Stamped on every stored (finalised) Activity score as `oura_daily_derived.model_versions.activity`,
+ * the way Sleep and readiness stamp theirs (#3388). A row with no `activity` key was scored before
+ * the stamp. Change it whenever a weight, curve, gate or the rule behind an input changes.
+ * 2026-11-03 (#3388): the move lane no longer waits for a resting HR, and the zone lane reads the
+ * one resting-HR rule the HR zones and Body Battery share.
+ */
+export const ACTIVITY_MODEL_VERSION = 'v2:move-lane-without-resting-hr:shared-resting-hr:2026-11-03'
+
+/**
  * The Activity Score model in serialisable form — lane weights, the over-exertion taper constants
  * and the strength-frequency curve. Exported so tooling (the admin day-review audit) can present a
  * score alongside the exact model that produced it without copying any of it.
