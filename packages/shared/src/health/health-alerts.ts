@@ -64,8 +64,8 @@ function illnessCopy(flag: IllnessFlag, advisory: string | null): { title: strin
 
 /**
  * Decide, per anomaly type, whether to fire a local notification. Pure. `notifiedToday` is the set
- * of types already fired today (dedup). Precedence: readiness-low is suppressed when a more specific
- * illness or stress alert fires the same pass (design decision 5).
+ * of types already fired today (dedup). Precedence: readiness-low is suppressed whenever a more specific
+ * illness or stress anomaly is present, whether or not its alert fired this pass (design decision 5).
  */
 export function computeHealthAlertActions(
   input: HealthAlertInput,
@@ -87,7 +87,7 @@ export function computeHealthAlertActions(
   // sibling-surface rule, and it matters more here than there. This path fires a PUSH NOTIFICATION
   // ("High stress day"), so at TN-34's measured 83% of days the owner was notified four days in five
   // off a number with a +0.072 correlation to readiness. Worse, a fired stress alert sets
-  // `moreSpecificFired` and SUPPRESSES the readiness-low alert below — so the noise flag was also
+  // `stressTriggered` and SUPPRESSES the readiness-low alert below — so the noise flag was also
   // masking the real one.
   //
   // `stressCurrent` is kept deliberately: TN-33 §8 measures strong episode structure in the SERIES
@@ -100,9 +100,12 @@ export function computeHealthAlertActions(
     ? fire('stress', 'High stress day', 'Daytime stress has run high today. A lighter session or some recovery time may help.')
     : skip('stress')
 
-  // ── Readiness-low: standalone only — suppressed if illness or stress fired this pass ──
-  const moreSpecificFired = illness.type === 'fire' || stress.type === 'fire'
-  const readinessTriggered = input.readinessHasData && input.readinessLabel === 'Low' && !moreSpecificFired
+  // ── Readiness-low: standalone only — suppressed while an illness or stress anomaly is present ──
+  // Keyed on the anomaly, not on the alert firing this pass: the once-a-day dedup turns the more
+  // specific alert into a skip on a second open, which used to let "Readiness is low" through
+  // after the owner had already been told about the fever (#3536).
+  const moreSpecificPresent = illnessTriggered || stressTriggered
+  const readinessTriggered = input.readinessHasData && input.readinessLabel === 'Low' && !moreSpecificPresent
   const readiness = readinessTriggered
     ? fire('readiness', 'Readiness is low', 'Your readiness is Low today. Consider a lighter session, a deload, or a rest day.')
     : skip('readiness')

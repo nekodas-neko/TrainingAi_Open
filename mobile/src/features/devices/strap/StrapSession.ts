@@ -261,6 +261,10 @@ export class StrapSession {
     const link = this.link;
     if (!this.accelWanted || !link || this.stopAccel || this.accelStarting) return;
     const generation = this.generation;
+    // A new link starts the stream afresh. If the old stream's error beat the disconnect callback,
+    // `unavailable` is still showing; clear it so the card does not say the stream could not start
+    // until the first frame (#3541). A strap that cannot stream says so again when this attempt fails.
+    if (this.current.accel === 'unavailable') this.publish({ accel: 'starting' });
     this.accelStarting = true;
     link
       .startAccelerometer(

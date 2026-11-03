@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type PropsWithChildren,
@@ -15,6 +16,8 @@ import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { bleAdapter } from '../../../integrations/ble/platform';
 import { deviceAlert } from '../../../integrations/notifications/platform';
 import { HrOutbox } from './HrOutbox';
+import { useActivityServiceRunning } from '../../activities/data/background-recording';
+import { holdStrapForActivity } from './activity-hold';
 import { StrapSession, type StrapHold } from './StrapSession';
 
 const Context = createContext<StrapSession | null>(null);
@@ -88,17 +91,30 @@ export function useStrap() {
 }
 
 /**
- * Holds the strap link, and records its readings, for the whole of a walk, run or guided walk.
- * Unlike a screen hold it is not dropped when the app goes to the background: a walk with the
- * phone in a pocket keeps recording until the activity ends.
+ * Holds the strap link, and records its readings, for the whole of a walk, run or guided walk. It
+ * survives the app going to the background only while the recording service is running (see
+ * `activityHoldWanted`); without the service it is a foreground hold, as a screen's is.
  */
 export function useActivityStrapHold(active: boolean) {
   const session = useContext(Context);
+  const serviceRunning = useActivityServiceRunning();
+  const holdRef = useRef<ReturnType<typeof holdStrapForActivity> | null>(null);
+  const serviceRef = useRef(serviceRunning);
+  serviceRef.current = serviceRunning;
+  // Held for the walk only: the service starting or stopping goes through `update` below and must
+  // not release the hold, which would drop the link and reset the trace.
   useEffect(() => {
     if (!session || !active) return;
-    session.hold('activity', true);
-    return () => session.hold('activity', false);
+    const hold = holdStrapForActivity(session, AppState, serviceRef.current);
+    holdRef.current = hold;
+    return () => {
+      holdRef.current = null;
+      hold.release();
+    };
   }, [session, active]);
+  useEffect(() => {
+    holdRef.current?.update(serviceRunning);
+  }, [serviceRunning]);
 }
 
 /**

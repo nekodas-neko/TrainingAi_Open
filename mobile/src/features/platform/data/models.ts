@@ -69,6 +69,17 @@ export type Alert = {
   trigger: { at: number } | { hour: number; minute: number; weekday?: number };
 };
 export const ALERT_OWNER = 'trainingai-native-v1';
+/** What a health anomaly alert opens on a tap: the readiness view, as the current app's `/health/readiness` does (#3541). */
+export const HEALTH_ALERT_TARGET = 'health-readiness';
+/** True for a notification the scheduler plans, lists and may cancel. */
+export const isSchedulerAlert = (data: Record<string, unknown> | undefined | null) =>
+  data?.owner === ALERT_OWNER;
+/**
+ * True for a notification whose tap the app routes: the planned alerts, and a health alert, which
+ * the scheduler never owns (a reconcile would cancel it) and so carries its own marker (#3541).
+ */
+export const isRoutableAlert = (data: Record<string, unknown> | undefined | null) =>
+  isSchedulerAlert(data) || typeof data?.healthAlert === 'string';
 export function alertSignature(alert: Alert) {
   return JSON.stringify(alert);
 }

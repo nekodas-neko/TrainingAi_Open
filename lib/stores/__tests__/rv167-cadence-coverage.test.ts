@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { CADENCE_SERIES_BIN_SEC, type CadenceSummary } from '@trainingai/shared/health/cadence'
-import { cadenceCoverage, stepsEstimateIfCovered, MIN_CADENCE_COVERAGE } from '../cadence-coverage'
+import { cadenceCoverage, stepsEstimateIfCovered, MIN_CADENCE_COVERAGE } from '@trainingai/shared/health/cadence-coverage'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const src = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')

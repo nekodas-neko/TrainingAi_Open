@@ -1,3 +1,4 @@
+import { activityHoldWanted, holdStrapForActivity } from '../src/features/devices/strap/activity-hold.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -826,6 +827,21 @@ test('a strap without PMD, or a stream that fails, reports the accelerometer una
   assert.ok(failing.ble.log.includes('acc stop'));
 });
 
+test('a stream error that beats the disconnect does not leave "unavailable" up after the reconnect (#3541)', async () => {
+  const { session, ble, clock } = await pairedSession();
+  session.hold('activity', true);
+  await settle();
+  session.setAccelerometer(true);
+  await settle();
+  ble.failAccelerometer();
+  assert.equal(session.getSnapshot().accel, 'unavailable');
+  ble.drop();
+  assert.equal(session.getSnapshot().accel, 'unavailable', 'kept while the link is down');
+  await clock.advance(2_000);
+  await settle();
+  assert.equal(session.getSnapshot().accel, 'starting', 'cleared once the new link restarts the stream');
+});
+
 test('a malformed frame is ignored and releasing the walk stops the stream', async () => {
   const { session, ble } = await pairedSession();
   session.hold('activity', true);
@@ -836,4 +852,59 @@ test('a malformed frame is ignored and releasing the walk stops the stream', asy
   assert.equal(session.getSnapshot().accel, 'starting');
   session.dispose();
   assert.ok(ble.log.includes('acc stop'));
+});
+
+test('an activity holds the strap in the background only while the recording service runs (#3541)', () => {
+  assert.equal(activityHoldWanted(true, 'background'), true);
+  assert.equal(activityHoldWanted(true, 'active'), true);
+  assert.equal(activityHoldWanted(false, 'active'), true);
+  assert.equal(activityHoldWanted(false, 'background'), false);
+  assert.equal(activityHoldWanted(false, 'inactive'), false);
+});
+
+test('the recording service starting mid-walk keeps the link and the trace (#3541)', async () => {
+  const { session, ble } = await pairedSession();
+  let state = 'active';
+  const appListeners = new Set<(s: string) => void>();
+  const appState = {
+    get currentState() {
+      return state;
+    },
+    addEventListener: (_t: 'change', l: (s: string) => void) => {
+      appListeners.add(l);
+      return { remove: () => appListeners.delete(l) };
+    },
+  };
+  const hold = holdStrapForActivity(session, appState, false);
+  await settle();
+  ble.beat(bytes(0x16, 120, 0x00, 0x02));
+  const before = session.getSnapshot();
+  assert.equal(before.recording, true);
+  assert.equal(before.trace.length > 0, true);
+  const disconnects = ble.log.filter((x) => x === 'disconnect').length;
+  hold.update(true);
+  await settle();
+  assert.equal(session.getSnapshot().link, 'connected');
+  assert.equal(session.getSnapshot().recording, true);
+  assert.deepEqual(session.getSnapshot().trace, before.trace);
+  assert.equal(ble.log.filter((x) => x === 'disconnect').length, disconnects);
+  // With the service running, backgrounding keeps the hold; the walk ending releases it.
+  state = 'background';
+  appListeners.forEach((l) => l(state));
+  assert.equal(session.getSnapshot().recording, true);
+  hold.release();
+  await settle();
+  assert.equal(session.getSnapshot().recording, false);
+  assert.equal(session.getSnapshot().link, 'idle');
+  assert.equal(appListeners.size, 0);
+});
+
+test('holding the activity twice does not reset the recording (#3541)', async () => {
+  const { session, ble } = await pairedSession();
+  session.hold('activity', true);
+  await settle();
+  ble.beat(bytes(0x16, 120, 0x00, 0x02));
+  const trace = session.getSnapshot().trace;
+  session.hold('activity', true);
+  assert.deepEqual(session.getSnapshot().trace, trace);
 });

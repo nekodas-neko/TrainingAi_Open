@@ -50,6 +50,12 @@ describe('shared health alerts: each type fires and does not fire', () => {
     expect(fires({ readinessLabel: 'Low', stressCurrent: -1 })).toEqual(['stress'])
   })
 
+  it('readiness-low stays quiet on a later open, after the illness or stress alert already fired (#3536)', () => {
+    const fever = { readinessLabel: 'Low' as const, illnessFlag: 'fever' as const }
+    expect(fires(fever, ['illness'])).toEqual([])
+    expect(fires({ readinessLabel: 'Low', stressCurrent: -1 }, ['stress'])).toEqual([])
+  })
+
   it('uses the radar advisory as the body when there is one', () => {
     const [illness] = computeHealthAlertActions({ ...calm, illnessFlag: 'elevated', illnessAdvisory: 'Rest.' })
     expect(illness).toMatchObject({ type: 'fire', body: 'Rest.' })

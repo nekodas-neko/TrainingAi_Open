@@ -29,7 +29,7 @@ import type { PhaseBand } from '@/components/activity/activity-hr-chart'
 import { phaseBandsFromSegments } from '@/components/activity/phase-bands-plugin'
 import type { WalkHrSample } from './walk-active'
 import { cadenceFieldsForSave, type CadenceSummary } from '@trainingai/shared/health/cadence'
-import { stepsEstimateIfCovered } from '@/lib/stores/cadence-coverage'
+import { stepsEstimateIfCovered } from '@trainingai/shared/health/cadence-coverage'
 import { navigateToTab } from "@/lib/shell-nav";
 
 const ActivityHrChart = dynamic(

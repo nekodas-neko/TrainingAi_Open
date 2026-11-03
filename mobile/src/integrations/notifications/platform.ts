@@ -15,6 +15,6 @@ export async function observeAlerts(_onOpen: (data: Record<string, unknown>) => 
   return () => {};
 }
 export async function deviceAlert(_title: string, _body: string) {}
-export async function healthAlert(_type: string, _title: string, _body: string) {
+export async function healthAlert(_type: string, _title: string, _body: string, _scope?: string) {
   return false;
 }

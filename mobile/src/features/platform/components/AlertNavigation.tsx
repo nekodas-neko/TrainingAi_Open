@@ -4,12 +4,15 @@ import { usePlatformIntegrations } from '../PlatformProvider';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { useAccountContext } from '../../account/AccountProvider';
+import { HEALTH_ALERT_TARGET } from '../data/models';
+import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
 import type { Tab } from '../../../app/navigation/tabs';
 import { estimateActionFrom, type EstimateAction } from '../../meal-plans/data/estimated-meals';
 export function AlertNavigation({
   onWorkout,
   onWalk,
   onTab,
+  onHealthDetail,
   onReview,
   onWeek,
   onMealEstimate,
@@ -17,6 +20,8 @@ export function AlertNavigation({
   onWorkout: (id: string) => void;
   onWalk: () => void;
   onTab: (tab: Tab) => void;
+  /** A health alert's tap: the Health tab with this view open (#3541). */
+  onHealthDetail: (detail: HealthDetail) => void;
   onReview: () => void;
   onWeek: (week: string) => void;
   /** A meal reminder's action, or a tap on it, for one plan meal (#2123). */
@@ -72,6 +77,7 @@ export function AlertNavigation({
       );
       onWeek(shiftDateStr(weekStartForDay(today), -7));
     } else if (opened.target === 'health') onTab('Health');
+    else if (opened.target === HEALTH_ALERT_TARGET) onHealthDetail('readiness');
   }, [
     opened,
     state,
@@ -83,6 +89,7 @@ export function AlertNavigation({
     onWorkout,
     onWalk,
     onTab,
+    onHealthDetail,
     onReview,
     onWeek,
     onMealEstimate,

@@ -6,6 +6,9 @@ import { restSoundSource } from '../feedback/rest-cue';
 import { ESTIMATE_ACTION_IDS } from '../../features/meal-plans/data/estimated-meals';
 import {
   ALERT_OWNER,
+  HEALTH_ALERT_TARGET,
+  isRoutableAlert,
+  isSchedulerAlert,
   alertSignature,
   type Alert,
 } from '../../features/platform/data/models';
@@ -127,7 +130,7 @@ export const nativeAlerts = {
         .map((row) => row.request)
         .filter((row) => !pendingIds.has(row.identifier)),
     ]
-      .filter((row) => row.content.data?.owner === ALERT_OWNER)
+      .filter((row) => isSchedulerAlert(row.content.data))
       .map((row) => ({
         id: row.identifier,
         signature: String(row.content.data?.signature ?? ''),
@@ -193,7 +196,7 @@ export async function observeAlerts(onOpen: (data: Record<string, unknown>) => v
   const opened = new Set<string>();
   function handle(response: import('expo-notifications').NotificationResponse | null) {
     const data = response?.notification.request.content.data;
-    if (!response || data?.owner !== ALERT_OWNER) return;
+    if (!response || !isRoutableAlert(data)) return;
     const id = `${response.notification.request.identifier}:${response.notification.date}`;
     if (opened.has(id)) return;
     opened.add(id);
@@ -228,7 +231,7 @@ export async function deviceAlert(title: string, body: string) {
  * scheduler's alerts, so reconciling the planned ones never cancels it. True once it was posted;
  * false when notifications are off, so the caller does not count it as sent.
  */
-export async function healthAlert(type: string, title: string, body: string) {
+export async function healthAlert(type: string, title: string, body: string, scope?: string) {
   if (!(await alertPermission(false))) return false;
   const notifications = await sdk();
   if (Platform.OS === 'android')
@@ -239,7 +242,15 @@ export async function healthAlert(type: string, title: string, body: string) {
       vibrationPattern: [0, 250, 150, 250],
     });
   await notifications.scheduleNotificationAsync({
-    content: { title, body, sound: 'default', data: { healthAlert: type } },
+    content: {
+      title,
+      body,
+      sound: 'default',
+      // Deliberately no `owner`: `nativeAlerts.list()` returns every owned notification and the
+      // scheduler cancels what it did not plan. `healthAlert` routes the tap to `observeAlerts`,
+      // and `scope` lets it open only for the account that was signed in when it was posted.
+      data: { healthAlert: type, scope, target: HEALTH_ALERT_TARGET },
+    },
     trigger: Platform.OS === 'android' ? { channelId: 'health-alerts' } : null,
   });
   return true;
