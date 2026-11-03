@@ -161,10 +161,6 @@
             "gap": "no_input"
           },
           {
-            "key": "prevDayActivity",
-            "gap": "no_input"
-          },
-          {
             "key": "recoveryIndex",
             "gap": "no_input"
           },

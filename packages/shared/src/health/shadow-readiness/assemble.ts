@@ -263,6 +263,8 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     'activity.yesterday_load': compact(metrics.map(m => obs(m.date, m.steps, m.stepsSource ?? 'body_metrics'))),
     'activity.zone_minutes_week': zoneWeek,
     'activity.training_load': trainingLoad,
+    // #2826 item 4: the same night duration as `sleep.duration`, read as capacity to train.
+    'activity.sleep_capacity': duration,
     'body.temperature': perInput(d => summaryByDate.get(d)?.tempDevC, ouraTemperature),
     'body.breathing_rate': perInput(d => summaryByDate.get(d)?.breathAvgRpm, nightBreathing),
     'body.spo2': compact(metrics.map(m => obs(m.date, m.spo2Pct, m.spo2Source ?? 'body_metrics'))),
@@ -303,6 +305,7 @@ function daytimeStressSeries(raw: ShadowRawHistory): UnitObservation[] {
 /** Units whose value for day `D` is the night keyed to `D`. Everything else reads `D − 1`. */
 const NIGHT_UNITS: ReadonlySet<ShadowUnitId> = new Set<ShadowUnitId>([
   'sleep.duration', 'sleep.efficiency', 'sleep.deep_rem_share', 'sleep.latency', 'sleep.timing', 'sleep.balance',
+  'activity.sleep_capacity',
   'heart.overnight_hrv', 'heart.overnight_rhr', 'heart.overnight_settling',
   'body.temperature', 'body.breathing_rate',
 ])

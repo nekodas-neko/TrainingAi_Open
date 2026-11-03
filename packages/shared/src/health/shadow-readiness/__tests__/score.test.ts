@@ -328,7 +328,8 @@ describe('shadow readiness — structural rules', () => {
   it('points: pillar totals float (#2833) — a pillar is the sum of its units\' points; renormalised shares sum to 1', () => {
     // Version 3's fixed 30 / 30 / 20 / 20 survives everywhere except Heart, which gave up 6.5 points
     // when HRV and resting HR became one pattern with one 13-point budget (#2826).
-    expect(PILLAR_POINTS).toEqual({ sleep: 30, heart: 23.5, activity: 20, body: 20 })
+    // Version 6 (#2826 item 4): Heart 23.5 → 21 (settling 4.5 → 2), Activity 20 → 23 (sleep capacity).
+    expect(PILLAR_POINTS).toEqual({ sleep: 30, heart: 21, activity: 23, body: 20 })
     for (const p of SHADOW_PILLARS) {
       const sum = SHADOW_UNIT_IDS.filter(id => UNIT_DEFS[id].pillar === p).reduce((s, id) => s + UNIT_DEFS[id].points, 0)
       expect(sum).toBeCloseTo(PILLAR_POINTS[p], 10)

@@ -158,8 +158,11 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
       activityBalance:  stored(96),   // 5.76
     }                                 // → 43.26
 
+    // #3358 (v15): `prevDayActivity` left the model and `activityBalance` took its share, so the
+    // current model re-derives this row to (43.26 − 4.50 − 5.76 + 96 × 0.15) / 0.90 = 52.67. That is
+    // a model change, stamped on the row; under v14 weights it read 48 as described above.
     const r = rederiveReadinessFromStored(map)
     expect(r?.missing).toEqual([])
-    expect(r?.score).toBe(48)
+    expect(r?.score).toBe(53)
   })
 })

@@ -36,7 +36,7 @@ describe('storedReadinessMatches', () => {
 // A complete stored map whose every input is null re-derives to the model's neutral 50.
 const contributors = Object.fromEntries(Object.keys(READINESS_WEIGHTS).map(k => [k, { score: 50, provisional: false, input: null, gap: null }]))
 const audit = (readinessScore: number, illnessFlag: string | null) => buildReadinessAudit({
-  date: '2026-10-19', summary: null, priorSummary: null, sleepScore: null, activityScore: null, prevDayActivityScore: null, ouraDaily: null,
+  date: '2026-10-19', summary: null, priorSummary: null, sleepScore: null, activityScore: null, ouraDaily: null,
   derived: { day: '2026-10-19', readinessScore, readinessContributors: contributors, illnessFlag, modelVersions: { readiness: 'v8' } } as unknown as OuraDailyDerivedRow,
 })
 const weightsMoved = (notes: readonly string[]) => notes.some(n => n.includes('the WEIGHTS moved'))

@@ -26,7 +26,8 @@ export const CONTRIBUTOR_LABELS: Record<string, string> = {
   // eight keys are the Oura names in camelCase and resolve through `labelFor`'s fallback; the other
   // two were renamed and do not, and rendered as raw keys until RV-201. Keep this list in step with
   // `READINESS_WEIGHTS`. `checkin` left the composite in #2224 and stays here for the derived rows
-  // written before that, which still carry it.
+  // written before that, which still carry it. `prevDayActivity` left in #3358 (readiness v15) and
+  // stays for the same reason.
   checkin: 'Morning check-in',
   temperature: 'Body temperature',
   prevDayActivity: 'Previous day activity',

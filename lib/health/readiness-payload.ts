@@ -27,14 +27,12 @@ import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-s
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
-import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { scoreActivityForDay, restingHrBaseline, carriedOverRestingHr, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
 import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
 import { staleFinishedDays, metLookbackFrom } from '@trainingai/shared/health/finished-day-recheck'
 import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, runBackgroundFinalise, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
 import { type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveHrProfile, maxHrIsUnread } from '@trainingai/shared/health/hr-profile'
-import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult, type ContributorGap } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
@@ -545,20 +543,9 @@ export async function buildReadinessPayload(
   const ownActivityScore = activityResult?.preTaperScore ?? null // pre-taper: today's, for availability
   const activityDisplayScore = activityResult?.score ?? null      // tapered → the card / display
 
-  // Yesterday's own activity score — feeds the A4 composite's "Prev-Day Activity" contributor.
+  // #3358: yesterday's activity reaches readiness once, as the finished score below. The cut-down
+  // second copy (steps, energy and strength on today's goals) that sat beside it is retired.
   const yesterdayIso = shiftDateStr(todayIso, -1)
-  const yesterdayMetrics = bodyMetrics.find(m => m.date === yesterdayIso) ?? null
-  // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
-  // today's, so on a training day the "previous day" score reacted to this morning's session.
-  const prevWindow = strengthWindowEndingAt(recentSessions, yesterdayIso, tz)
-  const yesterdaySteps = dayStepCount(yesterdayMetrics?.steps, stepActivityLogs.filter(a => a.date === yesterdayIso))
-  const prevDayActivityScore = (yesterdayMetrics || yesterdaySteps != null || prevWindow.sessions7d > 0) ? (computeActivityScore({
-    steps: yesterdaySteps,
-    activeCalories: yesterdayMetrics?.activeCalories ?? null,
-    sessions7d: prevWindow.sessions7d,
-    volume7dKg: prevWindow.volume7dKg,
-    goals,
-  })?.preTaperScore ?? null) : null
 
   // #2435: readiness's activity-balance input is the previous COMPLETED day's Activity score, read
   // pre-taper so load fatigue isn't counted twice. It used to read today's partial score, so a
@@ -677,7 +664,6 @@ export async function buildReadinessPayload(
     ? computeReadinessComposite({
         ...compositeNightFields(night),
         previousNightScore: sleepScore100,
-        prevDayActivityScore,
         activityBalanceScore: prevCompletedDayActivityScore,
         nHistory,
       })

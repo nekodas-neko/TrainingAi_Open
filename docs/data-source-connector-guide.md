@@ -184,6 +184,11 @@ provenance bug before it was made required).
 - **Table:** `body_metrics`, unique on `(userId, date)`, `sourceMap: jsonb` stamps per-field
   provenance so a scale can win `weightKg` while a ring wins `steps` on the same day.
 - **Write path:** `repo.upsertBodyMetrics(userId, metrics[], source: HealthSource)`.
+- **Night HRV method (#3376):** a source that sends a night's HRV series writes its median; one that
+  sends only its own nightly figure writes that. Either way the connector picks through
+  `chooseNightHrv` and stamps the method with `stampNightHrvMethod` (`source_map` key
+  `hrv_ms:series_median` or `hrv_ms:source_average`), so a normal can tell the rulers apart
+  (`BodyMetrics.hrvMethod`).
 - **Cumulative-field gotcha:** a source reporting "today's" steps/calories mid-day is reporting a
   **partial day** — never compare a same-day cumulative read against a completed day's total.
 

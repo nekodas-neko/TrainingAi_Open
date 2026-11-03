@@ -7,7 +7,7 @@ describe('computeReadinessComposite', () => {
   it('falls back to neutral for every baseline-relative contributor when history is cold', () => {
     const result = computeReadinessComposite({
       rhrZ: -2, hrvZ: 2, tempZ: 0, sleepBalanceZ: 1,
-      previousNightScore: 80, prevDayActivityScore: 70, activityBalanceScore: 60,
+      previousNightScore: 80, activityBalanceScore: 60,
       nHistory: 3,
     })
     // `input: null` on a cold-baseline fallback is deliberate (Q-501): the z existed, but the score
@@ -26,7 +26,7 @@ describe('computeReadinessComposite', () => {
   it('scores a lower resting HR than baseline as better (positive)', () => {
     const result = computeReadinessComposite({
       rhrZ: -1, hrvZ: null, tempZ: null, sleepBalanceZ: null,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      previousNightScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
     expect(result.contributors.restingHeartRate.score).toBeGreaterThan(50)
@@ -36,7 +36,7 @@ describe('computeReadinessComposite', () => {
   it('scores higher HRV than baseline as better (positive)', () => {
     const result = computeReadinessComposite({
       rhrZ: null, hrvZ: 1, tempZ: null, sleepBalanceZ: null,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      previousNightScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
     expect(result.contributors.hrvBalance.score).toBeGreaterThan(50)
@@ -45,12 +45,12 @@ describe('computeReadinessComposite', () => {
   it('penalizes temperature deviation in either direction', () => {
     const hot = computeReadinessComposite({
       rhrZ: null, hrvZ: null, tempZ: 1.5, sleepBalanceZ: null,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      previousNightScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
     const cold = computeReadinessComposite({
       rhrZ: null, hrvZ: null, tempZ: -1.5, sleepBalanceZ: null,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      previousNightScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
     expect(hot.contributors.temperature.score).toBeLessThan(50)
@@ -60,7 +60,7 @@ describe('computeReadinessComposite', () => {
   it('recovery index is always neutral/provisional — no calibratable mapping', () => {
     const result = computeReadinessComposite({
       rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      previousNightScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
     expect(result.contributors.recoveryIndex).toEqual({ score: 50, provisional: true, input: null, gap: 'no_input' })
@@ -69,7 +69,7 @@ describe('computeReadinessComposite', () => {
   it('keeps sub-scores inside [0, 100], and z-driven ones approach the rail without landing on it', () => {
     const result = computeReadinessComposite({
       rhrZ: -10, hrvZ: 10, tempZ: 0, sleepBalanceZ: null,
-      previousNightScore: 500, prevDayActivityScore: -500, activityBalanceScore: null,
+      previousNightScore: 500, activityBalanceScore: -500,
       nHistory: FULL_HISTORY,
     })
     // TN-60: a z-driven contributor no longer CLAMPS, it compresses. Even ±10σ stays a hair short
@@ -81,13 +81,13 @@ describe('computeReadinessComposite', () => {
     }
     // Plain (already-0-100) inputs are NOT z-driven and still hard-clamp — untouched by TN-60.
     expect(result.contributors.previousNight.score).toBe(100)
-    expect(result.contributors.prevDayActivity.score).toBe(0)
+    expect(result.contributors.activityBalance.score).toBe(0)
   })
 
   it('an all-neutral input composites to exactly 50', () => {
     const result = computeReadinessComposite({
       rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      previousNightScore: null, activityBalanceScore: null,
       nHistory: 0,
     })
     expect(result.score).toBe(50)
@@ -105,7 +105,7 @@ describe('computeReadinessComposite', () => {
   it('scores 10 at −1.5σ and keeps FALLING beyond it, instead of railing at 0', () => {
     const at = (z: number) => computeReadinessComposite({
       rhrZ: null, hrvZ: z, tempZ: null, sleepBalanceZ: null,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      previousNightScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     }).contributors.hrvBalance.score
 
@@ -131,7 +131,7 @@ describe('computeReadinessComposite', () => {
   it('scores 90 at +1.5σ and keeps rising beyond it, instead of railing', () => {
     const at = (z: number) => computeReadinessComposite({
       rhrZ: -z, hrvZ: z, tempZ: 0, sleepBalanceZ: z,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      previousNightScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
     const edge = at(1.5)
@@ -160,7 +160,7 @@ describe('computeReadinessComposite', () => {
   it('puts a genuinely perfect day just under the ceiling rather than on it', () => {
     const r = computeReadinessComposite({
       rhrZ: -1.5, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 1.5,
-      previousNightScore: 100, prevDayActivityScore: 100, activityBalanceScore: 100,
+      previousNightScore: 100, activityBalanceScore: 100,
       recoveryIndexHours: 6,
       nHistory: FULL_HISTORY,
     })
@@ -170,7 +170,7 @@ describe('computeReadinessComposite', () => {
   it('still rewards a day better than 1.5σ on every axis — the ceiling is approached, not hit', () => {
     const at = (z: number) => computeReadinessComposite({
       rhrZ: -z, hrvZ: z, tempZ: 0, sleepBalanceZ: z,
-      previousNightScore: 100, prevDayActivityScore: 100, activityBalanceScore: 100,
+      previousNightScore: 100, activityBalanceScore: 100,
       recoveryIndexHours: 6,
       nHistory: FULL_HISTORY,
     }).score
@@ -185,20 +185,22 @@ describe('computeReadinessComposite', () => {
       expect(Object.keys(READINESS_WEIGHTS)).not.toContain('checkin')
       const r = computeReadinessComposite({
         rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
-        previousNightScore: 70, prevDayActivityScore: 60, activityBalanceScore: 55,
+        previousNightScore: 70, activityBalanceScore: 55,
         nHistory: FULL_HISTORY,
       })
       expect(Object.keys(r.contributors).sort()).toEqual(Object.keys(READINESS_WEIGHTS).sort())
     })
 
-    it('renormalises the other eight over the 0.90 they held, keeping every ratio between them', () => {
+    it('renormalises the others over the 0.90 they held, keeping every ratio between them', () => {
       const total = Object.values(READINESS_WEIGHTS).reduce((a, b) => a + b, 0)
       expect(total).toBeCloseTo(1, 12)
-      // The pre-#2224 weights, which summed to 0.90 without the check-in.
+      // The pre-#2224 weights, which summed to 0.90 without the check-in. Since #3358 the activity
+      // input carries what `prevDayActivity` (0.09) and it (0.06) held between them.
       const before = {
         restingHeartRate: 0.15, previousNight: 0.16, hrvBalance: 0.15, temperature: 0.10,
-        sleepBalance: 0.10, prevDayActivity: 0.09, recoveryIndex: 0.09, activityBalance: 0.06,
+        sleepBalance: 0.10, recoveryIndex: 0.09, activityBalance: 0.09 + 0.06,
       }
+      expect(Object.keys(READINESS_WEIGHTS).sort()).toEqual(Object.keys(before).sort())
       for (const [key, w] of Object.entries(before)) {
         expect(READINESS_WEIGHTS[key as keyof typeof READINESS_WEIGHTS], key).toBeCloseTo(w / 0.9, 12)
       }
@@ -208,7 +210,7 @@ describe('computeReadinessComposite', () => {
       // One of the invariants the 2026-08-18 range review found the composite genuinely holds.
       const r = computeReadinessComposite({
         rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
-        previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+        previousNightScore: null, activityBalanceScore: null,
         nHistory: FULL_HISTORY,
       })
       expect(r.score).toBe(50)
@@ -218,7 +220,7 @@ describe('computeReadinessComposite', () => {
   describe('recovery-index contributor (calibrated curve, was dead NEUTRAL)', () => {
     const base = {
       rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+      previousNightScore: null, activityBalanceScore: null,
       nHistory: 0,
     }
     // Anchor moved 6 h → 5 h on 2026-08-18 (Q-500), fitted against Oura's own recovery_index
@@ -251,7 +253,7 @@ describe('computeReadinessComposite', () => {
 describe('the temperature contributor scores 100 at baseline (#2359)', () => {
   const temp = (tempZ: number | null) => computeReadinessComposite({
     rhrZ: 0, hrvZ: 0, tempZ, sleepBalanceZ: 0,
-    previousNightScore: 80, prevDayActivityScore: 80, activityBalanceScore: 80,
+    previousNightScore: 80, activityBalanceScore: 80,
     recoveryIndexHours: 5,
     nHistory: FULL_HISTORY,
   }).contributors.temperature.score
@@ -286,7 +288,7 @@ describe('the temperature contributor scores 100 at baseline (#2359)', () => {
   it('leaves the other contributors\' curves alone: hrv at +1.5σ is still 90', () => {
     const r = computeReadinessComposite({
       rhrZ: 0, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 0,
-      previousNightScore: 80, prevDayActivityScore: 80, activityBalanceScore: 80,
+      previousNightScore: 80, activityBalanceScore: 80,
       recoveryIndexHours: 5,
       nHistory: FULL_HISTORY,
     })
@@ -296,7 +298,7 @@ describe('the temperature contributor scores 100 at baseline (#2359)', () => {
   it('a normal temperature lifts readiness by about the weight it carries, about a point', () => {
     const withTemp = (tempZ: number) => computeReadinessComposite({
       rhrZ: 0, hrvZ: 0, tempZ, sleepBalanceZ: 0,
-      previousNightScore: 80, prevDayActivityScore: 80, activityBalanceScore: 80,
+      previousNightScore: 80, activityBalanceScore: 80,
       recoveryIndexHours: 5,
       nHistory: FULL_HISTORY,
     }).score

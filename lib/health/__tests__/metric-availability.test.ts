@@ -67,7 +67,7 @@ describe('metricAvailability against the real producer', () => {
   // question.
   const FULL = {
     rhrZ: -0.5, hrvZ: 0.8, tempZ: 0.1, sleepBalanceZ: 0.4,
-    previousNightScore: 80, prevDayActivityScore: 70, activityBalanceScore: 60,
+    previousNightScore: 80, activityBalanceScore: 60,
     recoveryIndexHours: 4,
   }
 

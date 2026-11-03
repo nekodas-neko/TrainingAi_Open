@@ -24,8 +24,6 @@ export interface ReadinessAuditInput {
   sleepScore: number | null
   /** The activity-balance input: the previous completed day's finalised PRE-taper score (#2435). */
   activityScore: number | null
-  /** The prev-day contributor: the day before, scored on steps, energy and its strength window. */
-  prevDayActivityScore: number | null
   ouraDaily: OuraDailyRow | null
   derived: OuraDailyDerivedRow | null
   /**
@@ -43,7 +41,7 @@ const BASELINE_RELATIVE_WEIGHT = READINESS_WEIGHTS.restingHeartRate + READINESS_
   + READINESS_WEIGHTS.temperature + READINESS_WEIGHTS.sleepBalance
 
 export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
-  const { switchDay = null, date, summary, priorSummary, sleepScore, activityScore, prevDayActivityScore, ouraDaily, derived } = input
+  const { switchDay = null, date, summary, priorSummary, sleepScore, activityScore, ouraDaily, derived } = input
 
   const gaps: string[] = []
   const notes: string[] = []
@@ -96,7 +94,6 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
   const composite = auditedNight && (latestSummary || hasGenericRecoverySignal) ? computeReadinessComposite({
     ...compositeNightFields(night),
     previousNightScore: sleepScore,
-    prevDayActivityScore,
     activityBalanceScore: activityScore,
     nHistory,
   }) : null
@@ -191,12 +188,6 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       },
       subScore: c.sleepBalance.score, provisional: c.sleepBalance.provisional,
       excludedReason: nHistory < BASELINE_MIN_NIGHTS ? `baseline cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights) → neutral 50` : 'no prior sleep baseline → neutral 50',
-    },
-    {
-      key: 'prevDayActivity', label: "Previous day's activity",
-      input: { value: prevDayActivityScore, unit: '0-100', source: 'computeActivityScore for the prior day' },
-      subScore: c.prevDayActivity.score, provisional: c.prevDayActivity.provisional,
-      excludedReason: 'no activity data for the prior day → neutral 50',
     },
     {
       key: 'recoveryIndex', label: 'Recovery index',

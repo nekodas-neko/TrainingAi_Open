@@ -87,8 +87,9 @@ describe('every sleep contributor the model emits is presentable', () => {
 describe('every readiness contributor is presentable too', () => {
   const keys = Object.keys(READINESS_WEIGHTS)
 
-  it('covers all eight', () => {
-    expect(keys).toHaveLength(8)
+  // Seven since #3358 retired `prevDayActivity`.
+  it('covers all seven', () => {
+    expect(keys).toHaveLength(7)
   })
 
   it('has a label and an explanation for every one', () => {
