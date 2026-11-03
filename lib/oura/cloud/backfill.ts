@@ -14,7 +14,7 @@ import { dateStrMidnightInTz, daysBetweenDateStrs, DEFAULT_TZ, isCalendarDate, s
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { OuraUnavailableError } from './client'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
-import { fetchOuraDocuments, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
+import { describeRefusal, fetchOuraDocuments, fetchOuraHeartRate, fetchOuraRingBattery, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
 import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, mapRingBatteryRows, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType, type OuraSeriesType } from './documents'
 import { NO_WRITES, plannedCounts, reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraBatteryStore, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import { stampOuraData } from './freshness'
@@ -87,6 +87,11 @@ export interface OuraBackfillReport {
    * an entry here means a guess is wrong.
    */
   refusedDespiteGrant: string[]
+  /**
+   * Why Oura said it refused, per type in `forbidden` or `refusedDespiteGrant` (`401: insufficient_scope,
+   * scope="…"`), when it said: so the scope it wanted can be read, not guessed. Absent when no type has one.
+   */
+  refusalReasons?: Record<string, string>
   stoppedEarly: string | null
 }
 
@@ -178,11 +183,15 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
     if (err instanceof OuraUnavailableError) { report.stoppedEarly = err.message; return true }
     return false
   }
+  const noteReason = (type: string, status: 401 | 403, err: { reason?: string }) => {
+    if (err.reason) (report.refusalReasons ??= {})[type] = describeRefusal(status, err.reason)
+  }
   /** After a 401 on `type`: true to skip it and carry on, else why to stop. */
-  const refusedTypeOnly = async (type: string): Promise<true | OuraRefusalVerdict> => {
+  const refusedTypeOnly = async (type: string, err: OuraUnauthorizedError): Promise<true | OuraRefusalVerdict> => {
     const why = await refusal()
     if (why !== 'type_refused') return why
     report.refusedDespiteGrant.push(type)
+    noteReason(type, 401, err)
     return true
   }
 
@@ -216,11 +225,11 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
           readWhole.push({ type, from, to: shiftDateStr(to, -1), keepIds: got.docs.flatMap(d => d.type === type ? [d.doc.id] : []) })
         }
       } catch (err) {
-        if (err instanceof OuraForbiddenError) { report.forbidden.push(type); continue read }
+        if (err instanceof OuraForbiddenError) { report.forbidden.push(type); noteReason(type, 403, err); continue read }
         if (err instanceof OuraUnauthorizedError) {
           let why: true | OuraRefusalVerdict
           try {
-            why = await refusedTypeOnly(type)
+            why = await refusedTypeOnly(type, err)
           } catch (probeErr) {
             if (stop(probeErr)) break read
             throw probeErr
@@ -264,11 +273,11 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
         }
         report.counts = { ...report.counts, heartRatePoints: report.counts.heartRatePoints + written }
       } catch (err) {
-        if (err instanceof OuraForbiddenError) { report.forbidden.push('heartrate'); break }
+        if (err instanceof OuraForbiddenError) { report.forbidden.push('heartrate'); noteReason('heartrate', 403, err); break }
         if (err instanceof OuraUnauthorizedError) {
           let why: true | OuraRefusalVerdict
           try {
-            why = await refusedTypeOnly('heartrate')
+            why = await refusedTypeOnly('heartrate', err)
           } catch (probeErr) {
             if (stop(probeErr)) break
             throw probeErr
@@ -292,11 +301,11 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
           report.dropped += got.dropped
           if (!opts.dryRun) await deps.repo.insertOuraCloudBatteryReadings(userId, mapRingBatteryRows(got.rows))
         } catch (err) {
-          if (err instanceof OuraForbiddenError) { report.forbidden.push('ring_battery'); break }
+          if (err instanceof OuraForbiddenError) { report.forbidden.push('ring_battery'); noteReason('ring_battery', 403, err); break }
           if (err instanceof OuraUnauthorizedError) {
             let why: true | OuraRefusalVerdict
             try {
-              why = await refusedTypeOnly('ring_battery')
+              why = await refusedTypeOnly('ring_battery', err)
             } catch (probeErr) {
               if (stop(probeErr)) break
               throw probeErr
@@ -320,9 +329,16 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
  * documents or rows that failed the spec's shape, and a heart-rate pass that read nothing although
  * the grant covers it. Each is otherwise visible only in a report nobody reads.
  */
+/** `ring_battery (401: insufficient_scope, scope="x"), daily_stress`: each type with Oura's reason when it gave one. */
+export function listRefusedTypes(types: string[], reasons?: Record<string, string>): string {
+  return types.map(t => reasons?.[t] ? `${t} (${reasons[t]})` : t).join(', ')
+}
+
 export function reportBackfillGaps(userId: string, report: OuraBackfillReport): void {
   if (report.forbidden.length > 0) {
-    reportOuraCloudIssue('connect-backfill:forbidden', `Oura refused ${report.forbidden.join(', ')} (403)`, { userId })
+    reportOuraCloudIssue('connect-backfill:forbidden', report.forbidden.some(t => report.refusalReasons?.[t])
+      ? `Oura refused ${listRefusedTypes(report.forbidden, report.refusalReasons)}`
+      : `Oura refused ${report.forbidden.join(', ')} (403)`, { userId })
   }
   if (report.dropped > 0) {
     reportOuraCloudIssue('connect-backfill:dropped', `${report.dropped} documents or rows did not match the spec`, { userId })
@@ -377,7 +393,7 @@ export function startOuraConnectBackfill(userId: string): void {
       }
       // Our scope map is wrong for these: worth fixing, so recorded.
       if (result.ok && result.report.refusedDespiteGrant.length > 0) {
-        const types = result.report.refusedDespiteGrant.join(', ')
+        const types = listRefusedTypes(result.report.refusedDespiteGrant, result.report.refusalReasons)
         console.warn(`[oura] connect backfill: Oura refused ${types} although the grant covers it by our scope map`)
         reportOuraCloudIssue('connect-backfill:refused-despite-grant', `Oura refused ${types} although the grant covers it`, { userId })
       }

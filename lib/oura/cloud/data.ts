@@ -15,18 +15,83 @@ import {
 
 /** The token was refused (401): expired, revoked, or the grant is gone. */
 export class OuraUnauthorizedError extends Error {
-  constructor() {
+  /** Why Oura said it refused, when it said (`refusalReason`); safe to log and report. */
+  readonly reason?: string
+  constructor(reason?: string) {
     super('Oura refused the access token')
     this.name = 'OuraUnauthorizedError'
+    if (reason) this.reason = reason
   }
 }
 
 /** 403: the user's Oura membership lapsed or they did not share this data type. Not worth retrying. */
 export class OuraForbiddenError extends Error {
-  constructor(readonly path: string) {
+  /** Why Oura said it refused, when it said (`refusalReason`); safe to log and report. */
+  readonly reason?: string
+  constructor(readonly path: string, reason?: string) {
     super(`Oura refused access to ${path} (403)`)
     this.name = 'OuraForbiddenError'
+    if (reason) this.reason = reason
   }
+}
+
+/** The longest refusal reason kept. */
+export const MAX_REFUSAL_REASON = 200
+
+/** What of a refusal body is read: a reason is a sentence, not a page. */
+const MAX_REFUSAL_BODY = 4096
+
+/** Printable ASCII only, tokens removed, whitespace folded. */
+function cleanReasonPart(raw: string, secrets: string[]): string {
+  let t = raw
+  // Oura should never echo what we sent, but the one secret we hold is cheap to prove absent: removed
+  // before the ASCII filter (so it cannot be split by what the filter drops) and again after it
+  // (so one the filter joined together is caught too).
+  const scrub = (v: string) => secrets.reduce((acc, sec) => (sec ? acc.split(sec).join('[redacted]') : acc), v)
+  t = scrub(t).replace(/[^\x20-\x7e]/g, ' ')
+  return scrub(t).replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Why Oura refused a request (401 or 403), from what it sent back: the `WWW-Authenticate` header's
+ * `error` and `scope` parameters, and the JSON body's `detail` / `message` / `error` string. At most
+ * 200 characters of printable ASCII, and never anything we sent: not a request header, not the
+ * query, and the bearer token is removed from whatever Oura says. `undefined` when it said nothing
+ * usable.
+ */
+export async function refusalReason(res: Response, accessToken: string): Promise<string | undefined> {
+  const secrets = [accessToken, encodeURIComponent(accessToken)].filter((v, i, a) => v && a.indexOf(v) === i)
+  const parts: string[] = []
+  const auth = res.headers.get('www-authenticate')
+  if (auth) {
+    const param = (name: string) => new RegExp(`(?:^|[\\s,])${name}\\s*=\\s*(?:"([^"]*)"|([^\\s,"]+))`, 'i').exec(auth)
+    const error = param('error')
+    const scope = param('scope')
+    const e = error ? cleanReasonPart(error[1] ?? error[2] ?? '', secrets) : ''
+    const sc = scope ? cleanReasonPart(scope[1] ?? scope[2] ?? '', secrets) : ''
+    if (e) parts.push(e)
+    if (sc) parts.push(`scope="${sc}"`)
+  }
+  try {
+    const text = (await res.text()).slice(0, MAX_REFUSAL_BODY)
+    const body: unknown = JSON.parse(text)
+    if (body && typeof body === 'object') {
+      for (const key of ['detail', 'message', 'error'] as const) {
+        const v = (body as Record<string, unknown>)[key]
+        if (typeof v === 'string') {
+          const c = cleanReasonPart(v, secrets)
+          if (c) { parts.push(c); break }
+        }
+      }
+    }
+  } catch { /* no body, or not JSON: the header alone, or nothing */ }
+  const reason = parts.join(', ').slice(0, MAX_REFUSAL_REASON).trim()
+  return reason || undefined
+}
+
+/** `401: insufficient_scope, scope="x"`, or just `401` when Oura gave no reason. */
+export function describeRefusal(status: 401 | 403, reason?: string): string {
+  return reason ? `${status}: ${reason}` : String(status)
 }
 
 /**
@@ -67,8 +132,8 @@ async function getJson(path: string, accessToken: string, query?: Record<string,
   } catch (err) {
     throw new OuraUnavailableError(`Oura could not be reached: ${err instanceof Error ? err.name : 'unknown'}`)
   }
-  if (res.status === 401) throw new OuraUnauthorizedError()
-  if (res.status === 403) throw new OuraForbiddenError(path.split('/')[0])
+  if (res.status === 401) throw new OuraUnauthorizedError(await refusalReason(res, accessToken))
+  if (res.status === 403) throw new OuraForbiddenError(path.split('/')[0], await refusalReason(res, accessToken))
   if (res.status === 404) return { status: 404, body: null }
   // The webhook answers 503 and Oura retries; the backfill waits out a short Retry-After, else stops.
   if (res.status === 429) throw new OuraRateLimitedError(path.split('/')[0], parseRetryAfter(res.headers.get('retry-after')))
