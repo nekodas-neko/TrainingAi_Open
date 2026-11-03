@@ -60,3 +60,43 @@ describe('overnight settling on an Oura night (#3001)', () => {
     expect(prepareShadowHistory(raw({ ouraCloudContributors: [contributor('2026-10-20', null)] })).series['heart.overnight_settling']).toEqual([])
   })
 })
+
+// #3572: the shadow unit takes the same recovery-index hours the live score does, ahead of the contributor.
+describe('overnight settling takes Oura Cloud hours (#3572)', () => {
+  const hours = (date: string, h: number) => ({ date, hours: h })
+  const settling = (r: ShadowRawHistory) => prepareShadowHistory(r).series['heart.overnight_settling']!
+
+  it('gives an Oura Cloud night the cloud hours, not the contributor', () => {
+    const s = settling(raw({
+      ouraCloudContributors: [contributor('2026-10-20', 70)], ouraCloudRecoveryHours: [hours('2026-10-20', 5.25)],
+    }))
+    expect(s).toEqual([expect.objectContaining({ date: '2026-10-20', value: 5.25, source: 'oura_cloud_hr_series' })])
+    expect(s[0].minMeaningfulChange).toBeUndefined()
+  })
+
+  it('falls back to the contributor on a night with no usable series', () => {
+    const s = settling(raw({
+      ouraCloudContributors: [contributor('2026-10-20', 70), contributor('2026-10-21', 72)],
+      ouraCloudRecoveryHours: [hours('2026-10-21', 6)],
+    }))
+    expect(s.find(o => o.date === '2026-10-20')).toEqual(expect.objectContaining({ value: 70, source: 'oura_cloud', minMeaningfulChange: 5 }))
+    expect(s.find(o => o.date === '2026-10-21')).toEqual(expect.objectContaining({ value: 6, source: 'oura_cloud_hr_series' }))
+  })
+
+  it('leaves ring-era nights unchanged, and the ring’s hours still win a night that has both', () => {
+    const without = settling(raw({ dailySummaries: ringDays.map(d => summary(d, 5)) }))
+    const withHours = settling(raw({ dailySummaries: ringDays.map(d => summary(d, 5)), ouraCloudRecoveryHours: [hours('2026-10-10', 7)] }))
+    expect(withHours).toEqual(without)
+  })
+
+  it('scores a cloud night against cloud-hours nights only', () => {
+    const cloud = ouraDays.map((d, i) => hours(d, 5 + i * 0.1))
+    const r = scoreShadowReadiness(assembleShadowInputs(prepareShadowHistory(raw({
+      dailySummaries: ringDays.map(d => summary(d, 5)), ouraCloudContributors: ouraDays.map(d => contributor(d, 70)), ouraCloudRecoveryHours: cloud,
+    })), D))
+    const unit = r.units['heart.overnight_settling']
+    expect(unit.provenance?.source).toBe('oura_cloud_hr_series')
+    expect(unit.value).toBe(5.7)
+    expect(unit.validDays).toBe(7)
+  })
+})

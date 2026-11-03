@@ -106,7 +106,7 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
   const zoneFrom = [shiftDateStr(from, -(BASELINE_WINDOW_DAYS + 8)), shiftDateStr(today, -ZONE_HR_RETENTION_DAYS)].sort()[1]
   const zoneTo = shiftDateStr(to, -1)
 
-  const [sleepSessions, bodyMetrics, summaries, wear, derived, workouts, setHr, moods, mornings, evenings, user, goals, food, profile, program, ouraCloudFrom, ouraCloudContributors] = await Promise.all([
+  const [sleepSessions, bodyMetrics, summaries, wear, derived, workouts, setHr, moods, mornings, evenings, user, goals, food, profile, program, ouraCloudFrom, ouraCloudContributors, ouraCloudRecoveryHours] = await Promise.all([
     repo.listSleepSessions(userId, start, to),
     repo.listBodyMetrics(userId, start, to),
     repo.getOuraDailySummary(userId, start, to),
@@ -125,6 +125,8 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
     repo.getOuraCloudSwitchDay(userId),
     // #3001: a failed read leaves the settling unit on the ring's hours alone, as before.
     repo.getOuraCloudReadinessContributors(userId, start, to).catch(() => []),
+    // #3572: the same hours the live score reads; a failed read leaves the contributor in place.
+    repo.getOuraCloudRecoveryIndexHours(userId, eachDay(start, to), tz).catch(() => []),
   ])
 
   // Zone minutes only where something records HR at all (#2337): without a source, every zero
@@ -176,6 +178,7 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
       derived,
       ouraCloudFrom,
       ouraCloudContributors,
+      ouraCloudRecoveryHours,
       workouts: workouts.map(w => ({
         startedAt: new Date(w.startedAt),
         volumeKg: w.exercises.reduce((s, ex) => s + (ex.volume ?? 0), 0),
