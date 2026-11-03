@@ -37,7 +37,7 @@ const UPDATED = '2026-10-25T00:00:00.000Z'
 const base = {
   date: '2026-10-25', durationHours: 7, deepSleepHours: null, remSleepHours: null, lightSleepHours: null,
   awakHours: null, efficiency: 90, onsetLatencySec: null, averageHrvMs: null, avgHeartRate: null,
-  lowestHeartRate: null, respiratoryRate: null, sleepPhase5Min: null, timeInBedHours: null,
+  lowestHeartRate: null, sleepScore: null, respiratoryRate: null, sleepPhase5Min: null, timeInBedHours: null,
   manualSleepStart: null, manualEntry: false, syncStatus: 'synced' as const, updatedAt: UPDATED,
 }
 const cloud: LocalSleepSession = {

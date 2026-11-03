@@ -107,7 +107,7 @@ describe('mergeByDate files a night under its local wake day', () => {
     const out = mergeByDate([r], 'Australia/Brisbane')
     expect(out).toHaveLength(1)
     expect(out[0].date).toBe('2026-10-19')
-    expect(nightSessions([{ ...r, sleepStart: new Date(r.sleepStart!), sleepEnd: new Date(r.sleepEnd!) }], 'Australia/Brisbane')[0].date).toBe('2026-10-19')
+    expect(nightSessions([{ ...r, sleepStart: new Date(r.sleepStart!), sleepEnd: new Date(r.sleepEnd!), onsetAt: null, finalWakeAt: null }], 'Australia/Brisbane')[0].date).toBe('2026-10-19')
   })
 })
 
