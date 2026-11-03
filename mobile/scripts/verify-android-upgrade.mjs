@@ -6,8 +6,16 @@ function option(name, fallback) {
   const index = process.argv.indexOf(name);
   return index < 0 ? fallback : process.argv[index + 1];
 }
+// `aapt2 dump resources` prints about 1.7 MB for the release APK, past execFileSync's 1 MB default,
+// which used to surface as "Could not run aapt2". 64 MB leaves room as the app grows.
+const TOOL_OUTPUT_LIMIT = 64 * 1024 * 1024;
 export function invoke(tool, args) {
-  const options = { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] };
+  const options = {
+    encoding: 'utf8',
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: TOOL_OUTPUT_LIMIT,
+  };
   try {
     if (tool.endsWith('.jar')) return execFileSync('java', ['-jar', tool, ...args], options);
     if (process.platform === 'win32' && /\.(bat|cmd)$/i.test(tool)) {
@@ -21,9 +29,13 @@ export function invoke(tool, args) {
       );
     }
     return execFileSync(tool, args, options);
-  } catch {
+  } catch (error) {
+    // Say why: a missing tool (ENOENT), output past the limit (ENOBUFS) and a tool that ran and
+    // refused the APK (its exit status and first stderr line) need different fixes.
+    const stderr = String(error?.stderr ?? '').trim().split(/\r?\n/)[0];
+    const cause = error?.code ?? (error?.status != null ? `exit ${error.status}` : 'unknown error');
     throw new Error(
-      `Could not run ${tool}. Install Android SDK command-line/build tools, and check that the APK is valid.`,
+      `Could not run ${tool} ${args[0] ?? ''} (${cause}${stderr ? `: ${stderr}` : ''}). Install Android SDK command-line/build tools, and check that the APK is valid.`,
     );
   }
 }

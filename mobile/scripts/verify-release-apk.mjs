@@ -29,7 +29,8 @@ export function xmlResourceName(reference, resourcesDump) {
   if (!reference) return null;
   const named = reference.match(/^@xml\/(.+)$/);
   if (named) return named[1];
-  const id = reference.match(/^@(?:0x)?([0-9a-f]{8})$/i);
+  // apkanalyzer prints an unresolved reference as `@ref/0x7f150010`; older tools print `@7f150010`.
+  const id = reference.match(/^@(?:ref\/)?(?:0x)?([0-9a-f]{8})$/i);
   if (!id) return null;
   const line = resourcesDump
     .split('\n')
@@ -48,6 +49,39 @@ export function xmlResourcePath(name, resourcesDump) {
     if (/resource 0x/.test(line)) break;
   }
   return null;
+}
+
+/**
+ * The text XML behind `aapt2 dump xmltree --file <path> <apk>`. A packaged resource XML is compiled
+ * binary, so `apkanalyzer files cat` returns bytes no text match can read; aapt2 prints it as an
+ * indented tree (`E: exclude (line=3)` / `A: domain="root" (Raw: "root")`). Only elements and
+ * quoted plain attributes come back, which is all `excludedPaths` and `section` read.
+ */
+export function xmlFromTree(dump) {
+  const out = [];
+  const open = [];
+  let pending = null;
+  const flush = () => {
+    if (!pending) return;
+    out.push(`<${pending.name}${pending.attributes.map(([key, value]) => ` ${key}="${value}"`).join('')}>`);
+    open.push(pending);
+    pending = null;
+  };
+  for (const line of String(dump).split(/\r?\n/)) {
+    const element = line.match(/^(\s*)E: ([\w.:-]+)/);
+    if (element) {
+      flush();
+      const indent = element[1].length;
+      while (open.length && open[open.length - 1].indent >= indent) out.push(`</${open.pop().name}>`);
+      pending = { name: element[2], indent, attributes: [] };
+      continue;
+    }
+    const attribute = line.match(/^\s*A: ([\w-]+)="([^"]*)"/);
+    if (attribute && pending) pending.attributes.push([attribute[1], attribute[2]]);
+  }
+  flush();
+  while (open.length) out.push(`</${open.pop().name}>`);
+  return out.join('\n');
 }
 
 /** Every `<exclude domain= path=>` in an XML fragment, as `domain:path` strings. */
@@ -134,7 +168,7 @@ function main() {
   const read = (attribute) => {
     const name = xmlResourceName(manifestReference(manifest, attribute), resources);
     const path = name && xmlResourcePath(name, resources);
-    return path ? invoke(analyzer, ['files', 'cat', '--file', path, apk]) : '';
+    return path ? xmlFromTree(invoke(aapt2, ['dump', 'xmltree', '--file', path, apk])) : '';
   };
   const { exclusions: own } = require('../src/integrations/auth/private-backups.cjs');
   const exclusions = mergeExclusions(required, own);

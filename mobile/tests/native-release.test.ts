@@ -9,9 +9,11 @@ import {
   manifestReference,
   mergeExclusions,
   parseExclusions,
+  xmlFromTree,
   xmlResourceName,
   xmlResourcePath,
 } from '../scripts/verify-release-apk.mjs';
+import { invoke } from '../scripts/verify-android-upgrade.mjs';
 
 const require = createRequire(import.meta.url);
 const { exclusions } = require('../src/integrations/auth/private-backups.cjs');
@@ -101,6 +103,8 @@ test('references and paths are read from apkanalyzer and aapt2 output', () => {
   ].join('\n');
   assert.equal(xmlResourceName('@xml/trainingai_backup_rules', dump), 'trainingai_backup_rules');
   assert.equal(xmlResourceName('@7f0e0001', dump), 'trainingai_data_extraction_rules');
+  // apkanalyzer's `manifest print` form (cmdline-tools 9.0, Nov 2026).
+  assert.equal(xmlResourceName('@ref/0x7f0e0001', dump), 'trainingai_data_extraction_rules');
   assert.equal(xmlResourcePath('trainingai_backup_rules', dump), 'res/Aa.xml');
   assert.equal(xmlResourcePath('trainingai_data_extraction_rules', dump), 'res/Bb.xml');
   assert.equal(xmlResourcePath('missing', dump), null);
@@ -121,4 +125,53 @@ test('the workflow\'s required exclusions are parsed and held on top of the buil
   assert.equal(merged.length, lowered.length + 1);
   const problems = backupProblems({ manifest: MANIFEST, fullBackupXml: FULL.replaceAll('<exclude domain="file" path="SQLite"/>', ''), extractionXml: EXTRACTION, exclusions: merged });
   assert.ok(problems.some((p: string) => p.includes('SQLite')));
+});
+
+// `aapt2 dump xmltree` output captured from build-tools 37.0.0 on the published Preview APK, 3 Nov
+// 2026 (trimmed to two excludes per list). The packaged XML is binary, so this is the only text form.
+const exclude = (indent: string, domain: string, path: string) => [
+  `${indent}E: exclude (line=4)`,
+  `${indent}  A: domain="${domain}" (Raw: "${domain}")`,
+  `${indent}  A: path="${path}" (Raw: "${path}")`,
+];
+const FULL_BACKUP_TREE = [
+  'E: full-backup-content (line=2)',
+  ...exclude('    ', 'root', 'app_webview'),
+  ...exclude('    ', 'sharedpref', 'SecureStore.xml'),
+].join('\n');
+const EXTRACTION_TREE = [
+  'N: android=http://schemas.android.com/apk/res/android (line=2)',
+  '  E: data-extraction-rules (line=2)',
+  '      E: cloud-backup (line=3)',
+  ...exclude('          ', 'root', 'app_webview'),
+  ...exclude('          ', 'sharedpref', 'SecureStore.xml'),
+  '      E: device-transfer (line=12)',
+  ...exclude('          ', 'root', 'app_webview'),
+  '          E: include (line=14)',
+  '            A: http://schemas.android.com/apk/res/android:requireFlags(0x0101062b)=(type 0x11)0x1',
+  '            A: domain="file" (Raw: "file")',
+].join('\n');
+
+test('the compiled backup rules read through aapt2 xmltree give the same exclusions as the source XML', () => {
+  assert.deepEqual(excludedPaths(xmlFromTree(FULL_BACKUP_TREE)), ['root:app_webview', 'sharedpref:SecureStore.xml']);
+  const xml = xmlFromTree(EXTRACTION_TREE);
+  const problems = backupProblems({
+    manifest: 'android:fullBackupContent="@ref/0x7f150010" android:dataExtractionRules="@ref/0x7f150011"',
+    fullBackupXml: xmlFromTree(FULL_BACKUP_TREE),
+    extractionXml: xml,
+    exclusions: [
+      ['root', 'app_webview'],
+      ['sharedpref', 'SecureStore.xml'],
+    ],
+  });
+  // device-transfer lacks SecureStore.xml in this fixture, and only there; its <include> is no exclusion.
+  assert.deepEqual(problems, ['data-extraction-rules device-transfer does not exclude sharedpref SecureStore.xml.']);
+  assert.equal(xmlFromTree(''), '');
+});
+
+test('a tool printing more than 1 MB is read in full, not reported as "Could not run"', () => {
+  // `aapt2 dump resources` prints about 1.7 MB for the release APK.
+  const out = invoke(process.execPath, ['-e', 'process.stdout.write("x".repeat(3 * 1024 * 1024))']);
+  assert.equal(out.length, 3 * 1024 * 1024);
+  assert.throws(() => invoke(process.execPath, ['-e', 'process.exit(3)']), /Could not run .* \(exit 3\)/);
 });
