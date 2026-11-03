@@ -149,7 +149,8 @@ function utcOffsetMin(atMs: number, tz: string): number {
  * 00:00), where `dayStartMs` is that day's local midnight. Minutes elapsed since midnight are an hour
  * out after a daylight-saving change, so a chart whose x-axis is the clock face needs this one. A
  * 25-hour day reads its repeated hour twice (the same minute value) and a 23-hour day skips the missing
- * one. An instant outside the day lands outside 0–1439, as it does in elapsed minutes. Only a day that
+ * one. An instant outside the day lands outside 0–1439, as it does in elapsed minutes: where the change
+ * falls at midnight (Havana), `dayStartMs` itself reads 23:00 on the day before and so reads -60. Only a day that
  * is not 24 hours long pays for the zone lookup.
  */
 export function wallClockMinuteReader(dayStartMs: number, tz = DEFAULT_TZ): (atMs: number) => number {
@@ -157,6 +158,13 @@ export function wallClockMinuteReader(dayStartMs: number, tz = DEFAULT_TZ): (atM
   if (utcOffsetMin(dayStartMs + 86_400_000, tz) === startOffset) {
     return atMs => Math.floor((atMs - dayStartMs) / 60_000)
   }
+  // Where the change falls at local midnight (Havana, 00:00 -> 01:00) `dayStartMs` is the hour before
+  // and reads 23:00 on the previous day, not 00:00. Anchor on what the clock reads there (-60) instead of
+  // assuming 0, so 01:00 on the clock is minute 60 and not 120.
+  const DAY_MIN = 1440
+  const wallAtStart = Math.floor(dayStartMs / 60_000) + startOffset
+  const wallOfDay = ((wallAtStart % DAY_MIN) + DAY_MIN) % DAY_MIN
+  const clockAtStart = wallOfDay > DAY_MIN / 2 ? wallOfDay - DAY_MIN : wallOfDay
   const byQuarterHour = new Map<number, number>()
   return atMs => {
     const key = Math.floor(atMs / 900_000)
@@ -165,7 +173,7 @@ export function wallClockMinuteReader(dayStartMs: number, tz = DEFAULT_TZ): (atM
       offset = utcOffsetMin(atMs, tz)
       byQuarterHour.set(key, offset)
     }
-    return Math.floor((atMs - dayStartMs) / 60_000) + (offset - startOffset)
+    return clockAtStart + Math.floor((atMs - dayStartMs) / 60_000) + (offset - startOffset)
   }
 }
 
