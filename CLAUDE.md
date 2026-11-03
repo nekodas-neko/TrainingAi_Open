@@ -104,6 +104,9 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
 
 **Oura** → [`docs/rules/oura-ble.md`](docs/rules/oura-ble.md) and
 [`docs/oura-ble-operations.md`](docs/oura-ble-operations.md)
+- **Oura is one source, not the product** (owner, 3 Nov): features and scores read the generic shapes in
+  [`docs/data-source-connector-guide.md`](docs/data-source-connector-guide.md) §3, never an Oura
+  field or a source id, so a Fitbit could feed them the same way.
 - The ring's source is moving to the Oura Cloud API (OAuth, per user; #2808). Only the connector
   module `lib/oura/cloud/` calls Oura Cloud; its tokens are encrypted at rest with `OURA_TOKEN_KEY`.
 - Direct BLE until the switch: byte layouts come from the `open_oura` source, never memory.

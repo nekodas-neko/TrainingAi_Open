@@ -12,6 +12,15 @@ Everything else here (the tables, the formula inputs, the normalize-layer patter
 mechanisms) is described from the current code, not aspirationally — every claim below was checked
 against the source, not summarized from memory.
 
+> **The owner's rule (2026-11-03): Oura is one source, not the product.** In the owner's words: "As long
+> as the changes are using the oura data as interchangeable (i.e it would work with say a fitbit or so)
+> we are not building for oura - its just a source." So every feature and score reads the normalized
+> shapes in §3, never an Oura field name, and never branches on `oura_cloud` or any other source id.
+> A gate is on what the data can show (coverage, capability), never on which source or which date it
+> came from. Source-specific knowledge stops at the connector: the Oura Cloud adapter in
+> `lib/oura/cloud/` maps Oura's fields into the §3 shapes, and a Fitbit or Health Connect adapter maps
+> its own. When a feature needs a shape §3 lacks, add the generic shape and have each source fill it.
+
 ---
 
 ## 0. The model, in two layers
