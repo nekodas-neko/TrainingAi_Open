@@ -1,4 +1,4 @@
-import { CADENCE_SERIES_BIN_SEC, type CadenceSummary } from '@trainingai/shared/health/cadence'
+import { CADENCE_SERIES_BIN_SEC, type CadenceSummary } from './cadence'
 
 /**
  * RV-167 — `stepsEstimate` integrates only the cadence bins that exist, so a strap whose

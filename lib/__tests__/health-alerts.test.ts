@@ -79,6 +79,17 @@ describe('computeHealthAlertActions', () => {
     expect(get('readiness').type).toBe('skip')
   })
 
+  it('keeps readiness-low quiet on a later open once the illness alert already fired (#3536)', () => {
+    const get = forType({ readinessLabel: 'Low', illnessFlag: 'fever' }, new Set<HealthAlertType>(['illness']))
+    expect(get('illness').type).toBe('skip')
+    expect(get('readiness').type).toBe('skip')
+  })
+
+  it('keeps readiness-low quiet on a later open once the stress alert already fired (#3536)', () => {
+    const get = forType({ readinessLabel: 'Low', stressCurrent: -0.8 }, new Set<HealthAlertType>(['stress']))
+    expect(get('readiness').type).toBe('skip')
+  })
+
   it('a high-minutes day no longer masks the readiness-low alert', () => {
     // The point of unwiring here: the noise flag was suppressing the real one.
     const get = forType({ readinessLabel: 'Low', stressHighMinutes: 1000 })

@@ -187,7 +187,10 @@ export function sessionPayload(
           // A walk paced from the strap stores its cadence and each block's adherence, as the
           // current app's walk does (#2242); a walk with none stores what it did before.
           return pace && pace.startMs === session.startMs
-            ? { segments: pace.segments(segments), ...pace.cadencePayload() }
+            ? {
+                segments: pace.segments(segments),
+                ...pace.cadencePayload(elapsedMs(session, session.endMs) / 1000),
+              }
             : { segments };
         })()
       : {}),

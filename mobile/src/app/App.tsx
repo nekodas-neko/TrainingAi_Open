@@ -576,6 +576,10 @@ function AppShell() {
         onWorkout={openWorkout}
         onWalk={() => setDetail('activity-recording')}
         onTab={selectTab}
+        onHealthDetail={(next) => {
+          selectTab('Health');
+          setHealthDetail(next);
+        }}
         onReview={() => {
           selectTab('Nutrition');
           setNutritionReviewRequest((value) => ({

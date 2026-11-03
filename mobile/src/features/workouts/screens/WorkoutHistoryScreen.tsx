@@ -439,6 +439,7 @@ export function WorkoutHistoryScreen({
           status={
             <ResourceStatus
               inline
+              whenActive
               label="Calendar records"
               state={state}
               refresh={state.refresh}

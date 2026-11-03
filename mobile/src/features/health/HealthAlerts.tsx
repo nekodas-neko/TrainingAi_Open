@@ -36,6 +36,7 @@ export function HealthAlerts() {
   }, []);
   const ready = state?.ready === true;
   const enabled = state?.settings.healthAlerts ?? false;
+  const scope = state?.settings.scope;
   const settled = !readiness.loading && !battery.loading;
   useEffect(() => {
     if (!storage || !ready || !settled) return;
@@ -45,8 +46,8 @@ export function HealthAlerts() {
       permission,
       today,
       sources: { readiness: readiness.data, battery: battery.data },
-      post: healthAlert,
+      post: (type, title, body) => healthAlert(type, title, body, scope),
     }).catch(() => undefined);
-  }, [storage, ready, settled, enabled, permission, today, readiness.data, battery.data, resumed, storage]);
+  }, [storage, ready, settled, enabled, permission, today, readiness.data, battery.data, resumed, scope]);
   return null;
 }

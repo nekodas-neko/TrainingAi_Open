@@ -53,6 +53,14 @@ test('an illness night posts one notification, and readiness-low yields to it', 
   assert.equal(posted[0].title, 'Possible fever');
 });
 
+test('a later open the same day does not let low readiness through after the fever alert (#3536)', async () => {
+  const { posted, run } = fixture();
+  const lowAndFever = { readiness: { ...feverNight, label: 'Low' }, battery: calmBattery };
+  assert.deepEqual(await run({ sources: lowAndFever }), { status: 'checked', fired: ['illness'] });
+  assert.deepEqual(await run({ sources: lowAndFever }), { status: 'checked', fired: [] });
+  assert.deepEqual(posted.map((row) => row.type), ['illness']);
+});
+
 test('each type fires: stress, and standalone low readiness', async () => {
   const stress = fixture();
   assert.deepEqual(
@@ -136,4 +144,18 @@ test('a damaged saved record reads as nothing fired', async () => {
   const { store, run } = fixture();
   store.set(HEALTH_ALERTS_FIRED_KEY, '{not json');
   assert.deepEqual(await run(), { status: 'checked', fired: ['illness'] });
+});
+
+test('a health alert carries the owner, scope and target a tap needs to open the readiness view (#3541)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
+  const { ALERT_OWNER, HEALTH_ALERT_TARGET } = await import('../src/features/platform/data/models.ts');
+  assert.equal(HEALTH_ALERT_TARGET, 'health-readiness');
+  // observeAlerts drops a notification that is not the app's own, and AlertNavigation drops one for
+  // another scope, so the posted data needs all three.
+  assert.match(read('integrations/notifications/platform.native.ts'), /owner: ALERT_OWNER, scope, target: HEALTH_ALERT_TARGET/);
+  assert.match(read('features/health/HealthAlerts.tsx'), /healthAlert\(type, title, body, scope\)/);
+  assert.match(read('features/platform/components/AlertNavigation.tsx'), /HEALTH_ALERT_TARGET\) onHealthDetail\('readiness'\)/);
+  assert.match(read('app/App.tsx'), /onHealthDetail=\{[\s\S]*selectTab\('Health'\);[\s\S]*setHealthDetail\(next\)/);
+  assert.equal(typeof ALERT_OWNER, 'string');
 });

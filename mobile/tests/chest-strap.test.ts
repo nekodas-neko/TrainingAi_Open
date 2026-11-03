@@ -1,3 +1,4 @@
+import { activityHoldWanted } from '../src/features/devices/strap/activity-hold.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -826,6 +827,21 @@ test('a strap without PMD, or a stream that fails, reports the accelerometer una
   assert.ok(failing.ble.log.includes('acc stop'));
 });
 
+test('a stream error that beats the disconnect does not leave "unavailable" up after the reconnect (#3541)', async () => {
+  const { session, ble, clock } = await pairedSession();
+  session.hold('activity', true);
+  await settle();
+  session.setAccelerometer(true);
+  await settle();
+  ble.failAccelerometer();
+  assert.equal(session.getSnapshot().accel, 'unavailable');
+  ble.drop();
+  assert.equal(session.getSnapshot().accel, 'unavailable', 'kept while the link is down');
+  await clock.advance(2_000);
+  await settle();
+  assert.equal(session.getSnapshot().accel, 'starting', 'cleared once the new link restarts the stream');
+});
+
 test('a malformed frame is ignored and releasing the walk stops the stream', async () => {
   const { session, ble } = await pairedSession();
   session.hold('activity', true);
@@ -836,4 +852,12 @@ test('a malformed frame is ignored and releasing the walk stops the stream', asy
   assert.equal(session.getSnapshot().accel, 'starting');
   session.dispose();
   assert.ok(ble.log.includes('acc stop'));
+});
+
+test('an activity holds the strap in the background only while the recording service runs (#3541)', () => {
+  assert.equal(activityHoldWanted(true, 'background'), true);
+  assert.equal(activityHoldWanted(true, 'active'), true);
+  assert.equal(activityHoldWanted(false, 'active'), true);
+  assert.equal(activityHoldWanted(false, 'background'), false);
+  assert.equal(activityHoldWanted(false, 'inactive'), false);
 });

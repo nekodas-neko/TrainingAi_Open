@@ -6,6 +6,7 @@ import { restSoundSource } from '../feedback/rest-cue';
 import { ESTIMATE_ACTION_IDS } from '../../features/meal-plans/data/estimated-meals';
 import {
   ALERT_OWNER,
+  HEALTH_ALERT_TARGET,
   alertSignature,
   type Alert,
 } from '../../features/platform/data/models';
@@ -228,7 +229,7 @@ export async function deviceAlert(title: string, body: string) {
  * scheduler's alerts, so reconciling the planned ones never cancels it. True once it was posted;
  * false when notifications are off, so the caller does not count it as sent.
  */
-export async function healthAlert(type: string, title: string, body: string) {
+export async function healthAlert(type: string, title: string, body: string, scope?: string) {
   if (!(await alertPermission(false))) return false;
   const notifications = await sdk();
   if (Platform.OS === 'android')
@@ -239,7 +240,14 @@ export async function healthAlert(type: string, title: string, body: string) {
       vibrationPattern: [0, 250, 150, 250],
     });
   await notifications.scheduleNotificationAsync({
-    content: { title, body, sound: 'default', data: { healthAlert: type } },
+    content: {
+      title,
+      body,
+      sound: 'default',
+      // Owned and scoped like the planned alerts, so a tap reaches `observeAlerts` and opens the
+      // readiness view for the account that was signed in when it was posted.
+      data: { healthAlert: type, owner: ALERT_OWNER, scope, target: HEALTH_ALERT_TARGET },
+    },
     trigger: Platform.OS === 'android' ? { channelId: 'health-alerts' } : null,
   });
   return true;

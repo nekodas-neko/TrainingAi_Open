@@ -213,6 +213,7 @@ test('a paced walk stores its cadence and each block’s adherence, as the curre
   assert.ok(Math.abs(slow.avgCadenceSpm! - 90) < 6);
   assert.ok(Math.abs(fast.avgCadenceSpm! - 125) < 6);
   assert.ok(slow.steps! > 60 && fast.steps! > 90);
+  assert.ok(row.steps! >= slow.steps! + fast.steps!, `walk steps ${row.steps}`);
   assert.equal(activityPayload.safeParse(row).success, true, 'it passes the same save schema');
 });
 
@@ -228,10 +229,24 @@ test('a walk with no strap saves exactly what it did before', async () => {
   assert.equal(row.cadenceSpm, undefined);
   assert.equal(row.cadenceSeries, undefined);
   assert.equal(row.cadenceSource, undefined);
+  assert.equal(row.steps, undefined);
   assert.ok(row.segments!.every((x) => x.avgCadenceSpm === null && x.pacerSignal === undefined));
   // The sessionPayload default (no pacer) is the unpaced shape.
   assert.deepEqual(
     sessionPayload(f.store.getSnapshot().session!, 'Australia/Brisbane').segments,
     walkSegments(f.store.getSnapshot().session!.guidance!.kind === 'walk' ? (f.store.getSnapshot().session!.guidance as { config: typeof defaultWalk }).config : defaultWalk, 90),
   );
+});
+
+test('walk-level steps are the shared estimate, and absent when the strap covers under half the walk (#3541)', () => {
+  const full = new WalkPace(0, defaultWalk);
+  feed(full, 120, 120, 0);
+  const steps = full.cadencePayload(120).steps;
+  assert.ok(steps !== undefined && steps > 150, `steps ${steps}`);
+  assert.equal('steps' in full.cadencePayload(), false, 'no duration, no estimate');
+  // A stream that starts late, 20 s of cadence in a 120 s walk, is discarded rather than scaled.
+  const late = new WalkPace(0, defaultWalk);
+  feed(late, 120, 20, 100_000);
+  assert.equal('steps' in late.cadencePayload(120), false);
+  assert.equal('steps' in new WalkPace(0, defaultWalk).cadencePayload(120), false);
 });

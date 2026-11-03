@@ -69,6 +69,8 @@ export type Alert = {
   trigger: { at: number } | { hour: number; minute: number; weekday?: number };
 };
 export const ALERT_OWNER = 'trainingai-native-v1';
+/** What a health anomaly alert opens on a tap: the readiness view, as the current app's `/health/readiness` does (#3541). */
+export const HEALTH_ALERT_TARGET = 'health-readiness';
 export function alertSignature(alert: Alert) {
   return JSON.stringify(alert);
 }

@@ -8,6 +8,7 @@ import {
   type CadenceFields,
   type CadenceReading,
 } from '@trainingai/shared/health/cadence';
+import { stepsEstimateIfCovered } from '@trainingai/shared/health/cadence-coverage';
 import {
   addPacerTick,
   summarisePacerTally,
@@ -104,10 +105,20 @@ export class WalkPace {
     return cadenceFieldsForSave(summarizeCadence(this.readings, this.startMs));
   }
 
-  /** `cadenceFields` as the save schema takes them: a key is absent when nothing was measured. */
-  cadencePayload() {
+  /**
+   * `cadenceFields` as the save schema takes them: a key is absent when nothing was measured. With
+   * the walk's active seconds it also carries the walk-level `steps`, as the current app saves it
+   * (`stepsEstimateIfCovered`), and leaves it out when the strap's cadence covers too little of the
+   * walk to stand for it (#3541).
+   */
+  cadencePayload(activeSec?: number) {
     const fields = this.cadenceFields();
+    const steps =
+      activeSec === undefined
+        ? null
+        : stepsEstimateIfCovered(summarizeCadence(this.readings, this.startMs), activeSec);
     return {
+      ...(steps !== null ? { steps } : {}),
       ...(fields.cadenceSpm !== null ? { cadenceSpm: fields.cadenceSpm } : {}),
       ...(fields.cadenceSeries !== null ? { cadenceSeries: fields.cadenceSeries } : {}),
       ...(fields.cadenceSource !== null ? { cadenceSource: fields.cadenceSource } : {}),
