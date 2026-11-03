@@ -4,7 +4,7 @@
 // getHrRecoveryProfile AI-chat tool can never drift (mirrors computeWorkoutHr's shared-compute
 // pattern — the one path the recap route and admin backfill both call).
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { DEFAULT_TZ, toAestDay, todayInTz } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import { resolveHrProfile } from './hr-profile'
 import { aggregateHrRecoveryProfile, episodeFromSetHrStats, type RecoveryEpisode, type HrRecoveryProfile } from './hr-recovery-profile'
 import { aggregateHrRecoveryTrend, type BandTrend } from './hr-recovery-trend'
@@ -23,11 +23,16 @@ export interface HrRecoveryProfileResult {
 export async function computeHrRecoveryProfile(
   repo: WorkoutRepository, userId: string, tz: string = DEFAULT_TZ, days: number,
 ): Promise<HrRecoveryProfileResult> {
-  const since = new Date(Date.now() - days * 86_400_000)
+  // One window for both sources, starting at the user's local midnight `days` days ago. It used to
+  // be `now − days × 24 h` for the sets but that instant's whole day for the workouts, so a set
+  // logged earlier on the first day was dropped while a workout from the same morning was kept.
+  const today = todayInTz(tz)
+  const fromDay = shiftDateStr(today, -days)
+  const since = dateStrMidnightInTz(fromDay, tz)
 
   const [setRows, workouts, { restingHr }] = await Promise.all([
     repo.getSetHrStatsSince(userId, since),
-    repo.getOuraWorkouts(userId, { from: toAestDay(since, tz), to: todayInTz(tz) }),
+    repo.getOuraWorkouts(userId, { from: fromDay, to: today }),
     resolveHrProfile(repo, userId, tz),
   ])
 

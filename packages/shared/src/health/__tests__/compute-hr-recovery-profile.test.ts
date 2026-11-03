@@ -71,3 +71,23 @@ describe('computeHrRecoveryProfile', () => {
     expect(trend).toEqual([])
   })
 })
+
+// The window starts at the user's local midnight `days` days ago, for sets and workouts alike. It used
+// to be `now − days × 24 h` for sets, which dropped a set logged early on the first day.
+describe('computeHrRecoveryProfile window (local midnight)', () => {
+  it('asks for sets from local midnight and workouts from the same day', async () => {
+    const tz = 'Australia/Brisbane'
+    let setsSince: Date | null = null
+    let workoutRange: { from: string; to: string } | null = null
+    const repo = stubRepo({
+      getSetHrStatsSince: async (_u: string, since: Date) => { setsSince = since; return [] },
+      getOuraWorkouts: async (_u: string, range: { from: string; to: string }) => { workoutRange = range; return [] },
+    } as Partial<WorkoutRepository>)
+    await computeHrRecoveryProfile(repo, 'u1', tz, 30)
+    const { todayInTz, shiftDateStr } = await import('@trainingai/shared/date-utils')
+    const fromDay = shiftDateStr(todayInTz(tz), -30)
+    expect(workoutRange).toEqual({ from: fromDay, to: todayInTz(tz) })
+    // Midnight of that day in Brisbane is 14:00 UTC the day before.
+    expect(setsSince!.toISOString()).toBe(`${shiftDateStr(fromDay, -1)}T14:00:00.000Z`)
+  })
+})

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepositoryAsync } from "@/lib/data";
 import { rateLimit } from "@/lib/rate-limit";
-import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from "@trainingai/shared/date-utils";
+import { DEFAULT_TZ, shiftDateStr, todayInTz } from "@trainingai/shared/date-utils";
 import { z } from "zod";
 import { activityImplausibleReason, sleepImplausibleReason, MIN_PLAUSIBLE_BPM, MAX_PLAUSIBLE_BPM } from "@trainingai/shared/validation/plausibility";
 import { isPlausibleStepWindow } from "@trainingai/shared/health/step-estimate";
@@ -409,7 +409,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Enrichment candidates: recent activity logs missing HR/distance/calories ─
-  const from3d = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 3 * 86_400_000), tz);
+  const from3d = shiftDateStr(todayInTz(tz), -3);
   const recent = await repo.listActivityLogs(userId, from3d, todayInTz(tz));
   const enrichmentCandidates = recent
     .filter(a => a.avgHr == null && a.distanceKm == null && a.caloriesBurned == null && a.startTime && a.endTime)
