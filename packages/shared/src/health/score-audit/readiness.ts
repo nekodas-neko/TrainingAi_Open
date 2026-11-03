@@ -34,7 +34,7 @@ export interface ReadinessAuditInput {
    */
   /** The user's Oura API switch day, for the source label a backfill writes (`readinessSourceLabel`). */
   switchDay?: string | null
-  generic?: Pick<NightInputSources, 'bodyMetrics' | 'nights' | 'ouraDaily' | 'ouraCloudContributors'>
+  generic?: Pick<NightInputSources, 'bodyMetrics' | 'nights' | 'ouraDaily' | 'ouraCloudContributors' | 'ouraCloudRecoveryHours'>
 }
 
 const r3 = (n: number | null) => (n == null ? null : Math.round(n * 1000) / 1000)
@@ -204,7 +204,9 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
         value: night.recoveryIndex && 'hours' in night.recoveryIndex ? night.recoveryIndex.hours : null, unit: 'h',
         source: night.recoveryIndex && 'contributor' in night.recoveryIndex
           ? `oura_cloud readiness contributor recovery_index = ${night.recoveryIndex.contributor} (no hours)`
-          : 'oura_daily_summary.recovery_index_hours',
+          : night.recoveryIndex?.source === 'oura_cloud'
+            ? 'oura_cloud_sleep_periods.heart_rate (our hours from Oura\'s 5-minute series)'
+            : 'oura_daily_summary.recovery_index_hours',
         note: `Hours from the overnight HR minimum to wake; linear to 100 at ${READINESS_MODEL.recoveryIndexOptimalHours} h. Approximation — always flagged provisional.`,
       },
       subScore: c.recoveryIndex.score, provisional: c.recoveryIndex.provisional,

@@ -15,8 +15,9 @@
  * - **Per device.** A generic value is judged against a normal built only from earlier nights of
  *   the same source, so an `oura_cloud` HRV never scores against the ring's nights. While that
  *   normal is shorter than `BASELINE_MIN_NIGHTS`, the input reads `awaiting_baseline`.
- * - **Recovery index.** The ring's hours where tonight's summary has them; otherwise Oura's own
- *   `recovery_index` contributor, because Oura sends no underlying value for it.
+ * - **Recovery index.** The ring's hours where tonight's summary has them; else hours from Oura's
+ *   5-minute heart-rate series through the ring-era function (#3075 stage 2); else Oura's own
+ *   `recovery_index` contributor, for a night whose series is missing or too thin.
  * - **Never Oura's readiness, sleep or activity score.** Nothing here reads them.
  *
  * The composite and the illness radar both read the result through {@link compositeNightFields} and
@@ -88,6 +89,11 @@ export interface NightInputSources {
   ouraDaily: readonly { date: string; temperatureDeviation?: number | null }[]
   /** `oura_cloud_daily.readiness_contributors` per day. */
   ouraCloudContributors: readonly { date: string; readinessContributors: Record<string, number | null> | null }[]
+  /**
+   * #3075 stage 2: recovery-index hours our own code computed from Oura's 5-minute heart-rate series,
+   * per wake date. Absent or without the night, Oura's contributor stands in, as before.
+   */
+  ouraCloudRecoveryHours?: readonly { date: string; hours: number }[]
 }
 
 export interface ReadinessNightInputs {
@@ -99,6 +105,7 @@ export interface ReadinessNightInputs {
   inputs: Partial<Record<NightInputKey, NightInput>>
   recoveryIndex:
     | { hours: number; source: typeof RING_SUMMARY_SOURCE }
+    | { hours: number; source: 'oura_cloud' }
     | { contributor: number; source: 'oura_cloud' }
     | null
   /** Tonight's temperature deviation in °C for display: the ring's, else Oura's. */
@@ -206,6 +213,8 @@ export function resolveReadinessNightInputs(src: NightInputSources): ReadinessNi
   let recoveryIndex: ReadinessNightInputs['recoveryIndex'] = null
   if (ring?.recoveryIndexHours != null && Number.isFinite(ring.recoveryIndexHours)) {
     recoveryIndex = { hours: ring.recoveryIndexHours, source: RING_SUMMARY_SOURCE }
+  } else if (Number.isFinite(src.ouraCloudRecoveryHours?.find(r => r.date === nightDate)?.hours)) {
+    recoveryIndex = { hours: src.ouraCloudRecoveryHours!.find(r => r.date === nightDate)!.hours, source: 'oura_cloud' }
   } else {
     const c = src.ouraCloudContributors.find(r => r.date === nightDate)?.readinessContributors?.recovery_index
     if (typeof c === 'number' && Number.isFinite(c)) recoveryIndex = { contributor: c, source: 'oura_cloud' }

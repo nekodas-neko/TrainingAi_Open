@@ -3,7 +3,7 @@ import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, 
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
-import { overnightHrvFromSeries } from '@trainingai/shared/health/oura-sleep-detail'
+import { overnightHrvFromSeries, overnightRecoveryIndexHoursFromSeries } from '@trainingai/shared/health/oura-sleep-detail'
 import type { OuraCloudHeartrateWrite, OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
@@ -908,6 +908,8 @@ export interface MainSleepPeriod {
   lowestHeartRate: number | null
   /** #3075: our overnight HRV from the period's stored 5-minute series, or null when it holds none. */
   overnightHrvMs: number | null
+  /** #3075 stage 2: recovery-index hours from the period's stored 5-minute heart-rate series, or null when it is missing or not usable. */
+  overnightRecoveryIndexHours: number | null
 }
 
 /**
@@ -926,9 +928,10 @@ export async function getOuraMainSleepPeriods(
   const rows = await db.execute<{
     date: string; sleep_type: string; sleep_start: Date; sleep_end: Date; duration_hours: number | null
     average_hrv_ms: number | null; lowest_heart_rate: number | null; hrv_series: s.OuraSampleSeries | null
+    hr_series: s.OuraSampleSeries | null
   }>(sql`
     SELECT s.date::text AS date, p.sleep_type, s.sleep_start, s.sleep_end, s.duration_hours, s.average_hrv_ms, s.lowest_heart_rate,
-           p.hrv AS hrv_series
+           p.hrv AS hrv_series, p.heart_rate AS hr_series
       FROM sleep_sessions s
       JOIN oura_cloud_sleep_periods p ON p.user_id = s.user_id AND p.oura_id = s.oura_id
      WHERE s.user_id = ${userId} AND s.deleted_at IS NULL AND NOT s.manual_entry
@@ -943,6 +946,7 @@ export async function getOuraMainSleepPeriods(
     out.set(r.date, {
       date: r.date, averageHrvMs: r.average_hrv_ms, lowestHeartRate: r.lowest_heart_rate,
       overnightHrvMs: overnightHrvFromSeries(r.hrv_series),
+      overnightRecoveryIndexHours: overnightRecoveryIndexHoursFromSeries(r.hr_series, window),
     })
   }
   return [...out.values()]
@@ -3026,6 +3030,18 @@ export async function getLatestOuraDailySummaryBefore(db: Db, userId: string, da
     breathBaseline: r.breathBaselineMeanX8 != null ? { meanX8: r.breathBaselineMeanX8, devX8: r.breathBaselineDevX8 ?? 0 } : null,
     nHistory: r.nHistory,
   }
+}
+
+/**
+ * #3075 stage 2. The recovery-index hours of each wake date's main Oura Cloud period, from its stored
+ * 5-minute heart-rate series. Reads through `getOuraMainSleepPeriods`, so the period chosen is the
+ * one whose HRV stands for the night, and a date with no main period or no usable series is absent.
+ */
+export async function getOuraCloudRecoveryIndexHours(
+  db: Db, userId: string, dates: string[], tz: string,
+): Promise<{ date: string; hours: number }[]> {
+  const main = await getOuraMainSleepPeriods(db, userId, dates, tz)
+  return main.flatMap(m => m.overnightRecoveryIndexHours != null ? [{ date: m.date, hours: m.overnightRecoveryIndexHours }] : [])
 }
 
 export async function getOuraCloudReadinessContributors(db: Db, userId: string, from: string, to: string) {

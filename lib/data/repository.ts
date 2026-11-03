@@ -1654,6 +1654,8 @@ export interface WorkoutRepository {
    * the recovery index (rule 4 on #2860). Never Oura's readiness score itself: that is the tuning
    * reference, not an input.
    */
+  /** #3075 stage 2: recovery-index hours per wake date from the main period's 5-minute heart-rate series. */
+  getOuraCloudRecoveryIndexHours(userId: string, dates: string[], tz: string): Promise<{ date: string; hours: number }[]>
   getOuraCloudReadinessContributors(userId: string, from: string, to: string): Promise<{ date: string; readinessContributors: Record<string, number | null> | null }[]>
 
   // Completed-form derived metrics (Oura on-device-models program, Sub-plan A). Idempotent

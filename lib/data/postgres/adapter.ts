@@ -8374,6 +8374,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async replaceOuraDailySummary(userId: string, rows: import('../repository').OuraDailySummaryRow[]) { return oura.replaceOuraDailySummary(this.db, userId, rows) }
   async upsertOuraDailySummary(userId: string, rows: import('../repository').OuraDailySummaryRow[]) { return oura.upsertOuraDailySummary(this.db, userId, rows) }
   async getOuraDailySummary(userId: string, from: string, to: string) { return oura.getOuraDailySummary(this.db, userId, from, to) }
+  async getOuraCloudRecoveryIndexHours(userId: string, dates: string[], tz: string) { return oura.getOuraCloudRecoveryIndexHours(this.db, userId, dates, tz) }
   async getOuraCloudReadinessContributors(userId: string, from: string, to: string) { return oura.getOuraCloudReadinessContributors(this.db, userId, from, to) }
   async upsertOuraDailyDerived(userId: string, day: string, patch: import('../repository').OuraDailyDerivedPatch) { return oura.upsertOuraDailyDerived(this.db, userId, day, patch) }
   async clearNightDerivedScores(userId: string, day: string, pillars: { sleep: boolean; readiness: boolean }) { return oura.clearNightDerivedScores(this.db, userId, day, pillars) }
