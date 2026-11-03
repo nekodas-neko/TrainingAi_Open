@@ -1,9 +1,9 @@
 name: Android NDK
 description: >
-  Installs the NDK that the generated Expo project's Gradle build asks for, from a cache when it
-  can, so Gradle never downloads it (about 1 GB) in the middle of a build. Run it after
+  Installs the NDK and the CMake that the generated Expo project's Gradle build asks for, from a
+  cache when it can, so Gradle never downloads either in the middle of a build. Run it after
   `expo prebuild` and before any Gradle step. Used by native-side-by-side.yml, native-release.yml
-  and mobile.yml (#3573).
+  and mobile.yml (#3573, CMake since 3 Nov).
 
 runs:
   using: composite
@@ -30,6 +30,15 @@ runs:
         # the cache path is worked out here.
         echo "dir=$ANDROID_HOME/ndk/$version" >> "$GITHUB_OUTPUT"
         echo "NDK_VERSION=$version" >> "$GITHUB_ENV"
+        # CMake: no native library here pins a version (react-native-nitro-modules and expo-sqlite
+        # build with CMake), so the Android Gradle plugin installs its default, 3.22.1, mid-build.
+        # A truncated download of it failed a Preview build on 3 Nov ("Error on ZipFile unknown
+        # archive"). If the plugin's default changes, the build log names the new version and this
+        # line follows it.
+        cmake=3.22.1
+        echo "cmake=$cmake" >> "$GITHUB_OUTPUT"
+        echo "cmake_dir=$ANDROID_HOME/cmake/$cmake" >> "$GITHUB_OUTPUT"
+        echo "CMAKE_VERSION=$cmake" >> "$GITHUB_ENV"
 
     - name: Restore the NDK cache
       id: cache
@@ -65,3 +74,37 @@ runs:
       run: |
         [ -f "$ANDROID_HOME/ndk/$NDK_VERSION/source.properties" ] || {
           echo "::error::$ANDROID_HOME/ndk/$NDK_VERSION/source.properties is missing."; exit 1; }
+
+    - name: Restore the CMake cache
+      id: cmake-cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.version.outputs.cmake_dir }}
+        key: android-cmake-${{ runner.os }}-${{ steps.version.outputs.cmake }}
+
+    # Same rule as the NDK: retried on a dropped or corrupt download, and an install counts only if
+    # the cmake binary exists afterwards.
+    - name: Install CMake
+      if: steps.cmake-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -uo pipefail
+        dir="$ANDROID_HOME/cmake/$CMAKE_VERSION"
+        for attempt in 1 2 3; do
+          echo "Installing cmake;$CMAKE_VERSION (attempt $attempt of 3)"
+          rm -rf "$dir"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "cmake;$CMAKE_VERSION" || true
+          if [ -x "$dir/bin/cmake" ]; then
+            echo "CMake $CMAKE_VERSION installed."; exit 0
+          fi
+          echo "::warning::CMake install attempt $attempt did not leave $dir/bin/cmake."
+        done
+        rm -rf "$dir"
+        echo "::error::Could not install cmake;$CMAKE_VERSION after 3 attempts."
+        exit 1
+
+    - name: Check CMake is whole
+      shell: bash
+      run: |
+        [ -x "$ANDROID_HOME/cmake/$CMAKE_VERSION/bin/cmake" ] || {
+          echo "::error::$ANDROID_HOME/cmake/$CMAKE_VERSION/bin/cmake is missing."; exit 1; }
