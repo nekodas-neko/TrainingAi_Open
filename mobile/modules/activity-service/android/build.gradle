@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.trainingai'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.activityservice"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // ServiceCompat.startForeground with a service type needs core 1.12+; matches workout-status.
+  implementation 'androidx.core:core-ktx:1.17.0'
+  testImplementation 'junit:junit:4.13.2'
+}

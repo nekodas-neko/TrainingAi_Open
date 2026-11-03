@@ -1,4 +1,8 @@
 import { activityHoldWanted, holdStrapForActivity } from '../src/features/devices/strap/activity-hold.ts';
+import {
+  isActivityServiceRunning,
+  runActivityService,
+} from '../src/features/activities/data/background-recording.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -919,6 +923,56 @@ test('the recording service starting mid-walk keeps the link and the trace (#354
   assert.equal(session.getSnapshot().recording, false);
   assert.equal(session.getSnapshot().link, 'idle');
   assert.equal(appListeners.size, 0);
+});
+
+test('an indoor activity with its service running keeps the strap through the background (#3595)', async () => {
+  for (const answer of ['on', 'failed'] as const) {
+    const { session, ble } = await pairedSession();
+    let state = 'active';
+    const appListeners = new Set<(s: string) => void>();
+    const appState = {
+      get currentState() {
+        return state;
+      },
+      addEventListener: (_t: 'change', l: (s: string) => void) => {
+        appListeners.add(l);
+        return { remove: () => appListeners.delete(l) };
+      },
+    };
+    // As ActivityProvider and useRouteRecording wire it: the hold starts with the walk, the
+    // connected-device service a moment later.
+    const hold = holdStrapForActivity(session, appState, isActivityServiceRunning());
+    const stop = runActivityService(
+      {
+        start: async () =>
+          answer === 'on' ? { result: 'on', stop: async () => {} } : { result: 'failed' },
+      },
+      { title: 'TrainingAI · Activity', body: 'Tracking your treadmill' },
+      () => hold.update(isActivityServiceRunning()),
+    );
+    await settle();
+    ble.beat(bytes(0x16, 120, 0x00, 0x02));
+    const disconnects = ble.log.filter((x) => x === 'disconnect').length;
+    state = 'background';
+    appListeners.forEach((l) => l(state));
+    await settle();
+    if (answer === 'on') {
+      assert.equal(session.getSnapshot().recording, true, 'the screen going off keeps the hold');
+      assert.equal(session.getSnapshot().link, 'connected');
+      assert.equal(ble.log.filter((x) => x === 'disconnect').length, disconnects);
+      const trace = session.getSnapshot().trace.length;
+      ble.beat(bytes(0x16, 121, 0x00, 0x02));
+      assert.equal(session.getSnapshot().trace.length > trace, true, 'beats keep landing while locked');
+    } else {
+      // Refused: the hold is foreground-only, as before, and the screen shows the notice.
+      assert.equal(session.getSnapshot().recording, false);
+    }
+    stop();
+    hold.release();
+    await settle();
+    assert.equal(isActivityServiceRunning(), false);
+    assert.equal(session.getSnapshot().link, 'idle');
+  }
 });
 
 test('holding the activity twice does not reset the recording (#3541)', async () => {
