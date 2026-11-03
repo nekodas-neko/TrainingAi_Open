@@ -12,8 +12,16 @@
  * reader go through {@link withoutPartialDuration} or {@link nightsWithDuration}, so a new reader has
  * one function to call and the answer to "does a marked night count here" cannot differ by screen.
  *
- * Manual, never detected: an automatic "looks partial" rule would eventually hide a genuinely bad
- * short night, which is exactly what the Sleep Score exists to show. Marking is not deleting: the
+ * Never guessed: an automatic "looks partial" rule would eventually hide a genuinely bad short night,
+ * which is exactly what the Sleep Score exists to show. Two things say a night is partial, and both
+ * are a statement rather than a guess:
+ * - the owner's mark, `partialNightAt`;
+ * - #3075 stage 5: the source's own `recordingIncomplete` flag, derived on read from what the source
+ *   sent (a device whose battery ran low says it did not record the whole night). Any source can
+ *   send it; Oura's `low_battery_alert` is the first that does. It is never stored as a mark, so
+ *   the owner's toggle still says only what the owner said.
+ *
+ * Marking is not deleting: the
  * row, its window and its physiology stay, and unmarking (`partialNightAt` back to null) returns the
  * night exactly, because nothing here writes a value anywhere. Every function below is a pure read.
  */
@@ -33,13 +41,18 @@ export type PartialNightPayload = z.infer<typeof PartialNightPayloadSchema>
 export const PARTIAL_NIGHT_DROPPED_FIELDS = [
   'durationHours', 'timeInBedHours', 'efficiency', 'onsetLatencySec', 'restlessPeriods',
   'deepSleepHours', 'remSleepHours', 'lightSleepHours', 'awakHours',
+  // #3075 stage 4: restlessness is a share of the recorded window, which is not the whole night.
+  'restlessMin', 'movementMeasuredMin',
 ] as const
 
-interface MaybePartial { partialNightAt?: Date | string | null }
+interface MaybePartial { partialNightAt?: Date | string | null; recordingIncomplete?: boolean | null }
 
-/** True when the owner marked this night (or, for a reassembled night, any window of it) partial. */
+/**
+ * True when the owner marked this night (or, for a reassembled night, any window of it) partial, or
+ * when its source said its recording of the night is incomplete (#3075 stage 5).
+ */
 export function isPartialNight(night: MaybePartial | null | undefined): boolean {
-  return night?.partialNightAt != null
+  return night?.partialNightAt != null || night?.recordingIncomplete === true
 }
 
 /**

@@ -272,8 +272,13 @@ function plainScore(v: number | null): ReadinessContributor {
  *  day moves by 0.10 × (finished − copy) before rounding. Stored rows keep their `prevDayActivity` key and
  *  their v14 stamp. Also v15: a night whose HRV is the source's own nightly average, not a series median,
  *  is marked (#3376); it scores exactly as before.
+ *  v16: #3075 stages 4 and 5, from any source that sends them. The Sleep Score behind the sleep term takes a
+ *  restlessness penalty from the source's movement series; a night the source says it recorded incompletely
+ *  reads as partial (no sleep score, no hours in the sleep-balance normal), as the owner's mark does; and each
+ *  per-night normal is learned from one (source, algorithm version), so a source that changes its algorithm
+ *  starts its normals again. A night with none of the three is scored exactly as under v15.
  */
-export const READINESS_MODEL_VERSION = 'v15:one-activity-input:2026-11-03'
+export const READINESS_MODEL_VERSION = 'v16:restlessness-recording-flags:2026-11-04'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.

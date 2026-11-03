@@ -164,7 +164,9 @@ export interface MetGridInput {
 export function intradayHrContributors(input: {
   hrRows: readonly { timestamp: Date; bpm: number; source?: string | null }[];
   maxHr: number;
-  restingHr: number;
+  /** The resting HR the zone floors are drawn from; null while there is none. Zone minutes then wait,
+   *  and the move lane reads the movement series alone (heart rate needs it to say an hour was moved). */
+  restingHr: number | null;
   tz: string;
   dateIso: string;
   metGrid?: MetGridInput | null;
@@ -173,20 +175,19 @@ export function intradayHrContributors(input: {
   const { maxHr, restingHr, tz, dateIso, metGrid, dayIsOver = false } = input;
   const { rows, sparseHours } = dropSparseHrHours(input.hrRows, tz);
 
-  const profile = { maxHr, restingHr };
   const zoneMinutes =
-    rows.length === 0
+    rows.length === 0 || restingHr == null
       ? null
       : activeMinutesFromReadings(
           rows.map((r) => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })),
           {
-            moderateFloorBpm: moderateIntensityBpm(profile),
-            vigorousFloorBpm: vigorousIntensityBpm(profile),
+            moderateFloorBpm: moderateIntensityBpm({ maxHr, restingHr }),
+            vigorousFloorBpm: vigorousIntensityBpm({ maxHr, restingHr }),
           },
         );
 
   // Oura's heart rate does not decide a moved hour, its MET does.
-  const moveRows = rows.filter((r) => r.source !== 'oura_cloud');
+  const moveRows = restingHr == null ? [] : rows.filter((r) => r.source !== 'oura_cloud');
   const met = metGrid
     ? ouraCloudMovedHours(metGrid, {
         tz, dateIso, wakeHour: DEFAULT_WAKE_HOUR, sleepHour: DEFAULT_SLEEP_HOUR, activeMet: MET_ACTIVE_THRESHOLD,
@@ -196,7 +197,9 @@ export function intradayHrContributors(input: {
     return { zoneMinutes, moveHours: null, moveHoursGoal: null };
   }
 
-  const hr = hourlyHrActivity({ hrRows: moveRows, maxHr, restingHr, tz, dateIso });
+  const hr = restingHr == null
+    ? { measured: new Set<number>(), moved: new Set<number>() }
+    : hourlyHrActivity({ hrRows: moveRows, maxHr, restingHr, tz, dateIso });
   const measured = new Set([...hr.measured, ...(met?.worn ?? [])]);
   const moved = new Set([...hr.moved, ...(met?.moved ?? [])]);
 

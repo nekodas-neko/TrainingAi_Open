@@ -44,3 +44,18 @@ export function meanRestingHr(
   const mean = normalOrCarriedOver(perDeviceNormal(readings, { minNights: BASELINE_MIN_NIGHTS }))
   return mean == null ? null : Math.round(mean)
 }
+
+/**
+ * The resting HR for one local day: `meanRestingHr` over the window `restingHrWindow(date)` ends
+ * on, rows after `date` left out so a finished day never reads a later night. This is the number
+ * the Activity zone lane, the HR zones and Body Battery all draw their boundaries from (#3388), so
+ * the same day's zone minutes agree on every screen, and a device switch steps them all at once
+ * (after `BASELINE_MIN_NIGHTS` of the new device's nights, not before). Null with no reading.
+ */
+export function restingHrOnDay(
+  rows: readonly { date: string; restingHeartRate?: number | null; restingHeartRateSource?: string | null }[],
+  date: string,
+): number | null {
+  const { from, to } = restingHrWindow(date)
+  return meanRestingHr(rows.filter(r => r.date >= from && r.date <= to))
+}

@@ -1,12 +1,18 @@
 // The scopes we ask Oura for, how a stored grant reads, and which scope each collection needs
 // (#3026). The names come from the pinned spec, `openapi-v1.42.json`.
 import { describe, expect, it } from 'vitest'
-import { grantedOuraScopes, OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE, OURA_SCOPES, ouraCloudDeliveredTypes } from '../config'
+import { buildAuthorizeUrl, grantedOuraScopes, OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE, OURA_SCOPES, ouraCloudDeliveredTypes } from '../config'
 import { isOuraTypeShared, OURA_SCOPE_FOR } from '../documents'
 
 describe('Oura scopes (#3026)', () => {
   it('asks for v1.42\'s names: spo2, not spo2Daily, and heart_health', () => {
-    expect(OURA_SCOPES).toEqual(['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health'])
+    expect(OURA_SCOPES).toEqual(['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health', 'ring_configuration'])
+  })
+
+  it('asks for ring_configuration at connect, which Oura\'s 401 named for the ring battery (#3578)', () => {
+    const url = new URL(buildAuthorizeUrl({ clientId: 'cid', clientSecret: 'cs', redirectUri: 'https://app.example/api/oura/callback' }, 'state'))
+    expect(url.searchParams.get('scope')!.split(' ')).toContain('ring_configuration')
+    expect(OURA_SCOPE_FOR.ring_battery).toBe('ring_configuration')
   })
 
   it('only maps collections to scopes we ask for', () => {
@@ -57,6 +63,19 @@ describe('grantedOuraScopes', () => {
     expect(isOuraTypeShared(withHeart, 'daily_resilience')).toBe(true)
     expect(isOuraTypeShared(withHeart, 'daily_cardiovascular_age')).toBe(true)
     expect(isOuraTypeShared(withHeart, 'daily_spo2')).toBe(false)
+  })
+})
+
+describe('ring battery scope (#3578)', () => {
+  it('reads as not shared on a grant stored before ring_configuration, even one with daily', () => {
+    const old = grantedOuraScopes('extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health')
+    expect(isOuraTypeShared(old, 'ring_battery')).toBe(false)
+    expect(isOuraTypeShared(old, 'daily_stress')).toBe(true)
+  })
+
+  it('reads as shared on a new grant, and on a grant with no scope string', () => {
+    expect(isOuraTypeShared(grantedOuraScopes('extapi:daily extapi:ring_configuration'), 'ring_battery')).toBe(true)
+    expect(isOuraTypeShared(null, 'ring_battery')).toBe(true)
   })
 })
 

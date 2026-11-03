@@ -15,6 +15,9 @@
  * - **Per device.** A generic value is judged against a normal built only from earlier nights of
  *   the same source, so an `oura_cloud` HRV never scores against the ring's nights. While that
  *   normal is shorter than `BASELINE_MIN_NIGHTS`, the input reads `awaiting_baseline`.
+ * - **Per algorithm version** (#3075 stage 5). Within a source, only nights under the same version of
+ *   the source's own sleep algorithm, by `rowsInNormalGroup`'s rule: a source that changes its
+ *   algorithm restarts its normals; a night with no version joins the newest one.
  * - **Recovery index.** The ring's hours where tonight's summary has them; else hours from Oura's
  *   5-minute heart-rate series through the ring-era function (#3075 stage 2); else Oura's own
  *   `recovery_index` contributor, for a night whose series is missing or too thin.
@@ -33,6 +36,7 @@ import { trailingBaselineZ } from '@/lib/health/score-availability'
 import { canonicalNightForDate, type DatedNight } from '@trainingai/shared/health/sleep-night'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { hrvNightInNormal, type NightHrvMethod } from '@trainingai/shared/health/night-hrv-method'
+import { deviceOf, rowsInNormalGroup } from '@trainingai/shared/health/per-device-normal'
 
 /**
  * The window start dates readiness and the night-temperature loader both read, shifted on the local
@@ -87,6 +91,10 @@ export interface NightInputSources {
     respiratoryRateSource?: string | null
     /** #2265: a night the owner marked partial has no hours to balance; its breathing still counts. */
     partialNightAt?: Date | string | null
+    /** #3075 stage 5: a night its source recorded incompletely is partial likewise. */
+    recordingIncomplete?: boolean | null
+    /** #3075 stage 5: the source's algorithm version for the night, which keys its normals. */
+    sourceAlgorithmVersion?: string | null
   }[]
   /** `oura_daily` rows: Oura's own temperature deviation, already relative to Oura's baseline. */
   ouraDaily: readonly { date: string; temperatureDeviation?: number | null }[]
@@ -141,17 +149,21 @@ function latestDate(dates: (string | null | undefined)[]): string | null {
  * summary's own baselines. Without it a 0.3 °C deviation would round to zero.
  */
 function genericInput(
-  obs: readonly { date: string; value: number | null | undefined; source: string | null | undefined; inNormal?: boolean }[],
+  obs: readonly { date: string; value: number | null | undefined; source: string | null | undefined; inNormal?: boolean; algorithmVersion?: string | null }[],
   nightDate: string,
   scale = 1,
 ): NightInput | null {
   const tonight = obs.find(o => o.date === nightDate && o.value != null && Number.isFinite(o.value))
   if (!tonight) return null
   const source = tonight.source ?? UNKNOWN_SOURCE
-  const priors = obs
-    .filter(o => o.date < nightDate && o.value != null && Number.isFinite(o.value) && (o.source ?? UNKNOWN_SOURCE) === source
-      && o.inNormal !== false)
+  // #3075 stage 5: the same source under the same algorithm version (oldest first, as the rule needs).
+  const upToTonight = obs
+    .filter(o => o.date <= nightDate && o.value != null && Number.isFinite(o.value))
     .sort((a, b) => a.date.localeCompare(b.date))
+  // #3376: a night marked out of the normal (`inNormal: false`) still scores tonight; it only stays out
+  // of later nights' normals. Nothing is marked out today (`hrvNightInNormal` returns true).
+  const priors = rowsInNormalGroup(upToTonight, o => o.source, o => o.algorithmVersion, { source, algorithmVersion: tonight.algorithmVersion })
+    .filter(o => o.date < nightDate && o.inNormal !== false)
   // `trailingBaselineZ` holds back a z until the normal has BASELINE_MIN_NIGHTS nights, so a young
   // normal never yields a fabricated extreme; the night count says why it is missing.
   const z = trailingBaselineZ([...priors.map(o => o.value! * scale), tonight.value! * scale])
@@ -187,14 +199,23 @@ export function resolveReadinessNightInputs(src: NightInputSources): ReadinessNi
     }
   }
 
+  // #3075 stage 5: a body-metrics reading shares its night's algorithm version when the same source
+  // measured both; a reading from another source on that date has none of its own.
+  const nightByDate = new Map(src.nights.map(n => [n.date, n]))
+  const versionOn = (date: string, source: string | null | undefined) => {
+    const n = nightByDate.get(date)
+    return n?.sourceAlgorithmVersion != null && deviceOf(n.durationSource) === deviceOf(source) ? n.sourceAlgorithmVersion : null
+  }
+
   // Everything the ring could not score falls back to the generic value for the same night.
   const generic: Record<NightInputKey, () => NightInput | null> = {
     restingHeartRate: () => genericInput(
-      src.bodyMetrics.map(m => ({ date: m.date, value: (m.restingHeartRate ?? 0) > 0 ? m.restingHeartRate : null, source: m.restingHeartRateSource })),
+      src.bodyMetrics.map(m => ({ date: m.date, value: (m.restingHeartRate ?? 0) > 0 ? m.restingHeartRate : null, source: m.restingHeartRateSource, algorithmVersion: versionOn(m.date, m.restingHeartRateSource) })),
       nightDate),
     hrvBalance: () => genericInput(
       src.bodyMetrics.map(m => ({
         date: m.date, value: (m.hrvMs ?? 0) > 0 ? m.hrvMs : null, source: m.hrvSource,
+        algorithmVersion: versionOn(m.date, m.hrvSource),
         inNormal: hrvNightInNormal(m.hrvMethod ?? undefined),
       })),
       nightDate),
@@ -205,10 +226,10 @@ export function resolveReadinessNightInputs(src: NightInputSources): ReadinessNi
       src.ouraDaily.filter(d => !isPreRekey(d.date)).map(d => ({ date: d.date, value: d.temperatureDeviation, source: 'oura_cloud' })),
       nightDate, 100),
     sleepBalance: () => genericInput(
-      src.nights.filter(n => !isPartialNight(n)).map(n => ({ date: n.date, value: n.durationHours, source: n.durationSource })),
+      src.nights.filter(n => !isPartialNight(n)).map(n => ({ date: n.date, value: n.durationHours, source: n.durationSource, algorithmVersion: n.sourceAlgorithmVersion })),
       nightDate, 60),
     breathing: () => genericInput(
-      src.nights.map(n => ({ date: n.date, value: n.respiratoryRate, source: n.respiratoryRateSource })),
+      src.nights.map(n => ({ date: n.date, value: n.respiratoryRate, source: n.respiratoryRateSource, algorithmVersion: versionOn(n.date, n.respiratoryRateSource) })),
       nightDate, 10),
   }
   for (const key of Object.keys(generic) as NightInputKey[]) {

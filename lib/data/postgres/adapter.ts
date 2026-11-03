@@ -73,6 +73,8 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { sleepShapeFromHypnogram } from '@trainingai/shared/health/oura-sleep-detail'
+import { restlessnessFromMovement } from '@trainingai/shared/health/sleep-recording'
+import { ouraMovementSeries, ouraRecordingIncomplete, ouraAlgorithmVersion } from '@/lib/oura/cloud/sleep-recording-map'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
 import { PartialNightPayloadSchema } from '@trainingai/shared/health/partial-night'
 import { withNightRescore, partialNightRescore } from '@/lib/health/rescore-nights'
@@ -318,9 +320,29 @@ async function renameSessionExercises(tx: SqlTx, oldName: string, newName: strin
  * 30-second hypnogram. Nothing for a row with no usable hypnogram (a ring, manual or Health Connect
  * row joins no period), so those rows are exactly what they were; `sleepStart` and `sleepEnd` stay the bed window.
  */
-function cloudNightShape(r: { sleepPhase30Sec: string | null; bedtimeStart: Date | null }) {
+function cloudNightShape(r: { sleepPhase30Sec: string | null; bedtimeStart: Date | null }): { onsetAt?: Date; finalWakeAt?: Date; computedAwakenings?: number } {
   const shape = sleepShapeFromHypnogram(r.sleepPhase30Sec, r.bedtimeStart)
   return shape ? { onsetAt: shape.sleepOnset, finalWakeAt: shape.finalWake, computedAwakenings: shape.awakenings } : {}
+}
+
+/**
+ * #3075 stages 4 and 5. The Oura connector's part: map the period's movement series, low-battery flag
+ * and algorithm version into the generic night fields (`lib/oura/cloud/sleep-recording-map.ts`), and
+ * count restlessness inside the sleep window (`window`: onset to final wake where the hypnogram gives
+ * them, else the bed window). Each field is added only when the period gave one, so a ring, manual or
+ * Health Connect row, which joins no period, is exactly what it was.
+ */
+function cloudNightRecording(
+  r: { movement30Sec: string | null; bedtimeStart: Date | null; lowBatteryAlert: boolean | null; sleepAlgorithmVersion: string | null },
+  window: { from: Date; to: Date },
+) {
+  const restless = restlessnessFromMovement(ouraMovementSeries(r.movement30Sec, r.bedtimeStart), window)
+  const version = ouraAlgorithmVersion(r.sleepAlgorithmVersion)
+  return {
+    ...(restless ? { restlessMin: restless.restlessMin, movementMeasuredMin: restless.measuredMin } : {}),
+    ...(ouraRecordingIncomplete(r.lowBatteryAlert) ? { recordingIncomplete: true } : {}),
+    ...(version != null ? { sourceAlgorithmVersion: version } : {}),
+  }
 }
 
 function computeLbsToKgFix(
@@ -3611,6 +3633,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ...getTableColumns(s.sleepSessions), ouraSleepType: s.ouraCloudSleepPeriods.sleepType,
       // #3075 stage 3: the period's 30-second hypnogram, read here only to date the night's real onset and wake.
       sleepPhase30Sec: s.ouraCloudSleepPeriods.sleepPhase30Sec, bedtimeStart: s.ouraCloudSleepPeriods.bedtimeStart,
+      // #3075 stages 4 and 5: the period's movement series and its own recording flags, mapped to generic fields below.
+      movement30Sec: s.ouraCloudSleepPeriods.movement30Sec, lowBatteryAlert: s.ouraCloudSleepPeriods.lowBatteryAlert,
+      sleepAlgorithmVersion: s.ouraCloudSleepPeriods.sleepAlgorithmVersion,
     })
       .from(s.sleepSessions)
       .leftJoin(s.ouraCloudSleepPeriods, and(
@@ -3638,35 +3663,39 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         avgHeartRateSource: r.sourceMap?.avg_heart_rate ?? undefined,
       }, switchDay)
     }
-    return preferDeviceNights(rows).filter(r => r.date >= from && r.date <= to).map(r => ({
-      id: r.id, userId: r.userId, date: r.date,
-      sleepStart:      r.sleepStart,
-      sleepEnd:        r.sleepEnd,
-      durationHours:   r.durationHours   ?? undefined,
-      deepSleepHours:  r.deepSleepHours  ?? undefined,
-      remSleepHours:   r.remSleepHours   ?? undefined,
-      lightSleepHours: r.lightSleepHours ?? undefined,
-      awakHours:       r.awakHours       ?? undefined,
-      createdAt:       r.createdAt,
-      ouraId:          r.ouraId          ?? null,
-      efficiency:      r.efficiency      ?? undefined,
-      onsetLatencySec: r.onsetLatencySec ?? undefined,
-      averageHrvMs:    r.averageHrvMs    ?? undefined,
-      avgHeartRate:    r.avgHeartRate    ?? undefined,
-      lowestHeartRate: r.lowestHeartRate ?? undefined,
-      restlessPeriods: r.restlessPeriods ?? undefined,
-      // `sleep_score` is not read (#3011): nothing of ours writes it, so a value there could only
-      // be Oura's sleep score, and Oura's scores are never ours (scoring doc, rule 5).
-      respiratoryRate: r.respiratoryRate ?? undefined,
-      sleepPhase5Min:  r.sleepPhase5Min  ?? undefined,
-      timeInBedHours:  r.timeInBedHours  ?? undefined,
-      manualSleepStart: r.manualSleepStart ?? null,
-      manualEntry:     r.manualEntry,
-      partialNightAt:  r.partialNightAt ?? null,
-      ...nightSources(r),
-      ouraSleepType:   r.ouraSleepType   ?? null,
-      ...cloudNightShape(r),
-    }))
+    return preferDeviceNights(rows).filter(r => r.date >= from && r.date <= to).map(r => {
+      const shape = cloudNightShape(r)
+      return {
+        id: r.id, userId: r.userId, date: r.date,
+        sleepStart:      r.sleepStart,
+        sleepEnd:        r.sleepEnd,
+        durationHours:   r.durationHours   ?? undefined,
+        deepSleepHours:  r.deepSleepHours  ?? undefined,
+        remSleepHours:   r.remSleepHours   ?? undefined,
+        lightSleepHours: r.lightSleepHours ?? undefined,
+        awakHours:       r.awakHours       ?? undefined,
+        createdAt:       r.createdAt,
+        ouraId:          r.ouraId          ?? null,
+        efficiency:      r.efficiency      ?? undefined,
+        onsetLatencySec: r.onsetLatencySec ?? undefined,
+        averageHrvMs:    r.averageHrvMs    ?? undefined,
+        avgHeartRate:    r.avgHeartRate    ?? undefined,
+        lowestHeartRate: r.lowestHeartRate ?? undefined,
+        restlessPeriods: r.restlessPeriods ?? undefined,
+        // `sleep_score` is not read (#3011): nothing of ours writes it, so a value there could only
+        // be Oura's sleep score, and Oura's scores are never ours (scoring doc, rule 5).
+        respiratoryRate: r.respiratoryRate ?? undefined,
+        sleepPhase5Min:  r.sleepPhase5Min  ?? undefined,
+        timeInBedHours:  r.timeInBedHours  ?? undefined,
+        manualSleepStart: r.manualSleepStart ?? null,
+        manualEntry:     r.manualEntry,
+        partialNightAt:  r.partialNightAt ?? null,
+        ...nightSources(r),
+        ouraSleepType:   r.ouraSleepType   ?? null,
+        ...shape,
+        ...cloudNightRecording(r, { from: shape.onsetAt ?? r.sleepStart, to: shape.finalWakeAt ?? r.sleepEnd }),
+      }
+    })
   }
 
   /**

@@ -1,7 +1,7 @@
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { SleepSession } from '@trainingai/shared/types/body'
-import { perDeviceNormal, deviceOf } from '@trainingai/shared/health/per-device-normal'
+import { perDeviceNormal, deviceOf, rowsInNormalGroup } from '@trainingai/shared/health/per-device-normal'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 
 // Our own 0–100 Sleep Score. The weights are the ecore combiner weights recovered by
@@ -110,6 +110,27 @@ const SCHEDULE_DEV = [[0, 100], [0.4, 92], [0.8, 82], [1.2, 70], [1.8, 55], [2.5
 //
 // Awake fraction of the sleep window → penalty subtracted from the restfulness base.
 const AWAKE_PENALTY = [[0, 0], [0.05, 4], [0.1, 10], [0.2, 22], [0.35, 38]] as const
+
+// #3075 stage 4: the restlessness term comes back, in a unit we own. `restlessPeriods` stays unread
+// (the note above still holds for it). The night's restlessness is now the share of the measured
+// sleep window spent moving, from any source's per-epoch movement series
+// (`restlessnessFromMovement`, `health/sleep-recording.ts`), so a 30-second Oura epoch and a
+// one-minute epoch from another device land on the same scale, and a long night is not more
+// restless than a short one for being long. A night without a usable series has no penalty, which
+// is the behaviour before this stage. Like the awake fraction, the share is subtracted from the
+// restfulness base, never a term of its own, so the weights do not move.
+//
+// The anchors are a first calibration, set to leave ordinary movement alone: nothing up to a fifth
+// of the window, then a gentle rise to 18 points at 60%, below the awake penalty's top because a
+// movement epoch is a weaker sign of broken sleep than an awake one. Retuning them is a `tuning:` call.
+const RESTLESS_PENALTY = [[0, 0], [0.2, 0], [0.3, 3], [0.4, 8], [0.6, 18]] as const
+
+/** #3075 stage 4: the night's share of its measured sleep window spent moving, or null without a usable series. */
+export function restlessFractionOf(s: { restlessMin?: number | null; movementMeasuredMin?: number | null }): number | null {
+  return s.restlessMin != null && s.movementMeasuredMin != null && s.movementMeasuredMin > 0
+    ? s.restlessMin / s.movementMeasuredMin
+    : null
+}
 
 // Awake-time fragmentation cap (2026-08-06, owner-directed — a night with repeated work-call
 // wake-ups scored 89 "High" despite fragmented sleep, because normal duration/HRV/HR/timing
@@ -268,8 +289,11 @@ export const MAIN_SLEEP_MIN_HOURS = 4
  * night re-scored per device no longer carries the stamp of its pooled score.
  * 2026-11-03 (#3075 stage 3): on an Oura Cloud night with a usable hypnogram the `timing` and `schedule`
  * terms and the habitual bed and wake hours read when sleep began and ended, not the bed window.
+ * 2026-11-04 (#3075 stages 4 and 5): restfulness takes a restlessness penalty from the source's
+ * movement series; a night its source recorded incompletely is partial and has no score; and each
+ * normal is learned from one (device, algorithm version), not one device.
  */
-export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:own-sleep-onset-wake:2026-11-03'
+export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:own-sleep-onset-wake:restlessness-recording-flags:2026-11-04'
 
 /**
  * The stamp for each calibration (#2237): `v1` is the stamp above, `v2` the even-gain curve on the
@@ -279,7 +303,7 @@ export const SLEEP_SCORE_MODEL_VERSION = 'v1:per-device-baselines:own-sleep-onse
  */
 export const SLEEP_SCORE_MODEL_VERSIONS = {
   v1: SLEEP_SCORE_MODEL_VERSION,
-  v2: 'v2:even-gain:per-device-baselines:own-sleep-onset-wake:2026-11-03',
+  v2: 'v2:even-gain:per-device-baselines:own-sleep-onset-wake:restlessness-recording-flags:2026-11-04',
 } as const
 
 /**
@@ -305,6 +329,7 @@ export const SLEEP_MODEL = {
     hrRatioToBaseline: HR_RATIO,
     scheduleWorstEndpointDeviationHours: SCHEDULE_DEV,
     awakeFractionPenalty: AWAKE_PENALTY,
+    restlessFractionPenalty: RESTLESS_PENALTY,
     awakeFractionFragmentationCapByPersonalSd: AWAKE_FRAGMENTATION_CAP,
     /** The curve scoring new nights now (#2237): V1 until `scoreCalibrationFrom` is set, V2 from that
      *  wake date on. `sleepScoreCalibrationFor(date)` picks. */
@@ -464,12 +489,16 @@ export interface BaselineSessionInput {
   durationSource?: string | null
   hrvSource?: string | null
   avgHeartRateSource?: string | null
+  /** #3075 stage 5: the source's algorithm version for the night; a normal is learned per (device, version). */
+  sourceAlgorithmVersion?: string | null
   /** #2265: set when the owner marked the night partial; see `partial-night.ts`. */
   partialNightAt?: Date | string | null
+  /** #3075 stage 5: set when the source said its recording of the night is incomplete; partial likewise. */
+  recordingIncomplete?: boolean | null
 }
 
-/** The night being scored, as far as `sleepScoreBaselines` needs it: which devices measured it. */
-export type ScoredNightDevices = Pick<BaselineSessionInput, 'durationSource' | 'hrvSource' | 'avgHeartRateSource'>
+/** The night being scored, as far as `sleepScoreBaselines` needs it: which devices measured it, under which algorithm. */
+export type ScoredNightDevices = Pick<BaselineSessionInput, 'durationSource' | 'hrvSource' | 'avgHeartRateSource' | 'sourceAlgorithmVersion'>
 
 /** Mean of a set of clock hours, taken on the circle so 23:50 and 00:10 average to midnight. */
 function circularMeanHour(hours: number[]): number {
@@ -511,8 +540,13 @@ export function sleepScoreBaselines(
     ? allNights.reduce((a, b) => (b.sleepEnd.getTime() >= a.sleepEnd.getTime() ? b : a))
     : null
   const nightDevice = scored ? deviceOf(scored.durationSource) : newestNight ? deviceOf(newestNight.durationSource) : null
+  // #3075 stage 5: and the source's algorithm version for that night, so a source that changed its
+  // algorithm starts these normals again (`per-device-normal.ts`). Absent: the newest it has sent.
+  const nightVersion = scored ? scored.sourceAlgorithmVersion ?? null : newestNight?.sourceAlgorithmVersion ?? null
   // Schedule and awake-fraction baselines are the nights of the device that measured the window.
-  const nights = (nightDevice == null ? allNights : allNights.filter(s => deviceOf(s.durationSource) === nightDevice))
+  const nights = (nightDevice == null
+    ? allNights
+    : rowsInNormalGroup(allNights, s => s.durationSource, s => s.sourceAlgorithmVersion, { source: nightDevice, algorithmVersion: nightVersion }))
     .filter(s => !isPartialNight(s))
 
   // Trailing window, newest last — see SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS for why these two
@@ -524,8 +558,13 @@ export function sleepScoreBaselines(
     given: string | null | undefined,
     minNights: number,
   ) => perDeviceNormal(
-    allNights.map((s, i) => ({ date: String(i).padStart(6, '0'), value: (pick(s) ?? 0) > 0 ? pick(s) : null, source: sourceOf(s) })),
-    { minNights, aggregate: 'median', window: SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS, device: scored ? deviceOf(given) : undefined },
+    allNights.map((s, i) => ({
+      date: String(i).padStart(6, '0'), value: (pick(s) ?? 0) > 0 ? pick(s) : null, source: sourceOf(s), algorithmVersion: s.sourceAlgorithmVersion,
+    })),
+    {
+      minNights, aggregate: 'median', window: SLEEP_AUTONOMIC_BASELINE_WINDOW_NIGHTS,
+      device: scored ? deviceOf(given) : undefined, algorithmVersion: scored ? scored.sourceAlgorithmVersion : undefined,
+    },
   ).value
   const localHour = (d: Date) => {
     const [h, m] = formatInTimeZone(d, tz, 'HH:mm').split(':').map(Number)
@@ -600,15 +639,18 @@ export function computeSleepScore(
     add('schedule', SLEEP_WEIGHTS.schedule, interp(Math.max(0, lateBed, earlyWake), SCHEDULE_DEV))
   }
 
-  // Restfulness — efficiency, less time spent awake inside the window. `restlessPeriods` is not
-  // read here: see the note on AWAKE_PENALTY above (finding Q-3).
+  // Restfulness — efficiency, less time spent awake inside the window, less time spent moving in it
+  // (#3075 stage 4, from the source's movement series). `restlessPeriods` is not read here: see the
+  // note on AWAKE_PENALTY above (finding Q-3).
   const awakeFrac = session.awakHours != null && session.awakHours >= 0
     ? session.awakHours / (duration + session.awakHours)
     : null
-  if (session.efficiency != null || session.awakHours != null) {
+  const restlessFrac = restlessFractionOf(session)
+  if (session.efficiency != null || session.awakHours != null || restlessFrac != null) {
     const base = session.efficiency ?? RESTFULNESS_FALLBACK_BASE
     const awakePenalty = awakeFrac != null ? interp(awakeFrac, AWAKE_PENALTY) : 0
-    add('restfulness', SLEEP_WEIGHTS.restfulness, base - awakePenalty)
+    const restlessPenalty = restlessFrac != null ? interp(restlessFrac, RESTLESS_PENALTY) : 0
+    add('restfulness', SLEEP_WEIGHTS.restfulness, base - awakePenalty - restlessPenalty)
   }
 
   const totalWeight = parts.reduce((s, p) => s + p.weight, 0)

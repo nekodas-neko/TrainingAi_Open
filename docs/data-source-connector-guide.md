@@ -12,6 +12,15 @@ Everything else here (the tables, the formula inputs, the normalize-layer patter
 mechanisms) is described from the current code, not aspirationally — every claim below was checked
 against the source, not summarized from memory.
 
+> **The owner's rule (2026-11-03): Oura is one source, not the product.** In the owner's words: "As long
+> as the changes are using the oura data as interchangeable (i.e it would work with say a fitbit or so)
+> we are not building for oura - its just a source." So every feature and score reads the normalized
+> shapes in §3, never an Oura field name, and never branches on `oura_cloud` or any other source id.
+> A gate is on what the data can show (coverage, capability), never on which source or which date it
+> came from. Source-specific knowledge stops at the connector: the Oura Cloud adapter in
+> `lib/oura/cloud/` maps Oura's fields into the §3 shapes, and a Fitbit or Health Connect adapter maps
+> its own. When a feature needs a shape §3 lacks, add the generic shape and have each source fill it.
+
 ---
 
 ## 0. The model, in two layers
@@ -168,6 +177,20 @@ provenance bug before it was made required).
   through this same function.
 - **If your source only has stage *durations*, no interval boundaries**, omit `sleepPhase5Min`
   entirely rather than fabricating a flat/guessed hypnogram.
+- **What the source says about its own recording of the night** (#3075 stages 4 and 5), in the
+  generic shapes of `packages/shared/src/health/sleep-recording.ts`, each optional, each computed on
+  read by the source's reader and never stored by us:
+  - a `MovementSeries` (`{ epochSec, startAt, levels }`, our 0-3 scale, `null` for an unmeasured
+    epoch), which `restlessnessFromMovement` turns into `restlessMin` / `movementMeasuredMin` on the
+    night for the Sleep Score's restlessness penalty. Oura maps `movement_30_sec`; Fitbit's per-minute
+    sleep levels (`restless`, `awake`) or any accelerometer epoch count would map the same way;
+  - `recordingIncomplete: true` when the source says it did not record the whole night (Oura maps
+    `low_battery_alert`). The night is partial through `isPartialNight`, exactly as the owner's mark;
+  - `sourceAlgorithmVersion`, the label of the source's own sleep algorithm (Oura maps
+    `sleep_algorithm_version`). Normals are keyed by (source, version), so a source that changes its
+    algorithm restarts its normals (`per-device-normal.ts`).
+  The Oura mapping is `lib/oura/cloud/sleep-recording-map.ts`; a source that sends none of them
+  leaves its nights exactly as they were.
 
 ### 3c. Daily body/activity scalars — **one row per user per day, sparse columns**
 
@@ -239,7 +262,7 @@ table it reads.
 | **Illness radar** | `packages/shared/src/health/illness-radar.ts` | — | temperature (0.40), breathing (0.25), RHR (0.20), HRV-balance (0.15) — each optional, formula renormalizes over what's present | **not a formula limitation — a wiring gap.** The formula itself degrades gracefully, but its only caller (`readiness-payload.ts`) computes it *only if* an `oura_daily_summary` row exists — a Health-Connect-only user gets no illness computation at all, degraded or otherwise. Filed as PS-42 below |
 | **Training load / ACWR** | `packages/shared/src/ai-periodization/acwr.ts` (`computeVolumeAcwr`) | logged workout volume (`AcwrSession[]`, user-entered tonnage) | — | none — entirely source-agnostic, doesn't touch wearable data at all |
 | **OTS training stress score** | `packages/shared/src/health/training-stress.ts` + `lib/oura-models/inference/ots.ts` | — | — | full-day 1-min MET grid from raw ring events, persisted non-provisional `oura_daily_derived.readiness_score`, derived VO2max — **hard Oura-only, distinct from ACWR above** which is the source-agnostic training-load signal |
-| **Activity Score** | `packages/shared/src/health/activity-score.ts` | — | steps (18%) and activeCalories (15%) from `body_metrics` — **Health-Connect-writable**; strength-frequency/volume (45% combined) from logged workouts — source-agnostic | **zoneMinutes (10%) and moveHours (12%)** — both derived from intraday `oura_heartrate`. Health Connect's series reaches it since #2168 (§3a), ranked below any ring or strap row covering the same minutes, so a HC-only user now has them. Not device-verified, and a sparse series is not floored (§3a) |
+| **Activity Score** | `packages/shared/src/health/activity-score.ts` | — | steps (18%) and activeCalories (15%) from `body_metrics` — **Health-Connect-writable**; strength-frequency/volume (45% combined) from logged workouts — source-agnostic | **zoneMinutes (10%) and moveHours (12%)** — both derived from intraday `oura_heartrate`. Since #3388 moveHours also runs from any source's per-minute movement (MET) series with no resting HR; only zoneMinutes waits for one. Health Connect's series reaches it since #2168 (§3a), ranked below any ring or strap row covering the same minutes, so a HC-only user now has them. Not device-verified, and a sparse series is not floored (§3a) |
 
 **Reading this table:** `device-agnostic-source-architecture.md` §5's claim — that sleep staging
 beyond totals, daytime-HRV→stress→resilience, readiness's temperature term, illness detection,

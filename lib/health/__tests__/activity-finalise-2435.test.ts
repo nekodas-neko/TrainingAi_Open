@@ -14,6 +14,7 @@ const reportServerError = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/observability', () => ({ reportServerError }))
 
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
+import { ACTIVITY_MODEL_VERSION } from '@trainingai/shared/health/activity-score'
 import { finaliseActivityDay, ACTIVITY_FINALISE_DAYS, ACTIVITY_FINAL_GRACE_HOURS } from '@/lib/health/activity-finalise'
 
 const TZ = 'Australia/Brisbane'
@@ -56,6 +57,13 @@ describe('finaliseActivityDay', () => {
     expect(w.patch.activityContributors.preTaper).toBe(day.result!.preTaperScore)
     const stored = fx.derived.find(r => r.day === YESTERDAY)!
     expect(activityFinalisedAt(stored.activityContributors)!.getTime()).toBe(NOW.getTime())
+  })
+
+  it('stamps the Activity model version beside the stored score (#3388)', async () => {
+    setup()
+    await finaliseActivityDay(typedRepo(), 'u1', TZ, YESTERDAY)
+    const call = repo.upsertOuraDailyDerived.mock.calls.find(c => c[1] === YESTERDAY)!
+    expect((call[2] as { modelVersions?: unknown }).modelVersions).toEqual({ activity: ACTIVITY_MODEL_VERSION })
   })
 
   it('equals the live score the payload showed in the last minute of that day', async () => {

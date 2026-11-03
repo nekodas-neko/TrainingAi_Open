@@ -480,6 +480,12 @@ export interface AggregatableSleep extends SleepWindow {
   onsetAt?: Date | null
   finalWakeAt?: Date | null
   computedAwakenings?: number | null
+  /** #3075 stage 4: minutes moving and measured inside the sleep window (computed, never stored); see `SleepSession`. */
+  restlessMin?: number | null
+  movementMeasuredMin?: number | null
+  /** #3075 stage 5: the source's own flags for the night; see `SleepSession`. */
+  recordingIncomplete?: boolean | null
+  sourceAlgorithmVersion?: string | null
   /** #2265: the owner's partial-night mark. A reassembled night is marked when any window is. */
   partialNightAt?: Date | string | null
 }
@@ -555,6 +561,16 @@ export function aggregateNight<T extends AggregatableSleep>(period: SleepPeriod<
     ...(last.finalWakeAt != null ? { finalWakeAt: last.finalWakeAt } : {}),
     ...(w.some(x => x.computedAwakenings != null)
       ? { computedAwakenings: (sum(w.map(x => x.computedAwakenings)) ?? 0) + period.gapHours.length } : {}),
+    // #3075 stage 4: restlessness sums only when every window has a usable series. A night with one
+    // window unmeasured would state a fragment's share as the night's, so it has none, like a night
+    // whose single window had no series. Overrides what `...first` carried.
+    ...(w.every(x => x.restlessMin != null && x.movementMeasuredMin != null)
+      ? { restlessMin: sum(w.map(x => x.restlessMin)), movementMeasuredMin: sum(w.map(x => x.movementMeasuredMin)) }
+      : first.restlessMin != null || first.movementMeasuredMin != null ? { restlessMin: undefined, movementMeasuredMin: undefined } : {}),
+    // #3075 stage 5: a window the source recorded incompletely makes the night incomplete; the
+    // algorithm version is the first window's that has one. Added only when set, as below.
+    ...(w.some(x => x.recordingIncomplete === true) ? { recordingIncomplete: true } : {}),
+    ...(w.some(x => x.sourceAlgorithmVersion != null) ? { sourceAlgorithmVersion: w.find(x => x.sourceAlgorithmVersion != null)!.sourceAlgorithmVersion } : {}),
     // #2265: the mark is on the night, not on a window. Added only when set, so an unmarked night is
     // exactly the object it was before the mark existed.
     ...(w.some(x => x.partialNightAt != null) ? { partialNightAt: w.find(x => x.partialNightAt != null)!.partialNightAt } : {}),

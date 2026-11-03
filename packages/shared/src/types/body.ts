@@ -300,4 +300,24 @@ export interface SleepSession {
   finalWakeAt?: Date
   /** #3075 stage 3 — awake runs between onset and final wake, computed from the same hypnogram. Absent likewise. */
   computedAwakenings?: number
+  /**
+   * #3075 stage 4 — READ-ONLY, computed on read, never stored. The night's restlessness from the
+   * source's per-epoch movement series (`restlessnessFromMovement`, `health/sleep-recording.ts`):
+   * minutes moving and minutes measured inside the sleep window. Absent on every row whose source
+   * sent no usable series; such a night has no restlessness term.
+   */
+  restlessMin?: number
+  movementMeasuredMin?: number
+  /**
+   * #3075 stage 5 — READ-ONLY, from the source, never stored by us. True when the source says its own
+   * recording of the night is incomplete (the device's battery ran low, the recording was cut). The
+   * night reads as partial through `isPartialNight`, exactly as the owner's mark does. Absent or false: complete.
+   */
+  recordingIncomplete?: boolean
+  /**
+   * #3075 stage 5 — READ-ONLY, from the source. The label of the source's own algorithm that produced
+   * the night. Normals are keyed by (source, this), so a source that changes its algorithm restarts
+   * its normals (`per-device-normal.ts`). Absent when the source does not say.
+   */
+  sourceAlgorithmVersion?: string
 }

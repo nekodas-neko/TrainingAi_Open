@@ -6,15 +6,15 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '../date-utils'
 import { resolveHrProfile, maxHrIsUnread, type HrProfile } from './hr-profile'
-import { toOuraByDate } from './wear-confidence'
 import { ouraCloudMetGrid } from './oura-cloud-met'
-import { scoreActivityForDay, restingHrBaseline, carriedOverRestingHr, type ActivityDay } from './activity-day'
+import { scoreActivityForDay, type ActivityDay } from './activity-day'
+import { restingHrOnDay } from './resting-hr-mean'
 
-/** The history a day's score reads: the 28-day resting-HR baseline and the ACWR chronic window. */
+/** The history a day's score reads: the 28-day resting-HR window and the ACWR chronic window. */
 const HISTORY_DAYS = 28
 
 type ActivityDayRepo = Pick<WorkoutRepository,
-  'listBodyMetrics' | 'getOuraDaily' | 'getWorkoutSessionsFrom' | 'getHrForWindow' | 'getActiveProgram'
+  'listBodyMetrics' | 'getWorkoutSessionsFrom' | 'getHrForWindow' | 'getActiveProgram'
   | 'getUserById' | 'getUserGoals' | 'getOuraCloudActivitySeries' | 'listActivityLogs'>
 
 export interface LoadActivityDayOptions {
@@ -42,9 +42,8 @@ export async function loadActivityDay(
   // default (#3347 review): the day stays un-finalised and the next pass retries. Today only loses
   // the input for this read.
   const finished = date < todayInTz(tz)
-  const [bodyMetrics, ouraRows, sessions, hrRows, program, user, userGoals, cloudActivity, activityLogs, hrProfile] = await Promise.all([
+  const [bodyMetrics, sessions, hrRows, program, user, userGoals, cloudActivity, activityLogs, hrProfile] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
-    repo.getOuraDaily(userId, fromIso, date),
     repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(fromIso, tz)),
     options.hrRows ?? repo.getHrForWindow(userId, dayMid, nextMid),
     repo.getActiveProgram(userId),
@@ -76,10 +75,8 @@ export async function loadActivityDay(
     date,
     tz,
     bodyMetrics,
-    restingHrBaseline: restingHrBaseline(bodyMetrics, toOuraByDate(ouraRows)),
-    // The previous device's mean while the device in use warms up, so the stored score keeps its zone
-    // lane the same way the live one does (#3001).
-    restingHrCarriedOver: carriedOverRestingHr(bodyMetrics),
+    // The one resting-HR rule the HR zones and Body Battery read (#3388), as of this day.
+    restingHr: restingHrOnDay(bodyMetrics, date),
     hrRows,
     metGrid: ouraCloudMetGrid(cloudActivity, dayMid.getTime(), nextMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,
