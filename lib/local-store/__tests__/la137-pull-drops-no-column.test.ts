@@ -128,9 +128,11 @@ describe.skipIf(!canRun)('a sync pull drops no column applyDelta writes (LA-137)
     // #3060: the pull joins Oura's period type onto each sleep row from this table, by Oura id. Without
     // a matching period the type reads NULL, which is right for a non-Oura night but checks nothing.
     await pool.query(
-      `INSERT INTO oura_cloud_sleep_periods (user_id, oura_id, day, bedtime_start, bedtime_end, sleep_type)
-       VALUES ($1, $2, '2026-09-27', now() - interval '9 hours', now() - interval '1 hour', 'long_sleep')`,
-      [USER, made.get('sleep_sessions')!.oura_id])
+      `INSERT INTO oura_cloud_sleep_periods (user_id, oura_id, day, bedtime_start, bedtime_end, sleep_type, sleep_phase_30_sec)
+       VALUES ($1, $2, '2026-09-27', now() - interval '9 hours', now() - interval '1 hour', 'long_sleep', $3)`,
+      // #3582: a usable hypnogram (an hour or more of epochs, codes 1-4, some sleep), so the pull derives
+      // onset, final wake and awakenings and this test proves each reaches a local column.
+      [USER, made.get('sleep_sessions')!.oura_id, '4'.repeat(10) + '2'.repeat(60) + '44' + '1'.repeat(40) + '4'.repeat(8)])
   }, 60_000)
 
   afterAll(async () => {

@@ -53,6 +53,14 @@ export type SleepRow = {
    * row still shows what the ring recorded; the scores and averages are what leave the night out.
    */
   partialNightAt?: string | null;
+  /**
+   * #3582 — when sleep really began and ended on an Oura Cloud night (ISO), from its 30-second
+   * hypnogram; `sleepStart`/`sleepEnd` stay the bed window. Absent on a night without a usable
+   * hypnogram and in a payload from before it existed. A reader prefers it, then falls back to the
+   * bed window. The night's awakenings are already folded into `restlessPeriods` (ours, then Oura's).
+   */
+  onsetAt?: string | null;
+  finalWakeAt?: string | null;
 };
 
 /** A row as a window the night grouping can read: its times as instants, the row itself carried along. */
@@ -74,6 +82,8 @@ type RowWindow = {
   lowestHeartRate: number | null
   restlessPeriods: number | null
   respiratoryRate: number | null
+  onsetAt: Date | null
+  finalWakeAt: Date | null
 }
 
 // The night's main period: its longest row by sleep, by window when a row has no duration.
@@ -111,6 +121,7 @@ export function mergeByDate(rows: SleepRow[], tz: string = DEFAULT_TZ): SleepRow
     awakHours: r.awakHours, efficiency: r.efficiency, onsetLatencySec: r.onsetLatencySec,
     averageHrvMs: r.averageHrvMs, avgHeartRate: r.avgHeartRate, lowestHeartRate: r.lowestHeartRate,
     restlessPeriods: r.restlessPeriods, respiratoryRate: r.respiratoryRate,
+    onsetAt: r.onsetAt ? new Date(r.onsetAt) : null, finalWakeAt: r.finalWakeAt ? new Date(r.finalWakeAt) : null,
   }))
   const periods = groupSleepPeriods(windows, tz).nights
   const aggregates = periods.map(p => ({ period: p, night: aggregateNight(p) }))
@@ -149,6 +160,9 @@ export function mergeByDate(rows: SleepRow[], tz: string = DEFAULT_TZ): SleepRow
       // The ribbon is the main window's phase string, which spans only that window; say which, so
       // the hypnogram can position itself inside the wider night.
       sleepPhase5Min: main.row.sleepPhase5Min,
+      // #3582: the night's onset is its first window's and its wake its last's, where that window has one.
+      onsetAt: night.onsetAt?.toISOString() ?? null,
+      finalWakeAt: night.finalWakeAt?.toISOString() ?? null,
       partialNightAt: period.windows.find(w => w.row.partialNightAt != null)?.row.partialNightAt ?? null,
       phaseWindowStart: main.row.sleepPhase5Min ? main.row.sleepStart : null,
       phaseWindowEnd: main.row.sleepPhase5Min ? main.row.sleepEnd : null,
@@ -188,7 +202,10 @@ export function localSleepRowsAsNights(local: readonly LocalSleepSession[], tz: 
       remSleepHours: l.remSleepHours, lightSleepHours: l.lightSleepHours, awakHours: l.awakHours,
       efficiency: l.efficiency, onsetLatencySec: l.onsetLatencySec, averageHrvMs: l.averageHrvMs,
       avgHeartRate: l.avgHeartRate, lowestHeartRate: l.lowestHeartRate,
-      restlessPeriods: l.restlessPeriods,
+      // #3582: ours (the hypnogram's count), then Oura's, as the server's route folds it. A ring,
+      // manual or pre-v54 row has no computed count and keeps its own.
+      restlessPeriods: l.computedAwakenings ?? l.restlessPeriods,
+      onsetAt: l.onsetAt ?? null, finalWakeAt: l.finalWakeAt ?? null,
       respiratoryRate: l.respiratoryRate, sleepPhase5Min: l.sleepPhase5Min,
       sleepStart: l.sleepStart, sleepEnd: l.sleepEnd,
       sleepTimeRecommendation: null,

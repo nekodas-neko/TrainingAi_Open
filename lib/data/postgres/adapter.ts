@@ -5279,7 +5279,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // Not filtered on `deleted_at` (issue 2606): this is the tombstone channel for a removed manual
       // night, as for mood_logs and food_logs below. #3060: Oura's period type rides along, joined as
       // `listSleepSessions` joins it, so the device seed keeps a nap out of the night as the server does.
-      this.db.select({ ...getTableColumns(s.sleepSessions), ouraSleepType: s.ouraCloudSleepPeriods.sleepType })
+      // #3582: the period's 30-second hypnogram is read only to date the night's onset, wake and
+      // awakenings (`cloudNightShape`, as `listSleepSessions` does); it is dropped before the reply.
+      this.db.select({
+        ...getTableColumns(s.sleepSessions), ouraSleepType: s.ouraCloudSleepPeriods.sleepType,
+        sleepPhase30Sec: s.ouraCloudSleepPeriods.sleepPhase30Sec, bedtimeStart: s.ouraCloudSleepPeriods.bedtimeStart,
+      })
         .from(s.sleepSessions)
         .leftJoin(s.ouraCloudSleepPeriods, and(
           eq(s.ouraCloudSleepPeriods.userId, s.sleepSessions.userId),
@@ -5655,7 +5660,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
              progressionStyles, styleSets,
              programRoster: programRosterRows.map(r => r.id),
              progressionStyleRoster: styleRosterRows.map(r => r.id),
-             bodyMetrics, sleepSessions,
+             bodyMetrics,
+             // #3582: onsetAt / finalWakeAt / computedAwakenings ride on an Oura Cloud night with a usable
+             // hypnogram and are absent otherwise; a client that does not know them ignores them.
+             sleepSessions: sleepSessions.map(({ sleepPhase30Sec, bedtimeStart, ...row }) => ({
+               ...row, ...cloudNightShape({ sleepPhase30Sec, bedtimeStart }),
+             })),
              moodLogs, activityLogs, fitnessTests, prescribedRuns, workoutSessions,
              exerciseLogs, setLogs,
              personalRecords: personalRecords.map(r => ({
