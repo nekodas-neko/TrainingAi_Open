@@ -11,7 +11,7 @@ import { diagnosticsAvailable } from '../../../development/diagnostics/client';
 import { AccountPanel } from '../../account/components/AccountPanel';
 import { useState } from 'react';
 import { HomeLayoutSheet } from '../../home/components/HomeLayoutSheet';
-import { FeatureRow } from '../../../shared/ui';
+import { ListRow } from '../../../shared/ui';
 
 export function SettingsScreen() {
   const account = useAccountContext();
@@ -36,7 +36,7 @@ export function SettingsScreen() {
       <Card>
         <AppText variant="heading">Preferences</AppText>
         <HealthAlertsSetting />
-        <FeatureRow
+        <ListRow
           title="Live workout status"
           subtitle="Shown as an Android Live Update while a workout runs"
         />

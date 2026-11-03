@@ -26,6 +26,7 @@ import {
   drainChart,
   parseRingAlert,
   readingAge,
+  readingState,
   type RingAlertSettings,
 } from '../data/ring-battery';
 
@@ -63,6 +64,7 @@ export function RingBatteryCard() {
   const data = battery.data;
   const latest = data?.latest ?? null;
   const chart = drainChart(data?.series ?? []);
+  const state = readingState(latest, Date.now());
   const charging = latest?.charging === true;
   return (
     <>
@@ -70,7 +72,12 @@ export function RingBatteryCard() {
         <AppText variant="eyebrow" tone="muted">
           Oura Ring
         </AppText>
-        {latest ? (
+        {latest && state === 'stale' ? (
+          <AppText tone="muted">
+            No battery reading from the ring since{' '}
+            {formatDateDisplay(toAestDay(new Date(latest.tsMs), timezone), 'short')}
+          </AppText>
+        ) : latest ? (
           <>
             <Stack direction="row" align="center" gap="md">
               <Icon

@@ -301,6 +301,7 @@ function AppShell() {
           panel={healthPanel}
           onPanelChange={setHealthPanel}
           openDetail={setHealthDetail}
+          openDevices={() => setDetail('more-devices')}
           openPrograms={() => setDetail('programs')}
           openSettings={openSettings}
           openDay={(date) => {
