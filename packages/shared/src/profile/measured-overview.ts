@@ -118,6 +118,8 @@ export interface SleepNight {
   efficiency: number | null
   
   sleepStart: string | null
+  /** #3582: when sleep really began (an Oura Cloud night's first non-awake epoch). The bedtime average prefers it to the bed window. */
+  onsetAt?: string | null
   lowestHeartRate: number | null
   respiratoryRate: number | null
   /** #2265: the owner's partial-night mark; such a night keeps its heart rate and breathing in the averages. */
@@ -143,7 +145,7 @@ export function sleepAverages(nights: SleepNight[]): SleepAverages | null {
     nights: nights.length,
     durationHours: mean(full.map(n => n.durationHours)),
     efficiency: mean(full.map(n => n.efficiency)),
-    bedtimeMinutes: circularMeanMinutes(full.map(n => n.sleepStart)),
+    bedtimeMinutes: circularMeanMinutes(full.map(n => n.onsetAt ?? n.sleepStart)),
     lowestHeartRate: mean(nights.map(n => n.lowestHeartRate)),
     respiratoryRate: mean(nights.map(n => n.respiratoryRate)),
   }

@@ -35,6 +35,8 @@ const main = row({
 const asSession = (r: SleepRow) => ({
   ...r, sleepStart: new Date(r.sleepStart!), sleepEnd: new Date(r.sleepEnd!),
   timeInBedHours: null as number | null,
+  // #3582: a row's onset and wake are ISO strings; the night grouping reads instants, as `mergeByDate` maps them.
+  onsetAt: r.onsetAt ? new Date(r.onsetAt) : null, finalWakeAt: r.finalWakeAt ? new Date(r.finalWakeAt) : null,
 })
 
 describe('#3057 — an Oura night is its long_sleep period', () => {

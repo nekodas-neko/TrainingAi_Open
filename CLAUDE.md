@@ -40,7 +40,8 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
 - **Every change reaches `main` through a PR** with `Closes #N`. Five checks are required — Lint,
   Tests, Build, Migration Check, Custom Rules — and squash is the only merge method. Turn on
   auto-merge when you open the PR. Locally, `pnpm check:rules` runs the Custom Rules job (quote its
-  `Ran N of N`) and `pnpm test` the suite; neither alone is the gate.
+  `Ran N of N`), `pnpm test` the suite, and `pnpm typecheck:tests` the Build job's test-file type
+  check, which `pnpm typecheck` skips; none alone is the gate.
 - **A merge deploys nothing.** Production changes only through a release: a `v*` tag, deployed by
   `.github/workflows/release.yml` after the owner says "approve". Process and recovery:
   [`docs/owner-manual.md`](docs/owner-manual.md).

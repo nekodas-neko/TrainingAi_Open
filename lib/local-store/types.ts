@@ -97,6 +97,13 @@ export interface LocalSleepSession {
   /** #3060 (v53) — Oura's period type, from the server's Cloud period table. Null for any other
    *  source; `localSleepRowsAsNights` feeds it to the same nap rule the server's card applies. */
   ouraSleepType?:  string | null;
+  /** #3582 (v54) — when sleep really began and ended on an Oura Cloud night, and its awake runs
+   *  between the two, computed by the server from the 30-second hypnogram and carried by the pull.
+   *  Null/absent on a ring, manual or Health Connect night, on a night without a usable hypnogram,
+   *  and on any row pulled before v54. `sleepStart`/`sleepEnd` stay the bed window. */
+  onsetAt?:        string | null;
+  finalWakeAt?:    string | null;
+  computedAwakenings?: number | null;
   syncStatus:      'pending' | 'synced';
   updatedAt:       string;
 }

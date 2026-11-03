@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.516.0",
+    date: "2026-11-04",
+    changes: [
+      "Both apps: readiness scores your overnight recovery from our own reading of Oura's heart-rate data, the way it did with the ring, instead of Oura's 0–100 figure.",
+      "Both apps: your sleep timing, sleep schedule and the Body Battery wake-up now use when you actually fell asleep and woke up, from Oura's sleep stages, not when you got into and out of bed. Awakenings are counted the same way.",
+      "TrainingAi Preview: the Estimated 1RM card's spacing matches the current app.",
+      "Behind the scenes: the readiness model comparison reads the same recovery input as the live score; two never-opened Preview screens are gone; and the Android builds keep the NDK cached so a download hiccup no longer fails them.",
+    ],
+  },
+  {
     version: "1.515.0",
     date: "2026-11-03",
     changes: [

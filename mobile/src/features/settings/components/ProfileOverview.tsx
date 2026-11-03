@@ -188,7 +188,7 @@ export function ProfileOverview({
         <AppButton title="Fitness baselines" variant="ghost" onPress={openBaselines} />
       )}
       <AppText variant="subheading">Lifting</AppText>
-      <StrengthScreen embedded section="records" onBack={() => {}} />
+      <StrengthScreen section="records" />
     </>
   );
 }

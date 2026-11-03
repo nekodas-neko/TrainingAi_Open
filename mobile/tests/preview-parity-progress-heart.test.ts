@@ -20,7 +20,6 @@ test('every inline status on a card header is drawn only while active (#3521)', 
     'features/health/components/TrainingPanel.tsx',
     'features/health/components/RecordedHealthCards.tsx',
     'features/health/components/HealthResourceHeader.tsx',
-    'features/workouts/screens/WorkoutHistoryScreen.tsx',
   ];
   for (const file of files) {
     const source = read(file);
@@ -39,6 +38,12 @@ test('the Progress exercise rows and the Strength Trend value use the web sizes 
   assert.match(panel, /variant="strengthRowValue"/);
   assert.match(panel, /variant="strengthRowDelta"/);
   assert.match(read('features/progress/StrengthScreen.tsx'), /variant="trendValue"/);
+});
+
+test('the Estimated 1RM spacing matches the current app: groups 20, heading to row 12, rows 16 (#3521)', () => {
+  const panel = read('features/health/components/ProgressPanel.tsx');
+  assert.match(panel, /<Stack gap="xl">\s*\{groups\.map\(\(\{ session, rows \}\) => \(\s*<Stack key=\{session\} gap="md">/);
+  assert.match(panel, /<Stack gap="lg">\s*\{rows\.map/);
 });
 
 test('the page gradient keeps its last colour underneath, so a tall page never shows the teal app background (#2933)', () => {

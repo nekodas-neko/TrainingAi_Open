@@ -223,6 +223,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     // applies the same nap rule as the server's card. Null for any other source, and from an older
     // server's reply, which reads as the rule's "type unknown".
     ouraSleepType:   (r.ouraSleepType as string) ?? null,
+    // #3582 — the server's derived onset, final wake and awakenings; absent from an older server's reply.
+    onsetAt:         r.onsetAt ? toIso(r.onsetAt) : null,
+    finalWakeAt:     r.finalWakeAt ? toIso(r.finalWakeAt) : null,
+    computedAwakenings: typeof r.computedAwakenings === 'number' ? r.computedAwakenings : null,
     syncStatus:      'synced' as const,
     updatedAt:       toIso(r.updatedAt),
   } satisfies LocalSleepSession));

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { overnightHrvFromSeries, overnightRecoveryIndexHoursFromSeries, RECOVERY_SERIES_MIN_SAMPLES } from '../oura-sleep-detail'
+import {
+  overnightHrvFromSeries, overnightRecoveryIndexHoursFromSeries, RECOVERY_SERIES_MIN_SAMPLES,
+  sleepShapeFromHypnogram, HYPNOGRAM_MIN_EPOCHS,
+} from '../oura-sleep-detail'
+import { summarizeSleepStages } from '../sleep-staging'
+import type { SleepStage } from '../hypnogram'
 import { computeRecoveryIndex } from '../recovery-index'
 import { hrvMsFromSamples } from '../night-vitals'
 
@@ -91,5 +96,63 @@ describe('overnightRecoveryIndexHoursFromSeries', () => {
   it('never goes negative when the lowest point is at or after waking', () => {
     const lateMin = Array.from({ length: 96 }, (_, i) => 80 - i * 0.2)
     expect(overnightRecoveryIndexHoursFromSeries(hr(lateMin), window)).toBeGreaterThanOrEqual(0)
+  })
+})
+
+// #3075 stage 3: onset, final wake, awakenings and WASO from the 30-second hypnogram. Brisbane is UTC+10 all year;
+// the bed window opens at 22:30 local, 12:30Z, and an epoch is 30 s.
+describe('sleepShapeFromHypnogram', () => {
+  const BED = '2026-10-17T22:30:00+10:00'
+  // 10 awake epochs (5 min to fall asleep), light, an awake run of 2, deep, 1 awake, REM, 3 awake, light,
+  // then 8 awake epochs before the bed window closes: 174 epochs, 87 minutes.
+  const night = '4'.repeat(10) + '2'.repeat(60) + '44' + '1'.repeat(40) + '4' + '3'.repeat(30) + '444' + '2'.repeat(20) + '4'.repeat(8)
+  const at = (epoch: number) => new Date(new Date(BED).getTime() + epoch * 30_000)
+
+  it('dates onset and final wake at the first and last non-awake epoch, and counts what lies between', () => {
+    const shape = sleepShapeFromHypnogram(night, BED)!
+    expect(shape.sleepOnset).toEqual(at(10))            // 22:35, not the 22:30 bed window start
+    expect(shape.finalWake).toEqual(at(166))            // the end of the last light epoch, 23:53, not the 23:57 window end
+    expect(shape.awakenings).toBe(3)                    // runs of 2, 1 and 3; neither the latency nor the final wake-up
+    expect(shape.wasoMin).toBe(3)                       // 6 awake epochs x 30 s
+  })
+
+  it('reads a bed-window start given as a Date or as text alike', () => {
+    expect(sleepShapeFromHypnogram(night, new Date(BED))).toEqual(sleepShapeFromHypnogram(night, BED))
+  })
+
+  it('counts a single awake epoch as an awakening, as the ring-era rule has no minimum run', () => {
+    const one = '2'.repeat(60) + '4' + '2'.repeat(60)
+    expect(sleepShapeFromHypnogram(one, BED)).toMatchObject({ awakenings: 1, wasoMin: 0.5 })
+  })
+
+  it('a night with no awake epoch inside it has none, and onset and wake are the window\'s', () => {
+    const shape = sleepShapeFromHypnogram('2'.repeat(HYPNOGRAM_MIN_EPOCHS), BED)!
+    expect(shape).toMatchObject({ awakenings: 0, wasoMin: 0 })
+    expect(shape.sleepOnset).toEqual(at(0))
+    expect(shape.finalWake).toEqual(at(HYPNOGRAM_MIN_EPOCHS))
+  })
+
+  it('agrees with the ring-era rule on the same epochs', () => {
+    const code: Record<string, SleepStage> = { '1': 'deep', '2': 'light', '3': 'rem', '4': 'awake' }
+    const stages = [...night].map(c => code[c])
+    const first = stages.findIndex(s => s !== 'awake')
+    const last = stages.length - 1 - [...stages].reverse().findIndex(s => s !== 'awake')
+    const ring = summarizeSleepStages(stages.slice(first, last + 1), 0.5)
+    const shape = sleepShapeFromHypnogram(night, BED)!
+    expect(shape.awakenings).toBe(ring.awakenings)
+    expect(shape.wasoMin).toBe(ring.awakeMin)
+    // The whole string, as the ring's rollup would stage it, counts the trailing wake-up as one more run.
+    expect(summarizeSleepStages(stages, 0.5).awakenings).toBe(shape.awakenings + 1)
+  })
+
+  it('is null for a missing, short, all-awake or malformed string', () => {
+    expect(sleepShapeFromHypnogram(null, BED)).toBeNull()
+    expect(sleepShapeFromHypnogram(undefined, BED)).toBeNull()
+    expect(sleepShapeFromHypnogram('', BED)).toBeNull()
+    expect(sleepShapeFromHypnogram('2'.repeat(HYPNOGRAM_MIN_EPOCHS - 1), BED)).toBeNull() // under an hour
+    expect(sleepShapeFromHypnogram('4'.repeat(300), BED)).toBeNull()                     // no onset to find
+    expect(sleepShapeFromHypnogram('2'.repeat(HYPNOGRAM_MIN_EPOCHS) + '9', BED)).toBeNull() // a code outside 1-4
+    expect(sleepShapeFromHypnogram(night, null)).toBeNull()
+    expect(sleepShapeFromHypnogram(night, 'not a date')).toBeNull()
   })
 })

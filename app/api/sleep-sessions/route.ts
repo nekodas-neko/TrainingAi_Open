@@ -40,7 +40,9 @@ export async function GET() {
     averageHrvMs:    r.averageHrvMs    ?? null,
     avgHeartRate:    r.avgHeartRate    ?? null,
     lowestHeartRate: r.lowestHeartRate ?? null,
-    restlessPeriods: r.restlessPeriods ?? null,
+    // #3075 stage 3: an Oura Cloud night counts awakenings from its own hypnogram (the ring-era rule);
+    // Oura's restlessness value stays on the row and is the fallback. A ring night has no computed count.
+    restlessPeriods: r.computedAwakenings ?? r.restlessPeriods ?? null,
     respiratoryRate: r.respiratoryRate ?? null,
     sleepPhase5Min:  r.sleepPhase5Min  ?? null,
     sleepStart:      r.sleepStart.toISOString(),
@@ -58,6 +60,9 @@ export async function GET() {
     // #3057. `mergeByDate` keeps an Oura period beside a `long_sleep` out of the night. Since #3080 it
     // returns the night the Sleep Score scores, so the card and the score describe the same night.
     ouraSleepType: r.ouraSleepType ?? null,
+    // #3582. When sleep really began and ended on an Oura Cloud night; the bed window above is unchanged.
+    onsetAt:      r.onsetAt ? r.onsetAt.toISOString() : null,
+    finalWakeAt:  r.finalWakeAt ? r.finalWakeAt.toISOString() : null,
   })), tz);
 
   // A night the rollup has not yet derived past is still growing, and saying so is the whole of

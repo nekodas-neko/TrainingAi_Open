@@ -41,8 +41,6 @@ import { SettingsScreen } from '../features/settings/screens/SettingsScreen';
 import { ProgramsScreen } from '../features/programs/ProgramsScreen';
 import { AIProgramBuilder } from '../features/programs/AIProgramBuilder';
 import { ExerciseLibraryScreen } from '../features/workouts/screens/ExerciseLibraryScreen';
-import { WorkoutHistoryScreen } from '../features/workouts/screens/WorkoutHistoryScreen';
-import { StrengthScreen } from '../features/progress/StrengthScreen';
 import { ActiveWorkoutBar } from '../features/workouts/components/ActiveWorkoutBar';
 import { ClinicalScreen } from '../features/health/screens/ClinicalScreen';
 import { HealthDayScreen } from '../features/health/screens/HealthDayScreen';
@@ -137,10 +135,6 @@ function AppShell() {
     }
   }
   const [workoutId, setWorkoutId] = useState<string | null>(null);
-  const [workoutReturn, setWorkoutReturn] = useState<{
-    detail: DetailScreen | MoreDetail | null;
-    tab: Tab;
-  } | null>(null);
   const workouts = useWorkoutContext();
   function selectTab(next: Tab) {
     setHealthDetail(null);
@@ -202,13 +196,11 @@ function AppShell() {
     setDetail('settings');
   }
   function openWorkout(id: string) {
-    setWorkoutReturn(detail === 'workout-history' ? { detail, tab } : null);
     setTab('Workout');
     setWorkoutId(id);
     setDetail('workout-log');
   }
   function minimizeWorkout() {
-    setWorkoutReturn(null);
     setDetail(null);
     setHealthDetail(null);
     setTab('Home');
@@ -216,11 +208,7 @@ function AppShell() {
   const fullScreen =
     !!healthDetail || (detail !== null && !['health-data', 'settings'].includes(detail));
   function closeWorkout() {
-    setDetail(workoutReturn?.detail ?? null);
-    if (workoutReturn) {
-      setTab(workoutReturn.tab);
-    }
-    setWorkoutReturn(null);
+    setDetail(null);
   }
   return (
     <SafeAreaView
@@ -492,10 +480,6 @@ function AppShell() {
         />
       ) : detail === 'exercise-library' ? (
         <ExerciseLibraryScreen onBack={() => setDetail(null)} />
-      ) : detail === 'workout-history' ? (
-        <WorkoutHistoryScreen onBack={() => setDetail(null)} openWorkout={openWorkout} />
-      ) : detail === 'strength-progress' ? (
-        <StrengthScreen onBack={() => setDetail(null)} />
       ) : detail === 'profile-goals' ? (
         <ProfileGoalsScreen
           onBack={() => setDetail(null)}

@@ -17,6 +17,8 @@
  */
 import { hrvMsFromSamples } from '@trainingai/shared/health/night-vitals'
 import { computeRecoveryIndex } from '@trainingai/shared/health/recovery-index'
+import { summarizeSleepStages } from '@trainingai/shared/health/sleep-staging'
+import type { SleepStage } from '@trainingai/shared/health/hypnogram'
 
 /** Oura's `PublicSample`: `items` taken every `interval` seconds from `timestamp`. */
 export interface OuraSampleSeriesLike {
@@ -80,4 +82,66 @@ export function overnightRecoveryIndexHoursFromSeries(
   const slots = (wake - window.sleepStart.getTime()) / intervalMs
   if (!(slots > 0) || hrSeries.length < RECOVERY_SERIES_MIN_SAMPLES || hrSeries.length / slots < RECOVERY_SERIES_MIN_COVERAGE) return null
   return computeRecoveryIndex({ hrSeries, wakeTime: window.sleepEnd })?.hoursToSettle ?? null
+}
+
+/**
+ * #3075, stage 3: what makes a 30-second hypnogram good enough to date the night's real onset and wake.
+ *
+ * Onset and final wake are the first and last non-awake epochs, so a string that holds a fragment of
+ * the night (the ring came off, Oura staged little) dates the fragment's edges and calls them the
+ * night's. An hour of epochs is the shortest string we trust to say where a night began and ended:
+ * under it the caller keeps the bed window and Oura's own count. A string with a character outside
+ * 1-4 is refused whole rather than read around, and one with no non-awake epoch has no onset to find.
+ */
+export const HYPNOGRAM_MIN_EPOCHS = 120
+/** Seconds per epoch of Oura's `sleep_phase_30_sec`. */
+export const HYPNOGRAM_EPOCH_SEC = 30
+
+const STAGE_BY_CODE: Record<string, SleepStage> = { '1': 'deep', '2': 'light', '3': 'rem', '4': 'awake' }
+
+export interface OuraSleepShape {
+  /** The start of the first non-awake epoch: when sleep began, not when the bed window opened. */
+  sleepOnset: Date
+  /** The end of the last non-awake epoch: when sleep ended, not when the bed window closed. */
+  finalWake: Date
+  /** Awake runs between onset and final wake. */
+  awakenings: number
+  /** Minutes awake between onset and final wake (wake after sleep onset). */
+  wasoMin: number
+}
+
+/**
+ * The night's onset, final wake, awakenings and wake after sleep onset from Oura's 30-second
+ * hypnogram, with `bedtimeStart` as the first epoch's start. Null when the string is missing or not
+ * usable (see {@link HYPNOGRAM_MIN_EPOCHS}), so the caller can say Oura sent no usable detail.
+ *
+ * Awakenings and WASO come from the ring-era `summarizeSleepStages`, run on the epochs from onset
+ * through final wake: its awakenings are the wake runs after onset, so nothing before onset (latency)
+ * or after the last sleep epoch (the final wake-up) counts, and its awake minutes are WASO. The ring
+ * rule has no minimum run length, so neither does this: one awake epoch is an awakening.
+ */
+export function sleepShapeFromHypnogram(
+  phases: string | null | undefined,
+  bedtimeStart: Date | string | null | undefined,
+): OuraSleepShape | null {
+  if (typeof phases !== 'string' || phases.length < HYPNOGRAM_MIN_EPOCHS || bedtimeStart == null) return null
+  const startMs = new Date(bedtimeStart).getTime()
+  if (!Number.isFinite(startMs)) return null
+  const stages: SleepStage[] = []
+  for (const ch of phases) {
+    const stage = STAGE_BY_CODE[ch]
+    if (!stage) return null
+    stages.push(stage)
+  }
+  const first = stages.findIndex(s => s !== 'awake')
+  if (first < 0) return null
+  const last = stages.length - 1 - [...stages].reverse().findIndex(s => s !== 'awake')
+  const summary = summarizeSleepStages(stages.slice(first, last + 1), HYPNOGRAM_EPOCH_SEC / 60)
+  const epochMs = HYPNOGRAM_EPOCH_SEC * 1000
+  return {
+    sleepOnset: new Date(startMs + first * epochMs),
+    finalWake: new Date(startMs + (last + 1) * epochMs),
+    awakenings: summary.awakenings,
+    wasoMin: summary.awakeMin,
+  }
 }
