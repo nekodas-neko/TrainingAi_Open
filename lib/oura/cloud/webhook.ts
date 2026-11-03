@@ -393,7 +393,7 @@ export async function catchUpOuraCloudRingBattery(
 }
 
 const ringBatteryLastRun = new Map<string, number>()
-// A persistent refusal (the scope for this read is a guess, `OURA_SCOPE_FOR.ring_battery`) would
+// A persistent refusal (`OURA_SCOPE_FOR.ring_battery`, `ring_configuration`) would
 // otherwise re-run on every sync past the 5-minute throttle and report each time, so it backs off
 // (`ring-battery-backoff.ts`); connecting again or refreshing the token clears it.
 
@@ -404,7 +404,7 @@ export function startOuraCloudRingBatteryCatchUp(deps: Pick<OuraWebhookDeps, 're
   if (isRingBatteryBackedOff(userId, now)) return
   ringBatteryLastRun.set(userId, now)
   catchUpOuraCloudRingBattery(deps, userId, now).catch(err => {
-    // The scope for this read is a guess (`OURA_SCOPE_FOR.ring_battery`), so a refusal is reported, never silent.
+    // A refusal of this read (`OURA_SCOPE_FOR.ring_battery`) is reported, never silent.
     const refused = err instanceof OuraUnauthorizedError ? `Oura answered ${describeRefusal(401, err.reason)}`
       : err instanceof OuraForbiddenError ? `Oura answered ${describeRefusal(403, err.reason)}`
       : err instanceof OuraReauthRequiredError ? 'the connection needs the user to connect again'

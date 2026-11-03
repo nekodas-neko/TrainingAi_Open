@@ -122,7 +122,7 @@ describe('the reason on a 401 or 403 (#3562)', () => {
 })
 
 describe('the reason in the backfill report (#3562)', () => {
-  const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health'
+  const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health extapi:ring_configuration'
   function repo(): OuraBackfillDeps['repo'] {
     const row: OuraCloudTokenRow = {
       userId: USER, accessToken: encryptOuraToken('acc', USER, 'access_token'), refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
