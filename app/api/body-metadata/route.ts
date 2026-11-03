@@ -3,12 +3,12 @@ import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz";
 import { DEFAULT_TZ, startOfWeekInTz, ageFromDob, shiftDateStr } from "@trainingai/shared/date-utils";
-import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metrics";
+import { BodyMetadataPostSchema, WeightTrendDaysQuerySchema } from "@trainingai/shared/validation/body-metrics";
 import { ingestDayRejection } from "@trainingai/shared/validation/ingest-clock";
 import { sessionActiveMin, type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
 import { activityStepsForDayCount, withIndoorSteps } from "@trainingai/shared/health/activity-steps";
-import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
+import { weightTrendWindowStart, WEIGHT_TREND_WINDOW_DAYS } from "@trainingai/shared/health/long-term-goal-progress";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
@@ -156,7 +156,15 @@ export async function GET(req: NextRequest) {
   // 7 days — the card used to show "—" (7-day window) even though an older reading exists.
   // The same read supplies the Weight Trend slope's 30 days (#2480) — a subset, so no extra query.
   const includeOverview = req?.nextUrl.searchParams.get('overview') === '1';
-  const from180 = shiftDateStr(today, includeOverview ? -366 : -180);
+  // `?days=N` widens only the `weightTrend` series (#2179); absent keeps today's 30.
+  const daysParam = req?.nextUrl.searchParams.get('days') ?? null;
+  const parsedDays = daysParam === null ? null : WeightTrendDaysQuerySchema.safeParse(daysParam);
+  if (parsedDays && !parsedDays.success) {
+    return NextResponse.json({ error: "days must be a whole number of at least 1" }, { status: 400, headers: { "Cache-Control": "private, no-store" } });
+  }
+  const trendDays = parsedDays?.success ? parsedDays.data : WEIGHT_TREND_WINDOW_DAYS;
+  const trendFrom = weightTrendWindowStart(today, trendDays);
+  const from180 = [shiftDateStr(today, includeOverview ? -366 : -180), trendFrom].sort()[0];
 
   // Start of today in the user's timezone (UTC instant) — for today's completed workouts.
   const todayStartZoned = toZonedTime(now, tz);
@@ -195,7 +203,6 @@ export async function GET(req: NextRequest) {
 
   // Null, not [], when the read failed: an empty array says "no weigh-ins this month" and the card
   // would print "Need more data" over a history that exists. Null tells the client to fall back.
-  const trendFrom = weightTrendWindowStart(today);
   const weightTrend: WeightTrendPoint[] | null = weightHistoryFailed ? null : weightHistory
     .flatMap(m => (m.weightKg != null && m.date >= trendFrom ? [{ date: m.date, weightKg: m.weightKg }] : []));
 

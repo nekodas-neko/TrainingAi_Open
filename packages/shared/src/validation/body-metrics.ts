@@ -143,3 +143,18 @@ export const BodyMetadataPostSchema = z.object({
 // water lives on `/api/water-log`, not here. Strict turns that silent loss into a visible failure,
 // which is the point; the client fix is Q-319.
 }).strict()
+
+/**
+ * `GET /api/body-metadata?days=N`: how many local days the `weightTrend` series covers, today
+ * included (#2179). Absent keeps the 30-day default so no existing caller changes; a value over the
+ * cap is clamped to it, as `/api/fitness-tests` does, and anything that is not a whole number of at
+ * least 1 is refused.
+ */
+/** The longest weight series `/api/body-metadata?days=` returns, as `/api/fitness-tests` caps its own. */
+export const WEIGHT_TREND_MAX_DAYS = 730
+export const WeightTrendDaysQuerySchema = z
+  .string()
+  .regex(/^\d{1,6}$/)
+  .transform(Number)
+  .pipe(z.number().int().min(1).max(999_999))
+  .transform(n => Math.min(n, WEIGHT_TREND_MAX_DAYS))
