@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- The activity service for recordings with no GPS (a treadmill walk, an indoor session): it
+       keeps the app, and the chest strap's BLE link, alive with the screen off (#3595). Android 14
+       requires the type-specific permission; the type itself needs BLUETOOTH_CONNECT granted, which
+       the strap already asks for. No location permission is involved. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+  <application>
+    <service
+        android:name="expo.modules.activityservice.ActivityForegroundService"
+        android:exported="false"
+        android:foregroundServiceType="connectedDevice" />
+  </application>
+</manifest>

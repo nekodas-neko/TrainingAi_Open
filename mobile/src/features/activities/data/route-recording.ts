@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  BACKGROUND_FAILED_NOTICE,
   runBackgroundRecording,
   type BackgroundNotification,
   type BackgroundRecorder,
@@ -239,6 +240,34 @@ export function routeEligible(session: {
   guidance?: { kind: string };
 }) {
   return session.type.isDistanceBased && (!session.guidance || session.guidance.kind === 'walk');
+}
+/**
+ * Which foreground service an activity runs, from Start to Finish or Discard (#3595). One at a
+ * time: a GPS recording runs the location service, whose process also keeps the strap's link alive;
+ * anything else with a paired strap runs the connected-device service, which needs no location
+ * permission. A GPS recording whose location service had nothing to start (location denied or off)
+ * falls back to the connected-device one, so its strap still survives the background. With no
+ * strap and no GPS there is nothing for a service to keep alive.
+ */
+export type ActivityServiceKind = 'location' | 'connected-device';
+export function activityServiceKind(
+  session: { mode: string; type: { isDistanceBased: boolean }; guidance?: { kind: string } },
+  { strapPaired, locationSkipped }: { strapPaired: boolean; locationSkipped: boolean },
+): ActivityServiceKind | null {
+  if (session.mode !== 'active') {
+    return null;
+  }
+  if (routeEligible(session) && !locationSkipped) {
+    return 'location';
+  }
+  return strapPaired ? 'connected-device' : null;
+}
+/** The screen-on notice when Android refused the service the activity runs, GPS or indoor. */
+export function activityServiceNotice(
+  kind: ActivityServiceKind | null,
+  state: Record<ActivityServiceKind, BackgroundState>,
+) {
+  return kind && state[kind] === 'failed' ? BACKGROUND_FAILED_NOTICE : null;
 }
 export function recordsRoute(session: {
   mode: string;

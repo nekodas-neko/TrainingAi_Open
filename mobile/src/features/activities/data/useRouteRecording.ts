@@ -1,14 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
+import { activityService } from '../../../integrations/activity-service/platform';
 import { routeLocation } from '../../../integrations/location/route-location';
+import { useStrapSession } from '../../devices/strap/StrapProvider';
 import { useActivities } from './ActivityProvider';
 import { liveRouteReadout } from './ActivityStore';
 import {
-  BACKGROUND_FAILED_NOTICE,
   backgroundNotification,
+  runActivityService,
+  type ActivityServiceStarter,
   type BackgroundState,
 } from './background-recording';
 import {
+  activityServiceKind,
+  activityServiceNotice,
   gpsStatus,
   liveRouteStats,
   recordsRoute,
@@ -25,10 +30,32 @@ import {
 // whole activity, pauses included (#2846). It needs only foreground location permission; if it
 // cannot start, or the build has no service, recording stays on the screen-on watcher (with a
 // notice when Android refused it).
-export function useRouteRecording(source: LocationSource = routeLocation) {
+//
+// An activity with no GPS (a treadmill walk, an indoor session) runs the connected-device service
+// instead, while a strap is paired, so the strap's link survives the screen going off (#3595). So
+// does a GPS recording whose location service had nothing to start. One service at a time:
+// `activityServiceKind` picks.
+const noSubscribe = () => () => {};
+export function useRouteRecording(
+  source: LocationSource = routeLocation,
+  indoor: ActivityServiceStarter | undefined = activityService,
+) {
   const activity = useActivities(),
     store = activity.store,
     session = activity.session;
+  const strap = useStrapSession();
+  const strapPaired = useSyncExternalStore(
+    strap?.subscribe ?? noSubscribe,
+    () => !!strap?.getSnapshot().paired,
+    () => !!strap?.getSnapshot().paired,
+  );
+  // The session whose location service answered 'skipped': it falls back to the indoor service.
+  const [locationSkipped, setLocationSkipped] = useState<string | null>(null);
+  const kind =
+    activity.ready && session
+      ? activityServiceKind(session, { strapPaired, locationSkipped: locationSkipped === session.id })
+      : null;
+  const sessionId = session?.id ?? null;
   const recording = activity.ready && !!session && recordsRoute(session);
   const [watch, setWatch] = useState<RouteWatchState>(() => ({
     problem: null,
@@ -38,10 +65,10 @@ export function useRouteRecording(source: LocationSource = routeLocation) {
   const [attempt, setAttempt] = useState(0);
   // The service runs from Start to Finish or Discard, so a pause does not drop the notification or
   // the strap; the store ignores fixes while paused.
-  const serviceWanted =
-    activity.ready && !!session && session.mode === 'active' && routeEligible(session);
+  const serviceWanted = kind === 'location';
   const notification = session ? backgroundNotification(session) : null;
   const [background, setBackground] = useState<BackgroundState>('off');
+  const [indoorState, setIndoorState] = useState<BackgroundState>('off');
   useEffect(() => {
     if (!serviceWanted || !store || !notification || !source.background) {
       return;
@@ -52,14 +79,29 @@ export function useRouteRecording(source: LocationSource = routeLocation) {
       source.background,
       store,
       notification,
-      setBackground,
+      (state) => {
+        if (state === 'skipped' && sessionId) {
+          setLocationSkipped(sessionId);
+        }
+        setBackground(state);
+      },
       setWatch,
     );
     return () => {
       stop();
       setBackground('off');
     };
-  }, [serviceWanted, store, source, notification?.body]);
+  }, [serviceWanted, store, source, notification?.body, sessionId]);
+  useEffect(() => {
+    if (kind !== 'connected-device' || !indoor || !notification) {
+      return;
+    }
+    const stop = runActivityService(indoor, notification, setIndoorState);
+    return () => {
+      stop();
+      setIndoorState('off');
+    };
+  }, [kind, indoor, notification?.body]);
   // One source of fixes at a time: the screen-on watcher waits for the permission answer, and
   // stands down while the service is delivering.
   const awaitingBackground =
@@ -96,6 +138,6 @@ export function useRouteRecording(source: LocationSource = routeLocation) {
   const stats = session
     ? liveRouteReadout(session, activity.route, watch.now)
     : liveRouteStats(activity.route, 0);
-  const notice = eligible && background === 'failed' ? BACKGROUND_FAILED_NOTICE : null;
+  const notice = activityServiceNotice(kind, { location: background, 'connected-device': indoorState });
   return { eligible, status, notice, background, ...stats };
 }

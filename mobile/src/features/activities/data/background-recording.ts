@@ -52,8 +52,8 @@ function setRunning(value: boolean) {
   }
 }
 /**
- * True while the foreground service is up, so the app is allowed to run with the screen off. The
- * chest-strap hold for an activity (#3527) reads this: `useStrapHold` releases the strap when the
+ * True while either activity service is up (the GPS one or the indoor one), so the app is allowed
+ * to run with the screen off. The chest-strap hold for an activity (#3527, #3595) reads this: `useStrapHold` releases the strap when the
  * app leaves the foreground, which an activity with the service running must not.
  */
 export const isActivityServiceRunning = () => running;
@@ -65,48 +65,44 @@ export const useActivityServiceRunning = () =>
   useSyncExternalStore(subscribeActivityService, isActivityServiceRunning);
 
 /**
- * Starts the service for an activity and returns the stop function. Kept apart from React so the
- * lifecycle can be tested; `useRouteRecording` wraps it. Stopping before the start has answered
+ * The service for an activity with no GPS (#3595): a connected-device foreground service that only
+ * keeps the app alive, so the strap's link survives the screen going off. It needs no location
+ * permission. The Android side is `integrations/activity-service`.
+ */
+export type ActivityServiceStarter = {
+  start(options: { notification: BackgroundNotification }): Promise<BackgroundStarted>;
+};
+
+/**
+ * Starts a service and returns the stop function, publishing whether it runs for the strap hold.
+ * Kept apart from React so the lifecycle can be tested. Stopping before the start has answered
  * (the walker finishes while the permission question is open) stops it as soon as it is up.
  */
-export function runBackgroundRecording(
-  recorder: BackgroundRecorder,
-  sink: { appendFix(point: RoutePoint): unknown },
-  notification: BackgroundNotification,
+export function runForegroundService(
+  start: () => Promise<BackgroundStarted>,
   onState: (state: BackgroundState) => void,
-  onFix?: () => void,
 ) {
   let cancelled = false,
     stop: (() => Promise<void>) | null = null;
   onState('pending');
-  recorder
-    .start({
-      notification,
-      fix: (point) => {
+  start().then(
+    async (started) => {
+      if (started.result !== 'on') {
         if (!cancelled) {
-          sink.appendFix(point);
-          onFix?.();
+          onState(started.result);
         }
-      },
-    })
-    .then(
-      async (started) => {
-        if (started.result !== 'on') {
-          if (!cancelled) {
-            onState(started.result);
-          }
-          return;
-        }
-        if (cancelled) {
-          await started.stop().catch(() => {});
-          return;
-        }
-        stop = started.stop;
-        setRunning(true);
-        onState('on');
-      },
-      () => !cancelled && onState('failed'),
-    );
+        return;
+      }
+      if (cancelled) {
+        await started.stop().catch(() => {});
+        return;
+      }
+      stop = started.stop;
+      setRunning(true);
+      onState('on');
+    },
+    () => !cancelled && onState('failed'),
+  );
   return () => {
     if (cancelled) {
       return;
@@ -114,5 +110,42 @@ export function runBackgroundRecording(
     cancelled = true;
     setRunning(false);
     void stop?.().catch(() => {});
+  };
+}
+
+/** The indoor service run `useRouteRecording` mounts for an activity with no GPS. */
+export function runActivityService(
+  service: ActivityServiceStarter,
+  notification: BackgroundNotification,
+  onState: (state: BackgroundState) => void,
+) {
+  return runForegroundService(() => service.start({ notification }), onState);
+}
+
+/** The GPS service: as `runForegroundService`, with its fixes going to the store until stopped. */
+export function runBackgroundRecording(
+  recorder: BackgroundRecorder,
+  sink: { appendFix(point: RoutePoint): unknown },
+  notification: BackgroundNotification,
+  onState: (state: BackgroundState) => void,
+  onFix?: () => void,
+) {
+  let stopped = false;
+  const stop = runForegroundService(
+    () =>
+      recorder.start({
+        notification,
+        fix: (point) => {
+          if (!stopped) {
+            sink.appendFix(point);
+            onFix?.();
+          }
+        },
+      }),
+    onState,
+  );
+  return () => {
+    stopped = true;
+    stop();
   };
 }

@@ -5,7 +5,9 @@ import {
   BACKGROUND_FAILED_NOTICE,
   backgroundNotification,
   isActivityServiceRunning,
+  runActivityService,
   runBackgroundRecording,
+  type ActivityServiceStarter,
   type BackgroundRecorder,
   type BackgroundState,
   type BackgroundStarted,
@@ -18,6 +20,8 @@ import {
 import {
   GPS_LOST_AFTER_MS,
   ROUTE_CLOCK_TICK_MS,
+  activityServiceKind,
+  activityServiceNotice,
   gpsStatus,
   runServiceRecording,
   type RouteWatchState,
@@ -324,4 +328,91 @@ test('the service feed keeps driving the watch state while the service is on', a
   } finally {
     mock.timers.reset();
   }
+});
+
+// #3595: a treadmill walk or other indoor activity runs the connected-device service, so the
+// strap's link survives the background; a GPS recording keeps the location service.
+const treadmill = { isDistanceBased: false };
+const outdoor = { isDistanceBased: true };
+const strap = { strapPaired: true, locationSkipped: false };
+
+test('a GPS recording runs the location service; anything else with a strap runs the indoor one', () => {
+  assert.equal(activityServiceKind({ mode: 'active', type: outdoor }, strap), 'location');
+  assert.equal(activityServiceKind({ mode: 'active', type: outdoor, guidance: { kind: 'walk' } }, strap), 'location');
+  assert.equal(
+    activityServiceKind({ mode: 'active', type: outdoor }, { ...strap, strapPaired: false }),
+    'location',
+    'a GPS recording needs no strap for its service',
+  );
+  // A treadmill walk starts with isDistanceBased false; the plain Treadmill activity too.
+  assert.equal(activityServiceKind({ mode: 'active', type: treadmill, guidance: { kind: 'walk' } }, strap), 'connected-device');
+  assert.equal(activityServiceKind({ mode: 'active', type: treadmill }, strap), 'connected-device');
+  // A fitness test is distance based but records no route.
+  assert.equal(activityServiceKind({ mode: 'active', type: outdoor, guidance: { kind: 'test' } }, strap), 'connected-device');
+});
+
+test('no strap and no GPS starts nothing; nor does an activity that is not running', () => {
+  assert.equal(activityServiceKind({ mode: 'active', type: treadmill }, { ...strap, strapPaired: false }), null);
+  for (const mode of ['pre', 'done']) {
+    assert.equal(activityServiceKind({ mode, type: outdoor }, strap), null);
+    assert.equal(activityServiceKind({ mode, type: treadmill }, strap), null);
+  }
+});
+
+test('a GPS recording whose location service had nothing to start falls back to the indoor one', () => {
+  assert.equal(activityServiceKind({ mode: 'active', type: outdoor }, { ...strap, locationSkipped: true }), 'connected-device');
+  assert.equal(
+    activityServiceKind({ mode: 'active', type: outdoor }, { strapPaired: false, locationSkipped: true }),
+    null,
+  );
+});
+
+class FakeIndoor implements ActivityServiceStarter {
+  stops = 0;
+  notifications: string[] = [];
+  constructor(private answer: 'on' | 'failed' | 'skipped') {}
+  start({ notification }: { notification: { title: string; body: string } }) {
+    this.notifications.push(notification.body);
+    return Promise.resolve<BackgroundStarted>(
+      this.answer === 'on' ? { result: 'on', stop: async () => void this.stops++ } : { result: this.answer },
+    );
+  }
+}
+
+test('the indoor service tells the strap hold it is up, and stops once when the activity ends', async () => {
+  const service = new FakeIndoor('on'),
+    log = states();
+  const stop = runActivityService(
+    service,
+    backgroundNotification({ type: { label: 'Treadmill' } }),
+    log.on,
+  );
+  await settle();
+  assert.deepEqual(log.seen, ['pending', 'on']);
+  assert.deepEqual(service.notifications, ['Tracking your treadmill']);
+  assert.equal(isActivityServiceRunning(), true);
+  stop();
+  stop();
+  await settle();
+  assert.equal(service.stops, 1);
+  assert.equal(isActivityServiceRunning(), false);
+});
+
+test('an indoor service Android refuses shows the screen-on notice; one with nothing to start does not', async () => {
+  for (const answer of ['failed', 'skipped'] as const) {
+    const log = states();
+    runActivityService(new FakeIndoor(answer), backgroundNotification({ type: { label: 'Treadmill' } }), log.on);
+    await settle();
+    assert.deepEqual(log.seen, ['pending', answer]);
+    assert.equal(isActivityServiceRunning(), false);
+    assert.equal(
+      activityServiceNotice('connected-device', { location: 'off', 'connected-device': answer }),
+      answer === 'failed' ? BACKGROUND_FAILED_NOTICE : null,
+    );
+  }
+  // The GPS notice is unchanged, and a running or absent service says nothing.
+  assert.equal(activityServiceNotice('location', { location: 'failed', 'connected-device': 'off' }), BACKGROUND_FAILED_NOTICE);
+  assert.equal(activityServiceNotice('location', { location: 'off', 'connected-device': 'failed' }), null);
+  assert.equal(activityServiceNotice('connected-device', { location: 'off', 'connected-device': 'on' }), null);
+  assert.equal(activityServiceNotice(null, { location: 'failed', 'connected-device': 'failed' }), null);
 });
