@@ -354,7 +354,7 @@ export const OURA_SCOPE_FOR: Record<OuraDocumentType | OuraSeriesType, OuraScope
   workout: 'workout',
   session: 'session',
   heartrate: 'heartrate',
-  // Named by Oura itself, not the spec (which lists none for `ring_battery_level`): on 2026-11-02
+  // Named by Oura itself, not the spec (which lists none for `ring_battery_level`): on 2026-11-03
   // production logged `Oura answered 401: Token is not authorized access ring_configuration scope.`
   // (#3565, #3069, #3578). A grant stored before this scope was requested lacks it, so the battery
   // reads as not shared (backfill `notShared`) until the user connects again.
