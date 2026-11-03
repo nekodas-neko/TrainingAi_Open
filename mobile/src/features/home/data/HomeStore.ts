@@ -3,7 +3,7 @@ import { MoodFieldsSchema, type MoodFields } from '@trainingai/shared/validation
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { ApiError, UploadRejected, isRejectedForGood } from '../../account/api/client.ts';
+import { UploadRejected, isAuthRefusal, isRejectedForGood } from '../../account/api/client.ts';
 import { readPushAnswer } from '../../../core/sync/push-answer.ts';
 import { isCalendarDate } from '@trainingai/shared/date-utils';
 import { moodSchema, preferencesSchema, type HomePreferences, type Mood } from './models.ts';
@@ -294,7 +294,7 @@ export class HomeStore {
       } catch (cause) {
         if (generation === this.generation) {
           policy.failed();
-          const denied = cause instanceof ApiError && [401, 403].includes(cause.status);
+          const denied = isAuthRefusal(cause);
           if (denied) {
             this.denialRevision++;
           }
@@ -464,7 +464,7 @@ export class HomeStore {
         }
       } catch (cause) {
         if (generation === this.generation) {
-          const denied = cause instanceof ApiError && [401, 403].includes(cause.status);
+          const denied = isAuthRefusal(cause);
           if (denied) {
             this.denialRevision++;
           }

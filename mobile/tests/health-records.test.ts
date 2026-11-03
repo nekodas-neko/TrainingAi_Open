@@ -265,13 +265,30 @@ test('denied accounts cannot write and retain their pending records for recovery
   await store.logMetric('steps', 1000, date);
   await store.sync();
   f.connection.get = async () => {
-    throw new ApiError(403);
+    throw new ApiError(403, undefined, undefined, undefined, true);
   };
   await store.refresh(true);
   assert.equal(store.getSnapshot().denied, true);
   assert.equal(store.getSnapshot().operations.length, 1);
   await assert.rejects(store.logMetric('steps', 2000, date));
 });
+for (const status of [401, 403]) {
+  test(`a proxy's HTML ${status} does not deny health, and the pending record stays`, async () => {
+    const f = fixture();
+    const store = f.store();
+    await store.refresh();
+    f.setOnline(false);
+    await store.logMetric('steps', 1000, date);
+    await store.sync();
+    f.connection.get = async () => {
+      throw new ApiError(status);
+    };
+    await store.refresh(true);
+    assert.equal(store.getSnapshot().denied, false);
+    assert.equal(store.getSnapshot().operations.length, 1);
+    await store.logMetric('steps', 2000, date);
+  });
+}
 test('health records cannot be hydrated through another account scope', async () => {
   const f = fixture();
   const first = f.store();
@@ -411,7 +428,7 @@ test('a denied account cannot respond to a sleep verdict', async () => {
   const store = f.store();
   await store.refresh();
   f.connection.get = async () => {
-    throw new ApiError(403);
+    throw new ApiError(403, undefined, undefined, undefined, true);
   };
   await store.refresh(true);
   await assert.rejects(store.respondToVerdict(date, 'corrected'));

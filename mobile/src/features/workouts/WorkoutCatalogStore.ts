@@ -1,4 +1,4 @@
-import { ApiError } from '../account/api/client.ts';
+import { isAuthRefusal } from '../account/api/client.ts';
 import type { AccountReader } from '../account/session.ts';
 import type { ScopedStorage } from '../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../core/sync/RefreshPolicy.ts';
@@ -218,8 +218,7 @@ export class WorkoutCatalogStore {
       if (generation !== this.generation) {
         return;
       }
-      const unauthorized =
-        error instanceof ApiError && (error.status === 401 || error.status === 403);
+      const unauthorized = isAuthRefusal(error);
       const catalog = unauthorized ? null : this.current.catalog;
       if (revision === this.revision) {
         this.freshness.failed();

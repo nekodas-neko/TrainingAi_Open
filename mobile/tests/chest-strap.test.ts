@@ -1,4 +1,4 @@
-import { activityHoldWanted } from '../src/features/devices/strap/activity-hold.ts';
+import { activityHoldWanted, holdStrapForActivity } from '../src/features/devices/strap/activity-hold.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -860,4 +860,51 @@ test('an activity holds the strap in the background only while the recording ser
   assert.equal(activityHoldWanted(false, 'active'), true);
   assert.equal(activityHoldWanted(false, 'background'), false);
   assert.equal(activityHoldWanted(false, 'inactive'), false);
+});
+
+test('the recording service starting mid-walk keeps the link and the trace (#3541)', async () => {
+  const { session, ble } = await pairedSession();
+  let state = 'active';
+  const appListeners = new Set<(s: string) => void>();
+  const appState = {
+    get currentState() {
+      return state;
+    },
+    addEventListener: (_t: 'change', l: (s: string) => void) => {
+      appListeners.add(l);
+      return { remove: () => appListeners.delete(l) };
+    },
+  };
+  const hold = holdStrapForActivity(session, appState, false);
+  await settle();
+  ble.beat(bytes(0x16, 120, 0x00, 0x02));
+  const before = session.getSnapshot();
+  assert.equal(before.recording, true);
+  assert.equal(before.trace.length > 0, true);
+  const disconnects = ble.log.filter((x) => x === 'disconnect').length;
+  hold.update(true);
+  await settle();
+  assert.equal(session.getSnapshot().link, 'connected');
+  assert.equal(session.getSnapshot().recording, true);
+  assert.deepEqual(session.getSnapshot().trace, before.trace);
+  assert.equal(ble.log.filter((x) => x === 'disconnect').length, disconnects);
+  // With the service running, backgrounding keeps the hold; the walk ending releases it.
+  state = 'background';
+  appListeners.forEach((l) => l(state));
+  assert.equal(session.getSnapshot().recording, true);
+  hold.release();
+  await settle();
+  assert.equal(session.getSnapshot().recording, false);
+  assert.equal(session.getSnapshot().link, 'idle');
+  assert.equal(appListeners.size, 0);
+});
+
+test('holding the activity twice does not reset the recording (#3541)', async () => {
+  const { session, ble } = await pairedSession();
+  session.hold('activity', true);
+  await settle();
+  ble.beat(bytes(0x16, 120, 0x00, 0x02));
+  const trace = session.getSnapshot().trace;
+  session.hold('activity', true);
+  assert.deepEqual(session.getSnapshot().trace, trace);
 });

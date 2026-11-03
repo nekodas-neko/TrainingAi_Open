@@ -76,6 +76,12 @@ export const bodyOverviewSpec = (date: string) => ({
   query: { overview: '1' },
   schema: bodySpec(date).schema.extend({ measuredOverview: z.array(bodySchema).nullish() }),
 });
+// #2179: the weight series over `days` local days, for a screen that needs more than the shared
+// 30-day trend (a vial's whole dosing period). The server caps `days` at 730.
+export const bodyTrendSpec = (date: string, days: number) => ({
+  ...bodySpec(date),
+  query: { days: String(days) },
+});
 export type BodyData = z.infer<ReturnType<typeof bodySpec>['schema']>;
 export const sleepSchema = z
   .object({

@@ -404,7 +404,7 @@ test('authorization rejection prevents cached Home edits and preserves the disk 
     {
       ...f.connection,
       get: async () => {
-        throw new ApiError(403);
+        throw new ApiError(403, undefined, undefined, undefined, true);
       },
     },
     () => '10000000-0000-4000-8000-000000000098',
@@ -424,6 +424,24 @@ test('authorization rejection prevents cached Home edits and preserves the disk 
   await other.initialize();
   assert.equal(other.getSnapshot().ready, false);
   assert.equal(f.disk.get('home.v1'), raw);
+});
+
+test("a proxy's HTML 403 does not deny Home or block edits", async () => {
+  const f = fixture();
+  const store = new HomeStore(
+    f.storage,
+    {
+      ...f.connection,
+      get: async () => {
+        throw new ApiError(403);
+      },
+    },
+    () => '10000000-0000-4000-8000-000000000098',
+  );
+  await store.initialize();
+  await store.refresh('mood', day);
+  assert.equal(store.getSnapshot().denied, false);
+  await store.saveMood(day, { energyLevel: 'good' });
 });
 
 test('Home calendar normalizes separators and adds local completed workouts without duplicates', () => {
@@ -991,7 +1009,7 @@ for (const status of [401, 403]) {
   test(`a ${status} on a preference keeps it queued, with the queue behind it, and marks Home denied (#3392)`, async () => {
     const f = fixture();
     f.connection.patch = async () => {
-      throw new ApiError(status);
+      throw new ApiError(status, undefined, undefined, undefined, true);
     };
     const store = f.make();
     await store.initialize();
