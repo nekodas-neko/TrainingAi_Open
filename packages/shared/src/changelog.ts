@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.518.0",
+    date: "2026-11-05",
+    changes: [
+      "TrainingAi Preview: the phone's own sleep figures count restless minutes and treat a night your device recorded incompletely as a partial night, the same as the server. On such a night the \"ring was off\" switch shows on and locked, with a line saying why.",
+      "Both apps: when a device changes how it measures, Body Battery's, readiness's and the planner's personal averages start again for that device, as the Sleep Score's already do. Nothing changes until a device actually does.",
+      "Behind the scenes: scoring reads what each device's data can do instead of checking which device it is, and readiness reads its temperature, recovery and stress inputs the same device-neutral way. No score changes.",
+    ],
+  },
+  {
     version: "1.517.0",
     date: "2026-11-05",
     changes: [
