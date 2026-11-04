@@ -4,7 +4,7 @@ import { reportServerError } from '@/lib/observability'
 import { tryEnsureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { hrMaxFromAge, hrReserve } from '@trainingai/shared/health/hr-zones'
 import { meanRestingHr } from '@trainingai/shared/health/resting-hr-mean'
-import { perDeviceNormal, normalOrCarriedOver } from '@trainingai/shared/health/per-device-normal'
+import { perDeviceNormal, normalOrCarriedOver, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { resolveBatteryHrMax, batteryConfidence, HR_PEAK_WINDOW_DAYS, type BatteryConfidence } from '@trainingai/shared/health/body-battery-inputs'
@@ -145,7 +145,11 @@ const STRESS_DRAIN_RATE = 0.020 // battery points per minute at a full (100%) be
 // against the step goal, wherever a per-minute heart-rate series does not cover them. `exw`/`exs`
 // are the workout and step shares of the morning level, `cap` the goal-ratio cap, `pm` the per-minute
 // coverage the walk needs to see a span. The walk's own constants are v7's.
-export const BODY_BATTERY_MODEL_VERSION = `v8:rest+${WAKING_REST_OFFSET_BPM}bpm:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule:oura-stress:exw${WORKOUT_DRAIN_SHARE}:exs${STEP_DRAIN_SHARE}:cap${GOAL_RATIO_CAP}:pm${PER_MINUTE_COVERAGE_MIN}`
+// v9 (#3601, approved with #3075 stage 5): the resting-HR mean and the daytime-HRV baseline are keyed
+// by (source, the source's algorithm version), so a source that changes its algorithm restarts them
+// and the previous version's normal carries over meanwhile. `algv` marks the keying. No day moves
+// until a source sends a second version; v8 rows stay as written.
+export const BODY_BATTERY_MODEL_VERSION = `v9:rest+${WAKING_REST_OFFSET_BPM}bpm:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule:oura-stress:exw${WORKOUT_DRAIN_SHARE}:exs${STEP_DRAIN_SHARE}:cap${GOAL_RATIO_CAP}:pm${PER_MINUTE_COVERAGE_MIN}:algv`
 
 export interface BodyBatteryDayInput {
   repo: WorkoutRepository
@@ -200,7 +204,10 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   // ── Resting HR baseline + HRmax (for HR reserve) ──────────────────────────
   // #3001: the mean of the device that measured the newest night (the ring's until Oura has the
   // nights), through the one resting-HR mean the HR zones use, so the two cannot disagree.
-  const restingHr = meanRestingHr(bodyMetrics) ?? 60
+  // #3601: and of that device's newest algorithm version, by the same night's sleep, so a source that
+  // changes how it measures restarts the mean instead of pooling the two rulers.
+  const versionOn = nightAlgorithmVersion(sleepSessions)
+  const restingHr = meanRestingHr(bodyMetrics, versionOn) ?? 60
   const age = ageFromDob(user?.dateOfBirth, now)
   // The reserve is resolved from what this body has actually reached, not 220 − age. On the owner's
   // data the estimate reads 190 against a real 90-day peak of 168, and an inflated ceiling makes
@@ -299,7 +306,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   // #3001: per device, like the resting HR above. Oura's overnight HRV is an average and the ring's a
   // median of gated rMSSD, so the stress series is never read against a pooled mean of the two.
   const dhrvBaseline = normalOrCarriedOver(perDeviceNormal(
-    bodyMetrics.map(m => ({ date: m.date, value: m.hrvMs != null && m.hrvMs > 0 ? m.hrvMs : null, source: m.hrvSource })),
+    bodyMetrics.map(m => ({ date: m.date, value: m.hrvMs != null && m.hrvMs > 0 ? m.hrvMs : null, source: m.hrvSource, algorithmVersion: versionOn(m.date, m.hrvSource) })),
     { minNights: BASELINE_MIN_NIGHTS },
   ))
   // #2985: the Oura API has no per-minute skin temperature, so after the switch the only temperatures

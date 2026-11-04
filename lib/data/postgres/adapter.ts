@@ -41,7 +41,7 @@ import { classifyClockRegression, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, 
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
-import { rowsOfDeviceInUse, fillMissingNightSources } from '@trainingai/shared/health/per-device-normal'
+import { rowsOfDeviceInUse, fillMissingNightSources, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
@@ -2212,7 +2212,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // HRV trend: ratio of recent 3 days vs older baseline
       let hrvTrend: number | null = null
       // #3001: both stretches from the device in use, so Oura's HRV is never compared with the ring's.
-      const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource)
+      // #3601: and from its newest algorithm version, read from the same night's sleep.
+      const versionOnNight = nightAlgorithmVersion(sleepSessions)
+      const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource, m => versionOnNight(m.date, m.hrvSource))
       if (hrvRows.length >= 4) {
         const sorted = [...hrvRows].sort((a, b) => b.date.localeCompare(a.date))
         const recent3 = sorted.slice(0, 3)
