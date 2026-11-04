@@ -17,6 +17,7 @@ import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
+import { ouraDaytimeHighStress } from '@/lib/oura/cloud/readiness-signals-map'
 
 export function buildChatTools(repo: WorkoutRepository, userId: string, tz: string, todayIso: string) {
   // User-local midnight, shared by every lookback window below — never Date.now(), which
@@ -132,9 +133,11 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
             ...ringDerived
               .filter(d => d.daytimeStressScaled != null || d.stressHighMinutes != null)
               .map(d => ({ date: d.day, source: 'own' as const, level: d.daytimeStressScaled ?? null, highMinutes: d.stressHighMinutes ?? null })),
-            ...oura
-              .filter(r => r.stressHigh != null && ringByDate.get(r.date)?.stressHighMinutes == null && ringByDate.get(r.date)?.daytimeStressScaled == null)
-              .map(r => ({ date: r.date, source: 'oura' as const, level: null, highMinutes: Math.round(r.stressHigh! / 60) })),
+            // Read through the generic shape (#3620). The label stays the literal 'oura', not the
+            // shape's `source`: that would change the tool's output text the model reads.
+            ...ouraDaytimeHighStress(oura)
+              .filter(s => ringByDate.get(s.date)?.stressHighMinutes == null && ringByDate.get(s.date)?.daytimeStressScaled == null)
+              .map(s => ({ date: s.date, source: 'oura' as const, level: null, highMinutes: Math.round(s.minutes) })),
           ].sort((a, b) => a.date.localeCompare(b.date)),
           // Own stress-resilience level (1–5) + whole-day training-stress (OTS) — purpose-built
           // signals that were computed and stored but never surfaced to the chat (F9).

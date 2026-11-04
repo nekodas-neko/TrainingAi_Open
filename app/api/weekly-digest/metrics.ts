@@ -18,6 +18,7 @@ import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
+import { ouraDaytimeHighStress } from '@/lib/oura/cloud/readiness-signals-map'
 import {
   weekDays,
   type DailyPoint,
@@ -167,14 +168,15 @@ export async function computeWeeklyDigestMetrics(
 
   // Daytime stress (derived, dHRV): avg minutes of high stress per measured day. From the day the user
   // switched to the Oura API the ring's rows are partial leftovers and stand no longer; a day with no
-  // ring value takes Oura's (seconds, so /60), as the coach does (#3077). Display only, never a score input.
+  // ring value takes Oura's, as the coach does (#3077). Display only, never a score input.
   const ringStressPairs = derivedRows
     .filter(r => r.stressHighMinutes != null && beforeSourceSwitch(r.day, switchDay))
     .map(r => [r.day, r.stressHighMinutes!] as [string, number])
   const ringStressDays = new Set(ringStressPairs.map(([d]) => d))
-  const ouraStressPairs = ouraRows
-    .filter(r => r.stressHigh != null && !isPreRekey(r.date) && !ringStressDays.has(r.date))
-    .map(r => [r.date, Math.round(r.stressHigh! / 60)] as [string, number])
+  // Read through the generic shape (#3620), which carries minutes. The re-key gate stays on the rows.
+  const ouraStressPairs = ouraDaytimeHighStress(ouraRows.filter(r => !isPreRekey(r.date)))
+    .filter(s => !ringStressDays.has(s.date))
+    .map(s => [s.date, Math.round(s.minutes)] as [string, number])
   const stressPairs = [...ringStressPairs, ...ouraStressPairs]
   const stressOf = (from: string, to: string) =>
     meanOrNull(stressPairs.filter(([d]) => d >= from && d <= to).map(([, v]) => v))
