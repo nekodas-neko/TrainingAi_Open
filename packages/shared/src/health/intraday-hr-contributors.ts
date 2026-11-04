@@ -9,23 +9,25 @@
 // 120 s, so a phone writing one Health Connect reading every 10 minutes used to undercount a real
 // workout and score lower than having no HR at all.
 //
-// Health Connect and native Apple Health are gated. The ring and the strap are dense by construction and outrank it in
+// Which sources are held to the rule, and how, is each source's declared `heartRateSpacing`
+// (`source-connectors.ts`, #3597): scoring never names a source. Health Connect and native Apple
+// Health are judged hour by hour. The ring and the strap are dense by construction and outrank it in
 // the merged series (`hc-heart-rate-ranked-below-ring.test.ts`), so the owner's days do not move —
 // the measured outcome the decision stated. One implementation for the live payload and the day
 // audit, so the two cannot drift.
 //
-// Oura Cloud (#3114, option C, owner-approved 26 Oct 2026). Since the switch to the API the ring serves
-// 5-minute points at rest and asleep, irregular bursts while awake (in-hour gaps of ~17 minutes are
-// typical), and 5-second points only inside an Oura-app workout. That is too thin to say whether
-// the owner moved in an hour, so:
-//   - zone minutes read Oura heart rate only in dense STRETCHES (a run of readings no further apart
-//     than HR_DENSE_MAX_GAP_MS), so an Oura-app workout counts even inside an hour that is otherwise
-//     scattered; the strap and Health Connect are as before;
-//   - "moved this hour" comes from Oura's per-minute MET (`ouraCloudMovedHours`): a waking hour is
-//     moved when any worn minute in it is at MET_ACTIVE_THRESHOLD or more. Oura heart rate never
-//     decides it. An hour with no worn minute is not measured and leaves the goal, once the day is
-//     over or the ring has been worn later in it (an hour that has not arrived yet stays in);
-//   - the workout calorie estimate holds `oura_cloud` to the same rule (`getAvgBpmBySession`).
+// A source whose heart rate is dense only in stretches (#3114, option C, owner-approved 26 Oct 2026;
+// Oura Cloud declares it: 5-minute points at rest and asleep, irregular bursts while awake, 5-second
+// points only inside a workout) is too thin to say whether the user moved in an hour, so:
+//   - zone minutes read its heart rate only in dense STRETCHES (a run of readings no further apart
+//     than HR_DENSE_MAX_GAP_MS), so a workout counts even inside an hour that is otherwise
+//     scattered; hour-judged and dense sources are as before;
+//   - a source declaring `heartRateDecidesMovedHour: false` never decides "moved this hour". The
+//     per-minute movement series does (`movedHoursFromMovement`): a waking hour is moved when any worn
+//     minute in it is at MET_ACTIVE_THRESHOLD or more. An hour with no worn minute is not measured and
+//     leaves the goal, once the day is over or the device has been worn later in it (an hour that has
+//     not arrived yet stays in);
+//   - the workout calorie estimate holds gated sources to the same rule (`getAvgBpmBySession`).
 import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes';
 import {
   hourlyHrActivity,
@@ -33,22 +35,19 @@ import {
   DEFAULT_WAKE_HOUR,
   DEFAULT_SLEEP_HOUR,
 } from '@trainingai/shared/health/hourly-movement';
-import { ouraCloudMovedHours } from '@trainingai/shared/health/oura-cloud-met';
+import { movedHoursFromMovement, type PerMinuteMovementGrid } from '@trainingai/shared/health/per-minute-movement';
+import { sourceCapabilities, sourcesWith } from '@trainingai/shared/health/source-connectors';
 import { MET_ACTIVE_THRESHOLD } from '@trainingai/shared/health/daily-medians';
 import { moderateIntensityBpm, vigorousIntensityBpm } from '@trainingai/shared/health/hr-zones';
 
 /** The ring's own cadence, with 30 s of slack: the longest gap a dense hour may have. */
 export const HR_DENSE_MAX_GAP_MS = 5 * 60_000 + 30_000;
-/** The sources held to the density rule. A source not listed is dense by construction. */
-export const DENSITY_GATED_HR_SOURCES: ReadonlySet<string> = new Set([
-  'health_connect',
-  'health_connect_native',
-  'apple_health',
-  'oura_cloud',
-]);
-/** Gated sources judged by stretch, not by hour: their dense stretches sit inside otherwise
- *  scattered hours (an Oura-app workout). The rest are judged hour by hour. */
-const DENSE_STRETCH_HR_SOURCES: ReadonlySet<string> = new Set(['oura_cloud']);
+/** The declared sources held to the density rule, for a reader that has to name them (the workout
+ *  calorie SQL). A source not listed is dense by construction. Read from each source's capabilities. */
+export const DENSITY_GATED_HR_SOURCES: ReadonlySet<string> = new Set(
+  sourcesWith((c) => c.heartRateSpacing !== 'continuous'),
+);
+const spacingOf = (source: string | null | undefined) => sourceCapabilities(source).heartRateSpacing;
 
 type Row = { timestamp: Date | number; bpm: number; source?: string | null };
 
@@ -73,7 +72,7 @@ const ms = (t: Date | number) => (t instanceof Date ? t.getTime() : t);
  * hour) that lost their only HR. An hour of an hour-judged source is dense when it has at least two
  * readings and no gap between consecutive ones longer than HR_DENSE_MAX_GAP_MS — "across the worn
  * part": time before its first reading and after its last is not counted against it. A
- * stretch-judged source (Oura Cloud) keeps a reading when it sits in a run of at least two readings
+ * stretch-judged source (one dense only in stretches) keeps a reading when it sits in a run of at least two readings
  * no further apart than that.
  */
 export function dropSparseHrHours<T extends Row>(
@@ -100,9 +99,10 @@ export function dropSparseHrHours<T extends Row>(
   for (const r of rows) {
     hourOf.set(r, keyOf(ms(r.timestamp)));
     const src = r.source;
-    if (src != null && DENSE_STRETCH_HR_SOURCES.has(src)) {
+    const spacing = spacingOf(src);
+    if (src != null && spacing === 'dense_in_stretches') {
       stretchRows.set(src, [...(stretchRows.get(src) ?? []), r]);
-    } else if (src != null && DENSITY_GATED_HR_SOURCES.has(src)) {
+    } else if (src != null && spacing === 'sparse_by_hour') {
       const key = hourOf.get(r)!;
       gatedByHour.set(key, [...(gatedByHour.get(key) ?? []), ms(r.timestamp)]);
     }
@@ -125,8 +125,7 @@ export function dropSparseHrHours<T extends Row>(
     }
     close();
   }
-  const isGatedHourSource = (r: T) =>
-    r.source != null && DENSITY_GATED_HR_SOURCES.has(r.source) && !DENSE_STRETCH_HR_SOURCES.has(r.source);
+  const isGatedHourSource = (r: T) => r.source != null && spacingOf(r.source) === 'sparse_by_hour';
   const removed = (r: T) => dropped.has(r) || (isGatedHourSource(r) && sparseGatedHours.has(hourOf.get(r)!));
   const kept = rows.filter((r) => !removed(r));
   const keptHours = new Set(kept.map((r) => hourOf.get(r)!));
@@ -149,16 +148,13 @@ export interface IntradayHrContributors {
   moveHoursGoal: number | null;
 }
 
-/** Oura's per-minute MET as `ouraCloudMetGrid` builds it, covering at least the local day. */
-export interface MetGridInput {
-  startTimestampMs: number;
-  metsPerMinute: readonly (number | null)[];
-}
+/** The per-minute movement grid as `perMinuteMovementGrid` builds it, covering at least the local day. */
+export type MetGridInput = PerMinuteMovementGrid;
 
 /**
  * Zone minutes and move-every-hour for `dateIso`. Zone minutes are null when no dense HR remains;
- * the move lane is null when neither HR from a source other than Oura Cloud nor a worn MET minute
- * exists. `dayIsOver` says whether `dateIso` is a finished day: its hours with no worn minute have
+ * the move lane is null when neither HR from a source whose heart rate can decide a moved hour nor a
+ * worn movement minute exists. `dayIsOver` says whether `dateIso` is a finished day: its hours with no worn minute have
  * all left the goal, rather than only those before the last worn hour.
  */
 export function intradayHrContributors(input: {
@@ -186,10 +182,10 @@ export function intradayHrContributors(input: {
           },
         );
 
-  // Oura's heart rate does not decide a moved hour, its MET does.
-  const moveRows = restingHr == null ? [] : rows.filter((r) => r.source !== 'oura_cloud');
+  // A source that declares its heart rate cannot decide a moved hour is left to the movement series.
+  const moveRows = restingHr == null ? [] : rows.filter((r) => sourceCapabilities(r.source).heartRateDecidesMovedHour);
   const met = metGrid
-    ? ouraCloudMovedHours(metGrid, {
+    ? movedHoursFromMovement(metGrid, {
         tz, dateIso, wakeHour: DEFAULT_WAKE_HOUR, sleepHour: DEFAULT_SLEEP_HOUR, activeMet: MET_ACTIVE_THRESHOLD,
       })
     : null;
@@ -204,7 +200,7 @@ export function intradayHrContributors(input: {
   const moved = new Set([...hr.moved, ...(met?.moved ?? [])]);
 
   // Waking hours that leave the goal: a sparse hour whose HR was the only thing in it, and, on a day
-  // Oura's MET covers, an hour with no worn minute and no HR (the ring was off).
+  // the movement series covers, an hour with no worn minute and no HR (the device was off).
   const left = new Set<number>();
   for (const h of sparseHours) {
     if (h.date === dateIso && h.hour >= DEFAULT_WAKE_HOUR && h.hour < DEFAULT_SLEEP_HOUR) left.add(h.hour);

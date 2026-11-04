@@ -15,7 +15,7 @@ import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
-import { nightSourceRank, ringValueStands } from '@trainingai/shared/health/source-rank'
+import { nightSourceRank, beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { isNightWindow } from '@trainingai/shared/health/sleep-night'
 import { getOuraCloudSwitchDay } from './oura-cloud-tokens'
 import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
@@ -804,7 +804,7 @@ function storedNight(
   switchDay: string | null,
 ): { source: string | null; rank: number } {
   const ring = row.ouraId?.startsWith('ble:') === true && !row.manualEntry
-  if (ring && !ringValueStands(row.date, switchDay)) return { source: 'oura_ble', rank: -Infinity }
+  if (ring && !beforeSourceSwitch(row.date, switchDay)) return { source: 'oura_ble', rank: -Infinity }
   const source = ring ? 'oura_ble' : row.source ?? (row.ouraId != null ? 'oura_cloud' : null)
   return { source, rank: nightSourceRank(source, row.manualEntry) }
 }
@@ -1242,7 +1242,7 @@ export async function upsertOuraCloudDaily(db: Db, userId: string, rows: OuraClo
 /**
  * #2985: Oura's per-minute MET series and 5-minute activity class for the days in `[from, to]`, as
  * stored. Oura's activity day starts at 4 a.m. local, so a local-midnight window needs the day
- * before it too; `ouraCloudMetGrid` places every item by its own timestamp.
+ * before it too; `perMinuteMovementGrid` places every item by its own timestamp.
  */
 export async function getOuraCloudActivitySeries(db: Db, userId: string, from: string, to: string): Promise<OuraCloudActivitySeries[]> {
   const t = s.ouraCloudDaily
@@ -1400,7 +1400,7 @@ export async function dropBleNightsOuraCloudHolds(
   if (!switchDay) return rows
   const kept: OuraSleepUpsertRow[] = []
   for (const r of rows) {
-    if (ringValueStands(r.date, switchDay)) { kept.push(r); continue }
+    if (beforeSourceSwitch(r.date, switchDay)) { kept.push(r); continue }
     const held = await db.execute(sql`
       SELECT 1 FROM sleep_sessions o
        WHERE o.user_id = ${userId} AND o.deleted_at IS NULL AND NOT o.manual_entry

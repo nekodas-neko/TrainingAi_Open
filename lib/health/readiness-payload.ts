@@ -20,7 +20,7 @@ import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDos
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
-import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { latestRestingHrRow } from '@trainingai/shared/health/latest-resting-hr'
 import { rowsOfDeviceInUse } from '@trainingai/shared/health/per-device-normal'
 import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
@@ -29,7 +29,7 @@ import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { restingHrOnDay } from '@trainingai/shared/health/resting-hr-mean'
 import { scoreActivityForDay, restingHrBaseline, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
-import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
+import { perMinuteMovementGrid } from '@trainingai/shared/health/per-minute-movement'
 import { staleFinishedDays, metLookbackFrom } from '@trainingai/shared/health/finished-day-recheck'
 import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, runBackgroundFinalise, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
 import { type DailyGoals } from '@trainingai/shared/health/daily-goals'
@@ -390,9 +390,10 @@ export async function buildReadinessPayload(
 
   // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.
   const hrProfileP = resolveHrProfile(repo, userId, tz).catch(() => null)
-  // #3114: Oura's per-minute MET decides the move lane (its activity day starts at 4 a.m., hence the
-  // day before). Today's live read may go without it; a finalised day may not (`loadActivityDay`).
-  const cloudActivityP = (async () => repo.getOuraCloudActivitySeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
+  // #3114: the per-minute movement series decides the move lane (a source's day may start before local
+  // midnight, Oura's at 4 a.m., hence the day before). Today's live read may go without it; a
+  // finalised day may not (`loadActivityDay`).
+  const movementSeriesP = (async () => repo.getPerMinuteMovementSeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
   const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay, stepActivityLogs, metChangedAt, ouraCloudRecoveryHours] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
@@ -429,11 +430,11 @@ export async function buildReadinessPayload(
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
   // #2998: from the day the user switched to the Oura API, today's ring row is a partial leftover, so
   // its daytime stress and recovery give way to Oura's. Display and availability only, never a score input.
-  const ringStressToday = ringValueStands(todayIso, switchDay) ? derivedToday : null
+  const ringStressToday = beforeSourceSwitch(todayIso, switchDay) ? derivedToday : null
   // Latest day with a produced resilience level (today may be too incomplete to resolve one yet).
   // #3206: from the switch day the ring's rows are leftovers, so none of them is offered as the level
   // (the coach does the same). Oura's level is its own word and is not mapped onto this 1-5 scale.
-  const ringDerivedRows = derivedTodayRows.filter(r => ringValueStands(r.day, switchDay))
+  const ringDerivedRows = derivedTodayRows.filter(r => beforeSourceSwitch(r.day, switchDay))
   const latestResilience = [...ringDerivedRows].reverse().find(r => r.resilienceLevel != null) ?? null
   // LA-158: when there is no level, record what was actually observed rather than leaving the
   // surface to render nothing and say nothing. Measured 2026-09-27: resilience had published
@@ -527,7 +528,7 @@ export async function buildReadinessPayload(
     // #3388: the one resting-HR rule the HR zones and Body Battery read, so a day's zone minutes agree.
     restingHr: restingHrOnDay(bodyMetrics, todayIso),
     hrRows: todayHrRows,
-    metGrid: ouraCloudMetGrid(await cloudActivityP, todayMid.getTime(), tomorrowMid.getTime()),
+    metGrid: perMinuteMovementGrid(await movementSeriesP, todayMid.getTime(), tomorrowMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,
     sessions: recentSessions,
     program,
@@ -934,7 +935,7 @@ export async function buildReadinessPayload(
       // has contributors, and inventing some so they could say `awaiting_baseline` would be a claim
       // nothing computes. Stress is present when today's high-stress minutes were derived (0 is a
       // real reading), or from the switch day Oura sent them; resilience when any recent day published a level.
-      metricAvailability('daytimeStress', ringValueStands(todayIso, switchDay)
+      metricAvailability('daytimeStress', beforeSourceSwitch(todayIso, switchDay)
         ? derivedToday?.stressHighMinutes ?? null
         : (cloudDailyLive ? ouraToday.stressHigh ?? null : null)),
       metricAvailability('resilience', latestResilience?.resilienceLevel ?? null),

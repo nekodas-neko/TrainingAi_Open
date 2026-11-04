@@ -1,9 +1,9 @@
 // #3193: three readers each carried their own copy of the switch-day rule before going through
-// `ringValueStands`. Each copy is kept here exactly as it read before the repoint, and the table
+// `beforeSourceSwitch`. Each copy is kept here exactly as it read before the repoint, and the table
 // proves the repointed reader picks the same value on every row, so no past day's Body Battery or
-// shadow readiness moves. If `ringValueStands` ever changes, this fails before a score does.
+// shadow readiness moves. If `beforeSourceSwitch` ever changes, this fails before a score does.
 import { describe, it, expect } from 'vitest'
-import { ringValueStands } from '../source-rank'
+import { beforeSourceSwitch } from '../source-rank'
 
 type Pick = 'ring' | 'oura' | 'none'
 
@@ -18,7 +18,7 @@ const bodyBattery = {
     return ouraStress ? 'oura' : ring ? 'ring' : 'none'
   },
   after: ({ day, switchDay, ring, oura }: Row): Pick => {
-    const ouraStress = !ring && !ringValueStands(day, switchDay) && oura
+    const ouraStress = !ring && !beforeSourceSwitch(day, switchDay) && oura
     return ouraStress ? 'oura' : ring ? 'ring' : 'none'
   },
 }
@@ -36,7 +36,7 @@ const shadowReadiness = {
   after: ({ day, switchDay, ring, oura }: Row): Pick => {
     const from = switchDay ?? null
     let v: Pick = ring ? 'ring' : 'none'
-    if (!ringValueStands(day, from) && oura) v = 'oura'
+    if (!beforeSourceSwitch(day, from) && oura) v = 'oura'
     return v
   },
 }
@@ -52,7 +52,7 @@ const ouraNightKept = {
   after: ({ day, switchDay, ring, oura }: Row): Pick => {
     if (!ring) return 'none'
     if (!switchDay) return 'ring'
-    if (ringValueStands(day, switchDay)) return 'ring'
+    if (beforeSourceSwitch(day, switchDay)) return 'ring'
     return oura ? 'oura' : 'ring'
   },
 }
@@ -65,7 +65,7 @@ const SWITCH_DAYS: Array<string | null | undefined> = [null, undefined, '2026-10
 const ROWS: Row[] = DAYS.flatMap(day => SWITCH_DAYS.flatMap(switchDay =>
   [true, false].flatMap(ring => [true, false].map(oura => ({ day, switchDay, ring, oura })))))
 
-describe('every inline switch-day copy agrees with ringValueStands (#3193)', () => {
+describe('every inline switch-day copy agrees with beforeSourceSwitch (#3193)', () => {
   it('covers the full table', () => {
     expect(ROWS).toHaveLength(DAYS.length * SWITCH_DAYS.length * 4)
   })
@@ -78,12 +78,12 @@ describe('every inline switch-day copy agrees with ringValueStands (#3193)', () 
   }
 
   it('the ring stands before the switch and with no switch; Oura from the switch day on', () => {
-    expect(ringValueStands('2026-10-17', '2026-10-18')).toBe(true)
-    expect(ringValueStands('2026-10-18', '2026-10-18')).toBe(false)
-    expect(ringValueStands('2026-10-19', '2026-10-18')).toBe(false)
-    expect(ringValueStands('2026-10-19', null)).toBe(true)
-    expect(ringValueStands('2026-10-19', undefined)).toBe(true)
-    expect(ringValueStands('2026/10/17', '2026/10/18')).toBe(true)
-    expect(ringValueStands('2026/10/18', '2026/10/18')).toBe(false)
+    expect(beforeSourceSwitch('2026-10-17', '2026-10-18')).toBe(true)
+    expect(beforeSourceSwitch('2026-10-18', '2026-10-18')).toBe(false)
+    expect(beforeSourceSwitch('2026-10-19', '2026-10-18')).toBe(false)
+    expect(beforeSourceSwitch('2026-10-19', null)).toBe(true)
+    expect(beforeSourceSwitch('2026-10-19', undefined)).toBe(true)
+    expect(beforeSourceSwitch('2026/10/17', '2026/10/18')).toBe(true)
+    expect(beforeSourceSwitch('2026/10/18', '2026/10/18')).toBe(false)
   })
 })

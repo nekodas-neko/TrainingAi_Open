@@ -1542,6 +1542,10 @@ export interface WorkoutRepository {
   upsertOuraCloudDaily(userId: string, rows: import('./postgres/slices/oura').OuraCloudDailyRow[]): Promise<number>
   /** #2985: Oura's stored MET series and 5-minute activity class per day, for the MET cascade. */
   getOuraCloudActivitySeries(userId: string, from: string, to: string): Promise<import('./postgres/slices/oura').OuraCloudActivitySeries[]>
+  /** #3597: every per-minute movement series for the days in `[from, to]`, from each connector that
+   *  declares `perMinuteMovement`, already in the generic shape. A source's day may start before
+   *  local midnight, so a caller wanting a local day asks from the day before. */
+  getPerMinuteMovementSeries(userId: string, from: string, to: string): Promise<import('@trainingai/shared/health/per-minute-movement').MovementIntervalSeries[]>
   /** #3079: when each day's Oura MET series last changed; days without MET are left out. */
   getOuraCloudMetChangedAt(userId: string, from: string, to: string): Promise<{ date: string; changedAt: Date }[]>
   /** #2982: Oura's sessions (breathing, meditation …) with their series and mood. */

@@ -9,7 +9,7 @@ import { projectRm, isRmPlateau } from '@trainingai/shared/health/strength-proje
 import { aggregateExerciseHrTrend, summarizeHrByExercise } from '@trainingai/shared/workout/exercise-hr-trend'
 import { computeHrRecoveryProfile } from '@trainingai/shared/health/compute-hr-recovery-profile'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
-import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
 import { isBodyweightType, bodyweightRepMax } from '@trainingai/shared/1rm'
 import { todayMidnightUtc, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
@@ -101,7 +101,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         const stepsByDate = dayStepCountsByDate(metrics, activities)
         // #2998: from the day the user switched to the Oura API the ring's rollup rows are partial
         // leftovers, so its stress and resilience stand only before that day; Oura's read from it.
-        const ringDerived = derived.filter(d => ringValueStands(d.day, switchDay))
+        const ringDerived = derived.filter(d => beforeSourceSwitch(d.day, switchDay))
         const ringByDate = new Map(ringDerived.map(d => [d.day, d]))
         const tempByDate = new Map(oura.map(r => [r.date, r.temperatureDeviation ?? null]))
         const days = [...new Set([...derivedByDate.keys(), ...tempByDate.keys()])].sort()

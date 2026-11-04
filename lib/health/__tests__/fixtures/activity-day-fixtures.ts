@@ -4,6 +4,7 @@
 import { vi } from 'vitest'
 import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
+import { ouraActivityMovementSeries } from '@/lib/oura/cloud/activity-movement'
 
 export interface FixtureMetric {
   date: string
@@ -55,6 +56,11 @@ export function fixtureRepo(fx: ActivityFixture) {
     getOuraCloudActivitySeries: vi.fn(async (_u: string, from: string, to: string) => {
       if (fx.cloudActivityFails) throw new Error('oura_cloud_daily read failed')
       return (fx.cloudActivity ?? []).filter(r => r.date >= from && r.date <= to)
+    }),
+    // #3597: the generic read scoring makes, mapped from the fixture's Oura rows by the connector's own mapping.
+    getPerMinuteMovementSeries: vi.fn(async (_u: string, from: string, to: string) => {
+      if (fx.cloudActivityFails) throw new Error('oura_cloud_daily read failed')
+      return ouraActivityMovementSeries((fx.cloudActivity ?? []).filter(r => r.date >= from && r.date <= to))
     }),
     getActiveProgram: vi.fn(async () => fx.program),
     getHrForWindow: vi.fn(async (_u: string, from: Date, to: Date) =>
