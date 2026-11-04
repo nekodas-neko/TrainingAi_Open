@@ -75,8 +75,12 @@ const STRENGTH_FREQ_CURVE = [[0, 0], [0.34, 50], [0.67, 80], [1.0, 100], [1.5, 1
  * the stamp. Change it whenever a weight, curve, gate or the rule behind an input changes.
  * 2026-11-03 (#3388): the move lane no longer waits for a resting HR, and the zone lane reads the
  * one resting-HR rule the HR zones and Body Battery share.
+ * 2026-11-04 (#3612, approved with #3075 stage 5): that resting HR is keyed by (source, the source's
+ * algorithm version), so a source that changes its algorithm restarts the zone lane's resting HR with
+ * the HR zones and Body Battery. No day moves until a source sends a second version; stored v2 rows
+ * stay as written.
  */
-export const ACTIVITY_MODEL_VERSION = 'v2:move-lane-without-resting-hr:shared-resting-hr:2026-11-03'
+export const ACTIVITY_MODEL_VERSION = 'v3:version-keyed-resting-hr:2026-11-04'
 
 /**
  * The Activity Score model in serialisable form — lane weights, the over-exertion taper constants

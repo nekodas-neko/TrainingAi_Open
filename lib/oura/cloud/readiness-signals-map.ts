@@ -5,7 +5,7 @@
 // Every value is taken as Oura calculated it (owner, 2026-10-18, #2860) and labelled with the
 // connector's source, so the normals it joins are Oura's own.
 import type {
-  DailyTemperatureDeviation, DaytimeHighStress, OvernightRecoveryHours, RecoveryContributor,
+  DailyTemperatureDeviation, DaytimeHighRecovery, DaytimeHighStress, OvernightRecoveryHours, RecoveryContributor,
 } from '@trainingai/shared/health/readiness-signals'
 import { OURA_CLOUD_CONNECTOR } from '@trainingai/shared/health/source-connectors'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
@@ -25,6 +25,11 @@ export function ouraTemperatureDeviations(
 /** `oura_daily.stress_high`, which Oura sends in seconds, as minutes per day. */
 export function ouraDaytimeHighStress(rows: readonly { date: string; stressHigh?: number | null }[]): DaytimeHighStress[] {
   return rows.flatMap(r => r.stressHigh == null ? [] : [{ date: r.date, minutes: r.stressHigh / 60, source: SOURCE }])
+}
+
+/** `oura_daily.recovery_high`, which Oura sends in seconds, as minutes per day (#3616). */
+export function ouraDaytimeHighRecovery(rows: readonly { date: string; recoveryHigh?: number | null }[]): DaytimeHighRecovery[] {
+  return rows.flatMap(r => r.recoveryHigh == null ? [] : [{ date: r.date, minutes: r.recoveryHigh / 60, source: SOURCE }])
 }
 
 /** The `recovery_index` readiness contributor (0–100) of `oura_cloud_daily.readiness_contributors`. */

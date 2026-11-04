@@ -107,7 +107,7 @@ describe('no plan or cardio-week reader uses a single night (#3216)', () => {
 
   it('the plan snapshot reads the mean', () => {
     const src = read('packages/shared/src/running/assemble-plan-context.ts')
-    expect(src).toContain('meanRestingHr(metrics)')
+    expect(src).toContain('meanRestingHr(metrics, nightAlgorithmVersion(sleepSessions))')
     expect(src).not.toContain('latestRestingHr')
   })
 

@@ -9,6 +9,7 @@ import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
 import { meanRestingHr } from '@trainingai/shared/health/resting-hr-mean'
+import { nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
 import { computeZoneQuota, weekWindow } from '@trainingai/shared/health/zone-quota'
 import { activityStepsForDayCount, dayStepCount } from '@trainingai/shared/health/activity-steps'
@@ -59,7 +60,7 @@ export async function GET() {
     repo.getObservedHrProfile(userId, priorFrom, priorTo).catch(() => EMPTY_OBSERVED_HR),
   ])
 
-  const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, weekActivityLogs, userGoals] = await Promise.all([
+  const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, weekActivityLogs, userGoals, restingSleep] = await Promise.all([
     repo.getZoneMinutesRange(userId, from, to, tz, profile).catch(() => []),
     // LA-82: the profile above already degrades on this read; this copy only feeds age and the step
     // goal's inputs, which all take null.
@@ -79,6 +80,9 @@ export async function GET() {
     repo.listActivityLogs(userId, from, to).catch(() => []),
     // Q-524: the weekly steps target is the user's own goal × 7 when they set one.
     repo.getUserGoals(userId).catch(() => null),
+    // #3612: sleep over both resting-HR windows, for each reading's algorithm version. A failed read keys
+    // the two means by source only, as before this read existed.
+    repo.listSleepSessions(userId, priorWindowFromIso, today).catch(() => []),
   ])
   const todayActivityLogs = weekActivityLogs.filter((a) => a.date === today)
   const trainedToday = dayExercises.length > 0 || todayActivityLogs.length > 0
@@ -104,8 +108,10 @@ export async function GET() {
   const dailyTargets = targets.perZone.map((t) => ({ zoneId: t.zoneId, minutes: t.minutes / 7 }))
   const dayQuota = computeZoneQuota(dailyTargets, days.filter((d) => d.day === today), { hasHrSource: hrSource })
 
-  const restingHrNow = meanRestingHr(currentRestingMetrics)
-  const restingHrPrior = meanRestingHr(priorRestingMetrics)
+  // #3612: each mean of its window's newest (source, algorithm version) group, as the profile's.
+  const restingVersionOn = nightAlgorithmVersion(restingSleep)
+  const restingHrNow = meanRestingHr(currentRestingMetrics, restingVersionOn)
+  const restingHrPrior = meanRestingHr(priorRestingMetrics, restingVersionOn)
   const restingHrDeltaBpm = restingHrNow != null && restingHrPrior != null ? restingHrNow - restingHrPrior : null
   const avgHrDeltaBpm = observed.avg != null && observedPrior.avg != null ? observed.avg - observedPrior.avg : null
   const maxHrDeltaBpm = observed.isReliable && observedPrior.isReliable && observed.max != null && observedPrior.max != null

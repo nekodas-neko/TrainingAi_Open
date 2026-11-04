@@ -57,11 +57,15 @@ export function meanRestingHr(
  * the Activity zone lane, the HR zones and Body Battery all draw their boundaries from (#3388), so
  * the same day's zone minutes agree on every screen, and a device switch steps them all at once
  * (after `BASELINE_MIN_NIGHTS` of the new device's nights, not before). Null with no reading.
+ * #3612: every caller passes `nightAlgorithmVersion` over the same window's sleep, so a source that
+ * changes its algorithm steps the zone lane, the HR zones and Body Battery together, as a device does.
  */
 export function restingHrOnDay(
   rows: readonly { date: string; restingHeartRate?: number | null; restingHeartRateSource?: string | null }[],
   date: string,
+  /** #3612: as {@link meanRestingHr}'s, over the same days' sleep. Left out: per source. */
+  versionOn?: (date: string, source: string | null | undefined) => string | null,
 ): number | null {
   const { from, to } = restingHrWindow(date)
-  return meanRestingHr(rows.filter(r => r.date >= from && r.date <= to))
+  return meanRestingHr(rows.filter(r => r.date >= from && r.date <= to), versionOn)
 }

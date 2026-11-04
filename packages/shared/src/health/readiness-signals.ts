@@ -17,6 +17,9 @@
  *   could feed the same function.
  * - {@link DaytimeHighStress}: the source's minutes of high daytime stress. Oura maps
  *   `daily_stress.stress_high` (seconds); Garmin's or Fitbit's high-stress minutes would map here.
+ * - {@link DaytimeHighRecovery}: the source's minutes of high daytime recovery (calm, restorative
+ *   time while awake). Oura maps `daily_stress.recovery_high` (seconds); Garmin's "rest" stress
+ *   minutes would map here. Display only today (#3616).
  *
  * Pure types; importing no node module.
  */
@@ -55,6 +58,13 @@ export interface OvernightRecoveryHours {
 
 /** Minutes of high daytime stress on a local day, as the source calculated them. */
 export interface DaytimeHighStress {
+  date: string
+  minutes: number
+  source: string
+}
+
+/** Minutes of high daytime recovery on a local day, as the source calculated them. Display only. */
+export interface DaytimeHighRecovery {
   date: string
   minutes: number
   source: string

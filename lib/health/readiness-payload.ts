@@ -39,7 +39,7 @@ import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompo
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
 import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
-import { ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
+import { ouraDaytimeHighRecovery, ouraDaytimeHighStress, ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
 import { ouraCloudDeliveredTypes } from '@/lib/oura/cloud/config'
@@ -530,7 +530,8 @@ export async function buildReadinessPayload(
     tz,
     bodyMetrics,
     // #3388: the one resting-HR rule the HR zones and Body Battery read, so a day's zone minutes agree.
-    restingHr: restingHrOnDay(bodyMetrics, todayIso),
+    // #3612: keyed by (source, algorithm version) over the same 28 days' sleep, as theirs is.
+    restingHr: restingHrOnDay(bodyMetrics, todayIso, versionOn),
     hrRows: todayHrRows,
     metGrid: perMinuteMovementGrid(await movementSeriesP, todayMid.getTime(), tomorrowMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,
@@ -648,6 +649,13 @@ export async function buildReadinessPayload(
   // Cloud re-sync. Stress/recovery are NOT gated here: 10c coalesces live derived values over
   // Cloud below, and only the Cloud fallback is gated.
   const cloudDailyLive = ouraToday != null && !isPreRekey(ouraToday.date)
+  // #3616: today's daytime stress and recovery as the connector maps them (generic shapes, minutes),
+  // behind the same re-key gate as before. The response stays seconds (S5); the stored values are whole
+  // seconds, so rounding gives back exactly what the source sent.
+  const sourceStressToday = cloudDailyLive ? ouraDaytimeHighStress(ouraRows).find(s => s.date === todayIso) ?? null : null
+  const sourceRecoveryToday = cloudDailyLive ? ouraDaytimeHighRecovery(ouraRows).find(s => s.date === todayIso) ?? null : null
+  const sourceStressSec = sourceStressToday != null ? Math.round(sourceStressToday.minutes * 60) : null
+  const sourceRecoverySec = sourceRecoveryToday != null ? Math.round(sourceRecoveryToday.minutes * 60) : null
 
   // Generic-source fallback (Q-43): a user without a ring has no oura_daily_summary. Health Connect
   // and manual logs supply HRV, resting HR and sleep duration in the generic tables — enough for the
@@ -941,7 +949,7 @@ export async function buildReadinessPayload(
       // real reading), or from the switch day Oura sent them; resilience when any recent day published a level.
       metricAvailability('daytimeStress', beforeSourceSwitch(todayIso, switchDay)
         ? derivedToday?.stressHighMinutes ?? null
-        : (cloudDailyLive ? ouraToday.stressHigh ?? null : null)),
+        : sourceStressSec),
       metricAvailability('resilience', latestResilience?.resilienceLevel ?? null),
     ],
     ...(connectedSourcesSummary ? { connectedSources: connectedSourcesSummary } : {}),
@@ -982,8 +990,8 @@ export async function buildReadinessPayload(
     // Cloud seconds ONLY when that row post-dates the re-key. Derived is minutes → convert;
     // response stays seconds (S5). 10c's derived-first coalesce is preserved; item 21 gates
     // only the Cloud fallback.
-    stressHigh:              ringStressToday?.stressHighMinutes   != null ? ringStressToday.stressHighMinutes   * 60 : (cloudDailyLive ? ouraToday.stressHigh   ?? null : null),
-    recoveryHigh:            ringStressToday?.recoveryHighMinutes != null ? ringStressToday.recoveryHighMinutes * 60 : (cloudDailyLive ? ouraToday.recoveryHigh ?? null : null),
+    stressHigh:              ringStressToday?.stressHighMinutes   != null ? ringStressToday.stressHighMinutes   * 60 : sourceStressSec,
+    recoveryHigh:            ringStressToday?.recoveryHighMinutes != null ? ringStressToday.recoveryHighMinutes * 60 : sourceRecoverySec,
     recommendedBedtimeStart: cloudDailyLive ? ouraToday.recommendedBedtimeStart ?? null : null,
     recommendedBedtimeEnd:   cloudDailyLive ? ouraToday.recommendedBedtimeEnd   ?? null : null,
     isLowWearToday:          isLowWearDay(ouraToday?.nonWearTimeSec),

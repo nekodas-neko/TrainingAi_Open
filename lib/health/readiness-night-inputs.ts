@@ -38,7 +38,7 @@ import { trailingBaselineZ } from '@/lib/health/score-availability'
 import { canonicalNightForDate, type DatedNight } from '@trainingai/shared/health/sleep-night'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { hrvNightInNormal, type NightHrvMethod } from '@trainingai/shared/health/night-hrv-method'
-import { deviceOf, rowsInNormalGroup } from '@trainingai/shared/health/per-device-normal'
+import { nightAlgorithmVersion, rowsInNormalGroup } from '@trainingai/shared/health/per-device-normal'
 import type { DailyTemperatureDeviation, OvernightRecoveryHours, RecoveryContributor } from '@trainingai/shared/health/readiness-signals'
 
 /**
@@ -202,12 +202,9 @@ export function resolveReadinessNightInputs(src: NightInputSources): ReadinessNi
   }
 
   // #3075 stage 5: a body-metrics reading shares its night's algorithm version when the same source
-  // measured both; a reading from another source on that date has none of its own.
-  const nightByDate = new Map(src.nights.map(n => [n.date, n]))
-  const versionOn = (date: string, source: string | null | undefined) => {
-    const n = nightByDate.get(date)
-    return n?.sourceAlgorithmVersion != null && deviceOf(n.durationSource) === deviceOf(source) ? n.sourceAlgorithmVersion : null
-  }
+  // measured both; a reading from another source on that date has none of its own. #3613: the one
+  // lookup every version-keyed normal uses, over the canonical nights (one per date).
+  const versionOn = nightAlgorithmVersion(src.nights)
 
   // Everything the ring could not score falls back to the generic value for the same night.
   const generic: Record<NightInputKey, () => NightInput | null> = {
