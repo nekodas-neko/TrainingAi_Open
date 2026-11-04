@@ -25,7 +25,7 @@ object ActivityServiceController {
     settle("failed")
   }
 
-  fun start(context: Context, title: String, body: String, answer: (String) -> Unit) {
+  fun start(context: Context, title: String, body: String, clock: ActivityClock?, answer: (String) -> Unit) {
     val granted =
       ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
         PackageManager.PERMISSION_GRANTED
@@ -42,6 +42,10 @@ object ActivityServiceController {
       val intent = Intent(app, ActivityForegroundService::class.java)
         .putExtra(ActivityForegroundService.EXTRA_TITLE, title)
         .putExtra(ActivityForegroundService.EXTRA_BODY, body)
+      clock?.let {
+        intent.putExtra(ActivityForegroundService.EXTRA_CLOCK_STARTED_AT, it.startedAt.toDouble())
+        intent.putExtra(ActivityForegroundService.EXTRA_CLOCK_PAUSED_MS, (it.pausedElapsedMs ?: -1L).toDouble())
+      }
       try {
         // ForegroundServiceStartNotAllowedException (Android 12+) lands here.
         ContextCompat.startForegroundService(app, intent)
@@ -61,7 +65,21 @@ object ActivityServiceController {
     answer(result)
   }
 
+  /** Posts or updates the notification on whichever slot is live (see ActivityNotification.show). */
+  fun show(context: Context, title: String, body: String, clock: ActivityClock?) {
+    val app = context.applicationContext
+    main.post { ActivityNotification.show(app, title, body, clock) }
+  }
+
+  /** Removes the plain notification; the service's goes with the service. */
+  fun clear(context: Context) {
+    val app = context.applicationContext
+    main.post { ActivityNotification.clearPlain(app) }
+  }
+
   fun stop(context: Context) {
+    // Before onDestroy lands: a show sent right after this goes to the plain slot (see `running`).
+    ActivityForegroundService.running = false
     runCatching {
       context.applicationContext.stopService(Intent(context.applicationContext, ActivityForegroundService::class.java))
     }

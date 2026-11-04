@@ -31,8 +31,9 @@ export type BackgroundRecorder = {
 };
 
 // The current app's service notification: 'TrainingAI · Activity' over 'Tracking your walk or run'
-// (`lib/activity/gps-tracking.ts`). Naming the activity is the one change. Android shows the
-// title and body as given: a live elapsed time would need a service of our own (asked on #2846).
+// (`lib/activity/gps-tracking.ts`). Naming the activity is the one change. expo-location shows the
+// title and body as given; the live elapsed clock (#3626) is `activityServiceNotification`, on the
+// connected-device service's notification or, beside a GPS recording, a notification of its own.
 export function backgroundNotification(session: {
   type: { label: string };
   guidance?: { kind: string };
@@ -82,6 +83,18 @@ export function runForegroundService(
   start: () => Promise<BackgroundStarted>,
   onState: (state: BackgroundState) => void,
 ) {
+  return runServiceClaim(start, onState, setRunning);
+}
+
+/**
+ * As `runForegroundService`, telling `publish` instead of the activity flag. A gym workout's hold
+ * on the shared service (#3627) goes through here: the flag is the activity's alone.
+ */
+export function runServiceClaim(
+  start: () => Promise<BackgroundStarted>,
+  onState: (state: BackgroundState) => void,
+  publish: (running: boolean) => void = () => {},
+) {
   let cancelled = false,
     stop: (() => Promise<void>) | null = null;
   onState('pending');
@@ -98,7 +111,7 @@ export function runForegroundService(
         return;
       }
       stop = started.stop;
-      setRunning(true);
+      publish(true);
       onState('on');
     },
     () => !cancelled && onState('failed'),
@@ -108,7 +121,7 @@ export function runForegroundService(
       return;
     }
     cancelled = true;
-    setRunning(false);
+    publish(false);
     void stop?.().catch(() => {});
   };
 }

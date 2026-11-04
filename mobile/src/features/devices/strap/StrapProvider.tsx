@@ -18,6 +18,12 @@ import { deviceAlert } from '../../../integrations/notifications/platform';
 import { HrOutbox } from './HrOutbox';
 import { useActivityServiceRunning } from '../../activities/data/background-recording';
 import { holdStrapForActivity } from './activity-hold';
+import { workoutStrapService } from '../../../integrations/activity-service/platform';
+import {
+  holdServiceForWorkout,
+  workoutServiceExpiresIn,
+  workoutServiceWanted,
+} from './workout-hold';
 import { StrapSession, type StrapHold } from './StrapSession';
 
 const Context = createContext<StrapSession | null>(null);
@@ -75,6 +81,34 @@ export function StrapProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     session.hold('workout', workoutActive);
   }, [session, workoutActive]);
+  // The hold above keeps the link while the app runs; with the screen locked between sets Android
+  // would freeze the app and drop it. A paired strap holds the connected-device service for the
+  // workout (#3627), the same one an indoor activity holds, until finish, discard or sign-out.
+  const openWorkout = journal.data.workouts.find((workout) => workout.status === 'active') ?? null;
+  const strapPaired = useSyncExternalStore(
+    session.subscribe,
+    () => !!session.getSnapshot().paired,
+    () => !!session.getSnapshot().paired,
+  );
+  // The workout whose hold reached the cutoff while it ran: it stays released.
+  const [agedOut, setAgedOut] = useState<string | null>(null);
+  const serviceWanted =
+    !!openWorkout &&
+    agedOut !== openWorkout.id &&
+    workoutServiceWanted({ signedIn: !!connection, workout: openWorkout, strapPaired, now: Date.now() });
+  const serviceWorkout = serviceWanted ? openWorkout : null;
+  useEffect(() => {
+    if (!serviceWorkout || !workoutStrapService) return;
+    const release = holdServiceForWorkout(workoutStrapService);
+    const timer = setTimeout(
+      () => setAgedOut(serviceWorkout.id),
+      Math.max(0, workoutServiceExpiresIn(serviceWorkout, Date.now())),
+    );
+    return () => {
+      clearTimeout(timer);
+      release();
+    };
+  }, [serviceWorkout?.id, serviceWorkout?.startedAt]);
   return <Context.Provider value={session}>{children}</Context.Provider>;
 }
 
