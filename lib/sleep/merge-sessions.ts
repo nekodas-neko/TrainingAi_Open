@@ -61,6 +61,16 @@ export type SleepRow = {
    */
   onsetAt?: string | null;
   finalWakeAt?: string | null;
+  /**
+   * #3600 — the generic recording fields (#3075 stages 4 and 5), derived by the server on read from
+   * whatever source recorded the night and carried to the phone by the pull (SQLite v55). Absent for a
+   * source that sent none and in a payload from before they existed: no restlessness term, a complete
+   * recording, no algorithm version. `recordingIncomplete` makes the night partial through `isPartialNight`.
+   */
+  restlessMin?: number | null;
+  movementMeasuredMin?: number | null;
+  recordingIncomplete?: boolean | null;
+  sourceAlgorithmVersion?: string | null;
 };
 
 /** A row as a window the night grouping can read: its times as instants, the row itself carried along. */
@@ -84,6 +94,10 @@ type RowWindow = {
   respiratoryRate: number | null
   onsetAt: Date | null
   finalWakeAt: Date | null
+  restlessMin: number | null
+  movementMeasuredMin: number | null
+  recordingIncomplete: boolean | null
+  sourceAlgorithmVersion: string | null
 }
 
 // The night's main period: its longest row by sleep, by window when a row has no duration.
@@ -122,6 +136,8 @@ export function mergeByDate(rows: SleepRow[], tz: string = DEFAULT_TZ): SleepRow
     averageHrvMs: r.averageHrvMs, avgHeartRate: r.avgHeartRate, lowestHeartRate: r.lowestHeartRate,
     restlessPeriods: r.restlessPeriods, respiratoryRate: r.respiratoryRate,
     onsetAt: r.onsetAt ? new Date(r.onsetAt) : null, finalWakeAt: r.finalWakeAt ? new Date(r.finalWakeAt) : null,
+    restlessMin: r.restlessMin ?? null, movementMeasuredMin: r.movementMeasuredMin ?? null,
+    recordingIncomplete: r.recordingIncomplete ?? null, sourceAlgorithmVersion: r.sourceAlgorithmVersion ?? null,
   }))
   const periods = groupSleepPeriods(windows, tz).nights
   const aggregates = periods.map(p => ({ period: p, night: aggregateNight(p) }))
@@ -163,6 +179,11 @@ export function mergeByDate(rows: SleepRow[], tz: string = DEFAULT_TZ): SleepRow
       // #3582: the night's onset is its first window's and its wake its last's, where that window has one.
       onsetAt: night.onsetAt?.toISOString() ?? null,
       finalWakeAt: night.finalWakeAt?.toISOString() ?? null,
+      // #3600: `aggregateNight` sums the series only when every window has one and flags the night when
+      // any window is incomplete, so the merged row reads as the score's night does.
+      restlessMin: night.restlessMin ?? null, movementMeasuredMin: night.movementMeasuredMin ?? null,
+      recordingIncomplete: night.recordingIncomplete === true ? true : null,
+      sourceAlgorithmVersion: night.sourceAlgorithmVersion ?? null,
       partialNightAt: period.windows.find(w => w.row.partialNightAt != null)?.row.partialNightAt ?? null,
       phaseWindowStart: main.row.sleepPhase5Min ? main.row.sleepStart : null,
       phaseWindowEnd: main.row.sleepPhase5Min ? main.row.sleepEnd : null,
@@ -206,6 +227,9 @@ export function localSleepRowsAsNights(local: readonly LocalSleepSession[], tz: 
       // manual or pre-v54 row has no computed count and keeps its own.
       restlessPeriods: l.computedAwakenings ?? l.restlessPeriods,
       onsetAt: l.onsetAt ?? null, finalWakeAt: l.finalWakeAt ?? null,
+      // #3600: a row pulled before v55 has none; null reads as no restlessness term and a complete recording.
+      restlessMin: l.restlessMin ?? null, movementMeasuredMin: l.movementMeasuredMin ?? null,
+      recordingIncomplete: l.recordingIncomplete ?? null, sourceAlgorithmVersion: l.sourceAlgorithmVersion ?? null,
       respiratoryRate: l.respiratoryRate, sleepPhase5Min: l.sleepPhase5Min,
       sleepStart: l.sleepStart, sleepEnd: l.sleepEnd,
       sleepTimeRecommendation: null,

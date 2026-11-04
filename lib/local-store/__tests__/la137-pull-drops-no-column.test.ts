@@ -128,11 +128,14 @@ describe.skipIf(!canRun)('a sync pull drops no column applyDelta writes (LA-137)
     // #3060: the pull joins Oura's period type onto each sleep row from this table, by Oura id. Without
     // a matching period the type reads NULL, which is right for a non-Oura night but checks nothing.
     await pool.query(
-      `INSERT INTO oura_cloud_sleep_periods (user_id, oura_id, day, bedtime_start, bedtime_end, sleep_type, sleep_phase_30_sec)
-       VALUES ($1, $2, '2026-09-27', now() - interval '9 hours', now() - interval '1 hour', 'long_sleep', $3)`,
+      `INSERT INTO oura_cloud_sleep_periods (user_id, oura_id, day, bedtime_start, bedtime_end, sleep_type, sleep_phase_30_sec,
+         movement_30_sec, low_battery_alert, sleep_algorithm_version)
+       VALUES ($1, $2, '2026-09-27', now() - interval '9 hours', now() - interval '1 hour', 'long_sleep', $3, $4, true, 'v2')`,
       // #3582: a usable hypnogram (an hour or more of epochs, codes 1-4, some sleep), so the pull derives
       // onset, final wake and awakenings and this test proves each reaches a local column.
-      [USER, made.get('sleep_sessions')!.oura_id, '4'.repeat(10) + '2'.repeat(60) + '44' + '1'.repeat(40) + '4'.repeat(8)])
+      [USER, made.get('sleep_sessions')!.oura_id, '4'.repeat(10) + '2'.repeat(200) + '44' + '1'.repeat(40) + '4'.repeat(8),
+       // #3600: a movement series (some restless epochs) inside the sleep window, a low-battery flag and a version.
+       '1'.repeat(100) + '2'.repeat(20) + '1'.repeat(140)])
   }, 60_000)
 
   afterAll(async () => {

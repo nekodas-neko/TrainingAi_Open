@@ -15,6 +15,12 @@ test('a night is partial when it carries a mark time, including the pending plac
   assert.equal(isPartialNight({ partialNightAt: '2026-10-28T01:00:00.000Z' }), true);
 });
 
+test('a night its source recorded incompletely is partial too, through the shared rule (#3600)', () => {
+  assert.equal(isPartialNight({ recordingIncomplete: true }), true);
+  assert.equal(isPartialNight({ recordingIncomplete: false, partialNightAt: null }), false);
+  assert.equal(isPartialNight({ recordingIncomplete: null }), false);
+});
+
 test('only a measured night with an id offers the switch', () => {
   assert.equal(canMarkPartial({ id: 'a' }), true);
   assert.equal(canMarkPartial({ id: 'a', manualEntry: true }), false);

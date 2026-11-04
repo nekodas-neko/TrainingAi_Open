@@ -1,3 +1,4 @@
+import { isPartialNight as sharedIsPartialNight } from '@trainingai/shared/health/partial-night';
 import type { SleepRow } from './models';
 
 // #2265, mockup A: what the sleep night card shows for the "ring was off" switch. The rules live
@@ -21,8 +22,9 @@ export const PARTIAL_COPY = {
   failed: 'Could not save that change. Try again.',
 } as const;
 
-export function isPartialNight(night: { partialNightAt?: SleepRow['partialNightAt'] }): boolean {
-  return !!night.partialNightAt;
+/** The owner's mark or the source's incomplete-recording flag: the one shared rule (#3600), not a second copy. */
+export function isPartialNight(night: Partial<Pick<SleepRow, 'partialNightAt' | 'recordingIncomplete'>>): boolean {
+  return sharedIsPartialNight(night);
 }
 
 /** Only a night the ring or phone measured can be marked, the same rule `markNightPartial` enforces. */

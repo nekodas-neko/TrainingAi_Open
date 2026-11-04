@@ -26,6 +26,7 @@ import { baselinesSpec } from '../../activities/data/models';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { StrengthScreen } from '../../progress/StrengthScreen';
 import { formatHoursMinutes } from '@trainingai/shared/format/units'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 export function ReadingCards({ groups }: { groups: ReadingGroup[] }) {
   return (
     <>
@@ -101,7 +102,7 @@ export function ProfileOverview({
   const nights = health.sleep.filter((x) => !x.provisional);
   const sleep = sleepAverages(nights);
   const bedtime = circularMeanMinutes(
-    nights.filter((x) => x.partialNightAt == null).map((x) => x.sleepStart),
+    nights.filter((x) => !isPartialNight(x)).map((x) => x.onsetAt ?? x.sleepStart),
     (iso) => {
       const [h, m] = msToHHMMInTz(iso, health.timezone).split(':').map(Number);
       return h * 60 + m;

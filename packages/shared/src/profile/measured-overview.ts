@@ -1,3 +1,5 @@
+import { isPartialNight } from '../health/partial-night'
+
 
 
 
@@ -124,6 +126,8 @@ export interface SleepNight {
   respiratoryRate: number | null
   /** #2265: the owner's partial-night mark; such a night keeps its heart rate and breathing in the averages. */
   partialNightAt?: string | null
+  /** #3600: the source says it did not record the whole night; the night counts as partial exactly as the owner's mark does. */
+  recordingIncomplete?: boolean | null
 }
 
 export interface SleepAverages {
@@ -138,9 +142,9 @@ export interface SleepAverages {
 
 export function sleepAverages(nights: SleepNight[]): SleepAverages | null {
   if (nights.length === 0) return null
-  // #2265: a night marked partial keeps its physiology in the averages and loses its hours,
+  // #2265 / #3600: a night marked partial, or one its source says it recorded incompletely (`isPartialNight`), keeps its physiology in the averages and loses its hours,
   // efficiency and bedtime. It is still a night, so it still counts in `nights`.
-  const full = nights.filter(n => n.partialNightAt == null)
+  const full = nights.filter(n => !isPartialNight(n))
   return {
     nights: nights.length,
     durationHours: mean(full.map(n => n.durationHours)),

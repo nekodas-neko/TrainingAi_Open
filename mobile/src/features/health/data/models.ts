@@ -110,6 +110,13 @@ export const sleepSchema = z
     manualEntry: z.boolean().optional(),
     /** #2265: when the owner marked the night partial; null or absent when not. */
     partialNightAt: text,
+    /** #3075 stages 3-5, carried by the server's route: when sleep really began, and the generic recording fields. */
+    onsetAt: text,
+    finalWakeAt: text,
+    /** #3600: the source says it did not record the whole night; `isPartialNight` counts it as partial. */
+    recordingIncomplete: z.boolean().nullish(),
+    sourceAlgorithmVersion: text,
+    ...numericFields(['restlessMin', 'movementMeasuredMin'] as const),
     provisional: z.boolean().optional(),
     localOnly: z.boolean().optional(),
     sourceLabel: text,

@@ -5316,6 +5316,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.db.select({
         ...getTableColumns(s.sleepSessions), ouraSleepType: s.ouraCloudSleepPeriods.sleepType,
         sleepPhase30Sec: s.ouraCloudSleepPeriods.sleepPhase30Sec, bedtimeStart: s.ouraCloudSleepPeriods.bedtimeStart,
+        // #3600: the period's movement series and recording flags, read only to derive the generic night
+        // fields (`cloudNightRecording`, as `listSleepSessions` does); dropped before the reply.
+        movement30Sec: s.ouraCloudSleepPeriods.movement30Sec, lowBatteryAlert: s.ouraCloudSleepPeriods.lowBatteryAlert,
+        sleepAlgorithmVersion: s.ouraCloudSleepPeriods.sleepAlgorithmVersion,
       })
         .from(s.sleepSessions)
         .leftJoin(s.ouraCloudSleepPeriods, and(
@@ -5695,9 +5699,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
              bodyMetrics,
              // #3582: onsetAt / finalWakeAt / computedAwakenings ride on an Oura Cloud night with a usable
              // hypnogram and are absent otherwise; a client that does not know them ignores them.
-             sleepSessions: sleepSessions.map(({ sleepPhase30Sec, bedtimeStart, ...row }) => ({
-               ...row, ...cloudNightShape({ sleepPhase30Sec, bedtimeStart }),
-             })),
+             // #3600: restlessMin / movementMeasuredMin / recordingIncomplete / sourceAlgorithmVersion ride the
+             // same way (computed on read, the window `listSleepSessions` counts in), absent when the source gave none.
+             sleepSessions: sleepSessions.map(({ sleepPhase30Sec, bedtimeStart, movement30Sec, lowBatteryAlert, sleepAlgorithmVersion, ...row }) => {
+               const shape = cloudNightShape({ sleepPhase30Sec, bedtimeStart })
+               return {
+                 ...row, ...shape,
+                 ...cloudNightRecording({ movement30Sec, bedtimeStart, lowBatteryAlert, sleepAlgorithmVersion },
+                   { from: shape.onsetAt ?? row.sleepStart, to: shape.finalWakeAt ?? row.sleepEnd }),
+               }
+             }),
              moodLogs, activityLogs, fitnessTests, prescribedRuns, workoutSessions,
              exerciseLogs, setLogs,
              personalRecords: personalRecords.map(r => ({

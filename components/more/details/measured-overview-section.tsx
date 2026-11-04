@@ -14,6 +14,7 @@ import {
 import { ReadingGroupCard } from "./reading-group-card";
 import { sleepReplyWithPending } from "@/lib/sleep/manual-night-view";
 import { formatHoursMinutes } from '@trainingai/shared/format/units'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 
 interface Props {
   userId?: string
@@ -81,7 +82,7 @@ export function MeasuredOverviewSection({ userId, serverRecent }: Props) {
     // The minutes-of-day are computed in the USER's zone before the circular mean, not the device's
     // — a bare `getHours()` here renders a Brisbane bedtime as a New York one.
     // #2265: a marked night's bedtime is when the ring went on, not when the owner went to bed.
-    ? circularMeanMinutes(nights.filter(n => n.partialNightAt == null).map(n => n.sleepStart), iso => {
+    ? circularMeanMinutes(nights.filter(n => !isPartialNight(n)).map(n => n.onsetAt ?? n.sleepStart), iso => {
         const hhmm = formatInTimeZone(new Date(iso), tz, 'HH:mm')
         const [h, m] = hhmm.split(':').map(Number)
         return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null
