@@ -227,6 +227,11 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     onsetAt:         r.onsetAt ? toIso(r.onsetAt) : null,
     finalWakeAt:     r.finalWakeAt ? toIso(r.finalWakeAt) : null,
     computedAwakenings: typeof r.computedAwakenings === 'number' ? r.computedAwakenings : null,
+    // #3600 — the generic recording fields; absent from an older server's reply and from a source that sent none.
+    restlessMin:     typeof r.restlessMin === 'number' ? r.restlessMin : null,
+    movementMeasuredMin: typeof r.movementMeasuredMin === 'number' ? r.movementMeasuredMin : null,
+    recordingIncomplete: r.recordingIncomplete === true ? true : null,
+    sourceAlgorithmVersion: typeof r.sourceAlgorithmVersion === 'string' ? r.sourceAlgorithmVersion : null,
     syncStatus:      'synced' as const,
     updatedAt:       toIso(r.updatedAt),
   } satisfies LocalSleepSession));

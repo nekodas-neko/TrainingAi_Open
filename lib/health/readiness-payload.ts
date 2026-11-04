@@ -22,7 +22,7 @@ import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { latestRestingHrRow } from '@trainingai/shared/health/latest-resting-hr'
-import { rowsOfDeviceInUse } from '@trainingai/shared/health/per-device-normal'
+import { rowsOfDeviceInUse, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
@@ -491,7 +491,10 @@ export async function buildReadinessPayload(
   // night. Oura's HRV and the ring's differ by definition, so an Oura week judged against a baseline
   // pooled with ring nights shows a change in the person that is a change of ruler. Until that device
   // has the 5 nights a baseline needs, the baseline reads as not yet known rather than the other device's.
-  const hrvOnDevice   = rowsOfDeviceInUse(bodyMetrics, m => m.hrvMs, m => m.hrvSource)
+  // #3601: and of that device's newest algorithm version, read from the same night's sleep, so a source
+  // that changes its algorithm starts these baselines again rather than pooling the two rulers.
+  const versionOn     = nightAlgorithmVersion(sleepSessions)
+  const hrvOnDevice   = rowsOfDeviceInUse(bodyMetrics, m => m.hrvMs, m => m.hrvSource, m => versionOn(m.date, m.hrvSource))
   const hrvRows       = excludeLowWearDays(hrvOnDevice, ouraByDate)
   const recentHrvRows = hrvOnDevice.filter(m => m.date >= from7dIso)
   const baselineHrv   = hrvRows.length >= 5
@@ -505,9 +508,9 @@ export async function buildReadinessPayload(
     : 0
 
   // The 7-day mean and the baseline are of the device in use; `restingHrBaseline` picks the same rows.
-  const recentRhrRows = rowsOfDeviceInUse(bodyMetrics, m => m.restingHeartRate, m => m.restingHeartRateSource)
+  const recentRhrRows = rowsOfDeviceInUse(bodyMetrics, m => m.restingHeartRate, m => m.restingHeartRateSource, m => versionOn(m.date, m.restingHeartRateSource))
     .filter(m => m.date >= from7dIso)
-  const baselineRhr   = restingHrBaseline(bodyMetrics, ouraByDate)
+  const baselineRhr   = restingHrBaseline(bodyMetrics, ouraByDate, versionOn)
   const recentRhr = recentRhrRows.length
     ? recentRhrRows.reduce((s, m) => s + m.restingHeartRate!, 0) / recentRhrRows.length
     : null

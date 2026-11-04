@@ -34,12 +34,18 @@ export function restingHrWindow(todayIso: string): { from: string; to: string } 
  */
 export function meanRestingHr(
   rows: readonly { date?: string; restingHeartRate?: number | null; restingHeartRateSource?: string | null }[],
+  /**
+   * #3601: a reading's algorithm version (`nightAlgorithmVersion` over the same days' sleep), so the
+   * mean is of one (source, version) group, the way `perDeviceNormal` keys it. Left out: per source.
+   */
+  versionOn?: (date: string, source: string | null | undefined) => string | null,
 ): number | null {
   const readings = rows.map((r, i) => ({
     // A row with no date keeps its place in the list, so a caller without dates reads as one device.
     date: r.date ?? String(i).padStart(6, '0'),
     value: r.restingHeartRate != null && r.restingHeartRate > 0 ? r.restingHeartRate : null,
     source: r.restingHeartRateSource,
+    algorithmVersion: versionOn && r.date != null ? versionOn(r.date, r.restingHeartRateSource) : null,
   }))
   const mean = normalOrCarriedOver(perDeviceNormal(readings, { minNights: BASELINE_MIN_NIGHTS }))
   return mean == null ? null : Math.round(mean)

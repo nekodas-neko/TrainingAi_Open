@@ -27,6 +27,7 @@ import { metricValue, type SleepRow } from '../data/models';
 import {
   canMarkPartial,
   isPartialNight,
+  partialSwitchState,
   PARTIAL_COPY,
   PARTIAL_DIMMED_FIELDS,
   partialErrorMessage,
@@ -46,6 +47,7 @@ export function SleepNight({
   const [saving, setSaving] = useState(false);
   const [partialError, setPartialError] = useState<string | null>(null);
   const partial = isPartialNight(night);
+  const partialSwitch = partialSwitchState(night);
   // The mark is offered on the full night card only, and only for a measured night.
   const markable = !compact && !!store && canMarkPartial(night);
   async function setPartial(next: boolean) {
@@ -229,14 +231,18 @@ export function SleepNight({
         >
           <SwitchRow
             label={PARTIAL_COPY.label}
-            value={partial}
-            disabled={saving}
+            value={partialSwitch.value}
+            disabled={saving || partialSwitch.locked}
             onValueChange={(next) => {
               void setPartial(next);
             }}
           />
           <AppText variant="caption" tone="muted">
-            {partial ? PARTIAL_COPY.hintOn : PARTIAL_COPY.hintOff}
+            {partialSwitch.locked
+              ? PARTIAL_COPY.hintSourceFlagged
+              : partialSwitch.value
+                ? PARTIAL_COPY.hintOn
+                : PARTIAL_COPY.hintOff}
           </AppText>
           {partialError && <Notice title="Partial night" message={partialError} error />}
         </View>

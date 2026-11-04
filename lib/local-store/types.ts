@@ -104,6 +104,13 @@ export interface LocalSleepSession {
   onsetAt?:        string | null;
   finalWakeAt?:    string | null;
   computedAwakenings?: number | null;
+  /** #3600 (v55) — the generic recording fields the server derives on read and the pull carries: minutes
+   *  moving and measured inside the sleep window, the source's own incomplete-recording flag, and the
+   *  label of the source's algorithm. Null/absent for a source that sent none and on any row pulled before v55. */
+  restlessMin?:    number | null;
+  movementMeasuredMin?: number | null;
+  recordingIncomplete?: boolean | null;
+  sourceAlgorithmVersion?: string | null;
   syncStatus:      'pending' | 'synced';
   updatedAt:       string;
 }

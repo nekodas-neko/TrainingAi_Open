@@ -108,10 +108,10 @@ describe('Body Battery waking-rest offset and its re-derive (issue 2235)', () =>
 
   type Day = { action: string; recomputed: { endValue: number } }
 
-  it('stamps the 9 bpm offset in the model version (v7, carried into v8)', async () => {
+  it('stamps the 9 bpm offset in the model version (v7, carried into v8 and v9)', async () => {
     const { BODY_BATTERY_MODEL_VERSION, WAKING_REST_OFFSET_BPM } = await import('@/lib/health/body-battery-day')
     expect(WAKING_REST_OFFSET_BPM).toBe(9)
-    expect(BODY_BATTERY_MODEL_VERSION).toBe('v8:rest+9bpm:chg0.12:drn0.08:str0.02:hrmax-observed:oura-rule:oura-stress:exw0.5:exs0.45:cap1.5:pm0.8')
+    expect(BODY_BATTERY_MODEL_VERSION).toBe('v9:rest+9bpm:chg0.12:drn0.08:str0.02:hrmax-observed:oura-rule:oura-stress:exw0.5:exs0.45:cap1.5:pm0.8:algv')
   })
 
   it('moves exactly the days the offset reaches, by the pinned amounts', async () => {
@@ -143,7 +143,7 @@ describe('Body Battery waking-rest offset and its re-derive (issue 2235)', () =>
     const first = await call(`from=${from}&to=${to}&dryRun=false`)
     expect(first.summary.written).toBe(DAYS)
     expect(r.writes()).toBe(DAYS)
-    expect([...r.stored.values()].every(x => x.modelVersion.startsWith('v8:rest+9bpm:'))).toBe(true)
+    expect([...r.stored.values()].every(x => x.modelVersion.startsWith('v9:rest+9bpm:'))).toBe(true)
     // Frozen anchors are kept, not re-chosen.
     expect([...r.stored.values()].every(x => x.anchor === 60)).toBe(true)
 

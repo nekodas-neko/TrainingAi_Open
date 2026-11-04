@@ -41,7 +41,7 @@ import { classifyClockRegression, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, 
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
-import { rowsOfDeviceInUse, fillMissingNightSources } from '@trainingai/shared/health/per-device-normal'
+import { rowsOfDeviceInUse, fillMissingNightSources, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
@@ -2213,7 +2213,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // HRV trend: ratio of recent 3 days vs older baseline
       let hrvTrend: number | null = null
       // #3001: both stretches from the device in use, so Oura's HRV is never compared with the ring's.
-      const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource)
+      // #3601: and from its newest algorithm version, read from the same night's sleep.
+      const versionOnNight = nightAlgorithmVersion(sleepSessions)
+      const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource, m => versionOnNight(m.date, m.hrvSource))
       if (hrvRows.length >= 4) {
         const sorted = [...hrvRows].sort((a, b) => b.date.localeCompare(a.date))
         const recent3 = sorted.slice(0, 3)
@@ -5318,6 +5320,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.db.select({
         ...getTableColumns(s.sleepSessions), ouraSleepType: s.ouraCloudSleepPeriods.sleepType,
         sleepPhase30Sec: s.ouraCloudSleepPeriods.sleepPhase30Sec, bedtimeStart: s.ouraCloudSleepPeriods.bedtimeStart,
+        // #3600: the period's movement series and recording flags, read only to derive the generic night
+        // fields (`cloudNightRecording`, as `listSleepSessions` does); dropped before the reply.
+        movement30Sec: s.ouraCloudSleepPeriods.movement30Sec, lowBatteryAlert: s.ouraCloudSleepPeriods.lowBatteryAlert,
+        sleepAlgorithmVersion: s.ouraCloudSleepPeriods.sleepAlgorithmVersion,
       })
         .from(s.sleepSessions)
         .leftJoin(s.ouraCloudSleepPeriods, and(
@@ -5697,9 +5703,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
              bodyMetrics,
              // #3582: onsetAt / finalWakeAt / computedAwakenings ride on an Oura Cloud night with a usable
              // hypnogram and are absent otherwise; a client that does not know them ignores them.
-             sleepSessions: sleepSessions.map(({ sleepPhase30Sec, bedtimeStart, ...row }) => ({
-               ...row, ...cloudNightShape({ sleepPhase30Sec, bedtimeStart }),
-             })),
+             // #3600: restlessMin / movementMeasuredMin / recordingIncomplete / sourceAlgorithmVersion ride the
+             // same way (computed on read, the window `listSleepSessions` counts in), absent when the source gave none.
+             sleepSessions: sleepSessions.map(({ sleepPhase30Sec, bedtimeStart, movement30Sec, lowBatteryAlert, sleepAlgorithmVersion, ...row }) => {
+               const shape = cloudNightShape({ sleepPhase30Sec, bedtimeStart })
+               return {
+                 ...row, ...shape,
+                 ...cloudNightRecording({ movement30Sec, bedtimeStart, lowBatteryAlert, sleepAlgorithmVersion },
+                   { from: shape.onsetAt ?? row.sleepStart, to: shape.finalWakeAt ?? row.sleepEnd }),
+               }
+             }),
              moodLogs, activityLogs, fitnessTests, prescribedRuns, workoutSessions,
              exerciseLogs, setLogs,
              personalRecords: personalRecords.map(r => ({
