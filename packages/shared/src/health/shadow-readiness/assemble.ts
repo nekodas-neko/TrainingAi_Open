@@ -19,7 +19,7 @@ import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { nightSessions, canonicalNightForDate, type AggregatableSleep } from '@trainingai/shared/health/sleep-night'
 import { isPartialNight, withoutPartialDuration } from '@trainingai/shared/health/partial-night'
 import { isLowWearDay } from '@trainingai/shared/health/wear-confidence'
-import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { hrr60Candidates, nightlyCandidates } from '@trainingai/shared/inputs/adapters'
 import { resolveSlots, type InputName } from '@trainingai/shared/inputs/cascade'
 import type { ShadowUnitId } from './model'
@@ -295,7 +295,7 @@ function daytimeStressSeries(raw: ShadowRawHistory): UnitObservation[] {
     if (o) byDay.set(r.day, o)
   }
   for (const w of raw.wear) {
-    if (ringValueStands(w.date, from)) continue
+    if (beforeSourceSwitch(w.date, from)) continue
     const o = obs(w.date, w.stressHigh == null ? null : w.stressHigh / 60, 'oura_cloud')
     if (o) byDay.set(w.date, o)
   }

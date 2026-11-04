@@ -6,7 +6,7 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '../date-utils'
 import { resolveHrProfile, maxHrIsUnread, type HrProfile } from './hr-profile'
-import { ouraCloudMetGrid } from './oura-cloud-met'
+import { perMinuteMovementGrid } from './per-minute-movement'
 import { scoreActivityForDay, type ActivityDay } from './activity-day'
 import { restingHrOnDay } from './resting-hr-mean'
 
@@ -15,7 +15,7 @@ const HISTORY_DAYS = 28
 
 type ActivityDayRepo = Pick<WorkoutRepository,
   'listBodyMetrics' | 'getWorkoutSessionsFrom' | 'getHrForWindow' | 'getActiveProgram'
-  | 'getUserById' | 'getUserGoals' | 'getOuraCloudActivitySeries' | 'listActivityLogs'>
+  | 'getUserById' | 'getUserGoals' | 'getPerMinuteMovementSeries' | 'listActivityLogs'>
 
 export interface LoadActivityDayOptions {
   /** The HR profile's ceiling, when the caller has already resolved it (once, not per day). Null is a
@@ -42,7 +42,7 @@ export async function loadActivityDay(
   // default (#3347 review): the day stays un-finalised and the next pass retries. Today only loses
   // the input for this read.
   const finished = date < todayInTz(tz)
-  const [bodyMetrics, sessions, hrRows, program, user, userGoals, cloudActivity, activityLogs, hrProfile] = await Promise.all([
+  const [bodyMetrics, sessions, hrRows, program, user, userGoals, movementSeries, activityLogs, hrProfile] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
     repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(fromIso, tz)),
     options.hrRows ?? repo.getHrForWindow(userId, dayMid, nextMid),
@@ -50,12 +50,12 @@ export async function loadActivityDay(
     repo.getUserById(userId),
     // A swallowed goals read would score the day against the default step goal.
     finished ? repo.getUserGoals(userId) : repo.getUserGoals(userId).catch(() => null),
-    // #3114: Oura's per-minute MET decides the move lane; its activity day starts at 4 a.m., hence the
-    // day before. Not caught for a finished day: a swallowed failure would be stored as the final
-    // value (the 24 h grace then makes it permanent), so a failure leaves the day un-finalised for the
-    // next pass. Today (the day log scores today through here) only loses its move lane, as the
-    // readiness payload's live read does.
-    repo.getOuraCloudActivitySeries(userId, shiftDateStr(date, -1), date).catch((cause: unknown) => {
+    // #3114: the per-minute movement series decides the move lane; a source's day may start before
+    // local midnight (Oura's at 4 a.m.), hence the day before. Not caught for a finished day: a
+    // swallowed failure would be stored as the final value (the 24 h grace then makes it permanent),
+    // so a failure leaves the day un-finalised for the next pass. Today (the day log scores today
+    // through here) only loses its move lane, as the readiness payload's live read does.
+    repo.getPerMinuteMovementSeries(userId, shiftDateStr(date, -1), date).catch((cause: unknown) => {
       if (finished) throw cause
       return []
     }),
@@ -78,7 +78,7 @@ export async function loadActivityDay(
     // The one resting-HR rule the HR zones and Body Battery read (#3388), as of this day.
     restingHr: restingHrOnDay(bodyMetrics, date),
     hrRows,
-    metGrid: ouraCloudMetGrid(cloudActivity, dayMid.getTime(), nextMid.getTime()),
+    metGrid: perMinuteMovementGrid(movementSeries, dayMid.getTime(), nextMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,
     sessions,
     program,

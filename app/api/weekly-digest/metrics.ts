@@ -16,7 +16,7 @@ import { computeSleepScoreSeries } from '@trainingai/shared/health/sleep-score'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
-import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import {
   weekDays,
@@ -169,7 +169,7 @@ export async function computeWeeklyDigestMetrics(
   // switched to the Oura API the ring's rows are partial leftovers and stand no longer; a day with no
   // ring value takes Oura's (seconds, so /60), as the coach does (#3077). Display only, never a score input.
   const ringStressPairs = derivedRows
-    .filter(r => r.stressHighMinutes != null && ringValueStands(r.day, switchDay))
+    .filter(r => r.stressHighMinutes != null && beforeSourceSwitch(r.day, switchDay))
     .map(r => [r.day, r.stressHighMinutes!] as [string, number])
   const ringStressDays = new Set(ringStressPairs.map(([d]) => d))
   const ouraStressPairs = ouraRows

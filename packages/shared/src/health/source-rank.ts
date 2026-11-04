@@ -28,12 +28,14 @@ export const HEALTH_SOURCES = [
 export type HealthSource = (typeof HEALTH_SOURCES)[number];
 
 /**
- * #2998: whether the ring's own value still stands for `day`. From the day a user switched to the
- * Oura API (`getOuraCloudSwitchDay`) the ring's rows are partial leftovers and Oura's whole-day value
- * is read instead; with no switch the ring stands on every day. The one test for it: the night
- * ladder (`storedNight`) and every reader that falls back between the two go through it.
+ * #2998: whether `day` falls before the day the user switched sources, so the earlier source's own
+ * value still stands for it. With no switch, every day is before it. Today the one switch is from the
+ * ring over BLE to the Oura API (`getOuraCloudSwitchDay`): from that day the ring's rows are partial
+ * leftovers and the API's whole-day value is read instead. The one test for it: the night ladder
+ * (`storedNight`) and every reader that falls back between the two go through it. (Named
+ * `ringValueStands` before #3597.)
  */
-export function ringValueStands(day: string, switchDay: string | null | undefined): boolean {
+export function beforeSourceSwitch(day: string, switchDay: string | null | undefined): boolean {
   return switchDay == null || day < switchDay;
 }
 

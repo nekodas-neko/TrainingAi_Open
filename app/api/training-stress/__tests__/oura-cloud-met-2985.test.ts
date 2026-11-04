@@ -3,6 +3,7 @@
 // non-wear stretch must stay missing. Driven through the real handler with a repository double.
 import { describe, it, expect, vi } from 'vitest'
 import { dateStrMidnightInTz } from '@trainingai/shared/date-utils'
+import { ouraActivityMovementSeries } from '@/lib/oura/cloud/activity-movement'
 
 const TZ = 'Australia/Brisbane'
 const DAY = '2026-10-18'
@@ -36,7 +37,8 @@ vi.mock('@/lib/data', () => ({
     getUserById: async () => ({ dateOfBirth: '1993-06-15', sex: 'male', heightCm: 180 }),
     // No ring after the switch.
     getOuraDaytimeSignals: async () => ({ met: [], temp: [], still: [], motion: [] }),
-    getOuraCloudActivitySeries: (...a: unknown[]) => cloudActivity(...a),
+    // #3597: scoring reads the generic series; the Oura connector's own mapping fills it.
+    getPerMinuteMovementSeries: async (...a: unknown[]) => ouraActivityMovementSeries(await cloudActivity(...a)),
     listSleepSessions: async () => [],
     listActivityLogs: async () => [],
     getHealthConnectIntervals: async () => [],

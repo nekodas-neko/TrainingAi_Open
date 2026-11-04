@@ -183,7 +183,7 @@ describe('no score moves when the source rules become capabilities (#3597)', () 
       const r = rng(seed)
       const ringGrid = { startTimestampMs: from, metsPerMinute: Array.from({ length: 1440 }, () => (r() < 0.7 ? null : 1 + r() * 4)) }
       const met = resolveDayMetPerMinute({
-        ringGrid, cloudGrid: cloud, ringStillFramesMs: [], sleepSessions: [{ startMs: from, endMs: from + 6 * 3_600_000, source: 'sleep_record' }],
+        ringGrid, movementGrid: cloud, ringStillFramesMs: [], sleepSessions: [{ startMs: from, endMs: from + 6 * 3_600_000, source: 'sleep_record' }],
         activities: [{ startMs: from + 17 * 3_600_000, endMs: from + 18 * 3_600_000, met: 7 }],
       }, from, to)
       const device = deviceMetGrid(ringGrid, cloud, from, to)

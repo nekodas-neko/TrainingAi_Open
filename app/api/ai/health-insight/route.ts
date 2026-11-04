@@ -16,7 +16,7 @@ import { nightSessions, canonicalNightForDate, canonicalLatestNight } from '@tra
 import { metric, splitMeasured, type MetricLine } from './metrics'
 import { buildInsightText, type RecentComparison } from './insight-text'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 
 // An enum, a date and a boolean.
 const MAX_BODY_BYTES = 4 * 1024
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
   const todayOura = ouraRows.find(r => r.date === date) ?? ouraRows[ouraRows.length - 1] ?? null
   // The ring's rollup stands only before the day the user switched to the Oura API (#2998): from
   // then its row is partial, and Oura's temperature is read instead.
-  const todaySummary = summaries.find(s => s.date === date && ringValueStands(s.date, switchDay)) ?? null
+  const todaySummary = summaries.find(s => s.date === date && beforeSourceSwitch(s.date, switchDay)) ?? null
   // todayOura can fall back to an older row — annotate so the model never reads a stale
   // day's Oura values as "today".
   const staleNote = todayOura && todayOura.date !== date
