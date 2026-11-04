@@ -11,7 +11,7 @@ const day = (back: number) => shiftDateStr(TODAY, -back)
 const sources = (n: number, newVersionNights: number, tonight: Record<string, unknown> = {}): NightInputSources => {
   const version = (back: number) => (back < newVersionNights ? 'v2' : 'v1')
   return {
-    today: TODAY, summaries: [], ouraDaily: [], ouraCloudContributors: [],
+    today: TODAY, summaries: [], temperatureDeviations: [], recoveryContributors: [],
     bodyMetrics: Array.from({ length: n + 1 }, (_, back) => ({
       date: day(back), hrvMs: 50 + (back % 5), restingHeartRate: 54 + (back % 3), hrvSource: 'source_a', restingHeartRateSource: 'source_a',
     })),

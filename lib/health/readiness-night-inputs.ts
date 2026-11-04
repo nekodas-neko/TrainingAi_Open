@@ -18,10 +18,13 @@
  * - **Per algorithm version** (#3075 stage 5). Within a source, only nights under the same version of
  *   the source's own sleep algorithm, by `rowsInNormalGroup`'s rule: a source that changes its
  *   algorithm restarts its normals; a night with no version joins the newest one.
- * - **Recovery index.** The ring's hours where tonight's summary has them; else hours from Oura's
- *   5-minute heart-rate series through the ring-era function (#3075 stage 2); else Oura's own
- *   `recovery_index` contributor, for a night whose series is missing or too thin.
- * - **Never Oura's readiness, sleep or activity score.** Nothing here reads them.
+ * - **Recovery index.** The ring's hours where tonight's summary has them; else hours our code
+ *   computed from a source's overnight heart-rate series through the ring-era function (#3075 stage 2);
+ *   else the source's own 0–100 recovery contributor, for a night whose series is missing or too thin.
+ * - **Generic shapes only** (#3610). Temperature, the recovery contributor and the series hours arrive
+ *   as `@trainingai/shared/health/readiness-signals` shapes, each carrying its source; each connector
+ *   maps its own fields into them. Nothing here reads a device's field names.
+ * - **Never a source's own readiness, sleep or activity score.** Nothing here reads them.
  *
  * The composite and the illness radar both read the result through {@link compositeNightFields} and
  * {@link illnessNightFields}, so the two can never disagree about the same night (PS-42).
@@ -31,12 +34,12 @@ import { illnessZScores, type IllnessSummaryInput } from '@trainingai/shared/hea
 import type { BaselineContributorKey, ReadinessCompositeInputs } from '@trainingai/shared/health/readiness-composite'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
-import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { trailingBaselineZ } from '@/lib/health/score-availability'
 import { canonicalNightForDate, type DatedNight } from '@trainingai/shared/health/sleep-night'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { hrvNightInNormal, type NightHrvMethod } from '@trainingai/shared/health/night-hrv-method'
 import { deviceOf, rowsInNormalGroup } from '@trainingai/shared/health/per-device-normal'
+import type { DailyTemperatureDeviation, OvernightRecoveryHours, RecoveryContributor } from '@trainingai/shared/health/readiness-signals'
 
 /**
  * The window start dates readiness and the night-temperature loader both read, shifted on the local
@@ -96,15 +99,15 @@ export interface NightInputSources {
     /** #3075 stage 5: the source's algorithm version for the night, which keys its normals. */
     sourceAlgorithmVersion?: string | null
   }[]
-  /** `oura_daily` rows: Oura's own temperature deviation, already relative to Oura's baseline. */
-  ouraDaily: readonly { date: string; temperatureDeviation?: number | null }[]
-  /** `oura_cloud_daily.readiness_contributors` per day. */
-  ouraCloudContributors: readonly { date: string; readinessContributors: Record<string, number | null> | null }[]
+  /** Each source's own nightly temperature deviation, already relative to that source's baseline. */
+  temperatureDeviations: readonly DailyTemperatureDeviation[]
+  /** Each source's own 0–100 recovery sub-score per night. */
+  recoveryContributors: readonly RecoveryContributor[]
   /**
-   * #3075 stage 2: recovery-index hours our own code computed from Oura's 5-minute heart-rate series,
-   * per wake date. Absent or without the night, Oura's contributor stands in, as before.
+   * #3075 stage 2: recovery-index hours our own code computed from a source's overnight heart-rate
+   * series, per wake date. Absent or without the night, the source's contributor stands in, as before.
    */
-  ouraCloudRecoveryHours?: readonly { date: string; hours: number }[]
+  recoveryHours?: readonly OvernightRecoveryHours[]
 }
 
 export interface ReadinessNightInputs {
@@ -115,11 +118,10 @@ export interface ReadinessNightInputs {
   /** Only the inputs that have a value tonight. */
   inputs: Partial<Record<NightInputKey, NightInput>>
   recoveryIndex:
-    | { hours: number; source: typeof RING_SUMMARY_SOURCE }
-    | { hours: number; source: 'oura_cloud' }
-    | { contributor: number; source: 'oura_cloud' }
+    | { hours: number; source: string }
+    | { contributor: number; source: string }
     | null
-  /** Tonight's temperature deviation in °C for display: the ring's, else Oura's. */
+  /** Tonight's temperature deviation in °C for display: the ring's (`ble`), else another source's (`cloud`). */
   temperatureDeviation: { value: number; source: 'ble' | 'cloud' } | null
 }
 
@@ -219,11 +221,11 @@ export function resolveReadinessNightInputs(src: NightInputSources): ReadinessNi
         inNormal: hrvNightInNormal(m.hrvMethod ?? undefined),
       })),
       nightDate),
-    // Oura's deviation is already relative to Oura's own baseline, so it is judged as a deviation
-    // against the person's normal of Oura deviations, never as an absolute temperature. Only the
-    // Oura Cloud writes this column; a pre-re-key value belongs to the old account.
+    // A source's deviation is already relative to its own baseline, so it is judged as a deviation
+    // against the person's normal of that source's deviations, never as an absolute temperature. A
+    // value the source no longer stands behind (`superseded`) scores nothing.
     temperature: () => genericInput(
-      src.ouraDaily.filter(d => !isPreRekey(d.date)).map(d => ({ date: d.date, value: d.temperatureDeviation, source: 'oura_cloud' })),
+      src.temperatureDeviations.filter(t => !t.superseded).map(t => ({ date: t.date, value: t.deviationC, source: t.source })),
       nightDate, 100),
     sleepBalance: () => genericInput(
       src.nights.filter(n => !isPartialNight(n)).map(n => ({ date: n.date, value: n.durationHours, source: n.durationSource, algorithmVersion: n.sourceAlgorithmVersion })),
@@ -241,14 +243,14 @@ export function resolveReadinessNightInputs(src: NightInputSources): ReadinessNi
   let recoveryIndex: ReadinessNightInputs['recoveryIndex'] = null
   if (ring?.recoveryIndexHours != null && Number.isFinite(ring.recoveryIndexHours)) {
     recoveryIndex = { hours: ring.recoveryIndexHours, source: RING_SUMMARY_SOURCE }
-  } else if (Number.isFinite(src.ouraCloudRecoveryHours?.find(r => r.date === nightDate)?.hours)) {
-    recoveryIndex = { hours: src.ouraCloudRecoveryHours!.find(r => r.date === nightDate)!.hours, source: 'oura_cloud' }
   } else {
-    const c = src.ouraCloudContributors.find(r => r.date === nightDate)?.readinessContributors?.recovery_index
-    if (typeof c === 'number' && Number.isFinite(c)) recoveryIndex = { contributor: c, source: 'oura_cloud' }
+    const hours = src.recoveryHours?.find(r => r.date === nightDate)
+    const contributor = src.recoveryContributors.find(r => r.date === nightDate)
+    if (hours && Number.isFinite(hours.hours)) recoveryIndex = { hours: hours.hours, source: hours.source }
+    else if (contributor && Number.isFinite(contributor.score)) recoveryIndex = { contributor: contributor.score, source: contributor.source }
   }
 
-  const cloudTemp = src.ouraDaily.find(d => d.date === nightDate)?.temperatureDeviation ?? null
+  const cloudTemp = src.temperatureDeviations.find(t => t.date === nightDate)?.deviationC ?? null
   const temperatureDeviation: ReadinessNightInputs['temperatureDeviation'] = ring?.tempDevC != null
     ? { value: ring.tempDevC, source: 'ble' }
     : cloudTemp != null ? { value: cloudTemp, source: 'cloud' } : null

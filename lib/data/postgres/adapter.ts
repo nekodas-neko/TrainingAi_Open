@@ -75,6 +75,7 @@ import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { sleepShapeFromHypnogram } from '@trainingai/shared/health/oura-sleep-detail'
 import { restlessnessFromMovement } from '@trainingai/shared/health/sleep-recording'
 import { perMinuteMovementSeries } from './slices/movement-series'
+import { overnightRecoveryHours, recoveryContributors } from './slices/readiness-signals'
 import { ouraMovementSeries, ouraRecordingIncomplete, ouraAlgorithmVersion } from '@/lib/oura/cloud/sleep-recording-map'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
 import { PartialNightPayloadSchema } from '@trainingai/shared/health/partial-night'
@@ -8454,8 +8455,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async replaceOuraDailySummary(userId: string, rows: import('../repository').OuraDailySummaryRow[]) { return oura.replaceOuraDailySummary(this.db, userId, rows) }
   async upsertOuraDailySummary(userId: string, rows: import('../repository').OuraDailySummaryRow[]) { return oura.upsertOuraDailySummary(this.db, userId, rows) }
   async getOuraDailySummary(userId: string, from: string, to: string) { return oura.getOuraDailySummary(this.db, userId, from, to) }
-  async getOuraCloudRecoveryIndexHours(userId: string, dates: string[], tz: string) { return oura.getOuraCloudRecoveryIndexHours(this.db, userId, dates, tz) }
-  async getOuraCloudReadinessContributors(userId: string, from: string, to: string) { return oura.getOuraCloudReadinessContributors(this.db, userId, from, to) }
+  async getOvernightRecoveryHours(userId: string, dates: string[], tz: string) { return overnightRecoveryHours(this.db, userId, dates, tz) }
+  async getRecoveryContributors(userId: string, from: string, to: string) { return recoveryContributors(this.db, userId, from, to) }
   async upsertOuraDailyDerived(userId: string, day: string, patch: import('../repository').OuraDailyDerivedPatch) { return oura.upsertOuraDailyDerived(this.db, userId, day, patch) }
   async clearNightDerivedScores(userId: string, day: string, pillars: { sleep: boolean; readiness: boolean }) { return oura.clearNightDerivedScores(this.db, userId, day, pillars) }
   async getOuraStorageStats() { return oura.getOuraStorageStats(this.db) }

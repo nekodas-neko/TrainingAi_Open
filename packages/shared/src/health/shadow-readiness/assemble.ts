@@ -22,6 +22,7 @@ import { isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { hrr60Candidates, nightlyCandidates } from '@trainingai/shared/inputs/adapters'
 import { resolveSlots, type InputName } from '@trainingai/shared/inputs/cascade'
+import type { DailyTemperatureDeviation, DaytimeHighStress, OvernightRecoveryHours, RecoveryContributor } from '@trainingai/shared/health/readiness-signals'
 import type { ShadowUnitId } from './model'
 import { scoreFuel, type FuelParts, type ShadowContext, type ShadowScoreInput, type UnitInput, type UnitObservation } from './score'
 
@@ -45,19 +46,22 @@ export interface ShadowRawHistory {
     spo2Source?: string | null
   }[]
   dailySummaries: readonly { date: string; recoveryIndexHours: number | null; tempDevC: number | null; breathAvgRpm: number | null }[]
-  /** `oura_daily` rows: wear time for low-wear exclusion, Oura's own temperature deviation (#2984)
-   *  and its `stress_high` in seconds (#2985). */
-  wear: readonly { date: string; nonWearTimeSec?: number | null; temperatureDeviation?: number | null; stressHigh?: number | null }[]
+  /** `oura_daily` rows: wear time for low-wear exclusion. */
+  wear: readonly { date: string; nonWearTimeSec?: number | null }[]
+  /** #2984, #3610: each source's own nightly temperature deviation, judged against that source's normal. */
+  temperatureDeviations?: readonly DailyTemperatureDeviation[]
+  /** #2985, #3610: each source's own high-stress minutes, read from the switch day on. */
+  daytimeHighStress?: readonly DaytimeHighStress[]
   /** `oura_daily_derived`: high-stress minutes, and (#2634) the still-period resting HR, which the
    *  rollup stores only when its coverage cleared the floor, so a value here is already trusted. */
   derived: readonly { day: string; stressHighMinutes: number | null; stillRhrBpm?: number | null }[]
-  /** `oura_cloud_daily.readiness_contributors` per day: Oura's `recovery_index` stands in for the ring's
-   *  hours on a night the ring's summary has none (#3001), as the live composite takes it (rule 4). */
-  ouraCloudContributors?: readonly { date: string; readinessContributors: Record<string, number | null> | null }[]
-  /** #3572: recovery-index hours from Oura's 5-minute heart-rate series per wake date
-   *  (`getOuraCloudRecoveryIndexHours`, the value the live composite uses). Where a night has them they
+  /** A source's own 0–100 recovery contributor stands in for the ring's hours on a night the ring's
+   *  summary has none (#3001), as the live composite takes it (rule 4). */
+  recoveryContributors?: readonly RecoveryContributor[]
+  /** #3572: recovery-index hours from a source's overnight heart-rate series per wake date
+   *  (`getOvernightRecoveryHours`, the value the live composite uses). Where a night has them they
    *  stand ahead of the contributor above; a night without stays on the contributor. */
-  ouraCloudRecoveryHours?: readonly { date: string; hours: number }[]
+  recoveryHours?: readonly OvernightRecoveryHours[]
   /** The local day the user switched to the Oura API (`getOuraCloudSwitchDay`), or null. */
   ouraCloudFrom?: string | null
   /** Strength sessions with their total volume. */
@@ -101,13 +105,14 @@ export function deepRemSharePct(n: Pick<AggregatableSleep, 'deepSleepHours' | 'r
  *  normals do not restart; only a different device's values get a different label. */
 const RING_SUMMARY_SRC = 'oura_daily_summary'
 
-/** The smallest change worth reading in Oura's 0–100 recovery-index contributor (#3001): 5 points,
+/** The smallest change worth reading in a source's 0–100 recovery contributor (#3001): 5 points,
  *  against the 0.25 hours the unit uses for the ring's value. */
 const RECOVERY_CONTRIBUTOR_MIN_CHANGE = 5
 
-/** Device label for hours computed from Oura's heart-rate series (#3572). Hours and the 0–100
- *  contributor are different scales, so they never share a normal: the contributor keeps `oura_cloud`. */
-const CLOUD_HOURS_SRC = 'oura_cloud_hr_series'
+/** Label for hours computed from a source's heart-rate series (#3572): the source plus this suffix
+ *  (`oura_cloud_hr_series` for Oura). Hours and the 0–100 contributor are different scales, so they
+ *  never share a normal: the contributor keeps the source's own label. */
+const seriesHoursSource = (source: string) => `${source}_hr_series`
 
 /** Night sources whose sleep stages are our own estimate rather than a device's measurement (#2833). */
 const STAGER_SOURCES: ReadonlySet<string> = new Set(['oura_ble'])
@@ -216,25 +221,24 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
   const summaries = [...raw.dailySummaries].sort((a, b) => a.date.localeCompare(b.date))
   const metrics = [...raw.bodyMetrics].sort((a, b) => a.date.localeCompare(b.date))
 
-  // #2984, per input: the ring summary's value where it has one for the night, else Oura's own value
-  // for the same night (taken as Oura calculated it), labelled with its device so it learns its own
-  // normal. Oura's temperature is a deviation from Oura's baseline, so it is scored the same way the
-  // ring's deviation is: steady, against the person's normal of that device's deviations.
+  // #2984, per input: the ring summary's value where it has one for the night, else another source's
+  // own value for the same night (taken as it calculated it), labelled with its source so it learns its
+  // own normal. A source's temperature is a deviation from its own baseline, so it is scored the same
+  // way the ring's deviation is: steady, against the person's normal of that source's deviations.
   const summaryByDate = new Map(summaries.map(s => [s.date, s]))
   const perInput = (ring: (date: string) => number | null | undefined, fallback: Map<string, UnitObservation>) => {
     const dates = [...new Set([...summaryByDate.keys(), ...fallback.keys()])].sort()
     return compact(dates.map(d => obs(d, ring(d), RING_SUMMARY_SRC) ?? fallback.get(d) ?? null))
   }
-  const ouraTemperature = new Map(compact(raw.wear.map(w => obs(w.date, w.temperatureDeviation, 'oura_cloud'))).map(o => [o.date, o]))
-  const recoveryContributor = new Map(compact((raw.ouraCloudContributors ?? []).map(c => {
-    const v = c.readinessContributors?.recovery_index
-    const o = obs(c.date, typeof v === 'number' ? v : null, 'oura_cloud')
+  const sourceTemperature = new Map(compact((raw.temperatureDeviations ?? []).map(t => obs(t.date, t.deviationC, t.source))).map(o => [o.date, o]))
+  const recoveryContributor = new Map(compact((raw.recoveryContributors ?? []).map(c => {
+    const o = obs(c.date, c.score, c.source)
     return o ? { ...o, minMeaningfulChange: RECOVERY_CONTRIBUTOR_MIN_CHANGE } : null
   })).map(o => [o.date, o]))
-  // #3572: the live composite's order is ring hours, then cloud hours, then the contributor. Hours are the
+  // #3572: the live composite's order is ring hours, then series hours, then the contributor. Hours are the
   // unit's own scale, so they need no conversion and no floor override. Per date, hours replace the contributor.
-  const recoveryCloudHours = new Map(compact((raw.ouraCloudRecoveryHours ?? []).map(r => obs(r.date, r.hours, CLOUD_HOURS_SRC))).map(o => [o.date, o]))
-  const recoverySettling = new Map([...recoveryContributor, ...recoveryCloudHours])
+  const recoverySeriesHours = new Map(compact((raw.recoveryHours ?? []).map(r => obs(r.date, r.hours, seriesHoursSource(r.source)))).map(o => [o.date, o]))
+  const recoverySettling = new Map([...recoveryContributor, ...recoverySeriesHours])
   const nightBreathing = new Map(compact(nightList.map(([d, n]) => obs(d, n.respiratoryRate, n.respiratoryRateSource ?? 'sleep_sessions'))).map(o => [o.date, o]))
 
   const series: PreparedShadowHistory['series'] = {
@@ -250,9 +254,9 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     'sleep.balance': balance,
     'heart.overnight_hrv': nightlySeries(raw.bodyMetrics, 'hrvMs', 'HRV/night', 'night_hrv', wearByDate),
     'heart.overnight_rhr': nightlySeries(raw.bodyMetrics, 'restingHeartRate', 'RHR/night', 'night_rhr', wearByDate),
-    // The ring's hours where its summary has them, else Oura's recovery-index contributor, as the live
+    // The ring's hours where its summary has them, else a source's recovery contributor, as the live
     // composite takes it (#3001). The contributor is a 0–100 sub-score, not hours, so it carries its
-    // own device label and is learned against its own nights only, with a floor in its own units.
+    // own source label and is learned against its own nights only, with a floor in its own units.
     'heart.overnight_settling': perInput(d => summaryByDate.get(d)?.recoveryIndexHours, recoverySettling),
     'heart.daytime_rhr': compact(raw.derived.map(r => obs(r.day, r.stillRhrBpm, 'oura_daily_derived'))).sort((x, y) => x.date.localeCompare(y.date)),
     'heart.hr_recovery': [...hrrByDay.entries()].sort(([a], [b]) => a.localeCompare(b))
@@ -265,7 +269,7 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     'activity.training_load': trainingLoad,
     // #2826 item 4: the same night duration as `sleep.duration`, read as capacity to train.
     'activity.sleep_capacity': duration,
-    'body.temperature': perInput(d => summaryByDate.get(d)?.tempDevC, ouraTemperature),
+    'body.temperature': perInput(d => summaryByDate.get(d)?.tempDevC, sourceTemperature),
     'body.breathing_rate': perInput(d => summaryByDate.get(d)?.breathAvgRpm, nightBreathing),
     'body.spo2': compact(metrics.map(m => obs(m.date, m.spo2Pct, m.spo2Source ?? 'body_metrics'))),
     'body.daytime_stress': daytimeStressSeries(raw),
@@ -282,10 +286,10 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
 
 /**
  * Minutes of high daytime stress per day. Before the switch to the Oura API it is our own, from the
- * ring's daytime HRV (`oura_daily_derived`). From the switch day on it is Oura's `stress_high`, taken
- * as Oura calculated it (#2985), under source `oura_cloud`, so it learns its own normal (the scorer
- * keeps baselines per source) rather than joining ours. A day before the switch never reads
- * Oura's, so the older Cloud columns do not move a scored day.
+ * ring's daytime HRV (`oura_daily_derived`). From the switch day on it is the source's own high-stress
+ * minutes, taken as the source calculated them (#2985), under the source each value carries, so it
+ * learns its own normal (the scorer keeps baselines per source) rather than joining ours. A day before
+ * the switch never reads them, so the older Cloud columns do not move a scored day.
  */
 function daytimeStressSeries(raw: ShadowRawHistory): UnitObservation[] {
   const from = raw.ouraCloudFrom ?? null
@@ -294,10 +298,10 @@ function daytimeStressSeries(raw: ShadowRawHistory): UnitObservation[] {
     const o = obs(r.day, r.stressHighMinutes, 'oura_daily_derived')
     if (o) byDay.set(r.day, o)
   }
-  for (const w of raw.wear) {
-    if (beforeSourceSwitch(w.date, from)) continue
-    const o = obs(w.date, w.stressHigh == null ? null : w.stressHigh / 60, 'oura_cloud')
-    if (o) byDay.set(w.date, o)
+  for (const s of raw.daytimeHighStress ?? []) {
+    if (beforeSourceSwitch(s.date, from)) continue
+    const o = obs(s.date, s.minutes, s.source)
+    if (o) byDay.set(s.date, o)
   }
   return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date))
 }

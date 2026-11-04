@@ -71,6 +71,8 @@ export interface ConnectorAccountRoutes {
 interface ConnectorBase {
   /** Stable identifier, e.g. `'oura_cloud'`. */
   id: string
+  /** The source's name as a person reads it (#3610), e.g. in the score audit's wording. */
+  label: string
   transport: ConnectorTransport
   tier: 'raw' | 'computed' | 'manual'
   /** Which data types (§3) this source can provide. */
@@ -99,6 +101,7 @@ export type DataSourceConnector =
  */
 export const OURA_CLOUD_CONNECTOR = {
   id: 'oura_cloud',
+  label: 'Oura',
   transport: 'cloud_api',
   tier: 'computed',
   isolation: 'scored',

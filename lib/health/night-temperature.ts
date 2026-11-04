@@ -14,7 +14,7 @@ import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { TEMP_BASELINE_MIN_DAYS } from '@trainingai/shared/ai-periodization/deload-constants'
-import { isPreRekey } from '@/lib/oura/cloud-freshness'
+import { ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 import { resolveReadinessNightInputs, canonicalNightsByDate, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
 
 export interface NightTemperature {
@@ -56,7 +56,8 @@ export async function loadNightTemperature(
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getOuraDaily(userId, fromCountIso, todayIso),
   ])
-  const ouraDaily = ouraLong.filter(r => r.date >= from28dIso)
+  // #3610: the Oura connector's deviations in the generic shape; the resolver reads only that.
+  const temperatures = ouraTemperatureDeviations(ouraLong)
 
   // The same night assembly readiness uses, so the two agree on which night is "tonight".
   const night = resolveReadinessNightInputs({
@@ -64,9 +65,9 @@ export async function loadNightTemperature(
     summaries,
     bodyMetrics,
     nights: canonicalNightsByDate(nightSessions(sleepSessions, tz), tz),
-    ouraDaily,
+    temperatureDeviations: temperatures.filter(t => t.date >= from28dIso),
     // Recovery index only; nothing here reads it.
-    ouraCloudContributors: [],
+    recoveryContributors: [],
   })
 
   const deviation = night.temperatureDeviation
@@ -78,8 +79,8 @@ export async function loadNightTemperature(
     const from27 = shiftDateStr(todayIso, -27)
     trusted = isTemperatureBaselineCentred(summaries.filter(r => r.date >= from27).map(r => r.tempDevC))
   } else if (deviation?.source === 'cloud' && night.nightDate) {
-    const ouraDevs = ouraLong.filter(r => !isPreRekey(r.date) && r.temperatureDeviation != null && Number.isFinite(r.temperatureDeviation))
-    baselineNights = ouraDevs.filter(r => r.date < night.nightDate!).length
+    const sourceDevs = temperatures.filter(t => !t.superseded && Number.isFinite(t.deviationC))
+    baselineNights = sourceDevs.filter(t => t.date < night.nightDate!).length
     // #3169 (owner, 26 Oct): the temperature deload stays off on Oura's deviation until its new
     // baseline has been checked, however many nights it has. The prescription's `tempZ` is unaffected.
     // Lift this by computing it again: `isTemperatureBaselineCentred` over the same Oura nights.

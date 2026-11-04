@@ -39,6 +39,7 @@ import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompo
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
 import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
+import { ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
 import { ouraCloudDeliveredTypes } from '@/lib/oura/cloud/config'
@@ -394,7 +395,7 @@ export async function buildReadinessPayload(
   // midnight, Oura's at 4 a.m., hence the day before). Today's live read may go without it; a
   // finalised day may not (`loadActivityDay`).
   const movementSeriesP = (async () => repo.getPerMinuteMovementSeries(userId, shiftDateStr(todayIso, -1), todayIso))().catch(() => [])
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors, switchDay, stepActivityLogs, metChangedAt, ouraCloudRecoveryHours] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, recoveryContributors, switchDay, stepActivityLogs, metChangedAt, recoveryHours] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -410,9 +411,9 @@ export async function buildReadinessPayload(
     // TN-46: context for a flagged day, never an input to the score. A failure costs the context only.
     (async () => repo.listDoseEvents(userId, shiftDateStr(todayIso, -DOSE_EFFECT_LOOKBACK_DAYS), todayIso))().catch(() => []),
     connectedSourcesP,
-    // #2984: Oura's recovery-index contributor, the one input Oura sends no value for. A failure
+    // #2984: a source's own recovery contributor, for the one input with no underlying value. A failure
     // leaves that input missing, which is what it is without the read.
-    (async () => repo.getOuraCloudReadinessContributors(userId, from28dIso, todayIso))().catch(() => []),
+    (async () => repo.getRecoveryContributors(userId, from28dIso, todayIso))().catch(() => []),
     // #3193: a failed lookup reads as no switch, so the ring's value stands, as before the switch existed.
     (async () => knownSwitchDay !== undefined ? knownSwitchDay : repo.getOuraCloudSwitchDay(userId))().catch(() => null),
     // #3134: today's and yesterday's treadmill steps join the device count in the Activity score. A failed
@@ -422,9 +423,9 @@ export async function buildReadinessPayload(
     // training-stress re-check does. A failed read only loses that trigger for this read. Read here
     // with the rest rather than after them (#3392): it adds no round trip to the read.
     (async () => repo.getOuraCloudMetChangedAt(userId, metLookbackFrom(todayIso, ACTIVITY_FINALISE_DAYS), shiftDateStr(todayIso, -1)))().catch(() => []),
-    // #3075 stage 2: recovery-index hours from Oura's 5-minute heart-rate series, for the last week of
-    // wake dates (tonight's is the one scored). A failed read leaves Oura's contributor standing.
-    (async () => repo.getOuraCloudRecoveryIndexHours(userId, Array.from({ length: 8 }, (_, i) => shiftDateStr(todayIso, -i)), tz))().catch(() => []),
+    // #3075 stage 2: recovery-index hours from a source's overnight heart-rate series, for the last week
+    // of wake dates (tonight's is the one scored). A failed read leaves the contributor standing.
+    (async () => repo.getOvernightRecoveryHours(userId, Array.from({ length: 8 }, (_, i) => shiftDateStr(todayIso, -i)), tz))().catch(() => []),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -632,9 +633,9 @@ export async function buildReadinessPayload(
     summaries: dailySummaries,
     bodyMetrics,
     nights: canonicalNightsByDate(nights, tz),
-    ouraDaily: ouraRows,
-    ouraCloudContributors,
-    ouraCloudRecoveryHours,
+    temperatureDeviations: ouraTemperatureDeviations(ouraRows),
+    recoveryContributors,
+    recoveryHours,
   })
 
   // Temp deviation for display: tonight's ring value, else Oura's own for the same night.
