@@ -39,6 +39,8 @@ const getUserById = vi.fn(async (_u: string) => ({ dateOfBirth: '1990-01-01', he
 const listBodyMetrics = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getActiveRunningPlan = vi.fn(async (_u: string) => null as Row | null)
 const getDayExerciseNames = vi.fn(async (..._a: unknown[]) => [] as Row[])
+// #3612: the resting-HR means read the same windows' sleep for each reading's algorithm version.
+const listSleepSessions = vi.fn(async (..._a: unknown[]) => [] as Row[])
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
@@ -46,7 +48,7 @@ vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
     getZoneMinutesRange, listActivityLogs, getHrForWindow, getObservedHrProfile, getUserById, getUserGoals,
-    listBodyMetrics, getActiveRunningPlan, getDayExerciseNames,
+    listBodyMetrics, getActiveRunningPlan, getDayExerciseNames, listSleepSessions,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
