@@ -32,7 +32,12 @@ import {
 } from '../data/banner-data';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { DetectedWalkSheet } from './DetectedWalkSheet';
-import { recordedSpans, visibleWalks, walkCandidatesSpec } from '../data/detected-walks';
+import {
+  recordedSpans,
+  visibleWalks,
+  walkCandidatesSpec,
+  type DetectedWalk,
+} from '../data/detected-walks';
 import { GoalRecommendation } from '../../nutrition/components/GoalRecommendation';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 
@@ -56,7 +61,8 @@ export function HomeBanners({
   const undo = useUndo();
   const reduced = useReducedMotion();
   const [goals, setGoals] = useState(false);
-  const [reviewing, setReviewing] = useState(false);
+  // The walk the sheet was opened on, held so a newer detection arriving mid-edit can't replace it.
+  const [reviewing, setReviewing] = useState<DetectedWalk | null>(null);
   const activity = useActivities();
   const candidates = useWorkoutResource(walkCandidatesSpec(health.today));
   const session = activity.session;
@@ -146,7 +152,7 @@ export function HomeBanners({
             icon: 'legs' as const,
             label: 'Walk detected',
             subtitle: `Looks like you walked ${formatTimeOfDay(newest.startMs, health.timezone)}–${formatTimeOfDay(newest.endMs, health.timezone)}. Save it?${detected.length > 1 ? ` +${detected.length - 1} more` : ''}`,
-            open: () => setReviewing(true),
+            open: () => setReviewing(newest),
             dismiss: () => dismissWalks(),
           },
         ]
@@ -380,12 +386,12 @@ export function HomeBanners({
             ))}
         </Card>
       )}
-      {reviewing && newest && (
+      {reviewing && (
         <DetectedWalkSheet
-          key={newest.startMs}
-          walk={newest}
+          key={reviewing.startMs}
+          walk={reviewing}
           timezone={health.timezone}
-          onClose={() => setReviewing(false)}
+          onClose={() => setReviewing(null)}
         />
       )}
       {goals && (

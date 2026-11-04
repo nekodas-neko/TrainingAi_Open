@@ -3,6 +3,7 @@ import {
   formatTimeOfDay,
   localClockTimeToDate,
   msToHHMMInTz,
+  shiftDateStr,
   toAestDay,
 } from '@trainingai/shared/date-utils';
 import { activityPayload, type ActivityPayload } from '../../activities/data/models.ts';
@@ -94,12 +95,22 @@ export function initialChoice(walk: Span, timezone: string): WalkChoice {
     end: msToHHMMInTz(walk.endMs, timezone),
   };
 }
-/** The span an edited choice means, on the day the walk started; null while a time is not valid. */
+/** The longest span an end time before the start may roll over midnight into: a typo is not a walk. */
+const MAX_ROLLOVER_MS = 12 * 3_600_000;
+/**
+ * The span an edited choice means, starting on the day the walk started; null while a time is not
+ * valid. An end clock time before the start is the next morning (a 23:50–00:10 walk), as long as the
+ * span stays under 12 hours; the current app saves the real end the same way.
+ */
 export function choiceSpan(walk: Span, choice: WalkChoice, timezone: string): Span | null {
   if (!hhmm.test(choice.start.trim()) || !hhmm.test(choice.end.trim())) return null;
   const date = toAestDay(new Date(walk.startMs), timezone);
   const start = localClockTimeToDate(date, choice.start.trim(), timezone);
-  const end = localClockTimeToDate(date, choice.end.trim(), timezone);
+  let end = localClockTimeToDate(date, choice.end.trim(), timezone);
+  if (start && end && end <= start) {
+    const nextDay = localClockTimeToDate(shiftDateStr(date, 1), choice.end.trim(), timezone);
+    end = nextDay && nextDay.getTime() - start.getTime() < MAX_ROLLOVER_MS ? nextDay : null;
+  }
   return start && end && end > start ? { startMs: start.getTime(), endMs: end.getTime() } : null;
 }
 /**

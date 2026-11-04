@@ -114,6 +114,25 @@ test('an edit changes the type and the times, and a bad time saves nothing', () 
   }
 });
 
+test('a walk across midnight saves unedited, filed under the day it started', () => {
+  // 23:50–00:10 Brisbane: the end clock time is the next morning.
+  const late = { startMs: Date.UTC(2026, 10, 4, 13, 50), endMs: Date.UTC(2026, 10, 4, 14, 10), durationMin: 20 };
+  const payload = detectedActivityPayload(
+    '10000000-0000-4000-8000-000000000002',
+    late,
+    initialChoice(late, tz),
+    tz,
+  )!;
+  assert.ok(payload, 'an unedited midnight walk saves');
+  assert.equal(payload.date, '2026-11-04');
+  assert.equal(payload.durationMin, 20);
+  // An end before the start that would make a walk of 12 hours or more is still a typo.
+  assert.equal(
+    detectedActivityPayload('10000000-0000-4000-8000-000000000002', late, { type: 'walk', start: '23:50', end: '11:50' }, tz),
+    null,
+  );
+});
+
 test('confirming queues the activity once, however many times it is tapped', async () => {
   const f = stores();
   const home = f.home();
