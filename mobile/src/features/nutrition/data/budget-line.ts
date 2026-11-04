@@ -66,3 +66,12 @@ export function budgetLine(
       : null,
   });
 }
+
+/**
+ * The log-food sheet's "Today after logging" bar: warning once logging this food would take the
+ * day's counted intake past its budget, success otherwise. The current app's assign step does the
+ * same flip (`components/nutrition/assign-step.tsx`, BF-175 / #2160): orange over, green within.
+ */
+export function afterLoggingBarTone(afterKcal: number, budgetKcal: number): 'success' | 'warning' {
+  return afterKcal > budgetKcal ? 'warning' : 'success';
+}

@@ -29,6 +29,8 @@ import {
   Thumbnail,
 } from '../../../shared/ui';
 import { energySpec } from '../../health/data/models';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { afterLoggingBarTone } from '../data/budget-line';
 import {
   useWorkoutResource,
   useWorkoutResources,
@@ -130,6 +132,7 @@ export function FoodLogger({
   initialTab?: 'search';
 }) {
   const n = useNutrition(date);
+  const { theme } = useTheme();
   const resources = useWorkoutResources();
   const loggerKey = `food-logger:${date}:${library ? 'library' : 'log'}`;
   const photoKey = `food-photo:${date}:${library ? 'library' : 'log'}`;
@@ -869,7 +872,10 @@ export function FoodLogger({
                     <AppText>
                       {after} / {Math.round(energy.data.balance.budgetKcal)} kcal
                     </AppText>
-                    <ProgressBar value={after / energy.data.balance.budgetKcal} />
+                    <ProgressBar
+                      value={after / energy.data.balance.budgetKcal}
+                      color={theme.status[afterLoggingBarTone(after, energy.data.balance.budgetKcal)]}
+                    />
                   </Card>
                 );
               })()}
