@@ -15,6 +15,7 @@ import { walkBodyBattery, restThresholdFromOffset } from '@trainingai/shared/hea
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { buildDaytimeStressSeriesFromModel, summarizeStressDay, type StressPoint, type DhrvBaselines } from '@/lib/health/daytime-stress'
 import { resolveAnchor, type AnchorSource } from '@/lib/health/body-battery-anchor'
+import { ouraDaytimeHighStress } from '@/lib/oura/cloud/readiness-signals-map'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { metricAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
@@ -199,6 +200,8 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   ])
 
   const ouraDay = ouraRows[0] ?? null
+  // #3616: the day's high-stress minutes as the connector maps them (the Oura Cloud mapper here).
+  const daytimeHighStress = ouraDaytimeHighStress(ouraRows)
   const derivedDay = derivedRows[0] ?? null
 
   // ── Resting HR baseline + HRmax (for HR reserve) ──────────────────────────
@@ -363,22 +366,24 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
       reportServerError(err, { userId, url: '/api/body-battery#stress' })
     }
   }
-  // #2985: where the dHRV series is absent, Oura's `stress_high` for the day drives the stress drain,
-  // from the day the user switched to the Oura API (an older day keeps what it had). It is a day's
-  // total with no times, so it is spread evenly over the waking span: the level is the share of the
-  // span Oura counted as high stress, and a full-deviation minute drains at STRESS_DRAIN_RATE,
+  // #2985: where the dHRV series is absent, the source's own high-stress minutes for the day drive the
+  // stress drain, from the day the user switched to that source (an older day keeps what it had). It is
+  // a day's total with no times, so it is spread evenly over the waking span: the level is the share of
+  // the span the source counted as high stress, and a full-deviation minute drains at STRESS_DRAIN_RATE,
   // so the day's stress drain comes to about STRESS_DRAIN_RATE per high-stress minute.
-  const ouraStressHighMin = stressSeries.length === 0 && !beforeSourceSwitch(date, ouraCloudFrom)
-    && ouraDay?.stressHigh != null && ouraDay.stressHigh >= 0
-    ? Math.round(ouraDay.stressHigh / 60)
+  // #3616: read through the generic `DaytimeHighStress` shape the connector maps, never a field of its own.
+  const dayHighStress = daytimeHighStress.find(s => s.date === date) ?? null
+  const sourceStressHighMin = stressSeries.length === 0 && !beforeSourceSwitch(date, ouraCloudFrom)
+    && dayHighStress != null && dayHighStress.minutes >= 0
+    ? Math.round(dayHighStress.minutes)
     : null
   const wakingSpanMin = Math.max(0, (now.getTime() - wakeTime) / 60_000)
-  const ouraStressLevel = ouraStressHighMin != null && wakingSpanMin > 0
-    ? -Math.min(1, ouraStressHighMin / wakingSpanMin)
+  const sourceStressLevel = sourceStressHighMin != null && wakingSpanMin > 0
+    ? -Math.min(1, sourceStressHighMin / wakingSpanMin)
     : null
   // Step lookup: stressLevel (∈[−1,1]) of the most recent bucket at/under a time (30-min, held forward).
   const stressAt = (ms: number): number | null => {
-    if (ouraStressLevel != null) return ouraStressLevel
+    if (sourceStressLevel != null) return sourceStressLevel
     let v: number | null = null
     for (const p of stressSeries) { if (p.t <= ms) v = p.stressLevel; else break }
     return v
@@ -503,14 +508,14 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
       observedPeak: hrMaxResolved.observedPeak,
       peakDays: hrMaxResolved.peakDays,
     },
-    stress: ouraStressHighMin != null
+    stress: sourceStressHighMin != null
       ? {
-          // Oura's figure is a day's total: no moment-to-moment level, so no current reading or curve.
+          // The source's figure is a day's total: no moment-to-moment level, so no current reading or curve.
           current: null,
           draining: false,
           extraDrained: Math.round(stressDrained * 10) / 10,
           series: [],
-          highMinutes: ouraStressHighMin,
+          highMinutes: sourceStressHighMin,
         }
       : stressSeries.length
       ? {
@@ -521,7 +526,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
           highMinutes: stressSummary?.stressHighMinutes ?? null,
         }
       : null,
-    availability: [metricAvailability('daytimeStress', stressSeries.length > 0 ? stressSeries.length : ouraStressHighMin)],
+    availability: [metricAvailability('daytimeStress', stressSeries.length > 0 ? stressSeries.length : sourceStressHighMin)],
     exercise: {
       drained: Math.round(exerciseDrained),
       workoutDrained: Math.round(exercise.workoutDrained),

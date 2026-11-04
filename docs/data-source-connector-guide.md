@@ -253,10 +253,13 @@ DailyTemperatureDeviation { date, deviationC, source, superseded? }  // °C from
 RecoveryContributor       { date, score /* 0-100 */, source, provenance }
 OvernightRecoveryHours    { date, hours, source, provenance }       // our hours from its overnight HR series
 DaytimeHighStress         { date, minutes, source }
+DaytimeHighRecovery       { date, minutes, source }               // display only (#3616)
 ```
 
 - **Read by** the readiness night inputs (`lib/health/readiness-night-inputs.ts`), shadow readiness
-  (`shadow-readiness/assemble.ts`) and the readiness score audit. None of them reads a device's field
+  (`shadow-readiness/assemble.ts`) and the readiness score audit; daytime stress also by Body
+  Battery's stress-drain fallback (`body-battery-day.ts`), and stress and recovery by the readiness
+  payload's display (`readiness-payload.ts`, #3616). None of them reads a device's field
   names (#3610). Every normal a value joins is keyed on the `source` it carries, so two sources'
   values never share a baseline.
 - **`superseded`** marks a value the source no longer stands behind (Oura: the history before the
@@ -265,7 +268,8 @@ DaytimeHighStress         { date, minutes, source }
 - **`provenance`** is words for the score audit ("where this came from"). Display only; nothing
   branches on it.
 - **Oura's mapping** is `lib/oura/cloud/readiness-signals-map.ts`: `daily_readiness.temperature_deviation`,
-  the `recovery_index` readiness contributor, `daily_stress.stress_high` (seconds → minutes), and our
+  the `recovery_index` readiness contributor, `daily_stress.stress_high` and `recovery_high` (seconds →
+  minutes), and our
   hours from each night's 5-minute heart-rate series. The recovery contributor and the series hours
   are read through `repo.getRecoveryContributors` / `repo.getOvernightRecoveryHours`
   (`lib/data/postgres/slices/readiness-signals.ts`, one reader per connector id); the temperature and
@@ -273,7 +277,8 @@ DaytimeHighStress         { date, minutes, source }
 - **Who else could fill them:** Fitbit's nightly skin-temperature deviation or Health Connect's
   `SkinTemperatureRecord` deltas (temperature); Garmin's or Fitbit's overnight recovery sub-scores
   (contributor); any overnight heart-rate series, Fitbit intraday or Health Connect `HeartRateRecord`
-  (hours, through the same ring-era function); Garmin's or Fitbit's high-stress minutes (stress).
+  (hours, through the same ring-era function); Garmin's or Fitbit's high-stress minutes (stress);
+  Garmin's rest minutes (recovery).
   A source that fills none of them leaves those inputs missing, exactly as today.
 
 ---
