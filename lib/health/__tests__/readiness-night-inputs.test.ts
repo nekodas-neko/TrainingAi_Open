@@ -48,10 +48,13 @@ const sleepNights = (source: string, n: number) => Array.from({ length: n + 1 },
   date: day(i), durationHours: 7 + (i % 4) * 0.2, respiratoryRate: 14 + (i % 3) * 0.3,
   durationSource: source, respiratoryRateSource: source,
 }))
-const ouraTemps = (n: number) => Array.from({ length: n + 1 }, (_, i) => ({ date: day(i), temperatureDeviation: i === 0 ? 0.4 : (i % 3 - 1) * 0.1 }))
+const ouraTemps = (n: number) => Array.from({ length: n + 1 }, (_, i) => ({ date: day(i), deviationC: i === 0 ? 0.4 : (i % 3 - 1) * 0.1, source: 'oura_cloud' }))
+/** #3610: a source's recovery contributor and series hours, in the generic shapes. */
+const contributor = (date: string, score: number) => ({ date, score, source: 'oura_cloud', provenance: 'oura_cloud readiness contributor recovery_index' })
+const hoursOf = (date: string, hours: number) => ({ date, hours, source: 'oura_cloud', provenance: 'series' })
 
 const base = (over: Partial<NightInputSources> = {}): NightInputSources => ({
-  today: TODAY, summaries: [], bodyMetrics: [], nights: [], ouraDaily: [], ouraCloudContributors: [], ...over,
+  today: TODAY, summaries: [], bodyMetrics: [], nights: [], temperatureDeviations: [], recoveryContributors: [], ...over,
 })
 
 // #2265: a night the owner marked partial has no hours to balance, but its breathing is real.
@@ -60,7 +63,7 @@ describe('resolveReadinessNightInputs — a marked partial night', () => {
   const nights = (markTonight: boolean) => sleepNights('oura_cloud', 20).map(n =>
     n.date === TODAY ? { ...n, durationHours: 3.2, ...(markTonight ? { partialNightAt: MARK } : {}) } : n)
   const resolve = (markTonight: boolean) => resolveReadinessNightInputs(base({
-    bodyMetrics: bodyNights('oura_cloud', 20), nights: nights(markTonight), ouraDaily: ouraTemps(20),
+    bodyMetrics: bodyNights('oura_cloud', 20), nights: nights(markTonight), temperatureDeviations: ouraTemps(20),
   }))
 
   it('drops sleep balance for the marked night and keeps breathing and HRV', () => {
@@ -82,8 +85,8 @@ describe('resolveReadinessNightInputs — per input, not per row', () => {
       summaries: [fullRing(day(1)), partialRing(TODAY)],
       bodyMetrics: bodyNights('oura_cloud', 20),
       nights: sleepNights('oura_cloud', 20),
-      ouraDaily: ouraTemps(20),
-      ouraCloudContributors: [{ date: TODAY, readinessContributors: { recovery_index: 82, hrv_balance: 70 } }],
+      temperatureDeviations: ouraTemps(20),
+      recoveryContributors: [contributor(TODAY, 82)],
     }))
     expect(r.nightDate).toBe(TODAY)
     expect(r.ringSummary?.date).toBe(TODAY)
@@ -106,8 +109,8 @@ describe('resolveReadinessNightInputs — per input, not per row', () => {
       summaries: [fullRing(day(1)), fullRing(TODAY)],
       bodyMetrics: bodyNights('oura_cloud', 20),
       nights: sleepNights('oura_cloud', 20),
-      ouraDaily: ouraTemps(20),
-      ouraCloudContributors: [{ date: TODAY, readinessContributors: { recovery_index: 82 } }],
+      temperatureDeviations: ouraTemps(20),
+      recoveryContributors: [contributor(TODAY, 82)],
     }))
     for (const key of ['restingHeartRate', 'hrvBalance', 'temperature', 'sleepBalance', 'breathing'] as const) {
       expect(r.inputs[key]?.source, key).toBe(RING_SUMMARY_SOURCE)
@@ -136,8 +139,8 @@ describe('resolveReadinessNightInputs — per input, not per row', () => {
       summaries: [fullRing(day(1)), ring],
       bodyMetrics: bodyNights('oura_cloud', 20),
       nights: sleepNights('oura_cloud', 20),
-      ouraDaily: ouraTemps(20),
-      ouraCloudContributors: [{ date: TODAY, readinessContributors: { recovery_index: 64 } }],
+      temperatureDeviations: ouraTemps(20),
+      recoveryContributors: [contributor(TODAY, 64)],
     }))
     expect(r.inputs.restingHeartRate?.source).toBe(RING_SUMMARY_SOURCE)
     expect(r.inputs.sleepBalance?.source).toBe(RING_SUMMARY_SOURCE)
@@ -194,7 +197,7 @@ describe('normals re-learn per device', () => {
   })
 
   it('scores Oura\'s temperature deviation in centi-°C, so a small deviation is not rounded away', () => {
-    const r = resolveReadinessNightInputs(base({ bodyMetrics: bodyNights('oura_cloud', 20), ouraDaily: ouraTemps(20) }))
+    const r = resolveReadinessNightInputs(base({ bodyMetrics: bodyNights('oura_cloud', 20), temperatureDeviations: ouraTemps(20) }))
     expect(r.inputs.temperature?.z).toBeGreaterThan(1)
   })
 })
@@ -204,7 +207,7 @@ describe('the illness radar reads the composite\'s own z-scores (PS-42)', () => 
     const r = resolveReadinessNightInputs(base({
       summaries: [fullRing(day(1)), fullRing(TODAY, { hrvAvgMs: null })],
       bodyMetrics: bodyNights('oura_cloud', 20),
-      ouraDaily: ouraTemps(20),
+      temperatureDeviations: ouraTemps(20),
     }))
     const composite = compositeNightFields(r)
     const illness = illnessNightFields(r)
@@ -247,17 +250,17 @@ describe('the recovery-index contributor on its own scale', () => {
 // #3075 stage 2: an Oura Cloud night's recovery index is scored from our own hours where the heart-rate
 // series is usable, and from Oura's contributor where it is not. The ring's hours still win.
 describe('recovery index on an Oura Cloud night (#3075 stage 2)', () => {
-  const contributors = [{ date: TODAY, readinessContributors: { recovery_index: 82 } as Record<string, number | null> }]
+  const contributors = [contributor(TODAY, 82)]
   const cloud = (over: Partial<NightInputSources> = {}) => base({
-    bodyMetrics: bodyNights('oura_cloud', 20), nights: sleepNights('oura_cloud', 20), ouraDaily: ouraTemps(20),
-    ouraCloudContributors: contributors, ...over,
+    bodyMetrics: bodyNights('oura_cloud', 20), nights: sleepNights('oura_cloud', 20), temperatureDeviations: ouraTemps(20),
+    recoveryContributors: contributors, ...over,
   })
   const score = (r: ReturnType<typeof resolveReadinessNightInputs>) => computeReadinessComposite({
     ...compositeNightFields(r), previousNightScore: 80, activityBalanceScore: 70, nHistory: 61,
   }).contributors.recoveryIndex
 
   it('a night with a usable series takes our hours, scored on the hours curve, not the contributor', () => {
-    const r = resolveReadinessNightInputs(cloud({ ouraCloudRecoveryHours: [{ date: TODAY, hours: 4 }] }))
+    const r = resolveReadinessNightInputs(cloud({ recoveryHours: [hoursOf(TODAY, 4)] }))
     expect(r.recoveryIndex).toEqual({ hours: 4, source: 'oura_cloud' })
     const c = score(r)
     expect(c.input).toBe(4)
@@ -267,29 +270,29 @@ describe('recovery index on an Oura Cloud night (#3075 stage 2)', () => {
   })
 
   it('a night with no series falls back to the contributor, as before', () => {
-    for (const ouraCloudRecoveryHours of [undefined, [], [{ date: day(1), hours: 4 }]]) {
-      const r = resolveReadinessNightInputs(cloud({ ouraCloudRecoveryHours }))
+    for (const recoveryHours of [undefined, [], [hoursOf(day(1), 4)]]) {
+      const r = resolveReadinessNightInputs(cloud({ recoveryHours }))
       expect(r.recoveryIndex).toEqual({ contributor: 82, source: 'oura_cloud' })
       expect(score(r)).toMatchObject({ score: 82, scale: 'oura_contributor' })
     }
   })
 
   it('a night with neither is missing, never dropped to zero', () => {
-    const r = resolveReadinessNightInputs(cloud({ ouraCloudContributors: [] }))
+    const r = resolveReadinessNightInputs(cloud({ recoveryContributors: [] }))
     expect(r.recoveryIndex).toBeNull()
   })
 
   it('a ring-era night keeps the ring hours even when the cloud has some', () => {
     const r = resolveReadinessNightInputs(base({
-      summaries: [fullRing(day(1)), fullRing(TODAY)], ouraCloudContributors: contributors,
-      ouraCloudRecoveryHours: [{ date: TODAY, hours: 2 }],
+      summaries: [fullRing(day(1)), fullRing(TODAY)], recoveryContributors: contributors,
+      recoveryHours: [hoursOf(TODAY, 2)],
     }))
     expect(r.recoveryIndex).toEqual({ hours: 4.5, source: RING_SUMMARY_SOURCE })
   })
 
   it('a partial ring row does not hide the cloud hours', () => {
     const r = resolveReadinessNightInputs(cloud({
-      summaries: [fullRing(day(1)), partialRing(TODAY)], ouraCloudRecoveryHours: [{ date: TODAY, hours: 3.5 }],
+      summaries: [fullRing(day(1)), partialRing(TODAY)], recoveryHours: [hoursOf(TODAY, 3.5)],
     }))
     expect(r.recoveryIndex).toEqual({ hours: 3.5, source: 'oura_cloud' })
   })

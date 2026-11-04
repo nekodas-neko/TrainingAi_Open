@@ -467,7 +467,7 @@ describe('#2984: inputs carry their device, and temperature and breathing fall b
       { date: D, hrvMs: 47, hrvSource: 'oura_cloud' },
     ]
     raw.dailySummaries = Array.from({ length: 20 }, (_, i) => ({ date: shiftDateStr(D, -(i + 1)), recoveryIndexHours: 5, tempDevC: (i % 3 - 1) * 0.1, breathAvgRpm: 14 }))
-    raw.wear = [{ date: D, temperatureDeviation: 0.3 }]
+    raw.temperatureDeviations = [{ date: D, deviationC: 0.3, source: 'oura_cloud' }]
     return raw
   }
 

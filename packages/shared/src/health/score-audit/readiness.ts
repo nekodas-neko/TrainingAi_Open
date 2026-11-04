@@ -32,7 +32,7 @@ export interface ReadinessAuditInput {
    */
   /** The user's Oura API switch day, for the source label a backfill writes (`readinessSourceLabel`). */
   switchDay?: string | null
-  generic?: Pick<NightInputSources, 'bodyMetrics' | 'nights' | 'ouraDaily' | 'ouraCloudContributors' | 'ouraCloudRecoveryHours'>
+  generic?: Pick<NightInputSources, 'bodyMetrics' | 'nights' | 'temperatureDeviations' | 'recoveryContributors' | 'recoveryHours'>
 }
 
 const r3 = (n: number | null) => (n == null ? null : Math.round(n * 1000) / 1000)
@@ -49,7 +49,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
   // #3077: the same per-input, per-device choice the live score makes (`resolveReadinessNightInputs`),
   // so the audit explains today's model, not the ring-only v7 path. An audit, not a score: nothing
   // here is stored.
-  const generic = input.generic ?? { bodyMetrics: [], nights: [], ouraDaily: [], ouraCloudContributors: [] }
+  const generic = input.generic ?? { bodyMetrics: [], nights: [], temperatureDeviations: [], recoveryContributors: [] }
   const night = resolveReadinessNightInputs({
     today: date,
     summaries: [priorSummary, summary].filter((r): r is NonNullable<typeof r> => r != null),
@@ -72,9 +72,21 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     }
     const m = generic.bodyMetrics.find(r => r.date === generic$)
     const n = generic.nights.find(r => r.date === generic$)
-    const o = generic.ouraDaily.find(r => r.date === generic$)
+    const t = generic.temperatureDeviations.find(r => r.date === generic$)
     return key === 'restingHeartRate' ? m?.restingHeartRate ?? null : key === 'hrvBalance' ? m?.hrvMs ?? null
-      : key === 'temperature' ? o?.temperatureDeviation ?? null : key === 'sleepBalance' ? n?.durationHours ?? null : null
+      : key === 'temperature' ? t?.deviationC ?? null : key === 'sleepBalance' ? n?.durationHours ?? null : null
+  }
+  // #3610: the recovery index's wording comes from the shape that supplied it (its own provenance),
+  // never from which source it was. The ring summary's hours name the ring's column.
+  const ri = night.recoveryIndex
+  const recoveryIndexSource = (): string => {
+    if (ri == null || ri.source === RING_SUMMARY_SOURCE) return 'oura_daily_summary.recovery_index_hours'
+    if ('contributor' in ri) {
+      const shape = generic.recoveryContributors.find(r => r.date === night.nightDate && r.source === ri.source)
+      return `${shape?.provenance ?? `${ri.source} recovery contributor`} = ${ri.contributor} (no hours)`
+    }
+    const shape = (generic.recoveryHours ?? []).find(r => r.date === night.nightDate && r.source === ri.source)
+    return shape?.provenance ?? `our hours from ${ri.source}'s heart-rate series`
   }
 
   const latestSummary = summary ?? priorSummary
@@ -193,11 +205,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       key: 'recoveryIndex', label: 'Recovery index',
       input: {
         value: night.recoveryIndex && 'hours' in night.recoveryIndex ? night.recoveryIndex.hours : null, unit: 'h',
-        source: night.recoveryIndex && 'contributor' in night.recoveryIndex
-          ? `oura_cloud readiness contributor recovery_index = ${night.recoveryIndex.contributor} (no hours)`
-          : night.recoveryIndex?.source === 'oura_cloud'
-            ? 'oura_cloud_sleep_periods.heart_rate (our hours from Oura\'s 5-minute series)'
-            : 'oura_daily_summary.recovery_index_hours',
+        source: recoveryIndexSource(),
         note: `Hours from the overnight HR minimum to wake; linear to 100 at ${READINESS_MODEL.recoveryIndexOptimalHours} h. Approximation — always flagged provisional.`,
       },
       subScore: c.recoveryIndex.score, provisional: c.recoveryIndex.provisional,

@@ -8,6 +8,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { sleepFeelLabel } from '@trainingai/shared/health/sleep-feel-calibration'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { canonicalNightsByDate } from '@/lib/health/readiness-night-inputs'
+import { ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 import { buildSleepAudit } from './sleep'
 import { buildReadinessAudit } from './readiness'
 import { buildActivityAudit } from './activity'
@@ -50,7 +51,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   const [
     bodyMetrics, sleepSessions, workoutSessions, ouraRows,
     hrRows, summaries, derivedRows, mood, user, activityLogsTwoDays, nutrition, morningCheckin, userGoals,
-    ouraCloudContributors, switchDay, ouraCloudRecoveryHours,
+    recoveryContributors, switchDay, recoveryHours,
   ] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
     repo.listSleepSessions(userId, fromIso, date),
@@ -71,12 +72,12 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     repo.getDayCheckin(userId, date, 'morning'),
     // Q-524: the audit must score steps against the same goal the live route does.
     repo.getUserGoals(userId).catch(() => null),
-    // #3077: Oura's recovery-index contributor, the one input Oura sends no value for (as the live score reads it).
-    repo.getOuraCloudReadinessContributors(userId, fromIso, date).catch(() => []),
+    // #3077: a source's own recovery contributor, the one input with no underlying value (as the live score reads it).
+    repo.getRecoveryContributors(userId, fromIso, date).catch(() => []),
     // A failed lookup reads as no switch, so the ring's value stands (as the live payload does).
     repo.getOuraCloudSwitchDay(userId).catch(() => null),
     // #3075 stage 2: the live score's own-hours input, so the audit explains the same recovery index.
-    repo.getOuraCloudRecoveryIndexHours(userId, Array.from({ length: 8 }, (_, i) => shiftDateStr(date, -i)), tz).catch(() => []),
+    repo.getOvernightRecoveryHours(userId, Array.from({ length: 8 }, (_, i) => shiftDateStr(date, -i)), tz).catch(() => []),
   ])
 
   // Everything below is scoped to the audited day, never "today".
@@ -183,9 +184,9 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     generic: {
       bodyMetrics,
       nights: canonicalNightsByDate(nightsAll, tz),
-      ouraDaily: ouraRows,
-      ouraCloudContributors,
-      ouraCloudRecoveryHours,
+      temperatureDeviations: ouraTemperatureDeviations(ouraRows),
+      recoveryContributors,
+      recoveryHours,
     },
   }))
 

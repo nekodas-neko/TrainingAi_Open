@@ -23,6 +23,9 @@ import {
   resolveReadinessNightInputs, compositeNightFields, illnessNightFields, readinessSourceLabel,
   type NightInputSources, type RingSummaryInput,
 } from '@/lib/health/readiness-night-inputs'
+import {
+  ouraDaytimeHighStress, ouraOvernightRecoveryHours, ouraRecoveryContributors, ouraTemperatureDeviations,
+} from '@/lib/oura/cloud/readiness-signals-map'
 import { monthFixture, fixtureRepo } from './fixtures/activity-day-fixtures'
 
 let repo: Record<string, unknown>
@@ -73,7 +76,7 @@ function rng(seed: number) {
 interface OuraDailyStored { date: string; nonWearTimeSec: number | null; temperatureDeviation: number | null; stressHigh: number | null }
 /** An `oura_cloud_daily.readiness_contributors` row. */
 interface ContributorStored { date: string; readinessContributors: Record<string, number | null> | null }
-/** `getOuraCloudRecoveryIndexHours`'s row on `main`. */
+/** The Oura reader's recovery-hours row (`getOuraCloudRecoveryIndexHours`). */
 interface HoursStored { date: string; hours: number }
 
 interface Stored {
@@ -156,7 +159,8 @@ function stored(seed: number, today: string, switchDay: string | null, days = 40
 function wireNight(s: Stored): NightInputSources {
   return {
     today: s.today, summaries: s.summaries, bodyMetrics: s.bodyMetrics, nights: s.nights,
-    ouraDaily: s.ouraDaily, ouraCloudContributors: s.contributors, ouraCloudRecoveryHours: s.hours,
+    temperatureDeviations: ouraTemperatureDeviations(s.ouraDaily), recoveryContributors: ouraRecoveryContributors(s.contributors),
+    recoveryHours: ouraOvernightRecoveryHours(s.hours),
   }
 }
 
@@ -166,22 +170,26 @@ function wireShadow(s: Stored): ShadowRawHistory {
     sleepSessions: [], bodyMetrics: s.bodyMetrics,
     dailySummaries: s.summaries.map(x => ({ date: x.date, recoveryIndexHours: x.recoveryIndexHours, tempDevC: x.tempDevC, breathAvgRpm: x.breathAvgRpm })),
     wear: s.ouraDaily,
+    temperatureDeviations: ouraTemperatureDeviations(s.ouraDaily), daytimeHighStress: ouraDaytimeHighStress(s.ouraDaily),
     derived: s.ouraDaily.filter((_, i) => i % 3 !== 0).map((w, i) => ({ day: w.date, stressHighMinutes: 20 + (i % 11) * 4, stillRhrBpm: null })),
-    ouraCloudContributors: s.contributors, ouraCloudRecoveryHours: s.hours, ouraCloudFrom: s.switchDay,
+    recoveryContributors: ouraRecoveryContributors(s.contributors), recoveryHours: ouraOvernightRecoveryHours(s.hours), ouraCloudFrom: s.switchDay,
     workouts: [], program: null, setHr: [], zoneSeconds: null, unwellDates: new Set(), fuel: new Map(), weightVsPlan: new Map(),
   }
 }
 
 function wireAuditGeneric(s: Stored) {
-  return { bodyMetrics: s.bodyMetrics, nights: s.nights, ouraDaily: s.ouraDaily, ouraCloudContributors: s.contributors, ouraCloudRecoveryHours: s.hours }
+  return {
+    bodyMetrics: s.bodyMetrics, nights: s.nights, temperatureDeviations: ouraTemperatureDeviations(s.ouraDaily),
+    recoveryContributors: ouraRecoveryContributors(s.contributors), recoveryHours: ouraOvernightRecoveryHours(s.hours),
+  }
 }
 
 /** The repo reads the live payload makes for these four signals. */
 function wireRepo(s: Stored) {
   return {
     getOuraDaily: vi.fn(async (_u: string, from: string, to: string) => s.ouraDaily.filter(r => r.date >= from && r.date <= to)),
-    getOuraCloudReadinessContributors: vi.fn(async (_u: string, from: string, to: string) => s.contributors.filter(r => r.date >= from && r.date <= to)),
-    getOuraCloudRecoveryIndexHours: vi.fn(async (_u: string, dates: string[]) => s.hours.filter(r => dates.includes(r.date))),
+    getRecoveryContributors: vi.fn(async (_u: string, from: string, to: string) => ouraRecoveryContributors(s.contributors.filter(r => r.date >= from && r.date <= to))),
+    getOvernightRecoveryHours: vi.fn(async (_u: string, dates: string[]) => ouraOvernightRecoveryHours(s.hours.filter(r => dates.includes(r.date)))),
   }
 }
 

@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { assembleShadowInputs, prepareShadowHistory, type ShadowRawHistory } from '../assemble'
 import { scoreShadowReadiness } from '../score'
+import { ouraDaytimeHighStress } from '@/lib/oura/cloud/readiness-signals-map'
 
 const SWITCH = '2026-10-18'
 const D = '2026-10-20'
@@ -15,12 +16,14 @@ function raw(ouraCloudFrom: string | null): ShadowRawHistory {
     setHr: [], zoneSeconds: null, unwellDates: new Set(), fuel: new Map(), weightVsPlan: new Map(),
     // Our own figure for the 30 days before the switch.
     derived: Array.from({ length: 30 }, (_, i) => ({ day: shiftDateStr(SWITCH, -(i + 1)), stressHighMinutes: 40 + (i % 5) })),
-    // Oura's, in seconds: also on a day before the switch, where the frozen Cloud columns hold one.
-    wear: [
-      { date: shiftDateStr(SWITCH, -1), nonWearTimeSec: 0, stressHigh: 9_000 },
-      { date: SWITCH, nonWearTimeSec: 0, stressHigh: 3_600 },
-      { date: shiftDateStr(SWITCH, 1), nonWearTimeSec: 0, stressHigh: 5_400 },
-    ],
+    // Oura's `stress_high`, in seconds, through the connector's mapping: also on a day before the
+    // switch, where the frozen Cloud columns hold one.
+    wear: [],
+    daytimeHighStress: ouraDaytimeHighStress([
+      { date: shiftDateStr(SWITCH, -1), stressHigh: 9_000 },
+      { date: SWITCH, stressHigh: 3_600 },
+      { date: shiftDateStr(SWITCH, 1), stressHigh: 5_400 },
+    ]),
     ouraCloudFrom,
   }
 }

@@ -1653,14 +1653,17 @@ export interface WorkoutRepository {
   upsertOuraDailySummary(userId: string, rows: OuraDailySummaryRow[]): Promise<void>
   getOuraDailySummary(userId: string, from: string, to: string): Promise<OuraDailySummaryRow[]>
   /**
-   * #2984. Oura's own readiness contributors per day (`oura_cloud_daily.readiness_contributors`),
-   * each 0–100, oldest first. Read for the one readiness input Oura sends no underlying value for,
-   * the recovery index (rule 4 on #2860). Never Oura's readiness score itself: that is the tuning
-   * reference, not an input.
+   * #3075 stage 2, #3610: recovery-index hours per wake date, computed from each connector's overnight
+   * heart-rate series (for Oura, the main period's 5-minute series), each labelled with its source.
    */
-  /** #3075 stage 2: recovery-index hours per wake date from the main period's 5-minute heart-rate series. */
-  getOuraCloudRecoveryIndexHours(userId: string, dates: string[], tz: string): Promise<{ date: string; hours: number }[]>
-  getOuraCloudReadinessContributors(userId: string, from: string, to: string): Promise<{ date: string; readinessContributors: Record<string, number | null> | null }[]>
+  getOvernightRecoveryHours(userId: string, dates: string[], tz: string): Promise<import('@trainingai/shared/health/readiness-signals').OvernightRecoveryHours[]>
+  /**
+   * #2984, #3610. Each connector's own 0–100 recovery sub-score per day, oldest first, each labelled
+   * with its source (for Oura, the `recovery_index` readiness contributor). Read for the one readiness
+   * input with no underlying value (rule 4 on #2860). Never a source's readiness score itself: that
+   * is the tuning reference, not an input.
+   */
+  getRecoveryContributors(userId: string, from: string, to: string): Promise<import('@trainingai/shared/health/readiness-signals').RecoveryContributor[]>
 
   // Completed-form derived metrics (Oura on-device-models program, Sub-plan A). Idempotent
   // per-day upsert: only the fields present in `patch` are written, via COALESCE so a partial

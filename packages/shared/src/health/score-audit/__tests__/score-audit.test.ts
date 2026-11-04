@@ -10,6 +10,7 @@ import { buildReadinessAudit } from '../readiness'
 import { buildHeartRateAudit } from '../heart-rate'
 import type { SleepSession } from '@trainingai/shared/types/body'
 import type { OuraDailySummaryRow, OuraDailyDerivedRow } from '@/lib/data/repository'
+import { ouraRecoveryContributors } from '@/lib/oura/cloud/readiness-signals-map'
 
 const TZ = 'Australia/Brisbane'
 
@@ -262,7 +263,7 @@ describe('buildReadinessAudit', () => {
     })
     const generic = {
       bodyMetrics: [...priorNights, { date: DAY, hrvMs: 44, restingHeartRate: 58, hrvSource: 'oura_cloud', restingHeartRateSource: 'oura_cloud' }],
-      nights: [], ouraDaily: [], ouraCloudContributors: [{ date: DAY, readinessContributors: { recovery_index: 70 } }],
+      nights: [], temperatureDeviations: [], recoveryContributors: ouraRecoveryContributors([{ date: DAY, readinessContributors: { recovery_index: 70 } }]),
     }
 
     it('reads resting HR and HRV from Oura, labelled by source, rather than a null ring row', () => {

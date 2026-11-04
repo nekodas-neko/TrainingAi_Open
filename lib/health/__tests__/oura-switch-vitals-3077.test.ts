@@ -49,7 +49,7 @@ describe('readinessSourceLabel', () => {
     { date: '2026-10-19', hrvMs: 45, restingHeartRate: 57, hrvSource: 'oura_cloud', restingHeartRateSource: 'oura_cloud' },
   ]
   const night = () => resolveReadinessNightInputs({
-    today: '2026-10-19', summaries: [partial], bodyMetrics: cloudNights, nights: [], ouraDaily: [], ouraCloudContributors: [],
+    today: '2026-10-19', summaries: [partial], bodyMetrics: cloudNights, nights: [], temperatureDeviations: [], recoveryContributors: [],
   })
 
   it('says generic-derived once the switch day has passed and nothing came from the ring', () => {
