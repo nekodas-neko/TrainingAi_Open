@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.519.0",
+    date: "2026-11-05",
+    changes: [
+      "Both apps: your heart-rate zones, running plan, cardio week and the Activity score's zone minutes now follow the same resting-heart-rate rule as Body Battery: when a device changes how it measures, they start a fresh average for it. Nothing changes until a device actually does.",
+      "Behind the scenes: Body Battery, readiness, the weekly digest and the coach read daytime stress and recovery the same device-neutral way. No number you see changes.",
+    ],
+  },
+  {
     version: "1.518.0",
     date: "2026-11-05",
     changes: [
