@@ -37,6 +37,8 @@ import {
   routePointSchema,
   type RoutePoint,
 } from './route-recording.ts';
+import { backgroundNotification } from './background-recording.ts';
+import type { ServiceClock, ServiceNotification } from '../../../integrations/activity-service/shared-service.ts';
 
 const sessionSchema = z.object({
   id: z.uuid(),
@@ -165,6 +167,26 @@ export function elapsedMs(session: ActivitySession, now: number) {
     0,
     (session.pauseStartMs ?? session.endMs ?? now) - session.startMs - session.pausedMs,
   );
+}
+/**
+ * The notification clock for an activity under way (#3626), from the same `elapsedMs` the screen
+ * shows. Running, it counts up from the start moved on by the time already paused, so the system
+ * chronometer keeps time with the app suspended; paused, it is the frozen elapsed time. The current
+ * app's run chip counts up from a fixed start the same way (`lib/native/run-status-chip.ts`).
+ */
+export function activityClock(session: ActivitySession): ServiceClock | null {
+  if (session.mode !== 'active' || session.startMs === null) {
+    return null;
+  }
+  return {
+    startedAt: session.startMs + session.pausedMs,
+    pausedElapsedMs: session.pauseStartMs === null ? null : elapsedMs(session, session.pauseStartMs),
+  };
+}
+/** What the activity notification says while the activity runs: the service text and its clock. */
+export function activityServiceNotification(session: ActivitySession): ServiceNotification | null {
+  const clock = activityClock(session);
+  return clock ? { ...backgroundNotification(session), clock } : null;
 }
 // The recording screen's live readout: distance over active time to now. Measured to now, not to
 // the last fix: a pause that ended after the last fix is already subtracted, and measuring to the

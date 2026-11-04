@@ -20,7 +20,14 @@ import { useWorkoutResource, useWorkoutResources } from '../../workouts/data/Wor
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { healthReadPaths } from '../../../core/sync/health-invalidation';
-import { ActivityStore, elapsedMs, emptyActivity, sameActivityValue } from './ActivityStore';
+import {
+  ActivityStore,
+  activityServiceNotification,
+  elapsedMs,
+  emptyActivity,
+  sameActivityValue,
+} from './ActivityStore';
+import { activityServiceHost } from '../../../integrations/activity-service/platform';
 import { activityHistorySpec, hrProfileSpec } from '../../health/data/models';
 import { overlayCalories, walkSegmentStatsSpec } from './models';
 import { failedItems, waitingCount } from './sync-health';
@@ -88,9 +95,28 @@ export function ActivityStateProvider({
   return (
     <Context.Provider value={store}>
       <ActivityStrapHold />
+      <ActivityServiceClock />
       {children}
     </Context.Provider>
   );
+}
+/**
+ * The activity notification's live clock (#3626), from Start to Finish or Discard, frozen while
+ * paused. It sits here, not on the screen, so it follows the activity rather than the route shown.
+ */
+function ActivityServiceClock() {
+  const { session } = useActivities();
+  const notification = session ? activityServiceNotification(session) : null;
+  // Changes only on start, pause, resume and end: the chronometer does the counting.
+  // A change replaces what it shows, never clears it first, which would flicker.
+  const key = notification ? JSON.stringify(notification) : null;
+  const latest = useRef(notification);
+  latest.current = notification;
+  useEffect(() => {
+    activityServiceHost?.notify('activity', key ? latest.current : null);
+  }, [key]);
+  useEffect(() => () => activityServiceHost?.notify('activity', null), []);
+  return null;
 }
 /** The chest strap is held, and its heart rate saved, from the activity's start to its end (#3527). */
 function ActivityStrapHold() {
