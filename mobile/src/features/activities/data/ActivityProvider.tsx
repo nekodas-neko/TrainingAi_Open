@@ -60,6 +60,7 @@ export function ActivityProvider({ children }: PropsWithChildren) {
                 '/api/running-bests',
                 '/api/running-plan/run-type-stats',
                 '/api/guided-walk/segment-stats',
+                '/api/activity-detection/walks',
               ]);
               void resources?.refreshVisible();
               workouts.invalidate();

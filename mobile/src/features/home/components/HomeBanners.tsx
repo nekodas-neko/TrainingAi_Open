@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 import { useUndo } from '../../../shared/ui/undo/UndoProvider';
 import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
 import { layoutMotion } from '../../../shared/ui/layoutMotion';
-import { shiftDateStr, weekStartForDay } from '@trainingai/shared/date-utils';
+import { formatTimeOfDay, shiftDateStr, weekStartForDay } from '@trainingai/shared/date-utils';
 import {
   AppButton,
   AppText,
@@ -24,11 +24,20 @@ import {
 import { digestSpec, readinessSpec, profileSpec } from '../../health/data/models';
 import {
   bannerTone,
+  type BannerType,
   goalsReviewDue,
   localHour,
   recapHasData,
   shouldOfferMorning,
 } from '../data/banner-data';
+import { useActivities } from '../../activities/data/ActivityProvider';
+import { DetectedWalkSheet } from './DetectedWalkSheet';
+import {
+  recordedSpans,
+  visibleWalks,
+  walkCandidatesSpec,
+  type DetectedWalk,
+} from '../data/detected-walks';
 import { GoalRecommendation } from '../../nutrition/components/GoalRecommendation';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 
@@ -52,6 +61,24 @@ export function HomeBanners({
   const undo = useUndo();
   const reduced = useReducedMotion();
   const [goals, setGoals] = useState(false);
+  // The walk the sheet was opened on, held so a newer detection arriving mid-edit can't replace it.
+  const [reviewing, setReviewing] = useState<DetectedWalk | null>(null);
+  const activity = useActivities();
+  const candidates = useWorkoutResource(walkCandidatesSpec(health.today));
+  const session = activity.session;
+  // Offered walks minus the answered ones and any overlapping an activity this phone holds or is
+  // recording, so a walk saved here never comes back from a cached answer (#3625).
+  const detected = useMemo(
+    () =>
+      visibleWalks(candidates.data?.walks, home.answeredWalks, [
+        ...recordedSpans(activity.rows, health.timezone),
+        ...(session?.startMs != null
+          ? [{ startMs: session.startMs, endMs: session.endMs ?? Date.now() }]
+          : []),
+      ]),
+    [candidates.data, home.answeredWalks, activity.rows, health.timezone, session],
+  );
+  const newest = detected[0];
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +135,28 @@ export function HomeBanners({
     goalsReviewDue(profile.data?.user) && !home.markers[`goals:${health.today}`];
   const weekReady = !!recap.data?.digest && recapHasData(recap.data.metrics);
   const showWeek = !home.markers[`week:${week}`] && (weekReady || !!recap.error);
-  const entries = [
+  const entries: {
+    key: string;
+    type: BannerType;
+    icon: 'legs' | 'target' | 'nutrition' | 'upper';
+    label: string;
+    subtitle: string;
+    open: () => void;
+    dismiss?: () => void;
+  }[] = [
+    ...(newest
+      ? [
+          {
+            key: `walk:${newest.startMs}`,
+            type: 'walk' as const,
+            icon: 'legs' as const,
+            label: 'Walk detected',
+            subtitle: `Looks like you walked ${formatTimeOfDay(newest.startMs, health.timezone)}–${formatTimeOfDay(newest.endMs, health.timezone)}. Save it?${detected.length > 1 ? ` +${detected.length - 1} more` : ''}`,
+            open: () => setReviewing(newest),
+            dismiss: () => dismissWalks(),
+          },
+        ]
+      : []),
     ...(showGoals
       ? [
           {
@@ -146,6 +194,23 @@ export function HomeBanners({
         ]
       : []),
   ];
+  function dismissWalks() {
+    const store = home.store;
+    if (!store) return;
+    const starts = detected.map((walk) => walk.startMs);
+    void undo.perform({
+      key: 'walk-detected',
+      label: 'Walk dismissed',
+      apply: async () => {
+        layoutMotion(reduced);
+        for (const start of starts) await store.answerWalk(start);
+      },
+      revert: async () => {
+        layoutMotion(reduced);
+        for (const start of starts) await store.answerWalk(start, false);
+      },
+    });
+  }
   function dismissReminder(key: string, label: string) {
     const store = home.store;
     if (!store) return;
@@ -313,11 +378,21 @@ export function HomeBanners({
                 <IconButton
                   icon="close"
                   label={`Dismiss ${entry.label}`}
-                  onPress={() => dismissReminder(entry.key, entry.label)}
+                  onPress={() =>
+                    entry.dismiss ? entry.dismiss() : dismissReminder(entry.key, entry.label)
+                  }
                 />
               </Stack>
             ))}
         </Card>
+      )}
+      {reviewing && (
+        <DetectedWalkSheet
+          key={reviewing.startMs}
+          walk={reviewing}
+          timezone={health.timezone}
+          onClose={() => setReviewing(null)}
+        />
       )}
       {goals && (
         <GoalRecommendation

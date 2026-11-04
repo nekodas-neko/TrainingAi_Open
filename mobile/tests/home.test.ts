@@ -88,8 +88,13 @@ test('a timeline row prints its span above the title, and a wake-up its start on
 });
 
 test('each updates-strip icon is tinted by its type, not its position', () => {
-  assert.deepEqual(bannerTone, { goals: 'activity', day: 'checkin', week: 'sleep' });
-  assert.equal(new Set(Object.values(bannerTone)).size, 3);
+  assert.deepEqual(bannerTone, {
+    walk: 'brand',
+    goals: 'activity',
+    day: 'checkin',
+    week: 'sleep',
+  });
+  assert.equal(new Set(Object.values(bannerTone)).size, 4);
 });
 
 test('a whitespace-only display name falls back to the sign-in name', () => {
