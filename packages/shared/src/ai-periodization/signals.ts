@@ -4,7 +4,7 @@ import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-peri
 import { perExerciseRpeDelta, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { latestIllnessFromDerived, type IllnessFlag } from '@trainingai/shared/health/illness-radar'
-import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { loadNightTemperature } from '@/lib/health/night-temperature'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { sleepDurationTrend, sleepScoreTrend } from '@trainingai/shared/health/sleep-trend'
@@ -671,7 +671,7 @@ export async function aggregateSignals(
     // leftovers, so the level is absent (the prompt says "no data"), as the readiness payload does
     // (#3206). Oura's resilience word is not mapped onto this scale (owner question #3212).
     resilienceLevel: [...derivedRows].reverse()
-      .find(r => r.resilienceLevel != null && ringValueStands(r.day, switchDay))?.resilienceLevel ?? null,
+      .find(r => r.resilienceLevel != null && beforeSourceSwitch(r.day, switchDay))?.resilienceLevel ?? null,
     resilienceOura: [...ouraDailyRows].reverse().find(r => r.resilienceLevel)?.resilienceLevel ?? null,
     confidenceTier,
     confidence,

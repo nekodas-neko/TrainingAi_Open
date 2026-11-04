@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { fmtAest, DEFAULT_TZ, normalizeDateParam, dateStrMidnightInTz, shiftDateStr, todayInTz, wallClockMinuteReader } from "@trainingai/shared/date-utils";
-import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { toZonedTime } from "date-fns-tz";
@@ -403,7 +403,7 @@ export async function GET(req: NextRequest) {
   // From the switch day the ring's row is a partial leftover, so the night's deviation is Oura's own
   // (the value readiness v8 scores for temperature, `resolveReadinessNightInputs`). It is already
   // relative to Oura's baseline, so the ring-baseline gate above does not apply; Oura sends no mean.
-  if (!ringValueStands(dateIso, switchDay)) {
+  if (!beforeSourceSwitch(dateIso, switchDay)) {
     const cloud = (await repo.getOuraDaily(userId, dateIso, dateIso)).find(r => r.date === dateIso);
     const dev = cloud != null && !isPreRekey(cloud.date) ? cloud.temperatureDeviation ?? null : null;
     bodyTemp = dev != null ? { meanC: null, devC: dev, source: 'oura_cloud' } : null;

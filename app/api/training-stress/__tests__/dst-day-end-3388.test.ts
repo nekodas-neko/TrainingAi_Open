@@ -19,7 +19,7 @@ vi.mock('@/lib/data', () => ({
       windows.daytime.push([from, to])
       return { met: [], temp: [], still: [], motion: [] }
     },
-    getOuraCloudActivitySeries: async () => [],
+    getPerMinuteMovementSeries: async () => [],
     listSleepSessions: async () => [],
     listActivityLogs: async () => [],
     getHealthConnectIntervals: async (_u: string, _t: string, from: Date, to: Date) => {

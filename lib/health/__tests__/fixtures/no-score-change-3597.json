@@ -1,0 +1,2605 @@
+{
+ "activity": {
+  "Australia/Brisbane hr+met 2026-10-07": {
+   "score": 75,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "zoneMinutes": 100,
+    "moveHours": 100,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": 432,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "Australia/Brisbane hr+met 2026-10-08": {
+   "score": 72,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "zoneMinutes": 100,
+    "moveHours": 100,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": 276,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "Australia/Brisbane hr only 2026-10-07": {
+   "score": 71,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "zoneMinutes": 100,
+    "moveHours": 73,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": 432,
+    "moveHours": 11,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "Australia/Brisbane hr only 2026-10-08": {
+   "score": 65,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "zoneMinutes": 100,
+    "moveHours": 40,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": 276,
+    "moveHours": 6,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "Australia/Brisbane met only 2026-10-07": {
+   "score": 72,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "moveHours": 100,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "Australia/Brisbane met only 2026-10-08": {
+   "score": 69,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "moveHours": 100,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "Australia/Brisbane no resting hr 2026-10-07": {
+   "score": 72,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "moveHours": 100,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "Australia/Brisbane no resting hr 2026-10-08": {
+   "score": 69,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "moveHours": 100,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "Europe/London hr+met 2026-10-07": {
+   "score": 75,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "zoneMinutes": 100,
+    "moveHours": 100,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": 517,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "Europe/London hr+met 2026-10-08": {
+   "score": 72,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "zoneMinutes": 100,
+    "moveHours": 100,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": 131,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "Europe/London hr only 2026-10-07": {
+   "score": 72,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "zoneMinutes": 100,
+    "moveHours": 77,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": 517,
+    "moveHours": 10,
+    "moveHoursGoal": 13,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "Europe/London hr only 2026-10-08": {
+   "score": 60,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "zoneMinutes": 100,
+    "moveHours": 0,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": 131,
+    "moveHours": 0,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "Europe/London met only 2026-10-07": {
+   "score": 72,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "moveHours": 100,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "Europe/London met only 2026-10-08": {
+   "score": 69,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "moveHours": 100,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "Europe/London no resting hr 2026-10-07": {
+   "score": 72,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "moveHours": 100,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "Europe/London no resting hr 2026-10-08": {
+   "score": 69,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "moveHours": 100,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "America/Los_Angeles hr+met 2026-10-07": {
+   "score": 75,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "zoneMinutes": 100,
+    "moveHours": 100,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": 331,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "America/Los_Angeles hr+met 2026-10-08": {
+   "score": 69,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "moveHours": 100,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "America/Los_Angeles hr only 2026-10-07": {
+   "score": 69,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "zoneMinutes": 100,
+    "moveHours": 57,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": 331,
+    "moveHours": 8,
+    "moveHoursGoal": 14,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "America/Los_Angeles hr only 2026-10-08": {
+   "score": 64,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": null,
+    "moveHours": null,
+    "moveHoursGoal": null,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "America/Los_Angeles met only 2026-10-07": {
+   "score": 72,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "moveHours": 100,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "America/Los_Angeles met only 2026-10-08": {
+   "score": 69,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "moveHours": 100,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  },
+  "America/Los_Angeles no resting hr 2026-10-07": {
+   "score": 72,
+   "components": {
+    "steps": 69,
+    "activeEnergy": 100,
+    "moveHours": 100,
+    "strengthFreq": 55,
+    "strengthVolume": 56
+   },
+   "signals": {
+    "steps": 6900,
+    "activeCalories": 455,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": false,
+    "sessions7d": 2,
+    "volume7dKg": 14600
+   }
+  },
+  "America/Los_Angeles no resting hr 2026-10-08": {
+   "score": 69,
+   "components": {
+    "steps": 42,
+    "activeEnergy": 49,
+    "moveHours": 100,
+    "strengthFreq": 74,
+    "strengthVolume": 84
+   },
+   "signals": {
+    "steps": 4200,
+    "activeCalories": 210,
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15,
+    "strengthSessionToday": true,
+    "sessions7d": 3,
+    "volume7dKg": 21900
+   }
+  }
+ },
+ "readinessPayload": {
+  "activityScore": 72,
+  "activityContributors": {
+   "steps": 42,
+   "activeEnergy": 49,
+   "zoneMinutes": 100,
+   "moveHours": 100,
+   "strengthFreq": 74,
+   "strengthVolume": 84
+  },
+  "activityGoals": {
+   "stepGoal": 10000,
+   "activeEnergyGoal": 425,
+   "zoneMinutesGoal": 22,
+   "strengthFreqGoal": 5,
+   "sessionVolumeGoalKg": 5200,
+   "moveHoursGoal": 15
+  },
+  "activitySignals": {
+   "steps": 4200,
+   "activeCalories": 210,
+   "zoneMinutes": 244,
+   "moveHours": 15,
+   "sessions7d": 3,
+   "volume7dKg": 21900
+  },
+  "stored": [
+   {
+    "day": "2026-10-07",
+    "activityScore": 75
+   },
+   {
+    "day": "2026-10-08",
+    "activityScore": null
+   }
+  ]
+ },
+ "intraday": [
+  {
+   "seed": 1,
+   "kept": 1391,
+   "sparseHours": [
+    {
+     "date": "2026-10-07",
+     "hour": 5
+    },
+    {
+     "date": "2026-10-07",
+     "hour": 15
+    },
+    {
+     "date": "2026-10-07",
+     "hour": 20
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 413,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 2,
+   "kept": 804,
+   "sparseHours": [
+    {
+     "date": "2026-10-06",
+     "hour": 13
+    },
+    {
+     "date": "2026-10-06",
+     "hour": 22
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 411,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 3,
+   "kept": 1181,
+   "sparseHours": [
+    {
+     "date": "2026-10-05",
+     "hour": 5
+    },
+    {
+     "date": "2026-10-05",
+     "hour": 19
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 352,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 4,
+   "kept": 1336,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 517,
+    "moveHours": 11,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 5,
+   "kept": 1325,
+   "sparseHours": [
+    {
+     "date": "2026-10-03",
+     "hour": 2
+    },
+    {
+     "date": "2026-10-03",
+     "hour": 13
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 6,
+   "kept": 1229,
+   "sparseHours": [
+    {
+     "date": "2026-10-02",
+     "hour": 14
+    },
+    {
+     "date": "2026-10-02",
+     "hour": 15
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 547,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 7,
+   "kept": 1092,
+   "sparseHours": [
+    {
+     "date": "2026-10-01",
+     "hour": 18
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 391,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 8,
+   "kept": 949,
+   "sparseHours": [
+    {
+     "date": "2026-09-30",
+     "hour": 6
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 379,
+    "moveHours": 10,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 9,
+   "kept": 927,
+   "sparseHours": [
+    {
+     "date": "2026-10-08",
+     "hour": 8
+    },
+    {
+     "date": "2026-10-08",
+     "hour": 17
+    },
+    {
+     "date": "2026-10-08",
+     "hour": 19
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 458,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 10,
+   "kept": 1179,
+   "sparseHours": [
+    {
+     "date": "2026-10-07",
+     "hour": 0
+    },
+    {
+     "date": "2026-10-07",
+     "hour": 17
+    },
+    {
+     "date": "2026-10-07",
+     "hour": 20
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 11,
+   "kept": 1235,
+   "sparseHours": [
+    {
+     "date": "2026-10-06",
+     "hour": 12
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 440,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 12,
+   "kept": 1120,
+   "sparseHours": [
+    {
+     "date": "2026-10-05",
+     "hour": 10
+    },
+    {
+     "date": "2026-10-05",
+     "hour": 22
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 533,
+    "moveHours": 12,
+    "moveHoursGoal": 14
+   }
+  },
+  {
+   "seed": 13,
+   "kept": 1518,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 549,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 14,
+   "kept": 966,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 545,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 15,
+   "kept": 1841,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 16,
+   "kept": 1061,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 593,
+    "moveHours": 10,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 17,
+   "kept": 995,
+   "sparseHours": [
+    {
+     "date": "2026-09-30",
+     "hour": 2
+    },
+    {
+     "date": "2026-09-30",
+     "hour": 9
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 512,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 18,
+   "kept": 1784,
+   "sparseHours": [
+    {
+     "date": "2026-10-08",
+     "hour": 4
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 454,
+    "moveHours": 14,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 19,
+   "kept": 547,
+   "sparseHours": [
+    {
+     "date": "2026-10-07",
+     "hour": 0
+    },
+    {
+     "date": "2026-10-07",
+     "hour": 14
+    },
+    {
+     "date": "2026-10-07",
+     "hour": 23
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 347,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 20,
+   "kept": 905,
+   "sparseHours": [
+    {
+     "date": "2026-10-06",
+     "hour": 9
+    },
+    {
+     "date": "2026-10-06",
+     "hour": 12
+    },
+    {
+     "date": "2026-10-06",
+     "hour": 13
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": null,
+    "moveHoursGoal": null
+   }
+  },
+  {
+   "seed": 21,
+   "kept": 1645,
+   "sparseHours": [
+    {
+     "date": "2026-10-05",
+     "hour": 7
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 526,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 22,
+   "kept": 931,
+   "sparseHours": [
+    {
+     "date": "2026-10-04",
+     "hour": 3
+    },
+    {
+     "date": "2026-10-04",
+     "hour": 18
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 474,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 23,
+   "kept": 1447,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 526,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 24,
+   "kept": 672,
+   "sparseHours": [
+    {
+     "date": "2026-10-02",
+     "hour": 0
+    },
+    {
+     "date": "2026-10-02",
+     "hour": 23
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 468,
+    "moveHours": 9,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 25,
+   "kept": 1060,
+   "sparseHours": [
+    {
+     "date": "2026-10-01",
+     "hour": 6
+    },
+    {
+     "date": "2026-10-01",
+     "hour": 13
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 26,
+   "kept": 1068,
+   "sparseHours": [
+    {
+     "date": "2026-09-30",
+     "hour": 16
+    },
+    {
+     "date": "2026-09-30",
+     "hour": 22
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 422,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 27,
+   "kept": 864,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 368,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 28,
+   "kept": 1419,
+   "sparseHours": [
+    {
+     "date": "2026-10-07",
+     "hour": 2
+    },
+    {
+     "date": "2026-10-07",
+     "hour": 5
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 380,
+    "moveHours": 11,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 29,
+   "kept": 1232,
+   "sparseHours": [
+    {
+     "date": "2026-10-06",
+     "hour": 2
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 547,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 30,
+   "kept": 1435,
+   "sparseHours": [
+    {
+     "date": "2026-10-05",
+     "hour": 0
+    },
+    {
+     "date": "2026-10-05",
+     "hour": 5
+    },
+    {
+     "date": "2026-10-05",
+     "hour": 18
+    },
+    {
+     "date": "2026-10-05",
+     "hour": 23
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 31,
+   "kept": 785,
+   "sparseHours": [
+    {
+     "date": "2026-10-04",
+     "hour": 11
+    },
+    {
+     "date": "2026-10-04",
+     "hour": 14
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 296,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 32,
+   "kept": 1437,
+   "sparseHours": [
+    {
+     "date": "2026-10-03",
+     "hour": 3
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 473,
+    "moveHours": 11,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 33,
+   "kept": 1722,
+   "sparseHours": [
+    {
+     "date": "2026-10-02",
+     "hour": 0
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 566,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 34,
+   "kept": 1090,
+   "sparseHours": [
+    {
+     "date": "2026-10-01",
+     "hour": 20
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 421,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 35,
+   "kept": 1229,
+   "sparseHours": [
+    {
+     "date": "2026-09-30",
+     "hour": 4
+    },
+    {
+     "date": "2026-09-30",
+     "hour": 9
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 36,
+   "kept": 984,
+   "sparseHours": [
+    {
+     "date": "2026-10-08",
+     "hour": 3
+    },
+    {
+     "date": "2026-10-08",
+     "hour": 21
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 543,
+    "moveHours": 10,
+    "moveHoursGoal": 14
+   }
+  },
+  {
+   "seed": 37,
+   "kept": 1625,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 455,
+    "moveHours": 14,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 38,
+   "kept": 1540,
+   "sparseHours": [
+    {
+     "date": "2026-10-06",
+     "hour": 0
+    },
+    {
+     "date": "2026-10-06",
+     "hour": 6
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 548,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 39,
+   "kept": 1545,
+   "sparseHours": [
+    {
+     "date": "2026-10-05",
+     "hour": 1
+    },
+    {
+     "date": "2026-10-05",
+     "hour": 10
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 442,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 40,
+   "kept": 897,
+   "sparseHours": [
+    {
+     "date": "2026-10-04",
+     "hour": 1
+    },
+    {
+     "date": "2026-10-04",
+     "hour": 3
+    },
+    {
+     "date": "2026-10-04",
+     "hour": 13
+    },
+    {
+     "date": "2026-10-04",
+     "hour": 14
+    },
+    {
+     "date": "2026-10-04",
+     "hour": 23
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": null,
+    "moveHoursGoal": null
+   }
+  },
+  {
+   "seed": 41,
+   "kept": 967,
+   "sparseHours": [
+    {
+     "date": "2026-10-03",
+     "hour": 6
+    },
+    {
+     "date": "2026-10-03",
+     "hour": 18
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 252,
+    "moveHours": 14,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 42,
+   "kept": 1162,
+   "sparseHours": [
+    {
+     "date": "2026-10-02",
+     "hour": 22
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 316,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 43,
+   "kept": 623,
+   "sparseHours": [
+    {
+     "date": "2026-10-01",
+     "hour": 0
+    },
+    {
+     "date": "2026-10-01",
+     "hour": 1
+    },
+    {
+     "date": "2026-10-01",
+     "hour": 14
+    },
+    {
+     "date": "2026-10-01",
+     "hour": 22
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 325,
+    "moveHours": 14,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 44,
+   "kept": 381,
+   "sparseHours": [
+    {
+     "date": "2026-09-30",
+     "hour": 5
+    },
+    {
+     "date": "2026-09-30",
+     "hour": 7
+    },
+    {
+     "date": "2026-09-30",
+     "hour": 16
+    },
+    {
+     "date": "2026-09-30",
+     "hour": 21
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 335,
+    "moveHours": 8,
+    "moveHoursGoal": 12
+   }
+  },
+  {
+   "seed": 45,
+   "kept": 1114,
+   "sparseHours": [
+    {
+     "date": "2026-10-08",
+     "hour": 23
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 46,
+   "kept": 902,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 517,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 47,
+   "kept": 1875,
+   "sparseHours": [
+    {
+     "date": "2026-10-06",
+     "hour": 6
+    },
+    {
+     "date": "2026-10-06",
+     "hour": 19
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 675,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 48,
+   "kept": 806,
+   "sparseHours": [
+    {
+     "date": "2026-10-05",
+     "hour": 2
+    },
+    {
+     "date": "2026-10-05",
+     "hour": 9
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 456,
+    "moveHours": 10,
+    "moveHoursGoal": 14
+   }
+  },
+  {
+   "seed": 49,
+   "kept": 809,
+   "sparseHours": [
+    {
+     "date": "2026-10-04",
+     "hour": 0
+    },
+    {
+     "date": "2026-10-04",
+     "hour": 1
+    },
+    {
+     "date": "2026-10-04",
+     "hour": 2
+    },
+    {
+     "date": "2026-10-04",
+     "hour": 12
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 317,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 50,
+   "kept": 605,
+   "sparseHours": [
+    {
+     "date": "2026-10-03",
+     "hour": 3
+    },
+    {
+     "date": "2026-10-03",
+     "hour": 4
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 51,
+   "kept": 1259,
+   "sparseHours": [
+    {
+     "date": "2026-10-02",
+     "hour": 1
+    },
+    {
+     "date": "2026-10-02",
+     "hour": 11
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 608,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 52,
+   "kept": 1190,
+   "sparseHours": [
+    {
+     "date": "2026-10-01",
+     "hour": 21
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 374,
+    "moveHours": 11,
+    "moveHoursGoal": 14
+   }
+  },
+  {
+   "seed": 53,
+   "kept": 1531,
+   "sparseHours": [
+    {
+     "date": "2026-09-30",
+     "hour": 11
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 479,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 54,
+   "kept": 468,
+   "sparseHours": [
+    {
+     "date": "2026-10-08",
+     "hour": 0
+    },
+    {
+     "date": "2026-10-08",
+     "hour": 1
+    },
+    {
+     "date": "2026-10-08",
+     "hour": 8
+    },
+    {
+     "date": "2026-10-08",
+     "hour": 15
+    },
+    {
+     "date": "2026-10-08",
+     "hour": 23
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 249,
+    "moveHours": 13,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 55,
+   "kept": 1433,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 56,
+   "kept": 483,
+   "sparseHours": [
+    {
+     "date": "2026-10-06",
+     "hour": 23
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 400,
+    "moveHours": 9,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 57,
+   "kept": 1373,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 403,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 58,
+   "kept": 1314,
+   "sparseHours": [
+    {
+     "date": "2026-10-04",
+     "hour": 6
+    }
+   ],
+   "contributors": {
+    "zoneMinutes": 557,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 59,
+   "kept": 702,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": 389,
+    "moveHours": 15,
+    "moveHoursGoal": 15
+   }
+  },
+  {
+   "seed": 60,
+   "kept": 1015,
+   "sparseHours": [],
+   "contributors": {
+    "zoneMinutes": null,
+    "moveHours": null,
+    "moveHoursGoal": null
+   }
+  }
+ ],
+ "movementGrid": [
+  {
+   "seed": 1,
+   "grid": {
+    "start": 1791414000000,
+    "n": 1440,
+    "worn": 1097,
+    "values": "8e5f95f9ff9b0edcf7e132aa316264aede5e794c9ebc7fd8f71ed631b9eb9957"
+   },
+   "mix": {
+    "provided": 1207,
+    "derived": 55,
+    "estimated": 5,
+    "missing": 173
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1267,
+    "missing": 173,
+    "byRung": {
+     "provided": 1207,
+     "derived": 55,
+     "estimated": 5
+    },
+    "bySource": {
+     "oura_cloud": 762,
+     "sleep_record": 55,
+     "oura_ble": 445,
+     "manual": 5
+    }
+   },
+   "metsPerMinute": "69fbb3a9a07ff66f13468bf7265af6efde4f1e5532652b8c6a7d3aeb46b32716",
+   "provenance": "eb5fb2ecb825d204d77e2fe7845f2443fda3a8c8c37b6c37336722a9da734abf",
+   "device": "3fdf661b56d1634c03da79c0a094543bca93353ad54309fbeb98eecb29e5e5a9"
+  },
+  {
+   "seed": 2,
+   "grid": {
+    "start": 1791442800000,
+    "n": 1440,
+    "worn": 1112,
+    "values": "7fc77738f997381e7481d77f7a745e292af4019f0cba99724d59df6388332991"
+   },
+   "mix": {
+    "provided": 1215,
+    "derived": 30,
+    "estimated": 23,
+    "missing": 172
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1268,
+    "missing": 172,
+    "byRung": {
+     "provided": 1215,
+     "derived": 30,
+     "estimated": 23
+    },
+    "bySource": {
+     "oura_cloud": 763,
+     "oura_ble": 452,
+     "sleep_record": 30,
+     "manual": 23
+    }
+   },
+   "metsPerMinute": "266f8c2244bbd9ad1ec809d169e79d194ac35018e2124ee3d9f533cc3bc3aefd",
+   "provenance": "75620bed460b3bce919a95fa731c7c3fbd258b2d17ef363c764112225b889aad",
+   "device": "4682aed99bc2fac830572afb9e60ab37e8aaaed5dbea9c621e5a30f05a169d8c"
+  },
+  {
+   "seed": 3,
+   "grid": {
+    "start": 1791381600000,
+    "n": 1440,
+    "worn": 1005,
+    "values": "c81e1d2c1e02b4b2c1d4a6c97eb487ad0e6b6006a76f54fdc2f8c392ccfeaf24"
+   },
+   "mix": {
+    "provided": 1112,
+    "derived": 73,
+    "estimated": 9,
+    "missing": 246
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1194,
+    "missing": 246,
+    "byRung": {
+     "provided": 1112,
+     "derived": 73,
+     "estimated": 9
+    },
+    "bySource": {
+     "oura_cloud": 693,
+     "oura_ble": 419,
+     "sleep_record": 73,
+     "manual": 9
+    }
+   },
+   "metsPerMinute": "f3d5cae2a8ddcb754811dad3c4eb539582ab723737a0d1ed076a4f08bfe01de8",
+   "provenance": "6f37fab06e214bd765d4cc7142d747ed6e9abac59872608553f8312159f4300a",
+   "device": "2e79e4923c8d409ae903fc4712176bb968817a16b8ade2b6bd703924a51faa6c"
+  },
+  {
+   "seed": 4,
+   "grid": {
+    "start": 1791414000000,
+    "n": 1440,
+    "worn": 1256,
+    "values": "3199f856ee50366d6e755485b9f39c942549cdd413134befb04e5827fa91d687"
+   },
+   "mix": {
+    "provided": 1309,
+    "derived": 56,
+    "estimated": 6,
+    "missing": 69
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1371,
+    "missing": 69,
+    "byRung": {
+     "provided": 1309,
+     "derived": 56,
+     "estimated": 6
+    },
+    "bySource": {
+     "oura_cloud": 863,
+     "oura_ble": 446,
+     "sleep_record": 56,
+     "manual": 6
+    }
+   },
+   "metsPerMinute": "c8b23ab6604ccd27ea7192330f69e5a53f4d957f01c22c2bdecd0bd53dad9349",
+   "provenance": "df9158ced4737f1b1ef2d0e40aa342f1844397adcaee30199d2db77c42f57148",
+   "device": "35e0ee92f7591d392a12234f0da46b44850548e157977431e8a8924dbb3e424a"
+  },
+  {
+   "seed": 5,
+   "grid": {
+    "start": 1791442800000,
+    "n": 1440,
+    "worn": 1260,
+    "values": "02fb1a39c9aa5ea7b7945781d85f5c73c3b1223628626cf891ec15625b8ab037"
+   },
+   "mix": {
+    "provided": 1318,
+    "derived": 43,
+    "estimated": 8,
+    "missing": 71
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1369,
+    "missing": 71,
+    "byRung": {
+     "provided": 1318,
+     "derived": 43,
+     "estimated": 8
+    },
+    "bySource": {
+     "sleep_record": 43,
+     "oura_ble": 457,
+     "oura_cloud": 861,
+     "manual": 8
+    }
+   },
+   "metsPerMinute": "0f85dcb2f09a0226d3c7d5c21d6275ff273ac9a9fd0317af9ed5638153a2e3dc",
+   "provenance": "be0d4dba1f3d97e24d74e45fa58ed8507bb03b70a0619d65a3fea1798d2cb4fc",
+   "device": "65a098342c72d50747b0dc569e7a5006114c177e293495c8c54dd6f488b91bf8"
+  },
+  {
+   "seed": 6,
+   "grid": {
+    "start": 1791381600000,
+    "n": 1440,
+    "worn": 1081,
+    "values": "a64c9d88505645d1049342b7a3278c5cca5016fa3bf2bb5f2868e7fe26cbfb10"
+   },
+   "mix": {
+    "provided": 1193,
+    "derived": 36,
+    "estimated": 18,
+    "missing": 193
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1247,
+    "missing": 193,
+    "byRung": {
+     "provided": 1193,
+     "derived": 36,
+     "estimated": 18
+    },
+    "bySource": {
+     "oura_cloud": 756,
+     "oura_ble": 437,
+     "sleep_record": 36,
+     "manual": 18
+    }
+   },
+   "metsPerMinute": "806f7b3842f00d38d17004a628e677ed7cc2fb6ca92e15aee2afee8c08aa1d85",
+   "provenance": "fc985653bf5d93c162f7059a8cf8dbc336b453ef54f69d5a2d2c126ed97a54b7",
+   "device": "1adb2424c911cd6aa59199f7858d2e60ec02da7a155f63a53abbcec3722a7aa4"
+  },
+  {
+   "seed": 7,
+   "grid": {
+    "start": 1791414000000,
+    "n": 1440,
+    "worn": 1118,
+    "values": "8e934b3d336324171aaef655d1b6a116892e361ce90448a9a5b665b34280b202"
+   },
+   "mix": {
+    "provided": 1214,
+    "derived": 68,
+    "estimated": 10,
+    "missing": 148
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1292,
+    "missing": 148,
+    "byRung": {
+     "provided": 1214,
+     "derived": 68,
+     "estimated": 10
+    },
+    "bySource": {
+     "oura_cloud": 809,
+     "oura_ble": 405,
+     "sleep_record": 68,
+     "manual": 10
+    }
+   },
+   "metsPerMinute": "cba184970344f92b81ea94ad92e036695428e65f0d97ee3701a880bd37bb7268",
+   "provenance": "9728689c355f1244c8d63d6b8fb5347c7b7d752bfe4ae9ecd12796f95c61a0d0",
+   "device": "1c5db71fb56438311e41146be4a4a4e49fd64ec1d0772561a5f8fccf3bcbbdf3"
+  },
+  {
+   "seed": 8,
+   "grid": {
+    "start": 1791442800000,
+    "n": 1440,
+    "worn": 1071,
+    "values": "101e27c09b355f1200184c258f246cab2d4bed8016154db7b1de73194d677889"
+   },
+   "mix": {
+    "provided": 1185,
+    "derived": 46,
+    "estimated": 14,
+    "missing": 195
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1245,
+    "missing": 195,
+    "byRung": {
+     "provided": 1185,
+     "derived": 46,
+     "estimated": 14
+    },
+    "bySource": {
+     "oura_cloud": 753,
+     "oura_ble": 432,
+     "sleep_record": 46,
+     "manual": 14
+    }
+   },
+   "metsPerMinute": "add05a4640b1876047b698befa493b42e7a6856dcb5eaf2cadcb69b5e102496f",
+   "provenance": "14294a45a21bb54ce0d13602b9c64c5c0a84c672a22303449dbedeb3f596b611",
+   "device": "bee5302dc8f490aa7c619f4e5171ea29cb1860b1f168f9253b493ef52b115d8c"
+  },
+  {
+   "seed": 9,
+   "grid": {
+    "start": 1791381600000,
+    "n": 1440,
+    "worn": 1102,
+    "values": "da17e7ce06b254aba512a1f0f874ee282e0b627a6f677ecd8cd55abb81a8ad48"
+   },
+   "mix": {
+    "provided": 1207,
+    "derived": 37,
+    "estimated": 16,
+    "missing": 180
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1260,
+    "missing": 180,
+    "byRung": {
+     "provided": 1207,
+     "derived": 37,
+     "estimated": 16
+    },
+    "bySource": {
+     "oura_cloud": 779,
+     "oura_ble": 428,
+     "sleep_record": 37,
+     "manual": 16
+    }
+   },
+   "metsPerMinute": "09c4420681a5224c5a502ab9078b35aac585d179e8ee2c4e4c90dd3f291380db",
+   "provenance": "928aa917b1bd986c6d19af6e6a339584073d23ba03be5d5646f87652630e9161",
+   "device": "16e1ffcee1ca89ef1a251a0554bfe5d34ea944bec52fc1f3618ac93452c7d384"
+  },
+  {
+   "seed": 10,
+   "grid": {
+    "start": 1791414000000,
+    "n": 1440,
+    "worn": 1143,
+    "values": "6926bc45d11a903aa4c9b4dc0d4030a96c71ccc870fe176694342da4b26ad05b"
+   },
+   "mix": {
+    "provided": 1241,
+    "derived": 33,
+    "estimated": 13,
+    "missing": 153
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1287,
+    "missing": 153,
+    "byRung": {
+     "provided": 1241,
+     "derived": 33,
+     "estimated": 13
+    },
+    "bySource": {
+     "oura_cloud": 819,
+     "oura_ble": 422,
+     "sleep_record": 33,
+     "manual": 13
+    }
+   },
+   "metsPerMinute": "078bbdd43ede256e31ca8affd228279ee860aa9280de91dc479c5deb069d24b2",
+   "provenance": "55e8887a4e6363dd709865cb3d928d610b5a58f815d2418706adf2484389915d",
+   "device": "6cd9ccbe64df512b213bb42cb11ec788da628a097cf1b98658326307bb94c181"
+  },
+  {
+   "seed": 11,
+   "grid": {
+    "start": 1791442800000,
+    "n": 1440,
+    "worn": 1287,
+    "values": "c194a97bacfa4aeef2a353af6732151b467d1b2516552b7a9eafb387ba100ceb"
+   },
+   "mix": {
+    "provided": 1334,
+    "derived": 43,
+    "estimated": 8,
+    "missing": 55
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1385,
+    "missing": 55,
+    "byRung": {
+     "provided": 1334,
+     "derived": 43,
+     "estimated": 8
+    },
+    "bySource": {
+     "oura_cloud": 918,
+     "oura_ble": 416,
+     "sleep_record": 43,
+     "manual": 8
+    }
+   },
+   "metsPerMinute": "a6ab28307b661e67b6911ce037a2b1cd28ebf418d3ebe4e51d0c5b443f9b7891",
+   "provenance": "f62e531893fb6ef55b6e1a549a423003c6c57d49c26b13e101ab5d842c4b448e",
+   "device": "bbac59e4724bc7bd20ea5119c6d91ce626fbd43437eeab1d6a8da14cebc8acab"
+  },
+  {
+   "seed": 12,
+   "grid": {
+    "start": 1791381600000,
+    "n": 1440,
+    "worn": 1077,
+    "values": "9d7cf6390b80a95eddc1f43970bd9bf01e24a2bf6ecaa93e149cb52b7ba8bddc"
+   },
+   "mix": {
+    "provided": 1201,
+    "derived": 46,
+    "estimated": 7,
+    "missing": 186
+   },
+   "coverage": {
+    "total": 1440,
+    "filled": 1254,
+    "missing": 186,
+    "byRung": {
+     "provided": 1201,
+     "derived": 46,
+     "estimated": 7
+    },
+    "bySource": {
+     "oura_cloud": 750,
+     "sleep_record": 46,
+     "oura_ble": 451,
+     "manual": 7
+    }
+   },
+   "metsPerMinute": "379a27cae99a53f967aac4b207583a3ad80b7ae6c6ce8ac36424ddf70a848bb3",
+   "provenance": "453e9338bf456c5a1d51c7cd0a9d845afa6cc21f8d728a5602b25e8f5084f02a",
+   "device": "3d81023e30d9e64375db90cb7800772b7b265c62f98b85c484e367fc4bc6ecbf"
+  }
+ ],
+ "shadowStress": [
+  {
+   "from": "2026-10-18",
+   "series": [
+    {
+     "date": "2026-09-14",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-15",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-16",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-17",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-18",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-19",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-20",
+     "value": 35,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-21",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-22",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-23",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-24",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-25",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-26",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-27",
+     "value": 35,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-28",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-29",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-30",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-01",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-02",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-03",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-04",
+     "value": 35,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-05",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-06",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-07",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-08",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-09",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-10",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-11",
+     "value": 35,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-12",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-13",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-14",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-15",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-16",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-17",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-18",
+     "value": 55,
+     "source": "oura_cloud",
+     "rung": null
+    },
+    {
+     "date": "2026-10-19",
+     "value": 50,
+     "source": "oura_cloud",
+     "rung": null
+    },
+    {
+     "date": "2026-10-20",
+     "value": 45,
+     "source": "oura_cloud",
+     "rung": null
+    },
+    {
+     "date": "2026-10-21",
+     "value": 40,
+     "source": "oura_cloud",
+     "rung": null
+    },
+    {
+     "date": "2026-10-22",
+     "value": 35,
+     "source": "oura_cloud",
+     "rung": null
+    },
+    {
+     "date": "2026-10-23",
+     "value": 30,
+     "source": "oura_cloud",
+     "rung": null
+    }
+   ],
+   "scored": [
+    {
+     "quality": 1,
+     "reliability": 1,
+     "weight": 2,
+     "stage": "settled",
+     "validDays": 31,
+     "value": 31,
+     "provenance": {
+      "source": "oura_daily_derived",
+      "rung": null
+     },
+     "daytimeThrough": "2026-10-15",
+     "flags": [],
+     "score": 74,
+     "spread": 10,
+     "level": null,
+     "day": 4,
+     "normal": 33,
+     "gap": null,
+     "note": "No Level yardstick: learned base 70 at the normal."
+    },
+    {
+     "quality": 1,
+     "reliability": 1,
+     "weight": 2,
+     "stage": "settled",
+     "validDays": 33,
+     "value": 36,
+     "provenance": {
+      "source": "oura_daily_derived",
+      "rung": null
+     },
+     "daytimeThrough": "2026-10-17",
+     "flags": [],
+     "score": 64,
+     "spread": 10,
+     "level": null,
+     "day": -6,
+     "normal": 33,
+     "gap": null,
+     "note": "No Level yardstick: learned base 70 at the normal."
+    },
+    {
+     "quality": 1,
+     "reliability": 1,
+     "weight": 0,
+     "stage": "provisional",
+     "validDays": 2,
+     "value": 45,
+     "provenance": {
+      "source": "oura_cloud",
+      "rung": null
+     },
+     "daytimeThrough": "2026-10-20",
+     "flags": [
+      "source_changed"
+     ],
+     "score": null,
+     "spread": null,
+     "level": null,
+     "day": null,
+     "normal": null,
+     "gap": "learning",
+     "note": "Learning: no personal normal yet, and this unit has no population yardstick."
+    }
+   ]
+  },
+  {
+   "from": null,
+   "series": [
+    {
+     "date": "2026-09-14",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-15",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-16",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-17",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-18",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-19",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-20",
+     "value": 35,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-21",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-22",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-23",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-24",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-25",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-26",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-27",
+     "value": 35,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-28",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-29",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-09-30",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-01",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-02",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-03",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-04",
+     "value": 35,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-05",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-06",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-07",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-08",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-09",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-10",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-11",
+     "value": 35,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-12",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-13",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-14",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-15",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-16",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-17",
+     "value": 36,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-18",
+     "value": 35,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-19",
+     "value": 34,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-20",
+     "value": 33,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-21",
+     "value": 32,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-22",
+     "value": 31,
+     "source": "oura_daily_derived",
+     "rung": null
+    },
+    {
+     "date": "2026-10-23",
+     "value": 30,
+     "source": "oura_daily_derived",
+     "rung": null
+    }
+   ],
+   "scored": [
+    {
+     "quality": 1,
+     "reliability": 1,
+     "weight": 2,
+     "stage": "settled",
+     "validDays": 31,
+     "value": 31,
+     "provenance": {
+      "source": "oura_daily_derived",
+      "rung": null
+     },
+     "daytimeThrough": "2026-10-15",
+     "flags": [],
+     "score": 74,
+     "spread": 10,
+     "level": null,
+     "day": 4,
+     "normal": 33,
+     "gap": null,
+     "note": "No Level yardstick: learned base 70 at the normal."
+    },
+    {
+     "quality": 1,
+     "reliability": 1,
+     "weight": 2,
+     "stage": "settled",
+     "validDays": 33,
+     "value": 36,
+     "provenance": {
+      "source": "oura_daily_derived",
+      "rung": null
+     },
+     "daytimeThrough": "2026-10-17",
+     "flags": [],
+     "score": 64,
+     "spread": 10,
+     "level": null,
+     "day": -6,
+     "normal": 33,
+     "gap": null,
+     "note": "No Level yardstick: learned base 70 at the normal."
+    },
+    {
+     "quality": 1,
+     "reliability": 1,
+     "weight": 2,
+     "stage": "settled",
+     "validDays": 36,
+     "value": 33,
+     "provenance": {
+      "source": "oura_daily_derived",
+      "rung": null
+     },
+     "daytimeThrough": "2026-10-20",
+     "flags": [],
+     "score": 70,
+     "spread": 10,
+     "level": null,
+     "day": 0,
+     "normal": 33,
+     "gap": null,
+     "note": "No Level yardstick: learned base 70 at the normal."
+    }
+   ]
+  }
+ ]
+}

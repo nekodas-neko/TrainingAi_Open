@@ -1,8 +1,8 @@
 // #2634: the day's resting heart rate from still daytime periods, from Oura Cloud data.
 //
 // Heart rate is `oura_heartrate` rows of source `oura_cloud` (about one reading every 5 minutes), MET
-// is the day's `daily_activity.met` series with its `class_5_min` wear gate (`ouraCloudMetGrid`, the
-// same grid the training-stress route reads, #2985), and sleep is the stored nights and naps. The
+// is the day's `daily_activity.met` series with its `class_5_min` wear gate (`ouraActivityMovementSeries` into
+// `perMinuteMovementGrid`, the same grid the training-stress route reads, #2985), and sleep is the stored nights and naps. The
 // maths is `stillDaytimeRhr`, shared and source-agnostic; this only gathers its inputs and stores the
 // result on `oura_daily_derived`.
 //
@@ -11,7 +11,8 @@
 // nothing, so a thin day stays NULL and a thin re-read never replaces a fuller value.
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz, toAestDay, DEFAULT_TZ } from '@trainingai/shared/date-utils'
-import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
+import { perMinuteMovementGrid } from '@trainingai/shared/health/per-minute-movement'
+import { ouraActivityMovementSeries } from './activity-movement'
 import { CLOUD_HR_COVER_MS, MET_MINUTE_MS, stillDaytimeRhr } from '@trainingai/shared/health/still-rhr'
 import { reportOuraCloudIssue } from './report'
 
@@ -42,7 +43,7 @@ export async function refreshStillRhr(repo: StillRhrRepo, userId: string, days: 
       // Wake-date keyed: the night that ends this morning, and tonight's if it began before midnight.
       repo.listSleepSessions(userId, day, shiftDateStr(day, 1)),
     ])
-    const grid = ouraCloudMetGrid(series, dayStart.getTime(), dayEnd.getTime())
+    const grid = perMinuteMovementGrid(ouraActivityMovementSeries(series), dayStart.getTime(), dayEnd.getTime())
     const met = grid.metsPerMinute.flatMap((value, i) =>
       value == null ? [] : [{ tsMs: grid.startTimestampMs + i * MET_MINUTE_MS, value }])
     const still = stillDaytimeRhr({

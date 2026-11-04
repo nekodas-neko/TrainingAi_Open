@@ -29,7 +29,7 @@
 import { baselineZ, type Baseline } from '@trainingai/shared/health/personal-baseline'
 import { illnessZScores, type IllnessSummaryInput } from '@trainingai/shared/health/illness-radar'
 import type { BaselineContributorKey, ReadinessCompositeInputs } from '@trainingai/shared/health/readiness-composite'
-import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { trailingBaselineZ } from '@/lib/health/score-availability'
@@ -338,13 +338,13 @@ export interface NightVitalsSources {
 /**
  * Resting HR and HRV per night for the overlays (dose vitals, heart response). Before the switch to
  * the Oura API the ring summary stands, exactly as before. From the switch day the ring's rows are
- * partial leftovers (`ringValueStands`), so the night comes from the same generic values readiness
+ * partial leftovers (`beforeSourceSwitch`), so the night comes from the same generic values readiness
  * v8 scores (`resolveReadinessNightInputs`), labelled by the device that measured it.
  */
 export function nightVitals(src: NightVitalsSources): NightVital[] {
   const out: NightVital[] = []
   for (const s of src.summaries) {
-    if (s.date < src.from || s.date > src.to || !ringValueStands(s.date, src.switchDay)) continue
+    if (s.date < src.from || s.date > src.to || !beforeSourceSwitch(s.date, src.switchDay)) continue
     out.push({
       date: s.date, restingHr: s.rhrLowBpm, hrvMs: s.hrvAvgMs,
       restingHrSource: s.rhrLowBpm != null ? RING_SUMMARY_SOURCE : null,
@@ -353,7 +353,7 @@ export function nightVitals(src: NightVitalsSources): NightVital[] {
     })
   }
   for (const m of src.bodyMetrics) {
-    if (m.date < src.from || m.date > src.to || ringValueStands(m.date, src.switchDay)) continue
+    if (m.date < src.from || m.date > src.to || beforeSourceSwitch(m.date, src.switchDay)) continue
     const rhr = (m.restingHeartRate ?? 0) > 0 ? m.restingHeartRate! : null
     const hrv = (m.hrvMs ?? 0) > 0 ? m.hrvMs! : null
     if (rhr == null && hrv == null) continue
@@ -370,7 +370,7 @@ export function nightVitals(src: NightVitalsSources): NightVital[] {
 /**
  * The `readiness_source` label stored beside a score: what actually fed it. Before the switch to the
  * Oura API the ring's summary row is the source whenever one exists. From the switch day the row is a
- * partial leftover (`ringValueStands`), so the label is the ring's only if one of the night's inputs
+ * partial leftover (`beforeSourceSwitch`), so the label is the ring's only if one of the night's inputs
  * really came from it; otherwise the score was built from Oura's and the generic values.
  */
 export function readinessSourceLabel(
@@ -378,7 +378,7 @@ export function readinessSourceLabel(
   hasSummaryRow: boolean,
   switchDay: string | null | undefined,
 ): 'ble-derived' | 'generic-derived' {
-  if (night.nightDate != null && !ringValueStands(night.nightDate, switchDay)) {
+  if (night.nightDate != null && !beforeSourceSwitch(night.nightDate, switchDay)) {
     return Object.values(night.inputs).some(i => i?.source === RING_SUMMARY_SOURCE) ? 'ble-derived' : 'generic-derived'
   }
   return hasSummaryRow ? 'ble-derived' : 'generic-derived'

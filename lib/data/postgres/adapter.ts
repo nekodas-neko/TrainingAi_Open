@@ -74,6 +74,7 @@ import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibili
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { sleepShapeFromHypnogram } from '@trainingai/shared/health/oura-sleep-detail'
 import { restlessnessFromMovement } from '@trainingai/shared/health/sleep-recording'
+import { perMinuteMovementSeries } from './slices/movement-series'
 import { ouraMovementSeries, ouraRecordingIncomplete, ouraAlgorithmVersion } from '@/lib/oura/cloud/sleep-recording-map'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
 import { PartialNightPayloadSchema } from '@trainingai/shared/health/partial-night'
@@ -169,7 +170,7 @@ const BODY_METRICS_SOURCE_COLS: SourceColumn[] = [
 ]
 import { aestMidnight, toAestDay, todayInTz, todayDayOfWeek, dateStrMidnightInTz, shiftDateStr, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
-import { ringValueStands } from '@trainingai/shared/health/source-rank'
+import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { loadNightTemperature } from '@/lib/health/night-temperature'
 import { clampWindowStart } from '@trainingai/shared/workout/time-audit'
 import { computeAiDynamicNextSession, TEMP_ALERT_THRESHOLD_C, type AiDynamicInput } from '@trainingai/shared/ai-periodization/ai-dynamic'
@@ -2194,7 +2195,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // #3077: the ring's daytime stress stands only before the switch day; Oura's `stress_high`
       // (seconds) is read for a day the ring has none, as the coach and weekly digest do. Input only:
       // the scorer's stress arm is unwired (TN-34), so no recommendation moves with it.
-      const ringStressMinutes = ringValueStands(todayIso, switchDay) ? todayDerived?.stressHighMinutes ?? null : null
+      const ringStressMinutes = beforeSourceSwitch(todayIso, switchDay) ? todayDerived?.stressHighMinutes ?? null : null
       const ouraStressMinutes = ouraToday?.stressHigh != null && !isPreRekey(ouraToday.date) ? Math.round(ouraToday.stressHigh / 60) : null
       const stressHighMinutes = ringStressMinutes ?? ouraStressMinutes
       const history: AiDynamicInput['history'] = recentWsWithName.map(w => ({
@@ -8394,6 +8395,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async tombstoneOuraSessions(userId: string, ids: string[]) { return oura.tombstoneOuraSessions(this.db, userId, ids) }
   async tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean }) { return oura.tombstoneOuraSessionsAbsent(this.db, userId, range) }
   async getOuraCloudActivitySeries(userId: string, from: string, to: string) { return oura.getOuraCloudActivitySeries(this.db, userId, from, to) }
+  async getPerMinuteMovementSeries(userId: string, from: string, to: string) { return perMinuteMovementSeries(this.db, userId, from, to) }
   async getOuraCloudMetChangedAt(userId: string, from: string, to: string) { return oura.getOuraCloudMetChangedAt(this.db, userId, from, to) }
   async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }
   async getLatestOuraCloudBatteryAt(userId: string, since: Date) { return oura.getLatestOuraCloudBatteryAt(this.db, userId, since) }

@@ -30,7 +30,7 @@ import {
 import { BASELINE_MIN_NIGHTS, storedReadinessLearning } from '@trainingai/shared/health/readiness-composite';
 import { isOwnReadinessSource } from '@trainingai/shared/health/live-readiness';
 import { resolveDayMetPerMinute } from '@trainingai/shared/health/met-input';
-import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met';
+import { perMinuteMovementGrid } from '@trainingai/shared/health/per-minute-movement';
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy';
 import { metForActivity, intensityFromRpe } from '@trainingai/shared/health/workout-energy';
 import type { ActivityLog } from '@trainingai/shared/types/body';
@@ -132,7 +132,7 @@ async function evaluateTrainingStressDay(
     activityRows,
     kcalRows,
     stepRows,
-    cloudActivity,
+    movementSeries,
   ] = await Promise.all([
     repo.getOuraDailyDerived(userId, date, date),
     repo.getOuraDailySummary(userId, date, date),
@@ -148,8 +148,9 @@ async function evaluateTrainingStressDay(
     repo.listActivityLogs(userId, date, date),
     movementIntervals(repo, userId, 'active_kcal', intervalsFrom, dayEnd),
     movementIntervals(repo, userId, 'steps', intervalsFrom, dayEnd),
-    // #2985: Oura's activity day starts at 4 a.m., so the day before holds this day's first hours.
-    repo.getOuraCloudActivitySeries(userId, shiftDateStr(date, -1), date),
+    // #2985: a source's movement day may start before local midnight (Oura's at 4 a.m.), so the day
+    // before can hold this day's first hours.
+    repo.getPerMinuteMovementSeries(userId, shiftDateStr(date, -1), date),
   ]);
 
   const derived = derivedRows[0] ?? null;
@@ -171,14 +172,14 @@ async function evaluateTrainingStressDay(
 
   // #2115 v4: the day's `MET/min`, minute by minute from local midnight to the end of the day (or
   // now, for today), each minute from the best route that has it. The ring's own grid is rung 1 (J-6:
-  // keyed on each bin's wall-clock minute, so charger gaps stay gaps), then Oura's MET series where
-  // the ring has no minute (#2985); a minute nothing fills stays null, and `computeTrainingStress`
+  // keyed on each bin's wall-clock minute, so charger gaps stay gaps), then a connector's per-minute
+  // movement series where the ring has no minute (#2985); a minute nothing fills stays null, and `computeTrainingStress`
   // caps and renormalises over those.
   const grid = metGridFromDaytimeSamples(daytime.met);
   const met = resolveDayMetPerMinute(
     {
       ringGrid: grid,
-      cloudGrid: ouraCloudMetGrid(cloudActivity, dayStart.getTime(), dayEnd.getTime()),
+      movementGrid: perMinuteMovementGrid(movementSeries, dayStart.getTime(), dayEnd.getTime()),
       ringMotion: daytime.motion ?? [],
       ringStillFramesMs: daytime.still ?? [],
       sleepSessions: sleepRows.map((r) => ({
