@@ -225,6 +225,10 @@ export class SQLiteLocalStore implements LocalStore {
       onsetAt:         (r.onset_at as string) ?? null,
       finalWakeAt:     (r.final_wake_at as string) ?? null,
       computedAwakenings: (r.computed_awakenings as number) ?? null,
+      restlessMin:     (r.restless_min as number) ?? null,
+      movementMeasuredMin: (r.movement_measured_min as number) ?? null,
+      recordingIncomplete: r.recording_incomplete == null ? null : Number(r.recording_incomplete) === 1,
+      sourceAlgorithmVersion: (r.source_algorithm_version as string) ?? null,
       syncStatus:      (r.sync_status as 'pending' | 'synced') ?? 'synced',
       updatedAt:       String(r.updated_at),
     })));
@@ -1729,6 +1733,10 @@ export class SQLiteLocalStore implements LocalStore {
       // it. Never from an older copy, which would revert the rest of the row. A changed type always
       // arrives at a newer updated_at (the period upsert bumps the row).
       //
+      // #3600 (v55): the four recording fields are replaced with the row; a synced row pulled before v55
+      // is filled by an equal-updated_at re-send keyed on `source_algorithm_version` (every night a source
+      // gives any of the four also gives its version). Never from an older copy.
+      //
       // #3582 (v54): `onset_at` rides the same guard and the same exception. A synced row pulled
       // before v54 has none, and a re-send at an equal updated_at (Restore from cloud) fills it, never
       // from an older copy. The derived values change only when the night's row does.
@@ -1739,8 +1747,10 @@ export class SQLiteLocalStore implements LocalStore {
             avg_heart_rate, lowest_heart_rate, restless_periods, sleep_score,
             respiratory_rate, sleep_phase_5_min, time_in_bed_hours, manual_sleep_start,
             sleep_start, sleep_end, awake_hours, manual_entry, deleted_at, oura_sleep_type,
-            onset_at, final_wake_at, computed_awakenings, updated_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+            onset_at, final_wake_at, computed_awakenings,
+            restless_min, movement_measured_min, recording_incomplete, source_algorithm_version,
+            updated_at, sync_status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
            date=excluded.date, duration_hours=excluded.duration_hours,
            deep_sleep_hours=excluded.deep_sleep_hours,
@@ -1758,6 +1768,9 @@ export class SQLiteLocalStore implements LocalStore {
            deleted_at=excluded.deleted_at, oura_sleep_type=excluded.oura_sleep_type,
            onset_at=excluded.onset_at, final_wake_at=excluded.final_wake_at,
            computed_awakenings=excluded.computed_awakenings,
+           restless_min=excluded.restless_min, movement_measured_min=excluded.movement_measured_min,
+           recording_incomplete=excluded.recording_incomplete,
+           source_algorithm_version=excluded.source_algorithm_version,
            updated_at=excluded.updated_at, sync_status='synced'
          WHERE sleep_sessions.sync_status='synced'
            AND (excluded.updated_at > sleep_sessions.updated_at
@@ -1765,6 +1778,8 @@ export class SQLiteLocalStore implements LocalStore {
                 OR (sleep_sessions.oura_sleep_type IS NULL AND excluded.oura_sleep_type IS NOT NULL
                     AND excluded.updated_at >= sleep_sessions.updated_at)
                 OR (sleep_sessions.onset_at IS NULL AND excluded.onset_at IS NOT NULL
+                    AND excluded.updated_at >= sleep_sessions.updated_at)
+                OR (sleep_sessions.source_algorithm_version IS NULL AND excluded.source_algorithm_version IS NOT NULL
                     AND excluded.updated_at >= sleep_sessions.updated_at))`,
         [r.id, r.date, r.durationHours, r.deepSleepHours, r.remSleepHours, r.lightSleepHours,
          r.ouraId, r.efficiency, r.onsetLatencySec, r.averageHrvMs, r.avgHeartRate,
@@ -1772,7 +1787,10 @@ export class SQLiteLocalStore implements LocalStore {
          r.sleepPhase5Min, r.timeInBedHours, r.manualSleepStart,
          r.sleepStart ?? null, r.sleepEnd ?? null, r.awakHours ?? null, r.manualEntry ? 1 : 0,
          r.deletedAt ?? null, r.ouraSleepType ?? null,
-         r.onsetAt ?? null, r.finalWakeAt ?? null, r.computedAwakenings ?? null, r.updatedAt],
+         r.onsetAt ?? null, r.finalWakeAt ?? null, r.computedAwakenings ?? null,
+         r.restlessMin ?? null, r.movementMeasuredMin ?? null,
+         r.recordingIncomplete == null ? null : (r.recordingIncomplete ? 1 : 0), r.sourceAlgorithmVersion ?? null,
+         r.updatedAt],
       );
     }
 

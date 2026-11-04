@@ -63,6 +63,11 @@ export async function GET() {
     // #3582. When sleep really began and ended on an Oura Cloud night; the bed window above is unchanged.
     onsetAt:      r.onsetAt ? r.onsetAt.toISOString() : null,
     finalWakeAt:  r.finalWakeAt ? r.finalWakeAt.toISOString() : null,
+    // #3600. The generic recording fields `listSleepSessions` derives; null for a source that sent none.
+    restlessMin:  r.restlessMin ?? null,
+    movementMeasuredMin: r.movementMeasuredMin ?? null,
+    recordingIncomplete: r.recordingIncomplete === true ? true : null,
+    sourceAlgorithmVersion: r.sourceAlgorithmVersion ?? null,
   })), tz);
 
   // A night the rollup has not yet derived past is still growing, and saying so is the whole of

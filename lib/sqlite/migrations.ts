@@ -407,6 +407,12 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'sleep_sessions', column: 'onset_at',            ddl: `ALTER TABLE sleep_sessions ADD COLUMN onset_at TEXT` },
   { table: 'sleep_sessions', column: 'final_wake_at',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN final_wake_at TEXT` },
   { table: 'sleep_sessions', column: 'computed_awakenings', ddl: `ALTER TABLE sleep_sessions ADD COLUMN computed_awakenings INTEGER` },
+  // #3600 (v55). The generic recording fields the server derives on read; NULL on every existing row
+  // and for a source that sent none.
+  { table: 'sleep_sessions', column: 'restless_min',             ddl: `ALTER TABLE sleep_sessions ADD COLUMN restless_min REAL` },
+  { table: 'sleep_sessions', column: 'movement_measured_min',    ddl: `ALTER TABLE sleep_sessions ADD COLUMN movement_measured_min REAL` },
+  { table: 'sleep_sessions', column: 'recording_incomplete',     ddl: `ALTER TABLE sleep_sessions ADD COLUMN recording_incomplete INTEGER` },
+  { table: 'sleep_sessions', column: 'source_algorithm_version', ddl: `ALTER TABLE sleep_sessions ADD COLUMN source_algorithm_version TEXT` },
   // oura_daily gains sync_status so the applyDelta pull can clobber-guard a device-authored
   // (BLE rollup) row against a stale server pull — the D4 finding. Default 'synced' (existing
   // rows are server-mirrored); the device-write path that sets 'pending' lands with D2.
@@ -1782,6 +1788,20 @@ export const MIGRATIONS: UpgradeStatement[] = [
       `ALTER TABLE sleep_sessions ADD COLUMN onset_at TEXT`,
       `ALTER TABLE sleep_sessions ADD COLUMN final_wake_at TEXT`,
       `ALTER TABLE sleep_sessions ADD COLUMN computed_awakenings INTEGER`,
+    ],
+  },
+  {
+    // #3600 (stages 4 and 5 of #3075's follow-up). Same shape as v54: the server derives the night's
+    // restlessness, incomplete-recording flag and source algorithm version on read (no Postgres column)
+    // and the pull carries them. Local-only schema step with nullable columns; RECONCILE_COLUMNS covers a
+    // half-applied upgrade. No backfill: a row pulled before v55 reads NULL, which every reader treats as
+    // "no restlessness term, a complete recording, no version".
+    toVersion: 55,
+    statements: [
+      `ALTER TABLE sleep_sessions ADD COLUMN restless_min REAL`,
+      `ALTER TABLE sleep_sessions ADD COLUMN movement_measured_min REAL`,
+      `ALTER TABLE sleep_sessions ADD COLUMN recording_incomplete INTEGER`,
+      `ALTER TABLE sleep_sessions ADD COLUMN source_algorithm_version TEXT`,
     ],
   },
 ];
