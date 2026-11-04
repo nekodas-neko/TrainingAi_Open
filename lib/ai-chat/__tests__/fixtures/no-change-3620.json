@@ -1,0 +1,6492 @@
+{
+ "weekly-digest": {
+  "shift0-none-switchnone": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-none-switch2026-07-03": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-none-switch2026-07-07": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-none-switch2026-07-10": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-minutes-switchnone": {
+   "stress": {
+    "week": 38,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "d89b592f86f64b12c6529b1ae3a8ec1807edc33135aae23204e596d105e21bc0"
+  },
+  "shift0-minutes-switch2026-07-03": {
+   "stress": {
+    "week": 2,
+    "priorWeek": 31,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "44b5d56a205bdee3c9b33de8700010afdb57d5b9be6deeca3618375b7b59f6ae"
+  },
+  "shift0-minutes-switch2026-07-07": {
+   "stress": {
+    "week": 2,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "861382655b48b4a2973c6b7a35159d0d29d2f9ba6488a900f8284147c2070ae2"
+  },
+  "shift0-minutes-switch2026-07-10": {
+   "stress": {
+    "week": 18,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "e513fe446960fdcfe0dfeb584845de108ee442f1dce2178253af93dc95dcf170"
+  },
+  "shift0-level-switchnone": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-level-switch2026-07-03": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-level-switch2026-07-07": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-level-switch2026-07-10": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-mixed-switchnone": {
+   "stress": {
+    "week": 63,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 111
+     }
+    ]
+   },
+   "metrics": "623e72ced5d99d809a607e4605b463652f7bb654000c40ca08afe71b5640aa9d"
+  },
+  "shift0-mixed-switch2026-07-03": {
+   "stress": {
+    "week": 2,
+    "priorWeek": 24,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "ee616ef38df2e95b40825c338a6fb375bdb403dfdada054012d8df8e83823206"
+  },
+  "shift0-mixed-switch2026-07-07": {
+   "stress": {
+    "week": 2,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "3d9c40848c4bdeb758477858ef5d1f408683e3e6bdb5aebbc55c2e5108359494"
+  },
+  "shift0-mixed-switch2026-07-10": {
+   "stress": {
+    "week": 28,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "a720a22e43634b503ab2736610e9c6a59d95c39202c4b5fff3f547ce1ca6525f"
+  },
+  "shift5-none-switchnone": {
+   "stress": {
+    "week": 325,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "c11b5e8523d5d2a6253aeb27cbda11480fd4a8f059d325fc0cd9973e73ae6495"
+  },
+  "shift5-none-switch2026-07-03": {
+   "stress": {
+    "week": 325,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "c11b5e8523d5d2a6253aeb27cbda11480fd4a8f059d325fc0cd9973e73ae6495"
+  },
+  "shift5-none-switch2026-07-07": {
+   "stress": {
+    "week": 325,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "c11b5e8523d5d2a6253aeb27cbda11480fd4a8f059d325fc0cd9973e73ae6495"
+  },
+  "shift5-none-switch2026-07-10": {
+   "stress": {
+    "week": 325,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "c11b5e8523d5d2a6253aeb27cbda11480fd4a8f059d325fc0cd9973e73ae6495"
+  },
+  "shift5-minutes-switchnone": {
+   "stress": {
+    "week": 343,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "975ce326761592d9eaf30320e41722e07c319352aab8508a6bec8162b69a2a61"
+  },
+  "shift5-minutes-switch2026-07-03": {
+   "stress": {
+    "week": 325,
+    "priorWeek": 31,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "7c1f0743d5fddfcf77de1346b995f22f37c7d621337729a0152ce567704d274c"
+  },
+  "shift5-minutes-switch2026-07-07": {
+   "stress": {
+    "week": 325,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "c9021ca76ae2d2b94fa81a3c9a1e8ec2788cf1143ab34ef1d9edab4769a55907"
+  },
+  "shift5-minutes-switch2026-07-10": {
+   "stress": {
+    "week": 341,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "25f8e3b1ddd81cd775d593d76e3268c6100d743c3d926be0e348e1dde74622af"
+  },
+  "shift5-level-switchnone": {
+   "stress": {
+    "week": 325,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "c11b5e8523d5d2a6253aeb27cbda11480fd4a8f059d325fc0cd9973e73ae6495"
+  },
+  "shift5-level-switch2026-07-03": {
+   "stress": {
+    "week": 325,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "c11b5e8523d5d2a6253aeb27cbda11480fd4a8f059d325fc0cd9973e73ae6495"
+  },
+  "shift5-level-switch2026-07-07": {
+   "stress": {
+    "week": 325,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "c11b5e8523d5d2a6253aeb27cbda11480fd4a8f059d325fc0cd9973e73ae6495"
+  },
+  "shift5-level-switch2026-07-10": {
+   "stress": {
+    "week": 325,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "c11b5e8523d5d2a6253aeb27cbda11480fd4a8f059d325fc0cd9973e73ae6495"
+  },
+  "shift5-mixed-switchnone": {
+   "stress": {
+    "week": 77,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 111
+     }
+    ]
+   },
+   "metrics": "8d09ea41e63068d403024b51968422315e574c8c14f6c4ba0ee38a89bf9b6468"
+  },
+  "shift5-mixed-switch2026-07-03": {
+   "stress": {
+    "week": 325,
+    "priorWeek": 24,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "54a9883ac27623671b4416a10a18b28bfbc80ddb5f52ea4cf90dce244a8d5284"
+  },
+  "shift5-mixed-switch2026-07-07": {
+   "stress": {
+    "week": 325,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 3
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "8f01357f5fbafb27d7573e533c88a1ab8f1dc549a8d616c45e2aca5e25ffeb99"
+  },
+  "shift5-mixed-switch2026-07-10": {
+   "stress": {
+    "week": 297,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 30
+     },
+     {
+      "date": "2026-07-10",
+      "value": 60
+     },
+     {
+      "date": "2026-07-11",
+      "value": 90
+     },
+     {
+      "date": "2026-07-12",
+      "value": 1440
+     }
+    ]
+   },
+   "metrics": "40c8eba5c9fc3dfcee03d09eadabe6e7999385c2cabc3a4a76e8228e8970aa39"
+  },
+  "shift11-none-switchnone": {
+   "stress": {
+    "week": 0,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "3f8320e3e92d722482209a5a94b27fea88af0ee804402116c9014739cbfa296d"
+  },
+  "shift11-none-switch2026-07-03": {
+   "stress": {
+    "week": 0,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "3f8320e3e92d722482209a5a94b27fea88af0ee804402116c9014739cbfa296d"
+  },
+  "shift11-none-switch2026-07-07": {
+   "stress": {
+    "week": 0,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "3f8320e3e92d722482209a5a94b27fea88af0ee804402116c9014739cbfa296d"
+  },
+  "shift11-none-switch2026-07-10": {
+   "stress": {
+    "week": 0,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "3f8320e3e92d722482209a5a94b27fea88af0ee804402116c9014739cbfa296d"
+  },
+  "shift11-minutes-switchnone": {
+   "stress": {
+    "week": 62,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "9103688214bdc00d30870aa36a105216b4790c8efed8ccd7c9229c731b78afc7"
+  },
+  "shift11-minutes-switch2026-07-03": {
+   "stress": {
+    "week": 0,
+    "priorWeek": 31,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "d7c56446f1081002cc61d23be7b1030e5aeec4f5ae794db8463135d1bfa51790"
+  },
+  "shift11-minutes-switch2026-07-07": {
+   "stress": {
+    "week": 0,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "28f4d1512603c99c6c9b0bb2753f8dd05dea298f2af6da1e4610642a8b249013"
+  },
+  "shift11-minutes-switch2026-07-10": {
+   "stress": {
+    "week": 28,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "56a4462262f90375ec95f9517428affadd23a48bb80a8478dbf40b870bd99610"
+  },
+  "shift11-level-switchnone": {
+   "stress": {
+    "week": 0,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "3f8320e3e92d722482209a5a94b27fea88af0ee804402116c9014739cbfa296d"
+  },
+  "shift11-level-switch2026-07-03": {
+   "stress": {
+    "week": 0,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "3f8320e3e92d722482209a5a94b27fea88af0ee804402116c9014739cbfa296d"
+  },
+  "shift11-level-switch2026-07-07": {
+   "stress": {
+    "week": 0,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "3f8320e3e92d722482209a5a94b27fea88af0ee804402116c9014739cbfa296d"
+  },
+  "shift11-level-switch2026-07-10": {
+   "stress": {
+    "week": 0,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "3f8320e3e92d722482209a5a94b27fea88af0ee804402116c9014739cbfa296d"
+  },
+  "shift11-mixed-switchnone": {
+   "stress": {
+    "week": 94,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 111
+     }
+    ]
+   },
+   "metrics": "681b035d8b122aec4bce1ab793e207cad2ad578daf7ed9fd46e1af96dacdeed9"
+  },
+  "shift11-mixed-switch2026-07-03": {
+   "stress": {
+    "week": 0,
+    "priorWeek": 24,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "58d1fe5af359baf191445273f8daf179460a0a88d3a024e64fc7d85ba3cd57dc"
+  },
+  "shift11-mixed-switch2026-07-07": {
+   "stress": {
+    "week": 0,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": -1
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "5b5f25735be29e29bfb1353456f77e1fbf651e51ace575ab9ac781abe93a7266"
+  },
+  "shift11-mixed-switch2026-07-10": {
+   "stress": {
+    "week": 40,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": null
+     },
+     {
+      "date": "2026-07-10",
+      "value": null
+     },
+     {
+      "date": "2026-07-11",
+      "value": 0
+     },
+     {
+      "date": "2026-07-12",
+      "value": 0
+     }
+    ]
+   },
+   "metrics": "cdc54d8f1b2f1c2e52a21a768cc456a6fa0b0061668b273940edc46043d964f1"
+  },
+  "gaps": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": null
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 1
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "599d12f0af20fac71a35e7b2d13470deb869d1565a18bdc4c1dbffebeb792d4e"
+  }
+ },
+ "weekly-digest-switch-fails": {
+  "shift0-none-switchnone": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-none-switch2026-07-03": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-none-switch2026-07-07": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-none-switch2026-07-10": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-minutes-switchnone": {
+   "stress": {
+    "week": 38,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "d89b592f86f64b12c6529b1ae3a8ec1807edc33135aae23204e596d105e21bc0"
+  },
+  "shift0-minutes-switch2026-07-03": {
+   "stress": {
+    "week": 38,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "d89b592f86f64b12c6529b1ae3a8ec1807edc33135aae23204e596d105e21bc0"
+  },
+  "shift0-minutes-switch2026-07-07": {
+   "stress": {
+    "week": 38,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "d89b592f86f64b12c6529b1ae3a8ec1807edc33135aae23204e596d105e21bc0"
+  },
+  "shift0-minutes-switch2026-07-10": {
+   "stress": {
+    "week": 38,
+    "priorWeek": 41,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "d89b592f86f64b12c6529b1ae3a8ec1807edc33135aae23204e596d105e21bc0"
+  },
+  "shift0-level-switchnone": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-level-switch2026-07-03": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-level-switch2026-07-07": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-level-switch2026-07-10": {
+   "stress": {
+    "week": 2,
+    "priorWeek": null,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": null
+     },
+     {
+      "date": "2026-07-08",
+      "value": 1
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 2
+     },
+     {
+      "date": "2026-07-12",
+      "value": 2
+     }
+    ]
+   },
+   "metrics": "803239af4b993803726360cc3cbe912d4dc942328956f24345b1f06249e3ee1f"
+  },
+  "shift0-mixed-switchnone": {
+   "stress": {
+    "week": 63,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 111
+     }
+    ]
+   },
+   "metrics": "623e72ced5d99d809a607e4605b463652f7bb654000c40ca08afe71b5640aa9d"
+  },
+  "shift0-mixed-switch2026-07-03": {
+   "stress": {
+    "week": 63,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 111
+     }
+    ]
+   },
+   "metrics": "623e72ced5d99d809a607e4605b463652f7bb654000c40ca08afe71b5640aa9d"
+  },
+  "shift0-mixed-switch2026-07-07": {
+   "stress": {
+    "week": 63,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 111
+     }
+    ]
+   },
+   "metrics": "623e72ced5d99d809a607e4605b463652f7bb654000c40ca08afe71b5640aa9d"
+  },
+  "shift0-mixed-switch2026-07-10": {
+   "stress": {
+    "week": 63,
+    "priorWeek": 38,
+    "byDay": [
+     {
+      "date": "2026-07-06",
+      "value": null
+     },
+     {
+      "date": "2026-07-07",
+      "value": 76
+     },
+     {
+      "date": "2026-07-08",
+      "value": 83
+     },
+     {
+      "date": "2026-07-09",
+      "value": 1
+     },
+     {
+      "date": "2026-07-10",
+      "value": 2
+     },
+     {
+      "date": "2026-07-11",
+      "value": 104
+     },
+     {
+      "date": "2026-07-12",
+      "value": 111
+     }
+    ]
+   },
+   "metrics": "623e72ced5d99d809a607e4605b463652f7bb654000c40ca08afe71b5640aa9d"
+  }
+ },
+ "coach-recovery-tool": {
+  "shift0-none-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "0ce35db100a48b0c3e9324dd089af2aa5a91367da50adff2b6a1039a258aac67"
+  },
+  "shift0-none-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "0ce35db100a48b0c3e9324dd089af2aa5a91367da50adff2b6a1039a258aac67"
+  },
+  "shift0-none-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "0ce35db100a48b0c3e9324dd089af2aa5a91367da50adff2b6a1039a258aac67"
+  },
+  "shift0-none-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "0ce35db100a48b0c3e9324dd089af2aa5a91367da50adff2b6a1039a258aac67"
+  },
+  "shift0-minutes-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": null,
+     "highMinutes": 62
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "own",
+     "level": null,
+     "highMinutes": 104
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "bf8159e6abf54b956412235fdcea4f87c757a5116351f8ecf4173f7a8c37d8cd"
+  },
+  "shift0-minutes-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "9e6a308e7eb1a9aff316ebbc3666e4302796b2a40ee90a321a81f90d2aeecb98"
+  },
+  "shift0-minutes-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": null,
+     "highMinutes": 62
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "b13c1372eb2e02700d30ead1356999e0c4b48bbf7b8c1243e68dc588f34a5794"
+  },
+  "shift0-minutes-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": null,
+     "highMinutes": 62
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "87e6d31201b8f53b6b98b350b44b8e29e0488e020bff9daecde3c93011378035"
+  },
+  "shift0-level-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "140cdbd38346b134d205c5f494bba5cf74114af8214b80fc6e9c3ce799064603"
+  },
+  "shift0-level-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "987bd0d79c226d84642bc9508b3c0ad35f62dcb4c6717d44e4d0a6410bcf7be0"
+  },
+  "shift0-level-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "4fea8b2e3643d00f27b71b586f6080ba91c6ba7faf82c6611dcfd78826611e3b"
+  },
+  "shift0-level-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "ab7bf4c3e221578166e9fe900bdd37abfceef57ba0d0dda0c251b88ab617b51c"
+  },
+  "shift0-mixed-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": 48
+    },
+    {
+     "date": "2026-07-04",
+     "source": "own",
+     "level": null,
+     "highMinutes": 55
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": 76
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": 104
+    },
+    {
+     "date": "2026-07-12",
+     "source": "own",
+     "level": null,
+     "highMinutes": 111
+    }
+   ],
+   "output": "67b34865706dbec7d5dcf1f4eb1a3e916207d58354e949b9bebd4631e4332b0c"
+  },
+  "shift0-mixed-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "c80dd89b3ced1255919a7a15176b147447c5668772b6c42f830a332af06df551"
+  },
+  "shift0-mixed-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": 48
+    },
+    {
+     "date": "2026-07-04",
+     "source": "own",
+     "level": null,
+     "highMinutes": 55
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "6f370cc5d46e6c5538ef2f532d4e0ddf27a718460a3e39a1a1681dc096e24c64"
+  },
+  "shift0-mixed-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": 48
+    },
+    {
+     "date": "2026-07-04",
+     "source": "own",
+     "level": null,
+     "highMinutes": 55
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": 76
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "1209204333b6fdcf724e655661aa4c5d34753ecac56bb2dd6d866466489c9440"
+  },
+  "shift5-none-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "8916faf8e67d5fdd965e9462ddd464cb62741f099d87e1ee9115d410058cf45b"
+  },
+  "shift5-none-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "8916faf8e67d5fdd965e9462ddd464cb62741f099d87e1ee9115d410058cf45b"
+  },
+  "shift5-none-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "8916faf8e67d5fdd965e9462ddd464cb62741f099d87e1ee9115d410058cf45b"
+  },
+  "shift5-none-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "8916faf8e67d5fdd965e9462ddd464cb62741f099d87e1ee9115d410058cf45b"
+  },
+  "shift5-minutes-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": null,
+     "highMinutes": 62
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "own",
+     "level": null,
+     "highMinutes": 104
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "d18e4c3676fe0a20b9716bd6503979924a63103ecfe36a33d79d22e7a4a6c354"
+  },
+  "shift5-minutes-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "e6643eb9985b3307e38fce383d13e78a8f0ea4d234a8df2bb47d79b0d29a83f5"
+  },
+  "shift5-minutes-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": null,
+     "highMinutes": 62
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "dc541a97416a88cfea0513ce1ae4ea66232fdba19f385227d43ea1f140454403"
+  },
+  "shift5-minutes-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": null,
+     "highMinutes": 62
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "d7f923abdfef88f4938e924ea061cc6431a0bf716f115102c8c3a18fe508268d"
+  },
+  "shift5-level-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "2f8a9bc5da358dd84ec5c00473df9df7f143b5d7e4367bde5fcda625fd806d31"
+  },
+  "shift5-level-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "baf917d5591227ecb2b5014a85c3642d3b130659dd3746fc1608007a9077ff53"
+  },
+  "shift5-level-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "8901271a55f08195d4728cc965ed9854b0a52f3e38f981a6d18d664b74fc5ff0"
+  },
+  "shift5-level-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "7403187dc2b2f2cbf94f3ff50abea5eba5989e92250e73afbbefe671c06b3f27"
+  },
+  "shift5-mixed-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": 48
+    },
+    {
+     "date": "2026-07-04",
+     "source": "own",
+     "level": null,
+     "highMinutes": 55
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": 76
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": 104
+    },
+    {
+     "date": "2026-07-12",
+     "source": "own",
+     "level": null,
+     "highMinutes": 111
+    }
+   ],
+   "output": "ecae9b667e43ffa048cc53f865febae4d6419b6bc281045d8b8cdc4af99fdc70"
+  },
+  "shift5-mixed-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "c5d5b0a118a92e9a6c3238905f17321ab697026cb86c70b67c70e9544a6ad233"
+  },
+  "shift5-mixed-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": 48
+    },
+    {
+     "date": "2026-07-04",
+     "source": "own",
+     "level": null,
+     "highMinutes": 55
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "71db8c2df52b62dd7204b86c98c7a91f222078dec16ae1e351e19a4fdf0ce73a"
+  },
+  "shift5-mixed-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": 48
+    },
+    {
+     "date": "2026-07-04",
+     "source": "own",
+     "level": null,
+     "highMinutes": 55
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": 76
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    }
+   ],
+   "output": "5b5a231b3ac7dcea82d36a3d4f8f12d20440ff525c9611566e7d1f9f43509251"
+  },
+  "shift11-none-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "6e264557db906e4862a8bcc561309c3980505d51a95573036c85f9662a276a7c"
+  },
+  "shift11-none-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "6e264557db906e4862a8bcc561309c3980505d51a95573036c85f9662a276a7c"
+  },
+  "shift11-none-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "6e264557db906e4862a8bcc561309c3980505d51a95573036c85f9662a276a7c"
+  },
+  "shift11-none-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "6e264557db906e4862a8bcc561309c3980505d51a95573036c85f9662a276a7c"
+  },
+  "shift11-minutes-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": null,
+     "highMinutes": 62
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-11",
+     "source": "own",
+     "level": null,
+     "highMinutes": 104
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "440d64c5c4dee6e938527b3e4be8a958db82ba56d29dbfdcb43050bcee0e3e6e"
+  },
+  "shift11-minutes-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "edf50c4b4a15355e0488ba5789a42a1416eafe68753bbdf7b0d681ef213c7452"
+  },
+  "shift11-minutes-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": null,
+     "highMinutes": 62
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "9087233ca87f8a9b338bfd58e43fcbdf928e6d52fc1f93ba5cd710a867772f9f"
+  },
+  "shift11-minutes-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": null,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-02",
+     "source": "own",
+     "level": null,
+     "highMinutes": 41
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": null,
+     "highMinutes": 62
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "4cedfd504030ed58924cd025d00eaed5f962d46c0cf22b47342902430903f131"
+  },
+  "shift11-level-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-11",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "a318a4ce3e7c5690eac4a498a07037860850d0d52ba34b8d28359ac7ddf89591"
+  },
+  "shift11-level-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "793cda310eb81603dc960e35db08ddbaf13467e46e1f204699ae0f13ecc23892"
+  },
+  "shift11-level-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "07e2db4c4929bdc023d7eb500ea3797a9e13dbfd1121ed615b6c9549f8b06aad"
+  },
+  "shift11-level-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "430ab682c8fa8aa12c0674a5204f7b9e36835f4352d24242e6fd43e964995ad6"
+  },
+  "shift11-mixed-switchnone": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": 48
+    },
+    {
+     "date": "2026-07-04",
+     "source": "own",
+     "level": null,
+     "highMinutes": 55
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": 76
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-11",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": 104
+    },
+    {
+     "date": "2026-07-12",
+     "source": "own",
+     "level": null,
+     "highMinutes": 111
+    }
+   ],
+   "output": "ea835067d3e0eb99a2517c33165d9d7033ad698f77018260c37f1a3123b8a360"
+  },
+  "shift11-mixed-switch2026-07-03": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 30
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 60
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 90
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "49e60bf5f39287c1f5ada819876ab514c2717956489d35647245080a5f3511c2"
+  },
+  "shift11-mixed-switch2026-07-07": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": 48
+    },
+    {
+     "date": "2026-07-04",
+     "source": "own",
+     "level": null,
+     "highMinutes": 55
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-08",
+     "source": "oura",
+     "level": null,
+     "highMinutes": -1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "ad06e8404ac8498c153469efa4489a9d57ee7d589c054a1ef70b73935ce39bcc"
+  },
+  "shift11-mixed-switch2026-07-10": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": 20
+    },
+    {
+     "date": "2026-06-30",
+     "source": "own",
+     "level": null,
+     "highMinutes": 27
+    },
+    {
+     "date": "2026-07-01",
+     "source": "own",
+     "level": -0.09999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 3
+    },
+    {
+     "date": "2026-07-03",
+     "source": "own",
+     "level": 0.10000000000000003,
+     "highMinutes": 48
+    },
+    {
+     "date": "2026-07-04",
+     "source": "own",
+     "level": null,
+     "highMinutes": 55
+    },
+    {
+     "date": "2026-07-05",
+     "source": "own",
+     "level": -0.19999999999999998,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-06",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1440
+    },
+    {
+     "date": "2026-07-07",
+     "source": "own",
+     "level": 5.551115123125783e-17,
+     "highMinutes": 76
+    },
+    {
+     "date": "2026-07-08",
+     "source": "own",
+     "level": null,
+     "highMinutes": 83
+    },
+    {
+     "date": "2026-07-09",
+     "source": "own",
+     "level": -0.3,
+     "highMinutes": null
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    }
+   ],
+   "output": "261cfeead6e42bfb9e47d40a4c250dd1d16c037c5854d1bbbf119162c9a4fbc2"
+  },
+  "gaps": {
+   "daytimeStress": [
+    {
+     "date": "2026-06-29",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-06-30",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-01",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 0
+    },
+    {
+     "date": "2026-07-02",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-03",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-04",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-05",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-09",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-10",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 1
+    },
+    {
+     "date": "2026-07-11",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    },
+    {
+     "date": "2026-07-12",
+     "source": "oura",
+     "level": null,
+     "highMinutes": 2
+    }
+   ],
+   "output": "95b73bac2c71d73144738c54d25cdb142d4156c42fa489c671205602baf37481"
+  }
+ }
+}
