@@ -20,12 +20,22 @@ const RESTING_HR_BASELINE_MIN_DAYS = 5
  * Per device (#3001): the rows are those of the device that measured the newest night, so an Oura
  * week is never judged against a baseline pooled with the ring's differently measured nights. Until
  * that device has `RESTING_HR_BASELINE_MIN_DAYS` days the baseline is null, not the other device's.
+ * #3601: with `versionOn`, per (source, algorithm version) likewise: a source that changes its algorithm
+ * restarts the baseline.
  */
 export function restingHrBaseline<T extends { date: string; restingHeartRate?: number | null; restingHeartRateSource?: string | null }>(
   bodyMetrics: T[],
   ouraByDate: Map<string, { nonWearTimeSec?: number | null }>,
+  /**
+   * #3601: a reading's algorithm version (`nightAlgorithmVersion` over the same days' sleep), so the
+   * baseline is of the newest reading's (source, version) group. Left out: per source, as before.
+   */
+  versionOn?: (date: string, source: string | null | undefined) => string | null,
 ): number | null {
-  const onDevice = rowsOfDeviceInUse(bodyMetrics, m => m.restingHeartRate, m => m.restingHeartRateSource)
+  const onDevice = rowsOfDeviceInUse(
+    bodyMetrics, m => m.restingHeartRate, m => m.restingHeartRateSource,
+    versionOn ? m => versionOn(m.date, m.restingHeartRateSource) : undefined,
+  )
   const rows = excludeLowWearDays(onDevice, ouraByDate)
   return rows.length >= RESTING_HR_BASELINE_MIN_DAYS
     ? rows.reduce((s, m) => s + m.restingHeartRate!, 0) / rows.length

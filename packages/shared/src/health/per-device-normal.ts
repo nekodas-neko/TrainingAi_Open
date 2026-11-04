@@ -206,11 +206,42 @@ export function rowsOfDeviceInUse<T extends { date: string }>(
   rows: readonly T[],
   value: (row: T) => number | null | undefined,
   source: (row: T) => string | null | undefined,
+  /**
+   * #3601: the row's algorithm version (usually {@link nightAlgorithmVersion}'s lookup). Given, the
+   * rows are those of the newest row's (source, version) group by {@link rowsInNormalGroup}'s rule.
+   * Left out: the device's rows of every version, as before.
+   */
+  version?: (row: T) => string | null | undefined,
 ): T[] {
   const positive = (r: T) => { const v = value(r); return v != null && Number.isFinite(v) && v > 0 ? v : null }
   const device = currentDevice(rows.map(r => ({ date: r.date, value: positive(r), source: source(r) })))
   if (device == null) return []
-  return rows.filter(r => positive(r) != null && deviceOf(source(r)) === device)
+  const onDevice = rows.filter(r => positive(r) != null && deviceOf(source(r)) === device)
+  if (!version) return onDevice
+  // Oldest first, as the group rule needs; a stable sort keeps the newest row the one `currentDevice` named.
+  const oldestFirst = [...onDevice].sort((a, b) => a.date.localeCompare(b.date))
+  const inGroup = new Set(rowsInNormalGroup(oldestFirst, source, version, { source: device, algorithmVersion: version(oldestFirst[oldestFirst.length - 1]) }))
+  return onDevice.filter(r => inGroup.has(r))
+}
+
+/**
+ * #3601: the algorithm version a reading of `source` on `date` was made under, from the sleep night
+ * of that date when the same source recorded it (`durationSource`), as readiness's per-night inputs
+ * read it. Null when no night of that source on that date says, so the reading joins the newest
+ * version its source has sent. Takes raw sessions or canonical nights: a source's version is the
+ * same for every window it recorded that night.
+ */
+export function nightAlgorithmVersion(
+  nights: readonly { date: string; durationSource?: string | null; sourceAlgorithmVersion?: string | null }[],
+): (date: string, source: string | null | undefined) => string | null {
+  const byDate = new Map<string, { device: string; version: string }[]>()
+  for (const n of nights) {
+    if (n.sourceAlgorithmVersion == null) continue
+    const list = byDate.get(n.date) ?? []
+    list.push({ device: deviceOf(n.durationSource), version: n.sourceAlgorithmVersion })
+    byDate.set(n.date, list)
+  }
+  return (date, source) => byDate.get(date)?.find(n => n.device === deviceOf(source))?.version ?? null
 }
 
 /** The `source_map` label the ring's Bluetooth path writes. */

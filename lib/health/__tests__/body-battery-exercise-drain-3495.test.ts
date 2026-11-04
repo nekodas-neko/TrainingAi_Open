@@ -77,8 +77,8 @@ const session = { startedAt: at(17), completedAt: at(18), volume: 5200 }
 const sparse = seated(5, 'any_source')
 
 describe('the exercise drain in a day (#3495)', () => {
-  it('stamps v8', () => {
-    expect(BODY_BATTERY_MODEL_VERSION.startsWith('v8:rest+9bpm:')).toBe(true)
+  it('stamps the current model (v8 drain, carried into v9)', () => {
+    expect(BODY_BATTERY_MODEL_VERSION.startsWith('v9:rest+9bpm:')).toBe(true)
   })
 
   it('meets the pass tests: training ≥ 15 below rest, everything hit ≤ 5, a workout alone keeps reserve', async () => {
@@ -172,6 +172,6 @@ describe('the re-derive keeps days before the sign-off (#3495)', () => {
     expect(result.report.summary.beforeSignOff).toBe(1)
     expect(writes).toEqual(['2026-10-17'])
     expect(stored.get('2026-10-16')!.modelVersion).toBe('v7:stored')
-    expect(stored.get('2026-10-17')!.modelVersion.startsWith('v8:')).toBe(true)
+    expect(stored.get('2026-10-17')!.modelVersion.startsWith('v9:')).toBe(true)
   })
 })

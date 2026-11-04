@@ -277,8 +277,12 @@ function plainScore(v: number | null): ReadinessContributor {
  *  reads as partial (no sleep score, no hours in the sleep-balance normal), as the owner's mark does; and each
  *  per-night normal is learned from one (source, algorithm version), so a source that changes its algorithm
  *  starts its normals again. A night with none of the three is scored exactly as under v15.
+ *  v17: #3601, the rest of stage 5. The payload's displayed HRV and resting-HR baselines and 7-day means (and
+ *  the fallback score and early-deload check that read them) are of the newest reading's (source, algorithm
+ *  version), the version read from the same night's sleep. One version per source scores exactly as v16;
+ *  stored rows keep their v16 stamp.
  */
-export const READINESS_MODEL_VERSION = 'v16:restlessness-recording-flags:2026-11-04'
+export const READINESS_MODEL_VERSION = 'v17:version-keyed-baselines:2026-11-04'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.

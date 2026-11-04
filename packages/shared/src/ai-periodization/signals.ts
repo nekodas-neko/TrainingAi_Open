@@ -17,7 +17,7 @@ import { workingBudgetMin, planningBudgetMin } from '@trainingai/shared/workout/
 import { buildTimeProfiles, type ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
 import { robustAvgSetDurationsByExercise, buildMeasuredTimeBudget, resolveTransitionSec } from '@trainingai/shared/workout/time-audit'
 import { excludeLowWearDays, toOuraByDate } from '@trainingai/shared/health/wear-confidence'
-import { rowsOfDeviceInUse } from '@trainingai/shared/health/per-device-normal'
+import { rowsOfDeviceInUse, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import type { FigureSignals, FigureSignalExercise } from '@trainingai/shared/ai-periodization/prescription-figures'
 
@@ -564,7 +564,9 @@ export async function aggregateSignals(
   let hrvTrend: number | null = null
   const bodyMetrics = await repo.listBodyMetrics(userId, from14d, today)
   // #3001: both stretches from the device in use, so Oura's HRV is never compared with the ring's.
-  const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource)
+  // #3601: and from its newest algorithm version, read from the same night's sleep.
+  const versionOn = nightAlgorithmVersion(sleepSessions)
+  const hrvRows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), m => m.hrvMs, m => m.hrvSource, m => versionOn(m.date, m.hrvSource))
   if (hrvRows.length >= 4) {
     const sorted = [...hrvRows].sort((a, b) => b.date.localeCompare(a.date))
     const recent3 = sorted.slice(0, 3)
@@ -582,7 +584,7 @@ export async function aggregateSignals(
   // #3383: both stretches from the device in use — the ring's uncalibrated SpO2 is never compared with
   // Oura's — and unknown (null) until that device alone has the four nights the comparison needs.
   let spo2Trend: number | null = null
-  const spo2Rows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.spo2Pct != null && m.spo2Pct > 0), m => m.spo2Pct, m => m.spo2Source)
+  const spo2Rows = rowsOfDeviceInUse(bodyMetrics.filter(m => m.spo2Pct != null && m.spo2Pct > 0), m => m.spo2Pct, m => m.spo2Source, m => versionOn(m.date, m.spo2Source))
   if (spo2Rows.length >= 4) {
     const sorted = [...spo2Rows].sort((a, b) => b.date.localeCompare(a.date))
     const recent3 = sorted.slice(0, 3)
