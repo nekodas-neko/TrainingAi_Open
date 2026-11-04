@@ -18,6 +18,7 @@ import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { assembleShadowInputs, prepareShadowHistory, type ShadowRawHistory } from '@trainingai/shared/health/shadow-readiness/assemble'
 import { scoreShadowReadiness } from '@trainingai/shared/health/shadow-readiness/score'
 import { buildReadinessAudit } from '@trainingai/shared/health/score-audit/readiness'
+import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 import type { OuraDailySummaryRow } from '@/lib/data/repository'
 import {
   resolveReadinessNightInputs, compositeNightFields, illnessNightFields, readinessSourceLabel,
@@ -272,13 +273,16 @@ describe('no readiness output moves when Oura\'s readiness fields become generic
         ouraDaily: ouraToday, derived: null, switchDay: s.switchDay,
         generic: wireAuditGeneric(s),
       })
+      // The audit names the live model's version in a note. A version bump is not a score change, so
+      // the recording holds a placeholder for it and a later bump can't break this check.
+      const stamped = JSON.parse(JSON.stringify(audit).split(READINESS_MODEL_VERSION).join('<readiness-model-version>')) as typeof audit
       out[key] = {
-        all: digest(audit),
+        all: digest(stamped),
         score: audit.score,
         recoveryIndex: audit.contributors.find(c => c.key === 'recoveryIndex')?.input ?? null,
         temperature: audit.contributors.find(c => c.key === 'temperature')?.input ?? null,
-        gaps: audit.gaps,
-        notes: audit.notes,
+        gaps: stamped.gaps,
+        notes: stamped.notes,
       }
     }
     check('audit', out)
