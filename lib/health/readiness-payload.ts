@@ -530,7 +530,8 @@ export async function buildReadinessPayload(
     tz,
     bodyMetrics,
     // #3388: the one resting-HR rule the HR zones and Body Battery read, so a day's zone minutes agree.
-    restingHr: restingHrOnDay(bodyMetrics, todayIso),
+    // #3612: keyed by (source, algorithm version) over the same 28 days' sleep, as theirs is.
+    restingHr: restingHrOnDay(bodyMetrics, todayIso, versionOn),
     hrRows: todayHrRows,
     metGrid: perMinuteMovementGrid(await movementSeriesP, todayMid.getTime(), tomorrowMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,

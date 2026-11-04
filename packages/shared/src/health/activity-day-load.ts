@@ -9,12 +9,13 @@ import { resolveHrProfile, maxHrIsUnread, type HrProfile } from './hr-profile'
 import { perMinuteMovementGrid } from './per-minute-movement'
 import { scoreActivityForDay, type ActivityDay } from './activity-day'
 import { restingHrOnDay } from './resting-hr-mean'
+import { nightAlgorithmVersion } from './per-device-normal'
 
 /** The history a day's score reads: the 28-day resting-HR window and the ACWR chronic window. */
 const HISTORY_DAYS = 28
 
 type ActivityDayRepo = Pick<WorkoutRepository,
-  'listBodyMetrics' | 'getWorkoutSessionsFrom' | 'getHrForWindow' | 'getActiveProgram'
+  'listBodyMetrics' | 'listSleepSessions' | 'getWorkoutSessionsFrom' | 'getHrForWindow' | 'getActiveProgram'
   | 'getUserById' | 'getUserGoals' | 'getPerMinuteMovementSeries' | 'listActivityLogs'>
 
 export interface LoadActivityDayOptions {
@@ -42,8 +43,12 @@ export async function loadActivityDay(
   // default (#3347 review): the day stays un-finalised and the next pass retries. Today only loses
   // the input for this read.
   const finished = date < todayInTz(tz)
-  const [bodyMetrics, sessions, hrRows, program, user, userGoals, movementSeries, activityLogs, hrProfile] = await Promise.all([
+  const [bodyMetrics, sleepSessions, sessions, hrRows, program, user, userGoals, movementSeries, activityLogs, hrProfile] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, date),
+    // #3612: the same window's sleep, for each resting-HR reading's algorithm version. Thrown for a
+    // finished day like the reads below, so a day is never stored final on a mean keyed differently from
+    // the HR zones'; today only loses the version keying (per source, as before).
+    finished ? repo.listSleepSessions(userId, fromIso, date) : repo.listSleepSessions(userId, fromIso, date).catch(() => []),
     repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(fromIso, tz)),
     options.hrRows ?? repo.getHrForWindow(userId, dayMid, nextMid),
     repo.getActiveProgram(userId),
@@ -75,8 +80,9 @@ export async function loadActivityDay(
     date,
     tz,
     bodyMetrics,
-    // The one resting-HR rule the HR zones and Body Battery read (#3388), as of this day.
-    restingHr: restingHrOnDay(bodyMetrics, date),
+    // The one resting-HR rule the HR zones and Body Battery read (#3388), as of this day, keyed by
+    // (source, algorithm version) as theirs is (#3612).
+    restingHr: restingHrOnDay(bodyMetrics, date, nightAlgorithmVersion(sleepSessions)),
     hrRows,
     metGrid: perMinuteMovementGrid(movementSeries, dayMid.getTime(), nextMid.getTime()),
     maxHr: hrProfile?.maxHr ?? null,

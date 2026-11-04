@@ -3,6 +3,7 @@ import { todayInTz, shiftDateStr, dateStrMidnightInTz, ageFromDob } from '@train
 import { hrMaxFromAge, zoneMaxFromTests, DEFAULT_RESTING_HR } from '@trainingai/shared/health/hr-zones'
 import { resolveMaxHr, EMPTY_OBSERVED_HR, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 import { meanRestingHr, restingHrWindow } from '@trainingai/shared/health/resting-hr-mean'
+import { nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 
 /** Trailing window the observed max/min is corroborated over. */
 export const OBSERVED_WINDOW_DAYS = 90
@@ -120,9 +121,15 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     return null
   }
   let fitnessTestsUnread = false
-  const [user, bodyMetrics, observed, tests] = await Promise.all([
+  const [user, bodyMetrics, sleepSessions, observed, tests] = await Promise.all([
     repo.getUserById(userId).catch(failed('user')),
     repo.listBodyMetrics(userId, restingWindow.from, restingWindow.to).catch(failed('restingHr')),
+    // #3612: the same window's sleep, for each reading's algorithm version. A failed read only loses the
+    // version keying: the mean is then per source, exactly as before this read existed.
+    Promise.resolve().then(() => repo.listSleepSessions(userId, restingWindow.from, restingWindow.to)).catch((err: unknown) => {
+      console.error('[hr-profile] sleep read failed, resting HR keyed by source only:', err)
+      return []
+    }),
     repo.getObservedHrProfile(userId, observedFrom, observedTo).catch((err: unknown) => {
       failed('observed')(err)
       return EMPTY_OBSERVED_HR
@@ -136,7 +143,8 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
   ])
 
   // The same mean the running plan's zones are built from (#3216), so the two can't disagree.
-  const measuredRestingHr = meanRestingHr(bodyMetrics ?? [])
+  // #3612: of the newest (source, algorithm version) group, as Body Battery's (#3601).
+  const measuredRestingHr = meanRestingHr(bodyMetrics ?? [], nightAlgorithmVersion(sleepSessions))
   const restingHr = measuredRestingHr ?? DEFAULT_RESTING_HR
 
   const estimatedMax = hrMaxFromAge(ageFromDob(user?.dateOfBirth, new Date()))

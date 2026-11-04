@@ -13,6 +13,7 @@ import { isPushSession, inferEnvironment } from '@trainingai/shared/running/push
 import { liveReadinessForDay, isOwnReadinessSource } from '@trainingai/shared/health/live-readiness'
 import { BASELINE_MIN_NIGHTS, storedReadinessLearning } from '@trainingai/shared/health/readiness-composite'
 import { meanRestingHr, restingHrWindow } from '@trainingai/shared/health/resting-hr-mean'
+import { nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { prescribeNextRun } from '@trainingai/shared/running/prescription'
 import { weekIndexSince } from '@trainingai/shared/running/week-index'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
@@ -140,15 +141,18 @@ export async function resolveSnapshot(
   const todayIso = todayInTz(tz)
   const from90 = shiftDateStr(todayIso, -90)
   const restingWindow = restingHrWindow(todayIso)
-  const [user, metrics] = await Promise.all([
+  const [user, metrics, sleepSessions] = await Promise.all([
     repo.getUserById(userId),
     repo.listBodyMetrics(userId, restingWindow.from, restingWindow.to),
+    // #3612: the same window's sleep, for each reading's algorithm version, as `resolveHrProfile` reads
+    // it. A failed read keys the mean by source only, as before this read existed.
+    Promise.resolve().then(() => repo.listSleepSessions(userId, restingWindow.from, restingWindow.to)).catch(() => []),
   ])
   // #3216, option A: the 28-day mean, the value `resolveHrProfile` counts zone minutes with, so the
   // zones a run is prescribed in are the zones its minutes are counted in. This used to read the
   // OLDEST reading in 90 days (`.reverse().find()` over date-DESC rows). No reading gives null, and
   // `resolveFitnessSnapshot` then assumes the default of 60, as before.
-  const restingHr = meanRestingHr(metrics)
+  const restingHr = meanRestingHr(metrics, nightAlgorithmVersion(sleepSessions))
   // The cardio-baseline results feed VO₂max / max-HR / threshold-HR when present; guarded
   // so this route works before that sibling ships (falls back to age-based zones).
   let baseline = null
