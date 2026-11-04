@@ -8,6 +8,7 @@ import { readPushAnswer } from '../../../core/sync/push-answer.ts';
 import { isCalendarDate } from '@trainingai/shared/date-utils';
 import { moodSchema, preferencesSchema, type HomePreferences, type Mood } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { rememberAnswered } from './detected-walks.ts';
 
 const dateSchema = z
   .string()
@@ -37,6 +38,7 @@ const diskSchema = z.object({
   restDays: z.record(z.string(), z.boolean()).default({}),
   markers: z.record(z.string(), z.boolean()).default({}),
   setAside: z.string().nullable().default(null),
+  answeredWalks: z.array(z.number()).default([]),
 });
 type Operation = z.infer<typeof operationSchema>;
 export type HomeChange = Operation['kind'];
@@ -55,6 +57,8 @@ export type HomeState = {
   markers: Record<string, boolean>;
   /** The set-aside notice, kept on disk until the person has seen it (acknowledgeSetAside). */
   setAside: string | null;
+  /** Start times of detected walks the person saved or dismissed, kept three days (#3625). */
+  answeredWalks: number[];
 };
 export const emptyHome: HomeState = {
   ready: false,
@@ -70,6 +74,7 @@ export const emptyHome: HomeState = {
   restDays: {},
   markers: {},
   setAside: null,
+  answeredWalks: [],
 };
 function sameFields(actual: Record<string, unknown>, expected: Record<string, unknown>) {
   return Object.entries(expected).every(
@@ -215,6 +220,15 @@ export class HomeStore {
   async mark(key: string, marked = true) {
     this.guard();
     await this.write((state) => ({ markers: { ...state.markers, [key]: marked } }));
+  }
+  /** A detected walk was saved or dismissed; `answered = false` takes it back (an undone dismissal). */
+  async answerWalk(startMs: number, answered = true) {
+    this.guard();
+    await this.write((state) => ({
+      answeredWalks: answered
+        ? rememberAnswered(state.answeredWalks, startMs, this.now())
+        : state.answeredWalks.filter((t) => t !== startMs),
+    }));
   }
   async postponeGoals(date: string) {
     this.guard();

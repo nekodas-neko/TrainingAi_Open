@@ -74,11 +74,12 @@ export function recapHasData(metrics: Record<string, unknown> | undefined) {
 
 /**
  * The tint of each updates-strip icon, by type, as the current app's `home-banner-strip.tsx` draws
- * it: goals cyan, day amber, week purple. Keyed on the entry's type, never its position, so a
+ * it: a detected walk the brand colour (the current app's card is brand-tinted), goals cyan, day amber, week purple. Keyed on the entry's type, never its position, so a
  * dismissed row cannot hand its colour to the next.
  */
-export type BannerType = 'goals' | 'day' | 'week';
+export type BannerType = 'walk' | 'goals' | 'day' | 'week';
 export const bannerTone = {
+  walk: 'brand',
   goals: 'activity',
   day: 'checkin',
   week: 'sleep',
