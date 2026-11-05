@@ -96,9 +96,15 @@ export function createActivityServiceHost(native: NativeActivityService): Activi
           service = 'off';
           posted = null;
           await native.stop().catch(ignore);
+        } else if (result === 'on') {
+          service = 'on';
         } else {
-          service = result === 'on' ? 'on' : 'off';
-          if (result !== 'on') posted = null;
+          service = 'off';
+          posted = null;
+          // Everyone holding now was waiting on this start and gets its refusal. Let go of them
+          // before the notification is redrawn, or theirs goes up on a plain notification that
+          // says the strap is kept connected when nothing holds it, and a workout never redraws it.
+          holders.clear();
         }
         reconcile();
         return result;

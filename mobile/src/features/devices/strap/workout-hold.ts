@@ -53,6 +53,46 @@ export function workoutServiceExpiresIn(workout: OpenWorkout, now: number) {
 }
 
 /**
+ * The open workout StrapProvider holds the service for now, or null: `workoutServiceWanted`, less
+ * a workout whose hold already reached the cutoff while it ran (`agedOut`), which stays released.
+ */
+export function workoutToHold<W extends OpenWorkout & { id: string }>({
+  openWorkout,
+  agedOut,
+  signedIn,
+  strapPaired,
+  now,
+}: {
+  openWorkout: W | null;
+  agedOut: string | null;
+  signedIn: boolean;
+  strapPaired: boolean;
+  now: number;
+}): W | null {
+  if (!openWorkout || agedOut === openWorkout.id) return null;
+  return workoutServiceWanted({ signedIn, workout: openWorkout, strapPaired, now }) ? openWorkout : null;
+}
+
+/**
+ * One workout's hold as StrapProvider's effect takes it: held from now, and at the cutoff
+ * `onCutoff` marks the workout aged out so the next render lets it go. The returned cleanup
+ * releases the hold and the timer.
+ */
+export function holdWorkoutServiceUntilCutoff(
+  service: ActivityServiceStarter,
+  workout: OpenWorkout & { id: string },
+  onCutoff: (workoutId: string) => void,
+  now: number = Date.now(),
+) {
+  const release = holdServiceForWorkout(service);
+  const timer = setTimeout(() => onCutoff(workout.id), Math.max(0, workoutServiceExpiresIn(workout, now)));
+  return () => {
+    clearTimeout(timer);
+    release();
+  };
+}
+
+/**
  * Holds the shared service for one workout and returns the release. A refused or skipped start
  * (Bluetooth permission missing) leaves the workout's hold foreground-only, as before; the strap
  * card says why. The activity flag (`isActivityServiceRunning`) is not touched: it is the activity's.
