@@ -19,11 +19,7 @@ import { HrOutbox } from './HrOutbox';
 import { useActivityServiceRunning } from '../../activities/data/background-recording';
 import { holdStrapForActivity } from './activity-hold';
 import { workoutStrapService } from '../../../integrations/activity-service/platform';
-import {
-  holdServiceForWorkout,
-  workoutServiceExpiresIn,
-  workoutServiceWanted,
-} from './workout-hold';
+import { holdWorkoutServiceUntilCutoff, workoutToHold } from './workout-hold';
 import { StrapSession, type StrapHold } from './StrapSession';
 
 const Context = createContext<StrapSession | null>(null);
@@ -92,22 +88,16 @@ export function StrapProvider({ children }: PropsWithChildren) {
   );
   // The workout whose hold reached the cutoff while it ran: it stays released.
   const [agedOut, setAgedOut] = useState<string | null>(null);
-  const serviceWanted =
-    !!openWorkout &&
-    agedOut !== openWorkout.id &&
-    workoutServiceWanted({ signedIn: !!connection, workout: openWorkout, strapPaired, now: Date.now() });
-  const serviceWorkout = serviceWanted ? openWorkout : null;
+  const serviceWorkout = workoutToHold({
+    openWorkout,
+    agedOut,
+    signedIn: !!connection,
+    strapPaired,
+    now: Date.now(),
+  });
   useEffect(() => {
     if (!serviceWorkout || !workoutStrapService) return;
-    const release = holdServiceForWorkout(workoutStrapService);
-    const timer = setTimeout(
-      () => setAgedOut(serviceWorkout.id),
-      Math.max(0, workoutServiceExpiresIn(serviceWorkout, Date.now())),
-    );
-    return () => {
-      clearTimeout(timer);
-      release();
-    };
+    return holdWorkoutServiceUntilCutoff(workoutStrapService, serviceWorkout, setAgedOut);
   }, [serviceWorkout?.id, serviceWorkout?.startedAt]);
   return <Context.Provider value={session}>{children}</Context.Provider>;
 }
