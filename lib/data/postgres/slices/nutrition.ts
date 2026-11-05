@@ -1,7 +1,8 @@
-import { eq, and, inArray, gte, lte, asc, desc, sql, isNull, or } from 'drizzle-orm'
+import { eq, and, inArray, gt, gte, lte, asc, desc, sql, isNull, or } from 'drizzle-orm'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at'
 import { findDuplicateFoodItem, identityCalories } from '@trainingai/shared/nutrition/food-item-identity'
+import { lookAlikeKey } from '@trainingai/shared/nutrition/food-merge'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { summariseSupplementDay } from '@trainingai/shared/nutrition/supplement-day-totals'
 import type { SupplementDayLog, SupplementDayContributionRow } from '@trainingai/shared/types/supplement'
@@ -397,6 +398,52 @@ export async function getFoodItemById(db: Db, userId: string, id: string): Promi
     .where(and(eq(s.foodItems.id, id), eq(s.foodItems.userId, userId)))
     .limit(1)
   return row ? rowToFoodItem(row) : null
+}
+
+/**
+ * #3476. The ids of the user's live foods that share a look-alike key with any of `retired`: the
+ * keepers the look-alike merge (#2417) re-pointed those rows to. The merge fills a keeper's missing
+ * barcode and picture in the same transaction that tombstones its extras, but `food_items` has no
+ * `updated_at`, so the keeper's new values carry no clock a device can read. The extra's
+ * `deleted_at` is that clock, and the keeper is always a live row with the extra's key
+ * (`planLookAlikeMerge` picks it from the group), so re-sending the group's live rows carries the
+ * fill. More than one live row can share a key (a look-alike created after the merge); re-sending
+ * one of those is harmless.
+ */
+export async function lookAlikeKeeperIds(
+  db: Db, userId: string, retired: { name: string; brand: string | null }[],
+): Promise<string[]> {
+  if (retired.length === 0) return []
+  const keys = new Set(retired.map(lookAlikeKey))
+  // Names and brands only: the picture bytes are read once, by the caller, for the rows that match.
+  const live = await db.select({ id: s.foodItems.id, name: s.foodItems.name, brand: s.foodItems.brand })
+    .from(s.foodItems)
+    .where(and(eq(s.foodItems.userId, userId), isNull(s.foodItems.deletedAt)))
+  return live.filter(f => keys.has(lookAlikeKey(f))).map(f => f.id)
+}
+
+/**
+ * #3476. What a device that caches the food library needs after a look-alike merge: the foods
+ * retired since `since`, to drop, and fresh copies of their keepers, which may have gained a barcode
+ * or picture. Empty unless a merge ran. `since` is the device's last answer's `at`.
+ */
+export async function listRetiredFoodItems(
+  db: Db, userId: string, since: Date,
+): Promise<{ retired: { id: string; deletedAt: string }[]; keepers: FoodItem[] }> {
+  const rows = await db.select({
+    id: s.foodItems.id, name: s.foodItems.name, brand: s.foodItems.brand, deletedAt: s.foodItems.deletedAt,
+  }).from(s.foodItems)
+    .where(and(eq(s.foodItems.userId, userId), gt(s.foodItems.deletedAt, since)))
+  if (rows.length === 0) return { retired: [], keepers: [] }
+  const keeperIds = await lookAlikeKeeperIds(db, userId, rows)
+  const keepers = keeperIds.length
+    ? await db.select().from(s.foodItems)
+      .where(and(eq(s.foodItems.userId, userId), inArray(s.foodItems.id, keeperIds)))
+    : []
+  return {
+    retired: rows.map(r => ({ id: r.id, deletedAt: r.deletedAt!.toISOString() })),
+    keepers: keepers.map(rowToFoodItem),
+  }
 }
 
 /**

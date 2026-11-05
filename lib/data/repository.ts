@@ -1114,6 +1114,8 @@ export interface WorkoutRepository {
   searchFoodItems(userId: string, query: string): Promise<FoodItem[]>
   /** One owned food item, or null for an unknown id and another user's id alike. */
   getFoodItemById(userId: string, id: string): Promise<FoodItem | null>
+  /** #3476. Foods the look-alike merge retired since `since`, and fresh copies of their keepers. */
+  listRetiredFoodItems(userId: string, since: Date): Promise<{ retired: { id: string; deletedAt: string }[]; keepers: FoodItem[] }>
 
   listFoodLogs(userId: string, date: string): Promise<FoodLogWithItem[]>
   listFoodLogsSummary(userId: string, from: string, to: string): Promise<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]>

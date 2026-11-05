@@ -4903,6 +4903,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { reuseExisting?: boolean }) { return n.createFoodItem(this.db, userId, data, opts) }
   async searchFoodItems(userId: string, query: string) { return n.searchFoodItems(this.db, userId, query) }
   async getFoodItemById(userId: string, id: string) { return n.getFoodItemById(this.db, userId, id) }
+  async listRetiredFoodItems(userId: string, since: Date) { return n.listRetiredFoodItems(this.db, userId, since) }
   async getSupplementDayLog(userId: string, supplementId: string, date: string) { return n.getSupplementDayLog(this.db, userId, supplementId, date) }
   async listFoodLogs(userId: string, date: string) { return n.listFoodLogs(this.db, userId, date) }
   async createFoodLog(userId: string, data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'>
@@ -5636,6 +5637,17 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
     const foodItemsById = new Map<string, (typeof foodItemsReferenced)[number]>()
     for (const fi of [...foodItemsReferenced, ...foodItemsCreated]) foodItemsById.set(fi.id, fi)
+    // #3476. A food merged away in the window takes its keeper along: the merge may have filled the
+    // keeper's barcode or picture, and with no `updated_at` on `food_items` nothing else re-sends it
+    // unless a log moved to it. Only read when the window holds a tombstone, i.e. after a merge.
+    const retiredInWindow = foodItemsCreated.filter(fi => fi.deletedAt != null && fi.deletedAt > effectiveSince)
+    const keeperIds = (await n.lookAlikeKeeperIds(this.db, userId, retiredInWindow))
+      .filter(id => !foodItemsById.has(id))
+    if (keeperIds.length) {
+      const keepers = await this.db.select(foodItemCols).from(s.foodItems)
+        .where(and(eq(s.foodItems.userId, userId), inArray(s.foodItems.id, keeperIds)))
+      for (const fi of keepers) foodItemsById.set(fi.id, fi)
+    }
 
     // Children of the plans in this page. Variants and meals have no updated_at of their own and
     // cascade with the plan, so they are fetched by parent id rather than cursored — and they must
