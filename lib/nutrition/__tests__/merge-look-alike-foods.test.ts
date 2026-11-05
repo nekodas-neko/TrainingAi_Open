@@ -360,6 +360,17 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
       expect((await write()).ok && (await write() as { report: { totals: { groups: number } } }).report.totals.groups).toBe(0)
     })
 
+    it('the retired-foods read names the retired row and hands back the keeper (#3476)', async () => {
+      const before = new Date(Date.now() - 60_000)
+      const out = await nutrition.listRetiredFoodItems(db, USER, before)
+      expect(out.retired.map(r => r.id)).toEqual([retired])
+      expect(out.keepers.map(k => k.id)).toEqual([keeper])
+      // Read again from after the merge: nothing new.
+      expect(await nutrition.listRetiredFoodItems(db, USER, new Date(Date.now() + 1000))).toEqual({ retired: [], keepers: [] })
+      // Scoped to the user.
+      expect(await nutrition.listRetiredFoodItems(db, OTHER, before)).toEqual({ retired: [], keepers: [] })
+    })
+
     it('the pull carries the tombstone to a device that has not seen it', async () => {
       const delta = await repo.getSyncDelta(USER, new Date(Date.now() - 60_000)) as
         { foodItems?: { id: string; deletedAt?: Date | null }[] }
@@ -367,6 +378,50 @@ describe.skipIf(!canRun)('mergeLookAlikeFoods (#2417)', () => {
       expect(row).toBeDefined()
       expect(row!.deletedAt).toBeTruthy()
       expect(delta.foodItems?.find(f => f.id === keeper)?.deletedAt ?? null).toBeNull()
+    })
+  })
+
+  // #3476 item 2. The issue's failing input: extra E has barcode B and no live logs, keeper K has no
+  // barcode. Nothing moves to K, so before this fix the pull never re-sent K and a device's local
+  // scan of B found nothing once it dropped E.
+  describe('a keeper filled by the merge, with no log moved to it (#3476)', () => {
+    const BARCODE = '9300675024235'
+    let keeper: string, extra: string, cursor: Date
+    beforeEach(async () => {
+      const lastWeek = new Date(Date.now() - 7 * 86_400_000).toISOString()
+      keeper = await addFood({ createdAt: lastWeek }); extra = await addFood({ createdAt: lastWeek })
+      // K's logs are older than the device's cursor. Inserted with the time rather than updated to
+      // it: `trg_set_updated_at` fires on UPDATE and would stamp them now, which re-sends K anyway.
+      for (let i = 0; i < 2; i++) {
+        await pool.query(
+          `INSERT INTO food_logs (user_id, date, meal_type_id, food_item_id, quantity_multiplier, updated_at) VALUES ($1,'2026-10-01',$2,$3,1,$4)`,
+          [USER, mealTypeId, keeper, lastWeek],
+        )
+      }
+      await pool.query(`UPDATE food_items SET barcode = $1 WHERE id = $2`, [BARCODE, extra])
+      // The device's last pull, before the merge: it has both rows and K's logs.
+      cursor = new Date(Date.now() - 60_000)
+      const out = await write()
+      if (!out.ok) throw new Error(out.error)
+      expect(out.report.totals).toMatchObject({ groups: 1, logsToMove: 0 })
+    })
+
+    it('the pull re-sends the keeper with its new barcode alongside the tombstone', async () => {
+      const delta = await repo.getSyncDelta(USER, cursor) as
+        { foodItems?: { id: string; barcode?: string | null; deletedAt?: Date | null }[] }
+      expect(delta.foodItems?.find(f => f.id === extra)?.deletedAt).toBeTruthy()
+      expect(delta.foodItems?.find(f => f.id === keeper)).toMatchObject({ barcode: BARCODE, deletedAt: null })
+    })
+
+    it('a pull from after the merge re-sends neither', async () => {
+      const delta = await repo.getSyncDelta(USER, new Date(Date.now() + 1000)) as { foodItems?: { id: string }[] }
+      expect(delta.foodItems?.map(f => f.id) ?? []).toEqual([])
+    })
+
+    it('the retired-foods read hands back the keeper with the barcode', async () => {
+      const out = await nutrition.listRetiredFoodItems(db, USER, cursor)
+      expect(out.retired.map(r => r.id)).toEqual([extra])
+      expect(out.keepers).toEqual([expect.objectContaining({ id: keeper, barcode: BARCODE })])
     })
   })
 

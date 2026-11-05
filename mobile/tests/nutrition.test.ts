@@ -854,3 +854,55 @@ test('the calibration counter says "1 more day" and stops at zero', () => {
   assert.equal(calibrationProgress(12, false, 10)?.remaining, 0);
   assert.equal(calibrationProgress(null, false), null);
 });
+
+// #3476. After a look-alike merge the phone's library drops the merged-away food and takes the
+// keeper's new barcode, which the list route (live foods, 20 at most) cannot tell it.
+test('a merged-away food leaves the library and the keeper brings its new barcode', async () => {
+  const f = fixture();
+  const extra = foodSchema.parse({ ...food, id: id(102), barcode: '9300675024235' });
+  f.foods.push(extra);
+  const store = await ready(f);
+  await store.refresh('foods', date, true);
+  assert.deepEqual(
+    store.getSnapshot().data.foods.map((x) => x.id),
+    [food.id, extra.id],
+  );
+  // The merge on the server: the extra is retired, the keeper takes its barcode.
+  f.foods.splice(1, 1);
+  const keeper = { ...food, barcode: '9300675024235' };
+  const asked: (Record<string, string> | undefined)[] = [];
+  const originalGet = f.connection.get;
+  f.connection.get = async (path, query) => {
+    if (!path.endsWith('/retired')) return originalGet(path, query);
+    asked.push(query);
+    return asked.length === 1
+      ? { retired: [{ id: extra.id, deletedAt: '2026-10-11T02:00:00.000Z' }], keepers: [keeper], at: '2026-10-11T03:00:00.000Z' }
+      : { retired: [], keepers: [], at: '2026-10-11T03:05:00.000Z' };
+  };
+  await store.refresh('foods', date, true);
+  const library = store.getSnapshot().data.foods;
+  assert.deepEqual(library.map((x) => x.id), [food.id]);
+  assert.equal(library[0].barcode, '9300675024235');
+  assert.equal(store.getSnapshot().data.foodsRetiredAt, '2026-10-11T03:00:00.000Z');
+  // The next refresh asks from the last answer, and a reopened store remembers it.
+  await store.refresh('foods', date, true);
+  assert.deepEqual(asked, [undefined, { since: '2026-10-11T03:00:00.000Z' }]);
+  const reopened = f.make();
+  await reopened.initialize();
+  assert.equal(reopened.getSnapshot().data.foodsRetiredAt, '2026-10-11T03:05:00.000Z');
+  assert.deepEqual(reopened.getSnapshot().data.foods.map((x) => x.id), [food.id]);
+});
+
+test('a server without the retired-foods read still refreshes the library, and keeps no cursor', async () => {
+  const f = fixture();
+  const store = await ready(f);
+  const originalGet = f.connection.get;
+  f.connection.get = async (path, query) => {
+    if (path.endsWith('/retired')) throw new ApiError(404);
+    return originalGet(path, query);
+  };
+  assert.equal(await store.refresh('foods', date, true), true);
+  assert.deepEqual(store.getSnapshot().data.foods.map((x) => x.id), [food.id]);
+  assert.equal(store.getSnapshot().data.foodsRetiredAt, null);
+  assert.equal(store.getSnapshot().errors.foods, undefined);
+});

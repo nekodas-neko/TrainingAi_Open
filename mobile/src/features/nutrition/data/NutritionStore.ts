@@ -21,6 +21,12 @@ import { ApiError, isAuthRefusal } from '../../account/api/client.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { normaliseFood, type FoodEntry } from './food-values.ts';
 import {
+  RETIRED_FOODS_PATH,
+  refreshedLibrary,
+  retiredFoodsSchema,
+  type RetiredFoods,
+} from './retired-foods.ts';
+import {
   answerSchema,
   coreSpecs,
   eveningSchema,
@@ -136,6 +142,8 @@ const dataSchema = z.object({
   checkins: z.record(z.string(), z.unknown()),
   answers: z.record(z.string(), z.array(answerSchema)),
   mealStatuses: z.record(z.string(), z.array(mealLoggingChoiceSchema)).default({}),
+  // #3476. The last `at` from the retired-foods read, its next cursor.
+  foodsRetiredAt: z.string().nullable().default(null),
 });
 const httpBodies = {
   'meal-status': z
@@ -219,6 +227,7 @@ export const emptyNutrition: NutritionState = {
     checkins: {},
     answers: {},
     mealStatuses: {},
+    foodsRetiredAt: null,
   },
   operations: [],
   loaded: [],
@@ -629,6 +638,8 @@ export class NutritionStore {
         const response = spec.schema.parse(
           await this.connection.get(spec.path, 'query' in spec ? spec.query : undefined),
         );
+        // #3476. With the food list only: what a look-alike merge retired, and its keepers.
+        const retired = kind === 'foods' ? await this.retiredFoods() : null;
         if (generation !== this.generation || revision !== this.revision) {
           return;
         }
@@ -660,7 +671,10 @@ export class NutritionStore {
                           },
                         }
                       : kind === 'foods'
-                        ? { foods: mergeIds(state.data.foods, response as Food[]) }
+                        ? {
+                            foods: refreshedLibrary(state.data.foods, response as Food[], retired),
+                            ...(retired ? { foodsRetiredAt: retired.at } : {}),
+                          }
                         : {
                             [kind]: response,
                             ...(kind === 'supplements' ? { supplementDate: date } : {}),
@@ -1339,6 +1353,20 @@ export class NutritionStore {
   cancel() {
     this.canceled = true;
     this.generation++;
+  }
+  /**
+   * #3476. Null when the read fails: a server from before the route answers 404, and a failure here
+   * must not cost the food list its refresh. The cursor stays, so the next refresh asks again.
+   */
+  private async retiredFoods(): Promise<RetiredFoods | null> {
+    const since = this.current.data.foodsRetiredAt;
+    try {
+      return retiredFoodsSchema.parse(
+        await this.connection.get(RETIRED_FOODS_PATH, since ? { since } : undefined),
+      );
+    } catch {
+      return null;
+    }
   }
 }
 function mergeIds<T extends { id: string }>(base: T[], updated: T[]) {
