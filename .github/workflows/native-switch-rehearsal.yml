@@ -25,6 +25,19 @@ on:
         description: 'The native-release.yml run whose APK to rehearse (its run id)'
         type: string
         required: true
+      # The switch APK is arm64-only, and its libraries stay stored in the APK; on this x86_64
+      # emulator React Native's loader looks there for x86_64 and the app dies on start
+      # (SoLoaderDSONotFoundError). The emulator build (native-release.yml, emulator_abi) is the
+      # same code and version code with x86_64 added, so the start checks mean something. The
+      # install, data-folder and downgrade checks hold for either.
+      native_artifact:
+        description: 'Which APK of that run: the emulator build (starts on the emulator) or the switch build'
+        type: choice
+        required: false
+        default: trainingai-release-apk-emulator
+        options:
+          - trainingai-release-apk-emulator
+          - trainingai-release-apk
       rollback_tag:
         description: 'Release holding the rollback APK, e.g. v1.514.0. Blank skips the rollback step.'
         type: string
@@ -71,6 +84,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           NATIVE_RUN_ID: ${{ inputs.native_run_id }}
+          NATIVE_ARTIFACT: ${{ inputs.native_artifact }}
           INSTALLED_TAG: ${{ inputs.installed_tag }}
           ROLLBACK_TAG: ${{ inputs.rollback_tag }}
           ROLLBACK_CODE: ${{ inputs.rollback_version_code }}
@@ -93,7 +107,12 @@ jobs:
           mkdir -p "$A/native"
           gh release download "$INSTALLED_TAG" --repo "$GITHUB_REPOSITORY" --pattern "app-$INSTALLED_TAG.apk" --dir "$A"
           mv "$A/app-$INSTALLED_TAG.apk" "$A/installed.apk"
-          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name trainingai-release-apk --dir "$A/native"
+          case "$NATIVE_ARTIFACT" in
+            trainingai-release-apk|trainingai-release-apk-emulator) ;;
+            *) echo "::error::native_artifact must be one of the two release artifacts."; exit 1 ;;
+          esac
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$NATIVE_ARTIFACT" --dir "$A/native" \
+            || { echo "::error::Run $NATIVE_RUN_ID has no $NATIVE_ARTIFACT artifact (or it expired). Build it with native-release.yml$( [ "$NATIVE_ARTIFACT" = trainingai-release-apk-emulator ] && echo ', emulator_abi on')."; exit 1; }
           mv "$A/native/TrainingAi.apk" "$A/native.apk"
           if [ -n "$ROLLBACK_TAG" ]; then
             gh release download "$ROLLBACK_TAG" --repo "$GITHUB_REPOSITORY" --pattern "app-$ROLLBACK_TAG-versioncode-$ROLLBACK_CODE.apk" --dir "$A"
@@ -150,10 +169,11 @@ jobs:
         env:
           INSTALLED_TAG: ${{ inputs.installed_tag }}
           NATIVE_RUN_ID: ${{ inputs.native_run_id }}
+          NATIVE_ARTIFACT: ${{ inputs.native_artifact }}
         run: |
           {
             echo "### Switch-over rehearsal"
-            echo "Installed stand-in \`$INSTALLED_TAG\` (${INSTALLED_CODE:-?}), native run \`$NATIVE_RUN_ID\` (${NATIVE_CODE:-?}), rollback ${ROLLBACK_CODE:-none}."
+            echo "Installed stand-in \`$INSTALLED_TAG\` (${INSTALLED_CODE:-?}), native run \`$NATIVE_RUN_ID\` \`$NATIVE_ARTIFACT\` (${NATIVE_CODE:-?}), rollback ${ROLLBACK_CODE:-none}."
             cat "$RUNNER_TEMP/rehearsal/summary.md" 2> /dev/null || echo "The emulator step did not write a summary."
           } >> "$GITHUB_STEP_SUMMARY"
 

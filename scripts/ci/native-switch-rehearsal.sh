@@ -81,7 +81,11 @@ launch_check() {
   crashes=$(adb logcat -b crash -d 2> /dev/null | grep -c "$PKG" || true)
   if [ "${crashes:-0}" -gt 0 ]; then
     adb logcat -b crash -d > "$OUT/$label-crash.txt" 2> /dev/null || true
-    fail "the $label app crashed on start (see $label-crash.txt)"
+    if grep -q 'SoLoaderDSONotFoundError' "$OUT/$label-crash.txt"; then
+      fail "the $label app could not load its native libraries on this x86_64 emulator (SoLoaderDSONotFoundError): rehearse with the emulator build (native-release.yml, emulator_abi), not the arm64-only switch APK"
+    else
+      fail "the $label app crashed on start (see $label-crash.txt)"
+    fi
   elif [ -z "$pid" ]; then
     fail "the $label app is not running ${SETTLE}s after start"
   else
