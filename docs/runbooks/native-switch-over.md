@@ -21,7 +21,29 @@ downgrade"), **stop and tell the Orchestrator**. Never work around it.
   `d390062e…893c`, the `EXPECTED_CERT_SHA256` in `android.yml`) and with a higher `versionCode`
   (see *Version codes* below). Build it within 14 days of the switch: the artifact expires then.
 - ☐ The rollback build exists (see *Rollback*), with a code **above** the native app's.
+- ☐ The rehearsal passes with those two APKs (see *Rehearsal*).
 - ☐ The owner has said yes on the switch-over issue.
+
+## Rehearsal
+
+Run it with the very APKs of the day, once both exist: Actions → **Native switch rehearsal**
+(`native-switch-rehearsal.yml`) → Run workflow, with
+
+- **native_run_id**: the `native-release.yml` run that built the native APK;
+- **rollback_tag** and **rollback_version_code**: the release and code of the rollback build;
+- **installed_tag**: leave `v1.492.0`, the build on the phone (its own `app-v1.492.0.apk`).
+
+On an emulator, offline and never signed in, it installs the phone's build, then the native APK over
+it with `adb install -r`, then tries a downgrade (Android must refuse it), then the rollback over the
+native app. After each step it checks the versionCode Android reports, that a marker planted in the
+app's data folder is still there, and that the app starts and keeps running without a crash. Before
+the emulator it runs `verify-android-upgrade.mjs` on each pair (package, the pinned certificate, a
+rising code). The job summary lists every check; the artifact holds the screens and logs.
+
+It does not cover the owner's data or signed-in state, One UI, the radios or Health Connect. The
+emulator is x86_64 and runs the arm64-only native APK through Android's ARM translation; an image
+without it fails the native install with an ABI error, which says nothing about the APK (try another
+`api_level`).
 
 ## Switch-over day, in order
 

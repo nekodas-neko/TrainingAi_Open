@@ -1,0 +1,167 @@
+name: Native switch rehearsal
+
+# #2849. Rehearses switch-over day (docs/runbooks/native-switch-over.md, "Rehearsal") on an
+# emulator, with the exact APKs the phone will get, in the order it gets them:
+#   1. the installed app's own build (a release's app-<tag>.apk, the stand-in for the phone);
+#   2. the native release over it with `adb install -r` (an artifact of a native-release.yml run);
+#   3. a downgrade back to 1, which Android must refuse;
+#   4. the rollback build over the native app (an android.yml version_code build), when given.
+# After each install: the versionCode Android reports, a marker in the app's data folder still
+# there, and the app started and still running without a crash. scripts/ci/native-switch-rehearsal.sh
+# does the device part.
+#
+# Run by hand only. It installs nothing anywhere but the emulator and publishes nothing. The
+# emulator is offline: the APKs talk to production, and a rehearsal stays out of it.
+#
+# What it does NOT cover: the owner's real data and signed-in state, Samsung's One UI, radios (ring,
+# strap, scale), and Health Connect. The x86_64 emulator runs the arm64-only native build through
+# Android's ARM translation; an image without it fails the install with an ABI error, which says
+# nothing about the APK.
+
+on:
+  workflow_dispatch:
+    inputs:
+      native_run_id:
+        description: 'The native-release.yml run whose APK to rehearse (its run id)'
+        type: string
+        required: true
+      rollback_tag:
+        description: 'Release holding the rollback APK, e.g. v1.514.0. Blank skips the rollback step.'
+        type: string
+        required: false
+        default: ''
+      rollback_version_code:
+        description: 'That rollback build''s versionCode (its asset is app-<tag>-versioncode-<code>.apk)'
+        type: string
+        required: false
+        default: ''
+      installed_tag:
+        description: 'Release whose regular APK stands in for the app on the phone'
+        type: string
+        required: false
+        default: v1.492.0
+      api_level:
+        description: 'Emulator API level'
+        type: string
+        required: false
+        default: '34'
+
+# Read-only: it reads releases and another run's artifact, and writes nothing.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: native-switch-rehearsal
+  cancel-in-progress: false
+
+env:
+  PACKAGE: com.trainingai.app
+  # The installed app's certificate: the same digest as android.yml and native-release.yml pin.
+  EXPECTED_CERT_SHA256: d390062e367da6eee52ee74ca18632eae7686e5edb9c0c25e2fc98a3744d893c
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch the APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_RUN_ID: ${{ inputs.native_run_id }}
+          INSTALLED_TAG: ${{ inputs.installed_tag }}
+          ROLLBACK_TAG: ${{ inputs.rollback_tag }}
+          ROLLBACK_CODE: ${{ inputs.rollback_version_code }}
+          API_LEVEL: ${{ inputs.api_level }}
+        run: |
+          set -euo pipefail
+          # Inputs reach the shell through env only, and are checked before any use.
+          [[ "$NATIVE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "::error::native_run_id must be a run id."; exit 1; }
+          [[ "$INSTALLED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::installed_tag must be a v* tag."; exit 1; }
+          [[ "$API_LEVEL" =~ ^[0-9]{2}$ ]] || { echo "::error::api_level must be a number such as 34."; exit 1; }
+          if [ -n "$ROLLBACK_TAG" ]; then
+            [[ "$ROLLBACK_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::rollback_tag must be a v* tag."; exit 1; }
+            [[ "$ROLLBACK_CODE" =~ ^[0-9]+$ ]] || { echo "::error::rollback_version_code is required with rollback_tag."; exit 1; }
+          fi
+          workflow=$(gh run view "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" --json workflowName,conclusion --jq '.workflowName + "|" + .conclusion')
+          [ "$workflow" = "Native release build|success" ] \
+            || { echo "::error::Run $NATIVE_RUN_ID is '$workflow', not a successful Native release build."; exit 1; }
+
+          A="$RUNNER_TEMP/apks"
+          mkdir -p "$A/native"
+          gh release download "$INSTALLED_TAG" --repo "$GITHUB_REPOSITORY" --pattern "app-$INSTALLED_TAG.apk" --dir "$A"
+          mv "$A/app-$INSTALLED_TAG.apk" "$A/installed.apk"
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name trainingai-release-apk --dir "$A/native"
+          mv "$A/native/TrainingAi.apk" "$A/native.apk"
+          if [ -n "$ROLLBACK_TAG" ]; then
+            gh release download "$ROLLBACK_TAG" --repo "$GITHUB_REPOSITORY" --pattern "app-$ROLLBACK_TAG-versioncode-$ROLLBACK_CODE.apk" --dir "$A"
+            mv "$A/app-$ROLLBACK_TAG-versioncode-$ROLLBACK_CODE.apk" "$A/rollback.apk"
+            echo "ROLLBACK_APK=$A/rollback.apk" >> "$GITHUB_ENV"
+          fi
+          echo "INSTALLED_APK=$A/installed.apk" >> "$GITHUB_ENV"
+          echo "NATIVE_APK=$A/native.apk" >> "$GITHUB_ENV"
+          ls -la "$A"
+
+      # The same comparison the switch-over wrapper makes before installing, without a device: one
+      # package, one certificate (the pinned one), and a higher versionCode at each step.
+      - name: Check the APKs against each other
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort -V | tail -1)"
+          TOOLS="$(dirname "$(find "$ANDROID_HOME/cmdline-tools" -name apkanalyzer -type f | sort -V | tail -1)")"
+          verify() { node mobile/scripts/verify-android-upgrade.mjs --apksigner "$BT/apksigner" --apkanalyzer "$TOOLS/apkanalyzer" "$@"; }
+          verify --existing "$INSTALLED_APK" --replacement "$NATIVE_APK"
+          if [ -n "${ROLLBACK_APK:-}" ]; then verify --existing "$NATIVE_APK" --replacement "$ROLLBACK_APK"; fi
+          cert=$(verify --existing "$INSTALLED_APK" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).certificates.join(",").toLowerCase()))')
+          [ "$cert" = "$EXPECTED_CERT_SHA256" ] || { echo "::error::The installed-app stand-in is signed by $cert, not the pinned certificate."; exit 1; }
+          code() { "$TOOLS/apkanalyzer" manifest version-code "$1" | tr -d '[:space:]'; }
+          {
+            echo "INSTALLED_CODE=$(code "$INSTALLED_APK")"
+            echo "NATIVE_CODE=$(code "$NATIVE_APK")"
+            if [ -n "${ROLLBACK_APK:-}" ]; then echo "ROLLBACK_CODE=$(code "$ROLLBACK_APK")"; fi
+          } >> "$GITHUB_ENV"
+
+      # KVM has to be made available to the runner user before the emulator action runs.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Rehearse the switch on an emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        env:
+          REHEARSAL_OUT: ${{ runner.temp }}/rehearsal
+        with:
+          api-level: ${{ inputs.api_level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/ci/native-switch-rehearsal.sh
+
+      - name: Summary
+        if: always()
+        env:
+          INSTALLED_TAG: ${{ inputs.installed_tag }}
+          NATIVE_RUN_ID: ${{ inputs.native_run_id }}
+        run: |
+          {
+            echo "### Switch-over rehearsal"
+            echo "Installed stand-in \`$INSTALLED_TAG\` (${INSTALLED_CODE:-?}), native run \`$NATIVE_RUN_ID\` (${NATIVE_CODE:-?}), rollback ${ROLLBACK_CODE:-none}."
+            cat "$RUNNER_TEMP/rehearsal/summary.md" 2> /dev/null || echo "The emulator step did not write a summary."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Screens of an offline, signed-out app and the emulator's log: no health data.
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: switch-rehearsal
+          path: ${{ runner.temp }}/rehearsal
+          retention-days: 14
+          if-no-files-found: ignore
