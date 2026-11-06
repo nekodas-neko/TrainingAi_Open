@@ -40,6 +40,16 @@ describe('native-release.yml', () => {
     expect(code).toContain(`EXPECTED_CERT_SHA256: ${installed}`)
   })
 
+  // The switch rehearsal's emulator build (native-switch-rehearsal.yml) adds x86_64. It must never be
+  // the artifact the owner installs, so it carries its own name, and the default build stays arm64.
+  it('names the emulator build apart, and builds arm64 only unless asked', () => {
+    expect(code).toContain("name: ${{ inputs.emulator_abi && 'trainingai-release-apk-emulator' || 'trainingai-release-apk' }}")
+    expect(code).toMatch(/ABIS=arm64-v8a\n/)
+    expect(code).toMatch(/if \[ "\$EMULATOR_ABI" = "true" \]; then ABIS=arm64-v8a,x86_64; fi/)
+    expect(code).toContain('-PreactNativeArchitectures="$ABIS"')
+    expect(code).toMatch(/emulator_abi:\n(?: {8}.*\n)*? {8}default: false/)
+  })
+
   it('does not interpolate inputs into a script', () => {
     const scripts = [...code.matchAll(/run:\s*\|\n((?: {10,}.*\n|\n)+)/g)].map(m => m[1]).join('\n')
     expect(scripts).not.toMatch(/\$\{\{/)

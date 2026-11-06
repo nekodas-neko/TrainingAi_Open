@@ -26,10 +26,17 @@ downgrade"), **stop and tell the Orchestrator**. Never work around it.
 
 ## Rehearsal
 
-Run it with the very APKs of the day, once both exist: Actions → **Native switch rehearsal**
-(`native-switch-rehearsal.yml`) → Run workflow, with
+Run it with the APKs of the day, once both exist. First build the native app a second time for
+the emulator: `native-release.yml` with the same `ref` and `version_code` and **emulator_abi**
+ticked. That build is the same code and code number with x86_64 added, under its own artifact name
+(`trainingai-release-apk-emulator`). It is **never** installed on the phone: the switch APK is
+arm64-only, keeps its libraries stored in the APK, and on the x86_64 emulator React Native's loader
+looks there for x86_64 and the app dies on start (`SoLoaderDSONotFoundError`, seen on the first
+rehearsal, 6 Nov). Then Actions → **Native switch rehearsal** (`native-switch-rehearsal.yml`) → Run
+workflow, with
 
-- **native_run_id**: the `native-release.yml` run that built the native APK;
+- **native_run_id**: the `native-release.yml` run of the emulator build (leave **native_artifact**
+  on `trainingai-release-apk-emulator`);
 - **rollback_tag** and **rollback_version_code**: the release and code of the rollback build;
 - **installed_tag**: leave `v1.492.0`, the build on the phone (its own `app-v1.492.0.apk`).
 
@@ -40,10 +47,10 @@ app's data folder is still there, and that the app starts and keeps running with
 the emulator it runs `verify-android-upgrade.mjs` on each pair (package, the pinned certificate, a
 rising code). The job summary lists every check; the artifact holds the screens and logs.
 
-It does not cover the owner's data or signed-in state, One UI, the radios or Health Connect. The
-emulator is x86_64 and runs the arm64-only native APK through Android's ARM translation; an image
-without it fails the native install with an ABI error, which says nothing about the APK (try another
-`api_level`).
+The switch APK itself goes through the same pair checks and installs when it is the one named
+(**native_artifact** `trainingai-release-apk`): only its start checks are meaningless on the
+emulator. It does not cover the owner's data or signed-in state, One UI, the radios or Health
+Connect.
 
 ## Switch-over day, in order
 

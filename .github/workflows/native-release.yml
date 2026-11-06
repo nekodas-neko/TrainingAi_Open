@@ -30,6 +30,15 @@ on:
         type: string
         required: false
         default: main
+      # The switch rehearsal (native-switch-rehearsal.yml) runs on an x86_64 emulator, which cannot
+      # load this APK's arm64-only libraries: they stay stored in the APK, and React Native's loader
+      # looks for the emulator's own ABI there. This adds x86_64 beside arm64 and names the artifact
+      # apart, so the rehearsal can start the app. It is never the APK installed on the phone.
+      emulator_abi:
+        description: 'Rehearsal only: also include x86_64 for the emulator. Never install this build on the phone.'
+        type: boolean
+        required: false
+        default: false
 
 # Read-only. Nothing in this workflow writes to the repository or its releases.
 permissions:
@@ -151,7 +160,12 @@ jobs:
         uses: ./.github/actions/android-ndk
 
       - name: Compile the release APK
-        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+        env:
+          EMULATOR_ABI: ${{ inputs.emulator_abi }}
+        run: |
+          ABIS=arm64-v8a
+          if [ "$EMULATOR_ABI" = "true" ]; then ABIS=arm64-v8a,x86_64; fi
+          ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures="$ABIS"
         working-directory: mobile/android
 
       # The key is read only from here on, after every step that runs the checked-out code's build.
@@ -185,6 +199,7 @@ jobs:
       - name: Check the package, certificate, version code and backup rules
         env:
           BUILT_REF: ${{ inputs.ref }}
+          EMULATOR_ABI: ${{ inputs.emulator_abi }}
         run: |
           set -euo pipefail
           TOOLS="$(dirname "$(find "$ANDROID_HOME/cmdline-tools" -name apkanalyzer -type f | sort -V | tail -1)")"
@@ -202,11 +217,15 @@ jobs:
             echo "**$PACKAGE**, version code $ANDROID_VERSION_CODE, built from \`$BUILT_REF\`, $(du -h "$RUNNER_TEMP/$APK_NAME" | cut -f1)."
             echo "Signed by the installed app's certificate \`$EXPECTED_CERT_SHA256\`; the backup rules keep SecureStore and the health database out of Google backups."
             echo "This is a workflow artifact only. Nothing was published."
+            if [ "$EMULATOR_ABI" = "true" ]; then
+              echo ""
+              echo "**Emulator build for the switch rehearsal** (arm64-v8a and x86_64, artifact \`trainingai-release-apk-emulator\`). Never install it on the phone: the switch uses the arm64-only build."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v6
         with:
-          name: trainingai-release-apk
+          name: ${{ inputs.emulator_abi && 'trainingai-release-apk-emulator' || 'trainingai-release-apk' }}
           path: ${{ runner.temp }}/${{ env.APK_NAME }}
           retention-days: 14
           compression-level: 0
