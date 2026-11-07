@@ -1,9 +1,6 @@
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run';
-import {
-  MAX_MUTATION_ATTEMPTS,
-  nextRetryDelayMs,
-  resolveFailedOutboxIds,
-} from '@trainingai/shared/sync/push-retry';
+import { resolveFailedOutboxIds } from '@trainingai/shared/sync/push-retry';
+import { countRefusal, rejectionSchema, type Rejection } from '../../../core/sync/set-aside.ts';
 import { z } from 'zod';
 import { deadLettered, discardRow, retryRow, type QueueList } from './sync-health.ts';
 import { msToHHMMInTz, toAestDay } from '@trainingai/shared/date-utils';
@@ -62,16 +59,10 @@ const sessionSchema = z.object({
     .optional(),
 });
 export type ActivitySession = z.infer<typeof sessionSchema>;
-// What the server said when it refused a row, kept on the row. `attempts` counts server answers
-// only, never a lost connection. A row at MAX_MUTATION_ATTEMPTS is dead-lettered: the flush skips
-// it and it stays here, with the server's words, for the Sync health card's Retry / Discard to read.
-const rejection = z.object({
-  error: z.string(),
-  at: z.number(),
-  attempts: z.number().int().positive(),
-  retryAt: z.number().optional(),
-});
-export type Rejection = z.infer<typeof rejection>;
+// A refused row keeps the server's words on it (`core/sync/set-aside.ts`): backoff, then
+// dead-lettered, when the flush skips it and Sync health's Retry / Discard reads it.
+const rejection = rejectionSchema;
+export type { Rejection };
 export { deadLettered };
 const localRow = z.object({
   payload: activityPayload,
@@ -976,7 +967,10 @@ export class ActivityStore {
                   : !sameActivityField(confirmed[field], value)),
             ))
         ) {
-          throw new Error('Readback not confirmed.');
+          // The server took the push but its day does not show it (#3638): an edit of a row deleted
+          // elsewhere stays deleted. It counts like a refusal, so the rows behind it still upload.
+          await this.reject(activityRow ? 'rows' : 'tests', row, 'Readback not confirmed.');
+          continue;
         }
         await this.write((data) => ({
           ...data,
@@ -1024,14 +1018,7 @@ export class ActivityStore {
     row: { payload: { id: string }; rejected?: Rejection },
     error: string,
   ) {
-    const attempts = (row.rejected?.attempts ?? 0) + 1;
-    const at = this.now();
-    const rejected: Rejection = {
-      error,
-      at,
-      attempts,
-      ...(attempts < MAX_MUTATION_ATTEMPTS ? { retryAt: at + nextRetryDelayMs(attempts) } : {}),
-    };
+    const rejected = countRefusal(row.rejected, error, this.now());
     const unchanged = (item: { payload: { id: string } }) =>
       item.payload.id === row.payload.id &&
       JSON.stringify(item.payload) === JSON.stringify(row.payload);

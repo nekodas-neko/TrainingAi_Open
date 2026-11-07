@@ -1112,3 +1112,81 @@ test('a load stored as unrounded kg from the lb wheel reads 9.07 kg on read-only
   } as never);
   assert.match(event.notes, /Curl: 9\.07 kg × 8/);
 });
+
+// #3638. A workout log the server refuses for good is set aside after five counted refusals, and
+// the rest of that workout and the workout finished after it still upload.
+test('a refused workout upload is set aside and the next workout still uploads', async (t) => {
+  const f = await setup(t);
+  const refused = new Set<string>();
+  const accepted: string[] = [];
+  let offline = true;
+  f.connection.post = async (_path, body) => {
+    const mutation = (body as { mutations: { id: string; domain: string; date: string }[] })
+      .mutations[0];
+    if (offline) {
+      throw new Error('offline');
+    }
+    if (refused.has(mutation.id)) {
+      const { id, domain, date } = mutation;
+      return { processed: 0, errors: [{ id, domain, date, error: 'Workout session not found' }] };
+    }
+    accepted.push(mutation.id);
+    return { processed: 1, errors: [] };
+  };
+  const first = await recordFirst(f);
+  await f.controller.finish(first.id);
+  const [log, completion] = f.controller.getSnapshot().data.workouts[0].pending;
+  refused.add(log.id);
+  const secondId = await f.controller.start(f.session, programId);
+  assert.ok(secondId && secondId !== first.id);
+  const secondWorkout = f.controller
+    .getSnapshot()
+    .data.workouts.find((workout) => workout.id === secondId)!;
+  const secondSet = secondWorkout.exercises[0].sets[0];
+  f.controller.updateSet(secondId, exerciseId, secondSet.id, 'weight', '60');
+  await f.controller.startSet(secondId, exerciseId, secondSet.id);
+  f.clock(30_000);
+  assert.equal(await f.controller.recordSet(secondId, exerciseId, secondSet.id), true);
+  await f.controller.finish(secondId);
+  const second = { id: secondId };
+  offline = false;
+  for (let n = 0; n < 4; n++) {
+    await f.controller.sync();
+  }
+  assert.equal(accepted.length, 0, 'held while the refusal is counted');
+  await f.controller.sync();
+  const workouts = f.controller.getSnapshot().data.workouts;
+  const byId = (id: string) => workouts.find((workout) => workout.id === id)!;
+  assert.equal(byId(second.id).pending.length, 0, 'the next workout uploaded');
+  assert.ok(byId(second.id).syncedAt);
+  assert.ok(accepted.includes(completion.id), 'the completion behind it went up');
+  assert.deepEqual(
+    byId(first.id).pending.map((item) => item.id),
+    [log.id],
+    'the refused log stays on this phone',
+  );
+  assert.equal(byId(first.id).syncedAt, null);
+  assert.match(byId(first.id).syncError!, /refused part of this workout/);
+  assert.deepEqual(
+    f.controller.failed().map((item) => [item.list, item.id, item.label, item.attempts]),
+    [['workout', log.id, 'Workout', 5]],
+  );
+  // What is left to send is no longer a tail of the finish order, and still reads after a restart.
+  const saved = readJournal(await f.scope.get('workout-journal.v1'), f.connection);
+  assert.deepEqual(
+    saved.workouts.find((workout) => workout.id === first.id)!.pending.map((item) => item.id),
+    [log.id],
+  );
+  const sent = accepted.length;
+  await f.controller.sync();
+  assert.equal(accepted.length, sent, 'a set-aside write is not sent again');
+  // Discard from Sync health: nothing is left to send, so the workout counts as uploaded.
+  await f.controller.discardRejected(log.id);
+  assert.equal(f.controller.failed().length, 0);
+  const after = f.controller.getSnapshot().data.workouts.find((workout) => workout.id === first.id)!;
+  assert.equal(after.pending.length, 0);
+  assert.ok(after.syncedAt);
+  assert.equal(after.syncError, null);
+});
+
+

@@ -9,6 +9,17 @@ import type { AccountConnection } from '../../account/session.ts';
 import { ApiError } from '../../account/api/client.ts';
 import { programSpec, injurySpec, phaseSetsSpec, type SavedProgram } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { readPushAnswer } from '../../../core/sync/push-answer.ts';
+import {
+  ChangeRefused,
+  countRefusal,
+  deadLettered,
+  failedItem,
+  refusalOf,
+  rejectionSchema,
+  type FailedItem,
+  type RetryState,
+} from '../../../core/sync/set-aside.ts';
 
 const programBody = ProgramWriteSchema.extend({
   sessions: ProgramWriteSchema.shape.sessions.unwrap(),
@@ -16,7 +27,8 @@ const programBody = ProgramWriteSchema.extend({
 const injuryBody = InjuryCreateSchema.required({ startedDate: true }).extend({
   notes: z.string().max(1000).nullable(),
 });
-const identity = { id: z.uuid(), targetId: z.uuid() };
+// `rejected`: the server's refusals of this change (#3638); set aside at MAX_MUTATION_ATTEMPTS.
+const identity = { id: z.uuid(), targetId: z.uuid(), rejected: rejectionSchema.optional() };
 const commandSchema = z.discriminatedUnion('kind', [
   z.object({
     ...identity,
@@ -542,13 +554,17 @@ export class TrainingStore {
           : command.kind === 'injury_resolve'
             ? command.date
             : toAestDay(new Date(this.now()), this.connection.timezone ?? DEFAULT_TZ);
+      const mutation = { id: command.id, domain: 'injuries', date, payload };
       const response = z
-        .object({ processed: z.literal(1), errors: z.array(z.unknown()).length(0) })
-        .parse(
-          await this.connection.post('/api/sync/push', {
-            mutations: [{ id: command.id, domain: 'injuries', date, payload }],
-          }),
-        );
+        .object({ processed: z.number(), errors: z.array(z.unknown()) })
+        .parse(await this.connection.post('/api/sync/push', { mutations: [mutation] }));
+      const verdict = readPushAnswer(mutation, response);
+      if (verdict.kind === 'refused') {
+        throw new ChangeRefused(verdict.error);
+      }
+      if (verdict.kind === 'hold') {
+        throw new Error(verdict.error);
+      }
       return response;
     }
     const remoteId = this.current.programIds[command.targetId];
@@ -612,7 +628,11 @@ export class TrainingStore {
     if (this.flushing) {
       return this.flushing;
     }
-    if (this.cancelled || !this.current.ready || !this.current.operations.length) {
+    if (
+      this.cancelled ||
+      !this.current.ready ||
+      !this.current.operations.some((operation) => !deadLettered(operation))
+    ) {
       return Promise.resolve();
     }
     const generation = this.generation;
@@ -629,10 +649,35 @@ export class TrainingStore {
   private async flush(generation: number) {
     try {
       await this.writes;
-      while (generation === this.generation && this.current.operations.length) {
-        const command = this.current.operations[0];
+      // A change set aside (#3638) is passed over; one short of that holds the queue (a program's
+      // save before its delete), and the next sync tries it again.
+      while (
+        generation === this.generation &&
+        this.current.operations.some((operation) => !deadLettered(operation))
+      ) {
+        const command = this.current.operations.find((operation) => !deadLettered(operation))!;
         this.uploadingId = command.id;
-        const response = await this.replay(command);
+        let response: unknown;
+        try {
+          response = await this.replay(command);
+        } catch (failure) {
+          const refusal = refusalOf(failure);
+          if (refusal === null || generation !== this.generation) {
+            throw failure;
+          }
+          const rejected = countRefusal(command.rejected, refusal, this.now());
+          await this.commit((frame) => ({
+            ...frame,
+            operations: frame.operations.map((operation) =>
+              operation.id === command.id ? { ...operation, rejected } : operation,
+            ),
+          }));
+          this.uploadingId = null;
+          if (!deadLettered({ rejected })) {
+            throw failure;
+          }
+          continue;
+        }
         if (generation !== this.generation) {
           return;
         }
@@ -700,6 +745,55 @@ export class TrainingStore {
       }
     }
   }
+  // Sync health: the changes set aside, and Retry / Discard for one of them.
+  failed(): FailedItem[] {
+    const today = toAestDay(new Date(this.now()), this.connection.timezone ?? DEFAULT_TZ);
+    return this.current.operations
+      .filter((operation) => deadLettered(operation))
+      .map((operation) =>
+        failedItem(
+          'training',
+          operation.id,
+          operation.kind,
+          operation.kind === 'injury_save'
+            ? operation.body.startedDate
+            : operation.kind === 'injury_resolve'
+              ? operation.date
+              : operation.kind === 'program_save'
+                ? ''
+                : today,
+          operation.rejected!,
+        ),
+      );
+  }
+  retryState(id: string): RetryState {
+    const operation = this.current.operations.find((x) => x.id === id);
+    return !operation ? 'synced' : operation.rejected ? 'failing' : 'waiting';
+  }
+  retryRejected = async (id: string) => {
+    await this.commit((frame) => ({
+      ...frame,
+      operations: frame.operations.map((operation) =>
+        operation.id === id && deadLettered(operation)
+          ? { ...operation, rejected: undefined }
+          : operation,
+      ),
+    }));
+    await this.sync();
+  };
+  // Discard: that change leaves this phone's queue; the next read shows the server's copy again.
+  discardRejected = async (id: string) => {
+    const operation = this.current.operations.find((x) => x.id === id && deadLettered(x));
+    if (!operation) {
+      return;
+    }
+    await this.commit((frame) => ({
+      ...frame,
+      operations: frame.operations.filter((x) => x.id !== id),
+    }));
+    this.versions[operation.kind.startsWith('program_') ? 'programs' : 'injuries']++;
+    this.changed(false, true);
+  };
   cancel() {
     this.cancelled = true;
     this.generation++;

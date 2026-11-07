@@ -6,6 +6,7 @@ import {
   failedItems,
   itemDetail,
   itemTitle,
+  activityRetryState,
   retryNotice,
   retryRow,
   waitingCount,
@@ -77,21 +78,21 @@ test('the retry notice says synced, still failing or saved on the phone', () => 
     tests: [],
     runs: [],
   };
-  assert.equal(retryNotice(items, synced), 'Synced');
+  assert.equal(retryNotice(items.map((item) => activityRetryState(synced, item))), 'Synced');
   const mixed = {
     rows: [row('a', { ...dead, attempts: 1 })],
     tests: [],
     runs: [],
   };
-  assert.equal(retryNotice(items, mixed), '1 synced, 1 still failing');
+  assert.equal(retryNotice(items.map((item) => activityRetryState(mixed, item))), '1 synced, 1 still failing');
   const failing = {
     rows: mixed.rows,
     tests: [row('t', dead)],
     runs: [],
   };
-  assert.equal(retryNotice(items, failing), 'Still failing — see the error below');
+  assert.equal(retryNotice(items.map((item) => activityRetryState(failing, item))), 'Still failing — see the error below');
   const offline = { rows: [row('a')], tests: [], runs: [] };
-  assert.match(retryNotice([items[0]], offline), /^Saved on this phone/);
+  assert.match(retryNotice([activityRetryState(offline, items[0])]), /^Saved on this phone/);
 });
 
 const id = '10000000-0000-4000-8000-000000000001';
