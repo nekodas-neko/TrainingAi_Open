@@ -10,6 +10,11 @@
 // writes a fresh copy to the temp dir); the refactor must reproduce it exactly. Model version strings
 // are replaced by placeholders before anything is recorded or hashed, so a version bump elsewhere in
 // the same PR (#3612) is not read as an output change. Fixtures are seeded, so the recording is stable.
+//
+// Re-recorded once, for `bodyBattery` only (#3658): the response's `charged`/`drained` now report
+// only what reached the level. Before re-recording, the same cases were hashed with the old figures
+// (the stored gross totals) put back in, and every one matched the recording from `main`, so the
+// level, the stored row, stress and availability did not move.
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
