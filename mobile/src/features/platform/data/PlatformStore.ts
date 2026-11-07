@@ -1,6 +1,15 @@
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { platformSchema, type PlatformSettings, type Reminder } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
+/**
+ * Settings saved before cues defaulted on (#3647) carry the old opt-in default, almost always off
+ * because nothing asked. They turn on once, as the current app always cues; a later switch-off sticks.
+ */
+export function migrateCues(stored: unknown) {
+  return stored && typeof stored === 'object' && (stored as { walkCuesDefaultOn?: unknown }).walkCuesDefaultOn !== true
+    ? { ...stored, walkCues: true, walkCuesDefaultOn: true }
+    : stored;
+}
 export class PlatformStore {
   private state: { ready: boolean; settings: PlatformSettings; error: string | null };
   private listeners = new Set<() => void>();
@@ -31,8 +40,16 @@ export class PlatformStore {
     return (this.initialization ??= (async () => {
       try {
         const raw = await this.storage.get('platform-settings.v1');
-        if (raw) this.publish({ settings: platformSchema.parse(JSON.parse(raw)) });
-        else
+        if (raw) {
+          const stored = JSON.parse(raw);
+          const settings = platformSchema.parse(migrateCues(stored));
+          this.publish({ settings });
+          // Written back so the switch-on happens once; a failure retries it at the next launch.
+          if (stored?.walkCuesDefaultOn !== true)
+            await this.storage
+              .set('platform-settings.v1', JSON.stringify(settings))
+              .catch(() => {});
+        } else
           await this.storage.set('platform-settings.v1', JSON.stringify(this.state.settings));
         this.publish({ ready: true });
       } catch (failure) {

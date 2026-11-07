@@ -60,9 +60,6 @@ Connect.
    what Preview still holds, so anything Preview hasn't uploaded is stranded once you stop opening
    it. Open Preview on Wi-Fi, go to **More → Data & Sync**, tap **Sync now**, and wait for
    **No changes waiting to upload**.
-   - That count leaves out the strap's heart-rate samples and the scale's weigh-ins (#3655). So also
-     open **More → Devices & connections** and check the scale card shows nothing "to file". After
-     the last strap workout, leave Preview open on Wi-Fi for a minute.
    - Keep Preview installed until the native app has run for a week.
 2. **Flush the old app's outbox.** Open the current app on Wi-Fi, go to **More** and wait until the
    **Sync health** card is gone (no unsynced or dead-lettered rows). Anything left there is lost

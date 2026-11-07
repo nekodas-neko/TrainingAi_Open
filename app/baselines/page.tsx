@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getRepositoryAsync } from '@/lib/data'
 import { DEFAULT_TZ, ageFromDob, todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
+import { latestTestWeightKg } from '@trainingai/shared/health/fitness-tests'
 import { FitnessTestsContent } from '@/components/fitness-tests/fitness-tests-content'
 
 export default async function BaselinesPage() {
@@ -20,9 +21,7 @@ export default async function BaselinesPage() {
 
   const age = ageFromDob(user?.dateOfBirth, new Date())
   // Most recent logged weight in the window — feeds the Burr 2011 6MWT VO2max term.
-  const latestWeight = metrics
-    .filter((m) => m.weightKg != null && m.weightKg > 0)
-    .sort((a, b) => b.date.localeCompare(a.date))[0]?.weightKg ?? null
+  const latestWeight = latestTestWeightKg(metrics, today)
   // Test protocols aim at reachable targets, so they anchor on `targetAnchorMax` — the
   // corroborated observed max when there is one. This page used to hardcode
   // `hrMaxObserved: null`, so every protocol target was pinned to 220−age regardless of

@@ -233,13 +233,17 @@ export function liveRouteStats(points: RoutePoint[], activeSec: number) {
   };
 }
 
-// Only a recording that moves records a route: a manual distance-based activity or an outdoor
-// guided walk. A fitness test asks for its distance on the result screen, as in the current app.
+// Only a recording that moves records a route: a manual distance-based activity, an outdoor guided
+// walk, or a distance test (Cooper, 6MWT), whose distance comes from GPS as in the current app's
+// `test-active.tsx` (#3641). A test is distance-based exactly when its protocol captures distance.
 export function routeEligible(session: {
   type: { isDistanceBased: boolean };
   guidance?: { kind: string };
 }) {
-  return session.type.isDistanceBased && (!session.guidance || session.guidance.kind === 'walk');
+  return (
+    session.type.isDistanceBased &&
+    (!session.guidance || session.guidance.kind === 'walk' || session.guidance.kind === 'test')
+  );
 }
 /**
  * Which foreground service an activity runs, from Start to Finish or Discard (#3595). One at a

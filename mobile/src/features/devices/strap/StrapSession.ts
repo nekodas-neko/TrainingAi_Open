@@ -88,6 +88,11 @@ export type StrapState = {
   scanned: boolean;
   found: FoundDevice[];
   scanError: string | null;
+  /**
+   * Heart-rate samples saved on this phone and not yet uploaded, from the account's `HrOutbox`.
+   * Data & Sync's "waiting to upload" count reads it, as it reads the scale's `queued` (#3655).
+   */
+  queued: number;
 };
 type Timers = { set(run: () => void, ms: number): unknown; clear(handle: unknown): void };
 export type StrapDeps = {
@@ -153,6 +158,7 @@ export class StrapSession {
       scanned: false,
       found: [],
       scanError: null,
+      queued: 0,
     };
   }
 
@@ -214,12 +220,28 @@ export class StrapSession {
       this.bufferAccount = outbox.account;
       this.flush();
     }
-    void outbox?.sync();
+    this.publishQueued(outbox ? outbox.sync() : null);
   }
 
   /** Uploads whatever is saved. The provider calls it on a timer and when the app returns. */
   sync() {
-    void this.outbox?.sync();
+    if (this.outbox) this.publishQueued(this.outbox.sync());
+  }
+
+  /** Publishes what the outbox still holds once `after` settles; zero with no account. */
+  private publishQueued(after: Promise<unknown> | null) {
+    const outbox = this.outbox;
+    if (!outbox) {
+      if (this.current.queued !== 0) this.publish({ queued: 0 });
+      return;
+    }
+    const update = () => {
+      // Only the outbox still in use: an account change meanwhile has published its own count.
+      if (outbox !== this.outbox) return;
+      const queued = outbox.pending();
+      if (queued !== this.current.queued) this.publish({ queued });
+    };
+    void (after ?? Promise.resolve()).then(update, update);
   }
 
   hold(reason: StrapHold, on: boolean) {
@@ -358,10 +380,10 @@ export class StrapSession {
     // With no account to save to (signed out, session expired) the samples wait here.
     if (!this.buffer.length || !outbox) return;
     const samples = this.buffer.splice(0);
-    void outbox
-      .append(samples)
-      .then(() => outbox.sync())
-      .catch(() => {});
+    const appended = outbox.append(samples);
+    // Counted as soon as they are saved, and again once the upload has tried.
+    this.publishQueued(appended);
+    this.publishQueued(appended.then(() => outbox.sync()));
   }
 
   private updateWanted() {

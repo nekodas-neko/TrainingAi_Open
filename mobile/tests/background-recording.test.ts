@@ -347,8 +347,10 @@ test('a GPS recording runs the location service; anything else with a strap runs
   // A treadmill walk starts with isDistanceBased false; the plain Treadmill activity too.
   assert.equal(activityServiceKind({ mode: 'active', type: treadmill, guidance: { kind: 'walk' } }, strap), 'connected-device');
   assert.equal(activityServiceKind({ mode: 'active', type: treadmill }, strap), 'connected-device');
-  // A fitness test is distance based but records no route.
-  assert.equal(activityServiceKind({ mode: 'active', type: outdoor, guidance: { kind: 'test' } }, strap), 'connected-device');
+  // A distance test (Cooper, 6MWT) records its route for its distance, as the current app does (#3641).
+  assert.equal(activityServiceKind({ mode: 'active', type: outdoor, guidance: { kind: 'test' } }, strap), 'location');
+  // The resting HRR test captures no distance, so it is not distance based and takes the indoor one.
+  assert.equal(activityServiceKind({ mode: 'active', type: treadmill, guidance: { kind: 'test' } }, strap), 'connected-device');
 });
 
 test('no strap and no GPS starts nothing; nor does an activity that is not running', () => {

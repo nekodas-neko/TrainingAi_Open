@@ -6,7 +6,15 @@ import {
   cooperVo2max,
   sixMwtVo2max,
   distanceCanBeScored,
+  latestTestWeightKg,
+  maxHrFrom,
+  restingHrFrom,
+  baselineHrr1,
 } from '@trainingai/shared/health/fitness-tests';
+import { computeTotalDistanceKm } from '@trainingai/shared/activity/route-metrics';
+import type { RoutePoint } from '@trainingai/shared/activity/route-encoding';
+import { hrSamples, type HrWindow } from './hr-window.ts';
+import { ageFromDob } from '@trainingai/shared/date-utils';
 import { FitnessTestCreateBody } from '@trainingai/shared/validation/fitness-test';
 import { msToHHMMInTz, toAestDay } from '@trainingai/shared/date-utils';
 import { clipSegmentsAt } from '@trainingai/shared/walking/clip-segments';
@@ -38,6 +46,9 @@ export const guidanceSchema = z.discriminatedUnion('kind', [
     kind: z.literal('walk'),
     config: walkConfigSchema,
     saved: z.boolean().default(false),
+    // How many heart-rate readings the saved walk was built from, so a later, fuller window saves
+    // it again and an unchanged one does not (#3641).
+    hrReadings: z.number().int().nonnegative().optional(),
   }),
   z.object({
     kind: z.literal('test'),
@@ -105,6 +116,46 @@ export type FitnessProfile = {
   weightKg?: number | null;
   restingHr?: number | null;
 };
+/**
+ * A test's profile terms as the current app's baselines page builds them (#3640): the newest
+ * weigh-in in the 30 days to `today`, not only today's, and the HR profile's resting HR (the
+ * `resolveHrProfile` value `/api/hr-profile` serves), not today's ring reading.
+ */
+export function testProfile(input: {
+  today: string;
+  now: Date;
+  dateOfBirth?: string | null;
+  sex?: string | null;
+  body?: {
+    today?: { weightKg?: number | null } | null;
+    latestWeightKg?: number | null;
+    latestWeightDate?: string | null;
+  } | null;
+  hrProfile?: { restingHr?: number | null } | null;
+}): FitnessProfile {
+  const body = input.body;
+  return {
+    age: ageFromDob(input.dateOfBirth ?? null, input.now),
+    sex: input.sex ?? null,
+    weightKg: latestTestWeightKg(
+      [
+        { date: input.today, weightKg: body?.today?.weightKg },
+        ...(body?.latestWeightDate
+          ? [{ date: body.latestWeightDate, weightKg: body.latestWeightKg }]
+          : []),
+      ],
+      input.today,
+    ),
+    restingHr: input.hrProfile?.restingHr ?? null,
+  };
+}
+/**
+ * A test's result as the current app's `test-result.tsx` computes it, once, from what was recorded
+ * (#3641): avg and max HR from the strap's or ring's readings over the test (`maxHrFrom`, so a spike
+ * cannot set the peak), resting HR and 1-minute recovery from the same readings for the HRR test
+ * (`restingHrFrom`, `baselineHrr1`), and a distance test's distance from its GPS route. A value typed
+ * on the result screen overrides the recorded one; with nothing recorded and nothing typed it is left out.
+ */
 export function fitnessResult(
   session: {
     id: string;
@@ -116,6 +167,7 @@ export function fitnessResult(
   },
   timezone: string,
   profile: FitnessProfile,
+  recorded: { hr?: HrWindow | null; route?: RoutePoint[] } = {},
 ) {
   if (session.guidance?.kind !== 'test' || session.startMs === null || session.endMs === null) {
     throw new Error('Finish the test first.');
@@ -123,12 +175,19 @@ export function fitnessResult(
   const guidance = session.guidance,
     protocol = getProtocol(guidance.protocol)!;
   const durationSec = Math.floor((session.endMs - session.startMs) / 1000);
-  const distanceM = session.distance.trim()
+  const typedDistanceM = session.distance.trim()
     ? Number(session.distance.replace(',', '.')) * 1000
     : undefined;
-  if (distanceM !== undefined && (!Number.isFinite(distanceM) || distanceM < 0)) {
+  if (typedDistanceM !== undefined && (!Number.isFinite(typedDistanceM) || typedDistanceM < 0)) {
     throw new Error('Enter a valid distance.');
   }
+  const route = recorded.route ?? [];
+  // Whole metres, as the current app saves its GPS distance.
+  const gpsDistanceM =
+    protocol.captureDistance && route.length >= 2
+      ? Math.round(computeTotalDistanceKm(route) * 1000)
+      : undefined;
+  const distanceM = typedDistanceM ?? gpsDistanceM;
   const early = durationSec < testDuration(protocol.id) * 0.9;
   const scoreable =
     !early &&
@@ -148,32 +207,54 @@ export function fitnessResult(
     : null;
   const bpm = (value: string) =>
     value.trim() ? z.number().int().min(30).max(220).parse(Number(value)) : undefined;
-  const restingHr = bpm(guidance.restingHr),
-    maxHr = bpm(guidance.peakHr),
-    recovery = bpm(guidance.recoveryHr);
-  const hrr1Bpm = maxHr !== undefined && recovery !== undefined ? maxHr - recovery : undefined;
+  const readings = hrSamples(recorded.hr)
+    .filter((sample) => sample.at >= session.startMs! && sample.at <= session.endMs!)
+    .map((sample) => ({ timestamp: new Date(sample.at), bpm: sample.bpm }));
+  const sensorAvg = readings.length
+    ? Math.round(readings.reduce((sum, reading) => sum + reading.bpm, 0) / readings.length)
+    : undefined;
+  const sensorMax = maxHrFrom(readings) ?? undefined;
+  const typedResting = bpm(guidance.restingHr),
+    typedPeak = bpm(guidance.peakHr),
+    typedRecovery = bpm(guidance.recoveryHr);
+  const typed = typedResting !== undefined || typedPeak !== undefined || typedRecovery !== undefined;
+  const maxHr = typedPeak ?? sensorMax;
+  const restingHr = protocol.captureHrr
+    ? (typedResting ?? restingHrFrom(readings) ?? undefined)
+    : undefined;
+  const hrr1Bpm = protocol.captureHrr
+    ? typedPeak !== undefined && typedRecovery !== undefined
+      ? typedPeak - typedRecovery
+      : typedPeak === undefined && typedRecovery === undefined
+        ? (baselineHrr1(readings) ?? undefined)
+        : undefined
+    : undefined;
+  const method = protocol.captureHrr
+    ? typed
+      ? 'manual_hrr'
+      : undefined
+    : vo2maxEst != null && vo2maxEst > 0
+      ? protocol.vo2Equation === 'cooper'
+        ? 'cooper_1968'
+        : profile.age != null &&
+            profile.weightKg != null &&
+            profile.restingHr != null &&
+            ['male', 'female'].includes(profile.sex ?? '')
+          ? 'burr_2011'
+          : 'ross_2010'
+      : 'manual_distance_unscored';
   const payload = fitnessPayloadSchema.parse({
     id: session.id,
     testType: protocol.id,
     date: toAestDay(new Date(session.startMs), timezone),
     durationSec,
     ...(distanceM !== undefined ? { distanceM } : {}),
-    ...(protocol.captureHrr ? { restingHr, maxHr, hrr1Bpm } : {}),
-    ...(vo2maxEst != null && vo2maxEst > 0
-      ? {
-          vo2maxEst,
-          method:
-            protocol.vo2Equation === 'cooper'
-              ? 'cooper_1968'
-              : profile.age != null &&
-                  profile.weightKg != null &&
-                  profile.restingHr != null &&
-                  ['male', 'female'].includes(profile.sex ?? '')
-                ? 'burr_2011'
-                : 'ross_2010',
-        }
-      : { method: 'manual_distance_unscored' }),
-    ...(protocol.captureHrr ? { method: 'manual_hrr' } : {}),
+    ...(sensorAvg !== undefined ? { avgHr: sensorAvg } : {}),
+    ...(maxHr !== undefined ? { maxHr } : {}),
+    ...(restingHr !== undefined ? { restingHr } : {}),
+    ...(hrr1Bpm !== undefined ? { hrr1Bpm } : {}),
+    ...(vo2maxEst != null && vo2maxEst > 0 ? { vo2maxEst } : {}),
+    ...(method ? { method } : {}),
     ...(session.notes.trim() ? { notes: session.notes.trim() } : {}),
   });
   const draft = buildTestActivity({
@@ -181,8 +262,8 @@ export function fitnessResult(
     startMs: session.startMs,
     endMs: session.endMs,
     distanceM: distanceM ?? 0,
-    avgHr: null,
-    maxHr: null,
+    avgHr: payload.avgHr ?? null,
+    maxHr: payload.maxHr ?? null,
   });
   const activity = draft
     ? activityPayload.parse({
@@ -194,7 +275,7 @@ export function fitnessResult(
         ...(draft.distanceKm === 0 ? { distanceKm: undefined } : {}),
       })
     : null;
-  return { payload, activity, early, scoreable: !!scoreable };
+  return { payload, activity, early, scoreable: !!scoreable, gpsDistanceM };
 }
 
 export function treadmillSteps(

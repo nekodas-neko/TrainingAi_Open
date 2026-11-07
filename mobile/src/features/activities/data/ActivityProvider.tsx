@@ -13,9 +13,9 @@ import { randomUUID } from 'expo-crypto';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { useActivityStrapHold, useStrapSession } from '../../devices/strap/StrapProvider';
-import { speedTargetsFromHistory, walkHrTargets } from '@trainingai/shared/walking/walk-pacer';
+import { speedTargetsFromHistory } from '@trainingai/shared/walking/walk-pacer';
 import { walkPlan } from './guidance';
-import { PaceTicker } from './walk-pace';
+import { PaceTicker, pacerHrTargets } from './walk-pace';
 import { useWorkoutResource, useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
@@ -25,6 +25,7 @@ import {
   activityServiceNotification,
   elapsedMs,
   emptyActivity,
+  logsCadence,
   sameActivityValue,
 } from './ActivityStore';
 import { activityServiceHost } from '../../../integrations/activity-service/platform';
@@ -128,17 +129,14 @@ function ActivityStrapHold() {
   // (#3525). It lives here, not on the screen, so leaving the screen does not lose readings.
   const startMs = session?.mode === 'active' && session.guidance?.kind === 'walk' ? session.startMs : null;
   // The pacer's fallback rungs (#3549). Speed is paced against the walker's own past blocks, heart
-  // rate against a band off their max. Both stay off until they are known, and neither is fetched
-  // unless a guided walk is running.
+  // rate against a band off their reachable anchor, as the current app's walk does (#3649). Both stay
+  // off until they are known, and neither is fetched unless a guided walk is running.
   const stats = useWorkoutResource(walkSegmentStatsSpec, startMs !== null).data;
   const hrProfile = useWorkoutResource(hrProfileSpec, startMs !== null).data;
   const speedTargets = useMemo(() => speedTargetsFromHistory(stats), [stats]);
   const hrTargets = useMemo(
-    () =>
-      hrProfile?.maxHr != null && hrProfile.restingHr != null
-        ? walkHrTargets(hrProfile.maxHr, hrProfile.restingHr)
-        : null,
-    [hrProfile?.maxHr, hrProfile?.restingHr],
+    () => pacerHrTargets(hrProfile),
+    [hrProfile?.targetAnchorMax, hrProfile?.restingHr],
   );
   const targets = useRef({ speed: speedTargets, hr: hrTargets });
   targets.current = { speed: speedTargets, hr: hrTargets };
@@ -193,6 +191,26 @@ function ActivityStrapHold() {
       release();
     };
   }, [strap, store, startMs, paused]);
+  // A free walk, run, hike or treadmill keeps the strap's cadence too, and saves it as the current
+  // app does (#3648). The same counted stream as the live readout, released while paused, and each
+  // reading goes to the checkpoint so a kill keeps it.
+  const freeStartMs = session?.mode === 'active' && logsCadence(session) ? session.startMs : null;
+  useEffect(() => {
+    if (!strap || !store || freeStartMs === null || paused) return;
+    const current = store.getSnapshot().session;
+    const log = current ? store.cadenceFor(current) : null;
+    if (!log) return;
+    log.reset();
+    const release = strap.holdAccelerometer();
+    const stop = strap.onAccelerometer((batch) => {
+      log.onBatch(batch);
+      store.pacerUpdated();
+    });
+    return () => {
+      stop();
+      release();
+    };
+  }, [strap, store, freeStartMs, paused]);
   return null;
 }
 export function useActivities() {
