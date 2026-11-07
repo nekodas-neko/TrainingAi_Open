@@ -28,6 +28,7 @@ import { isRetryableWriteError } from '@trainingai/shared/sync/retryable-error'
 import { isSupersededEdit, editStampFromPayload, SUPERSEDED_WARNING, UNSTAMPED_WARNING, type EditStamp } from '@trainingai/shared/sync/edited-at'
 import { shouldPrune } from './retention-throttle'
 import { inSequence } from './in-sequence'
+import { pageWithTies } from './sync-page'
 
 /** Q-481 — at most one `applied_mutations` prune per day per process. */
 const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
@@ -5271,6 +5272,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // ── Sync ─────────────────────────────────────────────────────────────────
 
+  /** The database's current time, for a sync cursor (#3654). `clock_timestamp()`, not `now()`, so it
+   *  is the moment of the call even if a caller ever wraps the pull in a transaction. */
+  private async pullClock(): Promise<Date> {
+    const res = await this.db.execute<{ t: Date | string }>(sql`select clock_timestamp() as t`)
+    return new Date(res.rows[0].t)
+  }
+
   async getSyncDelta(userId: string, since: Date, windowDays: number | null = 90, pageLimit = 500): Promise<SyncDelta> {
     // `windowDays == null` skips the recent-window floor entirely and honours the caller's real
     // `since` — used by full-history restore (`?mode=restore` → since=epoch). The null MUST be
@@ -5300,6 +5308,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       deletedAt: s.foodItems.deletedAt,
     }
 
+    // #3654: the pull's start, read from the database's clock (the clock the `updated_at` trigger
+    // stamps with) BEFORE the first SELECT. The cursor is this minus an overlap, never a time taken
+    // after the reads: a row committed during the fan-out, or stamped by a transaction that began
+    // before it, would otherwise sit behind the cursor where no later pull looks.
+    const pullStartedAt = await this.pullClock()
+    // #3672. The paged reads take rows from the millisecond AFTER `since`, because a page ends on a
+    // whole millisecond (`pageWithTies`): the cursor is that millisecond and every row in it has been
+    // delivered. `since` is a JS Date, so it is always a whole millisecond and this is exactly
+    // "`updated_at` truncated to the millisecond > since". The unpaged reads keep `> since`, a
+    // superset, since re-sending a row is safe.
+    const pagedSince = new Date(effectiveSince.getTime() + 1)
+
     const [programs, progressionStyles, bodyMetrics, sleepSessions,
            moodLogs, activityLogs, fitnessTests, prescribedRuns, workoutSessions,
            foodLogs, supplements, supplementLogs, injuries,
@@ -5311,8 +5331,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.db.select().from(s.progressionStyles)
         .where(and(eq(s.progressionStyles.userId, userId), gt(s.progressionStyles.updatedAt, effectiveSince))),
       this.db.select().from(s.bodyMetrics)
-        .where(and(eq(s.bodyMetrics.userId, userId), gt(s.bodyMetrics.updatedAt, effectiveSince)))
-        .orderBy(asc(s.bodyMetrics.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.bodyMetrics.userId, userId), gte(s.bodyMetrics.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.bodyMetrics.updatedAt, pageLimit)),
       // Not filtered on `deleted_at` (issue 2606): this is the tombstone channel for a removed manual
       // night, as for mood_logs and food_logs below. #3060: Oura's period type rides along, joined as
       // `listSleepSessions` joins it, so the device seed keeps a nap out of the night as the server does.
@@ -5331,27 +5351,27 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           eq(s.ouraCloudSleepPeriods.userId, s.sleepSessions.userId),
           eq(s.ouraCloudSleepPeriods.ouraId, s.sleepSessions.ouraId),
         ))
-        .where(and(eq(s.sleepSessions.userId, userId), gt(s.sleepSessions.updatedAt, effectiveSince)))
-        .orderBy(asc(s.sleepSessions.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.sleepSessions.userId, userId), gte(s.sleepSessions.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.sleepSessions.updatedAt, pageLimit)),
       // Deliberately NOT filtered on `deleted_at`, unlike the two user-facing mood reads. This is
       // the tombstone channel: a delta that hid deleted rows could never tell a device a row went
       // away, so the delete would not propagate — the exact failure CLAUDE.md's sync rules exist to
       // prevent. `food_logs` below is unfiltered here for the same reason (Q-178).
       this.db.select().from(s.moodLogs)
-        .where(and(eq(s.moodLogs.userId, userId), gt(s.moodLogs.updatedAt, effectiveSince)))
-        .orderBy(asc(s.moodLogs.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.moodLogs.userId, userId), gte(s.moodLogs.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.moodLogs.updatedAt, pageLimit)),
       this.db.select().from(s.activityLogs)
-        .where(and(eq(s.activityLogs.userId, userId), gt(s.activityLogs.updatedAt, effectiveSince)))
-        .orderBy(asc(s.activityLogs.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.activityLogs.userId, userId), gte(s.activityLogs.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.activityLogs.updatedAt, pageLimit)),
       this.db.select().from(s.fitnessTests)
-        .where(and(eq(s.fitnessTests.userId, userId), gt(s.fitnessTests.updatedAt, effectiveSince)))
-        .orderBy(asc(s.fitnessTests.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.fitnessTests.userId, userId), gte(s.fitnessTests.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.fitnessTests.updatedAt, pageLimit)),
       this.db.select().from(s.prescribedRuns)
-        .where(and(eq(s.prescribedRuns.userId, userId), gt(s.prescribedRuns.updatedAt, effectiveSince)))
-        .orderBy(asc(s.prescribedRuns.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.prescribedRuns.userId, userId), gte(s.prescribedRuns.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.prescribedRuns.updatedAt, pageLimit)),
       this.db.select().from(s.workoutSessions)
-        .where(and(eq(s.workoutSessions.userId, userId), gt(s.workoutSessions.updatedAt, effectiveSince)))
-        .orderBy(asc(s.workoutSessions.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.workoutSessions.updatedAt, pageLimit)),
       this.db.select({
         id: s.foodLogs.id, date: s.foodLogs.date, mealTypeId: s.foodLogs.mealTypeId,
         foodItemId: s.foodLogs.foodItemId, quantityMultiplier: s.foodLogs.quantityMultiplier,
@@ -5361,8 +5381,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         mealGroupName: s.foodLogs.mealGroupName,
         loggedAt: s.foodLogs.loggedAt, updatedAt: s.foodLogs.updatedAt, deletedAt: s.foodLogs.deletedAt,
       }).from(s.foodLogs)
-        .where(and(eq(s.foodLogs.userId, userId), gt(s.foodLogs.updatedAt, effectiveSince)))
-        .orderBy(asc(s.foodLogs.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.foodLogs.userId, userId), gte(s.foodLogs.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.foodLogs.updatedAt, pageLimit)),
       this.db.select({
         id: s.supplements.id, name: s.supplements.name, dose: s.supplements.dose,
         defaultAmount: s.supplements.defaultAmount, unit: s.supplements.unit,
@@ -5392,16 +5412,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         deletedAt: s.supplementLogs.deletedAt,
       }).from(s.supplementLogs)
         .innerJoin(s.supplements, eq(s.supplementLogs.supplementId, s.supplements.id))
-        .where(and(eq(s.supplements.userId, userId), gt(s.supplementLogs.updatedAt, effectiveSince)))
-        .orderBy(asc(s.supplementLogs.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.supplements.userId, userId), gte(s.supplementLogs.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.supplementLogs.updatedAt, pageLimit)),
       this.db.select({
         id: s.injuries.id, muscleName: s.injuries.muscleName, notes: s.injuries.notes,
         severity: s.injuries.severity, startedDate: s.injuries.startedDate,
         resolvedDate: s.injuries.resolvedDate, createdAt: s.injuries.createdAt,
         updatedAt: s.injuries.updatedAt, deletedAt: s.injuries.deletedAt,
       }).from(s.injuries)
-        .where(and(eq(s.injuries.userId, userId), gt(s.injuries.updatedAt, effectiveSince)))
-        .orderBy(asc(s.injuries.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.injuries.userId, userId), gte(s.injuries.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.injuries.updatedAt, pageLimit)),
       // exercise_logs joined to the user's workout_sessions (avoids a userId FK on exercise_logs)
       this.db.select({
         id:                   s.exerciseLogs.id,
@@ -5429,8 +5449,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         deletedAt:            s.exerciseLogs.deletedAt,
       }).from(s.exerciseLogs)
         .innerJoin(s.workoutSessions, eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id))
-        .where(and(eq(s.workoutSessions.userId, userId), gt(s.exerciseLogs.updatedAt, effectiveSince)))
-        .orderBy(asc(s.exerciseLogs.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.workoutSessions.userId, userId), gte(s.exerciseLogs.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.exerciseLogs.updatedAt, pageLimit)),
       // set_logs joined through exercise_logs → workout_sessions for user scope
       this.db.select({
         id:            s.setLogs.id,
@@ -5455,8 +5475,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       }).from(s.setLogs)
         .innerJoin(s.exerciseLogs, eq(s.setLogs.exerciseLogId, s.exerciseLogs.id))
         .innerJoin(s.workoutSessions, eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id))
-        .where(and(eq(s.workoutSessions.userId, userId), gt(s.setLogs.updatedAt, effectiveSince)))
-        .orderBy(asc(s.setLogs.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.workoutSessions.userId, userId), gte(s.setLogs.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.setLogs.updatedAt, pageLimit)),
       this.db.select({
         exerciseName: s.personalRecords.exerciseName,
         exerciseId:   s.personalRecords.exerciseId,
@@ -5478,11 +5498,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         contributors:         s.ouraDaily.readinessContributors,
         updatedAt:            s.ouraDaily.syncedAt,
       }).from(s.ouraDaily)
-        .where(and(eq(s.ouraDaily.userId, userId), gt(s.ouraDaily.syncedAt, effectiveSince)))
-        .orderBy(asc(s.ouraDaily.syncedAt)).limit(pageLimit),
+        .where(and(eq(s.ouraDaily.userId, userId), gte(s.ouraDaily.syncedAt, pagedSince)))
+        .orderBy(pageWithTies(s.ouraDaily.syncedAt, pageLimit)),
       this.db.select().from(s.dayCheckins)
-        .where(and(eq(s.dayCheckins.userId, userId), gt(s.dayCheckins.updatedAt, effectiveSince)))
-        .orderBy(asc(s.dayCheckins.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.dayCheckins.userId, userId), gte(s.dayCheckins.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.dayCheckins.updatedAt, pageLimit)),
       // food_items referenced by this user's food logs in the window — a log whose
       // item isn't local can't render offline (getFoodLogsWithItems JOINs and drops it)
       this.db.selectDistinct(foodItemCols).from(s.foodItems)
@@ -5530,20 +5550,20 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         nHistory:             s.ouraDailySummary.nHistory,
         updatedAt:            s.ouraDailySummary.updatedAt,
       }).from(s.ouraDailySummary)
-        .where(and(eq(s.ouraDailySummary.userId, userId), gt(s.ouraDailySummary.updatedAt, effectiveSince)))
-        .orderBy(asc(s.ouraDailySummary.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.ouraDailySummary.userId, userId), gte(s.ouraDailySummary.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.ouraDailySummary.updatedAt, pageLimit)),
       // Phase-2 A2: oura_daily_derived backup pull (device-computed scored/analysis outputs). Keyed
       // on `day` already (no date→day alias). The 7 JSONB columns are stringified below for the
       // client's TEXT mirror. Cursor on `updated_at`.
       this.db.select().from(s.ouraDailyDerived)
-        .where(and(eq(s.ouraDailyDerived.userId, userId), gt(s.ouraDailyDerived.updatedAt, effectiveSince)))
-        .orderBy(asc(s.ouraDailyDerived.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.ouraDailyDerived.userId, userId), gte(s.ouraDailyDerived.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.ouraDailyDerived.updatedAt, pageLimit)),
       // Meal Plan (Q-186): NOT filtered on deleted_at — this is the tombstone channel, same as
       // mood_logs and food_logs above. A delta that hid deleted plans could never tell a device a
       // plan went away.
       this.db.select().from(s.mealPlans)
-        .where(and(eq(s.mealPlans.userId, userId), gt(s.mealPlans.updatedAt, effectiveSince)))
-        .orderBy(asc(s.mealPlans.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.mealPlans.userId, userId), gte(s.mealPlans.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.mealPlans.updatedAt, pageLimit)),
       // NOT filtered on deleted_at — this is the tombstone channel, same as mood_logs and food_logs
       // above. Hiding a soft-deleted answer here would mean an undo never reaches another device.
       // (This makes the fan-out 24 queries. Its width was flagged as a pool-contention suspect by
@@ -5552,8 +5572,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // at p50 and p95 besides. Adding a 25th query here is now cheap; adding a `Promise.all` back
       // is not.)
       this.db.select().from(s.planMealAnswers)
-        .where(and(eq(s.planMealAnswers.userId, userId), gt(s.planMealAnswers.updatedAt, effectiveSince)))
-        .orderBy(asc(s.planMealAnswers.updatedAt)).limit(pageLimit),
+        .where(and(eq(s.planMealAnswers.userId, userId), gte(s.planMealAnswers.updatedAt, pagedSince)))
+        .orderBy(pageWithTies(s.planMealAnswers.updatedAt, pageLimit)),
     ])
 
     // Nested program/style structure. The flat parent rows above filter by
@@ -5684,22 +5704,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       })),
     }
 
-    const now = new Date()
+    // `>=`: a page read WITH TIES can hold more than `pageLimit` rows (#3672).
     const page = (rows: { updatedAt: Date | string }[]) => ({
-      hitLimit: rows.length === pageLimit,
+      hitLimit: rows.length >= pageLimit,
       maxUpdatedAt: rows.length ? new Date(rows[rows.length - 1].updatedAt as string | Date) : null,
     })
     const { syncedAt, hasMore } = resolveSyncCursor([
       page(bodyMetrics), page(sleepSessions), page(moodLogs), page(activityLogs),
       page(fitnessTests), page(prescribedRuns), page(workoutSessions), page(foodLogs), page(supplementLogs), page(injuries),
       page(exerciseLogs), page(setLogs), page(dayCheckins), page(mealPlanRows), page(planMealAnswerRows),
-      { hitLimit: ouraDaily.length === pageLimit,
+      { hitLimit: ouraDaily.length >= pageLimit,
         maxUpdatedAt: ouraDaily.length ? new Date(ouraDaily[ouraDaily.length - 1].updatedAt as unknown as string | Date) : null },
-      { hitLimit: ouraDailySummary.length === pageLimit,
+      { hitLimit: ouraDailySummary.length >= pageLimit,
         maxUpdatedAt: ouraDailySummary.length ? new Date(ouraDailySummary[ouraDailySummary.length - 1].updatedAt as unknown as string | Date) : null },
-      { hitLimit: ouraDailyDerived.length === pageLimit,
+      { hitLimit: ouraDailyDerived.length >= pageLimit,
         maxUpdatedAt: ouraDailyDerived.length ? new Date(ouraDailyDerived[ouraDailyDerived.length - 1].updatedAt as unknown as string | Date) : null },
-    ], now)
+    ], pullStartedAt)
 
     // RV-174 — see `SyncDelta.programRoster`. Two small id-only reads, not windowed or paged:
     // a roster that stopped at a page boundary would delete the rows it did not reach.

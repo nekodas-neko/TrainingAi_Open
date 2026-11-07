@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
-import { DEFAULT_TZ, todayInTz, normalizeDateParam } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, normalizeDateParam, shiftDateStr } from '@trainingai/shared/date-utils'
 import { fromZonedTime } from 'date-fns-tz'
-import { pickPrimarySleep } from '@/lib/sleep/primary-sleep'
+import { gradedNightForDate } from '@trainingai/shared/health/sleep-night'
 import { bedtimeToMinuteWindow } from '@trainingai/shared/health/hr-sleep-band'
 
 export async function GET(req: NextRequest) {
@@ -24,12 +24,14 @@ export async function GET(req: NextRequest) {
   const repo = await getRepositoryAsync()
   const [rows, sleepRows] = await Promise.all([
     repo.getHrForWindow(session.user.id, from, to),
-    // sleep_sessions.date is the wake-up date, so the overnight sleep for this
-    // chart is the row dated `dateParam` — no prior-day query needed.
-    repo.listSleepSessions(session.user.id, dateParam, dateParam),
+    // sleep_sessions.date is the wake-up date. The day before is read too: the night is grouped by
+    // its windows, and a fragment that ended before midnight carries the earlier date.
+    repo.listSleepSessions(session.user.id, shiftDateStr(dateParam, -1), dateParam),
   ])
 
-  const primary = pickPrimarySleep(sleepRows)
+  // The night the Sleep score and the sleep card describe, never a daytime rest that happened to be
+  // listed first (#3662).
+  const primary = gradedNightForDate(sleepRows, dateParam, tz)
   const sleep = primary
     ? bedtimeToMinuteWindow(primary.sleepStart, primary.sleepEnd, dateParam, tz)
     : null

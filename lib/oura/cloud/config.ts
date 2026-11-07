@@ -43,7 +43,8 @@ export type OuraScope = (typeof OURA_SCOPES)[number]
  *   - SpO2 from `daily_spo2` (`spo2`), heart rate from the series (`heartrate`), and exercise from
  *     `workout` (`workout`).
  * A type left out (weight, body fat, nutrition, cadence, total calories) is not something Oura Cloud
- * sends us, so the Oura app's copy of it is always kept.
+ * sends us, so the Oura app's copy of it is always kept. `HEALTH_CONNECT_TYPES_OURA_CLOUD_DOES_NOT_SEND`
+ * names the ones Preview reads, and a test fails a Preview type that is in neither list (#3645).
  */
 export const OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE: Readonly<Record<string, OuraScope>> = {
   SleepSession: 'daily',
@@ -55,7 +56,13 @@ export const OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE: Readonly<Record<string, OuraSco
   HeartRate: 'heartrate',
   HeartRateSeries: 'heartrate',
   ActivitySession: 'workout',
+  // #3645: Preview's name for the same exercise session the current app reads as `ActivitySession`.
+  ExerciseSession: 'workout',
 }
+
+/** #3645: the Preview Health Connect types (`healthConnectTypes`) Oura Cloud does not send, so the
+ *  Oura app's copy of them is kept. Every other Preview type needs a scope above. */
+export const HEALTH_CONNECT_TYPES_OURA_CLOUD_DOES_NOT_SEND: readonly string[] = ['Weight']
 
 /**
  * #3204: for each type in `OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE`, whether Oura Cloud is delivering it

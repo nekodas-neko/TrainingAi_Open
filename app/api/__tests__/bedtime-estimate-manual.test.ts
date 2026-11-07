@@ -98,3 +98,16 @@ describe('GET /api/user/bedtime-estimate with a remembered bedtime (Q-519)', () 
     expect(await estimate()).toEqual({ bedtimeHour: 22, bedtimeMinute: 0 })
   })
 })
+
+describe('GET /api/user/bedtime-estimate reads one night per date (#3662)', () => {
+  it('a four-hour-plus daytime rest beside a real night does not move the bedtime', async () => {
+    // 10:42–16:52 Brisbane on a wake date that also has its 23:00 night. A rest that long counts as
+    // a night period, so averaging every period's start moved the estimate by most of an hour.
+    const restDay = day(3)
+    repo.sleep = [
+      ...Array.from({ length: 13 }, (_, i) => night(i + 1, 23)),
+      { date: restDay, sleepStart: new Date(`${restDay}T00:42:00.000Z`), sleepEnd: new Date(`${restDay}T06:52:00.000Z`), durationHours: 6.17 },
+    ]
+    expect(await estimate()).toEqual({ bedtimeHour: 23, bedtimeMinute: 0 })
+  })
+})

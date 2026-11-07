@@ -112,4 +112,18 @@ describe('buildRecoverySummary', () => {
       expect(out).toContain('Today: no scores or readings yet')
     }
   })
+  it('names the biomarkers behind a watch day, as the readiness screens do (#3660)', () => {
+    const out = buildRecoverySummary([], [], null, null, '2026-07-01', {
+      day: '2026-07-01', flag: 'watch', score: 40,
+      biomarkers: { restingHeartRate: { z: 1.5, contribution: 20 }, hrvBalance: { z: -1.2, contribution: 15 } },
+    })
+    expect(out).toContain('Resting HR and HRV are drifting from your baseline')
+    expect(out).not.toContain('Some biomarkers')
+  })
+  it('keeps the generic watch line when the stored row carries no biomarkers', () => {
+    const out = buildRecoverySummary([], [], null, null, '2026-07-01', {
+      day: '2026-07-01', flag: 'watch', score: 40, biomarkers: null,
+    })
+    expect(out).toContain('Some biomarkers are drifting from your baseline')
+  })
 })

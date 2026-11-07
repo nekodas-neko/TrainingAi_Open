@@ -145,3 +145,36 @@ test('an uploaded readiness answer expires the cached verdict, so a skip stays s
   assert.ok(manualHealthWritePaths.includes('/api/readiness-verdict'));
   assert.ok(manualHealthWritePaths.includes('/api/sleep-verdict'));
 });
+
+// #3659: the verdict is frozen at the first read of the day; today's readiness can be re-scored
+// later. The line states the live score and keeps the verdict's band and wording.
+test('the line states the live score, not the one frozen in the verdict', () => {
+  assert.deepEqual(readinessPrompt(verdict({ verdict: 'normal', score: 61 }), false, 66.4), {
+    kind: 'usual',
+    line: 'Readiness 66 is a usual day for you (usual 61–80).',
+  });
+  const asked = readinessPrompt(verdict({ verdict: 'poor', score: 47 }), false, 52);
+  assert.equal(asked.kind, 'ask');
+  if (asked.kind === 'ask') {
+    assert.equal(asked.eyebrow, 'Readiness is low today');
+    assert.equal(asked.title, '52 is under your usual 61–80. How do you feel?');
+  }
+  const answered = readinessPrompt(verdict({ verdict: 'good', score: 91, responseState: 'rated' }), false, 88);
+  assert.deepEqual(answered, { kind: 'usual', line: 'Readiness 88 is over your usual 61–80.' });
+});
+
+test('until the live score loads, the verdict’s own score stands', () => {
+  for (const live of [undefined, null]) {
+    const prompt = readinessPrompt(verdict({ verdict: 'normal', score: 72 }), false, live);
+    assert.deepEqual(prompt, { kind: 'usual', line: 'Readiness 72 is a usual day for you (usual 61–80).' });
+  }
+});
+
+test('Home’s readiness card passes the live score the chips show', async () => {
+  const card = await readFile(
+    new URL('../src/features/home/components/ReadinessPromptCard.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(card, /useWorkoutResource\(readinessSpec\(health\.today\)\)/);
+  assert.match(card, /readiness\.data\?\.readinessDisplayScore,\s*\);/);
+});

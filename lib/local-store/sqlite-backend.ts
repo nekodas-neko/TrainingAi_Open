@@ -1,6 +1,7 @@
 import { runSQL, querySQL, withTransaction, type SQLTransaction } from '@/lib/sqlite/sqlite-service';
 import { MAX_MUTATION_ATTEMPTS, nextRetryDelayMs } from './sync-helpers';
 import type { LocalStore, LocalWorkoutHistory } from './index';
+import { HELD_FILL_COLUMNS, HELD_TABLE_KEYS, type HeldRow, type HeldTable } from './held-tables';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalManualSleepNight, LocalWorkoutSession,
   LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle, PendingMutation,
@@ -1465,6 +1466,31 @@ export class SQLiteLocalStore implements LocalStore {
       }
     }
     return removed
+  }
+
+  async heldUpdatedAt(table: HeldTable, keys: string[]): Promise<Map<string, HeldRow>> {
+    const out = new Map<string, HeldRow>()
+    const keyExpr = HELD_TABLE_KEYS[table]
+    if (!keyExpr) throw new Error(`heldUpdatedAt: unknown table ${table}`)
+    const fills = HELD_FILL_COLUMNS[table] ?? []
+    const fillCols = fills.map(([col], i) => `, ${col} IS NULL AS f${i}`).join('')
+    const unique = [...new Set(keys)]
+    // Chunked under SQLite's bound-parameter limit.
+    for (let i = 0; i < unique.length; i += 500) {
+      const chunk = unique.slice(i, i + 500)
+      const rows = await querySQL<Record<string, unknown>>(
+        `SELECT ${keyExpr} AS k, updated_at AS u${fillCols} FROM ${table}
+          WHERE ${keyExpr} IN (${chunk.map(() => '?').join(',')})`,
+        chunk,
+      )
+      for (const r of rows) {
+        out.set(String(r.k), {
+          updatedAt: r.u == null ? null : String(r.u),
+          emptyFields: fills.filter((_, j) => Number(r[`f${j}`]) === 1).map(([, field]) => field),
+        })
+      }
+    }
+    return out
   }
 
   async applyDelta(delta: Parameters<LocalStore['applyDelta']>[0]): Promise<void> {

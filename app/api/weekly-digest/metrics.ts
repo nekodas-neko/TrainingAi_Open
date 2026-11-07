@@ -12,8 +12,7 @@ import { normalizeMuscle, roleWeight } from '@trainingai/shared/muscles'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
 import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
-import { computeSleepScoreSeries } from '@trainingai/shared/health/sleep-score'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalNightsByDate, recordsSleep } from '@trainingai/shared/health/sleep-night'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
@@ -121,39 +120,42 @@ export async function computeWeeklyDigestMetrics(
     ? recentWeights[0].weightKg! - recentWeights[recentWeights.length - 1].weightKg!
     : null
 
-  // Hours from every sleep session including naps — deliberately NOT nightSessions, which is what
-  // the score below uses. That asymmetry predates this and is left alone here.
+  // One night per date, the night the Sleep score and the sleep card grade (#3661): naps and
+  // daytime rests never enter, and a split night counts once, joined.
+  const nightByDate = new Map(canonicalNightsByDate(nightSessions(sleepSessions, tz), tz).map(n => [n.date, n]))
+  // #2265: a night marked partial has no hours to count. A night that recorded nothing is missing, not 0.
+  const sleepHoursPairs: [string, number][] = [...nightByDate]
+    .filter(([, n]) => !isPartialNight(n) && recordsSleep(n.durationHours))
+    .map(([d, n]) => [d, n.durationHours!])
   const sleepHoursOf = (from: string, to: string) =>
-    meanOrNull(sleepSessions.filter(s => s.date >= from && s.date <= to && s.durationHours != null && !isPartialNight(s)).map(s => s.durationHours!))
+    meanOrNull(sleepHoursPairs.filter(([d]) => d >= from && d <= to).map(([, v]) => v))
 
-  // Quality, not just hours: our own 0-100 sleep score per night (efficiency/stages/
-  // latency/restfulness — computeSleepScore, the same formula the readiness route uses).
-  // Scored once over the whole fetched history so every night is judged against its own prior
-  // nights' baselines (computeSleepScoreSeries), then windowed — scoring the window in isolation
-  // would strip the HRV/HR/schedule contributors off the earliest nights in it.
-  // Nights only — `computeSleepScore` has no minimum-duration guard, so a nap fed straight in
-  // scores ~5 and drags the weekly average (the F-1 bug class, in a caller the original fix missed).
-  const scoredSleep = computeSleepScoreSeries(nightSessions(sleepSessions, tz), tz)
-  const scoredPairs = scoredSleep
-    .map(r => [r.session.date, r.result?.score] as [string, number | undefined])
-    .filter((p): p is [string, number] => p[1] != null)
+  // Our own Sleep score per day, as stored (`oura_daily_derived.sleep_score`) and as the Day screen
+  // and the trend show it. Re-scoring the nights here judged each one on the 14 days this route
+  // fetches, against the stored score's 28, so a recap week could disagree with the days in it (#3661).
+  const scoredPairs = derivedRows
+    .filter(r => r.sleepScore != null)
+    .map(r => [r.day, r.sleepScore!] as [string, number])
   const sleepScoreOf = (from: string, to: string) =>
     meanOrNull(scoredPairs.filter(([d]) => d >= from && d <= to).map(([, v]) => v))
 
-  // HRV: overnight average (sleep_sessions.averageHrvMs), falling back to body_metrics.hrvMs. The
-  // fallback is chosen for the WHOLE window, never per day — a series mixing the two would draw
-  // points from two instruments on one line with nothing marking where it changed.
+  // HRV: the overnight average of each date's night (a nap's HRV is not an overnight value), falling
+  // back to body_metrics.hrvMs. The fallback is chosen for the WHOLE window, never per day — a series
+  // mixing the two would draw points from two instruments on one line with nothing marking where it changed.
+  const overnightHrvPairs: [string, number][] = [...nightByDate]
+    .filter(([, n]) => n.averageHrvMs != null)
+    .map(([d, n]) => [d, n.averageHrvMs!])
   const hrvOf = (from: string, to: string) => {
-    const sleepVals = sleepSessions.filter(s => s.date >= from && s.date <= to && s.averageHrvMs != null).map(s => s.averageHrvMs!)
+    const sleepVals = overnightHrvPairs.filter(([d]) => d >= from && d <= to).map(([, v]) => v)
     const bmVals = bodyMetrics.filter(m => m.date >= from && m.date <= to && m.hrvMs != null).map(m => m.hrvMs!)
     return meanOrNull(sleepVals.length > 0 ? sleepVals : bmVals)
   }
-  const hrvSleepRecap = sleepSessions.filter(s => s.date >= isoWeekKey && s.date <= recapWeekEndIso && s.averageHrvMs != null)
+  const hrvSleepRecap = overnightHrvPairs.filter(([d]) => d >= isoWeekKey && d <= recapWeekEndIso)
   const hrvBmRecap = bodyMetrics.filter(m => m.date >= isoWeekKey && m.date <= recapWeekEndIso && m.hrvMs != null)
   const hrvSource: 'overnight' | 'body-metrics' | null =
     hrvSleepRecap.length > 0 ? 'overnight' : hrvBmRecap.length > 0 ? 'body-metrics' : null
   const hrvPairs: [string, number][] =
-    hrvSource === 'overnight'   ? hrvSleepRecap.map(s => [s.date, s.averageHrvMs!]) :
+    hrvSource === 'overnight'   ? hrvSleepRecap :
     hrvSource === 'body-metrics' ? hrvBmRecap.map(m => [m.date, m.hrvMs!]) : []
 
   // Readiness: the app's own BLE-derived composite (the frozen Cloud column is dead since the
@@ -232,9 +234,7 @@ export async function computeWeeklyDigestMetrics(
     sleepHours: {
       week: sleepHoursOf(isoWeekKey, recapWeekEndIso),
       priorWeek: sleepHoursOf(from14dIso, priorWeekEndIso),
-      byDay: seriesFrom(sleepSessions
-        .filter(s => s.durationHours != null && !isPartialNight(s))
-        .map(s => [s.date, s.durationHours!] as [string, number])),
+      byDay: seriesFrom(sleepHoursPairs),
     },
     stressHighMinutes: {
       week: roundOrNull(stressOf(isoWeekKey, recapWeekEndIso)),

@@ -4,8 +4,8 @@ import { getRepository } from '@/lib/data'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { bucketize, correlationInsight, buildExercise1rmBaseline, sessionMean1RmPct, type BucketDef, type CorrelationStats, type WithheldReason } from '@trainingai/shared/health/correlation'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
-import { nightsWithDuration } from '@trainingai/shared/health/partial-night'
+import { nightSessions, canonicalNightsByDate } from '@trainingai/shared/health/sleep-night'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 
 export interface SleepCorrelationResponse {
   insight: string
@@ -47,10 +47,12 @@ export async function GET() {
   // night that followed it on the same date, and last-write-wins picked whichever came back last —
   // 21 % of this correlation's x-values were not nights. `nightSessions` classifies by circadian
   // position, so naps drop out and a night split by a wake-up (2026-05-29: 2.5 h + 4.0 h) comes back
-  // as the one ~6.5 h night it was.
+  // as the one ~6.5 h night it was. One night per date, the one the Sleep score grades: a date
+  // holding an overnight and a long daytime rest pairs with the overnight, not whichever ran later
+  // (#3662). A night marked partial has no hours to pair.
   const sleepByDate = new Map<string, number>()
-  for (const s of nightsWithDuration(nightSessions(sleepSessions, tz))) {
-    if (s.durationHours != null) {
+  for (const s of canonicalNightsByDate(nightSessions(sleepSessions, tz), tz)) {
+    if (s.durationHours != null && !isPartialNight(s)) {
       sleepByDate.set(s.date, s.durationHours)
     }
   }

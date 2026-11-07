@@ -1904,6 +1904,12 @@ async function pullKeyset<T>(
  * ```sql
  * CREATE INDEX IF NOT EXISTS oura_heartrate_user_updated ON oura_heartrate(user_id, updated_at, id);
  * ```
+ *
+ * **⚠ AND IT MUST NOT TRUST THE KEYSET AS ITS RESUME POINT (#3654).** The keyset is exact about ties,
+ * but `updated_at` is `now()`, a writer's transaction start, and a row is visible only at COMMIT. A
+ * row stamped before the last page's last row but committed after that page was read is behind the
+ * cursor for good. The shared delta pull fixed this with an overlap (`SYNC_PULL_OVERLAP_MS`); the
+ * driver must do the same, resuming a finished drain from a cursor that far back.
  */
 export async function getOuraTimeseriesDelta(
   userId: string,

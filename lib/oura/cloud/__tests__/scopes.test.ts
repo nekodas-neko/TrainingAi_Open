@@ -1,8 +1,10 @@
 // The scopes we ask Oura for, how a stored grant reads, and which scope each collection needs
 // (#3026). The names come from the pinned spec, `openapi-v1.42.json`.
 import { describe, expect, it } from 'vitest'
-import { buildAuthorizeUrl, grantedOuraScopes, OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE, OURA_SCOPES, ouraCloudDeliveredTypes } from '../config'
+import { buildAuthorizeUrl, grantedOuraScopes, HEALTH_CONNECT_TYPES_OURA_CLOUD_DOES_NOT_SEND, OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE, OURA_SCOPES, ouraCloudDeliveredTypes } from '../config'
 import { isOuraTypeShared, OURA_SCOPE_FOR } from '../documents'
+import { healthConnectTypes } from '@trainingai/shared/validation/health-connect-import'
+import { FirstHandFilter, OURA_APP_PACKAGE } from '@trainingai/shared/health/health-connect-origin'
 
 describe('Oura scopes (#3026)', () => {
   it('asks for v1.42\'s names: spo2, not spo2Daily, and heart_health', () => {
@@ -93,6 +95,7 @@ describe('ouraCloudDeliveredTypes', () => {
     expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.HeartRate).toBe(OURA_SCOPE_FOR.heartrate)
     expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.HeartRateSeries).toBe(OURA_SCOPE_FOR.heartrate)
     expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.ActivitySession).toBe(OURA_SCOPE_FOR.workout)
+    expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE.ExerciseSession).toBe(OURA_SCOPE_FOR.workout)
     for (const scope of Object.values(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE)) expect(OURA_SCOPES).toContain(scope)
   })
 
@@ -117,5 +120,36 @@ describe('ouraCloudDeliveredTypes', () => {
     expect(ouraCloudDeliveredTypes(row('extapi:daily', new Date('2026-10-21T00:00:00Z')))).toBeNull()
     expect(ouraCloudDeliveredTypes({ accessToken: null, scope: 'extapi:daily', reauthRequiredAt: null })).toBeNull()
     expect(ouraCloudDeliveredTypes(null)).toBeNull()
+  })
+})
+
+// #3645: Preview added `ExerciseSession` and the map never got it, so Preview uploaded the Oura app's
+// workouts that the current app skips. Every type Preview reads must be either mapped or declared as
+// something Oura Cloud does not send.
+describe('Preview\'s Health Connect types (#3645)', () => {
+  it('maps every type Preview reads, except those Oura Cloud does not send', () => {
+    const unaccounted = healthConnectTypes.filter(type =>
+      !(type in OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE) && !HEALTH_CONNECT_TYPES_OURA_CLOUD_DOES_NOT_SEND.includes(type))
+    expect(unaccounted).toEqual([])
+  })
+
+  it('lists only real Preview types as not sent, and none that is also mapped', () => {
+    for (const type of HEALTH_CONNECT_TYPES_OURA_CLOUD_DOES_NOT_SEND) {
+      expect(healthConnectTypes as readonly string[]).toContain(type)
+      expect(OURA_SCOPE_FOR_HEALTH_CONNECT_TYPE).not.toHaveProperty(type)
+    }
+  })
+
+  it('drops the Oura app\'s exercise session under a workout grant, through the JSON the phone reads', () => {
+    const delivered = ouraCloudDeliveredTypes({ accessToken: 'ciphertext', scope: 'extapi:daily extapi:workout', reauthRequiredAt: null })!
+    const sources = JSON.parse(JSON.stringify({ ouraCloud: true, ouraCloudTypes: delivered }))
+    const filter = new FirstHandFilter<{ origin: string }>(sources, r => r.origin)
+    expect(filter.admit('ExerciseSession', { origin: OURA_APP_PACKAGE })).toBe(false)
+    expect(filter.admit('ActivitySession', { origin: OURA_APP_PACKAGE })).toBe(false)
+    // Another app's session is always kept, and so is Oura's without the workout scope.
+    expect(filter.admit('ExerciseSession', { origin: 'com.sec.android.app.shealth' })).toBe(true)
+    const noWorkout = ouraCloudDeliveredTypes({ accessToken: 'ciphertext', scope: 'extapi:daily', reauthRequiredAt: null })!
+    expect(new FirstHandFilter<{ origin: string }>({ ouraCloud: false, ouraCloudTypes: noWorkout }, r => r.origin)
+      .admit('ExerciseSession', { origin: OURA_APP_PACKAGE })).toBe(true)
   })
 })

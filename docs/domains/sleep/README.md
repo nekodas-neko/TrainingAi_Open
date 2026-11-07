@@ -12,7 +12,7 @@ or the ring/strap hardware that measures it ([`devices`](../devices/README.md)).
 
 | Area | Where |
 |---|---|
-| Night selection, merging, sensing span | `lib/sleep/` — `primary-sleep.ts`, `merge-sessions.ts`, `actual-window.ts`, `sensing-span.ts` |
+| Night selection, merging, sensing span | `packages/shared/src/health/sleep-night.ts` (`gradedNightForDate`, `canonicalNightsByDate`); `lib/sleep/` — `merge-sessions.ts`, `sensing-span.ts` |
 | Score & derived metrics | `packages/shared/src/health/` — `sleep-score.ts`, `sleep-night.ts`, `sleep-staging.ts`, `sleep-trend.ts`, `sleep-consistency.ts`, `sleep-feel-calibration.ts`, `hypnogram.ts`, `sleepnet-preprocess.ts`, `breathing-rate.ts`, `hrv-frequency.ts`, `spo2-variability.ts`, `hr-sleep-band.ts`, `night-vitals.ts` (**not** `lib/health/` — several plan docs still point there and are wrong) |
 | The app's verdict on last night | `packages/shared/src/health/sleep-verdict.ts` — per-component median/IQR over a trailing 28 nights, returning `normal \| poor \| good` **plus the bands and values it judged against**, so a later correction stays paired with the rule that produced it. Read by `GET /api/sleep-verdict` and stored in `sleep_verdicts` (migration 284; band medians since #2094, NULL on older rows). `VERDICT_IQR_MULTIPLIER` is **the owner's calibration**, currently 1.00 (TN-83) — see the Gotchas below before changing it. No UI renders it yet (TN-82). |
 | Tables | `sleep_sessions` (+ Oura columns), `oura_daily`, `sleep_verdicts` — see the Data Model in [`CLAUDE.md`](../../../CLAUDE.md) |
@@ -272,9 +272,12 @@ curve). **Before writing anything that treats one row as one night, call the hel
   drops them, because `computeSleepScore` returns null for `duration <= 0` and a null last-night
   renormalises `previousNight` out of the readiness composite. The bar is deliberately **zero, not
   a 20-minute floor** — short windows are real and get merged into fragmented nights on purpose.
-- **A day can hold both a nap and a night.** Any new sleep read must resolve which session it
-  means via `lib/sleep/primary-sleep.ts` — this has been the root cause of four separate bugs
-  (score, trend, weekly digest, Body Battery).
+- **A day can hold both a nap and a night.** Any new sleep read must resolve which night it
+  means via `gradedNightForDate` (raw rows) or `canonicalNightsByDate` (one night per date), in
+  `packages/shared/src/health/sleep-night.ts` — the night the Sleep score and the sleep card use.
+  Picking it any other way has been the root cause of bugs in the score, the trend, the weekly
+  digest, Body Battery, the day timeline, the HR chart's sleep band, Sleep vs Performance and the
+  bedtime estimate (#3662 retired the separate `primary-sleep.ts` picker).
 - **`ring_timestamp_ds` is not wall-clock.** BLE-sourced sleep timing needs the ring↔UTC anchor;
   see [`docs/oura-ble-operations.md`](../../oura-ble-operations.md).
 - **`sleep_sessions.sleep_score` is a dead column — never read it, and never populate it.** It was

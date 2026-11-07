@@ -5,6 +5,8 @@ import {
   type HeartHealthActivity, type HeartHealthDayOutcome,
 } from '@trainingai/shared/running/heart-health'
 import { todayInTz } from '@trainingai/shared/date-utils'
+import { budgetActivityLogs, HEALTH_CONNECT_SOURCE } from '@trainingai/shared/health/health-connect-workouts'
+import { readEveningBefore } from '@/lib/health/oura-budget-activities'
 
 /**
  * Issue 2093. Server half of the heart-health activity: measures each logged activity's minutes at
@@ -64,8 +66,17 @@ export async function heartHealthDays(
   const runDates = new Set(runs.map((r) => r.date))
   const today = todayInTz(tz)
 
+  // #3646: a Health Connect copy of an in-app log is the same workout, so it is measured once, by the
+  // energy budget's rule (`budgetActivityLogs`: the two share half the shorter window). Matched
+  // against logs only: strength sessions are not heart-health activities, so a watch's copy of a gym
+  // session still counts here, as it did.
+  const eveningBefore = logs.some((l) => l.externalSource === HEALTH_CONNECT_SOURCE)
+    ? await readEveningBefore(repo, userId, from)
+    : []
+  const counted = budgetActivityLogs(logs, [], tz, eveningBefore)
+
   // Only the days that carry a prescription need their activities measured.
-  const measured = await Promise.all(logs.filter((l) => runDates.has(l.date)).map(async (l): Promise<[string, HeartHealthActivity]> => [
+  const measured = await Promise.all(counted.filter((l) => runDates.has(l.date)).map(async (l): Promise<[string, HeartHealthActivity]> => [
     l.date,
     {
       id: l.id,

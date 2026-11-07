@@ -33,10 +33,11 @@ export function night(date: string, durationHours: number, averageHrvMs: number,
     sleepEnd: end,
   }
 }
+// Stored Sleep scores (#3661): the digest reads the day's stored score, as the Day screen does.
 export const derivedRows = [
-  { day: '2026-08-26', readinessSource: 'ble-derived', readinessScore: 71, stressHighMinutes: 44,
+  { day: '2026-08-26', readinessSource: 'ble-derived', readinessScore: 71, sleepScore: 55, stressHighMinutes: 44,
     resilienceLevel: 2, trainingLoadOts: 3.2, trainingLoadHigh: false, illnessFlag: 'normal', illnessScore: 1 },
-  { day: '2026-09-01', readinessSource: 'ble-derived', readinessScore: 66, stressHighMinutes: 51,
+  { day: '2026-09-01', readinessSource: 'ble-derived', readinessScore: 66, sleepScore: 67, stressHighMinutes: 51,
     resilienceLevel: 3, trainingLoadOts: 4.8, trainingLoadHigh: true, illnessFlag: 'watch', illnessScore: 5,
     illnessBiomarkers: { tempC: { z: 1.8 }, rhr: { z: -0.6 } } },
 ]
