@@ -26,7 +26,9 @@ import {
 } from './guidance.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
 import { summariseRoute } from '@trainingai/shared/activity/route-summary';
-import { WalkPace, type PaceSnapshot } from './walk-pace.ts';
+import { CadenceLog, WalkPace, walkSegmentStats, type PaceSnapshot } from './walk-pace.ts';
+import { hrFields, hrSamples, type HrWindow } from './hr-window.ts';
+import { supportsCadence } from '@trainingai/shared/health/cadence';
 import {
   keepsFix,
   liveRouteStats,
@@ -185,11 +187,16 @@ export function activityServiceNotification(session: ActivitySession): ServiceNo
 export function liveRouteReadout(session: ActivitySession, route: RoutePoint[], now: number) {
   return liveRouteStats(route, elapsedMs(session, now) / 1000);
 }
+/** A free walk, run, hike or treadmill: the recordings that save the strap's cadence (#3648). */
+export function logsCadence(session: { type: { id: string }; guidance?: unknown }) {
+  return !session.guidance && supportsCadence(session.type.id);
+}
 export function sessionPayload(
   session: ActivitySession,
   timezone: string,
   route: RoutePoint[] = [],
   pace: WalkPace | null = null,
+  recorded: { hr?: HrWindow | null; cadence?: CadenceLog | null } = {},
 ): ActivityPayload {
   if (session.mode !== 'done' || session.startMs === null || session.endMs === null) {
     throw new Error('Finish this activity before saving.');
@@ -205,6 +212,11 @@ export function sessionPayload(
     : session.distance.trim()
       ? Number(session.distance.replace(',', '.'))
       : undefined;
+  const activeSec = elapsedMs(session, session.endMs) / 1000;
+  const cadence =
+    recorded.cadence && recorded.cadence.startMs === session.startMs && logsCadence(session)
+      ? recorded.cadence
+      : null;
   return activityPayload.parse({
     id: session.id,
     date: toAestDay(new Date(session.startMs), timezone),
@@ -215,20 +227,29 @@ export function sessionPayload(
     endTime: msToHHMMInTz(session.endMs, timezone),
     ...(distanceKm !== undefined ? { distanceKm } : {}),
     ...routeFields,
+    // The walk's avg and max HR, and any free activity's: the window's strap or ring readings.
+    ...hrFields(recorded.hr),
+    ...(cadence ? cadence.payload(activeSec) : {}),
     ...(session.guidance?.kind === 'walk'
       ? (() => {
-          const segments = walkSegments(
-            session.guidance.config,
-            elapsedMs(session, session.endMs) / 1000,
-          );
-          // A walk paced from the strap stores its cadence and each block's adherence, as the
-          // current app's walk does (#2242); a walk with none stores what it did before.
+          const segments = walkSegments(session.guidance.config, activeSec);
+          const samples = hrSamples(recorded.hr);
+          const walkRoute = routeEligible(session) ? route : [];
+          // Each block's HR, distance and pace, as the current app's walk saves them (#3641). A walk
+          // paced from the strap also stores its cadence and each block's adherence (#2242).
           return pace && pace.startMs === session.startMs
             ? {
-                segments: pace.segments(segments),
-                ...pace.cadencePayload(elapsedMs(session, session.endMs) / 1000),
+                segments: pace.segments(segments, samples, walkRoute),
+                ...pace.cadencePayload(activeSec),
               }
-            : { segments };
+            : {
+                segments: walkSegmentStats({
+                  segments,
+                  startMs: session.startMs!,
+                  hrSamples: samples,
+                  route: walkRoute,
+                }),
+              };
         })()
       : {}),
     ...(session.notes.trim() ? { notes: session.notes.trim() } : {}),
@@ -298,6 +319,8 @@ export class ActivityStore {
   // The guided walk's live pacer and what it has recorded. Kept in memory and tied to the walk by its
   // start time; a kill mid-walk loses the cadence of that walk, not the walk (#3525).
   pace: WalkPace | null = null;
+  // A free walk's, run's, hike's or treadmill's cadence readings, tied to it the same way (#3648).
+  cadence: CadenceLog | null = null;
   // What a kill left of the walk's pacer, held until the walk's own pacer is created and restored.
   private savedPace: PaceSnapshot | null = null;
   private current: ActivityState = emptyActivity;
@@ -438,11 +461,16 @@ export class ActivityStore {
       );
     }
   }
-  // The guided walk's pacer has counted another second. A walk with no route (a treadmill) has no
-  // fixes to trigger a checkpoint, so the tally asks for one here.
+  // The guided walk's pacer has counted another second, or a free activity's cadence has a new
+  // reading. A recording with no route (a treadmill) has no fixes to trigger a checkpoint, so the
+  // tally asks for one here.
   pacerUpdated() {
     const session = this.current.session;
-    if (this.current.ready && session?.mode === 'active' && this.pace?.startMs === session.startMs)
+    if (
+      this.current.ready &&
+      session?.mode === 'active' &&
+      (this.pace?.startMs === session.startMs || this.cadence?.startMs === session.startMs)
+    )
       this.scheduleCheckpoint();
   }
   // Writes the route as it stands. Called on a timer while recording, and on pause, finish and the
@@ -473,7 +501,14 @@ export class ActivityStore {
       );
       // The pacer's tally rides along, and a failure to keep it never costs the route above.
       const pace = this.pace;
-      if (pace && pace.startMs === session.startMs && pace.hasData) {
+      const cadence = this.cadence;
+      const snapshot =
+        pace && pace.startMs === session.startMs && pace.hasData
+          ? () => pace.snapshot()
+          : cadence && cadence.startMs === session.startMs && cadence.hasData
+            ? () => ({ startMs: cadence.startMs, tallies: {}, readings: cadence.snapshot() })
+            : null;
+      if (snapshot) {
         // Built inside the guard too: a bad number in the snapshot must not reject the checkpoint.
         await Promise.resolve()
           .then(() =>
@@ -484,7 +519,7 @@ export class ActivityStore {
                   version: 1,
                   origin: this.connection.origin,
                   userId: this.connection.userId,
-                  ...pace.snapshot(),
+                  ...snapshot(),
                 }),
               ),
             ),
@@ -629,8 +664,20 @@ export class ActivityStore {
     }
     return this.pace;
   }
+  /** The cadence log for a running free walk, run, hike or treadmill, created on first use (#3648). */
+  cadenceFor(session: ActivitySession): CadenceLog | null {
+    if (!logsCadence(session) || session.startMs === null) return null;
+    if (this.cadence?.startMs !== session.startMs) {
+      this.cadence = new CadenceLog(session.startMs);
+      // A recording resumed after a kill carries on with the readings it had.
+      if (this.savedPace?.startMs === session.startMs) this.cadence.restore(this.savedPace.readings);
+      this.savedPace = null;
+    }
+    return this.cadence;
+  }
   async discard() {
     this.pace = null;
+    this.cadence = null;
     await this.write((data) => ({ ...data, session: null }));
     await this.clearRoute();
   }
@@ -642,12 +689,26 @@ export class ActivityStore {
       if (!data.session) {
         throw new Error('No activity to save.');
       }
-      const payload = activityPayload.parse({
-        ...sessionPayload(data.session, timezone, this.current.route),
-        ...(metrics.avgHr != null ? { avgHr: Math.round(metrics.avgHr) } : {}),
-        ...(metrics.maxHr != null ? { maxHr: Math.round(metrics.maxHr) } : {}),
-        ...(metrics.steps != null ? { steps: metrics.steps } : {}),
-      });
+      const session = data.session;
+      // The strap's cadence and covered steps, as the current app saves them for every foot
+      // activity (#3648); a treadmill's own distance-based steps take precedence, as there. The
+      // cadence is extra: if it ever fails the save schema, the activity is still saved.
+      const cadence = this.current.session ? this.cadenceFor(session) : null;
+      const build = (withCadence: boolean) =>
+        activityPayload.parse({
+          ...sessionPayload(session, timezone, this.current.route, null, {
+            cadence: withCadence ? cadence : null,
+          }),
+          ...(metrics.avgHr != null ? { avgHr: Math.round(metrics.avgHr) } : {}),
+          ...(metrics.maxHr != null ? { maxHr: Math.round(metrics.maxHr) } : {}),
+          ...(metrics.steps != null ? { steps: metrics.steps } : {}),
+        });
+      let payload: ActivityPayload;
+      try {
+        payload = build(true);
+      } catch {
+        payload = build(false);
+      }
       return {
         ...data,
         session: null,
@@ -657,6 +718,7 @@ export class ActivityStore {
         ],
       };
     });
+    this.cadence = null;
     await this.clearRoute().catch(() => {});
     this.invalidate();
     void this.sync();
@@ -683,25 +745,45 @@ export class ActivityStore {
       endMs: this.now(),
     }));
   }
-  async saveWalk(timezone: string) {
+  /**
+   * Saves the finished guided walk, once when it ends and again whenever more of its heart rate has
+   * reached the server (#3641): the strap's samples upload on their own timer, so the done screen
+   * hands over the window's readings as they arrive and the walk and its blocks are saved with them.
+   */
+  async saveWalk(timezone: string, hr: HrWindow | null = null) {
     await this.write((data) => {
       const session = data.session;
-      if (!session || session.guidance?.kind !== 'walk' || session.guidance.saved) {
+      if (!session || session.guidance?.kind !== 'walk') {
         return data;
       }
-      if (elapsedMs(session, this.now()) < 60_000) {
+      const guidance = session.guidance;
+      const readings = hrSamples(hr).length;
+      if (guidance.saved && readings <= (guidance.hrReadings ?? 0)) {
+        return data;
+      }
+      if (!guidance.saved && elapsedMs(session, this.now()) < 60_000) {
         throw new Error('This walk is too short to save.');
       }
-      // The pacer's numbers are extra: if they ever fail the save schema, the walk is still saved.
+      // After a kill the pacer is rebuilt from its checkpoint, so a later save keeps its cadence.
+      const pace = session.startMs !== null ? this.paceFor(session) : null;
+      // The pacer's numbers and the heart rate are extra: if either ever fails the save schema, the
+      // walk is still saved without it.
       let payload: ActivityPayload;
       try {
-        payload = sessionPayload(session, timezone, this.current.route, this.pace);
+        payload = sessionPayload(session, timezone, this.current.route, pace, { hr });
       } catch {
-        payload = sessionPayload(session, timezone, this.current.route);
+        try {
+          payload = sessionPayload(session, timezone, this.current.route, null, { hr });
+        } catch {
+          payload = sessionPayload(session, timezone, this.current.route);
+        }
       }
       return {
         ...data,
-        session: { ...session, guidance: { ...session.guidance, saved: true } },
+        session: {
+          ...session,
+          guidance: { ...guidance, saved: true, hrReadings: Math.max(readings, guidance.hrReadings ?? 0) },
+        },
         rows: [
           ...data.rows.filter((row) => row.payload.id !== payload.id),
           { payload, pending: true },
@@ -723,12 +805,17 @@ export class ActivityStore {
     this.invalidate();
     void this.sync();
   }
-  async saveFitness(timezone: string, profile: FitnessProfile) {
+  async saveFitness(timezone: string, profile: FitnessProfile, hr: HrWindow | null = null) {
     await this.write((data) => {
       if (!data.session) {
         throw new Error('No test to save.');
       }
-      const result = fitnessResult(data.session, timezone, profile);
+      // The test's heart rate and, for a distance test, its GPS route, as the current app records
+      // them (#3641).
+      const result = fitnessResult(data.session, timezone, profile, {
+        hr,
+        route: this.current.route,
+      });
       const record = result.activity ? activityPayload.parse(result.activity) : null;
       return {
         ...data,
@@ -745,6 +832,7 @@ export class ActivityStore {
         ],
       };
     });
+    await this.clearRoute().catch(() => {});
     this.invalidate();
     void this.sync();
   }

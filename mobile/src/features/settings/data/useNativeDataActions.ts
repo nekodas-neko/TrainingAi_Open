@@ -12,6 +12,9 @@ import { refreshAccountViews } from './refreshAccountViews';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { useHistoryDownload } from './HistoryDownloadProvider';
+import { useStrapSession } from '../../devices/strap/StrapProvider';
+import { useScaleSession } from '../../devices/scale/ScaleProvider';
+import { deviceUploadsWaiting, useQueued } from './device-uploads';
 export function useNativeDataActions() {
   const health = useHealthData(),
     home = useHome(),
@@ -29,6 +32,10 @@ export function useNativeDataActions() {
   const activities = useActivities(),
     history = useHistoryQueue(),
     download = useHistoryDownload().download;
+  const strap = useStrapSession(),
+    scale = useScaleSession();
+  const strapSamples = useQueued(strap),
+    scaleReadings = useQueued(scale);
   const pending =
     health.operations.length +
     home.operations.length +
@@ -38,7 +45,8 @@ export function useNativeDataActions() {
     journal.data.workouts.reduce((sum, row) => sum + row.pending.length, 0) +
     imported.pending +
     activities.pending +
-    history.operations.length;
+    history.operations.length +
+    deviceUploadsWaiting({ strapSamples, scaleReadings });
   async function sync(restore = false) {
     if (busy || !resources) {
       return;
@@ -57,6 +65,9 @@ export function useNativeDataActions() {
         activities.store?.sync(),
         history.queue?.sync(),
       ]);
+      // Counted above, so sent here too; each publishes its own count when its upload settles.
+      strap?.sync();
+      scale?.sync();
       await Promise.all([
         health.store?.refresh(true),
         home.store?.refresh('preferences', health.today, true),

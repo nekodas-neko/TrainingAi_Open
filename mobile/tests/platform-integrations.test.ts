@@ -339,27 +339,27 @@ test('integration preferences persist per account and disk failures preserve the
     storage = await createLocalStorage(db.database);
   const account = storage.account('https://example.com', 'one');
   const store = new PlatformStore(account, () => 'one-scope');
-  await store.configure({ walkCues: true, keepAwake: false });
+  await store.configure({ walkCues: false, keepAwake: false });
   const restored = new PlatformStore(account, () => 'unused-scope');
   await restored.initialize();
   assert.equal(restored.getSnapshot().settings.scope, 'one-scope');
-  assert.equal(restored.getSnapshot().settings.walkCues, true);
+  assert.equal(restored.getSnapshot().settings.walkCues, false, 'a switch-off saved since #3647 sticks');
   const other = new PlatformStore(
     storage.account('https://example.com', 'two'),
     () => 'two-scope',
   );
   await other.initialize();
-  assert.equal(other.getSnapshot().settings.walkCues, false);
+  assert.equal(other.getSnapshot().settings.walkCues, true, 'cues are on by default (#3647)');
   const disk = memory(),
     unsaved = new PlatformStore(disk, () => 'scope');
   await unsaved.initialize();
   disk.fail(true);
-  await assert.rejects(unsaved.configure({ walkCues: true }));
-  assert.equal(unsaved.getSnapshot().settings.walkCues, false);
+  await assert.rejects(unsaved.configure({ walkCues: false }));
+  assert.equal(unsaved.getSnapshot().settings.walkCues, true);
   disk.fail(false);
   await unsaved.retry();
   assert.equal(unsaved.getSnapshot().error, null);
-  assert.equal(unsaved.getSnapshot().settings.walkCues, false);
+  assert.equal(unsaved.getSnapshot().settings.walkCues, true);
   db.connection.close();
 });
 function calendarFixture() {

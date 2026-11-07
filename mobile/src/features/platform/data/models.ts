@@ -27,7 +27,11 @@ export type Reminder = z.infer<typeof reminderSchema>;
 export const platformSchema = z
   .object({
     scope: z.string().min(1),
-    walkCues: z.boolean().default(false),
+    // A guided walk's and a test's block-change cues. On by default: the current app always cues
+    // (#3647). `walkCuesDefaultOn` marks settings saved since then; `PlatformStore` turns the cues on
+    // once for settings saved before, when the opt-in default left them off.
+    walkCues: z.boolean().default(true),
+    walkCuesDefaultOn: z.literal(true).default(true),
     keepAwake: z.boolean().default(true),
     reminders: z.array(reminderSchema).max(12).default([]),
     calendarId: z.string().nullable().default(null),

@@ -36,6 +36,7 @@ import { wantsLiveCadence } from '../data/live-cadence';
 import { useRouteRecording } from '../data/useRouteRecording';
 import { gpsStatusText, routeEligible } from '../data/route-recording';
 import { RouteMap } from '../components/RouteMap';
+import { hrWindowSpec } from '../data/hr-window';
 
 function ManualActivityScreen({
   onBack,
@@ -86,18 +87,7 @@ function ManualActivityScreen({
     const timer = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(timer);
   }, [session?.mode, session?.pauseStartMs]);
-  const hr = useWorkoutResource(
-    {
-      path: '/api/oura/hr-window',
-      query: {
-        start: new Date(session?.startMs ?? 0).toISOString(),
-        end: new Date(session?.endMs ?? 0).toISOString(),
-      },
-      ttl: 300_000,
-      schema: z.object({ avgHr: z.number().nullish(), maxHr: z.number().nullish() }),
-    },
-    session?.mode === 'done',
-  );
+  const hr = useWorkoutResource(hrWindowSpec(session?.startMs, session?.endMs), session?.mode === 'done');
   async function run(operation: () => Promise<void>, after?: () => void) {
     if (busy) {
       return;
@@ -174,7 +164,11 @@ function ManualActivityScreen({
                 void run(
                   () =>
                     session.mode === 'done'
-                      ? activity.store!.save(timezone, { ...(hr.data ?? {}), steps })
+                      ? activity.store!.save(timezone, {
+                          avgHr: hr.data?.avgHr,
+                          maxHr: hr.data?.maxHr,
+                          steps,
+                        })
                       : activity.store!.finish(),
                   session.mode === 'done' ? onSaved : undefined,
                 )

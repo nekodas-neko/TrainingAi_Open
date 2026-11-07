@@ -54,6 +54,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
   const lastMealReminders = useRef<NonNullable<typeof mealReminders>>([]);
   if (mealReminders) lastMealReminders.current = mealReminders;
   const requestedRestPermission = useRef<string | null>(null);
+  const requestedCuePermission = useRef<string | null>(null);
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -142,6 +143,28 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       })
       .catch(() => {});
   }, [foreground, permissionScope, restDeadline, permission]);
+  // A guided walk or test with cues on asks for notification permission once at its start, as a rest
+  // does above, so the block-change cues can sound with the phone in a pocket (#3647).
+  const cuedActivity =
+    state?.settings.walkCues &&
+    activity.session?.mode === 'active' &&
+    activity.session.guidance &&
+    activity.session.startMs !== null
+      ? `${permissionScope}:${activity.session.startMs}`
+      : null;
+  useEffect(() => {
+    if (!foreground || !cuedActivity || permission || requestedCuePermission.current === cuedActivity)
+      return;
+    requestedCuePermission.current = cuedActivity;
+    void alertPermission(true)
+      .then((allowed) => {
+        if (mounted.current) {
+          setPermission(allowed);
+          setTick((value) => value + 1);
+        }
+      })
+      .catch(() => {});
+  }, [foreground, cuedActivity, permission]);
   useEffect(() => {
     if (
       !foreground ||

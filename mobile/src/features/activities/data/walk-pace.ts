@@ -3,7 +3,6 @@ import {
   STRAP_WINDOW_SEC,
   cadenceFieldsForSave,
   detectCadence,
-  stepsFromCadenceSeries,
   summarizeCadence,
   type CadenceFields,
   type CadenceReading,
@@ -11,10 +10,10 @@ import {
 import { stepsEstimateIfCovered } from '@trainingai/shared/health/cadence-coverage';
 import {
   addPacerTick,
-  summarisePacerTally,
   type PacerSegmentTally,
 } from '@trainingai/shared/health/pacer-adherence';
 import type { RoutePoint } from '@trainingai/shared/activity/route-encoding';
+import { computeWalkSegmentStats } from '@trainingai/shared/walking/segment-stats';
 import {
   readPacer,
   resolveCadenceTargets,
@@ -22,6 +21,7 @@ import {
   windowedSpeedKmh,
   type PacerReading,
   type TargetPair,
+  walkHrTargets,
 } from '@trainingai/shared/walking/walk-pacer';
 import type { AccelPhase, StrapState } from '../../devices/strap/StrapSession.ts';
 import { liveHrView } from '../../devices/strap/labels.ts';
@@ -116,6 +116,19 @@ export function paceSignals(input: {
 }
 
 /**
+ * The heart-rate rung's targets from the walker's HR profile, as the current app's walk screen reads
+ * them (`app/activity/guided-walk/page.tsx`): the band hangs off `targetAnchorMax`, the reachable
+ * anchor, not the zone ceiling `maxHr` (#3649). Off until both the anchor and resting HR are known.
+ */
+export function pacerHrTargets(
+  profile: { targetAnchorMax?: number | null; restingHr?: number | null } | null | undefined,
+) {
+  return profile?.targetAnchorMax != null && profile.restingHr != null
+    ? walkHrTargets(profile.targetAnchorMax, profile.restingHr)
+    : null;
+}
+
+/**
  * The once-a-second pacer step, with the pause handled (#3553). Nothing is counted while the walk
  * is paused (the clock and the speed both stand still, so every second would tally the same
  * reading). After a resume, speed is read only from fixes taken since, so the gap is never a
@@ -166,6 +179,82 @@ export type PaceSnapshot = {
   readings: [number, number][];
 };
 
+/** One heart-rate reading, epoch ms and bpm, as the walk's segment stats take them. */
+export type HrSample = { at: number; bpm: number };
+
+/**
+ * The strap's cadence readings over one recording and what they save as (#2242): the avg, binned
+ * series and source, and the covered steps. The guided walk's pacer keeps one; so does a free walk,
+ * run, hike or treadmill, which saves the same four fields as the current app's (#3648).
+ */
+export class CadenceLog {
+  private meter = new CadenceMeter();
+  private readings: CadenceReading[] = [];
+
+  constructor(readonly startMs: number) {}
+
+  /** One batch of accelerometer magnitudes (about a second at 50 Hz). */
+  onBatch(batch: { magnitudes: number[]; sampleRate: number; at: number }) {
+    const reading = this.meter.push(batch);
+    if (reading) this.readings.push(reading);
+  }
+
+  /** Drops the cadence window, for a resume after a pause. */
+  reset() {
+    this.meter.reset();
+  }
+
+  /** The cadence to show now: the strap's latest reading, unless it has gone stale. */
+  live(nowMs: number): number | null {
+    return this.meter.live(nowMs);
+  }
+
+  get hasData() {
+    return this.readings.length > 0;
+  }
+
+  /** `[seconds since the start, spm]`, for the checkpoint. */
+  snapshot(): [number, number][] {
+    return this.readings.map((reading) => [
+      Math.max(0, Math.round((reading.atMs - this.startMs) / 1000)),
+      Math.round(reading.spm * 10) / 10,
+    ]);
+  }
+
+  restore(readings: [number, number][]) {
+    this.readings = readings.map(([tSec, spm]) => ({
+      atMs: this.startMs + tSec * 1000,
+      spm,
+      source: 'strap' as const,
+    }));
+  }
+
+  /** What belongs on the activity row: avg, binned series and source, null when nothing was read. */
+  fields(): CadenceFields {
+    return cadenceFieldsForSave(summarizeCadence(this.readings, this.startMs));
+  }
+
+  /**
+   * `fields` as the save schema takes them: a key is absent when nothing was measured. With the
+   * recording's active seconds it also carries `steps`, as the current app saves it
+   * (`stepsEstimateIfCovered`), and leaves it out when the strap's cadence covers too little of the
+   * recording to stand for it (#3541).
+   */
+  payload(activeSec?: number) {
+    const fields = this.fields();
+    const steps =
+      activeSec === undefined
+        ? null
+        : stepsEstimateIfCovered(summarizeCadence(this.readings, this.startMs), activeSec);
+    return {
+      ...(steps !== null ? { steps } : {}),
+      ...(fields.cadenceSpm !== null ? { cadenceSpm: fields.cadenceSpm } : {}),
+      ...(fields.cadenceSeries !== null ? { cadenceSeries: fields.cadenceSeries } : {}),
+      ...(fields.cadenceSource !== null ? { cadenceSource: fields.cadenceSource } : {}),
+    };
+  }
+}
+
 /**
  * A guided walk's live pacer and what it records (#3525, #3549): the current app's `CadenceTracker`
  * (strap source) with its `pacerTallies`, over the same shared maths. It holds the strap's
@@ -176,8 +265,7 @@ export type PaceSnapshot = {
  * rate. A walk with no signal on any rung shows no band and records no adherence, never a false zero.
  */
 export class WalkPace {
-  private meter = new CadenceMeter();
-  private readings: CadenceReading[] = [];
+  private log: CadenceLog;
   private tallies: Record<number, PacerSegmentTally> = {};
   readonly targets: TargetPair;
   private speedTargets: TargetPair | null = null;
@@ -188,11 +276,12 @@ export class WalkPace {
     config: { fastCadenceSpm?: number; slowCadenceSpm?: number },
   ) {
     this.targets = resolveCadenceTargets(config);
+    this.log = new CadenceLog(startMs);
   }
 
   /**
    * The targets for the two fallback rungs. Each stays off until it is known: a speed pair needs
-   * enough past walks, a heart-rate pair needs the walker's max and resting HR.
+   * enough past walks, a heart-rate pair needs the walker's anchor and resting HR.
    */
   setTargets(targets: { speed: TargetPair | null; hr: TargetPair | null }) {
     this.speedTargets = targets.speed;
@@ -201,18 +290,17 @@ export class WalkPace {
 
   /** One batch of accelerometer magnitudes (about a second at 50 Hz). */
   onBatch(batch: { magnitudes: number[]; sampleRate: number; at: number }) {
-    const reading = this.meter.push(batch);
-    if (reading) this.readings.push(reading);
+    this.log.onBatch(batch);
   }
 
   /** Drops the cadence window, for a resume after a pause. */
   resetCadence() {
-    this.meter.reset();
+    this.log.reset();
   }
 
   /** The cadence to show now: the strap's latest reading, unless it has gone stale. */
   live(nowMs: number): number | null {
-    return this.meter.live(nowMs);
+    return this.log.live(nowMs);
   }
 
   /** The pacer's reading for a fast or slow block; null in other blocks or with no cadence. */
@@ -251,7 +339,7 @@ export class WalkPace {
 
   /** True once there is something worth keeping across a kill. */
   get hasData() {
-    return this.readings.length > 0 || Object.keys(this.tallies).length > 0;
+    return this.log.hasData || Object.keys(this.tallies).length > 0;
   }
 
   /** The tally and readings, for the activity checkpoint. */
@@ -259,10 +347,7 @@ export class WalkPace {
     return {
       startMs: this.startMs,
       tallies: Object.fromEntries(Object.entries(this.tallies)),
-      readings: this.readings.map((reading) => [
-        Math.max(0, Math.round((reading.atMs - this.startMs) / 1000)),
-        Math.round(reading.spm * 10) / 10,
-      ]),
+      readings: this.log.snapshot(),
     };
   }
 
@@ -272,60 +357,53 @@ export class WalkPace {
     this.tallies = Object.fromEntries(
       Object.entries(snapshot.tallies).map(([index, tally]) => [Number(index), tally]),
     );
-    this.readings = snapshot.readings.map(([tSec, spm]) => ({
-      atMs: this.startMs + tSec * 1000,
-      spm,
-      source: 'strap' as const,
-    }));
+    this.log.restore(snapshot.readings);
   }
 
   /** What belongs on the activity row: avg, binned series and source, null when nothing was read. */
   cadenceFields(): CadenceFields {
-    return cadenceFieldsForSave(summarizeCadence(this.readings, this.startMs));
+    return this.log.fields();
   }
 
-  /**
-   * `cadenceFields` as the save schema takes them: a key is absent when nothing was measured. With
-   * the walk's active seconds it also carries the walk-level `steps`, as the current app saves it
-   * (`stepsEstimateIfCovered`), and leaves it out when the strap's cadence covers too little of the
-   * walk to stand for it (#3541).
-   */
+  /** `CadenceLog.payload`: the walk's cadence fields and covered steps, as the save schema takes them. */
   cadencePayload(activeSec?: number) {
-    const fields = this.cadenceFields();
-    const steps =
-      activeSec === undefined
-        ? null
-        : stepsEstimateIfCovered(summarizeCadence(this.readings, this.startMs), activeSec);
-    return {
-      ...(steps !== null ? { steps } : {}),
-      ...(fields.cadenceSpm !== null ? { cadenceSpm: fields.cadenceSpm } : {}),
-      ...(fields.cadenceSeries !== null ? { cadenceSeries: fields.cadenceSeries } : {}),
-      ...(fields.cadenceSource !== null ? { cadenceSource: fields.cadenceSource } : {}),
-    };
+    return this.log.payload(activeSec);
   }
 
   /**
-   * The walk's segments with cadence, steps and pacer adherence filled in from this walk, in the
-   * shape `computeWalkSegmentStats` writes (a segment the pacer never judged carries no pacer keys).
+   * The walk's segments with HR, distance, pace, cadence, steps and pacer adherence, from the one
+   * shared `computeWalkSegmentStats` the current app's walk saves with (#3641). A segment the pacer
+   * never judged carries no pacer keys; one with no HR or route carries nulls.
    */
-  segments<T extends PlanSegment>(segments: T[]) {
-    const series = this.cadenceFields().cadenceSeries ?? [];
-    return segments.map((segment) => {
-      const from = segment.startSec;
-      const to = segment.endSec;
-      const inside = series.filter((point) => point.tSec >= from && point.tSec < to);
-      const total = inside.length
-        ? Math.round((inside.reduce((sum, point) => sum + point.spm, 0) / inside.length) * 10) / 10
-        : null;
-      const pacer = summarisePacerTally(this.tallies[segment.index]);
-      return {
-        ...segment,
-        avgCadenceSpm: total,
-        steps: stepsFromCadenceSeries(inside),
-        ...(pacer ?? {}),
-      };
+  segments<T extends PlanSegment>(segments: T[], hrSamples: HrSample[] = [], route: RoutePoint[] = []) {
+    return walkSegmentStats({
+      segments,
+      startMs: this.startMs,
+      hrSamples,
+      route,
+      cadenceSeries: this.cadenceFields().cadenceSeries,
+      tallies: this.tallies,
     });
   }
+}
+
+/** A guided walk's saved segments: the shared stats over the walk's HR, route and cadence (#3641). */
+export function walkSegmentStats(input: {
+  segments: PlanSegment[];
+  startMs: number;
+  hrSamples: HrSample[];
+  route: RoutePoint[];
+  cadenceSeries?: { tSec: number; spm: number }[] | null;
+  tallies?: Record<number, PacerSegmentTally> | null;
+}) {
+  return computeWalkSegmentStats({
+    plan: { segments: input.segments },
+    startedAtMs: input.startMs,
+    hrSamples: input.hrSamples,
+    rawPoints: input.route,
+    cadenceSeries: input.cadenceSeries ?? null,
+    pacerTallies: input.tallies ?? null,
+  });
 }
 
 /** What the guided walk's pacing card says, from the strap, GPS and the pacer (#3525, #3549). */

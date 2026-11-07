@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { summariseRoute } from '@trainingai/shared/activity/route-summary';
 import { View } from 'react-native';
-import { ageFromDob, toAestDay } from '@trainingai/shared/date-utils';
+import { toAestDay } from '@trainingai/shared/date-utils';
 import { getProtocol } from '@trainingai/shared/fitness-tests/protocols';
 import {
   AppButton,
@@ -21,9 +21,9 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useActivities } from '../data/ActivityProvider';
 import { elapsedMs } from '../data/ActivityStore';
-import { fitnessResult, testDuration, walkPlan, walkSegments } from '../data/guidance';
+import { fitnessResult, testDuration, testProfile, walkPlan, walkSegments } from '../data/guidance';
 import { useHealthData } from '../../health/data/HealthDataProvider';
-import { profileSpec, healthDaySpec, healthDaySchema } from '../../health/data/models';
+import { profileSpec, healthDaySpec, healthDaySchema, hrProfileSpec } from '../../health/data/models';
 import { baselinesSpec } from '../data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
@@ -32,6 +32,7 @@ import { LiveStrapBpm } from '../components/LiveStrapBpm';
 import { wantsLiveCadence } from '../data/live-cadence';
 import { useRouteRecording } from '../data/useRouteRecording';
 import { gpsProblemText, routeEligible } from '../data/route-recording';
+import { hrSamples, hrWindowSpec } from '../data/hr-window';
 export function GuidedActivityScreen({
   onBack,
   onSaved,
@@ -47,6 +48,7 @@ export function GuidedActivityScreen({
     action = useWorkoutAction(),
     { theme } = useTheme();
   const baseline = useWorkoutResource(baselinesSpec);
+  const hrProfile = useWorkoutResource(hrProfileSpec, guidance?.kind === 'test');
   const gps = useRouteRecording();
   const day = useWorkoutResource(
     healthDaySpec(
@@ -56,6 +58,13 @@ export function GuidedActivityScreen({
     ),
     session?.mode === 'done',
   );
+  // The strap's or ring's heart rate over the walk or test, the read a free activity saves from
+  // (#3641). Refetched as the strap's samples upload, which invalidates this path.
+  const hr = useWorkoutResource(
+    hrWindowSpec(session?.startMs, session?.endMs),
+    session?.mode === 'done' && session.startMs !== null && session.endMs !== null,
+  );
+  const hrCount = hrSamples(hr.data).length;
   const parsedDay=healthDaySchema.safeParse(day.data);
   const recorded=parsedDay.success?parsedDay.data.activityLogs.find(row=>row.id===session?.id):undefined;
   const [now, setNow] = useState(Date.now),
@@ -126,31 +135,52 @@ export function GuidedActivityScreen({
     ) {
       saving.current = true;
       void action
-        .run(() => activity.store!.saveWalk(health.timezone))
+        .run(() => activity.store!.saveWalk(health.timezone, hr.data ?? null))
         .finally(() => {
           saving.current = false;
         });
     }
   }, [session?.mode, guidance?.kind]);
+  // The saved walk again once more of its heart rate has reached the server (#3641).
+  const savedReadings = guidance?.kind === 'walk' ? (guidance.hrReadings ?? 0) : 0;
+  useEffect(() => {
+    if (
+      session?.mode === 'done' &&
+      guidance?.kind === 'walk' &&
+      guidance.saved &&
+      hrCount > savedReadings &&
+      !saving.current
+    ) {
+      saving.current = true;
+      void activity
+        .store!.saveWalk(health.timezone, hr.data ?? null)
+        .catch(() => {})
+        .finally(() => {
+          saving.current = false;
+        });
+    }
+  }, [session?.mode, guidance?.kind, guidance?.saved, hrCount, savedReadings]);
   if (!session || !guidance) {
     return <PageLayout title="Activity" onBack={onBack} />;
   }
   const clock = (value: number) =>
     `${Math.floor(Math.max(0, value) / 60)}:${String(Math.max(0, value) % 60).padStart(2, '0')}`;
   const user = profile.data?.user;
-  const measured = {
-    age: ageFromDob(
-      typeof user?.dateOfBirth === 'string' ? user.dateOfBirth : null,
-      new Date(),
-    ),
+  const measured = testProfile({
+    today: health.today,
+    now: new Date(),
+    dateOfBirth: typeof user?.dateOfBirth === 'string' ? user.dateOfBirth : null,
     sex: user?.sex,
-    weightKg: health.body?.today?.weightKg,
-    restingHr: health.body?.today?.restingHeartRate,
-  };
+    body: health.body,
+    hrProfile: hrProfile.data,
+  });
   let result: ReturnType<typeof fitnessResult> | null = null;
   try {
     if (session.mode === 'done' && guidance.kind === 'test') {
-      result = fitnessResult(session, health.timezone, measured);
+      result = fitnessResult(session, health.timezone, measured, {
+        hr: hr.data,
+        route: activity.route,
+      });
     }
   } catch {}
   const previous = [...(baseline.data?.fitnessTests ?? [])]
@@ -207,9 +237,9 @@ export function GuidedActivityScreen({
             onPress={() =>
               void action.run(async () => {
                 if (guidance.kind === 'test') {
-                  await activity.store!.saveFitness(health.timezone, measured);
+                  await activity.store!.saveFitness(health.timezone, measured, hr.data ?? null);
                 } else {
-                  await activity.store!.saveWalk(health.timezone);
+                  await activity.store!.saveWalk(health.timezone, hr.data ?? null);
                   await activity.store!.discard();
                 }
                 onSaved();
@@ -293,11 +323,6 @@ export function GuidedActivityScreen({
                 </AppText>
               )
             ))}
-          {protocol?.captureDistance && (
-            <AppText variant="micro" tone="muted">
-              Measure the covered distance; enter it on the result screen.
-            </AppText>
-          )}
         </Stack>
       ) : (
         <>
@@ -338,13 +363,18 @@ export function GuidedActivityScreen({
                   label="Distance covered (km)"
                   value={session.distance}
                   keyboardType="decimal-pad"
+                  placeholder={
+                    result?.gpsDistanceM != null
+                      ? `${(result.gpsDistanceM / 1000).toFixed(2)} from GPS`
+                      : 'Optional'
+                  }
                   onChangeText={(distance) => update({ distance })}
                 />
               )}
               {protocol?.captureHrr && (
                 <>
                   <AppText variant="caption" tone="muted">
-                    Enter measurements from your sensor. Leave missing readings blank.
+                    Read from your strap or ring. Enter a reading only to replace it.
                   </AppText>
                   <TextField
                     label="Resting heart rate (bpm)"
@@ -395,7 +425,10 @@ export function GuidedActivityScreen({
               <Grid>
                 <MetricTile
                   label="Average HR"
-                  value={recorded?.avgHr?.toString() ?? null}
+                  value={
+                    (hr.data?.avgHr != null ? Math.round(hr.data.avgHr) : recorded?.avgHr)?.toString() ??
+                    null
+                  }
                   unit="bpm"
                 />
                 <MetricTile

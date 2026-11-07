@@ -589,6 +589,9 @@ export const hrProfileSpec = {
     .object({
       maxHr: n,
       restingHr: n,
+      // The anchor for reachable targets (the walk band, test targets): the corroborated observed
+      // max when there is one. Not the zone ceiling `maxHr` (#3649).
+      targetAnchorMax: n,
       estimatedMax: n,
       workingMax: n,
       workingMaxSource: z.string(),

@@ -3,6 +3,8 @@
 // adding a new estimator here, confirm no duplicate exists (grep 'vo2max').
 import { analyseHrRecovery, type HrReading } from '@trainingai/shared/workout/hr-analysis'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
+import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 
 function round1(x: number): number {
   return Math.round(x * 10) / 10
@@ -152,4 +154,25 @@ export function restingHrFrom(readings: HrReading[]): number | null {
  *  outside 30–220 bpm and takes the k-th highest, so a lone spike can't move it. */
 export function maxHrFrom(readings: HrReading[]): number | null {
   return computeObservedHr(readings.map((r) => r.bpm)).max
+}
+
+/** How far back a weigh-in still stands for the 6MWT's weight term (the baselines page's window). */
+export const TEST_WEIGHT_WINDOW_DAYS = 30
+
+/**
+ * The weight the 6MWT's Burr 2011 term reads: the newest logged weight in the 30 days to `today`
+ * (local dates), picked by `latestWeightKg`. Both apps use this, so a test on a morning with no
+ * weigh-in still scores on the full equation (#3640).
+ */
+export function latestTestWeightKg(
+  rows: readonly { date: string; weightKg?: number | null }[],
+  today: string,
+): number | null {
+  const from = shiftDateStr(today, -TEST_WEIGHT_WINDOW_DAYS)
+  return latestWeightKg(
+    rows
+      .map(row => ({ date: row.date.replace(/\//g, '-'), weightKg: row.weightKg }))
+      .filter(row => row.date >= from),
+    today,
+  )
 }

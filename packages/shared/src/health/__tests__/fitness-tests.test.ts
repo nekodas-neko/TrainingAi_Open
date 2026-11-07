@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sixMwtVo2max, cooperVo2max, baselineHrr1, restingHrFrom, maxHrFrom } from '../fitness-tests'
+import { sixMwtVo2max, cooperVo2max, baselineHrr1, restingHrFrom, maxHrFrom, latestTestWeightKg } from '../fitness-tests'
 import type { HrReading } from '@trainingai/shared/workout/hr-analysis'
 
 describe('sixMwtVo2max', () => {
@@ -116,5 +116,20 @@ describe('restingHrFrom / maxHrFrom', () => {
   it('empty → null', () => {
     expect(restingHrFrom([])).toBeNull()
     expect(maxHrFrom([])).toBeNull()
+  })
+})
+
+describe('latestTestWeightKg (#3640)', () => {
+  it('takes the newest weigh-in in the 30 days to today, so a morning with none still has a weight', () => {
+    const rows = [
+      { date: '2026-10-01', weightKg: 81 },
+      { date: '2026-10-09', weightKg: 80 },
+      { date: '2026-10-11', weightKg: undefined },
+    ]
+    expect(latestTestWeightKg(rows, '2026-10-12')).toBe(80)
+  })
+  it('ignores a weigh-in older than the window, and a zero', () => {
+    expect(latestTestWeightKg([{ date: '2026-09-01', weightKg: 82 }], '2026-10-12')).toBeNull()
+    expect(latestTestWeightKg([{ date: '2026-10-10', weightKg: 0 }], '2026-10-12')).toBeNull()
   })
 })

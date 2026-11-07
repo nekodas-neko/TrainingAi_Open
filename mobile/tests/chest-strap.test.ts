@@ -984,3 +984,36 @@ test('holding the activity twice does not reset the recording (#3541)', async ()
   session.hold('activity', true);
   assert.deepEqual(session.getSnapshot().trace, trace);
 });
+
+test('the strap publishes how many samples wait to upload, for Data & Sync to count (#3655)', async () => {
+  const { session, ble, clock } = await pairedSession({ noOutbox: true });
+  let online = false;
+  session.setOutbox(
+    new HrOutbox(memoryStorage(), {
+      origin: 'https://example.test',
+      userId: 'u1',
+      post: async () => {
+        if (!online) throw new Error('Offline');
+        return { ok: true };
+      },
+    }),
+  );
+  await settle();
+  assert.equal(session.getSnapshot().queued, 0);
+  session.hold('workout', true);
+  await settle();
+  for (let i = 0; i < 3; i++) {
+    ble.beat(bytes(0x06, 120));
+    await clock.advance(1_000);
+  }
+  await clock.advance(10_000);
+  await settle();
+  assert.ok(session.getSnapshot().queued > 0, 'kept on the phone while offline');
+  online = true;
+  session.sync();
+  await settle();
+  await settle();
+  assert.equal(session.getSnapshot().queued, 0);
+  session.setOutbox(null);
+  assert.equal(session.getSnapshot().queued, 0);
+});

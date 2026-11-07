@@ -68,6 +68,11 @@ export function ScaleProvider({ children }: PropsWithChildren) {
   return <Context.Provider value={session}>{children}</Context.Provider>;
 }
 
+/** The scale session where one is provided, else null: for features that read it only if present. */
+export function useScaleSession() {
+  return useContext(Context);
+}
+
 export function useScale() {
   const session = useContext(Context);
   if (!session) throw new Error('ScaleProvider is required.');
