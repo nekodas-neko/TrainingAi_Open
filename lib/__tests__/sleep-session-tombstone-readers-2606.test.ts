@@ -67,7 +67,7 @@ const ALLOWED: { file: string; marker: string; reason: string }[] = [
     reason: 'issue 2752: the ghost sweep compares every synced ring row with the server id list, which includes tombstones; a tombstoned row the server still holds is never deleted' },
   { file: 'lib/local-store/sqlite-backend.ts', marker: "DELETE FROM sleep_sessions WHERE sync_status = 'synced' AND id IN",
     reason: 'issue 2752: deletes by id the ghosts chosen above, rows whose server copy no longer exists at all' },
-  { file: 'lib/data/postgres/adapter.ts', marker: 'gt(s.sleepSessions.updatedAt, effectiveSince)',
+  { file: 'lib/data/postgres/adapter.ts', marker: 'gte(s.sleepSessions.updatedAt, pagedSince)',
     reason: 'the delta pull IS the tombstone channel: a device learns of a removal only because the removed row is sent' },
   { file: 'lib/data/postgres/adapter.ts', marker: 'array_agg(id::text) AS ids FROM sleep_sessions WHERE user_id',
     reason: 'issue 2752 (#2778): the id list the device ghost sweep compares against; a tombstoned row is not a ghost, so its id must be listed. It used to pass only because its window reached the next method\'s predicate' },

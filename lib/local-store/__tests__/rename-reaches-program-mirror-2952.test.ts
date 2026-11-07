@@ -37,7 +37,12 @@ describe.skipIf(!canRun)('a server rename reaches the local program mirror (issu
       [USER, `rename-mirror-2952-${USER}@example.com`],
     )
     for (const [p, name] of [[using, 'Mirror 2952 Old'], [notUsing, 'Mirror 2952 Other']] as const) {
-      await pool.query(`INSERT INTO programs (id, user_id, name) VALUES ($1, $2, $3)`, [p.program, USER, `P ${p.program}`])
+      // Stamped an hour back, outside the pull's overlap (#3654): a program the rename leaves alone is
+      // then not re-sent, so the mark below shows whether the rename re-sent it.
+      await pool.query(
+        `INSERT INTO programs (id, user_id, name, updated_at) VALUES ($1, $2, $3, now() - interval '1 hour')`,
+        [p.program, USER, `P ${p.program}`],
+      )
       await pool.query(`INSERT INTO program_sessions (id, program_id, name, position) VALUES ($1, $2, 'A', 0)`, [p.session, p.program])
       await pool.query(
         `INSERT INTO session_exercises (id, session_id, exercise_name, position) VALUES ($1, $2, $3, 0)`,
