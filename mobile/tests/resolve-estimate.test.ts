@@ -161,7 +161,9 @@ test('"I ate this" logs the meal in its slot and clears the estimate in the same
     logDate: date,
     deleted: true,
   });
-  // Then it reaches the server, and the estimate is gone there too.
+  // Then it reaches the server, and the estimate is gone there too. The upload the log started
+  // offline is let finish first, so the sync below is a fresh one rather than joining it.
+  await store.sync();
   f.online(true);
   await store.sync();
   assert.equal(store.getSnapshot().operations.length, 0, store.getSnapshot().error ?? '');

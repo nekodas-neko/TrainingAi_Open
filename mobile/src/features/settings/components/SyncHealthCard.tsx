@@ -2,36 +2,84 @@ import { useState } from 'react';
 import { AppButton, AppText, Card, ConfirmationCard, Stack } from '../../../shared/ui';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import {
+  activityRetryState,
   failedHeading,
+  isActivityList,
   itemDetail,
   itemTitle,
   retryNotice,
   type FailedItem,
 } from '../../activities/data/sync-health';
-// The current app's More → Sync health card (`components/more/sync-health-card.tsx`), for the
-// queues Preview dead-letters: activities, fitness tests and run completions. The current app
-// discards without asking; Preview asks first, as the task for #3130 specified.
-export function SyncHealthCard() {
+import type { SetAsideQueue } from '../../../core/sync/set-aside';
+import { useNutrition } from '../../nutrition/data/NutritionProvider';
+import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
+import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
+import { useTrainingSync } from '../../workouts/data/WorkoutDataProvider';
+// Every Preview outbox that sets a refused change aside (`core/sync/set-aside.ts`, #3638), as one
+// list. Each hook re-renders this card when its queue changes.
+function useSetAsideQueues(): SetAsideQueue[] {
   const activities = useActivities(),
+    nutrition = useNutrition(),
+    history = useHistoryQueue(),
+    journal = useWorkoutJournal(),
+    training = useTrainingSync();
+  const queues: SetAsideQueue[] = [];
+  const activityStore = activities.store;
+  if (activityStore) {
+    queues.push({
+      failed: activities.failed,
+      retry: (item) =>
+        isActivityList(item.list) ? activityStore.retryRejected(item.list, item.id) : Promise.resolve(),
+      discard: (item) =>
+        isActivityList(item.list)
+          ? activityStore.discardRejected(item.list, item.id)
+          : Promise.resolve(),
+      state: (item) => activityRetryState(activityStore.getSnapshot(), item),
+    });
+  }
+  for (const store of [nutrition.store, history.queue, journal.controller, training.store]) {
+    if (store) {
+      queues.push({
+        failed: store.failed(),
+        retry: (item) => store.retryRejected(item.id),
+        discard: (item) => store.discardRejected(item.id),
+        state: (item) => store.retryState(item.id),
+      });
+    }
+  }
+  return queues;
+}
+// The current app's More → Sync health card (`components/more/sync-health-card.tsx`), for every
+// change Preview has set aside: activities, nutrition, workouts, history edits, programs and
+// injuries. The current app discards without asking; Preview asks first, as #3130 specified.
+export function SyncHealthCard() {
+  const queues = useSetAsideQueues(),
     [busy, setBusy] = useState(false),
     [discarding, setDiscarding] = useState<FailedItem | null>(null),
     [notice, setNotice] = useState<string | null>(null);
-  const store = activities.store,
-    failed = activities.failed;
+  const failed = queues.flatMap((queue) => queue.failed);
+  const queueOf = (item: FailedItem) =>
+    queues.find((queue) =>
+      queue.failed.some((entry) => entry.list === item.list && entry.id === item.id),
+    );
   if (failed.length === 0 && !notice) {
     return null;
   }
   async function retry(items: FailedItem[]) {
-    if (!store || busy) {
+    if (busy) {
       return;
     }
     setBusy(true);
     setNotice(null);
     try {
-      for (const item of items) {
-        await store.retryRejected(item.list, item.id);
+      const retried = items.flatMap((item) => {
+        const queue = queueOf(item);
+        return queue ? [{ item, queue }] : [];
+      });
+      for (const { item, queue } of retried) {
+        await queue.retry(item);
       }
-      setNotice(retryNotice(items, store.getSnapshot()));
+      setNotice(retryNotice(retried.map(({ item, queue }) => queue.state(item))));
     } catch {
       setNotice('Retry failed');
     } finally {
@@ -40,12 +88,13 @@ export function SyncHealthCard() {
   }
   async function discard(item: FailedItem) {
     setDiscarding(null);
-    if (!store) {
+    const queue = queueOf(item);
+    if (!queue) {
       return;
     }
     setBusy(true);
     try {
-      await store.discardRejected(item.list, item.id);
+      await queue.discard(item);
       setNotice('Change discarded');
     } catch {
       setNotice('Could not discard that change');

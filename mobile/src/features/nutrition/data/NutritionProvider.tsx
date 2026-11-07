@@ -1,3 +1,4 @@
+import { deadLettered } from '../../../core/sync/set-aside';
 import { todayInTz } from '@trainingai/shared/date-utils';
 import { randomUUID } from 'expo-crypto';
 import {
@@ -131,6 +132,10 @@ export function useNutrition(date?: string) {
   return {
     ...state,
     ...context,
+    // Changes still on their way up: one set aside (#3638) is listed in Sync health instead.
+    waiting:
+      state.operations.filter((op) => !deadLettered(op)).length +
+      state.http.filter((op) => !deadLettered(op)).length,
     date: day,
     connected: !!context.store,
     view: context.store?.view(day) ?? {

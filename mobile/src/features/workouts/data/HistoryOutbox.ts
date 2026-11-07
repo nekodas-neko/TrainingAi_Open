@@ -4,6 +4,17 @@ import { EditedAtSchema, withEditedAt } from '@trainingai/shared/sync/edited-at'
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { readPushAnswer } from '../../../core/sync/push-answer.ts';
+import {
+  ChangeRefused,
+  countRefusal,
+  deadLettered,
+  failedItem,
+  refusalOf,
+  rejectionSchema,
+  type FailedItem,
+  type RetryState,
+} from '../../../core/sync/set-aside.ts';
 
 const operation = MutationSchema.extend({
   id: z.uuid(),
@@ -13,6 +24,8 @@ const operation = MutationSchema.extend({
     'workout_session_delete',
     'activity_logs',
   ]),
+  // #3638: the server's refusals of this change; set aside at MAX_MUTATION_ATTEMPTS.
+  rejected: rejectionSchema.optional(),
 }).superRefine((change, context) => {
   const schema =
     change.domain === 'activity_logs'
@@ -171,43 +184,31 @@ export class HistoryOutbox {
   private async flush(generation: number) {
     try {
       await this.writes;
-      while (generation === this.generation && this.current.operations.length) {
-        const change = this.current.operations[0];
-        const result = (await this.connection.post('/api/sync/push', {
-          mutations: [change],
-        })) as {
-          processed?: number;
-          errors?: unknown[];
-        };
-        if (result.processed !== 1 || !Array.isArray(result.errors) || result.errors.length) {
-          throw new Error('Not confirmed.');
-        }
-        if (generation !== this.generation) {
-          return;
-        }
-        if (change.domain === 'activity_logs') {
-          const day = z
-            .object({ date: z.string(), activityLogs: z.array(z.object({ id: z.string() })) })
-            .parse(await this.connection.get('/api/day-log', { date: change.date }));
-          if (generation !== this.generation) {
-            return;
+      // A change set aside (#3638) is passed over; one short of that holds the queue (an edit
+      // before a delete of the same log), and the next sync tries it again.
+      while (
+        generation === this.generation &&
+        this.current.operations.some((operation) => !deadLettered(operation))
+      ) {
+        const change = this.current.operations.find((operation) => !deadLettered(operation))!;
+        try {
+          await this.upload(change, generation);
+        } catch (failure) {
+          const refusal = refusalOf(failure);
+          if (refusal === null || generation !== this.generation) {
+            throw failure;
           }
-          if (
-            day.date.replace(/\//g, '-') !== change.date.replace(/\//g, '-') ||
-            day.activityLogs.some((log) => log.id === change.payload.id)
-          ) {
-            throw new Error('Activity deletion readback not confirmed.');
+          const rejected = countRefusal(change.rejected, refusal, this.now());
+          await this.write((operations) =>
+            operations.map((operation) =>
+              operation.id === change.id ? { ...operation, rejected } : operation,
+            ),
+          );
+          if (!deadLettered({ rejected })) {
+            throw failure;
           }
-          this.invalidate(change);
+          this.invalidate();
         }
-        await this.confirmed(change);
-        if (generation !== this.generation) {
-          return;
-        }
-        await this.write((operations) =>
-          operations.filter((operation) => operation.id !== change.id),
-        );
-        this.invalidate();
       }
     } catch (failure) {
       if (generation === this.generation) {
@@ -219,6 +220,78 @@ export class HistoryOutbox {
         });
       }
     }
+  }
+  private async upload(change: HistoryOperation, generation: number) {
+    const { rejected: _rejected, ...mutation } = change;
+    const result = (await this.connection.post('/api/sync/push', {
+      mutations: [mutation],
+    })) as {
+      processed?: number;
+      errors?: unknown[];
+    };
+    if (!Array.isArray(result.errors)) {
+      throw new Error('Not confirmed.');
+    }
+    const verdict = readPushAnswer(change, result);
+    if (verdict.kind === 'hold') {
+      throw new Error(verdict.error);
+    }
+    if (verdict.kind === 'refused') {
+      throw new ChangeRefused(verdict.error);
+    }
+    if (generation !== this.generation) {
+      return;
+    }
+    if (change.domain === 'activity_logs') {
+      const day = z
+        .object({ date: z.string(), activityLogs: z.array(z.object({ id: z.string() })) })
+        .parse(await this.connection.get('/api/day-log', { date: change.date }));
+      if (generation !== this.generation) {
+        return;
+      }
+      if (
+        day.date.replace(/\//g, '-') !== change.date.replace(/\//g, '-') ||
+        day.activityLogs.some((log) => log.id === change.payload.id)
+      ) {
+        throw new ChangeRefused('Activity deletion readback not confirmed.');
+      }
+      this.invalidate(change);
+    }
+    await this.confirmed(change);
+    if (generation !== this.generation) {
+      return;
+    }
+    await this.write((operations) => operations.filter((operation) => operation.id !== change.id));
+    this.invalidate();
+  }
+  // Sync health: the changes set aside, and Retry / Discard for one of them.
+  failed(): FailedItem[] {
+    return this.current.operations
+      .filter((operation) => deadLettered(operation))
+      .map((operation) =>
+        failedItem('history', operation.id, operation.domain, operation.date, operation.rejected!),
+      );
+  }
+  retryState(id: string): RetryState {
+    const operation = this.current.operations.find((x) => x.id === id);
+    return !operation ? 'synced' : operation.rejected ? 'failing' : 'waiting';
+  }
+  async retryRejected(id: string) {
+    await this.write((operations) =>
+      operations.map((operation) =>
+        operation.id === id && deadLettered(operation)
+          ? { ...operation, rejected: undefined }
+          : operation,
+      ),
+    );
+    await this.sync();
+  }
+  // Discard: the change leaves the queue, so its overlay goes and the server's copy shows again.
+  async discardRejected(id: string) {
+    await this.write((operations) =>
+      operations.filter((operation) => !(operation.id === id && deadLettered(operation))),
+    );
+    this.invalidate();
   }
   cancel() {
     this.generation++;

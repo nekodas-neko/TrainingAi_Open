@@ -4,6 +4,7 @@ import { LogExercisePayloadSchema } from '@trainingai/shared/workout/log-payload
 import { CompleteWorkoutPayloadSchema } from '@trainingai/shared/workout/complete-payload';
 import { EditedAtSchema } from '@trainingai/shared/sync/edited-at';
 import type { PendingWrite } from '../../../core/sync/pushMutation.ts';
+import { rejectionSchema } from '../../../core/sync/set-aside.ts';
 import type { CatalogIdentity, SessionPreview } from '../catalog.ts';
 import { workoutFlow } from './flow.ts';
 import { measuredExerciseTiming } from './timing.ts';
@@ -117,6 +118,8 @@ const workoutSchema = z.object({
       id: z.uuid(),
       domain: z.enum(['workout_log', 'complete_workout']),
       exerciseId: z.uuid().optional(),
+      // #3638: the server's refusals of this write; set aside at MAX_MUTATION_ATTEMPTS.
+      rejected: rejectionSchema.optional(),
     }),
   ),
   syncedAt: timestamp.nullable(),
@@ -187,17 +190,21 @@ export function readJournal(
         { ...workout, status: 'active', runningSet: null },
         workout.completedAt,
       ).pending;
-      const suffix = expected.slice(expected.length - workout.pending.length);
-      if (
-        workout.pending.length > expected.length ||
-        workout.pending.some(
-          (item, index) =>
-            item.id !== suffix[index]?.id ||
-            item.domain !== suffix[index]?.domain ||
-            item.exerciseId !== suffix[index]?.exerciseId,
-        )
-      ) {
-        throw new Error('Invalid saved upload order.');
+      // What is left to upload keeps the finish order. It is a tail of it, unless a write was set
+      // aside (#3638) and the ones after it went up: then it is any in-order subset.
+      let at = 0;
+      for (const item of workout.pending) {
+        while (at < expected.length && expected[at].id !== item.id) {
+          at++;
+        }
+        if (
+          at === expected.length ||
+          item.domain !== expected[at].domain ||
+          item.exerciseId !== expected[at].exerciseId
+        ) {
+          throw new Error('Invalid saved upload order.');
+        }
+        at++;
       }
       if (
         (workout.pending.length === 0) !== (workout.syncedAt !== null) ||

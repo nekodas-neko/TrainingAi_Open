@@ -156,7 +156,7 @@ export function NutritionStatus({ date }: { date?: string }) {
       busy={n.syncing || n.loading.length > 0 || !n.ready}
       error={error}
       message={
-        n.operations.length + n.http.length ? 'Saved on this phone. Waiting to sync.' : null
+        n.waiting ? 'Saved on this phone. Waiting to sync.' : null
       }
       onRetry={
         error

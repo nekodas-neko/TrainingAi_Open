@@ -67,6 +67,9 @@ function fixture() {
   const applied = new Set<string>();
   const sent: { id: string; domain: string; date: string; payload: Record<string, unknown> }[] =
     [];
+  // #3638: a push the server refuses for good, and a log it takes but its day read never lists.
+  const refused = new Set<string>();
+  const hidden = new Set<string>();
   const storage = {
     get: async (key: string) => disk.get(key) ?? null,
     set: async (key: string, value: string) => {
@@ -92,7 +95,7 @@ function fixture() {
         : path.endsWith('food-items')
           ? foods.slice()
           : path.endsWith('food-logs')
-            ? logs.slice()
+            ? logs.filter((log) => !hidden.has(log.id))
             : path.endsWith('targets')
               ? {}
               : path.endsWith('day-checkin')
@@ -137,6 +140,12 @@ function fixture() {
       }
       const op = (body as { mutations: typeof sent }).mutations[0];
       sent.push(op);
+      if (refused.has(String(op.payload.id))) {
+        return {
+          processed: 0,
+          errors: [{ id: op.id, domain: op.domain, date: op.date, error: 'FK ownership check failed' }],
+        };
+      }
       if (!applied.has(op.id)) {
         applied.add(op.id);
         if (op.domain === 'supplement_logs') {
@@ -208,6 +217,8 @@ function fixture() {
     failDisk: (v: boolean) => {
       diskFails = v;
     },
+    refused,
+    hidden,
   };
 }
 async function ready(f: ReturnType<typeof fixture>) {
@@ -905,4 +916,98 @@ test('a server without the retired-foods read still refreshes the library, and k
   assert.deepEqual(store.getSnapshot().data.foods.map((x) => x.id), [food.id]);
   assert.equal(store.getSnapshot().data.foodsRetiredAt, null);
   assert.equal(store.getSnapshot().errors.foods, undefined);
+});
+
+// #3638. Five counted refusals set a change aside; the changes queued behind it then upload.
+async function syncTimes(store: NutritionStore, times: number) {
+  for (let n = 0; n < times; n++) {
+    await store.sync();
+  }
+}
+const oats = foodSchema.parse({ ...food, id: id(102), name: 'Oats', calories: 380 });
+test('a nutrition change the server refuses for good is set aside, and the next one uploads', async () => {
+  const f = fixture();
+  f.foods.push(oats);
+  const store = await ready(f);
+  f.online(false);
+  await store.logFoods([{ ...food, quantityMultiplier: 1 }], date, mealType.id);
+  const refusedLog = store.getSnapshot().operations[0];
+  f.refused.add(String(refusedLog.payload.id));
+  await store.logFoods([{ ...oats, quantityMultiplier: 1 }], date, mealType.id);
+  await store.sync();
+  f.online(true);
+  await syncTimes(store, 3);
+  assert.equal(store.failed().length, 0, 'held and retried before it is set aside');
+  assert.equal(f.logs.length, 0, 'the queue waits behind a change not yet set aside');
+  await syncTimes(store, 2);
+  assert.deepEqual(
+    store.failed().map((item) => [item.list, item.label, item.date, item.attempts]),
+    [['nutrition', 'Food log', date, 5]],
+  );
+  assert.equal(store.failed()[0].error, 'FK ownership check failed');
+  assert.deepEqual(
+    f.logs.map((log) => log.foodItemId),
+    [oats.id],
+    'the change behind it uploaded',
+  );
+  assert.deepEqual(
+    store.getSnapshot().operations.map((op) => op.id),
+    [refusedLog.id],
+  );
+  assert.equal(store.getSnapshot().error, null);
+  const pushes = f.sent.length;
+  await store.sync();
+  assert.equal(f.sent.length, pushes, 'a set-aside change is not sent again');
+  // Retry from Sync health sends it again; once the server takes it, it leaves the queue.
+  f.refused.clear();
+  await store.retryRejected(refusedLog.id);
+  assert.equal(store.retryState(refusedLog.id), 'synced');
+  assert.equal(store.getSnapshot().operations.length, 0);
+  assert.equal(f.logs.length, 2);
+});
+
+test('a nutrition change whose read-back never shows it is counted and set aside', async () => {
+  const f = fixture();
+  f.foods.push(oats);
+  const store = await ready(f);
+  f.online(false);
+  await store.logFoods([{ ...food, quantityMultiplier: 1 }], date, mealType.id);
+  const unseen = store.getSnapshot().operations[0];
+  f.hidden.add(String(unseen.payload.id));
+  await store.logFoods([{ ...oats, quantityMultiplier: 1 }], date, mealType.id);
+  await store.sync();
+  f.online(true);
+  await syncTimes(store, 5);
+  assert.deepEqual(
+    store.failed().map((item) => [item.error, item.attempts]),
+    [['Readback not confirmed.', 5]],
+  );
+  assert.equal(
+    f.sent.filter((op) => op.id === unseen.id).length,
+    1,
+    'pushed once, then read back five times',
+  );
+  assert.deepEqual(
+    store.getSnapshot().operations.map((op) => op.id),
+    [unseen.id],
+  );
+  assert.equal(f.logs.filter((log) => !f.hidden.has(log.id)).length, 1, 'the next log uploaded');
+  // Discard drops it from this phone's queue without a request.
+  const pushes = f.sent.length;
+  await store.discardRejected(unseen.id);
+  assert.equal(store.getSnapshot().operations.length, 0);
+  assert.equal(f.sent.length, pushes);
+});
+
+test('a failed read of the day is never counted against the change', async () => {
+  const f = fixture();
+  const store = await ready(f);
+  f.failRead(true);
+  await store.logFoods([{ ...food, quantityMultiplier: 1 }], date, mealType.id);
+  await syncTimes(store, 8);
+  assert.equal(store.failed().length, 0);
+  assert.equal(store.getSnapshot().operations[0].rejected, undefined);
+  f.failRead(false);
+  await store.sync();
+  assert.equal(store.getSnapshot().operations.length, 0);
 });

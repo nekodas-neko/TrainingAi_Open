@@ -1,5 +1,17 @@
 import { dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils';
 import { RetryLater } from '../../../core/sync/HistoryDownload.ts';
+import { readPushAnswer } from '../../../core/sync/push-answer.ts';
+import {
+  ChangeRefused,
+  countRefusal,
+  deadLettered,
+  failedItem,
+  refusalOf,
+  rejectionSchema,
+  type FailedItem,
+  type Rejection,
+  type RetryState,
+} from '../../../core/sync/set-aside.ts';
 import { NUTRITION_DAYS_KEPT, NutritionPersistence } from './nutrition-persistence.ts';
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at';
 import {
@@ -74,6 +86,9 @@ const operationSchema = MutationSchema.extend({
     'plan_meal_answers',
   ]),
   acknowledged: z.boolean().default(false),
+  // #3638: the server's refusals of this change (or read-backs that did not show it). Set aside at
+  // MAX_MUTATION_ATTEMPTS: the flush passes over it, and Sync health lists it with Retry / Discard.
+  rejected: rejectionSchema.optional(),
 }).superRefine((op, ctx) => {
   let valid = false;
   const p = op.payload;
@@ -176,6 +191,7 @@ const httpSchema = z
     kind: z.enum(['targets', 'complete', 'restrictions', 'plan-link', 'meal-status']),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     payload: z.record(z.string(), z.unknown()),
+    rejected: rejectionSchema.optional(),
   })
   .superRefine((op, ctx) => {
     if (
@@ -211,6 +227,7 @@ export type NutritionState = {
     kind: 'targets' | 'complete' | 'restrictions' | 'plan-link' | 'meal-status';
     date: string;
     payload: Record<string, unknown>;
+    rejected?: Rejection;
   }[];
 };
 export const emptyNutrition: NutritionState = {
@@ -1013,253 +1030,44 @@ export class NutritionStore {
     this.flushing = (async () => {
       try {
         await this.writes;
-        while (generation === this.generation && this.current.operations.length) {
-          const op = this.current.operations[0];
-          if (!op.acknowledged) {
-            const result = z
-              .object({ processed: z.number(), errors: z.array(z.unknown()) })
-              .parse(
-                await this.connection.post('/api/sync/push', {
-                  mutations: [
-                    { id: op.id, domain: op.domain, date: op.date, payload: op.payload },
-                  ],
-                }),
-              );
-            if (result.processed !== 1 || result.errors.length) {
-              throw new Error('Upload not confirmed.');
-            }
-            if (generation !== this.generation) {
-              return;
-            }
-            await this.write((state) => ({
-              operations: state.operations.map((x) =>
-                x.id === op.id ? { ...x, acknowledged: true } : x,
-              ),
-            }));
-          }
-          if (
-            op.domain === 'supplement_logs' &&
-            op.date !==
-              toAestDay(
-                new Date(this.now()),
-                this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-              )
-          ) {
-            await this.confirmHistoricalDose(op);
-            if (generation !== this.generation) {
-              return;
-            }
-            await this.write((state) => ({
-              operations: state.operations.filter((x) => x.id !== op.id),
-            }));
-            this.changed();
-            continue;
-          }
-          const kind =
-            op.domain === 'food_logs'
-              ? 'logs'
-              : op.domain === 'food_items'
-                ? 'foods'
-                : op.domain === 'saved_meals'
-                  ? 'meals'
-                  : op.domain === 'day_checkins'
-                    ? 'checkin'
-                    : op.domain === 'plan_meal_answers'
-                      ? 'answers'
-                      : 'supplements';
-          const refreshed = await this.refresh(kind, op.date, true);
-          if (generation !== this.generation) {
-            return;
-          }
-          const key =
-            kind +
-            (['logs', 'checkin', 'answers', 'supplements'].includes(kind) ? ':' + op.date : '');
-          if (!refreshed || this.current.errors[key]) {
-            throw new Error('Readback failed.');
-          }
-          if (
-            kind === 'foods' &&
-            !this.current.data.foods.some((food) => food.id === op.payload.id)
-          ) {
-            const items = coreSpecs.foods.schema.parse(
-              await this.connection.get(coreSpecs.foods.path, { q: String(op.payload.name) }),
-            );
-            if (generation !== this.generation) {
-              return;
-            }
-            if (!items.some((food) => food.id === op.payload.id)) {
-              throw new Error('Food-item readback not confirmed.');
-            }
-            await this.write((state) => ({
-              data: { ...state.data, foods: mergeIds(state.data.foods, items) },
-            }));
-          }
-          if (kind === 'logs') {
-            const found = (this.current.data.days[op.date] ?? []).find(
-              (x) => x.id === op.payload.id,
-            );
-            if (
-              op.payload.deleted
-                ? found
-                : !found ||
-                  found.quantityMultiplier !== op.payload.quantityMultiplier ||
-                  found.mealTypeId !== op.payload.mealTypeId
-            ) {
-              throw new Error('Readback not confirmed.');
-            }
-          }
-          if (!confirmedOperation(this.current, op)) {
-            throw new Error('Readback not confirmed.');
-          }
-          await this.write((state) => ({
-            operations: state.operations.filter((x) => x.id !== op.id),
-          }));
-          this.changed();
-        }
-        const deferredStatuses = new Set<string>();
+        // A change set aside (#3638) is passed over, so one refusal never holds the queue for good.
+        // A refusal short of that holds the queue (its order matters: a food before its log) and
+        // the next sync tries it again.
         while (
           generation === this.generation &&
-          this.current.http.some((op) => !deferredStatuses.has(op.id))
+          this.current.operations.some((op) => !deadLettered(op))
         ) {
-          const op = this.current.http.find((op) => !deferredStatuses.has(op.id))!;
-          const path =
-            op.kind === 'plan-link'
-              ? `/api/nutrition/meal-plans/meals/${op.payload.planMealId}`
-              : op.kind === 'targets'
-                ? '/api/nutrition/targets'
-                : op.kind === 'complete'
-                  ? '/api/food-logging-complete'
-                  : op.kind === 'meal-status'
-                    ? '/api/nutrition/meal-statuses'
-                    : '/api/nutrition/dietary-restrictions';
-          const method =
-            op.kind === 'plan-link'
-              ? this.connection.patch
-              : op.kind === 'complete' || op.kind === 'meal-status'
-                ? this.connection.post
-                : this.connection.put;
-          if (!method) {
-            throw new Error('This action is unavailable.');
-          }
+          const op = this.current.operations.find((op) => !deadLettered(op))!;
           try {
-            await method(
-              path,
-              op.kind === 'plan-link'
-                ? { savedMealId: op.payload.savedMealId }
-                : op.kind === 'meal-status'
-                  ? { ...op.payload, decisionId: op.id }
-                  : op.payload,
-            );
-          } catch (cause) {
-            if (
-              op.kind === 'meal-status' &&
-              cause instanceof ApiError &&
-              cause.status === 404
-            ) {
+            await this.upload(op, generation);
+          } catch (failure) {
+            const refusal = refusalOf(failure);
+            if (refusal === null || generation !== this.generation) {
+              throw failure;
+            }
+            if (!(await this.refuse('operations', op, refusal))) {
+              throw failure;
+            }
+          }
+        }
+        const deferredStatuses = new Set<string>();
+        const waiting = (op: NutritionState['http'][number]) =>
+          !deferredStatuses.has(op.id) && !deadLettered(op);
+        while (generation === this.generation && this.current.http.some(waiting)) {
+          const op = this.current.http.find(waiting)!;
+          try {
+            if ((await this.request(op, generation)) === 'deferred') {
               deferredStatuses.add(op.id);
-              continue;
             }
-            throw cause;
-          }
-          if (generation !== this.generation) {
-            return;
-          }
-          if (op.kind === 'targets') {
-            const refreshed = await this.refresh('targets', op.date, true);
-            if (
-              !refreshed ||
-              this.current.errors.targets ||
-              !matches(this.current.data.targets, op.payload)
-            ) {
-              throw new Error('Readback failed.');
+          } catch (failure) {
+            const refusal = refusalOf(failure);
+            if (refusal === null || generation !== this.generation) {
+              throw failure;
+            }
+            if (!(await this.refuse('http', op, refusal))) {
+              throw failure;
             }
           }
-          if (op.kind === 'complete') {
-            // Preserve queued completion requests from earlier app versions.
-            const refreshed = await this.refresh('checkin', op.date, true);
-            const checkin = this.current.data.checkins[op.date] as {
-              foodLoggingCompletedAt?: unknown;
-            } | null;
-            if (
-              !refreshed ||
-              this.current.errors['checkin:' + op.date] ||
-              Boolean(checkin?.foodLoggingCompletedAt) !== op.payload.complete
-            ) {
-              throw new Error('Readback failed.');
-            }
-          }
-          if (op.kind === 'meal-status') {
-            const refreshed = await this.refresh('mealStatuses', op.date, true);
-            const row = this.current.data.mealStatuses[op.date]?.find(
-              (choice) => choice.mealTypeId === op.payload.mealTypeId,
-            );
-            if (
-              !refreshed ||
-              !row ||
-              row.decisionId !== op.id ||
-              row.skipped !== op.payload.skipped
-            ) {
-              throw new Error('Meal-status readback failed.');
-            }
-          }
-          if (op.kind === 'restrictions') {
-            const response = z
-              .object({
-                mine: z.array(z.object({ restrictionId: z.string(), severity: z.string() })),
-              })
-              .parse(await this.connection.get('/api/nutrition/dietary-restrictions'));
-            const entries = op.payload.entries as { restrictionId: string; severity: string }[];
-            if (
-              response.mine.length !== entries.length ||
-              !entries.every((entry) => response.mine.some((row) => matches(row, entry)))
-            ) {
-              throw new Error('Readback failed.');
-            }
-          }
-          if (op.kind === 'plan-link') {
-            const plans = z
-              .object({
-                plans: z.array(
-                  z.object({
-                    variants: z.array(
-                      z.object({
-                        meals: z.array(
-                          z.object({ id: z.string(), savedMealId: z.string().nullable() }),
-                        ),
-                      }),
-                    ),
-                  }),
-                ),
-              })
-              .parse(await this.connection.get('/api/nutrition/meal-plans'));
-            if (
-              !plans.plans.some((plan) =>
-                plan.variants.some((v) =>
-                  v.meals.some(
-                    (m) =>
-                      m.id === op.payload.planMealId &&
-                      m.savedMealId === op.payload.savedMealId,
-                  ),
-                ),
-              )
-            ) {
-              throw new Error('Meal link readback failed.');
-            }
-            await this.write((state) => ({
-              data: {
-                ...state.data,
-                planLinks: {
-                  ...state.data.planLinks,
-                  [String(op.payload.planMealId)]: String(op.payload.savedMealId),
-                },
-              },
-            }));
-          }
-          if (generation !== this.generation) {
-            return;
-          }
-          await this.write((state) => ({ http: state.http.filter((x) => x.id !== op.id) }));
-          this.changed();
         }
         this.publish({ error: null });
       } catch (cause) {
@@ -1284,6 +1092,317 @@ export class NutritionStore {
       }
     });
     return this.flushing;
+  }
+  // Counts one refusal against a queued change (an unchanged copy, in case it was edited
+  // meanwhile). True once it is set aside, when the queue carries on past it.
+  private async refuse(
+    list: 'operations' | 'http',
+    op: { id: string; rejected?: Rejection },
+    error: string,
+  ) {
+    const rejected = countRefusal(op.rejected, error, this.now());
+    await this.write((state) =>
+      list === 'operations'
+        ? {
+            operations: state.operations.map((x) =>
+              x.id === op.id && JSON.stringify(x.rejected) === JSON.stringify(op.rejected)
+                ? { ...x, rejected }
+                : x,
+            ),
+          }
+        : {
+            http: state.http.map((x) =>
+              x.id === op.id && JSON.stringify(x.rejected) === JSON.stringify(op.rejected)
+                ? { ...x, rejected }
+                : x,
+            ),
+          },
+    );
+    return deadLettered({ rejected });
+  }
+  // Sync health: the changes set aside, and Retry / Discard for one of them.
+  failed(): FailedItem[] {
+    return [
+      ...this.current.operations
+        .filter((op) => deadLettered(op))
+        .map((op) => failedItem('nutrition', op.id, op.domain, op.date, op.rejected!)),
+      ...this.current.http
+        .filter((op) => deadLettered(op))
+        .map((op) => failedItem('nutrition-request', op.id, op.kind, op.date, op.rejected!)),
+    ];
+  }
+  retryState(id: string): RetryState {
+    const op = [...this.current.operations, ...this.current.http].find((x) => x.id === id);
+    return !op ? 'synced' : op.rejected ? 'failing' : 'waiting';
+  }
+  // Retry: forget the refusals and send it again from the start, push included.
+  async retryRejected(id: string) {
+    await this.write((state) => ({
+      operations: state.operations.map((op) =>
+        op.id === id && deadLettered(op) ? { ...op, rejected: undefined, acknowledged: false } : op,
+      ),
+      http: state.http.map((op) =>
+        op.id === id && deadLettered(op) ? { ...op, rejected: undefined } : op,
+      ),
+    }));
+    await this.sync();
+  }
+  // Discard: drop that one change from this phone's queue. Nothing on the server is touched, and
+  // the day's next read shows the server's copy again.
+  async discardRejected(id: string) {
+    await this.write((state) => ({
+      operations: state.operations.filter((op) => !(op.id === id && deadLettered(op))),
+      http: state.http.filter((op) => !(op.id === id && deadLettered(op))),
+    }));
+    this.changed();
+  }
+  // One queued change: pushed, then read back. A refusal or a read-back that came back without
+  // the change throws ChangeRefused, which the flush counts; anything else throws as it is.
+  private async upload(op: NutritionOperation, generation: number) {
+    if (!op.acknowledged) {
+      const result = z
+        .object({ processed: z.number(), errors: z.array(z.unknown()) })
+        .parse(
+          await this.connection.post('/api/sync/push', {
+            mutations: [
+              { id: op.id, domain: op.domain, date: op.date, payload: op.payload },
+            ],
+          }),
+        );
+      const verdict = readPushAnswer(op, result);
+      if (verdict.kind === 'hold') {
+        throw new Error(verdict.error);
+      }
+      if (verdict.kind === 'refused') {
+        throw new ChangeRefused(verdict.error);
+      }
+      if (generation !== this.generation) {
+        return;
+      }
+      await this.write((state) => ({
+        operations: state.operations.map((x) =>
+          x.id === op.id ? { ...x, acknowledged: true } : x,
+        ),
+      }));
+    }
+    if (
+      op.domain === 'supplement_logs' &&
+      op.date !==
+        toAestDay(
+          new Date(this.now()),
+          this.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+        )
+    ) {
+      await this.confirmHistoricalDose(op);
+      if (generation !== this.generation) {
+        return;
+      }
+      await this.write((state) => ({
+        operations: state.operations.filter((x) => x.id !== op.id),
+      }));
+      this.changed();
+      return;
+    }
+    const kind =
+      op.domain === 'food_logs'
+        ? 'logs'
+        : op.domain === 'food_items'
+          ? 'foods'
+          : op.domain === 'saved_meals'
+            ? 'meals'
+            : op.domain === 'day_checkins'
+              ? 'checkin'
+              : op.domain === 'plan_meal_answers'
+                ? 'answers'
+                : 'supplements';
+    const refreshed = await this.refresh(kind, op.date, true);
+    if (generation !== this.generation) {
+      return;
+    }
+    const key =
+      kind +
+      (['logs', 'checkin', 'answers', 'supplements'].includes(kind) ? ':' + op.date : '');
+    if (!refreshed || this.current.errors[key]) {
+      throw new Error('Readback failed.');
+    }
+    if (
+      kind === 'foods' &&
+      !this.current.data.foods.some((food) => food.id === op.payload.id)
+    ) {
+      const items = coreSpecs.foods.schema.parse(
+        await this.connection.get(coreSpecs.foods.path, { q: String(op.payload.name) }),
+      );
+      if (generation !== this.generation) {
+        return;
+      }
+      if (!items.some((food) => food.id === op.payload.id)) {
+        throw new ChangeRefused('Food-item readback not confirmed.');
+      }
+      await this.write((state) => ({
+        data: { ...state.data, foods: mergeIds(state.data.foods, items) },
+      }));
+    }
+    if (kind === 'logs') {
+      const found = (this.current.data.days[op.date] ?? []).find(
+        (x) => x.id === op.payload.id,
+      );
+      if (
+        op.payload.deleted
+          ? found
+          : !found ||
+            found.quantityMultiplier !== op.payload.quantityMultiplier ||
+            found.mealTypeId !== op.payload.mealTypeId
+      ) {
+        throw new ChangeRefused('Readback not confirmed.');
+      }
+    }
+    if (!confirmedOperation(this.current, op)) {
+      throw new ChangeRefused('Readback not confirmed.');
+    }
+    await this.write((state) => ({
+      operations: state.operations.filter((x) => x.id !== op.id),
+    }));
+    this.changed();
+  }
+  // One queued request, then its read-back. 'deferred' leaves it for a later sync this flush.
+  private async request(
+    op: NutritionState['http'][number],
+    generation: number,
+  ): Promise<'done' | 'deferred'> {
+    const path =
+      op.kind === 'plan-link'
+        ? `/api/nutrition/meal-plans/meals/${op.payload.planMealId}`
+        : op.kind === 'targets'
+          ? '/api/nutrition/targets'
+          : op.kind === 'complete'
+            ? '/api/food-logging-complete'
+            : op.kind === 'meal-status'
+              ? '/api/nutrition/meal-statuses'
+              : '/api/nutrition/dietary-restrictions';
+    const method =
+      op.kind === 'plan-link'
+        ? this.connection.patch
+        : op.kind === 'complete' || op.kind === 'meal-status'
+          ? this.connection.post
+          : this.connection.put;
+    if (!method) {
+      throw new Error('This action is unavailable.');
+    }
+    try {
+      await method(
+        path,
+        op.kind === 'plan-link'
+          ? { savedMealId: op.payload.savedMealId }
+          : op.kind === 'meal-status'
+            ? { ...op.payload, decisionId: op.id }
+            : op.payload,
+      );
+    } catch (cause) {
+      if (
+        op.kind === 'meal-status' &&
+        cause instanceof ApiError &&
+        cause.status === 404
+      ) {
+        return 'deferred';
+      }
+      throw cause;
+    }
+    if (generation !== this.generation) {
+      return 'done';
+    }
+    if (op.kind === 'targets') {
+      const refreshed = await this.refresh('targets', op.date, true);
+      if (!refreshed || this.current.errors.targets) {
+        throw new Error('Readback failed.');
+      }
+      if (!matches(this.current.data.targets, op.payload)) {
+        throw new ChangeRefused('Readback not confirmed.');
+      }
+    }
+    if (op.kind === 'complete') {
+      // Preserve queued completion requests from earlier app versions.
+      const refreshed = await this.refresh('checkin', op.date, true);
+      const checkin = this.current.data.checkins[op.date] as {
+        foodLoggingCompletedAt?: unknown;
+      } | null;
+      if (!refreshed || this.current.errors['checkin:' + op.date]) {
+        throw new Error('Readback failed.');
+      }
+      if (Boolean(checkin?.foodLoggingCompletedAt) !== op.payload.complete) {
+        throw new ChangeRefused('Readback not confirmed.');
+      }
+    }
+    if (op.kind === 'meal-status') {
+      const refreshed = await this.refresh('mealStatuses', op.date, true);
+      const row = this.current.data.mealStatuses[op.date]?.find(
+        (choice) => choice.mealTypeId === op.payload.mealTypeId,
+      );
+      if (!refreshed) {
+        throw new Error('Meal-status readback failed.');
+      }
+      if (!row || row.decisionId !== op.id || row.skipped !== op.payload.skipped) {
+        throw new ChangeRefused('Meal-status readback not confirmed.');
+      }
+    }
+    if (op.kind === 'restrictions') {
+      const response = z
+        .object({
+          mine: z.array(z.object({ restrictionId: z.string(), severity: z.string() })),
+        })
+        .parse(await this.connection.get('/api/nutrition/dietary-restrictions'));
+      const entries = op.payload.entries as { restrictionId: string; severity: string }[];
+      if (
+        response.mine.length !== entries.length ||
+        !entries.every((entry) => response.mine.some((row) => matches(row, entry)))
+      ) {
+        throw new ChangeRefused('Readback not confirmed.');
+      }
+    }
+    if (op.kind === 'plan-link') {
+      const plans = z
+        .object({
+          plans: z.array(
+            z.object({
+              variants: z.array(
+                z.object({
+                  meals: z.array(
+                    z.object({ id: z.string(), savedMealId: z.string().nullable() }),
+                  ),
+                }),
+              ),
+            }),
+          ),
+        })
+        .parse(await this.connection.get('/api/nutrition/meal-plans'));
+      if (
+        !plans.plans.some((plan) =>
+          plan.variants.some((v) =>
+            v.meals.some(
+              (m) =>
+                m.id === op.payload.planMealId &&
+                m.savedMealId === op.payload.savedMealId,
+            ),
+          ),
+        )
+      ) {
+        throw new ChangeRefused('Meal link readback not confirmed.');
+      }
+      await this.write((state) => ({
+        data: {
+          ...state.data,
+          planLinks: {
+            ...state.data.planLinks,
+            [String(op.payload.planMealId)]: String(op.payload.savedMealId),
+          },
+        },
+      }));
+    }
+    if (generation !== this.generation) {
+      return 'done';
+    }
+    await this.write((state) => ({ http: state.http.filter((x) => x.id !== op.id) }));
+    this.changed();
+    return 'done';
   }
   view(date: string) {
     return nutritionView(this.current.denied ? emptyNutrition : this.current, date);
@@ -1348,7 +1467,7 @@ export class NutritionStore {
       }
       since = response.syncedAt;
     }
-    throw new Error('Historical dose readback not confirmed.');
+    throw new ChangeRefused('Historical dose readback not confirmed.');
   }
   cancel() {
     this.canceled = true;

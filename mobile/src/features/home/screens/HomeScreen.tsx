@@ -129,8 +129,7 @@ export function HomeScreen(navigation: HomeNavigation) {
   const pending =
     home.operations.length ||
     health.operations.length ||
-    nutrition.operations.length ||
-    nutrition.http.length;
+    nutrition.waiting;
   const allPending = pending || apple.pending || activity.pending;
   const error =
     [

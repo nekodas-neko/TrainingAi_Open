@@ -127,8 +127,11 @@ export function sanitiseNutrition(r: RawNutrition): RawNutrition {
   let satFat   = pos(r.satFatG)
   const sodium = pos(r.sodiumMg)
 
-  // Serving size sanity
-  serving = clamp(serving || 100, 1, 2000)
+  // Serving size sanity. Rounded before the caps below, as it is stored: capped against the
+  // unrounded serving, a 58.1 g serving kept 58.1 g of fat while the serving became 58 g, and a second
+  // pass (the server repairs a pushed scan again) cut the fat to 58 g, so Preview's read-back of the
+  // food never matched (#3638).
+  serving = Math.round(clamp(serving || 100, 1, 2000))
 
   // Macro density caps per serving (extremely generous upper bounds)
   const maxFatG    = serving * 1.0   // fat can't exceed serving weight
@@ -152,14 +155,15 @@ export function sanitiseNutrition(r: RawNutrition): RawNutrition {
     calories = Math.round(calFromMacros)
   }
 
+  // Calorie cap (single item unlikely to exceed 3000 kcal). Before the fat check, which reads it:
+  // applied after, a second pass found fat above the capped calories and cut it (#3638).
+  calories = clamp(calories, 0, 3000)
+
   // If fat alone (×9) exceeds total calories by >20%, fat was hallucinated — recalculate
   if (fat * KCAL_PER_G.fat > calories * 1.2 && protein * KCAL_PER_G.protein + carbs * KCAL_PER_G.carbs < calories) {
     fat = Math.max(0, Math.round((calories - protein * KCAL_PER_G.protein - carbs * KCAL_PER_G.carbs) / KCAL_PER_G.fat))
     satFat = clamp(satFat, 0, fat)
   }
-
-  // Final calorie cap (single item unlikely to exceed 3000 kcal)
-  calories = clamp(calories, 0, 3000)
 
   // Downgrade confidence if we had to make corrections
   const corrected = (
@@ -174,7 +178,7 @@ export function sanitiseNutrition(r: RawNutrition): RawNutrition {
 
   return {
     ...r,
-    servingSizeG: Math.round(serving),
+    servingSizeG: serving,
     calories:     Math.round(calories),
     proteinG:     Math.round(protein  * 10) / 10,
     carbsG:       Math.round(carbs    * 10) / 10,

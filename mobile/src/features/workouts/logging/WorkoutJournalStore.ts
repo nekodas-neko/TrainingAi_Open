@@ -1,6 +1,14 @@
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { effectiveRestSec } from '@trainingai/shared/workout/rest-target';
 import { pushMutation } from '../../../core/sync/pushMutation.ts';
+import {
+  countRefusal,
+  deadLettered,
+  failedItem,
+  refusalOf,
+  type FailedItem,
+  type RetryState,
+} from '../../../core/sync/set-aside.ts';
 import { ApiError } from '../../account/api/client.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { readSessionResponse, type SessionPreview } from '../catalog.ts';
@@ -1041,13 +1049,16 @@ export class WorkoutJournalStore {
     try {
       await this.write();
       while (generation === this.generation && !this.current.busy) {
+        // A write set aside (#3638) is passed over, so the workouts behind it still upload. One
+        // short of that holds the queue, and the next sync tries it again.
         const workout = this.current.data.workouts.find(
-          (workout) => workout.status === 'completed' && workout.pending.length > 0,
+          (workout) =>
+            workout.status === 'completed' && workout.pending.some((item) => !deadLettered(item)),
         );
         if (!workout) {
           return;
         }
-        const pending = workout.pending[0];
+        const pending = workout.pending.find((item) => !deadLettered(item))!;
         try {
           await pushMutation(this.connection, mutationFor(workout, pending));
           if (generation !== this.generation) {
@@ -1061,7 +1072,7 @@ export class WorkoutJournalStore {
                 ...latest,
                 pending: remaining,
                 syncedAt: remaining.length === 0 ? now : null,
-                syncError: null,
+                syncError: remaining.some(deadLettered) ? setAsideNotice : null,
               };
             }),
           );
@@ -1072,19 +1083,29 @@ export class WorkoutJournalStore {
           if (generation !== this.generation) {
             return;
           }
+          const refusal = refusalOf(error);
+          const rejected = refusal === null ? null : countRefusal(pending.rejected, refusal, this.now());
           const message =
-            error instanceof ApiError && [401, 403].includes(error.status)
-              ? 'Sign in again to upload this workout. It is saved on this phone.'
-              : failureNotice(
-                  'Workout saved on this phone. Upload is pending; retry when connected.',
-                  error,
-                );
+            rejected && deadLettered({ rejected })
+              ? setAsideNotice
+              : error instanceof ApiError && [401, 403].includes(error.status)
+                ? 'Sign in again to upload this workout. It is saved on this phone.'
+                : failureNotice(
+                    'Workout saved on this phone. Upload is pending; retry when connected.',
+                    error,
+                  );
           await this.write((data) =>
             replaceWorkout(data, workout.id, (latest) => ({
               ...latest,
+              pending: rejected
+                ? latest.pending.map((item) => (item.id === pending.id ? { ...item, rejected } : item))
+                : latest.pending,
               syncError: message,
             })),
           );
+          if (rejected && deadLettered({ rejected })) {
+            continue;
+          }
           return;
         }
       }
@@ -1100,4 +1121,53 @@ export class WorkoutJournalStore {
       }
     }
   }
+  // Sync health: the writes set aside, and Retry / Discard for one of them.
+  failed(): FailedItem[] {
+    return this.current.data.workouts.flatMap((workout) =>
+      workout.pending
+        .filter((item) => deadLettered(item))
+        .map((item) => failedItem('workout', item.id, item.domain, workout.date, item.rejected!)),
+    );
+  }
+  retryState(id: string): RetryState {
+    const item = this.current.data.workouts
+      .flatMap((workout) => workout.pending)
+      .find((pending) => pending.id === id);
+    return !item ? 'synced' : item.rejected ? 'failing' : 'waiting';
+  }
+  retryRejected = async (id: string) => {
+    await this.write((data) => ({
+      ...data,
+      workouts: data.workouts.map((workout) => ({
+        ...workout,
+        pending: workout.pending.map((item) =>
+          item.id === id && deadLettered(item) ? { ...item, rejected: undefined } : item,
+        ),
+      })),
+    }));
+    await this.sync();
+  };
+  // Discard: that one write is not sent. The workout stays on this phone; once nothing is left to
+  // send it counts as uploaded, so it can be deleted from this phone's history.
+  discardRejected = async (id: string) => {
+    const now = this.now();
+    await this.write((data) => ({
+      ...data,
+      workouts: data.workouts.map((workout) => {
+        if (!workout.pending.some((item) => item.id === id && deadLettered(item))) {
+          return workout;
+        }
+        const remaining = workout.pending.filter((item) => item.id !== id);
+        return {
+          ...workout,
+          pending: remaining,
+          syncedAt: remaining.length === 0 ? now : null,
+          syncError: remaining.some(deadLettered) ? setAsideNotice : null,
+        };
+      }),
+    }));
+    void this.sync();
+  };
 }
+const setAsideNotice =
+  'The server refused part of this workout. It is kept on this phone; see Sync health under More → Data & Sync.';

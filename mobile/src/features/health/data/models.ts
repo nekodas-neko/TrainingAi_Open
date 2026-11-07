@@ -10,6 +10,11 @@ const text = z
   .string()
   .nullish()
   .transform((value) => value ?? null);
+// A Postgres `time` column comes back as "07:12:00"; every reader of a server activity, and every
+// payload built from one (the activity editor, #3642), uses the "07:12" the activity schema takes.
+const clockTime = text.transform((value) =>
+  value !== null && /^\d{2}:\d{2}:\d{2}/.test(value) ? value.slice(0, 5) : value,
+);
 const numericFields = <T extends string>(keys: readonly T[]) =>
   Object.fromEntries(keys.map((key) => [key, n])) as Record<T, typeof n>;
 export const bodySchema = z
@@ -660,10 +665,10 @@ export const activityHistorySpec = {
           durationMin: n,
           distanceKm: n,
           title: text,
-          startTime: text,
+          startTime: clockTime,
           notes: text,
           source: text,
-          endTime: text,
+          endTime: clockTime,
           cadenceSource: text,
           cadenceSpm: n,
           elevationLossM: n,
