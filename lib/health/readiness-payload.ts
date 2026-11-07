@@ -1005,7 +1005,7 @@ export async function buildReadinessPayload(
     illnessScore:             illness?.score                         ?? null,
     illnessBiomarkers:        illness?.biomarkers                    ?? null,
     illnessSuppression:       illness?.readinessSuppression          ?? 0,
-    illnessAdvisory:          illness ? withDoseContext(illnessAdvisory(illness.flag), recentDoseList) : null,
+    illnessAdvisory:          illness ? withDoseContext(illnessAdvisory(illness.flag, illness.biomarkers), recentDoseList) : null,
     recentDoses:              recentDoseList,
     ownResilienceLevel:       latestResilience?.resilienceLevel ?? null,
     ownResilienceBand:        latestResilience?.resilienceLevel != null ? resilienceLevelToBand(latestResilience.resilienceLevel) : null,
