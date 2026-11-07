@@ -1,19 +1,17 @@
-import { displayOneRm, displayOneRmSeries, oneRmLabel } from '@trainingai/shared/1rm';
+import { displayOneRm, displayOneRmSeries, isEstimatedOneRm, oneRmLabel } from '@trainingai/shared/1rm';
 import { AppText, Card, LineChart, Stack } from '../../../shared/ui';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { exerciseHistorySpec } from '../data/models';
 import { ResourceStatus } from './ResourceStatus';
 import { formatSetLoad } from '../logging/targets';
+import { oneRmTrendEntries } from '../data/exercise-history';
 
 export function ExerciseHistory({ name }: { name: string }) {
   const state = useWorkoutResource(exerciseHistorySpec(name));
   const type = state.data?.exerciseType ?? 'weighted';
-  const dated = (state.data?.entries ?? [])
-    .filter((entry) => entry.estimated1rm !== null)
-    .slice()
-    .reverse();
+  const dated = oneRmTrendEntries(state.data?.entries ?? []);
   const values = displayOneRmSeries(
-    dated.map((entry) => entry.estimated1rm!),
+    dated.map((entry) => entry.estimated1rm),
     type,
   );
   return (
@@ -44,7 +42,7 @@ export function ExerciseHistory({ name }: { name: string }) {
                     {entry.date}
                   </AppText>
                 </Stack>
-                {entry.estimated1rm !== null && (
+                {isEstimatedOneRm(entry.estimated1rm) && (
                   <AppText variant="caption" tone="brand">
                     {oneRmLabel(type)} · {displayOneRm(entry.estimated1rm, type).text}
                   </AppText>

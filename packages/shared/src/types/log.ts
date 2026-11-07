@@ -59,6 +59,8 @@ export interface ExerciseHistoryLogRow {
   volume?: number
   isEarlyDeload: boolean
   phaseType?: ProgramPhaseType
+  /** `exercise_logs.exercise_deloaded`: an AI per-exercise deload, stored with `estimated_1rm = 0` (#3666). */
+  exerciseDeloaded: boolean
   sets: Pick<SetLog, 'weightKg' | 'reps' | 'intensityPct' | 'rpe' | 'rpeSource'>[]
 }
 

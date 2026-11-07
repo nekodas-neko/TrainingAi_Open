@@ -27,8 +27,10 @@ export interface ExerciseHistoryEntry {
   rpeDelta: number | null;
 }
 
+// #3666: an AI per-exercise deload (soreness, the user's Deload choice, a confirmed deload week)
+// sets only `exercise_deloaded`, with `phase_type` null, so it is a deload row too.
 function isDeloadRow(row: ExerciseHistoryLogRow): boolean {
-  return row.isEarlyDeload || row.phaseType === 'deload';
+  return row.isEarlyDeload || row.phaseType === 'deload' || row.exerciseDeloaded;
 }
 
 const HISTORY_LIMIT = 20;

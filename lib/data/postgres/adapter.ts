@@ -176,6 +176,7 @@ import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { loadNightTemperature } from '@/lib/health/night-temperature'
 import { clampWindowStart } from '@trainingai/shared/workout/time-audit'
 import { computeAiDynamicNextSession, TEMP_ALERT_THRESHOLD_C, type AiDynamicInput } from '@trainingai/shared/ai-periodization/ai-dynamic'
+import { loggedAsSession, programSessionFor } from '@trainingai/shared/workout/session-identity'
 import { computeMuscleRecovery } from '@trainingai/shared/ai-periodization/muscle-recovery'
 import { suggestedSoreMuscles } from '@trainingai/shared/checkin/suggested-soreness'
 import { resolveSelfReportedSick } from '@trainingai/shared/ai-periodization/signals'
@@ -1958,11 +1959,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     type HistoryRow = {
       id: string; logged_at: Date; session_name: string;
       estimated_1rm: number | null; volume: number | null;
-      is_early_deload: boolean; phase_type: string | null;
+      is_early_deload: boolean; phase_type: string | null; exercise_deloaded: boolean;
     }
     const result = await this.db.execute<HistoryRow>(sql`
       SELECT el.id, el.logged_at, ws.session_name, el.estimated_1rm, el.volume,
-        ws.is_early_deload, ws.phase_type
+        ws.is_early_deload, ws.phase_type, el.exercise_deloaded
       FROM exercise_logs el
       JOIN workout_sessions ws ON ws.id = el.workout_session_id
       WHERE ws.user_id = ${userId} AND el.exercise_name = ${exerciseName}
@@ -1986,6 +1987,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       id: r.id, loggedAt: new Date(r.logged_at), sessionName: r.session_name,
       estimated1rm: r.estimated_1rm ?? undefined, volume: r.volume ?? undefined,
       isEarlyDeload: r.is_early_deload, phaseType: (r.phase_type as ProgramPhaseType | null) ?? undefined,
+      exerciseDeloaded: r.exercise_deloaded === true,
       sets: setRows.filter(ss => ss.exerciseLogId === r.id).map(ss => ({
         weightKg: ss.weightKg, reps: ss.reps,
         intensityPct: ss.intensityPct ?? undefined, rpe: ss.rpe ?? undefined, rpeSource: ss.rpeSource ?? undefined,
@@ -2105,13 +2107,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // `next-session-carries-program.test.ts` covers every return instead.
     const common = { ...reminders, program }
 
-    // Fetch recent workout sessions with their stored session name.
-    // Using session name (not FK) avoids mismatches after program edits/renames.
+    // Fetch recent workout sessions with their program-session id and stored name: matched by id,
+    // name as the fallback (issue 3665, `loggedAsSession`).
     // Only include sessions that have at least one logged exercise — orphaned sessions
     // (opened but no sets logged) would otherwise skew the "most overdue" calculation.
     const recentWsWithName = await this.db.select({
-      startedAt:   s.workoutSessions.startedAt,
-      sessionName: s.workoutSessions.sessionName,
+      startedAt:        s.workoutSessions.startedAt,
+      sessionName:      s.workoutSessions.sessionName,
+      programSessionId: s.workoutSessions.programSessionId,
     })
       .from(s.workoutSessions)
       .where(and(
@@ -2126,7 +2129,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
     // Always show today's actual session first — overrides rest-day rules
     if (lastWs && toAestDay(lastWs.startedAt, timezone) === todayAest) {
-      const todaySession = sessions.find(sess => sess.name.toLowerCase() === lastWs.sessionName?.toLowerCase())
+      const todaySession = programSessionFor(lastWs, sessions)
       if (todaySession) return { isRestDay: false, session: todaySession, reason: `Already trained: ${todaySession.name}`, ...common }
     }
 
@@ -2142,11 +2145,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       return { isRestDay: true, reason: 'Rest day — you chose to rest today', ...common }
     }
 
-    // Compute most-overdue session using name-based last-done lookup
-    // (reliable even when workout_sessions.session_id FK is stale after program edits).
+    // Most-overdue session. Issue 3665: matched by `session_id` first, so a renamed session keeps
+    // its history; the stored name is the fallback for a row with no id or one from another
+    // program (`loggedAsSession`), which is what kept history across a rebuilt program.
+    const programSessionIds = new Set(sessions.map(sess => sess.id))
     const sessionLastDone = new Map<string, Date | null>()
     for (const sess of sessions) {
-      const ws = recentWsWithName.find(w => w.sessionName?.toLowerCase() === sess.name.toLowerCase())
+      const ws = recentWsWithName.find(w => loggedAsSession(w, sess, programSessionIds))
       sessionLastDone.set(sess.id, ws?.startedAt ?? null)
     }
     const nextSession = [...sessions].sort((a, b) => {
@@ -2202,6 +2207,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const stressHighMinutes = ringStressMinutes ?? ouraStressMinutes
       const history: AiDynamicInput['history'] = recentWsWithName.map(w => ({
         sessionName: w.sessionName ?? '',
+        programSessionId: w.programSessionId,
         startedAt: w.startedAt,
         hasExercises: true,
       }))
@@ -2324,13 +2330,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       return { isRestDay: false, session: nextSession, reason: `Scheduled day — rotate: ${nextSession.name}`, ...common }
     }
 
-    // Build a per-day map of session names done (for rest-day detection)
+    // Build a per-day map of the sessions done (for rest-day detection). Keyed by the program
+    // session's id when the row is one of them (issue 3665), else by its stored name, so a workout
+    // outside the program still counts as a training day as before.
     const recentDays = new Map<string, Set<string>>()
     for (const ws of recentWsWithName) {
       const d = toAestDay(ws.startedAt, timezone)
       if (!recentDays.has(d)) recentDays.set(d, new Set())
-      const name = ws.sessionName?.toLowerCase()
-      if (name) recentDays.get(d)!.add(name)
+      const key = sessions.find(sess => loggedAsSession(ws, sess, programSessionIds))?.id
+        ?? (ws.sessionName ? `name:${ws.sessionName.toLowerCase()}` : null)
+      if (key) recentDays.get(d)!.add(key)
     }
 
     // Walk backwards from yesterday. Count consecutive training days and collect
@@ -2360,7 +2369,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const age = Date.now() - ws.startedAt.getTime()
       return age < 7 * 86_400_000
     })
-    const allSessionsDone = sessions.every(s => currentCycleTypes.has(s.name.toLowerCase()))
+    const allSessionsDone = sessions.every(s => currentCycleTypes.has(s.id))
     if (hasTrainedRecentlyForRotation && (consecutiveDays >= restAfterN || (isDefaultRotation && allSessionsDone))) {
       const reason = allSessionsDone
         ? `Rest day — full ${sessions.length}-session cycle complete`

@@ -244,6 +244,15 @@ export function repMaxFromAmrapOneRm(oneRm: number, addedKg = 0): number {
   return best
 }
 
+/**
+ * Whether a stored 1RM is a real estimate. A deload log stores 0 (`estimateOneRm` with
+ * `deloaded`), so a trend or a "latest 1RM" reading it as a value dives to 0 at every deload
+ * (#3666). Both apps' exercise history read this.
+ */
+export function isEstimatedOneRm(value: number | null | undefined): value is number {
+  return value != null && value > 0
+}
+
 export type OneRmUnit = 'kg' | 'RM'
 
 export function isBodyweightType(exerciseType?: string | null): boolean {

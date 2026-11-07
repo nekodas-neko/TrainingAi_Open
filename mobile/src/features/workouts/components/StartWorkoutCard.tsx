@@ -2,6 +2,7 @@ import { AppButton, Card, Stack, StateCard } from '../../../shared/ui';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import type { SessionPreview } from '../catalog';
 import { WorkoutSaveNotice } from './WorkoutSaveNotice';
+import { StaleWorkoutCard, useStaleWorkout } from './StaleWorkoutCard';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { SessionStartOptions } from '../logging/session-options';
 
@@ -31,6 +32,7 @@ export function StartWorkoutCard({
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
   const active = journal.data.workouts.find((workout) => workout.status === 'active');
+  const stale = useStaleWorkout(active);
   async function start(useSaved = false) {
     const id = await journal.controller?.start(session, programId, useSaved, options);
     if (id) {
@@ -53,6 +55,14 @@ export function StartWorkoutCard({
           void journal.controller?.initialize();
         }}
       />
+    );
+  }
+  if (active && stale) {
+    return (
+      <>
+        <StaleWorkoutCard workout={active} />
+        <WorkoutSaveNotice />
+      </>
     );
   }
   const Wrapper = inline ? Stack : Card;

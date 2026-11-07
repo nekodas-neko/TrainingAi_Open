@@ -30,6 +30,7 @@ import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
 import { useWorkoutXp } from '../../rewards/data/useRewards';
 import { WorkoutXp } from '../../rewards/components/WorkoutXp';
 import { WorkoutCalendarAction } from '../../platform/components/WorkoutCalendarAction';
+import { StaleWorkoutCard, useStaleWorkout } from '../components/StaleWorkoutCard';
 
 export function WorkoutLogScreen({
   openCoach,
@@ -48,6 +49,7 @@ export function WorkoutLogScreen({
   const { theme } = useTheme();
   const workout = journal.data.workouts.find((workout) => workout.id === workoutId);
   const xp = useWorkoutXp(workout);
+  const stale = useStaleWorkout(workout);
   useTrainingKeepAwake(workout?.status === 'active');
   const previousStatus = useRef({ id: workoutId, status: workout?.status });
   useEffect(() => {
@@ -59,6 +61,23 @@ export function WorkoutLogScreen({
       feedback('success');
     previousStatus.current = { id: workoutId, status: workout?.status };
   }, [workoutId, workout?.status]);
+  if (journal.controller && journal.ready && workout?.status === 'active' && stale) {
+    // #3664: whatever opened it (the Home card, the active-workout bar), a days-old workout is
+    // offered to save or discard, never resumed into today.
+    return (
+      <WorkoutLayout title="Workout" onBack={closeWorkout}>
+        <StaleWorkoutCard
+          workout={workout}
+          onResolved={(outcome) => {
+            if (outcome === 'discarded') {
+              closeWorkout();
+            }
+          }}
+        />
+        <WorkoutSaveNotice />
+      </WorkoutLayout>
+    );
+  }
   if (journal.controller && journal.ready && workout?.status === 'active') {
     return (
       <GuidedWorkoutScreen

@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import { getPool } from '@/lib/data/postgres/client'
 import { getRepository } from '@/lib/data'
-import { estimateOneRm, isDeloadedForEstimate, BW_REF, withPrescribedBars, type OneRmSetInput } from '@trainingai/shared/1rm'
+import { estimateOneRm, isDeloadedForEstimate, BW_REF, withPrescribedBars, type OneRmSetInput, type RMStyleSet } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
 import { PushedEditedAtSchema, isSupersededEdit, type EditStamp } from '@trainingai/shared/sync/edited-at'
+import { loggedStyleFromSetRows } from '@trainingai/shared/workout/logged-style'
 
 /**
  * Editing and deleting a logged exercise — the ONE implementation both write paths call (RV-175).
@@ -80,18 +81,33 @@ export async function editExerciseLog(
   // keep `estimated_1rm = 0`, or a phase-deload log enters the working 1RM basis on its next edit.
   const deloaded = isDeloadedForEstimate({ exerciseDeloaded: ctxRows[0].exercise_deloaded, isAnyDeload, isBaseline })
 
+  // Issue 3663: re-score against the style the log was scored with when it was written. The log
+  // path scores the payload's `progressionStyle` (the AI's prescribed percentages, or the static
+  // style), and stores each set's share of it on `set_logs` (`planned_pct`, `planned_reps`,
+  // `use_for_1rm`). Those rows are the record of that style, so they are read first. Preview sends
+  // no style id, and the current app sends the session exercise's static style even when the AI
+  // prescribed different percentages, so `style_id` alone re-scored a Preview log with no style at
+  // all (about 11% low) and an AI-driven log against the wrong one. `style_id` remains the fallback
+  // for rows logged before the planned columns existed.
+  const { rows: plannedRows } = await db.query<{
+    set_number: number; planned_pct: number | null; planned_reps: number | null
+    use_for_1rm: boolean | null; planned_weight_kg: number | null
+  }>(
+    `SELECT set_number, planned_pct, planned_reps, use_for_1rm, planned_weight_kg FROM set_logs
+     WHERE exercise_log_id = $1 AND deleted_at IS NULL ORDER BY set_number`,
+    [exerciseLogId],
+  )
+  const baseStyle: RMStyleSet[] | null = loggedStyleFromSetRows(plannedRows, weights.length, exerciseType)
+    ?? styles.find(st => st.id === ctxRows[0].style_id)?.sets
+    ?? null
+
   // Issue 2200: an edit re-scores each set against the bar it was given (`planned_weight_kg`, kept
   // by set number) and the last real 1RM before this log, the basis the bars came from. A bar that
   // basis could not have produced is ignored per set, so a row with no stored bar — every row
   // before #2445 — re-scores exactly as it did before.
-  const baseStyle = styles.find(st => st.id === ctxRows[0].style_id)?.sets ?? null
   let style = baseStyle
   if (baseStyle && exerciseType !== 'bodyweight') {
-    const { rows: barRows } = await db.query<{ set_number: number; planned_weight_kg: number | null }>(
-      `SELECT set_number, planned_weight_kg FROM set_logs
-       WHERE exercise_log_id = $1 AND deleted_at IS NULL AND planned_weight_kg IS NOT NULL`,
-      [exerciseLogId],
-    )
+    const barRows = plannedRows.filter(r => r.planned_weight_kg != null)
     if (barRows.length > 0) {
       const bars = weights.map((_, i) => barRows.find(r => r.set_number === i + 1)?.planned_weight_kg ?? null)
       const basisKg = await repo.getPrescriptionBasisBefore(userId, exerciseName, new Date(ctxRows[0].logged_at), exerciseLogId)
