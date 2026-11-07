@@ -43,11 +43,17 @@ export function readinessPrompt(
   verdict: ReadinessVerdictData | null | undefined,
   /** Today's check-in carries a tapped answer, or a queued answer or skip is waiting to upload. */
   feelAnswered = false,
+  /**
+   * Today's live readiness (`readinessDisplayScore`), as the score chips show it (#3659). The
+   * verdict is frozen at its first read and today can be re-scored after it, so its own score is
+   * only the fallback until the live one loads. The verdict still picks the band and the wording.
+   */
+  liveScore?: number | null,
 ): ReadinessPrompt {
   if (!verdict) {
     return { kind: 'silent' };
   }
-  const score = Math.round(verdict.score);
+  const score = Math.round(liveScore ?? verdict.score);
   if (verdict.verdict === 'normal') {
     return {
       kind: 'usual',

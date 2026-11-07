@@ -392,6 +392,17 @@ export function canonicalNightForDate<T extends DatedNight>(
   return best
 }
 
+/**
+ * One canonical night per wake date ({@link canonicalNightForDate}), oldest date first, from
+ * {@link nightSessions}'s output. Readiness, the night temperature, the day audit and every reader that
+ * keys nights by date build it here, so no reader breaks a two-night date its own way (#3077, #3662).
+ */
+export function canonicalNightsByDate<T extends DatedNight>(nights: T[], tz: string): T[] {
+  return [...new Set(nights.map(n => n.date))]
+    .map(d => canonicalNightForDate(nights, d, tz))
+    .filter((n): n is NonNullable<typeof n> => n != null)
+}
+
 /** The fields the per-date pickers read from an aggregated night. */
 export type DatedNight = { date: string; sleepStart: Date; sleepEnd: Date; durationHours?: number | null }
 
@@ -584,4 +595,17 @@ export function aggregateNight<T extends AggregatableSleep>(period: SleepPeriod<
  */
 export function nightSessions<T extends AggregatableSleep>(sessions: T[], tz: string = DEFAULT_TZ): T[] {
   return groupSleepPeriods(sessions, tz).nights.map(aggregateNight)
+}
+
+/**
+ * The night a wake date is graded on, from raw sessions: the night the Sleep score scores and the
+ * sleep card shows (`scoreSleepForDate`, `mergeByDate`). Naps and daytime rests never win, a split
+ * night comes back joined, and a date with two night periods takes the longer real night, never
+ * whichever row the database listed first (#3662).
+ *
+ * Pass every row that could belong to the night: a night is grouped by its windows, and its first
+ * window can carry the date before (a fragment that ended before midnight).
+ */
+export function gradedNightForDate<T extends AggregatableSleep>(sessions: T[], date: string, tz: string): T | null {
+  return canonicalNightForDate(nightSessions(sessions, tz), date, tz)
 }

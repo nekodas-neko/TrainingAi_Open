@@ -162,3 +162,21 @@ export function levelWithExerciseDrain(walkLevel: number, anchor: number, exerci
   if (!dayHasExerciseDrain) return walkLevel
   return Math.max(0, Math.min(100, Math.min(walkLevel, anchor) - exerciseDrained))
 }
+
+/**
+ * The "+charged / −drained" a card prints beside the level, rounded, so that
+ * `anchor + charged − drained = level` holds on the figures as shown (#3658).
+ *
+ * The walk counts charge per sample before any cap, so charge spent against the 100 ceiling, or
+ * above the morning mark on a day with an exercise drain (`levelWithExerciseDrain`), never reached
+ * the level and is not shown as gained. Drain lost against the 0 floor is likewise not shown as
+ * lost. The gross totals stay what `body_battery_daily` stores: its write guard reads them as
+ * "this day recorded movement", which a day held at 100 would fail if they were netted.
+ */
+export function shownBatteryTotals(
+  anchor: number, level: number, grossCharged: number, grossDrained: number,
+): { charged: number; drained: number } {
+  const unreconciled = anchor + grossCharged - grossDrained - level
+  const charged = Math.round(Math.max(0, grossCharged - Math.max(0, unreconciled)))
+  return { charged, drained: Math.round(anchor) + charged - Math.round(level) }
+}

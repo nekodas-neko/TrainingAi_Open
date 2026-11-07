@@ -5,6 +5,7 @@ import { AppText, Card, Stack, StatusIndicator } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { readinessVerdictSpec } from '../../health/data/checkin';
+import { readinessSpec } from '../../health/data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHome } from '../data/HomeProvider';
 import {
@@ -32,6 +33,7 @@ export function ReadinessPromptCard({
   const health = useHealthData();
   const home = useHome();
   const verdict = useWorkoutResource(readinessVerdictSpec(health.today));
+  const readiness = useWorkoutResource(readinessSpec(health.today));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pending = health.operations.filter(
@@ -45,6 +47,7 @@ export function ReadinessPromptCard({
   const prompt = readinessPrompt(
     verdict.data?.verdict,
     feelAnswered || respondedToday(health.readinessResponses, health.today),
+    readiness.data?.readinessDisplayScore,
   );
   async function answer(feel: Feel | null) {
     if (!health.store || busy) {

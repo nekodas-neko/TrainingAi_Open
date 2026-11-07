@@ -1834,7 +1834,7 @@
  },
  "bodyBattery": {
   "switch=2026-10-17 stress=no-row series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -1849,7 +1849,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=no-row series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -1956,7 +1956,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=null series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -1971,7 +1971,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=null series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -2078,7 +2078,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=0 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "d4dbbabed945d68ebdf3e385ef49f597091ab0fea9aa23bc6937c4c017c4f026",
+   "all": "bce3e5b69b4da8f92446011027364a015e58a5a0a8457bf8dacb7b1a635a76a8",
    "current": 63,
    "stress": {
     "current": null,
@@ -2099,7 +2099,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=0 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "98f580c767499720eefc8306a347b4a746996db3106ea76c508bffe2a228ed8f",
+   "all": "a1e0fa32fdd41593dbfc63f28d2f8c4f33976ce5af4b2017a94a21534ea100d9",
    "current": 63,
    "stress": {
     "current": null,
@@ -2212,7 +2212,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=59 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "f254eb1730fee75764d8b4152896c734db3e6dba79c96e1f25aa2a68518db19a",
+   "all": "0ec050b9c1e7d6adb0036ed3ee2302e50c4971eafdd6efee4e24d6d6525449fa",
    "current": 63,
    "stress": {
     "current": null,
@@ -2233,7 +2233,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=59 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "12c216a3cea5b217b2675f26e16c78f4dcffb62a668dcb2c1408e5be8806baca",
+   "all": "72f3fd033b70d939fb74f547d0b3c6af45d64924dafcf539d7eb75a5b9ce7fb0",
    "current": 63,
    "stress": {
     "current": null,
@@ -2346,7 +2346,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=3600 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "f979b7d38f0c1d540ca70d44437b16349441ac12601909470ecd87b1fa663361",
+   "all": "cdc97700ef41593e4801763e21bc954795690d3f0a45e6717023c30f1d684dcb",
    "current": 62,
    "stress": {
     "current": null,
@@ -2367,7 +2367,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=3600 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "5f1bd3c217c326e2c1c2df7caad2781797aba88c88c5c370d4dc01dc97f6f559",
+   "all": "3e517d478d3dd70405d31e784890768dde159dc5408370d53a28abe3f479a973",
    "current": 63,
    "stress": {
     "current": null,
@@ -2480,7 +2480,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=3617 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "f979b7d38f0c1d540ca70d44437b16349441ac12601909470ecd87b1fa663361",
+   "all": "cdc97700ef41593e4801763e21bc954795690d3f0a45e6717023c30f1d684dcb",
    "current": 62,
    "stress": {
     "current": null,
@@ -2501,7 +2501,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=3617 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "5f1bd3c217c326e2c1c2df7caad2781797aba88c88c5c370d4dc01dc97f6f559",
+   "all": "3e517d478d3dd70405d31e784890768dde159dc5408370d53a28abe3f479a973",
    "current": 63,
    "stress": {
     "current": null,
@@ -2635,7 +2635,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=7237 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "29e4086297db7a50a083a064a748bf7a527ed94976d482e8269002f3c19d6cb5",
+   "all": "d31bdb9df1230bf0dce8fa7a52e25cb676b7e7ec9cb23ab28350832c53dbd010",
    "current": 63,
    "stress": {
     "current": null,
@@ -2769,7 +2769,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=100000 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "41f3e4ebabad44d157649e241fbbc7130e591c2fa8ca8560f767ac9f670ca863",
+   "all": "ce2a8cd2cf481060e47ab152755cd26295e1128e7698f3017b54409379b79478",
    "current": 63,
    "stress": {
     "current": null,
@@ -2882,7 +2882,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=-60 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -2897,7 +2897,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-17 stress=-60 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -3004,7 +3004,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=no-row series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -3019,7 +3019,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=no-row series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -3126,7 +3126,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=null series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -3141,7 +3141,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=null series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -3248,7 +3248,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=0 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "d4dbbabed945d68ebdf3e385ef49f597091ab0fea9aa23bc6937c4c017c4f026",
+   "all": "bce3e5b69b4da8f92446011027364a015e58a5a0a8457bf8dacb7b1a635a76a8",
    "current": 63,
    "stress": {
     "current": null,
@@ -3269,7 +3269,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=0 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "98f580c767499720eefc8306a347b4a746996db3106ea76c508bffe2a228ed8f",
+   "all": "a1e0fa32fdd41593dbfc63f28d2f8c4f33976ce5af4b2017a94a21534ea100d9",
    "current": 63,
    "stress": {
     "current": null,
@@ -3382,7 +3382,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=59 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "f254eb1730fee75764d8b4152896c734db3e6dba79c96e1f25aa2a68518db19a",
+   "all": "0ec050b9c1e7d6adb0036ed3ee2302e50c4971eafdd6efee4e24d6d6525449fa",
    "current": 63,
    "stress": {
     "current": null,
@@ -3403,7 +3403,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=59 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "12c216a3cea5b217b2675f26e16c78f4dcffb62a668dcb2c1408e5be8806baca",
+   "all": "72f3fd033b70d939fb74f547d0b3c6af45d64924dafcf539d7eb75a5b9ce7fb0",
    "current": 63,
    "stress": {
     "current": null,
@@ -3516,7 +3516,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=3600 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "f979b7d38f0c1d540ca70d44437b16349441ac12601909470ecd87b1fa663361",
+   "all": "cdc97700ef41593e4801763e21bc954795690d3f0a45e6717023c30f1d684dcb",
    "current": 62,
    "stress": {
     "current": null,
@@ -3537,7 +3537,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=3600 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "5f1bd3c217c326e2c1c2df7caad2781797aba88c88c5c370d4dc01dc97f6f559",
+   "all": "3e517d478d3dd70405d31e784890768dde159dc5408370d53a28abe3f479a973",
    "current": 63,
    "stress": {
     "current": null,
@@ -3650,7 +3650,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=3617 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "f979b7d38f0c1d540ca70d44437b16349441ac12601909470ecd87b1fa663361",
+   "all": "cdc97700ef41593e4801763e21bc954795690d3f0a45e6717023c30f1d684dcb",
    "current": 62,
    "stress": {
     "current": null,
@@ -3671,7 +3671,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=3617 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "5f1bd3c217c326e2c1c2df7caad2781797aba88c88c5c370d4dc01dc97f6f559",
+   "all": "3e517d478d3dd70405d31e784890768dde159dc5408370d53a28abe3f479a973",
    "current": 63,
    "stress": {
     "current": null,
@@ -3805,7 +3805,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=7237 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "29e4086297db7a50a083a064a748bf7a527ed94976d482e8269002f3c19d6cb5",
+   "all": "d31bdb9df1230bf0dce8fa7a52e25cb676b7e7ec9cb23ab28350832c53dbd010",
    "current": 63,
    "stress": {
     "current": null,
@@ -3939,7 +3939,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=100000 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "41f3e4ebabad44d157649e241fbbc7130e591c2fa8ca8560f767ac9f670ca863",
+   "all": "ce2a8cd2cf481060e47ab152755cd26295e1128e7698f3017b54409379b79478",
    "current": 63,
    "stress": {
     "current": null,
@@ -4052,7 +4052,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=-60 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4067,7 +4067,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-18 stress=-60 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4174,7 +4174,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=no-row series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4189,7 +4189,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=no-row series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4296,7 +4296,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=null series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4311,7 +4311,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=null series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4418,7 +4418,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=0 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4433,7 +4433,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=0 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4540,7 +4540,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=59 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4555,7 +4555,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=59 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4662,7 +4662,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=3600 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4677,7 +4677,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=3600 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4784,7 +4784,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=3617 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4799,7 +4799,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=3617 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4906,7 +4906,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=7237 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -4921,7 +4921,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=7237 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5028,7 +5028,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=100000 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5043,7 +5043,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=100000 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5150,7 +5150,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=-60 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5165,7 +5165,7 @@
    "hadPersistedAnchor": false
   },
   "switch=2026-10-19 stress=-60 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5272,7 +5272,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=no-row series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5287,7 +5287,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=no-row series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5394,7 +5394,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=null series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5409,7 +5409,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=null series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5516,7 +5516,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=0 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5531,7 +5531,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=0 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5638,7 +5638,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=59 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5653,7 +5653,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=59 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5760,7 +5760,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=3600 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5775,7 +5775,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=3600 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5882,7 +5882,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=3617 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -5897,7 +5897,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=3617 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -6004,7 +6004,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=7237 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -6019,7 +6019,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=7237 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -6126,7 +6126,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=100000 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -6141,7 +6141,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=100000 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [
@@ -6248,7 +6248,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=-60 series=false until=2026-10-18T07:00:00.000Z": {
-   "all": "149fa66fca2e45f73e595c35ec90596769fdafcad52ccefcf5f668ebeeb26695",
+   "all": "9d1c55e7cf6da5c16dc9121503291d1c9662be0abf3b995317084f676a25cba0",
    "current": 63,
    "stress": null,
    "availability": [
@@ -6263,7 +6263,7 @@
    "hadPersistedAnchor": false
   },
   "switch=null stress=-60 series=false until=2026-10-17T21:00:00.000Z": {
-   "all": "e5b3ceaa1efcf8322ecd28e1e6a27cb19ca0794147df484400c55604ce78dfa0",
+   "all": "e6a1238f584ee464a6a37014eeb66d01a70bf0817db95b0a00c7962ae7f04da5",
    "current": 63,
    "stress": null,
    "availability": [

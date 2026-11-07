@@ -156,7 +156,7 @@ export function buildRecoverySummary(
   }
 
   if (illness) {
-    const advisory = illnessAdvisory(illness.flag)
+    const advisory = illnessAdvisory(illness.flag, illness.biomarkers ?? undefined)
     // illnessAdvisory is non-null exactly when flag ≥ watch — normal nights stay silent.
     if (advisory) lines.push(`Illness radar (${illness.day}): ${illness.flag}, score ${illness.score}/100 — ${advisory}`)
   }

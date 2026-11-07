@@ -196,6 +196,41 @@ describe('/api/day-timeline — sleep', () => {
     expect(await eventsOf('wakeup')).toEqual([])
     expect(await eventsOf('sleep')).toEqual([])
   })
+
+  // #3662: the night is the one the Sleep score and the sleep card grade, whatever order the rows
+  // come back in. Every row carries a source id, so "the first row with one" was the first listed.
+  it('picks the overnight over a long daytime rest listed first', async () => {
+    listSleepSessions.mockResolvedValue([
+      sleep({ ouraId: 'rest', sleepStart: bne(DAY, '10:42'), sleepEnd: bne(DAY, '17:25'), durationHours: 6.17 }),
+      sleep({ ouraId: 'night', sleepStart: bne(YESTERDAY, '21:27'), sleepEnd: bne(DAY, '06:01'), durationHours: 7.92 }),
+    ])
+    const [wake] = (await eventsOf('wakeup')).filter((e: Row) => e.date === DAY)
+    expect(wake.timeMs).toBe(bne(DAY, '06:01').getTime())
+    expect(wake.sleepDurationH).toBeCloseTo(7.92, 5)
+    const [asleep] = await eventsOf('sleep')
+    expect(asleep.timeMs).toBe(bne(YESTERDAY, '21:27').getTime())
+  })
+
+  it('joins a split night, so it wakes at the end of the second half', async () => {
+    listSleepSessions.mockResolvedValue([
+      sleep({ ouraId: 'a', sleepStart: bne(YESTERDAY, '22:30'), sleepEnd: bne(DAY, '02:00'), durationHours: 3.5 }),
+      sleep({ ouraId: 'b', sleepStart: bne(DAY, '03:30'), sleepEnd: bne(DAY, '07:15'), durationHours: 3.75 }),
+    ])
+    const [wake] = (await eventsOf('wakeup')).filter((e: Row) => e.date === DAY)
+    expect(wake.timeMs).toBe(bne(DAY, '07:15').getTime())
+    expect(wake.sleepDurationH).toBeCloseTo(7.25, 5)
+    expect((await eventsOf('sleep'))[0].timeMs).toBe(bne(YESTERDAY, '22:30').getTime())
+  })
+
+  it("reads yesterday's night from the same rows, by its own date", async () => {
+    listSleepSessions.mockResolvedValue([
+      sleep({ date: YESTERDAY, ouraId: 'y', sleepStart: bne('2026-09-06', '22:00'), sleepEnd: bne(YESTERDAY, '06:30'), durationHours: 8.5 }),
+      sleep(),
+    ])
+    const wakes = await eventsOf('wakeup')
+    expect(wakes.map((e: Row) => e.date).sort()).toEqual([YESTERDAY, DAY])
+    expect(wakes.find((e: Row) => e.date === YESTERDAY).timeMs).toBe(bne(YESTERDAY, '06:30').getTime())
+  })
 })
 
 describe('/api/day-timeline — workouts', () => {

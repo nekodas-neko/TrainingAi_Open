@@ -21,7 +21,7 @@ import { metricAvailability, type MetricAvailability } from '@/lib/health/score-
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 import {
-  exerciseDrain, levelWithExerciseDrain,
+  exerciseDrain, levelWithExerciseDrain, shownBatteryTotals,
   WORKOUT_DRAIN_SHARE, STEP_DRAIN_SHARE, GOAL_RATIO_CAP, PER_MINUTE_COVERAGE_MIN,
 } from '@trainingai/shared/health/body-battery-exercise'
 
@@ -46,8 +46,8 @@ export interface BodyBatteryResponse {
    *  curve is real, but the level it starts from is not settled — the UI says so rather than
    *  presenting a number that will move on its own. */
   anchorProvisional: boolean
-  charged: number   // total points gained since wake
-  drained: number   // total points lost since wake
+  charged: number   // points gained since wake that reached the level: anchor + charged − drained = current (#3658)
+  drained: number   // points lost since wake that reached the level
   wakeTime: number | null   // epoch ms
   series: BodyBatteryPoint[]
   hasData: boolean          // true when real HR drove the arc
@@ -432,6 +432,8 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   const battery = levelWithExerciseDrain(walk.battery, anchor, exerciseDrained, hasExerciseDrain)
   const charged = walk.charged
   const drained = walk.drained + exerciseDrained
+  // What the cards print: only the charge and drain that reached the level (#3658).
+  const shown = shownBatteryTotals(anchor, battery, charged, drained)
   const stressDrained = walk.stressDrained
   const series: BodyBatteryPoint[] = hasExerciseDrain
     ? walk.series.map(p => ({ t: p.t, v: Math.round(levelWithExerciseDrain(p.v, anchor, exercise.drainedBy(p.t), true)) }))
@@ -494,8 +496,8 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
     anchor: Math.round(anchor),
     anchorSource,
     anchorProvisional,
-    charged: Math.round(charged),
-    drained: Math.round(drained),
+    charged: shown.charged,
+    drained: shown.drained,
     // The anchor the curve was actually walked from — re-deriving it here let the reported wake
     // time disagree with the one the series starts at.
     wakeTime,

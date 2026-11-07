@@ -148,8 +148,33 @@ describe('GET /api/oura/hr-day', () => {
   })
 
   it('reads the night dated the same day, because sleep_sessions.date is the WAKE date', async () => {
+    // The day before is read too: a night's first fragment can end before midnight and carry it.
     await get('?date=2026-09-01')
-    expect(listSleepSessions).toHaveBeenCalledWith('u-1', '2026-09-01', '2026-09-01')
+    expect(listSleepSessions).toHaveBeenCalledWith('u-1', '2026-08-31', '2026-09-01')
+  })
+
+  // #3662: the band shades the night the Sleep score and the sleep card describe, not a long
+  // daytime rest that happened to be listed first, and a split night is shaded as one.
+  const bne = (day: string, hhmm: string) => new Date(`${day}T${hhmm}:00+10:00`)
+  const row = (start: Date, end: Date, hours: number, id: string) =>
+    ({ id, date: '2026-09-01', ouraId: id, sleepStart: start, sleepEnd: end, durationHours: hours })
+
+  it('shades the overnight, not a daytime rest listed first', async () => {
+    listSleepSessions.mockResolvedValue([
+      row(bne('2026-09-01', '10:42'), bne('2026-09-01', '17:25'), 6.17, 'rest'),
+      row(bne('2026-08-31', '21:27'), bne('2026-09-01', '06:01'), 7.92, 'night'),
+    ])
+    const json = await (await get('?date=2026-09-01')).json()
+    expect(json.sleep).toEqual({ startMin: 0, endMin: 6 * 60 + 1 })
+  })
+
+  it('shades a split night to the end of its second half', async () => {
+    listSleepSessions.mockResolvedValue([
+      row(bne('2026-08-31', '22:30'), bne('2026-09-01', '02:00'), 3.5, 'a'),
+      row(bne('2026-09-01', '03:30'), bne('2026-09-01', '07:15'), 3.75, 'b'),
+    ])
+    const json = await (await get('?date=2026-09-01')).json()
+    expect(json.sleep).toEqual({ startMin: 0, endMin: 7 * 60 + 15 })
   })
 
   it('returns a null sleep band rather than omitting the field when there is no night', async () => {
