@@ -26,7 +26,9 @@ import {
   createWorkout,
   emptyJournal,
   endRest,
+  finishStaleWorkout,
   finishWorkout,
+  isStaleWorkout,
   mutationFor,
   pauseWorkout,
   readJournal,
@@ -37,6 +39,9 @@ import {
   type WorkoutSet,
 } from './workout.ts';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
+
+export const STALE_WORKOUT_NOTICE =
+  'Save or discard your unfinished workout before starting another.';
 
 export const PROGRAM_AS_WRITTEN =
   'Your AI coach could not prepare this session, so it starts from your program as written.';
@@ -290,6 +295,12 @@ export class WorkoutJournalStore {
       (workout) => workout.status === 'active',
     );
     if (active) {
+      // #3664: a days-old workout is never resumed into today; the caller offers to save or
+      // discard it first (StaleWorkoutCard).
+      if (isStaleWorkout(active, this.now())) {
+        this.publish({ message: STALE_WORKOUT_NOTICE });
+        return null;
+      }
       return active.id;
     }
     const generation = this.generation;
@@ -995,6 +1006,21 @@ export class WorkoutJournalStore {
     const now = this.now();
     const saved = await this.action((data) =>
       replaceWorkout(data, workoutId, (workout) => finishWorkout(workout, now)),
+    );
+    if (saved) {
+      void this.sync();
+    }
+    return saved;
+  };
+  /** #3664: saves a stale workout as it stood at its last recorded set, then uploads it. */
+  finishStale = async (workoutId: string) => {
+    const saved = await this.action((data) =>
+      replaceWorkout(data, workoutId, (workout) => {
+        if (!isStaleWorkout(workout, this.now())) {
+          throw new Error('This workout is still in progress.');
+        }
+        return finishStaleWorkout(workout);
+      }),
     );
     if (saved) {
       void this.sync();

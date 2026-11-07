@@ -2,6 +2,7 @@ import { toAestDay } from '@trainingai/shared/date-utils'
 import { normalizeMuscle, moodMuscleMatches } from '@trainingai/shared/muscles'
 import type { ProgramSession, MuscleAssignment, NextSessionRecommendation } from '@trainingai/shared/types/program'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
+import { loggedAsSession, programSessionFor } from '@trainingai/shared/workout/session-identity'
 
 export interface MuscleRecovery {
   muscle: string
@@ -11,6 +12,8 @@ export interface MuscleRecovery {
 
 export interface SessionHistory {
   sessionName: string
+  /** `workout_sessions.session_id`: the identity matched first (#3665). Null on an unlinked row. */
+  programSessionId?: string | null
   startedAt: Date
   hasExercises: boolean
 }
@@ -141,8 +144,9 @@ function sessionBalanceScore(
   history: SessionHistory[],
   now: Date,
 ): number {
+  const ids = new Set(sessions.map(x => x.id))
   const lastDoneMs = (s: ProgramSession): number => {
-    const entry = history.find(h => h.sessionName.toLowerCase() === s.name.toLowerCase() && h.hasExercises)
+    const entry = history.find(h => h.hasExercises && loggedAsSession(h, s, ids))
     // Use 30-day fallback for never-done sessions, not Unix epoch
     return entry ? entry.startedAt.getTime() : now.getTime() - THIRTY_DAYS_MS
   }
@@ -158,8 +162,14 @@ function sessionBalanceScore(
 
 // ── Freshness score — inverse of recency ─────────────────────────────────────
 
-function sessionFreshnessScore(session: ProgramSession, history: SessionHistory[], now: Date): number {
-  const last = history.find(h => h.sessionName.toLowerCase() === session.name.toLowerCase() && h.hasExercises)
+function sessionFreshnessScore(
+  session: ProgramSession,
+  sessions: ProgramSession[],
+  history: SessionHistory[],
+  now: Date,
+): number {
+  const ids = new Set(sessions.map(x => x.id))
+  const last = history.find(h => h.hasExercises && loggedAsSession(h, session, ids))
   if (!last) return 100
   const hoursAgo = (now.getTime() - last.startedAt.getTime()) / 3_600_000
   return Math.min(100, (hoursAgo / 48) * 100)
@@ -303,7 +313,7 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
   const todayStr = toAestDay(now, timezone)
   const todaySession = history.find(h => h.hasExercises && toAestDay(h.startedAt, timezone) === todayStr)
   if (todaySession) {
-    const sess = sessions.find(s => s.name.toLowerCase() === todaySession.sessionName.toLowerCase())
+    const sess = programSessionFor(todaySession, sessions)
     if (sess) return { isRestDay: false, session: sess, reason: `Already trained: ${sess.name}`, ...rem }
   }
 
@@ -318,7 +328,7 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
   const scoredRaw = sessions.map(s => {
     const recoveryScore  = sessionRecoveryScore(s, muscleAssignments, muscleRecovery, soreMuscles, suggestedSoreMuscles)
     const balanceScore   = sessionBalanceScore(s, sessions, history, now)
-    const freshnessScore = sessionFreshnessScore(s, history, now)
+    const freshnessScore = sessionFreshnessScore(s, sessions, history, now)
     return {
       session: s,
       recoveryScore,

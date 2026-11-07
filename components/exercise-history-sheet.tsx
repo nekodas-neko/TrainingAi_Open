@@ -5,7 +5,7 @@ import { Sparkline } from '@/components/ui/sparkline'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { ExerciseHistoryEntry, ExerciseHistoryResponse } from "@/app/api/exercise-history/route";
-import { displayOneRmSeries, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
+import { displayOneRmSeries, isEstimatedOneRm, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
 import type { MuscleAssignment } from "@trainingai/shared/types/program";
 import { MUSCLE_ROLE_LABEL } from "@trainingai/shared/workout/role-labels";
 import { MuscleHeatmap } from "@/components/muscle-heatmap";
@@ -87,7 +87,7 @@ export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClo
   const unit = oneRmUnit(exerciseType);
   const unitSuffix = unit === 'RM' ? 'reps' : 'kg';
   const rms = displayOneRmSeries(
-    entries.map(e => e.estimated1rm).filter((v): v is number => v != null && v > 0),
+    entries.map(e => e.estimated1rm).filter(isEstimatedOneRm),
     exerciseType,
   );
   const hasChart = rms.length >= 2;

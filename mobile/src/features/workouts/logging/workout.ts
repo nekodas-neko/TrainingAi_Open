@@ -44,6 +44,7 @@ const exerciseSchema = z.object({
   name: z.string().min(1).max(200),
   muscles: z.array(z.string()),
   style: z.string().nullable(),
+  styleId: z.string().nullable().default(null),
   instructions: z.string().nullable(),
   exerciseType: z.enum(['weighted', 'bodyweight']),
   exerciseRole: z.enum(['primary', 'secondary', 'accessory']).nullable().default(null),
@@ -426,6 +427,8 @@ export function mutationFor(
         }
       : {}),
     ...(exercise.style === null ? {} : { styleName: exercise.style }),
+    // #3663: as the current app sends it. The server keeps it only when the style is this user's.
+    ...(exercise.styleId === null ? {} : { styleId: exercise.styleId }),
     muscleGroups: exercise.muscles,
     exerciseDeloaded: exercise.deloaded,
     intensityMode: workout.intensityMode,
@@ -539,6 +542,67 @@ export function finishWorkout(workout: WorkoutRecord, now: number): WorkoutRecor
   };
   completed.pending.forEach((item) => mutationFor(completed, item));
   return completed;
+}
+
+/**
+ * The current app's age for an abandoned workout (`lib/stores/workout-store.ts`, E1-4: "Continue
+ * Workout resumed a days-old session"). It drops such a workout outright, which loses nothing there
+ * because each exercise uploaded when it was logged. Preview's sets are only on this phone until
+ * the workout finishes, so a stale one is offered to save or discard instead (#3664).
+ */
+export const STALE_WORKOUT_MS = 4 * 60 * 60 * 1000;
+
+/** The newest moment anything happened in a workout: its start, a set, a rest, a pause. */
+export function lastActivityAt(workout: WorkoutRecord): number {
+  const times = [
+    workout.startedAt,
+    workout.warmupEndedAt,
+    workout.pausedAt,
+    workout.rest?.startedAt,
+    workout.restAnchor?.startedAt,
+    ...workout.exercises.flatMap((exercise) => [
+      exercise.readyStartedAt,
+      ...exercise.sets.flatMap((set) => [set.startedAt, set.completedAt]),
+    ]),
+  ];
+  return Math.max(...times.filter((at): at is number => typeof at === 'number'));
+}
+
+/**
+ * An unfinished workout nobody has touched for over four hours. It is never resumed into today:
+ * its sets would upload under its old date and its duration would span the gap (#3664). Measured
+ * from its last activity, not its start, so a long session in progress never goes stale.
+ */
+export function isStaleWorkout(workout: WorkoutRecord, now: number): boolean {
+  return workout.status === 'active' && now - lastActivityAt(workout) > STALE_WORKOUT_MS;
+}
+
+/**
+ * Finishes a stale workout as it stood at its last recorded set: the set in progress, the rest
+ * and the pause that followed it are dropped, so neither the gap nor today lands in its duration.
+ */
+export function finishStaleWorkout(workout: WorkoutRecord): WorkoutRecord {
+  const recorded = recordedSets(workout);
+  if (!recorded.length) {
+    throw new Error('This workout has no recorded sets to save. Discard it instead.');
+  }
+  const endedAt = Math.max(...recorded.map((set) => set.completedAt!));
+  return finishWorkout(
+    {
+      ...workout,
+      pausedAt: null,
+      runningSet: null,
+      rest: null,
+      restAnchor: null,
+      exercises: workout.exercises.map((exercise) => ({
+        ...exercise,
+        sets: exercise.sets.map((set) =>
+          set.completedAt === null ? { ...set, startedAt: null } : set,
+        ),
+      })),
+    },
+    endedAt,
+  );
 }
 
 export function endRest(

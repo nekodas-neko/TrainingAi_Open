@@ -17,6 +17,8 @@ export type ExercisePreview = {
   sets: SetPreview[];
   setCount: number;
   style: string | null;
+  // The session exercise's progression style id, sent with each log as the current app sends it (#3663).
+  styleId?: string | null;
   instructions: string | null;
   exerciseType: 'weighted' | 'bodyweight';
   exerciseRole?: 'primary' | 'secondary' | 'accessory' | null;
@@ -188,6 +190,7 @@ function exercise(value: unknown, dataDate: string | null = null): ExercisePrevi
     sets,
     setCount: row.progressionStyle == null ? count(row.defaultSets) : sets.length,
     style: optionalText(row.styleName),
+    styleId: optionalText(row.styleId),
     instructions:
       typeof row.instructions === 'string' && row.instructions.trim() ? row.instructions : null,
     exerciseType: row.exerciseType === 'bodyweight' ? 'bodyweight' : 'weighted',
@@ -526,6 +529,9 @@ export function readSavedCatalog(
             });
             if (row.style !== null) {
               text(row.style);
+            }
+            if (row.styleId != null) {
+              text(row.styleId);
             }
             if (row.instructions !== null) {
               text(row.instructions);
