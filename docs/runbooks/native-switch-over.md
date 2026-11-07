@@ -23,6 +23,7 @@ downgrade"), **stop and tell the Orchestrator**. Never work around it.
 - ☐ The rollback build exists (see *Rollback*), with a code **above** the native app's.
 - ☐ The rehearsal passes with those two APKs (see *Rehearsal*).
 - ☐ The owner has said yes on the switch-over issue.
+- ☐ Preview is still installed, so step 1 can empty its queues.
 
 ## Rehearsal
 
@@ -54,13 +55,22 @@ Connect.
 
 ## Switch-over day, in order
 
-1. **Flush the old app's outbox.** Open the current app on Wi-Fi, go to **More** and wait until the
+1. **Flush TrainingAi Preview's queues.** Preview (`com.trainingai.app.preview`) is a separate app.
+   The native app installed today as `com.trainingai.app` starts with an empty store and can't read
+   what Preview still holds, so anything Preview hasn't uploaded is stranded once you stop opening
+   it. Open Preview on Wi-Fi, go to **More → Data & Sync**, tap **Sync now**, and wait for
+   **No changes waiting to upload**.
+   - That count leaves out the strap's heart-rate samples and the scale's weigh-ins (#3655). So also
+     open **More → Devices & connections** and check the scale card shows nothing "to file". After
+     the last strap workout, leave Preview open on Wi-Fi for a minute.
+   - Keep Preview installed until the native app has run for a week.
+2. **Flush the old app's outbox.** Open the current app on Wi-Fi, go to **More** and wait until the
    **Sync health** card is gone (no unsynced or dead-lettered rows). Anything left there is lost
    in the switch. Retry or discard the dead letters first.
-2. **Fresh database backup.** Actions → **Database backup** (`db-backup.yml`) → Run workflow. Wait
+3. **Fresh database backup.** Actions → **Database backup** (`db-backup.yml`) → Run workflow. Wait
    for green: it restores the dump into an empty Postgres to prove it.
-3. **Plug the phone in** by USB with debugging on. Exactly one phone should be attached.
-4. **Rehearse (dry run).** From the repo root:
+4. **Plug the phone in** by USB with debugging on. Exactly one phone should be attached.
+5. **Rehearse (dry run).** From the repo root:
    ```
    node scripts/native-switch-over/install.mjs --apk <native-release.apk>
    ```
@@ -71,20 +81,25 @@ Connect.
    prints the install command and stops. Fix anything it refuses before going on. The tools come
    from the Android SDK (`apksigner`, `apkanalyzer`, `adb`); pass `--apksigner`, `--apkanalyzer`,
    `--adb` or the `APKSIGNER` / `APKANALYZER` variables if they aren't on `PATH`.
-5. **Install.** Same command plus the explicit flag:
+6. **Install.** Same command plus the explicit flag:
    ```
    node scripts/native-switch-over/install.mjs --apk <native-release.apk> --i-have-the-owners-yes
    ```
    It runs only `adb install -r`. Keep the backup folder until the native app has run for a week.
-6. **Sign in** on the phone with the owner's account.
-7. **Smoke checks** (see [`device-smoke-checklist.md`](../device-smoke-checklist.md)): today's
-   data shows, a workout log saves and appears on the server, Health Connect sync runs, a
-   reminder fires. More → About shows the expected app version and build, the commit it was built
-   from, and the live server version. Report results on the switch-over issue, naming what wasn't
-   checked.
+7. **Sign in** on the phone with the owner's account.
 8. **Re-grant what the new install doesn't inherit.** Settings → Oura → "Open Display over other
    apps", allow it (the owner said yes on #3561), then turn the morning Oura fetch back on.
-   Notification permission is asked for on first use.
+   Notification permission is asked for on first use. Nothing carries the old app's or Preview's
+   pairings over, and Health Connect import starts switched off on a fresh install:
+   - **More → Devices & connections:** pair the heart-rate strap and the scale again.
+   - **More → Health Connect:** turn on **Sync Health Connect**, and allow the permissions it asks
+     for.
+9. **Smoke checks** (see [`device-smoke-checklist.md`](../device-smoke-checklist.md)): today's
+   data shows, a workout log saves and appears on the server, Health Connect sync runs, a
+   reminder fires, the strap's heart rate records during a workout, and one weigh-in from the
+   scale files. More → About shows the expected app version and build, the commit it was built
+   from, and the live server version. Report results on the switch-over issue, naming what wasn't
+   checked.
 
 The wrapper never runs in CI.
 
