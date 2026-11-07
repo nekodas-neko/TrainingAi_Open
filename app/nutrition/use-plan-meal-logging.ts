@@ -5,8 +5,8 @@ import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { toast } from 'sonner'
 import type { FoodLogWithItem, MealPlan, MealPlanMeal, MealType } from '@trainingai/shared/types/nutrition'
 import { logPlanMeal } from '@trainingai/shared/nutrition/log-plan-meal'
-import { pickPlanVariant, variantForEstimates } from '@trainingai/shared/nutrition/plan-variant'
-import { dueForEstimate, estimateSlotsFor } from '@trainingai/shared/nutrition/meal-estimate'
+import { pickPlanVariant } from '@trainingai/shared/nutrition/plan-variant'
+import { planEstimateAnswers } from '@trainingai/shared/nutrition/plan-estimate-answers'
 import { todayInTz, nowDatetimeInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
@@ -199,34 +199,29 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
     if (!userId || !mealPlan) return
     const store = getLocalStore(userId)
     if (!store || date !== todayInTz(tz)) return
-    const variant = variantForEstimates(mealPlan, isTrainingDay)
-    if (!variant) return
-    const slots = estimateSlotsFor(variant.meals, mealTypes)
-    if (slots.length === 0) return
     const [answers, dayLogs] = await Promise.all([store.getPlanMealAnswers(date), store.getFoodLogsWithItems(date)])
     const [h, m] = nowDatetimeInTz(tz).slice(11, 16).split(':').map(Number)
-    const due = dueForEstimate({
-      slots,
+    // #3650: the same rule TrainingAi Preview runs, from one shared function.
+    const due = planEstimateAnswers({
+      plan: mealPlan,
+      isTrainingDay,
+      mealTypes,
       loggedMealTypeIds: new Set(dayLogs.map(l => l.mealTypeId)),
       answeredPlanMealIds: new Set(answers.map(a => a.planMealId)),
       localHour: h + m / 60,
-      biasKcal: 0,
     })
     if (due.length === 0) return
     const now = new Date().toISOString()
     for (const e of due) {
       const id = crypto.randomUUID()
-      const est = {
-        estCalories: e.calories, estProteinG: e.proteinG, estCarbsG: e.carbsG, estFatG: e.fatG,
-        estBiasKcal: e.biasKcal, estBasis: 'planA',
-      }
+      const { planMealId, answer, ...est } = e
       await store.upsertPlanMealAnswer({
-        id, planMealId: e.planMealId, logDate: date, answer: 'estimated',
+        id, planMealId, logDate: date, answer,
         answeredAt: now, updatedAt: now, deletedAt: null, ...est,
       })
       await store.queueMutation({
         userId, domain: 'plan_meal_answers', date,
-        payload: { id, planMealId: e.planMealId, logDate: date, answer: 'estimated', ...est },
+        payload: { id, planMealId, logDate: date, answer, ...est },
       })
     }
     // #2072: the Nutrition ring counts these; tell it to re-read. #2863: body-metadata and

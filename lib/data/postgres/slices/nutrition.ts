@@ -387,6 +387,27 @@ export async function searchFoodItems(db: Db, userId: string, query: string): Pr
 }
 
 /**
+ * #3651. The user's live food carrying this exact barcode, newest first, as the current app's
+ * local `getFoodItemByBarcode` reads it (live rows only, so a food the look-alike merge retired
+ * resolves to its keeper, which the merge gave the barcode). TrainingAi Preview caches only part of
+ * the library, so a re-scan checks here before Open Food Facts instead of saving a second row.
+ * Trimmed, not normalised: a code is what the scanner read.
+ */
+export async function findFoodItemsByBarcode(db: Db, userId: string, barcode: string): Promise<FoodItem[]> {
+  const code = barcode.trim()
+  if (!code) return []
+  const rows = await db.select().from(s.foodItems)
+    .where(and(
+      eq(s.foodItems.userId, userId),
+      isNull(s.foodItems.deletedAt),
+      eq(s.foodItems.barcode, code),
+    ))
+    .orderBy(desc(s.foodItems.createdAt))
+    .limit(1)
+  return rows.map(rowToFoodItem)
+}
+
+/**
  * One food item by id, for the native client to read back what it uploaded under a client-minted
  * id. Scoped on `userId` in the WHERE, so another user's id and an unknown id are the same empty
  * result — the caller answers both 404 and ownership does not leak. A food merged into its keeper

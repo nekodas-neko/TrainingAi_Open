@@ -203,9 +203,26 @@ export async function setMealLoggingStatus(
           409,
         );
     }
+    // A choice makes the day tracked meal by meal (`explicit`): a skip, or clearing one. A
+    // `skipped: false` that clears nothing is not a choice. Preview sends one with every food
+    // log, and marking the day explicit for it dropped the day's plan-meal estimates and its
+    // "finished logging" mark from the calibrated burn (#3639). The current app writes no
+    // statuses, so its days stay non-explicit; this keeps a Preview food log the same.
+    const [existing] = await tx
+      .select({ skipped: s.mealLoggingStatuses.skipped, explicit: s.mealLoggingStatuses.explicit })
+      .from(s.mealLoggingStatuses)
+      .where(
+        and(
+          eq(s.mealLoggingStatuses.userId, userId),
+          eq(s.mealLoggingStatuses.logDate, date),
+          eq(s.mealLoggingStatuses.mealTypeId, mealTypeId),
+        ),
+      )
+      .limit(1);
+    const explicit = skipped || existing?.skipped === true || existing?.explicit === true;
     await tx
       .insert(s.mealLoggingStatuses)
-      .values({ userId, logDate: date, mealTypeId, skipped, decisionId, explicit: true })
+      .values({ userId, logDate: date, mealTypeId, skipped, decisionId, explicit })
       .onConflictDoUpdate({
         target: [
           s.mealLoggingStatuses.userId,
@@ -214,7 +231,7 @@ export async function setMealLoggingStatus(
         ],
         set: {
           skipped,
-          explicit: true,
+          explicit,
           decisionId,
           decidedAt: new Date(),
           retired: false,

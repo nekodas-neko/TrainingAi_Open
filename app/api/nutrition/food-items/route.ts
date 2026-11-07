@@ -29,9 +29,17 @@ export async function GET(req: Request) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const q = new URL(req.url).searchParams.get('q') ?? ''
+  const params = new URL(req.url).searchParams
+  const barcode = params.get('barcode')
+  // #3651. `barcode` resolves a scan against the whole library; `q` is the name search.
+  if (barcode !== null && (barcode.trim().length === 0 || barcode.length > 64)) {
+    return NextResponse.json({ error: 'Invalid barcode' }, { status: 400, headers: { "Cache-Control": "private, no-store" } })
+  }
+  const q = params.get('q') ?? ''
   const repo = await getRepository()
-  const items = await repo.searchFoodItems(userId, q)
+  const items = barcode !== null
+    ? await repo.findFoodItemsByBarcode(userId, barcode)
+    : await repo.searchFoodItems(userId, q)
   return NextResponse.json(items, { headers: { "Cache-Control": "private, no-store" } })
 }
 
