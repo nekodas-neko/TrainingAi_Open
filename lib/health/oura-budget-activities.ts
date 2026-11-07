@@ -36,7 +36,9 @@ export async function ouraBudgetActivities(
   return ouraWorkoutActivities(rows, withEveningBefore, tz).filter(a => a.date >= from && a.date <= to)
 }
 
-async function readEveningBefore(repo: Pick<WorkoutRepository, 'listActivityLogs'>, userId: string, from: string) {
+/** The in-app logs of the day before `from`, matched against a range's first day and never counted
+ *  (also read by the heart-health activity, #3646). Empty when the read fails. */
+export async function readEveningBefore(repo: Pick<WorkoutRepository, 'listActivityLogs'>, userId: string, from: string) {
   const dayBefore = shiftDateStr(from, -1)
   try {
     return await repo.listActivityLogs(userId, dayBefore, dayBefore)
