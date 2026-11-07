@@ -11,11 +11,11 @@
  */
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalNightsByDate } from '@trainingai/shared/health/sleep-night'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 import { TEMP_BASELINE_MIN_DAYS } from '@trainingai/shared/ai-periodization/deload-constants'
 import { ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
-import { resolveReadinessNightInputs, canonicalNightsByDate, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
+import { resolveReadinessNightInputs, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
 
 export interface NightTemperature {
   /** The night readiness scores (its wake date), or null when there is no night to read. */

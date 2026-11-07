@@ -5,7 +5,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { subDays } from 'date-fns'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { computeSleepStartConsistency } from '@trainingai/shared/health/sleep-consistency'
-import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalNightsByDate } from '@trainingai/shared/health/sleep-night'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 
 const FALLBACK_HOUR = 22
@@ -39,10 +39,14 @@ export async function GET() {
   // and which are naps, and a manual value substituted first would be attached to whatever survived
   // that. The aggregate carries the field through from its first window, so the night it lands on is
   // the night the user answered about.
+  //
+  // One night per date, the one the Sleep score grades (#3662): a four-hour daytime rest counts as
+  // a night period, and averaged in beside that date's real night it moved the estimate by most of
+  // an hour for two weeks.
   const { meanMinutesFromNoon } = computeSleepStartConsistency(
     // #2265: a night the owner marked partial has the wrong bedtime unless they also remembered the
     // real one (`manualSleepStart`), in which case that is the bedtime. Otherwise it is skipped.
-    nightSessions(sleepSessions, tz)
+    canonicalNightsByDate(nightSessions(sleepSessions, tz), tz)
       .filter(s => !isPartialNight(s) || s.manualSleepStart != null)
       .map(s => (s.manualSleepStart ?? s.sleepStart).toISOString()),
     tz,

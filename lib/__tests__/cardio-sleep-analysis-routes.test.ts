@@ -223,6 +223,26 @@ describe('GET /api/sleep-performance-correlation', () => {
     expect(body.buckets.find((b: Row) => b.label === '<6h')).toBeUndefined()
   })
 
+  it("pairs a day's lifts with its overnight, not a long daytime rest on the same date (#3662)", async () => {
+    // A ≥ 4 h rest counts as a night period wherever it sits, so `nightSessions` returns two for
+    // the date, and last-write-wins took the later one. The date's night is the one the score grades.
+    const rest = (dayIso: string, hours: number) => {
+      const start = new Date(`${dayIso}T00:42:00Z`)                  // 10:42 Brisbane
+      return { date: dayIso, durationHours: hours, sleepStart: start, sleepEnd: new Date(start.getTime() + hours * 3_600_000) }
+    }
+    const days = ['2026-03-01', '2026-03-02', '2026-03-03']
+    getWorkoutSessionsFrom.mockResolvedValue(days.map(d => workoutDay(d, 1)))
+    listSleepSessions.mockResolvedValue([
+      night('2026-03-01', 7.6),
+      night('2026-03-02', 7.9),
+      rest('2026-03-02', 6.2),
+      night('2026-03-03', 7.4),
+    ])
+    const body = await (await sleepCorrelation()).json()
+    expect(body.buckets.find((b: Row) => b.label === '7–8h').count).toBe(3)
+    expect(body.buckets.find((b: Row) => b.label === '6–7h')).toBeUndefined()
+  })
+
   it('falls back to the previous night when the sleep row is dated the night before', async () => {
     // Sleep rows are keyed on the wake date, but a row can land on the day before the workout;
     // the route tries the workout's own date first and then yesterday's.

@@ -26,7 +26,7 @@ import { rowsOfDeviceInUse, nightAlgorithmVersion } from '@trainingai/shared/hea
 import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
 import { isPartialNight } from '@trainingai/shared/health/partial-night'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
-import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalLatestNight, canonicalNightsByDate } from '@trainingai/shared/health/sleep-night'
 import { restingHrOnDay } from '@trainingai/shared/health/resting-hr-mean'
 import { scoreActivityForDay, restingHrBaseline, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
 import { perMinuteMovementGrid } from '@trainingai/shared/health/per-minute-movement'
@@ -43,7 +43,7 @@ import { ouraDaytimeHighRecovery, ouraDaytimeHighStress, ouraTemperatureDeviatio
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
 import { ouraCloudDeliveredTypes } from '@/lib/oura/cloud/config'
-import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, canonicalNightsByDate, readinessSourceLabel, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
+import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, readinessSourceLabel, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.

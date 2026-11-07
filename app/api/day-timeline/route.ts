@@ -9,7 +9,7 @@ import {
   MIN_DISTANCE_M, MIN_AVG_SPEED_KMH, MIN_DURATION_SEC, MAX_DURATION_SEC,
 } from '@/lib/activity/detection-thresholds'
 import type { SleepSession } from '@trainingai/shared/types/body'
-import { pickPrimarySleep } from '@/lib/sleep/primary-sleep'
+import { gradedNightForDate } from '@trainingai/shared/health/sleep-night'
 import { sessionActiveMin } from '@trainingai/shared/workout/active-duration'
 
 export type TimelineEventType = 'wakeup' | 'sleep' | 'workout' | 'meal' | 'walk' | 'bedtime' | 'tag'
@@ -82,9 +82,10 @@ export async function GET(req: Request) {
 
   const repo = await getRepository()
 
-  const [sleepRows, ySleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraTags, ouraSessions, derivedRows] = await Promise.all([
-    repo.listSleepSessions(userId, date, date),
-    repo.listSleepSessions(userId, yesterday, yesterday),
+  const [sleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraTags, ouraSessions, derivedRows] = await Promise.all([
+    // From the day before yesterday: a night is grouped by its windows, and a fragment that ended
+    // before midnight carries the earlier date.
+    repo.listSleepSessions(userId, shiftDateStr(yesterday, -1), date),
     repo.getWorkoutSessionsFrom(userId, yDayStart),
     repo.listFoodLogs(userId, date),
     repo.listMealTypes(userId),
@@ -101,9 +102,10 @@ export async function GET(req: Request) {
   const derivedByDate = new Map(derivedRows.map(r => [r.day, r]))
 
   // ── Wakeups (today + yesterday) ──────────────────────────────────────────
-  // listSleepSessions filters by wake-up date, so any returned row belongs on that day.
-  const todaySleep = pickPrimarySleep(sleepRows)
-  const yesterdaySleep = pickPrimarySleep(ySleepRows)
+  // Each date's graded night: the one the Sleep score and the sleep card use, so "Woke up" and
+  // "Fell asleep" never come from a daytime rest or half of a split night (#3662).
+  const todaySleep = gradedNightForDate(sleepRows, date, tz)
+  const yesterdaySleep = gradedNightForDate(sleepRows, yesterday, tz)
 
   function pushWakeup(sleep: SleepSession | null, dayStr: string) {
     if (!sleep?.sleepEnd) return
