@@ -906,3 +906,49 @@ test('a server without the retired-foods read still refreshes the library, and k
   assert.equal(store.getSnapshot().data.foodsRetiredAt, null);
   assert.equal(store.getSnapshot().errors.foods, undefined);
 });
+
+// #3654. The server's pull cursor now overlaps: a drained page cursors ten minutes behind the pull's
+// start, and a page can re-send rows an earlier page already carried. A backdated dose's readback
+// must still find its row and finish, whichever page carries it and however often.
+test('a backdated dose is confirmed when the pull re-sends rows across pages', async () => {
+  const f = fixture();
+  f.supplements.push(
+    supplementSchema.parse({
+      id: id(140),
+      name: 'Creatine',
+      dose: null,
+      defaultAmount: 5,
+      unit: 'g',
+      active: true,
+      sortOrder: 0,
+      reminderEnabled: false,
+      reminderTime: null,
+      loggedToday: false,
+    }),
+  );
+  const yesterday = '2026-10-10';
+  const other = { supplementId: id(141), logDate: yesterday, source: 'manual', amount: 1, unit: 'g', doseText: null };
+  const ours = { supplementId: id(140), logDate: yesterday, source: 'manual', amount: 5, unit: 'g', doseText: null };
+  const pages = [
+    // A page cut short: the cursor is the page's last stamp, ahead of `since`.
+    { supplementLogs: [other], syncedAt: '2026-10-10T01:00:00.000Z', hasMore: true },
+    // The next page re-sends the row the first page carried, then ours, twice over.
+    { supplementLogs: [other, ours, ours], syncedAt: '2026-10-11T02:50:00.000Z', hasMore: false },
+  ];
+  const asked: string[] = [];
+  const get = f.connection.get;
+  f.connection.get = async (path: string, query?: Record<string, string>) => {
+    if (path.endsWith('/api/sync/pull')) {
+      asked.push(query?.since ?? '');
+      return pages[asked.length - 1] ?? { supplementLogs: [], syncedAt: '2026-10-11T02:50:00.000Z', hasMore: false };
+    }
+    return get(path, query);
+  };
+  const store = await ready(f);
+  await store.refresh('supplements', date);
+  await store.logSupplement(store.view(date).supplements[0], yesterday);
+  await store.sync();
+  assert.equal(store.getSnapshot().operations.length, 0, store.getSnapshot().error ?? '');
+  assert.equal(asked.length, 2);
+  assert.equal(asked[1], '2026-10-10T01:00:00.000Z');
+});

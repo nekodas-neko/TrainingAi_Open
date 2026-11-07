@@ -1,5 +1,6 @@
 import { isSQLiteAvailable, isLocalStoreDead, runSQL, querySQL, querySQLOpen } from '@/lib/sqlite/sqlite-service';
 import { storeOwnedByAnotherAccount } from './device-owner';
+import type { HeldRow, HeldTable } from './held-tables';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalManualSleepNight, LocalWorkoutSession,
   LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle, PendingMutation,
@@ -285,7 +286,14 @@ export interface LocalStore {
    *  whose `updated_at` is before `before` are considered, so a row pulled after the server read its
    *  id list is never taken for a ghost. Never touches a pending or manual row. Returns the count. */
   deleteGhostBleSleepRows(serverIds: ReadonlySet<string>, before: Date): Promise<number>;
+  /** #3654: the `updated_at` this device holds for each of `keys` in a pulled table, keyed as the pull
+   *  keys it (`day_checkins` as `log_date|phase`), with the fill columns it lacks
+   *  (`HELD_FILL_COLUMNS`). A key the device does not hold is absent. Read before a pull is applied,
+   *  to tell a row the pull's overlap re-sent from one that changed. Optional: a store without it
+   *  reads as holding nothing, so every pulled row counts as a change. */
+  heldUpdatedAt?(table: HeldTable, keys: string[]): Promise<Map<string, HeldRow>>;
 }
+
 
 // Per-user factory. Each call with the same userId returns the same instance.
 const _stores = new Map<string, LocalStore>();

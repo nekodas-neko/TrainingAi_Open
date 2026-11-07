@@ -1,6 +1,7 @@
 import { getLocalStore, getUngatedLocalStore, type LocalStore } from './index';
 import { reconcileDeadLetters } from './dead-letter-signal';
 import { verifyDataEpoch } from './data-epoch';
+import { freshnessFor, everyRowIsFresh } from './pull-freshness';
 import { resolveFailedOutboxIds, serverBackoffMs, buildWorkoutLogPayload } from './sync-helpers';
 import type { SyncDelta } from '@/lib/data/repository';
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
@@ -751,6 +752,12 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   let prunedPrograms = 0;
   let prunedBests = 0;
   let bestsReadFailed = false;
+  // #3654: which domains this page changes on the device, read before it is applied (see
+  // `pull-freshness.ts`). An incremental pull re-sends the server's overlap; a full re-pull or a
+  // restore counts every row, as before.
+  const isFresh = fullResync || restore ? everyRowIsFresh : freshnessFor(store!);
+  const byId = (r: { id: string }) => r.id;
+  let fresh = noSyncedDomains();
   try {
     await withApplyLock(async () => {
       // Waiting for the lock can outlast a sign-out: `clearLocalStoreData` empties the tables and
@@ -770,6 +777,43 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
           bestsReadFailed = true;
           return;
         }
+      }
+      try {
+        fresh = {
+          biometrics: await isFresh('body_metrics', bodyMetrics, r => r.date) ||
+                      await isFresh('mood_logs', moodLogs, r => r.logDate) ||
+                      await isFresh('sleep_sessions', sleepSessions, byId),
+          // A program's or a style's children ride only with a changed parent (LB-66), so the parents decide.
+          programs:   await isFresh('local_programs', programs, byId) ||
+                      await isFresh('local_progression_styles', progressionStyles, byId),
+          workouts:   await isFresh('workout_sessions', workoutSessions, byId) ||
+                      await isFresh('exercise_logs', exerciseLogs, byId) ||
+                      await isFresh('set_logs', setLogs, byId),
+          // `food_items` has no server `updated_at`, so a held food cannot be told unchanged from
+          // changed: a food this device lacks counts, and so does any tombstone, since a merge's keeper
+          // rides with one (#3476). A food re-sent beside a re-sent log is held and counts for nothing.
+          nutrition:  await isFresh('food_logs', foodLogs, byId) ||
+                      (foodItems.length > 0 && await isFresh('food_items', foodItems.filter(f => !f.deletedAt), byId)) ||
+                      foodItems.some(f => f.deletedAt),
+          supplements: await isFresh('supplements', supplements, byId) ||
+                       await isFresh('supplement_logs', supplementLogs, byId),
+          activity:    await isFresh('activity_logs', activityLogs, byId),
+          fitnessTests: await isFresh('fitness_tests', fitnessTests, byId),
+          running:     await isFresh('prescribed_runs', prescribedRuns, byId),
+          injuries:    await isFresh('injuries', injuries, byId),
+          ouraDaily:   await isFresh('oura_daily', ouraDaily, r => r.day),
+          dayCheckins: await isFresh('day_checkins', dayCheckins, r => `${r.logDate}|${r.phase}`),
+          // Variants and meals ride their plan's page, so the plan and the answers decide.
+          mealPlans:   await isFresh('meal_plans', mealPlans, byId) ||
+                       await isFresh('plan_meal_answers', planMealAnswers, byId),
+        };
+      } catch (err) {
+        // A read that fails here must not cost the pull: count the page as the old code did.
+        console.error('[pullDelta] reading held rows failed — counting every pulled row as a change:', err);
+        fresh = {
+          biometrics: true, programs: true, workouts: true, nutrition: true, supplements: true, activity: true,
+          fitnessTests: true, running: true, injuries: true, ouraDaily: true, dayCheckins: true, mealPlans: true,
+        };
       }
       await store!.applyDelta(delta);
       // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
@@ -792,31 +836,28 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
 
   return {
     count: count + prunedPrograms + prunedBests,
+    // Each flag is raised by a row that changes the device (`fresh`, #3654), not by every row the page
+    // carried: the server's overlap re-sends rows the device already holds.
     domains: {
-      biometrics:  bodyMetrics.length > 0 || moodLogs.length > 0 || sleepSessions.length > 0,
-      programs:    prunedPrograms > 0 || programs.length > 0 || progressionStyles.length > 0 ||
-                   programSessions.length > 0 || sessionExercises.length > 0 ||
-                   schedules.length > 0 || scheduleDays.length > 0 || styleSets.length > 0,
+      biometrics:  fresh.biometrics,
+      programs:    prunedPrograms > 0 || fresh.programs,
       // set_logs are cursored on their own `updated_at`, so a set edited on its own arrives without
       // its exercise log — and every workout summary is derived from sets.
-      workouts:    workoutSessions.length > 0 || exerciseLogs.length > 0 || setLogs.length > 0 ||
-                   personalRecords.length > 0 || prunedBests > 0,
-      nutrition:   foodItems.length > 0 || foodLogs.length > 0,
-      supplements: supplements.length > 0 || supplementLogs.length > 0,
-      activity:    activityLogs.length > 0,
-      fitnessTests: fitnessTests.length > 0,
-      running:     prescribedRuns.length > 0,
-      injuries:    injuries.length > 0,
+      workouts:    fresh.workouts || personalRecords.length > 0 || prunedBests > 0,
+      nutrition:   fresh.nutrition,
+      supplements: fresh.supplements,
+      activity:    fresh.activity,
+      fitnessTests: fresh.fitnessTests,
+      running:     fresh.running,
+      injuries:    fresh.injuries,
       // `ouraDailySummary` / `ouraDailyDerived` deliberately raise nothing: the phone is their only
       // writer, so a pull carries them back only as the echo of its own backup push (or a restore),
       // and invalidating every Oura-derived cache on each echo would blank first paint for no change.
-      ouraDaily:   ouraDaily.length > 0,
-      dayCheckins: dayCheckins.length > 0,
+      ouraDaily:   fresh.ouraDaily,
+      dayCheckins: fresh.dayCheckins,
       // Rides the mealPlans flag rather than getting its own: the answers only mean anything
       // beside the plan they answer, and every consumer that reacts to one needs the other.
-      // Variants and meals ride their plan's page today; listed so the flag still holds if they stop.
-      mealPlans:   mealPlans.length > 0 || mealPlanVariants.length > 0 || mealPlanMeals.length > 0 ||
-                   planMealAnswers.length > 0,
+      mealPlans:   fresh.mealPlans,
     },
     // Old servers omit hasMore entirely, which reads as false — one page, done:
     // fully backwards compatible.
