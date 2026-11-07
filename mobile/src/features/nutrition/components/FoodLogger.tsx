@@ -58,13 +58,13 @@ import {
   lookupBarcodeScan,
   photoRetryAllowed,
   readFoodScan,
-  savedBarcodeFood,
   savedSource,
   scanBasis,
   scanSource,
   type ScanBasis,
 } from '../data/scan-response';
 import { photoDraftSchema } from '../data/photo-draft';
+import { librarySearch, librarySearchSpec, recentFoods, savedFoodForBarcode } from '../data/food-library';
 import { MacroLine, NutritionFieldsForm, foodFields, macroKeys } from './NutritionElements';
 import { failureNotice } from '../../../core/reporting/index.ts';
 const draftSchema = z.object({
@@ -210,6 +210,13 @@ export function FoodLogger({
       current = false;
     };
   }, [photoScope, photoKey, resources]);
+  // #3651 / #3652. The phone keeps part of the library; the rest is searched on the server, and
+  // a food the look-alike merge retired is never offered.
+  const retired = new Set(n.view.retiredFoodIds);
+  const savedSearch = useWorkoutResource(
+    librarySearchSpec(term.trim()),
+    term.trim().length >= 2 && d.tab === 'search',
+  );
   const database = useWorkoutResource(
     {
       path: '/api/nutrition/food-search',
@@ -359,14 +366,16 @@ export function FoodLogger({
       });
       return;
     }
-    const saved = savedBarcodeFood(n.view.foods, code);
-    if (saved) {
-      pick(saved);
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
+      // #3651: a food already saved, on the phone or anywhere in the library, before the database.
+      const saved = await savedFoodForBarcode(resources.connection, n.view.foods, code, retired);
+      if (saved) {
+        setBusy(false);
+        pick(saved);
+        return;
+      }
       review(await lookupBarcodeScan(resources.connection, code));
     } catch (cause) {
       setError(barcodeError(cause));
@@ -668,12 +677,15 @@ export function FoodLogger({
                   onChangeText={setQuery}
                 />
                 {(d.tab === 'recent'
-                  ? (recent.data ?? n.view.logs.map((log) => log.foodItem))
-                  : n.view.foods
-                )
-                  .filter((food) => food.name.toLowerCase().includes(query.toLowerCase()))
-                  .slice(0, 50)
-                  .map((food) => (
+                  ? recentFoods(
+                      recent.data ?? n.view.logs.map((log) => log.foodItem),
+                      n.view.foods,
+                      retired,
+                    )
+                      .filter((food) => food.name.toLowerCase().includes(query.toLowerCase()))
+                      .slice(0, 50)
+                  : librarySearch(n.view.foods, savedSearch.data, query, retired)
+                ).map((food) => (
                     <ListRow
                       key={food.id}
                       leading={<Thumbnail uri={food.imageDataUri} label={food.name} />}

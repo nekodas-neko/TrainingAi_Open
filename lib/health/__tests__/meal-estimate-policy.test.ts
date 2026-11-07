@@ -57,6 +57,15 @@ describe('meal-status calorie accounting', () => {
       expect(result.balance?.intakeKcal).toBe(1000);
     },
   );
+  it('a Preview food log’s non-explicit status row keeps the plan estimate, as the current app does (#3639)', async () => {
+    // The current app writes no status rows; a Preview breakfast log now stores a non-explicit
+    // one. Both read the same intake.
+    for (const tracking of [[], [{ mealTypeId: 'breakfast', skipped: false, explicit: false }]]) {
+      const result = await computeEnergyBalance(fixture(tracking), 'one', 'Australia/Brisbane', date);
+      expect(result.balance?.estimatedKcal).toBe(500);
+      expect(result.balance?.intakeKcal).toBe(1500);
+    }
+  });
   it('logging the real meal replaces its estimate instead of counting both', async () => {
     const result = await computeEnergyBalance(
       fixture([], ['breakfast', 'lunch']),

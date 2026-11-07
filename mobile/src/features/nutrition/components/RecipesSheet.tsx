@@ -34,6 +34,7 @@ import { MacroLine } from './NutritionElements';
 import { aiFailureText } from '../../account/api/client';
 import { readRecipeScan, recipePhotoError } from '../data/scan-response';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { keeperItems } from '../data/retired-foods';
 const editorSchema = z.object({
   name: z.string(),
   servings: z.string(),
@@ -97,10 +98,8 @@ export function RecipesSheet({
             servings: String(meal.servings),
             imageDataUri: meal.imageDataUri ?? null,
             mealTypeIds: meal.mealTypeIds,
-            items: meal.items.map((i) => ({
-              foodItemId: i.foodItemId,
-              quantityMultiplier: i.quantityMultiplier,
-            })),
+            // #3652: a meal read before a look-alike merge edits onto the keeper.
+            items: keeperItems(meal.items, n.view.foods, new Set(n.view.retiredFoodIds)),
             url: '',
           }
         : initial,
@@ -108,11 +107,13 @@ export function RecipesSheet({
     setEditor(meal ? (duplicate ? 'copy:' + meal.id : meal.id) : 'new');
     setSelected(null);
   }
+  // A retired food with no keeper on the phone still draws from the meal's own copy (#3652).
+  const known = [...n.view.foods, ...n.view.meals.flatMap((m) => m.items.map((i) => i.foodItem))];
   const items = d.items.flatMap((item) => {
-    const food = item.food ?? n.view.foods.find((x) => x.id === item.foodItemId);
+    const food = item.food ?? known.find((x) => x.id === item.foodItemId);
     return food ? [{ ...item, food }] : [];
   });
-  const aggregate = recipeTotals(d.items, n.view.foods);
+  const aggregate = recipeTotals(d.items, known);
   async function save(force = false) {
     if (!n.store || busy) {
       return;

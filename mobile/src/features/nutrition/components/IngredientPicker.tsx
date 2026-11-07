@@ -6,6 +6,7 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useNutrition } from '../data/NutritionProvider';
 import { FoodItemPushSchema, foodSchema, scanSchema, type Food } from '../data/models';
 import { NutritionFieldsForm, macroKeys } from './NutritionElements';
+import { librarySearch, librarySearchSpec } from '../data/food-library';
 export function useSearchTerm(value: string) {
   const [term, setTerm] = useState(value);
   useEffect(() => {
@@ -27,6 +28,8 @@ export function IngredientPicker({
   const [manual, setManual] = useState(false);
   const [fields, setFields] = useState<Record<string, string>>({ servingSizeG: '100' });
   const [error, setError] = useState<string | null>(null);
+  // #3651: saved foods the phone has not cached are searched on the server, as in the logger.
+  const saved = useWorkoutResource(librarySearchSpec(term.trim()), term.trim().length >= 2 && !manual);
   const results = useWorkoutResource(
     {
       path: '/api/nutrition/food-search',
@@ -87,17 +90,16 @@ export function IngredientPicker({
       ) : (
         <>
           <TextField label="Search ingredients" value={query} onChangeText={setQuery} />
-          {n.view.foods
-            .filter((f) => f.name.toLowerCase().includes(query.toLowerCase()))
-            .slice(0, 30)
-            .map((f) => (
+          {librarySearch(n.view.foods, saved.data, query, new Set(n.view.retiredFoodIds), 30).map(
+            (f) => (
               <ListRow
                 key={f.id}
                 title={f.name}
                 subtitle={f.servingSizeG + ' g'}
                 onPress={() => onChoose(f, false)}
               />
-            ))}
+            ),
+          )}
           {results.data?.results.map((s, i) => (
             <ListRow
               key={i}

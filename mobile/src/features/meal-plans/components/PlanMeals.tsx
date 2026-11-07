@@ -3,6 +3,7 @@ import { logPlanMeal as logPlan } from '../data/log-plan-meal';
 import { EstimatedMeals } from './EstimatedMeals';
 import type { EstimateRequest } from '../data/estimated-meals';
 import { knownTrainingDay, nextSessionSpec } from '../data/next-session';
+import { usePlanEstimates } from '../usePlanEstimates';
 import {
   daysBetweenDateStrs,
   secondsSinceLocalMidnight,
@@ -108,6 +109,9 @@ export function ActiveMealPlan({
     plan?.variants.find((v) => v.dayType === 'all') ??
     plan?.variants.find((v) => v.dayType === (knownTraining ? 'training' : 'rest')) ??
     plan?.variants[0];
+  // #3650: today's unlogged plan meals are assumed eaten once their slot is over, as the current
+  // app's plan card does when it loads.
+  usePlanEstimates(n, date, plan, knownTraining);
   const hour = secondsSinceLocalMidnight(n.timezone) / 3600;
   const logged = (m: Meal) =>
     plannedMealRecorded(m, n.view.logs, n.view.mealTypes as unknown as MealType[]);

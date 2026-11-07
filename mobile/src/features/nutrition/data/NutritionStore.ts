@@ -34,8 +34,13 @@ import type { AccountConnection } from '../../account/session.ts';
 import { normaliseFood, type FoodEntry } from './food-values.ts';
 import {
   RETIRED_FOODS_PATH,
+  keeperFor,
+  liveCatalog,
   refreshedLibrary,
+  retiredFoodIdsOf,
   retiredFoodsSchema,
+  retiredFoodsSince,
+  retiredIdsAfter,
   type RetiredFoods,
 } from './retired-foods.ts';
 import {
@@ -63,7 +68,8 @@ import {
   type Supplement,
 } from './models.ts';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
-import { QUANTITY_MULTIPLIER_MAX, QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds';
+import { QUANTITY_MULTIPLIER_MAX, QUANTITY_MULTIPLIER_MIN, quantityMultiplierInRange } from '@trainingai/shared/nutrition/quantity-bounds';
+import { lookAlikeFactor } from '@trainingai/shared/nutrition/food-merge';
 const logBody = z.object({
   id: z.uuid(),
   mealTypeId: z.uuid(),
@@ -159,6 +165,10 @@ const dataSchema = z.object({
   mealStatuses: z.record(z.string(), z.array(mealLoggingChoiceSchema)).default({}),
   // #3476. The last `at` from the retired-foods read, its next cursor.
   foodsRetiredAt: z.string().nullable().default(null),
+  // #3652. Every food the look-alike merge retired, by id, so a saved day's or saved meal's stale
+  // copy is never offered or logged. Undefined on a phone that predates the list, which re-reads
+  // retirements from the beginning once.
+  retiredFoodIds: z.array(z.string()).optional(),
 });
 const httpBodies = {
   'meal-status': z
@@ -558,8 +568,11 @@ export class NutritionStore {
         ...state.data,
         foods: mergeIds(
           state.data.foods,
+          // #3652: an Undo restoring a log on a merged-away food must not put it back in the library.
           knownFoods.filter(
-            (food) => !state.data.foods.some((existing) => existing.id === food.id),
+            (food) =>
+              !state.data.foods.some((existing) => existing.id === food.id) &&
+              !retiredFoodIdsOf(state.data).has(food.id),
           ),
         ),
       },
@@ -690,7 +703,16 @@ export class NutritionStore {
                       : kind === 'foods'
                         ? {
                             foods: refreshedLibrary(state.data.foods, response as Food[], retired),
-                            ...(retired ? { foodsRetiredAt: retired.at } : {}),
+                            ...(retired
+                              ? {
+                                  foodsRetiredAt: retired.at,
+                                  retiredFoodIds: retiredIdsAfter(
+                                    state.data.retiredFoodIds,
+                                    response as Food[],
+                                    retired,
+                                  ),
+                                }
+                              : {}),
                           }
                         : {
                             [kind]: response,
@@ -800,9 +822,21 @@ export class NutritionStore {
     }[] = [];
     const available = this.view(date).foods.slice();
     const knownFoods: Food[] = [];
-    for (const entry of entries) {
+    const retired = retiredFoodIdsOf(this.current.data);
+    for (const original of entries) {
+      // #3652. A stale copy of a merged-away food (a saved day's log, an old saved meal) lands on
+      // its keeper, in the same grams, as the merge moves a log. With no keeper on the phone the
+      // log keeps the id, which the server still accepts.
+      const keeper = original.id ? keeperFor({ ...original, id: original.id }, available, retired) : null;
+      const moved = keeper
+        ? original.quantityMultiplier * lookAlikeFactor(original, keeper)
+        : original.quantityMultiplier;
+      const entry =
+        keeper && keeper.id !== original.id && quantityMultiplierInRange(moved)
+          ? { ...keeper, quantityMultiplier: moved }
+          : original;
       let foodId = entry.id;
-      if (foodId && !available.some((food) => food.id === foodId)) {
+      if (foodId && !available.some((food) => food.id === foodId) && !retired.has(foodId)) {
         knownFoods.push(
           foodSchema.parse({ source: 'manual', ...normaliseFood(entry, foodId) }),
         );
@@ -1478,7 +1512,7 @@ export class NutritionStore {
    * must not cost the food list its refresh. The cursor stays, so the next refresh asks again.
    */
   private async retiredFoods(): Promise<RetiredFoods | null> {
-    const since = this.current.data.foodsRetiredAt;
+    const since = retiredFoodsSince(this.current.data);
     try {
       return retiredFoodsSchema.parse(
         await this.connection.get(RETIRED_FOODS_PATH, since ? { since } : undefined),
@@ -1620,7 +1654,9 @@ export function nutritionView(state: NutritionState, date: string) {
         recorded,
         skipped,
       ),
-    foods: mergeIds([], foods),
+    // #3652: merged-away foods are never offered; a stale copy stands for its keeper.
+    foods: liveCatalog(mergeIds([], foods), retiredFoodIdsOf(state.data)),
+    retiredFoodIds: state.data.retiredFoodIds ?? [],
     meals,
     supplements,
     targets: targetView,

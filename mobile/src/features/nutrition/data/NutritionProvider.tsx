@@ -147,6 +147,7 @@ export function useNutrition(date?: string) {
       >,
       loggingComplete: false,
       foods: [],
+      retiredFoodIds: [] as string[],
       meals: [],
       supplements: [],
       targets: {},

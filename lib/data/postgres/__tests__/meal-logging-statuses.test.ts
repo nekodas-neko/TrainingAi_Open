@@ -155,4 +155,35 @@ describe.skipIf(!canRun)('meal status persistence', () => {
       )?.skipped,
     ).toBe(false);
   });
+  it('keeps a food log’s skipped:false out of per-meal tracking until it clears a skip (#3639)', async () => {
+    const day = shiftDateStr(date, -2);
+    const explicitOf = async () =>
+      (await listMealLoggingCompleteness(getDb(), user, day, day))[0]?.explicit;
+    const log = await createFoodLog(getDb(), user, {
+      date: day,
+      mealTypeId: dinner,
+      foodItemId: food,
+      quantityMultiplier: 1,
+    });
+    // What Preview queues with every food log.
+    await setMealLoggingStatus(getDb(), user, day, dinner, false, randomUUID());
+    expect(await explicitOf()).toBe(false);
+    expect(
+      (await listMealLoggingStatuses(getDb(), user, day)).every((row) => !row.explicit),
+    ).toBe(true);
+    // An explicit skip makes the day tracked meal by meal; clearing it keeps it so.
+    await setMealLoggingStatus(getDb(), user, day, breakfast, true, randomUUID());
+    expect(await explicitOf()).toBe(true);
+    await setMealLoggingStatus(getDb(), user, day, breakfast, false, randomUUID());
+    expect(await explicitOf()).toBe(true);
+    expect(
+      (await listMealLoggingStatuses(getDb(), user, day)).find(
+        (row) => row.mealTypeId === breakfast,
+      ),
+    ).toMatchObject({ skipped: false, explicit: true });
+    // A later food log's skipped:false never turns an explicit row back.
+    await setMealLoggingStatus(getDb(), user, day, dinner, false, randomUUID());
+    expect(await explicitOf()).toBe(true);
+    await deleteFoodLog(getDb(), log.id, user);
+  });
 });

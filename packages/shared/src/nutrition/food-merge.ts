@@ -136,6 +136,15 @@ export interface MergePlan {
 
 
 /** The key two rows share when they are look-alikes. Shown to the owner, who passes it back in `keepers`. */
+/**
+ * What a quantity of `extra` is in servings of `keeper`: the merge moves a log as
+ * `quantity × factor`, so the grams stay the same. Also used by TrainingAi Preview when it logs a
+ * merged-away food from a stale copy and lands the log on the keeper instead (#3652).
+ */
+export function lookAlikeFactor(extra: { servingSizeG: number }, keeper: { servingSizeG: number }): number {
+  return extra.servingSizeG === keeper.servingSizeG ? 1 : extra.servingSizeG / keeper.servingSizeG
+}
+
 export function lookAlikeKey(f: { name: string; brand?: string | null }): string {
   return `${norm(f.name)} | ${norm(f.brand)}`
 }
@@ -282,7 +291,7 @@ export function planLookAlikeMerge(foods: MergeFood[], keepers: Record<string, s
     const planned = extras
       .sort(byKeeperRank)
       .map(e => {
-        const factor = e.servingSizeG === keeper.servingSizeG ? 1 : e.servingSizeG / keeper.servingSizeG
+        const factor = lookAlikeFactor(e, keeper)
         return {
           id: e.id,
           factor,

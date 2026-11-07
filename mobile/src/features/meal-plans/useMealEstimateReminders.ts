@@ -6,6 +6,7 @@ import { planSpec } from '../nutrition/data/models';
 import { useWorkoutResource } from '../workouts/data/WorkoutDataProvider';
 import { estimateReminders, type MealEstimateReminder, type PlanMeal } from './data/estimated-meals';
 import { knownTrainingDay, nextSessionSpec } from './data/next-session';
+import { usePlanEstimates } from './usePlanEstimates';
 
 /**
  * Today's meal reminders (#2123), or null while they cannot be known yet. Only meal groups with
@@ -20,6 +21,9 @@ export function useMealEstimateReminders(): MealEstimateReminder[] | null {
   const next = useWorkoutResource(nextSessionSpec, wanted);
   const plan = plans.data?.plans.find((p) => p.id === plans.data?.activePlanId);
   const training = knownTrainingDay(next.data);
+  // The reminder says the meal is "counted until you answer" (#3650), so while reminders are on
+  // the estimate is written wherever the app is open, not only on the Nutrition screen.
+  usePlanEstimates(n, n.today, wanted ? plan : null, training);
   const { answers, logs, mealTypes } = n.view;
   return useMemo(() => {
     if (!n.ready) return null;
