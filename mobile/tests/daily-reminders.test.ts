@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { localClockTimeToDate } from '@trainingai/shared/date-utils';
 import { platformSchema, alertSignature, type Alert } from '../src/features/platform/data/models.ts';
 import { planAlerts, notificationsBlocked } from '../src/features/platform/data/alert-plan.ts';
 import { AlertScheduler } from '../src/features/platform/data/AlertScheduler.ts';
@@ -14,8 +14,23 @@ import {
 const TZ = 'Australia/Brisbane';
 const TODAY = '2026-11-09'; // a Monday
 // Fixtures anchor to local midday.
-const MIDDAY = fromZonedTime(`${TODAY}T12:00:00`, TZ).getTime();
-const local = (ms: number, tz = TZ) => formatInTimeZone(ms, tz, 'yyyy-MM-dd HH:mm');
+const MIDDAY = localClockTimeToDate(TODAY, '12:00', TZ)!.getTime();
+function local(ms: number, tz = TZ) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(ms)
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}
 
 const creatine = {
   id: 'sup-1',
