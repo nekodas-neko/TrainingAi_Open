@@ -6,6 +6,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.520.0",
+    date: "2026-11-09",
+    changes: [
+      "Both apps: applying a goal recommendation in weekly mode saves your daily steps and water goals, not seven times them, and a calorie target with a decimal saves as a whole number instead of failing.",
+      "Both apps: a sleep score from an older night no longer shows as today's, and while you've marked a night as partial its sleep verdict stays hidden.",
+      "Both apps: editing a food log after duplicate foods were merged keeps the grams you entered, and a personal record is dated by when you lifted it, not when it uploaded.",
+      "Both apps: a change saved while your phone was syncing is no longer missed, a long run of changes saved at the same moment no longer stalls the sync, and a workout Health Connect also recorded counts once in heart health.",
+      "Current app: the day-review and Sunday recap reminders follow your profile's timezone, and a bedtime after midnight now gets its wind-down reminder.",
+      "TrainingAi Preview: sends the current app's supplement, meal, before-bed, day-review and Sunday recap reminders, under the same switches. While both apps are installed you may get each one twice.",
+      "TrainingAi Preview: offers walks you didn't record on Home, keeps the strap connected through a locked gym workout, and shows a running clock on the activity notification.",
+      "TrainingAi Preview: guided walks, fitness tests and free activities record what the current app records. Workouts show \"New Personal Record\", keep their numbers right after an edit, a rename or a deload, and let you save or discard a workout left running for hours.",
+      "TrainingAi Preview: nutrition matches the current app, with meal tracking, plan estimates, barcode lookup, merged foods and the budget bar's colours.",
+      "TrainingAi Preview: picks up the accent colour you chose in the current app. Its Sleep chip shows a dash for a night with no score, and Home refreshes on its own once the morning Oura hand-off lands. A change the server refuses is set aside in Sync health instead of holding up the rest.",
+      "Behind the scenes: a burst of uploads can no longer tie up every database connection; error reports leave out the values a failed query carried; the link-safety check understands every form of IPv6 address; and a weigh-in dated in the future is refused.",
+    ],
+  },
+  {
     version: "1.519.0",
     date: "2026-11-05",
     changes: [
