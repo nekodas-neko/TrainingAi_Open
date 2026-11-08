@@ -1,5 +1,5 @@
 import { getRepositoryAsync } from "@/lib/data"
-import { summariseCause } from "@/lib/observability/pg-cause"
+import { summariseCause, scrubOwnPgMessage } from "@/lib/observability/pg-cause"
 import { scrubBoundParams, scrubBoundParamsInStack } from "@/lib/observability/scrub-params"
 import { trackPendingWrite, flushPendingWrites } from "@/lib/observability/pending-writes"
 
@@ -18,9 +18,9 @@ export const flushPendingReports = flushPendingWrites
 export function reportServerError(err: unknown, context?: { userId?: string; url?: string }): void {
   // #3673: a Drizzle query error carries its bound parameters (health values, a password hash) in
   // its message and stack. `error_events` is readable by every agent, so they never reach it.
-  const baseMessage = scrubBoundParams(err instanceof Error ? err.message : String(err))
+  const baseMessage = scrubOwnPgMessage(err, scrubBoundParams(err instanceof Error ? err.message : String(err)))
   const rawStack = err instanceof Error ? err.stack ?? null : null
-  const stack = rawStack === null ? null : scrubBoundParamsInStack(rawStack)
+  const stack = rawStack === null ? null : scrubOwnPgMessage(err, scrubBoundParamsInStack(rawStack))
 
   const { prefix, block } = summariseCause(err)
   const message = `${prefix}${baseMessage}`

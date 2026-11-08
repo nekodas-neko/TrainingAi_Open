@@ -1,5 +1,5 @@
 import type { ErrorEvent, EventHint } from '@sentry/nextjs'
-import { scrubBoundParams } from './scrub-params'
+import { scrubBoundParams, scrubPgMessage } from './scrub-params'
 
 /**
  * Everything that decides what does NOT leave this app for a third party (Q-404).
@@ -98,9 +98,15 @@ const MAX_VALUE_LENGTH = 1000
  *
  * Without this, every uncaught database error forwards row values to sentry.io — on the `users`
  * path that is an email address.
+ *
+ * #3685: Sentry's default linked-errors integration sends a Drizzle error's `cause` — the pg error
+ * — as its own exception value, and Postgres quotes the bad value in that message
+ * (`invalid input syntax for type uuid: "<value>"`). An event does not say reliably which value is
+ * a pg error, so every value gets `scrubPgMessage`; on any other message it only drops a quoted
+ * value that ends a line after a colon. The pg `detail` is not part of the exception value.
  */
 export function scrubExceptionValue(value: string): string {
-  const head = scrubBoundParams(value)
+  const head = scrubPgMessage(scrubBoundParams(value))
   return head.length > MAX_VALUE_LENGTH ? `${head.slice(0, MAX_VALUE_LENGTH)}… [truncated]` : head
 }
 
