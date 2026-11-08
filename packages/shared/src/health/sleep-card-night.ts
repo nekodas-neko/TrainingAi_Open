@@ -14,6 +14,28 @@ import { canonicalLatestNight, isNightWindow } from './sleep-night'
 /** `2026-10-18` -> `18 Oct`. Calendar arithmetic on the string; no timezone is involved. */
 export const sleepNightDateLabel = formatDayShort
 
+/**
+ * A night dated `today` or the day before: the newest a surface may show as last night. Anything
+ * older is stale (#2906).
+ */
+export function isCurrentNightDate(date: string, today: string): boolean {
+  return date <= today && date >= shiftDateStr(today, -1)
+}
+
+/**
+ * #3667: the readiness payload's Sleep Score as a surface may show it as current: null when the night
+ * it scored is older than yesterday, by the same rule as the Sleep card's night. A payload from before
+ * `sleepScoreDate` existed carries no date and is shown as it always was.
+ */
+export function currentSleepScore(
+  payload: { sleepScore?: number | null; sleepScoreDate?: string | null } | null | undefined,
+  today: string,
+): number | null {
+  const score = payload?.sleepScore ?? null
+  if (score == null || payload?.sleepScoreDate == null) return score
+  return isCurrentNightDate(payload.sleepScoreDate, today) ? score : null
+}
+
 export interface SleepCardNight<T extends { date: string }> {
   /** The night the card shows, or null when nothing recent enough exists. */
   night: T | null
@@ -43,7 +65,6 @@ export function pickSleepCardNight<T extends SleepCardRow>(
   today: string,
   tz: string,
 ): SleepCardNight<T> {
-  const yesterday = shiftDateStr(today, -1)
   const timed = new Map<T, T & { sleepStart: Date; sleepEnd: Date }>()
   const untimed: T[] = []
   for (const row of rows) {
@@ -59,7 +80,7 @@ export function pickSleepCardNight<T extends SleepCardRow>(
   const timedNight = canonical ? ([...timed].find(([, w]) => w === canonical)?.[0] ?? null) : null
   let newest = timedNight
   for (const row of untimed) if (!newest || row.date > newest.date) newest = row
-  if (newest && newest.date >= yesterday) {
+  if (newest && isCurrentNightDate(newest.date, today)) {
     return { night: newest, label: `Night ending ${sleepNightDateLabel(newest.date)}` }
   }
   return {

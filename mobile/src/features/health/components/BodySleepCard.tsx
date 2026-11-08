@@ -1,5 +1,5 @@
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
-import { pickSleepCardNight } from '@trainingai/shared/health/sleep-card-night';
+import { currentSleepScore, pickSleepCardNight } from '@trainingai/shared/health/sleep-card-night';
 import { sleepCoverageNote } from '@trainingai/shared/health/sleep-coverage-note';
 import { AppButton, AppText, Badge, Stack } from '../../../shared/ui';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
@@ -24,8 +24,8 @@ export function BodySleepCard({ openDetail }: { openDetail: (detail: HealthDetai
   // dated today or yesterday, with its date named.
   const { night: lastNight, label: nightLabel } = pickSleepCardNight(health.sleep, health.today, health.timezone);
   // Our computed score, the number Home shows, and nothing else: a night's stored `sleepScore` could
-  // only be Oura's (#3011).
-  const score = readiness.data?.sleepScore ?? null;
+  // only be Oura's (#3011). #3667: and only when the night it scored may be shown as last night.
+  const score = currentSleepScore(readiness.data, health.today);
   const note = score !== null ? sleepCoverageNote(readiness.data?.sleepScoreCoverage) : null;
   const range = sleepTimeRange(lastNight ?? undefined, health.timezone);
   const chips = lastNight ? sleepChips(lastNight) : null;

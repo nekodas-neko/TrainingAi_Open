@@ -206,6 +206,12 @@ export interface ReadinessScoreResponse {
   // one. Oura's readiness is never shown in its place (scoring doc rule 5, #3000).
   readinessDisplayScore: number | null
   sleepScore: number | null
+  /**
+   * #3667: the wake date of the night `sleepScore` scored, null with no score. The newest night can
+   * be days old (the ring not worn), so a surface shows the score as current only through
+   * `currentSleepScore`, the Sleep card's own today-or-yesterday rule.
+   */
+  sleepScoreDate: string | null
   /** OR-204: how complete today's own sleep score is. Null when there is no score. */
   sleepScoreCoverage: import('@trainingai/shared/health/sleep-score').SleepScoreCoverage | null
   activityScore: number | null      // Oura activity score blended with logged training load
@@ -960,6 +966,7 @@ export async function buildReadinessPayload(
     // Ours only: computeSleepScore(lastSleep). Oura's sleep score is never ours, so a night we
     // could not score shows no score rather than Oura's (scoring doc rule 5, #3000).
     sleepScore:              sleepScore100,
+    sleepScoreDate:          sleepScore100 != null && lastSleep ? lastSleep.date : null,
     sleepScoreCoverage:      sleepScoreResult?.coverage ?? null,
     activityScore:           activityBlend.final,
     activityBlend,

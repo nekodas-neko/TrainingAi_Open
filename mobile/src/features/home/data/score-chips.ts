@@ -1,4 +1,4 @@
-import { shiftDateStr } from '@trainingai/shared/date-utils';
+import { currentSleepScore } from '@trainingai/shared/health/sleep-card-night';
 
 // The four scores at the top of Home: which value each shows and what it is called. Home's chips
 // and the home-screen widget both read this, so the two never word or pick a score differently.
@@ -6,6 +6,7 @@ import { shiftDateStr } from '@trainingai/shared/date-utils';
 type Readiness = {
   readinessDisplayScore?: number | null;
   sleepScore?: number | null;
+  sleepScoreDate?: string | null;
   activityScore?: number | null;
   restingHr?: number | null;
   restingHrLastNight?: number | null;
@@ -23,9 +24,9 @@ export type ScoreChipModel = {
   /** The band styles' small-capital name ("Move" for Activity); scoreChipLabel picks which shows. */
   shortLabel: string;
   value: number | null;
-  /** Shown instead of the rounded value: the night's hours when there is no sleep score. */
+  /** Shown instead of the rounded value. */
   display?: string;
-  /** What the figure counts when it is not a score: bpm for the heart chip, h for sleep hours. */
+  /** What the figure counts when it is not a score: bpm for the heart chip. */
   unit?: string;
   /** Drawn with Home's info mark: the score rests on limited data. */
   qualified: boolean;
@@ -37,8 +38,10 @@ export function homeScoreChips(
   today: string,
 ): ScoreChipModel[] {
   const resting = data?.restingHrLastNight != null || data?.restingHr != null;
-  const night = sleep.find((row) => row.date === today || row.date === shiftDateStr(today, -1));
-  const duration = data?.sleepScore == null ? night?.durationHours : null;
+  // #3667: the current app's chip, which this matches: last night's score or a dash. Never an older
+  // night's score as today's, and never the hours in its place (a night marked partial has no score
+  // by design, and its hours are the short reading the mark exists to stop).
+  const sleepScore = currentSleepScore(data, today);
   return [
     {
       key: 'readiness',
@@ -57,13 +60,12 @@ export function homeScoreChips(
     },
     {
       key: 'sleep',
-      label: duration != null ? 'Sleep (h)' : 'Sleep',
+      label: 'Sleep',
       shortLabel: 'Sleep',
-      value: data?.sleepScore ?? null,
-      ...(duration != null ? { display: duration.toFixed(1), unit: 'h' } : {}),
+      value: sleepScore,
       qualified: Boolean(
         sleep.find((row) => row.date === today)?.provisional ||
-          (data?.sleepScoreCoverage != null && data.sleepScoreCoverage.level !== 'full'),
+          (sleepScore != null && data?.sleepScoreCoverage != null && data.sleepScoreCoverage.level !== 'full'),
       ),
     },
     {

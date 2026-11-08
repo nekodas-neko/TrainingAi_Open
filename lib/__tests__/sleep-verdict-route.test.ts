@@ -81,9 +81,36 @@ describe('GET /api/sleep-verdict', () => {
     const body = await (await get()).json()
 
     expect(body.verdict).toEqual(stored)
-    // The snapshot is the point: no re-read of the nights, no re-write of the row.
-    expect(listSleepSessions).not.toHaveBeenCalled()
+    // The snapshot is the point: no re-read of the history, no re-write of the row. Only the night
+    // itself is read, for its partial mark (#3667).
+    expect(listSleepSessions).toHaveBeenCalledTimes(1)
+    expect(listSleepSessions.mock.calls[0].slice(1)).toEqual([shiftDateStr(DAY, -1), DAY])
     expect(upsertSleepVerdict).not.toHaveBeenCalled()
+  })
+
+  // #3667: the owner marks the night partial after Home announced it short.
+  it('hides a STORED verdict once the night is marked partial, leaving the row untouched', async () => {
+    getSleepVerdict.mockResolvedValue({ date: DAY, verdict: 'poor', responseState: 'none' })
+    listSleepSessions.mockResolvedValue([targetNight({ durationHours: 3.25, partialNightAt: new Date('2026-09-26T01:00:00Z') })])
+
+    const body = await (await get()).json()
+
+    expect(body).toEqual({ verdict: null, partialNight: true })
+    expect(upsertSleepVerdict).not.toHaveBeenCalled()
+    expect(setSleepVerdictResponse).not.toHaveBeenCalled()
+  })
+
+  it('hides a STORED verdict when the source says the recording is incomplete', async () => {
+    getSleepVerdict.mockResolvedValue({ date: DAY, verdict: 'poor', responseState: 'none' })
+    listSleepSessions.mockResolvedValue([targetNight({ durationHours: 3.25, recordingIncomplete: true })])
+    expect((await (await get()).json()).verdict).toBeNull()
+  })
+
+  it('shows the STORED verdict again once the mark is lifted', async () => {
+    const stored = { date: DAY, verdict: 'poor', responseState: 'none' }
+    getSleepVerdict.mockResolvedValue(stored)
+    listSleepSessions.mockResolvedValue([targetNight({ durationHours: 3.25, partialNightAt: null })])
+    expect((await (await get()).json()).verdict).toEqual(stored)
   })
 
   it('computes and persists on the first read, with the bands beside the values', async () => {

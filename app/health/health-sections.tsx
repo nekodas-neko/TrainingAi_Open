@@ -119,6 +119,8 @@ export interface HealthSectionsCtx {
   recentSleep: SleepRow | null;
   sleepNightLabel: string;
   readiness: ReadinessScoreResponse | null;
+  /** #3667: `currentSleepScore(readiness, today)`: null when the scored night is older than yesterday. */
+  sleepScore: number | null;
   todayWaterMl: number | null;
   waterGoalMl: number;
   activeEnergyKcalToday: number | null;
@@ -165,7 +167,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
   const {
     metaLoading, metaToday, metaRecent, latestWeight, latestWeightIsStale, latestWeightDate, latestBf, latestSteps,
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
-    setMetricSheet, setWaterLogOpen, recentSleep, sleepNightLabel, readiness,
+    setMetricSheet, setWaterLogOpen, recentSleep, sleepNightLabel, readiness, sleepScore,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError, retryWeeklyStats,
@@ -405,7 +407,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
           key="sleep"
           recentSleep={recentSleep}
           nightLabel={sleepNightLabel}
-          computedSleepScore={readiness?.sleepScore ?? null}
+          computedSleepScore={sleepScore}
           sleepScoreCoverage={readiness?.sleepScoreCoverage ?? null}
           metaLoading={metaLoading}
           onOpenSheet={() => setMetricSheet("sleep")}

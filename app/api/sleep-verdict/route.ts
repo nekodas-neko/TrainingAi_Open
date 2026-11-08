@@ -11,6 +11,7 @@ import {
   VERDICT_BASELINE_NIGHTS,
 } from '@trainingai/shared/health/sleep-verdict'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { isPartialNight } from '@trainingai/shared/health/partial-night'
 
 // One date and one word.
 const MAX_BODY_BYTES = 1024
@@ -47,6 +48,10 @@ const ResponseBody = z.object({
  * MADE, and an announcement happens exactly when the sheet reads this. If nobody opens the sheet
  * there was no announcement and correctly no row. It is safe to repeat: `upsertSleepVerdict` is
  * idempotent per `(user, date)` and never touches `response_state`.
+ *
+ * #3667: a night marked partial after its verdict was stored has no verdict to show (#2265: a marked
+ * night is never judged). The stored row stays as it was, so the snapshot is never rewritten; it is
+ * only not shown while the mark stands, and Tuning tells it apart by the night's own mark.
  */
 export async function GET(req: Request) {
   const session = await auth()
@@ -64,7 +69,13 @@ export async function GET(req: Request) {
   const repo = await getRepository()
 
   const stored = await repo.getSleepVerdict(userId, date)
-  if (stored) return json({ verdict: stored })
+  if (stored) {
+    // Only the night itself is read: the snapshot's values and bands are never recomputed.
+    const night = nightSessions(await repo.listSleepSessions(userId, shiftDateStr(date, -1), date), tz)
+      .filter(n => n.date === date)
+    if (night.some(isPartialNight)) return json({ verdict: null, partialNight: true })
+    return json({ verdict: stored })
+  }
 
   const rows = await repo.listSleepSessions(userId, shiftDateStr(date, -HISTORY_DAYS), date)
   // TN-83: `sleep_sessions` holds more than one row per date — naps, and fragments of a broken

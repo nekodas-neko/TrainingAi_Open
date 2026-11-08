@@ -50,3 +50,15 @@ export function canMarkPartial(
 export function partialErrorMessage(error: unknown): string {
   return error instanceof Error && error.message ? error.message : PARTIAL_COPY.failed;
 }
+
+/**
+ * #3667: Home's sleep verdict is not shown for last night when that night is marked partial (#2265:
+ * a marked night is never judged) or exists only on this phone so far. The server stops returning a
+ * stored verdict once the mark lands; this hides it the moment the owner marks it.
+ */
+export function hidesSleepVerdict(
+  sleep: readonly Partial<Pick<SleepRow, 'date' | 'localOnly' | 'partialNightAt' | 'recordingIncomplete'>>[],
+  today: string,
+): boolean {
+  return sleep.some((night) => night.date === today && (night.localOnly === true || isPartialNight(night)));
+}

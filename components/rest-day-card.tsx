@@ -5,6 +5,9 @@ import { MoonIcon } from "lucide-react";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
 import type { MoodLog } from "@trainingai/shared/types/mood";
 import { restDayGuidance } from "@trainingai/shared/health/rest-day-guidance";
+import { currentSleepScore } from "@trainingai/shared/health/sleep-card-night";
+import { todayInTz } from "@trainingai/shared/date-utils";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 
 interface RestDayCardProps {
   readiness: ReadinessScoreResponse | null;
@@ -22,10 +25,12 @@ function formatBedtime(minsFromLocalMidnight: number): string {
 }
 
 export const RestDayCard = memo(function RestDayCard({ readiness, moodLog, consecutiveRestDays }: RestDayCardProps) {
+  const tz = useUserTimezone();
   const guidance = restDayGuidance({
     readinessScore: readiness?.score ?? null,
     soreMuscles: moodLog?.soreMuscles ?? [],
-    sleepScore: readiness?.sleepScore ?? null,
+    // #3667: an older night's score is not last night's.
+    sleepScore: currentSleepScore(readiness, todayInTz(tz)),
     consecutiveRestDays,
   });
 

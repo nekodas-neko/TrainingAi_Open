@@ -28,6 +28,7 @@ import { useHealthData } from '../../health/data/HealthDataProvider';
 import { sleepWokeEnd } from '../../health/data/body-view';
 import { useOuraHandoff, type OuraHandoffStatus } from '../../health/OuraHandoffProvider';
 import { hasLastNight } from '../../health/data/oura-handoff';
+import { hidesSleepVerdict } from '../../health/data/partial-night-view';
 import {
   energySpec,
   goalsSpec,
@@ -785,7 +786,7 @@ function HomeSleepFeedback({ onCorrect }: { onCorrect: () => void }) {
   const health = useHealthData();
   const state = useWorkoutResource(verdictSpec(health.today));
   const verdict = state.data?.verdict;
-  if (health.sleep.some((night) => night.date === health.today && night.localOnly) || !verdict) {
+  if (hidesSleepVerdict(health.sleep, health.today) || !verdict) {
     return null;
   }
   const { line, prominent } = verdictCopy(verdict);

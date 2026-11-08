@@ -12,6 +12,9 @@ import {
 } from "@/components/home/score-ring-frames";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
 import { scoreGapText } from "@/components/health/score-gap-copy";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
+import { todayInTz } from "@trainingai/shared/date-utils";
+import { currentSleepScore } from "@trainingai/shared/health/sleep-card-night";
 
 interface Props {
   readiness: ReadinessScoreResponse;
@@ -379,6 +382,7 @@ function ScoreRailCell({ props, first }: { props: CellProps; first: boolean }) {
 }
 
 export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, sleepProvisional }: Props) {
+  const tz = useUserTimezone();
   const [ringStyle, setRingStyle] = useState<ScoreRingStyle>("default");
   useEffect(() => {
     setRingStyle(loadScoreRingStyle());
@@ -386,13 +390,15 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
     window.addEventListener(SCORE_RING_STYLE_CHANGE_EVENT, onChange);
     return () => window.removeEventListener(SCORE_RING_STYLE_CHANGE_EVENT, onChange);
   }, []);
+  // #3667: an older night's score is not today's: a dash, as the Sleep card shows no stale night.
+  const sleepScore = currentSleepScore(readiness, todayInTz(tz));
 
   if (
     readiness.readinessDisplayScore == null &&
     readiness.restingHrLastNight == null &&
     readiness.restingHr == null &&
     readiness.hrCurrent == null &&
-    readiness.sleepScore == null &&
+    sleepScore == null &&
     readiness.activityScore == null
   ) {
     return null;
@@ -449,8 +455,8 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
     {
       label: "Sleep",
       short: "Sleep",
-      display: readiness.sleepScore != null ? String(readiness.sleepScore) : "—",
-      cue: scoreCue(readiness.sleepScore),
+      display: sleepScore != null ? String(sleepScore) : "—",
+      cue: scoreCue(sleepScore),
       accent: "#a78bfa",
       href: "/health/sleep",
       Icon: Moon,
@@ -467,7 +473,7 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
       gapReason: scoreGapText(readiness.availability, "sleep"),
       // #2280 (OR-204, owner 2026-08-23): a night scored on incomplete inputs says so wherever the
       // number is shown. The glyph is all the room this cell has; /health/sleep names what is missing.
-      limited: readiness.sleepScoreCoverage != null && readiness.sleepScoreCoverage.level !== "full",
+      limited: sleepScore != null && readiness.sleepScoreCoverage != null && readiness.sleepScoreCoverage.level !== "full",
     },
     {
       label: "Activity",

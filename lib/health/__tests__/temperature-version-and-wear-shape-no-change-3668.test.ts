@@ -282,8 +282,12 @@ describe('no readiness output moves when temperature is version-keyed and wear b
             getOuraCloudSwitchDay: vi.fn(async () => s.switchDay),
           }
           const p = await buildReadinessPayload('u1', tz)
+          // `sleepScoreDate` is a field #3667 adds in the same PR (the date of the night the existing
+          // `sleepScore` scored), not a score; it is left out of the digest so the recording from
+          // `main` still stands for every value that was there.
+          const { sleepScoreDate: _added, ...payloadOnMain } = p
           out[`v${v} switch=${sw}`] = {
-            all: digest(p),
+            all: digest(payloadOnMain),
             readinessDisplayScore: p.readinessDisplayScore,
             readinessCompositeContributors: p.readinessCompositeContributors,
             baselineHrv: p.baselineHrv, recentHrv: p.recentHrv, restingHr: p.restingHr, restingHrBaseline: p.restingHrBaseline,

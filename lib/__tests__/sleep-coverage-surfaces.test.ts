@@ -25,7 +25,8 @@ describe('the Home Sleep chip', () => {
     // Scoped to the sleep cell: from its href up to the next cell's label, so a `limited` on the
     // Readiness cell cannot satisfy it.
     const cell = chip.slice(chip.indexOf('href: "/health/sleep"'), chip.indexOf('label: "Activity"'))
-    expect(cell).toMatch(/limited: readiness\.sleepScoreCoverage != null && readiness\.sleepScoreCoverage\.level !== "full"/)
+    // #3667: and only beside a score shown as current, never on a dash.
+    expect(cell).toMatch(/limited: sleepScore != null && readiness\.sleepScoreCoverage != null && readiness\.sleepScoreCoverage\.level !== "full"/)
   })
 
   it('says why out loud, in the words the qualifier already uses', () => {

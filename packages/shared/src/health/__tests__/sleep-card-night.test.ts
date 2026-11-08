@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { shiftDateStr } from '../../date-utils'
-import { pickSleepCardNight, sleepNightDateLabel } from '../sleep-card-night'
+import { currentSleepScore, isCurrentNightDate, pickSleepCardNight, sleepNightDateLabel } from '../sleep-card-night'
 
 const TZ = 'Australia/Brisbane' // UTC+10, no DST
 
@@ -110,5 +110,25 @@ describe('pickSleepCardNight', () => {
     expect(sleepNightDateLabel('2026-10-18')).toBe('18 Oct')
     expect(sleepNightDateLabel('2026-09-15')).toBe('15 Sept')
     expect(sleepNightDateLabel('garbage')).toBe('garbage')
+  })
+})
+
+// #3667: the Sleep score badge and the Home chips read the card's own rule for the scored night.
+describe('currentSleepScore', () => {
+  const today = '2026-11-08'
+  it('shows a score for last night or the night before, never an older one', () => {
+    expect(currentSleepScore({ sleepScore: 78, sleepScoreDate: today }, today)).toBe(78)
+    expect(currentSleepScore({ sleepScore: 78, sleepScoreDate: '2026-11-07' }, today)).toBe(78)
+    expect(currentSleepScore({ sleepScore: 78, sleepScoreDate: '2026-11-06' }, today)).toBeNull()
+    expect(currentSleepScore({ sleepScore: 78, sleepScoreDate: '2026-11-09' }, today)).toBeNull()
+  })
+  it('no score is no score; a payload from before the date existed shows as it did', () => {
+    expect(currentSleepScore({ sleepScore: null, sleepScoreDate: null }, today)).toBeNull()
+    expect(currentSleepScore(null, today)).toBeNull()
+    expect(currentSleepScore({ sleepScore: 78 }, today)).toBe(78)
+  })
+  it('is the same rule as the card\'s night', () => {
+    expect(isCurrentNightDate('2026-11-07', today)).toBe(true)
+    expect(isCurrentNightDate('2026-11-06', today)).toBe(false)
   })
 })

@@ -22,3 +22,9 @@ export const healthReadPaths = [
   '/api/weights-summary',
   '/api/muscle-recovery',
 ];
+
+/**
+ * #3667: what a night arriving after Home loaded changes. Every health read, plus the morning's sleep
+ * verdict and the day log, which Home reads before last night exists.
+ */
+export const nightLandedPaths = [...healthReadPaths, '/api/sleep-verdict', '/api/day-log'];

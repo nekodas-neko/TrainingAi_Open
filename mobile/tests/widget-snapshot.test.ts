@@ -60,7 +60,8 @@ test("Home's score chips: labels, values and fallbacks", () => {
   const sparse = homeScoreChips({ hrCurrent: 61, limited: true }, [{ date: '2026-10-22', durationHours: 7.2 }], today);
   assert.equal(sparse[0]!.qualified, true);
   assert.equal(sparse[1]!.label, 'Heart Rate');
-  assert.deepEqual([sparse[2]!.label, sparse[2]!.display], ['Sleep (h)', '7.2']);
+  // #3667: no score is a dash, never the night's hours, as in the current app.
+  assert.deepEqual([sparse[2]!.label, sparse[2]!.value, sparse[2]!.display], ['Sleep', null, undefined]);
   assert.equal(sparse[3]!.value, null);
 });
 

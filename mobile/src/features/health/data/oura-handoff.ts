@@ -118,6 +118,8 @@ export type HandoffDeps = {
   // Oura opened but TrainingAi could not come back: automatic runs must stop.
   stayedBehind: (day: string) => Promise<void>;
   wait: (day: string) => Promise<WaitOutcome>;
+  // #3667: the night arrived while waiting. Everything Home read before it existed is reloaded.
+  nightLanded?: () => void;
   setState: (state: HandoffState) => void;
 };
 
@@ -186,6 +188,7 @@ export function createHandoffRunner(deps: HandoffDeps) {
     }
     if (outcome === 'stayed_behind') await deps.stayedBehind(decision.day);
     const wait = await deps.wait(decision.day);
+    if (wait === 'landed') deps.nightLanded?.();
     if (wait !== 'cancelled') {
       deps.setState(wait === 'landed' ? IDLE : { status: 'timeout', day: decision.day });
     }
