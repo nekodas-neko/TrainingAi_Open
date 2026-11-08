@@ -31,7 +31,8 @@ import {
   isStaleWorkout,
   mutationFor,
   pauseWorkout,
-  readJournal,
+  openJournal,
+  rereadSetAside,
   resumeWorkout,
   setValues,
   type WorkoutJournal,
@@ -180,9 +181,18 @@ export class WorkoutJournalStore {
   };
   private async load(generation: number) {
     try {
-      const data = readJournal(await this.storage.get(key), this.connection);
+      const { journal: data, rewrite } = openJournal(
+        await this.storage.get(key),
+        this.connection,
+        this.now(),
+      );
       if (generation === this.generation) {
         this.publish({ data, ready: true, busy: false, message: null });
+        // #3671: pruned or set-aside workouts are written out once, so the next launch reads less.
+        // A failure here loses nothing: the next write saves the same journal.
+        if (rewrite) {
+          void this.write().catch(() => undefined);
+        }
         void this.sync();
       }
     } catch (failure) {
@@ -1153,19 +1163,38 @@ export class WorkoutJournalStore {
   }
   // Sync health: the writes set aside, and Retry / Discard for one of them.
   failed(): FailedItem[] {
-    return this.current.data.workouts.flatMap((workout) =>
-      workout.pending
-        .filter((item) => deadLettered(item))
-        .map((item) => failedItem('workout', item.id, item.domain, workout.date, item.rejected!)),
-    );
+    return [
+      ...this.current.data.workouts.flatMap((workout) =>
+        workout.pending
+          .filter((item) => deadLettered(item))
+          .map((item) => failedItem('workout', item.id, item.domain, workout.date, item.rejected!)),
+      ),
+      // #3671: a saved workout this version could not read, kept with whatever it had not sent.
+      ...this.current.data.setAside.map((item) =>
+        failedItem('workout', item.id, 'workout_log', item.date, {
+          error: item.error,
+          at: item.at,
+          attempts: 1,
+        }),
+      ),
+    ];
   }
   retryState(id: string): RetryState {
+    if (this.current.data.setAside.some((item) => item.id === id)) {
+      return 'failing';
+    }
     const item = this.current.data.workouts
       .flatMap((workout) => workout.pending)
       .find((pending) => pending.id === id);
     return !item ? 'synced' : item.rejected ? 'failing' : 'waiting';
   }
   retryRejected = async (id: string) => {
+    if (this.current.data.setAside.some((item) => item.id === id)) {
+      const now = this.now();
+      await this.write((data) => rereadSetAside(data, id, now));
+      await this.sync();
+      return;
+    }
     await this.write((data) => ({
       ...data,
       workouts: data.workouts.map((workout) => ({
@@ -1180,6 +1209,13 @@ export class WorkoutJournalStore {
   // Discard: that one write is not sent. The workout stays on this phone; once nothing is left to
   // send it counts as uploaded, so it can be deleted from this phone's history.
   discardRejected = async (id: string) => {
+    if (this.current.data.setAside.some((item) => item.id === id)) {
+      await this.write((data) => ({
+        ...data,
+        setAside: data.setAside.filter((item) => item.id !== id),
+      }));
+      return;
+    }
     const now = this.now();
     await this.write((data) => ({
       ...data,

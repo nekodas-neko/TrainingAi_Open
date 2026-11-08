@@ -129,13 +129,36 @@ const workoutSchema = z.object({
   syncedAt: timestamp.nullable(),
   syncError: z.string().nullable(),
 });
+// #3671. A saved workout this build cannot read, kept as it was saved rather than failing the whole
+// journal. Only one that may still hold unsent sets is kept: an uploaded or discarded one is dropped.
+// Sync health lists it; Retry reads it again (after an update that understands it), Discard drops it.
+const setAsideWorkoutSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  error: z.string(),
+  at: z.number(),
+  record: z.unknown(),
+});
+export type SetAsideWorkout = z.infer<typeof setAsideWorkoutSchema>;
 const journalSchema = z.object({
   version: z.literal(1),
   origin: z.string(),
   userId: z.string(),
   workouts: z.array(workoutSchema),
   preferences: workoutPreferencesSchema.default(defaultWorkoutPreferences),
+  setAside: z.array(setAsideWorkoutSchema).default([]),
 });
+// The journal as saved, before each workout is read on its own.
+const savedJournalSchema = journalSchema.extend({ workouts: z.array(z.unknown()) });
+
+/**
+ * #3671. How long a finished workout stays on the phone once every write has uploaded, and a
+ * discarded one at all. The server has an uploaded workout; the phone keeps it two weeks so this
+ * week's and last week's cards, the session list and the done screen still find it. A workout with
+ * anything left to send is never pruned, however old.
+ */
+export const UPLOADED_WORKOUT_RETENTION_MS = 14 * 86_400_000;
+export const DISCARDED_WORKOUT_RETENTION_MS = 86_400_000;
 export type WorkoutRecord = z.infer<typeof workoutSchema>;
 export type WorkoutExercise = z.infer<typeof exerciseSchema>;
 export type WorkoutSet = z.infer<typeof setSchema>;
@@ -148,67 +171,174 @@ export function emptyJournal(identity: CatalogIdentity): WorkoutJournal {
     userId: identity.userId,
     workouts: [],
     preferences: defaultWorkoutPreferences(),
+    setAside: [],
   };
 }
 
 export function readJournal(
   raw: string | null,
   identity: CatalogIdentity,
+  now = Date.now(),
 ): WorkoutJournal {
+  return openJournal(raw, identity, now).journal;
+}
+
+/**
+ * The saved journal, read one workout at a time (#3671). A workout that fails to read no longer
+ * fails the journal, which left Start showing "Retry loading" for good: an uploaded or discarded
+ * one is dropped, and any other is set aside (`SetAsideWorkout`). Finished workouts past their
+ * retention are pruned. `rewrite` says the saved copy should be replaced with `journal`.
+ */
+export function openJournal(
+  raw: string | null,
+  identity: CatalogIdentity,
+  now = Date.now(),
+): { journal: WorkoutJournal; rewrite: boolean } {
   if (raw === null) {
-    return emptyJournal(identity);
+    return { journal: emptyJournal(identity), rewrite: false };
   }
-  const saved = journalSchema.parse(JSON.parse(raw));
+  const saved = savedJournalSchema.parse(JSON.parse(raw));
   if (saved.origin !== identity.origin || saved.userId !== identity.userId) {
     throw new Error('Workout storage belongs to a different account.');
   }
-  if (saved.workouts.filter((workout) => workout.status === 'active').length > 1) {
-    throw new Error('Multiple active workouts in storage.');
-  }
   const identities = new Set<string>();
-  for (const workout of saved.workouts) {
+  const workouts: WorkoutRecord[] = [];
+  const setAside = [...saved.setAside];
+  let rewrite = false;
+  for (const value of saved.workouts) {
+    const read = readSavedWorkout(value, identities, workouts.some((w) => w.status === 'active'));
+    if (read.ok) {
+      if (!retained(read.workout, now)) {
+        rewrite = true;
+        continue;
+      }
+      workouts.push(read.workout);
+      continue;
+    }
+    rewrite = true;
+    if (!settled(value)) {
+      setAside.push(setAsideWorkout(value, read.error, now));
+    }
+  }
+  return { journal: { ...saved, workouts, setAside }, rewrite };
+}
+
+/** One set-aside workout read again: back into the journal if it now reads, else its new error. */
+export function rereadSetAside(
+  journal: WorkoutJournal,
+  id: string,
+  now: number,
+): WorkoutJournal {
+  const entry = journal.setAside.find((item) => item.id === id);
+  if (!entry) {
+    return journal;
+  }
+  const identities = new Set(
+    journal.workouts.flatMap((workout) => [workout.id, ...workoutIdentities(workout)]),
+  );
+  const read = readSavedWorkout(
+    entry.record,
+    identities,
+    journal.workouts.some((workout) => workout.status === 'active'),
+  );
+  return {
+    ...journal,
+    workouts: read.ok ? [...journal.workouts, read.workout] : journal.workouts,
+    setAside: read.ok
+      ? journal.setAside.filter((item) => item.id !== id)
+      : journal.setAside.map((item) =>
+          item.id === id ? { ...item, error: read.error, at: now } : item,
+        ),
+  };
+}
+
+function retained(workout: WorkoutRecord, now: number) {
+  if (workout.status === 'discarded') {
+    return now - workout.startedAt < DISCARDED_WORKOUT_RETENTION_MS;
+  }
+  return (
+    workout.status !== 'completed' ||
+    workout.pending.length > 0 ||
+    workout.syncedAt === null ||
+    now - workout.syncedAt < UPLOADED_WORKOUT_RETENTION_MS
+  );
+}
+
+// Nothing of a workout that reads as uploaded or discarded is lost by dropping it, whatever else
+// in it this build cannot read.
+function settled(value: unknown) {
+  if (!value || typeof value !== 'object') {
+    return true;
+  }
+  const row = value as Record<string, unknown>;
+  return (
+    row.status === 'discarded' ||
+    (row.status === 'completed' &&
+      typeof row.syncedAt === 'number' &&
+      Array.isArray(row.pending) &&
+      row.pending.length === 0)
+  );
+}
+
+function setAsideWorkout(value: unknown, error: string, now: number): SetAsideWorkout {
+  const row = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  return {
+    id: typeof row.id === 'string' && row.id ? row.id : `unreadable-${now}`,
+    date: typeof row.date === 'string' ? row.date : '',
+    error,
+    at: now,
+    record: value,
+  };
+}
+
+function workoutIdentities(workout: WorkoutRecord) {
+  return workout.exercises.flatMap((exercise) => [
+    exercise.logId,
+    ...exercise.sets.map((set) => set.id),
+  ]);
+}
+
+function readSavedWorkout(
+  value: unknown,
+  identities: Set<string>,
+  activeSeen: boolean,
+): { ok: true; workout: WorkoutRecord } | { ok: false; error: string } {
+  try {
+    const workout = workoutSchema.parse(value);
+    if (workout.status === 'active' && activeSeen) {
+      throw new Error('Multiple active workouts in storage.');
+    }
+    checkSavedWorkout(workout, identities);
+    return { ok: true, workout };
+  } catch (failure) {
+    return {
+      ok: false,
+      error:
+        failure instanceof z.ZodError
+          ? 'This saved workout could not be read by this version of the app.'
+          : failure instanceof Error
+            ? failure.message
+            : 'This saved workout could not be read.',
+    };
+  }
+}
+
+// One saved workout's own invariants. Its ids join `identities` only once it has passed them all.
+function checkSavedWorkout(workout: WorkoutRecord, identities: Set<string>) {
+  const own = [workout.id, ...workoutIdentities(workout)];
+  if (new Set(own).size !== own.length || own.some((id) => identities.has(id))) {
+    throw new Error('Duplicate workout log identity.');
+  }
+  {
     if (
       workout.flow &&
       !workout.exercises.some((exercise) => exercise.id === workout.flow!.exerciseId)
     ) {
       throw new Error('Missing saved workout exercise.');
     }
-    for (const id of [
-      workout.id,
-      ...workout.exercises.flatMap((exercise) => [
-        exercise.logId,
-        ...exercise.sets.map((set) => set.id),
-      ]),
-    ]) {
-      if (identities.has(id)) {
-        throw new Error('Duplicate workout log identity.');
-      }
-      identities.add(id);
-    }
     if (workout.status === 'completed') {
       if (workout.completedAt === null || workout.completedAt < workout.startedAt) {
         throw new Error('Invalid workout completion.');
-      }
-      workout.pending.forEach((item) => mutationFor(workout, item));
-      const expected = finishWorkout(
-        { ...workout, status: 'active', runningSet: null },
-        workout.completedAt,
-      ).pending;
-      // What is left to upload keeps the finish order. It is a tail of it, unless a write was set
-      // aside (#3638) and the ones after it went up: then it is any in-order subset.
-      let at = 0;
-      for (const item of workout.pending) {
-        while (at < expected.length && expected[at].id !== item.id) {
-          at++;
-        }
-        if (
-          at === expected.length ||
-          item.domain !== expected[at].domain ||
-          item.exerciseId !== expected[at].exerciseId
-        ) {
-          throw new Error('Invalid saved upload order.');
-        }
-        at++;
       }
       if (
         (workout.pending.length === 0) !== (workout.syncedAt !== null) ||
@@ -216,6 +346,32 @@ export function readJournal(
         workout.rest
       ) {
         throw new Error('Invalid saved upload status.');
+      }
+      // Only a workout with writes still to send is replayed through the upload's own rules
+      // (#3671): an uploaded one has nothing left a later schema change could stop, and re-running
+      // every past workout's finish on each launch was both the cost and the risk.
+      if (workout.pending.length > 0) {
+        workout.pending.forEach((item) => mutationFor(workout, item));
+        const expected = finishWorkout(
+          { ...workout, status: 'active', runningSet: null },
+          workout.completedAt,
+        ).pending;
+        // What is left to upload keeps the finish order. It is a tail of it, unless a write was
+        // set aside (#3638) and the ones after it went up: then it is any in-order subset.
+        let at = 0;
+        for (const item of workout.pending) {
+          while (at < expected.length && expected[at].id !== item.id) {
+            at++;
+          }
+          if (
+            at === expected.length ||
+            item.domain !== expected[at].domain ||
+            item.exerciseId !== expected[at].exerciseId
+          ) {
+            throw new Error('Invalid saved upload order.');
+          }
+          at++;
+        }
       }
     } else if (workout.pending.length || workout.completedAt !== null) {
       throw new Error('Invalid pending workout writes.');
@@ -233,7 +389,7 @@ export function readJournal(
       }
     }
   }
-  return saved;
+  own.forEach((id) => identities.add(id));
 }
 
 export function createWorkout(
