@@ -322,7 +322,8 @@ export async function logExerciseFromPayload(
     isBaseline,
     exerciseDeloaded: exerciseDeloaded ?? false,
   })) {
-    isPR = await repo.upsertPersonalRecordIfBetter(userId, exercise, estimated1rm);
+    // #3671: dated by the set, not the upload, so a workout synced after midnight keeps its day.
+    isPR = await repo.upsertPersonalRecordIfBetter(userId, exercise, estimated1rm, loggedAt);
   }
 
   return {
