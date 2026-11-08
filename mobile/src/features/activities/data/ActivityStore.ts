@@ -25,7 +25,7 @@ import {
   type FitnessProfile,
 } from './guidance.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
-import { summariseRoute } from '@trainingai/shared/activity/route-summary';
+import { routeUntil, summariseRoute } from '@trainingai/shared/activity/route-summary';
 import { CadenceLog, WalkPace, walkSegmentStats, type PaceSnapshot } from './walk-pace.ts';
 import { hrFields, hrSamples, type HrWindow } from './hr-window.ts';
 import { supportsCadence } from '@trainingai/shared/health/cadence';
@@ -191,16 +191,25 @@ export function liveRouteReadout(session: ActivitySession, route: RoutePoint[], 
 export function logsCadence(session: { type: { id: string }; guidance?: unknown }) {
   return !session.guidance && supportsCadence(session.type.id);
 }
+/**
+ * The route a finished activity keeps: the fixes up to its end. A guided walk that ended with the
+ * phone locked kept recording until the screen's timer next ran (#3674); a free activity has no
+ * fixes after its end, so this changes nothing there.
+ */
+export function finishedRoute(session: ActivitySession, route: RoutePoint[]): RoutePoint[] {
+  return session.endMs === null ? route : routeUntil(route, session.endMs);
+}
 export function sessionPayload(
   session: ActivitySession,
   timezone: string,
-  route: RoutePoint[] = [],
+  allFixes: RoutePoint[] = [],
   pace: WalkPace | null = null,
   recorded: { hr?: HrWindow | null; cadence?: CadenceLog | null } = {},
 ): ActivityPayload {
   if (session.mode !== 'done' || session.startMs === null || session.endMs === null) {
     throw new Error('Finish this activity before saving.');
   }
+  const route = finishedRoute(session, allFixes);
   // The same fields the current app saves for a GPS activity, with the average pace over the
   // activity's active time, the seconds its duration counts (#3092).
   const summary = routeEligible(session)

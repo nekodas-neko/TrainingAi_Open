@@ -428,6 +428,35 @@ test('a guided walk saves its route with pace over the walk time', async () => {
   f.done();
 });
 
+// #3674: the walk's planned end passes with the phone locked. The screen's timer does not run, so
+// the finish comes only at unlock, while the location task kept delivering the walk home. The saved
+// distance, pace, splits and route are the walk's own, up to its end.
+test('a guided walk that ends with the phone locked saves only the walking up to its end', async () => {
+  const f = fixture(),
+    source = new FakeLocation(),
+    store = await guidedWalk(f);
+  f.watch(store, source);
+  // 120 fixes over the planned 240 s, then 10 more minutes of walking home before the unlock.
+  walkNorth(f, source, 0, 120);
+  const endMs = f.now();
+  walkNorth(f, source, 120, 300);
+  await store.finishGuided();
+  assert.equal(store.getSnapshot().session?.endMs, endMs);
+  await store.saveWalk(timezone);
+  const row = store.getSnapshot().rows[0].payload;
+  const all = store.getSnapshot().route;
+  const walked = all.filter((point) => point.t <= endMs);
+  assert.ok(all.length > walked.length, 'the fixes after the end were recorded');
+  const km = haversineDistanceKm(walked[0], walked.at(-1)!);
+  assert.equal(row.distanceKm, Math.round(km * 100) / 100);
+  assert.equal(row.avgPaceSecPerKm, Math.round(240 / km));
+  assert.equal(decodeRoute(row.routePolyline!).length > 0, true);
+  const lastSaved = decodeRoute(row.routePolyline!).at(-1)!;
+  assert.ok(lastSaved.lat <= walked.at(-1)!.lat + 1e-6, 'the saved route stops at the end');
+  assert.ok((row.splits?.length ?? 0) <= Math.ceil(km), 'no split from the walk home');
+  f.done();
+});
+
 // #3093 review: a pace bucket or split spanning a pause or a stop covers a few metres and reads as
 // hours per km, which the save schema rejects. These tracks are the ones real activities produce.
 const walkConfig = {

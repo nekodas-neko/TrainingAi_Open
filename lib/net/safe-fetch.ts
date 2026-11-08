@@ -88,17 +88,76 @@ function isPublicIpv4(addr: string): boolean {
   return true
 }
 
+/**
+ * Parse an IPv6 literal into its eight 16-bit groups, or null when it is not one. Handles `::`
+ * compression and a trailing dotted quad (`::ffff:127.0.0.1`), so every spelling of an address
+ * reaches the same groups. This matters because the URL parser rewrites the host before it gets
+ * here: `https://[::ffff:127.0.0.1]/` arrives as `::ffff:7f00:1`, which a pattern looking for a
+ * dotted quad never matches (#3673).
+ */
+function parseIpv6(addr: string): number[] | null {
+  let text = addr
+  const tail: number[] = []
+  const dotted = text.match(/^(.*:)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
+  if (dotted) {
+    const v4 = parseIpv4(dotted[2])
+    if (v4 === null) return null
+    tail.push(v4 >>> 16, v4 & 0xffff)
+    text = dotted[1].endsWith('::') ? dotted[1] : dotted[1].slice(0, -1)
+  }
+  const halves = text.split('::')
+  if (halves.length > 2) return null
+  const groups = (part: string): number[] | null => {
+    if (part === '') return []
+    const out: number[] = []
+    for (const g of part.split(':')) {
+      if (!/^[0-9a-f]{1,4}$/.test(g)) return null
+      out.push(parseInt(g, 16))
+    }
+    return out
+  }
+  const head = groups(halves[0])
+  if (head === null) return null
+  if (halves.length === 1) {
+    const all = [...head, ...tail]
+    return all.length === 8 ? all : null
+  }
+  const rest = groups(halves[1])
+  if (rest === null) return null
+  const known = head.length + rest.length + tail.length
+  if (known > 7) return null
+  return [...head, ...new Array<number>(8 - known).fill(0), ...rest, ...tail]
+}
+
+const v4From = (hi: number, lo: number): string =>
+  `${hi >>> 8}.${hi & 0xff}.${lo >>> 8}.${lo & 0xff}`
+
+/**
+ * Judged on the parsed groups, never on the spelling. Any form that carries an IPv4 destination
+ * (mapped `::ffff:0:0/96`, compatible `::/96`, SIIT `::ffff:0:0:0/96`, 6to4 `2002::/16`) is judged
+ * by the IPv4 rules on the address it carries. Translation and tunnelling prefixes whose IPv4 end
+ * cannot be read off reliably (NAT64, Teredo) are refused outright. Anything that does not parse
+ * is refused.
+ */
 function isPublicIpv6(addr: string): boolean {
-  const lower = addr.toLowerCase().split('%')[0]
-  // An IPv4-mapped or IPv4-compatible address reaches an IPv4 destination, so it is judged
-  // by the IPv4 rules — otherwise ::ffff:127.0.0.1 walks straight past them.
-  const mapped = lower.match(/^::(?:ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
-  if (mapped) return isPublicIpv4(mapped[1])
-  if (lower === '::' || lower === '::1') return false
-  if (/^f[cd][0-9a-f]{2}:/.test(lower)) return false // fc00::/7 unique-local
-  if (/^fe[89ab][0-9a-f]:/.test(lower)) return false // fe80::/10 link-local
-  if (/^ff[0-9a-f]{2}:/.test(lower)) return false // ff00::/8 multicast
-  if (/^(2001:0?db8|64:ff9b|100::)/.test(lower)) return false
+  const g = parseIpv6(addr.toLowerCase().split('%')[0])
+  if (g === null) return false
+  const [g0, g1, g2, g3, g4, g5, g6, g7] = g
+  if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0) {
+    // ::/96 compatible (this includes `::` and `::1`), ::ffff:0:0/96 mapped, ::ffff:0:0:0/96 SIIT.
+    if (g4 === 0 && (g5 === 0 || g5 === 0xffff)) return isPublicIpv4(v4From(g6, g7))
+    if (g4 === 0xffff && g5 === 0) return isPublicIpv4(v4From(g6, g7))
+    return false // nothing else in ::/64 is routable unicast
+  }
+  if (g0 === 0x2002) return isPublicIpv4(v4From(g1, g2)) // 6to4 carries its IPv4 in groups 1–2
+  if (g0 === 0x64 && g1 === 0xff9b) return false // NAT64 64:ff9b::/96 and 64:ff9b:1::/48
+  if (g0 === 0x2001 && g1 === 0) return false // Teredo 2001::/32
+  if (g0 === 0x2001 && g1 === 0x0db8) return false // documentation
+  if (g0 === 0x0100 && g1 === 0 && g2 === 0 && g3 === 0) return false // discard 100::/64
+  if ((g0 & 0xfe00) === 0xfc00) return false // fc00::/7 unique-local
+  if ((g0 & 0xffc0) === 0xfe80) return false // fe80::/10 link-local
+  if ((g0 & 0xffc0) === 0xfec0) return false // fec0::/10 site-local (deprecated, still private)
+  if ((g0 & 0xff00) === 0xff00) return false // ff00::/8 multicast
   return true
 }
 

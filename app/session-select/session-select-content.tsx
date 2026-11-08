@@ -820,7 +820,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // Local-first seed (SYN-10) before the cachedFetch revalidates — same shape
     // as fetchMeta's body-metric fast-path above.
     if (userId) {
-      readLocalWorkoutSessionsDay(userId, today).then(rows => { if (rows.length > 0) setOuraWorkoutSessions(rows); }).catch(() => {});
+      readLocalWorkoutSessionsDay(userId, today, tz).then(rows => { if (rows.length > 0) setOuraWorkoutSessions(rows); }).catch(() => {});
     }
     cachedFetch<{ sessions: { sessionName: string; startedAt: string; completedAt: string | null }[] }>(
       `workout-sessions-day:${today}`, `/api/workout-sessions/day?date=${today}`, TTL_MEDIUM,
