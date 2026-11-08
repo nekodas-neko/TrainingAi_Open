@@ -2,6 +2,7 @@ import * as healthConnect from './slices/health-connect'
 import { stampNightHrvMethod } from './slices/night-hrv-method'
 import { chooseNightHrv, nightHrvMethodFromProvenance, type NightHrvMethod } from '@trainingai/shared/health/night-hrv-method'
 import { trackPendingWrite } from '@/lib/observability/pending-writes'
+import { scrubBoundParams } from '@/lib/observability/scrub-params'
 import * as appleHealth from './slices/apple-health'
 import * as authData from './slices/auth'
 import * as mealLogging from './slices/meal-logging-statuses'
@@ -25,6 +26,7 @@ import { collapseOnConflict, keepLatestNonNull } from './collapse-conflicts'
 import { invitedEmails } from './schema'
 import { resolveSyncCursor } from '@trainingai/shared/sync/cursor'
 import { isRetryableWriteError } from '@trainingai/shared/sync/retryable-error'
+import { ingestDayRejection } from '@trainingai/shared/validation/ingest-clock'
 import { isSupersededEdit, editStampFromPayload, SUPERSEDED_WARNING, UNSTAMPED_WARNING, type EditStamp } from '@trainingai/shared/sync/edited-at'
 import { shouldPrune } from './retention-throttle'
 import { inSequence } from './in-sequence'
@@ -5806,9 +5808,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // before any mutation is even tried.
     let userTz: string = DEFAULT_TZ
     // `manual_sleep` needs it too: a typed night's date is its wake date in the user's timezone.
+    // `body_metrics` needs it for the future-day guard below.
     // So does `mood_logs`: a check-in sent without its suggested list falls back to deriving one,
     // and that reads the day's recovery in the user's timezone (#3669 item 6).
-    if (mutations.some(m => m.domain === 'workout_log' || m.domain === 'manual_sleep' || m.domain === 'mood_logs')) {
+    if (mutations.some(m =>
+      m.domain === 'workout_log' || m.domain === 'manual_sleep' || m.domain === 'body_metrics' || m.domain === 'mood_logs')) {
       try {
         const user = await this.getUserById(userId)
         userTz = user?.timezone ?? DEFAULT_TZ
@@ -5823,6 +5827,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         void syncStatus; void updatedAt; void deletedAt
 
         if (mut.domain === 'body_metrics') {
+          // #3674: the same day rule `POST /api/body-metadata` applies, on the path both apps
+          // actually write manual entries through. A phone whose clock is set ahead dates a weigh-in
+          // in the future, and that row would then outrank every later one as "the most recent
+          // weight" for good (Q-494). A rejection, not a retry: the date will not improve.
+          const dayReason = ingestDayRejection(mut.date, todayInTz(userTz))
+          if (dayReason) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: `body_metrics: ${dayReason}` })
+            continue
+          }
           const p = clean as Record<string, unknown>
           // A waterMlDelta payload (water-log-sheet's quick-add) is an increment,
           // not an absolute set — route it through incrementWaterLog, the same
@@ -6770,7 +6783,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // was then dead-lettering the first as if it were the second. Classify here, while the
         // cause chain is intact.
         errors.push({
-          id: mut.id, domain: mut.domain, date: mut.date, error: String(err),
+          // #3673: `String(err)` of a Drizzle error ends with the mutation's bound values. This string
+          // goes back to the device and, for a retryable one, into `error_events` via the route.
+          id: mut.id, domain: mut.domain, date: mut.date, error: scrubBoundParams(String(err)),
           ...(isRetryableWriteError(err) ? { retryable: true } : {}),
         })
       }

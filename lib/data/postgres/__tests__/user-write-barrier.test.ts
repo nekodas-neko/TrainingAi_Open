@@ -85,3 +85,58 @@ describe.skipIf(!canRun)('withUserWriteBarrier and a reset', () => {
     expect(Date.now() - t0).toBeLessThan(5000)
   })
 })
+
+// #3672 item 2: the lock connection and the query connection come from the same pool of ten. Ten
+// covered writes at once used to make every connection a lock holder waiting for a query
+// connection, and all ten failed after `connectionTimeoutMillis`.
+describe.skipIf(!canRun)('withUserWriteBarrier under concurrency (#3672)', () => {
+  const V = '00000000-0000-4000-8000-0000003672aa'
+  let pool: import('pg').Pool
+  let barrier: typeof import('../user-write-barrier')
+
+  beforeAll(async () => {
+    const client = await import('../client')
+    pool = client.getPool()
+    barrier = await import('../user-write-barrier')
+    await pool.query('DELETE FROM users WHERE id = $1', [V])
+    await pool.query(
+      `INSERT INTO users (id, email, password_hash, timezone, is_admin, is_active) VALUES ($1, $2, 'x', 'Australia/Brisbane', false, true)`,
+      [V, 'barrier-3672@example.com'])
+  })
+  afterAll(async () => { if (canRun) await pool.query('DELETE FROM users WHERE id = $1', [V]) })
+
+  it('scales the cap to the pool and always leaves a holder a connection to query on', () => {
+    expect(barrier.maxBarrierHolders(10)).toBe(4)
+    expect(barrier.maxBarrierHolders(5)).toBe(2)
+    expect(barrier.maxBarrierHolders(2)).toBe(1)
+    expect(barrier.maxBarrierHolders(1)).toBe(1)
+  })
+
+  it('twelve covered writes at once all succeed, never more than the cap hold a lock, and the pool stays usable', async () => {
+    const signedInAt = Math.floor(Date.now() / 1000) + 5
+    let peak = 0
+    const runs = Array.from({ length: 12 }, (_, i) => barrier.withUserWriteBarrier(V, signedInAt, async () => {
+      peak = Math.max(peak, barrier.barrierOccupancy().holders)
+      // Three pooled queries per run, as the review's reproduction did, with a hold between them.
+      for (let q = 0; q < 3; q++) await pool.query('SELECT pg_sleep(0.05)')
+      return i
+    }))
+    // Another route's query, issued while the burst is in flight, is not starved.
+    const t0 = Date.now()
+    await pool.query('SELECT 1')
+    expect(Date.now() - t0, 'an unrelated query waited on the pool').toBeLessThan(2000)
+
+    const out = await Promise.allSettled(runs)
+    expect(out.filter(r => r.status === 'rejected')).toEqual([])
+    expect(out.map(r => (r as PromiseFulfilledResult<number>).value)).toEqual(Array.from({ length: 12 }, (_, i) => i))
+    expect(peak).toBeLessThanOrEqual(barrier.maxBarrierHolders())
+    expect(barrier.barrierOccupancy()).toEqual({ holders: 0, waiting: 0 })
+  }, 20_000)
+
+  it('a write that throws gives its slot back', async () => {
+    const signedInAt = Math.floor(Date.now() / 1000) + 5
+    await Promise.allSettled(Array.from({ length: 6 }, () =>
+      barrier.withUserWriteBarrier(V, signedInAt, async () => { throw new Error('boom') })))
+    expect(barrier.barrierOccupancy()).toEqual({ holders: 0, waiting: 0 })
+  })
+})

@@ -20,7 +20,7 @@ import {
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useActivities } from '../data/ActivityProvider';
-import { elapsedMs } from '../data/ActivityStore';
+import { elapsedMs, finishedRoute } from '../data/ActivityStore';
 import { fitnessResult, testDuration, testProfile, walkPlan, walkSegments } from '../data/guidance';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { profileSpec, healthDaySpec, healthDaySchema, hrProfileSpec } from '../../health/data/models';
@@ -81,7 +81,7 @@ export function GuidedActivityScreen({
   const route = useMemo(
     () =>
       session?.mode === 'done' && session.endMs !== null && routeEligible(session)
-        ? summariseRoute(activity.route, elapsedMs(session, session.endMs) / 1000)
+        ? summariseRoute(finishedRoute(session, activity.route), elapsedMs(session, session.endMs) / 1000)
         : null,
     [session?.mode, session?.endMs, session?.type, session?.guidance, activity.route],
   );

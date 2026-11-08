@@ -170,13 +170,14 @@ any device that still holds the old rows. The guarantees, and where each lives:
   gate closed and the next launch wipes again; the clears raise instead of being swallowed.
 - **A covered write holds off a reset and a reset holds off a covered write**
   (`lib/data/postgres/user-write-barrier.ts`, an advisory lock). The sync push and the ring-sample
-  ingest use it; the other upload paths rely on the 409 gate alone. **Pool cost (#3435):** each
-  covered write holds one pooled connection for its whole duration, and the pool is 10, so roughly ten
-  covered writes at once would leave the rest waiting out `connectionTimeoutMillis` (5 s) and failing.
-  That is not realistic for the few users today, and there is no cheap fix: the shared lock lives on the
-  session, so the connection cannot be returned early. After a deploy that touches either path, watch
-  `error_events` for pool-timeout errors; if they appear, the answer is fewer concurrent covered writes
-  per user (the push is one request per sync), not a bigger pool, which `client.ts` deliberately cannot raise.
+  ingest use it; the other upload paths rely on the 409 gate alone. **Pool cost (#3435, #3672):** each
+  covered write holds one pooled connection for the lock plus the ones it queries on, from the same pool
+  of 10. Ten at once used to leave every connection a lock holder waiting for a query connection, and all
+  of them failed after `connectionTimeoutMillis` (5 s); Preview's "Sync now" starts seven at once, so that
+  was reachable. The barrier therefore admits at most `maxBarrierHolders()` (4 on a pool of 10) at a
+  time per process, and the rest wait in memory holding no connection. Keep that gate in the barrier,
+  not in a client: it covers the current app, Preview and the ring ingest at once. Never fix pool
+  timeouts with a bigger pool, which `client.ts` deliberately cannot raise.
 - **A new upload path needs nothing to be covered by the gate**, but a new queue of unsent writes must
   be wiped by `clearAccountStorage` (web) or live under the account scope (Preview), the same census as sign-out.
 - **The phone's `oura_raw.db` is deliberately NOT wiped** by a reset, a sign-out or an account change.
