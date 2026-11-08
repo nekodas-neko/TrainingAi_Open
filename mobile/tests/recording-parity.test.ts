@@ -226,6 +226,37 @@ test('a Cooper test saves its GPS distance and peak HR, and the activity its avg
   assert.equal(typed.payload.distanceM, 2500);
 });
 
+test('a Cooper test that ends with the phone locked measures only the fixes up to its end (#3684)', () => {
+  const session = {
+    id: testId,
+    startMs: START,
+    endMs: START + 720_000,
+    distance: '',
+    notes: '',
+    guidance: {
+      kind: 'test' as const,
+      protocol: 'cooper12' as const,
+      activityId,
+      countdownUntil: START,
+      restingHr: '',
+      peakHr: '',
+      recoveryHr: '',
+      saved: false,
+    },
+  };
+  // 2.4 km over the 12 minutes, then the same pace for 10 more minutes before the screen's timer
+  // finished the test at unlock.
+  const points = Array.from({ length: 265 }, (_, i) => ({
+    lat: -27.47 + (i * 2400) / 144 / 111_195,
+    lng: 153.02,
+    t: START + i * 5000,
+  }));
+  const result = fitnessResult(session, tz, {}, { route: points });
+  assert.ok(Math.abs((result.payload.distanceM ?? 0) - 2400) <= 2, `${result.payload.distanceM}`);
+  const within = fitnessResult(session, tz, {}, { route: points.slice(0, 145) });
+  assert.equal(result.payload.vo2maxEst, within.payload.vo2maxEst);
+});
+
 test('the resting HRR test reads resting HR and 1-minute recovery from the strap, typed values override', () => {
   const session = {
     id: testId,

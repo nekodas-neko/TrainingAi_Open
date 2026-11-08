@@ -12,6 +12,7 @@ import {
   baselineHrr1,
 } from '@trainingai/shared/health/fitness-tests';
 import { computeTotalDistanceKm } from '@trainingai/shared/activity/route-metrics';
+import { routeUntil } from '@trainingai/shared/activity/route-summary';
 import type { RoutePoint } from '@trainingai/shared/activity/route-encoding';
 import { hrSamples, type HrWindow } from './hr-window.ts';
 import { ageFromDob } from '@trainingai/shared/date-utils';
@@ -181,7 +182,9 @@ export function fitnessResult(
   if (typedDistanceM !== undefined && (!Number.isFinite(typedDistanceM) || typedDistanceM < 0)) {
     throw new Error('Enter a valid distance.');
   }
-  const route = recorded.route ?? [];
+  // Only the fixes up to the test's end (#3684): the finish runs from the screen's timer, and with
+  // the phone locked the location task keeps adding the distance covered after the end.
+  const route = routeUntil(recorded.route ?? [], session.endMs);
   // Whole metres, as the current app saves its GPS distance.
   const gpsDistanceM =
     protocol.captureDistance && route.length >= 2

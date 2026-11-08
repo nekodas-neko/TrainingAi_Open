@@ -199,6 +199,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
             Date.now(),
             lastMealReminders.current,
             daily.input,
+            daily.clock,
           ),
         )
       : '[]';

@@ -5,6 +5,11 @@ import type { WorkoutRecord } from '../../workouts/logging/workout.ts';
 import { reminderText, type MealEstimateReminder } from '../../meal-plans/data/estimated-meals.ts';
 import type { Alert, PlatformSettings } from './models.ts';
 import { planDailyReminders, type DailyReminderInput } from './daily-reminders.ts';
+import { localClockTimeToDate, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils';
+
+/** The user's local day and profile zone, which fixed-time reminders are planned in. */
+export type AlertClock = { today: string; tz: string };
+
 export function planAlerts(
   settings: PlatformSettings,
   workouts: WorkoutRecord[],
@@ -12,6 +17,7 @@ export function planAlerts(
   now = Date.now(),
   mealReminders: MealEstimateReminder[] = [],
   daily: DailyReminderInput | null = null,
+  clock: AlertClock | null = null,
 ): Alert[] {
   const scope = settings.scope;
   const result: Alert[] = [];
@@ -127,24 +133,34 @@ export function planAlerts(
         trigger: { at },
       });
   }
+  // Fixed-time reminders are dated instants in the profile's zone, today's and tomorrow's, as the
+  // daily reminders are (#3683). A native DAILY or WEEKLY trigger reads the phone's clock, so a
+  // phone in another zone fired them at the wrong moment. Planning two days ahead means a reminder
+  // stops if the app is not opened for two days, the same limit the daily reminders have. A time
+  // already past stays in the plan, so the notification on screen is kept; the native layer never
+  // schedules a past time.
+  const zone = clock?.tz ?? daily?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const today = clock?.today ?? daily?.today ?? toAestDay(new Date(now), zone);
+  const days = [today, shiftDateStr(today, 1)];
   for (const reminder of settings.reminders.filter((row) => row.enabled)) {
-    const [hour, minute] = reminder.time.split(':').map(Number);
     const target =
       reminder.kind === 'meal' || reminder.kind === 'supplement'
         ? 'nutrition'
         : reminder.kind === 'workout'
           ? 'workout'
           : reminder.kind;
-    const days = [...new Set(reminder.days)].sort();
-    for (const weekday of days.length === 7 ? [undefined] : days) {
+    for (const day of days) {
+      // Reminder days are 0 = Sunday … 6 = Saturday, read off the calendar date itself.
+      if (!reminder.days.includes(new Date(`${day}T12:00:00Z`).getUTCDay())) continue;
+      const at = localClockTimeToDate(day, reminder.time, zone)?.getTime();
+      if (at === undefined || !Number.isFinite(at)) continue;
       result.push({
-        id: `${scope}:reminder:${reminder.id}:${weekday ?? 'daily'}`,
+        id: `${scope}:reminder:${reminder.id}:${day}`,
         scope,
         title: reminder.title,
-        zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         body: 'Your TrainingAi reminder.',
         target,
-        trigger: { hour, minute, ...(weekday !== undefined ? { weekday } : {}) },
+        trigger: { at },
       });
     }
   }

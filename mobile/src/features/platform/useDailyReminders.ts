@@ -60,5 +60,7 @@ export function useDailyReminders(estimates: readonly MealEstimateReminder[]) {
   ]);
   if (input) last.current = input;
   const current = last.current;
-  return { input: current, on: !!current && wantsDailyReminders(current) };
+  // The profile's local day and zone, known before nutrition loads, for the fixed-time reminders.
+  const clock = useMemo(() => ({ today: n.today, tz: n.timezone }), [n.today, n.timezone]);
+  return { input: current, on: !!current && wantsDailyReminders(current), clock };
 }
