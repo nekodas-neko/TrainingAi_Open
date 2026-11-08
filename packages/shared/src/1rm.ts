@@ -316,6 +316,22 @@ export function displayOneRmDelta(
   return { value: diff, unit, text }
 }
 
+/**
+ * Whether this session's estimate is a new personal record, as the exercise summary and the done
+ * screen say it (E1-7, #3671). The bar is the ALL-TIME record, not last session: an off-day before
+ * a recovery day made every normal session flash a record the app then never stored. With no
+ * record yet (a new exercise) the last session's estimate is the bar, and with neither any
+ * estimate is one. 0.1 absorbs rounding. Both apps decide it here.
+ */
+export function beatsPersonalRecord(
+  newEst1rm: number | null | undefined,
+  allTimePr1rm: number | null | undefined,
+  prevEst1rm: number | null | undefined,
+): boolean {
+  if (newEst1rm == null || !(newEst1rm > 0)) return false
+  const bar = allTimePr1rm ?? prevEst1rm ?? null
+  return bar == null || newEst1rm > bar + 0.1
+}
 
 export function describePersonalRecord(
   exerciseName: string,

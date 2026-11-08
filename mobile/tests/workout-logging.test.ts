@@ -895,6 +895,30 @@ test('an exercise swap preserves already-recorded loads under the original exerc
   assert.deepEqual(new Set(names), new Set(['Bench press', 'Push-up']));
 });
 
+test('a swap does not hand the swapped-out exercise\'s personal record to its replacement (#3671)', async (t) => {
+  const f = await setup(t);
+  // `start` pins the live prescription, so the record comes from the server's row.
+  Object.assign(f.response.exercises[0], { allTimePr1rm: 140, prevFromBaseline: true });
+  const { id } = await recordFirst(f);
+  const previous = f.controller.getSnapshot().data.workouts[0].exercises[0];
+  assert.equal(previous.allTimePr1rm, 140);
+  await f.controller.swapExercise(id, previous.id, {
+    name: 'Push-up',
+    exerciseType: 'bodyweight',
+    muscles: ['chest'],
+    equipment: ['bodyweight'],
+    instructions: null,
+    estimated1rm: null,
+    lastWeights: [],
+  });
+  const changed = f.controller.getSnapshot().data.workouts[0];
+  const replacement = changed.exercises.find((exercise) => !exercise.retired)!;
+  const archive = changed.exercises.find((exercise) => exercise.retired)!;
+  assert.equal(replacement.allTimePr1rm, null);
+  assert.equal(replacement.prevFromBaseline, false);
+  assert.equal(archive.allTimePr1rm, 140);
+});
+
 test('timer choices persist per account and workout while hidden clocks still record actual durations', async (t) => {
   const f = await setup(t);
   const id = (await f.controller.start(f.session, programId, true))!;

@@ -859,7 +859,8 @@ export class WorkoutJournalStore {
       | 'lastReps'
       | 'lastDate'
       | 'lastWeights'
-    >,
+    > &
+      Partial<Pick<SessionPreview['exercises'][number], 'allTimePr1rm' | 'prevFromBaseline'>>,
   ) => {
     const now = this.now();
     const archiveId = this.uuid();
@@ -898,6 +899,9 @@ export class WorkoutJournalStore {
           secondaryMuscles: alternative.secondaryMuscles ?? [],
           lastReps: alternative.lastReps ?? [],
           lastDate: alternative.lastDate ?? null,
+          // #3671: the swapped-out exercise's record is not this one's.
+          allTimePr1rm: alternative.allTimePr1rm ?? null,
+          prevFromBaseline: alternative.prevFromBaseline ?? false,
           latestWeight: null,
           target80: null,
           readyStartedAt: now,

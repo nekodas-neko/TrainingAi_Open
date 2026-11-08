@@ -1,4 +1,4 @@
-import { estimateOneRm, withPrescribedBars } from '@trainingai/shared/1rm';
+import { beatsPersonalRecord, estimateOneRm, withPrescribedBars } from '@trainingai/shared/1rm';
 import { setValues, type WorkoutExercise, type WorkoutRecord } from './workout';
 
 export function exerciseResult(workout: WorkoutRecord, exercise: WorkoutExercise) {
@@ -75,4 +75,40 @@ export function workoutResult(workout: WorkoutRecord) {
       : null,
     restSeconds: rests.length ? rests.reduce((sum, set) => sum + set.restAfterSec!, 0) : null,
   };
+}
+
+/**
+ * #3671. Whether this exercise's estimate is a new personal record, as the current app's exercise
+ * summary badge decides it (`beatsPersonalRecord`, against the all-time record the catalog
+ * carried). A deloaded exercise has no estimate, and a deload session's sets never count, baseline
+ * excepted, as the server's own record gate.
+ */
+export function newPersonalRecord(workout: WorkoutRecord, exercise: WorkoutExercise): boolean {
+  if (workout.intensityMode === 'deload' && !workout.isBaseline) return false;
+  return beatsPersonalRecord(
+    exerciseResult(workout, exercise).estimate,
+    exercise.allTimePr1rm,
+    exercise.estimated1rm,
+  );
+}
+
+/** The done screen's "Personal Records": each exercise that set one, once, in session order. */
+export function personalRecordNames(workout: WorkoutRecord): string[] {
+  return [
+    ...new Set(
+      workout.exercises
+        .filter((exercise) => newPersonalRecord(workout, exercise))
+        .map((exercise) => exercise.name),
+    ),
+  ];
+}
+
+/** The share line for one record, as the current app writes it (`done-screen.tsx`). */
+export function personalRecordShareText(name: string) {
+  return `🏆 New personal record on ${name}! #TrainingAI`;
+}
+
+/** The line the workout's own share adds when it set records, as the current app writes it. */
+export function personalRecordsLine(names: readonly string[]) {
+  return names.length ? `🏆 New PRs: ${names.join(', ')}` : null;
 }

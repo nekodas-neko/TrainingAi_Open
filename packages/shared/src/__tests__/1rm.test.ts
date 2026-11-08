@@ -656,3 +656,17 @@ describe('pickHeadlinePersonalRecord', () => {
     expect(pickHeadlinePersonalRecord([])).toBeNull()
   })
 })
+
+// #3671 ②. One rule for both apps' "New Personal Record" (E1-7: the bar is the all-time record).
+describe('beatsPersonalRecord', () => {
+  it('beats the all-time record by more than 0.1, else last session, else any estimate', async () => {
+    const { beatsPersonalRecord } = await import('../1rm')
+    expect(beatsPersonalRecord(120, 119, 130)).toBe(true)
+    expect(beatsPersonalRecord(120, 119.95, null)).toBe(false)
+    expect(beatsPersonalRecord(120, null, 110)).toBe(true)
+    expect(beatsPersonalRecord(120, null, 125)).toBe(false)
+    expect(beatsPersonalRecord(120, null, null)).toBe(true)
+    expect(beatsPersonalRecord(0, null, null)).toBe(false)
+    expect(beatsPersonalRecord(null, 100, 100)).toBe(false)
+  })
+})

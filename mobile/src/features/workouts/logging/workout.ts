@@ -52,6 +52,9 @@ const exerciseSchema = z.object({
   lastWeights: z.array(z.number().min(-100).max(500)),
   equipment: z.array(z.string()).default([]),
   estimated1rm: z.number().nonnegative().nullable().default(null),
+  // #3671. Carried from the catalog so the summary can say "New Personal Record" offline.
+  allTimePr1rm: z.number().positive().nullable().default(null),
+  prevFromBaseline: z.boolean().default(false),
   target80: z.number().min(-100).max(500).nullable().default(null),
   latestWeight: z.number().min(-100).max(500).nullable().default(null),
   lastSetMode: z.enum(['amrap', 'plus1']).nullable().default(null),

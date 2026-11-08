@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@trainingai/shared/utils";
 import type { ExerciseSummaryData } from "./types";
 import { formatTime, formatSetLoad } from "./utils";
-import { bodyweightRepMax, displayOneRm, displayOneRmSeries, isBodyweightType, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
+import { beatsPersonalRecord, bodyweightRepMax, displayOneRm, displayOneRmSeries, isBodyweightType, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { EXERCISE_HISTORY_TTL } from '@trainingai/shared/cache-ttl';
 import { SessionClock } from "./session-clock";
@@ -88,8 +88,7 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
   // session — an off-day previous session made every recovery day flash a phantom PR
   // the app then never recorded. Gate on the all-time record (fall back to last
   // session only when there's no PR row yet, e.g. a brand-new exercise).
-  const prBar = allTimePr1rm ?? prevEst1rm;
-  const isNewPR = newEst1rm > 0 && (prBar == null || newEst1rm > prBar + 0.1);
+  const isNewPR = beatsPersonalRecord(newEst1rm, allTimePr1rm, prevEst1rm);
 
   useEffect(() => {
     if (isNewPR) hapticSuccess();

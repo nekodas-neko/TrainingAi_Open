@@ -8,6 +8,7 @@ import type { WorkoutRecord } from '../logging/workout';
 export function WorkoutLayout({
   title,
   subtitle,
+  subtitleNode,
   detail,
   onBack,
   backIcon = 'back',
@@ -25,6 +26,8 @@ export function WorkoutLayout({
 }: PropsWithChildren<{
   title: string;
   subtitle?: string;
+  /** Drawn in the subtitle's place when given (the summary's "New Personal Record!", #3671). */
+  subtitleNode?: ReactNode;
   detail?: string;
   onBack?: () => void;
   backIcon?: 'back' | 'forward';
@@ -61,7 +64,7 @@ export function WorkoutLayout({
             >
               {title}
             </AppText>
-            {subtitle && (
+            {subtitleNode ?? (subtitle && (
               <AppText
                 numberOfLines={1}
                 variant={ring ? 'micro' : 'caption'}
@@ -70,7 +73,7 @@ export function WorkoutLayout({
               >
                 {subtitle}
               </AppText>
-            )}
+            ))}
             {detail && (
               <AppText variant="caption" tone="muted">
                 {detail}

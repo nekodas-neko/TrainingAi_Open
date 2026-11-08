@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import {
   barShareOfOneRm,
@@ -34,7 +34,9 @@ import { WorkoutSaveNotice } from '../components/WorkoutSaveNotice';
 import { ExerciseReady } from '../components/ExerciseReady';
 import { LoadSuggestion } from '../components/LoadSuggestion';
 import { ExerciseSummary } from '../components/ExerciseSummary';
-import { exerciseResult } from '../logging/summary';
+import { exerciseResult, newPersonalRecord } from '../logging/summary';
+import { PersonalRecordBadge } from '../components/PersonalRecordBadge';
+import { feedback } from '../../../integrations/feedback/haptics';
 import { WarmupContent } from '../components/WarmupContent';
 import { WorkoutLayout } from '../components/WorkoutLayout';
 import { SetRecapGrid } from '../components/SetRecapGrid';
@@ -113,6 +115,11 @@ export function GuidedWorkoutScreen({
     ? exercise.sets.find((set) => set.id === workout.runningSet!.setId)
     : exercise.sets[setIndex];
   const resting = flow.stage === 'exercise' && !!workout.rest && !workout.runningSet;
+  // #3671: the summary says "New Personal Record!" and buzzes once, as the current app does.
+  const summaryRecord = flow.stage === 'summary' && newPersonalRecord(workout, exercise);
+  useEffect(() => {
+    if (summaryRecord) feedback('success', true);
+  }, [exercise.id, summaryRecord]);
   const ready =
     flow.stage === 'exercise' &&
     setIndex === 0 &&
@@ -249,6 +256,7 @@ export function GuidedWorkoutScreen({
               ? exercise.name
               : workout.sessionName
         }
+        subtitleNode={summaryRecord ? <PersonalRecordBadge /> : undefined}
         subtitle={
           flow.stage === 'summary'
             ? 'Set summary'
