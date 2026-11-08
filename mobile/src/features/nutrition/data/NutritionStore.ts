@@ -35,6 +35,7 @@ import { normaliseFood, type FoodEntry } from './food-values.ts';
 import {
   RETIRED_FOODS_PATH,
   keeperFor,
+  logReadbackMatches,
   liveCatalog,
   refreshedLibrary,
   retiredFoodIdsOf,
@@ -92,6 +93,10 @@ const operationSchema = MutationSchema.extend({
     'plan_meal_answers',
   ]),
   acknowledged: z.boolean().default(false),
+  // #3670. A food-log edit's serving size, in grams, of the food it was pushed against. Kept off
+  // the payload: the server converts an edit against a merged-away food onto its keeper, and the
+  // read-back then confirms it by grams instead of by quantity.
+  sentServingG: z.number().positive().optional(),
   // #3638: the server's refusals of this change (or read-backs that did not show it). Set aside at
   // MAX_MUTATION_ATTEMPTS: the flush passes over it, and Sync health lists it with Retry / Discard.
   rejected: rejectionSchema.optional(),
@@ -543,6 +548,7 @@ export class NutritionStore {
       domain: NutritionOperation['domain'];
       date: string;
       payload: Record<string, unknown>;
+      sentServingG?: number;
     }[],
     knownFoods: Food[] = [],
   ) {
@@ -927,6 +933,7 @@ export class NutritionStore {
       {
         domain: 'food_logs',
         date: log.date,
+        sentServingG: log.foodItem.servingSizeG,
         payload: {
           id: log.id,
           mealTypeId,
@@ -954,6 +961,7 @@ export class NutritionStore {
       logs.map((log) => ({
         domain: 'food_logs' as const,
         date: log.date,
+        sentServingG: log.foodItem.servingSizeG,
         payload: {
           id: log.id,
           mealTypeId: log.mealTypeId,
@@ -1020,6 +1028,7 @@ export class NutritionStore {
       logs.map((log) => ({
         domain: 'food_logs',
         date: log.date,
+        sentServingG: log.foodItem.servingSizeG,
         payload: {
           id: log.id,
           mealTypeId,
@@ -1284,7 +1293,7 @@ export class NutritionStore {
         op.payload.deleted
           ? found
           : !found ||
-            found.quantityMultiplier !== op.payload.quantityMultiplier ||
+            !logReadbackMatches(found, op.payload, op.sentServingG) ||
             found.mealTypeId !== op.payload.mealTypeId
       ) {
         throw new ChangeRefused('Readback not confirmed.');

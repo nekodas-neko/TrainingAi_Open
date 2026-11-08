@@ -8,7 +8,7 @@ import {
   recentFoods,
   savedFoodForBarcode,
 } from '../src/features/nutrition/data/food-library.ts';
-import { keeperItems } from '../src/features/nutrition/data/retired-foods.ts';
+import { keeperItems, logReadbackMatches } from '../src/features/nutrition/data/retired-foods.ts';
 
 // #3652: after a look-alike merge, the merged-away food is never offered or logged from a stale
 // copy; its keeper stands in. #3651: search and the barcode check reach the whole library.
@@ -62,7 +62,7 @@ const logOn = (food: Food, n: number, day = '2026-10-20') =>
     loggedAt: day + 'T02:00:00.000Z',
   } as Parameters<typeof scaledLog>[1]);
 
-function fixture(opts: { retiredAnswer?: boolean } = {}) {
+function fixture(opts: { retiredAnswer?: boolean; serverConverts?: boolean } = {}) {
   const disk = new Map<string, string>();
   const days: Record<string, ReturnType<typeof scaledLog>[]> = { '2026-10-20': [logOn(extra, 900)] };
   const asked: (Record<string, string> | undefined)[] = [];
@@ -87,7 +87,21 @@ function fixture(opts: { retiredAnswer?: boolean } = {}) {
     },
     post: async (path: string, body: unknown) => {
       if (path.endsWith('meal-statuses')) return { success: true };
-      for (const op of (body as { mutations: typeof sent }).mutations) sent.push(op);
+      for (const op of (body as { mutations: typeof sent }).mutations) {
+        sent.push(op);
+        // #3670: the server converts an edit against the retired food onto its keeper, in grams.
+        const p = op.payload;
+        if (opts.serverConverts && op.domain === 'food_logs' && p.foodItemId === extra.id) {
+          const log = logOn(keeper, 900);
+          days['2026-10-20'] = [
+            scaledLog(keeper, {
+              ...log,
+              quantityMultiplier:
+                ((p.quantityMultiplier as number) * extra.servingSizeG) / keeper.servingSizeG,
+            } as Parameters<typeof scaledLog>[1]),
+          ];
+        }
+      }
       return { processed: 1, errors: [] };
     },
   };
@@ -227,4 +241,27 @@ test('a saved meal read before the merge edits onto the keeper in the same grams
   assert.deepEqual(keeperItems([{ foodItemId: extra.id, quantityMultiplier: 2, foodItem: extra }], [rice], retired), [
     { foodItemId: extra.id, quantityMultiplier: 2 },
   ]);
+});
+
+test('an edit of a saved-day log on the merged-away food is confirmed when the server moves it to the keeper (#3670)', async () => {
+  const f = fixture({ serverConverts: true });
+  const store = await opened(f);
+  const stale = store.view('2026-10-20').logs[0];
+  await store.editLog(stale, 2);
+  await store.sync();
+  // 2 × 50 g pushed; the server stores 1 × the keeper's 100 g, and the read-back accepts it.
+  assert.equal(f.sent.at(-1)?.payload.foodItemId, extra.id);
+  assert.equal(store.getSnapshot().operations.length, 0);
+  const shown = store.view('2026-10-20').logs[0];
+  assert.equal(shown.foodItemId, keeper.id);
+  assert.equal(shown.quantityMultiplier, 1);
+});
+
+test('the read-back compares grams only across a food change, and only with the sent serving size', () => {
+  const found = { foodItemId: keeper.id, quantityMultiplier: 1, foodItem: { servingSizeG: 100 } };
+  assert.equal(logReadbackMatches(found, { foodItemId: extra.id, quantityMultiplier: 2 }, 50), true);
+  assert.equal(logReadbackMatches(found, { foodItemId: extra.id, quantityMultiplier: 3 }, 50), false);
+  assert.equal(logReadbackMatches(found, { foodItemId: extra.id, quantityMultiplier: 2 }, undefined), false);
+  assert.equal(logReadbackMatches(found, { foodItemId: keeper.id, quantityMultiplier: 2 }, 50), false);
+  assert.equal(logReadbackMatches(found, { foodItemId: keeper.id, quantityMultiplier: 1 }, undefined), true);
 });
