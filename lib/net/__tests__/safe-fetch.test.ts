@@ -31,6 +31,35 @@ describe('isPublicAddress', () => {
     }
     expect(isPublicAddress('2606:4700::1111')).toBe(true)
   })
+
+  // #3673: the URL parser rewrites `[::ffff:127.0.0.1]` to `[::ffff:7f00:1]`, and a guard that
+  // only recognised the dotted spelling let every hex spelling of a private IPv4 through.
+  it('judges every spelling of an IPv6 address that carries an IPv4 destination by that destination', () => {
+    for (const addr of [
+      '::ffff:7f00:1', '::ffff:a00:1', '::ffff:a9fe:a9fe', '::ffff:c0a8:101', // mapped, hex
+      '0:0:0:0:0:ffff:7f00:1', '0000:0000:0000:0000:0000:ffff:127.0.0.1', '::FFFF:7F00:1',
+      '::7f00:1', '::127.0.0.1', '::a9fe:a9fe', '0:0:0:0:0:0:0:1', // compatible
+      '::ffff:0:7f00:1', '::ffff:0:127.0.0.1', // SIIT
+      '2002:7f00:1::', '2002:a9fe:a9fe::1', '2002:c0a8:101::', // 6to4
+      '64:ff9b::7f00:1', '64:ff9b::8.8.8.8', '64:ff9b:1::1', '2001:0:4136:e378::1', // NAT64, Teredo
+      '2001:db8::1', '100::1', 'fec0::1', '::2', '::1:0:0:0', // documentation, discard, site-local, rest of ::/64
+    ]) {
+      expect(isPublicAddress(addr), addr).toBe(false)
+    }
+  })
+
+  it('still accepts a public IPv4 carried in a mapped or 6to4 address, and ordinary public IPv6', () => {
+    for (const addr of ['::ffff:5db8:d822', '::ffff:93.184.216.34', '2002:5db8:d822::1',
+                        '2606:4700:4700::1111', '2a00:1450:4001:82b::200e']) {
+      expect(isPublicAddress(addr), addr).toBe(true)
+    }
+  })
+
+  it('refuses anything that does not parse as an address', () => {
+    for (const addr of ['::ffff:999.0.0.1', '1:2:3:4:5:6:7:8:9', '1::2::3', 'gggg::1', '::12345', '1:2:3:4:5:6:7']) {
+      expect(isPublicAddress(addr), addr).toBe(false)
+    }
+  })
 })
 
 describe('scheme', () => {
@@ -67,6 +96,19 @@ describe('private addresses', () => {
     })
     expect(r).toEqual({ ok: false, reason: 'private_address' })
     expect(resolved).toBe(false)
+  })
+
+  it('rejects an IPv4-mapped IPv6 literal after the URL parser has rewritten it to hex', async () => {
+    for (const url of ['https://[::ffff:127.0.0.1]/', 'https://[::ffff:10.0.0.1]/x', 'https://[::ffff:169.254.169.254]/latest',
+                       'https://[::127.0.0.1]/', 'https://[0:0:0:0:0:ffff:7f00:1]/', 'https://[2002:7f00:1::]/']) {
+      let fetched = false
+      const r = await fetchPublicUrl(url, {
+        resolve: publicDns,
+        fetchImpl: async () => { fetched = true; return page('') },
+      })
+      expect(r, url).toEqual({ ok: false, reason: 'private_address' })
+      expect(fetched, url).toBe(false)
+    }
   })
 
   it('rejects a public hostname that resolves to a private address', async () => {

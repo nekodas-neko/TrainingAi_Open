@@ -41,6 +41,18 @@ export interface RouteSummary {
 }
 
 /**
+ * The fixes recorded up to an activity's end (#3674). A guided walk ends at its plan's end, but the
+ * finish runs from the screen's timer, which does not fire with the phone locked, while the location
+ * task keeps delivering fixes. Without this, the walk home after the end is counted in the walk's
+ * distance against the walk's own duration, so its pace reads too fast. Both apps' guided walks
+ * clip with this before anything reads the route.
+ */
+export function routeUntil<P extends RoutePoint>(points: P[], endMs: number): P[] {
+  const last = points.at(-1)
+  return last === undefined || last.t <= endMs ? points : points.filter(point => point.t <= endMs)
+}
+
+/**
  * The route fields an activity log saves, from the raw GPS points. One builder for the current
  * app's activity screen, its guided walk and TrainingAi Preview (#2845), which used to each spell
  * the same nine fields out by hand.

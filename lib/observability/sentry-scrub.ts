@@ -1,4 +1,5 @@
 import type { ErrorEvent, EventHint } from '@sentry/nextjs'
+import { scrubBoundParams } from './scrub-params'
 
 /**
  * Everything that decides what does NOT leave this app for a third party (Q-404).
@@ -92,20 +93,14 @@ const SAFE_CONTEXT_KEYS = ['os', 'runtime', 'device', 'browser', 'app', 'trace',
 const MAX_VALUE_LENGTH = 1000
 
 /**
- * Drizzle puts the bound parameters INTO the exception message:
- * `` super(`Failed query: ${query}\nparams: ${params}`) `` — verified in the pinned
- * `drizzle-orm/errors.js`, not from memory. `params` is an array, so the template comma-joins the
- * real values straight into `.message`.
- *
- * The SQL above that line is kept deliberately: Drizzle parameterises, so it carries `$1`/`$2`
- * placeholders rather than values, and it is the part that makes the error diagnosable.
+ * Drizzle puts the bound parameters INTO the exception message; `scrubBoundParams` drops them (the
+ * same function the `error_events` writers use). A message past `MAX_VALUE_LENGTH` is cut as well.
  *
  * Without this, every uncaught database error forwards row values to sentry.io — on the `users`
  * path that is an email address.
  */
 export function scrubExceptionValue(value: string): string {
-  const cut = value.indexOf('\nparams:')
-  const head = cut === -1 ? value : `${value.slice(0, cut)}\nparams: [scrubbed]`
+  const head = scrubBoundParams(value)
   return head.length > MAX_VALUE_LENGTH ? `${head.slice(0, MAX_VALUE_LENGTH)}… [truncated]` : head
 }
 

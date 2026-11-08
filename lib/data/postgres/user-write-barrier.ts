@@ -20,17 +20,67 @@ import { signedInBeforeCutoff } from '@/lib/auth/session-cutoff'
  * So a write either finishes before the reset (and is wiped by it) or starts after it (and is
  * refused). Nothing lands in the fresh account.
  *
- * Costs, stated: one extra pooled connection is held for the duration of a covered write (the pool
- * is 10, and `connectionTimeoutMillis` turns starvation into a 5 s error rather than a hang), and a
+ * Costs, stated: one extra pooled connection is held for the duration of a covered write, and a
  * covered write waits behind a reset in progress. Only the sync push and the ring-sample ingest take
  * it; the other upload paths are covered by the 409 gate alone, whose remaining window is a request
  * already in its handler when a reset commits.
+ *
+ * **At most `maxBarrierHolders()` covered writes hold a lock connection at once (#3672).** The lock
+ * connection and the connection `run()` queries on come from the same pool. With ten covered writes
+ * in flight on a pool of ten, every connection was a lock holder waiting for a query connection: all
+ * of them waited out `connectionTimeoutMillis` (5 s) and failed, and every other route stalled with
+ * them. Preview's "Sync now" starts seven pushes at once, and the current app's push and the ring
+ * ingest take the same barrier, so ten is reachable. A covered write past the cap waits here, in
+ * memory and holding no connection, until a holder finishes. The gate is per process, which is the
+ * unit the pool is per.
  */
 export const CUT_OFF = Symbol('write-cut-off')
+
+/**
+ * Lock holders allowed at once: four on the pool of ten, so the holders and their query connections
+ * use at most eight and two stay free for every other route. A smaller pool scales it down, never
+ * below one, so a holder always has a connection left to query on.
+ */
+export function maxBarrierHolders(poolMax = getPool().options.max ?? 10): number {
+  return Math.max(1, Math.min(4, Math.floor((poolMax - 1) / 2)))
+}
+
+let holders = 0
+const waiting: Array<() => void> = []
+
+async function acquireSlot(): Promise<void> {
+  if (holders < maxBarrierHolders()) { holders++; return }
+  // The slot is handed over by `releaseSlot`, which keeps `holders` unchanged on a hand-over.
+  await new Promise<void>(resolve => waiting.push(resolve))
+}
+
+function releaseSlot(): void {
+  const next = waiting.shift()
+  if (next) next()
+  else holders--
+}
+
+/** Test seam: covered writes holding a lock connection right now, and those queued for one. */
+export function barrierOccupancy(): { holders: number; waiting: number } {
+  return { holders, waiting: waiting.length }
+}
 
 const lockKey = (userId: string) => `user-writes:${userId.toLowerCase()}`
 
 export async function withUserWriteBarrier<T>(
+  userId: string,
+  signedInAt: number | undefined,
+  run: () => Promise<T>,
+): Promise<T | typeof CUT_OFF> {
+  await acquireSlot()
+  try {
+    return await holdBarrier(userId, signedInAt, run)
+  } finally {
+    releaseSlot()
+  }
+}
+
+async function holdBarrier<T>(
   userId: string,
   signedInAt: number | undefined,
   run: () => Promise<T>,

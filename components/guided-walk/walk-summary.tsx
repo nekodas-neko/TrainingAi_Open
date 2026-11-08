@@ -21,7 +21,7 @@ import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
 import { registerWalkExit } from '@/lib/walk/walk-exit'
 import { computePaceSeries } from '@/lib/activity/activity-metrics'
 import { clipSegmentsAt } from '@trainingai/shared/walking/clip-segments'
-import { summariseRoute } from '@trainingai/shared/activity/route-summary'
+import { routeUntil, summariseRoute } from '@trainingai/shared/activity/route-summary'
 import { computeWalkSegmentStats, aggregateSegmentsByKind, walkEffortDisplay, type KindAggregate } from '@/lib/walk/segment-stats'
 import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
@@ -66,12 +66,17 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   // samples and elapsed time and showed a 0-minute walk. `MobileAuthHandler` asks through the same
   // registry the active screen uses for its Exit prompt.
   useEffect(() => registerWalkExit(leave), [leave])
-  const rawPoints = useGuidedWalkStore(s => s.rawPoints)
+  const allPoints = useGuidedWalkStore(s => s.rawPoints)
   const pacerTallies = useGuidedWalkStore(s => s.pacerTallies)
   const plan = buildIntervalPlan(config)
   // Never above the plan: a walk cannot run longer than it was told to, and the 1 Hz tick can land
   // a second past `totalSec` before the finish fires.
   const actualSec = Math.min(elapsedSec, plan.totalSec)
+  // #3674: only the fixes up to the walk's end. The finish runs from a timer that does not fire with
+  // the phone locked, while the GPS watcher keeps recording, so the walk home was counted in the
+  // distance against the walk's own duration.
+  const walkEndMs = startedAtMs + actualSec * 1000
+  const rawPoints = useMemo(() => routeUntil(allPoints, walkEndMs), [allPoints, walkEndMs])
   const durationMin = Math.round(actualSec / 60)
   const bpms = samples.map(s => s.bpm)
   const avgHr = avg(bpms)
@@ -174,7 +179,7 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
     // GPS-derived fields, from the same summariseRoute as activity-store.ts's finish().
     // On a treadmill the watcher never started, so rawPoints is empty and every field below
     // falls to null through the existing hasRoute guard rather than a second code path.
-    const rawPoints = useGuidedWalkStore.getState().rawPoints
+    const rawPoints = routeUntil(useGuidedWalkStore.getState().rawPoints, walkEndMs)
     const hasRoute = !isTreadmill && rawPoints.length >= 2
     // The pace denominator is the walk's own elapsed time, not the GPS fix span.
     const route = hasRoute ? summariseRoute(rawPoints, actualSec) : null
