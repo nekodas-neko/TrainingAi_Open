@@ -1057,3 +1057,62 @@ test('a backdated dose is confirmed when the pull re-sends rows across pages', a
   assert.equal(asked.length, 2);
   assert.equal(asked[1], '2026-10-10T01:00:00.000Z');
 });
+
+// #3670 ②. `nutrition_targets.calories` is an integer: a decimal answered 500 and the queue re-sent
+// it on every sync. The current app's form sends whole kcal (`parseInt`), and so does Preview now.
+function targetsServer(f: ReturnType<typeof fixture>) {
+  let targets: Record<string, unknown> = {};
+  const puts: Record<string, unknown>[] = [];
+  const connection = {
+    ...f.connection,
+    get: (path: string, query?: Record<string, string>) =>
+      path.endsWith('targets') ? Promise.resolve(targets) : f.connection.get(path, query),
+    put: async (_path: string, body: unknown) => {
+      const b = body as Record<string, unknown>;
+      puts.push(b);
+      // What Postgres did before the server fix: refuse a decimal for an integer column.
+      if (typeof b.calories === 'number' && !Number.isInteger(b.calories)) {
+        throw new ApiError(500);
+      }
+      targets = { ...targets, ...b };
+      return targets;
+    },
+  };
+  let seq = 950;
+  const make = () => new NutritionStore(f.storage, connection, () => id(seq++));
+  return { puts, make };
+}
+
+test('a decimal calorie target is queued, sent and read back as whole kcal (#3670)', async () => {
+  const f = fixture();
+  const server = targetsServer(f);
+  const store = server.make();
+  await store.initialize();
+  await store.queueHttp('targets', date, { calories: 2150.5, proteinG: 150.5 });
+  assert.equal(store.getSnapshot().http[0].payload.calories, 2150);
+  await store.sync();
+  assert.deepEqual(server.puts, [{ calories: 2150, proteinG: 150.5 }]);
+  assert.equal(store.getSnapshot().http.length, 0);
+  assert.equal(store.view(date).targets.calories, 2150);
+});
+
+test('a decimal calorie target queued by an earlier build loads, uploads and does not hold the queue (#3670)', async () => {
+  const f = fixture();
+  const server = targetsServer(f);
+  const first = server.make();
+  await first.initialize();
+  await first.queueHttp('targets', date, { calories: 2150 });
+  await first.queueHttp('complete', date, { date, complete: true });
+  // Rewrite the saved queue as an earlier build left it: the decimal as typed.
+  for (const [key, value] of f.disk) {
+    if (!value.includes('"kind":"targets"')) continue;
+    f.disk.set(key, value.replace('"calories":2150', '"calories":2150.5'));
+  }
+  const store = server.make();
+  await store.initialize();
+  assert.equal(store.getSnapshot().http[0].payload.calories, 2150.5);
+  await store.sync();
+  assert.deepEqual(server.puts.at(-1), { calories: 2150 });
+  assert.equal(store.getSnapshot().http.length, 0);
+  assert.equal(store.view(date).targets.calories, 2150);
+});

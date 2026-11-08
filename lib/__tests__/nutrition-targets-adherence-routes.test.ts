@@ -147,6 +147,16 @@ describe('/api/nutrition/targets', () => {
     expect(updateUserGoals).not.toHaveBeenCalled()
     expect((await res.json()).proteinG).toBe(160)
   })
+  // #3670 ②: `nutrition_targets.calories` is an integer, so "2150.5" reached Postgres and answered 500.
+  it('stores a decimal calorie target as the whole kcal, as the current app\'s form sends it', async () => {
+    getUserGoals.mockResolvedValue({ calorieGoalType: 'daily' })
+    const res = await put({ calories: 2150.5, proteinG: 150.5 })
+    expect(res.status).toBe(200)
+    expect(upsertNutritionTargets).toHaveBeenCalledWith(sessionUser!.id, {
+      calories: 2150, proteinG: 150.5, carbsG: undefined, fatG: undefined, fiberG: undefined,
+    })
+    expect(updateUserGoals).toHaveBeenCalledWith(sessionUser!.id, { calorieGoal: 2150 })
+  })
 })
 
 describe('/api/nutrition/adherence', () => {

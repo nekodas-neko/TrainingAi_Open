@@ -62,6 +62,7 @@ import {
   supplementSchema,
   targetsBody,
   targetsSchema,
+  wholeTargets,
   totals,
   type Food,
   type FoodLog,
@@ -898,7 +899,7 @@ export class NutritionStore {
     if (!this.current.ready || this.current.denied || this.canceled) {
       throw new Error('Check your account before saving.');
     }
-    const parsed = httpBodies[kind].parse(payload);
+    const parsed = httpBodies[kind].parse(kind === 'targets' ? wholeTargets(payload) : payload);
     const op = httpSchema.parse({ id: this.uuid(), kind, date, payload: parsed });
     await this.write((state) => ({
       http: [
@@ -1338,7 +1339,9 @@ export class NutritionStore {
           ? { savedMealId: op.payload.savedMealId }
           : op.kind === 'meal-status'
             ? { ...op.payload, decisionId: op.id }
-            : op.payload,
+            : op.kind === 'targets'
+              ? wholeTargets(op.payload)
+              : op.payload,
       );
     } catch (cause) {
       if (
@@ -1358,7 +1361,7 @@ export class NutritionStore {
       if (!refreshed || this.current.errors.targets) {
         throw new Error('Readback failed.');
       }
-      if (!matches(this.current.data.targets, op.payload)) {
+      if (!matches(this.current.data.targets, wholeTargets(op.payload))) {
         throw new ChangeRefused('Readback not confirmed.');
       }
     }

@@ -4,6 +4,7 @@ import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at'
 import { findDuplicateFoodItem, identityCalories } from '@trainingai/shared/nutrition/food-item-identity'
 import { lookAlikeFactor, lookAlikeKey } from '@trainingai/shared/nutrition/food-merge'
 import { quantityMultiplierInRange } from '@trainingai/shared/nutrition/quantity-bounds'
+import { wholeCalorieTarget } from '@trainingai/shared/validation/goal-bounds'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { summariseSupplementDay } from '@trainingai/shared/nutrition/supplement-day-totals'
 import type { SupplementDayLog, SupplementDayContributionRow } from '@trainingai/shared/types/supplement'
@@ -1023,7 +1024,9 @@ export async function getNutritionTargets(db: Db, userId: string): Promise<Nutri
   }
 }
 
-export async function upsertNutritionTargets(db: Db, userId: string, data: Omit<NutritionTargets, 'id' | 'userId' | 'updatedAt'>): Promise<NutritionTargets> {
+export async function upsertNutritionTargets(db: Db, userId: string, input: Omit<NutritionTargets, 'id' | 'userId' | 'updatedAt'>): Promise<NutritionTargets> {
+  // #3670 ②: the column is an integer, so a decimal is a 500 unless it is made whole here.
+  const data = input.calories === undefined ? input : { ...input, calories: wholeCalorieTarget(input.calories) }
   const [r] = await db.insert(s.nutritionTargets)
     .values({ userId, ...data, updatedAt: new Date() })
     .onConflictDoUpdate({

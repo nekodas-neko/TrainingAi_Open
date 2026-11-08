@@ -45,6 +45,17 @@ export const GOAL_BOUNDS = {
 export type GoalBoundField = keyof typeof GOAL_BOUNDS
 
 /**
+ * #3670 ②. The calorie target as `nutrition_targets.calories` (an `integer`) stores it: the whole
+ * kcal, dropping any decimal, which is what the current app's form has always sent (`parseInt`).
+ * Postgres refuses "2150.5" for an integer, so a decimal that reached the write answered 500, and
+ * Preview's request queue re-sent it on every sync. The bound stays decimal-tolerant on purpose: a
+ * decimal already queued on a phone must still parse when its store loads.
+ */
+export function wholeCalorieTarget<T extends number | null | undefined>(kcal: T): T {
+  return (typeof kcal === 'number' ? Math.trunc(kcal) : kcal) as T
+}
+
+/**
  * The Zod number for a bounded goal field. Every surface that writes one of these builds its schema
  * from here, so a bound cannot be enforced on one path and not another — which is the whole of
  * RV-41.
