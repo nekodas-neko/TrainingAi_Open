@@ -10,7 +10,7 @@ const USER = '00000000-0000-4000-8000-000000367001'
 
 describe.skipIf(!canRun)('createFoodLog: an edit against a merged-away food (#3670)', () => {
   let pool: import('pg').Pool
-  let repo: import('@/lib/data/repository').Repository
+  let repo: import('@/lib/data/repository').WorkoutRepository
   let mealTypeId: string
 
   const clean = async () => {

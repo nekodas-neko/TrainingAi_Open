@@ -10,7 +10,7 @@ const EXERCISE = 'PR Date Test Press 3671'
 
 describe.skipIf(!canRun)('upsertPersonalRecordIfBetter dates the record by the set (#3671)', () => {
   let pool: import('pg').Pool
-  let repo: import('@/lib/data/repository').Repository
+  let repo: import('@/lib/data/repository').WorkoutRepository
   const achievedAt = async () => {
     const { rows } = await pool.query(
       `SELECT achieved_at FROM personal_records WHERE user_id = $1 AND exercise_name = $2`, [USER, EXERCISE])
