@@ -27,6 +27,9 @@ export const preferencesSchema = UserPreferencesSchema.pick({
   scoreRingStyle: true,
   energyHeroSize: true,
   weightLookback: true,
+  // The current app's reminder switches, read by Preview's daily reminders (#3653).
+  mealReminders: true,
+  dayReviewReminders: true,
 }).strip();
 export type HomePreferences = z.infer<typeof preferencesSchema>;
 export const widgetLabels = {

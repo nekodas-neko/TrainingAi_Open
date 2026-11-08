@@ -4,12 +4,14 @@ import type { ActivitySession } from '../../activities/data/ActivityStore.ts';
 import type { WorkoutRecord } from '../../workouts/logging/workout.ts';
 import { reminderText, type MealEstimateReminder } from '../../meal-plans/data/estimated-meals.ts';
 import type { Alert, PlatformSettings } from './models.ts';
+import { planDailyReminders, type DailyReminderInput } from './daily-reminders.ts';
 export function planAlerts(
   settings: PlatformSettings,
   workouts: WorkoutRecord[],
   activity: ActivitySession | null,
   now = Date.now(),
   mealReminders: MealEstimateReminder[] = [],
+  daily: DailyReminderInput | null = null,
 ): Alert[] {
   const scope = settings.scope;
   const result: Alert[] = [];
@@ -159,12 +161,23 @@ export function planAlerts(
       trigger: { at: reminder.at },
     });
   }
+  // The current app's supplement, meal-group and end-of-day reminders (#3653).
+  if (daily) result.push(...planDailyReminders(scope, daily));
   return result;
 }
 
 /** Whether anything the user has switched on needs notification permission to work. */
-export function wantsNotifications(settings: PlatformSettings, restCueOn: boolean) {
-  return restCueOn || settings.walkCues || settings.reminders.some((row) => row.enabled);
+export function wantsNotifications(
+  settings: PlatformSettings,
+  restCueOn: boolean,
+  dailyRemindersOn = false,
+) {
+  return (
+    restCueOn ||
+    dailyRemindersOn ||
+    settings.walkCues ||
+    settings.reminders.some((row) => row.enabled)
+  );
 }
 
 /** The Rest timer alarm row in Preview settings (#3083): the rest cue drives the alarm, there is no switch of its own. */
@@ -181,6 +194,7 @@ export function notificationsBlocked(
   settings: PlatformSettings,
   restCueOn: boolean,
   permission: boolean,
+  dailyRemindersOn = false,
 ) {
-  return !permission && wantsNotifications(settings, restCueOn);
+  return !permission && wantsNotifications(settings, restCueOn, dailyRemindersOn);
 }

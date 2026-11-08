@@ -53,7 +53,6 @@ const EXEMPT_PREFIXES = [
 const REVIEWED_BENIGN = new Set([
   // RV-179 triage of the device-clock getters (2026-10-07). Each was read; none is a rendering bug.
   'app/api/day-log/route.ts',                       // getHours() on `toZonedTime(startedAt, tz)` — the zoned-time idiom, already in the user's zone
-  'lib/day-review-reminders.ts',                    // getMinutes() is arithmetic on the Date it just set to the user's bedtime for a device notification; nothing is rendered
   'lib/oura-ble/continuous-capture.ts',             // the phone's own hour decides whether the ring's daytime capture runs — device-local is the point of that battery policy
   'packages/shared/src/utils.ts',                   // localDateString / localDatetimeString: device-local by name and by contract
   // The one LB-126 deliberately did NOT convert: this renders a MONTH and YEAR from

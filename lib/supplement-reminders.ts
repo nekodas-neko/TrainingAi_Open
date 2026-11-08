@@ -1,7 +1,12 @@
 import { Capacitor } from '@capacitor/core'
 import type { SupplementWithStatus } from '@trainingai/shared/types/supplement'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
-import { instantAtLocalTime, localDayInTz } from '@/lib/reminders/local-instant'
+import { localDayInTz } from '@/lib/reminders/local-instant'
+import {
+  supplementReminderAt,
+  supplementReminderDue,
+  supplementReminderText,
+} from '@trainingai/shared/reminders/daily-reminders'
 
 export const SUPPLEMENT_REMINDERS_CHANNEL = 'supplement-reminders'
 export const SUPPLEMENT_REMINDER_ROUTE = '/nutrition'
@@ -33,13 +38,14 @@ export function computeSupplementReminderActions(
   return supplements.map((s): SupplementReminderAction => {
     const supplementId = s.id
 
-    if (!s.active || !s.reminderEnabled || !s.reminderTime || s.loggedToday) {
+    // The rule and the instant are shared with TrainingAi Preview (#3653); the instant is the
+    // user's wall clock, not the phone's (LB-148).
+    const reminderAt = supplementReminderDue(s)
+      ? supplementReminderAt(localDayInTz(now, tz), s.reminderTime, tz)
+      : null
+    if (!reminderAt) {
       return { supplementId, type: 'cancel' }
     }
-
-    const [hours, minutes] = s.reminderTime.split(':').map(Number)
-    // The user's wall clock, not the phone's (LB-148).
-    const reminderAt = instantAtLocalTime(localDayInTz(now, tz), hours, minutes, tz)
 
     if (now >= reminderAt) {
       if (notifiedToday.has(supplementId)) {
@@ -94,8 +100,7 @@ export async function reconcileSupplementReminders(
       await LocalNotifications.schedule({
         notifications: [{
           id,
-          title: 'Supplement reminder',
-          body: `Don't forget to log ${action.name}!`,
+          ...supplementReminderText(action.name),
           schedule: { at },
           channelId: SUPPLEMENT_REMINDERS_CHANNEL,
           extra: { route: SUPPLEMENT_REMINDER_ROUTE },

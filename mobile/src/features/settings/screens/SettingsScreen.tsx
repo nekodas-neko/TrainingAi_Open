@@ -3,6 +3,7 @@ import { BackgroundSettings } from '../../weather/components/BackgroundSettings'
 import { WeatherSettings } from '../../weather/components/WeatherSettings';
 import { IntegrationSettings } from '../../platform/components/IntegrationSettings';
 import { HealthAlertsSetting } from '../../health/components/HealthAlertsSetting';
+import { ReminderPreferenceSwitch } from '../../platform/components/ReminderPreferenceSwitch';
 import { OuraMorningSyncSetting } from '../../health/components/OuraMorningSyncSetting';
 import { AppText, AppButton, Card } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
@@ -35,6 +36,7 @@ export function SettingsScreen() {
       </Card>
       <Card>
         <AppText variant="heading">Preferences</AppText>
+        <ReminderPreferenceSwitch name="dayReviewReminders" />
         <HealthAlertsSetting />
         <ListRow
           title="Live workout status"

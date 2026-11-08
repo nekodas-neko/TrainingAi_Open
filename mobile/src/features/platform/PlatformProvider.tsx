@@ -22,6 +22,7 @@ import { CalendarStore } from './data/CalendarStore';
 import { AlertScheduler } from './data/AlertScheduler';
 import { planAlerts } from './data/alert-plan';
 import { useMealEstimateReminders } from '../meal-plans/useMealEstimateReminders';
+import { useDailyReminders } from './useDailyReminders';
 import {
   nativeAlerts,
   alertPermission,
@@ -37,6 +38,8 @@ const Context = createContext<{
   enableAlerts: (key?: 'walkCues') => Promise<void>;
   refresh: () => void;
   opened: Record<string, unknown> | null;
+  /** True when a supplement, meal-group or day-review reminder is on (#3653). */
+  dailyRemindersOn: boolean;
 } | null>(null);
 export function PlatformProvider({ children }: PropsWithChildren) {
   const { dataReader } = useAccountContext(),
@@ -53,6 +56,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
   const mealReminders = useMealEstimateReminders();
   const lastMealReminders = useRef<NonNullable<typeof mealReminders>>([]);
   if (mealReminders) lastMealReminders.current = mealReminders;
+  const daily = useDailyReminders(lastMealReminders.current);
   const requestedRestPermission = useRef<string | null>(null);
   const requestedCuePermission = useRef<string | null>(null);
   const mounted = useRef(false);
@@ -194,6 +198,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
             activity.session,
             Date.now(),
             lastMealReminders.current,
+            daily.input,
           ),
         )
       : '[]';
@@ -243,8 +248,9 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       enableAlerts,
       refresh: () => setTick((value) => value + 1),
       opened,
+      dailyRemindersOn: daily.on,
     }),
-    [stores, alertError, permission, opened, enableAlerts],
+    [stores, alertError, permission, opened, enableAlerts, daily.on],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

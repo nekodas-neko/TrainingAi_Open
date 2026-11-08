@@ -27,14 +27,24 @@ import { useNutrition } from '../data/NutritionProvider';
 import { mealTypeBody } from '../data/models';
 import { GoalRecommendation } from './GoalRecommendation';
 import { NutritionReminders } from '../../platform/components/NutritionReminders';
+import { ReminderPreferenceSwitch } from '../../platform/components/ReminderPreferenceSwitch';
 const formSchema = z.object({
   name: z.string(),
   emoji: z.string(),
   timeStartHour: z.string(),
   timeEndHour: z.string(),
   required: z.boolean(),
+  // The current app's "Remind me if not logged" (#3653). Defaulted so a draft saved before it parses.
+  remindersEnabled: z.boolean().default(true),
 });
-const empty = { name: '', emoji: '🍽️', timeStartHour: '0', timeEndHour: '24', required: true };
+const empty = {
+  name: '',
+  emoji: '🍽️',
+  timeStartHour: '0',
+  timeEndHour: '24',
+  required: true,
+  remindersEnabled: true,
+};
 export function NutritionSettings({ onClose }: { onClose: () => void }) {
   const n = useNutrition();
   const resources = useWorkoutResources();
@@ -109,6 +119,7 @@ export function NutritionSettings({ onClose }: { onClose: () => void }) {
           <AppText variant="eyebrow" tone="muted">
             Meal Reminders
           </AppText>
+          <ReminderPreferenceSwitch name="mealReminders" />
           <NutritionReminders kind="meal" />
           <AppText variant="eyebrow" tone="muted">
             Meal Types
@@ -126,6 +137,7 @@ export function NutritionSettings({ onClose }: { onClose: () => void }) {
                     timeStartHour: String(mt.timeStartHour),
                     timeEndHour: String(mt.timeEndHour),
                     required: mt.required,
+                    remindersEnabled: mt.remindersEnabled,
                   });
                   setEdit(mt.id);
                 }}
@@ -201,6 +213,11 @@ export function NutritionSettings({ onClose }: { onClose: () => void }) {
             />
           </Grid>
           <SwitchRow
+            label="Remind me if not logged"
+            value={f.remindersEnabled}
+            onValueChange={(remindersEnabled) => draft.setValue({ ...f, remindersEnabled })}
+          />
+          <SwitchRow
             label="Required meal"
             value={f.required}
             onValueChange={(required) => draft.setValue({ ...f, required })}
@@ -217,7 +234,6 @@ export function NutritionSettings({ onClose }: { onClose: () => void }) {
                   timeStartHour: Number(f.timeStartHour),
                   timeEndHour: Number(f.timeEndHour),
                   sortOrder: existing?.sortOrder ?? n.view.mealTypes.length,
-                  remindersEnabled: existing?.remindersEnabled ?? false,
                 });
                 await resources!.write(
                   edit === 'new' ? 'POST' : 'PUT',
