@@ -15,7 +15,13 @@ import {
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHome } from '../data/HomeProvider';
-import { homeSections, moveHomeSection, sectionLabels } from '../data/models';
+import {
+  homeSections,
+  moveHomeSection,
+  restorableHiddenSections,
+  sectionLabels,
+  visibleSectionIndex,
+} from '../data/models';
 import { failureNotice } from '../../../core/reporting/index.ts';
 export function HomeSection({
   id,
@@ -38,7 +44,8 @@ export function HomeSection({
   const [colors, setColors] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const order = useMemo(() => homeSections(home.preferences), [home.preferences]);
-  const index = order.indexOf(id);
+  const hiddenKeys = home.preferences.homeHiddenSections ?? [];
+  const { index, count } = visibleSectionIndex(order, id, hiddenKeys);
   async function save(patch: Partial<typeof home.preferences>) {
     try {
       layoutMotion(reduced);
@@ -168,13 +175,13 @@ export function HomeSection({
               title: 'Move earlier',
               icon: 'up',
               disabled: index === 0,
-              run: () => reorder(moveHomeSection(order, id, -1)),
+              run: () => reorder(moveHomeSection(order, id, -1, hiddenKeys)),
             },
             {
               title: 'Move later',
               icon: 'down',
-              disabled: index === order.length - 1,
-              run: () => reorder(moveHomeSection(order, id, 1)),
+              disabled: index === count - 1,
+              run: () => reorder(moveHomeSection(order, id, 1, hiddenKeys)),
             },
             { title: 'Hide widget', icon: 'close', run: hide },
           ]}
@@ -186,7 +193,8 @@ export function HomeSection({
 export function HiddenHomeSections() {
   const home = useHome();
   const hidden = home.preferences.homeHiddenSections ?? [];
-  if (!hidden.length) {
+  const restorable = restorableHiddenSections(home.preferences);
+  if (!restorable.length) {
     return null;
   }
   return (
@@ -194,7 +202,7 @@ export function HiddenHomeSections() {
       <AppText variant="eyebrow" tone="muted">
         Hidden sections
       </AppText>
-      {hidden.map((id) => (
+      {restorable.map((id) => (
         <AppButton
           key={id}
           title={`Show ${sectionLabels[id] ?? id}`}

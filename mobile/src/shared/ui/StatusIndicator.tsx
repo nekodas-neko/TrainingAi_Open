@@ -14,6 +14,7 @@ export function StatusIndicator({
   onRetry,
   message,
   actionLabel = 'Retry',
+  onDetailsSeen,
 }: {
   label: string;
   busy?: boolean;
@@ -21,6 +22,8 @@ export function StatusIndicator({
   onRetry?: () => void;
   message?: string | null;
   actionLabel?: string;
+  /** The details sheet was opened and then closed: the sentence behind the icon has been read. */
+  onDetailsSeen?: () => void;
 }) {
   const { theme } = useTheme();
   const [details, setDetails] = useState(false);
@@ -50,13 +53,21 @@ export function StatusIndicator({
           onPress={() => setDetails(true)}
         />
       ) : null}
-      <Sheet visible={details && !!detail} title={label} onClose={() => setDetails(false)}>
+      <Sheet
+        visible={details && !!detail}
+        title={label}
+        onClose={() => {
+          setDetails(false);
+          onDetailsSeen?.();
+        }}
+      >
         <AppText>{detail}</AppText>
         {onRetry && (
           <AppButton
             title={actionLabel}
             onPress={() => {
               setDetails(false);
+              onDetailsSeen?.();
               onRetry();
             }}
           />

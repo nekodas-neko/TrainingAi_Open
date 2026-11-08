@@ -1,3 +1,4 @@
+import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { Grid, MetricTile } from '../../../shared/ui';
 import type { Tone } from '../../../shared/theme/theme';
 import { useHealthContext } from '../HealthProvider';
@@ -32,7 +33,7 @@ export function HealthSummary() {
                 : snapshot.mode === 'sample'
                   ? 'Sample data'
                   : (snapshot.metrics.find((reading) => reading.key === metric.key)?.source ??
-                    'Apple Health')
+                    deviceHealthName)
               : 'No reading loaded'
           }
         />

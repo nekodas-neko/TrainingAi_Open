@@ -16,6 +16,7 @@ export function HomeHeader({
   editing = false,
   avatar,
   badge = 0,
+  onDetailsSeen,
 }: {
   today: string;
   timezone: string;
@@ -28,6 +29,8 @@ export function HomeHeader({
   onProfile: () => void;
   editing?: boolean;
   avatar?: string | null;
+  /** The owner opened the status details and closed them, so a set-aside notice has been read. */
+  onDetailsSeen?: () => void;
   /** Pending signups and feedback for an admin; nothing is drawn at 0. */
   badge?: number;
 }) {
@@ -64,6 +67,7 @@ export function HomeHeader({
             message={pending ? 'Saved on this phone. Waiting to sync.' : null}
             busy={refreshing}
             onRetry={error ? onRefresh : undefined}
+            onDetailsSeen={onDetailsSeen}
           />
         ) : (
           <IconButton

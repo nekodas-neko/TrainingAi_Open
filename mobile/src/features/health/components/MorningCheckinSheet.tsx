@@ -1,3 +1,4 @@
+import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import {
@@ -148,7 +149,7 @@ export function MorningCheckinSheet({ onClose }: { onClose: () => void }) {
             <Card>
               <AppText variant="caption">
                 {copy?.line ??
-                  `${formatHoursMinutes((localNight?.durationHours ?? 0) * 60)} sleep · Apple Health`}
+                  `${formatHoursMinutes((localNight?.durationHours ?? 0) * 60)} sleep · ${deviceHealthName}`}
               </AppText>
               <ChipPicker
                 label={

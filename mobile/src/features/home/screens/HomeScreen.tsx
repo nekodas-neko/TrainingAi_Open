@@ -65,7 +65,6 @@ export type HomeNavigation = {
   openCollection: () => void;
   openExplanation: (id: string) => void;
 };
-const SET_ASIDE_SEEN_MS = 6000;
 
 export function HomeScreen(navigation: HomeNavigation) {
   const { theme } = useTheme();
@@ -153,23 +152,18 @@ export function HomeScreen(navigation: HomeNavigation) {
     (key) => !home.preferences.homeHiddenSections?.includes(key),
   );
   const showHome = workout.signedIn && !health.denied && !home.denied;
-  // The header lists each store's set-aside notice beside its errors; once it has been on screen for
-  // a few seconds it is seen, and only the store that showed it is acknowledged.
+  // The header lists each store's set-aside notice beside its errors, behind its status icon. The
+  // notice is seen once the owner has opened those details and closed them, and only the store that
+  // showed one is acknowledged. A timer on the icon used to clear it unread (#3669 item 7).
   const shown = setAsideShown(showHome, home, health);
-  useEffect(() => {
-    if (!shown.home && !shown.health) {
-      return;
+  const acknowledgeSetAside = () => {
+    if (shown.home) {
+      home.store?.acknowledgeSetAside().catch(() => {});
     }
-    const timer = setTimeout(() => {
-      if (shown.home) {
-        home.store?.acknowledgeSetAside().catch(() => {});
-      }
-      if (shown.health) {
-        health.store?.acknowledgeSetAside().catch(() => {});
-      }
-    }, SET_ASIDE_SEEN_MS);
-    return () => clearTimeout(timer);
-  }, [shown.home, shown.health, home.setAside, health.setAside, home.store, health.store]);
+    if (shown.health) {
+      health.store?.acknowledgeSetAside().catch(() => {});
+    }
+  };
   const { signups: adminSignups } = useAdminPending();
   return (
     <PageLayout
@@ -208,6 +202,7 @@ export function HomeScreen(navigation: HomeNavigation) {
               onLayout={() => setEditing((value) => !value)}
               editing={editing}
               onProfile={navigation.openMore}
+              onDetailsSeen={acknowledgeSetAside}
               badge={adminSignups}
             />
             <HomeEnergy onOpen={navigation.openHealthDetail} />

@@ -6,8 +6,10 @@ import {
   homeSections,
   homeStreak,
   moveHomeSection,
+  restorableHiddenSections,
   trainingDays,
   trainingWeek,
+  visibleSectionIndex,
 } from '../src/features/home/data/models.ts';
 import {
   adminPendingTotal,
@@ -550,6 +552,58 @@ test('dismissals survive reopening per day/week and offline goal postponement re
   await next.sync();
   assert.equal(next.getSnapshot().operations.length, 0);
 });
+test('undoing an offline goals postpone drops its upload and brings the check-in back (#3669)', async () => {
+  const f = fixture();
+  f.online(false);
+  const store = f.make();
+  await store.initialize();
+  await store.postponeGoals(day);
+  await store.sync();
+  assert.equal(store.getSnapshot().operations[0].kind, 'goal-review');
+  await store.cancelGoalsPostpone(day);
+  assert.equal(store.getSnapshot().markers[`goals:${day}`], false);
+  assert.equal(store.getSnapshot().operations.length, 0);
+  f.online(true);
+  await store.sync();
+  assert.equal(store.getSnapshot().operations.length, 0);
+});
+test('Move earlier/later moves past hidden sections, and Show lists only sections in the layout (#3669)', () => {
+  const prefs = {
+    homeCards: ['sleepWidget'],
+    homeSectionOrder: ['recommendation', 'streak', 'weekStrip', 'card_sleepWidget', 'metricTiles'],
+    homeHiddenSections: ['streak'],
+  };
+  const order = homeSections(prefs);
+  const visible = (o: string[]) => o.filter((key) => !prefs.homeHiddenSections.includes(key));
+  const moved = moveHomeSection(order, 'weekStrip', -1, prefs.homeHiddenSections);
+  // The swap is with Recommended Today, the neighbour on screen; Streak keeps its slot.
+  assert.deepEqual(visible(moved), ['weekStrip', 'recommendation', 'card_sleepWidget', 'metricTiles']);
+  assert.equal(moved[1], 'streak');
+  assert.deepEqual(visibleSectionIndex(order, 'weekStrip', prefs.homeHiddenSections), {
+    index: 1,
+    count: 4,
+  });
+  assert.equal(visibleSectionIndex(order, 'recommendation', prefs.homeHiddenSections).index, 0);
+  // Sleep hidden, then switched off under Cards: "Show Sleep" would bring nothing back.
+  const off = { ...prefs, homeCards: [], homeHiddenSections: ['streak', 'card_sleepWidget'] };
+  assert.deepEqual(restorableHiddenSections(off), ['streak']);
+  assert.deepEqual(restorableHiddenSections({ ...off, homeCards: ['sleepWidget'] }), [
+    'streak',
+    'card_sleepWidget',
+  ]);
+});
+test('a phone-only night on the timeline names the phone health store it came from (#3669)', () => {
+  const night = sleepSchema.parse({
+    date: '2026-10-17',
+    localOnly: true,
+    sleepStart: '2026-10-16T12:30:00.000Z',
+    sleepEnd: '2026-10-16T20:00:00.000Z',
+  });
+  const events = localTimeline([], [], [night], '2026-10-17', 'Australia/Brisbane', 'Health Connect');
+  const asleep = events.find((event) => event.type === 'sleep');
+  assert.ok(asleep, 'the night produced a sleep row');
+  assert.equal(asleep.subtitle, 'Health Connect');
+});
 test('banner eligibility uses the recap week and the profile review timestamp', () => {
   const now = Date.parse(day + 'T04:00:00Z');
   assert.equal(
@@ -667,12 +721,12 @@ test('an unsynced completed workout enters Home timeline and a lost-reply server
     completedAt: at + 30 * 60_000,
     pending: [{ id: 'pending', domain: 'complete_workout' as const }],
   };
-  const events = localTimeline([], [pending], [], day, 'Australia/Brisbane');
+  const events = localTimeline([], [pending], [], day, 'Australia/Brisbane', 'Health Connect');
   assert.equal(events.length, 1);
   assert.equal(events[0].durationMin, 30);
-  const paused = localTimeline([], [{ ...pending, pausedMs: 10 * 60_000 }], [], day, 'Australia/Brisbane');
+  const paused = localTimeline([], [{ ...pending, pausedMs: 10 * 60_000 }], [], day, 'Australia/Brisbane', 'Health Connect');
   assert.equal(paused[0].durationMin, 20, 'time spent paused is not part of the duration');
-  assert.equal(localTimeline(events, [pending], [], day, 'Australia/Brisbane').length, 1);
+  assert.equal(localTimeline(events, [pending], [], day, 'Australia/Brisbane', 'Health Connect').length, 1);
 });
 
 test('dragging variable-height sections displaces neighbours and preserves hidden sections', async () => {
@@ -1041,7 +1095,7 @@ test('the timeline Woke up event is the time you woke, not the recorded window e
     phaseWindowEnd: '2026-10-16T20:23:00.000Z',
     sleepPhase5Min: '4' + '2'.repeat(96) + '4444',
   });
-  const events = localTimeline([], [], [night], '2026-10-17', 'Australia/Brisbane');
+  const events = localTimeline([], [], [night], '2026-10-17', 'Australia/Brisbane', 'Health Connect');
   const woke = events.find((event) => event.type === 'wakeup');
   assert.equal(woke?.timeMs, Date.parse('2026-10-16T20:05:00.000Z'));
   assert.equal(woke?.time.replace(/\s/g, ' '), '6:05 am');
@@ -1071,13 +1125,13 @@ test('a ring night\'s Woke up from the server also reads the time you woke (#342
     sleepStart: '2026-10-17T04:00:00.000Z',
     sleepEnd: '2026-10-17T04:40:00.000Z',
   });
-  const events = localTimeline([server], [], [nap, night], '2026-10-17', 'Australia/Brisbane');
+  const events = localTimeline([server], [], [nap, night], '2026-10-17', 'Australia/Brisbane', 'Health Connect');
   const woke = events.filter((event) => event.type === 'wakeup');
   assert.equal(woke.length, 1);
   assert.equal(woke[0].timeMs, Date.parse('2026-10-16T20:05:00.000Z'));
   assert.equal(woke[0].time.replace(/\s/g, ' '), '6:05 am');
   // A night that doesn't match the event's recorded end leaves it alone.
-  const other = localTimeline([server], [], [nap], '2026-10-17', 'Australia/Brisbane');
+  const other = localTimeline([server], [], [nap], '2026-10-17', 'Australia/Brisbane', 'Health Connect');
   assert.equal(other[0].timeMs, server.timeMs);
 });
 

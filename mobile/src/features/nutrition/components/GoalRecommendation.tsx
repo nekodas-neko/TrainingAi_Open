@@ -1,4 +1,8 @@
 import { ACTIVITY_LEVELS } from '@trainingai/shared/types/user';
+import {
+  goalShownForPeriod,
+  recommendationGoalsPatch,
+} from '@trainingai/shared/nutrition/goal-recommendation-apply';
 import { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
 import {
@@ -103,16 +107,12 @@ export function GoalRecommendation({
     }
     setBusy(true);
     const selected = new Set(draft.value.selected);
-    const goals: Record<string, number> = {};
+    // The stored goals are daily in both modes; weekly mode only shows them ×7 (#3643).
+    const goals = recommendationGoalsPatch(rec.recommended, {
+      steps: selected.has('steps'),
+      water: selected.has('water'),
+    });
     const targets: Record<string, number> = {};
-    if (selected.has('steps')) {
-      goals.stepsGoal =
-        rec.recommended.stepsGoal * (rec.current.stepsGoalType === 'weekly' ? 7 : 1);
-    }
-    if (selected.has('water')) {
-      goals.waterGoalMl =
-        rec.recommended.waterMl * (rec.current.waterGoalType === 'weekly' ? 7 : 1);
-    }
     for (const [choice, key] of [
       ['protein', 'proteinG'],
       ['carbs', 'carbsG'],
@@ -178,11 +178,13 @@ export function GoalRecommendation({
       setBusy(false);
     }
   }
+  const shown = (daily: number | null, period: string | null) =>
+    daily == null ? '—' : goalShownForPeriod(daily, period);
   const options = rec
     ? [
         {
           value: 'steps',
-          label: `Steps: ${rec.current.stepsGoal ?? '—'} → ${rec.recommended.stepsGoal * (rec.current.stepsGoalType === 'weekly' ? 7 : 1)} (${rec.current.stepsGoalType ?? 'daily'})`,
+          label: `Steps: ${shown(rec.current.stepsGoal, rec.current.stepsGoalType)} → ${goalShownForPeriod(rec.recommended.stepsGoal, rec.current.stepsGoalType)} (${rec.current.stepsGoalType ?? 'daily'})`,
         },
         {
           value: 'protein',
@@ -195,7 +197,7 @@ export function GoalRecommendation({
         { value: 'fat', label: `Fat: ${rec.current.fatG ?? '—'} → ${rec.recommended.fatG} g` },
         {
           value: 'water',
-          label: `Water: ${rec.current.waterGoalMl ?? '—'} → ${rec.recommended.waterMl * (rec.current.waterGoalType === 'weekly' ? 7 : 1)} ml (${rec.current.waterGoalType ?? 'daily'})`,
+          label: `Water: ${shown(rec.current.waterGoalMl, rec.current.waterGoalType)} → ${goalShownForPeriod(rec.recommended.waterMl, rec.current.waterGoalType)} ml (${rec.current.waterGoalType ?? 'daily'})`,
         },
         ...(rec.recommended.activityLevel &&
         rec.recommended.activityLevel !== rec.current.activityLevel

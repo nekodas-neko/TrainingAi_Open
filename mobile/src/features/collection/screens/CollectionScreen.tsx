@@ -1,9 +1,9 @@
 import { View } from 'react-native';
 import {
-  AppText,
   PageLayout,
   Skeleton,
   Stack,
+  StateCard,
   StatusIndicator,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -37,7 +37,16 @@ export function CollectionScreen({ onBack }: { onBack: () => void }) {
     >
       <Stack gap="md" style={{ paddingHorizontal: theme.spacing.lg }}>
         {!collections && state.error ? (
-          <AppText tone="muted">Couldn’t load your collection.</AppText>
+          // A first load that failed has nothing to paint and no pull-to-refresh, so the retry is
+          // here (#3669 item 2), as the friend profile and Friends panel do.
+          <StateCard
+            error
+            title="Couldn’t load your collection"
+            message="Check your connection and try again."
+            action="Retry"
+            loading={state.loading || state.refreshing}
+            onAction={state.refresh}
+          />
         ) : !collections ? (
           <View
             accessibilityLabel="Loading collection"

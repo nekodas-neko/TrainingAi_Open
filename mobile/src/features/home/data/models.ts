@@ -3,6 +3,7 @@ import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log';
 import { UserPreferencesSchema } from '@trainingai/shared/user/preferences';
 import { computeDayStreak, streakRestGapFor } from '@trainingai/shared/workout/day-streak';
 import { shiftDateStr, weekStartForDay } from '@trainingai/shared/date-utils';
+import { preserveHiddenOrder } from '../../../shared/ui/reorder.ts';
 export type HomeSchedule = {
   type: 'weekly' | 'rotation';
   restAfterN?: number | null;
@@ -128,15 +129,39 @@ export function homeCardsPatch(preferences: HomePreferences, homeCards: string[]
     ),
   };
 }
-export function moveHomeSection(order: string[], key: string, direction: -1 | 1) {
-  const index = order.indexOf(key);
+/**
+ * Move a section one place among the sections on screen. Hidden ones keep their slots and are moved
+ * past, as the drag does (`preserveHiddenOrder`): swapping with a hidden neighbour changed nothing
+ * the owner could see (#3669 item 5).
+ */
+export function moveHomeSection(
+  order: string[],
+  key: string,
+  direction: -1 | 1,
+  hidden: readonly string[] = [],
+) {
+  const visible = order.filter((k) => k === key || !hidden.includes(k));
+  const index = visible.indexOf(key);
   const destination = index + direction;
-  if (index < 0 || destination < 0 || destination >= order.length) {
+  if (index < 0 || destination < 0 || destination >= visible.length) {
     return order;
   }
-  const next = [...order];
+  const next = [...visible];
   [next[index], next[destination]] = [next[destination], next[index]];
-  return next;
+  return preserveHiddenOrder(order, next);
+}
+/** Where a section sits among the ones on screen, which is what "Move earlier/later" can reach. */
+export function visibleSectionIndex(order: readonly string[], key: string, hidden: readonly string[]) {
+  const visible = order.filter((k) => k === key || !hidden.includes(k));
+  return { index: visible.indexOf(key), count: visible.length };
+}
+/**
+ * The hidden sections "Show" can bring back: only ones still in the layout. A card switched off
+ * under Cards keeps its hidden key, and showing it brought nothing back (#3669 item 5).
+ */
+export function restorableHiddenSections(preferences: HomePreferences) {
+  const sections = homeSections(preferences);
+  return (preferences.homeHiddenSections ?? []).filter((key) => sections.includes(key));
 }
 export function trainingDays(
   calendars: (Record<string, string[]> | undefined)[],
