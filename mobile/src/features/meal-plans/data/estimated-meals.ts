@@ -97,6 +97,8 @@ export type MealEstimateReminder = {
   date: string;
   /** When the slot is over, as epoch ms. */
   at: number;
+  /** The meal group it asks about, so that group's plain "log your meal" reminder stands aside (#3653). */
+  mealTypeId: string;
   mealTypeName: string;
   mealName: string;
   kcal: number;
@@ -136,6 +138,7 @@ export function estimateReminders(input: {
       planMealId: meal.id,
       date: input.date,
       at: at.getTime(),
+      mealTypeId: type.id,
       mealTypeName: type.name,
       mealName: meal.name,
       kcal: Math.round(meal.targetCalories),

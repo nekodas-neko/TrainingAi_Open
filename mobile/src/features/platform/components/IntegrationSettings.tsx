@@ -32,6 +32,7 @@ export function IntegrationSettings() {
     permission,
     alertError,
     refresh,
+    dailyRemindersOn,
   } = usePlatformIntegrations();
   const { theme } = useTheme();
   const journal = useWorkoutJournal();
@@ -61,7 +62,7 @@ export function IntegrationSettings() {
   const restCueOn =
     journal.data.preferences.timers.restCues ||
     journal.data.workouts.some((x) => x.status === 'active' && x.timers.restCues);
-  const blocked = !!settings && notificationsBlocked(settings, restCueOn, permission);
+  const blocked = !!settings && notificationsBlocked(settings, restCueOn, permission, dailyRemindersOn);
   return (
     <Card>
       <AppText variant="heading">Alerts & calendar</AppText>

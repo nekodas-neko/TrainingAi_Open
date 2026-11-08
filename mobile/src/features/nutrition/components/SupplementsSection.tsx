@@ -41,7 +41,11 @@ const formSchema = z.object({
   stoppedOn: z.string(),
   dosePrompt: z.boolean(),
   active: z.boolean(),
+  // The current app's "Daily reminder" (#3653). Defaulted so a draft saved before it parses.
+  reminderEnabled: z.boolean().default(false),
+  reminderTime: z.string().default('08:00'),
 });
+const REMINDER_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const blank = {
   name: '',
   dose: '',
@@ -51,6 +55,8 @@ const blank = {
   stoppedOn: '',
   dosePrompt: false,
   active: true,
+  reminderEnabled: false,
+  reminderTime: '08:00',
 };
 export function SupplementsSection({ date }: { date: string }) {
   const n = useNutrition(date);
@@ -314,6 +320,8 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
       stoppedOn: s.stoppedOn ?? '',
       dosePrompt: s.dosePrompt,
       active: s.active,
+      reminderEnabled: s.reminderEnabled,
+      reminderTime: s.reminderTime ?? '08:00',
     });
   }
   async function toggleActive(s: Supplement) {
@@ -358,6 +366,8 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
     }
     setBusy(true);
     try {
+      if (f.reminderEnabled && !REMINDER_TIME.test(f.reminderTime.trim()))
+        throw new Error('Reminder time is not HH:MM.');
       const body = SupplementCreateSchema.parse({
         name: f.name.trim(),
         dose: f.dose.trim() || null,
@@ -367,9 +377,9 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
         stoppedOn: f.stoppedOn.trim() || null,
         dosePrompt: f.dosePrompt,
         active: f.active,
-        reminderEnabled:
-          n.view.supplements.find((x) => x.id === edit)?.reminderEnabled ?? false,
-        reminderTime: n.view.supplements.find((x) => x.id === edit)?.reminderTime ?? null,
+        // As the current app saves it: no time while the reminder is off.
+        reminderEnabled: f.reminderEnabled,
+        reminderTime: f.reminderEnabled ? f.reminderTime.trim() : null,
         sortOrder:
           edit === 'new'
             ? n.view.supplements.length
@@ -386,7 +396,9 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
       setEdit(null);
       setError(null);
     } catch {
-      setError('Check the name, dates and dose amount. Your draft is preserved.');
+      setError(
+        'Check the name, dates, dose amount and reminder time. Your draft is preserved.',
+      );
     } finally {
       setBusy(false);
     }
@@ -462,6 +474,24 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
             value={f.active}
             onValueChange={(active) => draft.setValue({ ...f, active })}
           />
+          <SwitchRow
+            label="Daily reminder"
+            value={f.reminderEnabled}
+            onValueChange={(reminderEnabled) => draft.setValue({ ...f, reminderEnabled })}
+          />
+          <AppText variant="caption" tone="muted">
+            Notify me if not logged by this time
+          </AppText>
+          {f.reminderEnabled && (
+            <TextField
+              label="Reminder time (24-hour)"
+              value={f.reminderTime}
+              placeholder="08:00"
+              maxLength={5}
+              keyboardType="numbers-and-punctuation"
+              onChangeText={(reminderTime) => draft.setValue({ ...f, reminderTime })}
+            />
+          )}
           <AppButton
             title="Save supplement"
             busy={busy}

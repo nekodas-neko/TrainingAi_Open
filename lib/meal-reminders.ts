@@ -1,7 +1,15 @@
 import { Capacitor } from '@capacitor/core'
 import type { MealType, FoodLog } from '@trainingai/shared/types/nutrition'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
-import { instantAtLocalTime, localDayInTz } from '@/lib/reminders/local-instant'
+import { localDayInTz } from '@/lib/reminders/local-instant'
+import {
+  END_OF_DAY_MEAL_TEXT,
+  FALLBACK_BEDTIME,
+  endOfDayMealReminderAt,
+  hasUnloggedRequiredMeal,
+  mealReminderText,
+  mealWindowEndAt,
+} from '@trainingai/shared/reminders/daily-reminders'
 
 export const MEAL_REMINDERS_CHANNEL = 'meal-reminders'
 export const MEAL_REMINDER_ROUTE = '/nutrition'
@@ -51,10 +59,8 @@ export function computeMealReminderActions(
       return { mealTypeId: mt.id, type: 'cancel' }
     }
 
-    const endHour = mt.timeEndHour >= 24 ? 23 : mt.timeEndHour
-    const endMinute = mt.timeEndHour >= 24 ? 59 : 0
-    // The user's wall clock, not the phone's (LB-148).
-    const endTime = instantAtLocalTime(localDayInTz(now, tz), endHour, endMinute, tz)
+    // Shared with TrainingAi Preview (#3653); the user's wall clock, not the phone's (LB-148).
+    const endTime = mealWindowEndAt(localDayInTz(now, tz), mt.timeEndHour, tz)
 
     if (now >= endTime) {
       // Already sent the one-time catch-up notification for this meal today —
@@ -66,10 +72,6 @@ export function computeMealReminderActions(
     }
     return { mealTypeId: mt.id, type: 'scheduled', at: endTime, emoji: mt.emoji, name: mt.name }
   })
-}
-
-function reminderBody(emoji: string, name: string): string {
-  return `Don't forget to log ${emoji} ${name}!`
 }
 
 function readNotifiedToday(): Record<string, string> {
@@ -122,8 +124,7 @@ export async function reconcileMealReminders(
       await LocalNotifications.schedule({
         notifications: [{
           id,
-          title: 'Meal reminder',
-          body: reminderBody(action.emoji, action.name),
+          ...mealReminderText(action.emoji, action.name),
           schedule: { at },
           channelId: MEAL_REMINDERS_CHANNEL,
           extra: { route: MEAL_REMINDER_ROUTE },
@@ -159,7 +160,7 @@ export async function scheduleEndOfDayReminder(
     const { LocalNotifications } = await import('@capacitor/local-notifications')
 
     const loggedIds = new Set(foodLogs.map(l => l.mealTypeId))
-    const hasUnloggedRequired = mealTypes.some(mt => mt.required && !loggedIds.has(mt.id))
+    const hasUnloggedRequired = hasUnloggedRequiredMeal(mealTypes, loggedIds)
 
     if (!hasUnloggedRequired) {
       await LocalNotifications.cancel({ notifications: [{ id: EOD_REMINDER_ID }] })
@@ -170,8 +171,7 @@ export async function scheduleEndOfDayReminder(
     const lastScheduled = localStorage.getItem(EOD_REMINDER_KEY)
     if (lastScheduled === today) return
 
-    let bedtimeHour = 22
-    let bedtimeMinute = 0
+    let { bedtimeHour, bedtimeMinute } = FALLBACK_BEDTIME
     try {
       const res = await fetch('/api/user/bedtime-estimate')
       if (res.ok) {
@@ -181,17 +181,15 @@ export async function scheduleEndOfDayReminder(
       }
     } catch { /* use fallback */ }
 
-    // The user's wall clock, not the phone's (LB-148).
-    const windowEnd = instantAtLocalTime(today, bedtimeHour, bedtimeMinute, tz)
-    const at = new Date(windowEnd.getTime() - 30 * 60_000)
+    // Shared with TrainingAi Preview (#3653); the user's wall clock, not the phone's (LB-148).
+    const at = endOfDayMealReminderAt(today, { bedtimeHour, bedtimeMinute }, tz)
     // If that time has already passed today, don't schedule
     if (at <= new Date()) return
 
     await LocalNotifications.schedule({
       notifications: [{
         id: EOD_REMINDER_ID,
-        title: 'Log your meals before bed',
-        body: "You have unlogged required meals today. Tap to backfill.",
+        ...END_OF_DAY_MEAL_TEXT,
         schedule: { at },
         channelId: MEAL_REMINDERS_CHANNEL,
         extra: { route: '/nutrition?chat=backfill' },

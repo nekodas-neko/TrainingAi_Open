@@ -145,7 +145,12 @@ export const nativeAlerts = {
   },
   async schedule(alert: Alert) {
     const notifications = await sdk();
-    const timer = 'at' in alert.trigger && !alert.mealEstimate;
+    // A workout's or walk's timed cue is a timer; a dated reminder (a meal estimate, a supplement,
+    // a meal group, the day review) is a reminder, on the quieter channel (#3653).
+    const timer =
+      'at' in alert.trigger &&
+      !alert.mealEstimate &&
+      (alert.target === 'workout' || alert.target === 'walk');
     const channelId = timer ? 'training-timers' : 'training-reminders';
     if ('at' in alert.trigger && alert.trigger.at <= Date.now()) return;
     const trigger: import('expo-notifications').NotificationTriggerInput =

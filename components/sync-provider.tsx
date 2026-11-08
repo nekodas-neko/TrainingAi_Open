@@ -328,8 +328,8 @@ export function SyncProvider({ userId }: SyncProviderProps) {
       }
 
       if (localStorage.getItem('ta_pref_day_review_reminders') !== 'false') {
-        await scheduleEveningReminder();
-        await scheduleWeeklyRecapReminder();
+        await scheduleEveningReminder(tz);
+        await scheduleWeeklyRecapReminder(tz);
       }
     }
 
