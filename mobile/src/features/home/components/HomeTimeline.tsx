@@ -20,6 +20,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { scaleAlpha } from '../../../shared/theme/alpha';
 import { timelineHues } from '../../../shared/theme/tokens';
 import { localTimeline, timelineSchema, type TimelineEvent } from '../data/timeline';
+import { deviceHealthName } from '../../../integrations/device-health/platform';
 import {
   isSleepEvent,
   timelineDestinationDate,
@@ -59,6 +60,7 @@ export function HomeTimeline({
     health.sleep,
     today,
     health.timezone,
+    deviceHealthName,
   );
   for (const row of activity.rows) {
     const log = row.payload;

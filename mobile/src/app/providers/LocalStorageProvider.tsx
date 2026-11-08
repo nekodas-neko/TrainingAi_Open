@@ -6,7 +6,7 @@ import type { LocalStorage } from '../../core/storage/LocalStorage';
 import { StorageUpgradeRequired } from '../../core/storage/migrations';
 import { StorageProvider } from '../../core/storage/StorageProvider';
 import { AppearancePreferences } from '../../features/settings/appearance';
-import { AppearanceProvider } from '../../features/settings/AppearanceProvider';
+import { AppearanceAccountSync, AppearanceProvider } from '../../features/settings/AppearanceProvider';
 import { WeatherProvider } from '../../features/weather/WeatherProvider';
 import { WeatherStore } from '../../features/weather/data/WeatherStore';
 import { fetchWeather } from '../../features/weather/data/open-meteo';
@@ -93,6 +93,7 @@ export function LocalStorageProvider({ children }: PropsWithChildren) {
   return (
     <StorageProvider storage={ready.storage}>
       <AppearanceProvider preferences={ready.preferences}>
+        <AppearanceAccountSync preferences={ready.preferences} />
         <WeatherProvider store={ready.weather}>{children}</WeatherProvider>
       </AppearanceProvider>
     </StorageProvider>

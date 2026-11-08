@@ -1,3 +1,4 @@
+import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { Notice } from '../../../shared/ui';
 import type { HealthSnapshot } from '../types';
 
@@ -14,7 +15,7 @@ export function HealthNotice({
         snapshot?.mode === 'sample'
           ? 'Sample data'
           : snapshot?.mode === 'device'
-            ? 'Apple Health'
+            ? deviceHealthName
             : 'No health data loaded'
       }
       message={

@@ -36,6 +36,8 @@ export function localTimeline(
   sleep: readonly SleepRow[],
   today: string,
   timezone: string,
+  /** The phone's health store a `localOnly` night came from: `deviceHealthName` (#3669 item 3). */
+  deviceSource: string,
 ) {
   // #3426: the server's "Woke up" is the session's recorded window end. Show the time that night's
   // sleep ended, as the night header and Home do (#3415). The night is the one whose recorded end
@@ -120,7 +122,7 @@ export function localTimeline(
         date,
         sleepDate: night.date,
         sleepDurationH: night.durationHours ?? undefined,
-        subtitle: 'Apple Health',
+        subtitle: deviceSource,
       });
     }
   }

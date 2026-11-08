@@ -1,3 +1,4 @@
+import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { useState } from 'react';
 import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones';
 import { zoneStacksUnmeasured } from '@trainingai/shared/health/cardio-trends';
@@ -57,7 +58,7 @@ export function CardioTrends() {
             data.hasHrSource,
           ) ? (
             <AppText variant="caption" tone="muted">
-              No heart-rate data yet. Connect Apple Health, then record a workout.
+              No heart-rate data yet. Connect {deviceHealthName}, then record a workout.
             </AppText>
           ) : data.weeklyZoneStacks.length ? (
             <StackedBarChart

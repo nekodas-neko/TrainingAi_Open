@@ -15,6 +15,7 @@ import type { User } from '@trainingai/shared/types'
 import type { ActivityLevel } from '@trainingai/shared/types/user'
 import { invalidateGoalRecommendations } from '@/lib/cache-groups'
 import { STEPS_GOAL_KEY, WATER_GOAL_KEY } from '@/lib/home/home-prefs'
+import { goalShownForPeriod, recommendationGoalsPatch } from '@trainingai/shared/nutrition/goal-recommendation-apply'
 
 export interface GoalRecommendationData {
   id: string
@@ -67,10 +68,6 @@ interface MetricRow {
   suggested: number
 }
 
-function multiplier(goalType: 'daily' | 'weekly' | null): number {
-  return goalType === 'weekly' ? 7 : 1
-}
-
 function formatActivityLevel(level: ActivityLevel | null): string {
   return level ? level.replaceAll('_', ' ') : 'unset'
 }
@@ -116,12 +113,16 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
   if (!data) return null
   const rec = data
 
+  // Both sides of each row read in the user's mode: the stored goal and the recommendation are daily
+  // figures, so a weekly-mode user sees both ×7 here. The write below stays daily (#3643).
+  const shown = (daily: number | null, period: 'daily' | 'weekly' | null) =>
+    daily == null ? null : goalShownForPeriod(daily, period)
   const rows: MetricRow[] = [
-    { key: 'steps', label: 'Steps Goal', unit: '', current: data.current.stepsGoal, suggested: data.recommended.stepsGoal * multiplier(data.current.stepsGoalType) },
+    { key: 'steps', label: 'Steps Goal', unit: '', current: shown(data.current.stepsGoal, data.current.stepsGoalType), suggested: goalShownForPeriod(data.recommended.stepsGoal, data.current.stepsGoalType) },
     { key: 'protein', label: 'Protein', unit: 'g', current: data.current.proteinG, suggested: data.recommended.proteinG },
     { key: 'carbs', label: 'Carbs', unit: 'g', current: data.current.carbsG, suggested: data.recommended.carbsG },
     { key: 'fat', label: 'Fat', unit: 'g', current: data.current.fatG, suggested: data.recommended.fatG },
-    { key: 'water', label: 'Water', unit: 'ml', current: data.current.waterGoalMl, suggested: data.recommended.waterMl * multiplier(data.current.waterGoalType) },
+    { key: 'water', label: 'Water', unit: 'ml', current: shown(data.current.waterGoalMl, data.current.waterGoalType), suggested: goalShownForPeriod(data.recommended.waterMl, data.current.waterGoalType) },
   ]
 
   const showActivityRow = data.recommended.activityLevel != null && data.recommended.activityLevel !== data.current.activityLevel
@@ -133,11 +134,10 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
     // partial apply must stay pending and retryable rather than record a state the data contradicts.
     const failed: string[] = []
     try {
-      const goalsPatch: Record<string, number> = {}
-      const stepsRow = rows.find(r => r.key === 'steps')!
-      const waterRow = rows.find(r => r.key === 'water')!
-      if (checked.steps) goalsPatch.stepsGoal = Math.round(stepsRow.suggested)
-      if (checked.water) goalsPatch.waterGoalMl = Math.round(waterRow.suggested)
+      const goalsPatch = recommendationGoalsPatch(rec.recommended, {
+        steps: !!checked.steps,
+        water: !!checked.water,
+      })
       if (Object.keys(goalsPatch).length > 0) {
         if (await writeJson('/api/user/goals', 'PATCH', goalsPatch)) {
           // Seeds are written only once the PATCH has landed. Writing them regardless would leave

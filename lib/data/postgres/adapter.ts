@@ -5806,7 +5806,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // before any mutation is even tried.
     let userTz: string = DEFAULT_TZ
     // `manual_sleep` needs it too: a typed night's date is its wake date in the user's timezone.
-    if (mutations.some(m => m.domain === 'workout_log' || m.domain === 'manual_sleep')) {
+    // So does `mood_logs`: a check-in sent without its suggested list falls back to deriving one,
+    // and that reads the day's recovery in the user's timezone (#3669 item 6).
+    if (mutations.some(m => m.domain === 'workout_log' || m.domain === 'manual_sleep' || m.domain === 'mood_logs')) {
       try {
         const user = await this.getUserById(userId)
         userTz = user?.timezone ?? DEFAULT_TZ
@@ -5935,7 +5937,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             sleepQuality: p.sleepQuality ?? 'ok',
             bodyState:    p.bodyState   ?? [],
             soreMuscles:  p.soreMuscles ?? [],
-          })
+            // BF-173: the list the sheet showed, when it sent one. Dropping it here made the server
+            // re-derive it at push time, against a recovery feed the lifter never saw (#3669 item 6).
+            suggestedSoreMuscles: p.suggestedSoreMuscles,
+          }, userTz)
           processed++
         } else if (mut.domain === 'day_checkins') {
           const p = clean as Record<string, unknown>

@@ -79,6 +79,27 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
     await pool.query(`DELETE FROM mood_logs WHERE user_id = $1`, [TEST_USER_ID])
   })
 
+  it('mood_logs: both paths store the suggested sore muscles the sheet sent (BF-173, #3669)', async () => {
+    // Dropped on both paths, the server derived the list at write time from that moment's recovery
+    // feed instead. With no recovery data here the derivation suggests nothing, so a stored
+    // ['chest'] can only have come from the payload.
+    const body = { energyLevel: 'ok', bodyState: [], soreMuscles: ['chest', 'quadriceps'], suggestedSoreMuscles: ['chest'] }
+    const { POST } = await import('@/app/api/mood/route')
+    const res = await POST(jsonReq('http://localhost/api/mood', body) as never)
+    expect(res.status).toBe(200)
+    const webRow = await pool.query(`SELECT suggested_sore_muscles FROM mood_logs WHERE user_id = $1`, [TEST_USER_ID])
+    expect(webRow.rows[0].suggested_sore_muscles).toEqual(['chest'])
+    await pool.query(`DELETE FROM mood_logs WHERE user_id = $1`, [TEST_USER_ID])
+
+    const result = await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-mood-3', domain: 'mood_logs', date: '2026-01-01', payload: body,
+    }])
+    expect(result.processed).toBe(1)
+    const pushRow = await pool.query(`SELECT suggested_sore_muscles FROM mood_logs WHERE user_id = $1`, [TEST_USER_ID])
+    expect(pushRow.rows[0].suggested_sore_muscles).toEqual(['chest'])
+    await pool.query(`DELETE FROM mood_logs WHERE user_id = $1`, [TEST_USER_ID])
+  })
+
   it('mood_logs: both paths reject an energyLevel outside the enum (Q-131)', async () => {
     // The push branch used to cast straight through, so an arbitrary string reached the NOT NULL
     // energy_level column and every readiness/energy surface rendered it as a real check-in.

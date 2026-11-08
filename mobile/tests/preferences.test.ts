@@ -235,3 +235,80 @@ test('appearance writes are serialized so slower older selections cannot overwri
   await settled(preferences);
   assert.deepEqual(JSON.parse(stored!), { mode: 'system', brand: 'cyan', customHue: null });
 });
+
+// #3669 item 4: the accent follows the account, as the current app's does.
+function accountFake(bag: Record<string, unknown>, online = { value: true }) {
+  const patches: unknown[] = [];
+  return {
+    patches,
+    online,
+    account: {
+      get: async () => {
+        if (!online.value) throw new TypeError('offline');
+        return { ...bag };
+      },
+      patch: async (_path: string, body: unknown) => {
+        if (!online.value) throw new TypeError('offline');
+        patches.push(body);
+        for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+          if (v === null) delete bag[k];
+          else bag[k] = v;
+        }
+        return { ...bag };
+      },
+    },
+  };
+}
+
+test('a fresh install takes the accent saved on the account, and keeps light/dark on the phone', async () => {
+  const fixture = sqliteFixture();
+  try {
+    const storage = (await createLocalStorage(fixture.database)).device();
+    const preferences = new AppearancePreferences(storage);
+    await preferences.load();
+    await preferences.attachAccount(accountFake({ brandTheme: 'purple', theme: 'light' }).account);
+    await settled(preferences);
+    assert.equal(preferences.getSnapshot().brand, 'purple');
+    assert.equal(preferences.getSnapshot().customHue, null);
+    assert.equal(preferences.getSnapshot().mode, 'system');
+
+    await preferences.attachAccount(accountFake({ brandHue: 200 }).account);
+    await settled(preferences);
+    assert.equal(preferences.getSnapshot().customHue, 200);
+    const reopened = new AppearancePreferences(storage);
+    await reopened.load();
+    assert.equal(reopened.getSnapshot().customHue, 200);
+  } finally {
+    fixture.connection.close();
+  }
+});
+
+test('an accent picked here reaches the account, and one picked offline is sent on the next try', async () => {
+  const fixture = sqliteFixture();
+  try {
+    const storage = (await createLocalStorage(fixture.database)).device();
+    const fake = accountFake({ brandTheme: 'green' });
+    const preferences = new AppearancePreferences(storage);
+    await preferences.load();
+    await preferences.attachAccount(fake.account);
+    preferences.setBrand('gold');
+    await preferences.syncAccount();
+    await settled(preferences);
+    assert.deepEqual(fake.patches.at(-1), { brandTheme: 'gold', brandHue: null });
+
+    fake.online.value = false;
+    preferences.setCustomHue(123.4);
+    await preferences.syncAccount();
+    await settled(preferences);
+    // Relaunch while still unsent: the account's older accent must not overwrite the pick.
+    const reopened = new AppearancePreferences(storage);
+    await reopened.load();
+    fake.online.value = true;
+    await reopened.attachAccount(fake.account);
+    await settled(reopened);
+    assert.equal(reopened.getSnapshot().customHue, 123.4);
+    assert.deepEqual(fake.patches.at(-1), { brandHue: 123, brandTheme: null });
+  } finally {
+    fixture.connection.close();
+  }
+});

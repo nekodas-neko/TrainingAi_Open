@@ -166,6 +166,9 @@ export function HomeBanners({
             label: 'Goals check-in',
             subtitle: 'Review your nutrition and activity goals',
             open: () => setGoals(true),
+            // The current app's "Remind later": the server's review date moves, so the 14-day gate
+            // closes on every device, not only today's marker on this phone (#3669 item 1).
+            dismiss: () => postponeGoals(),
           },
         ]
       : []),
@@ -208,6 +211,23 @@ export function HomeBanners({
       revert: async () => {
         layoutMotion(reduced);
         for (const start of starts) await store.answerWalk(start, false);
+      },
+    });
+  }
+  function postponeGoals() {
+    const store = home.store;
+    if (!store) return;
+    const date = health.today;
+    void undo.perform({
+      key: `goals:${date}`,
+      label: 'Goals check-in postponed for 14 days',
+      apply: async () => {
+        layoutMotion(reduced);
+        await store.postponeGoals(date);
+      },
+      revert: async () => {
+        layoutMotion(reduced);
+        await store.cancelGoalsPostpone(date);
       },
     });
   }

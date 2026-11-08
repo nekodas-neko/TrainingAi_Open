@@ -239,6 +239,21 @@ export class HomeStore {
     }));
     void this.sync();
   }
+  /**
+   * Takes back a postpone (its undo). A still-queued `goal-review` op is dropped with the marker;
+   * one already sent stands, because the server has no way to un-touch a review date. The op at the
+   * head of the queue may be in flight, so only the ones behind it are dropped.
+   */
+  async cancelGoalsPostpone(date: string) {
+    this.guard();
+    await this.write((state) => {
+      const head = this.flushing ? state.operations[0]?.id : undefined;
+      return {
+        markers: { ...state.markers, [`goals:${date}`]: false },
+        operations: state.operations.filter((op) => op.kind !== 'goal-review' || op.id === head),
+      };
+    });
+  }
   refresh(kind: 'preferences' | 'mood', date: string, manual = false): Promise<void> {
     const key = kind === 'preferences' ? kind : `${kind}:${date}`;
     const active = this.requests.get(key);

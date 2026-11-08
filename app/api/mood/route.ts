@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
-  const { energyLevel, sleepQuality, bodyState, soreMuscles } = parsed.data
+  const { energyLevel, sleepQuality, bodyState, soreMuscles, suggestedSoreMuscles } = parsed.data
 
   const logDate = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
   const repo = await getRepositoryAsync()
@@ -62,6 +62,8 @@ export async function POST(req: NextRequest) {
     sleepQuality: sleepQuality ?? 'ok',
     bodyState: bodyState ?? [],
     soreMuscles: soreMuscles ?? [],
+    // BF-173: the list the sheet showed. Absent, the server derives one (#3669 item 6).
+    suggestedSoreMuscles,
   }, tz)
   return NextResponse.json(log)
 }
