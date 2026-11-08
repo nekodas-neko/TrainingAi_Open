@@ -5,6 +5,7 @@ import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
 import { driftAgainst } from './types'
 import { OWN_TARGET_GOAL_TYPE, ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import { ownCalorieTargetReason } from '@trainingai/shared/validation/plausibility'
+import { wholeCalorieTarget } from '@trainingai/shared/validation/goal-bounds'
 
 const TARGET_FIELDS = ['calories', 'proteinG', 'carbsG', 'fatG'] as const
 // `calorieGoalType` is not a coach field: it is written as the flag that makes `calorieGoal` the user's
@@ -139,6 +140,8 @@ async function write(db: Db, userId: string, changes: PatchChange[], kind: 'nutr
   if (kind === 'nutrition_targets') {
     const values: Record<string, unknown> = { userId }
     for (const c of changes) if ((TARGET_FIELDS as readonly string[]).includes(c.field)) values[c.field] = c.to
+    // #3670 ②: `calories` is an integer column; a decimal from the model would otherwise be a 500.
+    if (typeof values.calories === 'number') values.calories = wholeCalorieTarget(values.calories)
     await db
       .insert(s.nutritionTargets)
       .values(values as typeof s.nutritionTargets.$inferInsert)

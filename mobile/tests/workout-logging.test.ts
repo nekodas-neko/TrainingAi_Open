@@ -15,7 +15,11 @@ import {
   emptyJournal,
   finishWorkout,
   mutationFor,
+  openJournal,
   readJournal,
+  UPLOADED_WORKOUT_RETENTION_MS,
+  DISCARDED_WORKOUT_RETENTION_MS,
+  type WorkoutRecord,
 } from '../src/features/workouts/logging/workout.ts';
 import {
   PROGRAM_AS_WRITTEN,
@@ -638,7 +642,12 @@ test('corrupt upload ordering is rejected without dropping the recorded sets', a
   const completed = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
   completed.pending.reverse();
   const raw = JSON.stringify({ ...emptyJournal(f.connection), workouts: [completed] });
-  assert.throws(() => readJournal(raw, f.connection), /upload order/);
+  // #3671: set aside with its recorded sets, rather than failing the whole journal.
+  const journal = readJournal(raw, f.connection);
+  assert.equal(journal.workouts.length, 0);
+  assert.equal(journal.setAside.length, 1);
+  assert.match(journal.setAside[0].error, /upload order/);
+  assert.deepEqual(journal.setAside[0].record, JSON.parse(JSON.stringify(completed)));
 });
 
 test('guided warm-up, rest, summary and next exercise persist without uploading unfinished work', async (t) => {
@@ -755,10 +764,11 @@ test('older workouts resume their unfinished set without requiring a new warm-up
     stage: 'exercise',
     exerciseId: '10000000-0000-4000-8000-000000000099',
   };
-  assert.throws(
-    () => readJournal(JSON.stringify(raw), f.connection),
-    /Missing saved workout exercise/,
-  );
+  // #3671: an active workout that does not read is set aside, never dropped or fatal.
+  const journal = readJournal(JSON.stringify(raw), f.connection);
+  assert.equal(journal.workouts.length, 0);
+  assert.match(journal.setAside[0].error, /Missing saved workout exercise/);
+  assert.equal(journal.setAside[0].id, id);
 });
 
 test('unequal supersets alternate using the shared order and survive reopening between members', async (t) => {
@@ -893,6 +903,30 @@ test('an exercise swap preserves already-recorded loads under the original exerc
       (item) => (mutationFor(finished, item).payload as { exercise: string }).exercise,
     );
   assert.deepEqual(new Set(names), new Set(['Bench press', 'Push-up']));
+});
+
+test('a swap does not hand the swapped-out exercise\'s personal record to its replacement (#3671)', async (t) => {
+  const f = await setup(t);
+  // `start` pins the live prescription, so the record comes from the server's row.
+  Object.assign(f.response.exercises[0], { allTimePr1rm: 140, prevFromBaseline: true });
+  const { id } = await recordFirst(f);
+  const previous = f.controller.getSnapshot().data.workouts[0].exercises[0];
+  assert.equal(previous.allTimePr1rm, 140);
+  await f.controller.swapExercise(id, previous.id, {
+    name: 'Push-up',
+    exerciseType: 'bodyweight',
+    muscles: ['chest'],
+    equipment: ['bodyweight'],
+    instructions: null,
+    estimated1rm: null,
+    lastWeights: [],
+  });
+  const changed = f.controller.getSnapshot().data.workouts[0];
+  const replacement = changed.exercises.find((exercise) => !exercise.retired)!;
+  const archive = changed.exercises.find((exercise) => exercise.retired)!;
+  assert.equal(replacement.allTimePr1rm, null);
+  assert.equal(replacement.prevFromBaseline, false);
+  assert.equal(archive.allTimePr1rm, 140);
 });
 
 test('timer choices persist per account and workout while hidden clocks still record actual durations', async (t) => {
@@ -1190,3 +1224,118 @@ test('a refused workout upload is set aside and the next workout still uploads',
 });
 
 
+
+// #3671 ③. The journal kept every finished and discarded workout forever, and one workout it could
+// not read failed the whole journal, so Start offered only "Retry loading".
+async function finishedJournal(t: { after(fn: () => void): void }) {
+  const f = await setup(t);
+  await recordFirst(f);
+  const finished = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
+  const uploaded = (at: number, id: string): WorkoutRecord => ({
+    ...finished,
+    id,
+    exercises: finished.exercises.map((exercise, i) => ({
+      ...exercise,
+      logId: `${id.slice(0, -4)}${String(10 + i).padStart(4, '0')}`,
+      sets: exercise.sets.map((set, j) => ({
+        ...set,
+        id: `${id.slice(0, -4)}${String(100 + i * 20 + j).padStart(4, '0')}`,
+      })),
+    })),
+    pending: [],
+    syncedAt: at,
+    syncError: null,
+  });
+  return { f, finished, uploaded };
+}
+const wid = (n: number) => `50000000-0000-4000-8000-${String(n).padStart(8, '0')}0000`;
+
+test('uploaded workouts are pruned after the retention; anything unsent never is (#3671)', async (t) => {
+  const { f, finished, uploaded } = await finishedJournal(t);
+  const now = f.clock();
+  const old = uploaded(now - UPLOADED_WORKOUT_RETENTION_MS - 1, wid(1));
+  const recent = uploaded(now - UPLOADED_WORKOUT_RETENTION_MS + 60_000, wid(2));
+  // Finished long ago and never uploaded: kept, whatever its age.
+  const unsent = finished;
+  const discardedOld = {
+    ...uploaded(0, wid(3)),
+    status: 'discarded' as const,
+    completedAt: null,
+    syncedAt: null,
+    startedAt: now - DISCARDED_WORKOUT_RETENTION_MS - 1,
+  };
+  const raw = JSON.stringify({
+    ...emptyJournal(f.connection),
+    workouts: [old, recent, unsent, discardedOld],
+  });
+  const { journal, rewrite } = openJournal(raw, f.connection, now);
+  assert.equal(rewrite, true);
+  assert.deepEqual(
+    journal.workouts.map((w) => w.id),
+    [recent.id, unsent.id],
+  );
+  assert.equal(openJournal(JSON.stringify(journal), f.connection, now).rewrite, false);
+});
+
+test('an unreadable uploaded workout is dropped, an unreadable unsent one set aside, and the rest still load (#3671)', async (t) => {
+  const { f, finished, uploaded } = await finishedJournal(t);
+  const now = f.clock();
+  const good = uploaded(now - 60_000, wid(4));
+  // A later schema change rejects these two: an uploaded one, and one still waiting to upload.
+  const badUploaded = { ...uploaded(now - 60_000, wid(5)), status: 'completed', exercises: 'x' };
+  const badUnsent = { ...finished, timezone: '' };
+  const raw = JSON.stringify({
+    ...emptyJournal(f.connection),
+    workouts: [badUploaded, good, badUnsent],
+  });
+  const journal = readJournal(raw, f.connection, now);
+  assert.deepEqual(journal.workouts.map((w) => w.id), [good.id]);
+  assert.equal(journal.setAside.length, 1);
+  assert.equal(journal.setAside[0].id, finished.id);
+  assert.deepEqual(journal.setAside[0].record, JSON.parse(JSON.stringify(badUnsent)));
+});
+
+test('a journal with an unreadable workout opens, logs, and lists it in Sync health with Retry and Discard (#3671)', async (t) => {
+  const { f, finished } = await finishedJournal(t);
+  const badUnsent = { ...finished, timezone: '' };
+  await f.scope.set(
+    'workout-journal.v1',
+    JSON.stringify({ ...emptyJournal(f.connection), workouts: [badUnsent] }),
+  );
+  let now = f.clock();
+  const store = new WorkoutJournalStore(f.scope, f.connection, f.uuid, () => now);
+  await store.initialize();
+  assert.equal(store.getSnapshot().ready, true);
+  assert.deepEqual(
+    store.failed().map((item) => [item.list, item.id, item.label]),
+    [['workout', finished.id, 'Workout']],
+  );
+  assert.equal(store.retryState(finished.id), 'failing');
+  // Logging still works.
+  const id = await store.start(f.session, programId);
+  assert.ok(id);
+  // The set-aside copy is saved, not lost, when the journal is next written.
+  assert.equal(readJournal(await f.scope.get('workout-journal.v1'), f.connection).setAside.length, 1);
+  // Retry reads it again; still unreadable, it stays set aside.
+  now += 1000;
+  await store.retryRejected(finished.id);
+  assert.equal(store.getSnapshot().data.setAside[0].at, now);
+  await store.discardRejected(finished.id);
+  assert.deepEqual(store.failed(), []);
+  assert.equal(readJournal(await f.scope.get('workout-journal.v1'), f.connection).setAside.length, 0);
+});
+
+test('a set-aside workout that reads after an update goes back into the journal on Retry (#3671)', async (t) => {
+  const { f, finished } = await finishedJournal(t);
+  const raw = JSON.stringify({
+    ...emptyJournal(f.connection),
+    workouts: [],
+    setAside: [{ id: finished.id, date: finished.date, error: 'old', at: 1, record: finished }],
+  });
+  await f.scope.set('workout-journal.v1', raw);
+  const store = new WorkoutJournalStore(f.scope, f.connection, f.uuid, () => f.clock());
+  await store.initialize();
+  await store.retryRejected(finished.id);
+  assert.deepEqual(store.getSnapshot().data.setAside, []);
+  assert.equal(store.getSnapshot().data.workouts.find((w) => w.id === finished.id)?.status, 'completed');
+});

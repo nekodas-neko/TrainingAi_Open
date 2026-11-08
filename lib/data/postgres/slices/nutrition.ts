@@ -2,7 +2,9 @@ import { eq, and, inArray, gt, gte, lte, asc, desc, sql, isNull, or } from 'driz
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at'
 import { findDuplicateFoodItem, identityCalories } from '@trainingai/shared/nutrition/food-item-identity'
-import { lookAlikeKey } from '@trainingai/shared/nutrition/food-merge'
+import { lookAlikeFactor, lookAlikeKey } from '@trainingai/shared/nutrition/food-merge'
+import { quantityMultiplierInRange } from '@trainingai/shared/nutrition/quantity-bounds'
+import { wholeCalorieTarget } from '@trainingai/shared/validation/goal-bounds'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { summariseSupplementDay } from '@trainingai/shared/nutrition/supplement-day-totals'
 import type { SupplementDayLog, SupplementDayContributionRow } from '@trainingai/shared/types/supplement'
@@ -591,6 +593,38 @@ async function resolveLogEatenAt(db: Db, userId: string, mealTypeId: string, dat
   })
 }
 
+/**
+ * An edit pushed against a food the look-alike merge has since retired (#3670 ①).
+ *
+ * The conflict arm below keeps the stored `food_item_id`, so once the merge has moved a log to its
+ * keeper, an edit from a device that still shows the old food (or one queued offline before the
+ * merge) carries a quantity in the OLD food's servings. Written as-is onto the keeper it changes the
+ * grams: 2 × a 170 g serving became 2 × 100 g. Convert it with the merge's own factor, exactly as
+ * Preview does when it logs a stale copy (#3682), so the grams are what the user typed.
+ *
+ * Only a retired look-alike of the stored food is converted. When the rescaled quantity would fall
+ * outside the push range (the merge itself refuses such a group), the log takes the client's food
+ * and quantity instead: the grams still hold, and the retired row still renders.
+ */
+async function resolveEditAgainstMergedFood(
+  db: Db, userId: string, logId: string, foodItemId: string, quantityMultiplier: number,
+): Promise<{ foodItemId: string; quantityMultiplier: number; takeClientFood: boolean } | null> {
+  const [stored] = await db.select({ foodItemId: s.foodLogs.foodItemId }).from(s.foodLogs)
+    .where(and(eq(s.foodLogs.id, logId), eq(s.foodLogs.userId, userId))).limit(1)
+  if (!stored || stored.foodItemId === foodItemId) return null
+  const foods = await db.select({
+    id: s.foodItems.id, name: s.foodItems.name, brand: s.foodItems.brand,
+    servingSizeG: s.foodItems.servingSizeG, deletedAt: s.foodItems.deletedAt,
+  }).from(s.foodItems)
+    .where(and(eq(s.foodItems.userId, userId), inArray(s.foodItems.id, [stored.foodItemId, foodItemId])))
+  const sent = foods.find((f) => f.id === foodItemId)
+  const keeper = foods.find((f) => f.id === stored.foodItemId)
+  if (!sent || !keeper || sent.deletedAt == null || lookAlikeKey(sent) !== lookAlikeKey(keeper)) return null
+  const moved = quantityMultiplier * lookAlikeFactor({ servingSizeG: Number(sent.servingSizeG) }, { servingSizeG: Number(keeper.servingSizeG) })
+  if (!quantityMultiplierInRange(moved)) return { foodItemId, quantityMultiplier, takeClientFood: true }
+  return { foodItemId: keeper.id, quantityMultiplier: moved, takeClientFood: false }
+}
+
 export async function createFoodLog(
   db: Db,
   userId: string,
@@ -598,6 +632,11 @@ export async function createFoodLog(
     & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null; mealGroupName?: string | null },
 ): Promise<FoodLog> {
   const { id, loggedAt, ...rest } = data
+  const merged = id ? await resolveEditAgainstMergedFood(db, userId, id, rest.foodItemId, rest.quantityMultiplier) : null
+  if (merged) {
+    rest.foodItemId = merged.foodItemId
+    rest.quantityMultiplier = merged.quantityMultiplier
+  }
   // The client's `loggedAt` is a CANDIDATE, not an answer — an offline replay carries the instant
   // the button was pressed, which is the very thing Q-413 exists to stop storing unexamined.
   const eatenAt = await resolveLogEatenAt(db, userId, rest.mealTypeId, rest.date, loggedAt ?? new Date())
@@ -623,6 +662,7 @@ export async function createFoodLog(
       // UPDATE (CLAUDE.md, write-path ownership).
       set: {
         quantityMultiplier: rest.quantityMultiplier,
+        ...(merged?.takeClientFood ? { foodItemId: rest.foodItemId } : {}),
         mealTypeId: rest.mealTypeId,
         date: rest.date,
         loggedAt: sql`CASE WHEN ${s.foodLogs.mealTypeId} IS DISTINCT FROM excluded.meal_type_id OR ${s.foodLogs.date} IS DISTINCT FROM excluded.date THEN excluded.logged_at ELSE ${s.foodLogs.loggedAt} END`,
@@ -984,7 +1024,9 @@ export async function getNutritionTargets(db: Db, userId: string): Promise<Nutri
   }
 }
 
-export async function upsertNutritionTargets(db: Db, userId: string, data: Omit<NutritionTargets, 'id' | 'userId' | 'updatedAt'>): Promise<NutritionTargets> {
+export async function upsertNutritionTargets(db: Db, userId: string, input: Omit<NutritionTargets, 'id' | 'userId' | 'updatedAt'>): Promise<NutritionTargets> {
+  // #3670 ②: the column is an integer, so a decimal is a 500 unless it is made whole here.
+  const data = input.calories === undefined ? input : { ...input, calories: wholeCalorieTarget(input.calories) }
   const [r] = await db.insert(s.nutritionTargets)
     .values({ userId, ...data, updatedAt: new Date() })
     .onConflictDoUpdate({

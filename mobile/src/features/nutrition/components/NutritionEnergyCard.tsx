@@ -35,7 +35,6 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
     totals: n.view.totals,
     recordedIntake: resolved.intake,
     budgetKcal: b?.budgetKcal,
-    targetCalories: n.view.targets.calories,
     targets: n.view.targets,
     scaledTargets: scaled?.scaled,
   });

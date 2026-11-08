@@ -18,7 +18,8 @@ import { formatDuration } from '../../../shared/hooks/useClock';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { WorkoutSaveNotice } from '../components/WorkoutSaveNotice';
 import { GuidedWorkoutScreen } from './GuidedWorkoutScreen';
-import { workoutResult } from '../logging/summary';
+import { personalRecordNames, personalRecordsLine, workoutResult } from '../logging/summary';
+import { PersonalRecords } from '../components/PersonalRecords';
 import { activeElapsedMs } from '../logging/workout';
 import { WorkoutLayout } from '../components/WorkoutLayout';
 import { RecapCard } from '../components/RecapCard';
@@ -137,6 +138,18 @@ export function WorkoutLogScreen({
   }
   const result = workoutResult(workout);
   const duration = formatDuration(activeElapsedMs(workout, workout.completedAt!) / 1000);
+  // #3671: the records this session set, and the share line the current app adds for them.
+  const records = personalRecordNames(workout);
+  const shareWorkout = () => {
+    void Share.share({
+      message: [
+        `Workout complete! ${workout.sessionName} · ${result.exercises} exercises · ${result.sets} sets · ${duration} · ${Math.round(result.loadVolume)} kg volume`,
+        personalRecordsLine(records),
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    });
+  };
   const stats = [
     {
       label: 'Exercises',
@@ -201,6 +214,7 @@ export function WorkoutLogScreen({
       )}
       {workout.syncError && <Notice title="Upload pending" message={workout.syncError} />}
       <WorkoutSaveNotice />
+      <PersonalRecords names={records} shareWorkout={shareWorkout} />
       <WorkoutXp xp={xp} />
       <View style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
         <Grid>
@@ -240,9 +254,7 @@ export function WorkoutLogScreen({
             icon="share"
             variant="surface"
             onPress={() => {
-              void Share.share({
-                message: `Workout complete! ${workout.sessionName} · ${result.exercises} exercises · ${result.sets} sets · ${duration} · ${Math.round(result.loadVolume)} kg volume`,
-              });
+              shareWorkout();
             }}
             style={{ flex: 1 }}
           />

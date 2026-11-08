@@ -30,8 +30,13 @@ export function ExerciseSummary({
       : exercise.estimated1rm;
   const current =
     exercise.exerciseType === 'bodyweight' ? result.repMax : result.estimate;
+  // As the current app: no change against a baseline test's estimate, or during one (#3671).
   const difference =
-    !workout.isBaseline && !exercise.deloaded && previous !== null && current !== null
+    !workout.isBaseline &&
+    !exercise.prevFromBaseline &&
+    !exercise.deloaded &&
+    previous !== null &&
+    current !== null
       ? current - previous
       : null;
   const color =

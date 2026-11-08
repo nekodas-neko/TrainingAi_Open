@@ -149,7 +149,6 @@ function useWidgetSnapshot(userId: string) {
         totals: nutrition.view.totals,
         recordedIntake,
         budgetKcal: energyData?.balance?.budgetKcal,
-        targetCalories: nutrition.view.targets.calories,
         targets: nutrition.view.targets,
         scaledTargets: energyData?.macroTargets?.scaled,
       }),

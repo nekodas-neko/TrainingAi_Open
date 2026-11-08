@@ -3,7 +3,7 @@ import {
   DayCheckinScalesSchema,
 } from '@trainingai/shared/validation/day-checkin';
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item';
-import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds';
+import { goalBoundSchema, wholeCalorieTarget } from '@trainingai/shared/validation/goal-bounds';
 import { SupplementCreateSchema } from '@trainingai/shared/validation/supplement';
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
 import { SavedMealSchema } from '@trainingai/shared/validators/saved-meal';
@@ -150,6 +150,16 @@ export const targetsBody = z
     fiberG: goalBoundSchema('fiberG').nullish(),
   })
   .strict();
+/**
+ * #3670 ②. A targets body as the server stores it: whole kcal, as the current app's form sends
+ * (`parseInt`). Applied when the request is queued, and again when it is sent and read back, so a
+ * decimal queued by an earlier build neither answers 500 nor fails its read-back forever.
+ */
+export function wholeTargets<T extends Record<string, unknown>>(body: T): T {
+  return typeof body.calories === 'number'
+    ? { ...body, calories: wholeCalorieTarget(body.calories) }
+    : body;
+}
 export const eveningSchema = DayCheckinScalesSchema.merge(DayCheckinExtrasSchema)
   .extend({ phase: z.literal('evening') })
   .strict();

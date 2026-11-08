@@ -180,6 +180,14 @@ describe('logExerciseFromPayload — ai_dynamic deload PR gate (AI-8)', () => {
     expect(getSessionPeriodization).not.toHaveBeenCalled()
     expect(upsertPersonalRecordIfBetter).toHaveBeenCalledTimes(1)
   })
+  // #3671: a PR set at 21:00 that syncs the next morning is dated by the set, not by the upload.
+  it('dates the PR by the last set\'s end, which is the log\'s own loggedAt', async () => {
+    getActiveProgramWithPhases.mockResolvedValue(null)
+    getActiveProgram.mockResolvedValue({ id: 'p1', phaseMode: 'manual' })
+    const setEnd = Date.now() - 12 * 3_600_000
+    await logExerciseFromPayload('u1', { ...basePayload, setEndTimes: [setEnd] }, TZ)
+    expect(upsertPersonalRecordIfBetter).toHaveBeenCalledWith('u1', 'Bench Press', expect.any(Number), new Date(setEnd))
+  })
 })
 
 describe('logExerciseFromPayload — planned snapshot (set-log planned_pct/planned_rest_sec)', () => {

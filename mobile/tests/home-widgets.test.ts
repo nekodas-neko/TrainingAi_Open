@@ -19,9 +19,10 @@ const module = '../modules/home-widgets/android/src/main/';
 test('kcal left is Home\'s nutrition card: the budget alone, with no fall back to the calorie target', () => {
   const totals = { calories: 1260, proteinG: 98, carbsG: 132, fatG: 46 };
   const home = budgetEnergyModel({ totals, recordedIntake: null, budgetKcal: null });
-  const screen = nutritionEnergyModel({ totals, recordedIntake: null, budgetKcal: null, targetCalories: 2300, targets: {}, scaledTargets: null });
+  // #3670 ③: the Nutrition screen's model has no fallback either now, as the current app (#2071).
+  const screen = nutritionEnergyModel({ totals, recordedIntake: null, budgetKcal: null, targets: {}, scaledTargets: null });
   assert.equal(home.remaining, null);
-  assert.equal(screen.remaining, 1040);
+  assert.equal(screen.remaining, null);
   assert.deepEqual(remainingText(1040), { value: '1,040', label: 'kcal left' });
 });
 

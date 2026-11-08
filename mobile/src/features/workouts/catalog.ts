@@ -26,6 +26,13 @@ export type ExercisePreview = {
   lastWeights: number[];
   equipment: string[];
   estimated1rm: number | null;
+  /**
+   * #3671. The all-time personal record, the bar a "New Personal Record" must beat
+   * (`beatsPersonalRecord`), and whether `estimated1rm` came from a baseline test, after which the
+   * summary shows no change against it, as the current app does.
+   */
+  allTimePr1rm?: number | null;
+  prevFromBaseline?: boolean;
   target80: number | null;
   latestWeight: number | null;
   lastSetMode: 'amrap' | 'plus1' | null;
@@ -151,6 +158,10 @@ function count(value: unknown): number {
   }
   return result;
 }
+// A record the server could not read is no record: never a reason to refuse the catalog.
+function optionalRecord(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
 function duration(value: unknown) {
   return value == null ? null : number(value);
 }
@@ -200,6 +211,8 @@ function exercise(value: unknown, dataDate: string | null = null): ExercisePrevi
     deloaded: row.deloaded === true,
     equipment: row.equipment == null ? [] : array(row.equipment).map(text),
     estimated1rm: duration(row.estimated1rm),
+    allTimePr1rm: optionalRecord(row.allTimePr1rm),
+    prevFromBaseline: row.prevFromBaseline === true,
     target80: load(row.target80),
     latestWeight: load(row.latestWeight),
     lastSetMode:
@@ -478,6 +491,8 @@ export function readSavedCatalog(
             count(row.setCount);
             row.equipment = row.equipment == null ? [] : array(row.equipment).map(text);
             row.estimated1rm = duration(row.estimated1rm);
+            row.allTimePr1rm = optionalRecord(row.allTimePr1rm);
+            row.prevFromBaseline = row.prevFromBaseline === true;
             row.target80 = load(row.target80);
             row.latestWeight = load(row.latestWeight);
             if (

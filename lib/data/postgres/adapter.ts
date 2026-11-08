@@ -4626,7 +4626,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .where(eq(s.exerciseEstimates.userId, userId))
   }
 
-  async upsertPersonalRecordIfBetter(userId: string, exerciseName: string, estimated1rm: number): Promise<boolean> {
+  // #3671. `achievedAt` is the set's own time (the log's `loggedAt`). Preview uploads a workout at
+  // finish, or later when offline, so the upload time dated a 21:00 PR to the next morning.
+  async upsertPersonalRecordIfBetter(userId: string, exerciseName: string, estimated1rm: number, achievedAt: Date = new Date()): Promise<boolean> {
     const exerciseId = await this.resolveExerciseId(exerciseName)
     return this.db.transaction(async tx => {
       const [existing] = await tx
@@ -4636,10 +4638,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .for('update')
       if (existing && estimated1rm <= existing.best) return false
       await tx.insert(s.personalRecords)
-        .values({ userId, exerciseName, exerciseId, estimated1rm, achievedAt: new Date() })
+        .values({ userId, exerciseName, exerciseId, estimated1rm, achievedAt })
         .onConflictDoUpdate({
           target: [s.personalRecords.userId, s.personalRecords.exerciseName],
-          set: { estimated1rm, achievedAt: new Date(), exerciseId },
+          set: { estimated1rm, achievedAt, exerciseId },
         })
       return true
     })

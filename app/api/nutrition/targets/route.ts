@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { OWN_TARGET_GOAL_TYPE } from '@trainingai/shared/nutrition/calorie-budget'
 import { z } from 'zod'
-import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds'
+import { goalBoundSchema, wholeCalorieTarget } from '@trainingai/shared/validation/goal-bounds'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { dailyKcalToGoal } from '@trainingai/shared/nutrition/calorie-balance'
@@ -42,9 +42,11 @@ export async function PUT(req: Request) {
   if (!parsed.success) {
     return invalidBodyResponse(parsed.error)
   }
+  // #3670 ②: whole kcal, as the current app's form sends, so the mirror below matches the row.
+  const calories = wholeCalorieTarget(parsed.data.calories)
   const repo = await getRepository()
   const targets = await repo.upsertNutritionTargets(userId, {
-    calories: parsed.data.calories ?? undefined,
+    calories: calories ?? undefined,
     proteinG: parsed.data.proteinG ?? undefined,
     carbsG:   parsed.data.carbsG   ?? undefined,
     fatG:     parsed.data.fatG     ?? undefined,
@@ -54,12 +56,12 @@ export async function PUT(req: Request) {
   // the matching note in /api/user/goals. Without this the two surfaces drift apart silently.
   // Converted back to the user's chosen daily/weekly unit so mirroring never flips their
   // display preference, and never writes a daily number into a weekly-typed field.
-  if (parsed.data.calories != null) {
+  if (calories != null) {
     const { calorieGoalType } = await repo.getUserGoals(userId)
     // Issue 2622. When `calorie_goal` holds the user's OWN target it is not a mirror of this row, and
     // overwriting it here would change the budget on every surface as a side effect of a macro edit.
     if (calorieGoalType !== OWN_TARGET_GOAL_TYPE) {
-      await repo.updateUserGoals(userId, { calorieGoal: dailyKcalToGoal(parsed.data.calories, calorieGoalType) })
+      await repo.updateUserGoals(userId, { calorieGoal: dailyKcalToGoal(calories, calorieGoalType) })
     }
   }
   return NextResponse.json(targets)

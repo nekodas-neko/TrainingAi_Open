@@ -936,7 +936,8 @@ export interface WorkoutRepository {
   // personal record with a hand-typed number (Q-5).
   upsertExerciseEstimate(userId: string, exerciseName: string, estimated1rm: number): Promise<void>
   getExerciseEstimates(userId: string): Promise<{ exerciseName: string; estimated1rm: number }[]>
-  upsertPersonalRecordIfBetter(userId: string, exerciseName: string, estimated1rm: number): Promise<boolean>
+  /** `achievedAt` is when the set was done (the log's `loggedAt`), not when it uploaded (#3671). */
+  upsertPersonalRecordIfBetter(userId: string, exerciseName: string, estimated1rm: number, achievedAt?: Date): Promise<boolean>
   // Recompute the all-time PR for an exercise from surviving exercise_logs (excluding
   // deload sessions) — corrects PRs downward after an edit/delete.
   reconcilePersonalRecord(userId: string, exerciseName: string): Promise<void>

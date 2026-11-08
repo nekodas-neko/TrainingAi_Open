@@ -116,3 +116,23 @@ export function keeperItems<I extends { foodItemId: string; quantityMultiplier: 
       : { foodItemId: item.foodItemId, quantityMultiplier: item.quantityMultiplier };
   });
 }
+
+/**
+ * #3670. Whether a food log read back from the server shows the edit that was pushed. Normally the
+ * quantity must match exactly. When the server converted an edit against a merged-away food onto
+ * its keeper (`createFoodLog`, with `lookAlikeFactor`), the log comes back on another food with
+ * another quantity but the same grams; `sentServingG` is the pushed food's serving size, which the
+ * operation keeps for this check.
+ */
+export function logReadbackMatches(
+  found: { foodItemId: string; quantityMultiplier: number; foodItem: { servingSizeG: number } },
+  sent: Record<string, unknown>,
+  sentServingG: number | undefined,
+): boolean {
+  if (found.quantityMultiplier === sent.quantityMultiplier) return true;
+  if (found.foodItemId === sent.foodItemId || sentServingG == null) return false;
+  if (typeof sent.quantityMultiplier !== 'number') return false;
+  const expected = sent.quantityMultiplier * sentServingG;
+  const got = found.quantityMultiplier * found.foodItem.servingSizeG;
+  return Math.abs(got - expected) <= 1e-6 * Math.max(1, Math.abs(expected));
+}

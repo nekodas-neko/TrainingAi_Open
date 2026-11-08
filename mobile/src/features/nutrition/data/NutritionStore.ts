@@ -35,6 +35,7 @@ import { normaliseFood, type FoodEntry } from './food-values.ts';
 import {
   RETIRED_FOODS_PATH,
   keeperFor,
+  logReadbackMatches,
   liveCatalog,
   refreshedLibrary,
   retiredFoodIdsOf,
@@ -61,6 +62,7 @@ import {
   supplementSchema,
   targetsBody,
   targetsSchema,
+  wholeTargets,
   totals,
   type Food,
   type FoodLog,
@@ -92,6 +94,10 @@ const operationSchema = MutationSchema.extend({
     'plan_meal_answers',
   ]),
   acknowledged: z.boolean().default(false),
+  // #3670. A food-log edit's serving size, in grams, of the food it was pushed against. Kept off
+  // the payload: the server converts an edit against a merged-away food onto its keeper, and the
+  // read-back then confirms it by grams instead of by quantity.
+  sentServingG: z.number().positive().optional(),
   // #3638: the server's refusals of this change (or read-backs that did not show it). Set aside at
   // MAX_MUTATION_ATTEMPTS: the flush passes over it, and Sync health lists it with Retry / Discard.
   rejected: rejectionSchema.optional(),
@@ -543,6 +549,7 @@ export class NutritionStore {
       domain: NutritionOperation['domain'];
       date: string;
       payload: Record<string, unknown>;
+      sentServingG?: number;
     }[],
     knownFoods: Food[] = [],
   ) {
@@ -892,7 +899,7 @@ export class NutritionStore {
     if (!this.current.ready || this.current.denied || this.canceled) {
       throw new Error('Check your account before saving.');
     }
-    const parsed = httpBodies[kind].parse(payload);
+    const parsed = httpBodies[kind].parse(kind === 'targets' ? wholeTargets(payload) : payload);
     const op = httpSchema.parse({ id: this.uuid(), kind, date, payload: parsed });
     await this.write((state) => ({
       http: [
@@ -927,6 +934,7 @@ export class NutritionStore {
       {
         domain: 'food_logs',
         date: log.date,
+        sentServingG: log.foodItem.servingSizeG,
         payload: {
           id: log.id,
           mealTypeId,
@@ -954,6 +962,7 @@ export class NutritionStore {
       logs.map((log) => ({
         domain: 'food_logs' as const,
         date: log.date,
+        sentServingG: log.foodItem.servingSizeG,
         payload: {
           id: log.id,
           mealTypeId: log.mealTypeId,
@@ -1020,6 +1029,7 @@ export class NutritionStore {
       logs.map((log) => ({
         domain: 'food_logs',
         date: log.date,
+        sentServingG: log.foodItem.servingSizeG,
         payload: {
           id: log.id,
           mealTypeId,
@@ -1284,7 +1294,7 @@ export class NutritionStore {
         op.payload.deleted
           ? found
           : !found ||
-            found.quantityMultiplier !== op.payload.quantityMultiplier ||
+            !logReadbackMatches(found, op.payload, op.sentServingG) ||
             found.mealTypeId !== op.payload.mealTypeId
       ) {
         throw new ChangeRefused('Readback not confirmed.');
@@ -1329,7 +1339,9 @@ export class NutritionStore {
           ? { savedMealId: op.payload.savedMealId }
           : op.kind === 'meal-status'
             ? { ...op.payload, decisionId: op.id }
-            : op.payload,
+            : op.kind === 'targets'
+              ? wholeTargets(op.payload)
+              : op.payload,
       );
     } catch (cause) {
       if (
@@ -1349,7 +1361,7 @@ export class NutritionStore {
       if (!refreshed || this.current.errors.targets) {
         throw new Error('Readback failed.');
       }
-      if (!matches(this.current.data.targets, op.payload)) {
+      if (!matches(this.current.data.targets, wholeTargets(op.payload))) {
         throw new ChangeRefused('Readback not confirmed.');
       }
     }
