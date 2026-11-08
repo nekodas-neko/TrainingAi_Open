@@ -1,4 +1,4 @@
-import { summariseCause } from './pg-cause'
+import { scrubOwnPgMessage, summariseCause } from './pg-cause'
 import { scrubBoundParams, scrubBoundParamsInStack } from './scrub-params'
 
 // Records an error that escaped a route handler, for Next's `onRequestError` hook.
@@ -166,9 +166,9 @@ export async function recordRequestError(err: unknown, ctx: RequestErrorContext)
 
     // #3673: the bound parameters of a Drizzle query error (a password hash on a failed password
     // change, health values on any write) never reach `error_events`, the same as for Sentry.
-    const baseMessage = scrubBoundParams(err instanceof Error ? err.message : String(err))
+    const baseMessage = scrubOwnPgMessage(err, scrubBoundParams(err instanceof Error ? err.message : String(err)))
     const rawStack = err instanceof Error ? (err.stack ?? null) : null
-    const stack = rawStack === null ? null : scrubBoundParamsInStack(rawStack)
+    const stack = rawStack === null ? null : scrubOwnPgMessage(err, scrubBoundParamsInStack(rawStack))
     const url = ctx.path ? `${ctx.method ?? 'GET'} ${ctx.path}` : null
 
     // Same treatment `reportServerError` gives it (Q-107/Q-142): a `DrizzleQueryError`'s own
