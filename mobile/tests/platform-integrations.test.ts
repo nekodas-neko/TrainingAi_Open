@@ -211,7 +211,7 @@ test('fitness-test phases and prescribed activity targets use paused deadlines w
   assert.equal(target.length, 1);
   assert.equal((target[0].trigger as { at: number }).at, now + 610000);
 });
-test('daily reminders collapse weekdays, weekly reminders retain exact weekdays and disabled reminders disappear', () => {
+test('fixed-time reminders are dated instants for today and tomorrow, weekly ones only on their days, disabled ones gone', () => {
   const reminder = {
     id: 'one',
     kind: 'meal',
@@ -220,23 +220,38 @@ test('daily reminders collapse weekdays, weekly reminders retain exact weekdays 
     days: [0, 1, 2, 3, 4, 5, 6],
     enabled: true,
   };
-  assert.equal(planAlerts(settings({ reminders: [reminder] }), [], null, now).length, 1);
+  // Tuesday 13 Oct 2026 in Brisbane (UTC+10, no DST).
+  const clock = { today: '2026-10-13', tz: 'Australia/Brisbane' };
+  const daily = planAlerts(settings({ reminders: [reminder] }), [], null, now, [], null, clock);
+  assert.deepEqual(
+    daily.map((row) => [row.id, row.trigger]),
+    [
+      ['account-one:reminder:one:2026-10-13', { at: Date.UTC(2026, 9, 13, 2, 30) }],
+      ['account-one:reminder:one:2026-10-14', { at: Date.UTC(2026, 9, 14, 2, 30) }],
+    ],
+  );
+  assert.ok(daily.every((row) => !('zone' in row)));
+  // Sunday (0) and Wednesday (3): only tomorrow, Wednesday, matches.
   const weekly = planAlerts(
     settings({ reminders: [{ ...reminder, days: [0, 3] }] }),
     [],
     null,
     now,
-  );
-  assert.equal(weekly.length, 2);
-  assert.deepEqual(
-    weekly.map((row) => row.trigger),
-    [
-      { hour: 12, minute: 30, weekday: 0 },
-      { hour: 12, minute: 30, weekday: 3 },
-    ],
+    [],
+    null,
+    clock,
   );
   assert.deepEqual(
-    planAlerts(settings({ reminders: [{ ...reminder, enabled: false }] }), [], null, now),
+    weekly.map((row) => [row.id, row.trigger]),
+    [['account-one:reminder:one:2026-10-14', { at: Date.UTC(2026, 9, 14, 2, 30) }]],
+  );
+  // Sunday only: neither Tuesday nor Wednesday, so nothing until the app plans Saturday's tomorrow.
+  assert.deepEqual(
+    planAlerts(settings({ reminders: [{ ...reminder, days: [0] }] }), [], null, now, [], null, clock),
+    [],
+  );
+  assert.deepEqual(
+    planAlerts(settings({ reminders: [{ ...reminder, enabled: false }] }), [], null, now, [], null, clock),
     [],
   );
   assert.equal(
@@ -246,6 +261,68 @@ test('daily reminders collapse weekdays, weekly reminders retain exact weekdays 
     }).success,
     false,
   );
+});
+test('a fixed-time reminder fires on the profile clock when the phone is in another zone (#3683)', () => {
+  const reminder = { id: 'r', kind: 'workout', title: 'Train', time: '08:00', days: [0, 1, 2, 3, 4, 5, 6], enabled: true };
+  const clock = { today: '2026-10-13', tz: 'Australia/Brisbane' };
+  const previous = process.env.TZ;
+  try {
+    process.env.TZ = 'Australia/Brisbane';
+    const home = planAlerts(settings({ reminders: [reminder] }), [], null, now, [], null, clock);
+    process.env.TZ = 'America/Los_Angeles';
+    assert.notEqual(new Date(now).getHours(), 10); // the process really is elsewhere now
+    const away = planAlerts(settings({ reminders: [reminder] }), [], null, now, [], null, clock);
+    assert.deepEqual(away, home);
+    // 08:00 Brisbane is 22:00 UTC the day before.
+    assert.deepEqual(away[0].trigger, { at: Date.UTC(2026, 9, 12, 22, 0) });
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
+});
+test('across a DST change a fixed-time reminder keeps its local time', () => {
+  const reminder = { id: 'r', kind: 'review', title: 'Review', time: '08:00', days: [0, 1, 2, 3, 4, 5, 6], enabled: true };
+  // Sydney moves to daylight time early on Sunday 4 Oct 2026.
+  const tz = 'Australia/Sydney';
+  const [sat, sun] = planAlerts(settings({ reminders: [reminder] }), [], null, now, [], null, {
+    today: '2026-10-03',
+    tz,
+  }).map((row) => ('at' in row.trigger ? row.trigger.at : 0));
+  const local = (at: number) =>
+    new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(at);
+  assert.equal(local(sat), '08:00');
+  assert.equal(local(sun), '08:00');
+  assert.equal(sun - sat, 23 * 3600_000);
+});
+test('the scheduler leaves an unchanged reminder alone and cancels a changed or removed one', async () => {
+  const saved = new Map<string, string>(),
+    scheduled: string[] = [],
+    cancelled: string[] = [];
+  const scheduler = new AlertScheduler({
+    list: async () => [...saved].map(([id, signature]) => ({ id, signature })),
+    schedule: async (alert) => {
+      scheduled.push(alert.id);
+      saved.set(alert.id, alertSignature(alert));
+    },
+    cancel: async (id) => {
+      cancelled.push(id);
+      saved.delete(id);
+    },
+  });
+  const reminder = { id: 'r', kind: 'meal', title: 'Lunch', time: '12:30', days: [0, 1, 2, 3, 4, 5, 6], enabled: true };
+  const plan = (rows: (typeof reminder)[]) =>
+    planAlerts(settings({ reminders: rows }), [], null, now, [], null, { today: '2026-10-13', tz: 'Australia/Brisbane' });
+  await scheduler.reconcile(plan([reminder]));
+  assert.equal(scheduled.length, 2);
+  // Re-planned later the same day: nothing is scheduled twice.
+  await scheduler.reconcile(plan([reminder]));
+  assert.equal(scheduled.length, 2);
+  assert.deepEqual(cancelled, []);
+  await scheduler.reconcile(plan([{ ...reminder, time: '13:00' }]));
+  assert.deepEqual(cancelled.sort(), ['account-one:reminder:r:2026-10-13', 'account-one:reminder:r:2026-10-14']);
+  assert.equal(scheduled.length, 4);
+  await scheduler.reconcile(plan([]));
+  assert.equal(saved.size, 0);
 });
 test('notification budget refuses excess repeat days instead of silently losing alerts', () => {
   const reminders = Array.from({ length: 6 }, (_, i) => ({

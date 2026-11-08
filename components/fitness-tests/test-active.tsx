@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { getLiveHrManager } from '@/lib/live-hr/manager'
 import { startGpsWatcher, type GpsWatcher } from '@/lib/activity/gps-tracking'
 import { haversineDistanceKm } from '@/lib/activity/activity-metrics'
+import { computeTotalDistanceKm } from '@trainingai/shared/activity/route-metrics'
+import { routeUntil } from '@trainingai/shared/activity/route-summary'
 import { hrReserveTarget } from '@trainingai/shared/health/hr-zones'
 import { hapticSuccess } from '@/lib/haptics'
 import type { LiveHrSample } from '@/lib/live-hr/types'
@@ -49,11 +51,16 @@ export function TestActive({ protocol, profile, startedAtMs, onFinish }: {
     if (finishedRef.current) return
     finishedRef.current = true
     hapticSuccess()
+    // A timed test ends at its own end (#3684). The timer that calls this does not run with the
+    // screen off, while the GPS watcher keeps recording, so finishing at unlock used to add the
+    // distance covered after the end, and the VO2max read from it. A self-paced test ends now.
+    const now = Date.now()
+    const endMs = protocol.durationSec != null ? Math.min(now, startedAtMs + protocol.durationSec * 1000) : now
     onFinishRef.current({
       hrSamples: hrRef.current,
-      distanceM: Math.round(distKmRef.current * 1000),
+      distanceM: Math.round(computeTotalDistanceKm(routeUntil(pointsRef.current, endMs)) * 1000),
       startMs: startedAtMs,
-      endMs: Date.now(),
+      endMs,
       recoveryStartMs: protocol.phases ? hrrRecoveryStartMs(protocol.phases, startedAtMs) : null,
     })
   }

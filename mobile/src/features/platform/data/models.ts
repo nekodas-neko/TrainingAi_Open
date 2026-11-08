@@ -69,7 +69,6 @@ export type Alert = {
   restCueId?: string;
   /** A meal reminder that carries the answer actions (#2123): the plan meal and its local day. */
   mealEstimate?: { planMealId: string; date: string };
-  zone?: string;
   trigger: { at: number } | { hour: number; minute: number; weekday?: number };
 };
 export const ALERT_OWNER = 'trainingai-native-v1';
