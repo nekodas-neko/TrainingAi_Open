@@ -25,7 +25,7 @@ import {
   type NightInputSources, type RingSummaryInput,
 } from '@/lib/health/readiness-night-inputs'
 import {
-  ouraDaytimeHighStress, ouraOvernightRecoveryHours, ouraRecoveryContributors, ouraTemperatureDeviations,
+  ouraDailyWear, ouraDaytimeHighStress, ouraOvernightRecoveryHours, ouraRecoveryContributors, ouraTemperatureDeviations,
 } from '@/lib/oura/cloud/readiness-signals-map'
 import { monthFixture, fixtureRepo } from './fixtures/activity-day-fixtures'
 
@@ -170,7 +170,7 @@ function wireShadow(s: Stored): ShadowRawHistory {
     tz: 'Australia/Brisbane', ageYears: 40,
     sleepSessions: [], bodyMetrics: s.bodyMetrics,
     dailySummaries: s.summaries.map(x => ({ date: x.date, recoveryIndexHours: x.recoveryIndexHours, tempDevC: x.tempDevC, breathAvgRpm: x.breathAvgRpm })),
-    wear: s.ouraDaily,
+    wear: ouraDailyWear(s.ouraDaily), // #3668: wear through the connector's mapping
     temperatureDeviations: ouraTemperatureDeviations(s.ouraDaily), daytimeHighStress: ouraDaytimeHighStress(s.ouraDaily),
     derived: s.ouraDaily.filter((_, i) => i % 3 !== 0).map((w, i) => ({ day: w.date, stressHighMinutes: 20 + (i % 11) * 4, stillRhrBpm: null })),
     recoveryContributors: ouraRecoveryContributors(s.contributors), recoveryHours: ouraOvernightRecoveryHours(s.hours), ouraCloudFrom: s.switchDay,

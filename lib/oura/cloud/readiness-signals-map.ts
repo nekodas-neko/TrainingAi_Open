@@ -5,7 +5,7 @@
 // Every value is taken as Oura calculated it (owner, 2026-10-18, #2860) and labelled with the
 // connector's source, so the normals it joins are Oura's own.
 import type {
-  DailyTemperatureDeviation, DaytimeHighRecovery, DaytimeHighStress, OvernightRecoveryHours, RecoveryContributor,
+  DailyTemperatureDeviation, DailyWear, DaytimeHighRecovery, DaytimeHighStress, OvernightRecoveryHours, RecoveryContributor,
 } from '@trainingai/shared/health/readiness-signals'
 import { OURA_CLOUD_CONNECTOR } from '@trainingai/shared/health/source-connectors'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
@@ -48,4 +48,13 @@ export function ouraOvernightRecoveryHours(rows: readonly { date: string; hours:
     date: r.date, hours: r.hours, source: SOURCE,
     provenance: `oura_cloud_sleep_periods.heart_rate (our hours from ${OURA_CLOUD_CONNECTOR.label}'s 5-minute series)`,
   }))
+}
+
+/**
+ * `oura_daily.non_wear_time_sec`, per day (#3668). A day with no wear time stored has no row. Before
+ * the switch the ring's own rollup wrote the column; either way it is the Oura ring's wear, and the
+ * low-wear rule judges the day, not the source, so one label serves.
+ */
+export function ouraDailyWear(rows: readonly { date: string; nonWearTimeSec?: number | null }[]): DailyWear[] {
+  return rows.flatMap(r => r.nonWearTimeSec == null ? [] : [{ date: r.date, nonWearSec: r.nonWearTimeSec, source: SOURCE }])
 }

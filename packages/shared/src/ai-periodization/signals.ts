@@ -16,7 +16,8 @@ import { oneRmTrendStatus } from '@trainingai/shared/1rm'
 import { workingBudgetMin, planningBudgetMin } from '@trainingai/shared/workout/duration-model'
 import { buildTimeProfiles, type ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
 import { robustAvgSetDurationsByExercise, buildMeasuredTimeBudget, resolveTransitionSec } from '@trainingai/shared/workout/time-audit'
-import { excludeLowWearDays, toOuraByDate } from '@trainingai/shared/health/wear-confidence'
+import { excludeLowWearDays, wearByDate } from '@trainingai/shared/health/wear-confidence'
+import { ouraDailyWear } from '@/lib/oura/cloud/readiness-signals-map'
 import { rowsOfDeviceInUse, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import type { FigureSignals, FigureSignalExercise } from '@trainingai/shared/ai-periodization/prescription-figures'
@@ -570,8 +571,9 @@ export async function aggregateSignals(
   if (hrvRows.length >= 4) {
     const sorted = [...hrvRows].sort((a, b) => b.date.localeCompare(a.date))
     const recent3 = sorted.slice(0, 3)
-    const ouraForHrvWindow = toOuraByDate(await repo.getOuraDaily(userId, from14d, today))
-    const older = excludeLowWearDays(sorted.slice(3), ouraForHrvWindow).slice(0, 7)
+    // #3668: wear in the generic shape the connector maps.
+    const wear = wearByDate(ouraDailyWear(await repo.getOuraDaily(userId, from14d, today)))
+    const older = excludeLowWearDays(sorted.slice(3), wear).slice(0, 7)
     if (older.length > 0) {
       const recentAvg = recent3.reduce((s, m) => s + m.hrvMs!, 0) / recent3.length
       const olderAvg = older.reduce((s, m) => s + m.hrvMs!, 0) / older.length

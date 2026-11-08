@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { wornHours, isLowWearDay, excludeLowWearDays, toOuraByDate, MIN_WEAR_HOURS, completenessForDay } from '../wear-confidence'
+import { wornHours, isLowWearDay, excludeLowWearDays, wearByDate, MIN_WEAR_HOURS, completenessForDay } from '../wear-confidence'
 import { secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 
 describe('wornHours', () => {
@@ -53,16 +53,33 @@ describe('isLowWearDay', () => {
 })
 
 describe('excludeLowWearDays', () => {
-  it('drops rows whose date has a low-wear Oura day', () => {
+  it('drops rows whose date has a low-wear day', () => {
     const rows = [{ date: '2026-07-01' }, { date: '2026-07-02' }, { date: '2026-07-03' }]
-    const ouraByDate = toOuraByDate([
-      { date: '2026-07-01', nonWearTimeSec: 0 },        // full wear — kept
-      { date: '2026-07-02', nonWearTimeSec: 20 * 3600 }, // low wear — dropped
+    const wear = wearByDate([
+      { date: '2026-07-01', nonWearSec: 0, source: 'source_a' },        // full wear — kept
+      { date: '2026-07-02', nonWearSec: 20 * 3600, source: 'source_a' }, // low wear — dropped
     ])
-    expect(excludeLowWearDays(rows, ouraByDate)).toEqual([
+    expect(excludeLowWearDays(rows, wear)).toEqual([
       { date: '2026-07-01' },
-      { date: '2026-07-03' }, // no Oura row for this date — kept, can't judge
+      { date: '2026-07-03' }, // no wear row for this date — kept, can't judge
     ])
+  })
+
+  // #3668: the rule reads the generic shape, so any source's wear excludes the same way.
+  it('reads any source\'s wear the same way', () => {
+    const rows = [{ date: '2026-07-01' }, { date: '2026-07-02' }]
+    const wear = wearByDate([{ date: '2026-07-02', nonWearSec: 20 * 3600, source: 'source_b' }])
+    expect(excludeLowWearDays(rows, wear)).toEqual([{ date: '2026-07-01' }])
+  })
+
+  it('a day two sources report is low-wear when either saw it so', () => {
+    const wear = wearByDate([
+      { date: '2026-07-01', nonWearSec: 0, source: 'source_a' },
+      { date: '2026-07-01', nonWearSec: 20 * 3600, source: 'source_b' },
+      { date: '2026-07-02', nonWearSec: 20 * 3600, source: 'source_a' },
+      { date: '2026-07-02', nonWearSec: 600, source: 'source_b' },
+    ])
+    expect(excludeLowWearDays([{ date: '2026-07-01' }, { date: '2026-07-02' }], wear)).toEqual([])
   })
 })
 

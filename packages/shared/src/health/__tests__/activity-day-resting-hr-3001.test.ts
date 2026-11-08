@@ -8,7 +8,7 @@ import { MET_ACTIVE_THRESHOLD } from '../daily-medians'
 const day = (i: number) => `2026-10-${String(i).padStart(2, '0')}`
 const nights = (from: number, n: number, bpm: number, source: string) =>
   Array.from({ length: n }, (_, i) => ({ date: day(from + i), restingHeartRate: bpm, restingHeartRateSource: source }))
-const noWearGaps = new Map<string, { nonWearTimeSec?: number | null }>()
+const noWearGaps = new Map<string, { nonWearSec: number }>()
 
 describe('restingHrBaseline per device (#3001)', () => {
   it('is the ring’s mean while it is the device in use', () => {

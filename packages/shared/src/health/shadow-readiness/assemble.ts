@@ -18,11 +18,11 @@ import { activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-min
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { nightSessions, canonicalNightForDate, type AggregatableSleep } from '@trainingai/shared/health/sleep-night'
 import { isPartialNight, withoutPartialDuration } from '@trainingai/shared/health/partial-night'
-import { isLowWearDay } from '@trainingai/shared/health/wear-confidence'
+import { isLowWearDay, wearByDate as byDate, type WearByDate } from '@trainingai/shared/health/wear-confidence'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { hrr60Candidates, nightlyCandidates } from '@trainingai/shared/inputs/adapters'
 import { resolveSlots, type InputName } from '@trainingai/shared/inputs/cascade'
-import type { DailyTemperatureDeviation, DaytimeHighStress, OvernightRecoveryHours, RecoveryContributor } from '@trainingai/shared/health/readiness-signals'
+import type { DailyTemperatureDeviation, DailyWear, DaytimeHighStress, OvernightRecoveryHours, RecoveryContributor } from '@trainingai/shared/health/readiness-signals'
 import type { ShadowUnitId } from './model'
 import { scoreFuel, type FuelParts, type ShadowContext, type ShadowScoreInput, type UnitInput, type UnitObservation } from './score'
 
@@ -46,8 +46,8 @@ export interface ShadowRawHistory {
     spo2Source?: string | null
   }[]
   dailySummaries: readonly { date: string; recoveryIndexHours: number | null; tempDevC: number | null; breathAvgRpm: number | null }[]
-  /** `oura_daily` rows: wear time for low-wear exclusion. */
-  wear: readonly { date: string; nonWearTimeSec?: number | null }[]
+  /** #3668: each day's wear in the generic shape a connector maps, for low-wear exclusion. */
+  wear: readonly DailyWear[]
   /** #2984, #3610: each source's own nightly temperature deviation, judged against that source's normal. */
   temperatureDeviations?: readonly DailyTemperatureDeviation[]
   /** #2985, #3610: each source's own high-stress minutes, read from the switch day on. */
@@ -131,7 +131,7 @@ function nightlySeries(
   field: 'hrvMs' | 'restingHeartRate',
   input: InputName,
   route: 'night_hrv' | 'night_rhr',
-  wearByDate: Map<string, { nonWearTimeSec?: number | null }>,
+  wearByDate: WearByDate,
 ): UnitObservation[] {
   // #2984: each value carries its device, so the scorer's per-source normal (edge case #11) splits
   // an `oura_cloud` night from the ring's. A row from before provenance keeps the table label.
@@ -147,7 +147,7 @@ function nightlySeries(
 
 export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHistory {
   const { tz } = raw
-  const wearByDate = new Map(raw.wear.map(w => [w.date, w]))
+  const wearByDate = byDate(raw.wear)
 
   // Sleep: one canonical night per wake date — the longest main sleep of the date, on any clock
   // (edge case #13; `canonicalNightForDate`).
@@ -278,7 +278,7 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
 
   // Edge case #7: low-wear days and days flagged unwell leave every window.
   const excluded = new Map<string, 'low_wear' | 'unwell'>()
-  for (const w of raw.wear) if (isLowWearDay(w.nonWearTimeSec)) excluded.set(w.date, 'low_wear')
+  for (const [date, w] of wearByDate) if (isLowWearDay(w.nonWearSec)) excluded.set(date, 'low_wear')
   for (const d of raw.unwellDates) excluded.set(d, 'unwell')
 
   return { raw, series, excluded }

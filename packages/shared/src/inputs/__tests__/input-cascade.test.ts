@@ -9,7 +9,7 @@ import {
   ringMotionMetCandidates, ringMotionMet, RING_MOTION_MET_MAP_V1,
   hrr60Candidates, nightlyCandidates,
 } from '../adapters'
-import { excludeLowWearDays, toOuraByDate } from '@trainingai/shared/health/wear-confidence'
+import { excludeLowWearDays, wearByDate } from '@trainingai/shared/health/wear-confidence'
 
 // A fixed instant, not "now": nothing here depends on the current day. Anchored to a minute boundary.
 const T0 = Date.UTC(2026, 9, 6, 2, 0, 0)
@@ -246,13 +246,12 @@ describe('wear filtering survives the switch to named inputs (#2098 step 3)', ()
     { date: '2026-10-04', hrvMs: 50 },
     { date: '2026-10-05', hrvMs: 47 },
   ]
-  const ouraRows = [
-    { date: '2026-10-01', nonWearTimeSec: 3600 },
-    { date: '2026-10-02', nonWearTimeSec: 0 },
-    { date: '2026-10-03', nonWearTimeSec: 14 * 3600 },
-    { date: '2026-10-04', nonWearTimeSec: 7200 },
-  ]
-  const wear = toOuraByDate(ouraRows)
+  const wear = wearByDate([
+    { date: '2026-10-01', nonWearSec: 3600, source: 'oura_cloud' },
+    { date: '2026-10-02', nonWearSec: 0, source: 'oura_cloud' },
+    { date: '2026-10-03', nonWearSec: 14 * 3600, source: 'oura_cloud' },
+    { date: '2026-10-04', nonWearSec: 7200, source: 'oura_cloud' },
+  ])
   const resolved = resolveSlots('HRV/night', nightlyCandidates(
     metrics.map((m) => ({ date: m.date, value: m.hrvMs, source: 'oura_ble' })), 'night_hrv', wear,
   ))
