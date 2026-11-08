@@ -13,7 +13,7 @@
  */
 import { MINUTE_MS, minuteOf, type Candidate, type Resolved } from './cascade'
 import { isPlausibleStepWindow, dedupeOverlappingWindows, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
-import { isLowWearDay } from '@trainingai/shared/health/wear-confidence'
+import { isLowWearDay, type WearByDate } from '@trainingai/shared/health/wear-confidence'
 import { cadenceToMet } from '@trainingai/shared/health/cadence'
 
 /**
@@ -250,13 +250,13 @@ export function hrr60Candidates(
 export function nightlyCandidates(
   rows: readonly { date: string; value: number | null | undefined; source?: string | null }[],
   route: 'night_hrv' | 'night_rhr',
-  wearByDate: Map<string, { nonWearTimeSec?: number | null }>,
+  wearByDate: WearByDate,
   defaultSource = 'unknown',
 ): Candidate[] {
   const out: Candidate[] = []
   for (const r of rows) {
     if (r.value == null) continue
-    const lowWear = isLowWearDay(wearByDate.get(r.date)?.nonWearTimeSec)
+    const lowWear = isLowWearDay(wearByDate.get(r.date)?.nonWearSec)
     out.push({ slot: r.date, value: r.value, route, source: r.source ?? defaultSource, ...(lowWear ? { lowWear: true } : {}) })
   }
   return out

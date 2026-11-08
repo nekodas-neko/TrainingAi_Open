@@ -20,6 +20,9 @@
  * - {@link DaytimeHighRecovery}: the source's minutes of high daytime recovery (calm, restorative
  *   time while awake). Oura maps `daily_stress.recovery_high` (seconds); Garmin's "rest" stress
  *   minutes would map here. Display only today (#3616).
+ * - {@link DailyWear}: how long the source was not worn on a local day. Oura maps
+ *   `daily_activity.non_wear_time` (seconds); Fitbit's or Health Connect's off-wrist time would map
+ *   here. Readiness's low-wear rule reads it (#3668).
  *
  * Pure types; importing no node module.
  */
@@ -67,5 +70,15 @@ export interface DaytimeHighStress {
 export interface DaytimeHighRecovery {
   date: string
   minutes: number
+  source: string
+}
+
+/**
+ * Seconds of a local day the source was not worn (#3668). A day the source did not report has no row:
+ * there is nothing to judge it by, so it is never read as low-wear.
+ */
+export interface DailyWear {
+  date: string
+  nonWearSec: number
   source: string
 }

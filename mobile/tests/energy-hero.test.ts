@@ -58,12 +58,13 @@ test('the heart figure carries bpm wherever it is drawn, so it never reads as a 
   assert.deepEqual(chipFigure(none), { text: '—' });
 });
 
-test("Slim's sleep-hours fallback carries its h; a sleep score carries no unit", () => {
+test('a sleep score carries no unit, and no score is a dash, as in the current app (#3667)', () => {
   const night = [{ date: today, durationHours: 7.4 }];
-  const hours = homePillars({ hrCurrent: 61 }, night, today)[0]!;
-  assert.deepEqual(chipFigure(hours), { text: '7.4', unit: 'h' });
   const scored = homePillars({ sleepScore: 84 }, night, today)[0]!;
   assert.deepEqual(chipFigure(scored), { text: '84' });
+  // An unscored night (a night marked partial has no score by design) shows no hours in its place.
+  const unscored = homePillars({ hrCurrent: 61 }, night, today)[0]!;
+  assert.deepEqual([unscored.label, chipFigure(unscored)], ['Sleep', { text: '—' }]);
 });
 
 test('the widget still reads the full four-chip model', () => {

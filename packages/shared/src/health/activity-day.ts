@@ -5,7 +5,7 @@ import { getDailyGoals, type DailyGoals, type GoalProfile } from './daily-goals'
 import { hrMaxFromAge } from './hr-zones'
 import { latestWeightKg } from './latest-weight'
 import { intradayHrContributors, type MetGridInput } from './intraday-hr-contributors'
-import { excludeLowWearDays } from './wear-confidence'
+import { excludeLowWearDays, type WearByDate } from './wear-confidence'
 import { rowsOfDeviceInUse } from './per-device-normal'
 import { dayStepCount } from './activity-steps'
 
@@ -25,7 +25,8 @@ const RESTING_HR_BASELINE_MIN_DAYS = 5
  */
 export function restingHrBaseline<T extends { date: string; restingHeartRate?: number | null; restingHeartRateSource?: string | null }>(
   bodyMetrics: T[],
-  ouraByDate: Map<string, { nonWearTimeSec?: number | null }>,
+  /** #3668: each day's wear in the generic shape (`wearByDate`), never a device's own field. */
+  wear: WearByDate,
   /**
    * #3601: a reading's algorithm version (`nightAlgorithmVersion` over the same days' sleep), so the
    * baseline is of the newest reading's (source, version) group. Left out: per source, as before.
@@ -36,7 +37,7 @@ export function restingHrBaseline<T extends { date: string; restingHeartRate?: n
     bodyMetrics, m => m.restingHeartRate, m => m.restingHeartRateSource,
     versionOn ? m => versionOn(m.date, m.restingHeartRateSource) : undefined,
   )
-  const rows = excludeLowWearDays(onDevice, ouraByDate)
+  const rows = excludeLowWearDays(onDevice, wear)
   return rows.length >= RESTING_HR_BASELINE_MIN_DAYS
     ? rows.reduce((s, m) => s + m.restingHeartRate!, 0) / rows.length
     : null

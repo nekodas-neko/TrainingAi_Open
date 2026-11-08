@@ -373,3 +373,20 @@ test('the card forgets a timeout on a new day or once the setting is off', () =>
   const syncing: HandoffState = { status: 'syncing', day: '2026-10-14' };
   assert.deepEqual(currentHandoffState(syncing, '2026-10-14', false), syncing);
 });
+
+// #3667: Home loaded its readiness, verdict and timeline before last night existed.
+test('a night that lands while waiting reloads what Home read without it, once', async () => {
+  const landed: string[] = [];
+  const w = world({ nightLanded: () => landed.push('reload') });
+  assert.deepEqual(await w.runner.run(false), { kind: 'waited', outcome: 'returned', wait: 'landed' });
+  assert.deepEqual(landed, ['reload']);
+});
+
+test('a wait that times out or is cancelled reloads nothing', async () => {
+  for (const outcome of ['timeout', 'cancelled'] as const) {
+    const landed: string[] = [];
+    const w = world({ wait: async () => outcome, nightLanded: () => landed.push('reload') });
+    await w.runner.run(false);
+    assert.deepEqual(landed, [], outcome);
+  }
+});

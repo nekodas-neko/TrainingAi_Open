@@ -11,7 +11,7 @@ import { useTabVisibility } from "@/components/shell/tab-visibility";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
-import { pickSleepCardNight } from "@trainingai/shared/health/sleep-card-night";
+import { pickSleepCardNight, currentSleepScore } from "@trainingai/shared/health/sleep-card-night";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { getLocalStore } from "@/lib/local-store";
 import { withIndoorSteps } from "@trainingai/shared/health/activity-steps";
@@ -625,6 +625,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     metaLoading, metaToday, metaRecent, latestWeight, latestWeightIsStale, latestWeightDate: latestWeightMeta.date, latestBf, latestSteps,
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
     setMetricSheet, setWaterLogOpen, recentSleep, sleepNightLabel, readiness,
+    // #3667: the badge shows a score only for the night the card may show, never an older one.
+    sleepScore: currentSleepScore(readiness, todayStr),
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError,

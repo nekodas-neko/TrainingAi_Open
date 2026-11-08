@@ -2,6 +2,8 @@
 // unreliable HRV/RHR/readiness signals. One shared filter so every baseline
 // computation (readiness-score, ai-periodization signals) excludes the same
 // low-wear days instead of drifting into divergent thresholds.
+import type { DailyWear } from './readiness-signals';
+
 export const MIN_WEAR_HOURS = 18;
 
 export function wornHours(
@@ -17,26 +19,33 @@ export function isLowWearDay(nonWearTimeSec: number | null | undefined): boolean
   return hours != null && hours < MIN_WEAR_HOURS;
 }
 
+/** A day's wear, as {@link excludeLowWearDays} reads it: the generic `DailyWear` shape's seconds. */
+export type WearByDate = ReadonlyMap<string, Pick<DailyWear, 'nonWearSec'>>;
+
 /**
- * Excludes rows whose date matches a known low-wear Oura day. A date with no
- * Oura row at all is kept — there's no wear-time signal to judge it by, so it
+ * The wear rows by date (#3668: the generic shape a connector maps, never a device's own field).
+ * With more than one source on a date, the longest non-wear time stands, so a day any source saw
+ * as low-wear is low-wear.
+ */
+export function wearByDate(wear: readonly DailyWear[]): Map<string, DailyWear> {
+  const out = new Map<string, DailyWear>();
+  for (const w of wear) {
+    const prev = out.get(w.date);
+    if (!prev || w.nonWearSec > prev.nonWearSec) out.set(w.date, w);
+  }
+  return out;
+}
+
+/**
+ * Excludes rows whose date is a known low-wear day. A date with no wear row
+ * at all is kept — there's no wear-time signal to judge it by, so it
  * shouldn't be silently dropped from a baseline that predates this filter.
  */
 export function excludeLowWearDays<T extends { date: string }>(
   rows: T[],
-  ouraByDate: Map<string, { nonWearTimeSec?: number | null }>,
+  wear: WearByDate,
 ): T[] {
-  return rows.filter(r => {
-    const oura = ouraByDate.get(r.date);
-    if (!oura) return true;
-    return !isLowWearDay(oura.nonWearTimeSec);
-  });
-}
-
-export function toOuraByDate<T extends { date: string; nonWearTimeSec?: number | null }>(
-  rows: T[],
-): Map<string, T> {
-  return new Map(rows.map(r => [r.date, r]));
+  return rows.filter(r => !isLowWearDay(wear.get(r.date)?.nonWearSec));
 }
 
 export interface DayCompleteness {

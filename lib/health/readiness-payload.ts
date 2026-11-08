@@ -34,12 +34,12 @@ import { staleFinishedDays, metLookbackFrom } from '@trainingai/shared/health/fi
 import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, runBackgroundFinalise, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
 import { type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveHrProfile, maxHrIsUnread } from '@trainingai/shared/health/hr-profile'
-import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
+import { excludeLowWearDays, wearByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult, type ContributorGap } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
 import { applyIllnessSuppression, computeIllnessRadar, illnessAdvisory, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
-import { ouraDaytimeHighRecovery, ouraDaytimeHighStress, ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
+import { ouraDailyWear, ouraDaytimeHighRecovery, ouraDaytimeHighStress, ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
 import { ouraCloudDeliveredTypes } from '@/lib/oura/cloud/config'
@@ -206,6 +206,12 @@ export interface ReadinessScoreResponse {
   // one. Oura's readiness is never shown in its place (scoring doc rule 5, #3000).
   readinessDisplayScore: number | null
   sleepScore: number | null
+  /**
+   * #3667: the wake date of the night `sleepScore` scored, null with no score. The newest night can
+   * be days old (the ring not worn), so a surface shows the score as current only through
+   * `currentSleepScore`, the Sleep card's own today-or-yesterday rule.
+   */
+  sleepScoreDate: string | null
   /** OR-204: how complete today's own sleep score is. Null when there is no score. */
   sleepScoreCoverage: import('@trainingai/shared/health/sleep-score').SleepScoreCoverage | null
   activityScore: number | null      // Oura activity score blended with logged training load
@@ -444,7 +450,8 @@ export async function buildReadinessPayload(
     ? null
     : observeResilienceCoverage(ringDerivedRows.map(r => r.daytimeStressCoverageMin))
   const ouraToday = ouraRows.find(r => r.date === todayIso) ?? null
-  const ouraByDate = toOuraByDate(ouraRows)
+  // #3668: the low-wear rule reads each day's wear in the generic shape the connector maps.
+  const wear = wearByDate(ouraDailyWear(ouraRows))
 
   // ── HR stats for today ──────────────────────────────────────────────────────
   const hrCurrent = todayHrRows.length > 0 ? todayHrRows[todayHrRows.length - 1].bpm : null
@@ -495,7 +502,7 @@ export async function buildReadinessPayload(
   // that changes its algorithm starts these baselines again rather than pooling the two rulers.
   const versionOn     = nightAlgorithmVersion(sleepSessions)
   const hrvOnDevice   = rowsOfDeviceInUse(bodyMetrics, m => m.hrvMs, m => m.hrvSource, m => versionOn(m.date, m.hrvSource))
-  const hrvRows       = excludeLowWearDays(hrvOnDevice, ouraByDate)
+  const hrvRows       = excludeLowWearDays(hrvOnDevice, wear)
   const recentHrvRows = hrvOnDevice.filter(m => m.date >= from7dIso)
   const baselineHrv   = hrvRows.length >= 5
     ? hrvRows.reduce((s, m) => s + m.hrvMs!, 0) / hrvRows.length
@@ -510,7 +517,7 @@ export async function buildReadinessPayload(
   // The 7-day mean and the baseline are of the device in use; `restingHrBaseline` picks the same rows.
   const recentRhrRows = rowsOfDeviceInUse(bodyMetrics, m => m.restingHeartRate, m => m.restingHeartRateSource, m => versionOn(m.date, m.restingHeartRateSource))
     .filter(m => m.date >= from7dIso)
-  const baselineRhr   = restingHrBaseline(bodyMetrics, ouraByDate, versionOn)
+  const baselineRhr   = restingHrBaseline(bodyMetrics, wear, versionOn)
   const recentRhr = recentRhrRows.length
     ? recentRhrRows.reduce((s, m) => s + m.restingHeartRate!, 0) / recentRhrRows.length
     : null
@@ -959,6 +966,7 @@ export async function buildReadinessPayload(
     // Ours only: computeSleepScore(lastSleep). Oura's sleep score is never ours, so a night we
     // could not score shows no score rather than Oura's (scoring doc rule 5, #3000).
     sleepScore:              sleepScore100,
+    sleepScoreDate:          sleepScore100 != null && lastSleep ? lastSleep.date : null,
     sleepScoreCoverage:      sleepScoreResult?.coverage ?? null,
     activityScore:           activityBlend.final,
     activityBlend,
@@ -994,7 +1002,7 @@ export async function buildReadinessPayload(
     recoveryHigh:            ringStressToday?.recoveryHighMinutes != null ? ringStressToday.recoveryHighMinutes * 60 : sourceRecoverySec,
     recommendedBedtimeStart: cloudDailyLive ? ouraToday.recommendedBedtimeStart ?? null : null,
     recommendedBedtimeEnd:   cloudDailyLive ? ouraToday.recommendedBedtimeEnd   ?? null : null,
-    isLowWearToday:          isLowWearDay(ouraToday?.nonWearTimeSec),
+    isLowWearToday:          isLowWearDay(wear.get(todayIso)?.nonWearSec),
     baselineHrv,
     recentHrv,
     restingHr:                recentRhr != null ? Math.round(recentRhr) : (baselineRhr != null ? Math.round(baselineRhr) : null),

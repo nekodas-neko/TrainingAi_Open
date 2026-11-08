@@ -21,7 +21,7 @@ import { assembleShadowInputs, prepareShadowHistory, type ShadowRawHistory } fro
 import { scoreShadowReadiness } from '@trainingai/shared/health/shadow-readiness/score'
 import { monthFixture, fixtureRepo, type ActivityFixture } from './fixtures/activity-day-fixtures'
 import { movementGridForTest } from './fixtures/movement-grid-for-test'
-import { ouraDaytimeHighStress } from '@/lib/oura/cloud/readiness-signals-map'
+import { ouraDailyWear, ouraDaytimeHighStress } from '@/lib/oura/cloud/readiness-signals-map'
 
 let repo: ReturnType<typeof fixtureRepo>
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo, getRepositoryAsync: async () => repo }))
@@ -207,7 +207,8 @@ describe('no score moves when the source rules become capabilities (#3597)', () 
       tz: 'Australia/Brisbane', ageYears: 40, sleepSessions: [], bodyMetrics: [], dailySummaries: [], workouts: [], program: null,
       setHr: [], zoneSeconds: null, unwellDates: new Set(), fuel: new Map(), weightVsPlan: new Map(),
       derived: Array.from({ length: 40 }, (_, i) => ({ day: shiftDateStr(SWITCH, 5 - i), stressHighMinutes: 30 + (i % 7) })),
-      wear: Array.from({ length: 40 }, (_, i) => ({ date: shiftDateStr(SWITCH, 5 - i), nonWearTimeSec: 0 })),
+      // #3668: wear reaches shadow readiness through the connector's mapping too.
+      wear: ouraDailyWear(Array.from({ length: 40 }, (_, i) => ({ date: shiftDateStr(SWITCH, 5 - i), nonWearTimeSec: 0 }))),
       // #3610: Oura's `stress_high` reaches shadow readiness through the connector's mapping.
       daytimeHighStress: ouraDaytimeHighStress(Array.from({ length: 40 }, (_, i) => ({ date: shiftDateStr(SWITCH, 5 - i), stressHigh: 1800 + (i % 9) * 300 }))),
       ouraCloudFrom: from,

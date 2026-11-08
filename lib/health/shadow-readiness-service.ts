@@ -36,7 +36,7 @@ import { prepareShadowHistory, assembleShadowInputs, type ShadowRawHistory } fro
 import { scoreShadowReadiness, type FuelParts } from '@trainingai/shared/health/shadow-readiness/score'
 import { MATURITY_LOOKBACK_DAYS, BASELINE_WINDOW_DAYS } from '@trainingai/shared/health/shadow-readiness/model'
 import type { ShadowReadinessRecord } from '@trainingai/shared/types/body'
-import { ouraDaytimeHighStress, ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
+import { ouraDailyWear, ouraDaytimeHighStress, ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 
 type Repo = WorkoutRepository
 
@@ -175,7 +175,7 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
       sleepSessions,
       bodyMetrics,
       dailySummaries: summaries,
-      wear,
+      wear: ouraDailyWear(wear),
       // #3610: the Oura connector's own readiness fields, in the generic shapes shadow readiness reads.
       temperatureDeviations: ouraTemperatureDeviations(wear),
       daytimeHighStress: ouraDaytimeHighStress(wear),

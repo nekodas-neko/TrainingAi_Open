@@ -11,6 +11,8 @@ import {
 import { AppState } from 'react-native';
 import { z } from 'zod';
 import { useAccountContext } from '../account/AccountProvider';
+import { nightLandedPaths } from '../../core/sync/health-invalidation';
+import { useWorkoutResources } from '../workouts/data/WorkoutDataProvider';
 import { usePlatformIntegrations } from '../platform/PlatformProvider';
 import { appHandoff } from '../../integrations/app-handoff/platform';
 import { useHealthData } from './data/HealthDataProvider';
@@ -50,6 +52,7 @@ export function OuraHandoffProvider({ children }: PropsWithChildren) {
   const { dataReader } = useAccountContext();
   const { store: health, timezone, today } = useHealthData();
   const { store: platform, state: platformState } = usePlatformIntegrations();
+  const resources = useWorkoutResources();
   const [state, setState] = useState<HandoffState>(IDLE);
   const mounted = useRef(true);
   const timezoneRef = useRef(timezone);
@@ -94,11 +97,16 @@ export function OuraHandoffProvider({ children }: PropsWithChildren) {
           sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
           now: Date.now,
         }),
+      // #3667: the readiness score, the verdict, the timeline and Energy were read without the night.
+      nightLanded: () => {
+        resources?.invalidate(nightLandedPaths);
+        void resources?.refreshVisible();
+      },
       setState: (next) => {
         if (mounted.current) setState(next);
       },
     });
-  }, [health, platform, dataReader]);
+  }, [health, platform, dataReader, resources]);
   const handOff = useCallback(
     (manual: boolean) => {
       void runner?.run(manual).catch(() => {

@@ -6,6 +6,7 @@
 // Driven through the real `buildReadinessPayload`, because the defect was the persist's day key.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
+import { currentSleepScore } from '@trainingai/shared/health/sleep-card-night'
 
 const repo = {
   listBodyMetrics: vi.fn(async (_u: string, _f: string, _t: string) => [] as unknown[]),
@@ -114,6 +115,19 @@ describe.each([
     // The Activity finalise (#2435) does store yesterday's activity-only row; nothing else may.
     const otherThanActivity = repo.upsertOuraDailyDerived.mock.calls.filter(([, , p]) => p.activityContributors === undefined)
     expect(otherThanActivity.map(([, day]) => day)).not.toContain(shiftDateStr(today, -1))
+  })
+
+  // #3667: the score carries the night it scored, so no surface shows an older night's as today's.
+  it('dates the sleep score by the night it scored', async () => {
+    for (const gap of [0, 1, 3]) {
+      const { today, sleep, body } = history(tz, BASELINE_MIN_NIGHTS + 8, gap)
+      repo.listSleepSessions.mockResolvedValue(sleep)
+      repo.listBodyMetrics.mockResolvedValue(body)
+      const out = await buildReadinessPayload('u1', tz)
+      expect(out.sleepScore, `gap ${gap}`).not.toBeNull()
+      expect(out.sleepScoreDate, `gap ${gap}`).toBe(shiftDateStr(today, -gap))
+      expect(currentSleepScore(out, today), `gap ${gap}`).toBe(gap <= 1 ? out.sleepScore : null)
+    }
   })
 
   it("after the sync: writes today's row, and only today's", async () => {

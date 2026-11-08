@@ -2,7 +2,7 @@
 // Each shape carries the connector's source, so every normal it joins stays Oura's own.
 import { describe, it, expect } from 'vitest'
 import {
-  ouraDaytimeHighStress, ouraOvernightRecoveryHours, ouraRecoveryContributors, ouraTemperatureDeviations,
+  ouraDailyWear, ouraDaytimeHighStress, ouraOvernightRecoveryHours, ouraRecoveryContributors, ouraTemperatureDeviations,
 } from '@/lib/oura/cloud/readiness-signals-map'
 import { OURA_CLOUD_REKEY_DATE } from '@/lib/oura/cloud-freshness'
 
@@ -38,5 +38,18 @@ describe('the Oura connector\'s readiness mapping', () => {
       date: '2026-10-20', hours: 4.25, source: 'oura_cloud',
       provenance: 'oura_cloud_sleep_periods.heart_rate (our hours from Oura\'s 5-minute series)',
     }])
+  })
+
+  // #3668: readiness's low-wear rule reads wear in this shape, never the column.
+  it('maps the stored non-wear seconds, dropping days with none stored', () => {
+    expect(ouraDailyWear([
+      { date: '2026-10-20', nonWearTimeSec: 0 },
+      { date: '2026-10-21', nonWearTimeSec: 50_000 },
+      { date: '2026-10-22', nonWearTimeSec: null },
+      { date: '2026-10-23' },
+    ])).toEqual([
+      { date: '2026-10-20', nonWearSec: 0, source: 'oura_cloud' },
+      { date: '2026-10-21', nonWearSec: 50_000, source: 'oura_cloud' },
+    ])
   })
 })

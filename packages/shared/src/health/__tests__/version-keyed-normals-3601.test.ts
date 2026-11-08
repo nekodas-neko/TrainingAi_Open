@@ -9,7 +9,7 @@ import { restingHrBaseline } from '../activity-day'
 
 const day = (i: number) => `2026-10-${String(i).padStart(2, '0')}`
 const range = (from: number, n: number) => Array.from({ length: n }, (_, i) => from + i)
-const noWearGaps = new Map<string, { nonWearTimeSec?: number | null }>()
+const noWearGaps = new Map<string, { nonWearSec: number }>()
 
 /** Body-metric rows from `source_a`, `bpm` and `hrv` per night. */
 const metrics = (days: number[], bpm: number, hrv: number, source = 'source_a') =>

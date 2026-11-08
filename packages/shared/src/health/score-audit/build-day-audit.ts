@@ -2,12 +2,12 @@ import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, ageFromDob } from '@trai
 import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { finalisedPreTaper } from '@trainingai/shared/health/activity-day'
 import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
-import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
+import { excludeLowWearDays, wearByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { sleepFeelLabel } from '@trainingai/shared/health/sleep-feel-calibration'
 import { nightSessions, canonicalNightsByDate } from '@trainingai/shared/health/sleep-night'
-import { ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
+import { ouraDailyWear, ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 import { buildSleepAudit } from './sleep'
 import { buildReadinessAudit } from './readiness'
 import { buildActivityAudit } from './activity'
@@ -82,7 +82,8 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   // Everything below is scoped to the audited day, never "today".
   const activityLogs = activityLogsTwoDays.filter(a => a.date === date)
   const sessionsUpToDay = workoutSessions.filter(ws => new Date(ws.startedAt).getTime() < nextMid.getTime())
-  const ouraByDate = toOuraByDate(ouraRows)
+  // #3668: wear in the generic shape the connector maps, as the live route reads it.
+  const wear = wearByDate(ouraDailyWear(ouraRows))
   const ouraToday = ouraRows.find(r => r.date === date) ?? null
   const derivedForDay = derivedRows.find(r => r.day === date) ?? null
   const dayMetrics = bodyMetrics.find(m => m.date === date) ?? null
@@ -92,8 +93,8 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   const priorSummary = [...summariesUpToDay].reverse().find(s => s.date < date) ?? null
 
   // ── Personal baselines (28-day, low-wear days excluded — the live route's rule) ──
-  const hrvRows = excludeLowWearDays(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), ouraByDate)
-  const rhrRows = excludeLowWearDays(bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0), ouraByDate)
+  const hrvRows = excludeLowWearDays(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0), wear)
+  const rhrRows = excludeLowWearDays(bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0), wear)
   const recentHrvRows = bodyMetrics.filter(m => m.date >= from7dIso && m.date <= date && m.hrvMs != null && m.hrvMs > 0)
   const recentRhrRows = bodyMetrics.filter(m => m.date >= from7dIso && m.date <= date && m.restingHeartRate != null && m.restingHeartRate > 0)
 
@@ -269,7 +270,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
         hrvBaselineDays: { value: hrvRows.length, unit: 'days', note: `≥${BASELINE_MIN_SAMPLE_DAYS} required for a 28-day HRV baseline.` },
         rhrBaselineDays: { value: rhrRows.length, unit: 'days', note: `≥${BASELINE_MIN_SAMPLE_DAYS} required for a 28-day resting-HR baseline.` },
         intradayHrSamples: { value: hrRows.length, unit: 'samples', note: 'Drives zone-minutes, move-hours and the HR card.' },
-        isLowWearDay: { value: isLowWearDay(ouraToday?.nonWearTimeSec), note: 'Low-wear days are excluded from baselines and skew same-day readings.' },
+        isLowWearDay: { value: isLowWearDay(wear.get(date)?.nonWearSec), note: 'Low-wear days are excluded from baselines and skew same-day readings.' },
         sleepNightsInWindow: { value: sleepSessions.length, unit: 'nights' },
         hasDailySummary: { value: summary != null, note: 'Without an oura_daily_summary row the readiness composite cannot run at all.' },
       },

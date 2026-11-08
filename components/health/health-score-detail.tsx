@@ -167,7 +167,7 @@ export function HealthScoreDetail({
           readinessDisplayScore: readiness,
           temperatureDeviation: null,
           temperatureDeviationSource: null,
-          sleepScore: row.sleepScore, sleepScoreCoverage: null, activityScore: row.activityScore,
+          sleepScore: row.sleepScore, sleepScoreDate: row.sleepScore != null ? row.day : null, sleepScoreCoverage: null, activityScore: row.activityScore,
           activityBlend: { base: row.activityScore, adjustment: 0, final: row.activityScore, trained: false },
           readinessContributors: null,
           readinessCompositeContributors: null,

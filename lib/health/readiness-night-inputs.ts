@@ -209,9 +209,10 @@ export function resolveReadinessNightInputs(src: NightInputSources): ReadinessNi
       nightDate),
     // A source's deviation is already relative to its own baseline, so it is judged as a deviation
     // against the person's normal of that source's deviations, never as an absolute temperature. A
-    // value the source no longer stands behind (`superseded`) scores nothing.
+    // value the source no longer stands behind (`superseded`) scores nothing. #3668: keyed by the
+    // night's algorithm version too, like the other four, so a new version restarts this normal with them.
     temperature: () => genericInput(
-      src.temperatureDeviations.filter(t => !t.superseded).map(t => ({ date: t.date, value: t.deviationC, source: t.source })),
+      src.temperatureDeviations.filter(t => !t.superseded).map(t => ({ date: t.date, value: t.deviationC, source: t.source, algorithmVersion: versionOn(t.date, t.source) })),
       nightDate, 100),
     sleepBalance: () => genericInput(
       src.nights.filter(n => !isPartialNight(n)).map(n => ({ date: n.date, value: n.durationHours, source: n.durationSource, algorithmVersion: n.sourceAlgorithmVersion })),

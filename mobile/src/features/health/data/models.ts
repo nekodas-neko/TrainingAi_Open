@@ -214,6 +214,8 @@ export const readinessSpec = (date: string) => ({
           }),
         )
         .nullish(),
+      // #3667: the wake date of the night `sleepScore` scored.
+      sleepScoreDate: text,
       sleepScoreCoverage: z
         .object({
           ratio: z.number(),
