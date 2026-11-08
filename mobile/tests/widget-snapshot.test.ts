@@ -35,7 +35,6 @@ const energy = nutritionEnergyModel({
   totals: { calories: 1260, proteinG: 98, carbsG: 132, fatG: 46 },
   recordedIntake: null,
   budgetKcal: 2500,
-  targetCalories: 2300,
   targets: { proteinG: 160, carbsG: 250, fatG: 70 },
   scaledTargets: null,
 });
@@ -94,15 +93,30 @@ test("kcal left follows Home's nutrition card: the budget alone, recorded intake
   const recorded = nutritionEnergyModel({
     totals: { calories: 1260, proteinG: 0, carbsG: 0, fatG: 0 },
     recordedIntake: 900,
-    budgetKcal: null,
-    targetCalories: 2300,
+    budgetKcal: 2300,
     targets: { proteinG: 160 },
     scaledTargets: { proteinG: 170, carbsG: 260, fatG: 75 },
   });
   assert.equal(recorded.remaining, 1400);
   assert.equal(recorded.targets.proteinG, 170);
-  const noGoal = nutritionEnergyModel({ totals: null, recordedIntake: null, budgetKcal: null, targetCalories: null, targets: {}, scaledTargets: null });
+  const noGoal = nutritionEnergyModel({ totals: null, recordedIntake: null, budgetKcal: null, targets: {}, scaledTargets: null });
   assert.equal(noGoal.remaining, null);
+
+  // #3670 ③: the Nutrition card has no budget until the energy balance loads, and then shows
+  // "kcal" with no denominator, as the current app does (#2071) — never the stored calorie target.
+  // The stored target is still at hand (the card used to pass it); it must not become the goal.
+  const stored = { targetCalories: 2000 };
+  const offline = nutritionEnergyModel({
+    ...stored,
+    totals: { calories: 1260, proteinG: 98, carbsG: 132, fatG: 46 },
+    recordedIntake: null,
+    budgetKcal: null,
+    targets: { proteinG: 160, carbsG: 250, fatG: 70 },
+    scaledTargets: null,
+  });
+  assert.equal(offline.goal, null);
+  assert.equal(offline.remaining, null);
+  assert.equal(offline.targets.proteinG, 160);
 });
 
 test("Body Battery's headline matches the card's", () => {
@@ -151,7 +165,7 @@ test('missing data stays missing in the snapshot rather than turning into zero',
     input({
       scores: homeScoreChips({}, [], today),
       battery: { hasData: false, current: 0, label: 'Good', trend: 'steady', anchor: 0, anchorSource: 'default', anchorProvisional: false, series: [] },
-      energy: nutritionEnergyModel({ totals: null, recordedIntake: null, budgetKcal: null, targetCalories: null, targets: {}, scaledTargets: null }),
+      energy: nutritionEnergyModel({ totals: null, recordedIntake: null, budgetKcal: null, targets: {}, scaledTargets: null }),
       budget: budgetEnergyModel({ totals: null, recordedIntake: null, budgetKcal: null }),
       water: { ml: null, goalMl: 2500 },
     }),

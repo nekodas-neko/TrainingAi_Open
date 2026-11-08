@@ -163,16 +163,15 @@ test("budgetEnergyModel: recorded intake missing, the figure waits; the server's
 });
 
 test("the card calls pin parity: no fallback to the calorie target, End of Day clamps at zero", () => {
-  // A card that fell back would show 1,100 left here.
+  // A card that fell back would show 1,100 left here. The Nutrition card no longer does (#3670 ③).
   const withTarget = nutritionEnergyModel({
     totals: totals(900),
     recordedIntake: 900,
     budgetKcal: null,
-    targetCalories: 2000,
     targets: {},
     scaledTargets: null,
   });
-  assert.equal(withTarget.remaining, 1100);
+  assert.equal(withTarget.remaining, null);
   assert.equal(
     budgetEnergyModel({ totals: totals(900), recordedIntake: 900, budgetKcal: null }).remaining,
     null,
