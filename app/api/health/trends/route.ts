@@ -3,7 +3,8 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, toAestDay, secondsSinceLocalMidnight, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
-import { wornHours } from '@trainingai/shared/health/wear-confidence'
+import { wornHours, wearByDate } from '@trainingai/shared/health/wear-confidence'
+import { ouraDailyWear, ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 import { aggregateWorkoutDay, type DaySession } from '@trainingai/shared/health/workout-density'
 import { rollupDailyBestHrr, setHrr60Values } from '@trainingai/shared/workout/hrr-trend'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
@@ -22,7 +23,7 @@ export interface HealthTrendDay {
   proteinPerKg: number | null    // day's protein_g ÷ the latest known bodyweight in range
   steps: number | null
   waterMl: number | null
-  temperatureDeviation: number | null  // °C deviation from personal baseline (Oura daily_readiness)
+  temperatureDeviation: number | null  // °C deviation from the source's own baseline (`DailyTemperatureDeviation`)
 }
 
 export interface HealthTrendsResponse {
@@ -53,7 +54,10 @@ export async function GET() {
     repo.listActivityLogs(userId, from14dIso, todayIso).catch(() => []),
   ])
 
-  const ouraByDate = new Map(ouraRows.map(r => [r.date, r]))
+  // #3691: wear and temperature through the Oura connector's generic shapes, never its field names.
+  // Every deviation is shown, a superseded one included, as the chart always has.
+  const wearOn = wearByDate(ouraDailyWear(ouraRows))
+  const temperatureOn = new Map(ouraTemperatureDeviations(ouraRows).map(t => [t.date, t.deviationC]))
   // Our own persisted daily scores (oura_daily_derived). The only source for the three score series:
   // Oura's own readiness, sleep and activity scores are never ours (scoring doc rule 5, #3000).
   const derivedByDate = new Map(derivedRows.map(r => [r.day, r]))
@@ -93,7 +97,6 @@ export async function GET() {
   const trends: HealthTrendDay[] = []
   for (let i = 13; i >= 0; i--) {
     const d = shiftDateStr(todayIso, -i)
-    const oura = ouraByDate.get(d)
     const derived = derivedByDate.get(d)
     const body = bodyByDate.get(d)
     const { sessionDurationMin, workoutDensity } = aggregateWorkoutDay(sessionsByDate.get(d) ?? [])
@@ -105,7 +108,7 @@ export async function GET() {
       hrvMs: body?.hrvMs ?? null,
       rhrBpm: body?.restingHeartRate ?? null,
       hrr1Bpm: hrrByDay.get(d) ?? null,
-      wornHours: wornHours(oura?.nonWearTimeSec, d === todayIso ? secondsSinceLocalMidnight(tz) : 86400),
+      wornHours: wornHours(wearOn.get(d)?.nonWearSec, d === todayIso ? secondsSinceLocalMidnight(tz) : 86400),
       sessionDurationMin,
       workoutDensity,
       proteinPerKg: body?.proteinG != null && latestWeightKg != null
@@ -113,7 +116,7 @@ export async function GET() {
         : null,
       steps: stepsByDate.get(d) ?? null,
       waterMl: body?.waterMl ?? null,
-      temperatureDeviation: oura?.temperatureDeviation ?? null,
+      temperatureDeviation: temperatureOn.get(d) ?? null,
     })
   }
 
