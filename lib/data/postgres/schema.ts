@@ -221,8 +221,10 @@ export const scheduleDays = pgTable('schedule_days', {
 //
 // The Drizzle property names now match what the columns hold, which is the whole fix: reaching for
 // `workoutSessions.programSessionId` gets the column that actually stores a program-session id.
-// Dropping the dead column is a data-losing migration and needs owner confirmation, so it is named
-// `unusedProgramSessionId` instead — a name nobody reaches for by accident.
+// #2412 step 1: the dead column is no longer declared here, so Drizzle stops selecting it and no
+// deployed code reads it. That makes dropping it (step 2, a data-losing migration released on its
+// own) safe to deploy, but the drop itself needs the owner's confirmation and is not done yet: the
+// column still exists in the database until then. Do not re-declare it.
 //
 // It has already cost a session: a repro fixture populated `program_session_id`, the periodization
 // block took its `null` branch, and the honest reading of that run was "the race does not exist".
@@ -243,8 +245,6 @@ export const workoutSessions = pgTable('workout_sessions', {
   isEarlyDeload:     boolean('is_early_deload').notNull().default(false),
   wasOverride:       boolean('was_override').notNull().default(false),
   intensityMode:     text('intensity_mode'),
-  /** DEAD — never written, never read. See the block comment above; do not start using it. */
-  unusedProgramSessionId: uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
   sessionRpe:        integer('session_rpe'),
   /** #3266: whole seconds the workout was paused; NULL means never paused, the same as 0. */
   pausedSec:         integer('paused_sec'),
