@@ -13,6 +13,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { nightSessions, canonicalNightsByDate } from '@trainingai/shared/health/sleep-night'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
+import { nightAlgorithmVersion, rowsInNormalGroup } from '@trainingai/shared/health/per-device-normal'
 import { TEMP_BASELINE_MIN_DAYS } from '@trainingai/shared/ai-periodization/deload-constants'
 import { ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 import { resolveReadinessNightInputs, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
@@ -27,8 +28,9 @@ export interface NightTemperature {
   deviationSource: 'ble' | 'cloud' | null
   /**
    * Nights in the normal behind `deviationC`, counted for that device alone: the ring summary's
-   * accrued `nHistory`, or the earlier post-re-key Oura nights with a deviation. Never a mix, so an
-   * Oura night cannot borrow the ring's month of history.
+   * accrued `nHistory`, or the earlier post-re-key nights with a deviation from the same source under
+   * the same sleep-algorithm version (#3691), as the z's normal is keyed. Never a mix, so an Oura night
+   * cannot borrow the ring's month of history, nor a new algorithm version the old one's.
    */
   baselineNights: number
   /** `isTemperatureBaselineCentred` over the same device's trailing deviations, tonight included. */
@@ -37,7 +39,8 @@ export interface NightTemperature {
 
 /**
  * Oura's nights are counted over a window long enough to reach the alert's maturity gate. The
- * resolver itself still reads 28 days, as readiness does, so its z is readiness's z.
+ * resolver itself still reads 28 days, as readiness does, so its z is readiness's z. The count's own
+ * sleep sessions span this window too, so each deviation's algorithm version can be looked up (#3691).
  */
 const OURA_COUNT_WINDOW_DAYS = TEMP_BASELINE_MIN_DAYS * 2
 
@@ -50,11 +53,13 @@ export async function loadNightTemperature(
   // Shifted on the local date string, so each window starts at a local midnight.
   const { from28dIso } = readinessWindowStarts(todayIso)
   const fromCountIso = shiftDateStr(todayIso, -OURA_COUNT_WINDOW_DAYS)
-  const [summaries, bodyMetrics, sleepSessions, ouraLong] = await Promise.all([
+  const [summaries, bodyMetrics, sleepSessions, ouraLong, sleepSessionsLong] = await Promise.all([
     repo.getOuraDailySummary(userId, from28dIso, todayIso),
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getOuraDaily(userId, fromCountIso, todayIso),
+    // A separate read, so the resolver's 28-day nights are exactly readiness's.
+    repo.listSleepSessions(userId, fromCountIso, todayIso),
   ])
   // #3610: the Oura connector's deviations in the generic shape; the resolver reads only that.
   const temperatures = ouraTemperatureDeviations(ouraLong)
@@ -79,8 +84,18 @@ export async function loadNightTemperature(
     const from27 = shiftDateStr(todayIso, -27)
     trusted = isTemperatureBaselineCentred(summaries.filter(r => r.date >= from27).map(r => r.tempDevC))
   } else if (deviation?.source === 'cloud' && night.nightDate) {
-    const sourceDevs = temperatures.filter(t => !t.superseded && Number.isFinite(t.deviationC))
-    baselineNights = sourceDevs.filter(t => t.date < night.nightDate!).length
+    const nightDate = night.nightDate
+    // #3691: the earlier deviations in tonight's (source, algorithm version) group, by the same rule
+    // that keys the z's normal (`rowsInNormalGroup`, versions from `nightAlgorithmVersion`), so a
+    // source that changes its algorithm restarts this count with its z.
+    const versionOn = nightAlgorithmVersion(canonicalNightsByDate(nightSessions(sleepSessionsLong, tz), tz))
+    const tonight = temperatures.find(t => t.date === nightDate)
+    const upToTonight = temperatures
+      .filter(t => !t.superseded && Number.isFinite(t.deviationC) && t.date <= nightDate)
+      .sort((a, b) => a.date.localeCompare(b.date))
+    baselineNights = rowsInNormalGroup(upToTonight, t => t.source, t => versionOn(t.date, t.source), {
+      source: tonight?.source, algorithmVersion: versionOn(nightDate, tonight?.source),
+    }).filter(t => t.date < nightDate).length
     // #3169 (owner, 26 Oct): the temperature deload stays off on Oura's deviation until its new
     // baseline has been checked, however many nights it has. The prescription's `tempZ` is unaffected.
     // Lift this by computing it again: `isTemperatureBaselineCentred` over the same Oura nights.
