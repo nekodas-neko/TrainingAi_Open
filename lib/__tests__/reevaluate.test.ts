@@ -261,13 +261,28 @@ describe('reevaluatePrescriptionForToday — an applied prescription ages out (Q
     expect(result.needsRegenerate).toBe(false)
   })
 
-  // A `pending` prescription is an OFFER, and its expiry already means something else: it is what
-  // shouldTriggerEmergencyDeload reads to decide whether to stop re-offering. Ageing it out here
-  // too would have this function and that one racing over one field for two purposes.
-  it('does not age out a pending offer — that expiry belongs to the emergency-deload suppression', () => {
+  // A pending "stay" is an offer whose numbers still drive load; its expiry is not what retires it.
+  it('does not age out a pending stay', () => {
+    const offer = { ...basePrescription([ex('bench')]), phaseAction: 'stay' as const }
+    const result = reevaluatePrescriptionForToday(offer, baseSignals,
+      { ...baseState, prescription: offer, prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, NOW)
+    expect(result.needsRegenerate).toBe(false)
+  })
+
+  // #3700: a pending deload or rest-day offer past its expiry is no longer an answer to anything.
+  // The emergency-deload suppression only reads an UNEXPIRED pending deload, so ageing an expired one
+  // out cannot race it. Exempting these was how a week-old sick-day plan came back as the plan.
+  it('ages out an expired pending deload offer', () => {
     const offer = { ...basePrescription([ex('bench')]), deload: true, phaseAction: 'deload_recommended' as const }
     const result = reevaluatePrescriptionForToday(offer, baseSignals,
       { ...baseState, prescription: offer, prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, NOW)
+    expect(result.needsRegenerate).toBe(true)
+  })
+
+  it('leaves an unexpired pending deload offer to the emergency-deload suppression', () => {
+    const offer = { ...basePrescription([ex('bench')]), deload: true, phaseAction: 'deload_recommended' as const }
+    const result = reevaluatePrescriptionForToday(offer, baseSignals,
+      { ...baseState, prescription: offer, prescriptionStatus: 'pending', prescriptionExpiresAt: live }, NOW)
     expect(result.needsRegenerate).toBe(false)
   })
 

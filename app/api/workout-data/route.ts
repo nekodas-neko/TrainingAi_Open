@@ -283,11 +283,12 @@ async function handleWorkoutData(req: NextRequest) {
             new Map(programSession.exercises.map(ex => [ex.id, ex.exerciseRole])),
           )
         : null
-      const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null
+      const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase })
+      // An aged-out prescription is pending regeneration, not the plan (#3700).
+      const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null && !aiPrescriptionPending
         && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
 
       const aiPhaseLabel = aiPrescription ? capitalize(aiPrescription.phase) : ''
-      const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase })
       const droppedThisCycle = new Set(aiDrivesLoad ? (aiPrescription!.droppedExerciseIds ?? []) : [])
 
       const exercises = buildWorkoutExercises(programSession, {
@@ -474,7 +475,11 @@ async function handleWorkoutData(req: NextRequest) {
         new Map(programSession.exercises.map(ex => [ex.id, ex.exerciseRole])),
       )
     : null
-  const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null
+  // Computed before the load decision: an aged-out prescription (#3700) is regenerating, so it is
+  // not the plan. Serving it once more while the regeneration ran in the background put an expired
+  // rest-day plan on the bar, and nothing repainted the screen when the fresh one landed.
+  const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase })
+  const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null && !aiPrescriptionPending
     && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
 
   if (aiDrivesLoad && aiPrescription && aiPeriodizationState) {
@@ -595,7 +600,6 @@ async function handleWorkoutData(req: NextRequest) {
   // phase transition, or a program edit) and the regeneration below hasn't landed yet. The
   // client uses this to show a "preparing your AI workout" state instead of painting the
   // base-program numbers the AI is about to replace.
-  const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase })
   if (aiPrescriptionPending && !isPoll) {
     regeneratePrescriptionInBackground(userId, programSession.id, repo, tz)
   }

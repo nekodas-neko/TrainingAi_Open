@@ -94,12 +94,13 @@ export async function GET() {
         new Map(programSession.exercises.map(e => [e.id, e.exerciseRole])),
       )
     : null;
-  const drives = isAiDynamic && prescription != null && periodization != null
-    && prescriptionDrivesLoad(prescription.phaseAction, periodization.prescriptionStatus);
-
   // An ai_dynamic program has no phase rows, so its baseline is this pair alone (workout-data).
   const isBaselinePhase = periodization?.phase === 'baseline' && !periodization.baselineComplete;
   const pending = prescription == null || isAiPrescriptionPending(periodization, { isAiDynamic, isBaselinePhase });
+  // An aged-out prescription is made again when the session is opened, so the preview shows it as
+  // pending rather than previewing the expired one (#3700).
+  const drives = isAiDynamic && prescription != null && periodization != null && !pending
+    && prescriptionDrivesLoad(prescription.phaseAction, periodization.prescriptionStatus);
   const source: NextSessionPrescriptionResponse['source'] = !isAiDynamic
     ? 'static'
     : drives ? 'driving' : (pending ? 'pending' : 'static');

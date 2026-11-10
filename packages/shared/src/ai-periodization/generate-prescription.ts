@@ -1,4 +1,5 @@
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { nextMidnightInTz, todayInTz } from '@trainingai/shared/date-utils'
+import { prescriptionExpiresAt } from '@trainingai/shared/ai-periodization/prescription-expiry'
 
 /**
  * How long a rules fallback plan is held (LB-165).
@@ -400,7 +401,10 @@ async function runPrescriptionGeneration(
     )
     // Offered, not imposed: only stores the prescription. Persisted phase state and
     // sessions_in_phase stay untouched until the user accepts it (respond route).
-    const expiresAt = new Date(Date.now() + 7 * 86_400_000)
+    // #3700: a deload fired by the lifter's own sick report answers today only, so it ends at the
+    // next local midnight and the next open asks again. The other triggers describe the block and
+    // keep the week.
+    const expiresAt = prescriptionExpiresAt(prescription, tz, new Date(), { illnessTriggered: trigger?.kind === 'illness' })
     await repo.storePrescription(userId, programSessionId, prescription, expiresAt)
 
     return {
@@ -432,9 +436,10 @@ async function runPrescriptionGeneration(
       `Most of this session's muscles are still sore (${muscles}) — a lighter full-session deload will serve recovery better than training through it.`,
       `Deload — most of this session's muscles are still sore (${muscles})`,
     )
-    // Soreness is a per-day signal — expire tomorrow so a clean check-in
-    // gets a fresh decision (the emergency offer keeps its 7-day window).
-    const expiresAt = new Date(Date.now() + 86_400_000)
+    // Soreness is a per-day signal — expire at the next local midnight so a clean check-in
+    // gets a fresh decision. It was `now + 24h`, which kept an evening deload alive through the
+    // next day's morning check-in (#3700).
+    const expiresAt = nextMidnightInTz(tz)
     await repo.storePrescription(userId, programSessionId, prescription, expiresAt)
     return {
       ok: true,
@@ -804,7 +809,9 @@ async function runPrescriptionGeneration(
     await repo.advancePhase(userId, programSessionId, prescription.phase)
   }
 
-  const expiresAt = new Date(Date.now() + 7 * 86_400_000)
+  // #3700: a rest-day recommendation is sized on today's readiness and ends at the next local
+  // midnight; a plan sized on the block keeps its week.
+  const expiresAt = prescriptionExpiresAt(prescription, tz)
   // Content and status in ONE write. Previously this stored the prescription (which resets the
   // status to 'pending') and then set 'auto_applied' in a second statement; two concurrent
   // generations for this session could interleave between them and leave the status describing the

@@ -171,7 +171,10 @@ describe('GET /api/next-session/prescription', () => {
     expect(body.exercises[0].sets[0]).toEqual({ weightKg: 85, reps: 5, restSec: 120 })
   })
 
-  it('keeps driving load even once the stored prescription is past its expiry timestamp (no auto-expiry — only an explicit dismiss changes status)', async () => {
+  // #3700: an aged-out prescription is regenerated when the session is next opened (workout-data,
+  // Q-229), so the preview must not show it as the plan. It used to keep 'driving' here, which is how
+  // a week-old sick-day plan was previewed as the next session.
+  it('shows an aged-out prescription as pending, not as the plan', async () => {
     const sess = session('sess-1', 'Push', [{ id: 'ex-1', exerciseName: 'Bench Press', styleId: 'style-1' }])
     const prog = { id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] }
     getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
@@ -194,8 +197,9 @@ describe('GET /api/next-session/prescription', () => {
 
     const res = await GET()
     const body = await res.json()
-    expect(body.source).toBe('driving')
-    expect(body.exercises[0].sets[0]).toEqual({ weightKg: 85, reps: 5, restSec: 120 })
+    expect(body.source).toBe('pending')
+    // The program's own style, not the expired prescription's 3×5 @ 85%.
+    expect(body.exercises[0].sets[0]).toEqual({ weightKg: 80, reps: 8, restSec: 90 })
   })
 
   it('never calls a prescription-mutating repo method', async () => {
