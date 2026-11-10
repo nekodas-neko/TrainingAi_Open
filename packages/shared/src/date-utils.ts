@@ -334,6 +334,16 @@ export function midnightDaysAgoInTz(tz: string, daysAgo: number, at: Date = new 
   return dateStrMidnightInTz(dayKeyInTz(tz, daysAgo, at).replace(/\//g, '-'), tz)
 }
 
+/**
+ * The instant of the local midnight that ENDS the day `at` falls on in `tz`: the start of the next
+ * local day. DST-correct for the same reason as `midnightDaysAgoInTz`: the calendar date is
+ * shifted first, then turned back into an instant, so a 23- or 25-hour day still ends at 00:00
+ * local and never at `at + 86400000` (#3700).
+ */
+export function nextMidnightInTz(tz: string, at: Date = new Date()): Date {
+  return dateStrMidnightInTz(shiftDateStr(formatInTimeZone(at, tz, 'yyyy-MM-dd'), 1), tz)
+}
+
 // Whole calendar days between two date strings ('YYYY-MM-DD' or 'YYYY/MM/DD', either
 // separator). UTC-day arithmetic on pure date keys — matches shiftDateStr's semantics.
 // Positive when `toStr` is after `fromStr`.

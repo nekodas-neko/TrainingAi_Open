@@ -368,6 +368,42 @@ describe('GET /api/workout-data — what drives the bar', () => {
     expect(opts.aiPhaseLabel).toBe('Accumulation')
   })
 
+  // #3700: an expired plan used to be served once more while a background regeneration ran, and
+  // nothing repainted the screen when the new one landed. The owner trained a week-old sick-day
+  // plan that way. Aged out, it is pending regeneration, and the bar follows the program until the
+  // fresh one arrives.
+  it('keeps an accepted rest-day plan off the bar once it has expired, and regenerates it', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      prescription: prescription({ phaseAction: 'rest_day_recommended' }),
+      prescriptionExpiresAt: new Date(Date.now() - 60_000),
+    }))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(buildOptsFor()!.aiDrivesLoad).toBe(false)
+    expect(body.aiPrescriptionPending).toBe(true)
+    expect(regeneratePrescriptionSingleFlight).toHaveBeenCalledTimes(1)
+  })
+
+  it('regenerates an expired PENDING rest-day offer, which never drove load and so was never aged out', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      prescriptionStatus: 'pending',
+      prescription: prescription({ phaseAction: 'rest_day_recommended' }),
+      prescriptionExpiresAt: new Date(Date.now() - 60_000),
+    }))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(body.aiPrescriptionPending).toBe(true)
+    expect(regeneratePrescriptionSingleFlight).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves an unexpired rest-day offer alone', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      prescriptionStatus: 'pending',
+      prescription: prescription({ phaseAction: 'rest_day_recommended' }),
+    }))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(body.aiPrescriptionPending).toBe(false)
+    expect(regeneratePrescriptionSingleFlight).not.toHaveBeenCalled()
+  })
+
   it('keeps a dismissed prescription off the bar, and its drops with it', async () => {
     getSessionPeriodization.mockResolvedValue(periodization({
       prescriptionStatus: 'dismissed',

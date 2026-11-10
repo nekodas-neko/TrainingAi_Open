@@ -1,4 +1,5 @@
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
+import { prescriptionAgedOut } from './prescription-expiry'
 
 // True when a fresh AI prescription is being (re)generated for an ai_dynamic session:
 // the prescription slot was consumed (by a completed session, a phase transition, or a
@@ -18,12 +19,23 @@ import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodiza
 // Gemini outage at completion silently cost two sessions of AI prescriptions. `storePrescription`
 // flips the status back to 'pending' when a fresh prescription lands, so the status alone is the
 // correct, self-clearing signal regardless of whether the stale JSONB was nulled.
+//
+// #3700: an aged-out prescription (`prescriptionAgedOut`) is pending too. It used to be served once
+// more as the plan while a regeneration ran in the background, and nothing repainted the screen when
+// the fresh one landed, so the lifter trained the expired plan. A one-day rest-day offer expires at
+// the next local midnight; the next open must regenerate it, show "preparing", and paint the new
+// one. Both readers (workout-data, the next-session preview) take this as "not the plan".
 export function isAiPrescriptionPending(
-  state: Pick<SessionPeriodization, 'prescription' | 'prescriptionStatus'> | null | undefined,
+  state: (Pick<SessionPeriodization, 'prescription' | 'prescriptionStatus'>
+    & Partial<Pick<SessionPeriodization, 'prescriptionExpiresAt'>>) | null | undefined,
   opts: { isAiDynamic: boolean; isBaselinePhase: boolean },
+  now: Date = new Date(),
 ): boolean {
   return opts.isAiDynamic
     && !opts.isBaselinePhase
     && state != null
-    && state.prescriptionStatus === 'consumed'
+    && (state.prescriptionStatus === 'consumed' || (
+      state.prescription != null
+      && prescriptionAgedOut({ ...state, prescriptionExpiresAt: state.prescriptionExpiresAt ?? null }, now)
+    ))
 }

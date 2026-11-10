@@ -3,6 +3,7 @@ import { computePerExerciseDeload, type PerExerciseDeloadInput } from './per-exe
 import { shouldTriggerEmergencyDeload, type EmergencySignals, type EmergencyState } from './emergency-deload'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { recostPrescription, rowNumbersMoved, type FigureSignals } from './prescription-figures'
+import { prescriptionAgedOut } from './prescription-expiry'
 
 // Cheap fresh-signals subset for consumption-day re-evaluation — deliberately NOT the full
 // 30-signal aggregation (aggregateSignals), which is too expensive to run on every
@@ -86,15 +87,9 @@ export interface ReevaluationResult {
 // the previous session is consumed up to 7 days later — soreness that has since cleared
 // must drop its deload, and newly-sore muscles must pick one up, without re-running Gemini.
 // Past that window it is no longer re-evaluated but replaced: see the expiry branch below.
-/** The expiry branch on its own: a stored prescription past its window is replaced, not re-shaped.
- *  Shared with the Home warm (#2155), so the two cannot disagree about when one is needed. */
-export function prescriptionAgedOut(
-  state: Pick<EmergencyState, 'prescriptionStatus' | 'prescriptionExpiresAt'>,
-  now = new Date(),
-): boolean {
-  const agesOutOnExpiry = state.prescriptionStatus !== 'pending' && state.prescriptionStatus !== 'none'
-  return agesOutOnExpiry && state.prescriptionExpiresAt != null && state.prescriptionExpiresAt <= now
-}
+// The expiry branch lives in `prescription-expiry.ts` beside the expiry it reads (#3700); re-exported
+// so existing imports keep working.
+export { prescriptionAgedOut } from './prescription-expiry'
 
 export function reevaluatePrescriptionForToday(
   prescription: AiPrescription,
@@ -130,6 +125,8 @@ export function reevaluatePrescriptionForToday(
   // The two exemptions, both deliberate. `pending` is an *offer* whose expiry the emergency-deload
   // suppression below already owns, and re-deriving it here would fight that. `none` means there is
   // no offer to age out at all, so regenerating on it would be a loop with nothing to show for it.
+  // #3700 narrowed the first: a pending rest day or deload ages out too, because its expiry is the
+  // only thing that stops a one-day recovery answer being met again a week later.
   if (prescriptionAgedOut(state, now)) {
     return { prescription, changed: false, needsRegenerate: true }
   }
