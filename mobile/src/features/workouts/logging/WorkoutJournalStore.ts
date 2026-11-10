@@ -317,6 +317,11 @@ export class WorkoutJournalStore {
     this.publish({ busy: true, message: null, savedFallbackFor: null });
     try {
       let selected = session;
+      if (useSaved && selected.prescriptionPending) {
+        // #3717: the saved entry of a pending session holds the program as written; say so.
+        this.publish({ message: PROGRAM_AS_WRITTEN });
+        selected = { ...selected, prescriptionPending: false };
+      }
       if (!useSaved) {
         let response: unknown;
         try {
@@ -325,9 +330,13 @@ export class WorkoutJournalStore {
             ...(options.aiDeload ? { aiDeload: '1' } : {}),
           });
         } catch (error) {
+          // A network failure offers the saved session; only a real refusal (401/403 and the
+          // like) blames the sign-in. A pending session gets the offer too (#3717): its saved
+          // entry is the program as written, because a pending plan never drives load, and that
+          // is what `settlePending` falls back to online. Refusing it stranded the lifter at a
+          // gym with no signal whenever a plan was waiting to be regenerated.
           const fallback =
-            !session.prescriptionPending &&
-            (!(error instanceof ApiError) || error.status >= 500 || error.status === 429);
+            !(error instanceof ApiError) || error.status >= 500 || error.status === 429;
           if (generation === this.generation) {
             this.publish({
               savedFallbackFor: fallback ? session.id : null,
