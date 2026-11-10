@@ -27,7 +27,7 @@ export function PrescriptionControls({
 }) {
   const action = preparation.action;
   const [confirm, setConfirm] = useState<string | null>(null);
-  const state = preparation.state.data?.state;
+  const state = preparation.prescribedState;
   const prescription = state?.prescription;
   const blocked =
     preparation.session?.exercises

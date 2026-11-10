@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { buildCardExerciseSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
+import { servePrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
 import type { Baseline1rmEntry } from '@trainingai/shared/types/ai-periodization'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 
@@ -80,18 +81,23 @@ export async function GET(
     }
   }
 
+  // #3716: an aged-out prescription is not the plan on any read (#3700), so the card must not show
+  // it, nor the Deload toggle adopt its flag. It goes out as `null` with `prescriptionAgedOut`; the
+  // workout-data read the same screen makes regenerates it and shows "preparing".
+  const served = servePrescriptionState(state)
+
   // A stored prescription can carry a no-op transition (target phase === current phase)
   // from before the generation-time guard landed; those rows live up to 7 days. Normalise
   // on read so the card never offers an impossible transition.
-  if (state.prescription) {
-    state = {
-      ...state,
-      prescription: normalizeStoredPrescription(
-        state.prescription, state.phase,
-        new Map(validSession.exercises.map(e => [e.id, e.exerciseRole])),
-      ),
-    }
-  }
+  const shown = served.prescription
+    ? {
+        ...served,
+        prescription: normalizeStoredPrescription(
+          served.prescription, served.phase,
+          new Map(validSession.exercises.map(e => [e.id, e.exerciseRole])),
+        ),
+      }
+    : served
 
   // The prescription card consumes ONLY `signals.exercises`, and only identity/role/1RM-trend
   // from it (workout-screen.tsx's PeriodizationResponse type is the contract). This used to call
@@ -106,5 +112,5 @@ export async function GET(
   ])
   const signals = { exercises: buildCardExerciseSignals(validSession.exercises, allPrs, prevPrs) }
 
-  return NextResponse.json({ state, signals }, { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json({ state: shown, signals }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

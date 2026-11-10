@@ -443,7 +443,7 @@ test('corrupt saved workouts block writes and preserve the original data', async
   assert.equal(await f.scope.get('workout-journal.v1'), '{broken');
 });
 
-test('offline starts require an explicit saved plan; pending and unauthorized prescriptions cannot start', async (t) => {
+test('offline starts require an explicit saved plan; unauthorized prescriptions cannot start', async (t) => {
   const f = await setup(t);
   f.connection.get = async () => {
     throw new Error('offline');
@@ -460,19 +460,47 @@ test('offline starts require an explicit saved plan; pending and unauthorized pr
   assert.equal(await f.controller.start(f.session, programId), null);
   assert.equal(f.controller.getSnapshot().savedFallbackFor, null);
   assert.equal(
-    await f.controller.start(
-      { ...f.session, prescriptionPending: true },
-      programId,
-      true,
-    ),
-    null,
-  );
-  assert.equal(
     f.controller
       .getSnapshot()
       .data.workouts.filter((workout) => workout.status === 'active').length,
     0,
   );
+});
+
+// #3717: a session whose plan is being regenerated could not start offline, and the message blamed
+// the sign-in. Its saved entry is the program as written, so it starts from that.
+test('an offline pending session offers the saved session and starts from the program as written', async (t) => {
+  const f = await setup(t);
+  const pending = { ...f.session, prescriptionPending: true };
+  f.connection.get = async () => {
+    throw new Error('offline');
+  };
+  assert.equal(await f.controller.start(pending, programId), null);
+  assert.equal(f.controller.getSnapshot().savedFallbackFor, pending.id);
+  assert.doesNotMatch(f.controller.getSnapshot().message ?? '', /sign-in/);
+  const id = await f.controller.start(pending, programId, true);
+  assert.ok(id);
+  assert.equal(f.controller.getSnapshot().message, PROGRAM_AS_WRITTEN);
+  const workout = f.controller.getSnapshot().data.workouts.find((w) => w.id === id)!;
+  assert.equal(workout.fromSavedPlan, true);
+  assert.deepEqual(
+    workout.exercises.map((exercise) => exercise.sets.length),
+    pending.exercises.map((exercise) => exercise.sets.length),
+  );
+});
+
+test('a pending session answered 401 still refuses and blames the sign-in', async (t) => {
+  const f = await setup(t);
+  f.connection.get = async () => {
+    throw new ApiError(401);
+  };
+  assert.equal(
+    await f.controller.start({ ...f.session, prescriptionPending: true }, programId),
+    null,
+  );
+  assert.equal(f.controller.getSnapshot().savedFallbackFor, null);
+  assert.match(f.controller.getSnapshot().message ?? '', /sign-in/);
+  assert.equal(f.controller.getSnapshot().data.workouts.length, 0);
 });
 
 test('workout day is pinned to account timezone across midnight and an offline completion', () => {
