@@ -26,6 +26,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
 import { activityZoneModel } from '../data/activity-zones';
+import { activityHrPoints } from '../data/hr-trace';
 import { activityHistorySpec, hrProfileSpec, metricValue } from '../data/models';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { HealthViewReady } from './HealthViewReady';
@@ -81,24 +82,10 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
     () => hr.data?.readings.slice().sort((a, b) => a.timestamp.localeCompare(b.timestamp)) ?? [],
     [hr.data],
   );
-  const points = readings.flatMap((p, i) => [
-    ...(i && Date.parse(p.timestamp) - Date.parse(readings[i - 1].timestamp) > 120000
-      ? [
-          {
-            x:
-              (Date.parse(p.timestamp) - (start ?? Date.parse(readings[0].timestamp))) / 60000 -
-              0.01,
-            label: 'Not recorded',
-            value: null,
-          },
-        ]
-      : []),
-    {
-      x: (Date.parse(p.timestamp) - (start ?? Date.parse(readings[0].timestamp))) / 60000,
-      label: p.timestamp,
-      value: p.bpm,
-    },
-  ]);
+  const points = useMemo(
+    () => activityHrPoints(readings, start, timezone),
+    [readings, start, timezone],
+  );
   const maxHr = profile.data?.workingMax ?? profile.data?.maxHr;
   const restingHr = profile.data?.restingHr;
   const routePoints = useMemo(
@@ -185,6 +172,8 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
             onSelect={routePoints.length > 1 ? scrub : undefined}
             onRelease={routePoints.length > 1 ? () => setScrubPoint(null) : undefined}
             tone="heart"
+            gaps="connect"
+            dots="none"
             series={
               log.paceSeries?.length
                 ? [

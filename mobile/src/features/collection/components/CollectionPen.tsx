@@ -228,7 +228,9 @@ export const CollectionPen = memo(function CollectionPen({
             position: 'absolute',
             right: theme.spacing.sm + theme.spacing.xxs,
             top: theme.spacing.sm,
-            color: theme.colors.onSignal,
+            // collection-pen.tsx: text-white/75 with a dark shadow. onSignal is black, which put dark
+            // text on a night sky (#2903).
+            color: theme.colors.onScene,
             opacity: 0.75,
             textShadowColor: theme.colors.scrim,
             textShadowOffset: { width: 0, height: 1 },

@@ -45,7 +45,7 @@ import { CollectionCard } from '../../collection/components/CollectionCard';
 import { metricLabels } from '../data/models';
 import { budgetEnergyModel } from '../../nutrition/data/energy-model';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { bandColor } from '../../../shared/theme/tokens';
+import { bandColor, sleepGoalBar } from '../../../shared/theme/tokens';
 import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { DEFAULT_SLEEP_GOAL_HOURS } from '@trainingai/shared/health/daily-goals';
 import { formatHoursMinutes } from '@trainingai/shared/format/units'
@@ -492,7 +492,12 @@ function HomeWidgetBody({
               <Icon name="moon" color={theme.scores.sleep} />
             </Stack>
             {night?.durationHours != null && (
-              <ProgressBar value={night.durationHours / goal} color={theme.scores.sleep} />
+              <ProgressBar
+                value={night.durationHours / goal}
+                height={theme.spacing.xs + theme.spacing.xxs}
+                gradient={sleepGoalBar.gradient}
+                trackColor={sleepGoalBar.track}
+              />
             )}
             {known > 0 && (
               <>
@@ -784,6 +789,7 @@ function HomeWidgetBody({
 }
 function HomeSleepFeedback({ onCorrect }: { onCorrect: () => void }) {
   const health = useHealthData();
+  const { theme } = useTheme();
   const state = useWorkoutResource(verdictSpec(health.today));
   const verdict = state.data?.verdict;
   if (hidesSleepVerdict(health.sleep, health.today) || !verdict) {
@@ -795,16 +801,31 @@ function HomeSleepFeedback({ onCorrect }: { onCorrect: () => void }) {
       <AppText variant={prominent ? 'caption' : 'micro'} tone={prominent ? undefined : 'muted'}>
         {line}
       </AppText>
-      <AppButton
-        title="That’s wrong"
-        variant="ghost"
+      {/* sleep-verdict-note.tsx: a small underlined link under the line, left-aligned, muted 12 px
+          semibold, on a 44 px row; not a centred brand button (#2903). */}
+      <Pressable
+        accessibilityRole="button"
         onPress={() => {
           // Record the disagreement first and never let a failed record stop the sheet opening;
           // the correction that matters is the value the check-in saves.
           void health.store?.respondToVerdict(health.today, 'corrected').catch(() => {});
           onCorrect();
         }}
-      />
+        style={({ pressed }) => ({
+          alignSelf: 'flex-start',
+          minHeight: theme.sizes.touchTarget,
+          justifyContent: 'center',
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <AppText
+          variant="caption"
+          tone="muted"
+          style={{ fontWeight: '600', textDecorationLine: 'underline' }}
+        >
+          That’s wrong
+        </AppText>
+      </Pressable>
     </Stack>
   );
 }

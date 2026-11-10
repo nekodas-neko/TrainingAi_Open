@@ -51,6 +51,8 @@ export type ThemeColors = {
   disabled: string;
   scrim: string;
   onSignal: string;
+  /** Text drawn straight on a scene picture (the Collection pen): white in both modes, as text-white. */
+  onScene: string;
   /** The empty part of a progress bar. */
   track: string;
   /** Chart gridlines and axes. */
@@ -138,6 +140,7 @@ export function createTheme(
     disabled: mode === 'dark' ? '#809084' : '#717a73',
     scrim: '#00000088',
     onSignal: '#000000',
+    onScene: '#ffffff',
     grid: mode === 'dark' ? '#ffffff18' : '#d0d5d1',
     // The mockups' dark glass (12,14,20 at 42%) and, in light, white at 75%. D7 drew 70%, which
     // left the muted sub-text at 4.48:1 on a deep-night sky; 75% keeps it above 4.5:1 on every sky.
