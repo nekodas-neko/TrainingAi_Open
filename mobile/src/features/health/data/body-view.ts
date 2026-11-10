@@ -158,6 +158,19 @@ export function weekdayAxis(dates: readonly string[], max = 14): string[] {
   );
 }
 
+/**
+ * Today's non-wear seconds from `/api/oura/stats` (#3699): the generic `wear` shape when the server
+ * sends it (null there means no wear today), else the older `daily.nonWearTimeSec` a server from
+ * before that field still sends.
+ */
+export function todayNonWearSec(stats: {
+  wear?: { nonWearSec: number } | null;
+  daily: { nonWearTimeSec: number | null } | null;
+}): number | null {
+  if (stats.wear !== undefined) return stats.wear?.nonWearSec ?? null;
+  return stats.daily?.nonWearTimeSec ?? null;
+}
+
 /** Seconds the ring has been worn so far today: the elapsed day minus non-wear time, never negative. */
 export function wornSeconds(nonWearTimeSec: number | null, elapsedSec: number): number | null {
   return nonWearTimeSec === null ? null : Math.max(0, elapsedSec - nonWearTimeSec);

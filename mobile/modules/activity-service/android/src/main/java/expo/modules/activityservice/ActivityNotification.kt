@@ -38,6 +38,8 @@ object ActivityNotification {
     }
     val builder = NotificationCompat.Builder(context, CHANNEL_ID)
       .setSmallIcon(R.drawable.activity_service_icon)
+      // The app's accent, as on every expo-notifications post (app.json, #3711).
+      .setColor(0xFF00C84E.toInt())
       .setContentTitle(title)
       .setContentText(body)
       .setOngoing(true)

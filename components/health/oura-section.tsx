@@ -111,7 +111,7 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
 
   if (!data?.connected) return null
 
-  const { daily } = data
+  const { wear } = data
   // Direct-BLE poll is now the only battery source — /api/oura/stats no longer
   // calls the Oura Cloud, whose reading has been frozen since the re-key anyway.
   const battery = liveBattery != null
@@ -119,8 +119,9 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
     : null
 
   // Time worn today = elapsed-so-far − non_wear (partial day; never a full 24h)
-  const wornSec = daily?.nonWearTimeSec != null
-    ? Math.max(0, secondsSinceLocalMidnight() - daily.nonWearTimeSec)
+  // #3699: the generic wear shape, never the ring's own field name.
+  const wornSec = wear != null
+    ? Math.max(0, secondsSinceLocalMidnight() - wear.nonWearSec)
     : null
   const batteryIcon = battery?.charging
     ? <BatteryChargingIcon className="w-4 h-4 text-accent-green" />

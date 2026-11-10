@@ -8,13 +8,16 @@ const n = z
   .nullish()
   .transform((value) => value ?? null);
 
-/** `/api/oura/stats`: whether the ring has produced data, and today's rollup (non-wear time). */
+/** `/api/oura/stats`: whether the ring has produced data, and today's wear. */
 export const ouraStatsSpec = (date: string) => ({
   path: '/api/oura/stats',
   partition: date,
   ttl: 300_000,
   schema: z.object({
     connected: z.boolean(),
+    // #3699: today's wear in the generic shape. Optional because production before it ships sends
+    // only `daily.nonWearTimeSec`; `todayNonWearSec` falls back to that while the field is absent.
+    wear: z.object({ nonWearSec: z.number().finite() }).passthrough().nullish(),
     daily: z.object({ nonWearTimeSec: n }).passthrough().nullable(),
   }),
 });
