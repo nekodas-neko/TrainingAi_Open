@@ -143,8 +143,8 @@ export function IntegrationSettings() {
             }
           />
           <AppText variant="caption" tone="muted">
-            Times follow your phone’s local clock. Notifications follow your phone’s sound and
-            Focus settings.
+            Times follow your profile’s time zone, not the phone’s clock. Notifications follow your
+            phone’s sound and Focus settings.
           </AppText>
           <AppText variant="label">Workout calendar</AppText>
           <AppButton
