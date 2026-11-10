@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, toAestDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
+import { servePrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
 
 export async function GET() {
   const session = await auth()
@@ -24,7 +25,9 @@ export async function GET() {
   )
 
   const sessions = program.sessions.map((ps, i) => {
-    const state = states.find(s => s.programSessionId === ps.id) ?? null
+    const stored = states.find(s => s.programSessionId === ps.id) ?? null
+    // #3716: an aged-out prescription is not the session's plan, here as on every other read.
+    const state = stored && servePrescriptionState(stored)
     const lastCompleted = recentBySession[i].find(s => s.completedAt != null)
     const lastTrainedDaysAgo = lastCompleted?.completedAt != null
       ? daysBetweenDateStrs(toAestDateStr(lastCompleted.completedAt, tz), today)

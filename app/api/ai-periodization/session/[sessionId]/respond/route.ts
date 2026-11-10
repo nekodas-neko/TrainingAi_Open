@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { prescriptionAgedOut } from '@trainingai/shared/ai-periodization/prescription-expiry'
 
 // One response to a prescription.
 const MAX_BODY_BYTES = 16 * 1024
@@ -41,6 +42,12 @@ export async function POST(
   const state = await repo.getSessionPeriodization(userId, sessionId)
   if (!state) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!state.prescription) return NextResponse.json({ error: 'No prescription' }, { status: 400 })
+  // #3716: an aged-out prescription is no longer shown, so an Accept that reaches it was made on a
+  // plan the lifter never saw (a stale screen, a queued tap). Refused; opening the session makes a
+  // fresh one. A Dismiss would only bury a plan that is already being replaced, so it is refused too.
+  if (prescriptionAgedOut(state)) {
+    return NextResponse.json({ error: 'This prescription has expired. Reopen the session for a fresh one.' }, { status: 409 })
+  }
 
   const newStatus = body.action === 'accept' ? 'accepted' : 'dismissed'
 

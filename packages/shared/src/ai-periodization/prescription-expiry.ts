@@ -24,6 +24,8 @@ export interface ExpiryContext {
  *
  * - `rest_day_recommended`: the model's answer to how the lifter is today. Its exercise list is
  *   offered "for reference", never as next week's plan.
+ * - `session_swap_recommended`: "train a different session today" (`prompt.ts`), on today's
+ *   soreness and the hours since the last session. Tomorrow it answers nothing (#3716).
  * - A deload whose emergency trigger was the lifter's own illness report. That trigger is named at
  *   the decision (`emergencyDeloadTrigger`), so it can be told apart from every other deload.
  *
@@ -36,6 +38,7 @@ export function isOneDayPrescription(
   ctx: ExpiryContext = {},
 ): boolean {
   if (prescription.phaseAction === 'rest_day_recommended') return true
+  if (prescription.phaseAction === 'session_swap_recommended') return true
   return prescription.phaseAction === 'deload_recommended' && ctx.illnessTriggered === true
 }
 
@@ -59,7 +62,10 @@ export function prescriptionExpiresAt(
 // (see `prescriptionAgedOut`), but a pending rest day or deload is exactly what was served stale: it
 // does not drive load, so nothing on the read path ever looked at its expiry, and the lifter met it
 // again on the next open of the session. Once it has expired it is no longer an answer to anything.
-const PENDING_OFFERS_THAT_AGE_OUT = new Set<AiPrescription['phaseAction']>(['rest_day_recommended', 'deload_recommended'])
+// A session swap is a one-day answer too (#3716), so its pending offer ages out with the others.
+const PENDING_OFFERS_THAT_AGE_OUT = new Set<AiPrescription['phaseAction']>([
+  'rest_day_recommended', 'deload_recommended', 'session_swap_recommended',
+])
 
 /** The expiry branch on its own: a stored prescription past its window is replaced, not re-shaped.
  *  Shared by the reevaluation, the workout and next-session reads, and the Home warm (#2155), so
@@ -80,4 +86,73 @@ export function prescriptionAgedOut(
     return action != null && PENDING_OFFERS_THAT_AGE_OUT.has(action)
   }
   return true
+}
+
+/** The stored prescription state as a route returns it to a screen (#3716): an aged-out
+ *  prescription is left out, and `prescriptionAgedOut` says why. The field is optional on the wire
+ *  because Preview also talks to servers from before it existed. */
+export type ServedPrescriptionState<T> = T & { prescriptionAgedOut?: boolean }
+
+/**
+ * What the session-state reads (the prescription card, the program overview) return for a stored
+ * state. An aged-out prescription is not the plan on any read (#3700), so the card, the Deload
+ * default and Accept must not see it either: it is replaced by `null` and flagged. The stored row is
+ * untouched; opening the session regenerates it.
+ */
+export function servePrescriptionState<T extends Pick<SessionPeriodization, 'prescriptionStatus' | 'prescriptionExpiresAt'>
+  & Partial<Pick<SessionPeriodization, 'prescription'>>>(state: T, now = new Date()): ServedPrescriptionState<T> {
+  if (state.prescription == null || !prescriptionAgedOut(state, now)) return state
+  return { ...state, prescription: null, prescriptionAgedOut: true } as ServedPrescriptionState<T>
+}
+
+/** The client's side of `servePrescriptionState`, for a state read off the wire or a cache. */
+export interface WirePrescriptionState {
+  prescriptionStatus?: string | null
+  /** An ISO string off the wire, or a Date. */
+  prescriptionExpiresAt?: string | Date | null
+  prescription?: { phaseAction?: string } | null
+  prescriptionAgedOut?: boolean
+}
+
+/**
+ * True when a screen must not treat this state's prescription as the plan: not as the card, not as
+ * the Deload default, not as something to Accept (#3716).
+ *
+ * The server's flag wins when it is there. It is absent from servers older than the flag (Preview
+ * talks to production) and from a state cached before the prescription expired, so the expiry is
+ * read here too, through the same `prescriptionAgedOut` every server read uses.
+ */
+export function prescriptionAgedOutOnScreen(state: WirePrescriptionState | null | undefined, now = new Date()): boolean {
+  if (state == null) return false
+  if (state.prescriptionAgedOut === true) return true
+  const raw = state.prescriptionExpiresAt
+  const expiresAt = raw == null ? null : raw instanceof Date ? raw : new Date(raw)
+  if (expiresAt == null || Number.isNaN(expiresAt.getTime()) || state.prescriptionStatus == null) return false
+  return prescriptionAgedOut({
+    prescriptionStatus: state.prescriptionStatus as SessionPeriodization['prescriptionStatus'],
+    prescriptionExpiresAt: expiresAt,
+    prescription: (state.prescription ?? null) as SessionPeriodization['prescription'],
+  }, now)
+}
+
+/** `state` with an aged-out prescription taken off it, for a screen that holds the state (a cache
+ *  seed painted before the expiry included). Returns `state` itself when nothing changes. */
+export function hidePrescriptionAgedOutOnScreen<T extends WirePrescriptionState>(state: T, now = new Date()): T {
+  if (state.prescription == null || !prescriptionAgedOutOnScreen(state, now)) return state
+  return { ...state, prescription: null, prescriptionAgedOut: true } as T
+}
+
+/**
+ * What the Deload toggle adopts from the session's state before the lifter touches it (#3716), in
+ * both apps: the prescription's own flag while it governs the session; `false` once it has aged
+ * out, so yesterday's illness deload is not pre-selected this morning; `undefined` when there is
+ * nothing to adopt (no prescription, or a `consumed` one that describes a session already run).
+ */
+export function prescribedDeloadDefault(
+  state: (WirePrescriptionState & { prescription?: { deload?: boolean } | null }) | null | undefined,
+  now = new Date(),
+): boolean | undefined {
+  if (state == null || state.prescriptionStatus === 'consumed') return undefined
+  if (prescriptionAgedOutOnScreen(state, now)) return false
+  return state.prescription?.deload
 }

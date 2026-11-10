@@ -4,6 +4,7 @@ import { getRepository } from "@/lib/data";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-session-duration";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
+import { prescriptionAgedOut } from "@trainingai/shared/ai-periodization/prescription-expiry";
 
 export async function GET() {
   const session = await auth();
@@ -32,14 +33,17 @@ export async function GET() {
     // Reflect a Workout Review "drop this cycle" in the home card's exercise count / duration
     // estimate, matching what the workout screen will actually show.
     const p = state?.prescription;
-    if (p?.droppedExerciseIds?.length && state && prescriptionDrivesLoad(p.phaseAction, state.prescriptionStatus)) {
+    // #3716: an aged-out prescription is not the plan (#3700), so neither its drops nor its
+    // duration reach the Home card. Opening the session regenerates it.
+    const drives = !!p && !!state && !prescriptionAgedOut(state)
+      && prescriptionDrivesLoad(p.phaseAction, state.prescriptionStatus);
+    if (drives && p.droppedExerciseIds?.length) {
       const dropped = new Set(p.droppedExerciseIds);
       recommendation.session = {
         ...recommendation.session,
         exercises: recommendation.session.exercises.filter(e => !dropped.has(e.id)),
       };
     }
-    const drives = !!p && !!state && prescriptionDrivesLoad(p.phaseAction, state.prescriptionStatus);
     recommendation.estimatedDurationMin = drives && p.estimatedSessionDurationMin > 0
       ? p.estimatedSessionDurationMin
       : estimateProgramSessionMin(

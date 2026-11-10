@@ -306,6 +306,10 @@ async function runPrescriptionGeneration(
   excludeSessionId?: string,
   durationPreset?: DurationPreset,
 ): Promise<GeneratePrescriptionResult> {
+  // A one-day prescription ends at the midnight that closes the day it was asked for. Read from the
+  // start, not the store: a generation that straddles midnight would otherwise live all of the next
+  // day (#3716).
+  const startedAt = new Date()
   const today = todayInTz(tz)
 
   // Validate the session belongs to the active program, then ensure it has a periodization
@@ -404,7 +408,7 @@ async function runPrescriptionGeneration(
     // #3700: a deload fired by the lifter's own sick report answers today only, so it ends at the
     // next local midnight and the next open asks again. The other triggers describe the block and
     // keep the week.
-    const expiresAt = prescriptionExpiresAt(prescription, tz, new Date(), { illnessTriggered: trigger?.kind === 'illness' })
+    const expiresAt = prescriptionExpiresAt(prescription, tz, startedAt, { illnessTriggered: trigger?.kind === 'illness' })
     await repo.storePrescription(userId, programSessionId, prescription, expiresAt)
 
     return {
@@ -439,7 +443,7 @@ async function runPrescriptionGeneration(
     // Soreness is a per-day signal — expire at the next local midnight so a clean check-in
     // gets a fresh decision. It was `now + 24h`, which kept an evening deload alive through the
     // next day's morning check-in (#3700).
-    const expiresAt = nextMidnightInTz(tz)
+    const expiresAt = nextMidnightInTz(tz, startedAt)
     await repo.storePrescription(userId, programSessionId, prescription, expiresAt)
     return {
       ok: true,
@@ -811,7 +815,7 @@ async function runPrescriptionGeneration(
 
   // #3700: a rest-day recommendation is sized on today's readiness and ends at the next local
   // midnight; a plan sized on the block keeps its week.
-  const expiresAt = prescriptionExpiresAt(prescription, tz)
+  const expiresAt = prescriptionExpiresAt(prescription, tz, startedAt)
   // Content and status in ONE write. Previously this stored the prescription (which resets the
   // status to 'pending') and then set 'auto_applied' in a second statement; two concurrent
   // generations for this session could interleave between them and leave the status describing the
