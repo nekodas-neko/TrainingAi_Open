@@ -70,3 +70,9 @@ test('a weekly-mode goal recommendation stores the daily figures (#3643)', async
   });
   assert.equal(goalShownForPeriod(10000, 'weekly'), 70000);
 });
+
+test("the reminders caption says times follow the profile's time zone, as they do since #3694 (#3683)", async () => {
+  const text = await source('features/platform/components/IntegrationSettings.tsx');
+  assert.doesNotMatch(text, /Times follow your phone’s local clock/);
+  assert.match(text, /Times follow your profile’s time zone/);
+});
