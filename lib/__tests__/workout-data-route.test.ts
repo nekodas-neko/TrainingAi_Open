@@ -394,6 +394,31 @@ describe('GET /api/workout-data — what drives the bar', () => {
     expect(regeneratePrescriptionSingleFlight).toHaveBeenCalledTimes(1)
   })
 
+  // #3714: a pending stay drives load, and every stay is pending while auto-apply is off. Its expiry
+  // used to be ignored, so a session left unused for over a week replayed its last plan.
+  it('keeps an expired PENDING stay off the bar, and regenerates it', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      prescriptionStatus: 'pending',
+      prescription: prescription({ phaseAction: 'stay' }),
+      prescriptionExpiresAt: new Date(Date.now() - 60_000),
+    }))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(buildOptsFor()!.aiDrivesLoad).toBe(false)
+    expect(body.aiPrescriptionPending).toBe(true)
+    expect(regeneratePrescriptionSingleFlight).toHaveBeenCalledTimes(1)
+  })
+
+  it('lets an unexpired pending stay drive load', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      prescriptionStatus: 'pending',
+      prescription: prescription({ phaseAction: 'stay' }),
+    }))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(buildOptsFor()!.aiDrivesLoad).toBe(true)
+    expect(body.aiPrescriptionPending).toBe(false)
+    expect(regeneratePrescriptionSingleFlight).not.toHaveBeenCalled()
+  })
+
   it('leaves an unexpired rest-day offer alone', async () => {
     getSessionPeriodization.mockResolvedValue(periodization({
       prescriptionStatus: 'pending',
