@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { activityZoneModel } from '../src/features/health/data/activity-zones.ts';
+import { activityHrPoints } from '../src/features/health/data/hr-trace';
 
 // The component needs a device to render (the suite has no renderer), so the order and the memo
 // keys are read from the source, as the other parity guards do; the zone maths runs for real.
@@ -49,4 +50,37 @@ test('the zone model yields time in zone and route segments only when it has wha
   assert.ok(full.zones && full.zones.totalSec > 0);
   assert.deepEqual(activityZoneModel({ ...base, maxHr: null, restingHr: 55 }), { zones: null, zoneSegments: null });
   assert.equal(activityZoneModel({ ...base, maxHr: 190, restingHr: 55, readings: readings.slice(0, 1) }).zones, null);
+});
+
+// #3702: a 40-minute walk read raw UTC timestamps at the axis ends and drew short strokes, because
+// every gap over two minutes broke the line and every reading carried a dot.
+test('the Heart rate & pace trace is one time-ordered line labelled in local clock time (#3702)', () => {
+  const tz = 'Australia/Brisbane';
+  const start = Date.parse('2026-11-02T00:17:00.000Z'); // 10:17 am in Brisbane
+  // Sparse, unordered readings with gaps of several minutes, as a ring-only window has.
+  const readings = [
+    { timestamp: '2026-11-02T00:57:36.000Z', bpm: 101 },
+    { timestamp: '2026-11-02T00:18:14.000Z', bpm: 96 },
+    { timestamp: '2026-11-02T00:30:00.000Z', bpm: 118 },
+    { timestamp: '2026-11-02T00:30:05.000Z', bpm: 121 },
+    { timestamp: 'not a time', bpm: 80 },
+  ];
+  const points = activityHrPoints(readings, start, tz);
+  assert.equal(points.length, 4, 'one point per valid reading, no inserted breaks');
+  assert.ok(points.every((p) => p.value !== null));
+  for (let i = 1; i < points.length; i++) assert.ok(points[i].x > points[i - 1].x, 'x increases');
+  assert.equal(points[0].label, '10:18 am');
+  assert.equal(points.at(-1)!.label, '10:57 am');
+  assert.ok(Math.abs(points[0].x - (74 / 60)) < 1e-9, 'x is minutes since the activity start');
+  assert.ok(points.every((p) => !/T\d\d:|Z$/.test(p.label)), 'no ISO strings on the axis');
+  assert.deepEqual(activityHrPoints([], start, tz), []);
+});
+
+test('the activity HR chart draws the trace connected and without per-reading dots (#3702)', async () => {
+  const text = await source;
+  const chart = text.slice(text.indexOf('label="Recorded heart rate"'), text.indexOf('series={'));
+  assert.match(chart, /gaps="connect"/);
+  assert.match(chart, /dots="none"/);
+  assert.match(text, /activityHrPoints\(readings, start, timezone\)/);
+  assert.doesNotMatch(text, /label: p\.timestamp/);
 });

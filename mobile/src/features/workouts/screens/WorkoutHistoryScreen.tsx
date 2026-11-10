@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Pressable } from 'react-native';
 import { ExerciseHistory } from '../components/ExerciseHistory';
-import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import {
   AppButton,
   AppText,
@@ -20,7 +19,6 @@ import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { daySpec, type DayExercise } from '../data/models';
 import { useHistoryQueue } from '../data/HistoryQueueProvider';
 import { overlayHistory } from '../data/HistoryOutbox';
-import { useWorkoutContext } from '../WorkoutProvider';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { useWorkoutAction } from '../data/useWorkoutAction';
 import { formatSetLoad } from '../logging/targets';
@@ -38,7 +36,6 @@ export function HistoryDay({
   readOnly?: boolean;
   sessionEnergy?: { id: string; kcal: number; source: 'hr' | 'met' }[];
 }) {
-  const { timezone } = useWorkoutContext();
   const [history, setHistory] = useState<string | null>(null);
   const state = useWorkoutResource(daySpec(date));
   const queue = useHistoryQueue();
@@ -188,7 +185,8 @@ export function HistoryDay({
           {state.data?.workoutDurationsById?.[id] && (
             <AppText variant="caption" tone="muted">
               {compact
-                ? `${formatTimeOfDay(state.data.workoutDurationsById[id]!.start, timezone)} → ${formatTimeOfDay(state.data.workoutDurationsById[id]!.end, timezone)} · `
+                ? // The day log sends these already formatted ("7:51 am"), not as instants.
+                  `${state.data.workoutDurationsById[id]!.start} → ${state.data.workoutDurationsById[id]!.end} · `
                 : ''}
               {Math.round(state.data.workoutDurationsById[id]!.minutes)} min
             </AppText>

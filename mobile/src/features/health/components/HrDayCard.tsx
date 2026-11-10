@@ -11,9 +11,9 @@ import { AppText, Card, Legend, LineChart } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { scaleAlpha } from '../../../shared/theme/alpha';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
-import { daySpec } from '../../workouts/data/models';
+import { daySessionsSpec } from '../../workouts/data/models';
 import { useHealthData } from '../data/HealthDataProvider';
-import { hrDayBuckets, hrTracePoints } from '../data/hr-trace';
+import { hrDayBuckets, hrTracePoints, hrWorkoutWindows } from '../data/hr-trace';
 import { hrSpec, stressSpec } from '../data/models';
 export function HrDayCard({
   embedded = false,
@@ -24,7 +24,7 @@ export function HrDayCard({
   const { theme } = useTheme();
   const state = useWorkoutResource(hrSpec(today));
   const stress = useWorkoutResource(stressSpec(today));
-  const workouts = useWorkoutResource(daySpec(today));
+  const workouts = useWorkoutResource(daySessionsSpec(today));
   const midnight = dateStrMidnightInTz(today, timezone).getTime();
   // Wall-clock minutes of the day, so the axis is the clock face on a 23- or 25-hour day too (#3445).
   const wallMinute = wallClockMinuteReader(midnight, timezone);
@@ -55,18 +55,11 @@ export function HrDayCard({
           },
         ]
       : []),
-    ...Object.values(workouts.data?.workoutDurationsById ?? {}).flatMap((d) =>
-      d
-        ? [
-            {
-              from: minute(d.start),
-              to: minute(d.end),
-              label: 'Workout',
-              color: theme.tones.activity.foreground,
-            },
-          ]
-        : [],
-    ),
+    ...hrWorkoutWindows(workouts.data?.sessions ?? [], wallMinute).map((window) => ({
+      ...window,
+      label: 'Workout',
+      color: theme.tones.activity.foreground,
+    })),
   ];
   const stressPoints = (stress.data?.series ?? []).flatMap((p, i, rows) => [
     ...(i && p.t - rows[i - 1].t > 75 * 60000

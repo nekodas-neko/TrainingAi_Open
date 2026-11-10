@@ -19,8 +19,10 @@ import { useTheme } from '../theme/ThemeProvider';
 //   gridlines  faint horizontal lines at round totals
 //   yAxis      value labels in a column left of the bars (implies gridlines)
 //   target     { value, label } dashed goal line on the stack total; the scale grows to include it
+//   compactAxisLabels  the current app's 9 px chart.js ticks under the bars
 // Any of gridlines / yAxis / target also draws the stacks on one exact linear scale.
-// Weekday labels: set each bar's `label`, e.g. formatDateDisplay(date, 'weekday').
+// Weekday labels: set each bar's `label`, e.g. formatDateDisplay(date, 'weekday'). A label that still
+// does not fit its column shrinks (to 70%) rather than being cut to "09-…" (#2934).
 export function StackedBarChart({
   label,
   unit,
@@ -31,8 +33,10 @@ export function StackedBarChart({
   target: targetProp,
   tickCount,
   height,
+  compactAxisLabels = false,
 }: {
   readable?: boolean;
+  compactAxisLabels?: boolean;
   gridlines?: boolean;
   yAxis?: boolean;
   target?: ChartTarget;
@@ -99,9 +103,17 @@ export function StackedBarChart({
               })}
             </Svg>
             <AppText
-              variant={readable ? 'caption' : 'micro'}
+              variant={
+                compactAxisLabels
+                  ? 'axisTick'
+                  : readable
+                    ? 'caption'
+                    : 'micro'
+              }
               tone={readable ? 'text' : 'muted'}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
               style={{ textAlign: 'center' }}
             >
               {bar.label}

@@ -253,6 +253,27 @@ export const daySpec = (date: string) => ({
     .passthrough(),
   ttl: DAY_LOG_TTL * 1000,
 });
+/**
+ * The day's workout sessions as instants, from the endpoint the current app's Heart rate card reads
+ * (`workout-sessions-day:` at TTL_MEDIUM). The day log's `workoutDurationsById` carries display
+ * strings ("7:51 am"), which cannot be placed on a chart (#2903).
+ */
+export const daySessionsSpec = (date: string) => ({
+  path: '/api/workout-sessions/day',
+  query: { date },
+  schema: z
+    .object({
+      sessions: z
+        .array(
+          z
+            .object({ sessionName: text, startedAt: text, completedAt: text.nullable() })
+            .passthrough(),
+        )
+        .default([]),
+    })
+    .passthrough(),
+  ttl: TTL_MEDIUM * 1000,
+});
 export const recapSpec = (id: string) => ({
   path: `/api/workout-sessions/${id}/recap`,
   schema: z.object({ recap: text.optional(), degraded: z.boolean().optional() }),

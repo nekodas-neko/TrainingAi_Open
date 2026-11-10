@@ -43,8 +43,12 @@ export function CardioTrends() {
           { value: 'cadence', label: 'Cadence' },
         ]}
       />
+      {/* The current app's three views are each their own h-40 box, so one tab never keeps another's
+          height. Keyed by view, the reserve is measured afresh on each tab instead of holding the
+          tallest one seen, which left an empty band under the zone bars (#2934). */}
       <StableContent
-        minHeight={theme.sizes.hrChartHeight + theme.sizes.touchTarget}
+        key={view}
+        minHeight={theme.sizes.hrChartHeight}
         loading={!data && state.loading}
       >
         {!data ? (
@@ -66,7 +70,9 @@ export function CardioTrends() {
               unit="min"
               gridlines
               yAxis
-              height={theme.sizes.hrChartHeight}
+              compactAxisLabels
+              // zone-stack-chart.tsx is one h-40 box with its x ticks inside it.
+              height={theme.sizes.hrChartHeight - (theme.typography.axisTick.lineHeight ?? 0)}
               tickCount={4}
               bars={data.weeklyZoneStacks.map((week) => ({
                 label: week.weekStart.slice(5),

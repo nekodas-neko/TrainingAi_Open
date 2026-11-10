@@ -1,5 +1,5 @@
 import { usePagerMotion } from '../../../shared/ui/usePagerMotion';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import {
   AppButton,
@@ -57,8 +57,13 @@ export function HealthScreen({
   const resources = useWorkoutResources();
   const [localTab, setTab] = useState<HealthPanel>('training');
   const [sleepDate, setSleepDate] = useState<string | null>(null);
+  // Health sits in a RetainedView, and a hidden <Activity> re-runs its effects each time it is shown
+  // again, so a bare [sleepRequest] effect reopened the sheet on every return to the tab (#3703).
+  // Each request is honoured once, by its count, as NutritionScreen does with its requests.
+  const handledSleep = useRef(0);
   useEffect(() => {
-    if (sleepRequest) {
+    if (sleepRequest && sleepRequest.count > handledSleep.current) {
+      handledSleep.current = sleepRequest.count;
       setSleepDate(sleepRequest.date);
     }
   }, [sleepRequest]);

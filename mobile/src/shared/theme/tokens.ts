@@ -368,6 +368,12 @@ export const scoreColors = {
   },
   dark: { readiness: '#60a5fa', heart: '#f87171', sleep: '#a78bfa', activity: '#f97316' },
 };
+// home-card-widget.tsx's sleep goal bar: an indigo-to-violet fill, squeezed into the filled part,
+// on a violet track at 15% (rgba(139,92,246,0.15)); the same in both modes.
+export const sleepGoalBar = {
+  gradient: ['#6366f1', '#a78bfa'],
+  track: '#8b5cf626',
+} as const;
 export const weatherColors = {
   light: {
     uvLow: statusColors.light.success,

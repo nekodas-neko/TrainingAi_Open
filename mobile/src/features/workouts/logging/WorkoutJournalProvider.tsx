@@ -44,6 +44,7 @@ export function WorkoutJournalProvider({ children }: PropsWithChildren) {
       '/api/ai-periodization',
       '/api/next-session',
       '/api/day-log',
+      '/api/workout-sessions/day',
       '/api/calendar-data',
       '/api/streak-data',
       '/api/exercise-history',

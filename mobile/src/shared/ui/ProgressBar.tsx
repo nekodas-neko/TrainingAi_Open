@@ -1,6 +1,7 @@
 import { useReducedMotion } from './useReducedMotion';
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { Animated, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function ProgressBar({
@@ -10,6 +11,8 @@ export function ProgressBar({
   color,
   target,
   height,
+  gradient,
+  trackColor,
 }: {
   value: number;
   complete?: boolean;
@@ -18,8 +21,15 @@ export function ProgressBar({
   target?: number;
   /** Track height; the standard bar when omitted. */
   height?: number;
+  /**
+   * A left-to-right ramp across the filled part, as the current app's `linear-gradient(90deg, …)`
+   * fill scaled to the value (its ends are the ramp's ends however full the bar is). Overrides color.
+   */
+  gradient?: readonly [string, string];
+  trackColor?: string;
 }) {
   const { theme } = useTheme();
+  const gradientId = `bar${useId().replace(/:/g, '')}`;
   const reduced = useReducedMotion();
   const fraction = Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
   const fill = useRef(new Animated.Value(fraction)).current;
@@ -44,7 +54,7 @@ export function ProgressBar({
       style={{
         height: height ?? theme.spacing.sm,
         borderRadius: theme.radii.pill,
-        backgroundColor: theme.colors.track,
+        backgroundColor: trackColor ?? theme.colors.track,
         overflow: 'hidden',
       }}
     >
@@ -52,10 +62,26 @@ export function ProgressBar({
         style={{
           height: '100%',
           width: fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-          backgroundColor: color ?? (complete ? theme.anatomy.main : theme.colors.brand),
+          backgroundColor: gradient
+            ? undefined
+            : (color ?? (complete ? theme.anatomy.main : theme.colors.brand)),
+          borderRadius: gradient ? theme.radii.pill : undefined,
+          overflow: gradient ? 'hidden' : undefined,
           alignSelf: origin === 'right' ? 'flex-end' : 'flex-start',
         }}
-      />
+      >
+        {gradient && (
+          <Svg width="100%" height="100%" viewBox="0 0 100 1" preserveAspectRatio="none">
+            <Defs>
+              <LinearGradient id={gradientId} x1="0" x2="1" y1="0" y2="0">
+                <Stop offset={0} stopColor={gradient[0]} />
+                <Stop offset={1} stopColor={gradient[1]} />
+              </LinearGradient>
+            </Defs>
+            <Rect width={100} height={1} fill={`url(#${gradientId})`} />
+          </Svg>
+        )}
+      </Animated.View>
       {target !== undefined && (
         <View
           pointerEvents="none"

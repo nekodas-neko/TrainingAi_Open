@@ -402,10 +402,12 @@ export function LineChart({
               ? 'Tap the chart to inspect a reading'
               : (() => {
                   const p = valid.find((p) => (p.x ?? points.indexOf(p)) === selection) ?? valid[0];
-                  return `${p.label}: ${p.value} · ${bands
-                    .filter((b) => selection >= b.from && selection <= b.to)
-                    .map((b) => b.label)
-                    .join(' · ')}`;
+                  return [
+                    `${p.label}: ${p.value}`,
+                    ...bands
+                      .filter((b) => selection >= b.from && selection <= b.to)
+                      .map((b) => b.label),
+                  ].join(' · ');
                 })()}
           </AppText>
         </View>

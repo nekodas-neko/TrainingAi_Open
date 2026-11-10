@@ -220,8 +220,9 @@ export async function GET(req: NextRequest) {
     const completedMs = ws.completedAt?.getTime();
     const endMs = completedMs != null && completedMs >= startMs ? completedMs : reconstructedEndMs;
     workoutDurationsById[ws.id] = {
-      start: fmtMs(startMs),
-      end:   fmtMs(endMs),
+      // Display strings ("7:51 am") in the user's zone; without it every user got Brisbane's clock.
+      start: fmtMs(startMs, tz),
+      end:   fmtMs(endMs, tz),
       // Active time: the span less any pause (#3266), the same figure every other screen shows.
       minutes: Math.round(sessionActiveMin(new Date(startMs), new Date(endMs), ws.pausedSec)),
     };

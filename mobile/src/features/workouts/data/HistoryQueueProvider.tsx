@@ -38,6 +38,7 @@ export function HistoryQueueProvider({ children }: PropsWithChildren) {
               }
               resources?.invalidate([
                 '/api/day-log',
+                '/api/workout-sessions/day',
                 '/api/calendar-data',
                 '/api/streak-data',
                 '/api/exercise-history',
