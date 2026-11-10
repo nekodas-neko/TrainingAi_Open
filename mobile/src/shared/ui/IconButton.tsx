@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+import { Pressable } from './Pressable';
 import { Icon, type IconName } from './Icon';
 import { useTheme } from '../theme/ThemeProvider';
 import type { ReactNode } from 'react';

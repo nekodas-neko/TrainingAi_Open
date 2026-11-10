@@ -9,7 +9,8 @@ import { nativeColor } from '../../../shared/ui';
 import type { ReactNode } from 'react';
 import type { z } from 'zod';
 import type { ResourceSpec, ResourceState } from '../../workouts/data/WorkoutResources';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import {
   AppText,
   Card,

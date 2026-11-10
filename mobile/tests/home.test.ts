@@ -855,14 +855,40 @@ test('a Home card turned on goes before Metric Tiles, with or without a saved or
     homeSections({ homeCards: ['stepsWidget'], homeSectionOrder: saved.homeSectionOrder }),
     ['streak', 'recommendation', 'card_stepsWidget', 'metricTiles', 'weekStrip'],
   );
-  // Turning a card off drops it from the saved order, as the web does.
-  assert.deepEqual(homeCardsPatch(patch, ['stepsWidget']).homeSectionOrder, [
+  // Turning a card off keeps its slot in the saved order and only leaves it off Home, as the
+  // current app does (#3705).
+  const off = { ...patch, ...homeCardsPatch(patch, ['stepsWidget']) };
+  assert.deepEqual(off.homeSectionOrder, patch.homeSectionOrder);
+  assert.deepEqual(homeSections(off), [
     'streak',
     'recommendation',
     'card_stepsWidget',
     'metricTiles',
     'weekStrip',
   ]);
+});
+
+test('a Home card switched off and on again returns to the slot it had (#3705)', () => {
+  const start = {
+    homeCards: ['stepsWidget', 'sleepWidget', 'hrWidget'],
+    homeSectionOrder: [
+      'recommendation',
+      'streak',
+      'card_stepsWidget',
+      'weekStrip',
+      'card_sleepWidget',
+      'card_hrWidget',
+      'metricTiles',
+    ],
+  };
+  const before = homeSections(start);
+  assert.equal(before.indexOf('card_sleepWidget'), 4);
+  const off = { ...start, ...homeCardsPatch(start, ['stepsWidget', 'hrWidget']) };
+  assert.ok(!homeSections(off).includes('card_sleepWidget'));
+  const on = { ...off, ...homeCardsPatch(off, ['stepsWidget', 'hrWidget', 'sleepWidget']) };
+  assert.deepEqual(homeSections(on), before);
+  // The saved order is the one the current app reads: it filters by the active cards on load.
+  assert.deepEqual(on.homeSectionOrder, start.homeSectionOrder);
 });
 
 test('a preference the server rejects with a 400 is set aside and does not block later Home writes', async () => {

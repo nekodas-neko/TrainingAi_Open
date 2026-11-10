@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, type PressableProps } from 'react-native';
+import { ActivityIndicator, type PressableProps } from 'react-native';
+import { Pressable } from './Pressable';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
 import { Icon, type IconName } from './Icon';

@@ -1,7 +1,8 @@
 import { ActionMenu } from './ActionMenu';
 import { feedback } from '../../integrations/feedback/haptics';
 import { useState, type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from './Pressable';
 import { useTheme } from '../theme/ThemeProvider';
 import type { Tone } from '../theme/theme';
 import { AppText } from './AppText';

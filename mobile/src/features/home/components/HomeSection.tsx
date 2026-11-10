@@ -23,6 +23,8 @@ import {
   visibleSectionIndex,
 } from '../data/models';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { SectionLongPressContext, type SectionLongPress } from '../../../shared/ui/sectionLongPress';
+const MENU_DELAY_MS = 350;
 export function HomeSection({
   id,
   editing,
@@ -101,6 +103,16 @@ export function HomeSection({
       },
     });
   }
+  // A tappable card takes the touch from the Pressable below, so the card's own Pressable is handed
+  // this long press through context (#3704). Editing turns it off: the card is not touchable then.
+  const openMenu = useCallback(() => {
+    feedback('impact');
+    setMenu(true);
+  }, []);
+  const longPress = useMemo<SectionLongPress | null>(
+    () => (editing ? null : { onLongPress: openMenu, delayLongPress: MENU_DELAY_MS }),
+    [editing, openMenu],
+  );
   const keys =
     id === 'streak'
       ? ['streakLeft', 'streakRight']
@@ -152,15 +164,12 @@ export function HomeSection({
           ))}
         <Pressable
           accessible={false}
-          delayLongPress={350}
-          onLongPress={() => {
-            if (!editing) {
-              feedback('impact');
-              setMenu(true);
-            }
-          }}
+          delayLongPress={MENU_DELAY_MS}
+          onLongPress={longPress?.onLongPress}
         >
-          <View pointerEvents={editing ? 'none' : 'auto'}>{children}</View>
+          <SectionLongPressContext.Provider value={longPress}>
+            <View pointerEvents={editing ? 'none' : 'auto'}>{children}</View>
+          </SectionLongPressContext.Provider>
         </Pressable>
         {error && <StatusIndicator label="Home layout" error={error} />}
       </View>

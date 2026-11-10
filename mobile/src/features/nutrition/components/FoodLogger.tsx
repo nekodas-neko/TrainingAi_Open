@@ -66,7 +66,7 @@ import {
 import { photoDraftSchema } from '../data/photo-draft';
 import { librarySearch, librarySearchSpec, recentFoods, savedFoodForBarcode } from '../data/food-library';
 import { MacroLine, NutritionFieldsForm, foodFields, macroKeys } from './NutritionElements';
-import { failureNotice } from '../../../core/reporting/index.ts';
+import { failureNotice, reportError } from '../../../core/reporting/index.ts';
 const draftSchema = z.object({
   step: z.enum(['capture', 'review', 'assign']),
   recipeServings: z.number().default(1),
@@ -160,6 +160,8 @@ export function FoodLogger({
   const [captureStage, setCaptureStage] = useState<string | null>(null);
   const capturedPhoto = useRef<Awaited<ReturnType<typeof pickNutritionImage>>>(null);
   const capturedResult = useRef<{ image: string; scans: Scan[] } | null>(null);
+  // Set once the sheet is closed, so an analysis still running cannot write the draft back.
+  const abandoned = useRef(false);
   const [photoRetry, setPhotoRetry] = useState(false);
   const [photoLoadedScope, setPhotoLoadedScope] = useState<string | null>(null);
   const photoReady = photoLoadedScope === photoScope && !!resources;
@@ -298,6 +300,7 @@ export function FoodLogger({
             region: n.region,
           }),
         );
+      if (abandoned.current) return;
       if (typeof input.image === 'string') {
         capturedResult.current = { image: input.image, scans };
       }
@@ -490,6 +493,17 @@ export function FoodLogger({
       setBusy(false);
     }
   }
+  // Closing the sheet abandons the food, as the current app's `handleClose` resets its steps
+  // (components/nutrition/food-logger-sheet.tsx). The draft lives only while the sheet is open, so
+  // an app Android closed mid-log (the camera can do that) comes back to it; ✕ or Back starts the
+  // next Log Food clean (#3707).
+  function abandon() {
+    abandoned.current = true;
+    void Promise.all([resources?.clearDraft(photoKey), resources?.clearDraft(loggerKey)]).catch(
+      reportError,
+    );
+    onClose();
+  }
   const title =
     d.step === 'capture' ? 'Log Food' : d.step === 'review' ? 'Review' : 'Assign to Meal';
   return (
@@ -498,7 +512,7 @@ export function FoodLogger({
         visible
         fullHeight
         title={captureStage ?? title}
-        onClose={onClose}
+        onClose={abandon}
         actions={
           <StatusIndicator
             label="Food logging"
