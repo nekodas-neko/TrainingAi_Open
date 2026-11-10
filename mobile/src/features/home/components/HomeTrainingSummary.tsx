@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, Card, Grid, ProgressBar, Stack, TouchSurface } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { shiftDateStr, formatDateDisplay } from '@trainingai/shared/date-utils';

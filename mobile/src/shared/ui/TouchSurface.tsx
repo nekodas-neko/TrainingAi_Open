@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Platform, Pressable, type PressableProps } from 'react-native';
+import { Animated, Platform, type PressableProps } from 'react-native';
+import { Pressable } from './Pressable';
 import { useReducedMotion } from './useReducedMotion';
 
 export function TouchSurface({

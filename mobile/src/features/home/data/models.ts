@@ -115,16 +115,17 @@ export function homeSections(preferences: HomePreferences) {
     keys.filter((key) => key in sectionLabels),
   );
 }
-// The preferences to save when the enabled cards change: the cards, and the section order with the
-// turned-off cards dropped and the turned-on ones placed before Metric Tiles (the web saves both).
+// The preferences to save when the enabled cards change. A card switched off keeps its slot in the
+// saved order, and `homeSections` leaves it out while it is off, so switching it back on returns it
+// to that slot (#3705). This is the current app's order: its Cards switch writes only `homeCards`
+// and `loadSectionOrder` (lib/home/home-prefs.ts) filters the saved order by the active cards, so
+// both apps read one saved order. A card with no slot yet goes before Metric Tiles.
 export function homeCardsPatch(preferences: HomePreferences, homeCards: string[]) {
-  const current = homeSections(preferences).filter(
-    (key) => !key.startsWith('card_') || homeCards.includes(key.slice(5)),
-  );
+  const saved = [...new Set(preferences.homeSectionOrder ?? [])];
   return {
     homeCards,
     homeSectionOrder: insertBeforeMetricTiles(
-      current,
+      saved.length ? saved : homeSections(preferences),
       homeCards.map((key) => `card_${key}`).filter((key) => key in sectionLabels),
     ),
   };
