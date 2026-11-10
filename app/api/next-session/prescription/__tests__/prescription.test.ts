@@ -4,7 +4,7 @@ const TEST_USER_ID = 'user-1'
 
 const getNextSession = vi.fn()
 const getActiveProgram = vi.fn()
-const listProgressionStyles = vi.fn(async () => [])
+const listProgressionStyles = vi.fn(async (): Promise<unknown[]> => [])
 const listExerciseLibrary = vi.fn(async () => [])
 const getLastExerciseLogsBatch = vi.fn(async () => new Map())
 // Q-202: the working basis now comes from the last NON-DELOAD 1RM, not from the last log,
