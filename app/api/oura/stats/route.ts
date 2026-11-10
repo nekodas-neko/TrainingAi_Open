@@ -3,6 +3,9 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { OuraDailyRow } from '@/lib/data/repository'
+import type { DailyWear } from '@trainingai/shared/health/readiness-signals'
+import { wearByDate } from '@trainingai/shared/health/wear-confidence'
+import { ouraDailyWear } from '@/lib/oura/cloud/readiness-signals-map'
 
 // Reads today's Oura rollup from our own DB. It deliberately makes NO call to the
 // Oura Cloud API: since the direct-BLE re-key the ring sends the Cloud nothing, so
@@ -19,6 +22,11 @@ export interface OuraStatsResponse {
    *  `oura_tokens` — so removing the Cloud integration would have silently hidden the Health tab's
    *  whole Ring section. It is a direct-BLE fact now. */
   connected: boolean
+  /** Today's wear in the generic `DailyWear` shape (#3699), mapped by the source's connector, so a
+   *  client never reads a device's own field name. Null when no source has wear for today. */
+  wear: DailyWear | null
+  /** Today's raw Oura row. Kept only for Preview builds that predate `wear` and still read
+   *  `daily.nonWearTimeSec`; new readers use `wear`. */
   daily: OuraDailyRow | null
 }
 
@@ -40,7 +48,7 @@ export async function GET() {
 
   if (!hasBleSamples) {
     return NextResponse.json(
-      { connected: false, daily: null } satisfies OuraStatsResponse,
+      { connected: false, wear: null, daily: null } satisfies OuraStatsResponse,
       { headers: { "Cache-Control": "private, no-store" } },
     )
   }
@@ -49,6 +57,7 @@ export async function GET() {
 
   return NextResponse.json({
     connected: true,
+    wear: wearByDate(ouraDailyWear(ouraRows)).get(today) ?? null,
     daily: ouraRows[0] ?? null,
   } satisfies OuraStatsResponse, { headers: { "Cache-Control": "private, no-store" } })
 }

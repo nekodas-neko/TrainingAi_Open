@@ -15,6 +15,7 @@ import {
   waterGoalText,
   waterText,
   weekdayAxis,
+  todayNonWearSec,
   weightPaceLine,
   wornSeconds,
 } from '../src/features/health/data/body-view.ts';
@@ -154,6 +155,20 @@ test('time worn is the elapsed day less non-wear time and never negative', () =>
   assert.equal(wornSeconds(3600, 36000), 32400);
   assert.equal(wornSeconds(40000, 36000), 0);
   assert.equal(wornSeconds(null, 36000), null);
+});
+
+test("today's non-wear reads the generic wear field, and the older field only when it is absent (#3699)", () => {
+  const spec = ouraStatsSpec('2026-10-17');
+  // A server with the generic field: it wins, even over a differing raw row.
+  assert.equal(
+    todayNonWearSec(spec.schema.parse({ connected: true, wear: { nonWearSec: 300, source: 'x' }, daily: { nonWearTimeSec: 999 } })),
+    300,
+  );
+  // The generic field says no wear today: no fallback to the raw row.
+  assert.equal(todayNonWearSec(spec.schema.parse({ connected: true, wear: null, daily: null })), null);
+  // Production 1.518.0 sends no `wear` key: fall back to the raw row's field.
+  assert.equal(todayNonWearSec(spec.schema.parse({ connected: true, daily: { nonWearTimeSec: 120 } })), 120);
+  assert.equal(todayNonWearSec(spec.schema.parse({ connected: true, daily: null })), null);
 });
 
 test('wording helpers', () => {

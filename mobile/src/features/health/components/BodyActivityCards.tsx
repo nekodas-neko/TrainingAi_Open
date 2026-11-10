@@ -33,7 +33,7 @@ import { useHealthData } from '../data/HealthDataProvider';
 import { energySpec, goalsSpec, trendsSpec } from '../data/models';
 import { ouraStatsSpec, ringBatterySpec } from '../data/body-models';
 import { readingAge } from '../../devices/data/ring-battery';
-import { waterGoalText, waterText, weekdayAxis, wornSeconds } from '../data/body-view';
+import { todayNonWearSec, waterGoalText, waterText, weekdayAxis, wornSeconds } from '../data/body-view';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
 import { HealthMetricCard } from './HealthMetricCard';
 import { HealthResourceHeader } from './HealthResourceHeader';
@@ -306,7 +306,7 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
   const level = battery.data?.latest?.percent ?? null;
   const batteryAge = battery.data?.latest?.ageMinutes ?? 0;
   const worn = wornSeconds(
-    stats.data.daily?.nonWearTimeSec ?? null,
+    todayNonWearSec(stats.data),
     secondsSinceLocalMidnight(timezone),
   );
   const days = trendsState.data?.trends ?? [];

@@ -38,6 +38,7 @@ const LogValueSheet = dynamic(() => import("./components/log-value-sheet").then(
 import { cn } from "@trainingai/shared/utils";
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, todayDayOfWeek, shiftDateStr, dayKeyInTz } from "@trainingai/shared/date-utils";
 import { formatInTimeZone } from "date-fns-tz";
+import { dayReviewDismissKey, dayReviewHidden } from "@/lib/home/day-review-banner";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
@@ -240,6 +241,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         setSleepGoal(loadSleepGoal());
         setWaterGoal(loadWaterGoal());
         setWaterGoalType(loadWaterGoalType());
+        // #3710: the hour and today's dismiss key, so a Home left open overnight drops
+        // yesterday's Day in review in the morning.
+        setDayReviewDismissed(dayReviewHidden(tz, k => localStorage.getItem(k)));
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -336,10 +340,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // lib/day-review-reminders.ts) — most of the day hasn't happened yet before evening, so the
     // digest is thin-to-empty and the "ready" banner reads as premature/wrong that early. Gate on
     // local hour in addition to the per-day dismiss flag so it stops resurfacing every morning.
-    const currentHour = parseInt(formatInTimeZone(new Date(), tz, 'H'), 10)
-    setDayReviewDismissed(
-      currentHour < 17 || localStorage.getItem(`ta_day_review_dismissed_${todayInTz(tz)}`) === '1'
-    );
+    setDayReviewDismissed(dayReviewHidden(tz, k => localStorage.getItem(k)));
 
     // Local-first trained-days fill (APK-only — no local store in the web sandbox):
     // pullDelta already populates workout_sessions/exercise_logs, this is purely the
@@ -1145,7 +1146,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           dayReviewDismissed={dayReviewDismissed}
           onDayReviewActivate={() => navigateToTab(router, "/nutrition?review=day")}
           onDayReviewDismiss={() => {
-            localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
+            localStorage.setItem(dayReviewDismissKey(tz), '1');
             setDayReviewDismissed(true);
           }}
         />

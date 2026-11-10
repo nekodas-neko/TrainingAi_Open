@@ -40,7 +40,14 @@
       ],
       "./src/integrations/notifications/local-only.cjs",
       "./src/integrations/notifications/exact-alarms.cjs",
-      ["expo-notifications", { "enableBackgroundRemoteNotifications": false }],
+      [
+        "expo-notifications",
+        {
+          "enableBackgroundRemoteNotifications": false,
+          "icon": "./assets/notification-icon.png",
+          "color": "#00c84e"
+        }
+      ],
       [
         "expo-calendar",
         {

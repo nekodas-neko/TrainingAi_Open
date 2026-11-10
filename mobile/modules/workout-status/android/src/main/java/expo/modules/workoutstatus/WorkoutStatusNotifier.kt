@@ -137,6 +137,8 @@ object WorkoutStatusNotifier {
     val view = WorkoutStatusPresenter.present(status, nowMs)
     val builder = NotificationCompat.Builder(context, CHANNEL_ID)
       .setSmallIcon(R.drawable.workout_status_icon)
+      // The app's accent, as on every expo-notifications post (app.json, #3711).
+      .setColor(0xFF00C84E.toInt())
       .setContentTitle(view.title)
       .setContentText(view.text)
       .setSubText(view.subText.ifEmpty { null })
