@@ -407,6 +407,10 @@ export const periodizationSchema = z.object({
       phaseSessionCount: finite.optional(),
       phaseSessionTarget: finite.optional(),
       prescriptionStatus: text,
+      // #3716: when the prescription stops being the plan. Read with `prescriptionAgedOut`, which
+      // newer servers send and production (1.518.0) does not, so both are optional.
+      prescriptionExpiresAt: z.string().nullish().catch(null),
+      prescriptionAgedOut: z.boolean().optional().catch(undefined),
       prescription: z
         .object({
           phase: text,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { readTodayCacheSync } from '@/lib/sqlite/cache'
 import { isFullOverride } from './utils'
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
+import { prescribedDeloadDefault, prescriptionAgedOutOnScreen } from '@trainingai/shared/ai-periodization/prescription-expiry'
 
 /**
  * Today's intensity choice (Q-109-followup).
@@ -30,10 +31,12 @@ import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodiza
  */
 export function useDeloadChoice(seedFromUrl: boolean, periodization?: SessionPeriodization | null) {
   // Only a prescription that still governs the session: once it is `consumed` its deload flag
-  // describes a session that has already run, and adopting it would relabel the next one.
-  const prescribedDeload = periodization && periodization.prescriptionStatus !== 'consumed'
-    ? periodization.prescription?.deload
-    : undefined
+  // describes a session that has already run, and adopting it would relabel the next one. An
+  // aged-out one reads as Full (#3716): an illness deload ends at midnight, and adopting it the
+  // next morning would train yesterday's sick report.
+  const prescribedDeload = prescribedDeloadDefault(periodization)
+  const governs = !!periodization && periodization.prescriptionStatus !== 'consumed'
+    && !prescriptionAgedOutOnScreen(periodization)
 
   const [deload, setDeloadState] = useState(seedFromUrl)
   const [recommended, setRecommended] = useState(false)
@@ -74,8 +77,7 @@ export function useDeloadChoice(seedFromUrl: boolean, periodization?: SessionPer
   // a normal plan with one sore-shoulder row Full was shown as an override and overrode nothing.
   // Adoption above stays on the session flag: a per-exercise deload must not flip the whole
   // session to Deload.
-  const exerciseDeloaded = !!periodization && periodization.prescriptionStatus !== 'consumed'
-    && !!periodization.prescription?.exercises.some(e => e.deloaded)
+  const exerciseDeloaded = governs && !!periodization?.prescription?.exercises.some(e => e.deloaded)
   const overrideFull = isFullOverride(chosen, prescribedDeload || exerciseDeloaded || undefined, deload)
 
   return { deload, setDeload, recommended, prescribedDeload: !!prescribedDeload, overrideFull }

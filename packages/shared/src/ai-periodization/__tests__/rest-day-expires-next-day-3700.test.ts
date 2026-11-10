@@ -119,6 +119,8 @@ describe('an expired prescription is no longer the plan', () => {
 const mocks = vi.hoisted(() => ({
   signals: null as unknown,
   modelAnswer: null as unknown,
+  /** Runs while the model "answers", to let the clock move during a generation (#3716). */
+  duringModel: null as null | (() => void),
 }))
 vi.mock('../signals', async importOriginal => ({
   ...(await importOriginal<typeof import('../signals')>()),
@@ -126,7 +128,10 @@ vi.mock('../signals', async importOriginal => ({
 }))
 vi.mock('@/lib/ai/instrument', () => ({
   aiModel: () => ({}),
-  loggedGenerateObject: async () => ({ object: mocks.modelAnswer }),
+  loggedGenerateObject: async () => {
+    mocks.duringModel?.()
+    return { object: mocks.modelAnswer }
+  },
 }))
 
 const { generatePrescriptionForSession } = await import('../generate-prescription')
@@ -186,8 +191,29 @@ describe('generation stores the short expiry (#3700)', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-11-03T09:30:00Z')) // 19:30 Brisbane
     mocks.signals = baseSignals()
+    mocks.duringModel = null
   })
   afterEach(() => { vi.useRealTimers() })
+
+  // #3716: the expiry was read from the moment the plan was stored, so a rest day asked for at
+  // 23:59 and stored at 00:00 lived all of the next day.
+  it('a generation that straddles midnight ends at the midnight that closed the day it was asked on', async () => {
+    vi.setSystemTime(new Date('2026-11-03T13:59:30Z')) // 23:59:30 Brisbane on 3 Nov
+    mocks.duringModel = () => { vi.setSystemTime(new Date('2026-11-03T14:00:30Z')) } // 00:00:30 on 4 Nov
+    mocks.modelAnswer = answer('rest_day_recommended')
+    const h = harness()
+    await h.run('Australia/Brisbane')
+    expect(h.stored[0].prescription.phaseAction).toBe('rest_day_recommended')
+    expect(h.stored[0].expiresAt.toISOString()).toBe('2026-11-03T14:00:00.000Z')
+  })
+
+  it('a model session swap ends at the next local midnight (#3716)', async () => {
+    mocks.modelAnswer = answer('session_swap_recommended')
+    const h = harness()
+    await h.run('Australia/Brisbane')
+    expect(h.stored[0].prescription.phaseAction).toBe('session_swap_recommended')
+    expect(h.stored[0].expiresAt.toISOString()).toBe('2026-11-03T14:00:00.000Z')
+  })
 
   it('a model rest-day recommendation ends at the next local midnight', async () => {
     mocks.modelAnswer = answer('rest_day_recommended')

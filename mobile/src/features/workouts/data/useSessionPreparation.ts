@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import { readDurationPreset, type DurationPreset } from '@trainingai/shared/workout/duration-model';
+import {
+  hidePrescriptionAgedOutOnScreen,
+  prescribedDeloadDefault,
+} from '@trainingai/shared/ai-periodization/prescription-expiry';
 import { readSessionResponse, type SessionPreview } from '../catalog';
 import { prepareSession, type SessionStartOptions } from '../logging/session-options';
 import { useWorkoutResource, useWorkoutResources } from './WorkoutDataProvider';
@@ -39,6 +43,12 @@ export function useSessionPreparation(
     ttl: 60_000,
   };
   const current = useWorkoutResource(spec, !!session);
+  // #3716: an aged-out prescription is not the plan. It is never the card, the Deload default or
+  // something to Accept; opening the session (the workout-data read above) regenerates it. Read
+  // from the expiry too, because production does not send `prescriptionAgedOut` and a saved
+  // response can outlive the prescription it holds.
+  const stored = state.data?.state;
+  const prescribedState = stored ? hidePrescriptionAgedOutOnScreen(stored) : stored;
   useEffect(() => {
     chosen.current = initialFullOverride;
     setDeload(false);
@@ -46,14 +56,16 @@ export function useSessionPreparation(
     setReverted([]);
   }, [session?.id, initialFullOverride]);
   useEffect(() => {
-    const prescribed = state.data?.state;
-    setDuration(readDurationPreset(prescribed?.prescription?.durationPreset));
-    if (
-      !chosen.current &&
-      prescribed?.prescriptionStatus !== 'consumed' &&
-      prescribed?.prescription
-    ) {
-      setDeload(prescribed.prescription.deload);
+    const raw = state.data?.state;
+    setDuration(
+      readDurationPreset(
+        (raw ? hidePrescriptionAgedOutOnScreen(raw) : raw)?.prescription?.durationPreset,
+      ),
+    );
+    // Yesterday's illness deload is not pre-selected once it has aged out (#3716).
+    const adopted = prescribedDeloadDefault(raw);
+    if (!chosen.current && adopted !== undefined) {
+      setDeload(adopted);
     }
   }, [state.data]);
   let prepared = session;
@@ -72,7 +84,7 @@ export function useSessionPreparation(
       );
     }
   }
-  const prescribed = state.data?.state?.prescription;
+  const prescribed = prescribedState?.prescription;
   const options: SessionStartOptions = {
     aiDeload: deload,
     fullOverride:
@@ -108,6 +120,8 @@ export function useSessionPreparation(
   return {
     session: prepared,
     state,
+    /** The session's prescription state as the screen may use it: aged out → no prescription. */
+    prescribedState,
     current,
     options,
     parseError,

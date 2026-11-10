@@ -63,6 +63,7 @@ import type { Injury } from "@trainingai/shared/types/injury";
 import type { ExerciseLibraryEntry } from "@trainingai/shared/types/program";
 import { InjurySwapSheet } from "@/components/workout/injury-swap-sheet";
 import type { SessionPeriodization } from "@trainingai/shared/types/ai-periodization";
+import { hidePrescriptionAgedOutOnScreen } from "@trainingai/shared/ai-periodization/prescription-expiry";
 
 const DoneScreen = dynamic(() => import("@/components/workout/done-screen").then(m => m.DoneScreen), { ssr: false });
 
@@ -466,15 +467,19 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     };
     const cacheKey = `ai-periodization-session:${programSessionId}`;
     // Instant paint from the last-known state, then revalidate.
+    // #3716: an aged-out prescription is not the plan, so it never reaches the card or the Deload
+    // default. The server leaves it out; a seed cached before it expired still carries it.
+    const forScreen = (d: PeriodizationResponse): PeriodizationResponse =>
+      ({ ...d, state: hidePrescriptionAgedOutOnScreen(d.state) });
     const seed = readCacheSync<PeriodizationResponse>(cacheKey);
-    if (seed) setPeriodization(seed);
+    if (seed) setPeriodization(forScreen(seed));
     setPeriodizationLoading(true);
     fetch(`/api/ai-periodization/session/${programSessionId}`, opts?.afterWrite ? { cache: 'no-store' } : undefined)
       .then(async (res) => {
         if (reqId !== periodizationReqRef.current) return; // superseded by a newer request
         if (res.ok) {
           const d = await res.json() as PeriodizationResponse;
-          setPeriodization(d);
+          setPeriodization(forScreen(d));
           setCached(cacheKey, d, TTL_MEDIUM);
         } else if (res.status === 404 && staleSessionIdRecoveredRef.current !== programSessionId) {
           // Stranded session id: the on-device program mirror is out of sync after an edit,
