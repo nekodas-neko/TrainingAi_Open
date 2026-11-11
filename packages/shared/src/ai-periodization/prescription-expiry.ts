@@ -58,34 +58,28 @@ export function prescriptionExpiresAt(
     : new Date(now.getTime() + PRESCRIPTION_TTL_MS)
 }
 
-// Recovery offers age out even while they are still `pending`. Every other pending offer is exempt
-// (see `prescriptionAgedOut`), but a pending rest day or deload is exactly what was served stale: it
-// does not drive load, so nothing on the read path ever looked at its expiry, and the lifter met it
-// again on the next open of the session. Once it has expired it is no longer an answer to anything.
-// A session swap is a one-day answer too (#3716), so its pending offer ages out with the others.
-const PENDING_OFFERS_THAT_AGE_OUT = new Set<AiPrescription['phaseAction']>([
-  'rest_day_recommended', 'deload_recommended', 'session_swap_recommended',
-])
-
 /** The expiry branch on its own: a stored prescription past its window is replaced, not re-shaped.
  *  Shared by the reevaluation, the workout and next-session reads, and the Home warm (#2155), so
  *  none of them can disagree about when one is needed.
  *
- *  `pending` is exempt except for recovery offers: a pending "stay" or transition is still an offer
- *  whose numbers drive load, and the emergency-deload suppression owns the re-offer of a deload that
- *  is still live. `none` means there is nothing to age out. */
+ *  Every status ages out except `none`, which means there is nothing to age out. `pending` used to
+ *  be exempt, on the grounds that the emergency-deload suppression owned an offer's expiry. It only
+ *  ever owned an UNEXPIRED pending deload, so nothing retired an expired offer: #3700 found a week-old
+ *  sick-day rest offer served as the plan, and #3714 a pending stay. A stay is stored `pending`
+ *  whenever `autoApplyPrescriptions` is off or the model's confidence is under the auto-apply bar,
+ *  and it drives load, so a session left unused for over a week kept replaying its last plan: the
+ *  Q-229 / BF-179 class through the one status those fixes exempted. Past its expiry, an offer of
+ *  any kind is pending regeneration.
+ *
+ *  `prescription` is accepted so callers can pass the stored state as it is; the action no longer
+ *  changes the answer. */
 export function prescriptionAgedOut(
   state: Pick<SessionPeriodization, 'prescriptionStatus' | 'prescriptionExpiresAt'>
     & Partial<Pick<SessionPeriodization, 'prescription'>>,
   now = new Date(),
 ): boolean {
   if (state.prescriptionExpiresAt == null || state.prescriptionExpiresAt > now) return false
-  if (state.prescriptionStatus === 'none') return false
-  if (state.prescriptionStatus === 'pending') {
-    const action = state.prescription?.phaseAction
-    return action != null && PENDING_OFFERS_THAT_AGE_OUT.has(action)
-  }
-  return true
+  return state.prescriptionStatus !== 'none'
 }
 
 /** The stored prescription state as a route returns it to a screen (#3716): an aged-out

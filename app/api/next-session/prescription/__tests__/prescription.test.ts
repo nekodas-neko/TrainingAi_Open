@@ -4,7 +4,7 @@ const TEST_USER_ID = 'user-1'
 
 const getNextSession = vi.fn()
 const getActiveProgram = vi.fn()
-const listProgressionStyles = vi.fn(async () => [])
+const listProgressionStyles = vi.fn(async (): Promise<unknown[]> => [])
 const listExerciseLibrary = vi.fn(async () => [])
 const getLastExerciseLogsBatch = vi.fn(async () => new Map())
 // Q-202: the working basis now comes from the last NON-DELOAD 1RM, not from the last log,
@@ -199,6 +199,34 @@ describe('GET /api/next-session/prescription', () => {
     const body = await res.json()
     expect(body.source).toBe('pending')
     // The program's own style, not the expired prescription's 3×5 @ 85%.
+    expect(body.exercises[0].sets[0]).toEqual({ weightKg: 80, reps: 8, restSec: 90 })
+  })
+
+  // #3714: a pending stay drives load, so it was previewed as the plan for as long as the session
+  // went unused, past its expiry. It is pending regeneration now, the same as an accepted one.
+  it('shows an expired PENDING stay as pending, not as the plan', async () => {
+    const sess = session('sess-1', 'Push', [{ id: 'ex-1', exerciseName: 'Bench Press', styleId: 'style-1' }])
+    const prog = { id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] }
+    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
+    getActiveProgram.mockResolvedValue(prog)
+    listProgressionStyles.mockResolvedValue([
+      { id: 'style-1', name: 'Standard', sets: [{ pct: 80, reps: 8, restSec: 90, useFor1rm: true }] },
+    ])
+    getLastExerciseLogsBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100 }]]))
+    getLastRealOneRmBatch.mockResolvedValue(new Map([['Bench Press', { estimated1rm: 100, target80: 80 }]]))
+    getSessionPeriodization.mockResolvedValue({
+      prescriptionStatus: 'pending',
+      prescriptionGeneratedAt: new Date(),
+      prescriptionExpiresAt: new Date(Date.now() - 1000),
+      prescription: {
+        phase: 'accumulation', phaseAction: 'stay', deload: false, reasoning: '', confidence: 0.5,
+        estimatedSessionDurationMin: 45, weeklyVolumeContribution: {},
+        exercises: [{ sessionExerciseId: 'ex-1', name: 'Bench Press', sets: 3, reps: 5, pct: 85, restSec: 120 }],
+      },
+    })
+
+    const body = await (await GET()).json()
+    expect(body.source).toBe('pending')
     expect(body.exercises[0].sets[0]).toEqual({ weightKg: 80, reps: 8, restSec: 90 })
   })
 
