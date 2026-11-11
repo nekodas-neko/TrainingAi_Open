@@ -11,6 +11,14 @@ import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, daysBetween
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { capitalize } from '@trainingai/shared/format/capitalize';
 import { FirstHandFilter, firstHandSkipsLapsed, knownFirstHandSources, type FirstHandSources } from '@trainingai/shared/health/health-connect-origin';
+import {
+  SYNC_DAYS_COLD, HR_UPLOAD_CHUNK, INTERVAL_UPLOAD_CHUNK, type ActivityInterval,
+} from '@trainingai/shared/health/health-connect-sync-limits';
+// #3729: moved to the shared package so the server stops importing this Capacitor module.
+export {
+  SYNC_DAYS_COLD, HR_UPLOAD_CHUNK, INTERVAL_UPLOAD_CHUNK,
+  type ActivityInterval, type ActivityIntervalKind,
+} from '@trainingai/shared/health/health-connect-sync-limits';
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -26,7 +34,6 @@ const HC_STAGE_TO_SLEEP_STAGE: Record<string, SleepStage> = {
 };
 
 export const LAST_SYNC_KEY  = 'ta_hc_last_sync';
-export const SYNC_DAYS_COLD = 30;  // days on first install
 const SYNC_DAYS_HOT  = 7;   // days on subsequent opens
 
 // Canonical read-type lists. Both requestPermissions and canRead.has() checks
@@ -149,8 +156,6 @@ export interface SyncPayload {
 /** One intraday heart-rate reading, at the source's own resolution. `at` is epoch ms. */
 export interface HeartRateSample { at: number; bpm: number }
 
-/** One request's share of the heart-rate series. `/api/sync-health` imports it as its own cap. */
-export const HR_UPLOAD_CHUNK = 10_000
 /** Heart-rate requests per sync. The route allows 60 a minute, so a dense 30-day cold sync is
  *  bounded rather than run into a 429 halfway; newest samples go first, so a cap drops the oldest. */
 export const HR_UPLOAD_MAX_CHUNKS = 20
@@ -227,25 +232,6 @@ async function uploadSeries<T>(
 
 /** What `health_connect_intervals.kind` holds: a step count or active kcal over [startMs, endMs],
  *  or a cadence sample in steps/min at startMs (= endMs). */
-export type ActivityIntervalKind = 'steps' | 'active_kcal' | 'cadence_spm'
-
-/** One row for `/api/sync-health`'s `activityIntervals`. `recordId` is Health Connect's own record
- *  id (`metadata.id`), which the server keys on so a re-read window is idempotent. */
-export interface ActivityInterval {
-  kind: ActivityIntervalKind
-  startMs: number
-  endMs: number
-  value: number
-  recordId: string
-  /** The writing app's package (`metadata.dataOrigin`). */
-  origin?: string
-  /** `metadata.device.type` as the plugin spells it, e.g. TYPE_WATCH. */
-  device?: string
-}
-
-/** One request's share of the interval rows. ~170 bytes a row as JSON, so a chunk is ~700 KB, under
- *  the route's 1 MB body cap. `/api/sync-health` imports it as its own array cap. */
-export const INTERVAL_UPLOAD_CHUNK = 4_000
 /** Interval requests per sync. With the heart-rate cap (20) and the daily post this stays under the
  *  route's 60 a minute; newest rows go first, so a cap drops the oldest. */
 export const INTERVAL_UPLOAD_MAX_CHUNKS = 20

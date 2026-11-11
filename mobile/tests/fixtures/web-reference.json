@@ -1,0 +1,139 @@
+{
+  "_about": [
+    "Excerpts of the Capacitor app's source that the native tests compare against (#3729).",
+    "Copied verbatim from main at 49d4bb5f so mobile/ reads nothing outside itself once the web app is deleted.",
+    "scripts/__tests__/mobile-web-reference.test.ts (root suite) fails if an excerpt stops matching its file while the file exists."
+  ],
+  "files": {
+    "components/admin/exercise-manager.tsx": [
+      "    title: \"Delete exercise?\",",
+      "    message: \"this removes it from the shared library. Programs and history that reference it are not deleted, but it will no longer be pickable.\",",
+      "    title: \"Replace this GIF?\",",
+      "    message: \"it already has a GIF. Re-mirroring overwrites it with the dataset's version, and the current one is not kept.\",",
+      "    title: \"Replace this GIF?\","
+    ],
+    "components/admin/exercise-unit-fix.tsx": [
+      "  return `Convert ${sessions} session(s) for ${exercises.join(\", \")} logged before ${beforeDate} from lbs to kg? This cannot be undone automatically. Sync your phone first (More → Data → Sync now). An unsynced edit to one of these workouts would put the old weights back.`;"
+    ],
+    "components/admin/activity-type-manager.tsx": [
+      "          ? `${pendingDelete.label} is removed from the activity type list for every user, and it cannot be undone. If any logged activity still uses it, the delete is refused and nothing changes.`"
+    ],
+    "app/admin/admin-content.tsx": [
+      "  const [confirmDeleteFeedback, setConfirmDeleteFeedback] = useState<string | null>(null)",
+      "  const [confirmDeactivate, setConfirmDeactivate] = useState<User | null>(null)",
+      "  const [confirmDelete, setConfirmDelete] = useState<User | null>(null)",
+      "  // account that holds data (the plain `confirmDelete` above is still the signup that never got in).",
+      "  // (Pending: Activate or Delete); one with data was in and was deactivated (Deactivated: Activate",
+      "                    onDelete={() => setConfirmDelete(u)}",
+      "                <p className=\"text-xs font-medium uppercase tracking-wide text-muted-foreground\">Deactivated</p>",
+      "                    onToggle={(id, action) => action === 'deactivate' ? setConfirmDeactivate(u) : toggleUser(id, action)}",
+      "              open={!!confirmDelete}",
+      "              onOpenChange={o => { if (!o) setConfirmDelete(null) }}",
+      "              title=\"Delete user?\"",
+      "              message={confirmDelete",
+      "                ? `Delete ${userLabel(confirmDelete)}? This permanently deletes their account and everything under it. It cannot be undone.`",
+      "              confirmLabel=\"Delete\"",
+      "                const u = confirmDelete",
+      "                setConfirmDelete(null)",
+      "              title=\"Delete account and data?\"",
+      "              confirmLabel=\"Delete account\"",
+      "              title={confirmAdmin?.grant ? 'Make admin?' : 'Remove admin?'}",
+      "              confirmLabel={confirmAdmin?.grant ? 'Make admin' : 'Remove admin'}",
+      "              open={!!confirmDeactivate}",
+      "              onOpenChange={o => { if (!o) setConfirmDeactivate(null) }}",
+      "              title=\"Deactivate user?\"",
+      "              message={confirmDeactivate",
+      "                ? `${userLabel(confirmDeactivate)} will be signed out to the pending screen until you activate them again.`",
+      "              confirmLabel=\"Deactivate\"",
+      "                const u = confirmDeactivate",
+      "                setConfirmDeactivate(null)",
+      "                title=\"Remove invite?\"",
+      "              const isConfirming = confirmDeleteFeedback === sub.id",
+      "                              onClick={() => setConfirmDeleteFeedback(null)}",
+      "                                setConfirmDeleteFeedback(null)",
+      "                            onClick={() => setConfirmDeleteFeedback(sub.id)}",
+      "                            Delete",
+      "  onDelete,",
+      "  onDelete?: (id: string) => void",
+      "  const isDeleteLoading = loadingId === `delete-${user.id}`",
+      "        {user.isActive ? 'Active' : user.hasData === false ? 'Pending' : 'Deactivated'}",
+      "          title={user.isAdmin ? 'Remove admin' : 'Make admin'}",
+      "          aria-label={user.isAdmin ? 'Remove admin' : 'Make admin'}",
+      "      {onDelete && !user.isActive && user.hasData === false && !isSelf && (",
+      "          onClick={() => onDelete(user.id)}",
+      "          disabled={isDeleteLoading}",
+      "          title=\"Delete user\"",
+      "          aria-label=\"Delete user\"",
+      "          {isDeleteLoading",
+      "          disabled={isDeleteLoading}",
+      "          title=\"Delete account and data\"",
+      "          aria-label=\"Delete account and data\"",
+      "          {isDeleteLoading",
+      "          title={user.isActive ? 'Deactivate' : 'Activate'}",
+      "          aria-label={user.isActive ? 'Deactivate' : 'Activate'}"
+    ],
+    "components/more/data-sync-panel.tsx": [
+      "/** Sync now · Restore from cloud · Export my data. These three used to sit under an \"About\"",
+      "            <p className=\"text-sm font-semibold\">Sync now</p>",
+      "            <p className=\"text-[10px] text-muted-foreground\">Pull latest data from server</p>",
+      "            <p className=\"text-sm font-semibold\">Restore from cloud</p>",
+      "            <p className=\"text-[10px] text-muted-foreground\">Rebuild full history after a wipe / on a new device</p>",
+      "            <p className=\"text-sm font-semibold\">Export my data</p>",
+      "            <p className=\"text-[10px] text-muted-foreground\">Download everything as a single file</p>"
+    ],
+    "app/session-select/constants.ts": [
+      "  weightSparkline:    \"#00d4ff\",\n  nutritionDonut:     \"#bf5fff\",\n  sleepWidget:        \"#8b5cf6\",\n  stepsWidget:        \"#2dd4bf\",\n  moodWidget:         \"#fbbf24\",\n  streakLeft:         \"#f97316\",\n  streakRight:        \"#22c55e\",\n  recommendedToday:   \"#06b6d4\",\n  acwrWidget:         \"#f59e0b\",\n  muscleStatusWidget: \"#22c55e\",\n  hrChartWidget:      \"transparent\",\n  energyBalanceWidget: \"#22c55e\",\n  collectionWidget: \"#fb923c\",\n};"
+    ],
+    "app/globals.css": [
+      "  button,\n  [role=\"button\"] {\n    min-height: 48px;",
+      "  input, textarea, select {\n    font-size: 16px !important;"
+    ],
+    "lib/sqlite/sqlite-service.ts": [
+      "const DB_NAME = 'trainingai';"
+    ],
+    "android/app/src/main/java/com/trainingai/app/oura/OuraRawDb.kt": [
+      "        private const val DB_NAME = \"oura_raw.db\"",
+      "                val file = context.getDatabasePath(DB_NAME)"
+    ],
+    "lib/notifications.ts": [
+      "export const WORKOUT_TIMERS_CHANNEL = 'workout-timers';",
+      "export const ACTIVITY_DETECTION_CHANNEL = 'activity-detection';"
+    ],
+    "lib/meal-reminders.ts": [
+      "export const MEAL_REMINDERS_CHANNEL = 'meal-reminders'"
+    ],
+    "lib/supplement-reminders.ts": [
+      "export const SUPPLEMENT_REMINDERS_CHANNEL = 'supplement-reminders'"
+    ],
+    "lib/day-review-reminders.ts": [
+      "export const DAY_REVIEW_CHANNEL = 'day-review-reminders'"
+    ],
+    "lib/workout-reminders.ts": [
+      "export const WORKOUT_REMINDERS_CHANNEL = 'workout-reminders'"
+    ],
+    "android/app/src/main/java/com/trainingai/app/MainActivity.java": [
+      "    private static final String REST_CHANNEL_ID = \"rest-timer\";",
+      "    private static final String RUN_CHANNEL_ID = \"run-status\";"
+    ],
+    "android/app/src/main/java/com/trainingai/app/oura/OuraRingService.kt": [
+      "        private const val CHANNEL_ID = \"oura-ble-v2\"",
+      "        private const val LEGACY_CHANNEL_ID = \"oura-ble\"",
+      "        private const val LOW_BATTERY_CHANNEL_ID = \"oura-ble-low-battery\"",
+      "        private const val DRAIN_DONE_CHANNEL_ID = \"oura-ble-drain-done\""
+    ],
+    "android/app/src/main/java/com/trainingai/app/scale/ScaleBleService.kt": [
+      "        private const val CHANNEL_ID = \"scale-ble-v2\"",
+      "        private const val LEGACY_CHANNEL_ID = \"scale-ble\"",
+      "        private const val PENDING_CHANNEL_ID = \"scale-ble-pending\"",
+      "        private const val SKIPPED_CHANNEL_ID = \"scale-ble-skipped\"",
+      "        private const val LOGGED_CHANNEL_ID = \"scale-ble-logged\"",
+      "        private const val FAILED_CHANNEL_ID = \"scale-ble-failed\"",
+      "        private const val DECLINED_CHANNEL_ID = \"scale-ble-declined\""
+    ],
+    "android/app/src/main/java/com/trainingai/app/polar/PolarStrapService.kt": [
+      "        private const val CHANNEL_ID = \"polar-ble-v2\"",
+      "        private const val LEGACY_CHANNEL_ID = \"polar-ble\"",
+      "        private const val LOW_BATTERY_CHANNEL_ID = \"polar-ble-low-battery\""
+    ]
+  }
+}

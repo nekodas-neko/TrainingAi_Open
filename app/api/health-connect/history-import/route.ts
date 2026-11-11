@@ -5,7 +5,7 @@ import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { DEFAULT_TZ, normalizeDateParamIso, todayInTz } from '@trainingai/shared/date-utils'
-import { historyDayRejection } from '@/lib/health-connect-history-import'
+import { historyDayRejection } from '@trainingai/shared/health/health-connect-sync-limits'
 
 // issue 2169. Where the signed-in user's explicit Health Connect "Import more history" run has got
 // to: the oldest local calendar day imported, one value per account. The device walks back 30 days a

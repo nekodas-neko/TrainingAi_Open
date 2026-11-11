@@ -6,7 +6,7 @@ import { prescriptionDrivesLoad, prescriptionStyleForExercise } from "@traininga
 import { normalizeStoredPrescription } from "@trainingai/shared/ai-periodization/reconcile-prescription";
 import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
 import { resolveBodyweightStyle, resolveWorkingBasis } from "@trainingai/shared/1rm";
-import { mroundStepUp, weightStepFor } from "@/components/workout/utils";
+import { mroundStepUp, weightStepFor } from "@trainingai/shared/workout/load-rounding";
 import { rateLimit } from "@/lib/rate-limit";
 import type { StyleSet } from "@trainingai/shared/types/progression";
 import type { ExerciseType } from "@trainingai/shared/types/program";

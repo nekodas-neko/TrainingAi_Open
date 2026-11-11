@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { webReference } from './web-reference.ts';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createApiClient } from '../src/features/account/api/client.ts';
@@ -52,7 +53,7 @@ test('only activation skips the confirm, as in the current app', () => {
 });
 
 test('confirm copy matches the current app word for word', () => {
-  const web = readFileSync(new URL('../../app/admin/admin-content.tsx', import.meta.url), 'utf8');
+  const web = webReference('app/admin/admin-content.tsx');
   for (const action of ['deactivate', 'delete', 'grant-admin', 'revoke-admin'] as const) {
     const c = userActionConfirm(action, user({}))!;
     assert.ok(web.includes(`title="${c.title}"`) || web.includes(`'${c.title}'`), c.title);

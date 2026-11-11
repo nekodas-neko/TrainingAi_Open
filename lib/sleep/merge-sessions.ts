@@ -1,6 +1,6 @@
 import { groupSleepPeriods, aggregateNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night';
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils';
-import type { LocalSleepSession } from '@/lib/local-store/types';
+import type { LocalSleepSession } from '@trainingai/shared/types/local-sleep-session';
 
 export type SleepRow = {
   /** The row id. `removeManualNight` needs it; optional so a payload sent before it existed still parses. */

@@ -2,8 +2,7 @@ import type { HealthConnectActivityLogInput, WorkoutRepository } from '@/lib/dat
 import { activityImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { daysBetweenDateStrs, normalizeDateParamIso } from '@trainingai/shared/date-utils'
 import { ingestDayRejection } from '@trainingai/shared/validation/ingest-clock'
-import { SYNC_DAYS_COLD } from '@/lib/health-connect-sync'
-import { HISTORY_WINDOW_DAYS } from '@/lib/health-connect-history-import'
+import { SYNC_DAYS_COLD, HISTORY_WINDOW_DAYS } from '@trainingai/shared/health/health-connect-sync-limits'
 
 /** A Health Connect exercise session as either app sends it. `recordId` is `metadata.id`; an older
  *  bundle of the current app sends none. */

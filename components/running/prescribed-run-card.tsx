@@ -3,15 +3,7 @@
 import { memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Footprints, TrendingUp, Info, Check } from 'lucide-react'
-import type { RunType } from '@trainingai/shared/running/types'
-
-export interface RunPrescription {
-  type: RunType
-  durationMin: number | null
-  distanceKm: number | null
-  targets: { zoneIds: number[]; hrLowBpm: number; hrHighBpm: number }
-  rationale: string
-}
+import type { RunType, RunPrescription } from '@trainingai/shared/running/types'
 
 const TYPE_LABEL: Record<RunType, string> = {
   recovery: 'Recovery run',

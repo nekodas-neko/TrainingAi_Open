@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { webReference } from './web-reference.ts';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { washSize } from '../src/shared/ui/card-wash.ts';
@@ -8,11 +9,8 @@ import { palettes } from '../src/shared/theme/palettes.ts';
 // #3506: Home's cards take the current app's tints, and the wash covers the whole card.
 test('every Home card tint is the current app default', async () => {
   // Read as text: the current app's file imports through its own `@/` alias, which this project's
-  // typecheck cannot resolve.
-  const web = await readFile(
-    new URL('../../app/session-select/constants.ts', import.meta.url),
-    'utf8',
-  );
+  // typecheck cannot resolve. A frozen excerpt since #3729.
+  const web = webReference('app/session-select/constants.ts');
   const block = web.slice(web.indexOf('weightSparkline'));
   const expected = Object.fromEntries(
     [...block.matchAll(/^\s*(\w+):\s*"([^"]+)"/gm)].map((m) => [m[1], m[2]]),

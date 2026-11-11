@@ -156,8 +156,8 @@ notes give the commit and build date.
 ## Builds and signing (owner, 13 Oct)
 
 - **Builds run on a GitHub runner**, so the signing key never leaves GitHub's secret store (owner,
-  2 Nov, #3526). The release build is `.github/workflows/native-release.yml`, below. `mobile-build.yml`
-  (Expo's cloud build) is **not used for the switch-over**.
+  2 Nov, #3526). The release build is `.github/workflows/native-release.yml`, below. The Expo cloud-build
+  workflow that was never used for the switch-over was removed, never having run (#3729).
 - **Before publishing any release build**, check its signing certificate's SHA-256 against the
   installed app.
 - **Development and side-by-side builds use their own key**, never the release key. TrainingAi

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { webReference } from './web-reference.ts';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -192,12 +193,9 @@ test("backups leave out the old app's leftover databases, side files included", 
   const listed = exclusions.map(([domain, path]: string[]) => `${domain}:${path}`);
   for (const entry of OLD_DATABASES) assert.ok(listed.includes(entry), `${entry} is backed up`);
   // The name the old app's store has on disk: the plugin appends SQLite.db to `trainingai`.
-  const service = readFileSync(new URL('../../lib/sqlite/sqlite-service.ts', import.meta.url), 'utf8');
+  const service = webReference('lib/sqlite/sqlite-service.ts');
   assert.match(service, /const DB_NAME = 'trainingai';/);
-  const raw = readFileSync(
-    new URL('../../android/app/src/main/java/com/trainingai/app/oura/OuraRawDb.kt', import.meta.url),
-    'utf8',
-  );
+  const raw = webReference('android/app/src/main/java/com/trainingai/app/oura/OuraRawDb.kt');
   assert.match(raw, /DB_NAME = "oura_raw\.db"/);
   assert.match(raw, /getDatabasePath\(DB_NAME\)/);
 });
@@ -344,7 +342,9 @@ test("the old app's channels are deleted once, on the real app ID only, and neve
 });
 
 test("the old-channel list matches the old app's code and shares no id with the native app's channels", () => {
-  const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+  // The old app's files come from the frozen excerpts (#3729); the native app's own are read directly.
+  const read = (path: string) =>
+    path.startsWith('mobile/') ? readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8') : webReference(path);
   const quoted = (text: string, pattern: RegExp) => [...text.matchAll(pattern)].map((m) => m[1]);
   const old = new Set([
     ...['lib/notifications.ts', 'lib/meal-reminders.ts', 'lib/supplement-reminders.ts', 'lib/day-review-reminders.ts', 'lib/workout-reminders.ts']

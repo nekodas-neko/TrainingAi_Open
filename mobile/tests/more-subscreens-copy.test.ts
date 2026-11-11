@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
+import { webReference } from './web-reference.ts';
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
 import { feedIconName, leaderIconName } from '../src/features/social/data/feed-icons.ts';
 import {
   HISTORY_WINDOW_DAYS,
@@ -17,10 +17,7 @@ test('the history import reads 30 days at a time, as the current app says', () =
 });
 
 test('Data & Sync captions match the current app word for word', () => {
-  const web = readFileSync(
-    new URL('../../components/more/data-sync-panel.tsx', import.meta.url),
-    'utf8',
-  );
+  const web = webReference('components/more/data-sync-panel.tsx');
   for (const row of [dataSyncCopy.sync, dataSyncCopy.restore, dataSyncCopy.exportData]) {
     assert.ok(web.includes(row.title), row.title);
     assert.ok(web.includes(row.caption), row.caption);

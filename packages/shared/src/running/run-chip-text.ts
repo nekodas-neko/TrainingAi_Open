@@ -1,4 +1,4 @@
-import type { RunPrescription } from '@/components/running/prescribed-run-card'
+import type { RunPrescription } from '@trainingai/shared/running/types'
 
 export type RunChipMode = 'distance' | 'duration' | 'elapsed'
 

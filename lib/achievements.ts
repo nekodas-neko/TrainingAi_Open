@@ -1,7 +1,7 @@
 import { getDb } from '@/lib/data/postgres/client'
 import { sql } from 'drizzle-orm'
 import { todayInTz, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
-import type { AchievementResult } from '@/components/profile/achievements-grid'
+import type { AchievementResult } from '@trainingai/shared/types/achievement'
 import { LEVEL_THRESHOLDS, getLevelLabel } from '@trainingai/shared/achievement-display'
 import { calorieDayHitsGoal, computeEntryStreak } from '@trainingai/shared/achievements-calc'
 import { computeDayStreak, streakRestGapFor } from '@trainingai/shared/workout/day-streak'

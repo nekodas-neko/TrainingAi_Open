@@ -2,6 +2,7 @@
 
 import type { ComponentType, CSSProperties } from 'react'
 import { useEffect, useRef } from 'react'
+import type { AchievementResult } from '@trainingai/shared/types/achievement'
 import {
   Dumbbell,
   TrendingUp,
@@ -63,18 +64,8 @@ const TIER_GLOW: Record<BadgeTier, string> = {
   gold:   '0 0 12px rgba(245,158,11,0.5), 0 0 24px rgba(245,158,11,0.2)',
 }
 
-export interface AchievementResult {
-  id: string
-  name: string
-  description: string
-  icon: string
-  category: string
-  xpReward: number
-  unlocked: boolean
-  progress: number
-  goal: number
-  current: number
-}
+// Re-exported for the four profile screens that take the type from here.
+export type { AchievementResult }
 
 interface AchievementsGridProps {
   achievements: AchievementResult[]

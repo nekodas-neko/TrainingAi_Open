@@ -303,7 +303,7 @@ test('every ladder tier has still art, none of it carrying what the phone cannot
   assert.doesNotMatch(catArt['scene-meadow'], /<style|<filter|animation/);
 });
 
-test('the committed art is what the script builds from public/cats today', () => {
+test('the committed art is what the script builds from assets/cats today', () => {
   assert.equal(readFileSync(outFile, 'utf8'), buildModule());
 });
 

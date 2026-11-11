@@ -695,6 +695,11 @@ jobs:
       - name: Every workflow job declares a timeout
         run: node scripts/check-workflow-job-timeouts.js
 
+      # #3729. The web screens and their Capacitor plumbing are retired after the native switch;
+      # nothing that outlives them may import them.
+      - name: Server, shared and native code import no client code
+        run: node scripts/check-import-boundary.js
+
   migrations:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
     needs: changes

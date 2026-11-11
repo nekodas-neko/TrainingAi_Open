@@ -12,15 +12,16 @@
 // Every window goes through `syncWindow`, which posts to `/api/sync-health` - the SAME ranked-merge
 // writes (`upsertBodyMetrics`, `saveSleepSession`) as a live sync, so a later live sync of an
 // overlapping day merges instead of double-counting.
-import { dateStrMidnightInTz, isCalendarDate, normalizeDateParamIso, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import type { HealthConnectPlugin } from '@devmaxime/capacitor-health-connect'
-import { SYNC_DAYS_COLD } from '@/lib/health-connect-sync'
+import {
+  SYNC_DAYS_COLD, HISTORY_WINDOW_DAYS, historyFloor,
+} from '@trainingai/shared/health/health-connect-sync-limits'
+// #3729: moved to the shared package so the server stops importing this Capacitor module.
+export {
+  HISTORY_WINDOW_DAYS, HISTORY_MAX_DAYS, historyFloor, historyDayRejection, importPastToleranceStartMs,
+} from '@trainingai/shared/health/health-connect-sync-limits'
 
-/** Days one window covers - one "call" of the spec. */
-export const HISTORY_WINDOW_DAYS = 30
-/** The furthest back an import goes. Ten years is past any Health Connect store; the bound keeps a
- *  store that answers every window with a sliver of data from walking back forever. */
-export const HISTORY_MAX_DAYS = 3650
 /** `/api/sync-health` allows 60 requests a minute. A dense window can use 40 of them (a daily post
  *  plus up to 20 heart-rate and 20 interval chunks), so back-to-back windows would trip a 429 on the
  *  second. One request per 1.2 s keeps a run at 50 a minute. */
@@ -46,27 +47,7 @@ export function coldSyncOldestDay(today: string): string {
   return shiftDateStr(today, -(SYNC_DAYS_COLD - 1))
 }
 
-/** The furthest-back day an import will request, and the oldest a client may claim to have reached. */
-export function historyFloor(today: string): string {
-  return shiftDateStr(today, -HISTORY_MAX_DAYS)
-}
 
-/** Why a client-claimed import day is not usable, or null. Shared by the progress route and the sync
- *  route's `historyFrom`, so the two cannot disagree about how far back is plausible. */
-export function historyDayRejection(input: string, today: string): string | null {
-  // Both separators, as every date param is (the client's localDateString() emits slashes).
-  const date = normalizeDateParamIso(input)
-  if (date === null || !isCalendarDate(date)) return `not a real calendar date: "${input.slice(0, 20)}"`
-  if (date > today) return `dated after today (${today})`
-  if (date < historyFloor(today)) return `older than ${HISTORY_MAX_DAYS} days`
-  return null
-}
-
-/** The instant before which `/api/sync-health` would drop a heart-rate or interval row as stale,
- *  pushed back to cover an import's window (plus a day of slack, as the ordinary bound has). */
-export function importPastToleranceStartMs(historyFrom: string, tz: string): number {
-  return dateStrMidnightInTz(shiftDateStr(normalizeDateParamIso(historyFrom) ?? historyFrom, -1), tz).getTime()
-}
 
 export interface HistoryWindow {
   /** First local day of the window, inclusive. */
