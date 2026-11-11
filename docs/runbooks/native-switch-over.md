@@ -182,7 +182,7 @@ The wrapper never runs in CI.
 
 ## Rollback
 
-**The rule (proposed, pending #3721 item 4; the owner has not answered yet):**
+**The rule (the owner accepted it on #3721 item 4, 11 Nov 2026):**
 
 - **Who decides:** the owner, and nobody else.
 - **Deadline:** 7 days from the switch. After that the window is closed: the old files may be

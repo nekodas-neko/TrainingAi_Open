@@ -118,7 +118,7 @@ what makes comparing them possible, and it is also why these rules exist:
    - The install uses `adb install -r` only.
    - After the install: sign in, restore from cloud, set up again, run the native smoke checks,
      then quiet Preview for its week.
-   - The day itself, in order, and the rollback (the rule is proposed, pending #3721):
+   - The day itself, in order, and the rollback (the rule the owner accepted on #3721):
      [`runbooks/native-switch-over.md`](runbooks/native-switch-over.md).
      Use its wrapper (`scripts/native-switch-over/install.mjs`) for the install.
 6. **Later.**
