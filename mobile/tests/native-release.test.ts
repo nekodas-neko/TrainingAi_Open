@@ -5,15 +5,22 @@ import { test } from 'node:test';
 import { MOBILE_CALLBACKS } from '../src/features/account/session.ts';
 import {
   backupProblems,
+  declaredPermissions,
   excludedPaths,
+  foregroundServices,
   manifestReference,
   mergeExclusions,
   parseExclusions,
+  parseNames,
+  parseServices,
+  permissionProblems,
+  serviceTypeBits,
   xmlFromTree,
   xmlResourceName,
   xmlResourcePath,
 } from '../scripts/verify-release-apk.mjs';
 import { invoke } from '../scripts/verify-android-upgrade.mjs';
+import { OLD_APP_CHANNELS, removeOldAppChannels } from '../src/integrations/notifications/old-app-channels.ts';
 
 const require = createRequire(import.meta.url);
 const { exclusions } = require('../src/integrations/auth/private-backups.cjs');
@@ -174,4 +181,183 @@ test('a tool printing more than 1 MB is read in full, not reported as "Could not
   const out = invoke(process.execPath, ['-e', 'process.stdout.write("x".repeat(3 * 1024 * 1024))']);
   assert.equal(out.length, 3 * 1024 * 1024);
   assert.throws(() => invoke(process.execPath, ['-e', 'process.exit(3)']), /Could not run .* \(exit 3\)/);
+});
+
+// #3728: what the Capacitor app leaves in databases/ when the native app installs over it.
+const OLD_DATABASES = ['trainingaiSQLite.db', 'oura_raw.db'].flatMap((name) =>
+  ['', '-journal', '-wal', '-shm'].map((suffix) => `database:${name}${suffix}`),
+);
+
+test("backups leave out the old app's leftover databases, side files included", () => {
+  const listed = exclusions.map(([domain, path]: string[]) => `${domain}:${path}`);
+  for (const entry of OLD_DATABASES) assert.ok(listed.includes(entry), `${entry} is backed up`);
+  // The name the old app's store has on disk: the plugin appends SQLite.db to `trainingai`.
+  const service = readFileSync(new URL('../../lib/sqlite/sqlite-service.ts', import.meta.url), 'utf8');
+  assert.match(service, /const DB_NAME = 'trainingai';/);
+  const raw = readFileSync(
+    new URL('../../android/app/src/main/java/com/trainingai/app/oura/OuraRawDb.kt', import.meta.url),
+    'utf8',
+  );
+  assert.match(raw, /DB_NAME = "oura_raw\.db"/);
+  assert.match(raw, /getDatabasePath\(DB_NAME\)/);
+});
+
+test("the packaged-rules check fails an APK whose rules miss one of the old app's databases", () => {
+  const without = (xml: string) => xml.replaceAll('<exclude domain="database" path="oura_raw.db-wal"/>', '');
+  const problems = backupProblems({ manifest: MANIFEST, fullBackupXml: without(FULL), extractionXml: without(EXTRACTION), exclusions });
+  assert.deepEqual(problems, [
+    'full-backup-content does not exclude database oura_raw.db-wal.',
+    'data-extraction-rules cloud-backup does not exclude database oura_raw.db-wal.',
+    'data-extraction-rules device-transfer does not exclude database oura_raw.db-wal.',
+  ]);
+});
+
+// The shape `apkanalyzer manifest print` gives: one attribute per line, the service type as a number.
+const PRINTED_MANIFEST = `<manifest package="com.trainingai.app">
+    <uses-permission
+        android:name="android.permission.CAMERA" />
+    <uses-permission
+        android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission-sdk-23
+        android:name="android.permission.BLUETOOTH_SCAN" />
+    <permission
+        android:name="com.trainingai.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    <application>
+        <service
+            android:name="expo.modules.location.services.LocationTaskService"
+            android:exported="false"
+            android:foregroundServiceType="0x8" />
+        <service
+            android:name="expo.modules.activityservice.ActivityForegroundService"
+            android:foregroundServiceType="connectedDevice" />
+        <service
+            android:name="androidx.work.impl.background.systemjob.SystemJobService" />
+    </application>
+</manifest>`;
+
+test('permissions and foreground services are read from the printed manifest', () => {
+  assert.deepEqual(declaredPermissions(PRINTED_MANIFEST), [
+    'android.permission.CAMERA',
+    'android.permission.SYSTEM_ALERT_WINDOW',
+    'android.permission.SCHEDULE_EXACT_ALARM',
+    'android.permission.BLUETOOTH_SCAN',
+  ]);
+  assert.deepEqual(
+    foregroundServices(PRINTED_MANIFEST).map(({ name, bits }) => [name.split('.').pop(), bits]),
+    [['LocationTaskService', 0x8], ['ActivityForegroundService', 0x10]],
+  );
+  assert.equal(serviceTypeBits('location|connectedDevice'), 0x18);
+  assert.equal(serviceTypeBits('24'), 0x18);
+  assert.equal(serviceTypeBits('teleport'), null);
+  assert.throws(() => parseServices('NoType'));
+  assert.throws(() => parseServices('a.B:teleport'));
+});
+
+test('the permission check names a missing permission, a forbidden one and a wrong or missing service', () => {
+  const services = parseServices(
+    'expo.modules.location.services.LocationTaskService:location expo.modules.activityservice.ActivityForegroundService:connectedDevice',
+  );
+  const permissions = ['android.permission.CAMERA', 'android.permission.SYSTEM_ALERT_WINDOW'];
+  assert.deepEqual(permissionProblems({ manifest: PRINTED_MANIFEST, permissions, services }), []);
+  // "Display over other apps" gone, as it would be if Expo's template stopped declaring it.
+  const noOverlay = PRINTED_MANIFEST.replace(/<uses-permission\s+android:name="android.permission.SYSTEM_ALERT_WINDOW" \/>/, '');
+  assert.deepEqual(permissionProblems({ manifest: noOverlay, permissions, services }), [
+    'The manifest does not declare the permission android.permission.SYSTEM_ALERT_WINDOW.',
+  ]);
+  assert.deepEqual(permissionProblems({ manifest: PRINTED_MANIFEST, forbidden: ['android.permission.CAMERA'] }), [
+    'The manifest declares android.permission.CAMERA, which this app must not ask for.',
+  ]);
+  const wrongType = PRINTED_MANIFEST.replace('"0x8"', '"0x1"').replace(/<service\s+android:name="expo.modules.activityservice[^>]*>/, '');
+  assert.deepEqual(permissionProblems({ manifest: wrongType, services }), [
+    'The foreground service expo.modules.location.services.LocationTaskService has type 0x1, not location.',
+    'The manifest has no foreground service expo.modules.activityservice.ActivityForegroundService.',
+  ]);
+});
+
+const workflow = readFileSync(new URL('../../.github/workflows/native-release.yml', import.meta.url), 'utf8');
+const pinnedBlock = (name: string) =>
+  parseNames(workflow.match(new RegExp(`^  ${name}: \\|\\n((?: {4}\\S+\\n)+)`, 'm'))?.[1] ?? '');
+
+test("the workflow's permission floor covers everything our own config and modules declare", async () => {
+  const pinned = new Set(pinnedBlock('REQUIRED_PERMISSIONS'));
+  assert.ok(pinned.has('android.permission.SYSTEM_ALERT_WINDOW'), '"Display over other apps" is not pinned');
+  // Granted on old Android only, or implied there: the floor names what Android 12+ asks for.
+  const legacy = new Set(['android.permission.BLUETOOTH', 'android.permission.BLUETOOTH_ADMIN', 'android.permission.SCHEDULE_EXACT_ALARM']);
+  const config = await configFor({ EAS_BUILD_PROFILE: 'android-preview' });
+  const modules = ['activity-service', 'app-handoff', 'workout-status'].flatMap((name) =>
+    declaredPermissions(readFileSync(new URL(`../modules/${name}/android/src/main/AndroidManifest.xml`, import.meta.url), 'utf8')),
+  );
+  assert.ok(modules.includes('android.permission.SYSTEM_ALERT_WINDOW'), 'only the Expo template declares the overlay permission');
+  for (const name of [...config.android.permissions, ...modules]) {
+    assert.ok(pinned.has(name) || legacy.has(name), `${name} is declared but not pinned in native-release.yml`);
+  }
+  assert.deepEqual(pinnedBlock('FORBIDDEN_PERMISSIONS'), ['android.permission.ACCESS_BACKGROUND_LOCATION']);
+  assert.ok(!pinned.has('android.permission.ACCESS_BACKGROUND_LOCATION'));
+});
+
+test("the workflow's foreground services are the two the code declares", () => {
+  const services = parseServices(pinnedBlock('REQUIRED_FOREGROUND_SERVICES').join(' '));
+  assert.deepEqual(services, [
+    ['expo.modules.location.services.LocationTaskService', 'location'],
+    ['expo.modules.activityservice.ActivityForegroundService', 'connectedDevice'],
+  ]);
+  const ours = readFileSync(new URL('../modules/activity-service/android/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
+  assert.deepEqual(permissionProblems({ manifest: ours, services: [services[1]] }), []);
+  const location = readFileSync(new URL('../node_modules/expo-location/android/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
+  assert.match(location, /android:name="\.services\.LocationTaskService"[\s\S]*?android:foregroundServiceType="location"/);
+});
+
+// #3728: the old app's notification channels, deleted by the real app only.
+test("the old app's channels are deleted once, on the real app ID only, and never one the native app posts to", async () => {
+  const run = async (applicationId: string | null, present: string[], failing: string[] = []) => {
+    const deleted: string[] = [];
+    let lists = 0;
+    const removed = await removeOldAppChannels({
+      applicationId,
+      list: async () => (lists++, present.map((id) => ({ id }))),
+      remove: async (id) => {
+        if (failing.includes(id)) throw new Error('refused');
+        deleted.push(id);
+      },
+    });
+    return { removed, deleted, lists };
+  };
+  const onPhone = ['meal-reminders', 'scale-ble-v2', 'health-alerts', 'training-timers', 'training-reminders'];
+  const first = await run('com.trainingai.app', onPhone);
+  assert.deepEqual(first.deleted, ['meal-reminders', 'scale-ble-v2']);
+  assert.deepEqual(first.removed, first.deleted);
+  // The second start finds none of them and deletes nothing.
+  assert.deepEqual((await run('com.trainingai.app', ['health-alerts', 'training-timers'])).deleted, []);
+  // Preview and the Dev build never had them: the list is not even read.
+  for (const id of ['com.trainingai.app.preview', 'com.trainingai.app.dev', null]) {
+    assert.deepEqual(await run(id, onPhone), { removed: [], deleted: [], lists: 0 });
+  }
+  // One refusal does not stop the rest, and an unreadable list deletes nothing.
+  assert.deepEqual((await run('com.trainingai.app', onPhone, ['meal-reminders'])).removed, ['scale-ble-v2']);
+  assert.deepEqual(
+    await removeOldAppChannels({ applicationId: 'com.trainingai.app', list: async () => { throw new Error('x'); }, remove: async () => undefined }),
+    [],
+  );
+});
+
+test("the old-channel list matches the old app's code and shares no id with the native app's channels", () => {
+  const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+  const quoted = (text: string, pattern: RegExp) => [...text.matchAll(pattern)].map((m) => m[1]);
+  const old = new Set([
+    ...['lib/notifications.ts', 'lib/meal-reminders.ts', 'lib/supplement-reminders.ts', 'lib/day-review-reminders.ts', 'lib/workout-reminders.ts']
+      .flatMap((path) => quoted(read(path), /_CHANNEL = '([^']+)'/g)),
+    ...['MainActivity.java', 'oura/OuraRingService.kt', 'scale/ScaleBleService.kt', 'polar/PolarStrapService.kt']
+      .flatMap((path) => quoted(read(`android/app/src/main/java/com/trainingai/app/${path}`), /CHANNEL_ID = "([^"]+)"/g)),
+  ]);
+  assert.deepEqual([...OLD_APP_CHANNELS].sort(), [...old].sort());
+  const native = [
+    ...quoted(read('mobile/src/integrations/notifications/platform.native.ts'), /(?:setNotificationChannelAsync\(|channelId: )'([^']+)'/g),
+    ...quoted(read('mobile/modules/activity-service/android/src/main/java/expo/modules/activityservice/ActivityNotification.kt'), /CHANNEL_ID = "([^"]+)"/g),
+    ...quoted(read('mobile/modules/workout-status/android/src/main/java/expo/modules/workoutstatus/WorkoutStatusNotifier.kt'), /CHANNEL_ID = "([^"]+)"/g),
+  ];
+  assert.ok(native.includes('health-alerts') && native.length >= 6);
+  for (const id of native) assert.ok(!OLD_APP_CHANNELS.includes(id), `${id} is a native channel and would be deleted`);
 });

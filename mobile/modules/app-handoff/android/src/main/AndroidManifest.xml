@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <!-- Bringing our own task back to the front after the hand-off (#2896). Normal permission. -->
   <uses-permission android:name="android.permission.REORDER_TASKS" />
+  <!-- "Display over other apps": with it allowed, Android lets the app come back to the front
+       after the morning Oura hand-off. Declared here because until #3722 only Expo's template
+       manifest carried it, and a template change would have dropped the setting silently. -->
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
   <!-- Android 11+ hides other apps unless they are named here. Clock and Settings are the
        spike's stand-ins for testing without Oura installed. -->
   <queries>

@@ -11,19 +11,41 @@ const info = (versionCode: number, certificates = [CERT], pkg = 'com.trainingai.
 const GOOD_MANIFEST =
   '<application android:allowBackup="true" android:fullBackupContent="@xml/b" android:dataExtractionRules="@xml/d">'
 
+// The shape of `adb shell dumpsys package com.trainingai.app` on Android 16, trimmed.
+const dump = (versionCode: number, granted: string[], denied: string[] = []) => `Packages:
+  Package [com.trainingai.app] (a1b2c3):
+    versionCode=${versionCode} minSdk=26 targetSdk=36
+    versionName=1.492.0
+    install permissions:
+      android.permission.INTERNET: granted=true
+    User 0: ceDataInode=1 installed=true hidden=false
+      runtime permissions:
+${granted.map((name) => `        ${name}: granted=true, flags=[ USER_SET ]`).join('\n')}
+${denied.map((name) => `        ${name}: granted=false, flags=[ USER_SET ]`).join('\n')}
+`
+const BEFORE = dump(1_513_000, ['android.permission.CAMERA', 'android.permission.POST_NOTIFICATIONS'], ['android.permission.RECORD_AUDIO'])
+const AFTER = dump(2_000_000_000, ['android.permission.CAMERA'], ['android.permission.POST_NOTIFICATIONS'])
+
 function harness(over: Record<string, unknown> = {}) {
   const calls: string[][] = []
+  let installedYet = false
   const adb = vi.fn((args: string[]) => {
     calls.push(args)
     if (args[0] === 'devices') return 'List of devices attached\nR5CY123\tdevice\n'
     if (args.includes('path')) return 'package:/data/app/~~x/com.trainingai.app-y/base.apk\n'
+    if (args.includes('dumpsys')) return installedYet ? AFTER : BEFORE
+    if (args.includes('install')) installedYet = true
     return ''
   })
   const writes: string[] = []
+  const records: Record<string, any>[] = []
   const fs = {
     existsSync: () => true,
     mkdirSync: vi.fn(),
-    writeFileSync: (p: string) => writes.push(p),
+    writeFileSync: (p: string, body: string) => {
+      writes.push(p)
+      if (p.endsWith('record.json')) records.push(JSON.parse(body))
+    },
     readFileSync: () => Buffer.from('apk'),
   }
   const inspect = vi.fn((apk: string) => (apk.endsWith('base.apk') ? info(1_513_000) : info(2_000_000_000)))
@@ -31,7 +53,7 @@ function harness(over: Record<string, unknown> = {}) {
     env: {}, adb, fs, inspect, log: vi.fn(), manifestPrint: () => GOOD_MANIFEST,
     now: new Date('2026-11-14T03:04:05Z'), ...over,
   }
-  return { deps, calls, writes, adb }
+  return { deps, calls, writes, records, adb }
 }
 const ARGS = ['--apk', '/tmp/new.apk', '--backup-root', '/tmp/bk']
 
@@ -69,6 +91,48 @@ describe('command construction', () => {
     ])
       expect(() => assertSafeAdb(bad)).toThrow()
   })
+  it('lets only the two read-only shell commands through (#3722)', async () => {
+    const { assertSafeAdb, buildAdb } = await load()
+    expect(buildAdb('S1').packageDump()).toEqual(['-s', 'S1', 'shell', 'dumpsys', 'package', 'com.trainingai.app'])
+    for (const ok of [buildAdb().packagePath(), buildAdb().packageDump(), buildAdb('S1').packageDump(), ['devices'], ['pull', '/a', '/b']])
+      expect(() => assertSafeAdb(ok)).not.toThrow()
+    for (const bad of [
+      ['shell', 'pm', 'uninstall', 'com.trainingai.app'],
+      ['shell', 'pm', 'uninstall', '-k', '--user', '0', 'com.trainingai.app'],
+      ['shell', 'cmd', 'package', 'uninstall', 'com.trainingai.app'],
+      ['shell', 'pm', 'clear', 'com.trainingai.app'],
+      ['shell', 'pm', 'revoke', 'com.trainingai.app', 'android.permission.CAMERA'],
+      ['shell', 'pm', 'grant', 'com.trainingai.app', 'android.permission.CAMERA'],
+      ['shell', 'am', 'force-stop', 'com.trainingai.app'],
+      ['shell', 'rm', '-rf', '/data/data/com.trainingai.app'],
+      ['shell', 'dumpsys', 'package', 'com.trainingai.app', ';', 'pm', 'clear', 'x'],
+      ['shell', 'dumpsys package com.trainingai.app; pm uninstall com.trainingai.app'],
+      ['shell', 'dumpsys', 'package', 'com.other.app'],
+      ['-s', 'S1', 'shell', 'pm', 'path', 'com.other.app'],
+      ['shell'],
+      ['install-multiple', '-r', '/a.apk'],
+      ['push', '/a', '/b'],
+      ['root'],
+      ['reboot'],
+      ['backup', '-apk', 'com.trainingai.app'],
+    ])
+      expect(() => assertSafeAdb(bad), bad.join(' ')).toThrow()
+  })
+  it('reads the versionCode and the granted permissions from dumpsys, and compares two reads', async () => {
+    const { parsePackageDump, comparePhoneState } = await load()
+    const before = parsePackageDump(BEFORE)
+    expect(before).toEqual({
+      versionCode: 1_513_000,
+      versionName: '1.492.0',
+      grantedPermissions: ['android.permission.CAMERA', 'android.permission.INTERNET', 'android.permission.POST_NOTIFICATIONS'],
+    })
+    expect(comparePhoneState(before, parsePackageDump(AFTER))).toEqual({
+      lost: ['android.permission.POST_NOTIFICATIONS'], gained: [],
+    })
+    expect(parsePackageDump('Unable to find package: com.trainingai.app')).toEqual({
+      versionCode: null, versionName: null, grantedPermissions: [],
+    })
+  })
   it('detects the backup-rule gaps', async () => {
     const { checkBackupRules } = await load()
     expect(checkBackupRules(GOOD_MANIFEST)).toEqual([])
@@ -88,15 +152,64 @@ describe('the flow', () => {
       'devices',
       'shell pm path com.trainingai.app',
       'pull /data/app/~~x/com.trainingai.app-y/base.apk /tmp/bk/20261114T030405/base.apk',
+      'shell dumpsys package com.trainingai.app',
     ])
     expect(h.writes.some((w) => w.endsWith('record.json'))).toBe(true)
+    expect(h.records.at(-1)?.phone.before.versionCode).toBe(1_513_000)
+    expect(h.records.at(-1)?.phone.after).toBeUndefined()
+  })
+  it('records the phone before and after a real install, and only reads it (#3722)', async () => {
+    const { main } = await load()
+    const h = harness()
+    const out = main([...ARGS, '--i-have-the-owners-yes'], h.deps)
+    const lines = h.calls.map((c) => c.join(' '))
+    expect(lines.filter((l) => l === 'shell dumpsys package com.trainingai.app')).toHaveLength(2)
+    expect(lines.indexOf('shell dumpsys package com.trainingai.app')).toBeLessThan(lines.findIndex((l) => l.startsWith('install')))
+    expect(lines.at(-1)).toBe('shell dumpsys package com.trainingai.app')
+    // Every call the whole flow makes is one of the four allowed verbs.
+    expect(new Set(h.calls.map((c) => c[0]))).toEqual(new Set(['devices', 'shell', 'pull', 'install']))
+    const phone = h.records.at(-1)?.phone
+    expect(phone.before.versionCode).toBe(1_513_000)
+    expect(phone.after.versionCode).toBe(2_000_000_000)
+    expect(phone.changes.lost).toEqual(['android.permission.POST_NOTIFICATIONS'])
+    expect(out.changes?.lost).toContain('android.permission.POST_NOTIFICATIONS')
+    const said = (h.deps.log as ReturnType<typeof vi.fn>).mock.calls.flat().join('\n')
+    expect(said).toMatch(/No longer granted[^\n]*POST_NOTIFICATIONS/)
+    expect(said).not.toMatch(/WARNING/)
+  })
+  it('refuses when the phone reports a different versionCode from the APK pulled off it', async () => {
+    const { main } = await load()
+    const h = harness({ inspect: (apk: string) => (apk.endsWith('base.apk') ? info(1_492_000) : info(2_000_000_000)) })
+    expect(() => main([...ARGS, '--i-have-the-owners-yes'], h.deps)).toThrow(/phone reports versionCode 1513000/)
+    expect(h.calls.some((c) => c.includes('install'))).toBe(false)
+  })
+  it('refuses when the installed versionCode cannot be read, and warns when the install did not take', async () => {
+    const { main } = await load()
+    const blind = harness()
+    blind.adb.mockImplementation((args: string[]) => {
+      if (args[0] === 'devices') return 'List of devices attached\nR5CY123\tdevice\n'
+      if (args.includes('path')) return 'package:/data/app/~~x/com.trainingai.app-y/base.apk\n'
+      return ''
+    })
+    expect(() => main([...ARGS, '--i-have-the-owners-yes'], blind.deps)).toThrow(/Could not read the installed versionCode/)
+    expect(blind.adb.mock.calls.some(([c]) => (c as string[]).includes('install'))).toBe(false)
+    const stuck = harness()
+    stuck.adb.mockImplementation((args: string[]) => {
+      if (args[0] === 'devices') return 'List of devices attached\nR5CY123\tdevice\n'
+      if (args.includes('path')) return 'package:/data/app/~~x/com.trainingai.app-y/base.apk\n'
+      return args.includes('dumpsys') ? BEFORE : ''
+    })
+    main([...ARGS, '--i-have-the-owners-yes'], stuck.deps)
+    expect((stuck.deps.log as ReturnType<typeof vi.fn>).mock.calls.flat().join('\n')).toMatch(/WARNING: expected versionCode 2000000000/)
   })
   it('installs with -r only after the backup, with the flag', async () => {
     const { main } = await load()
     const h = harness()
     expect(main([...ARGS, '--i-have-the-owners-yes'], h.deps).installed).toBe(true)
-    expect(h.calls.at(-1)).toEqual(['install', '-r', expect.stringMatching(/new\.apk$/)])
-    expect(h.calls.findIndex((c) => c[0] === 'pull')).toBeLessThan(h.calls.length - 1)
+    const at = h.calls.findIndex((c) => c[0] === 'install')
+    expect(h.calls[at]).toEqual(['install', '-r', expect.stringMatching(/new\.apk$/)])
+    expect(h.calls.filter((c) => c[0] === 'install')).toHaveLength(1)
+    expect(h.calls.findIndex((c) => c[0] === 'pull')).toBeLessThan(at)
   })
   it.each([
     ['a lower versionCode', (a: string) => (a.endsWith('base.apk') ? info(1_513_000) : info(1_512_000))],

@@ -3,8 +3,10 @@
 // the only safe way: `adb install -r`, after a backup of the installed APK and a full verify.
 // Runbook: docs/runbooks/native-switch-over.md. Used for the native app AND for the rollback.
 //
-// Dry-run by default: it reads the phone (read-only: package path, pull of base.apk) and writes the
-// local backup folder, runs every check, then prints the install command instead of running it.
+// Dry-run by default: it reads the phone (read-only: package path, pull of base.apk, and the
+// installed versionCode and granted permissions from `dumpsys package`) and writes the local
+// backup folder, runs every check, then prints the install command instead of running it. After a
+// real install it reads the versionCode and permissions again and records both (#3722).
 // A real install needs --i-have-the-owners-yes. It never runs in CI.
 //
 // Refused outright, whatever else is passed: uninstall, `pm clear`, and -d (downgrade). Uninstalling
@@ -61,6 +63,43 @@ export function assertSafeAdb(args) {
   const rest = words[0] === '-s' ? words.slice(2) : words;
   if (rest[0] === 'install' && !(rest.length === 3 && rest[1] === '-r'))
     throw new Refusal('The only install allowed is: adb [-s serial] install -r <apk>.');
+  // The phone's shell is where every destructive command lives (pm uninstall, pm clear, rm, am).
+  // Only the two reads below may reach it, spelled exactly.
+  if (rest[0] === 'shell' && !SAFE_SHELL.some((allowed) => allowed.join(' ') === rest.slice(1).join(' ')))
+    throw new Refusal(`Refused adb ${args.join(' ')}: the only shell commands allowed are the two read-only ones.`);
+  if (!['devices', 'shell', 'pull', 'install'].includes(rest[0]))
+    throw new Refusal(`Refused adb ${args.join(' ')}: not one of devices, shell (read-only), pull, install -r.`);
+}
+
+const SAFE_SHELL = [
+  ['pm', 'path', PACKAGE],
+  ['dumpsys', 'package', PACKAGE],
+];
+
+/**
+ * The installed versionCode and the granted permissions, from `adb shell dumpsys package <id>`.
+ * Install-time and runtime grants both print as `<name>: granted=true`. Returns nulls rather than
+ * throwing when the output is not in that shape: the snapshot is a record, not a gate.
+ */
+export function parsePackageDump(output) {
+  const text = String(output ?? '');
+  const code = /\bversionCode=(\d+)/.exec(text)?.[1];
+  const granted = [...text.matchAll(/^\s*([\w.]+): granted=true\b/gm)].map((m) => m[1]);
+  return {
+    versionCode: code ? Number(code) : null,
+    versionName: /\bversionName=(\S+)/.exec(text)?.[1] ?? null,
+    grantedPermissions: [...new Set(granted)].sort(),
+  };
+}
+
+/** What a before/after pair says: permissions the phone no longer grants, and ones it newly does. */
+export function comparePhoneState(before, after) {
+  const was = new Set(before.grantedPermissions);
+  const now = new Set(after.grantedPermissions);
+  return {
+    lost: before.grantedPermissions.filter((name) => !now.has(name)),
+    gained: after.grantedPermissions.filter((name) => !was.has(name)),
+  };
 }
 
 export function buildAdb(serial) {
@@ -68,6 +107,7 @@ export function buildAdb(serial) {
   return {
     devices: () => ['devices'],
     packagePath: () => [...prefix, 'shell', 'pm', 'path', PACKAGE],
+    packageDump: () => [...prefix, 'shell', 'dumpsys', 'package', PACKAGE],
     pull: (remote, local) => [...prefix, 'pull', remote, local],
     install: (apk) => [...prefix, 'install', '-r', apk],
   };
@@ -135,24 +175,30 @@ export function main(argv, deps = {}) {
   const installed = doInspect(backupApk, signer, analyzer);
   if (installed.package !== PACKAGE) throw new Refusal(`The installed APK is ${installed.package}, not ${PACKAGE}.`);
   const replacement = doInspect(apk, signer, analyzer);
+  // What the phone itself reports, before anything changes. `apk-latest` has offered newer builds
+  // since the code was last read, so this is the number the replacement has to beat.
+  const before = parsePackageDump(adb(cmd.packageDump()));
+  if (before.versionCode === null)
+    throw new Refusal('Could not read the installed versionCode from the phone (dumpsys package). Nothing was installed.');
+  if (before.versionCode !== installed.versionCode)
+    throw new Refusal(
+      `The phone reports versionCode ${before.versionCode} but the APK pulled from it is ${installed.versionCode}. Nothing was installed.`,
+    );
 
   // 2. Verify, before anything touches the phone.
   verifyUpgrade(installed, replacement);
   const problems = checkBackupRules(doManifest(apk));
   if (problems.length) throw new Refusal(`Backup rules: ${problems.join('; ')}. Do not install this build.`);
 
-  fs.writeFileSync(
-    join(dir, 'record.json'),
-    JSON.stringify(
-      {
-        installed: { ...installed, apkSha256: createHash('sha256').update(fs.readFileSync(backupApk)).digest('hex') },
-        replacement: { ...replacement, file: apk },
-        verified: ['same package', 'same signing certificate', 'higher versionCode', 'backup rules'],
-      },
-      null,
-      2,
-    ),
-  );
+  const record = {
+    installed: { ...installed, apkSha256: createHash('sha256').update(fs.readFileSync(backupApk)).digest('hex') },
+    replacement: { ...replacement, file: apk },
+    verified: ['same package', 'same signing certificate', 'higher versionCode', 'backup rules'],
+    phone: { before },
+  };
+  const writeRecord = () => fs.writeFileSync(join(dir, 'record.json'), JSON.stringify(record, null, 2));
+  writeRecord();
+  log(`The phone reports versionCode ${before.versionCode} (${before.versionName ?? 'no version name'}) with ${before.grantedPermissions.length} permissions granted.`);
   log(`Backed up the installed app to ${dir} (versionCode ${installed.versionCode}, cert ${installed.certificates.join(',')}).`);
   log(`Verified: same package and certificate, versionCode ${installed.versionCode} -> ${replacement.versionCode}, backup rules ok.`);
 
@@ -163,8 +209,20 @@ export function main(argv, deps = {}) {
     return { installed: false, dir };
   }
   adb(install);
-  log('Installed with adb install -r. Sign in, then run the smoke checks in the runbook.');
-  return { installed: true, dir };
+  // Read the phone again. The install has happened either way: a mismatch here is reported, loudly,
+  // and never "fixed" by this script.
+  const after = parsePackageDump(adb(cmd.packageDump()));
+  const changes = comparePhoneState(before, after);
+  record.phone.after = after;
+  record.phone.changes = changes;
+  writeRecord();
+  log(`Installed with adb install -r. The phone now reports versionCode ${after.versionCode ?? 'unknown'} with ${after.grantedPermissions.length} permissions granted.`);
+  if (after.versionCode !== replacement.versionCode)
+    log(`WARNING: expected versionCode ${replacement.versionCode}. Stop and tell the Orchestrator; do not retry or uninstall.`);
+  if (changes.lost.length) log(`No longer granted (re-grant in the runbook's "set up again" step): ${changes.lost.join(', ')}`);
+  if (changes.gained.length) log(`Newly granted: ${changes.gained.join(', ')}`);
+  log('Sign in, then carry on with the runbook.');
+  return { installed: true, dir, before, after, changes };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

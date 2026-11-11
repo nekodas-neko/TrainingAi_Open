@@ -67,6 +67,52 @@ env:
     sharedpref:SecureStore.xml
     sharedpref:trainingai_home_widgets.xml
     sharedpref:workout-status.xml
+    database:trainingaiSQLite.db
+    database:trainingaiSQLite.db-journal
+    database:trainingaiSQLite.db-wal
+    database:trainingaiSQLite.db-shm
+    database:oura_raw.db
+    database:oura_raw.db-journal
+    database:oura_raw.db-wal
+    database:oura_raw.db-shm
+  # The permissions the built APK must declare (#3722). A floor, pinned here for the same reason
+  # as the exclusions: a library, a plugin or Expo's template dropping one would otherwise ship as
+  # a setting the owner can no longer grant. SYSTEM_ALERT_WINDOW is "Display over other apps",
+  # which the morning Oura hand-off needs. The APK may declare more; the job summary lists them.
+  REQUIRED_PERMISSIONS: |
+    android.permission.health.READ_SLEEP
+    android.permission.health.READ_HEART_RATE
+    android.permission.health.READ_RESTING_HEART_RATE
+    android.permission.health.READ_HEART_RATE_VARIABILITY
+    android.permission.health.READ_STEPS
+    android.permission.health.READ_ACTIVE_CALORIES_BURNED
+    android.permission.health.READ_WEIGHT
+    android.permission.health.READ_EXERCISE
+    android.permission.health.READ_HEALTH_DATA_HISTORY
+    android.permission.READ_CALENDAR
+    android.permission.WRITE_CALENDAR
+    android.permission.ACCESS_COARSE_LOCATION
+    android.permission.ACCESS_FINE_LOCATION
+    android.permission.FOREGROUND_SERVICE
+    android.permission.FOREGROUND_SERVICE_LOCATION
+    android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE
+    android.permission.BLUETOOTH_CONNECT
+    android.permission.BLUETOOTH_SCAN
+    android.permission.CAMERA
+    android.permission.RECORD_AUDIO
+    android.permission.POST_NOTIFICATIONS
+    android.permission.POST_PROMOTED_NOTIFICATIONS
+    android.permission.USE_EXACT_ALARM
+    android.permission.REORDER_TASKS
+    android.permission.SYSTEM_ALERT_WINDOW
+  # Never asked for: routes record through the foreground service, not background location.
+  FORBIDDEN_PERMISSIONS: |
+    android.permission.ACCESS_BACKGROUND_LOCATION
+  # The two foreground services, as `class:type` (docs/module-map.md, "Preview's activity
+  # foreground service"): expo-location's for a GPS recording, ours for a strap with no GPS.
+  REQUIRED_FOREGROUND_SERVICES: |
+    expo.modules.location.services.LocationTaskService:location
+    expo.modules.activityservice.ActivityForegroundService:connectedDevice
 
 jobs:
   build:
@@ -196,7 +242,7 @@ jobs:
           rm -f "$KS"
 
       # Fails the job on any mismatch, so nothing is uploaded that could not replace the real app.
-      - name: Check the package, certificate, version code and backup rules
+      - name: Check the package, certificate, version code, backup rules and permissions
         env:
           BUILT_REF: ${{ inputs.ref }}
           EMULATOR_ABI: ${{ inputs.emulator_abi }}
@@ -212,10 +258,14 @@ jobs:
             --apksigner "$BT/apksigner" \
             --apkanalyzer "$TOOLS/apkanalyzer" \
             --aapt2 "$BT/aapt2" \
-            --require-exclusions "$REQUIRED_BACKUP_EXCLUSIONS" | tee "$RUNNER_TEMP/verified.json"
+            --require-exclusions "$REQUIRED_BACKUP_EXCLUSIONS" \
+            --require-permissions "$REQUIRED_PERMISSIONS" \
+            --forbid-permissions "$FORBIDDEN_PERMISSIONS" \
+            --require-foreground-services "$REQUIRED_FOREGROUND_SERVICES" | tee "$RUNNER_TEMP/verified.json"
           {
             echo "**$PACKAGE**, version code $ANDROID_VERSION_CODE, built from \`$BUILT_REF\`, $(du -h "$RUNNER_TEMP/$APK_NAME" | cut -f1)."
-            echo "Signed by the installed app's certificate \`$EXPECTED_CERT_SHA256\`; the backup rules keep SecureStore and the health database out of Google backups."
+            echo "Signed by the installed app's certificate \`$EXPECTED_CERT_SHA256\`; the backup rules keep SecureStore, the health database and the old app's leftover databases out of Google backups."
+            echo "It declares every pinned permission (\"Display over other apps\" among them) and both foreground services."
             echo "This is a workflow artifact only. Nothing was published."
             if [ "$EMULATOR_ABI" = "true" ]; then
               echo ""

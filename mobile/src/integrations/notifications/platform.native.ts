@@ -12,6 +12,7 @@ import {
   alertSignature,
   type Alert,
 } from '../../features/platform/data/models';
+import { removeOldAppChannels } from './old-app-channels';
 export function alertsAvailable() {
   return !!requireOptionalNativeModule('ExpoNotificationScheduler');
 }
@@ -33,6 +34,14 @@ async function sdk() {
         name: 'Training reminders',
         importance: notifications.AndroidImportance.DEFAULT,
         sound: 'default',
+      });
+      // The Capacitor app's channels, left behind by the install over it (#3728). Not awaited: a
+      // slow or failed delete must not hold up the rest and walk alarms.
+      void removeOldAppChannels({
+        applicationId: requireOptionalNativeModule<{ applicationId: string }>('ExpoApplication')
+          ?.applicationId,
+        list: () => notifications.getNotificationChannelsAsync(),
+        remove: (id) => notifications.deleteNotificationChannelAsync(id),
       });
     }
     // The three answers a meal reminder carries (#2123). They open the app: an action that does

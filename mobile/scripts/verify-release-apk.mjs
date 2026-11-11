@@ -4,11 +4,20 @@
 // session token and the health database to Google.
 //
 //   node scripts/verify-release-apk.mjs --apk app.apk --package com.trainingai.app \
-//     --version-code 123 --cert <sha256> --require-exclusions "root:app_webview file:SQLite ..."
+//     --version-code 123 --cert <sha256> --require-exclusions "root:app_webview file:SQLite ..." \
+//     --require-permissions "android.permission.CAMERA ..." \
+//     --require-foreground-services "expo.modules.location.services.LocationTaskService:location ..."
 //
 // --require-exclusions is the floor the workflow pins itself (`domain:path`, separated by spaces,
 // commas or newlines): the APK must carry all of them in all three lists, on top of whatever the
 // built code's private-backups.cjs lists. It is required, so a ref cannot lower the floor.
+//
+// --require-permissions and --require-foreground-services are the workflow's second floor (#3722):
+// every permission named must be a <uses-permission> of the merged manifest, and every
+// `class:type` must be a <service> declared with that foreground-service type. A permission that
+// goes missing (a library or the Expo template stops declaring it) would otherwise show up as a
+// setting the owner can no longer grant. --forbid-permissions names ones that must be absent.
+// Both are floors, not the whole list: the APK may declare more, and the output prints all of it.
 //
 // Tools come from --apksigner / --apkanalyzer / --aapt2 or APKSIGNER / APKANALYZER / AAPT2.
 import { createRequire } from 'node:module';
@@ -137,6 +146,104 @@ export function backupProblems({ manifest, fullBackupXml, extractionXml, exclusi
   return problems;
 }
 
+/** Whitespace- or comma-separated names. */
+export function parseNames(text) {
+  return String(text ?? '').split(/[\s,]+/).filter(Boolean);
+}
+
+/** Every `<uses-permission>` (and `-sdk-23`) name in `apkanalyzer manifest print` output. */
+export function declaredPermissions(manifest) {
+  return [
+    ...new Set(
+      [...String(manifest).matchAll(/<uses-permission(?:-sdk-23)?\b[^>]*?\bandroid:name="([^"]+)"/g)].map(
+        ([, name]) => name,
+      ),
+    ),
+  ];
+}
+
+// android.content.pm.ServiceInfo's FOREGROUND_SERVICE_TYPE_* bits. apkanalyzer prints the packaged
+// attribute as a number (`0x8`); a source manifest spells it (`location|connectedDevice`).
+const SERVICE_TYPE_BITS = {
+  dataSync: 0x1,
+  mediaPlayback: 0x2,
+  phoneCall: 0x4,
+  location: 0x8,
+  connectedDevice: 0x10,
+  mediaProjection: 0x20,
+  camera: 0x40,
+  microphone: 0x80,
+  health: 0x100,
+  remoteMessaging: 0x200,
+  systemExempted: 0x400,
+  shortService: 0x800,
+  mediaProcessing: 0x2000,
+  specialUse: 0x40000000,
+};
+
+/** A foregroundServiceType value as its bits, or null when it names a type this script does not know. */
+export function serviceTypeBits(value) {
+  const text = String(value ?? '').trim();
+  if (/^0x[0-9a-f]+$/i.test(text)) return Number.parseInt(text, 16);
+  if (/^\d+$/.test(text)) return Number(text);
+  let bits = 0;
+  for (const name of text.split('|').map((part) => part.trim()).filter(Boolean)) {
+    if (!Object.hasOwn(SERVICE_TYPE_BITS, name)) return null;
+    bits |= SERVICE_TYPE_BITS[name];
+  }
+  return text ? bits : null;
+}
+
+/**
+ * Every `<service>` with a foreground-service type.
+ * @returns {{ name: string, type: string, bits: number | null }[]}
+ */
+export function foregroundServices(manifest) {
+  const found = [];
+  for (const [, attributes] of String(manifest).matchAll(/<service\b([^>]*)>/g)) {
+    const name = attributes.match(/\bandroid:name="([^"]+)"/)?.[1];
+    const type = attributes.match(/\bandroid:foregroundServiceType="([^"]+)"/)?.[1];
+    if (name && type) found.push({ name, type, bits: serviceTypeBits(type) });
+  }
+  return found;
+}
+
+/** `class:type` entries (separated by whitespace or commas) as [class, type] pairs. */
+export function parseServices(text) {
+  return parseNames(text).map((entry) => {
+    const at = entry.lastIndexOf(':');
+    if (at < 1 || at === entry.length - 1) throw new Error(`Bad required service '${entry}', expected class:type.`);
+    const type = entry.slice(at + 1);
+    if (serviceTypeBits(type) === null) throw new Error(`Unknown foreground-service type '${type}' in '${entry}'.`);
+    return [entry.slice(0, at), type];
+  });
+}
+
+/**
+ * The problems with the manifest's permissions and foreground services; empty when every floor holds.
+ * @param {{ manifest: string, permissions?: string[], forbidden?: string[], services?: string[][] }} input
+ */
+export function permissionProblems({ manifest, permissions = [], forbidden = [], services = [] }) {
+  const problems = [];
+  const declared = new Set(declaredPermissions(manifest));
+  for (const name of permissions) {
+    if (!declared.has(name)) problems.push(`The manifest does not declare the permission ${name}.`);
+  }
+  for (const name of forbidden) {
+    if (declared.has(name)) problems.push(`The manifest declares ${name}, which this app must not ask for.`);
+  }
+  const found = foregroundServices(manifest);
+  for (const [name, type] of services) {
+    const service = found.find((entry) => entry.name === name);
+    const wanted = serviceTypeBits(type);
+    if (!service) problems.push(`The manifest has no foreground service ${name}.`);
+    else if (service.bits === null || (service.bits & wanted) !== wanted) {
+      problems.push(`The foreground service ${name} has type ${service.type}, not ${type}.`);
+    }
+  }
+  return problems;
+}
+
 function option(name, fallback) {
   const index = process.argv.indexOf(name);
   return index < 0 ? fallback : process.argv[index + 1];
@@ -152,6 +259,11 @@ function main() {
   const aapt2 = option('--aapt2', process.env.AAPT2 ?? 'aapt2');
   const required = parseExclusions(option('--require-exclusions', ''));
   if (!required.length) throw new Error('--require-exclusions is required: the workflow pins the backup floor.');
+  const permissions = parseNames(option('--require-permissions', ''));
+  if (!permissions.length) throw new Error('--require-permissions is required: the workflow pins the permission floor.');
+  const services = parseServices(option('--require-foreground-services', ''));
+  if (!services.length) throw new Error('--require-foreground-services is required: the workflow pins the services.');
+  const forbidden = parseNames(option('--forbid-permissions', ''));
   if (!Number.isSafeInteger(expectedCode) || expectedCode < 1) throw new Error('--version-code must be a positive integer.');
   if (!/^[A-F0-9]{64}$/.test(expectedCert)) throw new Error('--cert must be a SHA-256 digest.');
 
@@ -164,6 +276,7 @@ function main() {
   }
 
   const manifest = invoke(analyzer, ['manifest', 'print', apk]);
+  failures.push(...permissionProblems({ manifest, permissions, forbidden, services }));
   const resources = invoke(aapt2, ['dump', 'resources', apk]);
   const read = (attribute) => {
     const name = xmlResourceName(manifestReference(manifest, attribute), resources);
@@ -187,7 +300,18 @@ function main() {
     return;
   }
   console.info(
-    JSON.stringify({ package: built.package, versionCode: built.versionCode, certificate: built.certificates[0], backupExclusions: exclusions.length }, null, 2),
+    JSON.stringify(
+      {
+        package: built.package,
+        versionCode: built.versionCode,
+        certificate: built.certificates[0],
+        backupExclusions: exclusions.length,
+        permissions: declaredPermissions(manifest).sort(),
+        foregroundServices: foregroundServices(manifest).map(({ name, type }) => `${name}:${type}`),
+      },
+      null,
+      2,
+    ),
   );
 }
 

@@ -98,15 +98,28 @@ what makes comparing them possible, and it is also why these rules exist:
 5. **Switch-over.** Once #2849 has no blockers, `com.trainingai.app` is replaced. Do it only when
    every item on this checklist holds:
    - The owner's ring is on the Oura API, so there's no ring key to carry over.
+   - The server release the app needs is live (`/api/version`), and the release build is cut from
+     that released tag, never from `main`.
    - The release build's signing certificate SHA-256 matches the installed app's, and its version
-     code is above the installed one.
-   - The backup rules keep the session token out of Google backups. Check with
-     `apkanalyzer manifest print` on the release APK.
-   - The current app's outbox is empty.
+     code is above the one the phone reports that day (the wrapper's dry run reads it).
+   - The native build, its emulator twin and the rollback build were built together, as a set, and
+     the rehearsal passed with that set.
+   - The backup rules keep the session token, the health database and the old app's leftover
+     databases out of Google backups, and the APK declares every pinned permission and both
+     foreground services. `native-release.yml` checks both on the signed APK
+     (`mobile/scripts/verify-release-apk.mjs`).
+   - The current app has nothing unsent, of any of the five kinds: the outbox and dead letters,
+     unsent settings, the sensor upload queues, an unfinished workout, activity or walk, and
+     detected walks awaiting review.
+   - Preview's queues are empty and its phone-only settings are noted down.
    - A rollback Capacitor build is ready, signed with the same key and carrying an even higher
-     version code, because Android won't downgrade without an uninstall.
+     version code, because Android won't downgrade without an uninstall. The old web screens stay
+     deployed while a rollback is possible.
    - The install uses `adb install -r` only.
-   - The day itself, in order, and the rollback: [`runbooks/native-switch-over.md`](runbooks/native-switch-over.md).
+   - After the install: sign in, restore from cloud, set up again, run the native smoke checks,
+     then quiet Preview for its week.
+   - The day itself, in order, and the rollback (the rule is proposed, pending #3721):
+     [`runbooks/native-switch-over.md`](runbooks/native-switch-over.md).
      Use its wrapper (`scripts/native-switch-over/install.mjs`) for the install.
 6. **Later.**
    - Over-the-air updates, so screen fixes don't need a reinstall.
@@ -178,8 +191,13 @@ TrainingAi Preview: `expo prebuild`, Gradle `assembleRelease`, then `apksigner`.
   - the version code equals the input;
   - the merged manifest has `android:fullBackupContent` and `android:dataExtractionRules`, and the
     packaged XML (all three lists) excludes everything in `private-backups.cjs`: SecureStore, the
-    widget and workout-status preferences, the WebView, and the health database
-    (`fitnessai.sqlite`, kept in `filesDir/SQLite`).
+    widget and workout-status preferences, the WebView, the health database
+    (`fitnessai.sqlite`, kept in `filesDir/SQLite`), and the two databases the Capacitor app
+    leaves in `databases/` (`trainingaiSQLite.db` and `oura_raw.db`, with their side files; #3728);
+  - the merged manifest declares every permission pinned in the workflow (`REQUIRED_PERMISSIONS`,
+    "Display over other apps" among them), none of `FORBIDDEN_PERMISSIONS`, and both foreground
+    services with their types (`REQUIRED_FOREGROUND_SERVICES`). These are floors: the APK may
+    declare more, and the job's output lists all of it.
   The check is `mobile/scripts/verify-release-apk.mjs`.
 - **Publishes nothing.** It is a workflow artifact only, with read-only permissions. It never touches
   `apk-latest` (which `lib/github-release.ts` offers to the installed app as an update) or any

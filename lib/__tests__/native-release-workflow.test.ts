@@ -89,6 +89,15 @@ describe('the ref and the backup floor', () => {
 
   it('pins the required exclusions in the workflow and hands them to the verifier', () => {
     expect([...pinned()].sort()).toEqual([
+      // #3728: the Capacitor app's leftover databases, each SQLite side file named.
+      'database:oura_raw.db',
+      'database:oura_raw.db-journal',
+      'database:oura_raw.db-shm',
+      'database:oura_raw.db-wal',
+      'database:trainingaiSQLite.db',
+      'database:trainingaiSQLite.db-journal',
+      'database:trainingaiSQLite.db-shm',
+      'database:trainingaiSQLite.db-wal',
       'file:SQLite',
       'root:app_webview',
       'sharedpref:SecureStore',
@@ -100,9 +109,35 @@ describe('the ref and the backup floor', () => {
     expect(code).toContain('--require-exclusions "$REQUIRED_BACKUP_EXCLUSIONS"')
   })
 
-  it('matches what the app\'s own backup plugin excludes', () => {
+  it('matches what the app\'s own backup plugin excludes', async () => {
+    // Loaded, not text-matched: the old app's databases are built from two names and four suffixes.
+    const { createRequire } = await import('node:module')
+    const stub = { withAndroidManifest: () => undefined, withDangerousMod: () => undefined, AndroidConfig: {} }
     const plugin = readFileSync(new URL('../../mobile/src/integrations/auth/private-backups.cjs', import.meta.url), 'utf8')
-    const own = [...plugin.matchAll(/\['(\w+)', '([^']+)'\]/g)].map(m => `${m[1]}:${m[2]}`)
+    const loaded: { exports: { exclusions?: string[][] } } = { exports: {} }
+    new Function('require', 'module', plugin)(
+      (name: string) => (name === 'expo/config-plugins' ? stub : createRequire(import.meta.url)(name)),
+      loaded,
+    )
+    const own = (loaded.exports.exclusions ?? []).map(([domain, path]) => `${domain}:${path}`)
+    expect(own.length).toBeGreaterThan(8)
     expect([...own].sort()).toEqual([...pinned()].sort())
+  })
+
+  it('pins the permission floor, the forbidden list and both foreground services (#3722)', () => {
+    const block = (name: string) =>
+      (workflow.match(new RegExp(`^  ${name}: \\|\\n((?: {4}\\S+\\n)+)`, 'm'))?.[1] ?? '').split('\n').map(l => l.trim()).filter(Boolean)
+    const permissions = block('REQUIRED_PERMISSIONS')
+    expect(permissions).toContain('android.permission.SYSTEM_ALERT_WINDOW')
+    expect(permissions).toContain('android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE')
+    expect(permissions.length).toBeGreaterThanOrEqual(25)
+    expect(block('FORBIDDEN_PERMISSIONS')).toEqual(['android.permission.ACCESS_BACKGROUND_LOCATION'])
+    expect(block('REQUIRED_FOREGROUND_SERVICES')).toEqual([
+      'expo.modules.location.services.LocationTaskService:location',
+      'expo.modules.activityservice.ActivityForegroundService:connectedDevice',
+    ])
+    expect(code).toContain('--require-permissions "$REQUIRED_PERMISSIONS"')
+    expect(code).toContain('--forbid-permissions "$FORBIDDEN_PERMISSIONS"')
+    expect(code).toContain('--require-foreground-services "$REQUIRED_FOREGROUND_SERVICES"')
   })
 })
