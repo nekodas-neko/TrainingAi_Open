@@ -137,3 +137,84 @@ export async function lookupLatestApkRelease(): Promise<{ release: ApkRelease | 
   if (!release) return { release: null, status: 'unavailable' }
   return { release: mapApkRelease(release), status: 'ok' }
 }
+
+// ── The native app's release build (#3723) ────────────────────────────────────────────────────
+//
+// After the switch-over (#2849) the phone runs the native app (`mobile/`), whose screens ship
+// inside the APK, so a new build reaches the phone only by download. `native-release.yml` attaches
+// the signed release APK to the rolling `native-release-latest` release, and only when dispatched
+// with both `publish` and `confirm_switch_done` set. Until it has published once, the release does
+// not exist and this lookup reports null, which the native About screen treats as "say nothing".
+//
+// A separate release from `apk-latest`, on purpose: that one is the Capacitor app's, and
+// `fetchLatestApkRelease` above offers its first `.apk` to the installed Capacitor app.
+
+const NATIVE_RELEASE_TAG = 'native-release-latest'
+const NATIVE_RELEASE_URL = `https://api.github.com/repos/${APK_RELEASE_REPO}/releases/tags/${NATIVE_RELEASE_TAG}`
+
+export interface NativeReleaseBuild {
+  /** The app's marketing version, from `(vX.Y.Z)` in the release title or notes. */
+  versionName: string
+  /** The Android versionCode, from `version code N` in the notes. The number About compares. */
+  versionCode: number
+  /** When the APK was uploaded (the asset's `updated_at`, as BF-111 for `apk-latest`). */
+  publishedAt: string | null
+  /** The release page, where the APK is downloaded. */
+  pageUrl: string
+}
+
+/** `version code 1234` in the notes the workflow writes. Null rather than a guess. */
+export function parseNativeReleaseVersionCode(name?: string | null, body?: string | null): number | null {
+  for (const text of [name, body]) {
+    const hit = text?.match(/\bversion code (\d{1,10})\b/)
+    if (!hit) continue
+    const code = Number(hit[1])
+    // Android stores it as a signed 32-bit integer; native-release.yml caps it at 2100000000.
+    if (Number.isSafeInteger(code) && code > 0 && code <= 2_100_000_000) return code
+  }
+  return null
+}
+
+interface RawNativeRelease extends RawRelease {
+  html_url?: string | null
+}
+
+/**
+ * Release JSON -> the build About compares against. Null unless the release carries an APK, a
+ * version name and a version code: a half-written release must leave the notice silent.
+ */
+export function mapNativeReleaseBuild(release: RawNativeRelease): NativeReleaseBuild | null {
+  const apk = release.assets?.find(a => a.name.endsWith('.apk'))
+  const versionName = parseNativeReleaseVersion(release.name, release.body)
+  const versionCode = parseNativeReleaseVersionCode(release.name, release.body)
+  if (!apk || !versionName || versionCode === null) return null
+  const expectedPage = `https://github.com/${APK_RELEASE_REPO}/releases/tag/${NATIVE_RELEASE_TAG}`
+  return {
+    versionName,
+    versionCode,
+    publishedAt: apk.updated_at ?? release.published_at ?? null,
+    // The page, not the APK's own URL: the notes there say what the build is before it installs.
+    pageUrl: release.html_url === expectedPage ? release.html_url : expectedPage,
+  }
+}
+
+/**
+ * The newest published native release build, or null on any failure or before the first publish.
+ * Same request, timeout and five-minute revalidation as `lookupLatestApkRelease`.
+ */
+export async function fetchNativeReleaseBuild(): Promise<NativeReleaseBuild | null> {
+  const token = process.env.GITHUB_RELEASES_TOKEN
+  const res = await fetch(NATIVE_RELEASE_URL, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    signal: AbortSignal.timeout(5_000),
+    next: { revalidate: 300 },
+  }).catch(() => null)
+
+  if (!res?.ok) return null
+  const release = await res.json().catch(() => null)
+  return release ? mapNativeReleaseBuild(release) : null
+}

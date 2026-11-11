@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { CHANGELOG } from "@trainingai/shared/changelog"
-import { lookupLatestApkRelease } from "@/lib/github-release"
+import { fetchNativeReleaseBuild, lookupLatestApkRelease } from "@/lib/github-release"
 import { readBuildSha } from "@/lib/build-sha"
 
 // GET — public, cacheable version endpoint.
@@ -15,7 +15,10 @@ import { readBuildSha } from "@/lib/build-sha"
 // asserting either way.
 export async function GET() {
   const version = CHANGELOG[0]?.version ?? "unknown"
-  const { release, status } = await lookupLatestApkRelease()
+  const [{ release, status }, releaseBuild] = await Promise.all([
+    lookupLatestApkRelease(),
+    fetchNativeReleaseBuild(),
+  ])
   return NextResponse.json(
     {
       version,
@@ -37,6 +40,13 @@ export async function GET() {
       // and the one written exemption in `check-api-no-store.js`), so an unbusted poll can answer
       // from five minutes ago and report a deploy that has not happened.
       webBuildSha: readBuildSha(),
+      // #3723. The newest native app (`mobile/`) release build on `native-release-latest`, for the
+      // native About screen's "A newer build is available" notice. Additive: an older client
+      // ignores it. null before the first publish (none happens until after the switch-over) or
+      // when GitHub could not be read; the app shows nothing then.
+      nativeReleaseBuild: releaseBuild
+        ? { versionName: releaseBuild.versionName, versionCode: releaseBuild.versionCode, pageUrl: releaseBuild.pageUrl }
+        : null,
     },
     { headers: { "Cache-Control": "public, max-age=300" } },
   )

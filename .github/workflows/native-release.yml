@@ -13,10 +13,19 @@ name: Native release build
 # ANDROID_DEBUG_KEYSTORE_B64, the legacy name of that key). Its certificate is checked against the
 # installed app's before the APK is kept.
 #
-# The APK is a WORKFLOW ARTIFACT ONLY. This workflow never publishes to `apk-latest` or any
-# release: lib/github-release.ts offers the first `.apk` on `apk-latest` to the installed app as
-# an update, and an install over the real app is the owner's switch-over step, not an automatic one.
-# lib/__tests__/native-release-workflow.test.ts pins that.
+# The APK is kept as a 14-day WORKFLOW ARTIFACT. By default nothing is published, and this
+# workflow never touches `apk-latest`: lib/github-release.ts offers the first `.apk` there to the
+# installed Capacitor app as an update.
+#
+# PUBLISHING (#3723) is for AFTER the switch-over only. With `publish` AND `confirm_switch_done`
+# both set, a separate job attaches the checked APK to the rolling prerelease
+# `native-release-latest` (never marked "latest"), which the native app's About screen offers as
+# "A newer build is available". Before the switch that would be dangerous: this APK has the real
+# app's ID and key and a higher version code, so anyone who downloaded and opened it would install
+# it over the Capacitor app and skip the switch runbook (emptying the queues, the backup, the
+# rollback build). So `publish` alone is refused, it never runs on push or a schedule, and the
+# runbook (docs/runbooks/native-switch-over.md) says when it starts.
+# lib/__tests__/native-release-workflow.test.ts pins all of that.
 
 on:
   workflow_dispatch:
@@ -39,8 +48,19 @@ on:
         type: boolean
         required: false
         default: false
+      # #3723. Off unless asked, and refused unless confirm_switch_done is also set.
+      publish:
+        description: 'After the switch only: attach this APK to the native-release-latest download page'
+        type: boolean
+        required: false
+        default: false
+      confirm_switch_done:
+        description: 'Required with publish: the switch-over (docs/runbooks/native-switch-over.md) is done and has held'
+        type: boolean
+        required: false
+        default: false
 
-# Read-only. Nothing in this workflow writes to the repository or its releases.
+# Read-only. Only the `publish` job, which runs on the two inputs above, gets a write token.
 permissions:
   contents: read
 
@@ -122,6 +142,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.repository == 'nekodas-neko/TrainingAi_Open'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      version_code: ${{ steps.version.outputs.code }}
+      version_name: ${{ steps.name.outputs.name }}
     defaults:
       run:
         working-directory: mobile
@@ -154,7 +177,29 @@ jobs:
             exit 1
           }
 
+      # Refused before anything is built, so a mistaken publish costs nothing.
+      - name: Check the publish request
+        working-directory: .
+        env:
+          PUBLISH: ${{ inputs.publish }}
+          CONFIRMED: ${{ inputs.confirm_switch_done }}
+          EMULATOR_ABI: ${{ inputs.emulator_abi }}
+        run: |
+          set -euo pipefail
+          if [ "$PUBLISH" != "true" ]; then
+            exit 0
+          fi
+          if [ "$CONFIRMED" != "true" ]; then
+            echo "::error::publish needs confirm_switch_done too. This APK installs over the current app with the real app's key, so it is published only after the switch-over (docs/runbooks/native-switch-over.md) is done. Nothing was built."
+            exit 1
+          fi
+          if [ "$EMULATOR_ABI" = "true" ]; then
+            echo "::error::The emulator build is never published. Run again without emulator_abi."
+            exit 1
+          fi
+
       - name: Check the version code
+        id: version
         working-directory: .
         env:
           VERSION_CODE: ${{ inputs.version_code }}
@@ -166,6 +211,7 @@ jobs:
             exit 1
           fi
           echo "ANDROID_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v5
         with:
@@ -189,6 +235,15 @@ jobs:
       # the JS bundle inlines it for the About screen.
       - name: Record the built commit
         run: echo "EXPO_PUBLIC_BUILD_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      # The version name the publish job writes as `(vX.Y.Z)`, which /api/version reads back.
+      - name: Read the version name
+        id: name
+        run: |
+          set -euo pipefail
+          NAME="$(node -p "require('./app.json').expo.version")"
+          [[ "$NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::app.json's version '$NAME' is not X.Y.Z."; exit 1; }
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec expo prebuild --platform android --no-install
@@ -266,7 +321,7 @@ jobs:
             echo "**$PACKAGE**, version code $ANDROID_VERSION_CODE, built from \`$BUILT_REF\`, $(du -h "$RUNNER_TEMP/$APK_NAME" | cut -f1)."
             echo "Signed by the installed app's certificate \`$EXPECTED_CERT_SHA256\`; the backup rules keep SecureStore, the health database and the old app's leftover databases out of Google backups."
             echo "It declares every pinned permission (\"Display over other apps\" among them) and both foreground services."
-            echo "This is a workflow artifact only. Nothing was published."
+            echo "Kept as a 14-day workflow artifact. Publishing to the download page happens only in the publish job, with publish and confirm_switch_done both set."
             if [ "$EMULATOR_ABI" = "true" ]; then
               echo ""
               echo "**Emulator build for the switch rehearsal** (arm64-v8a and x86_64, artifact \`trainingai-release-apk-emulator\`). Never install it on the phone: the switch uses the arm64-only build."
@@ -280,3 +335,52 @@ jobs:
           retention-days: 14
           compression-level: 0
           if-no-files-found: error
+
+  # #3723. The only job with a write token, and it never builds or signs: it takes the APK the build
+  # job checked (package, certificate, version code, backup rules, permissions) and attaches it to
+  # the rolling download page. It runs only with both inputs set, which the build job has already
+  # refused otherwise; the condition is repeated here so neither alone can publish.
+  publish:
+    name: Publish to the download page
+    needs: build
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.publish && inputs.confirm_switch_done &&
+      !inputs.emulator_abi && github.ref == 'refs/heads/main' &&
+      github.repository == 'nekodas-neko/TrainingAi_Open'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: native-release-latest
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: trainingai-release-apk
+
+      - name: Publish to the rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODE: ${{ needs.build.outputs.version_code }}
+          NAME: ${{ needs.build.outputs.version_name }}
+          BUILT_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          [[ "$CODE" =~ ^[1-9][0-9]{0,9}$ ]] || { echo "::error::No version code from the build job. Nothing is published."; exit 1; }
+          [[ "$NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::No version name from the build job. Nothing is published."; exit 1; }
+          [ -s "$APK_NAME" ] || { echo "::error::The checked APK was not downloaded. Nothing is published."; exit 1; }
+          R=(-R "$GITHUB_REPOSITORY")
+          # lib/github-release.ts reads `(vX.Y.Z)` and `version code N` from these notes.
+          TITLE="TrainingAi release build (v$NAME)"
+          NOTES="$(printf '%s\n\n%s\n\n%s' \
+            "TrainingAi, the native app, built from \`$BUILT_REF\` on $(date -u +%Y-%m-%d), version code $CODE (v$NAME)." \
+            "For the phone AFTER the switch-over only. It installs over the TrainingAi app (\`$PACKAGE\`) and keeps its data and sign-in. Download **$APK_NAME** below and open it." \
+            "Signing certificate SHA-256: \`$EXPECTED_CERT_SHA256\`. How it works: docs/native-testing.md.")"
+          if ! gh release view "$RELEASE_TAG" "${R[@]}" > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" "${R[@]}" --target "$GITHUB_SHA" --prerelease --latest=false \
+              --title "$TITLE" --notes "$NOTES"
+          fi
+          gh release delete-asset "$RELEASE_TAG" "$APK_NAME" --yes "${R[@]}" 2> /dev/null || true
+          gh release upload "$RELEASE_TAG" "$APK_NAME" "${R[@]}"
+          gh release edit "$RELEASE_TAG" "${R[@]}" --prerelease --latest=false --title "$TITLE" --notes "$NOTES"
+          echo "Published version code $CODE (v$NAME): https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
