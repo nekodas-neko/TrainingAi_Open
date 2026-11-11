@@ -1,13 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
+import { load } from 'js-yaml'
 import { NATIVE_CALLBACKS } from '@/lib/auth/mobile/native-transaction'
 
 // .github/workflows/native-release.yml builds the REAL app's APK (#2840). lib/github-release.ts
 // offers the first `.apk` on the `apk-latest` release to the installed app as an update, so a
-// workflow that put its APK on any release could hand the owner the native app as an "update".
-// It is a workflow artifact only; the install is the owner's switch-over step.
+// workflow that put its APK there could hand the owner the native app as an "update". It keeps a
+// workflow artifact, and publishes to `native-release-latest` only after the switch (#3723).
 const workflow = readFileSync(new URL('../../.github/workflows/native-release.yml', import.meta.url), 'utf8')
 const code = workflow.replace(/^\s*#.*$/gm, '')
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a workflow file has no type
+const parsed = load(workflow) as any
 
 describe('native-release.yml', () => {
   it('runs only when dispatched by hand', () => {
@@ -15,17 +18,68 @@ describe('native-release.yml', () => {
     expect(triggers.match(/^ {2}\S+?:/gm)).toEqual(['  workflow_dispatch:'])
   })
 
-  it('never publishes to apk-latest or any release', () => {
+  // #3723. The APK has the real app's ID and key and a higher version code: published before the
+  // switch, opening it would install over the Capacitor app and skip the switch runbook.
+  it('never touches apk-latest, and publishes only from the gated publish job', () => {
     expect(code).not.toMatch(/apk-latest/)
-    expect(code).not.toMatch(/\bgh\s+release\b/)
-    expect(code).not.toMatch(/gh api[^\n]*releases/)
     expect(code).not.toMatch(/softprops|action-gh-release|create-release|upload-release-asset/)
-    expect(code).not.toMatch(/\bcontents:\s*write\b/)
     expect(code).not.toMatch(/\bgit\s+push\b/)
+    const { build, publish } = parsed.jobs
+    // The build job, which runs the checked-out code and holds the key, has no write token and no
+    // release call; the publish job has the token and builds nothing.
+    expect(build.permissions).toBeUndefined()
+    expect(JSON.stringify(build.steps)).not.toMatch(/\bgh\s+release\b|releases/)
+    expect(publish.permissions).toEqual({ contents: 'write' })
+    expect(publish.needs).toBe('build')
+    expect(JSON.stringify(publish.steps)).not.toMatch(/secrets\.|gradlew|apksigner|checkout/)
+    // Every release call names the rolling native tag.
+    expect(publish.env.RELEASE_TAG).toBe('native-release-latest')
+    const calls = [...code.matchAll(/gh release (\S+) (\S+)/g)]
+    expect(calls.length).toBeGreaterThan(0)
+    for (const [, , tag] of calls) expect(tag).toBe('"$RELEASE_TAG"')
+  })
+
+  it('publishes only when dispatched with both publish and confirm_switch_done', () => {
+    const inputs = parsed.on.workflow_dispatch.inputs
+    expect(inputs.publish).toMatchObject({ type: 'boolean', default: false })
+    expect(inputs.confirm_switch_done).toMatchObject({ type: 'boolean', default: false })
+    const condition: string = parsed.jobs.publish.if
+    for (const term of [
+      "github.event_name == 'workflow_dispatch'",
+      'inputs.publish',
+      'inputs.confirm_switch_done',
+      '!inputs.emulator_abi',
+      "github.ref == 'refs/heads/main'",
+    ]) expect(condition).toContain(term)
+    expect(condition).not.toMatch(/\|\|/)
+  })
+
+  it('refuses publish without confirm_switch_done before anything is built', () => {
+    const steps = parsed.jobs.build.steps as { name?: string; uses?: string; run?: string; env?: Record<string, string> }[]
+    const check = steps.findIndex(step => step.name === 'Check the publish request')
+    const checkout = steps.findIndex(step => step.uses?.startsWith('actions/checkout@'))
+    expect(check).toBeGreaterThanOrEqual(0)
+    expect(check).toBeLessThan(checkout)
+    expect(steps[check].env).toMatchObject({
+      PUBLISH: '${{ inputs.publish }}',
+      CONFIRMED: '${{ inputs.confirm_switch_done }}',
+    })
+    expect(steps[check].run).toMatch(/if \[ "\$CONFIRMED" != "true" \]; then\n\s+echo "::error::publish needs confirm_switch_done too\.[^\n]*"\n\s+exit 1/)
+  })
+
+  it('publishes a prerelease that is never marked latest', () => {
+    const run = (parsed.jobs.publish.steps as { run?: string }[]).map(step => step.run ?? '').join('\n')
+    const writes = run.split('\n').filter(line => /gh release (create|edit)/.test(line))
+    expect(writes).toHaveLength(2)
+    for (const line of writes) expect(line).toMatch(/--prerelease --latest=false/)
+    // lib/github-release.ts reads these two back.
+    expect(run).toContain('TITLE="TrainingAi release build (v$NAME)"')
+    expect(run).toContain('version code $CODE (v$NAME)')
   })
 
   it('keeps its APK as a workflow artifact', () => {
     expect(code).toMatch(/uses:\s*actions\/upload-artifact@/)
+    expect(code).toMatch(/retention-days: 14/)
     expect(code).toMatch(/^permissions:\n\s+contents:\s*read\s*$/m)
   })
 

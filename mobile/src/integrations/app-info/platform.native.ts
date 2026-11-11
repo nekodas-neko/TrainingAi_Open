@@ -6,6 +6,7 @@ import appConfig from '../../../app.json';
 const native = requireOptionalNativeModule<{
   nativeApplicationVersion?: string | null;
   nativeBuildVersion?: string | null;
+  applicationId?: string | null;
 }>('ExpoApplication');
 export const nativeAppVersion: string =
   native?.nativeApplicationVersion || appConfig.expo.version;
@@ -13,3 +14,5 @@ export const nativeAppVersion: string =
 export const nativeBuildCode: string = native?.nativeBuildVersion || '0';
 /** The commit the JavaScript was built from; CI sets it, a local run shows 'dev'. */
 export const appCodeSha: string = process.env.EXPO_PUBLIC_BUILD_SHA || 'dev';
+/** The installed build's application ID (com.trainingai.app, .preview or .dev); null without the module. */
+export const nativeApplicationId: string | null = native?.applicationId || null;

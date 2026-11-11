@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
+import { Linking, Pressable } from 'react-native';
 import { CHANGELOG } from '@trainingai/shared/changelog';
 import { OFF_ATTRIBUTION } from '@trainingai/shared/nutrition/open-food-facts';
 import {
   appCodeSha,
   nativeAppVersion,
+  nativeApplicationId,
   nativeBuildCode,
 } from '../../../integrations/app-info/platform';
 import {
   appVersionLine,
   codeVersionLine,
+  fetchReleaseBuild,
   fetchServerVersion,
+  releaseBuildNotice,
   serverVersionLine,
+  type ReleaseBuild,
 } from '../../../integrations/app-info/versions';
 import {
   AppButton,
@@ -32,15 +37,25 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
   const [modal, setModal] = useState<'feedback' | 'delete' | 'signout' | null>(null);
   // undefined while the one fetch is out, null when it failed.
   const [serverVersion, setServerVersion] = useState<string | null | undefined>(undefined);
+  // #3723: the newest published release build, for the release app's "newer build" notice.
+  const [releaseBuild, setReleaseBuild] = useState<ReleaseBuild | null>(null);
   useEffect(() => {
     let active = true;
     void fetchServerVersion(process.env.EXPO_PUBLIC_API_URL).then((version) => {
       if (active) setServerVersion(version);
     });
+    void fetchReleaseBuild(process.env.EXPO_PUBLIC_API_URL).then((build) => {
+      if (active) setReleaseBuild(build);
+    });
     return () => {
       active = false;
     };
   }, []);
+  const notice = releaseBuildNotice(
+    nativeApplicationId,
+    { version: nativeAppVersion, buildCode: nativeBuildCode },
+    releaseBuild,
+  );
   return (
     <PageLayout title="About" onBack={onBack}>
       <TabPanel>
@@ -60,6 +75,23 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
               Your training, nutrition and health in one place.
             </AppText>
           </Card>
+          {notice && (
+            // The current app's amber "New Android build" card (components/more/update-check-card.tsx).
+            <Pressable
+              accessibilityRole="link"
+              accessibilityHint="Opens the download page in the browser"
+              onPress={() => void Linking.openURL(notice.pageUrl)}
+            >
+              <Card accent={theme.status.warning}>
+                <AppText variant="label" style={{ color: theme.status.warning }}>
+                  {notice.title}
+                </AppText>
+                <AppText variant="caption" tone="muted">
+                  {notice.message}
+                </AppText>
+              </Card>
+            </Pressable>
+          )}
           <Card>
             <AppText variant="heading">Feedback</AppText>
             <AppButton

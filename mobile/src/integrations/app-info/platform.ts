@@ -5,3 +5,5 @@ export const nativeAppVersion: string = appConfig.expo.version;
 export const nativeBuildCode = '0';
 /** The commit the JavaScript was built from; CI sets it, a local run shows 'dev'. */
 export const appCodeSha: string = process.env.EXPO_PUBLIC_BUILD_SHA || 'dev';
+/** No installed build on the web and test runtimes. */
+export const nativeApplicationId: string | null = null;

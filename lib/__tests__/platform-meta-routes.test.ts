@@ -38,6 +38,7 @@ const getPool = vi.fn(() => ({ query }))
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const exportUserData = vi.fn()
 const reportServerError = vi.fn()
+const fetchNativeReleaseBuild = vi.fn()
 
 // The real changelog changes on every release, so a fixture built from it would assert a moving
 // target — and, worse, its top version would coincide with whatever the release lookup returns only
@@ -51,6 +52,7 @@ vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...a: unknown[]) => rateLimit(.
 vi.mock('@/lib/github-release', () => ({
   lookupLatestApkRelease: () => lookupLatestApkRelease(),
   fetchLatestApkRelease: () => fetchLatestApkRelease(),
+  fetchNativeReleaseBuild: () => fetchNativeReleaseBuild(),
 }))
 vi.mock('@/lib/data/postgres/client', () => ({ getPool: () => getPool() }))
 vi.mock('@/lib/export/full-export', () => ({ exportUserData: (...a: unknown[]) => exportUserData(...a) }))
@@ -71,12 +73,13 @@ const statusReq = (forwardedFor?: string) =>
   }))
 
 beforeEach(() => {
-  for (const m of [lookupLatestApkRelease, fetchLatestApkRelease, query, getPool, rateLimit, exportUserData, reportServerError]) m.mockClear()
+  for (const m of [lookupLatestApkRelease, fetchLatestApkRelease, fetchNativeReleaseBuild, query, getPool, rateLimit, exportUserData, reportServerError]) m.mockClear()
   rateLimit.mockReturnValue(true)
   query.mockResolvedValue({ rows: [] })
   getPool.mockReturnValue({ query })
   lookupLatestApkRelease.mockResolvedValue({ release: null, status: 'unconfigured' })
   fetchLatestApkRelease.mockResolvedValue(null)
+  fetchNativeReleaseBuild.mockResolvedValue(null)
   exportUserData.mockImplementation(async function* () { yield { _manifest: { excluded: [] } } })
   sessionUser = { id: 'u-1' }
 })
@@ -148,6 +151,27 @@ describe('GET /api/version', () => {
       expect(body.nativeVersionStatus).toBe(status)
       expect(body.version).toBe(WEB_VERSION)
     }
+  })
+
+  // #3723. The native app's release build, for its About notice. Additive: every existing field
+  // keeps its value, and before the first publish (or on a failed lookup) it is null.
+  it('reports the newest native release build beside the existing fields', async () => {
+    lookupLatestApkRelease.mockResolvedValue({
+      release: { version: NATIVE_VERSION, sha: 'abc1234', publishedAt: '2026-09-01T00:00:00Z', apkUrl: APK_URL },
+      status: 'ok',
+    })
+    const pageUrl = 'https://github.com/nekodas-neko/TrainingAi_Open/releases/tag/native-release-latest'
+    fetchNativeReleaseBuild.mockResolvedValue({ versionName: '0.2.0', versionCode: 512, publishedAt: '2026-11-12T00:00:00Z', pageUrl })
+    const body = await (await getVersion()).json()
+    expect(body.nativeReleaseBuild).toEqual({ versionName: '0.2.0', versionCode: 512, pageUrl })
+    expect(body).toMatchObject({ version: WEB_VERSION, nativeVersion: NATIVE_VERSION, nativeVersionStatus: 'ok' })
+  })
+
+  it('answers null for the native release build when there is none to report', async () => {
+    fetchNativeReleaseBuild.mockResolvedValue(null)
+    const body = await (await getVersion()).json()
+    expect(body.nativeReleaseBuild).toBeNull()
+    expect(body.version).toBe(WEB_VERSION)
   })
 
   it('is the one route allowed a public cache header, and uses it', async () => {

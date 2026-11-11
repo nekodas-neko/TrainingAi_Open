@@ -199,10 +199,34 @@ TrainingAi Preview: `expo prebuild`, Gradle `assembleRelease`, then `apksigner`.
     services with their types (`REQUIRED_FOREGROUND_SERVICES`). These are floors: the APK may
     declare more, and the job's output lists all of it.
   The check is `mobile/scripts/verify-release-apk.mjs`.
-- **Publishes nothing.** It is a workflow artifact only, with read-only permissions. It never touches
-  `apk-latest` (which `lib/github-release.ts` offers to the installed app as an update) or any
-  release. `lib/__tests__/native-release-workflow.test.ts` pins that.
+- **Publishes nothing by default.** The build job is read-only and keeps the APK as a 14-day
+  workflow artifact. It never touches `apk-latest` (which `lib/github-release.ts` offers to the
+  installed Capacitor app as an update). Publishing is the next section, and is off until the switch.
 - Installing it is the owner's switch-over step (checklist above), with `adb install -r` only.
+
+### Getting a release build to the phone after the switch (#3723)
+
+**Publishing is off until switch day is done and has held.** Before that, a published APK would be
+a trap: it has the real app's ID and key and a higher version code, so opening it installs over the
+Capacitor app and skips the runbook (emptying the queues, the backup, the rollback build).
+
+After the switch:
+1. Run **Native release build** as above, and also tick **publish** and **confirm_switch_done**.
+   `publish` alone is refused before anything is built, and so is `publish` with `emulator_abi`.
+2. Once every check has passed, a separate `publish` job (the only one with a write token; it
+   builds and signs nothing) attaches `TrainingAi.apk` to the rolling release
+   **`native-release-latest`**: a prerelease, never marked "latest". The 14-day artifact is kept
+   as well.
+3. `/api/version` reports that build as `nativeReleaseBuild` (version name, version code and the
+   release page), read by `lib/github-release.ts` with the same five-minute cache as `apk-latest`.
+   It is null before the first publish or when GitHub can't be read.
+4. On the phone, the release app's More → About shows **A newer build is available** when the
+   published version code is above the installed one. Tapping it opens the release page in the
+   browser; download `TrainingAi.apk` and open it. It installs over the app and keeps its data and
+   sign-in. Preview and development builds never show it.
+
+Left for once the switch has held (#3723), not done yet: `release.yml` stops calling `android.yml`,
+and `apk-latest` stops being offered.
 
 **If it fails on the certificate:** the secret isn't the installed app's key. Don't work around it
 and never uninstall. Compare with `mobile/scripts/verify-android-upgrade.mjs --existing <the

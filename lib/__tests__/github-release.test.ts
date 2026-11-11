@@ -1,5 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
-import { lookupLatestApkRelease, mapApkRelease, parseNativeReleaseSha, parseNativeReleaseVersion } from '@/lib/github-release'
+import {
+  fetchNativeReleaseBuild,
+  lookupLatestApkRelease,
+  mapApkRelease,
+  mapNativeReleaseBuild,
+  parseNativeReleaseSha,
+  parseNativeReleaseVersion,
+  parseNativeReleaseVersionCode,
+} from '@/lib/github-release'
 
 // The exact strings `.github/workflows/android.yml` publishes today.
 const NAME = 'Latest debug APK (v1.255.1)'
@@ -143,6 +151,80 @@ describe('lookupLatestApkRelease', () => {
       fetchSpy.mockRestore()
       if (prev === undefined) delete process.env.GITHUB_RELEASES_TOKEN
       else process.env.GITHUB_RELEASES_TOKEN = prev
+    }
+  })
+})
+
+// #3723. The strings native-release.yml writes when it publishes (`publish` + `confirm_switch_done`).
+const NATIVE_NAME = 'TrainingAi release build (v0.2.0)'
+const NATIVE_BODY =
+  'TrainingAi, the native app, built from `main` @ 1a2b3c4 on 2026-11-20, version code 512 (v0.2.0).'
+const NATIVE_PAGE = 'https://github.com/nekodas-neko/TrainingAi_Open/releases/tag/native-release-latest'
+const nativeRelease = (over: Record<string, unknown> = {}) => ({
+  name: NATIVE_NAME,
+  body: NATIVE_BODY,
+  html_url: NATIVE_PAGE,
+  published_at: '2026-11-20T09:00:00Z',
+  assets: [{ name: 'TrainingAi.apk', browser_download_url: `${NATIVE_PAGE}/TrainingAi.apk`, updated_at: '2026-11-20T09:05:00Z' }],
+  ...over,
+})
+
+describe('parseNativeReleaseVersionCode', () => {
+  it('reads the version code from the notes', () => {
+    expect(parseNativeReleaseVersionCode(NATIVE_NAME, NATIVE_BODY)).toBe(512)
+  })
+
+  it('returns null rather than guessing', () => {
+    expect(parseNativeReleaseVersionCode(NATIVE_NAME, 'no code here')).toBeNull()
+    expect(parseNativeReleaseVersionCode(null, null)).toBeNull()
+    expect(parseNativeReleaseVersionCode(null, 'version code 0')).toBeNull()
+    expect(parseNativeReleaseVersionCode(null, 'version code 9999999999')).toBeNull()
+  })
+})
+
+describe('mapNativeReleaseBuild', () => {
+  it('maps a published release to the build About compares against', () => {
+    expect(mapNativeReleaseBuild(nativeRelease())).toEqual({
+      versionName: '0.2.0',
+      versionCode: 512,
+      publishedAt: '2026-11-20T09:05:00Z',
+      pageUrl: NATIVE_PAGE,
+    })
+  })
+
+  it('stays silent on a release without an APK, a version or a version code', () => {
+    expect(mapNativeReleaseBuild(nativeRelease({ assets: [] }))).toBeNull()
+    expect(mapNativeReleaseBuild(nativeRelease({ name: 'x', body: 'version code 512' }))).toBeNull()
+    expect(mapNativeReleaseBuild(nativeRelease({ body: 'built (v0.2.0)' }))).toBeNull()
+  })
+
+  it('only ever links to the rolling release page', () => {
+    const build = mapNativeReleaseBuild(nativeRelease({ html_url: 'https://evil.example/x' }))
+    expect(build?.pageUrl).toBe(NATIVE_PAGE)
+  })
+})
+
+describe('fetchNativeReleaseBuild', () => {
+  it('reads the native-release-latest tag, not apk-latest', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(nativeRelease()), { status: 200 }),
+    )
+    try {
+      expect(await fetchNativeReleaseBuild()).toMatchObject({ versionCode: 512 })
+      expect(String(fetchSpy.mock.calls[0][0])).toMatch(/\/releases\/tags\/native-release-latest$/)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('answers null before the first publish (404) and when GitHub cannot be reached', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('{}', { status: 404 }))
+    try {
+      expect(await fetchNativeReleaseBuild()).toBeNull()
+      fetchSpy.mockRejectedValueOnce(new Error('offline'))
+      expect(await fetchNativeReleaseBuild()).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
     }
   })
 })

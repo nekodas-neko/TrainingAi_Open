@@ -180,6 +180,21 @@ Connect.
 
 The wrapper never runs in CI.
 
+## After the switch: getting new builds to the phone (#3723)
+
+Until the switch is done and has held, **never** run `native-release.yml` with **publish**. It
+needs **confirm_switch_done** as well, and refuses without it, because the published APK installs
+over the Capacitor app for anyone who opens it, skipping every step above.
+
+Once the switch has held, each new release build is run with **publish** and
+**confirm_switch_done** ticked. It lands on the rolling prerelease `native-release-latest`, and the
+app's More → About shows **A newer build is available** with a link to it. The steps and the
+version-code rule are the same as before: [`native-testing.md`](../native-testing.md), "Getting a
+release build to the phone after the switch".
+
+Still to do once the switch has held, tracked on #3723: `release.yml` stops calling `android.yml`,
+and `apk-latest` stops being offered.
+
 ## Rollback
 
 **The rule (the owner accepted it on #3721 item 4, 11 Nov 2026):**
