@@ -5,6 +5,7 @@ import { exerciseHistorySpec } from '../data/models';
 import { ResourceStatus } from './ResourceStatus';
 import { formatSetLoad } from '../logging/targets';
 import { oneRmTrendEntries } from '../data/exercise-history';
+import { ExerciseHrTrendCard } from './ExerciseHrTrendCard';
 
 export function ExerciseHistory({ name }: { name: string }) {
   const state = useWorkoutResource(exerciseHistorySpec(name));
@@ -31,6 +32,7 @@ export function ExerciseHistory({ name }: { name: string }) {
               }))}
             />
           </Card>
+          <ExerciseHrTrendCard name={name} />
           {state.data.entries.length === 0 ? (
             <AppText tone="muted">No previous sessions recorded.</AppText>
           ) : (

@@ -1,6 +1,6 @@
 import { feedback } from '../../../integrations/feedback/haptics';
 import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload';
-import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals';
+import { macroCalorieWarning, sumIngredients } from '@trainingai/shared/nutrition/scan-totals';
 import { QUANTITY_MULTIPLIER_MAX, QUANTITY_MULTIPLIER_MIN } from '@trainingai/shared/nutrition/quantity-bounds';
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
 import { foodLine } from '../data/display';
@@ -64,6 +64,7 @@ import {
   type ScanBasis,
 } from '../data/scan-response';
 import { photoDraftSchema } from '../data/photo-draft';
+import { refineEstimate } from '../data/portion-refine';
 import { librarySearch, librarySearchSpec, recentFoods, savedFoodForBarcode } from '../data/food-library';
 import { MacroLine, NutritionFieldsForm, foodFields, macroKeys } from './NutritionElements';
 import { failureNotice, reportError } from '../../../core/reporting/index.ts';
@@ -727,6 +728,11 @@ export function FoodLogger({
                         key={scan.barcode ?? index}
                         title={scan.name}
                         subtitle={foodLine(scan.brand, scan.servingSizeG, scan.calories)}
+                        warning={
+                          macroCalorieWarning(scan)
+                            ? 'Its macros and calories disagree — check before using'
+                            : undefined
+                        }
                         onPress={() => review(scan)}
                       />
                     ))}
@@ -775,6 +781,7 @@ export function FoodLogger({
             )}
             <NutritionFieldsForm
               value={d.fields}
+              calorieCheck
               onChange={(fields) =>
                 update({
                   fields,
@@ -828,7 +835,16 @@ export function FoodLogger({
                 <AppButton
                   title="Refine"
                   busy={busy}
-                  onPress={() => void analyse({ text: `${d.fields.name}. ${d.text}` })}
+                  onPress={() =>
+                    // A portion ("it was 300 g") is rescaled here; only the rest asks the model.
+                    refineEstimate(
+                      { correction: d.text, fields: d.fields, ingredients: d.ingredients },
+                      {
+                        applyLocal: (local) => update({ ...local, text: '' }),
+                        askModel: () => void analyse({ text: `${d.fields.name}. ${d.text}` }),
+                      },
+                    )
+                  }
                 />
               </Disclosure>
             )}

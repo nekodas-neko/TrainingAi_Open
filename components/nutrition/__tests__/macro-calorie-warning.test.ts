@@ -85,8 +85,10 @@ describe('the Review sheet is wired to it', () => {
     // this sheet would come to disagree about the same row.
     const warn = source('components/nutrition/macro-calorie-warning.tsx')
     expect(warn).toContain("from '@trainingai/shared/nutrition/scan-totals'")
-    expect(warn).toContain('MACRO_MISMATCH_VISIBLE_LIMIT')
-    expect(warn).not.toMatch(/0\.15|> 0\.4/)
+    // `macroCalorieWarning` applies MACRO_MISMATCH_VISIBLE_LIMIT and returns the Atwater figure, the
+    // one answer TrainingAi Preview's warning reads too (#3725).
+    expect(warn).toContain('macroCalorieWarning(')
+    expect(warn).not.toMatch(/0\.15|> 0\.4|\* 4|\* 9/)
   })
 
   it('says it in words and an icon, not colour alone', () => {

@@ -116,6 +116,24 @@ export function macroCalorieDisagreement(
   return Math.abs(calories - fromMacros) / calories
 }
 
+/**
+ * What the "calories don't match the macros" warning shows, or null when there is nothing to warn
+ * about: the Atwater figure the macros come to, once the disagreement is past
+ * `MACRO_MISMATCH_VISIBLE_LIMIT`. One answer for the current app's warning and TrainingAi Preview's
+ * (#3725), so the two cannot disagree about which rows look unverified.
+ */
+export function macroCalorieWarning(
+  r: { calories?: number; proteinG?: number; carbsG?: number; fatG?: number },
+): { fromMacros: number } | null {
+  const off = macroCalorieDisagreement(r)
+  if (off == null || off <= MACRO_MISMATCH_VISIBLE_LIMIT) return null
+  return {
+    fromMacros: Math.round(
+      pos(r.proteinG) * KCAL_PER_G.protein + pos(r.carbsG) * KCAL_PER_G.carbs + pos(r.fatG) * KCAL_PER_G.fat,
+    ),
+  }
+}
+
 export function sanitiseNutrition(r: RawNutrition): RawNutrition {
   let protein  = pos(r.proteinG)
   let carbs    = pos(r.carbsG)

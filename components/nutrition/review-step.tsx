@@ -7,7 +7,7 @@ import { readAiPausedMessage } from '@/lib/ai-paused-notice'
 import { Button } from '@/components/ui/button'
 import type { NutritionScanResult, NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { sumIngredientEntries } from '@trainingai/shared/nutrition/log-food'
-import { correctedServingG, parsePortionCorrection } from './portion-correction'
+import { correctedServingG, parsePortionCorrection, rescaleToServing, type ServingNutrition } from '@trainingai/shared/nutrition/portion-correction'
 import { MacroCalorieWarning } from './macro-calorie-warning'
 
 interface EditableNutrition {
@@ -27,17 +27,7 @@ interface EditableNutrition {
   imageDataUri?: string | null
 }
 
-interface BaseNutrition {
-  servingSizeG: number
-  calories: number
-  proteinG: number
-  carbsG: number
-  fatG: number
-  fiberG: number
-  sugarG: number
-  sodiumMg: number
-  satFatG: number
-}
+type BaseNutrition = ServingNutrition
 
 interface Props {
   result: NutritionScanResult | null
@@ -55,8 +45,6 @@ const CONFIDENCE_CONFIG: Record<string, { pct: number; bar: string; text: string
   medium: { pct: 60, bar: 'bg-accent-amber',  text: 'text-accent-amber',  label: '60%' },
   low:    { pct: 30, bar: 'bg-orange-500', text: 'text-orange-500', label: '30%' },
 }
-
-function r1(n: number) { return Math.round(n * 10) / 10 }
 
 export function ReviewStep({ result, value, ingredients, onIngredientsChange, onChange, onRefine, onBack, onNext }: Props) {
   const [correction, setCorrection] = useState('')
@@ -94,20 +82,9 @@ export function ReviewStep({ result, value, ingredients, onIngredientsChange, on
 
   function handleServingChange(newG: number) {
     const b = baseRef.current
-    if (!b || b.servingSizeG <= 0 || newG <= 0) { set('servingSizeG', newG); return }
-    const scale = newG / b.servingSizeG
-    onChange({
-      ...value,
-      servingSizeG: newG,
-      calories:  Math.round(b.calories * scale),
-      proteinG:  r1(b.proteinG * scale),
-      carbsG:    r1(b.carbsG   * scale),
-      fatG:      r1(b.fatG     * scale),
-      fiberG:    r1(b.fiberG   * scale),
-      sugarG:    r1(b.sugarG   * scale),
-      sodiumMg:  Math.round(b.sodiumMg * scale),
-      satFatG:   r1(b.satFatG  * scale),
-    })
+    const scaled = b ? rescaleToServing(b, newG) : null
+    if (!scaled) { set('servingSizeG', newG); return }
+    onChange({ ...value, ...scaled })
   }
 
   function handleIngredientWeightChange(idx: number, newWeightG: number) {
