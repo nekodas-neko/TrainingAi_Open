@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.521.0",
+    date: "2026-11-12",
+    changes: [
+      "Both apps: a workout plan written on a sick or rest day now ends at midnight instead of lasting a week, and a plan you haven't used for a week is written fresh the next time you open that session. An expired plan no longer shows on the workout screen or pre-selects Deload.",
+      "Both apps: a timed distance test (Cooper, 6-minute walk) that ends with the screen off no longer counts the distance walked after its end, so its distance and VO2max estimate stop reading high.",
+      "Both apps: the Body tab's time worn reads the generic wear figure, so another ring or watch could feed it the same way.",
+      "Current app: Home drops yesterday's Day in review in the morning when the app stayed open overnight.",
+      "TrainingAi Preview: reminders you add yourself fire on your profile's time zone, not the phone's clock, and show the app's icon instead of the Android robot. It can start a session offline while its plan is being refreshed, using your program as written.",
+      "TrainingAi Preview: a scanned food whose calories and macros disagree is flagged, a correction like \"it was 300 g\" is worked out on the phone instead of asking the AI again, and an exercise's history shows its Heart & Recovery card.",
+      "TrainingAi Preview: fixes from the 10 Nov phone pass: the Home card menu opens on a long press, cards keep their place when switched off and on, Log Food starts clean after you close it, the activity heart-rate chart shows local times, and the Sleep sheet no longer reopens on its own.",
+      "Behind the scenes: error reports leave out the values a failed database query echoed back; the night-temperature count is kept per algorithm version; the server can tell the native app about its newest release build, for a notice in About; and the switch-over runbook and its install script are tightened ahead of moving to the native app.",
+    ],
+  },
+  {
     version: "1.520.0",
     date: "2026-11-09",
     changes: [
