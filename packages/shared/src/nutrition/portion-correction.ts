@@ -13,6 +13,9 @@
  * anything that is not unambiguously a bare quantity falls through: no unit-less numbers, no
  * millilitres (grams are what the row stores, and ml→g is a density the app does not know), nothing
  * with a second clause.
+ *
+ * Shared by the current app's Review step and TrainingAi Preview's food logger (#3725), so the
+ * parser and the rescale it leads to exist once.
  */
 
 export type PortionCorrection =
@@ -86,4 +89,42 @@ export function correctedServingG(
   if (baseServingSizeG == null || baseServingSizeG <= 0) return null
   const g = correction.servings * baseServingSizeG
   return g > 0 && g <= MAX_GRAMS ? g : null
+}
+
+/** What one serving holds: the figures the serving size scales. */
+export interface ServingNutrition {
+  servingSizeG: number
+  calories: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+  fiberG: number
+  sugarG: number
+  sodiumMg: number
+  satFatG: number
+}
+
+function r1(n: number) { return Math.round(n * 10) / 10 }
+
+/**
+ * `base` at a new serving size: calories and sodium to the integer, grams to 0.1.
+ *
+ * Returns `null` when there is nothing to scale from or to (a base or a target of 0 g or less), so
+ * the caller decides what a serving size with no base means. Always scale from the snapshot the
+ * estimate arrived with, never from the last rescale: rounding twice drifts.
+ */
+export function rescaleToServing(base: ServingNutrition, newG: number): ServingNutrition | null {
+  if (!(base.servingSizeG > 0) || !(newG > 0)) return null
+  const scale = newG / base.servingSizeG
+  return {
+    servingSizeG: newG,
+    calories: Math.round(base.calories * scale),
+    proteinG: r1(base.proteinG * scale),
+    carbsG: r1(base.carbsG * scale),
+    fatG: r1(base.fatG * scale),
+    fiberG: r1(base.fiberG * scale),
+    sugarG: r1(base.sugarG * scale),
+    sodiumMg: Math.round(base.sodiumMg * scale),
+    satFatG: r1(base.satFatG * scale),
+  }
 }

@@ -4,6 +4,7 @@ import { normalizeMuscle } from '@trainingai/shared/muscles';
 import {
   DAY_LOG_TTL,
   EXERCISE_HISTORY_TTL,
+  EXERCISE_HR_TREND_TTL,
   NEXT_SESSION_PRESCRIPTION_TTL,
   TRAINING_STRESS_TTL,
   TTL_LONG,
@@ -155,6 +156,33 @@ export const exerciseHistorySpec = (name: string) => ({
   schema: historySchema,
   ttl: EXERCISE_HISTORY_TTL * 1000,
 });
+const bpm = finite.nullish().transform((value) => value ?? null);
+// The current app's Heart & Recovery card reads this same route (#3726). Only the fields the card
+// draws are named; the server's per-session rollup carries more.
+export const exerciseHrTrendSpec = (name: string) => ({
+  path: '/api/workout/exercise-hr-trend',
+  query: { exerciseName: name },
+  schema: z.object({
+    sessions: z
+      .array(
+        z.object({
+          avgPeakBpm: bpm,
+          avgDrop30: bpm,
+          avgDrop60: bpm,
+          avgDrop90: bpm,
+          avgDrop120: bpm,
+          avgPctHrrAtRestEnd: bpm,
+        }),
+      )
+      .default([]),
+    byIntensity: z
+      .array(z.object({ label: text, n: finite, avgPeakBpm: bpm, avgDrop60: bpm }))
+      .default([]),
+    coveredSets: finite.default(0),
+  }),
+  ttl: EXERCISE_HR_TREND_TTL * 1000,
+});
+export type ExerciseHrTrend = z.infer<ReturnType<typeof exerciseHrTrendSpec>['schema']>;
 export const mediaSpec = (name: string) => ({
   path: '/api/exercise-gif',
   query: { name },

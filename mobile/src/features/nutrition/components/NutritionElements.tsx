@@ -1,8 +1,12 @@
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { macroCalorieWarning } from '@trainingai/shared/nutrition/scan-totals';
+import { View } from 'react-native';
 import {
+  AppButton,
   AppText,
   Disclosure,
   Grid,
+  Icon,
   NumericStepper,
   Stack,
   StatusIndicator,
@@ -89,12 +93,68 @@ export function MacroLine({
     </Stack>
   );
 }
+/**
+ * The stated calories do not match the stated macros: the current app's warning
+ * (components/nutrition/macro-calorie-warning.tsx). It warns and offers the Atwater figure; the
+ * calories only change on the person's tap.
+ */
+export function MacroCalorieWarning({
+  value,
+  onUseMacroCalories,
+}: {
+  value: NutritionFields;
+  onUseMacroCalories: (calories: number) => void;
+}) {
+  const { theme } = useTheme();
+  const calories = Number(value.calories ?? '');
+  const warning = macroCalorieWarning({
+    calories,
+    proteinG: Number(value.proteinG ?? ''),
+    carbsG: Number(value.carbsG ?? ''),
+    fatG: Number(value.fatG ?? ''),
+  });
+  if (!warning) return null;
+  const amber = theme.status.warning;
+  const kcal = warning.fromMacros.toLocaleString();
+  return (
+    <View
+      accessibilityRole="alert"
+      style={{
+        borderWidth: 1,
+        borderColor: `${amber}66`,
+        backgroundColor: `${amber}1a`,
+        borderRadius: theme.radii.control,
+        padding: theme.spacing.md,
+        gap: theme.spacing.sm,
+      }}
+    >
+      <Stack direction="row" gap="xs" align="flex-start">
+        <Icon name="alert" color={amber} size={14} />
+        <AppText variant="label" style={{ flex: 1 }}>
+          These macros come to {kcal} kcal, not {Math.round(calories).toLocaleString()}.
+        </AppText>
+      </Stack>
+      <AppText variant="caption" tone="muted">
+        Food databases are filled in field by field, so one number can be wrong while the rest are
+        right. Check the label — high-fibre foods are legitimately a little out.
+      </AppText>
+      <AppButton
+        title={`Use ${kcal} kcal`}
+        variant="neutral"
+        onPress={() => onUseMacroCalories(warning.fromMacros)}
+      />
+    </View>
+  );
+}
 export function NutritionFieldsForm({
   value,
   onChange,
+  calorieCheck = false,
 }: {
   value: NutritionFields;
   onChange: (value: NutritionFields) => void;
+  /** The logger's Review step: warn when the calories and the macros disagree. */
+  calorieCheck?: boolean;
 }) {
   const set = (key: string, text: string) => onChange({ ...value, [key]: text });
   return (
@@ -129,6 +189,12 @@ export function NutritionFieldsForm({
           />
         ))}
       </Grid>
+      {calorieCheck && (
+        <MacroCalorieWarning
+          value={value}
+          onUseMacroCalories={(calories) => set('calories', String(calories))}
+        />
+      )}
       <Disclosure title="Other nutrients">
         <Grid columns={2}>
           {(['fiberG', 'sugarG', 'satFatG', 'sodiumMg'] as const).map((key, i) => (

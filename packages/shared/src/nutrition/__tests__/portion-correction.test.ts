@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { correctedServingG, parsePortionCorrection } from '../portion-correction'
+import { correctedServingG, parsePortionCorrection, rescaleToServing } from '../portion-correction'
 
 describe('parsePortionCorrection — the quantities it answers locally', () => {
   it.each([
@@ -85,5 +85,22 @@ describe('correctedServingG', () => {
 
   it('refuses a serving count that resolves past the gram ceiling', () => {
     expect(correctedServingG({ kind: 'servings', servings: 40 }, 800)).toBeNull()
+  })
+})
+
+describe('rescaleToServing', () => {
+  const base = { servingSizeG: 150, calories: 245, proteinG: 12.3, carbsG: 30.1, fatG: 8.2, fiberG: 3.3, sugarG: 4.1, sodiumMg: 310, satFatG: 2.2 }
+
+  it('scales every figure from the base, calories and sodium whole and grams to 0.1', () => {
+    expect(rescaleToServing(base, 300)).toEqual({
+      servingSizeG: 300, calories: 490, proteinG: 24.6, carbsG: 60.2, fatG: 16.4, fiberG: 6.6, sugarG: 8.2, sodiumMg: 620, satFatG: 4.4,
+    })
+    expect(rescaleToServing(base, 100)?.proteinG).toBe(8.2)
+  })
+
+  it('has no answer without a base or a target to scale between', () => {
+    expect(rescaleToServing({ ...base, servingSizeG: 0 }, 300)).toBeNull()
+    expect(rescaleToServing(base, 0)).toBeNull()
+    expect(rescaleToServing(base, Number.NaN)).toBeNull()
   })
 })

@@ -1,7 +1,7 @@
 'use client'
 
 import { TriangleAlert } from 'lucide-react'
-import { macroCalorieDisagreement, MACRO_MISMATCH_VISIBLE_LIMIT } from '@trainingai/shared/nutrition/scan-totals'
+import { macroCalorieWarning } from '@trainingai/shared/nutrition/scan-totals'
 
 /**
  * The stated calories do not match the stated macros (BF-109).
@@ -31,10 +31,9 @@ interface Props {
 }
 
 export function MacroCalorieWarning({ calories, proteinG, carbsG, fatG, onUseMacroCalories }: Props) {
-  const off = macroCalorieDisagreement({ calories, proteinG, carbsG, fatG })
-  if (off == null || off <= MACRO_MISMATCH_VISIBLE_LIMIT) return null
-
-  const fromMacros = Math.round(proteinG * 4 + carbsG * 4 + fatG * 9)
+  const warning = macroCalorieWarning({ calories, proteinG, carbsG, fatG })
+  if (!warning) return null
+  const { fromMacros } = warning
 
   return (
     <div

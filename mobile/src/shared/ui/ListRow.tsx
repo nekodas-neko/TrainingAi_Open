@@ -11,6 +11,7 @@ export function ListRow({
   titleTone,
   subtitle,
   subtitleColor,
+  warning,
   trailing,
   onPress,
   onLongPress,
@@ -25,6 +26,8 @@ export function ListRow({
   titleTone?: 'danger';
   subtitle?: string;
   subtitleColor?: string;
+  /** An amber caution line under the subtitle, with an icon so it is not colour alone. */
+  warning?: string;
   trailing?: ReactNode;
   onPress?: () => void;
   onLongPress?: () => void;
@@ -64,6 +67,14 @@ export function ListRow({
             {subtitle}
           </AppText>
         )}
+        {warning && (
+          <Stack direction="row" gap="xs" align="flex-start">
+            <Icon name="alert" color={theme.status.warning} size={12} />
+            <AppText variant="micro" style={{ flex: 1, color: theme.status.warning }}>
+              {warning}
+            </AppText>
+          </Stack>
+        )}
       </Stack>
       {trailing ?? (!disabled && <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />)}
     </>
@@ -73,7 +84,7 @@ export function ListRow({
     <Pressable
       accessibilityRole={checked === undefined ? 'button' : 'checkbox'}
       accessibilityLabel={title}
-      accessibilityHint={disabled ? 'Coming soon' : subtitle}
+      accessibilityHint={disabled ? 'Coming soon' : [subtitle, warning].filter(Boolean).join('. ') || undefined}
       accessibilityState={{ disabled, checked }}
       disabled={disabled}
       onPress={() => {

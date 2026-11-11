@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  macroCalorieDisagreement, sanitiseNutrition,
+  macroCalorieDisagreement, macroCalorieWarning, sanitiseNutrition,
   ATWATER_DEVIATION_LIMIT, MACRO_MISMATCH_VISIBLE_LIMIT,
 } from '../scan-totals'
 
@@ -48,5 +48,21 @@ describe('the two thresholds are consistent', () => {
     // 5*4 + 3*4 + 10*9 = 122 against a stated 50 → 144% out.
     expect(sanitiseNutrition({ calories: 50, proteinG: 5, carbsG: 3, fatG: 10, servingSizeG: 100 }).calories)
       .toBe(122)
+  })
+})
+
+describe('macroCalorieWarning', () => {
+  it('gives the Atwater figure once the gap is past the visible limit', () => {
+    // 45.7*4 + 52.1*4 + 13.6*9 = 513.6
+    expect(macroCalorieWarning({ calories: 173, proteinG: 45.7, carbsG: 52.1, fatG: 13.6 })).toEqual({ fromMacros: 514 })
+  })
+
+  it('says nothing at or under the limit, or with nothing to compare', () => {
+    const atLimit = 165 / (1 - MACRO_MISMATCH_VISIBLE_LIMIT)
+    expect(macroCalorieWarning({ calories: 165, proteinG: 10, carbsG: 20, fatG: 5 })).toBeNull()
+    expect(macroCalorieWarning({ calories: atLimit - 1, proteinG: 10, carbsG: 20, fatG: 5 })).toBeNull()
+    expect(macroCalorieWarning({ calories: atLimit + 5, proteinG: 10, carbsG: 20, fatG: 5 })).not.toBeNull()
+    expect(macroCalorieWarning({ calories: 0, proteinG: 10, carbsG: 20, fatG: 5 })).toBeNull()
+    expect(macroCalorieWarning({ calories: 120 })).toBeNull()
   })
 })
