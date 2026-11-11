@@ -96,9 +96,18 @@ describe('an expired prescription is no longer the plan', () => {
     expect(prescriptionAgedOut({ prescription: p('rest_day_recommended'), prescriptionStatus: 'accepted', prescriptionExpiresAt: expired }, now)).toBe(true)
   })
 
-  it('a pending stay or transition is still exempt', () => {
-    expect(prescriptionAgedOut({ prescription: p('stay'), prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, now)).toBe(false)
-    expect(prescriptionAgedOut({ prescription: p('transition_recommended'), prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, now)).toBe(false)
+  // #3714: a pending stay drives load, and every stay is pending while auto-apply is off, so an
+  // exemption here replayed a session's last plan for as long as the session went unused.
+  it('a pending stay or transition ages out at its expiry too', () => {
+    expect(prescriptionAgedOut({ prescription: p('stay'), prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, now)).toBe(true)
+    expect(prescriptionAgedOut({ prescription: p('transition_recommended'), prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, now)).toBe(true)
+    expect(prescriptionAgedOut({ prescription: p('stay'), prescriptionStatus: 'pending', prescriptionExpiresAt: live }, now)).toBe(false)
+    expect(prescriptionAgedOut({ prescription: p('transition_recommended'), prescriptionStatus: 'pending', prescriptionExpiresAt: live }, now)).toBe(false)
+  })
+
+  it('an expired pending stay reads as pending regeneration', () => {
+    const opts = { isAiDynamic: true, isBaselinePhase: false }
+    expect(isAiPrescriptionPending({ prescription: p('stay'), prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, opts, now)).toBe(true)
   })
 
   it('`none` never ages out', () => {

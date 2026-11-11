@@ -122,11 +122,11 @@ export function reevaluatePrescriptionForToday(
   // `PrescriptionStatus` joins `dismissed` as a silent gap, and nothing fails. A deny-list ages out
   // by default and a new status has to argue for its exemption.
   //
-  // The two exemptions, both deliberate. `pending` is an *offer* whose expiry the emergency-deload
-  // suppression below already owns, and re-deriving it here would fight that. `none` means there is
-  // no offer to age out at all, so regenerating on it would be a loop with nothing to show for it.
-  // #3700 narrowed the first: a pending rest day or deload ages out too, because its expiry is the
-  // only thing that stops a one-day recovery answer being met again a week later.
+  // The one exemption: `none` means there is no offer to age out at all, so regenerating on it would
+  // be a loop with nothing to show for it. `pending` used to be exempt too, as an offer whose expiry
+  // the emergency-deload suppression below owned. That suppression only reads an UNEXPIRED pending
+  // deload, so ageing an expired offer out cannot race it, and the exemption left every expired offer
+  // in place: a week-old rest day (#3700) and a pending stay, which drives load (#3714).
   if (prescriptionAgedOut(state, now)) {
     return { prescription, changed: false, needsRegenerate: true }
   }

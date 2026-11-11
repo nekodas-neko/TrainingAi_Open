@@ -82,12 +82,20 @@ describe('an expired prescription ages out whatever its status (BF-179)', () => 
       expect(result.needsRegenerate).toBe(true)
     })
 
-  // CONTROL 1 — `pending` must NOT age out here. Its expiry is owned by the emergency-deload
-  // suppression, and re-deriving it here would fight that. A fix that simply dropped the status
-  // test would pass every assertion above and fail this one.
-  it('leaves a PENDING prescription alone even when expired', () => {
+  // CONTROL 1 used to keep `pending` out of this list, on the grounds that the emergency-deload
+  // suppression owned its expiry. That suppression only reads an UNEXPIRED pending deload, so an
+  // expired one was retired by nothing (#3700, #3714). It ages out like every other status now; the
+  // unexpired case stays the suppression's.
+  it('regenerates an expired PENDING prescription', () => {
     const result = reevaluatePrescriptionForToday(
       deloadPrescription(), quietSignals, stateWith('pending', daysFromNow(-3)), NOW)
+
+    expect(result.needsRegenerate).toBe(true)
+  })
+
+  it('leaves a PENDING prescription alone while it is still inside its window', () => {
+    const result = reevaluatePrescriptionForToday(
+      deloadPrescription(), quietSignals, stateWith('pending', daysFromNow(+3)), NOW)
 
     expect(result.needsRegenerate).toBe(false)
   })

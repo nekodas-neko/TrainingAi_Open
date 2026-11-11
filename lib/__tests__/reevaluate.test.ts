@@ -261,11 +261,26 @@ describe('reevaluatePrescriptionForToday — an applied prescription ages out (Q
     expect(result.needsRegenerate).toBe(false)
   })
 
-  // A pending "stay" is an offer whose numbers still drive load; its expiry is not what retires it.
-  it('does not age out a pending stay', () => {
+  // #3714: a pending "stay" drives load, and every stay is pending while auto-apply is off. Exempting
+  // it from its expiry replayed a session's last plan for as long as the session went unused.
+  it('ages out an expired pending stay', () => {
     const offer = { ...basePrescription([ex('bench')]), phaseAction: 'stay' as const }
     const result = reevaluatePrescriptionForToday(offer, baseSignals,
       { ...baseState, prescription: offer, prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, NOW)
+    expect(result.needsRegenerate).toBe(true)
+  })
+
+  it('ages out an expired pending transition offer', () => {
+    const offer = { ...basePrescription([ex('bench')]), phaseAction: 'transition_recommended' as const }
+    const result = reevaluatePrescriptionForToday(offer, baseSignals,
+      { ...baseState, prescription: offer, prescriptionStatus: 'pending', prescriptionExpiresAt: expired }, NOW)
+    expect(result.needsRegenerate).toBe(true)
+  })
+
+  it('leaves an unexpired pending stay alone', () => {
+    const offer = { ...basePrescription([ex('bench')]), phaseAction: 'stay' as const }
+    const result = reevaluatePrescriptionForToday(offer, baseSignals,
+      { ...baseState, prescription: offer, prescriptionStatus: 'pending', prescriptionExpiresAt: live }, NOW)
     expect(result.needsRegenerate).toBe(false)
   })
 
