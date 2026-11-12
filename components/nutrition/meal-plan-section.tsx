@@ -7,7 +7,7 @@ import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import type { MealPlan, MealPlanMeal, MealType } from '@trainingai/shared/types/nutrition'
 import { pickPlanVariant } from '@trainingai/shared/nutrition/plan-variant'
 import { fillableMeals } from './plan-day-fill'
-import { rescaleRemaining } from './plan-rescale'
+import { rescaleRemaining } from '@trainingai/shared/nutrition/plan-rescale'
 import { PlanMealRow } from './plan-meal-row'
 import { ProgressFill } from "@/components/ui/progress-fill";
 

@@ -36,9 +36,19 @@ export interface DayTotals {
   fatG: number
 }
 
+/**
+ * The fields the re-scale reads from a planned meal. Narrower than `MealPlanMeal` so TrainingAi
+ * Preview's plan meals (whose `id` is optional on the wire) use the same rule without a cast; a
+ * meal with no id can never be in the declined set.
+ */
+export type RescalableMeal = Pick<
+  MealPlanMeal,
+  'position' | 'targetCalories' | 'targetProteinG' | 'targetCarbsG' | 'targetFatG'
+> & { id?: string | null }
+
 export interface RescaleInput {
   /** The active variant's meals, in plan order. */
-  meals: MealPlanMeal[]
+  meals: readonly RescalableMeal[]
   /** The variant's own targets for the day. */
   target: DayTotals
   /** What has actually been eaten. Absent on a day with no logs — which is not the same as zero. */
@@ -79,12 +89,12 @@ export interface RescaleResult {
  * Hour does not enter it at all — a lunch you skipped past is still food you might have, and
  * removing it from the day's remaining budget would silently hand its calories to dinner.
  */
-export function remainingMeals(
-  meals: MealPlanMeal[],
+export function remainingMeals<M extends RescalableMeal>(
+  meals: readonly M[],
   loggedPositions: Set<number>,
   declinedMealIds: Set<string>,
-): MealPlanMeal[] {
-  return meals.filter(m => !loggedPositions.has(m.position) && !declinedMealIds.has(m.id))
+): M[] {
+  return meals.filter(m => !loggedPositions.has(m.position) && !(m.id != null && declinedMealIds.has(m.id)))
 }
 
 /**
