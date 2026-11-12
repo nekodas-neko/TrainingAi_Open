@@ -835,6 +835,18 @@ SELECT
 FROM public.mood_logs t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.native_build_sightings AS
+SELECT
+  t.user_id,
+  t.build_code,
+  t.version_name,
+  t.day,
+  t.first_seen_at,
+  t.last_seen_at,
+  t.request_count
+FROM public.native_build_sightings t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.native_health_projection_days AS
 SELECT
   t.user_id,

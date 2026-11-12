@@ -2483,3 +2483,18 @@ export const healthConnectProjectionState = pgTable('health_connect_projection_s
     heart: { timestamp: string; bpm: number }[];
   }>(),
 });
+
+/**
+ * #3739 — which native builds call the server: one row per user, build (Android versionCode, from
+ * `X-App-Build`) and local day. `versionName` is the untrusted `X-App-Version` text, never
+ * interpreted. The one writer is `lib/native-builds/record-sighting.ts`; nothing prunes it yet.
+ */
+export const nativeBuildSightings = pgTable('native_build_sightings', {
+  userId:       uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  buildCode:    integer('build_code').notNull(),
+  versionName:  text('version_name'),
+  day:          date('day', { mode: 'string' }).notNull(),
+  firstSeenAt:  timestamp('first_seen_at', { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt:   timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+  requestCount: integer('request_count').notNull().default(1),
+}, t => [primaryKey({ columns: [t.userId, t.buildCode, t.day] })])
