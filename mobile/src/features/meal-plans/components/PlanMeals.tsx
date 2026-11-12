@@ -10,6 +10,7 @@ import {
   toAestDay,
 } from '@trainingai/shared/date-utils';
 import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time';
+import { rescaleRemaining } from '@trainingai/shared/nutrition/plan-rescale';
 import type { MealType } from '@trainingai/shared/types/nutrition';
 import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
@@ -28,7 +29,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { energySpec } from '../../health/data/models';
 import { MacroLine } from '../../nutrition/components/NutritionElements';
-import { planSpec, type MealPlan } from '../../nutrition/data/models';
+import { planSpec, totals, type MealPlan } from '../../nutrition/data/models';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { ingredientItems, recipeDuplicate } from '../../nutrition/data/recipes';
 import {
@@ -139,6 +140,27 @@ export function ActiveMealPlan({
       (date < n.today || (date === n.today && start != null && start <= hour))
     );
   });
+  // #3730: the remaining meals re-balanced against what was eaten, as the current app's plan card
+  // does (`components/nutrition/meal-plan-section.tsx`). Read time only: the stored plan is never
+  // rewritten, and every number falls back to the planned one when this returns null. `eaten` is
+  // logged food only, absent on a day with no logs, matching the current app's input.
+  const rescale = variant
+    ? rescaleRemaining({
+        meals: variant.meals,
+        target: {
+          calories: variant.targetCalories,
+          proteinG: variant.targetProteinG,
+          carbsG: variant.targetCarbsG,
+          fatG: variant.targetFatG,
+        },
+        eaten: n.view.logs.length ? totals(n.view.logs) : undefined,
+        loggedPositions: new Set(variant.meals.filter(logged).map((m) => m.position)),
+        declinedMealIds: new Set(
+          variant.meals.filter(declined).flatMap((m) => (m.id ? [m.id] : [])),
+        ),
+        isToday: date === n.today,
+      })
+    : null;
   async function action(fn: () => Promise<void>) {
     if (guard.current) {
       return;
@@ -236,6 +258,12 @@ export function ActiveMealPlan({
             Planned meals count only when you confirm what you ate. Unrecorded and skipped
             meals are excluded.
           </AppText>
+          {/* The floor sentence: shown only when the plan can no longer be met as written. */}
+          {rescale?.note && (
+            <AppText variant="caption" tone="muted">
+              {rescale.note}
+            </AppText>
+          )}
           {!!eligible.length && (
             <AppButton
               title="Log planned meals I ate"
@@ -258,12 +286,30 @@ export function ActiveMealPlan({
           {expanded &&
             variant.meals.map((m) => {
               const saved = m.id ? (n.view.planLinks[m.id] ?? m.savedMealId) : m.savedMealId;
+              const adjusted = rescale?.byPosition.get(m.position);
               return (
                 <Card key={m.id ?? m.position}>
                   <AppText variant="label">{m.name}</AppText>
+                  {/* The planned figure stays beside the re-balanced one, as in the current app:
+                      the plan itself has not changed. */}
                   <AppText variant="caption" tone="muted">
-                    {m.suggestedTime ?? ''} · {m.targetCalories} kcal target
+                    {m.suggestedTime ?? ''} ·{' '}
+                    {adjusted ? (
+                      <>
+                        <AppText variant="caption" tone="brand" style={{ fontWeight: '600' }}>
+                          {adjusted.calories.toLocaleString()} kcal
+                        </AppText>{' '}
+                        (planned {m.targetCalories.toLocaleString()})
+                      </>
+                    ) : (
+                      `${m.targetCalories} kcal target`
+                    )}
                   </AppText>
+                  {adjusted && (
+                    <AppText variant="caption" tone="muted">
+                      {adjusted.proteinG}P · {adjusted.carbsG}C · {adjusted.fatG}F
+                    </AppText>
+                  )}
                   <Badge
                     label={
                       logged(m)
