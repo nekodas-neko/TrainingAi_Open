@@ -1,5 +1,7 @@
-// #3724. The oldest native app (`mobile/`) build the server still supports, as an Android
-// versionCode. null means no minimum: every installed build keeps working.
+// #3724. The oldest release build of the native app (`com.trainingai.app`) the server still
+// supports, as its Android versionCode: 2,000,000 + minor×1000 + patch (runbook "Version codes").
+// null means no minimum: every installed build keeps working. TrainingAi Preview is never held to
+// it; its codes count minutes since 2026-01-01 and it is rebuilt from main on every merge.
 //
 // Raised only by a PR, never by an environment variable, so the number in force is always the one
 // in the released code. `/api/version` serves it as `minSupportedNativeBuild`; a native build below

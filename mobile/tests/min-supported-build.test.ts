@@ -70,17 +70,22 @@ test('the minimum fetch is null on failure and sends the identity headers', asyn
 });
 
 test('the notice shows only below a non-null minimum', () => {
-  assert.equal(tooOldNotice(PREVIEW_APPLICATION_ID, '400', null), null);
-  assert.equal(tooOldNotice(PREVIEW_APPLICATION_ID, '512', 512), null);
-  assert.equal(tooOldNotice(PREVIEW_APPLICATION_ID, '600', 512), null);
-  const notice = tooOldNotice(PREVIEW_APPLICATION_ID, '400', 512);
+  assert.equal(tooOldNotice(RELEASE_APPLICATION_ID, '2520000', null), null);
+  assert.equal(tooOldNotice(RELEASE_APPLICATION_ID, '2521000', 2521000), null);
+  assert.equal(tooOldNotice(RELEASE_APPLICATION_ID, '2522000', 2521000), null);
+  const notice = tooOldNotice(RELEASE_APPLICATION_ID, '2520000', 2521000);
   assert.equal(notice?.title, 'This version of TrainingAi is too old');
-  assert.equal(notice?.pageUrl, downloadPageFor(PREVIEW_APPLICATION_ID));
-  assert.equal(tooOldNotice(RELEASE_APPLICATION_ID, '400', 512)?.pageUrl, downloadPageFor(RELEASE_APPLICATION_ID));
+  assert.equal(notice?.pageUrl, downloadPageFor(RELEASE_APPLICATION_ID));
+});
+
+test('Preview is never held to the release minimum', () => {
+  // Preview's codes are minutes since 2026-01-01, far below any release code (2,000,000 + ...).
+  assert.equal(tooOldNotice(PREVIEW_APPLICATION_ID, '450000', 2521000), null);
+  assert.equal(tooOldNotice(PREVIEW_APPLICATION_ID, '400', 512), null);
 });
 
 test('an unknown build or a build with no download page is never blocked', () => {
-  assert.equal(tooOldNotice(PREVIEW_APPLICATION_ID, '0', 512), null);
+  assert.equal(tooOldNotice(RELEASE_APPLICATION_ID, '0', 512), null);
   assert.equal(tooOldNotice('com.trainingai.app.dev', '400', 512), null);
   assert.equal(tooOldNotice(null, '400', 512), null);
 });

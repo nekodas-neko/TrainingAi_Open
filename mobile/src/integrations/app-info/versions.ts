@@ -165,16 +165,20 @@ export interface TooOldNotice {
 }
 
 /**
- * #3724. The blocking "too old" notice, or null. Only below a non-null minimum, and only for a
- * build with a download page. An unknown installed code ('0', the module missing) says nothing
- * rather than guess.
+ * #3724. The blocking "too old" notice, or null. Only the release app, only below a non-null
+ * minimum. An unknown installed code ('0', the module missing) says nothing rather than guess.
+ *
+ * The minimum is a release versionCode (2,000,000 + minor×1000 + patch, runbook "Version codes").
+ * Preview counts its codes in minutes since 2026-01-01 (native-side-by-side.yml), about 450,000 in
+ * Nov 2026, so any release minimum would block every Preview build. Preview is rebuilt from `main`
+ * on every merge and retired a week after the switch, so it is never held to the minimum.
  */
 export function tooOldNotice(
   applicationId: string | null,
   buildCode: string,
   minimum: number | null,
 ): TooOldNotice | null {
-  if (minimum === null) return null;
+  if (minimum === null || applicationId !== RELEASE_APPLICATION_ID) return null;
   const pageUrl = downloadPageFor(applicationId);
   if (!pageUrl || !/^[1-9]\d{0,9}$/.test(buildCode)) return null;
   const installed = Number(buildCode);
