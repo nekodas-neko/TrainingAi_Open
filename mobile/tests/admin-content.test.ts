@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
+import { webReference } from './web-reference.ts';
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
 import {
   activityDeleteFailure,
   activityTypeBody,
@@ -73,16 +73,16 @@ test('delete failures read in the current app\'s words', () => {
 });
 
 test('confirm copy and the unit-fix warning match the current app word for word', () => {
-  const manager = readFileSync(new URL('../../components/admin/exercise-manager.tsx', import.meta.url), 'utf8');
+  const manager = webReference('components/admin/exercise-manager.tsx');
   for (const c of Object.values(exerciseConfirm)) {
     assert.ok(manager.includes(c.title), c.title);
     assert.ok(manager.includes(c.message), c.message);
   }
-  const fix = readFileSync(new URL('../../components/admin/exercise-unit-fix.tsx', import.meta.url), 'utf8');
+  const fix = webReference('components/admin/exercise-unit-fix.tsx');
   const sample = applyConfirmMessage(2, ['A', 'B'], '2026-01-01');
   assert.ok(sample.includes('Sync your phone first (More → Data → Sync now).'));
   assert.ok(fix.includes('Sync your phone first (More → Data → Sync now).'));
-  const types = readFileSync(new URL('../../components/admin/activity-type-manager.tsx', import.meta.url), 'utf8');
+  const types = webReference('components/admin/activity-type-manager.tsx');
   assert.ok(types.includes('is removed from the activity type list for every user'));
 });
 

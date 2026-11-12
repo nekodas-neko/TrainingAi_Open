@@ -158,7 +158,7 @@ Inspect the release APK's manifest and resolved backup XML with `apkanalyzer`: b
 
 ## CI and acceptance
 
-`.github/workflows/mobile.yml` runs mobile TypeScript, tests, all-platform exports and an unpublished Android debug compilation without signing secrets. `mobile-build.yml` is the separate manual signed-build workflow. It needs `EXPO_TOKEN` and either complete `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` secrets, or the existing `ANDROID_DEBUG_KEYSTORE_B64` fallback. The fallback still needs comparison with the installed APK's signer.
+`.github/workflows/mobile.yml` runs mobile TypeScript, tests, all-platform exports and an unpublished Android debug compilation without signing secrets. Signed release builds come from `.github/workflows/native-release.yml`; the separate manual EAS signed-build workflow was removed in #3729, never having run.
 
 Replacement builds use the `native-replacement` GitHub environment. The owner must configure its required reviewers, explicitly approve Expo custody with `NATIVE_ANDROID_EAS_SIGNING_APPROVED=true`, and set `ANDROID_EXPECTED_CERT_SHA256` from the actual installed APK. The workflow verifies the supplied key's certificate before handing it to pinned EAS CLI 24.13.0. Development builds use separate `ANDROID_DEV_KEYSTORE_B64`, `ANDROID_DEV_KEYSTORE_PASSWORD`, `ANDROID_DEV_KEY_ALIAS` and `ANDROID_DEV_KEY_PASSWORD` secrets in `native-development`; they never fall back to the owner's replacement key. An unconfigured local Android profile selects `.dev`.
 

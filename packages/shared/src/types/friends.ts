@@ -3,7 +3,7 @@ import {
   Swords, Shield, Rocket, Dumbbell, Crown, Trophy, Zap, Diamond,
   Sunrise, Moon, CheckCircle2, Bed, CalendarCheck, Activity, Star,
 } from 'lucide-react'
-import type { AchievementResult } from '@/components/profile/achievements-grid'
+import type { AchievementResult } from '@trainingai/shared/types/achievement'
 import { TITLE_CATALOGUE } from '../achievement-display'
 
 export type LucideIconType = ComponentType<{ className?: string; style?: CSSProperties }>

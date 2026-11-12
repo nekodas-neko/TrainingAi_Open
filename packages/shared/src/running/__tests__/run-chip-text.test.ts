@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { chooseRunChipMode, formatDistanceChipText } from '../run-chip-text'
-import type { RunPrescription } from '@/components/running/prescribed-run-card'
+import type { RunPrescription } from '@trainingai/shared/running/types'
 
 const basePrescription: RunPrescription = {
   type: 'easy',

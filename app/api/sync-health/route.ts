@@ -9,8 +9,10 @@ import { isPlausibleStepWindow } from "@trainingai/shared/health/step-estimate";
 import { isPlausibleCadence, MIN_PLAUSIBLE_SPM, MAX_PLAUSIBLE_SPM } from "@trainingai/shared/health/cadence";
 import { ingestDayRejection, INGEST_FUTURE_TOLERANCE_MS } from "@trainingai/shared/validation/ingest-clock";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { HR_UPLOAD_CHUNK, INTERVAL_UPLOAD_CHUNK, SYNC_DAYS_COLD, type ActivityInterval } from '@/lib/health-connect-sync'
-import { historyDayRejection, importPastToleranceStartMs } from '@/lib/health-connect-history-import'
+import {
+  HR_UPLOAD_CHUNK, INTERVAL_UPLOAD_CHUNK, SYNC_DAYS_COLD, type ActivityInterval,
+  historyDayRejection, importPastToleranceStartMs,
+} from '@trainingai/shared/health/health-connect-sync-limits'
 import type { HealthConnectIntervalRow } from '@/lib/data/repository'
 import { storeHealthConnectWorkouts, sweepWindow } from '@/lib/health/health-connect-workouts'
 

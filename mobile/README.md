@@ -105,7 +105,7 @@ Google still returns to the existing backend OAuth callback; the backend then re
 
 Health Connect covers sleep sessions/stages, heart-rate samples, resting heart rate, RMSSD, steps, active calories and weight. Raw record IDs, source packages, recording methods, modification timestamps and available device descriptions are retained. The account-scoped queue persists before uploading, resumes paged history, handles corrections/deletions and expired cursors, and preserves history that permissions no longer allow it to inspect. RMSSD and Apple's SDNN remain distinct. Permission-denied measurements remain unavailable. Uploads run while the app is foregrounded or returns to the foreground; background delivery is deferred. Additional legacy Android coverage (body composition, oxygen, basal/total energy, nutrition, exercise/distance and cadence) remains listed in the [deployment plan](https://chatgpt.com/space/page_c3a9c1659c348191bf8bf95e43fe8f2f).
 
-`mobile.yml` prepares an unpublished Android debug compilation in CI alongside TypeScript, logic tests and all-platform JavaScript exports. `mobile-build.yml` makes signed EAS builds using the existing keystore. These workflows must run after the changes are pushed; local prebuild/configuration checks do not verify native compilation or device behaviour.
+`mobile.yml` prepares an unpublished Android debug compilation in CI alongside TypeScript, logic tests and all-platform JavaScript exports. Signed release builds come from `native-release.yml` (the manual EAS-build workflow was removed in #3729, never having run). These workflows must run after the changes are pushed; local prebuild/configuration checks do not verify native compilation or device behaviour.
 
 ### Preserve the existing Android installation
 

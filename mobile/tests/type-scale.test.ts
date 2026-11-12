@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { webReference } from './web-reference.ts';
 import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { sizes, typography } from '../src/shared/theme/tokens';
@@ -297,7 +298,7 @@ test('page titles use the page title tokens, never the large value token', async
 });
 
 test('the tap target and input size follow the current app stylesheet', async () => {
-  const css = await readFile(new URL('../../app/globals.css', import.meta.url), 'utf8');
+  const css = webReference('app/globals.css');
   const floor = /button,\s*\[role="button"\]\s*\{\s*min-height:\s*(\d+)px/.exec(css);
   assert.ok(floor, 'tap-target floor not found in app/globals.css');
   assert.equal(sizes.touchTarget, Number(floor[1]));

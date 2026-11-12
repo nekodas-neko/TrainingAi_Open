@@ -2,6 +2,17 @@ import type { HrZone } from '@trainingai/shared/health/hr-zones'
 
 export type RunType = 'easy' | 'long' | 'interval' | 'tempo' | 'recovery'
 
+/** The prescribed run the plan card shows and the run screen's status chip reads. Lived in
+ *  `components/running/prescribed-run-card.tsx` until #3729, which moved it here so this package
+ *  no longer imports a client component. */
+export interface RunPrescription {
+  type: RunType
+  durationMin: number | null
+  distanceKm: number | null
+  targets: { zoneIds: number[]; hrLowBpm: number; hrHighBpm: number }
+  rationale: string
+}
+
 export interface FitnessSnapshot {
   maxHr: number
   restingHr: number
