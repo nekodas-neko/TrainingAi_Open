@@ -1,6 +1,8 @@
 import { AI_PAUSED_CODE, AI_PAUSED_MESSAGE, aiPausedMessage } from '@trainingai/shared/ai-paused-notice';
 import { reportError } from '../../../core/reporting/index.ts';
 import { REFRESH_TOKEN_RE } from '@trainingai/shared/auth/refresh-token';
+import { APP_BUILD_HEADER, APP_VERSION_HEADER } from '@trainingai/shared/native-min-build';
+import { nativeAppVersion, nativeBuildCode } from '../../../integrations/app-info/platform';
 
 export class ApiError extends Error {
   status: number;
@@ -97,6 +99,21 @@ export function aiFailureText(error: unknown, fallback: string): string {
   // A Coach reply that fails after the stream opened arrives as an error part holding the sentence.
   if (error instanceof Error && error.message === AI_PAUSED_MESSAGE) return AI_PAUSED_MESSAGE;
   return fallback;
+}
+/**
+ * #3724. This build's versionCode and versionName, read from the installed APK, sent on every call
+ * so the server can tell which builds still call it. A value that is not short printable ASCII is
+ * left out rather than sent, since a header cannot carry it.
+ */
+export function appIdentityHeaders(
+  build: string = nativeBuildCode,
+  version: string = nativeAppVersion,
+): Record<string, string> {
+  const safe = (value: string) => /^[\x21-\x7e]{1,40}$/.test(value);
+  return {
+    ...(safe(build) ? { [APP_BUILD_HEADER]: build } : {}),
+    ...(safe(version) ? { [APP_VERSION_HEADER]: version } : {}),
+  };
 }
 export function backendOrigin(baseUrl: string): string {
   const base = new URL(baseUrl);
@@ -217,6 +234,7 @@ export function createApiClient(
                   ? 'application/x-ndjson'
                   : 'application/json',
             ...(body ? { 'Content-Type': 'application/json' } : {}),
+            ...appIdentityHeaders(),
             ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
             ...(method !== 'GET' && epoch?.dataEpoch?.() ? { 'X-Data-Epoch': epoch.dataEpoch()! } : {}),
           },

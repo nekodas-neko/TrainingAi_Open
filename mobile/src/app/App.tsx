@@ -61,6 +61,7 @@ import { CardioScreen } from '../features/activities/screens/CardioScreen';
 import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
 import { WeighInBanner } from '../features/devices/components/WeighInBanner';
 import { AlertNavigation } from '../features/platform/components/AlertNavigation';
+import { TooOldScreen, useTooOldNotice } from '../features/platform/components/TooOldNotice';
 import type { EstimateRequest } from '../features/meal-plans/data/estimated-meals';
 import {
   WorkoutStatusAccountGuard,
@@ -209,6 +210,27 @@ function AppShell() {
     !!healthDetail || (detail !== null && !['health-data', 'settings'].includes(detail));
   function closeWorkout() {
     setDetail(null);
+  }
+  // #3724. Below the server's minimum build, the notice covers the app; the data screen (export
+  // and sync health) still opens over it, and the notice carries sign-out itself.
+  const tooOld = useTooOldNotice();
+  if (tooOld && detail !== 'more-data') {
+    return (
+      <SafeAreaView
+        edges={['top', 'left', 'right', 'bottom']}
+        style={{ flex: 1, backgroundColor: theme.colors.background }}
+      >
+        <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+        <TooOldScreen
+          notice={tooOld}
+          onOpenData={() => {
+            setHealthDetail(null);
+            setTab('More');
+            setDetail('more-data');
+          }}
+        />
+      </SafeAreaView>
+    );
   }
   return (
     <SafeAreaView

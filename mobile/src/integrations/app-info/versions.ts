@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { backendOrigin } from '../../features/account/api/client.ts';
+import { appIdentityHeaders, backendOrigin } from '../../features/account/api/client.ts';
 
 /** "App 0.1.0 (build 440887)"; the build part is left out when the code is '0' (module missing). */
 export function appVersionLine(version: string, buildCode: string): string {
@@ -35,7 +35,7 @@ export async function fetchServerVersion(
       credentials: 'omit',
       cache: 'no-store',
       redirect: 'error',
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...appIdentityHeaders() },
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) return null;
@@ -64,25 +64,52 @@ export function parseReleaseBuild(body: unknown): ReleaseBuild | null {
   return parsed.success ? parsed.data : null;
 }
 
-/** GET /api/version (public). Resolves null on any failure: offline, non-2xx, bad body. */
-export async function fetchReleaseBuild(
+/** The `/api/version` body (public), or null on any failure: offline, non-2xx, not JSON. */
+async function fetchVersionBody(
   baseUrl: string | undefined,
-  fetcher: typeof fetch = fetch,
-): Promise<ReleaseBuild | null> {
+  fetcher: typeof fetch,
+): Promise<unknown> {
   try {
     if (!baseUrl) return null;
     const response = await fetcher(new URL('/api/version', backendOrigin(baseUrl)), {
       credentials: 'omit',
       cache: 'no-store',
       redirect: 'error',
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...appIdentityHeaders() },
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) return null;
-    return parseReleaseBuild(await response.json());
+    return await response.json();
   } catch {
     return null;
   }
+}
+
+/** GET /api/version (public). Resolves null on any failure: offline, non-2xx, bad body. */
+export async function fetchReleaseBuild(
+  baseUrl: string | undefined,
+  fetcher: typeof fetch = fetch,
+): Promise<ReleaseBuild | null> {
+  return parseReleaseBuild(await fetchVersionBody(baseUrl, fetcher));
+}
+
+// #3724. The oldest native build the server supports (`minSupportedNativeBuild`, from
+// MIN_SUPPORTED_NATIVE_BUILD in packages/shared). A server from before it sends no field, and
+// anything that is not a whole versionCode reads as no minimum: a false block is worse than none.
+const MinimumBuildSchema = z.number().int().positive().max(2_100_000_000).nullable().catch(null);
+
+/** The minimum supported build from a `/api/version` body; null when absent, null or malformed. */
+export function parseMinimumBuild(body: unknown): number | null {
+  if (!body || typeof body !== 'object') return null;
+  return MinimumBuildSchema.parse((body as { minSupportedNativeBuild?: unknown }).minSupportedNativeBuild) ?? null;
+}
+
+/** GET /api/version (public). Resolves null (no minimum) on any failure. */
+export async function fetchMinimumBuild(
+  baseUrl: string | undefined,
+  fetcher: typeof fetch = fetch,
+): Promise<number | null> {
+  return parseMinimumBuild(await fetchVersionBody(baseUrl, fetcher));
 }
 
 /** The real app. Preview (.preview) and development (.dev) builds never show the notice. */
@@ -113,5 +140,48 @@ export function releaseBuildNotice(
     title: 'A newer build is available',
     message: `v${build.versionName} (build ${build.versionCode}). You have v${installed.version} (build ${installedCode}). Tap to download.`,
     pageUrl: build.pageUrl,
+  };
+}
+
+/** TrainingAi Preview, the side-by-side build, published to its own rolling release. */
+export const PREVIEW_APPLICATION_ID = 'com.trainingai.app.preview';
+const PREVIEW_PAGE = 'https://github.com/nekodas-neko/TrainingAi_Open/releases/tag/native-preview-latest';
+
+/**
+ * Where each installed build downloads its replacement: the release app from the same page as its
+ * About notice (`nativeReleaseBuild.pageUrl`), Preview from its own release. Development builds
+ * and the web preview have none.
+ */
+export function downloadPageFor(applicationId: string | null): string | null {
+  if (applicationId === RELEASE_APPLICATION_ID) return RELEASE_PAGE;
+  if (applicationId === PREVIEW_APPLICATION_ID) return PREVIEW_PAGE;
+  return null;
+}
+
+export interface TooOldNotice {
+  title: string;
+  message: string;
+  pageUrl: string;
+}
+
+/**
+ * #3724. The blocking "too old" notice, or null. Only below a non-null minimum, and only for a
+ * build with a download page. An unknown installed code ('0', the module missing) says nothing
+ * rather than guess.
+ */
+export function tooOldNotice(
+  applicationId: string | null,
+  buildCode: string,
+  minimum: number | null,
+): TooOldNotice | null {
+  if (minimum === null) return null;
+  const pageUrl = downloadPageFor(applicationId);
+  if (!pageUrl || !/^[1-9]\d{0,9}$/.test(buildCode)) return null;
+  const installed = Number(buildCode);
+  if (installed >= minimum) return null;
+  return {
+    title: 'This version of TrainingAi is too old',
+    message: `The server no longer supports build ${installed}, so this app may not save or show your data correctly. Install the new build to carry on.`,
+    pageUrl,
   };
 }

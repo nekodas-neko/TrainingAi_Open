@@ -18,6 +18,8 @@ const TAB_ROOTS = new Set([
   'WorkoutScreen',
   'NutritionScreen',
   'MoreScreen',
+  // #3724: replaces the whole shell when the build is too old; there is nothing behind it.
+  'TooOldScreen',
 ]);
 // Rendered inside App's own <Screen onBack>, so App registers Back for them.
 const HOSTED_BY_APP = new Set(['DataScreen', 'SettingsScreen']);
