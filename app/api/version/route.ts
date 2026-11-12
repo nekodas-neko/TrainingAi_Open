@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { CHANGELOG } from "@trainingai/shared/changelog"
 import { fetchNativeReleaseBuild, lookupLatestApkRelease } from "@/lib/github-release"
 import { readBuildSha } from "@/lib/build-sha"
+import { MIN_SUPPORTED_NATIVE_BUILD } from "@trainingai/shared/native-min-build"
 
 // GET — public, cacheable version endpoint.
 //
@@ -47,6 +48,10 @@ export async function GET() {
       nativeReleaseBuild: releaseBuild
         ? { versionName: releaseBuild.versionName, versionCode: releaseBuild.versionCode, pageUrl: releaseBuild.pageUrl }
         : null,
+      // #3724. The oldest native build the server still supports (a versionCode), or null for no
+      // minimum. A code constant raised by a PR, never an env var. Additive: an older client
+      // ignores it, and the native app reads a missing field as no minimum.
+      minSupportedNativeBuild: MIN_SUPPORTED_NATIVE_BUILD,
     },
     { headers: { "Cache-Control": "public, max-age=300" } },
   )

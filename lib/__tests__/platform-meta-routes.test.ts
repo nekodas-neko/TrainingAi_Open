@@ -62,6 +62,7 @@ vi.mock('@trainingai/shared/changelog', () => ({
 }))
 
 import { GET as getVersion } from '@/app/api/version/route'
+import { MIN_SUPPORTED_NATIVE_BUILD } from '@trainingai/shared/native-min-build'
 import { GET as getStatus } from '@/app/api/status/route'
 import { GET as getApk } from '@/app/api/download-apk/route'
 import { GET as getExport } from '@/app/api/export/route'
@@ -172,6 +173,16 @@ describe('GET /api/version', () => {
     const body = await (await getVersion()).json()
     expect(body.nativeReleaseBuild).toBeNull()
     expect(body.version).toBe(WEB_VERSION)
+  })
+
+  // #3724. The minimum native build, from the shared constant; null (no minimum) until a PR sets
+  // one. The key is always present, so a native client can tell "no minimum" from an old server.
+  it('carries the minimum supported native build from the shared constant', async () => {
+    fetchNativeReleaseBuild.mockResolvedValue(null)
+    const body = await (await getVersion()).json()
+    expect(body).toHaveProperty('minSupportedNativeBuild')
+    expect(body.minSupportedNativeBuild).toBe(MIN_SUPPORTED_NATIVE_BUILD)
+    expect(body.minSupportedNativeBuild).toBeNull()
   })
 
   it('is the one route allowed a public cache header, and uses it', async () => {
