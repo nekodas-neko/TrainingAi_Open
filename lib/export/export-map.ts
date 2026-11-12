@@ -199,6 +199,7 @@ export const WITHHELD_COLUMNS: Record<string, string[]> = {
 
 export const EXCLUDED: Record<string, Exclusion> = {
   health_connect_projection_state: { category: 'ops', reason: 'rebuild bookkeeping; source health records and resulting measurements are exported' },
+  native_build_sightings: { category: 'ops', reason: 'server telemetry of which app builds called the API (#3739); none of it is the user\'s training or health data' },
   native_health_projection_days: { category: 'ops', reason: 'pending import dates and per-day projection state; source records and measurements are exported' },
   auth_identities: { category: 'credentials', reason: 'private provider authentication identifiers' },
   apple_auth_attempts: { category: 'credentials', reason: 'short-lived authentication challenges' },

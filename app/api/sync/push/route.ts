@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { MutationSchema } from '@trainingai/shared/sync/mutation-schema';
 import { rateLimit } from '@/lib/rate-limit';
 import { reportServerError } from '@/lib/observability';
+import { recordNativeBuildSighting } from '@/lib/native-builds/record-sighting';
 import { readJsonLimited } from '@trainingai/shared/http/request-guards';
 import { withUserWriteBarrier, CUT_OFF } from '@/lib/data/postgres/user-write-barrier';
 import { SUPERSEDED_WARNING, UNSTAMPED_WARNING } from '@trainingai/shared/sync/edited-at';
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // #3739: which native builds still call the server. Fire-and-forget; never affects this response.
+  void recordNativeBuildSighting(req.headers, userId, session.user?.timezone);
   if (!rateLimit(`sync-push:${userId}`, 60, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }

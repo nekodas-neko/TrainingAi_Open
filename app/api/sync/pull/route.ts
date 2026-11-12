@@ -3,11 +3,14 @@ import { auth } from '@/auth';
 import { getRepository } from '@/lib/data';
 import { rateLimit } from '@/lib/rate-limit';
 import { reportServerError } from '@/lib/observability';
+import { recordNativeBuildSighting } from '@/lib/native-builds/record-sighting';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // #3739: which native builds still call the server. Fire-and-forget; never affects this response.
+  void recordNativeBuildSighting(req.headers, userId, session.user?.timezone);
 
   const isRestore = req.nextUrl.searchParams.get('mode') === 'restore';
 

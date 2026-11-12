@@ -54,6 +54,7 @@
     "meal_types": {"class":"HYDRATED MIRROR","note":"local table exists, NOT in getSyncDelta; filled from API fetches; server authoritative"},
     "measured_rmr": {"class":"SERVER-ONLY","note":"user data, no local mirror; writer: adapter.ts"},
     "mood_logs": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull"},
+    "native_build_sightings": {"class":"SERVER-ONLY","note":"#3739 which native builds call the server, one row per user, build and local day; writer: lib/native-builds/record-sighting.ts (sync pull/push only); reader: claude_ro view; no device copy, no delete UI"},
     "native_refresh_tokens": {"class":"SERVER-ONLY","note":"credential material (#2076 native app refresh tokens, SHA-256 hashes only); nothing on the device reads it; token_hash withheld from claude_ro; writer: slices/native-refresh-tokens.ts"},
     "nutrition_targets": {"class":"SERVER-ONLY","note":"user data, no local mirror; writer: goals.ts, nutrition.ts"},
     "meal_logging_statuses": {"class":"SERVER-ONLY","note":"per-day meal choices; Apple caches locally and queues authenticated API writes"},
