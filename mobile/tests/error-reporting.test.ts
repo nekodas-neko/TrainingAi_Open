@@ -114,6 +114,9 @@ test('offline, signed-out, not-found, conflict, rate-limit and paused failures a
     assert.ok(isExpectedFailure(new ApiError(status)));
   assert.ok(isExpectedFailure(new ApiError(503, 'ai_paused')));
   assert.ok(isExpectedFailure(new TypeError('Network request failed')));
+  // expo/fetch on Android (12 Nov, during a workout whose sets all synced on retry).
+  assert.ok(isExpectedFailure(new Error('fetch failed: Fetch request has been canceled')));
+  assert.ok(isExpectedFailure(new Error('fetch failed: java.net.SocketException: Socket closed')));
   assert.ok(!isExpectedFailure(new ApiError(500)));
   assert.ok(!isExpectedFailure(new ApiError(400)));
   assert.ok(!isExpectedFailure(new Error('Invalid workout count.')));

@@ -82,7 +82,12 @@ function isNetworkFailure(error: unknown): boolean {
   return (
     error.name === 'AbortError' ||
     error.name === 'TimeoutError' ||
-    /network request failed|failed to fetch|network error|aborted|timed? ?out/i.test(error.message)
+    // expo/fetch on Android words a dropped or cancelled request as "fetch failed: Fetch request has
+    // been canceled" or "fetch failed: java.net.SocketException: Socket closed" (12 Nov: five during
+    // one workout whose sets all synced on retry).
+    /network request failed|failed to fetch|fetch failed|network error|aborted|cancell?ed|socket ?(closed|exception)|timed? ?out/i.test(
+      error.message,
+    )
   );
 }
 
