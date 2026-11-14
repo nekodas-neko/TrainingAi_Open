@@ -120,13 +120,15 @@ export const MAX_PAGES = 50
 
 const Page = z.object({ data: z.array(z.unknown()), next_token: z.string().nullable().optional() })
 
-async function getJson(path: string, accessToken: string, query?: Record<string, string>): Promise<{ status: number; body: unknown }> {
+async function getJson(
+  path: string, accessToken: string, query?: Record<string, string>, timeoutMs = OURA_REQUEST_TIMEOUT_MS,
+): Promise<{ status: number; body: unknown }> {
   const url = `${OURA_API_BASE}/v2/usercollection/${path}${query ? `?${new URLSearchParams(query)}` : ''}`
   let res: Response
   try {
     res = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(OURA_REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: 'no-store',
     })
   } catch (err) {
@@ -144,13 +146,22 @@ async function getJson(path: string, accessToken: string, query?: Record<string,
 }
 
 /**
- * One document by its id, as a webhook names it. `null` when Oura no longer has it (404) or it does
- * not match the spec's model.
+ * One document by its id, as a webhook names it: the document, or why there is none (#3795 item 2).
+ * `not_found` is Oura no longer having it (404), which is normal after a delete; `invalid` is a
+ * document Oura sent that does not match the spec's model, which means a field changed at Oura.
+ * `timeoutMs` bounds the read (the webhook passes a shorter one); a timeout is `OuraUnavailableError`.
  */
-export async function fetchOuraDocument(accessToken: string, type: OuraDocumentType, id: string): Promise<OuraDocument | null> {
-  const { status, body } = await getJson(`${OURA_DOCUMENT_TYPES[type].path}/${encodeURIComponent(id)}`, accessToken)
-  if (status === 404) return null
-  return parseOuraDocument(type, body)
+export type OuraDocumentRead =
+  | { doc: OuraDocument; missing?: undefined }
+  | { doc: null; missing: 'not_found' | 'invalid' }
+
+export async function fetchOuraDocument(
+  accessToken: string, type: OuraDocumentType, id: string, opts: { timeoutMs?: number } = {},
+): Promise<OuraDocumentRead> {
+  const { status, body } = await getJson(`${OURA_DOCUMENT_TYPES[type].path}/${encodeURIComponent(id)}`, accessToken, undefined, opts.timeoutMs)
+  if (status === 404) return { doc: null, missing: 'not_found' }
+  const doc = parseOuraDocument(type, body)
+  return doc ? { doc } : { doc: null, missing: 'invalid' }
 }
 
 /**

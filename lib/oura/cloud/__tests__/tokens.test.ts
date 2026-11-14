@@ -5,8 +5,12 @@ import { OURA_REVOKE_URL, OURA_TOKEN_URL, type OuraOAuthConfig } from '../config
 import { decryptOuraToken, encryptOuraToken } from '../token-cipher'
 import {
   confirmOuraTokenRefused, connectOuraAccount, disconnectOuraAccount, getOuraAccessToken, getOuraConnection,
-  OuraAccountInUseError, OuraReauthRequiredError, REFRESH_MARGIN_MS, type OuraTokenStore,
+  forceOuraTokenRefresh, OuraAccountInUseError, OuraReauthRequiredError, OuraTokenSaveFailedError, REFRESH_MARGIN_MS, TOKEN_SAVE_ATTEMPTS, type OuraTokenStore,
 } from '../tokens'
+import { resetOuraCloudReportThrottle } from '../report'
+
+const reportServerError = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 
 const USER = '11111111-1111-4111-8111-111111111111'
 const CONFIG: OuraOAuthConfig = { clientId: 'cid', clientSecret: 'csecret', redirectUri: 'http://localhost:3000/api/oura/callback' }
@@ -342,9 +346,16 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
   })
 
   // #3227: a grant Oura refused must not read as connected, or the screen hides "Connect".
-  it('reports a grant Oura refused as not connected, with reauthRequired', async () => {
-    const store = fakeStore({ ...storedRow('acc-1', 'ref-1', NOW + 86400_000), reauthRequiredAt: new Date(NOW - 1000) })
-    expect(await getOuraConnection(store, USER)).toEqual({ connected: false, scope: null, expiresAt: null, reauthRequired: true })
+  // #3794: and keeps when data last arrived, so the app can show it going stale.
+  it('reports a grant Oura refused as not connected, with reauthRequired and when data last arrived', async () => {
+    const store = fakeStore({
+      ...storedRow('acc-1', 'ref-1', NOW + 86400_000), reauthRequiredAt: new Date(NOW - 1000),
+      lastDataAt: new Date('2026-10-13T21:00:00Z'), lastWebhookAt: new Date('2026-10-13T21:05:00Z'),
+    })
+    expect(await getOuraConnection(store, USER)).toEqual({
+      connected: false, scope: null, expiresAt: null, reauthRequired: true,
+      lastDataAt: '2026-10-13T21:00:00.000Z', lastWebhookAt: '2026-10-13T21:05:00.000Z',
+    })
   })
 
   it('leaves an unmarked connection as it was, with no reauthRequired field', async () => {
@@ -393,5 +404,113 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
     delete process.env.OURA_TOKEN_KEY
     expect(await disconnectOuraAccount(keyless, USER)).toEqual({ deleted: true, revoked: false })
     expect(keyless.row()).toBeNull()
+  })
+
+  // #3795 item 1: Oura rotates the refresh token on use, so a lost save loses the grant.
+  describe('saving a refreshed pair (#3795)', () => {
+    const due = () => storedRow('acc-1', 'ref-1', NOW + REFRESH_MARGIN_MS - 60_000)
+    const refreshed = () => jsonResponse({ access_token: 'acc-2', refresh_token: 'ref-2', expires_in: 30 * 86400 })
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] })
+      resetOuraCloudReportThrottle()
+      reportServerError.mockClear()
+    })
+    afterEach(() => { vi.useRealTimers() })
+
+    function failingSaves(store: ReturnType<typeof fakeStore>, failures: number) {
+      const save = store.saveOuraCloudTokens.bind(store)
+      let calls = 0
+      store.saveOuraCloudTokens = async (userId, input) => {
+        calls++
+        if (calls <= failures) throw Object.assign(new Error('connection terminated, value ref-2'), { code: '08006' })
+        return save(userId, input)
+      }
+      return () => calls
+    }
+
+    it('retries a save that fails twice, then stores the rotated pair, with one refresh at Oura', async () => {
+      const store = fakeStore(due())
+      const calls = failingSaves(store, 2)
+      fetchMock.mockResolvedValueOnce(refreshed())
+      const token = getOuraAccessToken(store, CONFIG, USER, () => NOW)
+      await vi.runAllTimersAsync()
+      expect(await token).toBe('acc-2')
+      expect(calls()).toBe(3)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(decryptOuraToken(store.row()!.refreshToken, USER, 'refresh_token')).toBe('ref-2')
+      expect(reportServerError).not.toHaveBeenCalled()
+    })
+
+    it('reports a save that always fails under refresh:save-failed, without the error text or a token', async () => {
+      const store = fakeStore(due())
+      const calls = failingSaves(store, Infinity)
+      fetchMock.mockResolvedValueOnce(refreshed())
+      const token = getOuraAccessToken(store, CONFIG, USER, () => NOW)
+      const settled = expect(token).rejects.toBeInstanceOf(OuraTokenSaveFailedError)
+      await vi.runAllTimersAsync()
+      await settled
+      expect(calls()).toBe(TOKEN_SAVE_ATTEMPTS)
+      await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(1))
+      const err = reportServerError.mock.calls[0][0] as Error
+      expect(err.message).toContain('refresh:save-failed')
+      expect(err.message).toContain('08006')
+      for (const secret of ['acc-1', 'acc-2', 'ref-1', 'ref-2', 'connection terminated']) expect(err.message).not.toContain(secret)
+      // The stored row is untouched: still the old pair.
+      expect(decryptOuraToken(store.row()!.refreshToken, USER, 'refresh_token')).toBe('ref-1')
+    })
+  })
+
+  describe('forceOuraTokenRefresh (#3795)', () => {
+    const fresh = () => storedRow('acc-1', 'ref-1', NOW + 20 * 86400_000)
+
+    it('a dry run reports the stored expiry and that a refresh would run, and asks Oura nothing', async () => {
+      const store = fakeStore(fresh())
+      expect(await forceOuraTokenRefresh(store, CONFIG, USER, true, () => NOW)).toEqual({
+        dryRun: true, stored: true, reauthRequired: false, expiresAt: new Date(NOW + 20 * 86400_000).toISOString(), wouldRefresh: true,
+      })
+      const marked = fakeStore({ ...fresh(), reauthRequiredAt: new Date(NOW) })
+      expect(await forceOuraTokenRefresh(marked, CONFIG, USER, true, () => NOW)).toMatchObject({ reauthRequired: true, wouldRefresh: false })
+      expect(await forceOuraTokenRefresh(fakeStore(), CONFIG, USER, true, () => NOW)).toMatchObject({ stored: false, wouldRefresh: false })
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('refreshes a token that is far from expiry, and reports the new expiry and no token', async () => {
+      const store = fakeStore(fresh())
+      fetchMock.mockResolvedValueOnce(jsonResponse({ access_token: 'acc-2', refresh_token: 'ref-2', expires_in: 30 * 86400 }))
+      const out = await forceOuraTokenRefresh(store, CONFIG, USER, false, () => NOW)
+      expect(out).toEqual({
+        dryRun: false, outcome: 'refreshed', previousExpiresAt: new Date(NOW + 20 * 86400_000).toISOString(),
+        expiresAt: new Date(NOW + 30 * 86400_000).toISOString(), detail: null,
+      })
+      expect(JSON.stringify(out)).not.toMatch(/acc-|ref-/)
+      expect(decryptOuraToken(store.row()!.refreshToken, USER, 'refresh_token')).toBe('ref-2')
+    })
+
+    it('reports a refused refresh as refused, and the grant is recorded as needing a reconnect', async () => {
+      const store = fakeStore(fresh())
+      fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'invalid_grant' }, 400))
+      expect(await forceOuraTokenRefresh(store, CONFIG, USER, false, () => NOW)).toMatchObject({ outcome: 'refused', detail: 'invalid_grant' })
+      expect(store.row()!.reauthRequiredAt).toBeInstanceOf(Date)
+    })
+
+    it('reports a save that failed every try as save_failed', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] })
+      try {
+        const store = fakeStore(fresh())
+        store.saveOuraCloudTokens = async () => { throw new Error('db down') }
+        fetchMock.mockResolvedValueOnce(jsonResponse({ access_token: 'acc-2', refresh_token: 'ref-2', expires_in: 30 * 86400 }))
+        const out = forceOuraTokenRefresh(store, CONFIG, USER, false, () => NOW)
+        await vi.runAllTimersAsync()
+        expect(await out).toMatchObject({ outcome: 'save_failed' })
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('does not ask Oura for a grant already refused, or with nothing stored', async () => {
+      expect(await forceOuraTokenRefresh(fakeStore({ ...fresh(), reauthRequiredAt: new Date(NOW) }), CONFIG, USER, false, () => NOW)).toMatchObject({ outcome: 'reauth_required' })
+      expect(await forceOuraTokenRefresh(fakeStore(), CONFIG, USER, false, () => NOW)).toMatchObject({ outcome: 'not_connected' })
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
   })
 })

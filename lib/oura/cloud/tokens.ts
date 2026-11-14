@@ -21,9 +21,42 @@ import { grantedOuraScopes, type OuraOAuthConfig } from './config'
 import { decryptOuraToken, encryptOuraToken, OuraTokenKeyMissingError } from './token-cipher'
 import { startOuraConnectBackfill } from './backfill'
 import { clearRingBatteryBackoff } from './ring-battery-backoff'
+import { reportOuraCloudIssue } from './report'
 
-/** Refresh when less than this is left. Oura's access tokens last about a day. */
+/**
+ * Refresh when less than this is left. The expiry is what Oura's token answer says (`expires_in`);
+ * the pinned spec does not state a lifetime, and every production grant so far has carried 30 days
+ * (#3795), so a refresh is rare and its loss is costly.
+ */
 export const REFRESH_MARGIN_MS = 10 * 60 * 1000
+
+/**
+ * How many times the refreshed pair is saved before giving up, and the waits between tries (#3795).
+ * Oura rotates the refresh token on use: once it has answered, the only copy of the new one is in
+ * memory, and a save that is not retried loses the grant at the next refresh.
+ */
+export const TOKEN_SAVE_ATTEMPTS = 3
+export const TOKEN_SAVE_BACKOFF_MS: readonly number[] = [250, 1000]
+
+/**
+ * Oura refreshed the grant but the new pair could not be stored (#3795). The old refresh token is
+ * spent, so the next refresh will be refused and the user will have to connect again.
+ */
+export class OuraTokenSaveFailedError extends Error {
+  constructor(readonly attempts: number) {
+    super(`The refreshed Oura tokens could not be saved after ${attempts} attempts`)
+    this.name = 'OuraTokenSaveFailedError'
+  }
+}
+
+/** A database error described by its class and code only: never its message, which could quote a value. */
+function describeSaveError(err: unknown): string {
+  if (!(err instanceof Error)) return 'unknown'
+  const code = (err as { code?: unknown }).code
+  return typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) ? `${err.name} ${code}` : err.name
+}
+
+const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 /** The slice of the repository this module needs, so tests can hand it a fake. */
 export interface OuraTokenStore {
@@ -151,7 +184,14 @@ export async function getOuraConnection(store: OuraTokenStore, userId: string): 
   const stored = !!row &&
     decryptOuraToken(row.accessToken, userId, 'access_token') !== null &&
     decryptOuraToken(row.refreshToken, userId, 'refresh_token') !== null
-  if (stored && row.reauthRequiredAt) return { connected: false, scope: null, expiresAt: null, reauthRequired: true }
+  // #3794: when the data last arrived stays in the answer, so the app can show it going stale.
+  if (stored && row.reauthRequiredAt) {
+    return {
+      connected: false, scope: null, expiresAt: null, reauthRequired: true,
+      lastWebhookAt: row.lastWebhookAt?.toISOString() ?? null,
+      lastDataAt: row.lastDataAt?.toISOString() ?? null,
+    }
+  }
   if (!row || !stored) return { connected: false, scope: null, expiresAt: null }
   return {
     connected: true,
@@ -213,7 +253,7 @@ async function refreshNow(
     const grant = await refreshAccessToken(config, refreshToken, now())
     // A refresh answer may leave `scope` out. Writing that `null` would make the grant read as
     // "covers everything" and bring back the 401 stop on an unshared type (#2974), so keep the stored list.
-    await store.saveOuraCloudTokens(userId, { ...encrypted(userId, grant), expiresAt: grant.expiresAt, scope: grant.scope ?? storedScope })
+    await saveRefreshedGrant(store, userId, { ...encrypted(userId, grant), expiresAt: grant.expiresAt, scope: grant.scope ?? storedScope })
     clearRingBatteryBackoff(userId)
     return grant.accessToken
   } catch (err) {
@@ -231,6 +271,81 @@ async function refreshNow(
     await store.markOuraCloudReauthRequired(userId, readAt)
     throw new OuraReauthRequiredError()
   }
+}
+
+/**
+ * Saves a refreshed pair, trying `TOKEN_SAVE_ATTEMPTS` times (#3795). When every try fails it is
+ * reported under `refresh:save-failed`, with the database error's class and code only, and
+ * `OuraTokenSaveFailedError` is thrown. It sits outside the `invalid_grant` handling in `refreshNow`.
+ */
+async function saveRefreshedGrant(store: OuraTokenStore, userId: string, input: SaveOuraCloudTokensInput): Promise<void> {
+  let last: unknown
+  for (let attempt = 1; attempt <= TOKEN_SAVE_ATTEMPTS; attempt++) {
+    try {
+      await store.saveOuraCloudTokens(userId, input)
+      return
+    } catch (err) {
+      last = err
+      if (attempt < TOKEN_SAVE_ATTEMPTS) await wait(TOKEN_SAVE_BACKOFF_MS[attempt - 1] ?? 1000)
+    }
+  }
+  const message = `Oura refreshed the grant, and saving the new tokens failed ${TOKEN_SAVE_ATTEMPTS} times (${describeSaveError(last)}); the next refresh will be refused`
+  console.error(`[oura] ${message}`)
+  reportOuraCloudIssue('refresh:save-failed', message, { userId })
+  throw new OuraTokenSaveFailedError(TOKEN_SAVE_ATTEMPTS)
+}
+
+/** What a forced refresh did (#3795, the `oura-force-refresh` agent job). Never carries a token. */
+export type OuraForcedRefreshReport =
+  | {
+    dryRun: true
+    /** Tokens are stored and open under this key. */
+    stored: boolean
+    reauthRequired: boolean
+    expiresAt: string | null
+    /** A real run would ask Oura for a refresh: tokens stored, and the grant not already refused. */
+    wouldRefresh: boolean
+  }
+  | {
+    dryRun: false
+    outcome: 'refreshed' | 'refused' | 'save_failed' | 'unavailable' | 'rejected' | 'not_connected' | 'reauth_required'
+    /** The expiry stored before the run, and after it (the new one when it refreshed). */
+    previousExpiresAt: string | null
+    expiresAt: string | null
+    /** What went wrong, safe to log: an error class, an OAuth error code, never a token. */
+    detail: string | null
+  }
+
+/**
+ * Forces one refresh for `userId`, whatever the stored expiry, through `refreshOnce` and so through
+ * `refreshNow`: the same save retries, the same `invalid_grant` handling, single-flight with any
+ * refresh already running. A dry run reads the row and asks Oura nothing.
+ */
+export async function forceOuraTokenRefresh(
+  store: OuraTokenStore, config: OuraOAuthConfig, userId: string, dryRun: boolean, now: () => number = Date.now,
+): Promise<OuraForcedRefreshReport> {
+  const row = await store.getOuraCloudTokens(userId)
+  const refreshToken = row ? decryptOuraToken(row.refreshToken, userId, 'refresh_token') : null
+  const accessOpens = row ? decryptOuraToken(row.accessToken, userId, 'access_token') !== null : false
+  const stored = !!row && !!refreshToken && accessOpens
+  const previousExpiresAt = row?.expiresAt?.toISOString() ?? null
+  const reauthRequired = !!row?.reauthRequiredAt
+  if (dryRun) return { dryRun: true, stored, reauthRequired, expiresAt: previousExpiresAt, wouldRefresh: stored && !reauthRequired }
+  const done = (outcome: Extract<OuraForcedRefreshReport, { dryRun: false }>['outcome'], expiresAt: string | null, detail: string | null = null) =>
+    ({ dryRun: false as const, outcome, previousExpiresAt, expiresAt, detail })
+  if (!row || !stored || !refreshToken) return done('not_connected', previousExpiresAt)
+  if (reauthRequired) return done('reauth_required', previousExpiresAt)
+  try {
+    await refreshOnce(store, config, userId, refreshToken, row, now)
+  } catch (err) {
+    if (err instanceof OuraReauthRequiredError) return done('refused', previousExpiresAt, 'invalid_grant')
+    if (err instanceof OuraTokenSaveFailedError) return done('save_failed', previousExpiresAt, err.message)
+    if (err instanceof OuraUnavailableError) return done('unavailable', previousExpiresAt, err.status != null ? `status ${err.status}` : err.name)
+    if (err instanceof OuraGrantRejectedError) return done('rejected', previousExpiresAt, `${err.status}${err.oauthError ? ` ${err.oauthError}` : ''}`)
+    throw err
+  }
+  const after = await store.getOuraCloudTokens(userId)
+  return done('refreshed', after?.expiresAt?.toISOString() ?? null)
 }
 
 /**
