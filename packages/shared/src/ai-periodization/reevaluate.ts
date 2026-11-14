@@ -213,7 +213,7 @@ export function reevaluatePrescriptionForToday(
         deloadNote: undefined,
         preDeload: undefined,
         // #3764: a plan deloaded for an untouched suggestion goes back to full load and says why.
-        ...(perEx.recentNotes[ex.sessionExerciseId] && !ex.autoregNote?.startsWith(RECENTLY_TRAINED_NOTE_PREFIX) && {
+        ...(perEx.recentNotes[ex.sessionExerciseId] && !ex.autoregNote?.includes(RECENTLY_TRAINED_NOTE_PREFIX) && {
           autoregNote: [ex.autoregNote, perEx.recentNotes[ex.sessionExerciseId]].filter(Boolean).join(' · '),
         }),
       }
@@ -225,6 +225,13 @@ export function reevaluatePrescriptionForToday(
         changed = true
         return { ...ex, deloadNote: note }
       }
+    }
+    // #3764: an exercise at normal load whose main muscle is an untouched suggestion says so, whichever
+    // path built the plan (the model, the rules fallback, or an older plan). A note only: no numbers move.
+    const recent = perEx.recentNotes[ex.sessionExerciseId]
+    if (!isDeloaded && !ex.deloaded && recent && !ex.autoregNote?.includes(RECENTLY_TRAINED_NOTE_PREFIX)) {
+      changed = true
+      return { ...ex, autoregNote: [ex.autoregNote, recent].filter(Boolean).join(' · ') }
     }
     return ex
   })

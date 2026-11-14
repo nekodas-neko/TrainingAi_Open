@@ -153,6 +153,13 @@ describe('consumption-day re-check', () => {
     expect(squat).toMatchObject({ ...FULL, deloaded: false, autoregNote: 'Trained recently — quads, normal load' })
     expect(squat.deloadNote).toBeUndefined()
   })
+  it('a plan built at normal load gains the neutral note once, and no numbers move', () => {
+    const fresh: AiPrescription = { ...stored, exercises: [stored.exercises[0], { sessionExerciseId: 'squat', name: 'Squat', ...FULL }] }
+    const r = reevaluatePrescriptionForToday(fresh, signals(log(['Quads'], ['Quads'])), { ...state }, NOW)
+    expect(r.changed).toBe(true)
+    expect(r.prescription.exercises[1]).toEqual({ sessionExerciseId: 'squat', name: 'Squat', ...FULL, autoregNote: 'Trained recently — quads, normal load' })
+    expect(reevaluatePrescriptionForToday(r.prescription, signals(log(['Quads'], ['Quads'])), { ...state }, NOW).changed).toBe(false)
+  })
   it('the same region added by the lifter keeps the deload', () => {
     const r = reevaluatePrescriptionForToday(stored, signals(log(['Quads'], [])), { ...state }, NOW)
     expect(r.prescription.exercises.find(e => e.sessionExerciseId === 'squat')).toMatchObject({ deloaded: true, pct: 52 })
