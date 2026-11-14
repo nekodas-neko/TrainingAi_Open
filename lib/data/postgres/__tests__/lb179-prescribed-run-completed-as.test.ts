@@ -10,6 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-000000179a01'
+const OTHER = '00000000-0000-4000-8000-000000179a02'
 const DATE = '2026-09-20'
 
 describe.skipIf(!canRun)('prescribed_runs.completed_as (LB-179)', () => {
@@ -21,12 +22,14 @@ describe.skipIf(!canRun)('prescribed_runs.completed_as (LB-179)', () => {
     pool = (await import('@/lib/data/postgres/client')).getPool()
     repo = await (await import('@/lib/data')).getRepositoryAsync()
     await pool.query(`INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, 'lb179@example.com', 'x', 'Australia/Brisbane') ON CONFLICT (id) DO NOTHING`, [USER])
+    await pool.query(`INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, 'lb179-other@example.com', 'x', 'Australia/Brisbane') ON CONFLICT (id) DO NOTHING`, [OTHER])
     planId = (await pool.query(`INSERT INTO running_plans (user_id, goal_kind, framework_key, fitness_snapshot, is_active) VALUES ($1, 'general', 'polarized', '{}'::jsonb, true) RETURNING id`, [USER])).rows[0].id
   })
   afterAll(async () => {
     if (!canRun) return
     await pool.query(`DELETE FROM running_plans WHERE user_id = $1`, [USER])
-    await pool.query(`DELETE FROM users WHERE id = $1`, [USER])
+    await pool.query(`DELETE FROM activity_logs WHERE user_id = ANY($1)`, [[USER, OTHER]])
+    await pool.query(`DELETE FROM users WHERE id = ANY($1)`, [[USER, OTHER]])
   })
 
   const fresh = () => repo.upsertPrescribedRun(USER, {
@@ -61,6 +64,29 @@ describe.skipIf(!canRun)('prescribed_runs.completed_as (LB-179)', () => {
     const res = await repo.pushMutations(USER, [{ domain: 'prescribed_run', date: DATE, payload: { id: r.id, status: 'completed', completedAs: 'walk' } }])
     expect(res.errors ?? []).toEqual([])
     expect(await stored(r.id)).toEqual({ status: 'completed', completed_as: 'walk' })
+  })
+
+  // #3796: the activity link is client-supplied on both write paths, so it is stored only when it
+  // names one of the caller's own activity logs, and as null otherwise — the status still lands.
+  it("stores the caller's own activity link, and null for another user's", async () => {
+    const activity = async (userId: string) => (await pool.query(
+      `INSERT INTO activity_logs (user_id, date, activity_type, title) VALUES ($1, $2, 'other', 'Run') RETURNING id`,
+      [userId, DATE])).rows[0].id as string
+    const own = await activity(USER)
+    const foreign = await activity(OTHER)
+    const link = async (id: string) => (await pool.query(`SELECT status, activity_log_id FROM prescribed_runs WHERE id = $1`, [id])).rows[0]
+
+    const r = await fresh()
+    await repo.updatePrescribedRun(USER, r.id, { status: 'completed', activityLogId: own })
+    expect(await link(r.id)).toEqual({ status: 'completed', activity_log_id: own })
+
+    await repo.updatePrescribedRun(USER, r.id, { status: 'completed', activityLogId: foreign })
+    expect(await link(r.id)).toEqual({ status: 'completed', activity_log_id: null })
+
+    // The offline push goes through the same write, and is not refused over the link.
+    const res = await repo.pushMutations(USER, [{ domain: 'prescribed_run', date: DATE, payload: { id: r.id, status: 'completed', activityLogId: foreign } }])
+    expect(res.errors ?? []).toEqual([])
+    expect(await link(r.id)).toEqual({ status: 'completed', activity_log_id: null })
   })
 
   it('the database refuses any other value', async () => {

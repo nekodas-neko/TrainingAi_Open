@@ -528,7 +528,7 @@ export async function phaseSetIdOwned(
  * True when `id` names a session (live or tombstoned) of one of `userId`'s programs.
  *
  * `program_sessions` has no `user_id`; ownership is through `programs`. Used before a
- * client-supplied session id is stored as a link (`workout_sessions.program_session_id`).
+ * client-supplied session id is stored as a link (`workout_sessions.programSessionId`).
  * A malformed id is `false`.
  */
 export async function programSessionIdOwned(db: Db, userId: string, id: string): Promise<boolean> {

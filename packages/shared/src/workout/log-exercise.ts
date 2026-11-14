@@ -79,7 +79,7 @@ export async function logExerciseFromPayload(
     }
   }
 
-  // The payload's `sessionId` is stored as `workout_sessions.program_session_id` and used to read
+  // The payload's `sessionId` is stored as the workout's program session link and used to read
   // phase state, so it must name a session in one of the caller's own programs. Dropped to null
   // rather than refused, for the reason given at the `styleId` check below: this runs for queued
   // outbox pushes too, and a refusal would quarantine a whole logged workout over one link column.
