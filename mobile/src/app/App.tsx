@@ -19,9 +19,13 @@ import { Screen, Notice } from '../shared/ui';
 import { useHealthContext } from '../features/health/HealthProvider';
 import { useHealthData } from '../features/health/data/HealthDataProvider';
 import { useHome } from '../features/home/data/HomeProvider';
-import type { Tab, DetailScreen, MoreDetail } from './navigation/tabs';
+import type { Tab } from './navigation/tabs';
+import * as stack from './navigation/stack';
+import type { Entry, Route } from './navigation/stack';
 import { TabBar } from './navigation/TabBar';
 import { RetainedView } from '../shared/ui/RetainedView';
+import { ScrollToTop } from '../shared/ui/ScrollToTop';
+import { useAndroidBack } from '../shared/ui/useAndroidBack';
 import { AccountProvider, useAccountContext } from '../features/account/AccountProvider';
 import { HomeScreen } from '../features/home/screens/HomeScreen';
 import { HealthScreen, type HealthPanel } from '../features/health/screens/HealthScreen';
@@ -82,12 +86,15 @@ function AppShell() {
   const { dataReader } = useAccountContext();
   const accountKey = JSON.stringify([dataReader?.origin, dataReader?.userId]);
   const { theme } = useTheme();
-  const [tab, setTab] = useState<Tab>('Home');
-  const [detail, setDetail] = useState<DetailScreen | MoreDetail | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [sessionFullOverride, setSessionFullOverride] = useState(false);
-  const [healthDetail, setHealthDetail] = useState<HealthDetail | null>(null);
-  const [healthDate, setHealthDate] = useState('');
+  // #3754. The tab and the screens open over it. Opening pushes, Back pops, a tab clears.
+  const [nav, setNav] = useState(stack.initialNavigation);
+  const { tab } = nav;
+  const current = stack.top(nav);
+  const healthDetail = current?.screen === 'health-detail' ? current.detail : null;
+  const detail = current && current.screen !== 'health-detail' ? current.screen : null;
+  const open = (route: Route) => setNav((value) => stack.push(value, route));
+  const openOn = (next: Tab, route: Route) => setNav((value) => stack.openOnTab(value, next, route));
+  const back = () => setNav(stack.pop);
   const [healthPanel, setHealthPanel] = useState<HealthPanel>('training');
   const [nutritionReviewRequest, setNutritionReviewRequest] = useState({
     scope: '',
@@ -102,32 +109,11 @@ function AppShell() {
     count: 0,
   });
   const [sleepRequest, setSleepRequest] = useState({ scope: '', date: '', count: 0 });
-  const [profileReturn, setProfileReturn] = useState(false);
-  const [friendId, setFriendId] = useState('');
-  const [coachScope, setCoachScope] = useState<CoachScope>('general');
-  const [coachReturn, setCoachReturn] = useState<{
-    detail: DetailScreen | MoreDetail | null;
-    tab: Tab;
-  }>({ detail: null, tab: 'Workout' });
-  function openCoach(scope: CoachScope = 'general') {
-    setCoachHandoff(false);
-    setCoachReturn({ detail, tab });
-    setCoachScope(scope);
-    setDetail('coach');
-  }
-  const [coachHandoff, setCoachHandoff] = useState(false);
-  function closeDetail() {
-    if (coachHandoff) {
-      setCoachHandoff(false);
-      setDetail('coach');
-    } else {
-      setDetail(null);
-    }
-  }
+  const openCoach = (scope: CoachScope = 'general') => open({ screen: 'coach', scope });
+  // The Coach stays under what it opens, so Back from Programs or the recorder returns to it.
   function coachDestination(destination: Destination) {
-    setCoachHandoff(destination === 'program_builder' || destination === 'log_activity');
-    if (destination === 'program_builder') setDetail('programs');
-    if (destination === 'log_activity') setDetail('activity-recording');
+    if (destination === 'program_builder') open({ screen: 'programs' });
+    if (destination === 'log_activity') open({ screen: 'activity-recording' });
     if (destination === 'profile') {
       selectTab('More');
     }
@@ -135,49 +121,41 @@ function AppShell() {
       selectTab('Nutrition');
     }
   }
-  const [workoutId, setWorkoutId] = useState<string | null>(null);
   const workouts = useWorkoutContext();
   function selectTab(next: Tab) {
-    setHealthDetail(null);
-    setDetail(null);
-    setTab(next);
+    setNav((value) => stack.selectTab(value, next));
     if (next === 'Workout') {
       workouts.refreshIfStale();
     }
   }
-  function openAppleHealth() {
-    selectTab('More');
-    setDetail('health-data');
+  // Tapping the tab you are on scrolls it to the top.
+  const [scrollTop, setScrollTop] = useState<Partial<Record<Tab, number>>>({});
+  function pressTab(next: Tab) {
+    if (next === tab && !current) {
+      setScrollTop((value) => ({ ...value, [next]: (value[next] ?? 0) + 1 }));
+    } else selectTab(next);
   }
-  // An Oura return that cold-started the app goes to the Oura screen, which finishes the connect.
-  const [ouraReturn, setOuraReturn] = useState<string | null>(null);
   useEffect(() => {
     errorReporter.setScreen(detail ?? tab);
   }, [detail, tab]);
+  // An Oura return that cold-started the app goes to the Oura screen, which finishes the connect.
   useEffect(() => {
     let active = true;
     void takeInitialOuraReturn().then((url) => {
       if (!active || !url) return;
-      setOuraReturn(url);
-      selectTab('More');
-      setDetail('more-devices');
+      openOn('More', { screen: 'more-devices', ouraReturn: url });
     });
     return () => {
       active = false;
     };
     // Once, at launch: the link that started the app never changes.
   }, []);
-  function openSession(id: string, fullOverride = false) {
-    setSessionFullOverride(fullOverride);
-    setTab('Workout');
-    setSessionId(id);
-    setDetail('workout-session');
-  }
+  const openSession = (id: string, fullOverride = false) =>
+    open({ screen: 'workout-session', sessionId: id, fullOverride });
   // A tap on a home-screen widget (#3268); dropped while signed out.
   useWidgetLaunch(!!dataReader, (target) => {
     if (target.kind === 'session') {
-      setHealthDetail(null);
-      openSession(target.id);
+      openOn('Workout', { screen: 'workout-session', sessionId: target.id, fullOverride: false });
     } else if (target.kind === 'train-instead') {
       // Home's own override (HomeRecommendation); the card then reads as a training day. A widget
       // tap usually cold-starts the app, before HomeProvider has opened the store, and the store
@@ -192,28 +170,25 @@ function AppShell() {
       }
     } else selectTab(target.kind === 'home' ? 'Home' : target.kind === 'workout' ? 'Workout' : 'Nutrition');
   });
-  function openSettings() {
-    setTab('More');
-    setDetail('settings');
-  }
-  function openWorkout(id: string) {
-    setTab('Workout');
-    setWorkoutId(id);
-    setDetail('workout-log');
-  }
-  function minimizeWorkout() {
-    setDetail(null);
-    setHealthDetail(null);
-    setTab('Home');
-  }
-  const fullScreen =
-    !!healthDetail || (detail !== null && !['health-data', 'settings'].includes(detail));
-  function closeWorkout() {
-    setDetail(null);
-  }
+  const openSettings = () => open({ screen: 'settings' });
+  const openWorkout = (id: string) => open({ screen: 'workout-log', workoutId: id });
+  // A notification's workout: the Workout tab with it open, so Back lands on that tab.
+  const openWorkoutFromAlert = (id: string) =>
+    openOn('Workout', { screen: 'workout-log', workoutId: id });
+  const openDay = (date: string) => open({ screen: 'health-day', date });
+  const openWeek = (week: string) => open({ screen: 'health-week', week });
+  const openHealthDetail = (next: HealthDetail) => open({ screen: 'health-detail', detail: next });
+  const openPrograms = () => open({ screen: 'programs' });
+  const openActivity = () => open({ screen: 'activity-recording' });
+  const fullScreen = !!current && !['health-data', 'settings'].includes(current.screen);
   // #3724. Below the server's minimum build, the notice covers the app; the data screen (export
   // and sync health) still opens over it, and the notice carries sign-out itself.
   const tooOld = useTooOldNotice();
+  // Android Back with nothing open: any tab but Home goes Home; Home leaves the app. Registered
+  // only then, so it never competes with an open screen's own handler.
+  useAndroidBack(
+    !tooOld && stack.rootBack(nav) === 'home' ? () => selectTab('Home') : undefined,
+  );
   if (tooOld && detail !== 'more-data') {
     return (
       <SafeAreaView
@@ -221,16 +196,162 @@ function AppShell() {
         style={{ flex: 1, backgroundColor: theme.colors.background }}
       >
         <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-        <TooOldScreen
-          notice={tooOld}
-          onOpenData={() => {
-            setHealthDetail(null);
-            setTab('More');
-            setDetail('more-data');
-          }}
-        />
+        <TooOldScreen notice={tooOld} onOpenData={() => openOn('More', { screen: 'more-data' })} />
       </SafeAreaView>
     );
+  }
+  function screenFor(entry: Entry) {
+    switch (entry.screen) {
+      case 'coach':
+        // Drawn once per scope below, so a conversation outlives its visit.
+        return null;
+      case 'friend-profile':
+        return (
+          <FriendProfileScreen
+            key={`${accountKey}:${entry.friendId}`}
+            userId={entry.friendId}
+            onBack={back}
+          />
+        );
+      case 'running':
+        return <RunningScreen key={accountKey} onBack={back} openActivity={openActivity} />;
+      case 'guided-walk':
+        return <WalkScreen key={accountKey} onBack={back} openActivity={openActivity} />;
+      case 'fitness-baselines':
+        return <BaselinesScreen key={accountKey} onBack={back} openActivity={openActivity} />;
+      case 'cardio':
+        return (
+          <CardioScreen
+            key={accountKey}
+            onBack={back}
+            openRunning={() => open({ screen: 'running' })}
+            openWalk={() => open({ screen: 'guided-walk' })}
+            openBaselines={() => open({ screen: 'fitness-baselines' })}
+            openActivity={openActivity}
+            openSettings={openSettings}
+          />
+        );
+      case 'activity-recording':
+        return <ActivityScreen key={accountKey} onBack={back} onSaved={back} />;
+      case 'more-data':
+        return <DataSyncScreen onBack={back} />;
+      case 'more-about':
+        return <AboutScreen onBack={back} />;
+      case 'more-admin':
+        return <AdminConsoleScreen onBack={back} />;
+      case 'more-account':
+        return <AccountScreen onBack={back} />;
+      case 'more-devices':
+        return (
+          <OuraScreen
+            initialReturn={entry.ouraReturn ?? null}
+            onBack={back}
+            openSignedInDevices={() => open({ screen: 'more-signed-in-devices' })}
+          />
+        );
+      case 'more-signed-in-devices':
+        return <SignedInDevicesScreen onBack={back} />;
+      case 'year-review':
+        return <YearReviewScreen onBack={back} />;
+      case 'collection':
+        return <CollectionScreen onBack={back} />;
+      case 'health-detail':
+        return (
+          <HealthDetailScreen
+            key={`${entry.detail}:${accountKey}`}
+            detail={entry.detail}
+            onBack={back}
+          />
+        );
+      case 'workout-log':
+        return (
+          <WorkoutLogScreen
+            openCoach={() => openCoach()}
+            workoutId={entry.workoutId}
+            openSettings={openSettings}
+            closeWorkout={back}
+            minimizeWorkout={() => selectTab('Home')}
+          />
+        );
+      case 'session-explain':
+        return (
+          <SessionExplainScreen
+            key={`${accountKey}:${entry.sessionId}`}
+            sessionId={entry.sessionId}
+            onBack={back}
+          />
+        );
+      case 'workout-session':
+        return (
+          <SessionScreen
+            sessionId={entry.sessionId}
+            initialFullOverride={entry.fullOverride}
+            openSettings={openSettings}
+            // The workout takes the session's place: closing it returns to where the session
+            // was opened from, not to a session that has already been started.
+            openWorkout={(id) =>
+              setNav((value) => stack.replaceTop(value, { screen: 'workout-log', workoutId: id }))
+            }
+            closeSession={back}
+          />
+        );
+      case 'programs':
+        return (
+          <ProgramsScreen onBack={back} openBuilder={() => open({ screen: 'program-builder' })} />
+        );
+      case 'program-builder':
+        return <AIProgramBuilder onBack={back} onSaved={back} />;
+      case 'exercise-library':
+        return <ExerciseLibraryScreen onBack={back} />;
+      case 'profile-goals':
+        return (
+          <ProfileGoalsScreen onBack={back} openProfile={() => open({ screen: 'profile-details' })} />
+        );
+      case 'profile-details':
+        return (
+          <ProfileDetailsScreen
+            onBack={back}
+            openClinical={() => open({ screen: 'clinical' })}
+            openBaselines={() => open({ screen: 'fitness-baselines' })}
+            openHealthBody={() => {
+              selectTab('Health');
+              setHealthPanel('body');
+            }}
+          />
+        );
+      case 'clinical':
+        return <ClinicalScreen key={accountKey} onBack={back} />;
+      case 'health-day':
+        return (
+          <HealthDayScreen
+            key={`${accountKey}:${entry.date}`}
+            initialDate={entry.date}
+            onBack={back}
+          />
+        );
+      case 'health-week':
+        return (
+          <HealthWeekScreen key={`${accountKey}:${entry.week}`} week={entry.week} onBack={back} />
+        );
+      case 'health-data':
+      case 'settings':
+        return (
+          <Screen
+            title={entry.screen === 'health-data' ? deviceHealthName : 'Settings'}
+            backLabel={tab}
+            onBack={back}
+          >
+            {entry.screen === 'health-data' ? <DataScreen /> : <SettingsScreen />}
+            {health.error && entry.screen === 'health-data' && (
+              <Notice
+                title={`Unable to read ${deviceHealthName}`}
+                message={health.error}
+                error
+              />
+            )}
+          </Screen>
+        );
+    }
   }
   return (
     <SafeAreaView
@@ -243,350 +364,139 @@ function AppShell() {
         detail={detail}
         healthDetail={healthDetail}
       />
-      <RetainedView
-        key={`home:${accountKey}`}
-        active={!healthDetail && !detail && tab === 'Home'}
-      >
-        <HomeScreen
-          openCoach={() => openCoach()}
-          openHealthDetail={setHealthDetail}
-          openHealthBody={() => {
-            selectTab('Health');
-            setHealthPanel('body');
-          }}
-          openDay={(date) => {
-            setHealthDate(date);
-            setDetail('health-day');
-          }}
-          openWeek={(week) => {
-            setHealthDate(week);
-            setDetail('health-week');
-          }}
-          openNutrition={(review, date) => {
-            selectTab('Nutrition');
-            if (date) {
-              setNutritionDateRequest((value) => ({
+      <RetainedView key={`home:${accountKey}`} active={!current && tab === 'Home'}>
+        <ScrollToTop.Provider value={scrollTop.Home ?? 0}>
+          <HomeScreen
+            openCoach={() => openCoach()}
+            openHealthDetail={openHealthDetail}
+            openHealthBody={() => {
+              selectTab('Health');
+              setHealthPanel('body');
+            }}
+            openDay={openDay}
+            openWeek={openWeek}
+            openNutrition={(review, date) => {
+              selectTab('Nutrition');
+              if (date) {
+                setNutritionDateRequest((value) => ({
+                  scope: accountKey,
+                  date,
+                  count: value.count + 1,
+                }));
+              }
+              if (review) {
+                setNutritionReviewRequest((value) => ({
+                  scope: accountKey,
+                  count: value.count + 1,
+                }));
+              }
+            }}
+            openSleep={(date) => {
+              selectTab('Health');
+              setHealthPanel('body');
+              setSleepRequest((value) => ({
                 scope: accountKey,
                 date,
                 count: value.count + 1,
               }));
-            }
-            if (review) {
-              setNutritionReviewRequest((value) => ({
-                scope: accountKey,
-                count: value.count + 1,
-              }));
-            }
-          }}
-          openSleep={(date) => {
-            selectTab('Health');
-            setHealthPanel('body');
-            setSleepRequest((value) => ({
-              scope: accountKey,
-              date,
-              count: value.count + 1,
-            }));
-          }}
-          openSession={openSession}
-          openWorkout={openWorkout}
-          openMore={() => selectTab('More')}
-          openPrograms={() => setDetail('programs')}
-          openExplanation={(id) => {
-            setSessionId(id);
-            setDetail('session-explain');
-          }}
-          openStats={() => {
-            selectTab('Health');
-            setHealthPanel('training');
-          }}
-          openCollection={() => setDetail('collection')}
-        />
+            }}
+            openSession={openSession}
+            openWorkout={openWorkout}
+            openMore={() => selectTab('More')}
+            openPrograms={openPrograms}
+            openExplanation={(id) => open({ screen: 'session-explain', sessionId: id })}
+            openStats={() => {
+              selectTab('Health');
+              setHealthPanel('training');
+            }}
+            openCollection={() => open({ screen: 'collection' })}
+          />
+        </ScrollToTop.Provider>
       </RetainedView>
-      <RetainedView
-        key={`health:${accountKey}`}
-        active={!healthDetail && !detail && tab === 'Health'}
-      >
-        <HealthScreen
-          sleepRequest={sleepRequest.scope === accountKey ? sleepRequest : undefined}
-          panel={healthPanel}
-          onPanelChange={setHealthPanel}
-          openDetail={setHealthDetail}
-          openDevices={() => setDetail('more-devices')}
-          openPrograms={() => setDetail('programs')}
-          openSettings={openSettings}
-          openDay={(date) => {
-            setHealthDate(date);
-            setDetail('health-day');
-          }}
-          openWeek={(week) => {
-            setHealthDate(week);
-            setDetail('health-week');
-          }}
-        />
+      <RetainedView key={`health:${accountKey}`} active={!current && tab === 'Health'}>
+        <ScrollToTop.Provider value={scrollTop.Health ?? 0}>
+          <HealthScreen
+            sleepRequest={sleepRequest.scope === accountKey ? sleepRequest : undefined}
+            panel={healthPanel}
+            onPanelChange={setHealthPanel}
+            openDetail={openHealthDetail}
+            openDevices={() => open({ screen: 'more-devices' })}
+            openPrograms={openPrograms}
+            openSettings={openSettings}
+            openDay={openDay}
+            openWeek={openWeek}
+          />
+        </ScrollToTop.Provider>
       </RetainedView>
-      <RetainedView
-        key={`workout:${accountKey}`}
-        active={!healthDetail && !detail && tab === 'Workout'}
-      >
+      <RetainedView key={`workout:${accountKey}`} active={!current && tab === 'Workout'}>
         <WorkoutScreen
-          openCardio={() => setDetail('cardio')}
+          openCardio={() => open({ screen: 'cardio' })}
           openSettings={openSettings}
           openWorkout={openWorkout}
           openSession={openSession}
-          openPrograms={() => setDetail('programs')}
+          openPrograms={openPrograms}
         />
       </RetainedView>
-      <RetainedView
-        key={`nutrition:${accountKey}`}
-        active={!healthDetail && !detail && tab === 'Nutrition'}
-      >
-        <NutritionScreen
-          openCoach={() => openCoach('nutrition')}
-          openSettings={openSettings}
-          dateRequest={
-            nutritionDateRequest.scope === accountKey ? nutritionDateRequest : undefined
-          }
-          reviewRequest={
-            nutritionReviewRequest.scope === accountKey ? nutritionReviewRequest.count : 0
-          }
-          estimateRequest={
-            mealEstimateRequest?.scope === accountKey ? mealEstimateRequest : null
-          }
-        />
+      <RetainedView key={`nutrition:${accountKey}`} active={!current && tab === 'Nutrition'}>
+        <ScrollToTop.Provider value={scrollTop.Nutrition ?? 0}>
+          <NutritionScreen
+            openCoach={() => openCoach('nutrition')}
+            openSettings={openSettings}
+            dateRequest={
+              nutritionDateRequest.scope === accountKey ? nutritionDateRequest : undefined
+            }
+            reviewRequest={
+              nutritionReviewRequest.scope === accountKey ? nutritionReviewRequest.count : 0
+            }
+            estimateRequest={
+              mealEstimateRequest?.scope === accountKey ? mealEstimateRequest : null
+            }
+          />
+        </ScrollToTop.Provider>
       </RetainedView>
-      <RetainedView
-        key={`more:${accountKey}`}
-        active={!healthDetail && !detail && tab === 'More'}
-      >
-        <MoreScreen
-          openFriendProfile={(id) => {
-            setFriendId(id);
-            setDetail('friend-profile');
-          }}
-          openSettings={() => setDetail('settings')}
-          openAccount={() => setDetail('more-account')}
-          openPrograms={() => setDetail('programs')}
-          openClinical={() => {
-            setProfileReturn(false);
-            setDetail('clinical');
-          }}
-          openGoals={() => setDetail('profile-goals')}
-          openProfile={() => setDetail('profile-details')}
-          openAppleHealth={openAppleHealth}
-          openData={() => setDetail('more-data')}
-          openDevices={() => setDetail('more-devices')}
-          openAbout={() => setDetail('more-about')}
-          openAdmin={() => setDetail('more-admin')}
-          openYear={() => setDetail('year-review')}
-          openCollection={() => setDetail('collection')}
-        />
+      <RetainedView key={`more:${accountKey}`} active={!current && tab === 'More'}>
+        <ScrollToTop.Provider value={scrollTop.More ?? 0}>
+          <MoreScreen
+            openFriendProfile={(id) => open({ screen: 'friend-profile', friendId: id })}
+            openSettings={openSettings}
+            openAccount={() => open({ screen: 'more-account' })}
+            openPrograms={openPrograms}
+            openClinical={() => open({ screen: 'clinical' })}
+            openGoals={() => open({ screen: 'profile-goals' })}
+            openProfile={() => open({ screen: 'profile-details' })}
+            openAppleHealth={() => open({ screen: 'health-data' })}
+            openData={() => open({ screen: 'more-data' })}
+            openDevices={() => open({ screen: 'more-devices' })}
+            openAbout={() => open({ screen: 'more-about' })}
+            openAdmin={() => open({ screen: 'more-admin' })}
+            openYear={() => open({ screen: 'year-review' })}
+            openCollection={() => open({ screen: 'collection' })}
+          />
+        </ScrollToTop.Provider>
       </RetainedView>
       {(['general', 'nutrition'] as const).map((scope) => (
         <RetainedView
           key={`coach:${accountKey}:${scope}`}
-          active={detail === 'coach' && coachScope === scope}
+          active={current?.screen === 'coach' && current.scope === scope}
         >
-          <CoachScreen
-            scope={scope}
-            onBack={() => {
-              setDetail(coachReturn.detail);
-              setTab(coachReturn.tab);
-            }}
-            onNavigate={coachDestination}
-          />
+          <CoachScreen scope={scope} onBack={back} onNavigate={coachDestination} />
         </RetainedView>
       ))}
-      {detail === 'coach' ? null : detail === 'friend-profile' ? (
-        <FriendProfileScreen
-          key={`${accountKey}:${friendId}`}
-          userId={friendId}
-          onBack={() => setDetail(null)}
-        />
-      ) : detail === 'running' ? (
-        <RunningScreen
-          key={accountKey}
-          onBack={() => setDetail('cardio')}
-          openActivity={() => setDetail('activity-recording')}
-        />
-      ) : detail === 'guided-walk' ? (
-        <WalkScreen
-          key={accountKey}
-          onBack={() => setDetail('cardio')}
-          openActivity={() => setDetail('activity-recording')}
-        />
-      ) : detail === 'fitness-baselines' ? (
-        <BaselinesScreen
-          key={accountKey}
-          onBack={() => {
-            setDetail(profileReturn ? 'profile-details' : 'cardio');
-            setProfileReturn(false);
-          }}
-          openActivity={() => setDetail('activity-recording')}
-        />
-      ) : detail === 'cardio' ? (
-        <CardioScreen
-          key={accountKey}
-          onBack={() => setDetail(null)}
-          openRunning={() => setDetail('running')}
-          openWalk={() => setDetail('guided-walk')}
-          openBaselines={() => {
-            setProfileReturn(false);
-            setDetail('fitness-baselines');
-          }}
-          openActivity={() => setDetail('activity-recording')}
-          openSettings={openSettings}
-        />
-      ) : detail === 'activity-recording' ? (
-        <ActivityScreen
-          key={accountKey}
-          onBack={coachHandoff ? closeDetail : () => setDetail('cardio')}
-          onSaved={coachHandoff ? closeDetail : () => setDetail('cardio')}
-        />
-      ) : detail === 'more-data' ? (
-        <DataSyncScreen onBack={() => setDetail(null)} />
-      ) : detail === 'more-about' ? (
-        <AboutScreen onBack={() => setDetail(null)} />
-      ) : detail === 'more-admin' ? (
-        <AdminConsoleScreen onBack={() => setDetail(null)} />
-      ) : detail === 'more-account' ? (
-        <AccountScreen onBack={() => setDetail(null)} />
-      ) : detail === 'more-devices' ? (
-        <OuraScreen
-          initialReturn={ouraReturn}
-          onBack={() => setDetail(null)}
-          openSignedInDevices={() => setDetail('more-signed-in-devices')}
-        />
-      ) : detail === 'more-signed-in-devices' ? (
-        <SignedInDevicesScreen onBack={() => setDetail('more-devices')} />
-      ) : detail === 'year-review' ? (
-        <YearReviewScreen onBack={() => setDetail(null)} />
-      ) : detail === 'collection' ? (
-        <CollectionScreen onBack={() => setDetail(null)} />
-      ) : healthDetail ? (
-        <HealthDetailScreen
-          key={`${healthDetail}:${accountKey}`}
-          detail={healthDetail}
-          onBack={() => setHealthDetail(null)}
-        />
-      ) : detail === 'workout-log' ? (
-        <WorkoutLogScreen
-          openCoach={() => openCoach()}
-          workoutId={workoutId}
-          openSettings={openSettings}
-          closeWorkout={closeWorkout}
-          minimizeWorkout={minimizeWorkout}
-        />
-      ) : detail === 'session-explain' ? (
-        <SessionExplainScreen
-          key={`${accountKey}:${sessionId}`}
-          sessionId={sessionId ?? ''}
-          onBack={() => setDetail(null)}
-        />
-      ) : detail === 'workout-session' ? (
-        <SessionScreen
-          sessionId={sessionId}
-          initialFullOverride={sessionFullOverride}
-          openSettings={openSettings}
-          openWorkout={openWorkout}
-          closeSession={() => setDetail(null)}
-        />
-      ) : detail === 'programs' ? (
-        <ProgramsScreen
-          onBack={closeDetail}
-          openBuilder={() => setDetail('program-builder')}
-        />
-      ) : detail === 'program-builder' ? (
-        <AIProgramBuilder
-          onBack={() => setDetail('programs')}
-          onSaved={() => setDetail('programs')}
-        />
-      ) : detail === 'exercise-library' ? (
-        <ExerciseLibraryScreen onBack={() => setDetail(null)} />
-      ) : detail === 'profile-goals' ? (
-        <ProfileGoalsScreen
-          onBack={() => setDetail(null)}
-          openProfile={() => setDetail('profile-details')}
-        />
-      ) : detail === 'profile-details' ? (
-        <ProfileDetailsScreen
-          onBack={() => setDetail(null)}
-          openClinical={() => {
-            setProfileReturn(true);
-            setDetail('clinical');
-          }}
-          openBaselines={() => {
-            setProfileReturn(true);
-            setDetail('fitness-baselines');
-          }}
-          openHealthBody={() => {
-            selectTab('Health');
-            setHealthPanel('body');
-          }}
-        />
-      ) : detail === 'clinical' ? (
-        <ClinicalScreen
-          key={accountKey}
-          onBack={() => {
-            setDetail(profileReturn ? 'profile-details' : null);
-            setProfileReturn(false);
-          }}
-        />
-      ) : detail === 'health-day' ? (
-        <HealthDayScreen
-          key={`${accountKey}:${healthDate}`}
-          initialDate={healthDate}
-          onBack={() => setDetail(null)}
-        />
-      ) : detail === 'health-week' ? (
-        <HealthWeekScreen
-          key={`${accountKey}:${healthDate}`}
-          week={healthDate}
-          onBack={() => setDetail(null)}
-        />
-      ) : !detail &&
-        (tab === 'Home' ||
-          tab === 'Health' ||
-          tab === 'Workout' ||
-          tab === 'Nutrition' ||
-          tab === 'More') ? null : (
-        <Screen
-          key={detail ?? tab}
-          title={
-            detail === 'health-data'
-              ? deviceHealthName
-              : detail === 'settings'
-                ? 'Settings'
-                : tab
-          }
-          backLabel={detail ? tab : undefined}
-          onBack={detail ? () => setDetail(null) : undefined}
-        >
-          {detail === 'health-data' ? (
-            <DataScreen />
-          ) : detail === 'settings' ? (
-            <SettingsScreen />
-          ) : tab === 'Nutrition' ? (
-            <NutritionScreen openSettings={openSettings} />
-          ) : null}
-          {health.error && detail === 'health-data' && (
-            <Notice
-              title={`Unable to read ${deviceHealthName}`}
-              message={health.error}
-              error
-            />
-          )}
-        </Screen>
+      {/* Every open screen stays alive under the one on top, so Back finds it as it was left. */}
+      {nav.stack.map((entry) =>
+        entry.screen === 'coach' ? null : (
+          <RetainedView key={`${entry.key}:${accountKey}`} active={entry === current}>
+            {screenFor(entry)}
+          </RetainedView>
+        ),
       )}
       {!fullScreen && <ActiveWorkoutBar onResume={openWorkout} />}
       <AlertNavigation
         onMealEstimate={(request) => setMealEstimateRequest({ ...request, scope: accountKey })}
-        onWorkout={openWorkout}
-        onWalk={() => setDetail('activity-recording')}
+        onWorkout={openWorkoutFromAlert}
+        onWalk={() => openOn('Workout', { screen: 'activity-recording' })}
         onTab={selectTab}
-        onHealthDetail={(next) => {
-          selectTab('Health');
-          setHealthDetail(next);
-        }}
+        onHealthDetail={(next) => openOn('Health', { screen: 'health-detail', detail: next })}
         onReview={() => {
           selectTab('Nutrition');
           setNutritionReviewRequest((value) => ({
@@ -594,14 +504,13 @@ function AppShell() {
             count: value.count + 1,
           }));
         }}
-        onWeek={(week) => {
-          selectTab('Health');
-          setHealthDate(week);
-          setDetail('health-week');
-        }}
+        onWeek={(week) => openOn('Health', { screen: 'health-week', week })}
       />
-      <WorkoutStatusSync onWorkout={openWorkout} onWorkoutTab={() => selectTab('Workout')} />
-      {!fullScreen && <TabBar selected={tab} onSelect={selectTab} />}
+      <WorkoutStatusSync
+        onWorkout={openWorkoutFromAlert}
+        onWorkoutTab={() => selectTab('Workout')}
+      />
+      {!fullScreen && <TabBar selected={tab} onSelect={pressTab} />}
       <WeighInBanner />
     </SafeAreaView>
   );
