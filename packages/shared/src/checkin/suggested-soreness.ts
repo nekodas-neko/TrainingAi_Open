@@ -1,4 +1,4 @@
-import { moodMuscleMatches } from '@trainingai/shared/muscles'
+import { moodMuscleMatches, normalizeMuscle } from '@trainingai/shared/muscles'
 
 // "Sore" in the check-in means NOT RECOVERED (owner call 2026-07-29) — training a muscle again
 // before it has recovered is the thing worth flagging, and it is derivable from the training log
@@ -43,4 +43,37 @@ export function suggestedSoreMuscles(
   )
   if (unrecovered.length === 0) return []
   return pillLabels.filter(label => unrecovered.some(r => moodMuscleMatches(r.muscle, label)))
+}
+
+export interface SoreTickProvenance {
+  /** Ticks the lifter put there: in the saved list and not in that check-in's suggestion. */
+  lifterReported: string[]
+  /** Suggestions left as they were: in both lists. Recently trained, not reported sore. */
+  untouchedSuggestions: string[]
+}
+
+/**
+ * #3764 (owner sign-off, option A, 15 Nov). Which of a check-in's saved sore ticks count as sore
+ * for LOAD decisions. A tick counts only when the lifter put it there. A suggestion the lifter left
+ * untouched is the recovery model talking, and it already speaks through the recovery feed, so on
+ * its own it must not lighten an exercise or a session. In production the saved list equalled the
+ * suggestion in 35 of 36 check-ins since 1 Oct, which turned the pre-tick into a weekly deload.
+ *
+ * `suggested` null or undefined means provenance is unknown (a check-in saved before migration 276):
+ * every tick is treated as the lifter's, which is the behaviour before this rule.
+ *
+ * Both lists are pill labels from one vocabulary, compared through `normalizeMuscle` so a case or
+ * synonym difference between the two writes cannot turn a suggestion into a lifter tick.
+ */
+export function soreTickProvenance(
+  soreMuscles: string[] | null | undefined,
+  suggested: string[] | null | undefined,
+): SoreTickProvenance {
+  const sore = soreMuscles ?? []
+  if (suggested == null) return { lifterReported: [...sore], untouchedSuggestions: [] }
+  const suggestedSet = new Set(suggested.map(normalizeMuscle))
+  const lifterReported: string[] = []
+  const untouchedSuggestions: string[] = []
+  for (const m of sore) (suggestedSet.has(normalizeMuscle(m)) ? untouchedSuggestions : lifterReported).push(m)
+  return { lifterReported, untouchedSuggestions }
 }

@@ -288,6 +288,22 @@ test('exercise readiness survives an offline reopen and syncs to its original da
   assert.equal(f.sent[0].date, day);
 });
 
+test('readiness sends the suggested sore regions with the check-in (#3764)', async () => {
+  // The engine tells an untouched suggestion from a lifter's tick only through this field.
+  const f = fixture();
+  const store = f.make();
+  await store.initialize();
+  await store.saveMood(day, {
+    energyLevel: 'good',
+    soreMuscles: ['Quads', 'Chest'],
+    bodyState: ['sore_muscles'],
+    suggestedSoreMuscles: ['Quads'],
+  });
+  await store.sync();
+  assert.equal(f.sent[0].domain, 'mood_logs');
+  assert.deepEqual((f.sent[0].payload as { suggestedSoreMuscles?: string[] }).suggestedSoreMuscles, ['Quads']);
+});
+
 test('a lost readiness reply retries one mutation identity and retains the local answer', async () => {
   const f = fixture();
   const store = f.make();

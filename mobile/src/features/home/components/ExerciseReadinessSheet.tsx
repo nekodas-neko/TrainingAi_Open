@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { suggestedSoreMuscles } from '@trainingai/shared/checkin/suggested-soreness';
+import {
+  soreTickProvenance,
+  suggestedSoreMuscles,
+} from '@trainingai/shared/checkin/suggested-soreness';
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload';
 import { moodMuscleMatches } from '@trainingai/shared/muscles';
 import {
@@ -73,7 +76,9 @@ export function ExerciseReadinessSheet({
     session?.muscleActivations?.map((row) => row.muscle) ??
     session?.exercises.flatMap((row) => row.muscles) ??
     [];
-  const overlap = muscles.filter((muscle) =>
+  // #3764: only a tick the lifter put there lightens anything, so only those reach the preview.
+  const lifterReported = soreTickProvenance(muscles, suggestions).lifterReported;
+  const overlap = lifterReported.filter((muscle) =>
     sessionMuscles.some((target) => moodMuscleMatches(target, muscle)),
   );
   const deload = computePerExerciseDeload(
@@ -85,7 +90,7 @@ export function ExerciseReadinessSheet({
         role: 'main' as const,
       })),
     })) ?? [],
-    muscles,
+    lifterReported,
     'strength',
     'accumulation',
   );

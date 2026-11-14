@@ -1,4 +1,5 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
+import { sessionSoreness } from './session-soreness'
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-periodization/confidence'
 import { perExerciseRpeDelta, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
@@ -78,7 +79,10 @@ export interface PrescriptionSignals {
   // soreMusclesInSession: sore muscles that appear in this session (relevant).
   // soreMusclesOutOfSession: sore but in muscles not trained today (irrelevant).
   // sorenessLogDate: which day's mood log was used ('today', 'yesterday', or 'none').
+  // #3764: both sore lists hold only the ticks the lifter put there (`sessionSoreness`).
   soreMusclesInSession: string[]
+  // Untouched check-in suggestions this session trains: changes no load, earns a neutral note.
+  recentlyTrainedMusclesInSession: string[]
   // Lifter said "Sick / Unwell" in TODAY's readiness check-in. Drives a rest-day
   // recommendation, and deloads the session if they train anyway.
   selfReportedSick: boolean
@@ -433,8 +437,6 @@ export async function aggregateSignals(
   // Today's log takes precedence; only fall back to yesterday's if no check-in today.
   // This ensures a clean check-in today clears yesterday's soreness flag.
   let sorenessLogDate: 'today' | 'yesterday' | 'none' = 'none'
-  const soreMusclesInSession: string[] = []
-  const soreMusclesOutOfSession: string[] = []
 
   // Self-reported illness from the readiness check-in. Distinct from `illness` below, which is
   // the biometric radar (skin temp / HRV): the lifter saying "I'm unwell" is a first-class
@@ -443,19 +445,9 @@ export async function aggregateSignals(
   const selfReportedSick = resolveSelfReportedSick(todayMoodLog?.bodyState, morningCheckinRow?.illnessContext)
 
   const moodLogToUse = todayMoodLog ?? yesterdayMoodLog
-  if (moodLogToUse) {
-    sorenessLogDate = todayMoodLog ? 'today' : 'yesterday'
-    if (moodLogToUse.bodyState.includes('sore_muscles') && moodLogToUse.soreMuscles.length > 0) {
-      for (const soreMuscle of moodLogToUse.soreMuscles) {
-        const relevant = sessionMuscleGroups.some(mg => moodMuscleMatches(mg, soreMuscle))
-        if (relevant) {
-          soreMusclesInSession.push(soreMuscle)
-        } else {
-          soreMusclesOutOfSession.push(soreMuscle)
-        }
-      }
-    }
-  }
+  if (moodLogToUse) sorenessLogDate = todayMoodLog ? 'today' : 'yesterday'
+  const { soreMusclesInSession, soreMusclesOutOfSession, recentlyTrainedMusclesInSession } =
+    sessionSoreness(moodLogToUse, sessionMuscleGroups)
 
   // Rep completion rate from last session vs prescription — program-wide (emergency-deload
   // trigger) and per-exercise (sizes the RPE-autoregulation back-off cut).
@@ -649,6 +641,7 @@ export async function aggregateSignals(
     hoursSinceLastSession,
     consecutiveSessionDaysOfThisType,
     soreMusclesInSession,
+    recentlyTrainedMusclesInSession,
     soreMusclesOutOfSession,
     sorenessLogDate,
     selfReportedSick,

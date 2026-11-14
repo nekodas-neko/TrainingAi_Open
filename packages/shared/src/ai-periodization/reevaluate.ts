@@ -1,5 +1,5 @@
 import type { AiPrescription, AiPrescriptionExercise } from '@trainingai/shared/types/ai-periodization'
-import { computePerExerciseDeload, type PerExerciseDeloadInput } from './per-exercise-deload'
+import { computePerExerciseDeload, RECENTLY_TRAINED_NOTE_PREFIX, type PerExerciseDeloadInput } from './per-exercise-deload'
 import { shouldTriggerEmergencyDeload, type EmergencySignals, type EmergencyState } from './emergency-deload'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { recostPrescription, rowNumbersMoved, type FigureSignals } from './prescription-figures'
@@ -10,7 +10,9 @@ import { prescriptionAgedOut } from './prescription-expiry'
 // workout-data fetch. Only what's needed to re-check soreness/injury-driven deloads and
 // the hours-since-last-session emergency condition.
 export interface ReevaluationSignals {
+  // #3764: lifter-reported ticks only; untouched suggestions are in the list below.
   soreMusclesInSession: string[]
+  recentlyTrainedMusclesInSession?: string[]
   hoursSinceLastSession: number | null
   activeInjuredMusclesInSession: string[]
   trainingGoal: string
@@ -47,14 +49,17 @@ export interface ReevaluationSignals {
 // dropping to 'none'), so the key changes either way.
 export function reevaluationKey(
   todayStr: string,
-  moodLog: { soreMuscles: string[]; bodyState: string[]; updatedAt?: Date | string | null } | null | undefined,
+  moodLog: { soreMuscles: string[]; bodyState: string[]; suggestedSoreMuscles?: string[] | null; updatedAt?: Date | string | null } | null | undefined,
   morningCheckin?: { illnessContext: string | null; updatedAt?: Date | string | null } | null,
   injuries?: { resolvedDate: string | null; updatedAt: Date | string } [] | null,
 ): string {
   const moodPart = moodLog ? (() => {
     const updated = moodLog.updatedAt instanceof Date ? moodLog.updatedAt.toISOString() : moodLog.updatedAt ?? ''
     const sore = moodLog.bodyState.includes('sore_muscles') ? [...moodLog.soreMuscles].sort().join(',') : ''
-    return `${updated}|${sore}`
+    // #3764: provenance decides which ticks lighten a load, so it is part of the key. Left out when
+    // unknown, so a legacy check-in keeps the key it had.
+    const suggested = moodLog.suggestedSoreMuscles == null ? '' : `|s:${[...moodLog.suggestedSoreMuscles].sort().join(',')}`
+    return `${updated}|${sore}${suggested}`
   })() : 'none'
   const checkinPart = morningCheckin ? (() => {
     const updated = morningCheckin.updatedAt instanceof Date
@@ -155,6 +160,7 @@ export function reevaluatePrescriptionForToday(
     signals.soreMusclesInSession,
     signals.trainingGoal,
     state.phase,
+    signals.recentlyTrainedMusclesInSession ?? [],
   )
 
   if (perEx.outcome === 'whole_session') {
@@ -206,6 +212,10 @@ export function reevaluatePrescriptionForToday(
         deloaded: false,
         deloadNote: undefined,
         preDeload: undefined,
+        // #3764: a plan deloaded for an untouched suggestion goes back to full load and says why.
+        ...(perEx.recentNotes[ex.sessionExerciseId] && !ex.autoregNote?.includes(RECENTLY_TRAINED_NOTE_PREFIX) && {
+          autoregNote: [ex.autoregNote, perEx.recentNotes[ex.sessionExerciseId]].filter(Boolean).join(' · '),
+        }),
       }
     }
     if (isDeloaded && wasDeloaded) {
@@ -215,6 +225,13 @@ export function reevaluatePrescriptionForToday(
         changed = true
         return { ...ex, deloadNote: note }
       }
+    }
+    // #3764: an exercise at normal load whose main muscle is an untouched suggestion says so, whichever
+    // path built the plan (the model, the rules fallback, or an older plan). A note only: no numbers move.
+    const recent = perEx.recentNotes[ex.sessionExerciseId]
+    if (!isDeloaded && !ex.deloaded && recent && !ex.autoregNote?.includes(RECENTLY_TRAINED_NOTE_PREFIX)) {
+      changed = true
+      return { ...ex, autoregNote: [ex.autoregNote, recent].filter(Boolean).join(' · ') }
     }
     return ex
   })
