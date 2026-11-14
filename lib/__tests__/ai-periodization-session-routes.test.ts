@@ -442,6 +442,14 @@ describe('POST …/session/[sessionId]/transition — one-day vs planned deload 
     expect(advancePhase).not.toHaveBeenCalled()
   })
 
+  it('an unforced "Move to Deload" over a one-day deload already trained is refused, phase unchanged', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ phase: 'realisation', prescription: oneDay(), prescriptionStatus: 'consumed' }))
+    const res = await transitionPost({ newPhase: 'deload' })
+    expect(res.status).toBe(409)
+    expect(advancePhase).not.toHaveBeenCalled()
+    expect(updatePrescriptionStatus).not.toHaveBeenCalled()
+  })
+
   it('the realisation ceiling\'s planned deload moves the phase', async () => {
     getSessionPeriodization.mockResolvedValue(state({
       phase: 'realisation',

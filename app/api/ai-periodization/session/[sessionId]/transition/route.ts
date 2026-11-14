@@ -69,13 +69,14 @@ export async function POST(
   // builds send this for both the offer's button and the phase list, so only an explicit `force`
   // (the phase list in current builds) moves the phase to `deload` over a one-day offer. A planned
   // deload (the realisation ceiling's `transition_recommended`) is not a one-day deload and moves
-  // the phase as before.
-  if (
-    body.newPhase === 'deload' && !body.force && state.phase !== 'deload' &&
-    isOneDayDeload(state.prescription) && state.prescriptionStatus === 'pending'
-  ) {
+  // the phase as before. An offer already trained or turned down has nothing left to accept, and
+  // is never a reason to move the phase either.
+  if (body.newPhase === 'deload' && !body.force && state.phase !== 'deload' && isOneDayDeload(state.prescription)) {
     if (prescriptionAgedOut(state)) {
       return NextResponse.json({ error: 'This prescription has expired. Reopen the session for a fresh one.' }, { status: 409 })
+    }
+    if (state.prescriptionStatus !== 'pending' && state.prescriptionStatus !== 'accepted') {
+      return NextResponse.json({ error: 'This deload offer has already been answered. Reopen the session for a fresh one.' }, { status: 409 })
     }
     await repo.updatePrescriptionStatus(userId, sessionId, 'accepted')
     const unchanged = await repo.getSessionPeriodization(userId, sessionId)
