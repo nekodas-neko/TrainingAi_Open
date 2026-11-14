@@ -18,20 +18,6 @@ export function localDatetimeString() {
   return `${n.getFullYear()}/${String(n.getMonth() + 1).padStart(2, "0")}/${String(n.getDate()).padStart(2, "0")} ${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`;
 }
 
-export function extractSheetId(url: string): [string, Error | null] {
-  try {
-    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    // Capture the first capture group (ID in this case)
-    if (match && match[1]) {
-      return [match[1], null];
-    }
-
-    return ["", new Error("Failed to extract Google Sheets ID from URL")];
-  } catch (err) {
-    return ["", err instanceof Error ? err : new Error("Unknown error")];
-  }
-}
-
 /** Pick readable foreground text color for a solid background hex, via YIQ luminance. */
 export function readableOn(hex: string): 'black' | 'white' {
   const r = parseInt(hex.slice(1, 3), 16);

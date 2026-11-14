@@ -14,8 +14,6 @@ export {
   MAX_MUTATION_ATTEMPTS,
   nextRetryDelayMs,
   resolveFailedOutboxIds,
-  type PushErrorRecord,
-  type ResolvedPushFailure,
 } from '@trainingai/shared/sync/push-retry'
 
 // Server Zod schemas declare optional fields `.optional()` (T | undefined); local SQLite

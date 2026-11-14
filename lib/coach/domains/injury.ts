@@ -2,7 +2,6 @@ import { and, eq, isNull, sql } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
-import type { PatchChange } from '../patch'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
 import { driftAgainst } from './types'
 
@@ -226,6 +225,3 @@ export const injuryHandler: DomainHandler = {
     return { ok: true }
   },
 }
-
-/** Unused today but kept beside the handler: the fields a future "which injury?" picker needs. */
-export type InjuryChange = PatchChange & { field: 'muscleName' | 'severity' | 'notes' | 'resolved' }

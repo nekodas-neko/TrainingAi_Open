@@ -25,7 +25,6 @@ import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-
 import { roleForSelectedExercise, musclesForSelectedExercise } from "./recommended-exercise-role";
 import { defaultStyleIdForSlot } from '@/components/config/default-exercise-style';
 
-export interface EditableSet { pct: number; reps: number; restSec?: number; useFor1rm?: boolean }
 export interface EditableExercise {
   key: string;
   // The DB session_exercises id, round-tripped through the editor so a save keeps it instead

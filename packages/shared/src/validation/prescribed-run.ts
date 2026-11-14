@@ -9,4 +9,3 @@ export const PrescribedRunPatchBody = z.object({
   // LB-179: how the run was satisfied. Absent leaves the stored value alone.
   completedAs:   z.enum(['run', 'walk']).nullable().optional(),
 })
-export type PrescribedRunPatch = z.infer<typeof PrescribedRunPatchBody>

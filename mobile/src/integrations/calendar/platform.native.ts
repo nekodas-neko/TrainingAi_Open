@@ -2,7 +2,7 @@ import { requireOptionalNativeModule } from 'expo';
 import type {
   CalendarService,
 } from '../../features/platform/data/CalendarStore';
-export const calendarAvailable = () => !!requireOptionalNativeModule('ExpoCalendar');
+const calendarAvailable = () => !!requireOptionalNativeModule('ExpoCalendar');
 async function sdk() {
   if (!calendarAvailable())
     throw new Error('Install the latest development build to use calendars.');

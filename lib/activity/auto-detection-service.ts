@@ -449,7 +449,3 @@ export async function stopAutoDetection(): Promise<void> {
   ungated = false
   store.setDetectionDiag(null)
 }
-
-export function isAutoDetectionRunning(): boolean {
-  return running
-}

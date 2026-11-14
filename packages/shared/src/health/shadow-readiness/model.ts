@@ -391,11 +391,6 @@ export const FUEL_BANDS = {
   hydration: { lo: 1, hi: Number.POSITIVE_INFINITY, belowSpan: 1, aboveSpan: null },
 } as const satisfies Record<string, Band>
 
-/** Research step plateau by age (Paluch 2022): 6,000 from 60, 8,000 under. Unknown age → 8,000. */
-export function stepsFloorForAge(ageYears: number | null): number {
-  return ageYears != null && ageYears >= 60 ? 6000 : 8000
-}
-
 // ── Pillar weights ───────────────────────────────────────────────────────────────────────────────
 
 export const SHADOW_PILLARS: readonly ShadowReadinessPillar[] = ['sleep', 'heart', 'activity', 'body']

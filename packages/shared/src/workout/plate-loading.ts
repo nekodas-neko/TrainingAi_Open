@@ -1,5 +1,5 @@
-export const BAR_WEIGHT_KG = 20;
-export const PLATE_PAIRS_KG = [25, 20, 15, 10, 5, 2.5, 1.25] as const;
+const BAR_WEIGHT_KG = 20;
+const PLATE_PAIRS_KG = [25, 20, 15, 10, 5, 2.5, 1.25] as const;
 export interface PlateBreakdown {
   perSide: number[];    // plates on each side, heaviest first
   achievableKg: number; // bar + 2 × sum(perSide); equals the target when exact

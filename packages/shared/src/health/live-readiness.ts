@@ -1,4 +1,4 @@
-import type { OuraDailyDerivedRow, WorkoutRepository } from '@/lib/data/repository'
+import type { OuraDailyDerivedRow } from '@/lib/data/repository'
 
 // The live composite readiness — One Formula, One Place. The app's own composite is persisted to
 // `oura_daily_derived.readiness_score` (`OWN_READINESS_SOURCES` below). Every AI surface (prescribe signals,
@@ -36,9 +36,4 @@ export function liveReadinessByDay(derived: DerivedReadiness[]): Map<string, num
 /** Live readiness for a single day, or null. */
 export function liveReadinessForDay(day: string, derived: DerivedReadiness[]): number | null {
   return liveReadinessByDay(derived).get(day) ?? null
-}
-
-/** Repo-backed accessor for callers that haven't already fetched the rows. */
-export async function getLiveReadiness(repo: WorkoutRepository, userId: string, day: string): Promise<number | null> {
-  return liveReadinessForDay(day, await repo.getOuraDailyDerived(userId, day, day))
 }

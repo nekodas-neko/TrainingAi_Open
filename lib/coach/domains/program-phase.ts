@@ -1,6 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
-import { FIELD_LABEL, type PatchChange } from '../patch'
+import { FIELD_LABEL } from '../patch'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
 import { driftAgainst } from './types'
 
@@ -168,5 +168,3 @@ export const programPhaseHandler: DomainHandler = {
     return { ok: true }
   },
 }
-
-export type PhaseChange = PatchChange & { field: 'phaseSetId' | 'sessionsPerCycle' | 'phaseMode' }

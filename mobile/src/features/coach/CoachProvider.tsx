@@ -15,12 +15,6 @@ export type Coach = {
   actions: CoachActions;
 };
 const Context = createContext<Coach | null>(null);
-export function CoachStateProvider({
-  coach,
-  children,
-}: PropsWithChildren<{ coach: Coach | null }>) {
-  return <Context.Provider value={coach}>{children}</Context.Provider>;
-}
 export function CoachProvider({ children }: PropsWithChildren) {
   const resources = useWorkoutResources(),
     workouts = useWorkoutContext(),

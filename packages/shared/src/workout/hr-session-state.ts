@@ -23,12 +23,6 @@ export interface HrDataResponse {
   setStats?: SessionHrData["setStats"];
 }
 
-// UI sentinel for a session's HR-recovery block.
-// 'loading'    — sync/read in flight
-// 'incomplete' — session never completed (route returned ready:false); distinct from 'none'
-// 'none'       — session completed but the Oura window produced no readings
-export type HrSessionState = SessionHrData | "loading" | "none" | "incomplete";
-
 export function classifyHrResponse(data: HrDataResponse): SessionHrData | "none" | "incomplete" {
   if (data.ready === false) return "incomplete";
   if (data.ready && data.hasData && data.readings) {

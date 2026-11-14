@@ -110,7 +110,6 @@ export function testDuration(protocolId: string) {
   return protocol.durationSec ?? phasesTotalSec(protocol.phases ?? []);
 }
 export const fitnessPayloadSchema = FitnessTestCreateBody.safeExtend({ id: z.uuid() });
-export type FitnessPayload = z.infer<typeof fitnessPayloadSchema>;
 export type FitnessProfile = {
   age?: number | null;
   sex?: string | null;

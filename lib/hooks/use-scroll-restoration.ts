@@ -192,5 +192,3 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>, keySuff
     }
   }, [ref, key])
 }
-
-export const __scrollRestorationInternals = { KEY_PREFIX, RESTORE_WINDOW_MS, MIN_OFFSET_PX }

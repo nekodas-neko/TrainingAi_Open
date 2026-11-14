@@ -37,7 +37,7 @@ export interface MovementBalanceRow {
   pct: number
 }
 
-export interface MovementBalance {
+interface MovementBalance {
   rows: MovementBalanceRow[]
   total: number
 }

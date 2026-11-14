@@ -1,5 +1,5 @@
 import { groupSleepPeriods, opensFollowingNight } from './sleep-night';
-export type SleepSampleNight = {
+type SleepSampleNight = {
   id: string;
   date: string;
   sleepStart: string;

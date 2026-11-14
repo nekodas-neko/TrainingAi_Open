@@ -9,15 +9,15 @@
 // Barbell plates come in pairs, so the smallest real change on a bar is two
 // plates — 2.5 kg with a 1.25 kg pair. Other equipment (dumbbells, cable
 // stacks, machines) keeps the finer 1.25 kg default.
-export const BARBELL_WEIGHT_STEP_KG = 2.5
-export const DEFAULT_WEIGHT_STEP_KG = 1.25
+const BARBELL_WEIGHT_STEP_KG = 2.5
+const DEFAULT_WEIGHT_STEP_KG = 1.25
 
 export function weightStepFor(equipment?: string[] | null): number {
   return equipment?.includes('barbell') ? BARBELL_WEIGHT_STEP_KG : DEFAULT_WEIGHT_STEP_KG
 }
 
 /** The bar range every plate-rounded weight is clamped to. */
-export const MIN_BAR_KG = 5
+const MIN_BAR_KG = 5
 export const MAX_BAR_KG = 250
 
 export function mroundStep(value: number, step: number): number {

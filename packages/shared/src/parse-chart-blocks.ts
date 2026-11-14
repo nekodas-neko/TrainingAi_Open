@@ -27,5 +27,4 @@ export const ChartPayloadSchema = z.object({
   datasets: z.array(ChartDatasetSchema).min(1),
 });
 
-export type ChartDataset = z.infer<typeof ChartDatasetSchema>;
 export type ChartPayload = z.infer<typeof ChartPayloadSchema>;

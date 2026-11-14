@@ -23,7 +23,7 @@ export interface HealthAlertInput {
   stressCurrent: number | null         // fallback: latest bucket level, [-1,+1], neg = stressed
 }
 
-export type HealthAlertAction =
+type HealthAlertAction =
   | { alertType: HealthAlertType; type: 'skip' }
   | { alertType: HealthAlertType; type: 'fire'; title: string; body: string }
 

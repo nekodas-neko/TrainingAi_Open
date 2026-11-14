@@ -1,4 +1,4 @@
-export { BAR_WEIGHT_KG, PLATE_PAIRS_KG, plateBreakdown } from '@trainingai/shared/workout/plate-loading';
+export { plateBreakdown } from '@trainingai/shared/workout/plate-loading';
 import { expectedRpePrefill } from "@trainingai/shared/ai-periodization/expected-rpe";
 import type { ExerciseType } from "@trainingai/shared/types/program";
 import type { PhaseStatus } from "@trainingai/shared/workout/session-data";
@@ -51,15 +51,8 @@ export function mround125(value: number): number {
   return Math.max(5, Math.min(250, Math.round(value / 1.25) * 1.25));
 }
 
-// Ceiling version: rounds UP to the nearest 1.25 kg.
-// Used for prescription weights so that following the recommendation never
-// drives the estimated 1RM downward — slight overload is better than underload.
-export function mround125Up(value: number): number {
-  return Math.max(5, Math.min(250, Math.ceil(value / 1.25) * 1.25));
-}
-
 export {
-  BARBELL_WEIGHT_STEP_KG, DEFAULT_WEIGHT_STEP_KG, MIN_BAR_KG, MAX_BAR_KG,
+  MAX_BAR_KG,
   weightStepFor, mroundStep, mroundStepUp, barIsCapped,
 } from "@trainingai/shared/workout/load-rounding";
 
