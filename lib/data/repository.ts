@@ -1423,7 +1423,8 @@ export interface WorkoutRepository {
   updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>
   storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void>
-  incrementSessionsInPhase(userId: string, programSessionId: string): Promise<void>
+  /** #3799: `completedAt` set, the row is counted only when the phase began at or before it. */
+  incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date): Promise<void>
   setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean): Promise<void>
 
   // `program_volume_targets` has no user_id column, so these take the userId and scope through

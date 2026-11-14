@@ -1,4 +1,5 @@
 import { getPool } from '@/lib/data/postgres/client'
+import { DECREMENT_SESSIONS_IN_PHASE_SQL } from '@/lib/data/postgres/slices/periodization'
 
 /**
  * Soft-deletes a whole workout session and its exercise_logs + set_logs
@@ -42,8 +43,7 @@ export async function deleteWorkoutSession(
       [workoutSessionId, userId],
     )
     const programSessionId = sessRows[0]?.session_id ?? null
-    const startedAt = sessRows[0]?.started_at ?? null
-    const wasCompleted = sessRows[0]?.completed_at != null
+    const completedAt = sessRows[0]?.completed_at ?? null
 
     const now = new Date().toISOString()
     await client.query(
@@ -62,15 +62,13 @@ export async function deleteWorkoutSession(
 
     // Completing a session increments sessions_in_phase, so deleting one must
     // decrement it — but only when the deleted session fell inside the current
-    // phase window (started_at >= phase_started_at) AND was actually completed
+    // phase window (completed_at >= phase_started_at, #3799) AND was actually completed
     // (canonical definition, AI-5) — an abandoned session that never completed
     // was never counted, so deleting it must not decrement. Floor at 0.
-    if (programSessionId && startedAt && wasCompleted) {
+    if (programSessionId && completedAt) {
       await client.query(
-        `UPDATE session_periodization
-         SET sessions_in_phase = GREATEST(sessions_in_phase - 1, 0), updated_at = now()
-         WHERE user_id = $1 AND program_session_id = $2 AND $3 >= phase_started_at`,
-        [userId, programSessionId, startedAt],
+        DECREMENT_SESSIONS_IN_PHASE_SQL,
+        [userId, programSessionId, completedAt],
       )
     }
 

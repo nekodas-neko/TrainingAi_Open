@@ -8363,7 +8363,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
   async updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription) { return period.updatePrescriptionExercisesCache(this.db, userId, programSessionId, prescription) }
   async storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null) { return period.storePendingTransition(this.db, userId, programSessionId, transition) }
-  async incrementSessionsInPhase(userId: string, programSessionId: string) { return period.incrementSessionsInPhase(this.db, userId, programSessionId) }
+  async incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date) { return period.incrementSessionsInPhase(this.db, userId, programSessionId, completedAt) }
   async setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean) { return period.setLastSessionRanPrescription(this.db, userId, programSessionId, ranPrescription) }
   async listSessionPeriodizationForProgram(userId: string, programId: string) { return period.listSessionPeriodizationForProgram(this.db, userId, programId) }
   async reconcileSessionsInPhase(userId: string, programId: string) { return period.reconcileSessionsInPhase(this.db, userId, programId) }

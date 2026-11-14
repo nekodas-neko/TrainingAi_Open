@@ -45,7 +45,7 @@ describe('completeWorkoutFromPayload', () => {
     expect(result).toEqual({ alreadyCompleted: false, programSessionId: 'ps-1' })
     expect(completeWorkoutSession).toHaveBeenCalledTimes(1)
     expect(updatePrescriptionStatus).toHaveBeenCalledWith('u1', 'ps-1', 'consumed')
-    expect(incrementSessionsInPhase).toHaveBeenCalledWith('u1', 'ps-1')
+    expect(incrementSessionsInPhase).toHaveBeenCalledWith('u1', 'ps-1', expect.any(Date))
   })
 
   it('is idempotent on replay: never double-consumes the prescription or double-increments the phase counter', async () => {

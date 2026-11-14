@@ -110,8 +110,8 @@ describe.skipIf(!canRun)('sessions_in_phase reconcile at prescribe route (SYNC-T
   })
 })
 
-// AI-5: canonical definition of "a session in the current phase" is completed
-// (completed_at IS NOT NULL), non-deleted, since phase_started_at.
+// AI-5: canonical definition of "a session in the current phase" is completed, non-deleted,
+// with completed_at at or after phase_started_at (#3799; it was started_at).
 describe.skipIf(!canRun)('reconcileSessionsInPhase canonical definition (AI-5)', () => {
   let pool: import('pg').Pool
   let db: ReturnType<typeof import('@/lib/data/postgres/client').getDb>
@@ -202,6 +202,68 @@ describe.skipIf(!canRun)('reconcileSessionsInPhase canonical definition (AI-5)',
 
     await deleteWorkoutSession(TEST_USER_ID, completedId)
     row = await pool.query(`SELECT sessions_in_phase FROM session_periodization WHERE user_id = $1 AND program_session_id = $2`, [TEST_USER_ID, programSessionId])
+    expect(row.rows[0].sessions_in_phase).toBe(0)
+  })
+
+  // #3799 item 5: the phase moved mid warm-up. The session started before phase_started_at and was
+  // finished after it, so it ran in the new phase and counts there. It read `started_at` before.
+  it('a session started before the phase moved and completed after it counts, on reconcile, increment and delete', async () => {
+    const { deleteWorkoutSession } = await import('@/lib/workout/delete-session')
+    const { incrementSessionsInPhase } = await import('@/lib/data/postgres/slices/periodization')
+    const read = async () => (await pool.query(
+      `SELECT sessions_in_phase FROM session_periodization WHERE user_id = $1 AND program_session_id = $2`,
+      [TEST_USER_ID, programSessionId],
+    )).rows[0].sessions_in_phase as number
+
+    await pool.query(
+      `UPDATE session_periodization SET sessions_in_phase = 0, phase_started_at = now() - interval '30 minutes'
+       WHERE user_id = $1 AND program_session_id = $2`,
+      [TEST_USER_ID, programSessionId],
+    )
+    const straddling = await pool.query(
+      `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at, completed_at)
+       VALUES ($1, $2, 'Test Session', now() - interval '45 minutes', now() - interval '5 minutes') RETURNING id`,
+      [TEST_USER_ID, programSessionId],
+    )
+    const id = straddling.rows[0].id
+    const el = await pool.query(
+      `INSERT INTO exercise_logs (workout_session_id, exercise_name, volume, logged_at) VALUES ($1, 'Squat', 100, now()) RETURNING id`,
+      [id],
+    )
+    await pool.query(`INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps) VALUES ($1, 1, 100, 5)`, [el.rows[0].id])
+
+    await reconcileSessionsInPhase(db, TEST_USER_ID, programId)
+    expect(await read()).toBe(1)
+
+    // The increment follows the same rule: completed after the move counts, before it does not.
+    await incrementSessionsInPhase(db, TEST_USER_ID, programSessionId, new Date(Date.now() - 5 * 60_000))
+    expect(await read()).toBe(2)
+    await incrementSessionsInPhase(db, TEST_USER_ID, programSessionId, new Date(Date.now() - 60 * 60_000))
+    expect(await read()).toBe(2)
+
+    await pool.query(`UPDATE session_periodization SET sessions_in_phase = 1 WHERE user_id = $1 AND program_session_id = $2`, [TEST_USER_ID, programSessionId])
+    await deleteWorkoutSession(TEST_USER_ID, id)
+    expect(await read()).toBe(0)
+  })
+
+  it('a session completed before the phase moved does not count in the new phase', async () => {
+    await pool.query(
+      `UPDATE session_periodization SET sessions_in_phase = 5, phase_started_at = now()
+       WHERE user_id = $1 AND program_session_id = $2`,
+      [TEST_USER_ID, programSessionId],
+    )
+    const before = await pool.query(
+      `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at, completed_at)
+       VALUES ($1, $2, 'Test Session', now() - interval '2 hours', now() - interval '1 hour') RETURNING id`,
+      [TEST_USER_ID, programSessionId],
+    )
+    const el = await pool.query(
+      `INSERT INTO exercise_logs (workout_session_id, exercise_name, volume, logged_at) VALUES ($1, 'Squat', 100, now()) RETURNING id`,
+      [before.rows[0].id],
+    )
+    await pool.query(`INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps) VALUES ($1, 1, 100, 5)`, [el.rows[0].id])
+    await reconcileSessionsInPhase(db, TEST_USER_ID, programId)
+    const row = await pool.query(`SELECT sessions_in_phase FROM session_periodization WHERE user_id = $1 AND program_session_id = $2`, [TEST_USER_ID, programSessionId])
     expect(row.rows[0].sessions_in_phase).toBe(0)
   })
 })
