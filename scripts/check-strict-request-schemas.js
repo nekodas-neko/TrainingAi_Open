@@ -97,8 +97,9 @@
 //     `ScaleBleService.kt`), and `health-connect-ingest` (Tasker). The APK does not update with a
 //     Railway deploy, so an old build can send a field a new schema does not name.
 //   * 1 third-party SDK wire format — `coach` (`DefaultChatTransport`).
-//   * 11 `generateObject` RESPONSE schemas — builder-chat 2, exercises/generate 1,
-//     generate-program 2, meal-plans/generate 2, meal-plans/generate/meal 2, nutrition/scan 2
+//   * 9 `generateObject` RESPONSE schemas — builder-chat 1, exercises/generate 1,
+//     generate-program 1 (11 until #3750 moved the shape those two share into
+//     `packages/shared/src/workout/model-program.ts`), meal-plans/generate 2, meal-plans/generate/meal 2, nutrition/scan 2
 //     (nutrition-goals/recommend left with its model call, #3286). These constrain the model's
 //     output, not a client's input.
 //
@@ -126,10 +127,13 @@ const BASELINE = {
   // client sends an unread `confidence` (added to the schema, not exempted); builder-review.tsx
   // mints a `clientId` on every exercise in its live program state and sends it wholesale to
   // builder-chat (added to `GeneratedExerciseSchema` in generated-program.ts for the same reason).
-  'app/api/builder-chat/route.ts': 2,
+  // #3750: the exercise-and-session RESPONSE shape both program routes ask the model for moved to
+  // `packages/shared/src/workout/model-program.ts` (outside ROOTS: it is model output, never a
+  // request), so builder-chat and generate-program each drop from 2 to 1.
+  'app/api/builder-chat/route.ts': 1,
   'app/api/coach/route.ts': 1,
   'app/api/exercises/generate/route.ts': 1,
-  'app/api/generate-program/route.ts': 2,
+  'app/api/generate-program/route.ts': 1,
   'app/api/hr-ingest/route.ts': 1,
   // Q-495 moved this schema out of the route so it could be unit-tested; the exemption moves with
   // it, for the same reason as before — the Tasker payload's exact shape is not in this repo.

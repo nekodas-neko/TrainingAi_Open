@@ -12,7 +12,8 @@ import { GeneratedProgramSchema } from '@trainingai/shared/validation/generated-
 import type { GeneratedProgram, ChatMessage } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
 import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
-import { capPrimariesPerSession } from '@trainingai/shared/workout/exercise-role'
+import { buildExerciseNameResolver } from '@trainingai/shared/workout/exercise-name-resolver'
+import { cleanModelProgram, ModelSessionSchema } from '@trainingai/shared/workout/model-program'
 import { styleWorkSec, workingBudgetMin, TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD } from '@trainingai/shared/workout/duration-model'
 import { activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
@@ -41,27 +42,15 @@ const RequestSchema = z.object({
   timePerSessionMinutes: z.number().int().min(20).max(180).nullable().optional(),
 }).strict()
 
-// RV-76: no mainMuscles/secondaryMuscles. `exerciseMuscleLookup` overwrites both below, and the
-// filter above that map drops every exercise the library does not hold — so the lookup is always
-// defined and the model's arrays were discarded on arrival.
-//
-// MODEL-OUTPUT schema. The request-side `GeneratedExerciseSchema` keeps both fields: it is
-// `.strict()` and the builder client posts its live program state wholesale, muscles included.
-const BuilderExerciseSchema = z.object({
-  name: z.string(),
-  exerciseRole: z.enum(['primary', 'secondary', 'accessory']),
-  progressionStyleName: z.string(),
-})
-
+// The exercise and session shapes are `ModelSessionSchema`, shared with `/api/generate-program`
+// (#3750). They carry no muscles (RV-76): `cleanModelProgram` writes the library's. The request-side
+// `GeneratedExerciseSchema` keeps both: it is `.strict()` and the builder client posts its live
+// program state wholesale, muscles included.
 const BuilderChatObjectSchema = z.object({
   response: z.string(),
   program: z.object({
     name: z.string(),
-    sessions: z.array(z.object({
-      name: z.string(),
-      icon: z.string(),
-      exercises: z.array(BuilderExerciseSchema),
-    })),
+    sessions: z.array(ModelSessionSchema),
   }),
 })
 
@@ -208,70 +197,27 @@ When responding, mention if a change improves or worsens weekly volume balance. 
       }),
     )
 
-    const styleByName = new Map(userStyles.map(s => [s.name, s.id]))
+    // The same cleaning `/api/generate-program` does (#3750): a paraphrased name ("bench press"
+    // or "Press, Bench" for the library's "Bench Press") is kept under the library's spelling with
+    // its muscles, where an exact-match filter here used to remove it. The resolver stops at case,
+    // punctuation, plurals and word order: "Barbell Bench Press" is a different name to it. A name the library does not
+    // hold is still dropped (F5): saved, it would carry no muscle assignments and under-count that
+    // muscle in recovery, volume and the heatmaps.
+    //
+    // The resolver is built over the WHOLE library, not the equipment- and injury-filtered list
+    // the prompt shows, because that is what the old filter matched against: the request's program
+    // may hold an exercise the list no longer offers, and the model returns it unchanged.
+    //
+    // No icon fallback and no empty-session check: this route has never had either.
+    const { sessions, dropped } = cleanModelProgram(raw.program.sessions, {
+      resolver: buildExerciseNameResolver(allExercises),
+      goal,
+      styleIdByName: new Map(userStyles.map(s => [s.name, s.id])),
+    })
+    const updatedProgram: GeneratedProgram = { ...program, ...raw.program, sessions }
 
-    // Authoritative muscle lookup — override whatever the AI returns.
-    const exerciseMuscleLookup = new Map(
-      allExercises.map(ex => [ex.name, {
-        mainMuscles: ex.muscles.filter((m: { muscle: string; role: string }) => m.role === 'main').map((m: { muscle: string; role: string }) => m.muscle),
-        secondaryMuscles: ex.muscles.filter((m: { muscle: string; role: string }) => m.role === 'secondary').map((m: { muscle: string; role: string }) => m.muscle),
-      }])
-    )
-
-    const goalRules = goal ? GOAL_STYLE_RULES[goal] : null
-
-    // F5: drop model-invented exercises not in the library (sibling generate-program
-    // already filters). A hallucinated name saves with AI-supplied/empty muscle
-    // assignments, silently under-counting that muscle in recovery/volume/heatmaps.
-    let droppedUnknown = 0
-    const updatedProgram: GeneratedProgram = {
-      ...program,
-      ...raw.program,
-      sessions: raw.program.sessions.map(s => ({
-        ...s,
-        // BF-126: cap before the role is read, because the role below picks the style. After the
-        // unknown-name filter, so a dropped hallucination cannot spend the session's one primary.
-        exercises: capPrimariesPerSession(s.exercises
-          .filter(ex => {
-            const known = exerciseMuscleLookup.has(ex.name)
-            if (!known) droppedUnknown++
-            return known
-          }))
-          .map(ex => {
-          // Re-enforce progression styles so the AI can't switch goal families.
-          let styleName = ex.progressionStyleName as string | undefined
-          if (goalRules) {
-            const role = ex.exerciseRole as string
-            const enforced = goalRules[role as keyof typeof goalRules] ?? goalRules.accessory
-            if (role === 'primary' || role === 'secondary') {
-              styleName = enforced
-            } else if (!styleByName.has(styleName ?? '')) {
-              styleName = enforced
-            }
-          }
-          // RV-76: no `?? ex.mainMuscles` fallback, because there is nothing to fall back to. The
-          // filter above drops every exercise the library does not hold, so `libraryMuscles` is
-          // always defined here — and the model no longer emits muscles at all. The non-null
-          // assertion states that guarantee rather than hiding it behind a `?? []` that would
-          // quietly ship an exercise with no muscles if the filter were ever loosened.
-          const libraryMuscles = exerciseMuscleLookup.get(ex.name)!
-          return {
-            ...ex,
-            progressionStyleName: styleName,
-            // The old `: ex.progressionStyleId` arm was dead too, and differently: the model output
-            // schema has never carried that field, so it was always `undefined`. It type-checked
-            // only because this callback was annotated with the CLIENT's exercise type, which does
-            // carry it. Inferring from the model schema is what surfaced it.
-            progressionStyleId: styleName ? styleByName.get(styleName) : undefined,
-            mainMuscles: libraryMuscles.mainMuscles,
-            secondaryMuscles: libraryMuscles.secondaryMuscles,
-          }
-        }),
-      })),
-    }
-
-    const response = droppedUnknown > 0
-      ? `${raw.response}\n\n(Removed ${droppedUnknown} exercise${droppedUnknown > 1 ? 's' : ''} not in the exercise library.)`
+    const response = dropped.length > 0
+      ? `${raw.response}\n\n(Removed ${dropped.length} exercise${dropped.length > 1 ? 's' : ''} not in the exercise library.)`
       : raw.response
 
     return NextResponse.json({

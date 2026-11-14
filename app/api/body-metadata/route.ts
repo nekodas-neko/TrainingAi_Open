@@ -13,6 +13,7 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
 import { bodyRecentFromDay, BODY_RECENT_DAYS } from '@trainingai/shared/health/body-recent-window'
+import { latestWeightKg as latestWeightOnOrBefore } from '@trainingai/shared/health/latest-weight'
 import { countedIntakeKcal } from '@trainingai/shared/nutrition/counted-intake';
 import { countedEstimatesForRange, sharedEstimateReads } from '@/lib/health/energy-balance-service'
 import { budgetMovement } from "@/lib/health/oura-budget-activities";
@@ -207,7 +208,8 @@ export async function GET(req: NextRequest) {
     .flatMap(m => (m.weightKg != null && m.date >= trendFrom ? [{ date: m.date, weightKg: m.weightKg }] : []));
 
   // Profile inputs for the active-energy estimator (below, after today's activity logs are in scope).
-  const bodyWeightForEnergy = latestWeightKg ?? metrics.find(m => m.weightKg != null)?.weightKg ?? null;
+  // The fallback (the 180-day read failed) picks by date too, not by the order `metrics` arrives in (#3771).
+  const bodyWeightForEnergy = latestWeightKg ?? latestWeightOnOrBefore(metrics, today);
   const ageYears = ageFromDob(session.user.dateOfBirth ?? null, now);
   const userSex = (session.user.sex === 'male' || session.user.sex === 'female') ? session.user.sex as Sex : null;
 
