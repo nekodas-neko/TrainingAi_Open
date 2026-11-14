@@ -174,8 +174,8 @@ export function buildRulesPrescription(
   if (asWritten && signals.phase === 'deload') {
     return {
       ...buildWholeSessionDeloadPrescription(signals, reasoning),
-      // The phase is already a deload, so there is nothing to recommend: `deload_recommended` on a
-      // stored prescription is what the accept route flips the phase on.
+      // The phase is already a deload, so there is nothing to recommend: `deload_recommended` marks
+      // a one-day offer to accept (#3799), and this is the planned week itself.
       phaseAction: 'stay',
       confidence: asWritten.confidence,
       sessionTimeBudgetMinutes: signals.sessionTimeBudgetMinutes,
