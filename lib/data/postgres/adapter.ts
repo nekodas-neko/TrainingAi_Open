@@ -4654,6 +4654,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // deload sessions — mirrors the log path's PR gate) after an edit or delete may have
   // invalidated the row personal_records currently points at. Corrects PRs downward.
   async reconcilePersonalRecord(userId: string, exerciseName: string): Promise<void> {
+    const best = await this.bestQualifyingPersonalRecord(userId, exerciseName)
+    if (!best) {
+      await this.db.delete(s.personalRecords).where(and(
+        eq(s.personalRecords.userId, userId), eq(s.personalRecords.exerciseName, exerciseName)))
+      return
+    }
+    await this.upsertPersonalRecord(userId, exerciseName, best.estimated1rm, best.loggedAt)
+  }
+
+  // The best surviving log that may stand as the exercise's personal record: the one rule
+  // `reconcilePersonalRecord` applies, read on its own so a report can say what reconciling would
+  // do without doing it (#3801). Null when no log qualifies.
+  async bestQualifyingPersonalRecord(userId: string, exerciseName: string): Promise<{ estimated1rm: number; loggedAt: Date } | null> {
     const [best] = await this.db
       .select({ estimated1rm: s.exerciseLogs.estimated1rm, loggedAt: s.exerciseLogs.loggedAt })
       .from(s.exerciseLogs)
@@ -4680,13 +4693,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
       .orderBy(desc(s.exerciseLogs.estimated1rm), asc(s.exerciseLogs.loggedAt))
       .limit(1)
-
-    if (!best?.estimated1rm) {
-      await this.db.delete(s.personalRecords).where(and(
-        eq(s.personalRecords.userId, userId), eq(s.personalRecords.exerciseName, exerciseName)))
-      return
-    }
-    await this.upsertPersonalRecord(userId, exerciseName, best.estimated1rm, best.loggedAt ?? new Date())
+    if (!best?.estimated1rm) return null
+    return { estimated1rm: best.estimated1rm, loggedAt: best.loggedAt ?? new Date() }
   }
 
   // personal_records holds one row per exercise (the all-time best). This returns

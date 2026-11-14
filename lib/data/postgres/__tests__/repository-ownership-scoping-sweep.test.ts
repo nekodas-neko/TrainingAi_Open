@@ -333,6 +333,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['listPersonalRecordsDated', r => r.listPersonalRecordsDated(USER_A)],
     ['listMaxReps', r => r.listMaxReps(USER_A)],
     ['listLoggedExerciseNames', r => r.listLoggedExerciseNames(USER_A)],
+    ['bestQualifyingPersonalRecord', r => r.bestQualifyingPersonalRecord(USER_A, bVal('exercise_logs', 'exercise_name'))],
     // goals, insights, body comp
     ['getGoalRecommendation', r => r.getGoalRecommendation(USER_A, bId('goal_recommendations'))],
     ['getAiHealthInsightWithHash', r => r.getAiHealthInsightWithHash(USER_A, bVal('ai_health_insights', 'section'), D)],
