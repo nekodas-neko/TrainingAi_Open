@@ -91,6 +91,18 @@ export function formatTimeOfDay(at: string | number | Date, tz = DEFAULT_TZ): st
   return formatInTimeZone(d, tz, 'h:mm aaa')
 }
 
+/**
+ * An instant as its calendar day and time of day in `tz` — "15 Sept, 7:05 am". The two halves are
+ * `formatDateDisplay(…, 'short')` of the day in `tz` and `formatTimeOfDay`, so it reads the same as
+ * either on its own. For a timestamp shown with its date (a last-sync time, a record's span), where
+ * `toLocaleString()` would have rendered the device's zone. '' for an unparseable input.
+ */
+export function formatDayAndTime(at: string | number | Date, tz = DEFAULT_TZ): string {
+  const d = at instanceof Date ? at : new Date(at)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${formatDateDisplay(toAestDay(d, tz), 'short')}, ${formatTimeOfDay(d, tz)}`
+}
+
 // Formats an instant as "HH:MM" (24-hour) in `tz` — for a clock time that gets PERSISTED
 // (activity_logs.start_time/end_time). Four sites built this from the device's own getHours(),
 // which stores whatever the phone's clock said rather than the user's wall time; unlike a

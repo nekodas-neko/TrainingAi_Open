@@ -12,7 +12,6 @@ import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import {
-  ApiError,
   isAuthRefusal,
   UploadRejected,
   isNothingToAnswer,
@@ -532,7 +531,7 @@ export class HealthStore {
     if (!this.current.setAside) {
       return;
     }
-    await this.write((state) => ({
+    await this.write(() => ({
       setAside: null,
     }));
   }

@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createUIMessageStreamResponse, type UIMessageChunk } from 'ai';
-import { z } from 'zod';
 import { createApiClient, ApiError } from '../src/features/account/api/client.ts';
 import { WorkoutResources } from '../src/features/workouts/data/WorkoutResources.ts';
 import { CoachConversation } from '../src/features/coach/data/CoachConversation.ts';

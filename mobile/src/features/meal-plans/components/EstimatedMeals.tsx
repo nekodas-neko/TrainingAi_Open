@@ -1,5 +1,4 @@
 import { randomUUID } from 'expo-crypto';
-import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time';
 import type { MealType } from '@trainingai/shared/types/nutrition';
 import { useEffect, useRef, useState } from 'react';
 import { TouchSurface } from '../../../shared/ui/TouchSurface';

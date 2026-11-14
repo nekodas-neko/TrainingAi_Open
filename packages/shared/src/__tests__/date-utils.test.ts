@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatInTimeZone } from 'date-fns-tz'
-import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz, midnightDaysAgoInTz, clockSkipOnDay, closeClockSkip, wallClockMinuteReader } from '../date-utils'
+import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz, midnightDaysAgoInTz, clockSkipOnDay, closeClockSkip, wallClockMinuteReader, formatDayAndTime } from '../date-utils'
 
 describe('ageFromDob', () => {
   const today = new Date('2026-07-22T00:00:00Z')
@@ -467,5 +467,18 @@ describe('wallClockMinuteReader anchor (#3470)', () => {
     expect(read('2027-04-04', tz, '2027-04-03T16:30:00Z')).toBe(150) // 02:30 AEST, repeated hour
     expect(read('2027-04-04', tz, '2027-04-03T17:30:00Z')).toBe(210) // 03:30 AEST
     expect(read('2027-04-04', tz, '2027-04-04T02:00:00Z')).toBe(12 * 60)
+  })
+})
+
+describe('formatDayAndTime', () => {
+  // 21:30 UTC on 14 Sept is 07:30 on 15 Sept in Brisbane and 17:30 on 14 Sept in New York — the
+  // day and the time both come from the zone passed, never the device's.
+  const at = '2026-09-14T21:30:00Z'
+  it('renders the day and the time in the zone given', () => {
+    expect(formatDayAndTime(at, 'Australia/Brisbane')).toBe(`${formatDateDisplay('2026-09-15')}, 7:30 am`)
+    expect(formatDayAndTime(at, 'America/New_York')).toBe(`${formatDateDisplay('2026-09-14')}, 5:30 pm`)
+  })
+  it('returns empty for an unparseable input', () => {
+    expect(formatDayAndTime('not a date')).toBe('')
   })
 })

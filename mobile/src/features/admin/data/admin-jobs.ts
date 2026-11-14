@@ -1,3 +1,4 @@
+import { isCalendarDate } from '@trainingai/shared/date-utils';
 import { isDateInput } from './admin-content';
 
 /**
@@ -101,8 +102,7 @@ export const WRITE_PHRASE = 'WRITE';
 
 const DAY = 86_400_000;
 const dayNumber = (s: string) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / DAY;
-const dateOk = (s: string) =>
-  isDateInput(s) && new Date(dayNumber(s) * DAY).toISOString().slice(0, 10) === s;
+const dateOk = (s: string) => isDateInput(s) && isCalendarDate(s);
 
 export type JobParams = { from: string; to: string };
 /** Why the dates cannot be sent, or null. The server checks again; this only saves a round trip. */

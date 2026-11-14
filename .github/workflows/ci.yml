@@ -338,7 +338,7 @@ jobs:
           FOUND=$(grep -rn --include='*.ts' --include='*.tsx' \
             -e '\.toISOString()\.slice(0' \
             -e "\.toISOString()\.split('T')" \
-            app/ lib/ components/ packages/ hooks/ types/ 2>/dev/null \
+            app/ lib/ components/ packages/ hooks/ types/ mobile/src/ 2>/dev/null \
             | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{?/\*)' \
             | grep -v 'lib/date-utils.ts' \
             | grep -v 'packages/shared/src/date-utils.ts' || true)

@@ -520,7 +520,7 @@ test('a run with a pause saves, and live pace after resuming is not 0:00', async
     f.now(),
   );
   assert.ok(resumed.paceSecPerKm! > 300 && resumed.paceSecPerKm! < 400, `${resumed.paceSecPerKm}`);
-  at = moveNorth(f, source, at, 90, 5.6);
+  moveNorth(f, source, at, 90, 5.6);
   const live = liveRouteReadout(store.getSnapshot().session!, store.getSnapshot().route, f.now());
   assert.equal(live.paceSecPerKm, Math.round(362 / live.distanceKm!));
   await store.finish();

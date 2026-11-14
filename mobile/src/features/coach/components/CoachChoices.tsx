@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ScrollView } from 'react-native';
 import { z } from 'zod';
-import { AppButton, AppText, Card, ListRow, Skeleton, Stack } from '../../../shared/ui';
+import { AppButton, AppText, Card, ListRow, Skeleton } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import type { ChoiceListArgs, WidgetResult } from '../data/widgets';

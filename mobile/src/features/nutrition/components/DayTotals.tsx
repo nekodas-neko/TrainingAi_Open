@@ -1,6 +1,6 @@
 import type { BodyBatteryLabel } from "@trainingai/shared/health/body-battery-band";
 import { useTheme } from "../../../shared/theme/ThemeProvider";
-import { AppText, Card, ProgressBar, Stack } from "../../../shared/ui";
+import { AppText, ProgressBar, Stack } from "../../../shared/ui";
 import { energySpec } from "../../health/data/models";
 import { useWorkoutResource } from "../../workouts/data/WorkoutDataProvider";
 import { batteryColor, dayTotalFigures } from "../data/display";

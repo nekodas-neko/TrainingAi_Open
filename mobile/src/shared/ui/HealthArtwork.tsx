@@ -13,7 +13,6 @@ import Svg, {
 import { useTheme } from '../theme/ThemeProvider';
 
 function SleepDecoration({
-  scheme,
   colors,
 }: {
   scheme: 'dark' | 'light';
@@ -65,7 +64,6 @@ function SleepDecoration({
 
 ('use strict');
 function ReadinessDecoration({
-  scheme,
   colors,
 }: {
   scheme: 'dark' | 'light';
@@ -175,7 +173,6 @@ function ActivityDecoration({
 
 ('use strict');
 function HeartRateDecoration({
-  scheme,
   colors,
 }: {
   scheme: 'dark' | 'light';

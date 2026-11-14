@@ -51,7 +51,9 @@ const root = path.join(__dirname, '..');
 
 // Client code only. `app/api/**` is server — it reads the tz from the session and is the half that
 // already behaves. `packages/shared` is shared with the server for the same reason.
-const DIRS = ['app', 'components', 'lib/hooks', 'lib/stores'];
+// `mobile/src` is the native app (#3803) — all of it is client code. Its user zone comes from
+// `useWorkoutContext().timezone` or a store's `connection.timezone`, not `useUserTimezone()`.
+const DIRS = ['app', 'components', 'lib/hooks', 'lib/stores', 'mobile/src'];
 const SKIP_PREFIX = ['app/api/'];
 
 // A bare call — no argument at all. `todayInTz(tz)` and `todayInTz(user?.timezone)` are the
@@ -159,6 +161,7 @@ if (require.main === module) runMain(async () => {
     console.error('`toAestDay(d)` with no zone fall back to Brisbane — none follows the user\'s setting,');
     console.error('which the server already honours. Pass the timezone from `useUserTimezone()`:');
     console.error('  const tz = useUserTimezone()   →   todayInTz(tz)');
+    console.error('  (native app, mobile/src: const { timezone } = useWorkoutContext(), or a store\'s connection.timezone)');
     for (const o of offenders) {
       console.error(`  ${o.rel}  ${o.n} bare call(s), baseline ${o.allowed}`);
     }

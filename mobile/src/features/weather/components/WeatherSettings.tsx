@@ -15,10 +15,13 @@ import { useWeather } from '../WeatherProvider';
 import { searchCities } from '../data/open-meteo';
 import { isWeatherDay, temperatureLabel, type WeatherPlace } from '../data/models';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { formatTimeOfDay } from '@trainingai/shared/date-utils';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 
 export function WeatherSettings() {
   const { theme } = useTheme();
   const { store, settings, snapshot, busy, error, saveError } = useWeather();
+  const { timezone } = useWorkoutContext();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<WeatherPlace[]>([]);
   const [searching, setSearching] = useState(false);
@@ -157,10 +160,7 @@ export function WeatherSettings() {
               </AppText>
               <AppText variant="caption" tone="muted">
                 Updated{' '}
-                {new Date(snapshot.fetchedAt).toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
+                {formatTimeOfDay(snapshot.fetchedAt, timezone)}
               </AppText>
             </Stack>
           )}

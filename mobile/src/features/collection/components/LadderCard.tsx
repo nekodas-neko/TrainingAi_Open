@@ -1,4 +1,3 @@
-import { View } from 'react-native';
 import { AppText, Card, Stack } from '../../../shared/ui';
 import type { LadderModel } from '../data/view';
 import { CatRoster } from './CatRoster';

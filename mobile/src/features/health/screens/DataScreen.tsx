@@ -15,11 +15,14 @@ import {
 import { useHealthContext, useAppleImport } from '../HealthProvider';
 import { useReportsContext } from '../../../development/diagnostics/ReportsProvider';
 import { diagnosticsAvailable } from '../../../development/diagnostics/client';
+import { formatDayAndTime } from '@trainingai/shared/date-utils';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 
 export function DataScreen() {
   const health = useHealthContext();
   const imported = useAppleImport();
   const reports = useReportsContext();
+  const { timezone } = useWorkoutContext();
   const { snapshot, busy, error } = health;
   const { report, reportBusy, reportStatus, reportAutomatically, setReportAutomatically } =
     reports;
@@ -91,7 +94,7 @@ export function DataScreen() {
         </AppText>
         <AppText variant="caption" tone="muted">
           {imported.completed
-            ? `Last synced ${new Date(imported.completed.completedAt).toLocaleString()} · ${imported.completed.nights} sleep nights`
+            ? `Last synced ${formatDayAndTime(imported.completed.completedAt, timezone)} · ${imported.completed.nights} sleep nights`
             : imported.store
               ? 'Readings are saved before upload. Your dashboard updates after they sync.'
               : 'Sign in to sync your health readings.'}
@@ -139,8 +142,8 @@ export function DataScreen() {
           <Card>
             <AppText variant="heading">Readable records · last 7 days</AppText>
             <AppText tone="muted">
-              {new Date(snapshot.inspection.startAt).toLocaleString()} –{' '}
-              {new Date(snapshot.inspection.endAt).toLocaleString()}
+              {formatDayAndTime(snapshot.inspection.startAt, timezone)} –{' '}
+              {formatDayAndTime(snapshot.inspection.endAt, timezone)}
             </AppText>
             <AppText tone="muted">
               Latest samples, not daily totals. Each type returns up to{' '}
@@ -171,8 +174,8 @@ export function DataScreen() {
               )}
               {entry.latestStart && (
                 <AppText tone="muted">
-                  {new Date(entry.latestStart).toLocaleString()} –{' '}
-                  {new Date(entry.latestEnd!).toLocaleString()}
+                  {formatDayAndTime(entry.latestStart, timezone)} –{' '}
+                  {formatDayAndTime(entry.latestEnd!, timezone)}
                 </AppText>
               )}
               {entry.detail && <AppText tone="muted">{entry.detail}</AppText>}
@@ -182,7 +185,7 @@ export function DataScreen() {
                     {source.name} · {source.count.toLocaleString()} returned records
                   </AppText>
                   <AppText variant="caption" tone="muted">
-                    Latest: {new Date(source.latestAt).toLocaleString()}
+                    Latest: {formatDayAndTime(source.latestAt, timezone)}
                   </AppText>
                 </Stack>
               ))}
