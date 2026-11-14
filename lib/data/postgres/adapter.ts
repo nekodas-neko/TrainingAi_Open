@@ -5267,15 +5267,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
   }
 
-  async upsertAiHealthInsight(userId: string, section: string, date: string, insight: string, contextHash?: string): Promise<void> {
-    await this.db.insert(s.aiHealthInsights)
-      .values({ userId, section, date, insight, contextHash: contextHash ?? null })
-      .onConflictDoUpdate({
-        target: [s.aiHealthInsights.userId, s.aiHealthInsights.section, s.aiHealthInsights.date],
-        set: { insight, contextHash: contextHash ?? null, createdAt: new Date() },
-      })
-  }
-
   async deleteAiHealthInsight(userId: string, section: string): Promise<void> {
     await this.db.delete(s.aiHealthInsights)
       .where(and(

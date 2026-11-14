@@ -35,7 +35,6 @@ const listExerciseLibrary = vi.fn(async () => [] as unknown[])
 const getExerciseMuscleAssignments = vi.fn(async (_n: string[]) => ({}) as Record<string, unknown[]>)
 const getFriendIds = vi.fn(async (_u: string) => [] as string[])
 const upsertAiHealthInsight = vi.fn(async () => undefined)
-const readFreshInsight = vi.fn(async (..._a: unknown[]) => null as string | null)
 const generateText = vi.fn(async (_o: unknown) => ({ text: '  the recap  ' }))
 
 let seq = 0
@@ -51,14 +50,6 @@ vi.mock('ai', () => ({ generateText: (o: unknown) => generateText(o) }))
 vi.mock('@/lib/ai/instrument', () => ({
   aiModel: () => ({}),
   loggedGenerateText: async (_m: unknown, run: () => Promise<{ text: string }>) => run(),
-}))
-vi.mock('@/lib/ai/insight-cache', () => ({
-  hashInsightContext: (p: string) => {
-    let h = 5381
-    for (let i = 0; i < p.length; i++) h = ((h * 33) ^ p.charCodeAt(i)) >>> 0
-    return `h:${h.toString(16)}`
-  },
-  readFreshInsight: (...a: unknown[]) => readFreshInsight(...a),
 }))
 
 import { GET } from '@/app/api/weekly-digest/route'
@@ -85,14 +76,13 @@ beforeEach(() => {
   for (const m of [getWorkoutSessionsFrom, listBodyMetrics, listSleepSessions, getOuraDaily,
                    getOuraDailyDerived, listRecentPersonalRecords, listExerciseLibrary,
                    getExerciseMuscleAssignments, getFriendIds, upsertAiHealthInsight,
-                   getOuraCloudSwitchDay, readFreshInsight, generateText]) m.mockClear()
+                   getOuraCloudSwitchDay, generateText]) m.mockClear()
   getOuraCloudSwitchDay.mockResolvedValue(null)
   getWorkoutSessionsFrom.mockResolvedValue([])
   for (const m of [listBodyMetrics, listSleepSessions, getOuraDaily, getOuraDailyDerived,
                    listRecentPersonalRecords, listExerciseLibrary]) m.mockResolvedValue([])
   getExerciseMuscleAssignments.mockResolvedValue({})
   getFriendIds.mockResolvedValue([])
-  readFreshInsight.mockResolvedValue(null)
   generateText.mockResolvedValue({ text: '  the recap  ' })
   // A FRESH user id per test: the route rate-limits 3/min per user, so a fourth test reusing one
   // gets a 429 and every `json.metrics` read fails on undefined.
@@ -152,13 +142,9 @@ describe('the route returns the metrics it used to throw away', () => {
     // the metrics rode along only when that row was rebuilt. A page fed only by cache misses was
     // blank almost every time. The row is gone; a stale one left over must not be read back.
     loadFixture()
-    readFreshInsight.mockResolvedValue('a digest from earlier this week')
-
     const first = await bodyOf(await post())
     const second = await bodyOf(await post())
 
-    expect(first.digest).not.toBe('a digest from earlier this week')
-    expect(readFreshInsight).not.toHaveBeenCalled()
     expect(first.metrics.training.volumeKg).toBe(7000)
     expect(second.digest).toBe(first.digest)
     expect(second.metrics).toEqual(first.metrics)
@@ -261,13 +247,12 @@ const DIGEST_TEXT = `• 2 sessions, 7,000 kg total (+40% vs the week before, wh
  * makes deleting the catch block's tests safe rather than a quiet loss of coverage.
  */
 describe('the week can no longer be lost to something outside this route (RV-69, RV-201)', () => {
-  it('reaches no model, no insight cache and no stored row on any path', async () => {
+  it('reaches no model and no stored row on any path', async () => {
     loadFixture()
     const json = await bodyOf(await post())
 
     expect(json.digest).toContain('2 sessions, 7,000 kg total')
     expect(generateText).not.toHaveBeenCalled()
-    expect(readFreshInsight).not.toHaveBeenCalled()
     expect(upsertAiHealthInsight).not.toHaveBeenCalled()
   })
 

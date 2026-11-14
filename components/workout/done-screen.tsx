@@ -99,15 +99,15 @@ export function DoneScreen({
   const [recapLoading, setRecapLoading] = useState(false);
   const [recapError, setRecapError] = useState(false);
 
-  // A completed session's recap never changes, so it is cache-seeded like every other
-  // screen in the app: re-opening the done screen paints the previous text immediately
-  // instead of re-running a ~3s AI call. cachedFetch swallows !res.ok, so the failure
-  // state comes from onError (CLAUDE.md: self-fetching cards need an explicit one).
+  // The recap is written by code from the session's own numbers (#3748), and is cache-seeded
+  // like every other screen in the app: re-opening the done screen paints the previous text
+  // immediately. cachedFetch swallows !res.ok, so the failure state comes from onError
+  // (CLAUDE.md: self-fetching cards need an explicit one).
   const loadRecap = useCallback(async () => {
     if (!workoutSessionId) return;
     setRecapLoading(true);
     setRecapError(false);
-    await cachedFetch<{ recap?: string; degraded?: boolean }>(
+    await cachedFetch<{ recap?: string }>(
       `workout-recap:${workoutSessionId}`,
       `/api/workout-sessions/${workoutSessionId}/recap`,
       WORKOUT_RECAP_TTL,
@@ -118,11 +118,6 @@ export function DoneScreen({
       },
       {
         onError: () => { setRecapError(true); setRecapLoading(false); },
-        // RV-69: the route now answers 200 with a deterministic readout of the session's figures
-        // when the model fails. Show it, but do not store it — this key's TTL is 24h and the only
-        // retry the card offers is a refetch, so a cached fallback would outlive every attempt to
-        // replace it.
-        shouldCache: (data) => !data.degraded,
       },
     );
   }, [workoutSessionId]);
@@ -424,7 +419,7 @@ export function DoneScreen({
               <p className="text-[10px] text-muted-foreground">Couldn&apos;t generate a recap — tap Generate to retry.</p>
             ) : (
               <p className="text-[10px] text-muted-foreground">
-                {recapLoading ? "Reviewing your session…" : "Tap Generate for a short AI review of this session."}
+                {recapLoading ? "Reviewing your session…" : "Tap Generate for a short review of this session."}
               </p>
             )}
           </div>

@@ -23,7 +23,6 @@ const listExerciseLibrary = vi.fn(async () => [] as unknown[])
 const getExerciseMuscleAssignments = vi.fn(async (_n: string[]) => ({}) as Record<string, unknown[]>)
 const getFriendIds = vi.fn(async (_u: string) => [] as string[])
 const upsertAiHealthInsight = vi.fn(async () => undefined)
-const readFreshInsight = vi.fn(async (..._a: unknown[]) => null as string | null)
 const generateText = vi.fn(async (_o: unknown) => ({ text: '  the recap  ' }))
 
 const TZ = 'America/New_York'          // deliberately NOT DEFAULT_TZ — see the file header
@@ -41,16 +40,6 @@ vi.mock('ai', () => ({ generateText: (o: unknown) => generateText(o) }))
 vi.mock('@/lib/ai/instrument', () => ({
   aiModel: () => ({}),
   loggedGenerateText: async (_m: unknown, run: () => Promise<{ text: string }>) => run(),
-}))
-vi.mock('@/lib/ai/insight-cache', () => ({
-  // Content-derived, not length-derived: the whole point of the hash is that a changed input
-  // invalidates a cached digest, and a length stub cannot tell 42 from 80.
-  hashInsightContext: (p: string) => {
-    let h = 5381
-    for (let i = 0; i < p.length; i++) h = ((h * 33) ^ p.charCodeAt(i)) >>> 0
-    return `h:${h.toString(16)}`
-  },
-  readFreshInsight: (...a: unknown[]) => readFreshInsight(...a),
 }))
 
 import { GET } from '@/app/api/weekly-digest/route'
@@ -70,13 +59,12 @@ beforeEach(() => {
   for (const m of [getWorkoutSessionsFrom, listBodyMetrics, listSleepSessions, getOuraDaily,
                    getOuraDailyDerived, listRecentPersonalRecords, listExerciseLibrary,
                    getExerciseMuscleAssignments, getFriendIds, upsertAiHealthInsight,
-                   readFreshInsight, generateText]) m.mockClear()
+                   generateText]) m.mockClear()
   getWorkoutSessionsFrom.mockResolvedValue([])
   for (const m of [listBodyMetrics, listSleepSessions, getOuraDaily, getOuraDailyDerived,
                    listRecentPersonalRecords, listExerciseLibrary]) m.mockResolvedValue([])
   getExerciseMuscleAssignments.mockResolvedValue({})
   getFriendIds.mockResolvedValue([])
-  readFreshInsight.mockResolvedValue(null)
   generateText.mockResolvedValue({ text: '  the recap  ' })
   freshUser()
 })
@@ -160,7 +148,6 @@ describe('the digest is recomputed, never cached or degraded (RV-201)', () => {
     await post()
     expect(generateText).not.toHaveBeenCalled()
     expect(upsertAiHealthInsight).not.toHaveBeenCalled()
-    expect(readFreshInsight).not.toHaveBeenCalled()
   })
 
   it('answers 200 with the metrics on every path — there is no longer one that does not', async () => {

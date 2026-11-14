@@ -19,7 +19,6 @@ const getWorkoutSessionsFrom = empty()
 const getUserById = vi.fn(async (_u: string) => ({ dob: null }) as unknown)
 const getUserGoals = vi.fn(async (_u: string) => ({ stepsGoal: null }))
 const upsertAiHealthInsight = vi.fn(async () => undefined)
-const readFreshInsight = vi.fn(async (..._a: unknown[]) => null as string | null)
 const generateText = vi.fn(async (_o: unknown) => ({ text: '  a measured reading  ' }))
 
 let seq = 0
@@ -36,10 +35,6 @@ vi.mock('@/lib/ai/instrument', () => ({
   loggedGenerateText: async (_m: unknown, run: (s: AbortSignal) => Promise<{ text: string }>) =>
     run(new AbortController().signal),
 }))
-vi.mock('@/lib/ai/insight-cache', () => ({
-  hashInsightContext: (p: string) => `h:${p.length}`,
-  readFreshInsight: (...a: unknown[]) => readFreshInsight(...a),
-}))
 
 import { POST } from '@/app/api/ai/health-insight/route'
 
@@ -53,12 +48,11 @@ const post = () =>
 beforeEach(() => {
   for (const m of [getOuraDaily, listSleepSessions, listBodyMetrics, getOuraDailyDerived,
                    getOuraDailySummary, getWorkoutSessionsFrom, getUserById, upsertAiHealthInsight,
-                   readFreshInsight, generateText]) m.mockClear()
+                   generateText]) m.mockClear()
   for (const m of [getOuraDaily, listSleepSessions, getOuraDailyDerived, getOuraDailySummary,
                    getWorkoutSessionsFrom]) m.mockResolvedValue([])
   listBodyMetrics.mockResolvedValue([{ date: DATE, restingHeartRate: 48, hrvMs: 71 }])
   getUserById.mockResolvedValue({ dob: null })
-  readFreshInsight.mockResolvedValue(null)
   generateText.mockResolvedValue({ text: '  a measured reading  ' })
   userId = `u-${++seq}` // the route rate-limits 10/hour per user
 })
