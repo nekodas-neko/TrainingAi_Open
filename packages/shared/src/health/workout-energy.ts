@@ -144,7 +144,21 @@ export function isPlausibleSessionDuration(durationMin: number | null | undefine
     && durationMin > 0 && durationMin <= MAX_PLAUSIBLE_SESSION_MIN
 }
 
-export { sessionActiveMin } from '../workout/active-duration'
+import { sessionActiveMin } from '../workout/active-duration'
+export { sessionActiveMin }
+
+/**
+ * A completed session's active minutes when its clock can be believed, otherwise null (#3801). The
+ * one definition of "a span we may count" for every total built from `completedAt − startedAt`:
+ * `weekly-stats` (which falls back to the exercise-log span on null) and the year review (which
+ * counts nothing for it). A span over `MAX_PLAUSIBLE_SESSION_MIN` is a wrongly stored start or end,
+ * and is excluded rather than clamped, for the reason given on the bound above.
+ */
+export function plausibleSessionActiveMin(startedAt: Date, completedAt: Date | null | undefined, pausedSec?: number | null): number | null {
+  if (completedAt == null) return null
+  const min = sessionActiveMin(startedAt, completedAt, pausedSec)
+  return isPlausibleSessionDuration(min) ? min : null
+}
 
 export interface WorkoutEnergyInput {
   durationMin: number

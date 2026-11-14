@@ -2300,9 +2300,12 @@ export async function getZoneMinutesRange(
       const cachedSeconds: DayZoneSeconds['seconds'] = [row.zone1Sec, row.zone2Sec, row.zone3Sec, row.zone4Sec, row.zone5Sec]
       // Trust the cache unless the profile drifted AND the day is still recomputable from HR. An
       // all-zero row may be one cached before a day without heart rate read as missing (#2985), so
-      // it is checked again while the HR is still there.
-      const recheckEmpty = cachedSeconds.every(v => v === 0) && day >= retentionCutoff
-      if ((profileMatches(row) || day < retentionCutoff) && !recheckEmpty) {
+      // it is checked again while the HR is still there. Past retention there is nothing left to
+      // check it against, and a day with no heart rate has no minutes to count, so it reads as
+      // missing at any age (#3801), never as a real zero. The row itself is left as it is.
+      const allZero = cachedSeconds.every(v => v === 0)
+      if (allZero && day < retentionCutoff) return null
+      if ((profileMatches(row) || day < retentionCutoff) && !allZero) {
         return { day, seconds: cachedSeconds }
       }
     }

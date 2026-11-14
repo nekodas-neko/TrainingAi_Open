@@ -19,6 +19,8 @@ import { runOuraWebhookRenewal } from '@/lib/oura/cloud/renewal'
 import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import { getDb } from '@/lib/data/postgres/client'
 import { mergeLookAlikeFoods } from '@/lib/nutrition/merge-look-alike-foods'
+import { reconcilePersonalRecords } from '@/lib/workout/reconcile-personal-records'
+import { heartHealthRescoreReport } from '@/lib/health/heart-health-rescore-report'
 
 /**
  * The agent key's allow-list (issue 2381, part b). A job is reachable with the key only if it is
@@ -83,6 +85,18 @@ const MergeLookAlikeFoodsParams = z.object({
   keepers: z.record(z.string().max(300), z.string().uuid()).refine(m => Object.keys(m).length <= 100, 'at most 100 keepers').optional(),
   /** `'exact'`: merge only the groups that leave every moved log's calories and macros unchanged. */
   only: z.literal('exact').optional(),
+}).strict()
+
+const ReconcilePersonalRecordsParams = z.object({
+  dryRun: z.boolean(),
+  /** Exercise names to reconcile; omitted, every exercise the owner has logged or holds a record for. */
+  exercises: z.array(z.string().min(1).max(200)).min(1).max(200).optional(),
+}).strict()
+
+const RescoreHeartHealthParams = z.object({
+  from: DateParam,
+  to: DateParam,
+  dryRun: z.boolean(),
 }).strict()
 
 export const AGENT_JOBS = {
@@ -357,6 +371,49 @@ export const AGENT_JOBS = {
       }
     },
   } satisfies AgentJobDef<z.infer<typeof MergeLookAlikeFoodsParams>>,
+
+  /**
+   * #3801 item 3. Reconciles personal records with the owner's own logs under the rule
+   * `reconcilePersonalRecord` applies (`reconcilePersonalRecords` in
+   * `lib/workout/reconcile-personal-records.ts`). A write only adds a missing record or raises one to
+   * its best qualifying log, through the only-higher upsert; a record the rule would lower or remove
+   * is reported and left as it is. So it never loses data, and a second run writes 0.
+   */
+  'reconcile-personal-records': {
+    params: ReconcilePersonalRecordsParams,
+    losesData: () => false,
+    run: async (ctx, p) => {
+      const report = await reconcilePersonalRecords(ctx.repo, ctx.userId, ctx.tz, { dryRun: p.dryRun, exercises: p.exercises })
+      return {
+        status: 200,
+        body: { report },
+        finish: { outcome: 'succeeded', affectedRows: report.summary.written, daysMoved: p.dryRun ? 0 : report.achievedOn.length },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof ReconcilePersonalRecordsParams>>,
+
+  /**
+   * #3801 item 4. Re-scores the owner's prescribed cardio days in `from`..`to` (at most 31 days,
+   * ending yesterday at the latest) through `heartHealthRescoreReport`, the code
+   * `POST /api/admin/backfill-heart-health` runs. A dry run lists, per day, the target, the counted
+   * minutes, whether it is met and whether a write would complete it. A write completes only the
+   * pending days the existing rule says are met and links the credited activity; it changes a stored
+   * status, so it needs an approval. Idempotent: a completed day is never taken back or re-written.
+   */
+  'rescore-heart-health': {
+    params: RescoreHeartHealthParams,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await heartHealthRescoreReport(ctx.repo, ctx.userId, ctx.tz, p.from, p.to, p.dryRun)
+      if (!result.ok) return { status: 400, body: { error: result.error }, finish: { outcome: 'refused', error: result.error } }
+      const { report } = result
+      return {
+        status: 200,
+        body: { report },
+        finish: { outcome: 'succeeded', affectedRows: report.summary.written, daysMoved: report.summary.written },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof RescoreHeartHealthParams>>,
 } as const
 
 export type AgentJobId = keyof typeof AGENT_JOBS
@@ -405,6 +462,8 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('oura-cloud-backfill'),
   requestSchema('oura-webhook-subscriptions'),
   requestSchema('merge-look-alike-foods'),
+  requestSchema('reconcile-personal-records'),
+  requestSchema('rescore-heart-health'),
 ])
 export type AgentActionRequest = z.infer<typeof AgentActionRequest>
 
