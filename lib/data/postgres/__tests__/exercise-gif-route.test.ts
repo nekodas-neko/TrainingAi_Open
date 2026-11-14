@@ -25,18 +25,25 @@ const OWNER = '00000000-0000-4000-8000-0000000000e3'
 const GENERATED = 'Gif Test Generated Lift'
 const CACHED = 'Gif Test Cached Lift'
 const UNKNOWN = 'Gif Test Unknown Lift'
+// Nothing in the override map or the dataset resembles this, so the lookup is a miss.
+const NOTHING = 'Qzxv Wjk'
 // A name the LOCAL override map resolves, so a fresh lookup finds something without any
 // network call — which is the only thing that can tell a re-lookup from a served null.
 const DIRECT = 'Hip Thrust'
 
 let sessionUser: { id: string } | null = { id: OWNER }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
+let rateAllowed = true
+const rateLimitKeys: string[] = []
+vi.mock('@/lib/rate-limit', () => ({
+  rateLimit: (key: string) => { rateLimitKeys.push(key); return rateAllowed },
+}))
 
 describe.skipIf(!canRun)('exercise-gif — the media it picks and what it writes back', () => {
   let pool: import('pg').Pool
   let GET: typeof import('@/app/api/exercise-gif/route').GET
 
-  const names = [GENERATED, CACHED, UNKNOWN, DIRECT]
+  const names = [GENERATED, CACHED, UNKNOWN, DIRECT, NOTHING]
 
   beforeAll(async () => {
     pool = (await import('@/lib/data/postgres/client')).getPool()
@@ -55,6 +62,8 @@ describe.skipIf(!canRun)('exercise-gif — the media it picks and what it writes
 
   beforeEach(async () => {
     sessionUser = { id: OWNER }
+    rateAllowed = true
+    rateLimitKeys.length = 0
     await pool.query(`DELETE FROM exercise_media WHERE exercise_name = ANY($1)`, [names])
     await pool.query(`DELETE FROM exercise_gif_cache WHERE exercise_name = ANY($1)`, [names])
   })
@@ -153,9 +162,23 @@ describe.skipIf(!canRun)('exercise-gif — the media it picks and what it writes
     expect((await body(CACHED.toUpperCase())).gifUrl).toBe('legacy.gif')
   })
 
-  it('writes its answer back to the cache for next time', async () => {
-    await gif(UNKNOWN)
-    expect(await cachedRow(UNKNOWN)).toBeDefined()
+  it('writes a found answer back to the cache for next time', async () => {
+    await gif(DIRECT)
+    expect((await cachedRow(DIRECT)).gif_url).toContain('hip-thrust')
+  })
+
+  // #3796: the cache is shared by every user, and a row holding nothing saves no work.
+  it('does not write a cache row for a miss', async () => {
+    expect(await body(NOTHING)).toEqual({ gifUrl: null, imageUrl: null })
+    expect(await cachedRow(NOTHING)).toBeUndefined()
+  })
+
+  it('is rate limited per user, before any lookup or write', async () => {
+    rateAllowed = false
+    const res = await gif(DIRECT)
+    expect(res.status).toBe(429)
+    expect(rateLimitKeys).toEqual([`exercise-gif:${OWNER}`])
+    expect(await cachedRow(DIRECT)).toBeUndefined()
   })
 
   /**
