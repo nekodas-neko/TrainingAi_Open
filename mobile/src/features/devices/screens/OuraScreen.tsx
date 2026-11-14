@@ -33,6 +33,8 @@ import {
   connectOura,
   connectStartedRecently,
   disconnectOura,
+  OURA_ACCOUNT_COPY,
+  ouraAccountState,
   ouraMessage,
   parseOuraCallback,
   readOuraStatus,
@@ -193,6 +195,9 @@ export function OuraScreen({
   }
 
   const connected = status?.connected === true;
+  // #3794: a grant Oura refused reads as stopped, not as never connected.
+  const accountState = ouraAccountState(status);
+  const copy = OURA_ACCOUNT_COPY[accountState ?? 'not_connected'];
   return (
     <PageLayout title="Devices" onBack={onBack}>
       <TabPanel>
@@ -204,18 +209,11 @@ export function OuraScreen({
                 Oura account
               </AppText>
               {status && (
-                <Badge
-                  label={connected ? 'Connected' : 'Not connected'}
-                  tone={connected ? 'brand' : 'neutral'}
-                />
+                <Badge label={copy.badge} tone={connected ? 'brand' : 'neutral'} />
               )}
             </Stack>
-            <AppText tone="muted">
-              {connected
-                ? 'Your ring’s sleep, readiness and activity reach TrainingAi from Oura after each sync.'
-                : 'Connect your Oura account so your ring’s data reaches TrainingAi. You approve it on Oura’s page and come straight back.'}
-            </AppText>
-            {connected && status && (
+            <AppText tone="muted">{copy.body}</AppText>
+            {(accountState === 'connected' || accountState === 'stopped') && status && (
               <AppText variant="caption" tone="muted">
                 {ouraFeedStatus(status, Date.now(), health.timezone)}
               </AppText>
@@ -249,7 +247,7 @@ export function OuraScreen({
               <AppButton title="Try again" variant="secondary" onPress={() => void refresh()} />
             ) : (
               <AppButton
-                title="Connect Oura"
+                title={copy.connect}
                 busy={busy === 'connect'}
                 disabled={busy !== null || status === null}
                 onPress={() => void connect()}
