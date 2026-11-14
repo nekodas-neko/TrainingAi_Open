@@ -33,7 +33,7 @@ const signals = (over: Partial<PrescriptionSignals> = {}): PrescriptionSignals =
     exercise({ sessionExerciseId: 'se-2', name: 'Barbell Skull Crusher', role: 'accessory', baseSets: [] }),
   ],
   phase: 'accumulation', sessionsInPhase: 2, hoursSinceLastSession: 48,
-  consecutiveSessionDaysOfThisType: 0, soreMusclesInSession: [], soreMusclesOutOfSession: [],
+  consecutiveSessionDaysOfThisType: 0, soreMusclesInSession: [], recentlyTrainedMusclesInSession: [], soreMusclesOutOfSession: [],
   sorenessLogDate: 'none', activeInjuredMusclesInSession: [], morningCheckin: null, rpeTrend: null,
   repCompletionRate: null, weeklyTargets: {}, weeklyLogged: {}, volumeBudgetPerMuscleGroup: {},
   acwr: null, sleepTrend: null, hrvTrend: null, spo2Trend: null, illness: null,

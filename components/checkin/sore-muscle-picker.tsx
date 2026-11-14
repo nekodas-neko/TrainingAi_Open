@@ -3,6 +3,7 @@
 import { memo, useMemo } from "react"
 import { MuscleHeatmap } from "@/components/muscle-heatmap"
 import { computePerExerciseDeload, type PerExerciseDeloadInput } from "@trainingai/shared/ai-periodization/per-exercise-deload"
+import { soreTickProvenance } from "@trainingai/shared/checkin/suggested-soreness"
 
 // Grouped so the pill column reads as anatomy rather than an alphabetical dump. Labels are the
 // stored values (mood_logs.soreMuscles) — normalizeMuscle maps them onto heatmap slugs, so
@@ -33,7 +34,9 @@ export const SoreMusclePicker = memo(function SoreMusclePicker({
 }: Props) {
   const lower = (xs: string[]) => xs.map(x => x.toLowerCase())
   const sessionLower = lower(sessionMuscles ?? [])
-  const overlapping = selected.filter(m => sessionLower.includes(m.toLowerCase()))
+  // #3764: only a tick the lifter put there lightens anything, so only those reach the banner.
+  const lifterReported = useMemo(() => soreTickProvenance(selected, suggested).lifterReported, [selected, suggested])
+  const overlapping = lifterReported.filter(m => sessionLower.includes(m.toLowerCase()))
 
   // Mirrors computePerExerciseDeload's own escalation math exactly (>50% of session exercises
   // matched on a MAIN-role assignment → whole-session), reusing the shared function rather than
@@ -42,8 +45,8 @@ export const SoreMusclePicker = memo(function SoreMusclePicker({
   // wrongly suppress the prediction, which the real deload-phase gate handles separately anyway.
   const willEscalateWholeSession = useMemo(() => {
     if (!sessionExercises?.length || overlapping.length === 0) return false
-    return computePerExerciseDeload(sessionExercises, selected, 'strength', 'accumulation').outcome === 'whole_session'
-  }, [sessionExercises, selected, overlapping.length])
+    return computePerExerciseDeload(sessionExercises, lifterReported, 'strength', 'accumulation').outcome === 'whole_session'
+  }, [sessionExercises, lifterReported, overlapping.length])
 
   // MuscleHeatmap is memoized, and an inline .map() here minted a new array identity on every
   // render — so the SVG body map re-rendered on every unrelated state change in the mood

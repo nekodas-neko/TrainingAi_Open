@@ -431,6 +431,7 @@ async function runPrescriptionGeneration(
     signals.soreMusclesInSession,
     signals.trainingGoal,
     state.phase,
+    signals.recentlyTrainedMusclesInSession,
   )
 
   if (perExDeload.outcome === 'whole_session') {
@@ -726,7 +727,7 @@ async function runPrescriptionGeneration(
       reps: ex.reps,
       pct: ex.pct,
       restSec: ex.rest_sec,
-      autoregNote: autoreg.notes[ex.session_exercise_id],
+      autoregNote: joinNotes(autoreg.notes[ex.session_exercise_id], perExDeload.recentNotes[ex.session_exercise_id]),
       ...(deloadedIds.has(ex.session_exercise_id) && {
         deloaded: true,
         deloadNote: perExDeload.notes[ex.session_exercise_id],
@@ -829,4 +830,11 @@ async function runPrescriptionGeneration(
   })))().catch(err => console.error('[prescribe] shadow record failed (ignored):', err))
 
   return { ok: true, prescription, prescriptionStatus, estimatedSessionDurationMin }
+}
+
+/** #3764: a neutral "Trained recently" note rides in `autoregNote`, the one note field the card
+ *  already shows on an exercise at normal load, beside any autoregulation note. */
+function joinNotes(...notes: Array<string | undefined>): string | undefined {
+  const kept = notes.filter((n): n is string => !!n)
+  return kept.length > 0 ? kept.join(' · ') : undefined
 }

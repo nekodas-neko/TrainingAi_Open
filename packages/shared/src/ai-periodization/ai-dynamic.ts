@@ -1,4 +1,5 @@
 import { toAestDay } from '@trainingai/shared/date-utils'
+import { soreTickProvenance } from '@trainingai/shared/checkin/suggested-soreness'
 import { normalizeMuscle, moodMuscleMatches } from '@trainingai/shared/muscles'
 import type { ProgramSession, MuscleAssignment, NextSessionRecommendation } from '@trainingai/shared/types/program'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
@@ -97,7 +98,6 @@ function sessionRecoveryScore(
   soreMuscles: string[],
   suggestedSoreMuscles: string[] | null | undefined,
 ): number {
-  const suggestedSet = new Set((suggestedSoreMuscles ?? []).map(normalizeMuscle))
   // A tick penalises only if the lifter added it. On `null` (unknown provenance) nothing is
   // treated as suggested, so the pre-BF-173 behaviour is preserved rather than guessed at.
   //
@@ -106,7 +106,7 @@ function sessionRecoveryScore(
   // `moodMuscleMatches` is. Both sides of the provenance filter are pill labels from one
   // vocabulary, so they still compare directly, through the normaliser for the same reason
   // everything else here does.
-  const lifterAdded = soreMuscles.filter(m => !suggestedSet.has(normalizeMuscle(m)))
+  const lifterAdded = soreTickProvenance(soreMuscles, suggestedSoreMuscles).lifterReported
   // BF-171. This is the only soreness consumer in the repo that matched raw; the other six go
   // through `moodMuscleMatches`. "Back" is a pill the picker offers and the exercise library has no
   // muscle of that name — it has `lats`, `upper back` and `traps` — so exact equality clamped

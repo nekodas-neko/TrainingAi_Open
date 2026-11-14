@@ -51,7 +51,7 @@ const signals = (over: Partial<PrescriptionSignals> = {}): PrescriptionSignals =
   sessionsInPhase: 2,
   hoursSinceLastSession: 48,
   consecutiveSessionDaysOfThisType: 0,
-  soreMusclesInSession: [],
+  soreMusclesInSession: [], recentlyTrainedMusclesInSession: [],
   soreMusclesOutOfSession: [],
   sorenessLogDate: 'none',
   activeInjuredMusclesInSession: [],
