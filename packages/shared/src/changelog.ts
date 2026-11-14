@@ -7,12 +7,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "1.522.0",
-    date: "2026-11-14",
+    date: "2026-11-15",
     changes: [
+      "Both apps: the workout recap is written from the session's own numbers instead of by the AI. The same workout now reads the same every time you open it, and the recap still appears when the AI is unavailable.",
+      "Both apps: heart-rate zones, the cardio week and the heart-rate profile load faster. The 90 days of heart rate behind them are worked out once a day instead of on every request. No number changes.",
+      "Both apps: the nutrition goal recommendation and your body details always use your most recent weigh-in, by date.",
+      "TrainingAi Preview: Back returns to the screen you came from, at the place you left it. Android's Back goes to Home from another tab, and tapping the tab you are on scrolls it to the top.",
+      "TrainingAi Preview: buttons and cards dim when pressed, and small controls have a larger touch area. A pace no longer reads 5:60, and a workout's volume and the week's nutrition average read the same on every screen.",
       "TrainingAi Preview: after you log a planned meal, the day's remaining plan meals re-balance to what is left, the same rule the current app uses.",
       "TrainingAi Preview: a connection that drops for a moment during a workout is no longer reported as a fault. Your sets still sync on the retry, as before.",
       "Behind the scenes: the server keeps a per-day record of which TrainingAi Preview builds are calling it, and can name a minimum build (none is set), so an old build can be told to update when one is needed.",
       "Behind the scenes: server code no longer imports screen code, and a rule keeps it that way.",
+      "Behind the scenes: a program the AI builds and one it changes in the builder chat are cleaned by the same code, and the next-session read fetches only the exercise names and muscles it uses.",
     ],
   },
   {
