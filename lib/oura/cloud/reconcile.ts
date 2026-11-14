@@ -1,6 +1,18 @@
 // The daily reconciliation read (#3079): re-reads the last `RECONCILE_DAYS` days of every document
 // type and the heart-rate series for each connected user, through the same code as the connect
-// backfill (`backfillOuraCloud`).
+// backfill (`backfillOuraCloud`). Once a week, on the user's local `RECONCILE_WEEKLY_WEEKDAY`, the
+// same pass reaches back `RECONCILE_WEEKLY_DAYS` instead (#3795 item 4), for an older night Oura
+// revised whose event was lost through all of Oura's retries.
+//
+// The weekly reach is a choice of window inside the daily pass, not a second timer: the clock below
+// restarts with every deploy (up to daily while the native app lands), so a 7-day timer could go a
+// month without firing, and a second lock and a second schedule are two more things to keep right.
+// The cost is that a weekday with no pass (the server down all day) skips that week's long read.
+//
+// What a pass did not store is reported (#3795 item 2): documents that failed the spec, types Oura
+// refused with a 403, and types refused although the grant covers them, each at most once a day.
+// `daily_resilience` refused despite the grant is expected (#3212) and kept apart, so it neither
+// makes noise nor hides a new type being refused.
 //
 // Webhooks are the primary feed, but Oura retries a failed delivery only about ten times over an
 // hour, so a missed event used to be recovered only by a manual backfill. Oura also revises a night
@@ -18,14 +30,20 @@ import type { Pool } from 'pg'
 import { getPool } from '@/lib/data/postgres/client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
-import { backfillOuraCloud, type OuraBackfillResult } from './backfill'
+import { backfillOuraCloud, listRefusedTypes, type OuraBackfillReport, type OuraBackfillResult } from './backfill'
 import { stillRhrRefresher } from './still-rhr'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
-import { reportOuraCloudIssue } from './report'
+import { OURA_DAILY_REPORT_INTERVAL_MS, reportOuraCloudIssue } from './report'
 import { withSessionLock } from './renewal'
 
 /** Today and the two days before it: last night, and the nights Oura is still likely to revise. */
 export const RECONCILE_DAYS = 3
+/** The weekly pass's reach: two weeks, well past the heart-rate catch-up's 7-day lookback. */
+export const RECONCILE_WEEKLY_DAYS = 14
+/** The user's local weekday (0 Sunday … 6 Saturday) whose pass reaches back `RECONCILE_WEEKLY_DAYS`: clear of Tuesday's release. */
+export const RECONCILE_WEEKLY_WEEKDAY = 3
+/** Types Oura refuses although the grant covers them by our scope map, known and accepted (#3212). */
+export const EXPECTED_REFUSED_DESPITE_GRANT: ReadonlySet<string> = new Set(['daily_resilience'])
 export const RECONCILE_INTERVAL_MS = 24 * 60 * 60 * 1000
 /** Clear of the renewal's first pass (5 min) and of a deploy's first minutes of traffic. */
 export const FIRST_PASS_DELAY_MS = 20 * 60 * 1000
@@ -46,6 +64,30 @@ export interface ReconcileDeps {
   now?: () => Date
 }
 
+/** How many days the pass for a user whose local day is `day` (`YYYY-MM-DD`) re-reads. */
+export function reconcileDaysFor(day: string): number {
+  return new Date(`${day}T12:00:00Z`).getUTCDay() === RECONCILE_WEEKLY_WEEKDAY ? RECONCILE_WEEKLY_DAYS : RECONCILE_DAYS
+}
+
+/** What the pass read but did not store, reported at most once a day per kind. Counts and type names only. */
+export function reportReconcileGaps(userId: string, from: string, to: string, report: OuraBackfillReport): void {
+  const daily = { userId, intervalMs: OURA_DAILY_REPORT_INTERVAL_MS }
+  if (report.dropped > 0) {
+    reportOuraCloudIssue('reconcile:dropped', `${report.dropped} documents or rows over ${from}..${to} did not match the spec and were not stored`, daily)
+  }
+  if (report.forbidden.length > 0) {
+    reportOuraCloudIssue('reconcile:forbidden', `Oura refused ${listRefusedTypes(report.forbidden, report.refusalReasons)} over ${from}..${to}`, daily)
+  }
+  const unexpected = report.refusedDespiteGrant.filter(t => !EXPECTED_REFUSED_DESPITE_GRANT.has(t))
+  const expected = report.refusedDespiteGrant.filter(t => EXPECTED_REFUSED_DESPITE_GRANT.has(t))
+  if (unexpected.length > 0) {
+    reportOuraCloudIssue('reconcile:refused-despite-grant', `Oura refused ${listRefusedTypes(unexpected, report.refusalReasons)} although the grant covers it`, daily)
+  }
+  if (expected.length > 0) {
+    reportOuraCloudIssue('reconcile:refused-despite-grant-expected', `Oura refused ${listRefusedTypes(expected, report.refusalReasons)} although the grant covers it (expected, #3212)`, daily)
+  }
+}
+
 function outcomeOf(result: OuraBackfillResult): ReconcileUserOutcome['result'] {
   if (!result.ok) return result.error
   return result.report.stoppedEarly ? 'stopped_early' : 'ok'
@@ -63,7 +105,7 @@ export async function reconcileOuraCloud(deps: ReconcileDeps): Promise<Reconcile
     const user = await deps.repo.getUserById(userId).catch(() => null)
     const tz = user?.timezone ?? DEFAULT_TZ
     const to = toAestDay(now, tz)
-    const from = shiftDateStr(to, -(RECONCILE_DAYS - 1))
+    const from = shiftDateStr(to, -(reconcileDaysFor(to) - 1))
     try {
       // Loaded here, as `runOuraReconcile` loads `@/lib/data`: this module is reached from the boot timer.
       const { workoutHrReattributor } = await import('@/lib/workout/post-completion-hr')
@@ -72,6 +114,7 @@ export async function reconcileOuraCloud(deps: ReconcileDeps): Promise<Reconcile
       })
       const outcome = outcomeOf(result)
       out.push({ userId, from, to, result: outcome })
+      if (result.ok) reportReconcileGaps(userId, from, to, result.report)
       if (outcome !== 'ok') {
         const detail = result.ok ? result.report.stoppedEarly ?? outcome : outcome
         console.warn(`[oura] daily reconciliation ${from}..${to}: ${detail}`)

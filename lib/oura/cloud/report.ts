@@ -16,16 +16,19 @@ export const OURA_REPORT_INTERVAL_MS = 60 * 60 * 1000
 const lastReported = new Map<string, number>()
 let observability: Promise<typeof import('@/lib/observability')> | null = null
 
+/** For a kind that is expected and only worth seeing once a day (#3795: the daily reconcile's gaps). */
+export const OURA_DAILY_REPORT_INTERVAL_MS = 24 * 60 * 60 * 1000
+
 /**
- * Reports `message` under `kind`, unless the same kind was reported in the last hour. Returns whether
- * it was sent. `kind` is the throttle key, so put the outcome in it (`webhook-signature:mismatch`)
- * and leave per-event detail in the message.
+ * Reports `message` under `kind`, unless the same kind was reported within `context.intervalMs`
+ * (default an hour). Returns whether it was sent. `kind` is the throttle key, so put the outcome in
+ * it (`webhook-signature:mismatch`) and leave per-event detail in the message.
  */
 export function reportOuraCloudIssue(
-  kind: string, message: string, context: { userId?: string } = {}, now = Date.now(),
+  kind: string, message: string, context: { userId?: string; intervalMs?: number } = {}, now = Date.now(),
 ): boolean {
   const last = lastReported.get(kind)
-  if (last !== undefined && now - last < OURA_REPORT_INTERVAL_MS) return false
+  if (last !== undefined && now - last < (context.intervalMs ?? OURA_REPORT_INTERVAL_MS)) return false
   lastReported.set(kind, now)
   const err = new Error(`oura_cloud ${kind}: ${message}`.slice(0, 500))
   // One import promise for every report, so concurrent reports never race the module load; a failed

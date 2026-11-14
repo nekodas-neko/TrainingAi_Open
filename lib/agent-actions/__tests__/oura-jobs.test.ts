@@ -8,6 +8,10 @@ vi.mock('@/lib/oura/cloud/backfill', async importActual => ({
   ...(await importActual<typeof import('@/lib/oura/cloud/backfill')>()), backfillOuraCloud: backfill,
 }))
 vi.mock('@/lib/oura/cloud/renewal', () => ({ runOuraWebhookRenewal: renewal }))
+const forceRefresh = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/oura/cloud/tokens', async importActual => ({
+  ...(await importActual<typeof import('@/lib/oura/cloud/tokens')>()), forceOuraTokenRefresh: forceRefresh,
+}))
 
 import { AgentActionRequest, agentJobLosesData, runAgentJob, type AgentJobContext } from '../jobs'
 
@@ -101,3 +105,53 @@ describe('oura-webhook-subscriptions (#2859)', () => {
     expect(out.status).toBe(409)
   })
 })
+
+// #3795: one forced refresh of the owner's grant, for the rehearsal before the first real one.
+describe('oura-force-refresh (#3795)', () => {
+  const APPROVAL = 'https://github.com/nekodas-neko/TrainingAi_Open/issues/3795#issuecomment-6885655059'
+  beforeEach(() => {
+    forceRefresh.mockReset()
+    process.env.OURA_CLIENT_ID = 'cid'
+    process.env.OURA_CLIENT_SECRET = 'cs'
+    process.env.OURA_REDIRECT_URI = 'http://localhost:3000/api/oura/callback'
+  })
+
+  it('takes only dryRun, and needs an approval for a real run, not for a dry run', () => {
+    expect(AgentActionRequest.safeParse(req('oura-force-refresh', { dryRun: true, userId: 'x' })).success).toBe(false)
+    expect(agentJobLosesData(AgentActionRequest.parse(req('oura-force-refresh', { dryRun: true })))).toBe(false)
+    expect(agentJobLosesData(AgentActionRequest.parse({ ...req('oura-force-refresh', { dryRun: false }), approval: APPROVAL }))).toBe(true)
+  })
+
+  it('a dry run answers the stored expiry and whether a refresh would run', async () => {
+    const report = { dryRun: true, stored: true, reauthRequired: false, expiresAt: '2026-12-11T02:00:00.000Z', wouldRefresh: true }
+    forceRefresh.mockResolvedValue(report)
+    const out = await runAgentJob(ctx, AgentActionRequest.parse(req('oura-force-refresh', { dryRun: true })))
+    expect(forceRefresh).toHaveBeenCalledWith(ctx.repo, expect.objectContaining({ clientId: 'cid' }), OWNER, true)
+    expect(out).toEqual({ status: 200, body: { report }, finish: { outcome: 'succeeded', affectedRows: 0, daysMoved: 0, error: null } })
+  })
+
+  it('records a refresh as succeeded, and a refusal or a failed save as failed with its outcome', async () => {
+    forceRefresh.mockResolvedValueOnce({ dryRun: false, outcome: 'refreshed', previousExpiresAt: 'a', expiresAt: '2027-01-14T02:00:00.000Z', detail: null })
+    const ok = await runAgentJob(ctx, AgentActionRequest.parse({ ...req('oura-force-refresh', { dryRun: false }), approval: APPROVAL }))
+    expect(ok.status).toBe(200)
+    expect(ok.finish).toEqual({ outcome: 'succeeded', affectedRows: 1, daysMoved: 0, error: null })
+
+    forceRefresh.mockResolvedValueOnce({ dryRun: false, outcome: 'refused', previousExpiresAt: 'a', expiresAt: 'a', detail: 'invalid_grant' })
+    const refused = await runAgentJob(ctx, AgentActionRequest.parse({ ...req('oura-force-refresh', { dryRun: false }), approval: APPROVAL }))
+    expect(refused.finish).toEqual({ outcome: 'failed', affectedRows: 0, daysMoved: 0, error: 'refused: invalid_grant' })
+
+    forceRefresh.mockResolvedValueOnce({ dryRun: false, outcome: 'save_failed', previousExpiresAt: 'a', expiresAt: 'a', detail: null })
+    const lost = await runAgentJob(ctx, AgentActionRequest.parse({ ...req('oura-force-refresh', { dryRun: false }), approval: APPROVAL }))
+    expect(lost.finish).toMatchObject({ outcome: 'failed', error: 'save_failed' })
+  })
+
+  it('answers 409 when there is no grant to refresh, and 503 without Oura configured', async () => {
+    forceRefresh.mockResolvedValueOnce({ dryRun: false, outcome: 'reauth_required', previousExpiresAt: null, expiresAt: null, detail: null })
+    const out = await runAgentJob(ctx, AgentActionRequest.parse({ ...req('oura-force-refresh', { dryRun: false }), approval: APPROVAL }))
+    expect(out.status).toBe(409)
+    expect(out.finish).toEqual({ outcome: 'refused', error: 'reauth_required' })
+    delete process.env.OURA_CLIENT_SECRET
+    expect((await runAgentJob(ctx, AgentActionRequest.parse(req('oura-force-refresh', { dryRun: true })))).status).toBe(503)
+  })
+})
+
