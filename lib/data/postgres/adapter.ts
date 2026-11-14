@@ -15,7 +15,7 @@ import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
 import { withUserLock } from './user-lock'
-import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
+import { estWorkoutKcal, plausibleSessionActiveMin } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
 import { errorLog } from '@trainingai/shared/logger'
@@ -1687,18 +1687,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async getYearReviewTotals(userId: string, from: Date): Promise<YearReviewTotals> {
-    const [sessionRow] = await this.db
-      .select({
-        sessionCount: sql<number>`COUNT(*)`,
-        // #3266: less the time paused, never more than the span itself.
-        totalMinutes: sql<number>`COALESCE(SUM(
-          EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60
-          - LEAST(COALESCE(${s.workoutSessions.pausedSec}, 0) / 60.0,
-                  GREATEST(EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60, 0))
-        ), 0)`,
-      })
+    // #3801: only completed workouts count, and only a span the shared plausibility rule accepts
+    // adds minutes (less the time paused, #3266). A workout never finished, or one whose start or
+    // end was stored wrongly, used to count and carry its whole span.
+    const sessions = await this.db
+      .select({ startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt, pausedSec: s.workoutSessions.pausedSec })
       .from(s.workoutSessions)
-      .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from), isNull(s.workoutSessions.deletedAt)))
+      .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from),
+        isNull(s.workoutSessions.deletedAt), isNotNull(s.workoutSessions.completedAt)))
+    const totalMinutes = sessions.reduce(
+      (sum, r) => sum + (plausibleSessionActiveMin(r.startedAt, r.completedAt, r.pausedSec) ?? 0), 0)
 
     const [setRow] = await this.db
       .select({
@@ -1714,10 +1712,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
 
     return {
-      sessionCount: Number(sessionRow?.sessionCount ?? 0),
+      sessionCount: sessions.length,
       totalSets: Number(setRow?.totalSets ?? 0),
       totalVolumeKg: Number(setRow?.totalVolumeKg ?? 0),
-      totalMinutes: Math.round(Number(sessionRow?.totalMinutes ?? 0)),
+      totalMinutes: Math.round(totalMinutes),
     }
   }
 
