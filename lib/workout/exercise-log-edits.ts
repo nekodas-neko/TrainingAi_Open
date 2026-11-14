@@ -71,7 +71,6 @@ export async function editExerciseLog(
     [exerciseLogId],
   )
   const exerciseName = ctxRows[0].exercise_name
-  const workoutSessionId = ctxRows[0].workout_session_id
   const repo = await getRepository()
   const exerciseType = await repo.getExerciseType(exerciseName)
   const styles = await repo.listProgressionStyles(userId)
@@ -203,7 +202,6 @@ export async function editExerciseLog(
     client.release()
   }
   await repo.reconcilePersonalRecord(userId, exerciseName)
-  await repo.deleteAiHealthInsight(userId, `session-recap:${workoutSessionId}`)
   return { found: true, superseded: false }
 }
 
@@ -293,6 +291,5 @@ export async function deleteExerciseLog(
   }
   const repo = await getRepository()
   if (exerciseName) await repo.reconcilePersonalRecord(userId, exerciseName)
-  if (workoutSessionId) await repo.deleteAiHealthInsight(userId, `session-recap:${workoutSessionId}`)
   return { found: true, sessionDeleted }
 }

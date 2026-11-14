@@ -1237,7 +1237,6 @@ export interface WorkoutRepository {
   saveMeasuredRmr(userId: string, input: MeasuredRmrInput): Promise<void>
   getLatestMeasuredRmr(userId: string): Promise<MeasuredRmrRow | null>
   listMeasuredRmr(userId: string): Promise<MeasuredRmrRow[]>
-  upsertAiHealthInsight(userId: string, section: string, date: string, insight: string, contextHash?: string): Promise<void>
   deleteAiHealthInsight(userId: string, section: string): Promise<void>
 
   // ── Sync ───────────────────────────────────────────────────────────────────
