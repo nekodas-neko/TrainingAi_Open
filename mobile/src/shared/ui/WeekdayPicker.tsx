@@ -3,6 +3,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { feedback } from '../../integrations/feedback/haptics';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
+import { PRESSED_OPACITY } from './pressFeedback';
 
 const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -42,7 +43,7 @@ export function WeekdayPicker({
               borderWidth: 1,
               borderColor: selected ? theme.colors.brand : theme.colors.border,
               backgroundColor: selected ? theme.colors.brand : theme.colors.surface,
-              opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
+              opacity: disabled ? 0.4 : pressed ? PRESSED_OPACITY : 1,
             })}
           >
             <AppText

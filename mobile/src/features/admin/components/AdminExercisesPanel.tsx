@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import {
   AppButton,
   AppText,
@@ -44,6 +45,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
   const { theme } = useTheme();
   return (
     <Pressable
+      feedback="none"
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}

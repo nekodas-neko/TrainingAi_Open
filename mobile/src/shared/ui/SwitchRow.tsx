@@ -1,3 +1,4 @@
+import { feedback } from '../../integrations/feedback/haptics';
 import { Switch } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
@@ -37,7 +38,10 @@ export function SwitchRow({
       <Switch
         accessibilityLabel={label}
         value={value}
-        onValueChange={onValueChange}
+        onValueChange={(next) => {
+          feedback();
+          onValueChange(next);
+        }}
         disabled={disabled}
         trackColor={{ false: theme.colors.raised, true: theme.colors.brand }}
       />

@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
+import { feedback } from '../../integrations/feedback/haptics';
 import { AppText } from './AppText';
 import { AppButton } from './AppButton';
 import { NumericStepper } from './NumericStepper';
@@ -115,6 +116,7 @@ export const NumberWheel = memo(function NumberWheel({
     const text = String(value);
     if (text !== last.current) {
       last.current = text;
+      feedback();
       onChange(text);
     }
   }

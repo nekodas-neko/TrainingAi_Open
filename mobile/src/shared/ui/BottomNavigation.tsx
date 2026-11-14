@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText } from './AppText';
 import { AttentionDot } from './AttentionDot';
 import { useTheme } from '../theme/ThemeProvider';
+import { PRESSED_OPACITY } from './pressFeedback';
 
 export function BottomNavigation<T extends string>({
   items,
@@ -55,7 +56,7 @@ export function BottomNavigation<T extends string>({
                 justifyContent: 'flex-end',
                 paddingBottom: theme.spacing.sm,
                 gap: theme.spacing.xs,
-                opacity: pressed ? 0.75 : 1,
+                opacity: pressed ? PRESSED_OPACITY : 1,
               })}
             >
               {item.emphasized ? (

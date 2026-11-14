@@ -2,7 +2,8 @@ import { definitionDose, hasFreeTextBesideAmount } from '@trainingai/shared/nutr
 import { supplementSubtitle } from '@trainingai/shared/nutrition/supplement-subtitle';
 import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { z } from 'zod';
 import {
   AppButton,
@@ -153,6 +154,7 @@ export function SupplementsSection({ date }: { date: string }) {
               }}
             >
               <Pressable
+                feedback="none"
                 accessibilityRole="checkbox"
                 accessibilityLabel={s.name}
                 accessibilityHint={subtitle ?? undefined}

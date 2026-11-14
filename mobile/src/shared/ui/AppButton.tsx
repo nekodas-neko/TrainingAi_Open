@@ -5,6 +5,7 @@ import { Stack } from './Stack';
 import { Icon, type IconName } from './Icon';
 import { useTheme } from '../theme/ThemeProvider';
 import type { TextVariant } from '../theme/tokens';
+import { PRESSED_OPACITY } from './pressFeedback';
 
 export function AppButton({
   title,
@@ -70,7 +71,7 @@ export function AppButton({
           backgroundColor: background,
           borderWidth: variant === 'surface' ? 1 : 0,
           borderColor: theme.colors.border,
-          opacity: state.pressed ? 0.75 : 1,
+          opacity: state.pressed ? PRESSED_OPACITY : 1,
         },
         typeof style === 'function' ? style(state) : style,
       ]}

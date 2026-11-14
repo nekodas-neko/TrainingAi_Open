@@ -600,6 +600,9 @@ jobs:
       - name: A click-toggled disclosure declares its ARIA state
         run: node scripts/check-toggle-aria.js
 
+      - name: Native feature code uses the shared Pressable
+        run: node scripts/check-mobile-shared-pressable.js
+
       - name: memo() call sites pass stable props
         run: node scripts/check-memo-prop-stability.js
 

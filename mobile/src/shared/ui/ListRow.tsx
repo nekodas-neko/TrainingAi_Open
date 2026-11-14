@@ -5,6 +5,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
 import { Icon } from './Icon';
+import { PRESSED_OPACITY } from './pressFeedback';
 
 export function ListRow({
   title,
@@ -103,7 +104,7 @@ export function ListRow({
       onAccessibilityAction={(event) => {
         if (!disabled && event.nativeEvent.actionName === 'longpress') onLongPress?.();
       }}
-      style={({ pressed }) => ({ ...rowStyle, opacity: pressed ? 0.75 : 1 })}
+      style={({ pressed }) => ({ ...rowStyle, opacity: pressed ? PRESSED_OPACITY : 1 })}
     >
       {content}
     </Pressable>

@@ -1,3 +1,4 @@
+import { feedback } from '../../integrations/feedback/haptics';
 import { Pressable } from 'react-native';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
@@ -24,13 +25,14 @@ export function MultiChoice({
             accessibilityRole="checkbox"
             accessibilityState={{ checked: value.includes(option.value) }}
             aria-checked={value.includes(option.value)}
-            onPress={() =>
+            onPress={() => {
+              feedback();
               onChange(
                 value.includes(option.value)
                   ? value.filter((v) => v !== option.value)
                   : [...value, option.value],
-              )
-            }
+              );
+            }}
             style={{
               minHeight: theme.sizes.touchTarget,
               paddingHorizontal: theme.spacing.md,

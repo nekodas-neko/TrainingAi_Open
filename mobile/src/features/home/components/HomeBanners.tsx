@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { useUndo } from '../../../shared/ui/undo/UndoProvider';
 import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
 import { layoutMotion } from '../../../shared/ui/layoutMotion';
@@ -328,15 +328,14 @@ export function HomeBanners({
                 layoutMotion(reduced);
                 setExpanded((value) => !value);
               }}
-              style={({ pressed }) => ({
+              style={{
                 flex: 1,
                 minHeight: theme.sizes.touchTarget,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: theme.spacing.sm,
                 padding: theme.spacing.md,
-                opacity: pressed ? 0.65 : 1,
-              })}
+              }}
             >
               {entries.map((entry) => (
                 <Icon
@@ -376,15 +375,14 @@ export function HomeBanners({
                   accessibilityRole="button"
                   accessibilityLabel={entry.label}
                   onPress={entry.open}
-                  style={({ pressed }) => ({
+                  style={{
                     flex: 1,
                     minHeight: theme.sizes.touchTarget,
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: theme.spacing.md,
                     padding: theme.spacing.md,
-                    opacity: pressed ? 0.65 : 1,
-                  })}
+                  }}
                 >
                   <Icon name={entry.icon} color={theme.tones[bannerTone[entry.type]].foreground} />
                   <Stack gap="xxs" style={{ flex: 1 }}>

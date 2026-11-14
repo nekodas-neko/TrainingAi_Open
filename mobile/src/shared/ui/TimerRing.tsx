@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from './Pressable';
 import Svg, { Circle } from 'react-native-svg';
 import { AppText } from './AppText';
 import { useTheme } from '../theme/ThemeProvider';

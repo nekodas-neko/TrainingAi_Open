@@ -3,7 +3,8 @@ import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
 import { layoutMotion } from '../../../shared/ui/layoutMotion';
 import { feedback } from '../../../integrations/feedback/haptics';
 import { useCallback, useMemo, useState, type PropsWithChildren, type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import {
   AppButton,
   ActionMenu,
@@ -162,7 +163,9 @@ export function HomeSection({
               }
             />
           ))}
+        {/* No dim: a tap here does nothing, and the hold starts the widget menu and reorder. */}
         <Pressable
+          feedback="none"
           accessible={false}
           delayLongPress={MENU_DELAY_MS}
           onLongPress={longPress?.onLongPress}

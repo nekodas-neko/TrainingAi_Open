@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { TouchSurface } from '../../../shared/ui/TouchSurface';
 import { AppText, Card, Skeleton, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
@@ -29,7 +30,7 @@ export function CollectionCard({
   const collections = state.data?.v2.collections;
   const model = collections ? cardModel(collections) : null;
   return (
-    <Pressable
+    <TouchSurface
       accessibilityRole="button"
       accessibilityLabel="Collection. Open your collection"
       onPress={openCollection}
@@ -84,6 +85,6 @@ export function CollectionCard({
           </>
         )}
       </Card>
-    </Pressable>
+    </TouchSurface>
   );
 }

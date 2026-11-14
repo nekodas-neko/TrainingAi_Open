@@ -8,6 +8,7 @@ import { AppText } from './AppText';
 import { IconButton } from './IconButton';
 import { Icon } from './Icon';
 import { useTheme } from '../theme/ThemeProvider';
+import { PRESSED_OPACITY } from './pressFeedback';
 
 export function Disclosure({
   title,
@@ -51,7 +52,7 @@ export function Disclosure({
                 minWidth: 0,
                 minHeight: theme.sizes.touchTarget,
                 justifyContent: 'center',
-                opacity: pressed ? 0.7 : 1,
+                opacity: pressed ? PRESSED_OPACITY : 1,
               })}
             >
               <AppText variant="label" numberOfLines={2}>{title}</AppText>

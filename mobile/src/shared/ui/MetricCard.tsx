@@ -10,6 +10,7 @@ import { Card } from './Card';
 import { Icon, type IconName } from './Icon';
 import { IconButton } from './IconButton';
 import { Stack } from './Stack';
+import { PRESSED_OPACITY } from './pressFeedback';
 
 export function MetricCard({
   label,
@@ -139,7 +140,7 @@ export function MetricCard({
           style={({ pressed }) => ({
             paddingRight: onOpen && !dense ? theme.sizes.iconSmall : 0,
             gap: theme.spacing.xs,
-            opacity: pressed ? 0.65 : 1,
+            opacity: pressed ? PRESSED_OPACITY : 1,
             minHeight:
               value !== undefined
                 ? dense
@@ -212,7 +213,7 @@ export function MetricCard({
                 style={({ pressed }) => ({
                   minHeight: theme.sizes.touchTarget,
                   justifyContent: 'center',
-                  opacity: pressed ? 0.65 : 1,
+                  opacity: pressed ? PRESSED_OPACITY : 1,
                 })}
               >
                 <Stack
@@ -235,7 +236,7 @@ export function MetricCard({
                 style={({ pressed }) => ({
                   minHeight: theme.sizes.touchTarget,
                   justifyContent: 'center',
-                  opacity: pressed ? 0.65 : 1,
+                  opacity: pressed ? PRESSED_OPACITY : 1,
                 })}
               >
                 <Stack

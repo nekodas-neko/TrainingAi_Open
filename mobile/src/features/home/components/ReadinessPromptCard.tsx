@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { CURRENT_VS_QUESTION } from '@trainingai/shared/types/day-checkin';
 import { AppText, Card, Stack, StatusIndicator } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -78,14 +79,13 @@ export function ReadinessPromptCard({
       accessibilityLabel="Log soreness"
       onPress={openReadiness}
       hitSlop={theme.spacing.xs}
-      style={({ pressed }) => ({
+      style={{
         minHeight: theme.sizes.touchTarget,
         justifyContent: 'center',
         paddingHorizontal: theme.spacing.md,
         borderRadius: theme.radii.pill,
         backgroundColor: theme.colors.raised,
-        opacity: pressed ? 0.65 : 1,
-      })}
+      }}
     >
       <AppText variant="label">Log soreness</AppText>
     </Pressable>
@@ -105,7 +105,7 @@ export function ReadinessPromptCard({
               accessibilityState={{ checked: false, disabled: busy }}
               disabled={busy}
               onPress={() => void answer(option.value)}
-              style={({ pressed }) => ({
+              style={{
                 flex: 1,
                 minHeight: theme.sizes.touchTarget,
                 alignItems: 'center',
@@ -116,8 +116,8 @@ export function ReadinessPromptCard({
                 borderWidth: 1,
                 borderColor: theme.colors.border,
                 backgroundColor: theme.colors.raised,
-                opacity: pressed || busy ? 0.65 : 1,
-              })}
+                opacity: busy ? 0.65 : 1,
+              }}
             >
               {/* Three pills share ~103 dp at 384 px: "About the same" wraps rather than clips. */}
               <AppText variant="label" style={{ textAlign: 'center' }}>

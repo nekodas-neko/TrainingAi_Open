@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { TouchSurface } from '../../../shared/ui/TouchSurface';
 import { AppText, Badge, Card, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { ExercisePreview } from '../catalog';
@@ -28,7 +29,7 @@ export function SessionExerciseList({
           ...(exercise.secondaryMuscles ?? []),
         ].some((muscle) => injuredMuscles.includes(normalizeMuscle(muscle)));
         return (
-          <Pressable
+          <TouchSurface
             key={exercise.id}
             accessibilityRole={onSelect ? 'button' : undefined}
             accessibilityLabel={`${exercise.name}${completed ? ', completed' : ''}`}
@@ -76,7 +77,7 @@ export function SessionExerciseList({
                 </View>
               </Stack>
             </Card>
-          </Pressable>
+          </TouchSurface>
         );
       })}
     </Stack>

@@ -6,6 +6,7 @@ import { IconButton } from './IconButton';
 import { Stack } from './Stack';
 import { calendarTitleStacked, monthGrid } from './monthGrid';
 import { useTheme } from '../theme/ThemeProvider';
+import { PRESSED_OPACITY } from './pressFeedback';
 
 export function MonthCalendar({
   month,
@@ -186,7 +187,7 @@ export function MonthCalendar({
                     // The dots sit under the date, so the date moves up to make room.
                     justifyContent: topAligned ? 'flex-start' : 'center',
                     paddingTop: topAligned ? theme.spacing.xxs : 0,
-                    opacity: pressed ? 0.6 : 1,
+                    opacity: pressed ? PRESSED_OPACITY : 1,
                   })}
                 >
                   <View

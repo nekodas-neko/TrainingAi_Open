@@ -1,3 +1,22 @@
+/**
+ * Which actions vibrate (#3759). A new control follows this table; nothing else vibrates.
+ *
+ * | Action                                                              | Kind        |
+ * |---------------------------------------------------------------------|-------------|
+ * | A selection changes: tab, segmented control, page dots, chip,       | `selection` |
+ * | choice tile, multi-choice, weekday, switch, stepper tick, wheel tick |             |
+ * | A confirm: saving a set, finishing a workout, logging food,         | `success`   |
+ * | a hold completing, an undo                                          |             |
+ * | A destructive swipe passing its threshold, a reorder step           | `selection` |
+ * | A gesture taking hold: sheet drag, reorder pick-up, section menu    | `impact`    |
+ * | A plain press that navigates or opens (AppButton, IconButton, rows, | none        |
+ * | cards)                                                              |             |
+ *
+ * The shared controls in `shared/ui` make these calls themselves, so a screen only calls
+ * `feedback` for a confirm it owns. Ticks closer together than 120 ms are dropped. On Android the
+ * calls go through the view haptics API, which follows the phone's own touch-vibration setting;
+ * on iOS they follow the system haptics switch. There is no separate in-app setting.
+ */
 import { Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo';
 

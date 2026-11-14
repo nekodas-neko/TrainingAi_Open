@@ -1,5 +1,6 @@
 import { bodyweightRepMax, displayOneRm, oneRmLabel } from '@trainingai/shared/1rm';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, Card, Icon, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { formatDuration } from '../../../shared/hooks/useClock';
