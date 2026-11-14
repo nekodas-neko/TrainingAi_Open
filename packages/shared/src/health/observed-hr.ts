@@ -118,6 +118,64 @@ export function computeObservedHr(bpms: readonly number[], opts?: ObservedHrOpti
   }
 }
 
+/**
+ * The same profile as `computeObservedHr`, read off a count per bpm instead of the readings (#3774).
+ *
+ * Heart rate is stored as a whole number, so a count per bpm value holds everything the profile
+ * reads: the count and the sum fold by addition, and a k-th highest or lowest reading "with
+ * multiplicity" is found by walking the counts from one end until k readings have been passed. That
+ * makes the profile of two disjoint sets of readings exactly the profile of their summed counts,
+ * which is what lets the server keep the closed part of a window and add only today's readings to it.
+ *
+ * `counts` may hold out-of-band values; they are counted as rejected, as the readings would be.
+ * Held to `computeObservedHr` by `observed-hr-histogram.test.ts`.
+ */
+export function observedHrFromCounts(
+  counts: Iterable<readonly [bpm: number, count: number]>, opts?: ObservedHrOptions,
+): ObservedHrProfile {
+  const k = Math.max(1, opts?.corroboration ?? CORROBORATION)
+  const minSamples = opts?.minReliableSamples ?? MIN_RELIABLE_SAMPLES
+
+  let total = 0
+  let sampleCount = 0
+  let sum = 0
+  const plausible: [number, number][] = []
+  for (const [bpm, count] of counts) {
+    if (!(count > 0)) continue
+    total += count
+    if (!Number.isFinite(bpm) || bpm < PLAUSIBLE_MIN_BPM || bpm > PLAUSIBLE_MAX_BPM) continue
+    sampleCount += count
+    sum += bpm * count
+    plausible.push([bpm, count])
+  }
+  const outOfBandRejected = total - sampleCount
+  if (sampleCount === 0) return { ...EMPTY_OBSERVED_HR, outOfBandRejected: total }
+
+  const avg = Math.round(sum / sampleCount)
+  if (sampleCount < k) {
+    return { min: null, max: null, avg, sampleCount, isReliable: false, outOfBandRejected, highestPlausible: null }
+  }
+
+  plausible.sort((a, b) => a[0] - b[0])
+  const kthFrom = (start: number, step: 1 | -1): number => {
+    let passed = 0
+    for (let i = start; i >= 0 && i < plausible.length; i += step) {
+      passed += plausible[i][1]
+      if (passed >= k) return plausible[i][0]
+    }
+    return plausible[start][0]
+  }
+  return {
+    min: kthFrom(0, 1),
+    max: kthFrom(plausible.length - 1, -1),
+    avg,
+    sampleCount,
+    isReliable: sampleCount >= minSamples,
+    outOfBandRejected,
+    highestPlausible: plausible[plausible.length - 1][0],
+  }
+}
+
 export interface MaxHrResolution {
   /** The max HR to use for effort math: the observed max when reliable and higher than
    *  the estimate, else the age estimate. */

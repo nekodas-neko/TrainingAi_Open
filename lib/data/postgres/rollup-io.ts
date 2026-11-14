@@ -75,7 +75,7 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
         isNull(s.workoutSessions.deletedAt),
       )),
     deleteBleHeartrateNotIn: async (since, keep) => {
-      await db.delete(s.ouraHeartrate).where(and(
+      const deleted = await db.delete(s.ouraHeartrate).where(and(
         eq(s.ouraHeartrate.userId, userId),
         eq(s.ouraHeartrate.source, 'ble'),
         gte(s.ouraHeartrate.timestamp, since),
@@ -84,7 +84,9 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
         // with no values is not a no-op to reason about, and the wrong reading of it (keep
         // everything) would silently strand rows the rollup had dropped.
         ...(keep.length ? [notInArray(s.ouraHeartrate.timestamp, keep)] : []),
-      ))
+      )).returning({ timestamp: s.ouraHeartrate.timestamp })
+      // #3774: a deleted row from an earlier day changes the kept part of the observed profile.
+      oura.dropObservedHrDayFor(userId, deleted.map(r => r.timestamp))
     },
     upsertHeartrate: async rows => { await oura.upsertOuraHeartrate(db, userId, rows) },
     deleteZoneMinutesFrom: (fromDay, tz) => oura.deleteZoneMinutesFrom(db, userId, fromDay, tz),

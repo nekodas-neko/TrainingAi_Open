@@ -4,7 +4,7 @@ import { DEFAULT_TZ, shiftDateStr, todayInTz } from '@trainingai/shared/date-uti
 import { projectDeviceHealth } from '@trainingai/shared/health/device-health-projection';
 import { groupSleepPeriods } from '@trainingai/shared/health/sleep-night';
 import { HEALTH_IMPORT_MAX_INTERVAL_DAYS } from '@trainingai/shared/health/import-limits';
-import { HR_RETENTION_DAYS, settleNights } from './oura';
+import { HR_RETENTION_DAYS, dropObservedHrDayFor, settleNights } from './oura';
 import { initialSourceMap, mergeSet, type SourceColumn } from '../../health-source';
 import type { getDb } from '../client';
 import * as s from '../schema';
@@ -77,7 +77,10 @@ export async function rebuildNativeHealth(
   timezone: string,
   project: (db: Db, from: Date, to: Date) => Promise<ReturnType<typeof projectDeviceHealth>>,
 ) {
-  return db.transaction(async (tx) => {
+  // #3774: the heart-rate rows this rebuild deletes or writes, reported once it has committed so the
+  // kept part of the observed profile is dropped for a change to an earlier day.
+  const heartChanged: Date[] = [];
+  const done = await db.transaction(async (tx) => {
     await tx.execute(projectionLock(userId, source));
     const state = s.nativeHealthProjectionDays;
     const pending = await tx
@@ -229,6 +232,7 @@ export async function rebuildNativeHealth(
     }
     const hr = s.ouraHeartrate;
     const byTimestamp = new Map(heart.map((point) => [point.timestamp.getTime(), point.bpm]));
+    const stored = new Map<number, number>();
     if (keys.length) {
       const previous = await tx
         .select()
@@ -246,6 +250,8 @@ export async function rebuildNativeHealth(
           keys.includes(formatInTimeZone(point.timestamp, timezone, 'yyyy-MM-dd')) &&
           !byTimestamp.has(point.timestamp.getTime()),
       );
+      for (const point of previous) stored.set(point.timestamp.getTime(), point.bpm);
+      for (const point of obsolete) heartChanged.push(point.timestamp);
       for (let i = 0; i < obsolete.length; i += 500)
         await tx.delete(hr).where(
           and(
@@ -258,6 +264,9 @@ export async function rebuildNativeHealth(
           ),
         );
     }
+    // A point already stored with the same bpm changes nothing a reader sees.
+    for (const point of heart)
+      if (stored.get(point.timestamp.getTime()) !== point.bpm) heartChanged.push(point.timestamp);
     for (let i = 0; i < heart.length; i += 500)
       await tx
         .insert(hr)
@@ -338,4 +347,6 @@ export async function rebuildNativeHealth(
       completedAt: new Date().toISOString(),
     };
   });
+  dropObservedHrDayFor(userId, heartChanged);
+  return done;
 }
