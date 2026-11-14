@@ -1,6 +1,7 @@
 import { ReorderScrollView } from './ReorderScrollView';
-import type { PropsWithChildren } from 'react';
-import { RefreshControl } from 'react-native';
+import { useRef, type PropsWithChildren } from 'react';
+import { RefreshControl, type ScrollView } from 'react-native';
+import { useScrollToTop } from './ScrollToTop';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function TabPanel({
@@ -12,8 +13,11 @@ export function TabPanel({
   onRefresh?: () => void;
 }>) {
   const { theme } = useTheme();
+  const view = useRef<ScrollView>(null);
+  useScrollToTop(view);
   return (
     <ReorderScrollView
+      scrollRef={view}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       refreshControl={

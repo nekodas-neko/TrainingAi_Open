@@ -155,7 +155,7 @@ test('a health alert carries the owner, scope and target a tap needs to open the
   assert.match(read('integrations/notifications/platform.native.ts'), /healthAlert: type, scope, target: HEALTH_ALERT_TARGET/);
   assert.match(read('features/health/HealthAlerts.tsx'), /healthAlert\(type, title, body, scope\)/);
   assert.match(read('features/platform/components/AlertNavigation.tsx'), /HEALTH_ALERT_TARGET\) onHealthDetail\('readiness'\)/);
-  assert.match(read('app/App.tsx'), /onHealthDetail=\{[\s\S]*selectTab\('Health'\);[\s\S]*setHealthDetail\(next\)/);
+  assert.match(read('app/App.tsx'), /onHealthDetail=\{\(next\) => openOn\('Health', \{ screen: 'health-detail', detail: next \}\)\}/);
   assert.equal(typeof ALERT_OWNER, 'string');
 });
 
