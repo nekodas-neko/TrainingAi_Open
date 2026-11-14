@@ -9,6 +9,7 @@ import { buildGoalExplanation, suggestActivityLevel, RECOMMENDATION_WINDOW_DAYS 
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
+import { latestWeightKg } from '@trainingai/shared/health/latest-weight'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 
 // An optional source marker; the body is normally absent.
@@ -70,7 +71,9 @@ export async function POST(req: Request) {
     repo.listActivityLogs(userId, fromIso, todayIso).catch(() => []),
   ])
 
-  const latestWeight = bodyMetrics.find(m => m.weightKg != null)?.weightKg
+  // By date, not by position: `listBodyMetrics` happens to return newest first, and the calorie and
+  // macro targets must not depend on that (#3771).
+  const latestWeight = latestWeightKg(bodyMetrics, todayIso)
   if (latestWeight == null) {
     return NextResponse.json({ error: 'no_weight_data' }, { status: 400 })
   }

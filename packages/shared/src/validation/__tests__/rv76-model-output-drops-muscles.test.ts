@@ -14,16 +14,9 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { GeneratedProgramSchema } from '../generated-program'
+import { ModelExerciseSchema } from '../../workout/model-program'
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
-
-/** A named `z.object({...})` literal from a route, so a match cannot come from a different one. */
-function schemaLiteral(src: string, name: string): string {
-  const i = src.indexOf(`const ${name} = z.object({`)
-  expect(i, `${name} not found`).toBeGreaterThan(-1)
-  const rest = src.slice(i)
-  return rest.slice(0, rest.indexOf('\n})') + 3)
-}
 
 /** What the builder client really posts: its program state, muscles and all. */
 const clientProgram = {
@@ -41,17 +34,22 @@ const clientProgram = {
 }
 
 describe('RV-76 — muscles leave the model schemas and stay in the request schema', () => {
-  for (const [file, schema] of [
-    ['app/api/generate-program/route.ts', 'GeneratedExerciseSchema'],
-    ['app/api/builder-chat/route.ts', 'BuilderExerciseSchema'],
-  ] as const) {
-    it(`${schema} no longer asks the model for muscles`, () => {
-      const literal = schemaLiteral(read(file), schema)
-      expect(literal).not.toContain('mainMuscles')
-      expect(literal).not.toContain('secondaryMuscles')
-      // Still the fields that ARE read, so this cannot pass by the schema being gutted.
-      expect(literal).toContain('name')
-      expect(literal).toContain('exerciseRole')
+  // #3750: both routes now take the exercise shape from one shared schema, so the check reads the
+  // schema itself and that each route uses it, where it used to read two literals in route source.
+  it('the shared model schema does not ask for muscles', () => {
+    const fields = Object.keys(ModelExerciseSchema.shape)
+    expect(fields).not.toContain('mainMuscles')
+    expect(fields).not.toContain('secondaryMuscles')
+    // Still the fields that ARE read, so this cannot pass by the schema being gutted.
+    expect(fields).toContain('name')
+    expect(fields).toContain('exerciseRole')
+  })
+
+  for (const file of ['app/api/generate-program/route.ts', 'app/api/builder-chat/route.ts']) {
+    it(`${file} asks the model for the shared shape and declares no exercise schema of its own`, () => {
+      const src = read(file)
+      expect(src).toContain('sessions: z.array(ModelSessionSchema)')
+      expect(src).not.toMatch(/exerciseRole: z\.enum/)
     })
   }
 

@@ -8,13 +8,13 @@ import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { z } from 'zod'
-import type { GeneratedProgram, GeneratedExercise } from '@trainingai/shared/types/builder'
+import type { GeneratedProgram } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
 import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
-import { buildExerciseNameResolver, resolveAgainstLibrary } from '@trainingai/shared/workout/exercise-name-resolver'
+import { buildExerciseNameResolver } from '@trainingai/shared/workout/exercise-name-resolver'
+import { cleanModelProgram, ModelSessionSchema } from '@trainingai/shared/workout/model-program'
 import { activeInjuries, activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
-import { capPrimariesPerSession } from '@trainingai/shared/workout/exercise-role'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import {
   styleWorkSec, workingBudgetMin,
@@ -79,28 +79,14 @@ const GOAL_PHASE_SET_MAP: Record<string, string> = {
   strength:               'Strength Progression',
 }
 
-// RV-76: no mainMuscles/secondaryMuscles. `resolveAgainstLibrary` below overwrites both with the
-// library's assignments for every exercise it keeps, and drops the ones it cannot resolve — so
-// asking the model for them bought two string arrays per exercise that were discarded a few lines
-// later, on the slowest call in the app. It was also a field the model is known to get wrong (the
-// comment at the prompt cites Glutes as main for squats).
-//
-// This is the MODEL-OUTPUT schema. The same two fields stay in the request-side
-// `GeneratedExerciseSchema` in packages/shared/src/validation/generated-program.ts, which is
-// `.strict()` and validates the program the builder client posts back — that state carries them.
-const GeneratedExerciseSchema = z.object({
-  name: z.string(),
-  exerciseRole: z.enum(['primary', 'secondary', 'accessory']),
-  progressionStyleName: z.string(),
-})
-
+// The exercise and session shapes are `ModelSessionSchema`, shared with `/api/builder-chat` (#3750).
+// They carry no muscles (RV-76): `cleanModelProgram` writes the library's over anything the model
+// would return, so asking for them bought two string arrays per exercise on the slowest call in
+// the app. The request-side `GeneratedExerciseSchema` in
+// packages/shared/src/validation/generated-program.ts keeps both; the builder client posts them.
 const GeneratedProgramSchema = z.object({
   name: z.string(),
-  sessions: z.array(z.object({
-    name: z.string(),
-    icon: z.string(),
-    exercises: z.array(GeneratedExerciseSchema),
-  })),
+  sessions: z.array(ModelSessionSchema),
   reasoning: z.string(),
 })
 export async function POST(req: Request) {
@@ -366,20 +352,19 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
     // Rule 2 of the prompt asks for exact names from the list; the model paraphrases anyway. An
     // exact-match filter used to DROP every paraphrase silently, so a session came back short of
     // the volume target the time budget was computed from, with nothing saying why. Resolving
-    // first means "Barbell Bench Press" is recognised as the library's "Bench Press" and the
+    // first means "bench press" or "Press, Bench" is recognised as the library's "Bench Press"
+    // (case, punctuation, plurals and word order; not an added word such as "Barbell") and the
     // exercise is kept — under the LIBRARY's name, because `personal_records` and
     // `exercise_estimates` are unique on `(user_id, exercise_name)`, so a paraphrase that survived
     // would start that lift's history from zero.
     //
-    // RV-76: the resolved exercises are kept in their OWN array rather than written back over
-    // `sess.exercises`. The model no longer emits muscles, so the schema's type has none, and
-    // assigning back would have thrown the library's assignments away in the type system while
-    // keeping them at runtime — the sort of gap that compiles and then reads `undefined`.
-    const unresolved: string[] = []
-    const resolvedSessions = raw.sessions.map(sess => {
-      const outcome = resolveAgainstLibrary(sess.exercises, nameResolver)
-      unresolved.push(...outcome.unresolved)
-      return { ...sess, exercises: outcome.resolved }
+    // Resolution, the primary cap, the style by role and the icon fallback are one function shared
+    // with `/api/builder-chat` (#3750), so the two routes cannot treat the same answer differently.
+    const { sessions: resolvedSessions, dropped: unresolved } = cleanModelProgram(raw.sessions, {
+      resolver: nameResolver,
+      goal: inputs.goal,
+      styleIdByName: new Map(userStyles.map(s => [s.name, s.id])),
+      fallbackIcon: true,
     })
 
     if (unresolved.length > 0) {
@@ -402,8 +387,6 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
       )
     }
 
-    // Map progressionStyleName → progressionStyleId using the user's actual styles
-    const styleByName = new Map(userStyles.map(s => [s.name, s.id]))
     const styleById = new Map(userStyles.map(s => [s.id, s.name]))
 
     type PhaseSet = Awaited<ReturnType<typeof repo.listPhaseSets>>[number]
@@ -421,50 +404,9 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
       }
     }
 
-    const SESSION_EMOJI: Record<string, string> = {
-      push: '🫸', pull: '🫷', legs: '🦵', upper: '💪', lower: '🦵',
-      'full body': '🏋️', cardio: '🏃', core: '🔥', arms: '💪',
-      back: '🔙', chest: '🫁', shoulders: '🙆', glutes: '🍑',
-    }
-
     const programJson: GeneratedProgram = {
       name: raw.name,
-      sessions: resolvedSessions.map(s => {
-        const hasEmoji = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/u.test(s.icon ?? '')
-        const icon = hasEmoji
-          ? s.icon
-          : (SESSION_EMOJI[s.name.toLowerCase()] ?? SESSION_EMOJI[s.name.toLowerCase().split(' ')[0]] ?? '🏋️')
-        return {
-          name: s.name,
-          icon,
-          // BF-126: cap before the role is read, because the role below picks the style.
-          exercises: capPrimariesPerSession(s.exercises).map(ex => {
-            const role = ex.exerciseRole as GeneratedExercise['exerciseRole']
-            const aiStyleName = ex.progressionStyleName
-            const goalRules = GOAL_STYLE_RULES[inputs.goal]
-            let styleName = aiStyleName
-            if (goalRules) {
-              const enforced = goalRules[role as keyof typeof goalRules] ?? goalRules.accessory
-              if (role === 'primary' || role === 'secondary') {
-                // Always enforce — never fall back to AI choice for primary/secondary
-                styleName = enforced
-              } else {
-                // For accessories accept AI's choice if valid, otherwise use enforced default
-                styleName = styleByName.has(aiStyleName) ? aiStyleName : enforced
-              }
-            }
-            const styleId = styleByName.get(styleName)
-            return {
-              name: ex.name,
-              exerciseRole: role,
-              progressionStyleName: styleName || undefined,
-              progressionStyleId: styleId,
-              mainMuscles: ex.mainMuscles,
-              secondaryMuscles: ex.secondaryMuscles,
-            }
-          }),
-        }
-      }),
+      sessions: resolvedSessions,
       reasoning: raw.reasoning,
       phaseStructureName: inputs.progressionMode === 'linear' ? 'Linear Progression' : inputs.progressionMode === 'ai' ? 'AI Dynamic' : phaseSet!.name,
       phaseSetId: inputs.progressionMode === 'phase' ? phaseSet!.id : '',
