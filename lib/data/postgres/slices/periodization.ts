@@ -440,6 +440,7 @@ export async function getSetLogsForSessions(db: Db, workoutSessionIds: string[])
   workoutSessionId: string; exerciseName: string; setNumber: number;
   rpe: number | null; reps: number; intensityPct: number | null; setTimeSec: number | null
   rpeSource: import('@trainingai/shared/workout/rpe-source').RpeSource | null
+  plannedReps: number | null
 }>> {
   if (workoutSessionIds.length === 0) return []
   return db
@@ -452,6 +453,7 @@ export async function getSetLogsForSessions(db: Db, workoutSessionIds: string[])
       reps: s.setLogs.reps,
       intensityPct: s.setLogs.intensityPct,
       setTimeSec: s.setLogs.setTimeSec,
+      plannedReps: s.setLogs.plannedReps,
     })
     .from(s.setLogs)
     .innerJoin(s.exerciseLogs, eq(s.setLogs.exerciseLogId, s.exerciseLogs.id))
