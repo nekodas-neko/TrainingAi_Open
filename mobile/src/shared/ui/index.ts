@@ -81,6 +81,8 @@ export { Thumbnail } from './Thumbnail';
 export { TargetBars } from './TargetBars';
 export { MetricCard } from './MetricCard';
 export { ActionTile } from './ActionTile';
+export { Pressable } from './Pressable';
+export { PRESSED_OPACITY, type PressFeedback } from './pressFeedback';
 export { TouchSurface } from './TouchSurface';
 
 export { ActionMenu, type MenuAction } from './ActionMenu';

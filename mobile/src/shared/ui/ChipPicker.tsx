@@ -1,3 +1,4 @@
+import { feedback } from '../../integrations/feedback/haptics';
 import { Pressable, ScrollView } from 'react-native';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
@@ -32,7 +33,10 @@ export function ChipPicker<T extends string | number>({
           accessibilityRole="button"
           accessibilityState={{ selected: value === option.value, disabled }}
           accessibilityLabel={option.label}
-          onPress={() => onChange(value === option.value ? null : option.value)}
+          onPress={() => {
+            feedback();
+            onChange(value === option.value ? null : option.value);
+          }}
           style={{
             minHeight: theme.sizes.touchTarget,
             paddingHorizontal: theme.spacing.md,

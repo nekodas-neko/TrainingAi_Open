@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { ExerciseHistory } from '../components/ExerciseHistory';
 import {
   AppButton,
@@ -201,7 +201,9 @@ export function HistoryDay({
                     accessibilityRole="button"
                     accessibilityLabel={entry.name + ' history'}
                     onPress={() => setHistory(entry.name)}
-                    style={{ flex: 1 }}
+                    // The name fills the row's height, which the 48 dp edit and delete buttons
+                    // beside it set, so the text stays where it was (#3759).
+                    style={{ flex: 1, alignSelf: 'stretch', justifyContent: 'center' }}
                   >
                     <AppText variant="caption">{entry.name}</AppText>
                   </Pressable>

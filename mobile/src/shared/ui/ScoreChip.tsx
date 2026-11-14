@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from './Pressable';
 import Svg, { Circle, Path, Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';

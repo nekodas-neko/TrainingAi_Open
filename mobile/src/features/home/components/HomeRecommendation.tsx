@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
+import { slopTo } from '../../../shared/ui/touchSlop';
 import {
   AppButton,
   AppText,
@@ -182,7 +183,14 @@ export function HomeRecommendation({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Why this session?"
-              hitSlop={theme.spacing.sm}
+              // One 20 dp line. The reach goes over the session name above and the gap below;
+              // neither is tappable (#3759).
+              hitSlop={{
+                top: slopTo(theme.sizes.touchTarget, theme.sizes.iconSmall),
+                bottom: slopTo(theme.sizes.touchTarget, theme.sizes.iconSmall),
+                left: theme.spacing.sm,
+                right: theme.spacing.sm,
+              }}
               onPress={() => openExplanation(session.id)}
               style={{ alignSelf: 'flex-start' }}
             >

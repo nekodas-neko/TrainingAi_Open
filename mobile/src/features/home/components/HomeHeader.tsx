@@ -1,4 +1,5 @@
-import { Pressable, Image, View } from 'react-native';
+import { Image, View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, AttentionDot, IconButton, Stack, StatusIndicator } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';

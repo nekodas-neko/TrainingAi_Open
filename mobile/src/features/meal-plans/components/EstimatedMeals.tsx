@@ -2,7 +2,7 @@ import { randomUUID } from 'expo-crypto';
 import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time';
 import type { MealType } from '@trainingai/shared/types/nutrition';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable } from 'react-native';
+import { TouchSurface } from '../../../shared/ui/TouchSurface';
 import { z } from 'zod';
 import { AppButton, AppText, Badge, Card, Icon, ListRow, Notice, Sheet, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -137,7 +137,7 @@ export function EstimatedMeals({
   return (
     <>
       {rows.map((row) => (
-        <Pressable
+        <TouchSurface
           key={row.meal.id}
           accessibilityRole="button"
           accessibilityLabel={`${row.mealTypeName}, estimated. Tap to answer.`}
@@ -157,7 +157,7 @@ export function EstimatedMeals({
               <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />
             </Stack>
           </Card>
-        </Pressable>
+        </TouchSurface>
       ))}
       <Sheet
         visible={open !== null}

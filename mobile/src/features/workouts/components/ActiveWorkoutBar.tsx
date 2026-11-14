@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { TouchSurface } from '../../../shared/ui/TouchSurface';
 import { AppText, Icon, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useClock, formatDuration } from '../../../shared/hooks/useClock';
@@ -19,7 +20,7 @@ function WorkoutBar({
   const now = workout.pausedAt ?? clock;
   const activity = workoutActivity(workout, now);
   return (
-    <Pressable
+    <TouchSurface
       accessibilityRole="button"
       accessibilityLabel={`Resume ${workout.sessionName}`}
       onPress={() => onResume(workout.id)}
@@ -53,7 +54,7 @@ function WorkoutBar({
         )}
         <Icon name="forward" tone="brand" />
       </Stack>
-    </Pressable>
+    </TouchSurface>
   );
 }
 export function ActiveWorkoutBar({ onResume }: { onResume: (id: string) => void }) {

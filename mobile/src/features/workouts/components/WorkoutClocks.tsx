@@ -1,4 +1,6 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
+import { slopTo } from '../../../shared/ui/touchSlop';
 import { transitionSecForEquipment } from '@trainingai/shared/workout/duration-model';
 import { AppButton, AppText, Icon, ProgressBar, Stack } from '../../../shared/ui';
 import { useClock, formatDuration } from '../../../shared/hooks/useClock';
@@ -59,12 +61,22 @@ export function SessionTimer({ workout }: { workout: WorkoutRecord; ring?: boole
   if (!pausable) {
     return chip;
   }
+  const chipHeight =
+    (theme.typography.micro.lineHeight ?? 0) +
+    (theme.typography.caption.lineHeight ?? 0) +
+    theme.spacing.xs * 2;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={paused ? 'Resume workout' : 'Pause workout'}
       disabled={journal.busy || !journal.controller}
-      hitSlop={theme.spacing.xs}
+      // The chip is two text lines and its padding; the reach stays inside the 48 dp header row.
+      hitSlop={{
+        top: slopTo(theme.sizes.touchTarget, chipHeight),
+        bottom: slopTo(theme.sizes.touchTarget, chipHeight),
+        left: theme.spacing.xs,
+        right: theme.spacing.xs,
+      }}
       onPress={() => {
         void (paused
           ? journal.controller?.resume(workout.id)

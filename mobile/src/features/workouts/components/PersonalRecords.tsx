@@ -1,4 +1,5 @@
-import { Pressable, Share, View } from 'react-native';
+import { Share, View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, Icon, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { personalRecordShareText } from '../logging/summary';

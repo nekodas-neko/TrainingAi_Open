@@ -14,7 +14,8 @@ import { rescaleRemaining } from '@trainingai/shared/nutrition/plan-rescale';
 import type { MealType } from '@trainingai/shared/types/nutrition';
 import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { z } from 'zod';
 import {
   AppButton,
@@ -410,7 +411,7 @@ function BuildPlanPrompt({
         accessibilityRole="button"
         accessibilityLabel="Build a meal plan"
         onPress={onSetup}
-        style={({ pressed }) => ({
+        style={{
           minHeight: theme.sizes.touchTarget,
           flexDirection: 'row',
           alignItems: 'center',
@@ -421,8 +422,7 @@ function BuildPlanPrompt({
           borderStyle: 'dashed',
           borderColor: theme.colors.border,
           backgroundColor: `${theme.colors.raised}66`,
-          opacity: pressed ? 0.8 : 1,
-        })}
+        }}
       >
         <Icon name="foods" tone="muted" size={theme.sizes.iconCompact} />
         <View style={{ flex: 1, minWidth: 0 }}>

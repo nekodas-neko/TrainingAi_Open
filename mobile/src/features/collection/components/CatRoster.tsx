@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, Stack } from '../../../shared/ui';
 import { layoutMotion } from '../../../shared/ui/layoutMotion';
 import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
@@ -50,14 +51,13 @@ export function CatRoster({
           accessibilityLabel={open ? 'Hide cats' : `Show all ${total} cats`}
           accessibilityState={{ expanded: open }}
           onPress={toggle}
-          style={({ pressed }) => ({
+          style={{
             minHeight: theme.sizes.touchTarget,
             justifyContent: 'center',
             paddingHorizontal: theme.spacing.md,
             borderRadius: theme.radii.pill,
             backgroundColor: theme.colors.raised,
-            opacity: pressed ? 0.7 : 1,
-          })}
+          }}
         >
           <AppText variant="caption" style={{ fontWeight: '600' }}>
             {open ? 'Hide' : `Show all ${total}`}

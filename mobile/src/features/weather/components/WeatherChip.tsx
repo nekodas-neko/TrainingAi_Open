@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, Icon, Sheet, Stack, type IconName } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWeather } from '../WeatherProvider';
@@ -33,23 +34,30 @@ export function WeatherChip() {
   const label = snapshot
     ? `${snapshot.place.name}: ${temperatureLabel(snapshot, settings.unit)}, ${snapshot.condition}${uv != null ? `, UV ${uv}` : ''}${stale ? ', saved weather' : ''}. Weather settings`
     : 'Weather settings. Choose a city or use current location.';
+  const chipHeight =
+    (theme.typography.caption.lineHeight ?? theme.sizes.iconSmall) + theme.spacing.sm;
   return (
     <>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
         onPress={() => setOpen(true)}
-        hitSlop={theme.spacing.sm}
-        style={({ pressed }) => ({
-          minHeight:
-            (theme.typography.caption.lineHeight ?? theme.sizes.iconSmall) + theme.spacing.sm,
+        // 24 dp drawn. The extra reach goes down over the date line, which is not tappable and
+        // sits inside the same header column, so nothing above the header can clip it (#3759).
+        hitSlop={{
+          top: theme.spacing.sm,
+          left: theme.spacing.sm,
+          right: theme.spacing.sm,
+          bottom: theme.sizes.touchTarget - chipHeight - theme.spacing.sm,
+        }}
+        style={{
+          minHeight: chipHeight,
           width: theme.sizes.touchTarget * 3,
           borderRadius: theme.radii.pill,
           backgroundColor: theme.colors.raised,
           paddingHorizontal: theme.spacing.sm,
           justifyContent: 'center',
-          opacity: pressed ? 0.75 : 1,
-        })}
+        }}
       >
         <Stack direction="row" align="center" gap="xs">
           {snapshot ? (

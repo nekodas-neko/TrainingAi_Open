@@ -1,3 +1,4 @@
+import { feedback } from '../../integrations/feedback/haptics';
 import { Pressable } from 'react-native';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
@@ -24,7 +25,10 @@ export function ChoiceTiles<T extends string | number>({
           <Pressable
             key={option.value}
             disabled={disabled}
-            onPress={() => onChange(option.value)}
+            onPress={() => {
+              if (value !== option.value) feedback();
+              onChange(option.value);
+            }}
             accessibilityRole="radio"
             accessibilityLabel={`${option.label}${option.caption?.trim() ? `, ${option.caption.trim()}` : ''}`}
             aria-checked={value === option.value}

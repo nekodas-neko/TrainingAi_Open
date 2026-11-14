@@ -1,5 +1,6 @@
 import { useRef } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { guideFor } from '@trainingai/shared/health/contributor-guide';
 import { scoreBand } from '@trainingai/shared/health/score-band';
 import { contributorNote } from '@trainingai/shared/health/score-gap-copy';

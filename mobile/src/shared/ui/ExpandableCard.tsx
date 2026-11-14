@@ -9,6 +9,7 @@ import { Stack } from './Stack';
 import { layoutMotion } from './layoutMotion';
 import { useReducedMotion } from './useReducedMotion';
 import { DisclosureIcon } from './DisclosureIcon';
+import { PRESSED_OPACITY } from './pressFeedback';
 
 export function ExpandableCard({
   title,
@@ -49,7 +50,7 @@ export function ExpandableCard({
             flexDirection: 'row',
             alignItems: 'center',
             gap: theme.spacing.md,
-            opacity: pressed ? 0.65 : 1,
+            opacity: pressed ? PRESSED_OPACITY : 1,
           })}
         >
           <Icon

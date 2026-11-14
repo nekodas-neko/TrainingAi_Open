@@ -1,6 +1,6 @@
 import type { MealLoggingStatus } from '@trainingai/shared/nutrition/meal-logging-status';
 import { useRef, useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, DisclosureIcon, IconButton, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { mealStatusLabels } from './MealLoggingStatus';
@@ -67,13 +67,12 @@ export function MealSectionHeader({
           accessibilityState={{ expanded }}
           accessibilityHint={expanded ? 'Collapse recorded food' : 'Expand recorded food'}
           onPress={onToggle}
-          style={({ pressed }) => ({
+          style={{
             flex: 1,
             minWidth: 0,
             minHeight: theme.sizes.touchTarget,
             justifyContent: 'center',
-            opacity: pressed ? 0.65 : 1,
-          })}
+          }}
         >
           {label}
         </Pressable>

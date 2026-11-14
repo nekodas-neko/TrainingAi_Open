@@ -4,6 +4,7 @@ import { scaleAlpha } from '../theme/alpha';
 import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 import { Stack } from './Stack';
+import { PRESSED_OPACITY } from './pressFeedback';
 
 export type TimelineRowMetric = {
   icon?: IconName;
@@ -59,7 +60,7 @@ export function TimelineRow({
       style={({ pressed }) => ({
         flexDirection: 'row',
         gap: theme.spacing.md,
-        opacity: pressed ? 0.65 : 1,
+        opacity: pressed ? PRESSED_OPACITY : 1,
       })}
     >
       <View style={{ width: marker + theme.spacing.xs, alignItems: 'center' }}>

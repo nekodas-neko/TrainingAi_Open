@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, ProgressBar, Stack } from '../../../shared/ui';
 import { levelProgress } from '@trainingai/shared/achievement-display';
 import { useTheme } from '../../../shared/theme/ThemeProvider';

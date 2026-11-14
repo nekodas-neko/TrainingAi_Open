@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Linking, Pressable } from 'react-native';
+import { Linking } from 'react-native';
+import { TouchSurface } from '../../../shared/ui/TouchSurface';
 import { CHANGELOG } from '@trainingai/shared/changelog';
 import { OFF_ATTRIBUTION } from '@trainingai/shared/nutrition/open-food-facts';
 import {
@@ -77,7 +78,7 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
           </Card>
           {notice && (
             // The current app's amber "New Android build" card (components/more/update-check-card.tsx).
-            <Pressable
+            <TouchSurface
               accessibilityRole="link"
               accessibilityHint="Opens the download page in the browser"
               onPress={() => void Linking.openURL(notice.pageUrl)}
@@ -90,7 +91,7 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
                   {notice.message}
                 </AppText>
               </Card>
-            </Pressable>
+            </TouchSurface>
           )}
           <Card>
             <AppText variant="heading">Feedback</AppText>

@@ -4,7 +4,8 @@ import {
   ouraTemperatureDeviationRow,
 } from '@trainingai/shared/format/temperature-deviation';
 import { useMemo, useState } from 'react';
-import { PanResponder, Pressable, View } from 'react-native';
+import { PanResponder, View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import {
   shiftDateStr,
   weekStartForDay,
@@ -98,6 +99,7 @@ export function HealthDayScreen({
         {days.map((day, i) => (
           <Pressable
             key={day}
+            feedback="none"
             disabled={day > today}
             accessibilityRole="button"
             accessibilityLabel={day}

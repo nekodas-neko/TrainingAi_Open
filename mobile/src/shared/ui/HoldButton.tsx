@@ -1,3 +1,4 @@
+import { feedback } from '../../integrations/feedback/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { AppText } from './AppText';
@@ -37,6 +38,7 @@ export function HoldButton({
       if (value >= 1 && !fired.current) {
         fired.current = true;
         stop();
+        feedback('success', true);
         onConfirm();
       }
     }, 30);

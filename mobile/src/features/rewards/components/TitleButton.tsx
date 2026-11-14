@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, Icon } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { equippedTitleName } from '../data/view';
@@ -23,15 +23,14 @@ export function TitleButton({
         accessibilityRole="button"
         accessibilityLabel={name ? `Title: ${name}. Change title` : 'Set title'}
         onPress={() => setOpen(true)}
-        style={({ pressed }) => ({
+        style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: theme.spacing.xs,
           minHeight: theme.sizes.touchTarget,
           paddingHorizontal: theme.spacing.sm,
-          opacity: pressed ? 0.7 : 1,
-        })}
+        }}
       >
         {name && equipped ? (
           <>

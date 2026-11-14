@@ -11,6 +11,7 @@ import type { z } from 'zod';
 import type { ResourceSpec, ResourceState } from '../../workouts/data/WorkoutResources';
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
+import { TouchSurface } from '../../../shared/ui/TouchSurface';
 import {
   AppText,
   Card,
@@ -279,7 +280,7 @@ function HomeWidgetBody({
     // the model counts the recorded intake, and `total` is still null.
     const eaten = goal !== null && remaining !== null ? goal - remaining : null;
     return (
-      <Pressable
+      <TouchSurface
         onPress={openNutrition}
         accessibilityRole="button"
         accessibilityLabel="View Nutrition"
@@ -353,7 +354,7 @@ function HomeWidgetBody({
             </Stack>
           </Stack>
         </Card>
-      </Pressable>
+      </TouchSurface>
     );
   }
   if (id === 'energyBalanceWidget') {
@@ -365,7 +366,7 @@ function HomeWidgetBody({
       budgetKcal: balance?.budgetKcal,
     });
     return (
-      <Pressable
+      <TouchSurface
         onPress={openNutrition}
         accessibilityRole="button"
         accessibilityLabel="View energy balance"
@@ -398,7 +399,7 @@ function HomeWidgetBody({
             </AppText>
           )}
         </Card>
-      </Pressable>
+      </TouchSurface>
     );
   }
   if (id === 'weightSparkline') {
@@ -415,7 +416,7 @@ function HomeWidgetBody({
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((row) => ({ label: row.date, value: row.weightKg }));
     return (
-      <Pressable
+      <TouchSurface
         onPress={openBody}
         accessibilityRole="button"
         accessibilityLabel="View weight trend"
@@ -439,7 +440,7 @@ function HomeWidgetBody({
             </View>
           </Stack>
         </Card>
-      </Pressable>
+      </TouchSurface>
     );
   }
   if (id === 'sleepWidget') {
@@ -464,7 +465,7 @@ function HomeWidgetBody({
         : null;
     return (
       <Stack>
-        <Pressable
+        <TouchSurface
           onPress={openBody}
           accessibilityRole="button"
           accessibilityLabel="View last night’s sleep"
@@ -554,7 +555,7 @@ function HomeWidgetBody({
               )
             )}
           </Card>
-        </Pressable>
+        </TouchSurface>
         {(waiting === 'timeout' || waiting === 'not_opened') && (
           <AppButton title="Sync now" variant="ghost" onPress={handoff.syncNow} />
         )}
@@ -569,7 +570,7 @@ function HomeWidgetBody({
     const rows = (health.body?.recent ?? []).slice(0, 7).reverse();
     const max = Math.max(1, ...rows.map((row) => row.steps ?? 0));
     return (
-      <Pressable onPress={openBody} accessibilityRole="button" accessibilityLabel="View steps">
+      <TouchSurface onPress={openBody} accessibilityRole="button" accessibilityLabel="View steps">
         <Card accent={accent}>
           <Stack direction="row" justify="space-between">
             <Stack gap="xs">
@@ -618,13 +619,13 @@ function HomeWidgetBody({
             ))}
           </Stack>
         </Card>
-      </Pressable>
+      </TouchSurface>
     );
   }
   if (id === 'moodWidget') {
     const feel = health.checkins[health.today]?.sleepQualityFeel;
     const logged = (
-      <Pressable
+      <TouchSurface
         onPress={openReadiness}
         accessibilityRole="button"
         accessibilityLabel="Edit exercise readiness"
@@ -708,7 +709,7 @@ function HomeWidgetBody({
             </Stack>
           )}
         </Card>
-      </Pressable>
+      </TouchSurface>
     );
     return <ReadinessPromptCard openReadiness={openReadiness} logged={logged} />;
   }
@@ -719,7 +720,7 @@ function HomeWidgetBody({
         ? acwrBandByKey(data.interpretation as Parameters<typeof acwrBandByKey>[0])
         : null;
     return (
-      <Pressable
+      <TouchSurface
         onPress={openTraining}
         accessibilityRole="button"
         accessibilityLabel="View training load"
@@ -736,13 +737,13 @@ function HomeWidgetBody({
             Acute : chronic workload ratio
           </AppText>
         </Card>
-      </Pressable>
+      </TouchSurface>
     );
   }
   if (id === 'muscleStatusWidget') {
     const fatigued = [...(recovery?.data?.muscles ?? [])].sort((a, b) => a.pct - b.pct).slice(0, 6);
     return (
-      <Pressable
+      <TouchSurface
         onPress={openTraining}
         accessibilityRole="button"
         accessibilityLabel="View muscle status"
@@ -769,12 +770,12 @@ function HomeWidgetBody({
             </AppText>
           )}
         </Card>
-      </Pressable>
+      </TouchSurface>
     );
   }
   if (id === 'hrChartWidget') {
     return (
-      <Pressable
+      <TouchSurface
         onPress={openBody}
         accessibilityRole="button"
         accessibilityLabel="View heart rate chart"
@@ -783,7 +784,7 @@ function HomeWidgetBody({
           {title('Heart Rate · Today')}
           <HrDayCard embedded color={accent} />
         </Card>
-      </Pressable>
+      </TouchSurface>
     );
   }
   return null;
@@ -812,12 +813,11 @@ function HomeSleepFeedback({ onCorrect }: { onCorrect: () => void }) {
           void health.store?.respondToVerdict(health.today, 'corrected').catch(() => {});
           onCorrect();
         }}
-        style={({ pressed }) => ({
+        style={{
           alignSelf: 'flex-start',
           minHeight: theme.sizes.touchTarget,
           justifyContent: 'center',
-          opacity: pressed ? 0.6 : 1,
-        })}
+        }}
       >
         <AppText
           variant="caption"

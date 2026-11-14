@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppText, Icon, Stack, StatusIndicator, AppButton } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { batteryColor } from '../../../shared/battery-color';
@@ -154,7 +155,6 @@ export function HomeEnergy({ onOpen }: { onOpen: (detail: HealthDetail) => void 
     accessibilityHint: expanded ? 'Collapse details' : 'Expand details',
     accessibilityState: { expanded },
     onPress: toggle,
-    style: ({ pressed }: { pressed: boolean }) => ({ opacity: pressed ? 0.75 : 1 }),
   };
   const limited = hero.hasData && hero.limited && (
     <AppText variant="micro" tone="muted">

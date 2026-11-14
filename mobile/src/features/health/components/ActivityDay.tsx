@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import {
   activityFacts as facts,
   ActivityDetails,
@@ -53,7 +53,8 @@ export function ActivityDay({ logs, date }: { logs: Activity[]; date: string }) 
         <Card key={log.id}>
           <Stack direction="row" align="center">
             <Pressable
-              style={{ flex: 1 }}
+              // Fills the row's height, which the 48 dp delete button sets (#3759).
+              style={{ flex: 1, alignSelf: 'stretch', justifyContent: 'center' }}
               accessibilityRole="button"
               accessibilityLabel={`${log.title ?? log.activityType} detail`}
               onPress={() => setSelected(log)}

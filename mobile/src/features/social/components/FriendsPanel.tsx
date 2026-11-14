@@ -1,6 +1,7 @@
 import { timeAgo } from '@trainingai/shared/format/time-ago';
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
+import { TouchSurface } from '../../../shared/ui/TouchSurface';
 import {
   AppButton,
   AppText,
@@ -190,7 +191,7 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                     myValue > 0 &&
                     Math.abs(value - myValue) / Math.max(value, myValue) < 0.1;
                 return (
-                  <Pressable
+                  <TouchSurface
                     key={entry.userId}
                     accessibilityRole="button"
                     accessibilityLabel={`Rank ${index + 1}, ${entry.displayName}${entry.isSelf ? ', you' : ''}, ${rankLabel(value, period, metric)}`}
@@ -224,7 +225,7 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                         {index === 0 && <Icon name={leaderIconName} color={theme.friends.gold} />}
                       </Stack>
                     </Card>
-                  </Pressable>
+                  </TouchSurface>
                 );
               })
             ) : (

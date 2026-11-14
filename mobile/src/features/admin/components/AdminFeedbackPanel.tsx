@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Image, Pressable, View } from 'react-native';
+import { Image, View } from 'react-native';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { AppButton, AppText, Badge, Card, Notice, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';

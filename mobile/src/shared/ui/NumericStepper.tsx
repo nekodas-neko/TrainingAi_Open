@@ -1,3 +1,4 @@
+import { feedback } from '../../integrations/feedback/haptics';
 import { AppButton } from './AppButton';
 import { Stack } from './Stack';
 import { TextField } from './TextField';
@@ -40,6 +41,8 @@ export function NumericStepper({
       max,
       Math.max(min, (Number.isFinite(number) ? number : 0) + direction * step),
     );
+    // A tick for a step that moved the value; none at the end of the range.
+    if (next !== number) feedback();
     onChange(String(Math.round(next * 100) / 100));
   }
   if (inline)
