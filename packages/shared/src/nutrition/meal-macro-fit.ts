@@ -94,7 +94,7 @@ export function fitDistance(actual: MacroTotals, target: MacroTotals): number {
 }
 
 /** Sum a set of per-meal totals — the running day total the user is really judging a swap against. */
-export function sumMacroTotals(totals: (MacroTotals | null | undefined)[]): MacroTotals {
+export function sumMacroTotals(totals: readonly (MacroTotals | null | undefined)[]): MacroTotals {
   return totals.reduce<MacroTotals>((acc, t) => t ? {
     calories: acc.calories + t.calories,
     proteinG: acc.proteinG + t.proteinG,

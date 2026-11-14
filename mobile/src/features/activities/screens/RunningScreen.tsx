@@ -5,7 +5,8 @@ import { SELECTABLE_CARDIO_GOALS } from '@trainingai/shared/running/cardio-goals
 import { RUN_TYPES_FOR_STATS } from '@trainingai/shared/running/run-type-stats';
 import { targetsForRunType } from '@trainingai/shared/running/hr-targets';
 import { recommendRunType } from '@trainingai/shared/running/recommend-run-type';
-import { formatPace } from '@trainingai/shared/health/vdot';
+import { formatPace, formatPaceValue } from '@trainingai/shared/health/vdot';
+import { formatDistanceKm } from '@trainingai/shared/format/units';
 import type { RunType } from '@trainingai/shared/running/types';
 import {
   AppButton,
@@ -202,13 +203,13 @@ export function RunningScreen({
                         'Best 1K',
                         bests.data.best1kSec == null
                           ? null
-                          : `${Math.floor(bests.data.best1kSec / 60)}:${String(Math.round(bests.data.best1kSec % 60)).padStart(2, '0')}`,
+                          : formatPaceValue(bests.data.best1kSec),
                       ],
                       [
                         'Best 5K',
                         bests.data.best5kSec == null
                           ? null
-                          : `${Math.floor(bests.data.best5kSec / 60)}:${String(Math.round(bests.data.best5kSec % 60)).padStart(2, '0')}`,
+                          : formatPaceValue(bests.data.best5kSec),
                       ],
                       [
                         'Best pace',
@@ -220,7 +221,7 @@ export function RunningScreen({
                         'Longest run',
                         bests.data.longestDistanceKm == null
                           ? null
-                          : `${bests.data.longestDistanceKm.toFixed(1)} km`,
+                          : formatDistanceKm(bests.data.longestDistanceKm),
                       ],
                     ] as const
                   )
@@ -244,7 +245,7 @@ export function RunningScreen({
                         <AppText variant="caption">{label[key]}</AppText>
                         <AppText variant="micro" tone="muted">
                           {row.avgPaceSecPerKm == null ? '—' : formatPace(row.avgPaceSecPerKm)}{' '}
-                          · {row.avgDistanceKm?.toFixed(1) ?? '—'} km · {row.avgHr ?? '—'} bpm
+                          · {row.avgDistanceKm == null ? '— km' : formatDistanceKm(row.avgDistanceKm)} · {row.avgHr ?? '—'} bpm
                         </AppText>
                       </Stack>
                     );
@@ -325,7 +326,7 @@ export function RunningScreen({
                     <AppText variant="caption" tone="muted">
                       {prescription.durationMin ?? '—'} min
                       {prescription.distanceKm != null
-                        ? ` · ${prescription.distanceKm.toFixed(2)} km target`
+                        ? ` · ${formatDistanceKm(prescription.distanceKm)} target`
                         : ''}{' '}
                       · Zone {prescription.targets.zoneIds.join('–')} ·{' '}
                       {prescription.targets.hrLowBpm}–{prescription.targets.hrHighBpm} bpm

@@ -5,7 +5,8 @@ import type {
 } from '@trainingai/shared/types/nutrition';
 import { normaliseFood } from './food-values';
 import type { Food, SavedMeal, Scan } from './models';
-import { foodSchema, scaleFood } from './models';
+import { sumMacroTotals } from '@trainingai/shared/nutrition/meal-macro-fit';
+import { foodSchema } from './models';
 export function asSharedMeal(meal: SavedMeal): SharedSavedMeal {
   return meal as unknown as SharedSavedMeal;
 }
@@ -64,23 +65,33 @@ export function scanRecipe(scan: Scan, yieldCount: number, uuid?: () => string) 
     url: '',
   };
 }
+/**
+ * A recipe's totals: each ingredient scaled, summed through the shared `sumMacroTotals`, and the
+ * TOTAL rounded (whole kcal, 0.1 g), as the server's sum is. Rounding each ingredient first, as
+ * this did, drifts from the saved figure by up to half a unit per ingredient (#3756).
+ */
 export function recipeTotals(items: RecipeItem[], foods: Food[]) {
-  return items.reduce(
-    (sum, item) => {
+  const sum = sumMacroTotals(
+    items.map((item) => {
       const f = item.food ?? foods.find((x) => x.id === item.foodItemId);
-      if (!f) {
-        return sum;
-      }
-      const scaled = scaleFood(f, item.quantityMultiplier);
-      return {
-        calories: sum.calories + scaled.calories,
-        proteinG: sum.proteinG + scaled.proteinG,
-        carbsG: sum.carbsG + scaled.carbsG,
-        fatG: sum.fatG + scaled.fatG,
-      };
-    },
-    { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+      const q = item.quantityMultiplier;
+      return f
+        ? {
+            calories: f.calories * q,
+            proteinG: f.proteinG * q,
+            carbsG: f.carbsG * q,
+            fatG: f.fatG * q,
+          }
+        : null;
+    }),
   );
+  const tenth = (value: number) => Math.round(value * 10) / 10;
+  return {
+    calories: Math.round(sum.calories),
+    proteinG: tenth(sum.proteinG),
+    carbsG: tenth(sum.carbsG),
+    fatG: tenth(sum.fatG),
+  };
 }
 export function recipeDuplicate(
   name: string,

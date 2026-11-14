@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { summariseRoute } from '@trainingai/shared/activity/route-summary';
 import { View } from 'react-native';
 import { toAestDay } from '@trainingai/shared/date-utils';
+import { formatDistanceKm, formatMinutes } from '@trainingai/shared/format/units';
 import { getProtocol } from '@trainingai/shared/fitness-tests/protocols';
 import {
   AppButton,
@@ -18,6 +19,7 @@ import {
   TextField,
   TimerRing,
 } from '../../../shared/ui';
+import { formatDuration as clock } from '../../../shared/hooks/useClock';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useActivities } from '../data/ActivityProvider';
 import { elapsedMs, finishedRoute } from '../data/ActivityStore';
@@ -163,8 +165,6 @@ export function GuidedActivityScreen({
   if (!session || !guidance) {
     return <PageLayout title="Activity" onBack={onBack} />;
   }
-  const clock = (value: number) =>
-    `${Math.floor(Math.max(0, value) / 60)}:${String(Math.max(0, value) % 60).padStart(2, '0')}`;
   const user = profile.data?.user;
   const measured = testProfile({
     today: health.today,
@@ -312,7 +312,7 @@ export function GuidedActivityScreen({
           {gps.eligible &&
             (gps.distanceKm != null && gps.distanceKm > 0 ? (
               <AppText variant="caption" tone="muted">
-                {gps.distanceKm.toFixed(2)} km
+                {formatDistanceKm(gps.distanceKm)}
                 {gps.status === 'lost' ? ` · ${gpsProblemText.lost}` : ''}
               </AppText>
             ) : (
@@ -328,7 +328,7 @@ export function GuidedActivityScreen({
         <>
           <AppText variant="heading">{protocol?.name ?? 'Interval walk'}</AppText>
           <Grid>
-            <MetricTile label="Duration" value={(seconds / 60).toFixed(1)} unit="min" />
+            <MetricTile label="Duration" value={formatMinutes(seconds / 60, { unit: false })} unit="min" />
             <MetricTile
               label={
                 guidance.kind === 'walk'
@@ -344,7 +344,7 @@ export function GuidedActivityScreen({
                       : result?.payload.vo2maxEst
                     )?.toString() ?? null)
                   : route
-                    ? route.distanceKm.toFixed(2)
+                    ? formatDistanceKm(route.distanceKm, { unit: false })
                     : null
               }
               unit={protocol?.captureHrr ? 'bpm drop' : protocol ? 'mL/kg/min' : 'km'}

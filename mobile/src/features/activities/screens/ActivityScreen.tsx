@@ -3,6 +3,8 @@ import { treadmillSteps } from '../data/guidance';
 import { GuidedActivityScreen } from './GuidedActivityScreen';
 import { useEffect, useMemo, useState } from 'react';
 import { formatPace, formatPaceValue } from '@trainingai/shared/health/vdot';
+import { formatDistanceKm, formatMinutes } from '@trainingai/shared/format/units';
+import { formatDuration } from '../../../shared/hooks/useClock';
 import { summariseRoute } from '@trainingai/shared/activity/route-summary';
 import { decodeRoute } from '@trainingai/shared/activity/route-encoding';
 import { View } from 'react-native';
@@ -117,7 +119,7 @@ function ManualActivityScreen({
     );
   }
   const seconds = Math.floor(elapsedMs(session, now) / 1000);
-  const clock = `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${String(Math.floor(seconds / 60) % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  const clock = formatDuration(seconds);
   const update = (patch: Parameters<NonNullable<typeof activity.store>['update']>[0]) => {
     void activity.store
       ?.update(patch)
@@ -240,7 +242,7 @@ function ManualActivityScreen({
                 <MetricTile
                   figure
                   label="km"
-                  value={gps.distanceKm == null ? null : gps.distanceKm.toFixed(2)}
+                  value={gps.distanceKm == null ? null : formatDistanceKm(gps.distanceKm, { unit: false })}
                 />
                 <MetricTile
                   figure
@@ -290,12 +292,14 @@ function ManualActivityScreen({
           <Grid>
             <MetricTile
               label="Duration"
-              value={(Math.round(seconds / 6) / 10).toString()}
+              value={formatMinutes(seconds / 60, { unit: false })}
               unit="min"
             />
             <MetricTile
               label="Distance"
-              value={route ? route.distanceKm.toFixed(2) : session.distance || null}
+              value={
+                route ? formatDistanceKm(route.distanceKm, { unit: false }) : session.distance || null
+              }
               unit="km"
             />
             {route?.avgPaceSecPerKm != null && (
