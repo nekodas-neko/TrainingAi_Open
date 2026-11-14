@@ -180,6 +180,8 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     sleepQuality: String(r.sleepQuality),
     bodyState:    (r.bodyState as string[]) ?? [],
     soreMuscles:  (r.soreMuscles as string[]) ?? [],
+    // #3764: kept on pull, or the upsert's `suggested_sore_muscles=excluded…` nulls the phone's copy.
+    suggestedSoreMuscles: (r.suggestedSoreMuscles as string[] | null | undefined) ?? null,
     updatedAt:    toIso(r.updatedAt),
     deletedAt:    r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:   'synced' as const,
