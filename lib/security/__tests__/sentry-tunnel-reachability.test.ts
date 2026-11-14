@@ -45,6 +45,15 @@ describe('the Sentry tunnel stays reachable', () => {
     expect(cfg).toMatch(/tunnelRoute:\s*'\/monitoring'/)
   })
 
+  // The gate above only lets a report through when it carries the session cookie. @sentry/nextjs
+  // 10.77.1 made the tunnel transport send `credentials: 'omit'` unless the app says otherwise, and
+  // with that default every browser report 307s to /sign-in. Read as source for the same reason as
+  // the middleware: importing the client config would run `Sentry.init`.
+  it('the browser SDK sends the session cookie with each tunnelled report', () => {
+    const client = readFileSync(join(process.cwd(), 'instrumentation-client.ts'), 'utf8')
+    expect(client).toMatch(/transportOptions:\s*\{\s*fetchOptions:\s*\{\s*credentials:\s*'same-origin'\s*\}\s*\}/)
+  })
+
   // The service worker's catch-all branch caches any ok response, and the Cache API rejects a POST
   // Request — so without an early return every successful error report raises an unhandled
   // rejection inside the worker. Found by reading the worker, not by running it: the SW does not
