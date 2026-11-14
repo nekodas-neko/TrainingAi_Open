@@ -7,6 +7,7 @@ import {
 } from '@trainingai/shared/nutrition/grocery-catalogue';
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients';
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals';
+import { sumMacroTotals } from '@trainingai/shared/nutrition/meal-macro-fit';
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
@@ -638,15 +639,7 @@ export function MealPlansSheet({
                         target={v}
                         actual={
                           v.meals.some((m) => m.actual != null)
-                            ? v.meals.reduce(
-                                (sum, m) => ({
-                                  calories: sum.calories + (m.actual?.calories ?? 0),
-                                  proteinG: sum.proteinG + (m.actual?.proteinG ?? 0),
-                                  carbsG: sum.carbsG + (m.actual?.carbsG ?? 0),
-                                  fatG: sum.fatG + (m.actual?.fatG ?? 0),
-                                }),
-                                { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
-                              )
+                            ? sumMacroTotals(v.meals.map((m) => m.actual))
                             : null
                         }
                       />

@@ -2,6 +2,7 @@ import {
   DayCheckinExtrasSchema,
   DayCheckinScalesSchema,
 } from '@trainingai/shared/validation/day-checkin';
+import { sumMacroTotals } from '@trainingai/shared/nutrition/meal-macro-fit';
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item';
 import { goalBoundSchema, wholeCalorieTarget } from '@trainingai/shared/validation/goal-bounds';
 import { SupplementCreateSchema } from '@trainingai/shared/validation/supplement';
@@ -349,15 +350,7 @@ export const nutritionPaths = [
 export function totals(
   rows: readonly Pick<Food, 'calories' | 'proteinG' | 'carbsG' | 'fatG'>[],
 ) {
-  return rows.reduce(
-    (sum, row) => ({
-      calories: sum.calories + row.calories,
-      proteinG: sum.proteinG + row.proteinG,
-      carbsG: sum.carbsG + row.carbsG,
-      fatG: sum.fatG + row.fatG,
-    }),
-    { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
-  );
+  return sumMacroTotals(rows);
 }
 export function scaledLog(
   food: Food,

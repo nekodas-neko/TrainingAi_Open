@@ -6,7 +6,7 @@
  * Home, `82.5 kg` on day detail and `82.45kg` — raw and without the space — in the week-day sheet.
  */
 import { describe, it, expect } from 'vitest'
-import { formatKg, formatLoadKg, formatMinutes, formatHoursMinutes } from '@trainingai/shared/format/units'
+import { formatKg, formatLoadKg, formatMinutes, formatHoursMinutes, formatDistanceKm } from '@trainingai/shared/format/units'
 import { formatPace, formatPaceValue } from '@trainingai/shared/health/vdot'
 
 describe('formatKg', () => {
@@ -144,5 +144,35 @@ describe('formatLoadKg (RV-208 ②)', () => {
   it('leaves formatKg padded unless asked', () => {
     expect(formatKg(80)).toBe('80.0 kg')
     expect(formatKg(80, { trim: true })).toBe('80 kg')
+  })
+})
+
+/** #3755: the same run read `5.2` on one native screen and `5.23` on another. */
+describe('formatDistanceKm', () => {
+  it('shows two decimals under 10 km', () => {
+    expect(formatDistanceKm(5.234)).toBe('5.23 km')
+    expect(formatDistanceKm(5)).toBe('5.00 km')
+    expect(formatDistanceKm(0)).toBe('0.00 km')
+  })
+
+  it('shows one decimal from 10 km', () => {
+    expect(formatDistanceKm(10)).toBe('10.0 km')
+    expect(formatDistanceKm(21.0975)).toBe('21.1 km')
+  })
+
+  it('picks the band on the rounded value, so it never reads 10.00', () => {
+    expect(formatDistanceKm(9.994)).toBe('9.99 km')
+    expect(formatDistanceKm(9.996)).toBe('10.0 km')
+  })
+
+  it('can drop the unit for a tile that draws its own', () => {
+    expect(formatDistanceKm(12.34, { unit: false })).toBe('12.3')
+  })
+})
+
+describe('formatPaceValue at the carry', () => {
+  it('reads 359.6 seconds as 6:00, never 5:60', () => {
+    expect(formatPaceValue(359.6)).toBe('6:00')
+    expect(formatPace(359.6)).toBe('6:00/km')
   })
 })

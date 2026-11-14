@@ -18,6 +18,9 @@ import {
   recipeTotals,
 } from '../src/features/nutrition/data/recipes.ts';
 import { mealLabelArtwork } from '../src/features/nutrition/data/meal-label.ts';
+import { recordedIntakeOf } from '../src/features/nutrition/data/recorded-intake.ts';
+import { nutritionEnergyModel } from '../src/features/nutrition/data/energy-model.ts';
+import { loggedAverage, weekWithToday } from '../src/features/nutrition/data/weekly-today.ts';
 import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload';
 import { calibrationProgress } from '@trainingai/shared/nutrition/calibration-progress';
 import {
@@ -228,6 +231,45 @@ async function ready(f: ReturnType<typeof fixture>) {
   await store.refresh('logs', date);
   return store;
 }
+// #3756: the energy card and the weekly chart's bar for today read one figure.
+test('a food logged on the phone and not yet synced moves the card and today\'s bar', async () => {
+  const f = fixture();
+  const store = await ready(f);
+  f.online(false);
+  await store.logFoods([{ ...food, id: undefined, quantityMultiplier: 1.5 }], date, mealType.id);
+  await store.sync();
+  assert.equal(f.logs.length, 0);
+  const snapshot = store.getSnapshot();
+  const view = store.view(date);
+  const pending = snapshot.operations.some((x) => x.date === date && x.domain === 'food_logs');
+  assert.equal(pending, true);
+  // The server has not seen the food: its balance and its weekly summary still say 400 kcal.
+  const balance = { loggedIntakeKcal: 400, intakeKcal: 400, budgetKcal: 2000 };
+  const week = [
+    { date: '2026-10-10', calories: 1800, proteinG: 120, carbsG: 200, fatG: 60, logged: true },
+    { date, calories: 400, proteinG: 20, carbsG: 40, fatG: 10, logged: true, isToday: true },
+  ];
+  const { intake } = recordedIntakeOf({ view, operations: snapshot.operations }, date, balance);
+  const card = nutritionEnergyModel({
+    totals: view.totals,
+    recordedIntake: intake,
+    budgetKcal: balance.budgetKcal,
+    targets: {},
+    scaledTargets: null,
+  });
+  const days = weekWithToday(week, {
+    date,
+    intake,
+    totals: view.totals,
+    recorded: view.logs.length > 0 || pending,
+  });
+  assert.equal(card.total?.calories, 195);
+  assert.equal(days[1].calories, 195);
+  assert.equal(days[1].proteinG, 3);
+  assert.deepEqual(days[0], week[0]);
+  assert.deepEqual(loggedAverage(days), { days: 2, calories: 998 });
+  store.cancel();
+});
 test('nutrition queues food before its log and survives reopening offline', async () => {
   const f = fixture();
   const store = await ready(f);

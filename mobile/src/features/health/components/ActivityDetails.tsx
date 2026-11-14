@@ -3,7 +3,8 @@ import { ActivityEditor } from '../../activities/components/ActivityEditor';
 import { useActivities, useActivityLogs } from '../../activities/data/ActivityProvider';
 import { dayTimeInstant } from '../data/manual-night';
 import { z } from 'zod';
-import { formatHoursMinutes } from '@trainingai/shared/format/units';
+import { formatDistanceKm, formatHoursMinutes } from '@trainingai/shared/format/units';
+import { formatPace } from '@trainingai/shared/health/vdot';
 import { decodeRoute } from '@trainingai/shared/activity/route-encoding';
 import {
   estimateDistanceKmAtTime,
@@ -45,11 +46,9 @@ export function activityFacts(log: HealthActivity) {
     .filter(([key]) => log[key] != null)
     .map(([key, label, unit]) => ({
       label,
-      value: metricValue(log[key], unit, key === 'distanceKm' ? 2 : 0),
+      value: key === 'distanceKm' ? formatDistanceKm(log[key]!) : metricValue(log[key], unit),
     }));
 }
-const pace = (v: number) =>
-  `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}/km`;
 export function ActivityDetails({ log: original }: { log: HealthActivity }) {
   const history = useWorkoutResource(activityHistorySpec);
   const entries = useActivityLogs(
@@ -127,9 +126,12 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
       </AppText>
       <Grid columns={3}>
         <MetricTile label="Duration" value={metricValue(log.durationMin, 'min')} />
-        <MetricTile label="Distance" value={metricValue(log.distanceKm, 'km', 2)} />
+        <MetricTile
+          label="Distance"
+          value={log.distanceKm == null ? '—' : formatDistanceKm(log.distanceKm)}
+        />
         {log.avgPaceSecPerKm != null && (
-          <MetricTile label="Average pace" value={pace(log.avgPaceSecPerKm)} />
+          <MetricTile label="Average pace" value={formatPace(log.avgPaceSecPerKm)} />
         )}
       </Grid>
       <KeyValueGrid rows={activityFacts(log)} />
@@ -234,7 +236,7 @@ export function ActivityDetails({ log: original }: { log: HealthActivity }) {
             points={log.splits.map((s) => ({ label: `Km ${s.km}`, value: s.paceSec }))}
           />
           <KeyValueGrid
-            rows={log.splits.map((s) => ({ label: `Km ${s.km}`, value: pace(s.paceSec) }))}
+            rows={log.splits.map((s) => ({ label: `Km ${s.km}`, value: formatPace(s.paceSec) }))}
           />
         </Card>
       )}

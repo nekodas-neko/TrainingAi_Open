@@ -22,6 +22,7 @@ import { overlayHistory } from '../data/HistoryOutbox';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { useWorkoutAction } from '../data/useWorkoutAction';
 import { formatSetLoad } from '../logging/targets';
+import { exerciseVolume } from '../logging/summary';
 
 export function HistoryDay({
   date,
@@ -293,11 +294,7 @@ export function HistoryDay({
                 {Math.round(
                   entries
                     .filter((e) => e.workoutSessionId === id)
-                    .reduce(
-                      (n, e) =>
-                        n + e.setWeights.reduce((sum, w, i) => sum + w * (e.reps[i] ?? 0), 0),
-                      0,
-                    ),
+                    .reduce((n, e) => n + exerciseVolume(e.setWeights, e.reps), 0),
                 ).toLocaleString()}{' '}
                 kg volume
               </AppText>

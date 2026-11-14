@@ -1,5 +1,15 @@
 import { beatsPersonalRecord, estimateOneRm, withPrescribedBars } from '@trainingai/shared/1rm';
+import { computeSetAggregates } from '@trainingai/shared/workout/set-aggregates';
 import { setValues, type WorkoutExercise, type WorkoutRecord } from './workout';
+
+/**
+ * One exercise's volume in kg, as the server stores it: `computeSetAggregates`, rounded to 0.1.
+ * The finish screen and the history list both read this, so they show the figure that is saved
+ * (#3756). An assisted set's negative weight subtracts, because that is what the stored figure does.
+ */
+export function exerciseVolume(weights: readonly number[], reps: readonly number[]) {
+  return weights.length && reps.length ? computeSetAggregates([...weights], [...reps]).volume : 0;
+}
 
 export function exerciseResult(workout: WorkoutRecord, exercise: WorkoutExercise) {
   const recorded = exercise.sets.filter((set) => set.completedAt !== null);
@@ -37,7 +47,10 @@ export function exerciseResult(workout: WorkoutRecord, exercise: WorkoutExercise
   return {
     sets: recorded.length,
     reps: values.reduce((sum, set) => sum + set.reps, 0),
-    loadVolume: values.reduce((sum, set) => sum + Math.max(0, set.weight) * set.reps, 0),
+    loadVolume: exerciseVolume(
+      values.map((set) => set.weight),
+      values.map((set) => set.reps),
+    ),
     estimate: estimate && estimate > 0 ? estimate : null,
     repMax:
       exercise.exerciseType === 'bodyweight' && values.length

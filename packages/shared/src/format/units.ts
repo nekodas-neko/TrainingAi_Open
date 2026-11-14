@@ -84,3 +84,18 @@ export function formatHoursMinutes(totalMinutes: number): string {
   if (m < 60) return `${m}m`
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
 }
+
+/**
+ * A distance covered, as `5.23 km` under 10 km and `12.3 km` from 10 km (#3755).
+ *
+ * The same run read `5.2` on the running screen and `5.23` on the activity screen, because each
+ * site picked its own `toFixed`. Two decimals while the figure is short: 10 m is what a walk or a
+ * 1 km repeat is judged at. One decimal from 10 km, where the hundredth is GPS noise and a fourth
+ * digit crowds a tile. The band is chosen on the ROUNDED value, so 9.996 reads `10.0`, never
+ * `10.00`.
+ */
+export function formatDistanceKm(km: number, opts?: { unit?: boolean }): string {
+  const twoDp = roundTo(km, 2)
+  const value = Math.abs(twoDp) < 10 ? twoDp.toFixed(2) : roundTo(km, 1).toFixed(1)
+  return opts?.unit === false ? value : `${value} km`
+}

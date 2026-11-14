@@ -13,7 +13,11 @@ import {
   StatusIndicator,
 } from '../../../shared/ui';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
+import { energySpec } from '../../health/data/models';
 import { adherenceSpec, weeklySpec } from '../data/models';
+import { useNutrition } from '../data/NutritionProvider';
+import { useRecordedIntake } from '../data/useRecordedIntake';
+import { loggedAverage, weekWithToday } from '../data/weekly-today';
 const percent = (value: number | null | undefined) =>
   value == null ? '—' : Math.round(value * 100) + '%';
 export function WeeklyNutrition({
@@ -26,12 +30,26 @@ export function WeeklyNutrition({
 }) {
   const { theme } = useTheme();
   const state = useWorkoutResource(weeklySpec);
+  // Today's bar reads the phone's own figure, the one the energy card shows; see weekly-today.ts.
+  const n = useNutrition();
+  const energy = useWorkoutResource(energySpec(n.today));
+  const intake = useRecordedIntake(
+    n.today,
+    energy.data?.date === n.today ? energy.data.balance : null,
+  ).intake;
+  const days = state.data
+    ? weekWithToday(state.data, {
+        date: n.today,
+        intake,
+        totals: n.view.totals,
+        recorded:
+          n.view.logs.length > 0 ||
+          n.operations.some((op) => op.date === n.today && op.domain === 'food_logs'),
+      })
+    : undefined;
   const adherence = useWorkoutResource(adherenceSpec);
   const [metric, setMetric] = useState<'calories' | 'proteinG' | 'carbsG' | 'fatG'>('calories');
-  const logged = state.data?.filter((d) => d.logged !== false) ?? [];
-  const average = logged.length
-    ? Math.round(logged.reduce((sum, d) => sum + d.calories, 0) / logged.length)
-    : null;
+  const { days: loggedDays, calories: average } = loggedAverage(days ?? []);
   const target =
     metric === 'calories' && calorieTarget != null && calorieTarget > 0
       ? { value: calorieTarget, label: `Target: ${Math.round(calorieTarget).toLocaleString()} kcal/day` }
@@ -66,7 +84,7 @@ export function WeeklyNutrition({
         ]}
         onChange={setMetric}
       />
-      {state.data ? (
+      {days ? (
         <StackedBarChart
           label="Seven days of nutrition"
           unit={metric === 'calories' ? 'kcal' : 'g'}
@@ -74,7 +92,7 @@ export function WeeklyNutrition({
           gridlines
           yAxis
           target={target}
-          bars={state.data.map((d) => ({
+          bars={days.map((d) => ({
             label: formatDateDisplay(d.date, 'weekday'),
             segments:
               d.logged === false
@@ -94,7 +112,7 @@ export function WeeklyNutrition({
       <AppText variant="caption" tone="muted">
         {average == null
           ? 'No food logged this week yet.'
-          : `${target ? `Target: ${Math.round(calorieTarget!).toLocaleString()} kcal/day · ` : ''}avg of ${plural(logged.length, 'logged day', 'logged days')}: ${average.toLocaleString()} kcal`}
+          : `${target ? `Target: ${Math.round(calorieTarget!).toLocaleString()} kcal/day · ` : ''}avg of ${plural(loggedDays, 'logged day', 'logged days')}: ${average.toLocaleString()} kcal`}
       </AppText>
       {adherence.data && adherence.data.requiredMealTypeCount > 0 && (
         <Stack gap="xs">
@@ -128,7 +146,7 @@ export function WeeklyNutrition({
         />
       )}
       <Disclosure title="View daily totals">
-        {state.data?.map((d) => (
+        {days?.map((d) => (
           <ListRow
             key={d.date}
             title={formatDateDisplay(d.date, 'short')}
