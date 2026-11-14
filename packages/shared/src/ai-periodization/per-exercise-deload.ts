@@ -9,6 +9,10 @@ import { deloadOverrideForGoal, type DeloadOverride } from '@trainingai/shared/a
 // offer a whole-session deload instead. Runs before the LLM call: the
 // prescription for a deloaded exercise is overwritten after parsing, so the
 // model can never fight it.
+//
+// #3764: `soreMusclesInSession` holds only the ticks the lifter put there (see
+// `soreTickProvenance`). A suggestion the lifter left untouched arrives separately as
+// `recentlyTrainedInSession`: it changes no load and no outcome, and only earns a neutral note.
 
 export interface PerExerciseDeloadInput {
   sessionExerciseId: string
@@ -24,13 +28,18 @@ export interface PerExerciseDeloadResult {
   // deduped — feeds note text here and the whole-session offer's reasoning.
   matchedMuscles: string[]
   override: DeloadOverride
+  /** Exercises at normal load whose main muscle is only an untouched suggestion: a neutral note. */
+  recentNotes: Record<string, string>
 }
+
+export const RECENTLY_TRAINED_NOTE_PREFIX = 'Trained recently'
 
 export function computePerExerciseDeload(
   exercises: PerExerciseDeloadInput[],
   soreMusclesInSession: string[],
   trainingGoal: string,
   phase: string,
+  recentlyTrainedInSession: string[] = [],
 ): PerExerciseDeloadResult {
   const override = deloadOverrideForGoal(trainingGoal)
   const none: PerExerciseDeloadResult = {
@@ -39,9 +48,10 @@ export function computePerExerciseDeload(
     notes: {},
     matchedMuscles: [],
     override,
+    recentNotes: {},
   }
   if (phase === 'deload') return none
-  if (exercises.length === 0 || soreMusclesInSession.length === 0) return none
+  if (exercises.length === 0) return none
 
   const matchedMuscles = new Set<string>()
   const affected: Array<{ id: string; sore: string[] }> = []
@@ -55,7 +65,19 @@ export function computePerExerciseDeload(
     affected.push({ id: ex.sessionExerciseId, sore })
   }
 
-  if (affected.length === 0) return none
+  const affectedIds = new Set(affected.map(a => a.id))
+  const recentNotes: Record<string, string> = {}
+  for (const ex of exercises) {
+    if (affectedIds.has(ex.sessionExerciseId)) continue
+    const recent = recentlyTrainedInSession.filter(label =>
+      ex.muscleAssignments.some(ma => ma.role === 'main' && moodMuscleMatches(ma.muscle, label)),
+    )
+    if (recent.length === 0) continue
+    recentNotes[ex.sessionExerciseId] =
+      `${RECENTLY_TRAINED_NOTE_PREFIX} — ${recent.map(s => s.toLowerCase()).join(' & ')}, normal load`
+  }
+
+  if (affected.length === 0) return { ...none, recentNotes }
 
   if (affected.length * 2 > exercises.length) {
     return { ...none, outcome: 'whole_session', matchedMuscles: [...matchedMuscles] }
@@ -73,5 +95,6 @@ export function computePerExerciseDeload(
     notes,
     matchedMuscles: [...matchedMuscles],
     override,
+    recentNotes,
   }
 }

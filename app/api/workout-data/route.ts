@@ -1,4 +1,5 @@
 import { capitalize } from '@trainingai/shared/format/capitalize';
+import { sessionSoreness } from "@trainingai/shared/ai-periodization/session-soreness";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
@@ -532,17 +533,12 @@ async function handleWorkoutData(req: NextRequest) {
           .filter(muscle => sessionMuscleGroups.some(mg => moodMuscleMatches(mg, muscle)))
       )]
       const moodLogToUse = todayMoodLog ?? yesterdayMoodLog
-      const soreMusclesInSession: string[] = []
-      if (moodLogToUse?.bodyState.includes('sore_muscles') && moodLogToUse.soreMuscles.length > 0) {
-        for (const soreMuscle of moodLogToUse.soreMuscles) {
-          if (sessionMuscleGroups.some(mg => moodMuscleMatches(mg, soreMuscle))) {
-            soreMusclesInSession.push(soreMuscle)
-          }
-        }
-      }
+      // #3764: the same split the full aggregation uses — an untouched suggestion changes no load.
+      const { soreMusclesInSession, recentlyTrainedMusclesInSession } = sessionSoreness(moodLogToUse, sessionMuscleGroups)
 
       const reevalSignals: ReevaluationSignals = {
           soreMusclesInSession,
+          recentlyTrainedMusclesInSession,
           hoursSinceLastSession,
           activeInjuredMusclesInSession,
           trainingGoal: program.trainingGoal,
