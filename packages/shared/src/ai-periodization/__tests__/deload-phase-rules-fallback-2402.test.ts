@@ -26,7 +26,7 @@ const exercise = (over: Partial<Ex> = {}): Ex => ({
 const signals = (over: Partial<PrescriptionSignals> = {}): PrescriptionSignals => ({
   trainingGoal: 'strength', autoApplyPrescriptions: false, effectiveTimeBudgetMin: 90,
   exercises: [exercise()], phase: 'deload', sessionsInPhase: 1, hoursSinceLastSession: 48,
-  consecutiveSessionDaysOfThisType: 0, soreMusclesInSession: [], soreMusclesOutOfSession: [],
+  consecutiveSessionDaysOfThisType: 0, soreMusclesInSession: [], recentlyTrainedMusclesInSession: [], soreMusclesOutOfSession: [],
   sorenessLogDate: 'none', activeInjuredMusclesInSession: [], morningCheckin: null, rpeTrend: null,
   repCompletionRate: null, weeklyTargets: {}, weeklyLogged: {}, volumeBudgetPerMuscleGroup: {},
   acwr: null, sleepTrend: null, hrvTrend: null, spo2Trend: null, illness: null,
