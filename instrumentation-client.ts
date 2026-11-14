@@ -12,9 +12,10 @@ import { sentryRelease } from '@/lib/observability/sentry-release'
 // nobody did, and for 13 days `connect-src` had no ingest host while this SDK reported nothing and
 // the same-origin homegrown reporter logged 9 client faults from the same device. The fix is NOT a
 // second host in the header: `next.config.ts` sets `tunnelRoute: '/monitoring'`, so events POST
-// same-origin — which `connect-src 'self'` already permits and no future CSP edit can revoke —
-// and `middleware.ts` excludes that path so a report from the sign-in screen is not 307'd away.
-// `lib/security/__tests__/sentry-tunnel-reachability.test.ts` holds both halves, because a comment
+// same-origin — which `connect-src 'self'` already permits and no future CSP edit can revoke.
+// `middleware.ts` deliberately keeps that path behind the auth gate (BF-92), so a report reaches
+// Sentry only when it carries the session cookie; see `transportOptions` below.
+// `lib/security/__tests__/sentry-tunnel-reachability.test.ts` holds every half, because a comment
 // predicting a hazard is what failed here.
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -30,6 +31,10 @@ Sentry.init({
   // the useful part of a Drizzle error is the parameterised SQL above the params line and 250 cuts
   // it mid-query.
   maxValueLength: 1000,
+  // Since @sentry/nextjs 10.77.1 the tunnel transport sends `credentials: 'omit'` by default. The
+  // tunnel sits behind the auth gate, so a cookieless report 307s to /sign-in and is lost; this
+  // keeps the session cookie on it, which is how it behaved before (and fetch's own default).
+  transportOptions: { fetchOptions: { credentials: 'same-origin' } },
   // No session replay and no profiling: both capture far more of a health screen than an alerting
   // tool needs, and the reason this vendor was accepted at all was alerting.
   tracesSampleRate: 0,
