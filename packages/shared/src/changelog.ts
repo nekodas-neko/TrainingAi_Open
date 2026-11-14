@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.522.0",
+    date: "2026-11-14",
+    changes: [
+      "TrainingAi Preview: after you log a planned meal, the day's remaining plan meals re-balance to what is left, the same rule the current app uses.",
+      "TrainingAi Preview: a connection that drops for a moment during a workout is no longer reported as a fault. Your sets still sync on the retry, as before.",
+      "Behind the scenes: the server keeps a per-day record of which TrainingAi Preview builds are calling it, and can name a minimum build (none is set), so an old build can be told to update when one is needed.",
+      "Behind the scenes: server code no longer imports screen code, and a rule keeps it that way.",
+    ],
+  },
+  {
     version: "1.521.0",
     date: "2026-11-12",
     changes: [
