@@ -306,7 +306,6 @@ export const draftPlanSchema = planSchema
   })
   .extend({ planName: z.string(), allergies: z.array(z.string()).default([]) })
   .passthrough();
-export type PlanDraft = z.infer<typeof draftPlanSchema>;
 export const scanSchema = z
   .object({
     name: z.string(),

@@ -17,8 +17,6 @@ const FRAMEWORKS: Record<string, RunFramework> = {
   [norwegian4x4Framework.key]: norwegian4x4Framework,
 }
 
-export const DEFAULT_FRAMEWORK_KEY = polarizedFramework.key
-
 export function getFramework(key: string): RunFramework {
   const fw = FRAMEWORKS[key]
   if (!fw) throw new Error(`Unknown running framework: ${key}`)

@@ -6,7 +6,7 @@
 //
 // The Polar H10 emits ~1 Hz Heart Rate Measurement notifications carrying bpm, the sensor-contact
 // flag ("strap is on the chest"), and every RR interval (beat-to-beat) since the last packet.
-export interface HrMeasurement {
+interface HrMeasurement {
   bpm: number
   /** RR intervals in ms (converted from 1/1024 s units). */
   rr: number[]

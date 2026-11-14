@@ -1,5 +1,4 @@
 import type { CalendarService } from '../../features/platform/data/CalendarStore';
-export const calendarAvailable = () => false;
 const unavailable = async (): Promise<never> => {
   throw new Error('Calendar integration requires the native app.');
 };

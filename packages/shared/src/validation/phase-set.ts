@@ -58,6 +58,3 @@ export const PhaseSetCloneBody = z.object({
   overrides: z.record(z.string().regex(/^\d+$/), z.number().int().min(0).max(MAX_DURATION_CYCLES)).default({}),
   includeBaseline: z.boolean().optional(),
 }).strict()
-
-export type PhaseSetWriteInput = z.infer<typeof PhaseSetWriteBody>
-export type PhaseSetCloneInput = z.infer<typeof PhaseSetCloneBody>

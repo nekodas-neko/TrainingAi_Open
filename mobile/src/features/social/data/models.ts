@@ -140,7 +140,6 @@ export const friendProfileSpec = (id: string) => ({
     achievements: z.array(achievementSchema),
   }),
 });
-export type PublicProfile = z.infer<ReturnType<typeof friendProfileSpec>['schema']>;
 export function titleLabel(key: string | null | undefined) {
   return titleName(key);
 }

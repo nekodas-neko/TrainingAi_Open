@@ -115,21 +115,6 @@ export function PausedBanner({ workout }: { workout: WorkoutRecord }) {
     </View>
   );
 }
-export function WorkoutClock({ workout }: { workout: WorkoutRecord }) {
-  const journal = useWorkoutJournal();
-  return (
-    <Stack direction="row" justify="space-between">
-      <SessionTimer workout={workout} />
-      <AppText variant="micro" tone="muted">
-        {journal.saveStatus === 'saved'
-          ? 'Saved on phone'
-          : journal.saveStatus === 'saving'
-            ? 'Saving…'
-            : 'Save failed'}
-      </AppText>
-    </Stack>
-  );
-}
 export function WarmupTimer({ workout }: { workout: WorkoutRecord }) {
   const now = useClock(workout.timers.warmup);
   const elapsed = Math.max(0, (now - workout.startedAt) / 1000);

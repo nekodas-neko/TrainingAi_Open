@@ -17,7 +17,6 @@ export {
   HEALTH_ALERT_IDS,
   HEALTH_ALERT_ROUTE,
   computeHealthAlertActions,
-  type HealthAlertAction,
   type HealthAlertInput,
   type HealthAlertType,
 } from '@trainingai/shared/health/health-alerts'

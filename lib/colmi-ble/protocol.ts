@@ -210,9 +210,6 @@ export const cmdSyncHrv = () => buildPacket([CMD.SYNC_HRV])
 export const cmdSyncActivity = (dayOffset = 0) =>
   buildPacket([CMD.SYNC_ACTIVITY, Math.max(0, Math.trunc(dayOffset)) & 0xff, 0x0f, 0x00, 0x5f, 0x01])
 
-export const cmdRealtimeHeartRate = (start: boolean) =>
-  buildPacket([CMD.REALTIME_HEART_RATE, start ? 0x01 : 0x00])
-
 /**
  * Set the ring's clock. Callers pass the parts **already resolved in the user's timezone** — this
  * module never reads a clock, because a helper that calls `new Date()` here would key the ring to

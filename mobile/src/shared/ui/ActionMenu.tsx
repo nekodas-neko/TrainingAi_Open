@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Sheet } from './Sheet';
 import { AppButton } from './AppButton';
 import type { IconName } from './Icon';
-export type MenuAction = {
+type MenuAction = {
   title: string;
   icon?: IconName;
   danger?: boolean;

@@ -4,6 +4,5 @@ export {
   PATTERN_ORDER,
   PATTERN_LABEL,
   movementBalance,
-  type MovementBalance,
   type MovementBalanceRow,
 } from '@trainingai/shared/health/movement-balance'

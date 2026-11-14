@@ -52,7 +52,6 @@ const aiUsageSchema = z
     ),
   })
   .passthrough();
-export type AiUsageSummary = z.infer<typeof aiUsageSchema>;
 export const AI_USAGE_WINDOWS = [
   { label: '24h', hours: 24 },
   { label: '7d', hours: 168 },

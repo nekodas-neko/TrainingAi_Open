@@ -30,5 +30,3 @@ export const EXPORT_ERROR_TRAILER = {
   },
 } as const
 
-export type ExportTrailer = typeof EXPORT_COMPLETE_TRAILER | typeof EXPORT_ERROR_TRAILER
-

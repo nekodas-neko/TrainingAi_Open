@@ -53,12 +53,6 @@ export function useAppleImport() {
 export function useAppleSleep() {
   return useContext(SleepContext) ?? { ...emptyAppleSleep, refresh: async () => {} };
 }
-export function AppleSleepProvider({
-  value,
-  children,
-}: PropsWithChildren<{ value: ReturnType<typeof useAppleSleepReadings> }>) {
-  return <SleepContext.Provider value={value}>{children}</SleepContext.Provider>;
-}
 export function useHealthContext() {
   const value = useContext(Context);
   if (!value) {

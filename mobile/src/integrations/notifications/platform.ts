@@ -1,4 +1,3 @@
-export const alertsAvailable = () => false;
 export async function alertPermission(request = false) {
   if (request) throw new Error('Notifications require the native app.');
   return false;

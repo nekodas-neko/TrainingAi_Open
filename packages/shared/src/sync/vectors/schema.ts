@@ -38,7 +38,6 @@ export const PULL_FLAGS = [
   'biometrics', 'programs', 'workouts', 'nutrition', 'supplements', 'activity', 'fitnessTests',
   'running', 'injuries', 'ouraDaily', 'dayCheckins', 'mealPlans',
 ] as const
-export type PullFlag = (typeof PULL_FLAGS)[number]
 
 /**
  * The device-side writes a vector may perform, named after the local store's write surface. This is
@@ -51,7 +50,6 @@ export const LOCAL_ACTIONS = [
   'deleteFoodLog', 'deleteInjury', 'deleteSupplementLog', 'softDeleteActivityLogPending',
   'queueMutation', 'upsertManualSleepLocally', 'removeManualSleepLocally',
 ] as const
-export type LocalAction = (typeof LOCAL_ACTIONS)[number]
 
 const Row = z.record(z.string(), z.unknown())
 
@@ -145,7 +143,6 @@ export const SyncVectorSchema = z.object({
 })
 
 export type SyncVector = z.infer<typeof SyncVectorSchema>
-export type SyncVectorInput = z.input<typeof SyncVectorSchema>
 
 export const SyncVectorFileSchema = z.object({
   formatVersion: z.literal(VECTOR_FORMAT_VERSION),

@@ -1,6 +1,6 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { mround, displayOneRm, isBodyweightType, bodyweightRepMax } from '@trainingai/shared/1rm'
-import type { Program, WorkoutSession } from "@trainingai/shared/types";
+import type { WorkoutSession } from "@trainingai/shared/types";
 import type { SleepSession } from '@trainingai/shared/types'
 import type { OuraDailyRow, OuraDailyDerivedRow } from '@/lib/data/repository'
 import type { DayCheckin } from '@trainingai/shared/types/day-checkin'
@@ -9,16 +9,6 @@ import type { Injury } from '@trainingai/shared/types/injury'
 import { activeInjuries, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
-
-export function buildProgramSummary(program: Program | null): string {
-  if (!program) return "(no active program)";
-  const lines: string[] = [`## Active Program: ${program.name}`];
-  for (const sess of program.sessions) {
-    const names = sess.exercises.map(e => e.exerciseName);
-    lines.push(`${sess.name}: ${names.join(", ") || "(no exercises)"}`);
-  }
-  return lines.join("\n");
-}
 
 // Builds an explicit Mon–today schedule so the AI doesn't have to infer rest days from gaps.
 export function buildWeekSchedule(sessions: WorkoutSession[], tz: string, todayIso: string): string {

@@ -75,11 +75,6 @@ export interface FoodLogWithItem extends FoodLog {
   satFatG?: number
 }
 
-export interface MealTypeWithLogs extends MealType {
-  logs: FoodLogWithItem[]
-  totals: { calories: number; proteinG: number; carbsG: number; fatG: number }
-}
-
 export interface SavedMealItem {
   id: string
   savedMealId: string

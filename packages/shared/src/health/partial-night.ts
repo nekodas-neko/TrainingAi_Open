@@ -35,8 +35,6 @@ export const PartialNightPayloadSchema = z.object({
   partial: z.boolean(),
 }).strict()
 
-export type PartialNightPayload = z.infer<typeof PartialNightPayloadSchema>
-
 /** The duration-derived fields a marked night loses. HRV, heart rate and breathing are not here. */
 export const PARTIAL_NIGHT_DROPPED_FIELDS = [
   'durationHours', 'timeInBedHours', 'efficiency', 'onsetLatencySec', 'restlessPeriods',

@@ -11,7 +11,7 @@ export interface PushErrorRecord {
   retryable?: boolean;
 }
 
-export interface ResolvedPushFailure {
+interface ResolvedPushFailure {
   error:     string;
   retryable: boolean;
 }

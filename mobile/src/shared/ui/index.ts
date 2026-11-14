@@ -39,7 +39,7 @@ export { Carousel } from './Carousel';
 export { AutoScrollRow } from './AutoScrollRow';
 export { TimelineRow } from './TimelineRow';
 export { HubCard } from './HubCard';
-export { MuscleMap, type MuscleActivation } from './MuscleMap';
+export { MuscleMap } from './MuscleMap';
 export { CompletionStamp } from './CompletionStamp';
 export { Sheet } from './Sheet';
 export { ProgressBar } from './ProgressBar';
@@ -85,7 +85,7 @@ export { Pressable } from './Pressable';
 export { PRESSED_OPACITY, type PressFeedback } from './pressFeedback';
 export { TouchSurface } from './TouchSurface';
 
-export { ActionMenu, type MenuAction } from './ActionMenu';
+export { ActionMenu } from './ActionMenu';
 
 export { HueSlider } from './HueSlider';
 export { SortableStack } from './SortableStack';

@@ -57,6 +57,3 @@ export function RpeSlider({ value, onChange }: RpeSliderProps) {
     </div>
   );
 }
-
-// Legacy vertical strip — kept for the done-card RPE badge only (not used as an input anymore)
-export { RPE_COLORS as default };

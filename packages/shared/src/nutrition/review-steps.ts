@@ -11,8 +11,6 @@
  */
 export type ReviewStepId = 'day' | 'meals' | 'wrapUp'
 
-export const ALL_REVIEW_STEPS: ReviewStepId[] = ['day', 'meals', 'wrapUp']
-
 export interface StepInput {
   /** The user's configured meal types. Empty means nothing is configured yet. */
   mealTypes: { id: string }[]

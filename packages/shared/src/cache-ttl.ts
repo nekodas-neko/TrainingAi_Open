@@ -136,16 +136,6 @@ export function floorSeedTtl(ttlSeconds: number): number {
 }
 
 /**
- * The AI restatement of a prescribed run's rationale (Q-469).
- *
- * `TTL_LONG` because the key already carries everything that can change the answer — the local date
- * plus the prescription fingerprint — so expiry is a backstop, not the freshness mechanism. Before
- * this, the card re-asked the model on **every mount**: 31 redundant calls across 9 distinct runs,
- * the same run explained about seven times, each time in different words.
- */
-export const RUNNING_PLAN_EXPLAIN_TTL = TTL_LONG;
-
-/**
  * The cat collection (BF-122b). `TTL_SHORT` because it moves only when a faucet day is added — a
  * workout, a step-count, a night's sleep — and every one of those already invalidates it by group.
  * The TTL is the backstop for the decay clock, which advances on its own with the calendar rather

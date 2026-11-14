@@ -13,7 +13,7 @@ import {
   type Alert,
 } from '../../features/platform/data/models';
 import { removeOldAppChannels } from './old-app-channels';
-export function alertsAvailable() {
+function alertsAvailable() {
   return !!requireOptionalNativeModule('ExpoNotificationScheduler');
 }
 const MEAL_ESTIMATE_CATEGORY = 'meal-estimate';

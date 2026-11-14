@@ -8,7 +8,7 @@ import { Skeleton } from './Skeleton';
 
 // `color` paints the muscle that exact colour instead of its role's (a volume reading, not a status);
 // such an assignment carries no `role`, so a screen reader is not told one.
-export type MuscleActivation = {
+type MuscleActivation = {
   muscle: string;
   role?: 'main' | 'secondary' | 'injured';
   color?: string;
