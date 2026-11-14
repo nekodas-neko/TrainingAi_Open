@@ -1,16 +1,17 @@
 import { ACWR_THRESHOLDS } from './acwr'
 import type { PrescriptionSignals } from './signals'
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
+import { holdsOneDayDeload } from './one-day-deload'
 
 export type EmergencySignals = Pick<PrescriptionSignals,
   'consecutiveSessionDaysOfThisType' | 'hoursSinceLastSession' | 'soreMusclesInSession' | 'activeInjuredMusclesInSession' | 'acwr' | 'rpeTrend' | 'repCompletionRate' | 'selfReportedSick'>
 export type EmergencyState = Pick<SessionPeriodization,
   'phase' | 'prescription' | 'prescriptionStatus' | 'prescriptionExpiresAt'>
 
-// Emergency deloads are OFFERED, not imposed: generating one must not mutate persisted
-// phase state (that happens on acceptance), and while one is pending — or the user is
-// already deloading — the stateless signal check is suppressed so it can't re-fire on
-// every prescribe call and pin sessions_in_phase at 0.
+// Emergency deloads are OFFERED, not imposed, and lighten one session: neither generating nor
+// accepting one moves the persisted phase (#3799). While one is pending or accepted — or the
+// phase is already a deload — the stateless signal check is suppressed so it can't re-fire on
+// every prescribe call.
 /** What fired an emergency deload, named once where it is decided so the plan and the sheet can say
  *  it (#2405). The sheet fell back to "sore muscle flagged in your check-in" for every whole-session
  *  deload, so a sick day read as soreness. */
@@ -54,12 +55,7 @@ export function emergencyDeloadTrigger(signals: EmergencySignals): EmergencyTrig
 
 export function shouldTriggerEmergencyDeload(signals: EmergencySignals, state: EmergencyState, now = new Date()): boolean {
   if (state.phase === 'deload') return false
-  const p = state.prescription
-  if (
-    p?.deload && p.phaseAction === 'deload_recommended' &&
-    state.prescriptionStatus === 'pending' &&
-    state.prescriptionExpiresAt != null && state.prescriptionExpiresAt > now
-  ) return false
+  if (holdsOneDayDeload(state, now)) return false
   // Active injuries are NOT a standalone trigger here (AI-4) — the prompt already
   // receives activeInjuredMusclesInSession separately and documents the finer-grained
   // session_swap_recommended path (lib/ai-periodization/prompt.ts), so the LLM can weigh

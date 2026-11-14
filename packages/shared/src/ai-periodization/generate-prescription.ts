@@ -30,6 +30,7 @@ import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
 import { budgetForPreset, requestedBudgetMin, fitBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import { applyAutoregulation, clampPrescribedPct } from '@trainingai/shared/ai-periodization/autoregulation'
 import { shouldTriggerEmergencyDeload, emergencyDeloadTrigger } from '@trainingai/shared/ai-periodization/emergency-deload'
+import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
 import { buildTransitionRationale } from '@trainingai/shared/ai-periodization/transition-rationale'
 import { DELOAD_LOWER_PCT, DELOAD_REPS, DELOAD_SETS, DELOAD_REST } from '@trainingai/shared/ai-periodization/deload-constants'
@@ -49,7 +50,7 @@ export type GeneratePrescriptionResult =
   | {
       ok: true
       prescription: AiPrescription
-      prescriptionStatus: 'pending' | 'auto_applied'
+      prescriptionStatus: 'pending' | 'auto_applied' | 'accepted'
       estimatedSessionDurationMin: number
     }
   | { ok: false; error: string; status: number }
@@ -373,20 +374,16 @@ async function runPrescriptionGeneration(
   const signals = await aggregateSignals(userId, programSessionId, repo, tz, excludeSessionId, budgetOverrideMin)
   if (!signals) return { ok: false, error: 'Could not aggregate signals', status: 404 }
 
-  // If an emergency deload is already pending and unexpired, return it as-is rather than
+  // If a one-day deload is already offered or accepted and unexpired, return it as-is rather than
   // regenerating — the trigger below is stateless and would otherwise re-fire on every
-  // prescribe call.
-  const pending = state.prescription
-  if (
-    pending?.deload && pending.phaseAction === 'deload_recommended' &&
-    state.prescriptionStatus === 'pending' &&
-    state.prescriptionExpiresAt != null && state.prescriptionExpiresAt > new Date()
-  ) {
+  // prescribe call, and an accepted one would come back as a fresh offer (#3799).
+  const held = state.prescription
+  if (held && holdsOneDayDeload(state)) {
     return {
       ok: true,
-      prescription: pending,
-      prescriptionStatus: 'pending',
-      estimatedSessionDurationMin: pending.estimatedSessionDurationMin,
+      prescription: held,
+      prescriptionStatus: state.prescriptionStatus === 'accepted' ? 'accepted' : 'pending',
+      estimatedSessionDurationMin: held.estimatedSessionDurationMin,
     }
   }
 
@@ -404,7 +401,7 @@ async function runPrescriptionGeneration(
       trigger?.note,
     )
     // Offered, not imposed: only stores the prescription. Persisted phase state and
-    // sessions_in_phase stay untouched until the user accepts it (respond route).
+    // sessions_in_phase stay untouched, and accepting it lightens this session only (#3799).
     // #3700: a deload fired by the lifter's own sick report answers today only, so it ends at the
     // next local midnight and the next open asks again. The other triggers describe the block and
     // keep the week.

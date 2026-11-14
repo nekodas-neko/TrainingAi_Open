@@ -6,6 +6,8 @@ import type { PeriodizationPhase } from '@trainingai/shared/types/ai-periodizati
 import { POST_TRANSITION_STATUS } from './status'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { isOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
+import { prescriptionAgedOut } from '@trainingai/shared/ai-periodization/prescription-expiry'
 
 // One phase transition.
 const MAX_BODY_BYTES = 16 * 1024
@@ -62,6 +64,24 @@ export async function POST(
   const isRecommended = state.prescription != null
     && (state.prescription.phaseAction === 'transition_recommended' || state.prescription.phaseAction === 'deload_recommended')
     && state.prescription.phase === body.newPhase
+  // #3799: "Move to Deload" on a deload offered for one day's reason (`isOneDayDeload`) takes that
+  // session's lighter plan and leaves the phase where it is — the same as accepting it. Older app
+  // builds send this for both the offer's button and the phase list, so only an explicit `force`
+  // (the phase list in current builds) moves the phase to `deload` over a one-day offer. A planned
+  // deload (the realisation ceiling's `transition_recommended`) is not a one-day deload and moves
+  // the phase as before.
+  if (
+    body.newPhase === 'deload' && !body.force && state.phase !== 'deload' &&
+    isOneDayDeload(state.prescription) && state.prescriptionStatus === 'pending'
+  ) {
+    if (prescriptionAgedOut(state)) {
+      return NextResponse.json({ error: 'This prescription has expired. Reopen the session for a fresh one.' }, { status: 409 })
+    }
+    await repo.updatePrescriptionStatus(userId, sessionId, 'accepted')
+    const unchanged = await repo.getSessionPeriodization(userId, sessionId)
+    return NextResponse.json({ state: unchanged, prescriptionStatus: 'accepted', phaseMoved: false })
+  }
+
   const isAdjacent = NEXT_PHASE[state.phase] === body.newPhase
   if (!isRecommended && !isAdjacent && !body.force) {
     return NextResponse.json({ error: 'Transition not recommended — pass force:true to override' }, { status: 400 })
