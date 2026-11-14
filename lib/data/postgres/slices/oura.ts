@@ -19,7 +19,7 @@ import { nightSourceRank, beforeSourceSwitch } from '@trainingai/shared/health/s
 import { isNightWindow } from '@trainingai/shared/health/sleep-night'
 import { getOuraCloudSwitchDay } from './oura-cloud-tokens'
 import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
-import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
+import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, observedHrFromCounts, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 import { redecodeJobKind, canFollowRunningRedecode } from '@/lib/oura-ble/redecode-job-kind'
 
 // Per-field provenance columns (migration 120) for the two multi-source Oura tables.
@@ -53,6 +53,10 @@ const OURA_SLEEP_SOURCE_COLS: SourceColumn[] = [
   { prop: 'sleepPhase5Min', col: 'sleep_phase_5_min' }, { prop: 'timeInBedHours', col: 'time_in_bed_hours' },
 ]
 import { mergeHrSources, isAggregatorHrSource, AGGREGATOR_HR_SOURCES, AGGREGATOR_COVER_MS } from '@trainingai/shared/health/hr-window-merge'
+import {
+  closedObservedCounts, dropObservedHrDay, observedHrDayCacheEnabled,
+  observedHrQueryCounts, splitObservedWindow,
+} from '../observed-hr-day-cache'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
 import { accumulateZoneSeconds, type HrReading } from '@trainingai/shared/health/zone-minutes'
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
@@ -1706,6 +1710,10 @@ async function writeHeartrateRows(
       .returning({ timestamp: s.ouraHeartrate.timestamp })
     for (const r of written) changed.push(r.timestamp)
   }
+  // #3774: a row for an earlier day (a ring back in range, a strap upload) changes the kept part of
+  // the day's observed profile. This runs when the statement returns, which is after the commit
+  // for a caller on the pool; a caller inside its own transaction must report again once it commits.
+  dropObservedHrDayFor(userId, changed)
 
   const now = Date.now()
   if (shouldPrune(lastHeartrateStorePrune, now, HR_PRUNE_THROTTLE_MS)) {
@@ -1726,6 +1734,18 @@ export async function pruneHeartrate(db: Db | Tx): Promise<void> {
     await freezeWorkoutHrDensity(tx, cutoff)
     await tx.execute(sql`DELETE FROM oura_heartrate WHERE timestamp < ${cutoff}`)
   })
+  // #3774: no kept observed profile is dropped here, because none can hold a deleted row: the prune
+  // cuts at `HR_RETENTION_DAYS` and the longest observed window is 90 days.
+  // `observed-hr-day-cache.test.ts` fails if those two numbers ever meet.
+}
+
+/** Drop a user's kept observed-profile counts for the heart-rate rows just written or deleted. */
+export function dropObservedHrDayFor(userId: string, changed: readonly Date[]): void {
+  if (changed.length === 0) return
+  let earliestMs = Infinity
+  let latestMs = -Infinity
+  for (const d of changed) { earliestMs = Math.min(earliestMs, d.getTime()); latestMs = Math.max(latestMs, d.getTime()) }
+  dropObservedHrDay(userId, { earliestMs, latestMs })
 }
 
 // ── Coarse trend buckets (RRD ladder) ─────────────────────────────────────────
@@ -2057,22 +2077,15 @@ export async function getOuraClockOffsets(db: Db, userId: string): Promise<Clock
   return { epoch, offsets }
 }
 
-export async function getObservedHrProfile(
-  db: Db, userId: string, from: Date, to: Date,
-): Promise<ObservedHrProfile> {
-  const k = CORROBORATION
+/**
+ * Which rows of a window `mergeHrSources` reads, as the two conditions on `h`. Written once so the
+ * profile query and the per-bpm counts below cannot apply different rules. `from`/`to` bound the
+ * rows that may decide another row, which is the whole window whatever part of it `h` ranges over.
+ */
+function mergedHrRowIsRead(userId: string, from: Date, to: Date): SQL {
   const aggregators = sql.join(AGGREGATOR_HR_SOURCES.map(a => sql`${a}`), sql`, `)
   const coverSec = AGGREGATOR_COVER_MS / 1000
-  const rows = await db.execute<{
-    merged_count: number; sample_count: number
-    avg_bpm: string | null; highest: number | null; kth_max: number | null; kth_min: number | null
-  }>(sql`
-    WITH merged AS MATERIALIZED (
-      SELECT h.bpm
-      FROM oura_heartrate h
-      WHERE h.user_id = ${userId}
-        AND h.timestamp >= ${from} AND h.timestamp <= ${to}
-        AND (COALESCE(h.source, '') NOT IN (${aggregators}) OR NOT EXISTS (
+  return sql`(COALESCE(h.source, '') NOT IN (${aggregators}) OR NOT EXISTS (
           SELECT 1 FROM oura_heartrate dv
           WHERE dv.user_id = ${userId}
             AND COALESCE(dv.source, '') NOT IN (${aggregators})
@@ -2087,7 +2100,71 @@ export async function getObservedHrProfile(
             AND st.timestamp >= ${from} AND st.timestamp <= ${to}
             AND st.timestamp >= to_timestamp(floor(extract(epoch FROM h.timestamp) / 10) * 10)
             AND st.timestamp <  to_timestamp(floor(extract(epoch FROM h.timestamp) / 10) * 10 + 10)
-        ))
+        ))`
+}
+
+/** How many merged readings a slice of a window has at each bpm. `rows` is the slice `h` ranges
+ *  over (`before` exclusive, `through` inclusive); `window` bounds the rows that decide them. */
+async function getMergedHrCounts(
+  db: Db, userId: string, window: { from: Date; to: Date },
+  rows: { from: Date; before: Date } | { from: Date; through: Date },
+): Promise<Map<number, number>> {
+  const upper = 'before' in rows ? sql`h.timestamp < ${rows.before}` : sql`h.timestamp <= ${rows.through}`
+  const res = await db.execute<{ bpm: number; n: number }>(sql`
+    SELECT h.bpm, count(*)::int AS n
+    FROM oura_heartrate h
+    WHERE h.user_id = ${userId}
+      AND h.timestamp >= ${rows.from} AND ${upper}
+      AND ${mergedHrRowIsRead(userId, window.from, window.to)}
+    GROUP BY h.bpm
+  `)
+  const counts = new Map<number, number>()
+  for (const r of (res as unknown as { rows: { bpm: number; n: number }[] }).rows) counts.set(Number(r.bpm), Number(r.n))
+  return counts
+}
+
+/**
+ * `getObservedHrProfile` for a caller that knows the user's timezone: the same profile, with the
+ * part of the window before the user's local midnight worked out once a day (#3774).
+ *
+ * The split, and why it gives the identical answer rather than a close one, is in
+ * `observed-hr-day-cache.ts`; `observed-hr-day-cache.test.ts` runs this and the direct query over
+ * the same rows through a day and across midnight. A window that can't be split, and every call
+ * while the cache is off (under test), runs the direct query.
+ */
+export async function getObservedHrProfileForDay(
+  db: Db, userId: string, from: Date, to: Date, tz: string,
+): Promise<ObservedHrProfile> {
+  const split = observedHrDayCacheEnabled() ? splitObservedWindow(from, to, tz) : null
+  if (!split) return getObservedHrProfile(db, userId, from, to)
+  // The kept part reads the window as ending at midnight. No row before `closedEnd` is decided by a
+  // later one, so that is the same set the full window gives, and it does not move with `to`.
+  const closed = await closedObservedCounts(userId, from, split, () => {
+    observedHrQueryCounts.closedFill++
+    return getMergedHrCounts(db, userId, { from, to: split.midnight }, { from, before: split.closedEnd })
+  })
+  observedHrQueryCounts.todayOnly++
+  const today = await getMergedHrCounts(db, userId, { from, to }, { from: split.closedEnd, through: to })
+  const counts = new Map(closed)
+  for (const [bpm, n] of today) counts.set(bpm, (counts.get(bpm) ?? 0) + n)
+  return observedHrFromCounts(counts)
+}
+
+export async function getObservedHrProfile(
+  db: Db, userId: string, from: Date, to: Date,
+): Promise<ObservedHrProfile> {
+  const k = CORROBORATION
+  observedHrQueryCounts.direct++
+  const rows = await db.execute<{
+    merged_count: number; sample_count: number
+    avg_bpm: string | null; highest: number | null; kth_max: number | null; kth_min: number | null
+  }>(sql`
+    WITH merged AS MATERIALIZED (
+      SELECT h.bpm
+      FROM oura_heartrate h
+      WHERE h.user_id = ${userId}
+        AND h.timestamp >= ${from} AND h.timestamp <= ${to}
+        AND ${mergedHrRowIsRead(userId, from, to)}
     )
     SELECT
       (SELECT count(*) FROM merged)::int AS merged_count,

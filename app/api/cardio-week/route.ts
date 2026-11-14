@@ -56,8 +56,11 @@ export async function GET() {
     // Guarded, because they used to be: both windows came out of the profile's one row fetch,
     // which was itself `.catch`ed, so a database fault left the card painting with an empty heart
     // section rather than 500ing the whole week.
-    repo.getObservedHrProfile(userId, observedFrom, observedTo).catch(() => EMPTY_OBSERVED_HR),
-    repo.getObservedHrProfile(userId, priorFrom, priorTo).catch(() => EMPTY_OBSERVED_HR),
+    // #3774: with `tz`, each window's part before its last local midnight is kept for the day. The
+    // three windows start at different instants, and a window's first rows are merged against its
+    // own bounds, so they keep three parts rather than share the profile's one.
+    repo.getObservedHrProfile(userId, observedFrom, observedTo, tz).catch(() => EMPTY_OBSERVED_HR),
+    repo.getObservedHrProfile(userId, priorFrom, priorTo, tz).catch(() => EMPTY_OBSERVED_HR),
   ])
 
   const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, weekActivityLogs, userGoals, restingSleep] = await Promise.all([

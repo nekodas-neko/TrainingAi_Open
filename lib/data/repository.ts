@@ -1593,8 +1593,10 @@ export interface WorkoutRepository {
   getHrForWindow(userId: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number; source: string | null }[]>
   /** The corroboration-gated observed HR profile for a window, aggregated in the database — the
    *  same answer as `computeObservedHr` over `getHrForWindow`'s rows, without materialising them
-   *  (RV-181). */
-  getObservedHrProfile(userId: string, from: Date, to: Date): Promise<ObservedHrProfile>
+   *  (RV-181). With `tz`, the same answer with the part of the window before the user's local
+   *  midnight worked out once a day rather than on every call (#3774); pass it whenever the window
+   *  ends at "now" or is fixed for the day. */
+  getObservedHrProfile(userId: string, from: Date, to: Date, tz?: string): Promise<ObservedHrProfile>
   /** Per-day time-in-HR-zone (seconds per zone) over a local-date range, reconcile-on-read cached
    *  in daily_zone_minutes. `today` is always recomputed (partial day). Server-derived, not synced. */
   getZoneMinutesRange(

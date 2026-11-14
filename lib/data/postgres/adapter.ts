@@ -2174,14 +2174,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // "yesterday" below silently became "today" and dropped a real row from the range.
       const from14dStr = shiftDateStr(todayIso, -14)
 
-      const [muscleAssignmentsMap, ouraRows, moodLog, recentWorkouts, exerciseLibrary, sleepSessions, bodyMetrics, derivedRows, nightTemp, morningCheckin, switchDay] = await Promise.all([
+      const [muscleAssignmentsMap, ouraRows, moodLog, recentWorkouts, muscleMap, sleepSessions, bodyMetrics, derivedRows, nightTemp, morningCheckin, switchDay] = await Promise.all([
         this.getExerciseMuscleAssignments(
           sessions.flatMap(s => s.exercises.map(e => e.exerciseName)),
         ),
         this.getOuraDaily(userId, todayIso, todayIso),
         this.getMoodLog(userId, todayIso),
         this.getWorkoutSessionsFrom(userId, from7d),
-        this.listExerciseLibrary(),
+        // #3774: only the name→muscles mapping is read here (`computeMuscleRecovery`), on every
+        // load of the next session, so not every column of the catalogue.
+        this.listExerciseMuscleMap(),
         this.listSleepSessions(userId, from14dStr, todayIso),
         this.listBodyMetrics(userId, from14dStr, todayIso),
         this.getOuraDailyDerived(userId, shiftDateStr(todayIso, -1), todayIso),
@@ -2236,7 +2238,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         }
       }
 
-      const muscleRecovery = computeMuscleRecovery(recentWorkouts, exerciseLibrary)
+      const muscleRecovery = computeMuscleRecovery(recentWorkouts, muscleMap)
 
       // Live BLE-derived readiness, never Oura's own readiness score (#3000). Computed once and reused for BOTH the scoring engine and
       // the signals block below, so the "Why this?" explain page shows the same number the
@@ -2946,6 +2948,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const rows = await this.db
       .select({ name: s.exerciseLibrary.name, muscles: s.exerciseLibrary.muscles })
       .from(s.exerciseLibrary)
+      // The same order as `listExerciseLibrary`: readers key this by lower-cased name and keep the
+      // last entry, so two names differing only in case must resolve the same way from either read.
+      .orderBy(asc(s.exerciseLibrary.name))
     return rows.map(r => ({ name: r.name, muscles: (r.muscles as MuscleAssignment[]) ?? [] }))
   }
 
@@ -8481,7 +8486,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertShadowReadiness(userId: string, record: import('@trainingai/shared/types').ShadowReadinessRecord) { return shadowReadinessSlice.upsertShadowReadiness(this.db, userId, record) }
   async getShadowReadiness(userId: string, from: string, to: string, modelVersion?: number) { return shadowReadinessSlice.getShadowReadiness(this.db, userId, from, to, modelVersion) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }
-  async getObservedHrProfile(userId: string, from: Date, to: Date) { return oura.getObservedHrProfile(this.db, userId, from, to) }
+  async getObservedHrProfile(userId: string, from: Date, to: Date, tz?: string) {
+    return tz ? oura.getObservedHrProfileForDay(this.db, userId, from, to, tz) : oura.getObservedHrProfile(this.db, userId, from, to)
+  }
   async getZoneMinutesRange(userId: string, fromDay: string, toDay: string, tz: string, profile: { maxHr: number; restingHr: number }) { return oura.getZoneMinutesRange(this.db, userId, fromDay, toDay, tz, profile) }
   async insertRrIntervals(userId: string, rows: { at: Date; rrMs: number }[]) { return oura.insertRrIntervals(this.db, userId, rows) }
   async getRrForWindow(userId: string, from: Date, to: Date) { return oura.getRrForWindow(this.db, userId, from, to) }

@@ -92,6 +92,12 @@ export function maxHrIsUnread(profile: HrProfile | null | undefined): boolean {
  * measurements and the equivalence argument; `observed-hr-sql-equivalence.test.ts` holds the two
  * paths to the same answer.
  *
+ * **And the 90 days are merged once per local day, not once per call** (#3774). The window starts
+ * at a local midnight and ends at "now", so only today's readings can change it; passing `tz` lets
+ * the repository keep the part before today's midnight and read only the rest. Every caller of this
+ * resolver shares that one kept part. The answer is identical, not close: see
+ * `lib/data/postgres/observed-hr-day-cache.ts`.
+ *
  * Resting HR is averaged over a FIXED 28-day window, deliberately not the caller's query
  * range — deriving it from a caller-controlled window shifts the zone boundaries with the
  * range and bakes the shifting bands into the `daily_zone_minutes` cache (review J-2).
@@ -130,7 +136,7 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
       console.error('[hr-profile] sleep read failed, resting HR keyed by source only:', err)
       return []
     }),
-    repo.getObservedHrProfile(userId, observedFrom, observedTo).catch((err: unknown) => {
+    repo.getObservedHrProfile(userId, observedFrom, observedTo, tz).catch((err: unknown) => {
       failed('observed')(err)
       return EMPTY_OBSERVED_HR
     }),
