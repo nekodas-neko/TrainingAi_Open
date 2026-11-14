@@ -50,7 +50,7 @@ export async function logExerciseFromPayload(
   superseded: boolean;
 }> {
   const {
-    sessionName, sessionId, workoutSessionId,
+    sessionName, sessionId: payloadSessionId, workoutSessionId,
     exerciseLogId: clientExerciseLogId, setLogIds: clientSetLogIds,
     exercise, weights, reps,
     localDate, timeToCompleteSet, setTimes, restTimes,
@@ -78,6 +78,14 @@ export async function logExerciseFromPayload(
       return { ...kept, exerciseLogId: clientExerciseLogId, isPR: false, superseded: true };
     }
   }
+
+  // The payload's `sessionId` is stored as `workout_sessions.program_session_id` and used to read
+  // phase state, so it must name a session in one of the caller's own programs. Dropped to null
+  // rather than refused, for the reason given at the `styleId` check below: this runs for queued
+  // outbox pushes too, and a refusal would quarantine a whole logged workout over one link column.
+  const sessionId = payloadSessionId && (await repo.programSessionIdOwned(userId, payloadSessionId))
+    ? payloadSessionId
+    : undefined;
 
   // Resolve phase context for automatic-mode programs
   let currentPhaseId: string | undefined;

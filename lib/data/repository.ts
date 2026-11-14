@@ -720,6 +720,10 @@ export interface WorkoutRepository {
   // ── Progression Styles ─────────────────────────────────────────────────────
   listProgressionStyles(userId: string): Promise<ProgressionStyle[]>
   /** True when every id supplied belongs to `userId` (RV-32). A malformed id is false, not a throw. */
+  /** True when `id` names a session of one of the caller's own programs. */
+  programSessionIdOwned(userId: string, id: string): Promise<boolean>
+  /** True when `id` is empty or names one of the caller's own phase sets. */
+  phaseSetIdOwned(userId: string, id: string | null | undefined): Promise<boolean>
   progressionStyleIdsOwned(userId: string, ids: (string | null | undefined)[]): Promise<boolean>
   saveProgressionStyle(userId: string, style: ProgressionStyle): Promise<ProgressionStyle>
   deleteProgressionStyle(userId: string, styleId: string): Promise<void>
