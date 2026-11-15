@@ -40,6 +40,11 @@ export function setUserReadMemosEnabled(enabled: boolean | null): void {
   for (const m of state.memos.values()) m.clear()
 }
 
+/** Forget every memo's entry for the user: an account erase or reset removes everything they hold. */
+export function dropUserReadMemos(userId: string): void {
+  for (const m of state.memos.values()) m.delete(userId)
+}
+
 export function createUserReadMemo<V>(name: string, opts: { maxEntries: number; maxAgeMs: number }): UserReadMemo<V> {
   let entries = state.memos.get(name) as Map<string, Entry<V>> | undefined
   if (!entries) {

@@ -4,6 +4,7 @@ import type { getDb } from '../client'
 import * as s from '../schema'
 import { bodyToHex, hexToBody, packFrames, unpackFrames, type RawFrame } from '@/lib/oura-ble/frame-pack'
 import { DS_BUCKET_SPAN } from './oura-raw-frames'
+import { dropOuraCloudSwitchDay } from './oura-cloud-tokens'
 
 type Db = ReturnType<typeof getDb>
 
@@ -210,6 +211,9 @@ export async function packOuraRawBuckets(
       eq(s.ouraRawSamples.userId, userId),
       inArray(s.ouraRawSamples.id, rows.map(r => r.id)),
     ))
+    // #3793 ⑥: packing keeps the newest frames hot, so the switch day should not move; dropped anyway,
+    // because it is read from the newest hot frame and a dropped entry costs one re-read.
+    dropOuraCloudSwitchDay(userId)
 
     results.push({ epoch: b.epoch, tag: b.tag, dsBucket, frames: source.length, bytes: blob.length })
     framesMoved += source.length

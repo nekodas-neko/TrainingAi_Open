@@ -1625,6 +1625,10 @@ export async function insertOuraCloudBatteryReadings(
       })))
     }
     return fresh.length
+  }).then(n => {
+    // #3793 ③: after the commit. These readings can be older than the kept part's edge.
+    if (n > 0) ringBatteryMemo.drop(userId)
+    return n
   })
 }
 
@@ -1653,8 +1657,56 @@ export async function getRingBatteryReadings(
   db: Db, userId: string, from: Date, to: Date,
 ): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>> {
   const detailFrom = new Date(to.getTime() - RING_BATTERY_DETAIL_MS)
+  if (!userReadMemosEnabled()) return readRingBattery(db, userId, sql`${from.toISOString()}::timestamptz`, to, detailFrom, {})
+  // #3793 ③: 120 days were rebuilt on every call (321 calls, about 3,100 rows each); only the last
+  // two can change. The part before `cut`, a UTC hour at or before the detail cut, is kept per user
+  // for the window's start (the local day); each call reads the rest live.
+  //
+  // **Why the split is exact.** Whether a row is returned depends on its hour (`rn`, `hour_charging`),
+  // its two neighbours (`prev_percent`, `next_percent`) and whether it is in the detail part. `cut`
+  // is an hour boundary, so no hour spans it. A kept row is before every later call's detail cut
+  // too, because `to` only moves forward. Its neighbours: the live query also reads the one row
+  // before `cut`, so the first live row sees its real predecessor; and the last kept row's successor
+  // is `firstAfterCutMs`, which only a write before it can change. Bluetooth polls are stamped
+  // `now()`, after it; Oura Cloud's readings can be older, so their insert drops the entry. With no
+  // row after `cut` yet, the successor is unknown and nothing is kept.
+  const kept = await ringBatteryMemo.get(userId, String(from.getTime()), async () => {
+    const cutMs = Math.floor(detailFrom.getTime() / 3_600_000) * 3_600_000
+    const cut = new Date(cutMs)
+    const [older, [after]] = await Promise.all([
+      readRingBattery(db, userId, sql`${from.toISOString()}::timestamptz`, to, detailFrom, { before: cut }),
+      db.select({ at: sql<string | null>`min(${s.ouraBleBatteryPoll.measuredAt})` }).from(s.ouraBleBatteryPoll)
+        .where(and(eq(s.ouraBleBatteryPoll.userId, userId), gte(s.ouraBleBatteryPoll.measuredAt, cut), lte(s.ouraBleBatteryPoll.measuredAt, to))),
+    ])
+    return { cutMs, filledToMs: to.getTime(), firstAfterCutMs: after?.at == null ? null : new Date(after.at).getTime(), older }
+  })
+  if (kept.firstAfterCutMs == null || kept.cutMs > detailFrom.getTime() || kept.filledToMs > to.getTime()) {
+    ringBatteryMemo.drop(userId)
+    return readRingBattery(db, userId, sql`${from.toISOString()}::timestamptz`, to, detailFrom, {})
+  }
+  const cut = new Date(kept.cutMs)
+  const live = await readRingBattery(db, userId, sql`COALESCE((
+      SELECT max(p.measured_at) FROM oura_ble_battery_poll p
+       WHERE p.user_id = ${userId} AND p.measured_at >= ${from.toISOString()}::timestamptz
+         AND p.measured_at < ${cut.toISOString()}::timestamptz
+    ), ${cut.toISOString()}::timestamptz)`, to, detailFrom, { atOrAfter: cut })
+  return [...kept.older, ...live]
+}
+
+type RingBatteryRow = { tsMs: number; percent: number; charging: boolean | null }
+
+/** #3793 ③: per user, keyed on the window's start (a local midnight); dropped by an Oura Cloud
+ *  battery insert or an account erase, else at 6 hours. 16 users of about 3,000 rows each. */
+const ringBatteryMemo = createUserReadMemo<{ cutMs: number; filledToMs: number; firstAfterCutMs: number | null; older: RingBatteryRow[] }>(
+  'ring-battery-older', { maxEntries: 16, maxAgeMs: 6 * 3_600_000 })
+
+/** The battery query. Rows from `windowFrom` to `to` decide each other; `out` limits which are returned. */
+async function readRingBattery(
+  db: Db, userId: string, windowFrom: SQL, to: Date, detailFrom: Date, out: { before?: Date; atOrAfter?: Date },
+): Promise<RingBatteryRow[]> {
   // The hour bucket is pinned to UTC so a session timezone with a half-hour offset cannot shift it.
   const { rows } = await db.execute<{ measured_at: Date; percent: number; charging: boolean | null }>(sql`
+    SELECT measured_at, percent, charging FROM (
     SELECT measured_at, percent,
            CASE WHEN rn = 1 THEN hour_charging ELSE charging END AS charging
       FROM (
@@ -1667,7 +1719,7 @@ export async function getRingBatteryReadings(
                    lag(percent) OVER (ORDER BY measured_at) AS prev_percent,
                    lead(percent) OVER (ORDER BY measured_at) AS next_percent
               FROM oura_ble_battery_poll
-             WHERE user_id = ${userId} AND measured_at >= ${from.toISOString()}::timestamptz
+             WHERE user_id = ${userId} AND measured_at >= ${windowFrom}
                AND measured_at <= ${to.toISOString()}::timestamptz
           ) w
       ) x
@@ -1676,6 +1728,10 @@ export async function getRingBatteryReadings(
         OR charging IS TRUE
         OR percent > prev_percent
         OR next_percent > percent
+    ) kept
+     WHERE TRUE
+       ${out.before ? sql`AND measured_at < ${out.before.toISOString()}::timestamptz` : sql``}
+       ${out.atOrAfter ? sql`AND measured_at >= ${out.atOrAfter.toISOString()}::timestamptz` : sql``}
      ORDER BY measured_at ASC`)
   return rows.map(r => ({ tsMs: new Date(r.measured_at).getTime(), percent: Number(r.percent), charging: r.charging }))
 }
@@ -2502,7 +2558,8 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
  *  `workout_sessions`; `userId` is a bound id or the session's own `user_id` column. The calorie gate
  *  and the prune-time freeze both read this one query (#3150). */
 type WorkoutHrSpan = { n: number; ungated: number; max_gap_ms: number | null }
-function workoutHrSpanSql(userId: string | SQLWrapper): SQL<WorkoutHrSpan | null> {
+/** Exported for `repeat-reads-unchanged-3793.test.ts`, which runs the calorie gate's previous query. */
+export function workoutHrSpanSql(userId: string | SQLWrapper): SQL<WorkoutHrSpan | null> {
   const gated = sql.join([...DENSITY_GATED_HR_SOURCES].map(g => sql`${g}`), sql`, `)
   return sql<WorkoutHrSpan | null>`(
     SELECT json_build_object('n', count(*), 'ungated', count(*) FILTER (WHERE g.source IS NULL OR g.source NOT IN (${gated})), 'max_gap_ms', max(g.gap_ms)) FROM (

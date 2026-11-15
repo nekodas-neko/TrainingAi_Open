@@ -13,6 +13,7 @@ import { nightAlgorithmVersion } from '@trainingai/shared/health/per-device-norm
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
 import { computeZoneQuota, weekWindow } from '@trainingai/shared/health/zone-quota'
 import { activityStepsForDayCount, dayStepCount } from '@trainingai/shared/health/activity-steps'
+import { metricsInDateRange } from '@trainingai/shared/health/metrics-in-date-range'
 
 // The Cardiovascular hub's week payload: HR profile + per-zone quota + steps.
 // Server-derived read only — no user writes here, so no outbox/local-store domain (spec D-9).
@@ -63,17 +64,21 @@ export async function GET() {
     repo.getObservedHrProfile(userId, priorFrom, priorTo, tz).catch(() => EMPTY_OBSERVED_HR),
   ])
 
-  const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, weekActivityLogs, userGoals, restingSleep] = await Promise.all([
+  // The four body-metric windows: the week, the 28 days weight is resolved over (weight isn't logged
+  // daily, so the week alone is too narrow; mirrors readiness-score), and the two resting-HR windows.
+  const metricWindows = {
+    week: [from, to], lookback: [from28dIso, today], currentResting: [currentWindowFromIso, today],
+    priorResting: [priorWindowFromIso, priorWindowToIso],
+  } as const
+  const metricsFrom = Object.values(metricWindows).map(w => w[0]).reduce((a, b) => (b < a ? b : a))
+  const metricsTo = Object.values(metricWindows).map(w => w[1]).reduce((a, b) => (b > a ? b : a))
+  const [days, user, allMetrics, plan, dayExercises, weekActivityLogs, userGoals, restingSleep] = await Promise.all([
     repo.getZoneMinutesRange(userId, from, to, tz, profile).catch(() => []),
     // LA-82: the profile above already degrades on this read; this copy only feeds age and the step
     // goal's inputs, which all take null.
     repo.getUserById(userId).catch(() => null),
-    repo.listBodyMetrics(userId, from, to).catch(() => []),
-    // Wider window for weight resolution — weight isn't logged daily, so the week window
-    // alone is too narrow to reliably find a recent reading (mirrors readiness-score's pattern).
-    repo.listBodyMetrics(userId, from28dIso, today).catch(() => []),
-    repo.listBodyMetrics(userId, currentWindowFromIso, today).catch(() => []),
-    repo.listBodyMetrics(userId, priorWindowFromIso, priorWindowToIso).catch(() => []),
+    // #3793 ⑦: one read over the widest window, sliced below into the four the card uses.
+    repo.listBodyMetrics(userId, metricsFrom, metricsTo).catch(() => []),
     repo.getActiveRunningPlan(userId).catch(() => null),
     // "No dedicated workout today" (Q-88 lazy-day credit) reuses the same lightweight
     // lifting check progress-summary's trainedToday uses, plus any logged cardio/guided-walk
@@ -87,6 +92,9 @@ export async function GET() {
     // the two means by source only, as before this read existed.
     repo.listSleepSessions(userId, priorWindowFromIso, today).catch(() => []),
   ])
+  const [weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics] = [
+    metricWindows.week, metricWindows.lookback, metricWindows.currentResting, metricWindows.priorResting,
+  ].map(([lo, hi]) => metricsInDateRange(allMetrics, lo, hi))
   const todayActivityLogs = weekActivityLogs.filter((a) => a.date === today)
   const trainedToday = dayExercises.length > 0 || todayActivityLogs.length > 0
 
