@@ -150,6 +150,9 @@ export type OuraWebhookDeps = {
   workoutHr?: OuraWorkoutHrReattribute
   /** #2634: refreshes the still-period resting HR of the days a write could change (`stillRhrRefresher`). */
   stillRhr?: StillRhrRefresh
+  /** #3779: told after a document is written, so a walking-plan day its steps finish is marked done.
+   *  Fire-and-forget: it must not throw or delay the answer to Oura. */
+  afterWrite?: (userId: string) => void
 }
 
 /**
@@ -218,6 +221,7 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     const doc = read.doc
     const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]), deps.rescore, deps.stillRhr)
     await stampOuraData(deps.repo, userId)
+    deps.afterWrite?.(userId)
     if (HEART_RATE_TRIGGERS.has(event.data_type)) {
       if (isOuraTypeShared(granted, 'heartrate')) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
       // The user's choice on Oura's consent page, not a failure: logged, never reported (as the backfill does).

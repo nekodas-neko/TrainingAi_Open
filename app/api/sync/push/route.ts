@@ -9,6 +9,7 @@ import { recordNativeBuildSighting } from '@/lib/native-builds/record-sighting';
 import { readJsonLimited } from '@trainingai/shared/http/request-guards';
 import { withUserWriteBarrier, CUT_OFF } from '@/lib/data/postgres/user-write-barrier';
 import { SUPERSEDED_WARNING, UNSTAMPED_WARNING } from '@trainingai/shared/sync/edited-at';
+import { settleWalkingPlanSoon } from '@/lib/health/walking-plan-service';
 
 /**
  * The envelope caps the batch at 100 mutations, and the largest bounded domain — `workout_log`,
@@ -157,6 +158,10 @@ export async function POST(req: NextRequest) {
         { userId, url: req.nextUrl.pathname },
       );
     }
+
+    // #3779: an activity, a step count or a rest day the device just pushed may finish a walking-plan
+    // day. Fire-and-forget and throttled; a user without a walking plan costs one plan read.
+    if (valid.length > 0) settleWalkingPlanSoon(repo, userId, session.user?.timezone);
 
     // Rejections first: they are the ones a reader is looking for when a mutation vanished.
     return NextResponse.json(

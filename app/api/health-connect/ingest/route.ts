@@ -8,6 +8,7 @@ import { reportServerError } from '@/lib/observability'
 import { clientIp } from '@trainingai/shared/http/client-ip'
 import { resolveIngestDate } from "@trainingai/shared/validation/ingest-clock";
 import { IngestBodySchema } from "@trainingai/shared/validation/health-connect-ingest";
+import { settleWalkingPlanSoon } from '@/lib/health/walking-plan-service';
 
 // Called by Tasker on Android — no session cookie, auth via shared secret.
 // Set HEALTH_CONNECT_INGEST_SECRET in Railway env vars.
@@ -89,6 +90,8 @@ export async function POST(req: NextRequest) {
       fatG:       body.fat        ?? undefined,
       distanceKm: body.distanceKm ?? undefined,
     }], 'health_connect');
+    // #3779: a step count may finish a walking-plan day.
+    settleWalkingPlanSoon(repo, userId, tz);
     return NextResponse.json({ success: true, date: dateIso });
   } catch (err) {
     reportServerError(err, { userId, url: '/api/health-connect/ingest' })
