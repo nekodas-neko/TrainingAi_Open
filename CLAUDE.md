@@ -107,13 +107,13 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
 - **Oura is one source, not the product** (owner, 3 Nov): features and scores read the generic shapes in
   [`docs/data-source-connector-guide.md`](docs/data-source-connector-guide.md) §3, never an Oura
   field or a source id, so a Fitbit could feed them the same way.
-- The ring's source is moving to the Oura Cloud API (OAuth, per user; #2808). Only the connector
-  module `lib/oura/cloud/` calls Oura Cloud; its tokens are encrypted at rest with `OURA_TOKEN_KEY`.
-- Direct BLE until the switch: byte layouts come from the `open_oura` source, never memory.
-  Decoders never throw. The history cursor advances only once a batch is committed to the phone's
-  own `oura_raw.db`, and never skips a gap (the server POST is a backup). Never prune or mutate the
-  server raw BLE archive. Re-pairing the ring with the official Oura app is the owner's switch-over
-  step, never an agent's.
+- The ring's source has been the Oura Cloud API (OAuth, per user) since 17 Oct (#2808). Only the
+  connector module `lib/oura/cloud/` calls Oura Cloud; its tokens are encrypted at rest with
+  `OURA_TOKEN_KEY`.
+- Direct BLE ran until the switch, and its code is still in `lib/oura-ble/`: byte layouts came from
+  the `open_oura` source, never memory; decoders never throw; the history cursor never skipped a
+  gap. Never prune or mutate the server raw BLE archive. Going back to direct BLE is the owner's
+  call, never an agent's.
 
 **AI, security, integrations** → [`docs/rules/ai-security-and-integrations.md`](docs/rules/ai-security-and-integrations.md)
 - Structured LLM output uses a schema, never `JSON.parse` of text; no model-reported number gates

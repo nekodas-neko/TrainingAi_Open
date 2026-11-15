@@ -6,8 +6,8 @@ open: **given the goal of not being locked to one ring, what does a new data sou
 into — what shape does it send, which table does it land in, which calculation reads it, and what
 happens when it can't supply something?** That doc states the tiers and the invariants; this one is
 the contract a new integration is checked against. No code in this repo implements a formal
-`DataSourceConnector` interface yet — §10 proposes one and files the implementation as a backlog
-entry rather than building it inline, per `CLAUDE.md`'s backlog-driven-implementation rule.
+`DataSourceConnector` interface yet — §10 proposes one. Since 2026-10-17 the ring reads through the
+Oura Cloud adapter in `lib/oura/cloud/` (#2808), which maps Oura's fields into the §3 shapes.
 Everything else here (the tables, the formula inputs, the normalize-layer pattern, the backfill
 mechanisms) is described from the current code, not aspirationally — every claim below was checked
 against the source, not summarized from memory.
@@ -85,12 +85,12 @@ same table.
 
 | Category | What it is | Today | Auth |
 |---|---|---|---|
-| **Direct BLE (raw)** | App/native code talks GATT straight to the device; we own the decoder | Oura Ring 5 (`lib/oura-ble/`), Renpho scale (`lib/scale-ble/`), Polar H10 (`lib/polar-ble/`) | Session (or admin, for the raw Oura ingest route) |
+| **Direct BLE (raw)** | App/native code talks GATT straight to the device; we own the decoder | Oura Ring 5 (`lib/oura-ble/`, until the 2026-10-17 switch to the Cloud API), Renpho scale (`lib/scale-ble/`), Polar H10 (`lib/polar-ble/`) | Session (or admin, for the raw Oura ingest route) |
 | **Direct BLE (learning mode)** | Same transport, but writes are isolated until trusted | Colmi R09 (`lib/colmi*` — see `docs/superpowers/plans/2026-08-26-alternative-ring-colmi-testing.md`) | Session |
 | **Platform aggregator (computed)** | OS-level health store that already merged whatever the user wears | Android Health Connect (`lib/health-connect-sync.ts`) | Session, via `/api/sync-health` |
 | **Platform aggregator, secret-gated** | Same idea, driven by an external automation (Tasker) rather than the in-app client | Health Connect via `/api/health-connect/ingest` | Shared secret, no session — **not currently multi-tenant** (single hardcoded `WEBHOOK_USER_ID`) |
 | **Manual entry** | User types a number | Body metadata form | Session |
-| **Cloud API (retired)** | Vendor's OAuth'd REST API, webhook-pushed or polled | Oura Cloud — **removed 2026-08-13, never re-add** (§ "Oura Ring — the Cloud integration is GONE" in `CLAUDE.md`) | — |
+| **Cloud API** | Vendor's OAuth'd REST API, webhook-pushed, with a backfill on connect | Oura Cloud (`lib/oura/cloud/`) — the ring's live source since 2026-10-17 (#2808). It was removed on 2026-08-13 and rebuilt as a connector | Per-user OAuth, tokens encrypted with `OURA_TOKEN_KEY`; webhooks signed with the client secret |
 
 **Apple HealthKit is not implemented and there is no iOS build.** The canonical runtime is the S25
 Ultra APK (`CLAUDE.md` "Canonical Runtime"). If iOS ever becomes a target, HealthKit is a **computed
