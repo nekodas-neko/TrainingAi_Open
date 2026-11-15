@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { z } from 'zod';
 import { readDurationPreset, type DurationPreset } from '@trainingai/shared/workout/duration-model';
 import {
   hidePrescriptionAgedOutOnScreen,
@@ -8,18 +7,10 @@ import {
 import { readSessionResponse, type SessionPreview } from '../catalog';
 import { prepareSession, type SessionStartOptions } from '../logging/session-options';
 import { useWorkoutResource, useWorkoutResources } from './WorkoutDataProvider';
-import { periodizationSpec } from './models';
+import { periodizationSpec, sessionPreparationSchema } from './models';
 import { useWorkoutAction } from './useWorkoutAction';
 import { failureNotice } from '../../../core/reporting/index.ts';
 
-const response = z
-  .object({
-    program: z.unknown(),
-    session: z.unknown(),
-    exercises: z.array(z.unknown()),
-    aiPrescriptionPending: z.boolean(),
-  })
-  .passthrough();
 export function useSessionPreparation(
   session: SessionPreview | undefined,
   programId: string | undefined,
@@ -39,7 +30,7 @@ export function useSessionPreparation(
   const spec = {
     path: '/api/workout-data',
     query: { tab: session?.id ?? 'missing', ...(deload ? { aiDeload: '1' } : {}) },
-    schema: response,
+    schema: sessionPreparationSchema,
     ttl: 60_000,
   };
   const current = useWorkoutResource(spec, !!session);
