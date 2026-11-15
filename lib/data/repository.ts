@@ -945,8 +945,11 @@ export interface WorkoutRepository {
   // Recompute the all-time PR for an exercise from surviving exercise_logs (excluding
   // deload sessions) — corrects PRs downward after an edit/delete.
   reconcilePersonalRecord(userId: string, exerciseName: string): Promise<void>
-  /** The log `reconcilePersonalRecord` would make the record, without writing it (#3801). */
-  bestQualifyingPersonalRecord(userId: string, exerciseName: string): Promise<{ estimated1rm: number; loggedAt: Date } | null>
+  /**
+   * The log `reconcilePersonalRecord` would make the record, without writing it (#3801).
+   * `excludeSessionIds` answers as if those sessions were already tombstoned (the #3802 dry run).
+   */
+  bestQualifyingPersonalRecord(userId: string, exerciseName: string, opts?: { excludeSessionIds?: string[] }): Promise<{ estimated1rm: number; loggedAt: Date } | null>
   listRecentPersonalRecords(userId: string, from: Date, to: Date): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date; exerciseType: string | null }[]>
   // All-time best estimated1rm per exercise, keyed by exercise name.
   listPersonalRecords(userId: string): Promise<Map<string, number>>
