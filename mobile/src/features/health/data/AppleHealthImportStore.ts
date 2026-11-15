@@ -3,7 +3,6 @@ import { isValidationRejection } from '../../account/api/client';
 import { z } from 'zod';
 import {
   appleImportBatch,
-  appleTypes,
   type AppleSampleType,
   type AppleImportBatch,
 } from '@trainingai/shared/validation/apple-health-import';

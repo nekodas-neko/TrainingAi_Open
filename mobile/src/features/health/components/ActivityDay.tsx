@@ -16,7 +16,6 @@ import {
   Stack,
   StatusIndicator,
 } from '../../../shared/ui';
-import { activityHistorySpec, metricValue } from '../data/models';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
 import { useActivities, useActivityLogs } from '../../activities/data/ActivityProvider';

@@ -21,15 +21,19 @@ const renameExercise = vi.fn(async () => ({ id: 'x-1', name: 'X' }))
 
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u-1', isAdmin: true } }) }))
 vi.mock('@/lib/data', () => ({ getRepository: async () => ({ createExercise, renameExercise }) }))
+const requireAdmin = vi.fn(async (_userId: string) => undefined as void)
 vi.mock('@/lib/admin', () => ({
-  requireAdmin: async () => undefined,
+  requireAdmin: (userId: string) => requireAdmin(userId),
   adminErrorResponse: () => new Response('forbidden', { status: 403 }),
 }))
 vi.mock('@/lib/observability', () => ({ reportServerError: vi.fn() }))
 
 import { POST } from '@/app/api/exercises/route'
 
-beforeEach(() => { createExercise.mockClear(); renameExercise.mockClear() })
+beforeEach(() => {
+  createExercise.mockClear(); renameExercise.mockClear()
+  requireAdmin.mockReset(); requireAdmin.mockResolvedValue(undefined)
+})
 
 const post = (body: object) =>
   POST(new Request('http://localhost/api/exercises', {
@@ -63,6 +67,16 @@ describe('POST /api/exercises refuses an unlabelled catalogue row', () => {
     expect(res.status).toBe(200)
     expect(renameExercise).toHaveBeenCalledTimes(1)
     expect(createExercise).not.toHaveBeenCalled()
+  })
+
+  // #3796: a rename rewrites the shared catalogue row and every user's logs that name it, so it
+  // is an admin write like a create, checked before the rename runs.
+  it('refuses a rename from a non-admin, before renaming anything', async () => {
+    requireAdmin.mockRejectedValue(new Error('Forbidden'))
+    const res = await post({ name: 'Dumbbell Lunge', mergeWithId: '00000000-0000-4000-8000-000000000001' })
+    expect(res.status).toBe(403)
+    expect(requireAdmin).toHaveBeenCalledWith('u-1')
+    expect(renameExercise).not.toHaveBeenCalled()
   })
 
   it('keeps every OTHER validation failure generic — only the equipment message is surfaced', async () => {

@@ -471,7 +471,9 @@ export function AiPrescriptionCard({
                   variant="outline"
                   className="flex-1 h-8 text-xs border-orange-500/50 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10"
                   disabled={loading}
-                  onClick={() => executeTransition(prescription.phase)}
+                  // #3799: a deload offered for one day's reason lightens this session only, so the
+                  // button accepts it and the phase stays where it is. A planned move still transitions.
+                  onClick={() => (isDeloadRecommended ? respond('accept') : executeTransition(prescription.phase))}
                 >
                   <ArrowRightIcon className="h-3.5 w-3.5 mr-1" />
                   {isCycleRestart ? 'Continue' : 'Move'} to {phaseLabel[prescription.phase] ?? prescription.phase}

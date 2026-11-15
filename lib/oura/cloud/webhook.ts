@@ -6,7 +6,9 @@
 //   - Events: `POST <callback>` with `x-oura-signature` (HMAC-SHA256 of `x-oura-timestamp` followed by
 //     the JSON body, keyed with the app's client secret, upper-case hex) and a small body naming the
 //     document: `{ event_type, data_type, object_id, event_time, user_id }`.
-//   - Answer within 10 s. Oura retries a failed delivery about ten times over an hour, and a 410
+//   - Answer within 10 s. The document read gets `WEBHOOK_DOCUMENT_TIMEOUT_MS` of it (#3795 item 3):
+//     a slow read fails to a 503 and Oura's retry reads again, instead of a late answer that Oura
+//     retries anyway while the work repeats. Oura retries a failed delivery about ten times over an hour, and a 410
 //     CANCELS the subscription, so this module never asks the route for a 410.
 //
 // The route is public and unauthenticated, so everything here fails closed: no settings, no
@@ -123,8 +125,10 @@ export type OuraWebhookOutcome =
   | { result: 'ignored'; reason: string }
   /** Nobody here is connected to that Oura account (any more), or their connection cannot be used. */
   | { result: 'unknown_user' }
-  /** Oura no longer has the document, or it did not match the spec. */
+  /** Oura no longer has the document (404). */
   | { result: 'not_found' }
+  /** Oura sent the document and it did not match the spec's model; reported (#3795 item 2). */
+  | { result: 'invalid_document' }
   /** The connection needs the user to connect again; retrying will not help. */
   | { result: 'reauth' }
   /** Oura refused this data type for the user (membership or consent). */
@@ -147,6 +151,12 @@ export type OuraWebhookDeps = {
   /** #2634: refreshes the still-period resting HR of the days a write could change (`stillRhrRefresher`). */
   stillRhr?: StillRhrRefresh
 }
+
+/**
+ * How long the webhook waits for Oura's document (#3795 item 3). Oura wants an answer within 10 s, and
+ * the write and re-score come after the read; a read slower than this is answered 503 for a retry.
+ */
+export const WEBHOOK_DOCUMENT_TIMEOUT_MS = 4_000
 
 function isStoredType(t: string): t is OuraDocumentType {
   return Object.prototype.hasOwnProperty.call(OURA_DOCUMENT_TYPES, t)
@@ -191,9 +201,21 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
   let token: string | null = null
   try {
     token = await getOuraAccessToken(deps.repo, deps.config, userId)
-    if (!token) return { result: 'unknown_user' }
-    const doc = await fetchOuraDocument(token, event.data_type, event.object_id)
-    if (!doc) return { result: 'not_found' }
+    if (!token) {
+      // #3795 item 5: the account is ours (the lookup above found it), so a null here is stored tokens
+      // that no longer open, as after `OURA_TOKEN_KEY` changes. Every event would be lost in silence.
+      // (A row gone since the lookup is a disconnect racing this event, and not reported.)
+      if (await deps.repo.getOuraCloudTokens(userId)) reportOuraCloudIssue('webhook:tokens-undecryptable', 'the stored Oura tokens do not decrypt under the current key; events are being dropped until the user connects again', { userId })
+      return { result: 'unknown_user' }
+    }
+    const read = await fetchOuraDocument(token, event.data_type, event.object_id, { timeoutMs: WEBHOOK_DOCUMENT_TIMEOUT_MS })
+    if (!read.doc) {
+      if (read.missing === 'not_found') return { result: 'not_found' }
+      // A field changed at Oura (as in #3033): a retry would get the same document. The type only, never the body.
+      reportOuraCloudIssue(`webhook:parse-failed:${event.data_type}`, `a ${event.data_type} document did not match the spec's model and was not stored`, { userId })
+      return { result: 'invalid_document' }
+    }
+    const doc = read.doc
     const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]), deps.rescore, deps.stillRhr)
     await stampOuraData(deps.repo, userId)
     if (HEART_RATE_TRIGGERS.has(event.data_type)) {

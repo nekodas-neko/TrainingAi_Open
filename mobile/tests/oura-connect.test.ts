@@ -15,6 +15,9 @@ import {
   ouraMessage,
   parseOuraCallback,
   readOuraStatus,
+  OURA_ACCOUNT_COPY,
+  ouraAccountState,
+  ouraFeedLastDataAt,
 } from '../src/features/devices/data/oura.ts';
 
 const require = createRequire(import.meta.url);
@@ -127,10 +130,10 @@ test('status is parsed strictly, and disconnect calls DELETE', async () => {
     await readOuraStatus(connection({ 'GET /api/oura/connection': { connected: true, scope: 'daily', expiresAt: null, lastDataAt: '2026-10-26T01:05:00.000Z', lastWebhookAt: null } })),
     { connected: true, scope: 'daily', expiresAt: null, lastDataAt: '2026-10-26T01:05:00.000Z', lastWebhookAt: null },
   );
-  // #3227: a grant Oura refused comes back not connected, with a field the schema drops.
+  // #3227, #3794: a grant Oura refused comes back not connected, with reauthRequired kept.
   assert.deepEqual(
     await readOuraStatus(connection({ 'GET /api/oura/connection': { connected: false, scope: null, expiresAt: null, reauthRequired: true } })),
-    { connected: false, scope: null, expiresAt: null },
+    { connected: false, scope: null, expiresAt: null, reauthRequired: true },
   );
   assert.deepEqual(await disconnectOura(conn), { ok: true });
   assert.deepEqual(calls, ['GET /api/oura/connection', 'DELETE /api/oura/connection']);
@@ -240,3 +243,37 @@ test('the Android manifest names Oura in <queries> exactly once, however often i
   assert.equal(entries(others).length, 1);
   assert.equal(others.manifest.queries?.[0].package?.length, 2);
 });
+
+// #3794: when Oura stops sharing, the screen says so, offers Connect again and keeps the last data time.
+test('a refused grant reads as stopped, with Connect again, and keeps when data last arrived', async () => {
+  const answer = {
+    connected: false, scope: null, expiresAt: null, reauthRequired: true,
+    lastDataAt: '2026-11-09T21:30:00.000Z', lastWebhookAt: '2026-11-09T21:31:00.000Z',
+  };
+  const status = await readOuraStatus(connection({ 'GET /api/oura/connection': answer }));
+  assert.equal(status.reauthRequired, true);
+  assert.equal(status.lastDataAt, '2026-11-09T21:30:00.000Z');
+  assert.equal(ouraAccountState(status), 'stopped');
+  assert.deepEqual(OURA_ACCOUNT_COPY.stopped, {
+    badge: 'Stopped',
+    body: 'Oura stopped sharing your data with TrainingAi. Connect again to pick up where it left off.',
+    connect: 'Connect again',
+  });
+  // The feed line keeps the time, so the cards show the data going stale.
+  assert.equal(ouraFeedLastDataAt(answer), '2026-11-09T21:30:00.000Z');
+});
+
+test('the account state is connected, never connected, or unknown until read', () => {
+  assert.equal(ouraAccountState(null), null);
+  assert.equal(ouraAccountState({ connected: true, scope: 'daily', expiresAt: null }), 'connected');
+  assert.equal(ouraAccountState({ connected: false, scope: null, expiresAt: null }), 'not_connected');
+  assert.equal(OURA_ACCOUNT_COPY.not_connected.connect, 'Connect Oura');
+  assert.equal(OURA_ACCOUNT_COPY.connected.badge, 'Connected');
+});
+
+test('the feed time is null when nothing arrived, and unknown when the answer cannot be read', () => {
+  assert.equal(ouraFeedLastDataAt({ connected: false, scope: null, expiresAt: null }), null);
+  assert.equal(ouraFeedLastDataAt(null), undefined);
+  assert.equal(ouraFeedLastDataAt({ lastDataAt: 5 }), undefined);
+});
+

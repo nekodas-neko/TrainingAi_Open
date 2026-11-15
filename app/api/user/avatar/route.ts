@@ -4,10 +4,14 @@ import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited, parseImageDataUri } from '@trainingai/shared/http/request-guards'
 
-const MAX_SIZE = 5 * 1024 * 1024 // 5MB decoded image
+// 200 KB decoded. The avatar is stored as a data URI and sent to every friend whose feed or
+// leaderboard shows it, so it is kept to what a small round picture needs. Avatars stored before
+// this cap are left as they are.
+const MAX_SIZE = 200 * 1024
+const MAX_SIZE_LABEL = '200 KB'
 // The data URL is base64 (~1.33×) plus JSON envelope — cap the raw body a bit above
-// the decoded limit so a legitimate 5MB image isn't rejected by the stream guard.
-const MAX_BODY_BYTES = 7 * 1024 * 1024
+// the decoded limit so a legitimate image at the cap isn't rejected by the stream guard.
+const MAX_BODY_BYTES = 300 * 1024
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -23,7 +27,7 @@ export async function POST(req: NextRequest) {
   const read = await readJsonLimited(req, MAX_BODY_BYTES)
   if (!read.ok) {
     const status = read.reason === 'too_large' ? 413 : 400
-    return NextResponse.json({ error: read.reason === 'too_large' ? 'Image too large (max 5MB)' : 'Invalid request' }, { status })
+    return NextResponse.json({ error: read.reason === 'too_large' ? `Image too large (max ${MAX_SIZE_LABEL}). Choose a smaller picture.` : 'Invalid request' }, { status })
   }
   const body = read.body as { avatar?: unknown }
   if (!body?.avatar || typeof body.avatar !== 'string') {
@@ -37,7 +41,7 @@ export async function POST(req: NextRequest) {
   const parsed = parseImageDataUri(body.avatar, MAX_SIZE)
   if (!parsed.ok) {
     return parsed.reason === 'too_large'
-      ? NextResponse.json({ error: 'Image too large (max 5MB)' }, { status: 400 })
+      ? NextResponse.json({ error: `Image too large (max ${MAX_SIZE_LABEL}). Choose a smaller picture.` }, { status: 400 })
       : NextResponse.json({ error: 'Unsupported image type (use JPEG, PNG or WebP)' }, { status: 400 })
   }
 

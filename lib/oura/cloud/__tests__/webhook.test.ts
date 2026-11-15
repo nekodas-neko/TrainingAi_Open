@@ -9,7 +9,7 @@ import { NO_WRITES } from '../ingest'
 import { getOuraAccessToken, storeOuraGrant, type OuraTokenStore } from '../tokens'
 import {
   catchUpOuraCloudHeartRate, catchUpOuraCloudRingBattery, handleOuraWebhookEvent, RING_BATTERY_OVERLAP_MS, resetOuraCloudRingBatteryThrottle, RING_BATTERY_MIN_INTERVAL_MS, RING_BATTERY_REFUSED_BACKOFF_MS, startOuraCloudRingBatteryCatchUp, HEART_RATE_LOOKBACK_MS, HEART_RATE_OVERLAP_MS, MAX_EVENT_AGE_MS, ouraWebhookConfig,
-  resetOuraCloudHeartRateThrottle, startOuraCloudHeartRateCatchUp, verifyOuraSignature, type OuraWebhookDeps,
+  resetOuraCloudHeartRateThrottle, startOuraCloudHeartRateCatchUp, verifyOuraSignature, WEBHOOK_DOCUMENT_TIMEOUT_MS, type OuraWebhookDeps,
 } from '../webhook'
 import type { User } from '@trainingai/shared/types'
 import { resetOuraCloudReportThrottle } from '../report'
@@ -317,12 +317,57 @@ describe('handleOuraWebhookEvent (#2859)', () => {
     expect(await handleOuraWebhookEvent(deps(), event({ event_type: 'delete' }))).toMatchObject({ result: 'ignored' })
   })
 
-  it('answers not_found when Oura no longer has the document or it is not the spec\'s shape', async () => {
+  it('answers not_found, and reports nothing, when Oura no longer has the document', async () => {
+    resetOuraCloudReportThrottle()
+    reportServerError.mockClear()
     fetchMock.mockResolvedValueOnce(new Response('', { status: 404 }))
     expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'not_found' })
-    fetchMock.mockResolvedValueOnce(jsonResponse({ id: 'rd-1' }))
-    expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'not_found' })
     expect(writes.daily).toBe(0)
+    await vi.waitFor(() => Promise.resolve())
+    expect(reportServerError).not.toHaveBeenCalled()
+  })
+
+  // #3795 item 2: a document that fails the spec's model is a field change at Oura, not a 404.
+  it('tells a document that fails the spec from a 404, and reports it with the type and never the body', async () => {
+    resetOuraCloudReportThrottle()
+    reportServerError.mockClear()
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: 'rd-1', private_value: 'secret-body-marker' }))
+    expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'invalid_document' })
+    expect(writes.daily).toBe(0)
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(1))
+    const [err, ctx] = reportServerError.mock.calls[0] as [Error, { userId?: string; url?: string }]
+    expect(err.message).toContain('webhook:parse-failed:daily_readiness')
+    expect(err.message).not.toContain('secret-body-marker')
+    expect(ctx).toEqual({ userId: USER, url: 'oura:webhook' })
+  })
+
+  // #3795 item 3: the read gets 4 s of Oura's 10, and a timeout is a retry (the route's 503).
+  it('gives the document read a 4-second timeout and turns a timeout into a retryable error', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout')
+    try {
+      fetchMock.mockRejectedValueOnce(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+      const out = handleOuraWebhookEvent(deps(), event())
+      await expect(out).rejects.toBeInstanceOf(OuraUnavailableError)
+      expect(timeout).toHaveBeenCalledWith(WEBHOOK_DOCUMENT_TIMEOUT_MS)
+      expect(WEBHOOK_DOCUMENT_TIMEOUT_MS).toBe(4_000)
+      expect(writes.stamps).toEqual(['webhook'])
+      expect(writes.daily).toBe(0)
+    } finally {
+      timeout.mockRestore()
+    }
+  })
+
+  // #3795 item 5: tokens that stop opening (a rotated OURA_TOKEN_KEY) are reported, at most hourly.
+  it('reports stored tokens that no longer decrypt, at most once an hour, and never calls Oura', async () => {
+    resetOuraCloudReportThrottle()
+    reportServerError.mockClear()
+    row = { ...row!, accessToken: encryptOuraToken('acc', USER, 'refresh_token') }
+    expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'unknown_user' })
+    expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'unknown_user' })
+    expect(fetchMock).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(1))
+    expect((reportServerError.mock.calls[0][0] as Error).message).toContain('webhook:tokens-undecryptable')
+    expect((reportServerError.mock.calls[0][0] as Error).message).not.toContain('acc')
   })
 
   /** Answers by URL: the document read, `personal_info` (by the token sent) and the token endpoint. */

@@ -4,17 +4,21 @@ import { getRepositoryAsync } from '@/lib/data'
 import { getDb } from '@/lib/data/postgres/client'
 import * as s from '@/lib/data/postgres/schema'
 import { inArray, desc, and, isNull } from 'drizzle-orm'
-import type { FeedEvent } from '@trainingai/shared/types/friends'
+import type { FeedEvent, FeedResponse, FeedUser } from '@trainingai/shared/types/friends'
+import { rateLimit } from '@/lib/rate-limit'
 import { profileDisplayName } from '@trainingai/shared/greeting'
 
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!rateLimit(`friends-feed:${session.user.id}`, 30, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
 
   const repo = await getRepositoryAsync()
   const friendIds = await repo.getFriendIds(session.user.id)
 
-  if (friendIds.length === 0) return NextResponse.json({ events: [] }, { headers: { 'Cache-Control': 'private, no-store' } })
+  if (friendIds.length === 0) return NextResponse.json({ events: [], users: {} } satisfies FeedResponse, { headers: { 'Cache-Control': 'private, no-store' } })
 
   const db = getDb()
 
@@ -58,7 +62,8 @@ export async function GET() {
       type: 'pr',
       userId: pr.userId,
       displayName: profileDisplayName(user) ?? 'Unknown',
-      avatar: user.avatar,
+      // The avatar is sent once per friend in `users`, not on every event.
+      avatar: null,
       equippedTitle: user.equippedTitle,
       payload: { exerciseName: pr.exerciseName, weightKg: pr.estimated1rm },
       occurredAt: pr.achievedAt.toISOString(),
@@ -72,7 +77,8 @@ export async function GET() {
       type: 'achievement',
       userId: ws.userId,
       displayName: profileDisplayName(user) ?? 'Unknown',
-      avatar: user.avatar,
+      // The avatar is sent once per friend in `users`, not on every event.
+      avatar: null,
       equippedTitle: user.equippedTitle,
       payload: { achievementName: 'Workout completed' },
       occurredAt: ws.completedAt.toISOString(),
@@ -81,5 +87,15 @@ export async function GET() {
 
   events.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
 
-  return NextResponse.json({ events: events.slice(0, 50) }, { headers: { "Cache-Control": "private, no-store" } })
+  const kept = events.slice(0, 50)
+  // Each friend once, keyed by id, and only those the kept events name — an avatar is a data URI
+  // and repeating it on every event multiplied the response by the number of events.
+  const users: Record<string, FeedUser> = {}
+  for (const e of kept) {
+    if (users[e.userId]) continue
+    const u = userMap.get(e.userId)!
+    users[e.userId] = { displayName: e.displayName, avatar: u.avatar, equippedTitle: u.equippedTitle }
+  }
+
+  return NextResponse.json({ events: kept, users } satisfies FeedResponse, { headers: { "Cache-Control": "private, no-store" } })
 }

@@ -1,5 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
+import { phaseSetIdOwned } from '@/lib/data/postgres/slices/programs'
 import { FIELD_LABEL } from '../patch'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
 import { driftAgainst } from './types'
@@ -68,7 +69,7 @@ async function phaseSetName(db: Db, userId: string, id: string | null): Promise<
   const [row] = await db
     .select({ name: s.phaseSets.name })
     .from(s.phaseSets)
-    .where(eq(s.phaseSets.id, id))
+    .where(and(eq(s.phaseSets.id, id), eq(s.phaseSets.userId, userId)))
     .limit(1)
   return row?.name ?? 'unknown'
 }
@@ -138,6 +139,13 @@ export const programPhaseHandler: DomainHandler = {
 
     const drift = driftAgainst(accepted, state as unknown as Record<string, unknown>)
     if (drift.length > 0) return { ok: false, reason: 'stale', drift }
+
+    // `phaseSetId` is written verbatim onto the program, so it must name one of the caller's own
+    // phase sets — the same check the program save route makes (Q-129).
+    const setChange = accepted.find(c => c.field === 'phaseSetId')
+    if (setChange && !(await phaseSetIdOwned(db, userId, setChange.to as string | null))) {
+      return { ok: false, reason: 'invalid', detail: 'That periodisation model is not one of yours' }
+    }
 
     const beforeState: Record<string, unknown> = {}
     const set: Record<string, unknown> = {}

@@ -3,13 +3,13 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { createRestCue, restSoundSource } from '../src/integrations/feedback/rest-cue.ts';
 
-const visibilities = ['foreground', 'pip', 'background'] as const;
+type Visibility = 'foreground' | 'pip' | 'background';
 const ringers = ['normal', 'vibrate', 'silent'] as const;
 
 // What is heard when a rest ends. The app's beep and the native beep are on the media stream, so
 // the ringer does not silence them; the notification channel's sound follows the ringer.
 function heardAtRestEnd(
-  visibility: (typeof visibilities)[number],
+  visibility: Visibility,
   permission: boolean,
   ringer: (typeof ringers)[number],
 ) {

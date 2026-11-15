@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { toAestDay } from '@trainingai/shared/date-utils';
 
 /** The catalogue's reads are the same for everyone; they still skip the phone's disk so a stale list is never trusted offline. */
 const noDiskCache = () => false;
@@ -223,11 +222,6 @@ export const adminUnitFixNamesSpec = {
   cache: noDiskCache,
   schema: z.object({ exerciseNames: z.array(z.string()) }).passthrough(),
 };
-/** A unit-fix log's day in the user's timezone, as YYYY-MM-DD to match the panel's "before" date field. */
-export function unitFixLogDay(loggedAt: string, timezone: string): string {
-  return toAestDay(new Date(loggedAt), timezone);
-}
-
 export const unitFixResultSchema = z
   .object({
     logs: z.array(

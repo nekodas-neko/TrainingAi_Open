@@ -10,7 +10,6 @@ import {
   WEATHER_TTL,
   type WeatherPlace,
   type WeatherSnapshot,
-  weatherUpdatedLabel,
 } from '../src/features/weather/data/models.ts';
 
 const brisbane = { lat: -27.47, lon: 153.03, name: 'Brisbane' };
@@ -323,11 +322,4 @@ test('manual refresh arriving during location lookup still bypasses the fresh fo
   resolve(brisbane);
   await Promise.all([automatic, manual]);
   assert.equal(calls, 2);
-});
-
-test('the updated time is read in the user timezone, not the phone one', () => {
-  // 2026-11-15 20:40 UTC is 6:40 am on the 16th in Brisbane and 8:40 pm in London.
-  const fetchedAt = Date.UTC(2026, 10, 15, 20, 40);
-  assert.equal(weatherUpdatedLabel({ fetchedAt }, 'Australia/Brisbane'), 'Updated 6:40 am');
-  assert.equal(weatherUpdatedLabel({ fetchedAt }, 'Europe/London'), 'Updated 8:40 pm');
 });

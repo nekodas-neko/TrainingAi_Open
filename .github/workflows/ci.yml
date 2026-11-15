@@ -168,6 +168,10 @@ jobs:
           - 5432:5432
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+      # #3803: shard 1 runs in the owner's zone, the rest in the runner's UTC. A test that reads the
+      # device clock against a UTC-built date passes in UTC and fails for part of a day in Brisbane
+      # (goal-baseline.test.ts failed every 15 June before 10:00), so one shard has to sit there.
+      TZ: ${{ matrix.shard == 1 && 'Australia/Brisbane' || 'UTC' }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
@@ -338,7 +342,7 @@ jobs:
           FOUND=$(grep -rn --include='*.ts' --include='*.tsx' \
             -e '\.toISOString()\.slice(0' \
             -e "\.toISOString()\.split('T')" \
-            app/ lib/ components/ packages/ hooks/ types/ 2>/dev/null \
+            app/ lib/ components/ packages/ hooks/ types/ mobile/src/ 2>/dev/null \
             | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|\{?/\*)' \
             | grep -v 'lib/date-utils.ts' \
             | grep -v 'packages/shared/src/date-utils.ts' || true)

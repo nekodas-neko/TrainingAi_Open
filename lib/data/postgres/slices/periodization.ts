@@ -1,4 +1,4 @@
-import { eq, and, inArray, asc, desc, sql, isNull, gte } from 'drizzle-orm'
+import { eq, and, inArray, asc, desc, sql, isNull, gte, lte } from 'drizzle-orm'
 import { NotFoundError } from '@trainingai/shared/errors'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -264,7 +264,10 @@ export async function storePendingTransition(db: Db, userId: string, programSess
     ))
 }
 
-export async function incrementSessionsInPhase(db: Db, userId: string, programSessionId: string): Promise<void> {
+// `completedAt` is the session's own completion time. A session counts toward the phase it was
+// COMPLETED in (the canonical definition above `reconcileSessionsInPhase`), so a completion stamped before the phase moved (an offline
+// finish synced after a later phase change) is not counted in the new phase.
+export async function incrementSessionsInPhase(db: Db, userId: string, programSessionId: string, completedAt?: Date): Promise<void> {
   await db
     .update(s.sessionPeriodization)
     .set({
@@ -274,18 +277,31 @@ export async function incrementSessionsInPhase(db: Db, userId: string, programSe
     .where(and(
       eq(s.sessionPeriodization.userId, userId),
       eq(s.sessionPeriodization.programSessionId, programSessionId),
+      ...(completedAt ? [lte(s.sessionPeriodization.phaseStartedAt, completedAt)] : []),
     ))
 }
+
+/**
+ * The decrement for a deleted workout, shared by both delete flows (`lib/workout/delete-session.ts`
+ * and the workout-entry delete in `lib/workout/exercise-log-edits.ts`). `$3` is the deleted
+ * session's `completed_at`; the callers run it only for a completed session. Floor at 0.
+ */
+export const DECREMENT_SESSIONS_IN_PHASE_SQL =
+  `UPDATE session_periodization
+   SET sessions_in_phase = GREATEST(sessions_in_phase - 1, 0), updated_at = now()
+   WHERE user_id = $1 AND program_session_id = $2 AND $3 >= phase_started_at`
 
 // Recompute every session's `sessions_in_phase` for a program from the actual
 // (non-empty) workout_sessions logged since each session's phase started. The stored
 // counter is only ever incremented (on complete-workout) and decremented (on the app's
 // delete flow), so directly-inserted or directly-deleted test rows can leave it stale.
 // Deriving from real sessions makes the count self-healing. Only writes rows that drift.
-// Canonical definition of "a session in the current phase": completed (completed_at IS NOT
-// NULL), non-deleted, since phase_started_at. Applied here and at both decrement sites
-// (delete-session.ts, workout-entry route) and the increment site (complete-workout.ts) —
-// one definition, checked in three places (AI-5).
+// Canonical definition of "a session in the current phase": non-deleted, with
+// logged sets, and COMPLETED at or after phase_started_at. Applied here, in the increment above
+// (complete-workout.ts passes the completion time) and in `DECREMENT_SESSIONS_IN_PHASE_SQL` (both
+// delete flows) — one definition, checked in three places (AI-5). It read `started_at` until #3799:
+// a session started before the phase moved and finished after it ran in the new phase and was not
+// counted, so a deload block ran three sessions instead of two.
 export async function reconcileSessionsInPhase(db: Db, userId: string, programId: string): Promise<void> {
   await db.execute(sql`
     UPDATE session_periodization sp
@@ -298,7 +314,7 @@ export async function reconcileSessionsInPhase(db: Db, userId: string, programId
       LEFT JOIN workout_sessions ws
         ON ws.session_id = sp2.program_session_id
        AND ws.user_id = sp2.user_id
-       AND ws.started_at >= sp2.phase_started_at
+       AND ws.completed_at >= sp2.phase_started_at
        AND ws.deleted_at IS NULL
        AND ws.completed_at IS NOT NULL
        AND EXISTS (SELECT 1 FROM exercise_logs el WHERE el.workout_session_id = ws.id AND el.deleted_at IS NULL)
@@ -440,6 +456,7 @@ export async function getSetLogsForSessions(db: Db, workoutSessionIds: string[])
   workoutSessionId: string; exerciseName: string; setNumber: number;
   rpe: number | null; reps: number; intensityPct: number | null; setTimeSec: number | null
   rpeSource: import('@trainingai/shared/workout/rpe-source').RpeSource | null
+  plannedReps: number | null
 }>> {
   if (workoutSessionIds.length === 0) return []
   return db
@@ -452,6 +469,7 @@ export async function getSetLogsForSessions(db: Db, workoutSessionIds: string[])
       reps: s.setLogs.reps,
       intensityPct: s.setLogs.intensityPct,
       setTimeSec: s.setLogs.setTimeSec,
+      plannedReps: s.setLogs.plannedReps,
     })
     .from(s.setLogs)
     .innerJoin(s.exerciseLogs, eq(s.setLogs.exerciseLogId, s.exerciseLogs.id))

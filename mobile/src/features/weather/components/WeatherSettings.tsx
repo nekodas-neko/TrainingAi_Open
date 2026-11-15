@@ -13,9 +13,10 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWeather } from '../WeatherProvider';
 import { searchCities } from '../data/open-meteo';
-import { isWeatherDay, temperatureLabel, weatherUpdatedLabel, type WeatherPlace } from '../data/models';
-import { useWorkoutContext } from '../../workouts/WorkoutProvider';
+import { isWeatherDay, temperatureLabel, type WeatherPlace } from '../data/models';
 import { failureNotice } from '../../../core/reporting/index.ts';
+import { formatTimeOfDay } from '@trainingai/shared/date-utils';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 
 export function WeatherSettings() {
   const { theme } = useTheme();
@@ -158,7 +159,8 @@ export function WeatherSettings() {
                   : ''}
               </AppText>
               <AppText variant="caption" tone="muted">
-                {weatherUpdatedLabel(snapshot, timezone)}
+                Updated{' '}
+                {formatTimeOfDay(snapshot.fetchedAt, timezone)}
               </AppText>
             </Stack>
           )}

@@ -660,3 +660,127 @@ describe.skipIf(!canRun)('AI Coach — create-on-swap', () => {
     expect(rows).toHaveLength(0)
   })
 })
+
+// ── #3796: ids the Coach writes must be the caller's own ─────────────────────────
+// `phaseSetId` (program_phase) and `styleId` (session_exercise) are written verbatim, so apply
+// refuses one that names another user's phase set or progression style, as the program save route
+// does. The phase reads behind the preview and the workout screen are scoped the same way.
+describe.skipIf(!canRun)('AI Coach — foreign phase set and style ids', () => {
+  const OWNER4 = '00000000-0000-4000-8000-00000000cfb1'
+  const OTHER4 = '00000000-0000-4000-8000-00000000cfb2'
+  const PROGRAM4 = '00000000-0000-4000-8000-00000000cfb3'
+  let pool: import('pg').Pool
+  let db: ReturnType<typeof import('@/lib/data/postgres/client').getDb>
+  let applyCoachPatch: typeof import('@/lib/coach/apply').applyCoachPatch
+  let previewPatch: typeof import('@/lib/coach/consequences').previewPatch
+  let listProgramPhases: typeof import('@/lib/data/postgres/slices/programs').listProgramPhases
+  let ownSetId = ''
+  let foreignSetId = ''
+  let ownStyleId = ''
+  let foreignStyleId = ''
+  let exerciseId = ''
+
+  beforeAll(async () => {
+    const client = await import('@/lib/data/postgres/client')
+    pool = client.getPool(); db = client.getDb()
+    ;({ applyCoachPatch } = await import('@/lib/coach/apply'))
+    ;({ previewPatch } = await import('@/lib/coach/consequences'))
+    ;({ listProgramPhases } = await import('@/lib/data/postgres/slices/programs'))
+    for (const id of [OWNER4, OTHER4]) {
+      await pool.query(
+        `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane')
+         ON CONFLICT (id) DO NOTHING`, [id, `coach-foreign-${id}@example.com`])
+    }
+  })
+
+  afterAll(async () => {
+    for (const id of [OWNER4, OTHER4]) {
+      await pool.query(`DELETE FROM coach_changes WHERE user_id = $1`, [id])
+      await pool.query(`DELETE FROM programs WHERE user_id = $1`, [id])
+      await pool.query(`DELETE FROM phase_sets WHERE user_id = $1`, [id])
+      await pool.query(`DELETE FROM progression_styles WHERE user_id = $1`, [id])
+      await pool.query(`DELETE FROM users WHERE id = $1`, [id])
+    }
+  })
+
+  beforeEach(async () => {
+    for (const id of [OWNER4, OTHER4]) {
+      await pool.query(`DELETE FROM coach_changes WHERE user_id = $1`, [id])
+      await pool.query(`DELETE FROM programs WHERE user_id = $1`, [id])
+      await pool.query(`DELETE FROM phase_sets WHERE user_id = $1`, [id])
+      await pool.query(`DELETE FROM progression_styles WHERE user_id = $1`, [id])
+    }
+    const set = async (userId: string, name: string) => {
+      const { rows: [ps] } = await pool.query(
+        `INSERT INTO phase_sets (user_id, name) VALUES ($1, $2) RETURNING id`, [userId, name])
+      await pool.query(
+        `INSERT INTO program_phases (phase_set_id, name, phase_type, duration_cycles, position)
+         VALUES ($1, $2, 'normal', 3, 0)`, [ps.id, `${name} Phase`])
+      return ps.id as string
+    }
+    ownSetId = await set(OWNER4, 'Own Block')
+    foreignSetId = await set(OTHER4, 'Other Block')
+    ownStyleId = (await pool.query(
+      `INSERT INTO progression_styles (user_id, name) VALUES ($1, 'Own Ramp') RETURNING id`, [OWNER4])).rows[0].id
+    foreignStyleId = (await pool.query(
+      `INSERT INTO progression_styles (user_id, name) VALUES ($1, 'Other Ramp') RETURNING id`, [OTHER4])).rows[0].id
+    await pool.query(
+      `INSERT INTO programs (id, user_id, name, is_active, sessions_per_cycle, phase_set_id)
+       VALUES ($1, $2, 'Foreign Id Test', true, 3, NULL)`, [PROGRAM4, OWNER4])
+    const { rows: [sess] } = await pool.query(
+      `INSERT INTO program_sessions (program_id, name, position) VALUES ($1, 'Day A', 0) RETURNING id`, [PROGRAM4])
+    exerciseId = (await pool.query(
+      `INSERT INTO session_exercises (session_id, exercise_name, position) VALUES ($1, 'Foreign Id Row', 0) RETURNING id`,
+      [sess.id])).rows[0].id
+  })
+
+  const setPatch = (to: string): CoachPatch => ({
+    domain: 'program_phase', targetId: null,
+    changes: [{ id: 'f1', field: 'phaseSetId', from: null, to }],
+  })
+  const stylePatch = (to: string): CoachPatch => ({
+    domain: 'session_exercise', targetId: exerciseId,
+    changes: [{ id: 'f2', field: 'styleId', from: null, to }],
+  })
+  const programSet = async () =>
+    (await pool.query(`SELECT phase_set_id FROM programs WHERE id = $1`, [PROGRAM4])).rows[0].phase_set_id
+  const exerciseStyle = async () =>
+    (await pool.query(`SELECT style_id FROM session_exercises WHERE id = $1`, [exerciseId])).rows[0].style_id
+
+  it("refuses another user's phase set, and writes nothing", async () => {
+    const result = await applyCoachPatch(db, OWNER4, setPatch(foreignSetId), ['f1'])
+    expect(result).toMatchObject({ ok: false, reason: 'invalid' })
+    expect(await programSet()).toBeNull()
+    expect((await pool.query(`SELECT 1 FROM coach_changes WHERE user_id = $1`, [OWNER4])).rowCount).toBe(0)
+  })
+
+  it('applies one of the caller\'s own phase sets', async () => {
+    expect((await applyCoachPatch(db, OWNER4, setPatch(ownSetId), ['f1'])).ok).toBe(true)
+    expect(await programSet()).toBe(ownSetId)
+  })
+
+  it("does not name another user's phase set in the preview", async () => {
+    const preview = await previewPatch(db, OWNER4, setPatch(foreignSetId))
+    const line = preview.consequences.find(c => c.text.startsWith('Periodisation model'))
+    expect(line?.text).toBe('Periodisation model none → unknown')
+  })
+
+  it("reads no phases through a phase set that is not the caller's", async () => {
+    // A link stored before the write paths checked it.
+    await pool.query(`UPDATE programs SET phase_set_id = $1 WHERE id = $2`, [foreignSetId, PROGRAM4])
+    expect(await listProgramPhases(db, OWNER4, PROGRAM4)).toEqual([])
+    await pool.query(`UPDATE programs SET phase_set_id = $1 WHERE id = $2`, [ownSetId, PROGRAM4])
+    expect((await listProgramPhases(db, OWNER4, PROGRAM4)).map(p => p.name)).toEqual(['Own Block Phase'])
+  })
+
+  it("refuses another user's progression style, and writes nothing", async () => {
+    const result = await applyCoachPatch(db, OWNER4, stylePatch(foreignStyleId), ['f2'])
+    expect(result).toMatchObject({ ok: false, reason: 'invalid' })
+    expect(await exerciseStyle()).toBeNull()
+  })
+
+  it("applies one of the caller's own progression styles", async () => {
+    expect((await applyCoachPatch(db, OWNER4, stylePatch(ownStyleId), ['f2'])).ok).toBe(true)
+    expect(await exerciseStyle()).toBe(ownStyleId)
+  })
+})

@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.523.0",
+    date: "2026-11-15",
+    changes: [
+      "Both apps: accepting a deload the app offered for one day's reason (soreness, a poor night, a missed-reps run) lightens that session only. It no longer moves the whole session type into a deload phase for the next two or three weeks. Choosing Deload from the phase list still moves the phase.",
+      "Both apps: a session counts toward its training phase by when you finished it, and the missed-reps check compares last session's reps with what that session planned, not with the plan written since.",
+      "Both apps: a sore muscle the app ticked for you no longer lightens an exercise by itself. Only a tick you add yourself does.",
+      "Both apps: the year review counts finished workouts only, and a heart-rate zone day the ring has no record of stays empty instead of reading as zero minutes.",
+      "Both apps: the friends feed loads faster because each friend's picture is sent once, and a profile picture is limited to 200 KB.",
+      "TrainingAi Preview: when Oura stops sharing your data, the Oura card says Stopped and offers Connect again, and the \"Oura · updated\" line on Readiness and Sleep keeps showing when data last arrived.",
+      "Behind the scenes: the Oura Cloud connection retries saving a refreshed sign-in, reports documents it could not read and stored sign-ins the server can no longer open, gives up on a slow read in time for Oura to retry, and once a week re-reads the last 14 days.",
+      "Behind the scenes: ids sent by the app (a phase set, a program session, a recorded run) are checked against your own records before they are stored, and the exercise picture lookup and friends feed are rate limited.",
+      "Behind the scenes: Next.js, Sentry, sharp and zod are on their patched releases, unused source files are removed, and two read-only maintenance jobs can check personal records and heart-health scores.",
+    ],
+  },
+  {
     version: "1.522.0",
     date: "2026-11-15",
     changes: [

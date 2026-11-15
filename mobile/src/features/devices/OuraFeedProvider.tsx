@@ -8,13 +8,16 @@ import {
   type PropsWithChildren,
 } from 'react';
 import { AppState } from 'react-native';
-import { z } from 'zod';
 import { useAccountContext } from '../account/AccountProvider';
+import { ouraFeedLastDataAt } from './data/oura';
 
 // When Oura data last reached the server (#2861), for the quiet "Oura · updated 7:05 am" line on the
 // Readiness and Sleep cards. Read from the connection status the Devices screen shows; null when
 // Oura is not connected, nothing has arrived, or the status could not be read.
-const feedSchema = z.object({ lastDataAt: z.string().nullish() });
+//
+// #3794: a connection Oura stopped sharing (`reauthRequired`) still answers `lastDataAt`, and it is
+// kept: that is exactly when the line has to appear, showing the data going stale. Only the field's
+// absence clears it, never the grant's state.
 // The line appears three hours after the last data, so the clock only has to be roughly right.
 const TICK_MS = 5 * 60 * 1000;
 
@@ -38,9 +41,9 @@ export function OuraFeedProvider({ children }: PropsWithChildren) {
       return;
     }
     const read = async () => {
-      const parsed = feedSchema.safeParse(await dataReader.get('/api/oura/connection').catch(() => null));
+      const at = ouraFeedLastDataAt(await dataReader.get('/api/oura/connection').catch(() => null));
       // A failed read keeps what was known: offline must not make old data look new, or the reverse.
-      if (parsed.success && mounted.current) setLastDataAt(parsed.data.lastDataAt ?? null);
+      if (at !== undefined && mounted.current) setLastDataAt(at);
       if (mounted.current) setNow(Date.now());
     };
     void read();

@@ -16,6 +16,7 @@ import { ouraOAuthConfig } from '@/lib/oura/cloud/config'
 import { backfillOuraCloud, CONNECT_BACKFILL_DAYS, validBackfillRange, type OuraBackfillResult } from '@/lib/oura/cloud/backfill'
 import { stillRhrRefresher } from '@/lib/oura/cloud/still-rhr'
 import { runOuraWebhookRenewal } from '@/lib/oura/cloud/renewal'
+import { forceOuraTokenRefresh } from '@/lib/oura/cloud/tokens'
 import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import { getDb } from '@/lib/data/postgres/client'
 import { mergeLookAlikeFoods } from '@/lib/nutrition/merge-look-alike-foods'
@@ -344,6 +345,34 @@ export const AGENT_JOBS = {
   } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
 
   /**
+   * #3795. Forces one refresh of the owner's Oura grant, whatever its expiry, through the path a
+   * near-expiry read takes (`forceOuraTokenRefresh` → `refreshNow`: the save retries, the
+   * `invalid_grant` handling, single-flight). It reports the outcome and the new expiry, never a
+   * token. A refusal or a failed save ends the grant until the owner connects again, so a real run
+   * needs an approval; a dry run reports the stored expiry and whether a refresh would be asked for,
+   * and calls nothing at Oura.
+   */
+  'oura-force-refresh': {
+    params: DryRunOnly,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const config = ouraOAuthConfig()
+      if (!config) return { status: 503, body: { error: 'Oura is not configured on this server' }, finish: { outcome: 'refused', error: 'oura not configured' } }
+      const report = await forceOuraTokenRefresh(ctx.repo, config, ctx.userId, p.dryRun)
+      if (report.dryRun) return { status: 200, body: { report }, finish: { outcome: 'succeeded', affectedRows: 0, daysMoved: 0, error: null } }
+      if (report.outcome === 'not_connected' || report.outcome === 'reauth_required') {
+        return { status: 409, body: { report }, finish: { outcome: 'refused', error: report.outcome } }
+      }
+      const ok = report.outcome === 'refreshed'
+      return {
+        status: 200,
+        body: { report },
+        finish: { outcome: ok ? 'succeeded' : 'failed', affectedRows: ok ? 1 : 0, daysMoved: 0, error: ok ? null : `${report.outcome}${report.detail ? `: ${report.detail}` : ''}`.slice(0, 200) },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+
+  /**
    * #2417. Merges look-alike `food_items` (same name and brand) into one keeper: the most-logged row,
    * or the one the owner names in `keepers`. A write re-points the extras' food logs and saved-meal
    * ingredients to the keeper with the quantity rescaled so the grams eaten do not change, then
@@ -461,6 +490,7 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('recompute-hrr1-best'),
   requestSchema('oura-cloud-backfill'),
   requestSchema('oura-webhook-subscriptions'),
+  requestSchema('oura-force-refresh'),
   requestSchema('merge-look-alike-foods'),
   requestSchema('reconcile-personal-records'),
   requestSchema('rescore-heart-health'),

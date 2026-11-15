@@ -8,7 +8,6 @@ import {
   injurySpec,
   type SavedProgram,
 } from '../src/features/workouts/data/models.ts';
-import { ApiError } from '../src/features/account/api/client.ts';
 import { sqliteFixture } from './storage-fixture.ts';
 import { workoutActivity } from '../src/features/workouts/logging/activity-summary.ts';
 import { loggingFixture } from './logging-fixture.ts';

@@ -36,6 +36,7 @@ vi.mock('@/lib/data', () => ({
     getSessionPeriodization,
     listBodyMetrics,
     getPrescriptionBasisBefore,
+    programSessionIdOwned: async () => true,
   }),
 }))
 

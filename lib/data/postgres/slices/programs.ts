@@ -420,6 +420,7 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
         })
         .returning()
       const scheduleId = schedRow.id
+      const savedSessionIds = new Set(savedSessions.map(sess => sess.id))
       await tx.delete(s.scheduleDays).where(eq(s.scheduleDays.scheduleId, scheduleId))
       if (schedulePayload.days) {
         for (const day of schedulePayload.days) {
@@ -427,9 +428,11 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
             .values({
               scheduleId,
               dayOfWeek: day.dayOfWeek,
-              // A stale client can still name a session this same save removed; the FK used to
-              // null it on delete and no longer fires.
-              sessionId: day.sessionId && !removedIds.includes(day.sessionId) ? day.sessionId : null,
+              // Only a session this save leaves live on this program. That covers a stale client
+              // naming a session this same save removed (the FK used to null it on delete and no
+              // longer fires) and an id that is not one of this program's sessions at all, which
+              // is stored as a rest day rather than refusing the whole program save.
+              sessionId: day.sessionId && savedSessionIds.has(day.sessionId) ? day.sessionId : null,
             })
         }
       }
@@ -492,10 +495,50 @@ export async function listProgramPhases(db: Db, userId: string, programId: strin
     .limit(1)
   if (!prog?.phaseSetId) return []
 
-  const rows = await db.select().from(s.programPhases)
-    .where(eq(s.programPhases.phaseSetId, prog.phaseSetId))
+  // The phases are read through the caller's own phase sets as well, so a `phase_set_id` that is
+  // not the caller's resolves to no phases even if one was stored before the write paths checked it.
+  const rows = await db.select({ phase: s.programPhases }).from(s.programPhases)
+    .innerJoin(s.phaseSets, eq(s.phaseSets.id, s.programPhases.phaseSetId))
+    .where(and(eq(s.programPhases.phaseSetId, prog.phaseSetId), eq(s.phaseSets.userId, userId)))
     .orderBy(asc(s.programPhases.position))
-  return rows.map(rowToPhase)
+  return rows.map(r => rowToPhase(r.phase))
+}
+
+/**
+ * True when `id` names a phase set belonging to `userId`, or is empty (nothing to check).
+ *
+ * `phase_sets.user_id` is NOT NULL and there is no shared or global set, so an id the caller does
+ * not own is always wrong (Q-129). The one check behind every write that stores a client-supplied
+ * `programs.phase_set_id`: the program save route and the Coach's program-phase apply. A malformed
+ * id is `false`, not a driver error, for the reason `progressionStyleIdsOwned` gives.
+ */
+export async function phaseSetIdOwned(
+  db: Db, userId: string, id: string | null | undefined,
+): Promise<boolean> {
+  if (id == null || id === '') return true
+  if (!isUuid(id)) return false
+  const [row] = await db.select({ id: s.phaseSets.id })
+    .from(s.phaseSets)
+    .where(and(eq(s.phaseSets.id, id), eq(s.phaseSets.userId, userId)))
+    .limit(1)
+  return !!row
+}
+
+/**
+ * True when `id` names a session (live or tombstoned) of one of `userId`'s programs.
+ *
+ * `program_sessions` has no `user_id`; ownership is through `programs`. Used before a
+ * client-supplied session id is stored as a link (`workout_sessions.programSessionId`).
+ * A malformed id is `false`.
+ */
+export async function programSessionIdOwned(db: Db, userId: string, id: string): Promise<boolean> {
+  if (!isUuid(id)) return false
+  const [row] = await db.select({ id: s.programSessions.id })
+    .from(s.programSessions)
+    .innerJoin(s.programs, eq(s.programs.id, s.programSessions.programId))
+    .where(and(eq(s.programSessions.id, id), eq(s.programs.userId, userId)))
+    .limit(1)
+  return !!row
 }
 
 export async function listPhaseSets(db: Db, userId: string): Promise<PhaseSetWithPhases[]> {

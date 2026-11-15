@@ -23,10 +23,19 @@ export const friendsSpec = {
   ttl: 300000,
   schema: z.object({ friendships: z.array(friendshipSchema) }),
 };
+// Each friend is sent once in `users` and events refer to them by id; an event's own `avatar` is
+// null from the server since then. `users` defaults to empty so a feed cached before it still reads.
+const feedUserSchema = z.object({
+  displayName: z.string(),
+  avatar: z.string().nullable(),
+  equippedTitle: z.string().nullable(),
+});
+export type FeedUser = z.infer<typeof feedUserSchema>;
 export const feedSpec = {
   path: '/api/friends/feed',
   ttl: 60000,
   schema: z.object({
+    users: z.record(z.string(), feedUserSchema).default({}),
     events: z.array(
       z.object({
         type: z.enum(['pr', 'level_up', 'achievement', 'season_badge']),

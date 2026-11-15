@@ -145,3 +145,40 @@ describe('every AI route answers a billing failure with the paused notice', () =
     expect(readFileSync(p as string, 'utf8')).toMatch(/aiPausedResponse\(/)
   })
 })
+
+/**
+ * #3803: the model is also called from modules a route imports — the workout prescription and the
+ * meal top-up — which the route scan above never reads. Both catch the failure and fall back on
+ * purpose (the program's own numbers; the meal left short), so the route never sees a billing
+ * error and cannot answer with the notice. What keeps the paused banner true for them is that the
+ * call goes through the logged chokepoint, whose failure path records the billing error
+ * (`noteAiBillingError` in `withAiLogging`). A bare `generateObject` here would skip that, and a
+ * dead balance would read as the model being quiet. Found through the import of
+ * `@/lib/ai/instrument`, as in prose-guards.test.ts; `lib/ai/` is the chokepoint itself.
+ */
+describe('a model call outside a route still records a billing failure', () => {
+  const ROOT = path.resolve(__dirname, '../../..')
+  const SKIP = new Set(['__tests__', '__check_fixture__', 'node_modules'])
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).filter(n => !SKIP.has(n)).flatMap(n => {
+      const p = path.join(dir, n)
+      if (statSync(p).isDirectory()) return path.relative(ROOT, p) === 'lib/ai' ? [] : walk(p)
+      return /\.tsx?$/.test(n) && !(n === 'route.ts' && path.relative(ROOT, p).startsWith('app/api')) ? [p] : []
+    })
+  const MODEL_CALL = /\b(generateObject|generateText|streamText|streamObject)\s*\(/
+  const modules = ['app', 'lib', 'packages', 'components'].flatMap(d => walk(path.join(ROOT, d))).filter(p => {
+    const src = readFileSync(p, 'utf8')
+    return /from '@\/lib\/ai\/instrument'/.test(src) && MODEL_CALL.test(src)
+  })
+
+  it('finds them', () => {
+    expect(modules.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it.each(modules.map(p => [path.relative(ROOT, p), p]))('%s calls the model only through the logged chokepoint', (_rel, p) => {
+    const src = readFileSync(p as string, 'utf8')
+    const raw = (src.match(new RegExp(MODEL_CALL.source, 'g')) ?? []).length
+    const logged = (src.match(/\b(loggedGenerateObject|loggedGenerateText|loggedStreamText|withAiLogging)\s*\(/g) ?? []).length
+    expect(logged, 'every model call is wrapped in a logged call').toBeGreaterThanOrEqual(raw)
+  })
+})

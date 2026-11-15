@@ -353,7 +353,7 @@ export class HomeStore {
     if (!this.current.setAside) {
       return;
     }
-    await this.write((state) => ({
+    await this.write(() => ({
       setAside: null,
     }));
   }

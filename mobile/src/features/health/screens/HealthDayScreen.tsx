@@ -20,7 +20,6 @@ import {
   IconButton,
   KeyValueGrid,
   LineChart,
-  MetricTile,
   PageLayout,
   Stack,
   StatusIndicator,

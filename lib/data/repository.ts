@@ -719,6 +719,10 @@ export interface WorkoutRepository {
 
   // ── Progression Styles ─────────────────────────────────────────────────────
   listProgressionStyles(userId: string): Promise<ProgressionStyle[]>
+  /** True when `id` names a session of one of the caller's own programs. A malformed id is false. */
+  programSessionIdOwned(userId: string, id: string): Promise<boolean>
+  /** True when `id` is empty or names one of the caller's own phase sets. A malformed id is false. */
+  phaseSetIdOwned(userId: string, id: string | null | undefined): Promise<boolean>
   /** True when every id supplied belongs to `userId` (RV-32). A malformed id is false, not a throw. */
   progressionStyleIdsOwned(userId: string, ids: (string | null | undefined)[]): Promise<boolean>
   saveProgressionStyle(userId: string, style: ProgressionStyle): Promise<ProgressionStyle>
@@ -1425,7 +1429,8 @@ export interface WorkoutRepository {
   updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>
   storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void>
-  incrementSessionsInPhase(userId: string, programSessionId: string): Promise<void>
+  /** #3799: `completedAt` set, the row is counted only when the phase began at or before it. */
+  incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date): Promise<void>
   setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean): Promise<void>
 
   // `program_volume_targets` has no user_id column, so these take the userId and scope through
@@ -1442,6 +1447,9 @@ export interface WorkoutRepository {
   getSetLogsForSessions(workoutSessionIds: string[]): Promise<Array<{
     workoutSessionId: string; exerciseName: string; setNumber: number;
     rpe: number | null; reps: number; intensityPct: number | null; setTimeSec: number | null
+    /** #3800: the reps the app asked for on this set, written when it was logged. Null on a freeform
+     *  or extra set, and on rows logged before the column existed. */
+    plannedReps?: number | null
     /** #2253: `rated` or the untouched pre-fill (`expected`); null before #2450 and with no RPE. */
     rpeSource?: import('@trainingai/shared/workout/rpe-source').RpeSource | null
   }>>

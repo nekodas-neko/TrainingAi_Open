@@ -142,7 +142,9 @@ function walk(dir) {
 
 const baseRef = resolveBaseRef();
 
-for (const top of ['app', 'lib', 'packages']) walk(path.join(root, top));
+// `mobile/src`: the native app (#3803). It imports aestMidnight from @trainingai/shared/date-utils
+// like the web tree, so the same call shape means the same thing there.
+for (const top of ['app', 'lib', 'packages', 'mobile/src']) walk(path.join(root, top));
 
 // Read after the walk, for every file at once: one git process per run, not one per file (#2081).
 const atBase = countsAtBase(baseRef, judged.map((j) => j.rel), countOmittingCalls);

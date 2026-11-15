@@ -25,10 +25,23 @@ export interface Friendship {
   }
 }
 
+/** One friend as the feed shows them, sent once per response in `FeedResponse.users`. */
+export interface FeedUser {
+  displayName: string
+  avatar: string | null
+  equippedTitle: string | null
+}
+
 export interface FeedEvent {
   type: 'pr' | 'level_up' | 'achievement' | 'season_badge'
+  /** Key into `FeedResponse.users`. */
   userId: string
   displayName: string
+  /**
+   * Always null from the server since the avatar moved to `FeedResponse.users`; the field stays so
+   * a client built before that still parses the response. Readers take the avatar from `users`,
+   * falling back to this only for a response cached before the change.
+   */
   avatar: string | null
   equippedTitle: string | null
   payload: {
@@ -42,6 +55,12 @@ export interface FeedEvent {
     badgeLabel?: string
   }
   occurredAt: string
+}
+
+/** `GET /api/friends/feed`. Each friend appears once in `users`; events refer to them by id. */
+export interface FeedResponse {
+  events: FeedEvent[]
+  users: Record<string, FeedUser>
 }
 
 export interface LeaderboardEntry {

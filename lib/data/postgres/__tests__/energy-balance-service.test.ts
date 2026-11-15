@@ -433,7 +433,7 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     const many = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
 
     expect(many.maintenance.kcal).toBe(none.maintenance.kcal)
-    expect(many.recommendedKcal).toBe(none.recommendedKcal)
+    expect(many.target.recommendedKcal).toBe(none.target.recommendedKcal)
     // The base is the same on both days too — the credit is a property of the user, not the day.
     expect(many.balance.restingBaseKcal).toBe(none.balance.restingBaseKcal)
   })

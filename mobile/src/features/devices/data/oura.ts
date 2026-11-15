@@ -12,8 +12,51 @@ const statusSchema = z.object({
   // #2861: when the feed last spoke. Absent from a server that predates the stamps.
   lastDataAt: z.string().nullish(),
   lastWebhookAt: z.string().nullish(),
+  // #3794: Oura refused the grant, so the connection stopped. Present only then.
+  reauthRequired: z.boolean().optional(),
 });
 export type OuraStatus = z.infer<typeof statusSchema>;
+
+const feedSchema = z.object({ lastDataAt: z.string().nullish() });
+/**
+ * When Oura data last reached the server, from a `/api/oura/connection` answer, for the "Oura ·
+ * updated …" line (`OuraFeedProvider`). Kept whether or not the grant is alive (#3794): a stopped
+ * connection is exactly when the line has to show the data going stale. `undefined` when the answer
+ * could not be read, so the caller keeps what it knew.
+ */
+export function ouraFeedLastDataAt(answer: unknown): string | null | undefined {
+  const parsed = feedSchema.safeParse(answer);
+  return parsed.success ? (parsed.data.lastDataAt ?? null) : undefined;
+}
+
+/**
+ * What the Oura account card shows (#3794). `stopped` is a connection that was working until Oura
+ * refused the grant: it keeps when data last arrived and offers Connect again, instead of reading as
+ * never connected. Null while the status has not been read.
+ */
+export type OuraAccountState = 'connected' | 'stopped' | 'not_connected';
+export function ouraAccountState(status: OuraStatus | null): OuraAccountState | null {
+  if (!status) return null;
+  if (status.connected) return 'connected';
+  return status.reauthRequired === true ? 'stopped' : 'not_connected';
+}
+export const OURA_ACCOUNT_COPY: Record<OuraAccountState, { badge: string; body: string; connect: string }> = {
+  connected: {
+    badge: 'Connected',
+    body: 'Your ring’s sleep, readiness and activity reach TrainingAi from Oura after each sync.',
+    connect: 'Connect Oura',
+  },
+  stopped: {
+    badge: 'Stopped',
+    body: 'Oura stopped sharing your data with TrainingAi. Connect again to pick up where it left off.',
+    connect: 'Connect again',
+  },
+  not_connected: {
+    badge: 'Not connected',
+    body: 'Connect your Oura account so your ring’s data reaches TrainingAi. You approve it on Oura’s page and come straight back.',
+    connect: 'Connect Oura',
+  },
+};
 export type OuraCallback =
   | { kind: 'connected' }
   | { kind: 'pending'; handle: string }

@@ -112,8 +112,8 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
   `OURA_TOKEN_KEY`.
 - Direct BLE ran until the switch, and its code is still in `lib/oura-ble/`: byte layouts came from
   the `open_oura` source, never memory; decoders never throw; the history cursor never skipped a
-  gap. Never prune or mutate the server raw BLE archive. Going back to direct BLE is the owner's
-  call, never an agent's.
+  gap. Never prune or mutate the server raw BLE archive. Re-pairing the ring with the official Oura
+  app, or going back to direct BLE, is the owner's call, never an agent's.
 
 **AI, security, integrations** → [`docs/rules/ai-security-and-integrations.md`](docs/rules/ai-security-and-integrations.md)
 - Structured LLM output uses a schema, never `JSON.parse` of text; no model-reported number gates
