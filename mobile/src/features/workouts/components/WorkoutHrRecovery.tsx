@@ -117,30 +117,30 @@ export function WorkoutHrRecovery({ workout }: { workout: WorkoutRecord }) {
             {data.setStats.map((x, index) => {
               const line = setHrLine(data.hrDense, x);
               return (
-              <Disclosure key={index} title={`${x.exerciseName} · set ${x.setNumber}`}>
-                {line.kind === 'figures' && <AppText variant="caption">{line.text}</AppText>}
-                {line.kind === 'note' && (
-                  <AppText variant="caption" tone="muted">
-                    {line.text}
-                  </AppText>
-                )}
-                {line.kind === 'figures' && x.hrr1 === null && (
+                <Disclosure key={index} title={`${x.exerciseName} · set ${x.setNumber}`}>
+                  {line.kind === 'figures' && <AppText variant="caption">{line.text}</AppText>}
+                  {line.kind === 'note' && (
+                    <AppText variant="caption" tone="muted">
+                      {line.text}
+                    </AppText>
+                  )}
+                  {line.kind === 'figures' && x.hrr1 === null && (
+                    <AppText variant="micro" tone="muted">
+                      {REST_NOT_MEASURED}
+                    </AppText>
+                  )}
                   <AppText variant="micro" tone="muted">
-                    {REST_NOT_MEASURED}
+                    {x.setStartMs === null
+                      ? 'Start time unavailable'
+                      : `Start ${formatDuration((x.setStartMs - origin) / 1000)}`}{' '}
+                    ·{' '}
+                    {x.setEndMs === null
+                      ? 'End time unavailable'
+                      : `End ${formatDuration((x.setEndMs - origin) / 1000)}`}
+                    . Set shading identifies effort, including superset partners. Gaps stay
+                    disconnected.
                   </AppText>
-                )}
-                <AppText variant="micro" tone="muted">
-                  {x.setStartMs === null
-                    ? 'Start time unavailable'
-                    : `Start ${formatDuration((x.setStartMs - origin) / 1000)}`}{' '}
-                  ·{' '}
-                  {x.setEndMs === null
-                    ? 'End time unavailable'
-                    : `End ${formatDuration((x.setEndMs - origin) / 1000)}`}
-                  . Set shading identifies effort, including superset partners. Gaps stay
-                  disconnected.
-                </AppText>
-              </Disclosure>
+                </Disclosure>
               );
             })}
           </Stack>

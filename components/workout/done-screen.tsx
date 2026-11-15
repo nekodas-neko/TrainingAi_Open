@@ -463,7 +463,7 @@ export function DoneScreen({
                     (most rows carry coverage_ok=false) and six of them in a row don't say
                     anything a lifter can use. See lib/health/hr-recovery-by-exercise.ts. */}
                 {hrData.hrDense === false && (
-                  <p className="text-[10px] text-muted-foreground">{SPARSE_WORKOUT_HR_NOTE}</p>
+                  <p className="text-2xs text-muted-foreground">{SPARSE_WORKOUT_HR_NOTE}</p>
                 )}
                 <div className="space-y-1">
                   {aggregateHrRecoveryByExercise(hrData.setStats).map(ex => (
