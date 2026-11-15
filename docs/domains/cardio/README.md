@@ -37,7 +37,7 @@ day through `linkPrescribedRun`, the one client writer, which **always** carries
 by `POST /api/admin/backfill-heart-health` ([`docs/admin-actions.md`](../../admin-actions.md) §11).
 An activity with no start time, or no heart rate across it, has unknown zone minutes and counts
 nothing (this replaces RV-166's "estimated from logged minutes"). Device pass still owed —
-[`docs/overview/known-issues.md`](../../overview/known-issues.md).
+[`docs/archive/known-issues.md`](../../archive/known-issues.md).
 
 **ACWR has exactly one implementation** (`computeVolumeAcwr`, the 7:28 call of `loadRatio`; its acute
 window is 7 local days since issue 2194, and `computeBlockTrend` is the 28:90 call, issue 2340) and

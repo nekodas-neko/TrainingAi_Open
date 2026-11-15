@@ -1,7 +1,7 @@
 # 2026-08-25 — the ring's power budget: the whole investigation (Q-388)
 
 **Extracted from `docs/implementation-backlog.md` on 2026-08-25**, per the compaction chore recorded
-in [`docs/doc-size-baseline-history.md`](../doc-size-baseline-history.md). Q-388 stays in the queue
+in [`docs/archive/doc-size-baseline-history.md`](../archive/doc-size-baseline-history.md). Q-388 stays in the queue
 as a decision plus a pointer here; nothing below is lost, and nothing below is startable work.
 
 **The state, in one line:** items 2 and 3 shipped, the night-window question was measured and

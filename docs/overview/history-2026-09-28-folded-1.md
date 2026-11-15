@@ -853,12 +853,12 @@ status was. `Q-220` measured the cost of that months ago and had been gated sinc
 
 ## The move
 
-The whole section is now `docs/overview/known-issues.md`. **Nothing was rewritten, reordered or
+The whole section is now `docs/archive/known-issues.md`. **Nothing was rewritten, reordered or
 archived — 451 headings in, 451 out.** `projectOverview.md` is **2,812 lines**, and its Document Map
 says plainly that a new Known Issue goes in the new file *"or the 79% grows back"*.
 
 **One file rather than one per pillar**, which was the structural call made when this was unblocked:
-`grep -n '^### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did, and the standing
+`grep -n '^### .*\[sleep\]' docs/archive/known-issues.md` works exactly as it did, and the standing
 rule depends on that grep. Per-pillar files would force an issue tagged `[sleep][platform]` to live
 in one and go missing from the other. Verified after the move: the sleep grep returns 28.
 

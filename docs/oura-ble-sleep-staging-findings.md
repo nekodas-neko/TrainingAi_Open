@@ -1,7 +1,7 @@
 # Oura Direct-BLE — Sleep Staging & Hypnogram: What We Can Actually Recover
 
 **Written:** 2026-07-08. Self-contained findings brief. Supersedes the pessimistic
-"no hypnogram over BLE" claims in [`oura-ble-remaining-work.md`](oura-ble-remaining-work.md)
+"no hypnogram over BLE" claims in [`oura-ble-remaining-work.md`](archive/oura-ble-remaining-work.md)
 (item 8) and the `projectOverview.md` session rows that call stages "null by design".
 
 ## The question

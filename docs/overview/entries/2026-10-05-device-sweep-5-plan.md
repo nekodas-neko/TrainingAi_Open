@@ -3,7 +3,7 @@
 **Branch:** `device/sweep-5-plan` · **Agent:** Device Verification · **Docs only.**
 
 Reviewed all 31 `Lane: DV` entries and the 131 device checks owed elsewhere against `main` at v1.486.11.
-`docs/device-sweep-5-plan.md` sets out six sittings of 45–60 minutes, failure-first:
+`docs/archive/device-sweep-5-plan.md` sets out six sittings of 45–60 minutes, failure-first:
 - fixes that failed before;
 - the production recomputes;
 - app-shell;

@@ -1,6 +1,6 @@
 # B5 — Save-latency fixes (plan 1 of 3)
 
-> Source: `docs/planned_upgrades.md` § B5 "Save latency" (audit 2026-07-02, verified post-#91). One PR. Line refs verified against `main` @ post-#98; re-grep anchors before editing if `main` has moved.
+> Source: `docs/archive/planned_upgrades.md` § B5 "Save latency" (audit 2026-07-02, verified post-#91). One PR. Line refs verified against `main` @ post-#98; re-grep anchors before editing if `main` has moved.
 >
 > Goal: saves *feel* instant everywhere — UI feedback fires synchronously after the local write, never after `await fetch`. Kills the reported "finished workout doesn't show as complete" lag.
 
@@ -47,4 +47,4 @@ The local-first branches are correct; only the web fallbacks block the toast on 
 - `pnpm tsc --noEmit && pnpm lint && pnpm test`, exercise every touched flow on `pnpm dev` against the local DB before asking to merge.
 - Not exercisable in sandbox (declare in the PR): native SQLite outbox path (Task 3 step 2), real Oura `hr-sync` latency (Task 2), on-device WebView timing.
 - Version: patch bump (bug fixes for shipped features) + `lib/changelog.ts` entry.
-- On ship: tick the four B5 save-latency bullets in `docs/planned_upgrades.md`.
+- On ship: tick the four B5 save-latency bullets in `docs/archive/planned_upgrades.md`.

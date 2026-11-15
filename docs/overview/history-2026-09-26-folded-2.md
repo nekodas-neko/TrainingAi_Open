@@ -126,7 +126,7 @@ that the gate exists in one file and not the other, plus the owner's screenshot 
 **Branch:** `device/sweep-3` · **Agent:** Device Verification · **Docs + `scripts/device/**`.**
 
 S25 Ultra, web v1.465.17, APK 1.460.4, **three-button navigation**, owner's account. Plan:
-`docs/device-sweep-3-plan.md`. Production was watched every 30 s throughout, with no slow answer.
+`docs/archive/device-sweep-3-plan.md`. Production was watched every 30 s throughout, with no slow answer.
 The admin BLE console stayed closed (DV-13). The phone showed 🔴 throughout and 🟢 at the end.
 
 ## Answers

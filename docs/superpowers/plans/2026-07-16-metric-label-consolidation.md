@@ -33,7 +33,7 @@ Source: **finding §4 of `docs/reviews/2026-07-16-data-efficiency-review.md`** (
 
 **Branch:** `fix/metric-label-consolidation` (start from freshly-fetched `main`: `git fetch origin main && git remote prune origin && git checkout -B fix/metric-label-consolidation origin/main`).
 
-**Backlog protocol:** this is the PR-2 implementer session for review-S9 item "4 — Metric source/label consolidation". Remove its entry from `docs/implementation-backlog.md` (or the Batch-S row in `docs/planned_upgrades.md`, wherever it was queued) in the same PR, and fold in the journal + `projectOverview.md` update as the final commits before merge.
+**Backlog protocol:** this is the PR-2 implementer session for review-S9 item "4 — Metric source/label consolidation". Remove its entry from `docs/implementation-backlog.md` (or the Batch-S row in `docs/archive/planned_upgrades.md`, wherever it was queued) in the same PR, and fold in the journal + `projectOverview.md` update as the final commits before merge.
 
 ---
 
@@ -535,7 +535,7 @@ In `package.json`, bump the patch version (from whatever current `main` holds af
 
 - [ ] **Step 4: Backlog removal + journal (last commits before merge)**
 
-- Remove this item's entry from `docs/implementation-backlog.md` (or its Batch-S row in `docs/planned_upgrades.md`).
+- Remove this item's entry from `docs/implementation-backlog.md` (or its Batch-S row in `docs/archive/planned_upgrades.md`).
 - Append the session summary to the most recent `docs/overview/history-*.md` and update `projectOverview.md`'s lean index (mark review-§4 consolidation ✅).
 
 ```bash

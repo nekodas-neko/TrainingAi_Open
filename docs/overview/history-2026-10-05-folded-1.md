@@ -212,7 +212,7 @@ plus two 11px literals where the scale has a token.
 ## Not exercised
 
 - **The device**, which is filed rather than claimed:
-  [`known-issues.md`](known-issues.md) carries the entry's own pass/fail (the suggestion must not
+  [`known-issues.md`](../archive/known-issues.md) carries the entry's own pass/fail (the suggestion must not
   shift the layout or compete with `Start Set 2`) **plus a second reading the entry does not name** —
   the pill sits above the card, so on a short viewport it may arrive off-screen and be missed
   entirely, the opposite failure from crowding and equally invisible from a container.

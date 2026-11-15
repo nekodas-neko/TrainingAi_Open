@@ -18,5 +18,5 @@ twenty PRs further on, so it is a real state rather than a stale read. The repo-
 is a different thing that happened at the same time. Nothing was un-parked to fill the gap, and the
 four stranded PRs were left alone because none were ours.
 
-The unblock for the lane is `docs/device-sweep-5-plan.md`, which covers fifteen of the forty-seven
+The unblock for the lane is `docs/archive/device-sweep-5-plan.md`, which covers fifteen of the forty-seven
 KEEP residues owed a device look. That pointer is the most useful thing in the baton.

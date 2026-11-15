@@ -444,7 +444,7 @@ by design: they are catalogued, not awarded.
 
 Reviewed all 33 `Lane: DV` entries and the 116 device checks owed elsewhere. Every sweep-2/3 finding
 filed on another lane has since shipped a fix (DV-15, DV-16, DV-17, DV-18, BF-61, BF-177, RV-103,
-RV-111), so those are station A. `docs/device-sweep-4-plan.md` splits the work into two sittings:
+RV-111), so those are station A. `docs/archive/device-sweep-4-plan.md` splits the work into two sittings:
 - **4a** (~2 h 30 min, nothing needed from the owner): fix checks, the post-fix performance
   readings, and new probes.
 - **4b** (~2 h 30 min): the gesture-navigation checks, the RV-155 debt stations, and the RV-125/BF-22
@@ -2503,7 +2503,7 @@ OR-150 itself deferred this — *"revisit only if these fifteen prove that a sta
 rather than one entry"*. Fifteen entries across three sweeps is that proof, and the deferral was
 right to want it first.
 
-## `docs/doc-size-baseline-history.md` stops being written by finishing PRs
+## `docs/archive/doc-size-baseline-history.md` stops being written by finishing PRs
 
 LB-120 measured the three files that collide on every pair of concurrent PRs, the same three every
 time across six resolve-and-push cycles on #1333. **Two are now gone:** the backlog's own `.size`
@@ -2659,7 +2659,7 @@ anything where the owner is the next actor, decision or task — the body says w
 about spending CI flakiness"*, and that judgement has an answer now: **E2E is not a required check**,
 so a flakier E2E cannot block a merge. Reversal is deleting the warm-up pass.
 
-**`Q-220` — move the Known Issues tables into `docs/overview/known-issues.md`** and leave
+**`Q-220` — move the Known Issues tables into `docs/archive/known-issues.md`** and leave
 `projectOverview.md` as the lean index it claims to be. Per-pillar files were the obvious alternative
 and are where this entry's own multi-tag risk bites: an issue tagged `[sleep][platform]` must live in
 one file and go missing from the other. One file keeps `grep -n '^### .*\[sleep\]'` working, which is

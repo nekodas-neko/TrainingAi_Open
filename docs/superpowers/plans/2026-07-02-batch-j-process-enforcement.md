@@ -1,6 +1,6 @@
 # Batch J — Process & enforcement (CI rules, device checklist, sw.js cache)
 
-> Source: `docs/planned_upgrades.md` § Batch J. Three independent chunks, each its own small PR — execute in any order, one at a time. J1 is split into waves because some rules have known outstanding violations that must be fixed (by other batches) before their check can be enforced.
+> Source: `docs/archive/planned_upgrades.md` § Batch J. Three independent chunks, each its own small PR — execute in any order, one at a time. J1 is split into waves because some rules have known outstanding violations that must be fixed (by other batches) before their check can be enforced.
 
 ## Chunk 1 — J1 wave 0: baseline audit (no CI change)
 
@@ -45,4 +45,4 @@ Write `docs/device-smoke-checklist.md` — one page, ~5-minute pass on the S25 a
 
 - Chunks are independent PRs; each: `pnpm tsc --noEmit && pnpm lint && pnpm test` (chunks 4 is docs-only — CI green suffices).
 - Chunk 2/3 verification is meta: deliberately violate each new rule on a scratch branch and watch CI fail correctly — a check that never fires is worse than none.
-- On ship: tick the J1/J2/J3 bullets in `docs/planned_upgrades.md`; chunks 4 and 5 also touch CLAUDE.md as described.
+- On ship: tick the J1/J2/J3 bullets in `docs/archive/planned_upgrades.md`; chunks 4 and 5 also touch CLAUDE.md as described.

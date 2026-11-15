@@ -57,7 +57,7 @@ This is the first real read path for `oura_daily_derived` and makes the existing
 - `app/api/health/trends/route.ts` — fetch derived rows; coalesce derived-over-Cloud per day.
 - `app/api/body-battery/route.ts` — anchor chain: derived readiness → own sleep score → Cloud → 50; `MODEL_VERSION` v4.
 - `package.json` (patch bump) + `lib/changelog.ts` — final task.
-- `projectOverview.md` + `docs/overview/history-newest.md` (or current newest journal) + `docs/planned_upgrades.md` Batch S (tick S1/S2/S6) + the `docs/implementation-backlog.md` entry for this plan — final task, same PR.
+- `projectOverview.md` + `docs/overview/history-newest.md` (or current newest journal) + `docs/archive/planned_upgrades.md` Batch S (tick S1/S2/S6) + the `docs/implementation-backlog.md` entry for this plan — final task, same PR.
 
 ---
 
@@ -618,7 +618,7 @@ Log in as `test@local.dev` / `testpass123`, capture the session cookie, then:
 
 - `package.json`: **patch** bump (bug-fix class) on the fresh rebase — re-bump if a parallel PR lands first.
 - `lib/changelog.ts` entry (top of `CHANGELOG`), e.g.: "The 14-day Readiness and Sleep sparklines, the Body Battery morning anchor, and the Sleep contributor bars now run on the app's own daily scores computed from your ring — instead of the pre-July Oura Cloud data that stopped updating when the ring moved to direct Bluetooth. Sparklines fill in from today forward; the battery no longer starts every day at a flat 50."
-- `docs/planned_upgrades.md`: tick/remove the Batch S entries for review findings 3.1, 3.2 and 1.3.
+- `docs/archive/planned_upgrades.md`: tick/remove the Batch S entries for review findings 3.1, 3.2 and 1.3.
 - `docs/implementation-backlog.md`: remove this plan's queue entry.
 - `projectOverview.md`: current status line; add a Known-Issues/notes row: "Derived-score sparklines have no backfill — days before 2026-07-16 stay on Cloud data or null; derived activity_score pending P-D."
 - Append the session journal entry to the newest `docs/overview/history-*.md`.
@@ -626,7 +626,7 @@ Log in as `test@local.dev` / `testpass123`, capture the session cookie, then:
 - [ ] **Step 4: Commit + push, open PR, watch CI, merge when green**
 
 ```bash
-git add package.json lib/changelog.ts projectOverview.md docs/overview/ docs/planned_upgrades.md docs/implementation-backlog.md
+git add package.json lib/changelog.ts projectOverview.md docs/overview/ docs/archive/planned_upgrades.md docs/implementation-backlog.md
 git commit -m "Bump version, changelog and docs for derived-score read paths"
 git push -u origin fix/derived-scores-read-paths
 ```

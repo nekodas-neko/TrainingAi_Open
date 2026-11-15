@@ -8,7 +8,7 @@ before touching the Oura BLE decode/rollup path or editing the `oura-native-ble`
 
 Related canon: the `oura-native-ble` skill (protocol knowledge base), the `oura-api`
 skill (the retired Cloud path), `docs/oura-ble-operations.md` (failure matrix / runbook),
-`docs/oura-ble-sleep-staging-findings.md` (the staging deep-dive), `docs/oura-ble-remaining-work.md`,
+`docs/oura-ble-sleep-staging-findings.md` (the staging deep-dive), `docs/archive/oura-ble-remaining-work.md`,
 and `docs/implementation-backlog.md` items 1–4 + the Oura bullets under "Not yet queued".
 
 ---

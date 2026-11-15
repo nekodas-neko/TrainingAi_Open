@@ -1,6 +1,6 @@
 # F6 — Metrics expansion
 
-> Source: `docs/planned_upgrades.md` § F6 (session-178 audit). Four tiers = four PR-sized chunks, in order — each tier stands alone and earlier tiers are pure wins on already-stored data. F2 (tags/session sync) and F3 (set telemetry) are separate items with their own batch-F plan; don't fold them in here.
+> Source: `docs/archive/planned_upgrades.md` § F6 (session-178 audit). Four tiers = four PR-sized chunks, in order — each tier stands alone and earlier tiers are pure wins on already-stored data. F2 (tags/session sync) and F3 (set telemetry) are separate items with their own batch-F plan; don't fold them in here.
 
 ## Chunk 1 — Tier 1: pure compute on stored data
 

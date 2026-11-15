@@ -2841,7 +2841,7 @@ orientation indexes, so nothing had ever seen them.
   - `x.md` in `entries/README.md` is a template.
   - Four in two cardio plan docs are build instructions (`Create: …`); the entries were written
     under a `feat-` prefix.
-  - **Four in `docs/doc-size-baseline-history.md` name entries that exist nowhere in the history
+  - **Four in `docs/archive/doc-size-baseline-history.md` name entries that exist nowhere in the history
     archives** (`2026-08-26-fix-batch-upsert-duplicate-collapse`, `…-fix-daily-summary-replace-guard`,
     `…-feat-app-load-metrics`, `2026-09-09-admin-tool-routes-test`). They were deleted, not folded,
     and that file is a historical log, so they stay as written.

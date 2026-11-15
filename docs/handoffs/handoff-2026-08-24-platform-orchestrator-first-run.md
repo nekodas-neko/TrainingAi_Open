@@ -46,7 +46,7 @@ All docs-only, all merged to `main`:
   into a chain: `Q-406 → Q-395a → Q-395b → Q-395c → Q-395` (checkpoint). Q-406 turned out to be the
   entry point, not the prerequisite it was filed as — its 2026-08-19 correction says the row can't
   be extracted before the design is decided, and the design is now decided. Backlog baseline raised
-  11334 → 11377 with the reason recorded in `docs/doc-size-baseline-history.md`.
+  11334 → 11377 with the reason recorded in `docs/archive/doc-size-baseline-history.md`.
 - **#344 — Q-393 folded into Q-392.** Clearing `Gate: owner` on Q-393 (which turned out to already
   be self-answered) put it directly above Q-392 in the queue and exposed that `mealLabelStyle` was
   already a row in Q-392's table. Two entries, one piece of work — removed rather than unblocked.

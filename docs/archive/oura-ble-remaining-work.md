@@ -7,7 +7,7 @@ fresh session/agent can pick up the direct-BLE Oura work without re-deriving con
 - Read this first, then the deeper references at the bottom.
 - Items are **priority-ordered**. Each says: **what**, **why**, **where** (files),
   **server-only vs needs-APK-rebuild**, and **how to verify**.
-- The canonical queue is still [`docs/implementation-backlog.md`](archive/implementation-backlog-2026-10-05.md)
+- The canonical queue is still [`docs/implementation-backlog.md`](implementation-backlog-2026-10-05.md)
   (follow its protocol: take the top item, one per session, remove it in the PR that
   completes it). This doc is the BLE-specific expansion of those entries + the new
   findings from session 219.
@@ -201,18 +201,18 @@ surface today) — left as optional future work.
   timestamp assumptions against a real captured vector + the owner's pre-re-key Oura history, and
   Redecode-backfill. Batches with items 2/6 (already need a rebuild). Only if a genuine full-night
   drain still yields nothing is staging truly absent for this ring → fall back to a motion/HR
-  model. Full findings: [`oura-ble-sleep-staging-findings.md`](oura-ble-sleep-staging-findings.md).
+  model. Full findings: [`oura-ble-sleep-staging-findings.md`](../oura-ble-sleep-staging-findings.md).
 - **Battery time-series** (avg charging time / drain / health) — the plugin polls battery
   every 5 min but discards it; needs a POST path + APK rebuild (spec Part A).
 
 ---
 
 ## Key references
-- **Canonical queue + protocol:** [`docs/implementation-backlog.md`](archive/implementation-backlog-2026-10-05.md)
+- **Canonical queue + protocol:** [`docs/implementation-backlog.md`](implementation-backlog-2026-10-05.md)
 - **Protocol knowledge base (byte layouts, GATT, auth, compute tiers):** the `oura-native-ble`
   skill (`.agents/skills/oura-native-ble/SKILL.md` / `.claude/skills/oura-native-ble/`).
 - **Operations manual (failure matrix, cadence, maintenance, integrity runbook):**
-  [`docs/oura-ble-operations.md`](oura-ble-operations.md).
+  [`docs/oura-ble-operations.md`](../oura-ble-operations.md).
 - **Pipeline handoff / phase results:**
   `docs/superpowers/plans/2026-07-07-oura-ble-phase-3-4-results.md`.
 - **Data-mapping plan (rollup design):**

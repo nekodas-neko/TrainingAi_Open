@@ -2063,7 +2063,7 @@ would spend presses on tabs and the unwind would stop matching what the user see
 
 - **The S25.** Every part of this is layout and gesture: a new tab strip, a rebuilt action row, and
   one fewer sheet in the back stack. `Gate: device`, written into
-  [`device-verification-queue.md`](../device-verification-queue.md) — it **replaces** N2's
+  [`device-verification-queue.md`](../archive/device-verification-queue.md) — it **replaces** N2's
   three-press check, which is now a two-press check, and rewrites N4 around the split.
 - **The native local store.** `getRecentFoodItemsForMeal` returns null in the web sandbox, so the
   `Recent` tab's local-first branch is only exercised on the device.

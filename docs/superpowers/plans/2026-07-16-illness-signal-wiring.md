@@ -12,7 +12,7 @@
 
 ## Why now
 
-Data-efficiency review finding **S3** (`docs/planned_upgrades.md` Batch S; full write-up `docs/reviews/2026-07-16-data-efficiency-review.md` §2.1, High/M): *"illness radar reaches ZERO decision layers"* — it is consumed by exactly one advisory on `/health/readiness` (`components/health/health-score-detail.tsx:181-192`) plus a bounded readiness suppression, and is absent from `PrescriptionSignals`, the rest-day/deload gates, the emergency/per-exercise deload, chat, digests, and Home. A fever-graded night today changes nothing about the prescribed session.
+Data-efficiency review finding **S3** (`docs/archive/planned_upgrades.md` Batch S; full write-up `docs/reviews/2026-07-16-data-efficiency-review.md` §2.1, High/M): *"illness radar reaches ZERO decision layers"* — it is consumed by exactly one advisory on `/health/readiness` (`components/health/health-score-detail.tsx:181-192`) plus a bounded readiness suppression, and is absent from `PrescriptionSignals`, the rest-day/deload gates, the emergency/per-exercise deload, chat, digests, and Home. A fever-graded night today changes nothing about the prescribed session.
 
 **Branch:** `feat/illness-signal-wiring`
 

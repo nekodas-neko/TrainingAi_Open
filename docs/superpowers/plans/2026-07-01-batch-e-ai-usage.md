@@ -1922,12 +1922,12 @@ Log in as `test@local.dev` / `testpass123` and run every "Manual verification" b
 AI upgrade: chat can now pull your real workout, recovery, nutrition and readiness data on demand and knows your Oura/sleep/check-in state; weekly summary and "why this session" load instantly after first generation; program/nutrition AI responses are schema-validated; interrupted AI answers now say so instead of stopping mid-sentence.
 ```
 
-Tick the Batch E items (excluding quick-wins 6/7, marked deferred) in `projectOverview.md` per the tick-immediately rule, and update `docs/planned_upgrades.md` (mark E1–E5 shipped, note exclusions).
+Tick the Batch E items (excluding quick-wins 6/7, marked deferred) in `projectOverview.md` per the tick-immediately rule, and update `docs/archive/planned_upgrades.md` (mark E1–E5 shipped, note exclusions).
 
 - [ ] **Step 14.4: Commit + PR**
 
 ```bash
-git add package.json lib/changelog.ts projectOverview.md docs/planned_upgrades.md
+git add package.json lib/changelog.ts projectOverview.md docs/archive/planned_upgrades.md
 git commit -m "Bump version and changelog for the AI usage batch"
 git push -u origin feat/batch-e-ai-usage
 ```

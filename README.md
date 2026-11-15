@@ -123,7 +123,7 @@ commented as such at its definition. No value in this repository grants access t
 | [`CLAUDE.md`](CLAUDE.md) | Authoritative architecture, data model, key files, conventions, Oura integration |
 | [`projectOverview.md`](projectOverview.md) | Lean index — current status, Known Issues & Risks, What's Left To Do |
 | [`docs/implementation-backlog.md`](docs/archive/implementation-backlog-2026-10-05.md) | Priority-ordered queue of ready-to-build work |
-| [`docs/planned_upgrades.md`](docs/planned_upgrades.md) | Open uplift ideas/findings |
+| [`docs/archive/planned_upgrades.md`](docs/archive/planned_upgrades.md) | Archived uplift ideas/findings (no longer maintained) |
 | [`docs/overview/`](docs/overview/) | Session journal (completed work, batched) + shipped-uplift archive |
 | [`docs/oura-ring-data-reference.md`](docs/oura-ring-data-reference.md) | Oura v2 field reference |
 | [`docs/device-smoke-checklist.md`](docs/device-smoke-checklist.md) | On-device verification steps (Samsung S25) |

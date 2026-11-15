@@ -75,7 +75,7 @@ will keep changing as the framework does. §3 of the README is where the `BF-` I
 ## Traps this role hits every session — read before the first PR
 
 - **`check-doc-index-size` fails almost every intake PR.** Raise the baseline in the same PR —
-  reasoning in `docs/doc-size-baseline-history.md` — but treat the failure as a real signal first.
+  reasoning in `docs/archive/doc-size-baseline-history.md` — but treat the failure as a real signal first.
   **Recompute after merging `origin/main` in, not just before**: a raise can evaporate if a parallel
   PR shrinks the same file first; if it does, say so in the history file rather than deleting the
   reasoning. Take the count from the script, never `wc -l` (reads one lower).

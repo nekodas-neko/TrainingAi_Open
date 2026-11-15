@@ -4,7 +4,7 @@
 > (activity-ring boost) shipped inside the shared `components/health/health-score-detail.tsx` ring
 > (`ScoreDisplay` boost arc `:47-55`, wired `:171-175`) — NOT in `activity-content.tsx`, which this plan
 > predates (the activity page was refactored to delegate to `HealthScoreDetail`). Per-task confirmation
-> is in `docs/planned_upgrades.md` § "Batch K". Retained for historical context only.
+> is in `docs/archive/planned_upgrades.md` § "Batch K". Retained for historical context only.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
@@ -13,7 +13,7 @@
 **Goal:** Five small, independent UI/bug fixes requested directly by the user from screenshots of the Home timeline, Activity detail page, and End of Day review sheet:
 1. Remove exercise names from workout timeline cards (Home timeline + full Timeline page) — redundant with the existing duration/sets/exercise-count line and makes cards taller than needed.
 2. Activity detail page: show the "+N training" boost (already called out in a text banner) as a visually distinct second-color segment on the activity score ring itself.
-3. Fix the End of Day / meal-backfill reminder to fire **30 minutes before** the user's estimated bedtime (their goal/average), not ~60 minutes before rounded to the hour — it currently under-shoots the design intent documented in `docs/planned_upgrades.md` Quick win table and `projectOverview.md`'s Phase 12.1 entry.
+3. Fix the End of Day / meal-backfill reminder to fire **30 minutes before** the user's estimated bedtime (their goal/average), not ~60 minutes before rounded to the hour — it currently under-shoots the design intent documented in `docs/archive/planned_upgrades.md` Quick win table and `projectOverview.md`'s Phase 12.1 entry.
 4. Convert the End of Day review's five 1–5 wellness scales (Physical tiredness, Mental drain, Movement, Hydration, Late/heavy meal) from plain black/white toggle buttons into a colored, benchmarked "slider" control — mirroring the segmented, filled-progress look already established by `RpeSlider` (`components/workout/rpe-strip.tsx`) and the workout builder's `GoalSpectrum` (`components/workout-builder/goal-spectrum.tsx`).
 5. Color-theme each scale to its metric (e.g. blue for hydration) and give the End of Day sheet itself a themed background instead of flat `bg-secondary`, reusing the existing `PAGE_GRADIENTS` night gradient from `components/health/detail-hero.tsx`.
 
@@ -323,4 +323,4 @@ The End of Day sheet (`components/nutrition/end-of-day/end-of-day-review.tsx`) c
 - The End of Day sheet has a visible themed (indigo/navy night) gradient background instead of a flat panel color.
 - `pnpm exec tsc --noEmit` and `pnpm lint` are clean (aside from the pre-existing unrelated `lib/push.ts` error).
 
-**Out of scope (don't do these as part of this plan):** a Start-of-Day/morning variant of the wellness scales (documented as a fast-follow in `docs/superpowers/specs/2026-07-01-end-of-day-review-design.md` and Batch F of `docs/planned_upgrades.md` — the `color` prop added here is deliberately optional/defaulted so that future work can adopt it without another refactor); adding a real Radix `Slider` dependency; changing the End of Day reminder's `hasUnloggedRequired` gating logic (only its *timing* was in scope here).
+**Out of scope (don't do these as part of this plan):** a Start-of-Day/morning variant of the wellness scales (documented as a fast-follow in `docs/superpowers/specs/2026-07-01-end-of-day-review-design.md` and Batch F of `docs/archive/planned_upgrades.md` — the `color` prop added here is deliberately optional/defaulted so that future work can adopt it without another refactor); adding a real Radix `Slider` dependency; changing the End of Day reminder's `hasUnloggedRequired` gating logic (only its *timing* was in scope here).

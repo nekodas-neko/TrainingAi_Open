@@ -1,6 +1,6 @@
 # Device sweep 3 — plan
 
-**Agent:** Device Verification · **Written:** 2026-09-23, after sweep 2 (`docs/device-sweep-2-plan.md`,
+**Agent:** Device Verification · **Written:** 2026-09-23, after sweep 2 (`docs/archive/device-sweep-2-plan.md`,
 journal `docs/overview/history-2026-09-24-folded-1.md#2026-09-23-device-sweep-2`) · **Target:** web v1.465.17, APK 1.460.4.
 
 The phone is on **three-button navigation** (`navigation_mode` 0), so every gesture-bar or

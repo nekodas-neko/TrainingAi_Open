@@ -1,6 +1,6 @@
 # Doc-size baseline — change history
 
-Every raise and every ratchet-down of the baselines in `docs/doc-size-baseline.json`, with the
+Every raise and every ratchet-down of the baselines in `docs/archive/doc-size-baseline.json`, with the
 reasoning that was recorded at the time. This file is append-only and is **not** read by any
 check — it exists so the reasoning survives without living in the script.
 
@@ -1161,7 +1161,7 @@ whole failure mode was a number nobody re-checked.
 
 Q-112 — the unified day review — was a single spec-sized entry that said of itself *"whoever picks
 this up should write a proper implementation plan first"*. The plan is now written
-([`2026-08-25-unified-day-review.md`](superpowers/plans/2026-08-25-unified-day-review.md)) and the
+([`2026-08-25-unified-day-review.md`](../superpowers/plans/2026-08-25-unified-day-review.md)) and the
 entry became an umbrella plus **Q-112a–e**, each one PR with its own lane, branch and `Needs:`.
 
 **A +19 raise was prepared and then withdrawn**: the original entry carried 28 lines of direction
@@ -1214,7 +1214,7 @@ falsify **Q-549**'s premise: `prod_DB` holds **423 MB flat**, not 0.79 GB.
 **The first draft of this cost +8 and +50, and the ratchet was right to refuse it.** Most of those
 lines were *measurement*, not queue state — the settings dump, the arithmetic, the caveats, the
 reasoning about where 0.79 GB came from. That belongs in a reference doc, and it now lives in
-[`docs/reviews/2026-08-25-railway-and-db-readings.md`](reviews/2026-08-25-railway-and-db-readings.md)
+[`docs/reviews/2026-08-25-railway-and-db-readings.md`](../reviews/2026-08-25-railway-and-db-readings.md)
 (new, unratcheted), linked from the platform index. What is left in the backlog is three short
 pointer blocks — the finding, the consequence for that entry, and a link — which is entry content.
 
@@ -2862,7 +2862,7 @@ Both are index material rather than narrative. The status entry is seven lines a
 journal for everything else — the two premise corrections the extraction turned up (the port is 22
 store operations, not the five the plan sketched from a line count; `run.ts` still reaches
 `onnxruntime-node`) are 25 lines in
-[the entry](overview/history-2026-09-10-folded-2.md#2026-08-23-oura-rollup-io-port), not here. The backlog annotation
+[the entry](../overview/history-2026-09-10-folded-2.md#2026-08-23-oura-rollup-io-port), not here. The backlog annotation
 stays in the queue because Q-545 is **not finished** — Task 2 of seven shipped, and the next
 implementer needs to read those two corrections *before* sizing Task 3, which is exactly what the
 queue entry is for.
@@ -3335,7 +3335,7 @@ entry's evidence for 2026-08-11/08-13 was overtaken by Q-536's clock repair, and
 was overtaken by `nightSessions`. A reader who re-derives from either goes the wrong way.
 
 **The Q-274 entry was trimmed first, not raised into.** Its first draft ran 34 lines; the narrative
-moved to [`entries/2026-08-25-sleep-fragment-nights.md`](overview/history-2026-09-10-folded-3.md#2026-08-25-sleep-fragment-nights)
+moved to [`entries/2026-08-25-sleep-fragment-nights.md`](../overview/history-2026-09-10-folded-3.md#2026-08-25-sleep-fragment-nights)
 and the queue kept what a queue needs — what is still owed, and what must not be trusted. Raising
 came second, once the entry was as short as it could honestly be.
 ## 2026-08-25 — `docs/implementation-backlog.md` 11532 → 11590 (+58)
@@ -3657,7 +3657,7 @@ carry. Four lines is the honest price of not losing it.
 and Q-27 (47), the latter closed on 2026-08-04 — *"CLOSED, not doing either item"* — and never
 removed. Q-27's substance is not gone either: the reasoning against moving the loose `docs/` root
 files into pillar folders, and against splitting the Known Issues per pillar, is now at the foot of
-[`docs/domains/README.md`](domains/README.md), which is where someone would arrive before proposing
+[`docs/domains/README.md`](../domains/README.md), which is where someone would arrive before proposing
 either move again.
 
 **The reason both sat there is that the check could not see them.** `check-backlog-pointers.js`
@@ -6854,7 +6854,7 @@ same pass — BF-82 shipped, so the guard-rail has done its job and only the pla
 `docs/overview/entries/` crossed the **250-file total ceiling**, which fails the branch that crosses
 it — here a Lane A feature PR whose only offence was adding its own journal entry. The 23 entries no
 durable doc links to were folded oldest-first and `git rm`'d, per the chore in
-[`entries/README.md`](overview/entries/README.md).
+[`entries/README.md`](../overview/entries/README.md).
 
 **A new history file rather than an append.** `history-2026-08-30.md` was 184 KB and the fold is
 105 KB, which would have put it at **289 KB** — past the ~250 KB rule the README already carries. So
@@ -7624,7 +7624,7 @@ user-visible change gets a status paragraph, and a change that could not be exer
 gets a Known-Issues row (CLAUDE.md, Canonical Runtime — the row is the *alternative* to the device
 smoke run, so it is not optional prose). The detail that is not index material — the design argument,
 the verification transcript, the one correction made while building — is in
-[`2026-09-02-la-47-coach-plan-card`](overview/history-2026-09-10-folded-5.md#2026-09-02-la-47-coach-plan-card)
+[`2026-09-02-la-47-coach-plan-card`](../overview/history-2026-09-10-folded-5.md#2026-09-02-la-47-coach-plan-card)
 and the paragraph links to it.
 
 Both entries shrink on their own terms rather than needing a sweep: the status paragraph is replaced
@@ -7717,7 +7717,7 @@ reader does not think a field was invented.
 The remainder is Q-509's result: the pre-registered experiment ran and failed its pass test, which
 belongs in the entry because it changes what the entry is asking for. The argument, the table and
 the caveats are in
-[`docs/reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md`](reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md);
+[`docs/reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md`](../reviews/2026-09-02-recovery-index-ble-smoothing-experiment.md);
 the entry carries the verdict and the pointer, and was cut by half after this check first failed.
 
 **This is the file's own growth mechanism working as intended** — fields are what make readiness
@@ -7732,7 +7732,7 @@ those lines a later session reads a fixed entry and closes it with a live fault 
 
 The correction to the entry's diagnosis is four lines and a pointer, cut from twelve after this check
 first failed. The argument belongs in
-[`2026-09-02-ps17-night-selection`](overview/history-2026-09-10-folded-5.md#2026-09-02-ps17-night-selection);
+[`2026-09-02-ps17-night-selection`](../overview/history-2026-09-10-folded-5.md#2026-09-02-ps17-night-selection);
 what the queue needs is that the summary does not read `sleep_sessions`, so the next person does not
 build the fix the entry originally described.
 
@@ -7746,7 +7746,7 @@ The lines are the evidence, not the argument: the four file:line references that
 already arrives, and the note that the outbox push confirms `synced` without applying the server row
 — which is why the number lands on the next pull rather than at first paint. Lane B needs those to
 avoid re-deriving them; the reasoning is in
-[`docs/overview/history-2026-09-06.md`](overview/history-2026-09-06.md) (folded 2026-09-06),
+[`docs/overview/history-2026-09-06.md`](../overview/history-2026-09-06.md) (folded 2026-09-06),
 and this block was cut by a third after the check first failed.
 
 A mis-laned entry costs more than its lines: it is picked up, traced and put back by every session
@@ -7762,7 +7762,7 @@ The numbers are in the entry rather than only the review on purpose — they are
 session re-running the same queries to decide whether the item is startable, and two of them
 (**n = 4**, **n = 6**) are the reason it is a `Keep:` and not a completion. The tables, the method and
 the caveats are in
-[`docs/reviews/2026-09-02-colmi-spo2-temp-stages.md`](reviews/2026-09-02-colmi-spo2-temp-stages.md).
+[`docs/reviews/2026-09-02-colmi-spo2-temp-stages.md`](../reviews/2026-09-02-colmi-spo2-temp-stages.md).
 
 ## 2026-09-02 — `projectOverview.md` → 9442, `docs/implementation-backlog.md` → 15621 (LB-38 root cause)
 
@@ -7784,7 +7784,7 @@ The lines earn their place by *correcting* the entry rather than adding to it: t
 reasoned from were one sub-type of a container, and its central ratio ("~0.77 in all three") is an
 artefact of those three sitting in one unwrapped run of a counter that wraps at 256. Leaving that in
 place would send the next session looking for a relationship that is not there. The measurement is in
-[`docs/reviews/2026-09-02-colmi-0x73-frame-structure.md`](reviews/2026-09-02-colmi-0x73-frame-structure.md).
+[`docs/reviews/2026-09-02-colmi-0x73-frame-structure.md`](../reviews/2026-09-02-colmi-0x73-frame-structure.md).
 
 ## 2026-09-02 — `projectOverview.md` → 9455, `docs/implementation-backlog.md` → 15621 (BF-107)
 
@@ -10582,7 +10582,7 @@ came out whole (77 lines), and LA-89 went in (29) — `oura/hr-sync` has no call
 says something untrue about what it does.
 
 **The entry carried a checklist that outlived it**, so it was moved rather than deleted:
-[`docs/route-test-fixtures.md`](route-test-fixtures.md) holds the fifteen fixture shapes that passed
+[`docs/route-test-fixtures.md`](../route-test-fixtures.md) holds the fifteen fixture shapes that passed
 review and were caught only by mutation, plus what the ratchet does and does not measure. It is
 linked from `docs/module-map.md` and named in the checker's own failure message, which is where
 someone writing a new route test will actually meet it.
@@ -11284,7 +11284,7 @@ cleared. Two sessions have now spent time on this query; a third would too.
 
 The evidence — the full 24-row 1RM table, the program inventory, the per-session phase state, and a
 side finding about ten pre-Q-298 `estimated_1rm = 0` logs — went to
-[`docs/reviews/2026-09-10-q52-phase-hold-remeasure.md`](reviews/2026-09-10-q52-phase-hold-remeasure.md),
+[`docs/reviews/2026-09-10-q52-phase-hold-remeasure.md`](../reviews/2026-09-10-q52-phase-hold-remeasure.md),
 which is where a first draft of this had put 53 lines into the index. What stayed is the conclusion,
 the earliest answerable date, and the instruction not to re-run the query. That is the shape this
 baseline is meant to permit: a queue entry may grow by the fact that changes what you do with it,
@@ -15824,7 +15824,7 @@ comes down.
 ## 2026-09-22 — `docs/implementation-backlog.md` +125 (26664 → 26789) (Review: DV probe entries)
 
 Ten entries (**RV-124…RV-133**) filing the probes in
-[`docs/device-agent-probe-checklist.md`](device-agent-probe-checklist.md) as queue work now that the
+[`docs/device-agent-probe-checklist.md`](../device-agent-probe-checklist.md) as queue work now that the
 Device Verification role exists (#1417), at ~12 lines each.
 
 **They are the first entries whose ONLY work is the device check**, and the filing took three tries
@@ -16301,7 +16301,7 @@ cannot transform `.tsx` at all, so logic left in the component is logic nothing 
 device a dead scrim and a mis-scoped one look identical. That is worth the lines because the
 obvious "simplification" later is to fold the controller back in.
 
-**LB-130 is new**, and it is the one to read: `docs/doc-size-baseline-history.md` — this file — is
+**LB-130 is new**, and it is the one to read: `docs/archive/doc-size-baseline-history.md` — this file — is
 now the guaranteed-conflict line that `.size` used to be. LA-33 split the `.size` map per document
 and RV-134 gave it a slack band; across five re-merges of #1449 in one hour the `.size` file
 conflicted only when a change genuinely grew a document, and **this file conflicted every time**.

@@ -1,6 +1,6 @@
 # Batch L — Per-screen wallpapers & visual identity
 
-> Source: `docs/planned_upgrades.md` § Batch L (user request, 2026-07-02). Extension of the shipped dynamic-background system — NOT a greenfield build. Three PR-sized chunks in dependency order: foundation first (nothing shows until roots are transparent; nothing ships until light mode is solved), then art screen-by-screen. **Hard constraint throughout: body text ≥4.5:1 contrast over any wallpaper, in both themes.**
+> Source: `docs/archive/planned_upgrades.md` § Batch L (user request, 2026-07-02). Extension of the shipped dynamic-background system — NOT a greenfield build. Three PR-sized chunks in dependency order: foundation first (nothing shows until roots are transparent; nothing ships until light mode is solved), then art screen-by-screen. **Hard constraint throughout: body text ≥4.5:1 contrast over any wallpaper, in both themes.**
 
 ## Chunk 1 — Foundation: reveal + legibility (L3 + L2, one PR, no new art)
 

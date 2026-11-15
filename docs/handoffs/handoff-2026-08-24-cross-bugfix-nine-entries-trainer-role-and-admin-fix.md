@@ -134,7 +134,7 @@ gone from the backlog.
 
 - `docs/agents/state/bugfix.md` — the baton, rewritten in full as part of this same wrap-up. Read
   it before this file if you are picking up the role.
-- `docs/doc-size-baseline-history.md` — every raise/ratchet this session made, each with the
+- `docs/archive/doc-size-baseline-history.md` — every raise/ratchet this session made, each with the
   reasoning, including the two that evaporated (see above).
 - `docs/implementation-backlog.md` — `BF-1` through `BF-9` (minus `BF-6`/`BF-8`, shipped). `BF-9`
   is the one with the most implementation-relevant detail packed into the entry itself.

@@ -1,6 +1,6 @@
 # B5 — Bundle splits (plan 3 of 3)
 
-> Source: `docs/planned_upgrades.md` § B5 "Remaining bundle splits (post-#91)" (audit 2026-07-02). One PR; tasks 1–8 are mechanical, task 9 is the only one needing design care. Re-grep anchors before editing.
+> Source: `docs/archive/planned_upgrades.md` § B5 "Remaining bundle splits (post-#91)" (audit 2026-07-02). One PR; tasks 1–8 are mechanical, task 9 is the only one needing design care. Re-grep anchors before editing.
 >
 > Goal: no route's initial chunk carries chart.js, the markdown/KaTeX stack, or dnd-kit unless its first paint renders them. Copy the pattern PR #91 established (`const X = dynamic(() => import(...).then(m => m.X), { ssr: false })`).
 
@@ -52,4 +52,4 @@ The only non-mechanical task; keep it minimal and behind explicit opt-in:
 - `pnpm tsc --noEmit && pnpm lint && pnpm test`; on `pnpm dev` visit every touched route and open every dynamized surface (done screen, chat message with code block + chart, meal-type manager, health detail sparklines, body-battery/readiness cards) — a wrong dynamic export shape fails only at render.
 - Not exercisable in sandbox (declare in PR): real WebView load timing; `sw.js` cache interaction on device (deploy lands via Railway, next app launch).
 - Version: patch bump + `lib/changelog.ts` entry.
-- On ship: tick the B5 bundle bullets in `docs/planned_upgrades.md`.
+- On ship: tick the B5 bundle bullets in `docs/archive/planned_upgrades.md`.

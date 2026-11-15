@@ -2,7 +2,7 @@
 
 > **✅ RESOLVED — all 8 tasks verified shipped on `main` 2026-07-20.** These landed piecemeal across
 > later cache-group / TTL-consolidation / push-parity sessions without this plan being closed out. Do
-> NOT re-implement. Per-task confirmation is in `docs/planned_upgrades.md` § "R — 2026-07-03 review
+> NOT re-implement. Per-task confirmation is in `docs/archive/planned_upgrades.md` § "R — 2026-07-03 review
 > correctness findings". This doc is retained for historical context only.
 
 **Branch:** `fix/review-quick-fixes` · **One PR.** Eight small, independent correctness/hygiene
@@ -10,7 +10,7 @@ fixes surfaced by the 2026-07-03 backlog review (session 184). All S effort; no 
 no new features. Each task lists its own verification. Standard gates apply: tests + lint +
 `tsc` + local dev-server exercise of every touched flow before presenting.
 
-Findings context: `docs/planned_upgrades.md` § "2026-07-03 backlog review".
+Findings context: `docs/archive/planned_upgrades.md` § "2026-07-03 backlog review".
 
 ---
 

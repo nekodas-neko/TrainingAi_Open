@@ -147,7 +147,7 @@ Known-Issues row for it.
 
 ## Phase B, after A4b
 
-Runbook: [`docs/public-repo-cut-runbook.md`](../public-repo-cut-runbook.md). Steps 7 (create repo) is
+Runbook: [`docs/archive/public-repo-cut-runbook.md`](../archive/public-repo-cut-runbook.md). Steps 7 (create repo) is
 done. Remaining: push the snapshot (fresh `git init`, one commit — **not** a history rewrite, because
 89 MB sits across the old history and missing one trace is the failure mode), CI + branch protection,
 verify the `apk-latest` URL logged-out, repoint Railway with
@@ -176,7 +176,7 @@ passes locally until it is committed, then fails CI. Cost one CI round on #1384.
 Continue the TrainingAI public-repo migration (Q-49) at Phase B.
 
 Read in this order: projectOverview.md -> docs/domains/platform/README.md ->
-docs/handoffs/handoff-2026-08-16-platform-public-repo-cut-a4b.md -> docs/public-repo-cut-runbook.md.
+docs/handoffs/handoff-2026-08-16-platform-public-repo-cut-a4b.md -> docs/archive/public-repo-cut-runbook.md.
 
 Phase A and A4b are done. Oura's material is out of the tree (check-private-paths reports
 "total tracked: 0.0 MB"), both boot checks are fatal against the bucket in production, and the

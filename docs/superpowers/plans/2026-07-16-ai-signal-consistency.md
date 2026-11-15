@@ -12,7 +12,7 @@
 
 ## Why now
 
-Source: **`docs/reviews/2026-07-16-data-efficiency-review.md` finding S7 (§2.4, "AI periodization inconsistencies", Medium/S)** — temperature deviation gates the next-session deload and appears in chat context + health-insight but is absent from the layer that actually prescribes load; the periodization/digest sleep signal is duration-only while the richer `computeSleepScore` runs daily elsewhere; SpO₂ feeds periodization but is invisible to chat. Queued as part of Batch S (`docs/planned_upgrades.md`).
+Source: **`docs/reviews/2026-07-16-data-efficiency-review.md` finding S7 (§2.4, "AI periodization inconsistencies", Medium/S)** — temperature deviation gates the next-session deload and appears in chat context + health-insight but is absent from the layer that actually prescribes load; the periodization/digest sleep signal is duration-only while the richer `computeSleepScore` runs daily elsewhere; SpO₂ feeds periodization but is invisible to chat. Queued as part of Batch S (`docs/archive/planned_upgrades.md`).
 
 **Branch:** `fix/ai-signal-consistency`
 

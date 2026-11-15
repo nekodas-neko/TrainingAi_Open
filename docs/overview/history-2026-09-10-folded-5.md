@@ -1818,7 +1818,7 @@ are worth recording because the repo's rules disagree with each other by file:
 - **`docs/implementation-backlog.md`** — twice a pure **two-additions** conflict (my LB-40/41/42
   against BF-87), so both sides were kept. The standing "a backlog conflict is two deletions" rule is
   a common case, not the rule; read the headings.
-- **`docs/doc-size-baseline-history.md`** — append-only, so both sides kept, main's first.
+- **`docs/archive/doc-size-baseline-history.md`** — append-only, so both sides kept, main's first.
 - **`docs/doc-size/*.size`** — the one genuine disagreement, twice. Two PRs raising the *same*
   document do not have a mergeable answer, and neither side was right: `projectOverview.md`'s
   baseline was **8593** on this branch and **8586** on main (main had *shrunk* it), with the merged

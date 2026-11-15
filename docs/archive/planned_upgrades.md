@@ -2,10 +2,10 @@
 
 > **The findings ledger — what's still open.** This is the curated list of uplift ideas/findings
 > that have **not** yet fully shipped. Each graduates to
-> [`docs/implementation-backlog.md`](archive/implementation-backlog-2026-10-05.md) (the ready-to-build queue) once a
+> [`docs/implementation-backlog.md`](implementation-backlog-2026-10-05.md) (the ready-to-build queue) once a
 > session writes its implementation plan.
 >
-> **Shipped detail lives in [`docs/overview/uplift-archive.md`](overview/uplift-archive.md)** — the
+> **Shipped detail lives in [`docs/overview/uplift-archive.md`](../overview/uplift-archive.md)** — the
 > full session-176 eight-dimension review + all follow-up audits (batches A–O), with file:line
 > evidence and shipped rationale, preserved for later review.
 >
@@ -33,7 +33,7 @@ Superseded/consolidated by the 2026-07-04 **offline-sync-integrity** plan (backl
 findings: A2 outbox confirm keys on `domain:date` not mutation id, A3 no retry cap/dead-letter/visibility,
 A4 persistent 5xx wedges the queue, A5 `applyDelta` pull-clobber gaps, A8 sync/DB throughput, A9 make the
 local store the single offline read source. ⚠️ Device-only (no native SQLite in the sandbox).
-→ `docs/superpowers/plans/2026-07-04-offline-sync-integrity.md` · [archive §Batch A](overview/uplift-archive.md)
+→ `docs/superpowers/plans/2026-07-04-offline-sync-integrity.md` · [archive §Batch A](../overview/uplift-archive.md)
 
 ### Batch B — Caching & performance ✅ shipped (B5/B6 residuals reconciled 2026-07-20)
 B1–B4 shipped (PR #99). **B5 + B6 residuals all verified present on `main` 2026-07-20:**
@@ -48,13 +48,13 @@ B1–B4 shipped (PR #99). **B5 + B6 residuals all verified present on `main` 202
   (`lib/data/exercise-muscle-map-cache.ts`); `admin/pending-count` shares one `cachedFetch` across
   bottom-nav/profile-tab/session-select; mixed TTLs consolidated (`lib/cache-ttl.ts`); in-flight-dedup
   fans out to all waiters (`lib/sqlite/cache.ts` `pendingWaiters`); SWR headers added.
-→ `docs/superpowers/plans/2026-07-02-b5-save-latency.md`, `2026-07-02-b6-data-store-fixes.md` · [archive §Batch B](overview/uplift-archive.md)
+→ `docs/superpowers/plans/2026-07-02-b5-save-latency.md`, `2026-07-02-b6-data-store-fixes.md` · [archive §Batch B](../overview/uplift-archive.md)
 
 ### Batch E — AI usage ⚙️ partial (E6 open)
 E1–E5 shipped. **Open: E6 — proactive cron layer** (`FEAT` MED) — one secret-guarded `/api/cron/*` route
 + Railway cron; unblocks pre-generated morning briefing, enriched weekly digest, PR celebrations, and
 pure-code anomaly alerts. Enabler for Batch N's push work. Not yet queued (needs a plan).
-→ [archive §Batch E](overview/uplift-archive.md)
+→ [archive §Batch E](../overview/uplift-archive.md)
 
 ### Batch F — Data & analytics ✅ shipped
 F1–F6 all shipped (PRs #170–#178 + chunks 2–4). F6 Tier 3–4: persisted the fetched-but-dropped Oura
@@ -64,7 +64,7 @@ webhook handlers for the already-subscribed spo2/stress/cardiovascular-age/resil
 (and fixed a pre-existing `vo2_max` webhook path-casing bug found along the way), and added a
 sync-freshness indicator + outbox-depth surfacing. ⚠️ Real Oura webhook delivery and native-outbox
 depth remain unexercised in the sandbox.
-→ [archive §Batch F](overview/uplift-archive.md)
+→ [archive §Batch F](../overview/uplift-archive.md)
 
 ### Batch J — Process & enforcement ⚙️ partial (J1 residual CI checks ⛔ blocked — re-verified 2026-07-20)
 J2 (device smoke checklist) and J3 (build-hash SW cache) shipped. **J1 residual CI checks remain ⛔ blocked**
@@ -78,7 +78,7 @@ J2 (device smoke checklist) and J3 (build-hash SW cache) shipped. **J1 residual 
 - **Duplicate-migration-number guard** — `081`/`087` still genuinely collide on disk
   (`081_exercise_library_expand.sql`+`081_exercise_media.sql`; `087_oura_webhook_fields.sql`+`087_composite_indexes.sql`),
   so the guard can't be enabled without a confirm-first renumber plan.
-→ `docs/superpowers/plans/2026-07-02-batch-j-process-enforcement.md` · [archive §Batch J](overview/uplift-archive.md)
+→ `docs/superpowers/plans/2026-07-02-batch-j-process-enforcement.md` · [archive §Batch J](../overview/uplift-archive.md)
 
 ### Batch K — User-requested UI/bug-fix batch ✅ shipped (all 5, reconciled 2026-07-20)
 All five items verified present on `main` 2026-07-20:
@@ -95,13 +95,13 @@ All five items verified present on `main` 2026-07-20:
   (filled-progress, per-scale colour).
 - **Task 5** (themed EOD background): `components/nutrition/end-of-day/end-of-day-review.tsx` renders the
   page gradient.
-→ `docs/superpowers/plans/2026-07-02-ui-bugfixes-activity-eod-review.md` · [archive §Batch K](overview/uplift-archive.md)
+→ `docs/superpowers/plans/2026-07-02-ui-bugfixes-activity-eod-review.md` · [archive §Batch K](../overview/uplift-archive.md)
 
 ### Batch L — Per-screen wallpapers ✅ shipped
 All chunks shipped: L2 (legibility/light-mode), L3 (opaque-root cleanup), chunk 2 (Health/Nutrition/More
 palettes), chunk 3 (Stats/Overview/Workout Select/Why-this-session palettes). ⚠️ On-device Samsung WebView
 verification still needed — the real gate for this batch, unexercised in the sandbox.
-→ [archive §Batch L](overview/uplift-archive.md)
+→ [archive §Batch L](../overview/uplift-archive.md)
 
 ### Batch M — Per-exercise deload ✅ shipped (reconciled 2026-07-20 — the "never landed" note was stale)
 The 2026-07-03 "no branch/PR/code on origin" note is **out of date** — all four blocks are on `main`:
@@ -111,7 +111,7 @@ route (`app/api/ai-periodization/session/[sessionId]/prescribe/route.ts:20,189`)
 (`lib/ai-periodization/reevaluate.ts`), prompt awareness (`lib/ai-periodization/prompt.ts`), UI
 (`components/workout/deload-info-sheet.tsx`), and tests (`per-exercise-deload.test.ts`,
 `deload-reverts.test.ts`). Deloads just the sore exercises with an amber chip + "use full weights" revert.
-→ `docs/superpowers/specs/2026-07-02-per-exercise-deload-design.md` + `plans/2026-07-02-per-exercise-deload-block-*.md` · [archive §Batch M](overview/uplift-archive.md)
+→ `docs/superpowers/specs/2026-07-02-per-exercise-deload-design.md` + `plans/2026-07-02-per-exercise-deload-block-*.md` · [archive §Batch M](../overview/uplift-archive.md)
 
 ### R — 2026-07-03 review correctness findings ✅ shipped (all 8 verified done, reconciled 2026-07-20)
 From the session-184 recent-code audit. **Re-verified against `main` 2026-07-20: every task in the
@@ -125,7 +125,7 @@ readCacheSync(...))` any more; T5 — canonical `READINESS_SCORE_TTL`/`MUSCLE_RE
 `lib/cache-ttl.ts` are used at every call site; T6 — `style-editor-sheet.tsx` no longer keys rows by
 index; T7 — `components/chat-overlay.tsx` + `app/workout-mockup/` are deleted; T8 — no
 `invalidateCache('')` full-cache nuke in `health-content.tsx`.
-→ `docs/superpowers/plans/2026-07-03-review-quick-fixes.md` · [archive §2026-07-03 review](overview/uplift-archive.md)
+→ `docs/superpowers/plans/2026-07-03-review-quick-fixes.md` · [archive §2026-07-03 review](../overview/uplift-archive.md)
 
 ### Batch N — Platform & ops ✅ shipped
 Operational safety net: `GET /api/status` healthcheck, throttled `oura_heartrate` retention, DB
@@ -135,7 +135,7 @@ native update banner, fixed a real `sendPushToUser` 410-cleanup bug + a push-tes
 full-data NDJSON export + `pushMutations`↔web-route parity tests for `mood_logs`/`day_checkins`/
 `food_logs`/`session_rpe` — found and fixed two more real drift bugs along the way (`day_checkins`
 missing phase-enum validation, `food_logs` missing `quantityMultiplier` range clamp) (chunk 3).
-→ [archive §N](overview/uplift-archive.md)
+→ [archive §N](../overview/uplift-archive.md)
 
 ### Batch O — Feature candidates ⚙️ phase 1 shipped
 Phase 1 shipped: post-session AI recap (cached forever per session, one-tap Generate on the done screen,
@@ -143,7 +143,7 @@ deterministic stats + one short Gemini narrative), rest-day active-recovery guid
 readiness-based bands, no LLM), and body measurements (waist/chest/arm/thigh/hip/neck as opt-in Overview
 widgets, migration 110, full offline-sync chain). **Unplanned remainder** (still open, until asked for):
 progress photos, warm-up protocol customization, voice logging, mesocycle retrospective.
-→ `docs/superpowers/plans/2026-07-03-batch-o-features-phase-1.md` · [archive §O](overview/uplift-archive.md)
+→ `docs/superpowers/plans/2026-07-03-batch-o-features-phase-1.md` · [archive §O](../overview/uplift-archive.md)
 
 ### Saved-meal "Add as new food" always 400s ✅ fixed (verified 2026-07-20)
 Found while verifying the nutrition-food-log-live-update fix (2026-07-05): `saved-meals-sheet.tsx`'s
@@ -155,7 +155,7 @@ Found while verifying the nutrition-food-log-live-update fix (2026-07-05): `save
 recommended.
 
 ### Batch S — 2026-07-16 data-efficiency review findings ✅ shipped (all S1–S10, reconciled 2026-07-20)
-Full write-up: [`docs/reviews/2026-07-16-data-efficiency-review.md`](reviews/2026-07-16-data-efficiency-review.md)
+Full write-up: [`docs/reviews/2026-07-16-data-efficiency-review.md`](../reviews/2026-07-16-data-efficiency-review.md)
 (severity/effort table in its §6; items already covered by queued P-C/P-D/P-E/etc. are reconciled
 in its §7 and deliberately NOT duplicated here). The theme: signals are computed and persisted
 but consumed by one surface or none, while siblings run on worse proxies or frozen Cloud data.
@@ -219,4 +219,4 @@ Quick wins (PR #91) · **Batch B1–B4** (PR #99) · **Batch C** training-engine
 **Batch G** UI/UX system (PR #134) · **Batch H** swipe navigation + H5 haptics · **Batch I** workout/nutrition
 features (all four) · **Batch J2/J3** · **Batch L2/L3** legibility + opaque-root.
 
-Full write-ups with file:line evidence and shipped rationale: [`docs/overview/uplift-archive.md`](overview/uplift-archive.md).
+Full write-ups with file:line evidence and shipped rationale: [`docs/overview/uplift-archive.md`](../overview/uplift-archive.md).

@@ -2,7 +2,7 @@
 
 **Who this is for.** The device-verification agent, which drives the S25 APK's WebView over
 DevTools/CDP. It is **not** the owner's tap-list — that is
-[`device-verification-queue.md`](device-verification-queue.md), grouped by screen because the cost
+[`device-verification-queue.md`](archive/device-verification-queue.md), grouped by screen because the cost
 there is picking the phone up. Nor is it the human smoke run
 ([`device-smoke-checklist.md`](device-smoke-checklist.md)) or the Home speed check
 ([`device-perf-profiling-checklist.md`](device-perf-profiling-checklist.md)). This file asks for the

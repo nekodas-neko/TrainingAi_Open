@@ -169,7 +169,7 @@ The rollup (`aggregateOuraRawSamples` in `lib/oura-ble/rollup/run.ts`, run in a 
 | Model | Code | Findings |
 |---|---|---|
 | Sleep window and stages | `packages/shared/src/health/sleep-staging.ts`; neural stager wrapper `lib/oura-models/inference/sleepnet.ts` | [`oura-ble-sleep-staging-findings.md`](oura-ble-sleep-staging-findings.md), [`domains/sleep/README.md`](domains/sleep/README.md) |
-| HR series, HRV (rMSSD), resting HR | rollup; `packages/shared/src/health/hrv-5min.ts` | [`oura-ble-remaining-work.md`](oura-ble-remaining-work.md) |
+| HR series, HRV (rMSSD), resting HR | rollup; `packages/shared/src/health/hrv-5min.ts` | [`oura-ble-remaining-work.md`](archive/oura-ble-remaining-work.md) |
 | SpO₂ estimate | `lib/oura-ble/spo2.ts` | ops §4 step 5 |
 | Steps, MET, activity | `packages/shared/src/health/step-estimate.ts`, `lib/oura-ble/step-*` | [steps plan](superpowers/plans/2026-07-09-oura-ble-steps.md) |
 | Daytime stress, Body Battery | `lib/health/daytime-stress.ts`, `lib/health/body-battery-day.ts` | [`module-map.md`](module-map.md) |

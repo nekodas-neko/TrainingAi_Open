@@ -232,7 +232,7 @@ transitions.)
 3. **UB5 (workout HR UI rework + Measure-now relocation)** — scoped UI change, no service rework.
 4. **UB6 (HR smoothing)** — reuse the existing `toBuckets` pattern.
 5. **UB4 (battery/wear-time)** and **UB1 (deep-link redirect)** — both need on-device data and
-   verification; UB4 may fold into ongoing Oura BLE work (`docs/oura-ble-remaining-work.md`).
+   verification; UB4 may fold into ongoing Oura BLE work (`docs/archive/oura-ble-remaining-work.md`).
 
 ---
 

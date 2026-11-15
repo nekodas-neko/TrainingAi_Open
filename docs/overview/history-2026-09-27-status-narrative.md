@@ -1303,7 +1303,7 @@ one a compaction sweep can act on, counts UNLINKED entries and read **3 of 60**.
 firing because entries are well cited by durable docs — the habit the entries README exists to
 establish — and the four foldable ones were all written in the previous two days, so a sweep would
 have deleted the newest rather than the oldest. Reversal is one number in
-`docs/doc-size-baseline.json`; the signal to do the real compaction instead is the floor rising from
+`docs/archive/doc-size-baseline.json`; the signal to do the real compaction instead is the floor rising from
 something other than journal citations.
 
 **A scale argument on the meal log, and four things its entry got wrong (LB-49).** `logMealItems`
@@ -2645,13 +2645,13 @@ Last swept **2026-09-03**.
 
 ## ⚠️ Known Issues & Risks
 
-> **The open issues moved to [`docs/overview/known-issues.md`](known-issues.md) on
+> **The open issues moved to [`docs/archive/known-issues.md`](../archive/known-issues.md) on
 > 2026-09-27 (Q-220)** — 451 entries that were **79% of this file**, which calls itself a lean index
 > and is read at the top of every session. The move was whole: nothing rewritten, reordered or
 > archived.
 >
 > **Read it when you touch a pillar**, and grep it the way you always did —
-> `grep -n '^### .*\[sleep\]' docs/overview/known-issues.md`. Resolved issues remain in
+> `grep -n '^### .*\[sleep\]' docs/archive/known-issues.md`. Resolved issues remain in
 > [`docs/overview/known-issues-resolved.md`](known-issues-resolved.md).
 
 
@@ -2660,7 +2660,7 @@ Last swept **2026-09-03**.
 ## 📋 What's Left To Do
 
 > **Ready-to-build work is queued in [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md);
-> open uplift ideas are in [`docs/planned_upgrades.md`](../planned_upgrades.md).** The list below
+> open uplift ideas are in [`docs/archive/planned_upgrades.md`](../archive/planned_upgrades.md).** The list below
 > is the residual legacy backlog — mostly ✅/🚫 — plus the device-only verifications that can't be
 > exercised in the sandbox.
 
