@@ -13,6 +13,8 @@ import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known
 import { buildEquipmentSet, equipmentEligible } from '@trainingai/shared/workout/equipment'
 import { buildExerciseNameResolver } from '@trainingai/shared/workout/exercise-name-resolver'
 import { cleanModelProgram, ModelSessionSchema } from '@trainingai/shared/workout/model-program'
+import { splitForDays } from '@trainingai/shared/workout/program-split'
+import { checkGeneratedProgram } from '@trainingai/shared/workout/program-check'
 import { activeInjuries, activeInjuredMuscles, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { excludeInjuredExercises } from '@trainingai/shared/workout/injury-substitution'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
@@ -84,9 +86,12 @@ const GOAL_PHASE_SET_MAP: Record<string, string> = {
 // would return, so asking for them bought two string arrays per exercise on the slowest call in
 // the app. The request-side `GeneratedExerciseSchema` in
 // packages/shared/src/validation/generated-program.ts keeps both; the builder client posts them.
+//
+// #3751: the session NAME is not asked for. Code picks the split and the names (`splitForDays`) and
+// lists them in the prompt; the model fills them in order, and the names are written on by index.
 const GeneratedProgramSchema = z.object({
   name: z.string(),
-  sessions: z.array(ModelSessionSchema),
+  sessions: z.array(ModelSessionSchema.omit({ name: true })),
   reasoning: z.string(),
 })
 export async function POST(req: Request) {
@@ -168,6 +173,8 @@ export async function POST(req: Request) {
       { status: 400 },
     )
   }
+
+  const split = splitForDays(inputs.sessionsPerWeek)
 
   const exerciseList = filteredExercises.map(ex =>
     `${ex.name}|${ex.muscles.map(m => `${m.muscle}(${m.role})`).join(',')}|${ex.equipment.map(e => EQUIPMENT_LABEL[e.toLowerCase()] ?? e).join(',')}`)
@@ -296,20 +303,15 @@ Style assignment (informational — the server enforces styles by role for this 
 - primary compounds get "${GOAL_STYLE_RULES[inputs.goal].primary}", secondary compounds "${GOAL_STYLE_RULES[inputs.goal].secondary}", accessories "${GOAL_STYLE_RULES[inputs.goal].accessory}".
 - Set progressionStyleName accordingly and use those styles' time estimates when fitting the session time budget.
 
-RECOMMENDED SPLITS BY FREQUENCY:
-- 1 day  → Full Body
-- 2 days → Full Body / Full Body  (hit every muscle twice)
-- 3 days → Push / Pull / Legs
-- 4 days → Upper / Lower / Upper / Lower  (or Push / Pull / Legs / Upper)
-- 5 days → Push / Pull / Legs / Upper / Lower  (each major muscle hit twice/week)
-- 6 days → Push / Pull / Legs / Push / Pull / Legs
-- 7 days → PPL × 2 + 1 Full Body (or add dedicated arms/shoulders day)
+SESSIONS — return exactly ${split.length}, in this order, one per line below. The names are already
+decided; fill each one with exercises for its focus:
+${split.map((s, i) => `${i + 1}. ${s.name}: ${s.focus}`).join('\n')}
 
 Each major muscle should appear in 2 different sessions per week to achieve optimal weekly volume.
 Each minor muscle (biceps, triceps, calves, core) gets sufficient volume from compound carry + 1 direct session.
 
 Rules:
-1. Use the recommended split for the given frequency above.
+1. Return the sessions in the order listed under SESSIONS above, one entry per session.
 2. Use ONLY exercises from the list below. Match exercise names exactly.
 3. Assign each exercise a role: "primary" (main compound), "secondary" (secondary compound), or "accessory" (isolation/single-joint).
 4. Assign each exercise a progressionStyleName from the available styles listed above. Use the exact style name string.
@@ -321,17 +323,9 @@ Rules:
    c. If the time budget runs out, cut small-muscle isolation exercises first. Never cut large-muscle compounds.
 8. Large muscles (chest, back, quads, hamstrings, glutes): aim for the UPPER end of their set range. They are the priority.
 9. Small muscles (biceps, triceps, calves, core): 6–10 direct sets/week is sufficient — compound carry counts toward this.
-10. SESSION NAMES — use SHORT standard names only. Do NOT include muscle lists or parenthetical annotations in any form.
-    - 3-day: "Push", "Pull", "Legs"
-    - 4-day Upper/Lower: "Upper Push", "Upper Pull", "Lower Squat", "Lower Hinge"
-    - 4-day PPL+Upper: "Push", "Pull", "Legs", "Upper"
-    - 5-day: "Push", "Pull", "Legs", "Upper", "Lower"
-    - 6-day: "Push A", "Push B", "Pull A", "Pull B", "Legs A", "Legs B"
-    - 1-day or 2-day: "Full Body", "Full Body A", "Full Body B"
-    - NEVER generate names like "Push Day (Chest/Shoulders/Triceps)" or "Upper Body Push" — 1–2 words maximum.
-11. Pick a session icon emoji matching the session focus.
-12. MUSCLE RECOVERY (critical for rolling rotation): Sessions that run on consecutive training days must NOT share primary muscle groups. The session ORDER in your output determines the training day sequence — adjacent sessions in the list will be trained back-to-back. Ensure each consecutive pair of sessions targets different primary muscles (e.g. Push then Pull is fine; Push then Upper Push is not).
-13. Before finalising: tally sets per large muscle across all sessions. Confirm each large muscle hits its target. Confirm time budget is met. Confirm no consecutive sessions share primary muscles.
+10. Pick a session icon emoji matching the session focus.
+11. MUSCLE RECOVERY (critical for rolling rotation): Sessions that run on consecutive training days must NOT share primary muscle groups. The session ORDER in your output determines the training day sequence — adjacent sessions in the list will be trained back-to-back. Ensure each consecutive pair of sessions targets different primary muscles (e.g. Push then Pull is fine; Push then Upper Push is not).
+12. Before finalising: tally sets per large muscle across all sessions. Confirm each large muscle hits its target. Confirm time budget is met. Confirm no consecutive sessions share primary muscles.
 
 Available exercises (name|muscles|equipment):
 ${exerciseList}${injuryBlock}${referenceBlock}`
@@ -360,7 +354,14 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
     //
     // Resolution, the primary cap, the style by role and the icon fallback are one function shared
     // with `/api/builder-chat` (#3750), so the two routes cannot treat the same answer differently.
-    const { sessions: resolvedSessions, dropped: unresolved } = cleanModelProgram(raw.sessions, {
+    // #3751: the names are code's. A session the model did not return comes back empty and is
+    // refused below like any other emptied session; one past the split is ignored.
+    const named = split.map((s, i) => ({
+      name: s.name,
+      icon: raw.sessions[i]?.icon ?? '',
+      exercises: raw.sessions[i]?.exercises ?? [],
+    }))
+    const { sessions: resolvedSessions, dropped: unresolved } = cleanModelProgram(named, {
       resolver: nameResolver,
       goal: inputs.goal,
       styleIdByName: new Map(userStyles.map(s => [s.name, s.id])),
@@ -387,6 +388,21 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
       )
     }
 
+    // #3751: check what the prompt asked the model to confirm for itself, and trim what is over the
+    // time budget. What cannot be repaired comes back as `notes`; the model is not asked again.
+    const equipmentByName = new Map(filteredExercises.map(ex => [ex.name, ex.equipment]))
+    const check = checkGeneratedProgram({
+      sessions: resolvedSessions,
+      goal: inputs.goal,
+      timePerSessionMinutes: inputs.timePerSessionMinutes,
+      schedule: inputs.scheduleType === 'rotation'
+        ? { type: 'rotation', restAfterN: inputs.rotationRestAfterN }
+        : { type: 'weekly', days: inputs.weeklyDays },
+      styleSetsById: new Map(userStyles.map(s => [s.id, s.sets])),
+      equipmentOf: name => equipmentByName.get(name),
+      focusMuscles: focusSet,
+    })
+
     const styleById = new Map(userStyles.map(s => [s.id, s.name]))
 
     type PhaseSet = Awaited<ReturnType<typeof repo.listPhaseSets>>[number]
@@ -406,7 +422,7 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
 
     const programJson: GeneratedProgram = {
       name: raw.name,
-      sessions: resolvedSessions,
+      sessions: check.sessions,
       reasoning: raw.reasoning,
       phaseStructureName: inputs.progressionMode === 'linear' ? 'Linear Progression' : inputs.progressionMode === 'ai' ? 'AI Dynamic' : phaseSet!.name,
       phaseSetId: inputs.progressionMode === 'phase' ? phaseSet!.id : '',
@@ -423,7 +439,7 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
         : [],
     }
 
-    return NextResponse.json({ program: programJson })
+    return NextResponse.json({ program: programJson, notes: check.notes })
   } catch (err) {
     reportServerError(err, { userId, url: '/api/generate-program' })
     console.error('[generate-program] Gemini error:', err)
