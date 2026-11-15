@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { WEATHER_CONDITIONS } from '@trainingai/shared/weather/weather-condition';
+import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 
 export const placeSchema = z.object({
   lat: z.number().finite().min(-90).max(90),
@@ -52,6 +53,11 @@ export function isWeatherDay(snapshot: WeatherSnapshot, now = Date.now()) {
     ? snapshot.daylight.some((day) => now >= day.rise && now < day.set)
     : snapshot.isDay;
 }
+/** "Updated 6:40 am", in the user's timezone rather than the phone's. */
+export function weatherUpdatedLabel(snapshot: Pick<WeatherSnapshot, 'fetchedAt'>, timezone: string) {
+  return `Updated ${formatTimeOfDay(snapshot.fetchedAt, timezone)}`;
+}
+
 export function temperatureLabel(snapshot: WeatherSnapshot, unit: WeatherSettings['unit']) {
   return `${Math.round(unit === 'fahrenheit' ? (snapshot.temperatureC * 9) / 5 + 32 : snapshot.temperatureC)}°${unit === 'fahrenheit' ? 'F' : 'C'}`;
 }

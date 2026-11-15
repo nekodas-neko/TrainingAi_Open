@@ -13,6 +13,7 @@ import {
   reviewedMap,
   toggleMuscle,
   type AdminExercise,
+  unitFixLogDay,
 } from '../src/features/admin/data/admin-content.ts';
 import { barShares, estCostUsd, fmtUsd } from '../src/features/admin/data/admin-monitoring.ts';
 
@@ -92,4 +93,11 @@ test('AI usage: estimate, formatting, and bars never vanish for a quiet bucket',
   assert.equal(fmtUsd(1.234), '$1.23');
   assert.deepEqual(barShares([0, 1, 100]), [4, 4, 100]);
   assert.deepEqual(barShares([0, 0]), [0, 0]);
+});
+
+test('a unit-fix log shows the day it was logged in the user timezone', () => {
+  // 15:30 UTC on the 14th is already the 15th in Brisbane, still the 14th in Los Angeles.
+  const loggedAt = '2026-11-14T15:30:00.000Z';
+  assert.equal(unitFixLogDay(loggedAt, 'Australia/Brisbane'), '2026-11-15');
+  assert.equal(unitFixLogDay(loggedAt, 'America/Los_Angeles'), '2026-11-14');
 });

@@ -131,6 +131,9 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
 - Bottom-anchored controls use a floored safe-area utility (`pb-safe-action`), never bare `pb-safe`.
 - A repeat visit never flashes a skeleton: seed from cache synchronously, revalidate behind it.
 - The web build is a dev surface and stays logic-free; when they differ, the device wins.
+- `mobile/` (the native app) is bound by this file except its web-only lines (cache groups,
+  `lib/local-store/`, Capacitor, `pb-safe-action`); [`mobile/AGENTS.md`](mobile/AGENTS.md) has
+  the native equivalents.
 - **Never uninstall the app or install over it with a differently signed APK** — it destroys the
   ring's BLE key, which cannot be recovered. **Never point the real app at a local server.**
   [`docs/canonical-runtime-android.md`](docs/canonical-runtime-android.md).

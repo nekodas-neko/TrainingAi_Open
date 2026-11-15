@@ -3,11 +3,13 @@ import { View } from 'react-native';
 import { AppButton, AppText, Card, Notice, Stack, TextField } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { failureNotice } from '../../../core/reporting/index.ts';
 import {
   applyConfirmMessage,
   isDateInput,
   toggleIn,
+  unitFixLogDay,
   unitFixResultSchema,
   type UnitFixResult,
 } from '../data/admin-content';
@@ -18,6 +20,7 @@ const fmt = (n: number | null) => (n === null ? '—' : String(n));
 /** Converts lbs-logged-as-kg sessions. Preview first; the write sits behind a confirm that says to sync the phone first. */
 export function AdminUnitFixPanel({ exerciseNames }: { exerciseNames: readonly string[] }) {
   const resources = useWorkoutResources();
+  const { timezone } = useWorkoutContext();
   const { theme } = useTheme();
   const [selected, setSelected] = useState<string[]>([]);
   const [beforeDate, setBeforeDate] = useState('');
@@ -112,7 +115,7 @@ export function AdminUnitFixPanel({ exerciseNames }: { exerciseNames: readonly s
               {result.logs.map((log) => (
                 <View key={log.exerciseLogId} style={{ gap: 2 }}>
                   <AppText variant="label">
-                    {log.exerciseName} — {new Date(log.loggedAt).toLocaleDateString('en-AU')}
+                    {log.exerciseName} — {unitFixLogDay(log.loggedAt, timezone)}
                   </AppText>
                   <AppText variant="caption" tone="muted">
                     Sets: {log.sets.map((s) => `${s.oldWeightKg}→${s.newWeightKg}kg×${s.reps}`).join(', ')}
