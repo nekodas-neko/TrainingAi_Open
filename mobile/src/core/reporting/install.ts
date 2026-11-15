@@ -1,6 +1,7 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { nativeAppVersion, nativeBuildCode } from '../../integrations/app-info/platform';
-import { reportError, errorReporter } from './index.ts';
+import { reportError, errorReporter, startupTimings } from './index.ts';
+import { nativeStartMs } from './StartupTimings.ts';
 
 type RejectionTracker = {
   enablePromiseRejectionTracker?: (options: {
@@ -27,11 +28,15 @@ export function installErrorReporting() {
 }
 function install(platform: 'android' | 'ios') {
   // Kept to the intake's character set, or every report would fail its schema and drop.
-  errorReporter.enable({
+  const build = {
     appVersion: nativeAppVersion.replace(/[^0-9A-Za-z.+-]/g, '').slice(0, 32) || '0',
     buildCode: nativeBuildCode.replace(/[^0-9A-Za-z.]/g, '').slice(0, 16) || '0',
     platform,
-  });
+  };
+  errorReporter.enable(build);
+  try {
+    installStartupTimings(build);
+  } catch {}
   const previous = ErrorUtils.getGlobalHandler();
   ErrorUtils.setGlobalHandler((error, isFatal) => {
     reportError(error);
@@ -46,5 +51,21 @@ function install(platform: 'android' | 'ios') {
     allRejections: true,
     onUnhandled: (_id, rejection) => reportError(rejection),
     onHandled: () => {},
+  });
+}
+
+function installStartupTimings(build: Parameters<typeof startupTimings.enable>[0]) {
+  let native: number | null = null;
+  try {
+    native = nativeStartMs(
+      (performance as { rnStartupTiming?: Parameters<typeof nativeStartMs>[0] }).rnStartupTiming,
+    );
+  } catch {}
+  // A background task can start the process with no screen; that start is not the person's.
+  startupTimings.enable(build, native, AppState.currentState !== 'background');
+  const subscription = AppState.addEventListener('change', (state) => {
+    if (state === 'active') return;
+    startupTimings.stop();
+    subscription.remove();
   });
 }
