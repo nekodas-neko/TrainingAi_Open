@@ -36,7 +36,7 @@ describe('goalBaseline', () => {
     // The age comes from the same helper the code under test uses (#3803). Re-deriving it here
     // compared the local clock with a UTC-midnight birthday, so the two disagreed for the first ten
     // hours of 15 June in Brisbane. This test is about the formula, not the age arithmetic.
-    const ageYears = ageFromDob(COMPLETE_USER.dateOfBirth, new Date())
+    const ageYears = ageFromDob(COMPLETE_USER.dateOfBirth, new Date())!
     expect(goalBaseline(INPUT)).toEqual(calculateBaseline({
       weightKg: 71.7,
       heightCm: 178,
