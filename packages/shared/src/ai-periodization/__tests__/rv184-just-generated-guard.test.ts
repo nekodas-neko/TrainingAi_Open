@@ -19,6 +19,11 @@ function repoWith(state: Record<string, unknown>, budget = 60): WorkoutRepositor
     ensureSessionPeriodization: async () => state,
     reconcileSessionsInPhase: async () => undefined,
     getSessionPeriodization: async () => state,
+    // #3766: the program's phase is read from every row of the program, and its weeks from completions.
+    listSessionPeriodizationForProgram: async () => [{ phaseStartedAt: new Date(0), ...state }],
+    listProgramCompletions: async () => [],
+    listModelPhaseAnswers: async () => [],
+    setProgramPhase: async () => undefined,
   }
   return new Proxy({}, {
     get: (_t, prop: string) => known[prop] ?? (async () => { throw new Error(`reached generation (${prop})`) }),

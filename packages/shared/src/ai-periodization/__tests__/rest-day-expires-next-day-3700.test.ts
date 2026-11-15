@@ -179,6 +179,11 @@ function harness() {
     ensureSessionPeriodization: async () => state,
     reconcileSessionsInPhase: async () => undefined,
     getSessionPeriodization: async () => state,
+    // #3766: the program's phase is read from every row of the program, and its weeks from completions.
+    listSessionPeriodizationForProgram: async () => [{ phaseStartedAt: new Date(0), ...state }],
+    listProgramCompletions: async () => [],
+    listModelPhaseAnswers: async () => [],
+    setProgramPhase: async () => undefined,
     storePrescription: async (_u: string, _s: string, prescription: AiPrescription, expiresAt: Date) => {
       stored.push({ prescription, expiresAt })
     },

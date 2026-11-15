@@ -46,7 +46,13 @@ vi.mock('@/lib/data', () => {
     updatePrescriptionStatus, listPersonalRecords, getExerciseEstimates, getActiveProgram,
     listPrograms, listVolumeTargets, getWeeklySetsByMuscleGroup, reconcileSessionsInPhase,
     listSessionPeriodizationForProgram, getRecentSessionsOfType,
-  })
+      // #3766: the program's phase. A program move reaches the same spy as a per-type one; which of the
+    // two the route picks is tested in program-phase-3766.test.ts.
+    advanceProgramPhase: advancePhase,
+    listProgramCompletions: async () => [],
+    listModelPhaseAnswers: async () => [],
+    setProgramPhase: async () => undefined,
+})
   return { getRepository: repo, getRepositoryAsync: repo }
 })
 
