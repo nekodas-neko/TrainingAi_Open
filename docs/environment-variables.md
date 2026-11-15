@@ -70,11 +70,13 @@ Optional:
   these changes who is protected, not just which rows the audit views show. The day-review export
   and the agent key do **not** use this helper; they read `ADMIN_EXPORT_USER_ID ?? WEBHOOK_USER_ID`
   directly.
-  **When you add a table, re-run `CLAUDE_RO_OWNER_USER_ID=<id> node scripts/generate-claude-ro-views.js`
-  into a NEW migration number** (never overwrite the previous one — `ensureSchema` tracks by filename,
-  so an edited already-applied migration is skipped forever and the change silently never lands) — the schema is default-deny, so a new table is unreadable
-  until it has a view, and a DB-backed test fails if the counts diverge. The migration DROPs and
-  rebuilds the schema each run: `CREATE OR REPLACE VIEW` would leave a stale unscoped view serving its
+  **When you add or drop a table or column, regenerate `lib/data/postgres/claude-ro-views.sql` in the
+  same PR**, overwriting that one file (`scripts/generate-claude-ro-views.js`; the command and the
+  reasons are in [`docs/rules/offline-first-and-storage.md`](rules/offline-first-and-storage.md)).
+  It is not a migration: it is applied after the migrations and re-applied when its hash changes, so
+  never re-issue it under a new migration number (BF-214). The schema is default-deny, so a new table
+  is unreadable until it has a view, and a DB-backed test fails if the counts diverge. The file DROPs
+  and rebuilds the schema each run: `CREATE OR REPLACE VIEW` would leave a stale unscoped view serving its
   old definition forever.
 - `ADMIN_EXPORT_SECRET` (+ `ADMIN_EXPORT_USER_ID`, falling back to `WEBHOOK_USER_ID`) — enables the
   `Authorization: Bearer …` path on `GET /api/admin/day-review`, so a window of score-audit days can be

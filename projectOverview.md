@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.486.11 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.486.11 · **Branch:** `main` · A merge deploys nothing; `.github/workflows/release.yml` deploys on a `v*` tag.
 **Last updated:** 2026-09-30.
 
 **Recent changes are NOT listed here.** They live in the session journal —
