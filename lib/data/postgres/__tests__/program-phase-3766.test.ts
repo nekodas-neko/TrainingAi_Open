@@ -99,13 +99,99 @@ describe.skipIf(!canRun)('program phase storage (#3766)', () => {
     const phased = rows.filter(r => r.programSessionId !== ids.fresh)
     expect(new Set(phased.map(r => r.phase))).toEqual(new Set(['intensification']))
     expect(new Set(phased.map(r => r.phaseStartedAt.getTime())).size).toBe(1)
-    expect(phased.every(r => r.pendingTransition === null)).toBe(true)
+    // The switch-over's short block is gone; every row carries the program's mark and the next move.
+    expect(phased.every(r => r.pendingTransition?.programPhase === true && r.pendingTransition.afterTrainingWeeks === undefined)).toBe(true)
+    expect(phased.every(r => r.pendingTransition?.newPhase === 'realisation')).toBe(true)
+  })
+
+  it('a move from a phase the program has already left writes nothing (a second tap)', async () => {
+    const before = await period.listSessionPeriodizationForProgram(db, USER, programId)
+    const pull = before.find(r => r.programSessionId === ids.pull)!
+    // Another session regenerated its plan after the first tap.
+    await period.storePrescription(db, USER, ids.legs, { phase: 'intensification', phaseAction: 'stay', exercises: [] } as never, new Date(Date.now() + 86_400_000))
+    const row = await period.advanceProgramPhase(db, USER, ids.pull, 'intensification', { phase: 'accumulation', phaseStartedAt: new Date('2026-11-22T14:00:00Z') })
+    expect(row.phaseStartedAt.getTime()).toBe(pull.phaseStartedAt.getTime())
+    const legs = (await period.getSessionPeriodization(db, USER, ids.legs))!
+    expect(legs.prescription?.phase).toBe('intensification')
+    expect(legs.prescriptionStatus).toBe('pending')
+  })
+
+  it('the switch-over refuses to run on a program that carries the mark', async () => {
+    const wrote = await period.setProgramPhase(db, USER, programId, 'accumulation', new Date('2026-11-29T14:00:00Z'), null, { expect: 'switch-over' })
+    expect(wrote).toBe(false)
+    expect((await period.getSessionPeriodization(db, USER, ids.legs))!.phase).toBe('intensification')
+  })
+
+  it('a plan is stored only while the slot is still in the phase it was made for', async () => {
+    const legs = (await period.getSessionPeriodization(db, USER, ids.legs))!
+    const plan = { phase: 'accumulation', phaseAction: 'stay', exercises: [] } as never
+    const later = new Date(Date.now() + 86_400_000)
+    expect(await period.storePrescription(db, USER, ids.legs, plan, later, 'pending', { phase: 'accumulation', phaseStartedAt: legs.phaseStartedAt })).toBe(false)
+    expect((await period.getSessionPeriodization(db, USER, ids.legs))!.prescription?.phase).toBe('intensification')
+    expect(await period.storePrescription(db, USER, ids.legs, plan, later, 'pending', { phase: 'intensification', phaseStartedAt: legs.phaseStartedAt })).toBe(true)
+  })
+
+  it('a per-type move keeps the switch-over\'s waiting stamp, and clears the program\'s mark', async () => {
+    await period.setProgramPendingTransition(db, USER, programId, { newPhase: 'accumulation', reasoning: 'wait', urgency: 'normal', switchOverPending: true, switchOverOn: '2026-11-23' })
+    const kept = await period.advancePhase(db, USER, ids.legs, 'accumulation')
+    expect(kept.pendingTransition).toMatchObject({ switchOverPending: true, switchOverOn: '2026-11-23' })
+    await period.setProgramPendingTransition(db, USER, programId, { newPhase: 'realisation', reasoning: 'next', urgency: 'normal', programPhase: true })
+    const cleared = await period.advancePhase(db, USER, ids.legs, 'realisation')
+    expect(cleared.pendingTransition).toBeNull()
+  })
+
+  it('a re-align moves only the rows that were behind, and voids only their plans', async () => {
+    const upper = (await period.getSessionPeriodization(db, USER, ids.upper))!
+    await period.storePrescription(db, USER, ids.upper, { phase: upper.phase, phaseAction: 'stay', exercises: [] } as never, new Date(Date.now() + 86_400_000))
+    await period.realignProgramPhase(db, USER, programId, {
+      phase: upper.phase, phaseStartedAt: upper.phaseStartedAt,
+      pendingTransition: { newPhase: 'realisation', reasoning: 'next', urgency: 'normal', programPhase: true },
+    })
+    const rows = await period.listSessionPeriodizationForProgram(db, USER, programId)
+    const by = Object.fromEntries(rows.map(r => [r.programSessionId, r]))
+    expect(by[ids.legs].phase).toBe(upper.phase) // was behind (the per-type move above)
+    expect(by[ids.legs].phaseStartedAt.getTime()).toBe(upper.phaseStartedAt.getTime())
+    expect(by[ids.legs].prescription).toBeNull()
+    expect(by[ids.upper].prescription).not.toBeNull() // already there: its plan is kept
+    expect(rows.filter(r => r.programSessionId !== ids.fresh).every(r => r.pendingTransition?.programPhase === true)).toBe(true)
+  })
+
+  it('each model answer since a moment, with when it was given', async () => {
+    await pool.query(
+      `INSERT INTO prescription_shadow (user_id, program_session_id, model_phase, model_phase_action, final_phase, final_phase_action, rows, created_at)
+       VALUES ($1, $2, 'intensification', 'stay', 'intensification', 'stay', '[]', '2026-11-24T02:00:00Z'),
+              ($1, $2, 'realisation', 'transition_recommended', 'intensification', 'stay', '[]', '2026-11-24T05:00:00Z'),
+              ($1, $2, 'intensification', 'stay', 'intensification', 'stay', '[]', '2026-11-01T05:00:00Z')`,
+      [USER, ids.pull],
+    )
+    const got = await period.listModelPhaseAnswers(db, USER, [ids.pull], new Date('2026-11-16T00:00:00Z'))
+    expect(got.map(a => [a.phaseAction, a.createdAt.toISOString()])).toEqual([
+      ['transition_recommended', '2026-11-24T05:00:00.000Z'],
+      ['stay', '2026-11-24T02:00:00.000Z'],
+    ])
   })
 
   it('a session type finishing its baseline joins the program where it is', async () => {
     const before = (await period.getSessionPeriodization(db, USER, ids.legs))!
     const joined = await period.setBaselineComplete(db, USER, ids.fresh, {})
-    expect(joined.phase).toBe('intensification')
+    expect(joined.phase).toBe(before.phase)
     expect(joined.phaseStartedAt.getTime()).toBe(before.phaseStartedAt.getTime())
+    expect(joined.pendingTransition?.programPhase).toBe(true)
+  })
+
+  it('two baselines finishing together on a new program take one phase and one start', async () => {
+    const prog = await pool.query(`INSERT INTO programs (user_id, name, phase_mode) VALUES ($1, 'Program phase test 2', 'ai_dynamic') RETURNING id`, [USER])
+    const pair: string[] = []
+    for (const [i, name] of ['a', 'b'].entries()) {
+      const ps = await pool.query(`INSERT INTO program_sessions (program_id, name, position) VALUES ($1, $2, $3) RETURNING id`, [prog.rows[0].id, name, i])
+      pair.push(ps.rows[0].id)
+      await pool.query(`INSERT INTO session_periodization (user_id, program_session_id) VALUES ($1, $2)`, [USER, ps.rows[0].id])
+    }
+    const [a, b] = await Promise.all(pair.map(id => period.setBaselineComplete(db, USER, id, {})))
+    expect(a.phase).toBe('accumulation')
+    expect(b.phase).toBe('accumulation')
+    // Serialised by the program's row lock: the second reads the first and joins it.
+    expect(a.phaseStartedAt.getTime()).toBe(b.phaseStartedAt.getTime())
+    await pool.query(`DELETE FROM programs WHERE id = $1`, [prog.rows[0].id])
   })
 })

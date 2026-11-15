@@ -36,9 +36,11 @@ export const SWITCH_OVER_BLOCK_WEEKS = 3
 /** The switch-over never starts before this local Monday (the first one after the sign-off). */
 export const PROGRAM_PHASE_SWITCH_EARLIEST = '2026-11-16'
 
-/** Phase actions that mean "stay, for a recovery reason". Any one of them in the current week's
- *  answers holds the program where it is. */
-const RECOVERY_ACTIONS = new Set(['deload_recommended', 'rest_day_recommended', 'session_swap_recommended'])
+/** Phase actions that mean "stay, for a recovery reason": a deload or a rest day. Any one of them in
+ *  the current week's vote holds the program where it is. A session swap is not one: it asks to train
+ *  a different session today because some of this one's muscles are sore or injured, says nothing
+ *  about the program's phase, and so counts in the vote without agreeing. */
+const RECOVERY_ACTIONS = new Set(['deload_recommended', 'rest_day_recommended'])
 
 export type PhaseRow = Pick<
   SessionPeriodization,
@@ -51,11 +53,16 @@ export interface ProgramCompletion {
   completedAt: Date
 }
 
-/** The latest model answer for one session type. */
+/** One session type's model answer, as it votes. */
 export interface PhaseVote {
   programSessionId: string
   phase: string
   phaseAction: string
+}
+
+/** One recorded model answer (`prescription_shadow`), with when it was given. */
+export interface PhaseAnswer extends PhaseVote {
+  createdAt: Date
 }
 
 /** The local Monday ("YYYY-MM-DD") of the training week an instant falls in. */
@@ -63,10 +70,18 @@ export function trainingWeekOf(at: Date, tz: string): string {
   return weekStartForDay(toAestDay(at, tz))
 }
 
-/** Rows that take part in the program's phase: a session type still measuring its baseline has
- *  not joined it yet. */
+/** The local midnight that starts the training week an instant falls in. */
+export function trainingWeekStartOf(at: Date, tz: string): Date {
+  return dateStrMidnightInTz(trainingWeekOf(at, tz), tz)
+}
+
+/** A session type still measuring its baseline has not joined the program's phase yet. */
+function isPhased(r: PhaseRow): boolean {
+  return r.baselineComplete && r.phase !== 'baseline'
+}
+
 function phasedRows<T extends PhaseRow>(rows: T[]): T[] {
-  return rows.filter(r => r.baselineComplete && r.phase !== 'baseline')
+  return rows.filter(isPhased)
 }
 
 /** Every phased row on one phase and one start. A program with no phased row is aligned. */
@@ -75,6 +90,12 @@ export function isProgramAligned(rows: PhaseRow[]): boolean {
   if (phased.length === 0) return true
   const [first] = phased
   return phased.every(r => r.phase === first.phase && r.phaseStartedAt.getTime() === first.phaseStartedAt.getTime())
+}
+
+/** The program is on one phase for good: it has made its switch-over, or it already shared one
+ *  phase when the rule shipped. Such a program never runs the switch-over again. */
+export function isProgramSwitched(rows: PhaseRow[]): boolean {
+  return phasedRows(rows).some(r => r.pendingTransition?.programPhase === true)
 }
 
 export interface ProgramPhaseView {
@@ -89,6 +110,8 @@ export interface ProgramPhaseView {
   capWeeks: number | null
   /** Session types with a completed session in the current local week, since the phase began. */
   trainedThisWeek: Set<string>
+  /** Each of those types' latest completed session this week. */
+  lastTrainedThisWeek: Map<string, Date>
   /** The current local week's Monday. */
   currentWeek: string
 }
@@ -105,18 +128,29 @@ export function programPhaseView(
   if (!aligned || phased.length === 0) {
     return {
       aligned, phase: null, phaseStartedAt: null, trainingWeeksDone: 0, weekNumber: 1, capWeeks: null,
-      trainedThisWeek: new Set(), currentWeek,
+      trainedThisWeek: new Set(), lastTrainedThisWeek: new Map(), currentWeek,
     }
   }
   const { phase, phaseStartedAt, pendingTransition } = phased[0]
+  const startWeek = trainingWeekOf(phaseStartedAt, tz)
+  let startWeekBegunBefore = false
   const weeks = new Set<string>()
-  const trainedThisWeek = new Set<string>()
+  const lastTrainedThisWeek = new Map<string, Date>()
   for (const c of completions) {
-    if (c.completedAt.getTime() < phaseStartedAt.getTime()) continue
     const week = trainingWeekOf(c.completedAt, tz)
+    if (c.completedAt.getTime() < phaseStartedAt.getTime()) {
+      if (week === startWeek) startWeekBegunBefore = true
+      continue
+    }
     weeks.add(week)
-    if (week === currentWeek) trainedThisWeek.add(c.programSessionId)
+    const last = lastTrainedThisWeek.get(c.programSessionId)
+    if (week === currentWeek && (last == null || c.completedAt > last)) lastTrainedThisWeek.set(c.programSessionId, c.completedAt)
   }
+  // The week a move lands in is a week OF the new phase only when none of its sessions came before
+  // the move, so every session of a counted week is in the phase ("All sessions that week are
+  // deloads"). A move on a Thursday after a Monday session starts the count at the next Monday; the
+  // switch-over, which starts at a Monday's midnight, counts its first week.
+  if (startWeekBegunBefore) weeks.delete(startWeek)
   const trainingWeeksDone = [...weeks].filter(w => w < currentWeek).length
   return {
     aligned,
@@ -125,7 +159,8 @@ export function programPhaseView(
     trainingWeeksDone,
     weekNumber: trainingWeeksDone + 1,
     capWeeks: programPhaseCapWeeks(phase, pendingTransition),
-    trainedThisWeek,
+    trainedThisWeek: new Set(lastTrainedThisWeek.keys()),
+    lastTrainedThisWeek,
     currentWeek,
   }
 }
@@ -165,7 +200,7 @@ export function applyProgramPhaseCap(prescription: AiPrescription, view: Program
  * The early trigger: the program moves before a cap when the model recommends the same move for at
  * least half of the distinct session types in the vote, and none of them recommends staying for a
  * recovery reason. One type alone never moves the program. `votes` holds one answer per session
- * type (an abstaining type is in the vote with a `stay`, or as `none`).
+ * type (an abstaining type is in the vote as `none`).
  */
 export function programMoveTarget(votes: PhaseVote[], currentPhase: PeriodizationPhase): PeriodizationPhase | null {
   if (votes.some(v => RECOVERY_ACTIONS.has(v.phaseAction))) return null
@@ -182,46 +217,130 @@ export function programMoveTarget(votes: PhaseVote[], currentPhase: Periodizatio
 }
 
 /**
- * The set of session types whose answers decide a move: the types trained in the current week, plus
- * the type being planned now (it is about to be trained this week). Each votes with its latest model
- * answer since the phase began; a trained type with no recorded answer abstains (counts, never agrees).
+ * The vote, as signed: "the distinct session types trained in the current week". Each votes with
+ * the model's answer for the session it trained this week, which is its latest answer given before
+ * that session was completed, and since the phase began. The session being planned now is not in the
+ * vote until its type has trained this week; this answer is recorded and counts once it has. A
+ * trained type with no recorded answer (a rules-fallback plan writes none) counts but never agrees.
  */
-export function collectVotes(
-  view: ProgramPhaseView,
-  current: PhaseVote,
-  latestAnswers: PhaseVote[],
-): PhaseVote[] {
-  const byType = new Map(latestAnswers.map(a => [a.programSessionId, a]))
-  const votes: PhaseVote[] = [current]
-  for (const id of view.trainedThisWeek) {
-    if (id === current.programSessionId) continue
-    votes.push(byType.get(id) ?? { programSessionId: id, phase: view.phase ?? '', phaseAction: 'none' })
+export function collectVotes(view: ProgramPhaseView, answers: PhaseAnswer[]): PhaseVote[] {
+  const since = view.phaseStartedAt?.getTime() ?? -Infinity
+  const votes: PhaseVote[] = []
+  for (const [id, trainedAt] of view.lastTrainedThisWeek) {
+    let answer: PhaseAnswer | null = null
+    for (const a of answers) {
+      const t = a.createdAt.getTime()
+      if (a.programSessionId !== id || t < since || t > trainedAt.getTime()) continue
+      if (answer == null || t > answer.createdAt.getTime()) answer = a
+    }
+    votes.push(answer
+      ? { programSessionId: id, phase: answer.phase, phaseAction: answer.phaseAction }
+      : { programSessionId: id, phase: view.phase ?? '', phaseAction: 'none' })
   }
   return votes
 }
 
+/** The phase, start and scheduled move a program move writes on every row. It always carries the
+ *  `programPhase` mark. A scheduled short block (the switch-over's) is kept; otherwise the next move
+ *  is the standard one at the standard cap. */
+export function programMoveMark(phase: PeriodizationPhase, scheduled: PendingTransition | null = null): PendingTransition {
+  if (scheduled?.afterTrainingWeeks != null) {
+    return {
+      newPhase: scheduled.newPhase, reasoning: scheduled.reasoning, urgency: scheduled.urgency,
+      afterTrainingWeeks: scheduled.afterTrainingWeeks, programPhase: true,
+    }
+  }
+  return {
+    newPhase: NEXT_PROGRAM_PHASE[phase],
+    reasoning: 'The program\'s next phase: at its cap, or earlier once half of a week\'s session types agree.',
+    urgency: 'normal',
+    programPhase: true,
+  }
+}
+
+/** Where a program on one phase is: the latest move among the rows that carry the program's mark
+ *  (a row that lost it, as a per-type move does, is behind). Any phased row when none carries it. */
+export interface ProgramTarget {
+  phase: PeriodizationPhase
+  phaseStartedAt: Date
+  pendingTransition: PendingTransition
+}
+
+export function programTarget(rows: PhaseRow[]): ProgramTarget | null {
+  const phased = phasedRows(rows)
+  if (phased.length === 0) return null
+  const marked = phased.filter(r => r.pendingTransition?.programPhase === true)
+  const pool = marked.length > 0 ? marked : phased
+  const latest = pool.reduce((a, b) => (b.phaseStartedAt.getTime() > a.phaseStartedAt.getTime() ? b : a))
+  return {
+    phase: latest.phase,
+    phaseStartedAt: latest.phaseStartedAt,
+    pendingTransition: programMoveMark(latest.phase, latest.pendingTransition),
+  }
+}
+
+/** The waiting stamp: the program is waiting for its switch-over, which starts on `day` once known. */
+export function switchOverWait(day: string | null): PendingTransition {
+  return {
+    newPhase: 'accumulation',
+    reasoning: day
+      ? `Switch-over to one phase for the program on ${day}.`
+      : 'Waiting for the switch-over to one phase for the program.',
+    urgency: 'normal',
+    switchOverPending: true,
+    ...(day != null && { switchOverOn: day }),
+  }
+}
+
+function laterDay(a: string | null | undefined, b: string | null | undefined): string | null {
+  if (a == null) return b ?? null
+  if (b == null) return a
+  return a > b ? a : b
+}
+
+/**
+ * The switch-over is for a program whose types were on their own phases when the rule shipped, and
+ * runs once. That is a program already stamped as waiting, or (on its first read) one whose rows
+ * that have not moved since `earliest` disagree. A program whose rows only disagree later (two
+ * baselines finishing together, a read racing a move, a per-type move on a program that was not
+ * active) is re-aligned to its own phase instead.
+ */
+function switchOverDue(phased: PhaseRow[], tz: string, earliest: string): boolean {
+  if (phased.some(r => r.pendingTransition?.switchOverPending === true)) return true
+  const unmoved = phased.filter(r => toAestDay(r.phaseStartedAt, tz) < earliest)
+  return unmoved.length >= 2 && !isProgramAligned(unmoved)
+}
+
 export type SwitchOverPlan =
-  | { kind: 'aligned' }
-  | { kind: 'waiting'; reason: 'deload_in_progress' }
-  | { kind: 'waiting'; reason: 'before_start'; startDay: string }
+  /** `mark`: the program shares one phase but does not carry the mark yet (its first read). */
+  | { kind: 'aligned'; mark: boolean }
+  | { kind: 'realign'; target: ProgramTarget }
+  /** `stamp`: the waiting stamp to write on every row, or null when they all carry it already. */
+  | { kind: 'waiting'; reason: 'deload_in_progress'; stamp: PendingTransition | null }
+  | { kind: 'waiting'; reason: 'before_start'; startDay: string; stamp: PendingTransition | null }
   | { kind: 'switch'; startDay: string; startsAt: Date }
 
 /**
  * The signed switch-over for a program whose session types are still on their own phases: every type
  * starts accumulation week 1 on the Monday after the last type in a deload finishes it (the old floor:
- * `DELOAD_FLOOR` completed deload sessions), never before `PROGRAM_PHASE_SWITCH_EARLIEST`, with the
- * first block shortened to `SWITCH_OVER_BLOCK_WEEKS`. Until that Monday each type keeps its own phase.
+ * `DELOAD_FLOOR` completed deload sessions), never before `earliest`, with the first block shortened
+ * to `SWITCH_OVER_BLOCK_WEEKS`. Until that Monday each type keeps its own phase.
+ *
+ * The Monday is stored on every row (`switchOverOn`) as soon as a finished deload gives it, and read
+ * back: a type that then leaves its deload (the per-type "Move to accumulation") no longer shows when
+ * its deload finished, and the date must not fall back to `earliest`.
  */
 export function planSwitchOver(
   rows: PhaseRow[],
   completions: ProgramCompletion[],
   tz: string,
   now: Date = new Date(),
+  earliest: string = PROGRAM_PHASE_SWITCH_EARLIEST,
 ): SwitchOverPlan {
-  if (isProgramAligned(rows)) return { kind: 'aligned' }
   const phased = phasedRows(rows)
-  if (phased.some(r => r.phase === 'deload' && r.sessionsInPhase < DELOAD_FLOOR)) {
-    return { kind: 'waiting', reason: 'deload_in_progress' }
+  if (isProgramAligned(rows)) return { kind: 'aligned', mark: phased.length > 0 && !isProgramSwitched(rows) }
+  if (isProgramSwitched(rows) || !switchOverDue(phased, tz, earliest)) {
+    return { kind: 'realign', target: programTarget(phased)! }
   }
 
   let lastFinish: Date | null = null
@@ -234,23 +353,61 @@ export function planSwitchOver(
     const finish = done[DELOAD_FLOOR - 1]
     if (finish && (lastFinish == null || finish > lastFinish)) lastFinish = finish
   }
+  const stored = phased.reduce<string | null>((d, r) => laterDay(d, r.pendingTransition?.switchOverOn), null)
+  const knownDay = laterDay(stored, lastFinish ? shiftDateStr(trainingWeekOf(lastFinish, tz), 7) : null)
+  const wait = switchOverWait(knownDay)
+  const stamp = phased.every(r => r.pendingTransition?.switchOverPending === true && (r.pendingTransition.switchOverOn ?? null) === knownDay)
+    ? null
+    : wait
 
-  const mondayAfterFinish = lastFinish ? shiftDateStr(trainingWeekOf(lastFinish, tz), 7) : null
-  const startDay = mondayAfterFinish && mondayAfterFinish > PROGRAM_PHASE_SWITCH_EARLIEST
-    ? mondayAfterFinish
-    : PROGRAM_PHASE_SWITCH_EARLIEST
-  if (toAestDay(now, tz) < startDay) return { kind: 'waiting', reason: 'before_start', startDay }
+  if (phased.some(r => r.phase === 'deload' && r.sessionsInPhase < DELOAD_FLOOR)) {
+    return { kind: 'waiting', reason: 'deload_in_progress', stamp }
+  }
+  const startDay = laterDay(knownDay, earliest)!
+  if (toAestDay(now, tz) < startDay) return { kind: 'waiting', reason: 'before_start', startDay, stamp }
   return { kind: 'switch', startDay, startsAt: dateStrMidnightInTz(startDay, tz) }
 }
 
-/** What the switch-over writes on every row besides the phase and start: the short first block. */
+/** What the switch-over writes on every row besides the phase and start: the short first block,
+ *  and the program's mark, so it never runs again. */
 export function switchOverPendingTransition(): PendingTransition {
   return {
     newPhase: 'intensification',
     reasoning: `Switch-over to one phase for the program: the first accumulation block runs ${SWITCH_OVER_BLOCK_WEEKS} training weeks.`,
     urgency: 'normal',
     afterTrainingWeeks: SWITCH_OVER_BLOCK_WEEKS,
+    programPhase: true,
   }
+}
+
+/**
+ * The phase a session type takes when its baseline completes, from the rows of the program's other
+ * types: the program's phase and start when it has one (so it joins the program where it is); a
+ * fresh accumulation from `now`, marked as the program's, when it is the first; and accumulation from
+ * `now` while the program waits for its switch-over, which then moves it with the rest.
+ */
+export function joiningPhaseFor(siblings: PhaseRow[], now: Date): {
+  phase: PeriodizationPhase; phaseStartedAt: Date; pendingTransition: PendingTransition | null
+} {
+  const phased = phasedRows(siblings)
+  if (phased.length === 0) return { phase: 'accumulation', phaseStartedAt: now, pendingTransition: programMoveMark('accumulation') }
+  if (isProgramAligned(phased)) {
+    const [first] = phased
+    return { phase: first.phase, phaseStartedAt: first.phaseStartedAt, pendingTransition: first.pendingTransition }
+  }
+  if (isProgramSwitched(phased)) return programTarget(phased)!
+  const wait = phased.find(r => r.pendingTransition?.switchOverPending === true)?.pendingTransition ?? null
+  return { phase: 'accumulation', phaseStartedAt: now, pendingTransition: wait }
+}
+
+/** A program move only writes when the program is where the caller saw it. `phase` + `phaseStartedAt`:
+ *  every phased row still holds them. `'switch-over'`: the program has not switched yet. */
+export type ProgramMoveExpectation = { phase: PeriodizationPhase; phaseStartedAt: Date } | 'switch-over'
+
+export interface ProgramMoveOptions {
+  /** Session types whose plans are voided even when they hold a one-day deload. */
+  voidAll?: string[]
+  expect?: ProgramMoveExpectation
 }
 
 /** The repository calls the program phase needs (a subset of `WorkoutRepository`). */
@@ -258,10 +415,15 @@ export interface ProgramPhaseRepo {
   reconcileSessionsInPhase(userId: string, programId: string): Promise<void>
   listSessionPeriodizationForProgram(userId: string, programId: string): Promise<SessionPeriodization[]>
   listProgramCompletions(userId: string, programId: string, since: Date): Promise<ProgramCompletion[]>
+  /** Resolves false when the expectation no longer held and nothing was written. */
   setProgramPhase(
     userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date,
-    pendingTransition: PendingTransition | null,
-  ): Promise<void>
+    pendingTransition: PendingTransition | null, opts?: ProgramMoveOptions,
+  ): Promise<boolean | void>
+  /** Writes `pending` on every phased row, leaving phase, start and plans alone. */
+  setProgramPendingTransition(userId: string, programId: string, pending: PendingTransition): Promise<void>
+  /** Puts every phased row on `target`; only rows that differed lose their plans. */
+  realignProgramPhase(userId: string, programId: string, target: ProgramTarget): Promise<void>
   voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
 }
 
@@ -274,8 +436,10 @@ export function staleTypeMoveOffer(r: Pick<SessionPeriodization, 'phase' | 'pres
 }
 
 /**
- * Read the program's phase, running the switch-over first when it is due. Idempotent: a second call
- * (or a concurrent one) finds the rows aligned and writes nothing.
+ * Read the program's phase, first doing what the rows call for: marking a program that already shares
+ * one phase, stamping (and dating) a program that waits for its switch-over, running the switch-over
+ * when it is due, or re-aligning a program on one phase whose rows have come to disagree. Idempotent:
+ * a second call finds the rows as the first left them and writes nothing.
  */
 export async function syncProgramPhase(
   repo: ProgramPhaseRepo,
@@ -286,22 +450,34 @@ export async function syncProgramPhase(
 ): Promise<ProgramPhaseView> {
   await repo.reconcileSessionsInPhase(userId, programId)
   let rows = await repo.listSessionPeriodizationForProgram(userId, programId)
-  const since = earliestStart(rows)
-  let completions = since ? await repo.listProgramCompletions(userId, programId, since) : []
+  let completions = await completionsFor(repo, userId, programId, rows, tz)
   const plan = planSwitchOver(rows, completions, tz, now)
+  if (plan.kind === 'aligned' && plan.mark) {
+    const [first] = phasedRows(rows)
+    const mark = programMoveMark(first.phase, first.pendingTransition)
+    await repo.setProgramPendingTransition(userId, programId, mark)
+    rows = rows.map(r => (isPhased(r) ? { ...r, pendingTransition: mark } : r))
+  }
   if (plan.kind === 'waiting') {
+    if (plan.stamp) await repo.setProgramPendingTransition(userId, programId, plan.stamp)
     for (const r of phasedRows(rows).filter(staleTypeMoveOffer)) await repo.voidSessionPrescription(userId, r.programSessionId)
   }
-  if (plan.kind === 'switch') {
-    await repo.setProgramPhase(userId, programId, 'accumulation', plan.startsAt, switchOverPendingTransition())
+  if (plan.kind === 'realign' || plan.kind === 'switch') {
+    if (plan.kind === 'realign') await repo.realignProgramPhase(userId, programId, plan.target)
+    else await repo.setProgramPhase(userId, programId, 'accumulation', plan.startsAt, switchOverPendingTransition(), { expect: 'switch-over' })
     await repo.reconcileSessionsInPhase(userId, programId)
     rows = await repo.listSessionPeriodizationForProgram(userId, programId)
-    completions = await repo.listProgramCompletions(userId, programId, plan.startsAt)
+    completions = await completionsFor(repo, userId, programId, rows, tz)
   }
   return programPhaseView(rows, completions, tz, now)
 }
 
-function earliestStart(rows: PhaseRow[]): Date | null {
+/** The program's completions from the start of the training week its earliest phase began in: the
+ *  sessions before a move in its own week decide whether that week counts. */
+async function completionsFor(
+  repo: ProgramPhaseRepo, userId: string, programId: string, rows: PhaseRow[], tz: string,
+): Promise<ProgramCompletion[]> {
   const starts = phasedRows(rows).map(r => r.phaseStartedAt.getTime())
-  return starts.length > 0 ? new Date(Math.min(...starts)) : null
+  if (starts.length === 0) return []
+  return repo.listProgramCompletions(userId, programId, trainingWeekStartOf(new Date(Math.min(...starts)), tz))
 }

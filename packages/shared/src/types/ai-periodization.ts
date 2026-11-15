@@ -48,6 +48,16 @@ export interface PendingTransition {
   /** A scheduled move: the current block ends after this many training weeks instead of the phase's
    *  standard cap (#3766's switch-over writes 3 on every row). Any phase move clears it. */
   afterTrainingWeeks?: number
+  /** #3766: the program is on one phase. Every program move writes it on every row, and so does the
+   *  first read of a program that already shared one phase. A program that carries it never runs the
+   *  switch-over again: a later disagreement between its rows is re-aligned to the program's phase. */
+  programPhase?: true
+  /** #3766: the program is waiting for its one-time switch-over to one phase. Written on every row on
+   *  the first read after the rule shipped, and kept by a per-type move during the wait. */
+  switchOverPending?: true
+  /** #3766: while waiting, the local Monday ("YYYY-MM-DD") the switch-over starts on, fixed as soon as
+   *  the last deload finishes, so a type leaving its deload afterwards cannot lose it. */
+  switchOverOn?: string
 }
 
 /** A prescription's two whole-session figures (`prescriptionFigures` computes both). */
@@ -59,6 +69,10 @@ export interface PrescriptionFigures {
 export interface AiPrescription {
   phase: PeriodizationPhase
   phaseAction: 'stay' | 'transition_recommended' | 'deload_recommended' | 'session_swap_recommended' | 'rest_day_recommended'
+  /** #3766: the move on offer is this session type's own (a deload's way out while the program waits
+   *  for its switch-over to one phase), so the screens do not call it the program's. Absent: a
+   *  transition is the program's. */
+  typeOnlyMove?: true
   exercises: AiPrescriptionExercise[]
   estimatedSessionDurationMin: number
   weeklyVolumeContribution: Record<string, number>

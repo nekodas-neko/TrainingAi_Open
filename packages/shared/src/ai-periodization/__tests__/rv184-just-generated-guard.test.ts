@@ -23,7 +23,9 @@ function repoWith(state: Record<string, unknown>, budget = 60): WorkoutRepositor
     listSessionPeriodizationForProgram: async () => [{ phaseStartedAt: new Date(0), ...state }],
     listProgramCompletions: async () => [],
     listModelPhaseAnswers: async () => [],
-    setProgramPhase: async () => undefined,
+    setProgramPhase: async () => true,
+    setProgramPendingTransition: async () => undefined,
+    realignProgramPhase: async () => undefined,
     voidSessionPrescription: async () => undefined,
   }
   return new Proxy({}, {

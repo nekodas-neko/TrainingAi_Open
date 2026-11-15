@@ -8,7 +8,7 @@ import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { isOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
 import { prescriptionAgedOut } from '@trainingai/shared/ai-periodization/prescription-expiry'
-import { NEXT_PROGRAM_PHASE, syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
+import { syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 // One phase transition.
@@ -81,19 +81,26 @@ export async function POST(
     return NextResponse.json({ state: unchanged, prescriptionStatus: 'accepted', phaseMoved: false })
   }
 
-  const isAdjacent = NEXT_PROGRAM_PHASE[state.phase] === body.newPhase
-  if (!isRecommended && !isAdjacent && !body.force) {
+  // #3766: a move is either the one on offer or an explicit `force` (the phase list). The next phase
+  // alone used to be enough; with the phase now the program's, an unoffered move from one type's
+  // screen would move every type.
+  if (!isRecommended && !body.force) {
     return NextResponse.json({ error: 'Transition not recommended — pass force:true to override' }, { status: 400 })
   }
 
   // #3766: the phase is the program's, so one tap moves every session type. A program still waiting
-  // for its switch-over to one phase moves only this session type, as before.
+  // for its switch-over moves only this session type, as before. The program move carries the phase
+  // and start this request saw: a second tap (or another session's auto-apply) landing after the
+  // first finds the program moved and changes nothing, so it cannot void the plans regenerated since.
+  // That move leaves this slot 'consumed' itself, so the status write is only the per-type path's.
   if (programPhase?.aligned) {
-    await repo.advanceProgramPhase(userId, sessionId, body.newPhase as PeriodizationPhase)
+    await repo.advanceProgramPhase(userId, sessionId, body.newPhase as PeriodizationPhase, {
+      phase: state.phase, phaseStartedAt: state.phaseStartedAt,
+    })
   } else {
     await repo.advancePhase(userId, sessionId, body.newPhase as PeriodizationPhase)
+    await repo.updatePrescriptionStatus(userId, sessionId, POST_TRANSITION_STATUS)
   }
-  await repo.updatePrescriptionStatus(userId, sessionId, POST_TRANSITION_STATUS)
   const updated = await repo.getSessionPeriodization(userId, sessionId)
 
   // Regeneration is fired by the CLIENT (see ai-prescription-card.tsx's executeTransition) — a

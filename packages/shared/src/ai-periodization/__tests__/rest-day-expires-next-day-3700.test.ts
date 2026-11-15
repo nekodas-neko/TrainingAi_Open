@@ -183,7 +183,9 @@ function harness() {
     listSessionPeriodizationForProgram: async () => [{ phaseStartedAt: new Date(0), ...state }],
     listProgramCompletions: async () => [],
     listModelPhaseAnswers: async () => [],
-    setProgramPhase: async () => undefined,
+    setProgramPhase: async () => true,
+    setProgramPendingTransition: async () => undefined,
+    realignProgramPhase: async () => undefined,
     voidSessionPrescription: async () => undefined,
     storePrescription: async (_u: string, _s: string, prescription: AiPrescription, expiresAt: Date) => {
       stored.push({ prescription, expiresAt })

@@ -45,7 +45,9 @@ vi.mock('@/lib/data', () => {
     advanceProgramPhase: advancePhase,
     listProgramCompletions: async () => [],
     listModelPhaseAnswers: async () => [],
-    setProgramPhase: async () => undefined,
+    setProgramPhase: async () => true,
+    setProgramPendingTransition: async () => undefined,
+    realignProgramPhase: async () => undefined,
     voidSessionPrescription: async () => undefined,
 })
   return { getRepository: repo, getRepositoryAsync: repo }
