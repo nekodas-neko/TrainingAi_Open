@@ -74,6 +74,9 @@ export interface PrescriptionSignals {
   }>
   phase: string
   sessionsInPhase: number
+  /** #3766: the program's training weeks in its phase, set by generation once the program is on one
+   *  phase. Absent while it waits for the switch-over, and on callers that do not read it. */
+  programPhase?: { trainingWeeksDone: number; capWeeks: number | null }
   hoursSinceLastSession: number | null
   consecutiveSessionDaysOfThisType: number
   // Muscle-specific soreness cross-referenced against today's session exercises.

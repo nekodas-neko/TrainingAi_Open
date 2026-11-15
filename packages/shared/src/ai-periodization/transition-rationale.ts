@@ -11,16 +11,17 @@ import type { PeriodizationPhase } from '@trainingai/shared/types/ai-periodizati
 // the engine gates on, so the explanation and the decision can never disagree.
 
 export interface TransitionEvidence {
-  sessionsInPhase: number
+  /** The program's training weeks in the phase being left (#3766). */
+  trainingWeeksInPhase: number
   rm1Trend: 'up' | 'flat' | 'down' | null
   rpeDelta: number | null
 }
 
 // Eligibility floors, mirroring the transition rules rendered into the system prompt
 // (prompt.ts). Kept here as data so the rationale quotes the same numbers the engine gates on.
-const FLOORS: Record<string, { minSessions: number; maxRpeDelta: number }> = {
-  intensification: { minSessions: 4, maxRpeDelta: 0.3 },
-  realisation: { minSessions: 3, maxRpeDelta: 0.5 },
+const FLOORS: Record<string, { minWeeks: number; maxRpeDelta: number }> = {
+  intensification: { minWeeks: 4, maxRpeDelta: 0.3 },
+  realisation: { minWeeks: 3, maxRpeDelta: 0.5 },
 }
 
 // Why each transition is the right move physiologically. Phrased as mechanism, not slogan —
@@ -67,10 +68,9 @@ export function buildTransitionRationale(
   const zone = intensityZone(trainingGoal, toPhase)
   const prevZone = intensityZone(trainingGoal, fromPhase)
 
+  const weeks = `${evidence.trainingWeeksInPhase} training week${evidence.trainingWeeksInPhase === 1 ? '' : 's'} of ${fromPhase} for the program`
   const facts: string[] = [
-    floor
-      ? `${evidence.sessionsInPhase} ${fromPhase} sessions logged (eligibility floor ${floor.minSessions})`
-      : `${evidence.sessionsInPhase} ${fromPhase} sessions logged`,
+    floor ? `${weeks} (eligibility floor ${floor.minWeeks})` : weeks,
   ]
   if (evidence.rm1Trend) facts.push(`estimated 1RM trending ${evidence.rm1Trend}`)
   if (evidence.rpeDelta != null) {

@@ -8376,6 +8376,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean) { return period.recordBaselineAnchors(this.db, userId, programSessionId, anchors, complete) }
   async revertAutoAdoptedBaseline(userId: string, programSessionId: string) { return period.revertAutoAdoptedBaseline(this.db, userId, programSessionId) }
   async advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase) { return period.advancePhase(this.db, userId, programSessionId, newPhase) }
+  async advanceProgramPhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase) { return period.advanceProgramPhase(this.db, userId, programSessionId, newPhase) }
+  async setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null) { return period.setProgramPhase(this.db, userId, programId, phase, startedAt, pendingTransition) }
+  async listProgramCompletions(userId: string, programId: string, since: Date) { return period.listProgramCompletions(this.db, userId, programId, since) }
+  async listModelPhaseAnswers(userId: string, programSessionIds: string[], since: Date) { return period.listModelPhaseAnswers(this.db, userId, programSessionIds, since) }
   async recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void> {
     await this.db.insert(s.prescriptionShadow).values({
       userId, programSessionId,

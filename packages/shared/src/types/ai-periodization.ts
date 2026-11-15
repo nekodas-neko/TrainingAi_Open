@@ -45,6 +45,9 @@ export interface PendingTransition {
   newPhase: PeriodizationPhase
   reasoning: string
   urgency: 'normal' | 'high'
+  /** A scheduled move: the current block ends after this many training weeks instead of the phase's
+   *  standard cap (#3766's switch-over writes 3 on every row). Any phase move clears it. */
+  afterTrainingWeeks?: number
 }
 
 /** A prescription's two whole-session figures (`prescriptionFigures` computes both). */

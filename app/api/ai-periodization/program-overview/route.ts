@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, toAestDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
 import { servePrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
+import { syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
 
 export async function GET() {
   const session = await auth()
@@ -13,12 +14,13 @@ export async function GET() {
   const program = await repo.getActiveProgram(userId)
   if (!program) return NextResponse.json({ sessions: [] }, { headers: { 'Cache-Control': 'private, no-store' } })
 
+  const tz = session.user?.timezone ?? DEFAULT_TZ
   // Self-heal the per-session phase counts from the real workout history before reading
-  // them, so directly-inserted/deleted test sessions can't leave a stale "N sessions".
-  await repo.reconcileSessionsInPhase(userId, program.id)
+  // them, so directly-inserted/deleted test sessions can't leave a stale "N sessions". #3766: the
+  // same step runs the switch-over to one program phase when it is due, so the list shows it.
+  await syncProgramPhase(repo, userId, program.id, tz)
   const states = await repo.listSessionPeriodizationForProgram(userId, program.id)
 
-  const tz = session.user?.timezone ?? DEFAULT_TZ
   const today = todayInTz(tz)
   const recentBySession = await Promise.all(
     program.sessions.map(ps => repo.getRecentSessionsOfType(userId, ps.id, 3)),

@@ -1421,6 +1421,14 @@ export interface WorkoutRepository {
   /** BF-143: undo a baseline auto-completed from personal records. Null when nothing matched. */
   revertAutoAdoptedBaseline(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
   advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization>
+  /** #3766: move the whole program the session belongs to (every session type, one start). */
+  advanceProgramPhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization>
+  /** #3766: put every phased row of the program on one phase and start (the switch-over, and moves). */
+  setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null): Promise<void>
+  /** #3766: completed sessions of the program since `since`, the input to training weeks. */
+  listProgramCompletions(userId: string, programId: string, since: Date): Promise<import('@trainingai/shared/ai-periodization/program-phase').ProgramCompletion[]>
+  /** #3766: each session type's latest raw model phase answer since `since`. */
+  listModelPhaseAnswers(userId: string, programSessionIds: string[], since: Date): Promise<import('@trainingai/shared/ai-periodization/program-phase').PhaseVote[]>
   /** `status` is written atomically with the prescription — see the slice for why (Q-54). */
   storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus): Promise<void>
   /** BF-199 Phase 1. Evidence only: nothing reads it to decide anything. */
