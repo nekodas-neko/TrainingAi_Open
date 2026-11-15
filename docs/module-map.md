@@ -578,6 +578,79 @@ The display analogue of One-Formula-One-Place (review 2026-07-16 §4). Any new c
 | Sleep score | `/api/readiness-score` `sleepScore` (`ouraToday.sleepScore ?? computeSleepScore()`); stored `sleep_sessions.sleep_score` is Cloud-only (NULL on BLE nights) — fallback display only | "Sleep" score badge/chip |
 | Readiness | `/api/readiness-score` `readinessDisplayScore` (null = insufficient data → hide, never show the ungated `score`) | "Readiness" |
 
+### More shared formulas (added for #3798)
+
+Each module below holds its rule once, in `packages/shared/src/`. Look here before writing a second copy.
+
+| Module | What it computes |
+|---|---|
+| `workout/bodyweight-load.ts` | What a bodyweight rep loads: `bodyweightLoadFactor` and `bodyweightSetLoadKg` price a set at body weight × factor + added weight, so volume, 1RM and ACWR count bodyweight work (Q-13) |
+| `workout/derive-session-rpe.ts` | A session's RPE from its rated sets when no session rating exists (`deriveSessionRpe`, `sessionEffort`), with which source supplied it (Q-420) |
+| `workout/program-session-duration.ts` | A program session's minutes from its exercises' progression styles and equipment, before any prescription exists, through the prescription's own duration model |
+| `workout/rest-target.ts` | The rest a set gets when its style sets none (`DEFAULT_REST_SEC`, `effectiveRestSec`), for the current app and Preview |
+| `workout/default-use-for-1rm.ts` | Whether a set counts toward the 1RM when its style does not say; a leaf so the client store can import it |
+| `workout/default-style.ts` | The progression style a new exercise slot defaults to: the most-used style for that role in the program, else the first |
+| `workout/streak-window.ts` | `STREAK_LOOKBACK_DAYS`, how far back the streak route sends days and the session screen walks; one number for both (BF-176) |
+| `workout/units.ts` | `LBS_TO_KG`, `lbsToKg`, `kgToLbs` |
+| `nutrition/macro-energy.ts` | Calories per macro and each macro's share of the total (`macroKcal`, `macroShares`) |
+| `nutrition/atwater.ts` | `KCAL_PER_G`, the Atwater factors (4 / 4 / 9), read by every calorie-from-macro sum |
+| `nutrition/day-trends.ts` | The week-window trend for the four nutrition stats: deltas, their sentence and the series (`trendDelta`, `deltaSentence`, `trendSeries`) |
+| `nutrition/plan-variant.ts` | Which meal-plan variant applies today (training, rest or all), shared by the plan card and the estimator (LA-184) |
+| `nutrition/meal-logging-status.ts` | A meal type's status (recorded, skipped, not recorded), whether the day is complete, and whether unrecorded-meal estimates may run |
+| `nutrition/vial-date.ts` | The allowed range for a vial's reconstitution date and what is wrong with one outside it (BF-136) |
+| `nutrition/definition-dose.ts` | What a supplement's definition says the dose is, for the manage sheet (OR-104) |
+| `nutrition/resting-rate-source.ts` | Whether the energy budget's resting rate was measured or from the formula, and how the explainer words it (#2413) |
+| `health/zone-quota.ts` | The week's per-zone quota: framework target minus minutes done, Zone 1 excluded from the training totals (`computeZoneQuota`, `weekWindow`) |
+| `health/hrv-baseline.ts` | The HRV card's 7-day vs 28-day deviation in percent, and its band through `scoreBand()` |
+| `health/live-readiness.ts` | The app's own readiness per day, the one read every AI surface uses; Oura's readiness is never substituted |
+| `health/rmssd.ts` | rMSSD from raw RR intervals, with the 20% artefact gate. The only RR → rMSSD implementation |
+| `health/hourly-movement.ts` | Moved hours for the Activity score's move-every-hour goal, from intraday HR above the rest boundary |
+| `health/progress-markers.ts` | Baseline → current verdicts for RHR, HRR1, HRV and VO₂max, direction-aware with a meaningful-change threshold |
+| `health/rest-day-guidance.ts` | The rest-day band and message from readiness, sleep score, sore muscles and consecutive rest days |
+| `health/cardio-trends.ts` | Weekly zone stacks, the efficiency curve, cadence trend and running bests for the Cardio Hub |
+| `health/session-picker.ts` | Which cardio modality to suggest for a time budget, from the running plan's gate and the zone quota |
+| `health/gait-classifier.ts` | Idle, walk or run from the ring's stride frequency; the single source of gait state |
+| `health/gait-constants.ts` | The cadence band (1.4–2.8 Hz) the gait classifier treats as walking or running |
+| `health/spo2-variability.ts` | SpO₂ variability within a sleep epoch, a REM and wake signal for the heuristic stager |
+| `health/sleepnet-preprocess.ts` | The SleepNet model's input tensors from raw ring samples, ported from the vendor's preprocessing |
+| `health/partial-night.ts` | Which nights the owner marked partial, and the duration-dependent fields those nights drop from scoring (#2265) |
+| `health/temperature-baseline-health.ts` | Whether the temperature baseline is centred enough for its deviation to move readiness (TN-6a) |
+| `health/training-stress-recheck.ts` | Finished days whose training-load verdict was taken mid-day and must be re-run |
+| `health/training-stress-rhr.ts` | The resting HR the training-stress score uses for a day: its own, else the latest within the window |
+| `health/daytime-stress-thresholds.ts` | The daytime-stress bucket and high-day thresholds, as a client-safe leaf that `daytime-stress.ts` re-exports |
+| `health/daily-digest-context.ts` | The digest's projections: weekly weight change at today's calorie delta, and steps per day still needed for the weekly goal |
+| `health/energy-balance.ts` | Intake minus active burn per day, an association proxy for the fuelling-vs-strength view |
+| `health/soreness-volume.ts` | Muscle volume per day against next-morning soreness, for the volume-predicts-soreness view |
+| `health/score-average-chip.ts` | The "+3 vs your 14-day average" chip under a detail screen's score |
+| `health/hr-recovery-honesty.ts` | The note saying how much of the HR Recovery Profile carries signal (`informativeShareNote`) |
+| `health/body-recent-window.ts` | The 7-day, newest-first window `/api/body-metadata` calls `recent` (#2505) |
+| `health/metrics-in-date-range.ts` | The rows of a wider date-keyed read that a narrower window would return, so a route reads once (#3793) |
+| `health/interval-overlap.ts` | `selectNonOverlapping`: keeps the highest-ranked intervals that do not overlap |
+| `health/device-health-projection.ts` | Projects imported device intervals (sleep, HR, resting HR, HRV, steps, energy, weight) into day rows |
+| `health/apple-health-projection.ts` | Maps Apple Health sample types onto the device projection |
+| `health/health-connect-projection.ts` | Maps Health Connect records onto the device projection; exercise sessions go to activity logs |
+| `health/sleep-samples.ts` | Groups imported sleep-stage samples into nights with stage hours |
+| `health/apple-sleep.ts` | Re-exports `SleepSample` from `sleep-samples.ts` |
+| `health/import-limits.ts` | The longest interval a health import may carry (7 days) |
+| `health/met-mix.ts` | The `MetMix` shape: how many minutes of a MET figure were provided, derived, estimated or missing |
+| `health/workout-activities.ts` | Workout activity ids and labels for the energy picker, without the MET table |
+| `health/score-audit/activity.ts`, `heart-rate.ts`, `sleep.ts`, `health/score-audit/types.ts` | The admin day-review audit per pillar: calls the serving formulas and lays out each contributor's input and effect. Never a second formula |
+| `running/zone-targets.ts` | Weekly minutes per HR zone for each framework (polarised 80/20, public-health floor) |
+| `running/frameworks/aerobic-recovery.ts`, `density-progression.ts`, `norwegian-4x4.ts`, `speed-vo2max.ts`, `zone2-base.ts` | The five running frameworks: each one's session mix, prescription and weekly growth |
+| `running/push-sessions.ts` | Which plan session is a push session (every fifth), and the run environment (outdoor when it has a GPS route, else indoor) |
+| `running/run-type-stats.ts` | Average stats per run type over completed runs |
+| `running/week-index.ts` | The 0-based week since a plan started, clamped at 0 |
+| `running/run-chip-text.ts` | Which metric the live run chip tracks, and its distance-mode text |
+| `ai-periodization/ai-dynamic.ts` | The AI-dynamic program's next session: recovery, balance and freshness scores per session, the deload call, and consecutive training or rest days |
+| `ai-periodization/muscle-recovery.ts` | Per-muscle recovery, with a time constant scaled by the bout's volume against the muscle's median, clamped to 16–48 h |
+| `ai-periodization/deload-constants.ts` | Deload sets, reps, load and rest per goal, and the readiness and temperature thresholds that call one |
+| `ai-periodization/role-plausibility.ts` | Caps a lighter-role exercise's load at the session's anchor lift |
+| `ai-periodization/transition-rationale.ts` | The evidence-cited rationale for an automatic phase transition |
+| `ai-periodization/prescription-shadow.ts` | What the rules prescriber would have said beside the model's prescription; logged, read by nothing (BF-199) |
+| `ai-periodization/prescription-pending.ts` | Whether a fresh AI prescription is still being generated for a session |
+| `ai-periodization/generation-dedup.ts` | In-flight and short-cooldown dedup for an expensive idempotent call |
+| `ai-periodization/block-trend-copy.ts` | The 28:90 block trend's band wording, its "Based on N weeks" caption and its steady band |
+
 ---
 
 ## 7. AI
@@ -810,6 +883,9 @@ check `components/ui/` first** (`CLAUDE.md` visual-consistency rules).
 |---|---|
 | Shared domain types | `packages/shared/src/types/` (program, progression, nutrition, body, mood, injury, supplement, user, log, friends, ai-periodization, goal-recommendation, builder, day-checkin, achievement, local-sleep-session) |
 | **Server, shared and native code never import client code (#3729)** | `scripts/check-import-boundary.js` (Custom Rules). `app/api/`, `lib/data/`, `lib/ai/`, every `lib/` file they reach, all of `packages/shared/` and `mobile/` must not import `components/`, `lib/local-store/`, `lib/sqlite/`, `lib/hooks/` or `@capacitor/*` (the one list is `CLIENT_DIRS` there; tests are not checked). A commented, shrink-only allowlist holds today's client-only files in `packages/shared/` (`fetch-with-retry.ts` and six in `nutrition/`). Moved out of client files for it: `AchievementResult` → `packages/shared/src/types/achievement.ts` (re-exported by `components/profile/achievements-grid.tsx`); `RunPrescription` → `packages/shared/src/running/types.ts`; `LocalSleepSession` → `packages/shared/src/types/local-sleep-session.ts` (re-exported by `lib/local-store/types.ts`); `SYNC_DAYS_COLD`, `HR_UPLOAD_CHUNK`, `INTERVAL_UPLOAD_CHUNK`, `ActivityInterval`, `ActivityIntervalKind`, `HISTORY_WINDOW_DAYS`, `HISTORY_MAX_DAYS`, `historyFloor`, `historyDayRejection`, `importPastToleranceStartMs` → `packages/shared/src/health/health-connect-sync-limits.ts` (re-exported by `lib/health-connect-sync.ts` and `lib/health-connect-history-import.ts`). The native tests that compared against web source read frozen excerpts in `mobile/tests/fixtures/web-reference.json` and the cat art in `mobile/assets/cats/`; `scripts/__tests__/mobile-web-reference.test.ts` keeps both in step with the web files while those exist |
+| Shared types, file by file | `types/program.ts` (programs, phases, sessions, exercises, schedule) · `types/progression.ts` (progression styles and their sets) · `types/log.ts` (set and exercise logs, workout sessions) · `types/mood.ts` (check-in) · `types/injury.ts` · `types/supplement.ts` (doses, vials, day logs) · `types/user.ts` (activity levels, goals) · `types/friends.ts` (feed, leaderboard, titles) · `types/ai-periodization.ts` (phases, prescriptions, transitions) · `types/goal-recommendation.ts` · `types/builder.ts` (generated programs). Shapes only, no logic |
+| Write bodies shared by a route and `pushMutations` | One schema per table, so an offline write is bounded like an online one: `validation/activity-log.ts` (also `deriveEndTime`), `validation/food-item.ts`, `validation/mood-log.ts`, `validation/injury.ts`, `validation/supplement.ts`, `validation/oura-summary.ts` (the phone's nightly summary and derived row), `validation/phase-set.ts`, `validation/program-write.ts`, `workout/log-payload.ts`, `workout/complete-payload.ts` |
+| Import and report bodies | `validation/apple-health-import.ts` and `validation/health-connect-import.ts` (a batch, split into accepted samples and rejections), `validation/client-error.ts` (web and native error reports), `validation/app-load.ts` (`/api/app-load` rows, #3774) |
 | Zod validators | `packages/shared/src/validation/` (`body-metrics.ts`, `day-checkin.ts`, `session-rpe.ts`, `generated-program.ts`) and `packages/shared/src/validators/` |
 | "Does this payload say anything?" | `packages/shared/src/validation/day-checkin.ts` → `dayCheckinHasAnswers(body)` (Q-465). A shape-valid body can still carry no information: `{}` used to write a check-in row with every metric null, indistinguishable from one where the user answered nothing. Counts the ten scales, an illness context, a non-blank journal, a non-empty sore-muscle list — **not** `phase`/`date` (addressing) or the `*Touched` flags (metadata about a prefill). Used by the route **and** the `pushMutations` branch, because the outbox reaches the same table. If another domain grows the same problem, put its predicate beside its schema the same way. |
 | Cross-field plausibility (ingest) | `packages/shared/src/validation/plausibility.ts` — the one place a payload's fields are checked *against each other*, which per-field Zod bounds cannot express: `activityImplausibleReason` (speed/kcal/steps per minute, HR ordering; also used by `fitness-tests` after unit conversion), `sleepImplausibleReason` (stage total vs the night's span), `oneRmImplausible`, `rrContradictsBpm` (a chest-strap packet's RR set vs its own bpm). Every threshold is deliberately generous — a rejection means a decode fault or unit mix-up, never a hard session. **Reuse these; do not restate a bound.** |
@@ -880,5 +956,24 @@ Full list under `app/api/`. Groups:
 `/profile` (+ `/[userId]`) · `/chat` · `/year-review` · `/admin` · auth pages
 (`/sign-in`, `/register`, `/mobile-signin`, `/auth-mobile-bridge`, `/pending`) ·
 `/sheet/[id]/*` (deep-link shells).
-</content>
-</invoke>
+
+---
+
+## 17. Other shared modules (`packages/shared/src/`)
+
+Wording and display rules both apps print, and small shared constants.
+
+| Module | What it holds |
+|---|---|
+| `achievement-display.ts` | The level ladder, badge tiers, category order, title catalogue and trophy slots; `lib/achievements.ts` awards against the same ladder |
+| `collection/titles.ts` | The titles that unlock the collection pen's backdrop scenes (#2189) |
+| `session-icons.ts` | The session icons a program editor offers, stored as emoji |
+| `exercise-gif-matcher.ts` | Matches an exercise name to the GIF dataset, with typo fixes and manual overrides |
+| `format/temperature-deviation.ts` | Oura's night temperature deviation as "+0.30 °C", and its row (#3215) |
+| `health/contributor-guide.ts` | What each score contributor measures, what high and low mean, and how to move it |
+| `health/score-gap-copy.ts` | Wording for a missing score and for a contributor still learning its baseline |
+| `health/resilience-copy.ts` | What the readiness screen may say when no resilience level exists (LA-158) |
+| `nutrition/grocery-catalogue.ts` | The curated grocery lists the meal-plan flow and the Coach offer (Q-407) |
+| `nutrition/review-steps.ts` | Which evening wrap-up steps show, as prompt, summary or omitted (Q-112b) |
+| `admin-wipe-copy.ts` | The one sentence on what an admin reset or delete cannot reach (#3369) |
+| `auth/refresh-token.ts` | `REFRESH_TOKEN_RE`, the native refresh token's accepted shape (#2076) |

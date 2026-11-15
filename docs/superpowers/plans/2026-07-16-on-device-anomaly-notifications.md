@@ -501,5 +501,3 @@ Standard change (no migration, no auth/security, no data-dropping anything, no s
 - **Keep the reconcile effect self-contained** — its own `useEffect`, native-only, own try/catch, no edits to existing effects or `CACHE_TASKS`. `sync-provider.tsx` is a hot merge file; additive is conflict-light.
 - **The dedup map is date-keyed** — no cleanup logic needed, day rollover re-arms every type automatically (copy `supplement-reminders.ts`, don't invent a TTL).
 - If line numbers here have drifted (the repo moves fast), re-anchor by symbol name — the `reconcileSupplementReminders` effect for the wiring, the `toggleDayReviewReminders` row for the toggle.
-</content>
-</invoke>
