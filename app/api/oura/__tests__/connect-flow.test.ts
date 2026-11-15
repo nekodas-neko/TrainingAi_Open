@@ -281,6 +281,22 @@ describe('Oura connect routes (#2858)', () => {
     expect(await (await connection()).json()).toEqual({ connected: false, scope: null, expiresAt: null })
   })
 
+  // #3794: a grant Oura refused still says when data last arrived, so Preview can show it going stale.
+  it('the status of a refused grant keeps when data and the last webhook arrived', async () => {
+    const { url, cookie } = await startAndOpen('web')
+    oauthResponses()
+    await callback(callbackReq({ code: 'c1', state: url.searchParams.get('ticket')! }, cookie))
+    row = { ...row!, reauthRequiredAt: new Date('2026-11-10T00:00:00Z'), lastDataAt: new Date('2026-11-09T21:30:00Z'), lastWebhookAt: new Date('2026-11-09T21:31:00Z') }
+    const res = await connection()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({
+      connected: false, scope: null, expiresAt: null, reauthRequired: true,
+      lastDataAt: '2026-11-09T21:30:00.000Z', lastWebhookAt: '2026-11-09T21:31:00.000Z',
+    })
+    expect(JSON.stringify(body)).not.toMatch(/acc-1|ref-1|v1\./)
+  })
+
   it('status and disconnect need a signed-in user', async () => {
     authMock.mockResolvedValue(null)
     expect((await connection()).status).toBe(401)

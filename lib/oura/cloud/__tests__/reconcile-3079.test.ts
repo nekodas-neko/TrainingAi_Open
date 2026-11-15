@@ -6,10 +6,11 @@ import { shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import type { OuraBackfillResult, backfillOuraCloud } from '../backfill'
 import { NO_WRITES } from '../ingest'
-import { reconcileOuraCloud, startOuraReconcile, RECONCILE_DAYS } from '../reconcile'
-import { resetOuraCloudReportThrottle } from '../report'
+import { reconcileDaysFor, reconcileOuraCloud, reportReconcileGaps, startOuraReconcile, RECONCILE_DAYS, RECONCILE_WEEKLY_DAYS, RECONCILE_WEEKLY_WEEKDAY } from '../reconcile'
+import { OURA_DAILY_REPORT_INTERVAL_MS, reportOuraCloudIssue, resetOuraCloudReportThrottle } from '../report'
 
-vi.mock('@/lib/observability', () => ({ reportServerError: vi.fn() }))
+const reportServerError = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/observability', () => ({ reportServerError }))
 
 const CONFIG = { clientId: 'cid', clientSecret: 'cs', redirectUri: 'https://x/api/oura/callback' }
 // Local midday in Brisbane, so "today" is unambiguous whatever the machine's clock (dates rule).
@@ -79,3 +80,80 @@ describe('startOuraReconcile', () => {
     expect(startOuraReconcile({ NODE_ENV: 'production' } as NodeJS.ProcessEnv)).toBe(false)
   })
 })
+
+// #3795 item 4: once a week the same pass reaches back two weeks.
+describe('the weekly long read (#3795)', () => {
+  // Local midday on a Wednesday, and the day after, in Brisbane.
+  const WEDNESDAY = new Date('2026-10-21T02:00:00.000Z')
+  const THURSDAY = new Date('2026-10-22T02:00:00.000Z')
+
+  it('reaches back 14 days on the user\'s local weekly weekday, covering the night 13 days back, and 3 on any other day', async () => {
+    expect(new Date('2026-10-21T12:00:00Z').getUTCDay()).toBe(RECONCILE_WEEKLY_WEEKDAY)
+    const repo = fakeRepo([{ id: 'u1', timezone: 'Australia/Brisbane' }])
+    const backfill = vi.fn(async () => okResult()) as unknown as typeof backfillOuraCloud
+    const [weekly] = await reconcileOuraCloud({ repo, config: CONFIG, backfill, now: () => WEDNESDAY })
+    const to = toAestDay(WEDNESDAY, 'Australia/Brisbane')
+    expect(weekly.from).toBe(shiftDateStr(to, -(RECONCILE_WEEKLY_DAYS - 1)))
+    // Day 13 back is inside the range; day 14 is not.
+    expect(weekly.from <= shiftDateStr(to, -13)).toBe(true)
+    expect(weekly.from > shiftDateStr(to, -14)).toBe(true)
+
+    const [daily] = await reconcileOuraCloud({ repo, config: CONFIG, backfill, now: () => THURSDAY })
+    expect(daily.from).toBe(shiftDateStr(toAestDay(THURSDAY, 'Australia/Brisbane'), -(RECONCILE_DAYS - 1)))
+    expect(daily.from > shiftDateStr(daily.to, -13)).toBe(true)
+  })
+
+  it('takes the weekday from the user\'s own local day', () => {
+    // 21 Oct 02:00 UTC is Wednesday in Brisbane and still Tuesday in New York.
+    expect(reconcileDaysFor(toAestDay(WEDNESDAY, 'Australia/Brisbane'))).toBe(RECONCILE_WEEKLY_DAYS)
+    expect(reconcileDaysFor(toAestDay(WEDNESDAY, 'America/New_York'))).toBe(RECONCILE_DAYS)
+  })
+})
+
+// #3795 item 2: what a pass read but did not store is reported, not only a stop.
+describe('the reconcile reports what it did not store (#3795)', () => {
+  const messages = () => reportServerError.mock.calls.map(c => (c[0] as Error).message)
+  const gaps = (over: Partial<Extract<OuraBackfillResult, { ok: true }>['report']>) => ({ ...(okResult() as Extract<OuraBackfillResult, { ok: true }>).report, ...over })
+
+  it('reports non-zero dropped, forbidden and refused-despite-grant counts from a pass', async () => {
+    reportServerError.mockClear()
+    const repo = fakeRepo([{ id: 'u1', timezone: 'Australia/Brisbane' }])
+    const backfill = vi.fn(async () => ({ ok: true, report: gaps({ dropped: 2, forbidden: ['workout'], refusedDespiteGrant: ['daily_stress'] }) })) as unknown as typeof backfillOuraCloud
+    const [out] = await reconcileOuraCloud({ repo, config: CONFIG, backfill, now: () => NOW })
+    expect(out.result).toBe('ok')
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(3))
+    expect(messages()).toEqual(expect.arrayContaining([
+      expect.stringContaining('reconcile:dropped: 2 documents'),
+      expect.stringContaining('reconcile:forbidden: Oura refused workout'),
+      expect.stringContaining('reconcile:refused-despite-grant: Oura refused daily_stress'),
+    ]))
+  })
+
+  it('reports nothing for a clean pass', async () => {
+    reportServerError.mockClear()
+    reportReconcileGaps('u1', '2026-10-17', '2026-10-19', gaps({}))
+    await new Promise(r => setTimeout(r, 0))
+    expect(reportServerError).not.toHaveBeenCalled()
+  })
+
+  it('reports the expected daily_resilience refusal at most once a day, apart from a new type', async () => {
+    reportServerError.mockClear()
+    const t0 = Date.parse('2026-10-19T02:00:00Z')
+    const expected = (now: number) => reportOuraCloudIssue('reconcile:refused-despite-grant-expected', 'x', { intervalMs: OURA_DAILY_REPORT_INTERVAL_MS }, now)
+    expect(expected(t0)).toBe(true)
+    expect(expected(t0 + 3 * 60 * 60 * 1000)).toBe(false)
+    expect(expected(t0 + OURA_DAILY_REPORT_INTERVAL_MS)).toBe(true)
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(2))
+
+    resetOuraCloudReportThrottle()
+    reportServerError.mockClear()
+    reportReconcileGaps('u1', '2026-10-17', '2026-10-19', gaps({ refusedDespiteGrant: ['daily_resilience'] }))
+    reportReconcileGaps('u1', '2026-10-17', '2026-10-19', gaps({ refusedDespiteGrant: ['daily_resilience', 'daily_stress'] }))
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(2))
+    expect(messages()).toEqual([
+      expect.stringContaining('reconcile:refused-despite-grant-expected: Oura refused daily_resilience'),
+      expect.stringContaining('reconcile:refused-despite-grant: Oura refused daily_stress'),
+    ])
+  })
+})
+

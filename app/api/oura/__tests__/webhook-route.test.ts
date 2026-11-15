@@ -187,6 +187,23 @@ describe('/api/oura/webhook (#2859)', () => {
       expect(reportServerError).not.toHaveBeenCalled()
     })
 
+    // #3795 item 3: a document read past 4 s is a clean 503, and Oura's retry reads again.
+    it('answers 503 when the document read times out, and records nothing as a failure', async () => {
+      const timeout = vi.spyOn(AbortSignal, 'timeout')
+      try {
+        fetchMock.mockRejectedValueOnce(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+        const res = await POST(eventReq(EVENT))
+        expect(res.status).toBe(503)
+        expect(await res.json()).toEqual({ error: 'Temporarily unavailable' })
+        expect(timeout).toHaveBeenCalledWith(4_000)
+        expect(written).toEqual([])
+        await settle()
+        expect(reportServerError).not.toHaveBeenCalled()
+      } finally {
+        timeout.mockRestore()
+      }
+    })
+
     it('answers 503 and records a database failure', async () => {
       fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.daily_readiness))
       repo.upsertOuraDaily.mockRejectedValueOnce(new Error('db down'))
