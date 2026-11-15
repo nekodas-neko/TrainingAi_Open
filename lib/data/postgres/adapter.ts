@@ -4686,8 +4686,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // The best surviving log that may stand as the exercise's personal record: the one rule
   // `reconcilePersonalRecord` applies, read on its own so a report can say what reconciling would
-  // do without doing it (#3801). Null when no log qualifies.
-  async bestQualifyingPersonalRecord(userId: string, exerciseName: string): Promise<{ estimated1rm: number; loggedAt: Date } | null> {
+  // do without doing it (#3801). Null when no log qualifies. `excludeSessionIds` answers as if those
+  // sessions were tombstoned, so a dry run can say what a delete would do to the record (#3802).
+  async bestQualifyingPersonalRecord(userId: string, exerciseName: string, opts: { excludeSessionIds?: string[] } = {}): Promise<{ estimated1rm: number; loggedAt: Date } | null> {
+    const excluded = opts.excludeSessionIds ?? []
     const [best] = await this.db
       .select({ estimated1rm: s.exerciseLogs.estimated1rm, loggedAt: s.exerciseLogs.loggedAt })
       .from(s.exerciseLogs)
@@ -4698,6 +4700,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         gt(s.exerciseLogs.estimated1rm, 0),
         isNull(s.exerciseLogs.deletedAt),
         isNull(s.workoutSessions.deletedAt),
+        ...(excluded.length ? [notInArray(s.workoutSessions.id, excluded)] : []),
         // Mirrors shouldCountTowardPr's per-exercise deload gate — unconditional, no
         // baseline exception (the exercise itself was cut, unlike a whole-session deload).
         eq(s.exerciseLogs.exerciseDeloaded, false),
