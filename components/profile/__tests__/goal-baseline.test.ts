@@ -4,6 +4,7 @@ import path from 'node:path'
 import { calculateBaseline } from '@trainingai/shared/nutrition/goal-recommendation'
 import { goalBaseline } from '../goal-baseline'
 import type { User } from '@trainingai/shared/types'
+import { ageFromDob } from '@trainingai/shared/date-utils'
 import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
@@ -32,7 +33,10 @@ const INPUT = { user: COMPLETE_USER, latestWeightKg: 71.7, latestBodyFatPct: 18.
 
 describe('goalBaseline', () => {
   it('is calculateBaseline, not a second formula', () => {
-    const ageYears = new Date().getFullYear() - 1990 - (new Date() < new Date(`${new Date().getFullYear()}-06-15`) ? 1 : 0)
+    // The age comes from the same helper the code under test uses (#3803). Re-deriving it here
+    // compared the local clock with a UTC-midnight birthday, so the two disagreed for the first ten
+    // hours of 15 June in Brisbane. This test is about the formula, not the age arithmetic.
+    const ageYears = ageFromDob(COMPLETE_USER.dateOfBirth, new Date())
     expect(goalBaseline(INPUT)).toEqual(calculateBaseline({
       weightKg: 71.7,
       heightCm: 178,
