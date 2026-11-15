@@ -400,6 +400,7 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
       styleSetsById: new Map(userStyles.map(s => [s.id, s.sets])),
       equipmentOf: name => equipmentByName.get(name),
       focusMuscles: focusSet,
+      fullBodySplit: split.every(s => s.fullBody),
     })
 
     const styleById = new Map(userStyles.map(s => [s.id, s.name]))

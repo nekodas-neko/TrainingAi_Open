@@ -29,7 +29,14 @@ import {
 import { useWorkoutDraft } from '../workouts/data/useWorkoutDraft';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { ProgramDraftSchema, programPayload } from './editor-model';
-import { BuilderInputSchema, builderSteps, generatedDraft, reviewedProgram } from './builder-model';
+import {
+  BuilderInputSchema,
+  GenerateProgramResponseSchema,
+  builderSteps,
+  generatedDraft,
+  reviewedProgram,
+  sortedWeekDays,
+} from './builder-model';
 import { ProgramSessionList } from './ProgramSessionList';
 
 const schema = z.object({
@@ -41,6 +48,7 @@ const schema = z.object({
   includeBaseline: z.boolean(),
   clonedPhaseSetId: z.string().nullable(),
   phaseCycles: z.record(z.string(), z.number().int().min(1).max(52)).default({}),
+  checkNotes: z.array(z.string()).default([]),
 });
 const equipment = ['dumbbell', 'barbell', 'cable', 'kettlebell', 'full_gym'];
 const muscles = [
@@ -101,6 +109,7 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
     includeBaseline: false,
     clonedPhaseSetId: null,
     phaseCycles: {},
+    checkNotes: [],
   });
   const value = draft.value;
   const inputs = value.inputs;
@@ -120,12 +129,16 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
       if (!inputs.programName.trim() || !inputs.equipment.length || !inputs.musclesToFocus.length) {
         throw new Error('Choose a name, equipment and muscle focus.');
       }
-      const result = z
-        .object({ program: GeneratedProgramSchema })
-        .parse(await draft.resources.write('POST', '/api/generate-program', inputs));
+      const result = GenerateProgramResponseSchema.parse(
+        await draft.resources.write('POST', '/api/generate-program', {
+          ...inputs,
+          weeklyDays: sortedWeekDays(inputs.weeklyDays),
+        }),
+      );
       const next = {
         ...value,
         generated: result.program,
+        checkNotes: result.notes,
         review: generatedDraft(result.program, inputs, randomUUID),
         step: 99,
         chat: [],
@@ -444,7 +457,7 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
               <WeekdayPicker value={inputs.weeklyDays} onToggle={(day) => input({
                 weeklyDays: inputs.weeklyDays.includes(day)
                   ? inputs.weeklyDays.filter((value) => value !== day)
-                  : [...inputs.weeklyDays, day],
+                  : sortedWeekDays([...inputs.weeklyDays, day]),
               })} />
           )}
         </>
@@ -467,6 +480,11 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
           {value.generated?.reasoning && (
             <Disclosure title="Why this program">
               <AppText>{value.generated.reasoning}</AppText>
+              {value.checkNotes.length > 0 && (
+                <AppText>
+                  {`Checked against your settings:\n${value.checkNotes.map((note) => `• ${note}`).join('\n')}`}
+                </AppText>
+              )}
             </Disclosure>
           )}
           {inputs.progressionMode === 'phase' && (

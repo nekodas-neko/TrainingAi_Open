@@ -22,6 +22,8 @@ export interface SplitSession {
   name: string
   /** What the session should lead with, in words the prompt can hand to the model. */
   focus: string
+  /** The session trains every large muscle, so its neighbours share muscles by design (#3840). */
+  fullBody?: true
 }
 
 const FULL_BODY = 'every large muscle: chest, back, quads, hamstrings and glutes, with some shoulder and arm work'
@@ -30,10 +32,10 @@ const PULL = 'back (lats and upper back), biceps and rear shoulders'
 const LEGS = 'quads, hamstrings, glutes and calves'
 
 const SPLITS: Record<number, SplitSession[]> = {
-  1: [{ name: 'Full Body', focus: FULL_BODY }],
+  1: [{ name: 'Full Body', focus: FULL_BODY, fullBody: true }],
   2: [
-    { name: 'Full Body A', focus: FULL_BODY },
-    { name: 'Full Body B', focus: `${FULL_BODY}, using different exercises from Full Body A` },
+    { name: 'Full Body A', focus: FULL_BODY, fullBody: true },
+    { name: 'Full Body B', focus: `${FULL_BODY}, using different exercises from Full Body A`, fullBody: true },
   ],
   3: [
     { name: 'Push', focus: PUSH },

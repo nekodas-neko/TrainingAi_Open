@@ -150,7 +150,9 @@ function ExerciseForm({ initial, onSave, onCancel, saving }: {
     try {
       const res = await fetch("/api/exercises/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
+        // Editing an entry: its name resolves to itself in the library, so ask the model to refresh
+        // it instead (#3840). Adding still looks in the library first.
+        body: JSON.stringify(initial ? { name: name.trim(), refresh: true } : { name: name.trim() }),
       });
       if (!res.ok) { toast.error((await readAiPausedMessage(res)) ?? "Generation failed"); return; }
       const data = await res.json();

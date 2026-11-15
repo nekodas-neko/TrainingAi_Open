@@ -96,8 +96,9 @@ describe('generate-program checks the result in code (#3751)', () => {
     expect(program.sessions[0].exercises.map((e: { name: string }) => e.name))
       .toEqual(['Bench Press', 'Lateral Raise', 'Dumbbell Curl'])
     expect(notes).toContain('Removed Triceps Pushdown from Push to fit the 30-minute session.')
-    // One 4-set chest exercise a week is under hypertrophy's 8.
-    expect(notes).toContain('Chest gets 4 sets a week, under the 8 this goal starts at.')
+    // One 4-set chest exercise in Push, which a rest after every 3 of 3 sessions runs 1.75 times a
+    // week (#3840): 7 sets, under hypertrophy's 8.
+    expect(notes).toContain('Chest gets 7 sets a week, under the 8 this goal starts at.')
     expect(generateObject).toHaveBeenCalledTimes(1)
   })
 
@@ -106,5 +107,17 @@ describe('generate-program checks the result in code (#3751)', () => {
     const res = await post()
     expect(res.status).toBe(502)
     expect((await res.json()).error).toContain('Legs')
+  })
+
+  it('a 2-day full-body rotation gets no neighbour-overlap note (#3840)', async () => {
+    modelSessions = [
+      { icon: '🏋️', exercises: [mex('Bench Press', 'primary'), mex('Squat', 'secondary')] },
+      { icon: '🏋️', exercises: [mex('Bench Press', 'primary'), mex('Squat', 'secondary')] },
+    ]
+    const res = await post({ ...BODY, sessionsPerWeek: 2, timePerSessionMinutes: null })
+    expect(res.status).toBe(200)
+    const { program, notes } = await res.json()
+    expect(program.sessions.map((s: { name: string }) => s.name)).toEqual(['Full Body A', 'Full Body B'])
+    expect(notes.some((n: string) => n.includes('consecutive days'))).toBe(false)
   })
 })

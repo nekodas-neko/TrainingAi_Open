@@ -2,7 +2,7 @@
 // session minutes, weekly sets per large muscle, back-to-back muscles — checked in code, and the one
 // that code can repair (time) repaired in the order the prompt states.
 import { describe, it, expect } from 'vitest'
-import { backToBackPairs, checkGeneratedProgram, type ProgramCheckInput } from '../program-check'
+import { backToBackPairs, checkGeneratedProgram, sessionRunsPerWeek, type ProgramCheckInput } from '../program-check'
 import { splitForDays } from '../program-split'
 import { equipmentFromNamePrefix, equipmentLedByName } from '../equipment'
 import type { GeneratedExercise, GeneratedSession } from '../../types/builder'
@@ -108,6 +108,7 @@ describe('weekly sets per large muscle', () => {
     const result = checkGeneratedProgram(base({
       sessions: [session('Push', [ex('Bench Press', 'primary', ['Chest'])])],
       focusMuscles: new Set(['chest']),
+      schedule: { type: 'weekly', days: [0] },
     }))
     expect(result.underRange).toEqual([{ label: 'Chest', sets: 4, minimum: 8 }])
     expect(result.notes).toContain('Chest gets 4 sets a week, under the 8 this goal starts at.')
@@ -120,6 +121,7 @@ describe('weekly sets per large muscle', () => {
         session('Pull B', [ex('Lat Pulldown', 'secondary', ['Biceps'], 's4', ['Lats'])]),
       ],
       focusMuscles: new Set(['lats']),
+      schedule: { type: 'weekly', days: [0, 3] },
     }))
     // 4 (main, counted once despite two back muscles) + 4 × 0.5 = 6, under back's 10.
     expect(result.underRange).toEqual([{ label: 'Back', sets: 6, minimum: 10 }])
@@ -220,5 +222,71 @@ describe('equipment from the name prefix', () => {
     expect(equipmentLedByName('Kettlebell Goblet Squat', ['dumbbell', 'kettlebell'])).toEqual(['kettlebell', 'dumbbell'])
     expect(equipmentLedByName('Machine Leg Press', ['barbell'])).toEqual(['machine', 'barbell'])
     expect(equipmentLedByName('Plank', ['bodyweight'])).toEqual(['bodyweight'])
+  })
+})
+
+// #3840: rough edges found reviewing #3751.
+describe('weekly sets weigh each session by how often it runs', () => {
+  it('a rotation with a rest after every 3 runs each of 3 sessions 1.75 times a week', () => {
+    expect(sessionRunsPerWeek(3, { type: 'rotation', restAfterN: 3 })).toEqual([1.75, 1.75, 1.75])
+  })
+
+  it('weekly days run the k-th day’s session k mod n, so a session can run twice or not at all', () => {
+    expect(sessionRunsPerWeek(2, { type: 'weekly', days: [0, 2, 4] })).toEqual([2, 1])
+    expect(sessionRunsPerWeek(3, { type: 'weekly', days: [1] })).toEqual([1, 0, 0])
+  })
+
+  it('a session run 1.75 times a week counts its sets 1.75 times', () => {
+    // Chest: 4 sets in Push, run 1.75 times a week = 7, under hypertrophy's 8. Counted once it
+    // was 4, which made the note fire for programs well inside the range.
+    const result = checkGeneratedProgram(base({
+      sessions: [
+        session('Push', [ex('Bench Press', 'primary', ['Chest']), ex('Cable Fly', 'accessory', ['Chest'], 's3')]),
+        session('Pull', [ex('Barbell Row', 'primary', ['Lats'])]),
+        session('Legs', [ex('Squat', 'primary', ['Quads'])]),
+      ],
+      focusMuscles: new Set(['chest']),
+      schedule: { type: 'rotation', restAfterN: 3 },
+    }))
+    // (4 + 3) × 1.75 = 12.25, inside the range: no note.
+    expect(result.underRange).toEqual([])
+  })
+
+  it('a fractional total reads to one decimal', () => {
+    const result = checkGeneratedProgram(base({
+      sessions: [
+        session('Push', [ex('Bench Press', 'primary', ['Chest'], 's3')]),
+        session('Pull', [ex('Barbell Row', 'primary', ['Lats'])]),
+        session('Legs', [ex('Squat', 'primary', ['Quads'])]),
+      ],
+      focusMuscles: new Set(['chest']),
+      schedule: { type: 'rotation', restAfterN: 3 },
+    }))
+    expect(result.underRange).toEqual([{ label: 'Chest', sets: 5.3, minimum: 8 }])
+    expect(result.notes).toContain('Chest gets 5.3 sets a week, under the 8 this goal starts at.')
+  })
+})
+
+describe('a full-body split gets no neighbour-overlap note', () => {
+  const fullBody = [
+    session('Full Body A', [ex('Bench Press', 'primary', ['Chest']), ex('Squat', 'secondary', ['Quads'])]),
+    session('Full Body B', [ex('Bench Press', 'primary', ['Chest']), ex('Squat', 'secondary', ['Quads'])]),
+  ]
+
+  it('two full-body sessions on a rotation share muscles by design, so it is not reported', () => {
+    const result = checkGeneratedProgram(base({ sessions: fullBody, fullBodySplit: true, schedule: { type: 'rotation', restAfterN: 3 } }))
+    expect(result.sharedNeighbours).toEqual([])
+    expect(result.notes.some(n => n.includes('consecutive days'))).toBe(false)
+  })
+
+  it('the same sessions outside a full-body split are still reported', () => {
+    const result = checkGeneratedProgram(base({ sessions: fullBody, schedule: { type: 'rotation', restAfterN: 3 } }))
+    expect(result.sharedNeighbours).toHaveLength(1)
+  })
+
+  it('splitForDays marks the 1- and 2-day splits full body, and no other', () => {
+    for (let d = 1; d <= 7; d++) {
+      expect(splitForDays(d).every(s => s.fullBody)).toBe(d <= 2)
+    }
   })
 })
