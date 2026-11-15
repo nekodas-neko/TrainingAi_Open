@@ -16,6 +16,7 @@ import { PostgresWorkoutRepository } from '@/lib/data/postgres/adapter'
 import type { OuraRawAggregateResult } from '@/lib/data/repository'
 import type { StressBackfillReport } from '@/lib/oura-ble/stress-backfill'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
+import { setUserReadMemosEnabled } from '@/lib/data/postgres/user-read-memo'
 
 /** Everything `aggregateOuraRawSamples` accepts. The ingest path passes only `sinceDs`; the admin
  *  redecode route passes the rest. */
@@ -63,6 +64,11 @@ export type WorkerReply =
 // Deliberately NOT `getRepositoryAsync()`: that calls `ensureSchema()`, which runs the ~180-file
 // migration sweep. The main process already ran it at boot (instrumentation-node.ts), and a second
 // sweep racing it from a worker is a hazard, not a safety net.
+// #3793: a worker has its own `globalThis`, so it would get its own copy of the per-user read memos,
+// and the writes that clear them (token saves, raw-frame inserts, profile edits) all run on the main
+// thread. The switch-day memo here would then answer from before a Cloud connection for up to an
+// hour, and BLE nights the main thread would hold back for Cloud would be written. Read live instead.
+setUserReadMemosEnabled(false)
 const repo = new PostgresWorkoutRepository()
 
 /**

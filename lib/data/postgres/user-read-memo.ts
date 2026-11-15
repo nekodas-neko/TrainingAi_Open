@@ -8,8 +8,10 @@
 // a hand-run statement, a second instance).
 //
 // **One process.** Like `observed-hr-day-cache.ts` (#3774), this is a Map in the server's memory,
-// on `globalThis` so every route bundle shares it. The app runs as one long-lived process; with two
-// instances a write on one would leave the other's entry stale until `maxAgeMs`.
+// on `globalThis` so every route bundle in the main thread shares it. A worker thread has its own
+// `globalThis` and never hears the main thread's drops, so a worker turns the memos off
+// (`rollup-worker-entry.ts`). The app runs as one long-lived process; with two instances a write on
+// one would leave the other's entry stale until `maxAgeMs`.
 //
 // Off under test unless a test turns it on, so suites sharing a user id never see each other's rows.
 
