@@ -21,24 +21,26 @@ async function googleUser(email: string, name: string | null | undefined, oauthS
   if (linked) {
     return linked
   }
+  // One rule for both paths below (#3797 item 3): an invite activates the account only when Google
+  // is authoritative for the address (`authorizeSignIn` has already required `email_verified`).
+  const invited = async () => authoritativeEmail && await repository.isInvited(email)
   const existing = await repository.getUserByEmail(email)
   if (existing) {
     if (existing.oauthSub || !authoritativeEmail) {
       return null
     }
-    if (!await repository.linkOAuthAccount(existing.id, oauthSub)) {
+    if (!await repository.linkOAuthAccount(existing.id, oauthSub, { activate: await invited() })) {
       return repository.getUserByOAuthSub(oauthSub)
     }
     return repository.getUserById(existing.id)
   }
 
-  const invited = authoritativeEmail && await repository.isInvited(email)
   return repository.upsertUser({
     oauthSub,
     email,
     name: name ?? undefined,
     timezone: 'Australia/Brisbane',
-  }, invited)
+  }, await invited())
 }
 
 export async function authorizeSignIn({ user, account, profile }: {

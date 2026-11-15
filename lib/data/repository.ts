@@ -626,6 +626,8 @@ export interface WorkoutRepository {
   getUserByOAuthSub(oauthSub: string): Promise<User | null>
   getUserByProvider(provider: AuthProvider, subject: string): Promise<User | null>
   getUserProviders(userId: string): Promise<AuthProvider[]>
+  /** #3797: when the newest sign-in method was linked onto the account, or null when none is. */
+  getLatestIdentityLinkedAt(userId: string): Promise<Date | null>
   linkIdentity(userId: string, provider: AuthProvider, subject: string, email?: string): Promise<boolean>
   createProviderUser(provider: AuthProvider, subject: string, email: string, name?: string): Promise<User>
   createAppleAuthAttempt(nonceHash: string, userId: string | null): Promise<AppleAuthAttempt>
@@ -694,7 +696,8 @@ export interface WorkoutRepository {
   touchLastGoalReviewAt(userId: string): Promise<void>
   updateUserAvatar(userId: string, avatar: string): Promise<User>
   updateUserPassword(userId: string, passwordHash: string): Promise<void>
-  linkOAuthAccount(userId: string, oauthSub: string): Promise<boolean>
+  /** #3797: a password it clears ends that password's native sign-ins; `activate` for a verified, invited address. */
+  linkOAuthAccount(userId: string, oauthSub: string, opts?: { activate?: boolean }): Promise<boolean>
   getTimingBaselineDate(userId: string): Promise<string | null>
   setTimingBaselineDate(userId: string, date: string | null): Promise<void>
   createEmailUser(email: string, passwordHash: string, name?: string, isActive?: boolean): Promise<User>

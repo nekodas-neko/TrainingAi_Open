@@ -610,6 +610,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const email = normalizeEmail(user.email)
     const invited = forceActive ?? await this.isInvited(email)
     const r = await this.db.transaction(async x => {
+      // #3797: this upsert is also a link, when a password account registered the address between
+      // sign-in's lookup and here. A password it clears ends that password's native sign-ins, as
+      // `linkOAuthAccount` does. Read without a lock to find whose families to lock first (see
+      // `lockEveryNativeFamily`); a row registered after this read is new and inactive, and an
+      // inactive account is never issued a native sign-in.
+      const [prior] = user.oauthSub
+        ? await x.select({ id: s.users.id, passwordHash: s.users.passwordHash }).from(s.users)
+          .where(eq(sql`lower(${s.users.email})`, email)).limit(1)
+        : []
+      if (prior?.passwordHash) await nativeRefreshTokens.lockEveryNativeFamily(x, prior.id)
       const [r] = await x.insert(s.users)
         .values({ oauthSub: user.oauthSub ?? null, email, name: user.name ?? null, isActive: invited })
         .onConflictDoUpdate({
@@ -620,6 +630,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             passwordHash: sql`CASE WHEN ${s.users.oauthSub} IS NULL AND EXCLUDED.oauth_sub IS NOT NULL
               AND NOT EXISTS (SELECT 1 FROM auth_identities WHERE user_id = users.id)
               THEN NULL ELSE ${s.users.passwordHash} END`,
+            // #3797 item 3: linking onto an existing row activates it when the address is invited
+            // and verified, as the insert above does for a new row. It never deactivates.
+            isActive: sql`${s.users.isActive} OR (${s.users.oauthSub} IS NULL AND EXCLUDED.oauth_sub IS NOT NULL AND ${invited})`,
           },
           setWhere: or(isNull(s.users.oauthSub), eq(s.users.oauthSub, user.oauthSub ?? '')),
         })
@@ -628,6 +641,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         throw new Error('Email is already linked to another Google account')
       }
 
+      if (prior?.passwordHash && r.id === prior.id && r.passwordHash === null) {
+        await nativeRefreshTokens.revokeEveryNativeSignIn(x, r.id)
+      }
       if (user.oauthSub) {
         await x.insert(s.authIdentities).values({ userId: r.id, provider: 'google', subject: user.oauthSub, email }).onConflictDoNothing()
       }
@@ -892,6 +908,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async getUserProviders(userId: string) { return authData.getUserProviders(this.db, userId) }
+  async getLatestIdentityLinkedAt(userId: string) { return authData.getLatestIdentityLinkedAt(this.db, userId) }
   async linkIdentity(userId: string, provider: AuthProvider, subject: string, email?: string) {
     return authData.linkIdentity(this.db, userId, provider, subject, email)
   }
@@ -1035,15 +1052,47 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     await this.db.update(s.users).set({ timingBaselineDate: date }).where(eq(s.users.id, userId))
   }
 
-  async linkOAuthAccount(userId: string, oauthSub: string): Promise<boolean> {
+  /**
+   * Link a Google identity onto an account found by its address (`lib/auth/sign-in.ts`).
+   *
+   * The password is cleared when the account has no other sign-in method: registration never proved
+   * the registrant owned the address (RV-192), Google just did. #3797: whoever signed in with that
+   * password is signed out in the same transaction, so a sign-in the address's owner never made
+   * cannot outlive the link. Every native sign-in is revoked (`revokeEveryNativeSignIn`). Web
+   * sessions are stateless cookies; the request making this link is the one that gets the next
+   * cookie, and a first password then needs a sign-in no older than this link
+   * (`app/api/user/password/route.ts`). When the password is kept (another method was linked
+   * already), nobody is signed out.
+   *
+   * `activate` (#3797 item 3): the address is invited and Google verified it, so the account is
+   * activated, as a new Google account for an invited address is. It never deactivates.
+   */
+  async linkOAuthAccount(userId: string, oauthSub: string, opts: { activate?: boolean } = {}): Promise<boolean> {
     return this.db.transaction(async x => {
-      const rows = await x.update(s.users).set({ oauthSub, passwordHash: sql`CASE WHEN EXISTS (SELECT 1 FROM auth_identities WHERE user_id = ${s.users.id}) THEN ${s.users.passwordHash} ELSE NULL END` })
-        .where(and(eq(s.users.id, userId), isNull(s.users.oauthSub)))
-        .returning({ id: s.users.id, email: s.users.email })
-      if (!rows.length) {
+      // Families before the user row: see `lockEveryNativeFamily`.
+      await nativeRefreshTokens.lockEveryNativeFamily(x, userId)
+      const [before] = await x.select({ passwordHash: s.users.passwordHash }).from(s.users)
+        .where(and(eq(s.users.id, userId), isNull(s.users.oauthSub))).for('update')
+      if (!before) {
         return false
       }
-      await x.insert(s.authIdentities).values({ userId, provider: 'google', subject: oauthSub, email: rows[0].email })
+      const rows = await x.update(s.users).set({
+        oauthSub,
+        passwordHash: sql`CASE WHEN EXISTS (SELECT 1 FROM auth_identities WHERE user_id = ${s.users.id}) THEN ${s.users.passwordHash} ELSE NULL END`,
+        ...(opts.activate ? { isActive: true } : {}),
+      })
+        .where(and(eq(s.users.id, userId), isNull(s.users.oauthSub)))
+        .returning({ id: s.users.id, email: s.users.email, passwordHash: s.users.passwordHash })
+      if (rows.length !== 1) {
+        return false
+      }
+      if (before.passwordHash !== null && rows[0].passwordHash === null) {
+        await nativeRefreshTokens.revokeEveryNativeSignIn(x, userId)
+      }
+      const linked = await x.insert(s.authIdentities)
+        .values({ userId, provider: 'google', subject: oauthSub, email: rows[0].email })
+        .returning({ userId: s.authIdentities.userId })
+      if (linked.length !== 1) throw new Error('Google identity was not linked')
       return true
     })
   }

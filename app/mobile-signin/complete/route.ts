@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { auth } from '@/auth';
 import { mintMobileBridgeToken } from '@/lib/auth/mobile/bridge';
 import { MOBILE_CHALLENGE_COOKIE } from '@/lib/auth/mobile/challenge-cookie';
+import { clearSessionCookies } from '@/lib/auth/clear-session-cookies';
 import {
   hasNativeConsent,
   nativeReturnUrl,
@@ -29,6 +30,10 @@ export async function GET() {
     NATIVE_CONSENT_COOKIE,
   ])
     response.cookies.delete(name);
+  // #3797: the browser's session was only the way to this bridge code; the code already carries its
+  // value (`mintMobileBridgeToken`). Left in place it stays signed in to the web app on the phone's
+  // browser, is not listed under Signed-in devices, and revoking the phone does not end it.
+  clearSessionCookies({ cookies: store }, response);
   response.headers.set('Cache-Control', 'private, no-store');
   return response;
 }

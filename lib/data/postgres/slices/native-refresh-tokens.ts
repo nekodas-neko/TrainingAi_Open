@@ -252,6 +252,43 @@ export async function revokeNativeRefreshTokenFamily(
   })
 }
 
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
+
+/** #3797: take the family lock of every family the account has, in a fixed order. A caller that
+ *  will also lock the `users` row (linking an identity) takes these FIRST: a rotation holds its
+ *  family lock while its insert waits on the `users` row (the foreign-key check), so locking the
+ *  user first and a family second can deadlock with it. Advisory locks are re-entrant, so the
+ *  revocation below taking them again is free. */
+export async function lockEveryNativeFamily(tx: Tx, userId: string): Promise<void> {
+  const rows = await tx.selectDistinct({ familyId: t.familyId }).from(t)
+    .where(eq(t.userId, userId))
+    .orderBy(t.familyId)
+  for (const r of rows) await lockFamily(tx, r.familyId)
+}
+
+/**
+ * #3797: end every native sign-in the account has, inside the caller's transaction. Used when a
+ * password is cleared by linking a sign-in method onto the account: whoever signed in with that
+ * password, on any device, is signed out. Every row not yet revoked is revoked (rotated and expired
+ * ones too, so presenting one later reads as revoked rather than as reuse). The reason is
+ * `password_change`, the CHECK's value for exactly this; a new value would need a migration.
+ *
+ * Fails closed: after the UPDATE, a row still unrevoked (one a concurrent sign-in inserted that this
+ * statement could not see) throws, and the caller's transaction, the link included, rolls back.
+ * Returns how many rows it revoked.
+ */
+export async function revokeEveryNativeSignIn(tx: Tx, userId: string): Promise<number> {
+  await lockEveryNativeFamily(tx, userId)
+  const revoked = await tx.update(t)
+    .set({ revokedAt: sql`now()`, revokedReason: 'password_change' })
+    .where(and(eq(t.userId, userId), isNull(t.revokedAt)))
+    .returning({ id: t.id })
+  const [left] = await tx.select({ n: sql<number>`count(*)::int` }).from(t)
+    .where(and(eq(t.userId, userId), isNull(t.revokedAt)))
+  if ((left?.n ?? 0) !== 0) throw new Error('native sign-ins changed while they were being ended')
+  return revoked.length
+}
+
 /** The caller's live tokens — one per signed-in device: not rotated, not revoked, not expired.
  *  Newest first. Never carries a hash. */
 export async function listActiveNativeRefreshTokens(db: Db, userId: string): Promise<NativeRefreshToken[]> {

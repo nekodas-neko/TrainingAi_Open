@@ -3,6 +3,7 @@ import { normalizeEmail } from '@trainingai/shared/validation/email'
 import type { getDb } from '../client'
 import { authIdentities, appleAuthAttempts, users } from '../schema'
 import { IdentityConflict } from '@/lib/auth/identity'
+import { revokeEveryNativeSignIn } from './native-refresh-tokens'
 import type { AuthProvider } from '@/lib/auth/identity'
 
 type Db = ReturnType<typeof getDb>
@@ -18,6 +19,13 @@ export async function getUserProviders(db: Db, userId: string): Promise<AuthProv
   const rows = await db.select({ provider: authIdentities.provider }).from(authIdentities)
     .where(eq(authIdentities.userId, userId))
   return rows.map(x => x.provider)
+}
+
+/** #3797: when the newest sign-in method (Google, Apple) was linked onto the account; null when none. */
+export async function getLatestIdentityLinkedAt(db: Db, userId: string): Promise<Date | null> {
+  const [row] = await db.select({ at: sql<Date | null>`max(${authIdentities.createdAt})` }).from(authIdentities)
+    .where(eq(authIdentities.userId, userId))
+  return row?.at ? new Date(row.at) : null
 }
 
 export async function linkIdentity(db: Db, userId: string, provider: AuthProvider, subject: string, email?: string) {
@@ -60,7 +68,13 @@ export async function createProviderUser(db: Db, provider: AuthProvider, subject
       if (user.isActive || user.oauthSub || identities.length) {
         throw new IdentityConflict()
       }
+      const hadPassword = user.passwordHash !== null
       ;[user] = await x.update(users).set({ passwordHash: null }).where(eq(users.id, user.id)).returning()
+      // #3797: a cleared password ends that password's native sign-ins, as a Google link does
+      // (`linkOAuthAccount`). Only an inactive account reaches here, and an inactive account is not
+      // issued or rotated native sign-ins, so the user row is locked before the families without
+      // the deadlock the Google link orders against.
+      if (hadPassword) await revokeEveryNativeSignIn(x, user.id)
     }
     await x.insert(authIdentities).values({ userId: user.id, provider, subject, email: normalized })
     return user

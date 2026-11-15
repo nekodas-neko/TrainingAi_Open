@@ -4,6 +4,8 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { freshForFirstPassword, FRESH_SIGN_IN_ERROR } from '@/lib/auth/fresh-sign-in'
+import { nowSeconds } from '@/lib/auth/session-cutoff'
 const MAX_BODY_BYTES = 4 * 1024
 
 export async function PATCH(req: NextRequest) {
@@ -37,6 +39,14 @@ export async function PATCH(req: NextRequest) {
     const valid = await verifyPassword(currentPassword, user.passwordHash)
     if (!valid) {
       return NextResponse.json({ error: 'Current password is incorrect.' }, { status: 400 })
+    }
+  } else {
+    // #3797: a first password needs a fresh sign-in (`lib/auth/fresh-sign-in.ts`). A native bearer
+    // token is re-stamped at every rotation, so its `signedInAt` is not a sign-in time and cannot
+    // show freshness: refused, fail closed. Setting a password is a web-screen action.
+    const bearer = req.headers.get('authorization')?.toLowerCase().startsWith('bearer ') === true
+    if (bearer || !freshForFirstPassword(session.signedInAt, await repo.getLatestIdentityLinkedAt(session.user.id), nowSeconds())) {
+      return NextResponse.json({ error: FRESH_SIGN_IN_ERROR, code: 'reauth_required' }, { status: 403 })
     }
   }
 
