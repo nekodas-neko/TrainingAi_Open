@@ -56,11 +56,14 @@ export async function heartHealthDays(
   repo: WorkoutRepository, userId: string, tz: string, from: string, to: string,
   profile?: Profile,
 ): Promise<HeartHealthDay[]> {
-  const [runs, logs, resolved] = await Promise.all([
+  const [allRuns, logs, resolved] = await Promise.all([
     repo.getPrescribedRuns(userId, from, to),
     repo.listActivityLogs(userId, from, to),
     profile ? Promise.resolve(profile) : resolveHrProfile(repo, userId, tz),
   ])
+  // #3779: a walking plan's day (`run_type = 'walk'`) is judged by the walking plan's own rules,
+  // on the server (`walking-plan-service.ts`), never by this one.
+  const runs = allRuns.filter((r) => r.runType !== 'walk')
   if (runs.length === 0) return []
   const floorBpm = heartHealthFloorBpm({ maxHr: resolved.maxHr, restingHr: resolved.restingHr })
   const runDates = new Set(runs.map((r) => r.date))

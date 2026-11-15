@@ -6,7 +6,8 @@ import { z } from 'zod'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, startOfWeekInTz } from '@trainingai/shared/date-utils'
 import { heartHealthDays, type HeartHealthDay } from '@/lib/health/heart-health-service'
 import { prescribeNextRun, OVERRIDE_RATIONALE_PREFIX } from '@trainingai/shared/running/prescription'
-import { defaultFrameworkForGoal, CARDIO_GOALS } from '@trainingai/shared/running/cardio-goals'
+import { defaultFrameworkForGoal, CARDIO_GOALS, cardioPlanKind, WALKING_FRAMEWORK_KEY } from '@trainingai/shared/running/cardio-goals'
+import { settleWalkingPlan } from '@/lib/health/walking-plan-service'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
 import type { GateAction } from '@trainingai/shared/running/recovery-gate'
 import type { GoalKind, Prescription, RunType } from '@trainingai/shared/running/types'
@@ -36,8 +37,29 @@ async function weekHeartHealth(repo: Awaited<ReturnType<typeof getRepository>>, 
   return { days }
 }
 
+/**
+ * #3779 — a walking plan's payload. Same top-level shape as a running plan's, so a screen that
+ * reads `plan`/`run`/`goal` keeps working: `prescription` is null (a walking plan never prescribes a
+ * run), `heartHealth.days` is empty (its days are completed on the server, not by the device's
+ * heart-health hook), and everything the walking screens read is under `walking`.
+ */
+async function walkingPayload(
+  repo: Awaited<ReturnType<typeof getRepository>>, userId: string, tz: string,
+  plan: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getRepository>>['getActiveRunningPlan']>>>,
+) {
+  const walking = await settleWalkingPlan(repo, userId, tz, { plan })
+  const today = todayInTz(tz)
+  const run = (await repo.getPrescribedRuns(userId, today, today)).find((r) => r.planId === plan.id) ?? null
+  const goalMeta = CARDIO_GOALS[plan.goalKind as GoalKind] ?? CARDIO_GOALS.walking
+  return {
+    plan, prescription: null, gateAction: 'proceed' as GateAction, gateReasons: [], run,
+    goal: { key: goalMeta.key, label: goalMeta.label, blurb: goalMeta.blurb },
+    isPushSession: false, heartHealth: { days: [] as HeartHealthDay[] }, walking,
+  }
+}
+
 const CreateBody = z.object({
-  goalKind: z.enum(['speed', 'endurance', 'heart_health', 'recovery', 'intervals', 'cardio_health', 'distance_event']).default('heart_health'),
+  goalKind: z.enum(['speed', 'endurance', 'heart_health', 'recovery', 'intervals', 'cardio_health', 'distance_event', 'walking']).default('heart_health'),
   targetDistanceKm: z.number().positive().optional(),
   targetDate: z.string().optional(),
   frameworkKey: z.string().optional(),
@@ -58,6 +80,9 @@ export async function GET() {
 
   const plan = await repo.getActiveRunningPlan(userId)
   if (!plan) return NextResponse.json({ plan: null, prescription: null }, { headers: { 'Cache-Control': NO_STORE } })
+  if (cardioPlanKind(plan) === 'walking') {
+    return NextResponse.json(await walkingPayload(repo, userId, tz, plan), { headers: { 'Cache-Control': NO_STORE } })
+  }
 
   const today = todayInTz(tz)
   const fitness = await resolveSnapshot(repo, userId, tz)
@@ -166,6 +191,15 @@ export async function POST(req: Request) {
   const repo = await getRepository()
   // Framework defaults from the chosen goal (speed→VO₂max intervals, heart_health→Zone 2,
   // recovery→aerobic, endurance→polarized); an explicit frameworkKey still overrides.
+  if (parsed.data.goalKind === 'walking') {
+    // #3779: no run framework, no fitness snapshot and no recovery gate. The plan's starting
+    // targets are set from the person's history on the first settle, inside `walkingPayload`.
+    const plan = await repo.saveRunningPlan(userId, {
+      goalKind: 'walking', targetDistanceKm: null, targetDate: null, frameworkKey: WALKING_FRAMEWORK_KEY,
+      timePerSessionMinutes: null, fitnessSnapshot: {}, isActive: true,
+    })
+    return NextResponse.json(await walkingPayload(repo, userId, tz, plan), { headers: { 'Cache-Control': NO_STORE } })
+  }
   const frameworkKey = parsed.data.frameworkKey ?? defaultFrameworkForGoal(parsed.data.goalKind)
   const fitness = await resolveSnapshot(repo, userId, tz)
 

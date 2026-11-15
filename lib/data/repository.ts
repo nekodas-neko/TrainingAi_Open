@@ -836,6 +836,9 @@ export interface WorkoutRepository {
   deleteFitnessTest(userId: string, id: string): Promise<void>
   getActiveRunningPlan(userId: string): Promise<RunningPlan | null>
   saveRunningPlan(userId: string, plan: Omit<RunningPlan, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<RunningPlan>
+  /** #3779: replaces the plan's `fitness_snapshot` jsonb (where a walking plan keeps its targets and
+   *  judged weeks), scoped to the user. Null when no such plan is theirs. */
+  updateRunningPlanSnapshot(userId: string, planId: string, fitnessSnapshot: Record<string, unknown>): Promise<RunningPlan | null>
   getPrescribedRuns(userId: string, from: string, to: string): Promise<PrescribedRun[]>
   upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt' | 'completedAs'>): Promise<PrescribedRun>
   updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate): Promise<PrescribedRun | null>

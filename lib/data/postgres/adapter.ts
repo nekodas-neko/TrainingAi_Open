@@ -3325,6 +3325,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return this.rowToRunningPlan(r)
   }
 
+  async updateRunningPlanSnapshot(userId: string, planId: string, fitnessSnapshot: Record<string, unknown>): Promise<RunningPlan | null> {
+    // Every value is built by the walking-plan service; nothing from a request body reaches here.
+    const [r] = await this.db.update(s.runningPlans)
+      .set({ fitnessSnapshot, updatedAt: new Date() })
+      .where(and(eq(s.runningPlans.id, planId), eq(s.runningPlans.userId, userId)))
+      .returning()
+    return r ? this.rowToRunningPlan(r) : null
+  }
+
   async getPrescribedRuns(userId: string, from: string, to: string): Promise<PrescribedRun[]> {
     const rows = await this.db.select().from(s.prescribedRuns)
       .where(and(

@@ -7,7 +7,7 @@ import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { prescribeOverride, OVERRIDE_RATIONALE_PREFIX } from '@trainingai/shared/running/prescription'
 import { targetsForRunType } from '@trainingai/shared/running/hr-targets'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
-import { CARDIO_GOALS } from '@trainingai/shared/running/cardio-goals'
+import { CARDIO_GOALS, cardioPlanKind } from '@trainingai/shared/running/cardio-goals'
 import type { GoalKind, Prescription, RunType } from '@trainingai/shared/running/types'
 import { assembleInputs, resolveSnapshot } from '@trainingai/shared/running/assemble-plan-context'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -54,6 +54,8 @@ export async function POST(req: Request) {
 
   const plan = await repo.getActiveRunningPlan(userId)
   if (!plan) return NextResponse.json({ error: 'No active running plan' }, { status: 404 })
+  // #3779: a walking plan never prescribes a run, so there is no run to override.
+  if (cardioPlanKind(plan) === 'walking') return NextResponse.json({ error: 'A walking plan has no run to override' }, { status: 409 })
 
   const fitness = await resolveSnapshot(repo, userId, tz)
   const { ctx, gate } = await assembleInputs(repo, userId, tz, fitness, plan)

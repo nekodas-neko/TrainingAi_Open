@@ -32,6 +32,16 @@ export interface CardioGoalMeta {
   selectable: boolean
 }
 
+/** The framework key a walking plan stores. No `RunFramework` has it: nothing prescribes a run. */
+export const WALKING_FRAMEWORK_KEY = 'walking-heart-health'
+
+export type CardioPlanKind = 'walking' | 'running'
+
+/** Which of the two plans (#3779) a stored plan is. Every goal but `walking` is a running goal. */
+export function cardioPlanKind(plan: { goalKind: string; frameworkKey?: string | null }): CardioPlanKind {
+  return plan.goalKind === 'walking' || plan.frameworkKey === WALKING_FRAMEWORK_KEY ? 'walking' : 'running'
+}
+
 export const CARDIO_GOALS: Record<GoalKind, CardioGoalMeta> = {
   speed: {
     key: 'speed',
@@ -77,6 +87,19 @@ export const CARDIO_GOALS: Record<GoalKind, CardioGoalMeta> = {
     needsTargetDistance: false,
     markers: ['vo2max', 'hrr1', 'efficiency', 'zone_distribution'],
     selectable: true,
+  },
+  // #3779 — the walking and heart-health plan. Judged on steps per day and active minutes per week
+  //   (`walking-plan.ts`, `walking-minutes.ts`); it never prescribes a run, and no framework or
+  //   recovery gate runs for it. Hidden from the one-list picker: the owner chose to ask "walk or
+  //   run" first (pick 1A), and that chooser arrives with the screens.
+  walking: {
+    key: 'walking',
+    label: 'Walking and heart health',
+    blurb: 'Your steps each day and your active minutes each week, growing slowly. A brisk walk does it; no running.',
+    defaultFrameworkKey: WALKING_FRAMEWORK_KEY,
+    needsTargetDistance: false,
+    markers: ['resting_hr', 'zone_distribution'],
+    selectable: false,
   },
   // ── Legacy aliases (pre-Phase-2 plans) — hidden from the picker, kept so a stored
   //    plan still resolves a framework/markers. ────────────────────────────────────
