@@ -8,7 +8,7 @@ import { shiftDateStr, weekStartForDay } from '../../date-utils'
 import {
   applyStepBack, dailyMinutesShare, firstJudgedWeek, initialWalkingState, judgeWeek, measureWeek,
   MINUTES_CEILING_PLUS, parseWalkingState, setMinutesCeiling, startingMinutesTarget, startingStepsTarget,
-  stepBackOffers, stepsCeiling, walkingDayRationale, walkingDayVerdict, weeksToJudge,
+  settleWeeks, stepBackOffers, stepsCeiling, walkingDayRationale, walkingDayVerdict, weeksInGrace, weeksToJudge,
   type WalkingDayMeasure, type WalkingPlanState,
 } from '../walking-plan'
 
@@ -216,11 +216,18 @@ describe('when weeks are judged', () => {
     expect(firstJudgedWeek('2026-11-05')).toBe('2026-11-09') // a Thursday
     expect(firstJudgedWeek('2026-11-08')).toBe('2026-11-09') // a Sunday
   })
-  it('only weeks that have ended, oldest first', () => {
+  it('a week is frozen only two days after its Sunday; until then it is in its grace, oldest first', () => {
     const s = state({ nextWeekToJudge: MONDAY })
     expect(weeksToJudge(s, shiftDateStr(MONDAY, 6))).toEqual([]) // still that Sunday
-    expect(weeksToJudge(s, shiftDateStr(MONDAY, 7))).toEqual([MONDAY]) // the next Monday
+    expect(weeksInGrace(s, shiftDateStr(MONDAY, 6))).toEqual([])
+    expect(weeksToJudge(s, shiftDateStr(MONDAY, 7))).toEqual([]) // the next Monday: in its grace
+    expect(weeksInGrace(s, shiftDateStr(MONDAY, 7))).toEqual([MONDAY])
+    expect(weeksInGrace(s, shiftDateStr(MONDAY, 8))).toEqual([MONDAY]) // Tuesday
+    expect(weeksToJudge(s, shiftDateStr(MONDAY, 9))).toEqual([MONDAY]) // Wednesday: frozen
+    expect(weeksInGrace(s, shiftDateStr(MONDAY, 9))).toEqual([])
     expect(weeksToJudge(s, shiftDateStr(MONDAY, 16))).toEqual([MONDAY, shiftDateStr(MONDAY, 7)])
+    expect(weeksToJudge(s, shiftDateStr(MONDAY, 14))).toEqual([MONDAY])
+    expect(weeksInGrace(s, shiftDateStr(MONDAY, 14))).toEqual([shiftDateStr(MONDAY, 7)])
   })
   it('weeks are Monday to Sunday', () => {
     expect(weekStartForDay('2026-11-08')).toBe('2026-11-02')
@@ -241,5 +248,69 @@ describe('stored state', () => {
     expect(parseWalkingState({ ...s, version: 2 })).toBeNull()
     expect(parseWalkingState({ ...s, minutesCeiling: 200 })).toBeNull()
     expect(parseWalkingState({ ...s, stepsTarget: '9000' })).toBeNull()
+  })
+})
+
+describe('a week is re-judged until its grace passes, then frozen', () => {
+  // Steps target 8,000; Monday to Saturday four days met it. Sunday's 9,000 decides the week.
+  const s0 = state({ stepsTarget: 8000, minutesTarget: 90, nextWeekToJudge: MONDAY, stepsStreak: 1 })
+  const sixDays = week(MONDAY, (i) => ({ steps: i < 4 ? 9000 : i < 6 ? 3000 : null }))
+  const withSunday = sixDays.map((d) => (d.date === shiftDateStr(MONDAY, 6) ? { ...d, steps: 9000 } : d))
+  const nextMonday = shiftDateStr(MONDAY, 7)
+  const wednesday = shiftDateStr(MONDAY, 9)
+
+  it('Sunday\'s steps arriving on Monday, after a first judgement, change the verdict', () => {
+    const first = settleWeeks(s0, sixDays, nextMonday, noGoal)
+    expect(first.judged).toEqual([])
+    expect(first.frozen).toEqual(s0) // nothing stored yet
+    expect(first.current.weeks.at(-1)).toMatchObject({ weekStart: MONDAY, stepDaysMet: 4, stepsMet: false, provisional: true })
+    expect(first.current.stepsTarget).toBe(8000)
+    expect(first.current.stepsStreak).toBe(0)
+
+    // The second settle, still Monday, sees Sunday: 5 days met, the second week in a row, so it grows.
+    const second = settleWeeks(first.frozen, withSunday, nextMonday, noGoal)
+    expect(second.current.weeks.at(-1)).toMatchObject({ stepDaysMet: 5, stepsMet: true, provisional: true })
+    expect(second.current.stepsTarget).toBe(8500)
+  })
+
+  it('after the grace the verdict is frozen and data arriving later moves nothing', () => {
+    const frozen = settleWeeks(s0, sixDays, wednesday, noGoal)
+    expect(frozen.judged).toEqual([MONDAY])
+    expect(frozen.frozen.weeks.at(-1)).toMatchObject({ stepDaysMet: 4, stepsMet: false })
+    expect(frozen.frozen.weeks.at(-1)!.provisional).toBeUndefined()
+    expect(frozen.frozen.nextWeekToJudge).toBe(nextMonday)
+    // Sunday's steps land on Thursday: the stored week is not re-judged.
+    const later = settleWeeks(frozen.frozen, withSunday, shiftDateStr(MONDAY, 10), noGoal)
+    expect(later.judged).toEqual([])
+    expect(later.frozen).toEqual(frozen.frozen)
+    expect(later.current.stepsTarget).toBe(8000)
+    expect(later.current.weeks.at(-1)).toMatchObject({ stepDaysMet: 4, stepsMet: false })
+  })
+})
+
+describe('the steps rule leaves rest and sick days out', () => {
+  // The signed spec: "A day with a rest day logged, or a sick check-in, is left out of every count."
+  const levels = { stepsTarget: 8000, minutesTarget: 150 }
+  it('a week with two days left out meets it when every one of its five counted days did', () => {
+    const r = measureWeek(MONDAY, week(MONDAY, (i) => ({ steps: 9000, excluded: i >= 5 ? 'rest' : null })), levels)
+    expect([r.countedDays, r.stepDaysMet, r.stepsMet]).toEqual([5, 5, true])
+  })
+  it('three counted days, all met, is a met week: min(5, counted days)', () => {
+    const r = measureWeek(MONDAY, week(MONDAY, (i) => ({ steps: 9000, excluded: i >= 3 ? 'sick' : null })), levels)
+    expect([r.countedDays, r.stepDaysMet, r.stepsMet]).toEqual([3, 3, true])
+  })
+  it('three counted days with two met is not', () => {
+    const r = measureWeek(MONDAY, week(MONDAY, (i) => ({ steps: i === 0 ? 3000 : 9000, excluded: i >= 3 ? 'sick' : null })), levels)
+    expect([r.countedDays, r.stepDaysMet, r.stepsMet]).toEqual([3, 2, false])
+  })
+  it('so a sick spell does not reset the steps streak or stop the growth', () => {
+    const s1 = state({ stepsTarget: 8000, stepsStreak: 1 })
+    const s2 = judgeWeek(s1, MONDAY, week(MONDAY, (i) => ({ steps: 9000, excluded: i >= 3 ? 'sick' : null })), noGoal)
+    expect(s2.stepsTarget).toBe(8500)
+    expect(s2.stepsStreak).toBe(0)
+  })
+  it('a week with no counted day is neutral', () => {
+    const r = measureWeek(MONDAY, week(MONDAY, () => ({ steps: 9000, excluded: 'rest' })), levels)
+    expect([r.countedDays, r.stepsMet, r.excluded]).toEqual([0, false, true])
   })
 })

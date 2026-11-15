@@ -1,4 +1,4 @@
-import { CADENCE_SERIES_BIN_SEC, isPlausibleCadence } from '../health/cadence'
+import { CADENCE_SERIES_BIN_SEC, isPlausibleCadence, supportsCadence } from '../health/cadence'
 import { DEFAULT_MAX_GAP_SEC, type HrReading } from '../health/zone-minutes'
 
 /**
@@ -30,10 +30,6 @@ export const MODERATE_SPEED_KMH = 4.8
 export const ESTIMATED_MINUTE_SHARE = 0.5
 /** The largest gap between two heart-rate readings that still counts as dense (seconds). */
 export const DENSE_HR_MAX_GAP_SEC = DEFAULT_MAX_GAP_SEC
-
-/** Activity types whose thin stretches the cadence, speed and estimate rules may count (rule 2).
- *  An explicit list, so a ride or a gym session never earns walking minutes without heart rate. */
-export const THIN_RULE_ACTIVITY_TYPES: readonly string[] = ['walk', 'treadmill', 'hike', 'run']
 
 export type ActiveMinuteBasis = 'heart_rate' | 'cadence' | 'speed' | 'estimated'
 
@@ -107,7 +103,9 @@ export function activeMinutesForActivity(
     : activity.durationMin != null && activity.durationMin > 0 ? Math.round(activity.durationMin * 60) : 0
   if (totalSec <= 0) return { ...base, minutes: 0, basis: null, bySource: { ...EMPTY_BY_SOURCE } }
 
-  const thinEligible = THIN_RULE_ACTIVITY_TYPES.includes(activity.activityType.toLowerCase())
+  // Rule 2 (cadence, speed, estimate) counts only the on-foot types that have a step rate
+  // (`CADENCE_ACTIVITY_TYPES`), so a ride or a gym session never earns walking minutes without heart rate.
+  const thinEligible = supportsCadence(activity.activityType.toLowerCase())
   const speed = averageSpeedKmh(activity.distanceKm, activity.durationMin ?? (windowSec > 0 ? windowSec / 60 : null))
   const series = (activity.cadenceSeries ?? [])
     .filter((p) => Number.isFinite(p.tSec) && Number.isFinite(p.spm))

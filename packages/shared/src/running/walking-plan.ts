@@ -25,9 +25,14 @@ import { isCalendarDate, shiftDateStr, weekStartForDay } from '../date-utils'
  * Choices the tables leave open, made here and stated in the PR:
  * - "Rounded up to the next 500/10" is a ceiling to that multiple; an exact multiple stays.
  * - "Two weeks in which 5 or more days met it" means two judged weeks in a row at the current level.
- * - A week is judged once it has ended. The plan's first week is judged only when the plan started
- *   on its Monday; a part week is shown and its days complete, but it moves no target.
- * - A week with every day left out (a whole week sick) moves nothing and breaks no streak.
+ * - A week is judged once it has ended, but the verdict stays provisional for `JUDGE_GRACE_DAYS`
+ *   (two) after its Sunday and is re-judged on every settle until then; only then is it frozen
+ *   into the stored state (`settleWeeks`). Sunday's steps or a walk often sync on Monday or later.
+ *   The plan's first week is judged only when the plan started on its Monday; a part week is shown
+ *   and its days complete, but it moves no target.
+ * - A left-out day is out of every count, the steps rule's included: a week meets it when at least
+ *   `min(5, countedDays)` counted days met the day's target. A week with every day left out (a
+ *   whole week sick) moves nothing and breaks no streak.
  * - "Missed by more than 25%": minutes under 75% of the week's target; steps, a mean over the
  *   week's counted days with a reading under 75% of the day's target. A week with no step reading
  *   at all is not evidence of a miss.
@@ -49,6 +54,14 @@ export const MINUTES_BASELINE_WEEKS = 4
 
 export const STEP_BACK_MISS_SHARE = 0.25
 export const STEP_BACK_WEEKS = 2
+
+/**
+ * Days after a week's Sunday during which its verdict is provisional and re-judged on each settle.
+ * Two: Health Connect and the Oura Cloud catch up when the phone or the ring next syncs, which can
+ * be a day late after a weekend away from either; past two days a late reading is rare, and
+ * waiting longer would hold the week's growth back for no gain. Frozen from the Wednesday.
+ */
+export const JUDGE_GRACE_DAYS = 2
 
 /** Week records kept on the plan — enough for the screens' history and the step-back rule. */
 export const WEEK_HISTORY_KEPT = 12
@@ -73,6 +86,8 @@ export interface WalkingWeekRecord {
   minutesMet: boolean
   /** Every day was left out (rest or sick), so the week moved nothing. */
   excluded: boolean
+  /** Judged inside the grace period: shown, but not yet frozen (never stored). */
+  provisional?: boolean
 }
 
 /** What the plan stores (on `running_plans.fitness_snapshot.walkingPlan`, no migration). */
@@ -231,6 +246,7 @@ export function measureWeek(
   const inWeek = days.filter((d) => d.date >= weekStart && d.date <= weekEnd)
   const counted = inWeek.filter((d) => d.excluded == null)
   const excludedCount = inWeek.length - counted.length
+  const countedDays = 7 - excludedCount
   const withSteps = counted.filter((d) => d.steps != null) as (WalkingDayMeasure & { steps: number })[]
   const stepDaysMet = withSteps.filter((d) => d.steps >= levels.stepsTarget).length
   const activeMinutes = counted.reduce((s, d) => s + d.activeMinutes, 0)
@@ -238,11 +254,11 @@ export function measureWeek(
     weekStart,
     stepsTarget: levels.stepsTarget,
     minutesTarget: levels.minutesTarget,
-    countedDays: 7 - excludedCount,
+    countedDays,
     stepDaysMet,
     meanSteps: withSteps.length > 0 ? Math.round(withSteps.reduce((s, d) => s + d.steps, 0) / withSteps.length) : null,
     activeMinutes,
-    stepsMet: stepDaysMet >= STEPS_DAYS_TO_MEET_WEEK,
+    stepsMet: countedDays > 0 && stepDaysMet >= Math.min(STEPS_DAYS_TO_MEET_WEEK, countedDays),
     minutesMet: activeMinutes >= levels.minutesTarget,
     excluded: excludedCount >= 7,
   }
@@ -286,12 +302,48 @@ export function judgeWeek(
   return next
 }
 
-/** The Mondays of the weeks that have ended and are not yet judged, oldest first. */
+/** True once `todayIso` is past the week's Sunday plus the grace days. */
+function isFrozen(weekStart: string, todayIso: string): boolean {
+  return todayIso >= shiftDateStr(weekStart, 7 + JUDGE_GRACE_DAYS)
+}
+
+/** The Mondays of the weeks whose grace has passed and are not yet frozen, oldest first. */
 export function weeksToJudge(state: Pick<WalkingPlanState, 'nextWeekToJudge'>, todayIso: string): string[] {
+  const out: string[] = []
+  for (let w = state.nextWeekToJudge; isFrozen(w, todayIso); w = shiftDateStr(w, 7)) out.push(w)
+  return out
+}
+
+/** The Mondays of the weeks that have ended but are still inside the grace, oldest first. */
+export function weeksInGrace(state: Pick<WalkingPlanState, 'nextWeekToJudge'>, todayIso: string): string[] {
   const currentWeek = weekStartForDay(todayIso)
   const out: string[] = []
-  for (let w = state.nextWeekToJudge; w < currentWeek; w = shiftDateStr(w, 7)) out.push(w)
+  for (let w = state.nextWeekToJudge; w < currentWeek; w = shiftDateStr(w, 7)) if (!isFrozen(w, todayIso)) out.push(w)
   return out
+}
+
+/**
+ * One settle's judgement. `frozen` is the state to store: every week past its grace judged, each
+ * once. `current` is what the plan asks for now: `frozen` with any week still inside its grace
+ * judged on top, re-judged from the latest data on every call and marked `provisional`.
+ * `days` must cover every week returned by `weeksToJudge` and `weeksInGrace`.
+ */
+export function settleWeeks(
+  state: WalkingPlanState,
+  days: readonly WalkingDayMeasure[],
+  todayIso: string,
+  ctx: { ownStepsGoal: number | null | undefined },
+): { frozen: WalkingPlanState; current: WalkingPlanState; judged: string[] } {
+  const judged = weeksToJudge(state, todayIso)
+  let frozen = state
+  for (const w of judged) frozen = judgeWeek(frozen, w, days, ctx)
+  let current = frozen
+  for (const w of weeksInGrace(frozen, todayIso)) {
+    current = judgeWeek(current, w, days, ctx)
+    const last = current.weeks.at(-1)!
+    current = { ...current, weeks: [...current.weeks.slice(0, -1), { ...last, provisional: true }] }
+  }
+  return { frozen, current, judged }
 }
 
 export interface StepBackOffer {
