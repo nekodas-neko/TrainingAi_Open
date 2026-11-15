@@ -452,10 +452,14 @@ Renew with `PUT /v2/webhook/subscription/renew/{id}`; a 403 there means it no lo
 
 | Oura endpoint | DB table | Key fields |
 |---|---|---|
-| daily_readiness | `oura_daily` | readiness_score, temperature_deviation, readiness_contributors |
-| daily_sleep | `oura_daily` | sleep_score, sleep_contributors |
+| daily_readiness | `oura_daily` | readiness_score, temperature_deviation |
+| daily_readiness | `oura_cloud_daily` | readiness_contributors |
+| daily_sleep | `oura_daily` | sleep_score |
+| daily_sleep | `oura_cloud_daily` | sleep_contributors |
 | daily_activity | `oura_daily` | activity_score, active_calories, activity times |
-| daily_stress | `oura_daily` | stress_high (seconds), recovery_high (seconds), day_summary |
+| daily_activity | `oura_cloud_daily` | activity_contributors, met, class_5_min |
+| daily_stress | `oura_daily` | stress_high (seconds), recovery_high (seconds) |
+| daily_stress | `oura_cloud_daily` | day_summary |
 | daily_cardiovascular_age | `oura_daily` | vascular_age, pulse_wave_velocity |
 | daily_resilience | `oura_daily` | resilience_level, resilience_contributors |
 | vO2_max | `oura_daily` | vo2_max |
@@ -465,7 +469,7 @@ Renew with `PUT /v2/webhook/subscription/renew/{id}`; a 403 there means it no lo
 | sleep.lowest_heart_rate | `body_metrics` | resting_heart_rate |
 | daily_activity.active_calories | `body_metrics` | active_calories |
 
-All upserts are written as source `oura_cloud` and merge per field by `source-rank.ts` (`lib/data/health-source.ts` → `mergeSet`): a null keeps the stored value, and the ring's BLE values and manual entries outrank `oura_cloud`. The writer is `lib/oura/cloud/ingest.ts` (#2859).
+Oura's readiness, sleep and activity contributors and the stress `day_summary` go to `oura_cloud_daily`, never `oura_daily` (#2982; `mapOuraDocuments` in `lib/oura/cloud/documents.ts`), so they stay off the device. All upserts are written as source `oura_cloud` and merge per field by `source-rank.ts` (`lib/data/health-source.ts` → `mergeSet`): a null keeps the stored value, and the ring's BLE values and manual entries outrank `oura_cloud`. The writer is `lib/oura/cloud/ingest.ts` (#2859).
 
 ## oura_tokens table columns
 `user_id` (PK), `personal_access_token` (legacy, unused), `access_token`, `refresh_token` (both AES-256-GCM ciphertext since #2858, `lib/oura/cloud/token-cipher.ts`), `expires_at`, `scope`, `oura_user_id` (UNIQUE — used to route webhook events to DB user), `webhook_signing_key` (legacy, unused: events are signed with the client secret)

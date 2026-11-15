@@ -1,6 +1,6 @@
 ---
 name: stop-slop
-description: Strip AI writing tells out of prose — filler openers, binary contrasts, passive voice, vague declaratives, adverb padding. Use when writing or editing any prose this repo ships: handoff docs, journal entries, projectOverview updates, PR bodies, commit messages, changelog entries, and user-facing UI copy. Also use when the user says "stop slop", "de-slop this", "this reads like AI", or "make this sound human".
+description: Strip AI writing tells out of prose — filler openers, binary contrasts, passive voice, vague declaratives, adverb padding. Use when writing or editing any prose this repo ships: handoff docs, journal entries, issue bodies, PR bodies, commit messages, changelog entries, and user-facing UI copy. Also use when the user says "stop slop", "de-slop this", "this reads like AI", or "make this sound human".
 version: 1.0.0
 ---
 
@@ -23,7 +23,7 @@ comprehension cost paid by the next agent**, who starts cold and has only the do
 | `projectOverview.md` Known Issues / Risks | A vague issue row is an unactionable issue row. |
 | PR titles and bodies | Reviewed by a human; also the squash-commit message. |
 | Commit messages | CLAUDE.md: must read as written by a human engineer. |
-| `lib/changelog.ts` entries | User-facing. |
+| `packages/shared/src/changelog.ts` entries | User-facing. |
 | UI copy (labels, empty states, toasts, errors) | User-facing, and space is tight on a 6.9" screen. |
 
 ## Core rules
