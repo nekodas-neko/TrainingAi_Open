@@ -46,13 +46,11 @@ export async function tombstoneWorkoutSessionInTx(
   workoutSessionId: string,
   now: string,
 ): Promise<string[] | null> {
-  // Capture program-session + completion before the delete to keep the AI-periodization phase
-  // counter honest (mirrors workout-entry DELETE).
-  const { rows: sessRows } = await client.query<{ session_id: string | null; completed_at: Date | null }>(
-    `SELECT session_id, completed_at FROM workout_sessions WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+  const { rows: owned } = await client.query(
+    `SELECT 1 FROM workout_sessions WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
     [workoutSessionId, userId],
   )
-  if (sessRows.length === 0) return null
+  if (owned.length === 0) return null
 
   const { rows: nameRows } = await client.query<{ exercise_name: string }>(
     `SELECT DISTINCT el.exercise_name
@@ -61,8 +59,15 @@ export async function tombstoneWorkoutSessionInTx(
     [workoutSessionId],
   )
   const exerciseNames = nameRows.map(r => r.exercise_name)
-  const programSessionId = sessRows[0].session_id
-  const completedAt = sessRows[0].completed_at
+
+  // Capture program-session + start time before delete to keep the
+  // AI-periodization phase counter honest (mirrors workout-entry DELETE).
+  const { rows: sessRows } = await client.query<{ session_id: string | null; started_at: Date; completed_at: Date | null }>(
+    `SELECT session_id, started_at, completed_at FROM workout_sessions WHERE id = $1 AND user_id = $2`,
+    [workoutSessionId, userId],
+  )
+  const programSessionId = sessRows[0]?.session_id ?? null
+  const completedAt = sessRows[0]?.completed_at ?? null
 
   await client.query(
     `UPDATE workout_sessions SET deleted_at = $3, updated_at = $3 WHERE id = $1 AND user_id = $2`,
