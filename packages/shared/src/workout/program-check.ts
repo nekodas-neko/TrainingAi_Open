@@ -153,7 +153,9 @@ function trimToBudget(
   let current = session
   let sec = sessionSec(current, input)
   const removed: string[] = []
-  while (sec > budgetSec) {
+  // Never trim a session to nothing: an all-accessory session (an Arms day) keeps its last
+  // exercise, and the over-budget note says it is still over.
+  while (sec > budgetSec && current.exercises.length > 1) {
     const [next] = trimCandidates(current.exercises)
     if (next === undefined) break
     removed.push(current.exercises[next].name)
@@ -210,7 +212,7 @@ export function checkGeneratedProgram(input: ProgramCheckInput): ProgramCheckRes
     if (budgetMin === null) return session
     const result = trimToBudget(session, budgetMin * 60, input)
     for (const exercise of result.removed) trimmed.push({ session: session.name, exercise })
-    if (result.sec > budgetMin * 60) overBudget.push({ session: session.name, minutes: Math.round(result.sec / 60) })
+    if (result.sec > budgetMin * 60) overBudget.push({ session: session.name, minutes: Math.ceil(result.sec / 60) })
     return result.session
   })
 

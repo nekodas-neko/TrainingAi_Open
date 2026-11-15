@@ -324,8 +324,7 @@ Rules:
 8. Large muscles (chest, back, quads, hamstrings, glutes): aim for the UPPER end of their set range. They are the priority.
 9. Small muscles (biceps, triceps, calves, core): 6–10 direct sets/week is sufficient — compound carry counts toward this.
 10. Pick a session icon emoji matching the session focus.
-11. MUSCLE RECOVERY (critical for rolling rotation): Sessions that run on consecutive training days must NOT share primary muscle groups. The session ORDER in your output determines the training day sequence — adjacent sessions in the list will be trained back-to-back. Ensure each consecutive pair of sessions targets different primary muscles (e.g. Push then Pull is fine; Push then Upper Push is not).
-12. Before finalising: tally sets per large muscle across all sessions. Confirm each large muscle hits its target. Confirm time budget is met. Confirm no consecutive sessions share primary muscles.
+11. MUSCLE RECOVERY: the sessions are trained in the order they are given above, so keep each session's main lifts to its own focus; neighbouring sessions should not lead with the same primary muscles. (Weekly sets, session time and neighbouring muscles are checked in code after you answer.)
 
 Available exercises (name|muscles|equipment):
 ${exerciseList}${injuryBlock}${referenceBlock}`

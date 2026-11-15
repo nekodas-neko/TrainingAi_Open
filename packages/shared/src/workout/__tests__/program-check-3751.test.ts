@@ -72,6 +72,28 @@ describe('over the time budget: trimmed in code', () => {
     expect(result.notes).toContain('Legs is estimated at 29 working minutes, over the 26 a 30-minute session leaves after warm-up.')
   })
 
+  it('never trims a session to nothing: an all-accessory day keeps its last exercise and is reported over', () => {
+    // 10 × 12 @ 180 s per exercise: well over a 30-minute session's 26 working minutes on its own.
+    const long = new Map([...STYLES, ['s10', Array(10).fill({ reps: 12, restSec: 180 })]])
+    const arms = session('Arms', [
+      ex('Dumbbell Curl', 'accessory', ['Biceps'], 's10'),
+      ex('Triceps Pushdown', 'accessory', ['Triceps'], 's10'),
+    ])
+    const result = checkGeneratedProgram(base({ sessions: [arms], timePerSessionMinutes: 30, styleSetsById: long }))
+    expect(result.sessions[0].exercises).toHaveLength(1)
+    expect(result.trimmed).toHaveLength(1)
+    expect(result.overBudget.map(o => o.session)).toEqual(['Arms'])
+  })
+
+  it('an over-budget note never reads as equal to the budget: minutes round up', () => {
+    // A 60-minute session's budget is 51 working minutes; 3070 s is 51.2 minutes, which must read 52.
+    const tight = new Map([...STYLES, ['s51', [{ reps: 12, restSec: 3070 - 40 }, { reps: 12, restSec: 0 }]]])
+    const one = session('Solo', [ex('Bench Press', 'primary', ['Chest'], 's51')])
+    const result = checkGeneratedProgram(base({ sessions: [one], timePerSessionMinutes: 60, styleSetsById: tight }))
+    expect(result.budgetMin).toBe(51)
+    for (const o of result.overBudget) expect(o.minutes).toBeGreaterThan(51)
+  })
+
   it('trims nothing without a time limit', () => {
     const result = checkGeneratedProgram(base({ sessions: [push], timePerSessionMinutes: null }))
     expect(result.budgetMin).toBeNull()
