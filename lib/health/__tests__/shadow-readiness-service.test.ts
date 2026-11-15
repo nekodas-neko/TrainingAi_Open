@@ -156,7 +156,7 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
       { shadowReadiness: 70, liveComposite: 68 },
       { shadowReadiness: null, liveComposite: 50 },
       { shadowReadiness: 40, liveComposite: null },
-    ])).toEqual({ compared: 2, moved: 1, medianAbsDiff: 4, maxAbsDiff: 6, excluded: { clamped: 0, 'unknown-era': 0 } })
+    ])).toEqual({ compared: 2, moved: 1, medianAbsDiff: 4, maxAbsDiff: 6, excluded: { clamped: 0, 'unknown-era': 0, 'old-scale': 0 } })
   })
 
   describe('live composite before illness suppression (#3170)', () => {
