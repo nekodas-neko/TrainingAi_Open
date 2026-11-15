@@ -1,25 +1,15 @@
 import { NextResponse } from "next/server"
-import { z } from "zod"
 import { auth } from "@/auth"
 import { getRepositoryAsync } from "@/lib/data"
 import { readJsonLimited } from "@trainingai/shared/http/request-guards"
 import { rateLimit } from "@/lib/rate-limit"
+import { AppLoadSchema } from "@trainingai/shared/validation/app-load"
 
 const MAX_BODY_BYTES = 2 * 1024
 
-// One row per page load (BF-19). Bounds reject the impossible, not the slow: a 10-minute load is a
-// corrupt reading, and a route longer than 200 chars is not a route.
-const AppLoadSchema = z.object({
-  route:           z.string().min(1).max(200),
-  responseStartMs: z.number().int().min(0).max(600_000).nullable().optional(),
-  domContentMs:    z.number().int().min(0).max(600_000).nullable().optional(),
-  totalMs:         z.number().int().min(0).max(600_000),
-  cold:            z.boolean(),
-  buildId:         z.string().max(64).nullable().optional(),
-}).strict()
-
 /**
- * POST — navigation timing from the device, sent via `navigator.sendBeacon`.
+ * POST — navigation timing from the web shell, sent via `navigator.sendBeacon`, or one native
+ * start-up mark (#3774). Body shape: `AppLoadSchema`.
  *
  * Rate limited well above the reporter's own cadence (it fires once per JS context) so a warm limit
  * cannot silently erase a real measurement, but low enough that a loop cannot fill the table.

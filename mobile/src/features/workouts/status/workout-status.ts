@@ -1,5 +1,4 @@
 import type {
-  PromotionReport,
   WorkoutStatusModule,
   WorkoutStatusPayload,
 } from '../../../integrations/workout-status/types.ts';
@@ -155,15 +154,4 @@ export function createWorkoutStatusReporter(
 /** Removes the notification whoever posted it, such as an earlier process of the old account. */
 export function clearWorkoutStatus(native: Pick<WorkoutStatusModule, 'clear'> | null) {
   safely(() => native?.clear());
-}
-
-/**
- * The one line sent to the error reporter once per app start, so the phone check has ground truth
- * on whether Android promoted the notification. Booleans and a named platform level only: the
- * reporter scrubs every digit, and no exercise or weight belongs in it.
- */
-export function promotionDiagnostic(report: PromotionReport) {
-  const level =
-    report.sdkFull >= 3_600_001 ? 'baklava-later' : report.sdkFull >= 3_600_000 ? 'baklava' : 'older';
-  return `Workout status promotion: promoted=${report.promoted} posted=${report.posted} level=${level} canpost=${report.canPostPromoted}`;
 }

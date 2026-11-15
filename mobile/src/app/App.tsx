@@ -74,7 +74,8 @@ import {
 import { DynamicBackground } from '../features/weather/components/DynamicBackground';
 import type { BackgroundSection } from '../features/weather/data/background';
 import { useWidgetLaunch } from '../features/widgets/useWidgetLaunch';
-import { errorReporter } from '../core/reporting/index.ts';
+import { errorReporter, startupTimings } from '../core/reporting/index.ts';
+import { StartupTimingMarks } from './StartupTimingMarks';
 import { installErrorReporting } from '../core/reporting/install';
 
 installErrorReporting();
@@ -512,6 +513,7 @@ function AppShell() {
       />
       {!fullScreen && <TabBar selected={tab} onSelect={pressTab} />}
       <WeighInBanner />
+      <StartupTimingMarks />
     </SafeAreaView>
   );
 }
@@ -520,6 +522,10 @@ function ErrorReportConnection() {
   const { dataReader } = useAccountContext();
   useEffect(() => {
     errorReporter.connect(
+      dataReader?.userId ?? null,
+      dataReader ? (path, body) => dataReader.post(path, body) : null,
+    );
+    startupTimings.connect(
       dataReader?.userId ?? null,
       dataReader ? (path, body) => dataReader.post(path, body) : null,
     );

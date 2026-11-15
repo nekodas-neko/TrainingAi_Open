@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import {
   clearWorkoutStatus,
   createWorkoutStatusReporter,
-  promotionDiagnostic,
   workoutStatusFor,
 } from '../src/features/workouts/status/workout-status.ts';
 import {
@@ -14,7 +14,6 @@ import {
   startingScope,
   type AccountScope,
 } from '../src/features/workouts/status/sync-decisions.ts';
-import { scrubText } from '../src/core/reporting/scrub.ts';
 import { workoutStatus as webModule } from '../src/integrations/workout-status/platform.ts';
 import type { WorkoutRecord } from '../src/features/workouts/logging/workout.ts';
 
@@ -316,14 +315,6 @@ test('a tap opens its workout only while it is the active one', () => {
   assert.equal(routeOpen(null, ids.workout), 'tab');
 });
 
-test('the promotion line names the level in words and survives the reporter scrub', () => {
-  const line = promotionDiagnostic({ posted: true, promoted: true, sdkFull: 3_600_001, canPostPromoted: true });
-  assert.equal(line, 'Workout status promotion: promoted=true posted=true level=baklava-later canpost=true');
-  assert.equal(scrubText(line), line);
-  assert.match(promotionDiagnostic({ posted: true, promoted: false, sdkFull: 3_600_000, canPostPromoted: true }), /level=baklava /);
-  assert.match(promotionDiagnostic({ posted: false, promoted: false, sdkFull: 0, canPostPromoted: false }), /level=older/);
-});
-
 test('a sign-out whose secure storage failed still clears the old workout', () => {
   let scope: AccountScope = startingScope;
   const step = (status: AccountScopeStatus, userId: string | null, hasSession: boolean) => {
@@ -346,4 +337,14 @@ test('away from the app a journal change goes to the notification at once (#3266
   assert.equal(statusDelay('inactive', false, 250), null);
   assert.equal(statusDelay('active', false, 250), 0, 'the reconcile goes at once');
   assert.equal(statusDelay('active', true, 250), 250, 'in the app a burst still settles first');
+});
+
+test('the workout status sends nothing to the error reporter (#3774)', () => {
+  // The promotion diagnostic answered its question and was reported as an error once per workout.
+  const dir = new URL('../src/features/workouts/status/', import.meta.url);
+  for (const name of readdirSync(dir)) {
+    const source = readFileSync(new URL(name, dir), 'utf8');
+    assert.doesNotMatch(source, /core\/reporting/, name);
+    assert.doesNotMatch(source, /\.promotion\(/, name);
+  }
 });
