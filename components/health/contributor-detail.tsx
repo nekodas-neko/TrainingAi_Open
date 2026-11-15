@@ -34,7 +34,7 @@ export function ContributorDetail({
 
   const band = score != null ? scoreBand(score) : null
   const learning = isLearningContributor({ provisional, gap })
-  const meaning = guideMeaning(guide, contributorKey, score)
+  const meaning = guideMeaning(guide, contributorKey, score ?? null)
 
   return (
     <div className="space-y-2.5 pt-2 text-[11px] leading-snug">
