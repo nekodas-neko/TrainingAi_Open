@@ -22,6 +22,7 @@ import { getDb } from '@/lib/data/postgres/client'
 import { mergeLookAlikeFoods } from '@/lib/nutrition/merge-look-alike-foods'
 import { reconcilePersonalRecords } from '@/lib/workout/reconcile-personal-records'
 import { heartHealthRescoreReport } from '@/lib/health/heart-health-rescore-report'
+import { cleanOwnerHistory3802 } from '@/lib/workout/clean-owner-history-3802'
 
 /**
  * The agent key's allow-list (issue 2381, part b). A job is reachable with the key only if it is
@@ -99,6 +100,17 @@ const RescoreHeartHealthParams = z.object({
   to: DateParam,
   dryRun: z.boolean(),
 }).strict()
+
+const GroupDigest = z.string().regex(/^[0-9a-f]{64}$/, 'a sha256 from the dry run\'s report.digests')
+const CleanOwnerHistoryParams = z.object({
+  dryRun: z.boolean(),
+  /** The per-group digests the dry run reported (`report.digests`). A write refuses unless its own plan's are the same. */
+  digests: z.object({
+    '1': GroupDigest, '2': GroupDigest, '3a': GroupDigest, '3b': GroupDigest, '3c': GroupDigest, '4': GroupDigest, '5': GroupDigest,
+  }).strict().optional(),
+}).strict().refine(p => p.dryRun || p.digests != null, {
+  message: 'a write needs digests: the report.digests its dry run returned', path: ['digests'],
+})
 
 export const AGENT_JOBS = {
   /**
@@ -443,6 +455,49 @@ export const AGENT_JOBS = {
       }
     },
   } satisfies AgentJobDef<z.infer<typeof RescoreHeartHealthParams>>,
+
+  /**
+   * #3802 (owner's yes, 15 Nov). The one-off clean-up of the owner's old bad rows, groups 1 to 5 of
+   * the spec comment: tombstones dead, empty and zero-length workouts (through the app's own session
+   * delete, with their logs) and seven named duplicate or stub activities, re-times 11 early
+   * workouts, and deletes the all-zero `daily_zone_minutes` cache rows (`cleanOwnerHistory3802`).
+   * A dry run reports each group's count, row ids and digest, and writes nothing. A write tombstones
+   * and deletes, so it needs an approval on issue #3802 and the dry run's `digests`; it refuses,
+   * writing nothing, unless every count is the spec's and every group's rows are the dry run's.
+   * Local times are the spec's Australia/Brisbane, not the account's zone.
+   */
+  'clean-owner-history-3802': {
+    params: CleanOwnerHistoryParams,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await cleanOwnerHistory3802(
+        {
+          connect: () => getPool().connect(),
+          reconcilePersonalRecord: (u, n) => ctx.repo.reconcilePersonalRecord(u, n),
+          bestQualifyingPersonalRecord: (u, n, o) => ctx.repo.bestQualifyingPersonalRecord(u, n, o),
+        },
+        ctx.userId,
+        p.dryRun ? { dryRun: true } : { dryRun: false, digests: p.digests! },
+      )
+      if (!result.ok) {
+        const error = result.error === 'counts_unexpected'
+          ? 'The plan\'s counts are not the spec\'s; nothing was written.'
+          : 'A group\'s rows differ from the dry run\'s; nothing was written. Dry-run again.'
+        const { ok: _ok, ...detail } = result
+        return { status: 409, body: { ...detail, message: error }, finish: { outcome: 'refused', error: result.error } }
+      }
+      const failed = result.report.written?.personalRecords.failed.length ?? 0
+      return {
+        status: 200,
+        body: { report: result.report },
+        finish: {
+          outcome: 'succeeded', affectedRows: result.affectedRows, daysMoved: result.daysMoved,
+          // The rows are written either way; a reconcile that threw after commit is named here.
+          error: failed > 0 ? `${failed} personal record reconcile(s) failed after commit` : null,
+        },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof CleanOwnerHistoryParams>>,
 } as const
 
 export type AgentJobId = keyof typeof AGENT_JOBS
@@ -466,16 +521,24 @@ export const ApprovalRef = z.string().max(500)
   .regex(/^https:\/\/github\.com\/nekodas-neko\/TrainingAi_Open\/(issues|pull)\/\d+#issuecomment-\d+$/,
     'approval must link to one comment on this repository')
 
+/**
+ * #3802's clean-up: the approval is the one comment on issue #3802 that records the owner's yes
+ * (15 Nov). Any other comment there, including an agent's own, is refused.
+ */
+const ApprovalRef3802 = z.literal('https://github.com/nekodas-neko/TrainingAi_Open/issues/3802#issuecomment-6885652396', {
+  message: 'approval must link to the comment on issue #3802 that records the owner\'s yes (6885652396)',
+})
+
 /** An agent's name: lower-case words, e.g. `orchestrator`, `bugfix`, `implementer`. */
 const Actor = z.string().regex(/^[a-z][a-z0-9-]{1,39}$/, 'actor is the agent name, lower-case')
 
-function requestSchema<J extends AgentJobId>(job: J) {
+function requestSchema<J extends AgentJobId>(job: J, approval: z.ZodType<string> = ApprovalRef) {
   return z.object({
     job: z.literal(job),
     actor: Actor,
     /** Must be the owner's account: the request says which account it acts on, and the route checks it. */
     targetUserId: z.string().uuid(),
-    approval: ApprovalRef.optional(),
+    approval: approval.optional(),
     params: AGENT_JOBS[job].params,
   }).strict()
 }
@@ -494,6 +557,7 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('merge-look-alike-foods'),
   requestSchema('reconcile-personal-records'),
   requestSchema('rescore-heart-health'),
+  requestSchema('clean-owner-history-3802', ApprovalRef3802),
 ])
 export type AgentActionRequest = z.infer<typeof AgentActionRequest>
 
