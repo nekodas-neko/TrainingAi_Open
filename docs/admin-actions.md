@@ -285,6 +285,7 @@ Authorization: Bearer $AGENT_ACTIONS_SECRET
 | `merge-look-alike-foods` | #2417 | `mergeLookAlikeFoods` in `lib/nutrition/merge-look-alike-foods.ts`, planned by `planLookAlikeMerge` (no admin route) | `dryRun`, `keepers?` (`{groupKey: foodItemId}`, keys from the dry run), `only?` (`'exact'`: merge only the `automatic` groups) | when `dryRun` is false: **it rewrites food logs and saved-meal ingredients.** Every log of a look-alike food (same name and brand) is re-pointed to the keeper with its quantity rescaled so the grams eaten do not change, and the extras are tombstoned (`food_items.deleted_at`, never deleted). The grams never change. All eight nutrition fields are exactly unchanged only for the **automatic** groups: the identical ones, and the same-per-100 g ones where the dry run's `worstChange` (the largest change to any moved log, per field: kcal whole; macros, fibre, sugar, sodium and saturated fat to 0.1 g; a missing value counts as 0) is zero for every extra. A same-per-100 g group with any non-zero change, and a group that genuinely differs, are **owner review**; there the grams hold and the numbers become the keeper's. `only: 'exact'` merges just the automatic groups, so they can be approved without deciding the rest. The job also fills a keeper's **missing barcode and picture** from its extras (add-only: a value the keeper has is never replaced or nulled). **A verified snapshot comes first** (`scripts/local-db/snapshot.js`) because the old `food_logs.food_item_id` and `quantity_multiplier` are overwritten in place | yes: a second run finds 0 groups. A log an unsynced device pushes against a retired food later is swept to the keeper by the next run |
 | `reconcile-personal-records` | #3801 | `reconcilePersonalRecords` in `lib/workout/reconcile-personal-records.ts`, which compares each record with `repo.bestQualifyingPersonalRecord`, the query `reconcilePersonalRecord` itself runs (after a log edit or delete) | `dryRun`, `exercises?` (1 to 200 names; default every exercise the owner has logged or holds a record for) | no: a write only **adds** a missing record or **raises** one to its best qualifying log, through the only-higher upsert. A record the rule would lower (`wouldLower`) or remove (`wouldRemove`) is reported and left alone | yes: a second run writes 0 |
 | `rescore-heart-health` | #3801, #2093 | `heartHealthRescoreReport` in `lib/health/heart-health-rescore-report.ts` (`POST /api/admin/backfill-heart-health`), around `rescoreHeartHealth` | `from`, `to` (≤ 31 days, `-` or `/`; the range ends yesterday at the latest), `dryRun` | when `dryRun` is false: it sets `prescribed_runs.status` to `completed` and links the credited activity, only on a `pending` day the existing rule says is met. A completed day is never taken back and a skipped one never touched | yes: a second run completes 0 |
+| `clean-owner-history-3802` | #3802 | `cleanOwnerHistory3802` in `lib/workout/clean-owner-history-3802.ts`; sessions go through `tombstoneWorkoutSessionInTx` (`lib/workout/delete-session.ts`), the app's own session delete (no admin route) | `dryRun`, `expect?` (the dry run's `report.counts`; required when `dryRun` is false) | when `dryRun` is false: **it tombstones workouts (with their exercise and set logs) and seven activities, re-times 11 workouts, and deletes the all-zero `daily_zone_minutes` rows.** A verified snapshot comes first | yes: a second run finds 0 in every group |
 
 `oura-cloud-backfill` with `dryRun: false` answers **202** and runs after the answer: read the
 outcome (`affected_rows`, `error`) from its `agent_action_log` row, which is finished when the run
@@ -334,6 +335,63 @@ the issue. A `wouldLower` or `wouldRemove` is not a job for this key: it would l
 heart rate covered it); `summary.wouldComplete` is the headline. A longer history is read in 31-day
 calls. Activity titles are in the report: post counts and dates on the issue, not the report.
 
+`clean-owner-history-3802` (#3802; the owner's yes is
+[comment 6885652396](https://github.com/nekodas-neko/TrainingAi_Open/issues/3802#issuecomment-6885652396),
+the row rules are [comment 6885759021](https://github.com/nekodas-neko/TrainingAi_Open/issues/3802#issuecomment-6885759021)).
+Every group is matched by its rule **and** the owner's id; nothing is written by id alone:
+
+| Group | Rule (all `deleted_at IS NULL`, the owner's) | Write | Production count, 15 Nov |
+|---|---|---|---|
+| `1` | `workout_sessions`, `completed_at IS NULL`, started more than a day ago | tombstone (the app's session delete) | 14 |
+| `2` | `workout_sessions`, completed, no live `exercise_logs` | tombstone | 3 |
+| `3a` | `workout_sessions`, `completed_at = started_at`, started at local midnight | tombstone | 4 |
+| `3b` | started at local midnight, longer than 6 h, at least one live log before `completed_at` | `started_at` := the first live `exercise_logs.logged_at` | 7 |
+| `3c` | longer than 10 h, not started at local midnight, at least one live log and every one at or before `completed_at - 10 h` | `completed_at` := `completed_at - 10 h` | 4 |
+| `4` | `activity_logs` with one of the seven ids in `ACTIVITY_IDS_3802` | tombstone, `deleted_reason = 'app'` (as `deleteActivityLog`) | 7 |
+| `5` | `daily_zone_minutes`, all five zones 0 | delete (a server-derived cache, never synced) | 19 |
+
+"Local midnight" is in the owner's stored time zone. The 3b and 3c updates run before the tombstones.
+Every write bumps `updated_at`, so the next delta pull carries the change and the tombstones to the
+phones; there, the `workouts` and `activity` pull flags run `invalidateWorkoutSummaries` and
+`invalidateActivityWrites` (`lib/cache-groups.ts`). On the server, the personal record of every
+exercise in a tombstoned session is reconciled after commit, as the app's delete does;
+`workout_hr_stats` and `set_hr_stats` are left as the app's delete leaves them, and a re-timed
+session's HR summary is not recomputed (its raw heart rate is past the 180-day prune). A
+`prescribed_runs` row that credits a tombstoned activity stays linked; the dry run lists any as
+`groups["4"].linkedPrescribedRunIds`.
+
+The **dry run** writes nothing (it runs in a read-only transaction) and answers
+`{ report: { dryRun: true, counts, groups, overlaps, childLogs, caches } }`: `counts` per group;
+`groups` with the row ids (`"5"` lists days), and for 3b and 3c each row's time before and after;
+`childLogs`, the live exercise and set logs that go with the tombstoned sessions. Ids and times only,
+no titles or values, so the report can be posted on the issue. **Compare `counts` with the
+production column above before asking for the write.**
+
+```
+POST /api/agent-actions
+Authorization: Bearer $AGENT_ACTIONS_SECRET
+{ "job": "clean-owner-history-3802", "actor": "orchestrator", "targetUserId": "<owner uuid>",
+  "params": { "dryRun": true } }
+```
+
+The **write** takes the approval link and the dry run's `counts`, verbatim, as `expect`:
+
+```
+{ "job": "clean-owner-history-3802", "actor": "orchestrator", "targetUserId": "<owner uuid>",
+  "approval": "https://github.com/nekodas-neko/TrainingAi_Open/issues/3802#issuecomment-6885652396",
+  "params": { "dryRun": false,
+              "expect": { "1": 14, "2": 3, "3a": 4, "3b": 7, "3c": 4, "4": 7, "5": 19 } } }
+```
+
+It runs in one transaction: it locks the owner's live sessions, the seven activities and the zone
+rows, plans again, and if any group's count differs from `expect` it answers **409**
+`{ error, expected, found }`, logged `refused` (`counts_changed`), and writes nothing; dry-run again.
+Each statement must then touch exactly the planned rows, or the whole transaction rolls back (500,
+logged `failed`). A write answers 200 with the same report plus `written` (sessions re-timed and
+tombstoned, exercise and set logs tombstoned, activities, zone days, records reconciled);
+`affected_rows` is sessions + activities + zone days. A second run's dry run is all zeros, and a write
+with those zeros writes 0. Take a verified snapshot first, and not while the owner's app is mid-sync.
+
 `stress-backfill` answers **202** with a job id; poll `GET /api/agent-actions?job=stress-backfill&jobId=N`
 (same key). Its log row is finished when the job ends. The job slot rules hold: another kind
 running is a **409**, logged as `refused`.
@@ -351,8 +409,8 @@ running is a **409**, logged as `refused`.
   link's shape, not who wrote the comment: the owner audits `approval_ref` in the log.
 
 **Not on the allow-list, deliberately:** every ring and key operation (they are native and go only
-through the Implementer's device harness), re-key, Pack, Fix lbs as kg, VACUUM, users, invites, feedback, exercise and activity deletes, and AI
-generation. A job is added by adding it to `AGENT_JOBS` with a test; the source-scan test
+through the Implementer's device harness), re-key, Pack, Fix lbs as kg, VACUUM, users, invites, feedback, exercise and activity deletes (the one exception is the fixed, owner-approved row set of
+`clean-owner-history-3802`), and AI generation. A job is added by adding it to `AGENT_JOBS` with a test; the source-scan test
 (`lib/agent-actions/__tests__/agent-key-source-scan.test.ts`) holds that the schema accepts exactly
 that list and that only the guard reads the secret.
 
