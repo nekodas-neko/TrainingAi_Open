@@ -220,5 +220,3 @@ Note: `setMoodSheetOpen`, `handleOpenMoodSheet`, `onLogMood`, `moodLog`, the `Mo
 - Design decision on record: this readiness sheet is deliberately **kept separate** from the morning check-in — do not merge.
 - The exact copy wording ("Exercise Readiness", "Save Readiness", "Readiness", the energy/soreness subtitle) may want a final user tweak — surface it for confirmation rather than assuming it is locked.
 - The emoji → Lucide conversion (Task 5) is intentionally optional and, if deferred, should be logged in `projectOverview.md` / the backlog as an open "replace on touch" item rather than silently dropped.
-</content>
-</invoke>
