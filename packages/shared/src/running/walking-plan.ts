@@ -1,4 +1,4 @@
-import { shiftDateStr, weekStartForDay } from '../date-utils'
+import { isCalendarDate, shiftDateStr, weekStartForDay } from '../date-utils'
 
 /**
  * Issue 3779. The walking and heart-health plan's two targets — steps per day and active minutes
@@ -332,7 +332,8 @@ export function setMinutesCeiling(state: WalkingPlanState, ceiling: MinutesCeili
 export function parseWalkingState(raw: unknown): WalkingPlanState | null {
   if (!raw || typeof raw !== 'object') return null
   const s = raw as Partial<WalkingPlanState>
-  const isDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
+  // Stored dates are dash-form local days; they are compared as strings, so a slash form is refused.
+  const isDate = (v: unknown) => typeof v === 'string' && !v.includes('/') && isCalendarDate(v)
   const isNum = (v: unknown) => typeof v === 'number' && Number.isFinite(v)
   if (s.version !== 1 || !isDate(s.startDate) || !isDate(s.nextWeekToJudge)) return null
   if (!isNum(s.stepsTarget) || !isNum(s.minutesTarget) || !Array.isArray(s.weeks)) return null

@@ -22,6 +22,7 @@ import {
 } from '../walking-plan-service'
 import { heartHealthDays } from '../heart-health-service'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- an in-memory fake of loosely-shaped rows
 type Row = Record<string, any>
 const USER = 'u-1'
 
