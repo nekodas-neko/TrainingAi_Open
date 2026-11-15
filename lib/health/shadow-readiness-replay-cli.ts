@@ -44,7 +44,7 @@ async function main(): Promise<void> {
   }
   const m = daysMoved(result.rows)
   console.info(`\n${result.rows.length} days scored; ${m.compared} with a live composite (before illness suppression); ${m.moved} differ by ≥ ${DAYS_MOVED_THRESHOLD} points; median |diff| ${m.medianAbsDiff?.toFixed(1) ?? '—'}, max ${m.maxAbsDiff?.toFixed(1) ?? '—'}.`)
-  console.info(`Left out, live composite unknown: ${m.excluded.clamped} clamped at 0 under an illness flag; ${m.excluded['unknown-era']} on an illness flag that may predate #3163.`)
+  console.info(`Left out, live composite unknown: ${m.excluded.clamped} clamped at 0 under an illness flag; ${m.excluded['unknown-era']} on an illness flag that may predate #3163; ${m.excluded['old-scale']} scored before #3778 with no contributors to convert.`)
   console.info(result.dryRun ? 'Dry run: nothing written. Pass --write to store the rows.' : `Wrote ${result.written} rows (computed_by = replay).`)
 }
 

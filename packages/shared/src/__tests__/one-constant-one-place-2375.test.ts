@@ -46,8 +46,10 @@ describe('one constant, one place — #2375', () => {
     const ui = read('app/session-select/components/deload-explanation.tsx')
     const engine = read('packages/shared/src/ai-periodization/ai-dynamic.ts')
     expect(ui).not.toMatch(/ouraReadiness\s*<\s*\d/)
-    expect(ui).toContain('ouraReadiness < DELOAD_READINESS_SOFT_MIN')
-    expect(engine).toContain('r >= DELOAD_READINESS_SOFT_MIN')
-    expect(engine).toContain('r >= DELOAD_READINESS_RECOMMENDED_MIN')
+    // #3824: both read the cut through `cutFor`, chosen by the score's model version.
+    expect(ui).toContain('cutFor("deloadSoft"')
+    expect(ui).toContain('ouraReadiness < softMin')
+    expect(engine).toContain("cutFor('deloadSoft', readinessModelVersion)")
+    expect(engine).toContain("cutFor('deloadRecommended', readinessModelVersion)")
   })
 })

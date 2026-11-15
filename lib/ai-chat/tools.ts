@@ -8,7 +8,7 @@ import { computeVolumeAcwr, trainingLoadBand, acwrBandByKey } from '@trainingai/
 import { projectRm, isRmPlateau } from '@trainingai/shared/health/strength-projection'
 import { aggregateExerciseHrTrend, summarizeHrByExercise } from '@trainingai/shared/workout/exercise-hr-trend'
 import { computeHrRecoveryProfile } from '@trainingai/shared/health/compute-hr-recovery-profile'
-import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
+import { liveReadinessByDay, liveReadinessByDayOnCurrentScale } from '@trainingai/shared/health/live-readiness'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
 import { isBodyweightType, bodyweightRepMax } from '@trainingai/shared/1rm'
@@ -97,7 +97,8 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         ])
         // Readiness, sleep and activity scores are ours (oura_daily_derived). Oura's own scores are
         // never sent as ours (scoring doc rule 5, #3000); its temperature deviation is a reading.
-        const readinessMap = liveReadinessByDay(derived)
+        // #3824: a daily series the model compares across days, so every day is on the current scale.
+        const readinessMap = liveReadinessByDayOnCurrentScale(derived)
         const derivedByDate = new Map(derived.map(d => [d.day, d]))
         const stepsByDate = dayStepCountsByDate(metrics, activities)
         // #2998: from the day the user switched to the Oura API the ring's rollup rows are partial

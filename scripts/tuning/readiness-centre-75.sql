@@ -4,7 +4,8 @@
 --   projected = clamp(round(stored + Σ w × (new sub-score − stored sub-score)))
 -- over resting HR, HRV balance and sleep balance; the new sub-score is the v18 curve applied to the
 -- stored z, the re-centred stored sub-score on a row with no stored input, or 75 when unscored.
--- Two statements: the summary, then each decision cut. Rewrites nothing.
+-- Only rows written under the old model version (v17 and before, or unstamped) are counted, so it
+-- can be re-run after release. Two statements: the summary, then each decision cut. Rewrites nothing.
 
 -- 1. Summary: how many days, how many move, by how much, and how many change band label.
 WITH k(key, w, sgn) AS (
@@ -17,6 +18,8 @@ WITH k(key, w, sgn) AS (
          (d.readiness_contributors -> k.key ->> 'input')::numeric AS z
     FROM claude_ro.oura_daily_derived d CROSS JOIN k
    WHERE d.readiness_score IS NOT NULL
+     -- Only rows still on the old scale, so this can be re-run after release: a v18 row has moved already.
+     AND coalesce(substring(d.model_versions ->> 'readiness' from '^v([0-9]+):')::int, 0) < 18
      AND jsonb_typeof(d.readiness_contributors -> k.key) = 'object'
      AND jsonb_typeof(d.readiness_contributors -> k.key -> 'score') = 'number'
 ), r AS (
@@ -54,7 +57,16 @@ SELECT count(*) AS days,
        sum(CASE WHEN band_after = 'High' THEN 1 ELSE 0 END) AS high_after,
        sum(CASE WHEN band_before = 'Low' THEN 1 ELSE 0 END) AS low_before,
        sum(CASE WHEN band_after = 'Low' THEN 1 ELSE 0 END) AS low_after,
-       min(day) AS first_day, max(day) AS last_day
+       min(day) AS first_day, max(day) AS last_day,
+       -- Old-scale scored rows left out above because none of the three centred contributors is in
+       -- a contributor map (pre-Q-501 rows hold none). The days above are the rest.
+       (SELECT count(*) FROM claude_ro.oura_daily_derived d
+         WHERE d.readiness_score IS NOT NULL
+           AND coalesce(substring(d.model_versions ->> 'readiness' from '^v([0-9]+):')::int, 0) < 18) AS old_scale_scored_rows,
+       (SELECT count(*) FROM claude_ro.oura_daily_derived d
+         WHERE d.readiness_score IS NOT NULL
+           AND coalesce(substring(d.model_versions ->> 'readiness' from '^v([0-9]+):')::int, 0) < 18)
+         - count(*) AS rows_dropped_no_contributor_map
   FROM b;
 
 -- 2. Each decision cut: days it fired on before and after, days that stopped or started, and the
@@ -69,6 +81,8 @@ WITH k(key, w, sgn) AS (
          (d.readiness_contributors -> k.key ->> 'input')::numeric AS z
     FROM claude_ro.oura_daily_derived d CROSS JOIN k
    WHERE d.readiness_score IS NOT NULL
+     -- Only rows still on the old scale, so this can be re-run after release: a v18 row has moved already.
+     AND coalesce(substring(d.model_versions ->> 'readiness' from '^v([0-9]+):')::int, 0) < 18
      AND jsonb_typeof(d.readiness_contributors -> k.key) = 'object'
      AND jsonb_typeof(d.readiness_contributors -> k.key -> 'score') = 'number'
 ), r AS (
@@ -97,7 +111,8 @@ WITH k(key, w, sgn) AS (
          (7, 'early-deload card', 'below', 45, 51),
          (8, 'running gate: rest', 'below', 50, 57),
          (9, 'running gate: soften', 'below', 65, 72),
-         (10, 'training stress: low readiness', 'below', 60, 67)
+         (10, 'training stress: low readiness', 'below', 60, 67),
+         (11, 'low-readiness push', 'below', 50, 57)
 ), f AS (
   SELECT cut.ord, cut.name, cut.side, cut.before, cut.after,
          CASE WHEN cut.side = 'below' THEN p.stored < cut.before ELSE p.stored >= cut.before END AS was,

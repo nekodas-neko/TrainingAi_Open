@@ -57,7 +57,7 @@ async function main() {
     if (ro !== 'on') throw new Error(`refusing to run: SHOW default_transaction_read_only is "${ro}", not "on"`)
     const rows = await lib.storedReadinessRows(arg)
     const projected = rows.map(lib.projectCentreShift).filter(Boolean)
-    console.log(`${rows.length} stored rows, ${projected.length} with a contributor map`)
+    console.log(`${rows.length} stored rows on the old scale, ${projected.length} with a contributor map, ${rows.length - projected.length} dropped for having none`)
     print(`stored rows for ${arg}`, lib.summariseCentreShift(projected))
   } finally {
     await lib.closePool()

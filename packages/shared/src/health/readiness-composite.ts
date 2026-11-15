@@ -8,7 +8,8 @@
 //
 // Baseline-relative contributors (RHR, HRV Balance, Temperature, Sleep Balance) are
 // cold for the first ~14 nights of accrued history — those are flagged provisional
-// and fall back to a neutral 50, exactly as open_health does. Recovery Index has no
+// and fall back to the centre: 75 for resting HR, HRV balance and sleep balance since #3778, a
+// neutral 50 for temperature, as open_health does. Recovery Index has no
 // calibratable hours→score mapping (per the addendum), so it's always neutral/
 // provisional; its raw hours are surfaced separately for display, never scored.
 
@@ -157,7 +158,7 @@ const AWAITING_BASELINE: ReadinessContributor = { score: 50, provisional: true, 
  * (0→50) stretched over 0→75. So:
  * - every σ value keeps its ordering and the knees stay at ±0.9σ;
  * - the top still bends toward 100 without reaching it (+1.5σ → 95, +3σ → 98, rounding to 100
- *   needs ~8σ), so great days do not pile onto a rail;
+ *   needs about 12.3σ), so great days do not pile onto a rail;
  * - the bottom still reaches low scores (−1.5σ → 15, −3σ → 7), so a genuinely poor night is Low.
  *
  * The price, stated so nobody rediscovers it: above baseline each σ is worth half the points it was
@@ -298,8 +299,33 @@ export function baselineContributorCurve(z: number, direction: BaselineDirection
     // pushes the raw score toward 0, keeps the TN-60 shape so extreme days stay ordered.
     return compressLowTail(100 - Math.abs(z) * (2 * Z_POINTS_PER_UNIT))
   }
+  return recentre(preCentreContributorCurve(z, direction))
+}
+
+/** The pre-#3778 curve for a centred contributor (resting HR, HRV balance, sleep balance): the TN-60
+ *  shape around 50, unrounded. `baselineContributorCurve` is this, re-centred to 75. */
+function preCentreContributorCurve(z: number, direction: 'higher-better' | 'lower-better'): number {
   const raw = 50 + (direction === 'higher-better' ? z : -z) * Z_POINTS_PER_UNIT
-  return recentre(compressTails(raw))
+  return compressTails(raw)
+}
+
+/**
+ * A scored centred contributor on the 50-centred scale, exactly as v17 scored it: from its own z
+ * through the pre-#3778 curve, then rounded once. For the stress-resilience port, whose fixed cuts
+ * were written against that scale (#3778). **Not** `preCentreSubScore(contributor.score)`: that
+ * inverts a score already rounded on the new scale, and the squeeze above 75 makes one new point worth
+ * two old ones, so it lands a point off on some days (#3824). A contributor with no z falls back to
+ * that inverse.
+ */
+export function preCentreContributorScore(
+  contributor: Pick<ReadinessContributor, 'score' | 'input'>,
+  direction: 'higher-better' | 'lower-better',
+): number {
+  const z = contributor.input
+  const old = typeof z === 'number' && Number.isFinite(z)
+    ? preCentreContributorCurve(z, direction)
+    : preCentreSubScore(contributor.score)
+  return Math.max(0, Math.min(100, Math.round(old)))
 }
 
 /** The sub-score a baseline-relative contributor falls back to with no input or a cold normal: the

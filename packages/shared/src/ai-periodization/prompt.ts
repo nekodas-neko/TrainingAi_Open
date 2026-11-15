@@ -5,7 +5,8 @@ import { SECONDS_PER_REP, SET_SETUP_SEC, fitBudgetMin } from '@trainingai/shared
 import { PCT_BANDS } from '@trainingai/shared/workout/time-profile'
 import { displayOneRm, displayOneRmDelta } from '@trainingai/shared/1rm'
 import { FEVER_TEMP_Z } from '@trainingai/shared/health/illness-radar'
-import { PROMPT_REST_DAY_READINESS_BELOW } from '@trainingai/shared/health/readiness-decision-thresholds'
+import { PROMPT_REST_DAY_READINESS_BELOW, cutFor } from '@trainingai/shared/health/readiness-decision-thresholds'
+import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 import { goalRange } from './goal-ranges'
 import { userTextBlock, USER_TEXT_NOTE } from '../ai/untrusted-text'
 // The units, superlative and no-diagnosis rules: `reasoning` is shown to the lifter (#3803).
@@ -189,6 +190,18 @@ Output field notes:
 ${PROSE_FIELD_GUARDS}`
 }
 
+
+/**
+ * #3824. The system prompt's rest-day rule names the cut for the current readiness scale. A score
+ * stored before #3778 (today's row on release day, until it is recomputed) is on the old scale, so
+ * its line says which cut applies to it. On the current scale the line is unchanged.
+ */
+function externalReadinessScaleNote(modelVersion: string | null | undefined): string {
+  const cut = cutFor('promptRestDay', modelVersion === undefined ? READINESS_MODEL_VERSION : modelVersion)
+  return cut === PROMPT_REST_DAY_READINESS_BELOW
+    ? ''
+    : `; scored on the earlier scale, so its rest-day cut is ${cut}, not ${PROMPT_REST_DAY_READINESS_BELOW}`
+}
 export function buildUserPrompt(
   signals: PrescriptionSignals,
   state: SessionPeriodization,
@@ -273,7 +286,7 @@ export function buildUserPrompt(
       ? `  Illness radar (vs personal baseline): ${signals.illness.flag} (score ${signals.illness.score}/100)`
       : `  Illness radar: no data`,
     signals.externalReadiness != null
-      ? `  External readiness score: ${signals.externalReadiness}/100 (one signal among many)`
+      ? `  External readiness score: ${signals.externalReadiness}/100 (one signal among many${externalReadinessScaleNote(signals.externalReadinessModelVersion)})`
       : `  External readiness: no data`,
     signals.trainingLoadOts != null
       ? `  Training stress (own OTS model): ${signals.trainingLoadOts.toFixed(1)}${signals.trainingLoadHigh ? ' — HIGH today' : ''}`

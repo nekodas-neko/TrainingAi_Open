@@ -17,6 +17,10 @@
 // none of them. Nothing here may feed back into `computeReadinessComposite`.
 
 import { iqrBand } from '@trainingai/shared/stats'
+import { readinessModelVersionOf, readinessScaleOf } from './readiness-decision-thresholds'
+import { toCurrentReadinessScale } from './readiness-scale'
+
+export { readinessModelVersionOf, readinessScaleOf }
 
 /** Scored days of history the band needs before it may judge anything. A window of 28 needs 28. */
 export const READINESS_VERDICT_BASELINE_DAYS = 28
@@ -40,24 +44,9 @@ export const READINESS_VERDICT_IQR_MULTIPLIER = 0.65
 /** Bumped whenever the verdict rule changes, so a stored snapshot says which rule produced it.
  *  v1: trailing 28 scored days, median ± 1.00 × IQR, strict inequality at the band edges.
  *  v2: the same, with the multiplier calibrated to 0.65 (#2430).
- *  v3: the baseline holds only days on the target's readiness SCALE (#3778). */
-export const READINESS_VERDICT_MODEL_VERSION = 3
-
-/** Readiness model v18 moved the centre to 75 (#3778). */
-const CENTRE_75_FROM_MODEL = 18
-
-/**
- * #3778. Which scale a stored score is on: readiness v18 moved the centre from 50 to 75, which lifts
- * an ordinary day by about 6 points. A v18 day judged against 28 days of the old scale reads "better
- * than usual" for four weeks for no reason in the person, so the baseline keeps only days on the
- * target's scale and the verdict is silent until 28 of them exist, as it is for any short baseline.
- * Unstamped rows predate the stamp (Q-273), so they are on the old scale. Other version bumps do not
- * split the baseline; `baselineSameVersionDays` still reports those.
- */
-export function readinessScaleOf(modelVersion: string | null): 'centre-50' | 'centre-75' {
-  const n = modelVersion == null ? NaN : Number(/^v(\d+):/.exec(modelVersion)?.[1])
-  return Number.isFinite(n) && n >= CENTRE_75_FROM_MODEL ? 'centre-75' : 'centre-50'
-}
+ *  v3: the baseline holds only days on the target's readiness SCALE (#3778).
+ *  v4: a v18 target converts older baseline days onto its scale instead of dropping them (#3824). */
+export const READINESS_VERDICT_MODEL_VERSION = 4
 
 export type ReadinessVerdict = 'normal' | 'poor' | 'good'
 
@@ -68,6 +57,8 @@ export interface ReadinessVerdictDay {
   score: number | null
   /** `model_versions.readiness` stamped on the row. Null on rows written before 2026-08-18. */
   modelVersion: string | null
+  /** The row's stored contributor map, so a day on the old scale can be converted (#3824). */
+  contributors?: unknown
 }
 
 export interface ReadinessVerdictBand {
@@ -98,21 +89,15 @@ export interface ReadinessVerdictResult {
   modelVersion: number
 }
 
-/** `model_versions.readiness` out of the row's JSONB, or null when the row carries no stamp. */
-export function readinessModelVersionOf(modelVersions: unknown): string | null {
-  if (modelVersions == null || typeof modelVersions !== 'object' || Array.isArray(modelVersions)) return null
-  const v = (modelVersions as { readiness?: unknown }).readiness
-  return typeof v === 'string' && v.length > 0 ? v : null
-}
-
 /** Stored derived rows, reduced to the shape the verdict reads. */
 export function toReadinessVerdictDays(
-  rows: readonly { day: string; readinessScore: number | null; modelVersions: unknown }[],
+  rows: readonly { day: string; readinessScore: number | null; modelVersions: unknown; readinessContributors?: unknown }[],
 ): ReadinessVerdictDay[] {
   return rows.map(r => ({
     date: r.day,
     score: r.readinessScore,
     modelVersion: readinessModelVersionOf(r.modelVersions),
+    contributors: r.readinessContributors,
   }))
 }
 
@@ -134,10 +119,17 @@ export function readinessVerdictForDay(
   const score = target.score
   if (score === null || !Number.isFinite(score)) return null
 
-  const scale = readinessScaleOf(target.modelVersion)
+  // #3824: every baseline day on the target's scale. A v18 target converts the older days onto its
+  // scale (`toCurrentReadinessScale`), so the verdict keeps working across the release instead of
+  // going silent for 28 days; a day that cannot be converted (no contributor map) is left out. An
+  // old-scale target (a past day judged now) keeps only old-scale days, as it was judged then.
+  const onTargetScale = readinessScaleOf(target.modelVersion) === 'centre-75'
+    ? (d: ReadinessVerdictDay) => toCurrentReadinessScale(d.score, d.modelVersion, d.contributors)
+    : (d: ReadinessVerdictDay) => readinessScaleOf(d.modelVersion) === 'centre-50' ? d.score : null
   const baseline = history
-    .filter(d => d.date < target.date && d.score !== null && Number.isFinite(d.score))
-    .filter(d => readinessScaleOf(d.modelVersion) === scale)
+    .filter(d => d.date < target.date)
+    .map(d => ({ ...d, score: onTargetScale(d) }))
+    .filter(d => d.score !== null && Number.isFinite(d.score))
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
     .slice(0, READINESS_VERDICT_BASELINE_DAYS)
   if (baseline.length < READINESS_VERDICT_BASELINE_DAYS) return null

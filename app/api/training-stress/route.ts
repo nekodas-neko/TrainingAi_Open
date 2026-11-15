@@ -29,6 +29,7 @@ import {
 } from '@trainingai/shared/health/training-stress-recheck';
 import { BASELINE_MIN_NIGHTS, storedReadinessLearning } from '@trainingai/shared/health/readiness-composite';
 import { isOwnReadinessSource } from '@trainingai/shared/health/live-readiness';
+import { readinessModelVersionOf } from '@trainingai/shared/health/readiness-decision-thresholds';
 import { resolveDayMetPerMinute } from '@trainingai/shared/health/met-input';
 import { perMinuteMovementGrid } from '@trainingai/shared/health/per-minute-movement';
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy';
@@ -156,6 +157,8 @@ async function evaluateTrainingStressDay(
   const derived = derivedRows[0] ?? null;
   // Readiness must be our own composite, whatever device fed it (#2992), never Oura's own score.
   const readiness = isOwnReadinessSource(derived?.readinessSource) ? derived!.readinessScore : null;
+  // #3824: a stored row keeps the scale it was written on, so the readiness cut is chosen by its stamp.
+  const readinessModelVersion = readinessModelVersionOf(derived?.modelVersions);
   // #2992: learning is read from our stored composite's own contributors, so an Oura Cloud day (no
   // ring summary) is judged on its own normals. Rows that cannot say keep the ring-summary rule.
   const readinessProvisional =
@@ -224,6 +227,7 @@ async function evaluateTrainingStressDay(
     sex: user?.sex ?? null,
     rhr: rhr?.value ?? null,
     readiness,
+    readinessModelVersion,
     readinessProvisional,
     vo2maxInputs: {
       restingHr: rhr?.value ?? null,

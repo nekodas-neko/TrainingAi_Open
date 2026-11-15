@@ -134,6 +134,7 @@ describe('every decision cut moved with the centre', () => {
       ['running gate: rest', 50, 57],
       ['running gate: soften', 65, 72],
       ['training stress: low readiness', 60, 67],
+      ['low-readiness push', 50, 57],
     ])
   })
 
@@ -160,7 +161,7 @@ describe('every decision cut moved with the centre', () => {
   it('running gate: rest under 57, soften under 72', () => {
     const p = { type: 'tempo', durationMin: 40, distanceKm: null, targets: {}, rationale: '', frameworkKey: 'x' } as unknown as Parameters<typeof applyRecoveryGate>[0]
     const gate = (readiness: number) => applyRecoveryGate(p, {
-      readiness, readinessProvisional: false, acwr: null, hoursSinceLowerBodyStrength: null, lastLowerBodyVolumeKg: 0,
+      readiness, readinessModelVersion: READINESS_MODEL_VERSION, readinessProvisional: false, acwr: null, hoursSinceLowerBodyStrength: null, lastLowerBodyVolumeKg: 0,
       monotony: null, hoursSinceLastHardRun: null, sleepHoursLastNight: null,
     }).action
     expect(gate(56)).toBe('rest')
@@ -207,7 +208,8 @@ describe('the stored-day replay', () => {
 })
 
 describe('the "is today unusual?" verdict does not mix the two scales', () => {
-  it('judges a v18 day only against v18 days, and stays silent until 28 exist', async () => {
+  // #3824: an old day WITH a contributor map is converted instead (readiness-scale-by-version-3824).
+  it('judges a v18 day only against days on its scale; old days with no inputs to convert do not count', async () => {
     const { readinessVerdictForDay, readinessScaleOf } = await import('../readiness-verdict')
     expect(readinessScaleOf('v17:version-keyed-baselines:2026-11-04')).toBe('centre-50')
     expect(readinessScaleOf(null)).toBe('centre-50')

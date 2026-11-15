@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
+import { liveReadinessByDay, liveReadinessByDayOnCurrentScale } from '@trainingai/shared/health/live-readiness'
 import { DEFAULT_TZ, todayInTz, ageFromDob, normalizeDateParamIso, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { z } from 'zod'
 import { formatContributors, weakestContributor } from '@/lib/oura/contributors'
@@ -121,10 +121,13 @@ export async function POST(req: Request) {
     weakest = weakestContributor(contributors)
     // Today is excluded from its own baseline, so "above the past week" cannot be satisfied by
     // today's own value sitting in the series it is compared against.
+    // #3824: today and the past week on one scale, so a week spanning #3778 is not read as a rise.
+    const onCurrentScale = liveReadinessByDayOnCurrentScale(derivedRows)
+    const todayDay = readinessMap.has(date) ? date : todayOura?.date ?? date
     recent = {
       noun: "the past week's scores",
-      values: ouraRows.filter(r => r.date !== date).map(r => readinessMap.get(r.date)).filter((v): v is number => v != null),
-      today: todayReadiness,
+      values: ouraRows.filter(r => r.date !== date).map(r => onCurrentScale.get(r.date)).filter((v): v is number => v != null),
+      today: todayReadiness == null ? null : onCurrentScale.get(todayDay) ?? null,
     }
     entries = [
       ...(todayReadiness == null ? [metric('Readiness score', null)] : []),

@@ -190,7 +190,7 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
       const live = liveCompositeOf(day, 0, 'fever', FROM)
       expect(live).toEqual({ liveComposite: null, liveGap: 'clamped' })
       expect(daysMoved([{ shadowReadiness: 20, ...live }])).toEqual({
-        compared: 0, moved: 0, medianAbsDiff: null, maxAbsDiff: null, excluded: { clamped: 1, 'unknown-era': 0 },
+        compared: 0, moved: 0, medianAbsDiff: null, maxAbsDiff: null, excluded: { clamped: 1, 'unknown-era': 0, 'old-scale': 0 },
       })
     })
 

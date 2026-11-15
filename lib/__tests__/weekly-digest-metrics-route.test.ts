@@ -54,6 +54,7 @@ vi.mock('@/lib/ai/instrument', () => ({
 
 import { GET } from '@/app/api/weekly-digest/route'
 import { buildWeeklyDigestText, type WeeklyDigestMetrics } from '@trainingai/shared/health/weekly-digest-metrics'
+import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 
 // A GET since RV-201 — it always was a read, and only a POST because it ran a model.
 const post = () => GET()
@@ -275,5 +276,29 @@ describe('the week can no longer be lost to something outside this route (RV-69,
     loadFixture()
     const json = await bodyOf(await post())
     expect(json.digest).toBe(buildWeeklyDigestText(json.metrics))
+  })
+})
+
+// #3824: a recap whose two weeks straddle #3778. The prior week's day was stored on the old scale,
+// the recap week's on the new one, and the same person sits behind both. Unconverted, the digest
+// would report readiness up by about 11.
+describe('readiness week over week compares one scale (#3824)', () => {
+  const atBaseline = (scale: 'v17' | 'v18') => {
+    const s = scale === 'v17' ? 50 : 75
+    return {
+      restingHeartRate: { score: s, input: 0, provisional: false, gap: null },
+      hrvBalance: { score: s, input: 0, provisional: false, gap: null },
+      sleepBalance: { score: s, input: 0, provisional: false, gap: null },
+    }
+  }
+  it('converts the old-scale day before averaging, and leaves out one it cannot convert', async () => {
+    getOuraDailyDerived.mockResolvedValue([
+      { day: '2026-08-26', readinessSource: 'ble-derived', readinessScore: 55, modelVersions: { readiness: 'v17:version-keyed-baselines:2026-11-04' }, readinessContributors: atBaseline('v17') },
+      { day: '2026-08-27', readinessSource: 'ble-derived', readinessScore: 20, modelVersions: null, readinessContributors: null },
+      { day: '2026-09-01', readinessSource: 'ble-derived', readinessScore: 66, modelVersions: { readiness: READINESS_MODEL_VERSION }, readinessContributors: atBaseline('v18') },
+    ] as never)
+    const json = await bodyOf(await post())
+    expect(json.metrics.readiness.priorWeek).toBe(66)
+    expect(json.metrics.readiness.week).toBe(66)
   })
 })

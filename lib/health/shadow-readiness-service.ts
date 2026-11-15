@@ -32,6 +32,7 @@ import { GOAL_DAILY_DELTA, KCAL_PER_KG } from '@trainingai/shared/nutrition/calo
 import { DEFAULT_WATER_GOAL_ML } from '@trainingai/shared/nutrition/goal-recommendation'
 import { READINESS_SUPPRESSION, type IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { readinessModelVersionOf } from '@trainingai/shared/health/readiness-verdict'
+import { toCurrentReadinessScale } from '@trainingai/shared/health/readiness-scale'
 import { prepareShadowHistory, assembleShadowInputs, type ShadowRawHistory } from '@trainingai/shared/health/shadow-readiness/assemble'
 import { scoreShadowReadiness, type FuelParts } from '@trainingai/shared/health/shadow-readiness/score'
 import { MATURITY_LOOKBACK_DAYS, BASELINE_WINDOW_DAYS } from '@trainingai/shared/health/shadow-readiness/model'
@@ -97,7 +98,7 @@ async function fuelForDay(
 /** Read everything the scorer needs to score every day in [from, to]. */
 async function loadHistory(repo: Repo, userId: string, tz: string, from: string, to: string): Promise<{
   raw: ShadowRawHistory
-  live: Map<string, { score: number | null; model: string | null; illnessFlag: string | null }>
+  live: Map<string, { score: number | null; model: string | null; illnessFlag: string | null; contributors: unknown }>
 }> {
   const start = shiftDateStr(from, -LOOKBACK_DAYS)
   const today = todayInTz(tz)
@@ -164,8 +165,8 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
     if (r.weightVsPlan != null) weightVsPlan.set(day, r.weightVsPlan)
   }
 
-  const live = new Map<string, { score: number | null; model: string | null; illnessFlag: string | null }>()
-  for (const r of derived) live.set(r.day, { score: r.readinessScore, model: readinessModelVersionOf(r.modelVersions), illnessFlag: r.illnessFlag })
+  const live = new Map<string, { score: number | null; model: string | null; illnessFlag: string | null; contributors: unknown }>()
+  for (const r of derived) live.set(r.day, { score: r.readinessScore, model: readinessModelVersionOf(r.modelVersions), illnessFlag: r.illnessFlag, contributors: r.readinessContributors })
 
   return {
     live,
@@ -212,8 +213,10 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
  */
 export const SERVED_READINESS_STORED_FROM: string | null = '2026-10-29'
 
-/** Why a day's live composite is unknown, so {@link daysMoved} leaves it out and counts it. */
-export type LiveCompositeGap = 'clamped' | 'unknown-era'
+/** Why a day's live composite is unknown, so {@link daysMoved} leaves it out and counts it.
+ *  `old-scale` (#3824): a pre-#3778 row with no contributor map, which cannot be moved onto the
+ *  current scale and would otherwise count the centre move as days the shadow model moved. */
+export type LiveCompositeGap = 'clamped' | 'unknown-era' | 'old-scale'
 
 /** The live side of the shadow comparison, a row's extra fields beyond what the table stores. */
 export interface LiveComparison {
@@ -229,8 +232,20 @@ export interface LiveComparison {
  */
 export function liveCompositeOf(
   day: string, score: number | null, illnessFlag: string | null, servedFrom: string | null = SERVED_READINESS_STORED_FROM,
+  /** #3824: the row's model version and contributors, so the composite is put on the current scale
+   *  (`toCurrentReadinessScale`) before the shadow is compared with it. Omitted = already current. */
+  scale?: { modelVersion: string | null; contributors: unknown },
 ): LiveComparison {
   if (score == null) return { liveComposite: null, liveGap: null }
+  const raw = liveCompositeOnStoredScale(day, score, illnessFlag, servedFrom)
+  if (raw.liveComposite == null || scale === undefined) return raw
+  const current = toCurrentReadinessScale(raw.liveComposite, scale.modelVersion, scale.contributors)
+  return current == null ? { liveComposite: null, liveGap: 'old-scale' } : { liveComposite: current, liveGap: null }
+}
+
+function liveCompositeOnStoredScale(
+  day: string, score: number, illnessFlag: string | null, servedFrom: string | null,
+): LiveComparison {
   const suppression = illnessFlag != null && Object.prototype.hasOwnProperty.call(READINESS_SUPPRESSION, illnessFlag)
     ? READINESS_SUPPRESSION[illnessFlag as IllnessFlag] : 0
   if (suppression === 0) return { liveComposite: score, liveGap: null }
@@ -271,7 +286,7 @@ export async function computeShadowRows(
       liveReadiness: l?.score ?? null,
       liveModelVersion: l?.score != null ? l.model : null,
       computedBy,
-      ...liveCompositeOf(date, l?.score ?? null, l?.illnessFlag ?? null),
+      ...liveCompositeOf(date, l?.score ?? null, l?.illnessFlag ?? null, SERVED_READINESS_STORED_FROM, l ? { modelVersion: l.model, contributors: l.contributors } : undefined),
     }
   })
 }
@@ -339,7 +354,7 @@ export interface DaysMoved {
  * suppressed morning is not counted as moved by the suppression alone.
  */
 export function daysMoved(rows: readonly (Pick<ShadowRow, 'shadowReadiness' | 'liveComposite'> & { liveGap?: LiveCompositeGap | null })[]): DaysMoved {
-  const excluded: Record<LiveCompositeGap, number> = { clamped: 0, 'unknown-era': 0 }
+  const excluded: Record<LiveCompositeGap, number> = { clamped: 0, 'unknown-era': 0, 'old-scale': 0 }
   for (const r of rows) if (r.shadowReadiness != null && r.liveGap) excluded[r.liveGap]++
   const diffs = rows
     .filter(r => r.shadowReadiness != null && r.liveComposite != null)

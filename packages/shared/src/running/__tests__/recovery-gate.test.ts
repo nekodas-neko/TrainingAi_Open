@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { applyRecoveryGate, type RecoveryGateInputs } from '../recovery-gate'
 import type { Prescription } from '../types'
+import { READINESS_MODEL_VERSION } from '../../health/readiness-composite'
 
 const hardRun: Prescription = {
   type: 'interval', durationMin: 40, distanceKm: null,
@@ -8,7 +9,7 @@ const hardRun: Prescription = {
   rationale: 'ideal', frameworkKey: 'polarized-80-20',
 }
 const base: RecoveryGateInputs = {
-  readiness: 80, readinessProvisional: false,
+  readiness: 80, readinessModelVersion: READINESS_MODEL_VERSION, readinessProvisional: false,
   hoursSinceLowerBodyStrength: 96, lastLowerBodyVolumeKg: 0,
   monotony: null, acwr: 1.0, hoursSinceLastHardRun: 48, sleepHoursLastNight: 8,
 }

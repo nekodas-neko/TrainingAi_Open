@@ -4,7 +4,7 @@ import { normalizeMuscle, moodMuscleMatches } from '@trainingai/shared/muscles'
 import type { ProgramSession, MuscleAssignment, NextSessionRecommendation } from '@trainingai/shared/types/program'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { loggedAsSession, programSessionFor } from '@trainingai/shared/workout/session-identity'
-import { SESSION_LOW_READINESS_BELOW } from '@trainingai/shared/health/readiness-decision-thresholds'
+import { cutFor } from '@trainingai/shared/health/readiness-decision-thresholds'
 
 export interface MuscleRecovery {
   muscle: string
@@ -32,6 +32,9 @@ export interface AiDynamicInput {
    */
   suggestedSoreMuscles?: string[] | null
   readinessScore: number | null
+  /** `model_versions.readiness` of the row `readinessScore` came from. Its cuts are chosen for that
+   *  score's scale (#3824): a row written before #3778 shipped is judged by the old cuts. */
+  readinessModelVersion: string | null
   temperatureDeviation: number | null
   // Nights of accrued temperature baseline. The elevated-temp deload only fires once this is
   // solid (≥ TEMP_BASELINE_MIN_DAYS) so an immature baseline (or the frozen pre-re-key Cloud value)
@@ -225,12 +228,13 @@ export function countConsecutiveRestDays(history: SessionHistory[], now: Date, t
 // Defined in `deload-constants.ts` (import-free) and re-exported here so every existing importer
 // is unchanged. Client components must import them from there instead: this module transitively
 // pulls the ONNX runtime, so a client import of even a bare number fails the build.
-import { TEMP_BASELINE_MIN_DAYS, TEMP_ALERT_THRESHOLD_C, DELOAD_READINESS_SOFT_MIN, DELOAD_READINESS_RECOMMENDED_MIN } from './deload-constants'
+import { TEMP_BASELINE_MIN_DAYS, TEMP_ALERT_THRESHOLD_C } from './deload-constants'
 export { TEMP_BASELINE_MIN_DAYS, TEMP_ALERT_THRESHOLD_C }
 
 function computeDeloadStrength(
   consecutiveTrainingDays: number,
   readinessScore: number | null,
+  readinessModelVersion: string | null,
   temperatureDeviation: number | null,
   temperatureBaselineDays: number,
   illnessFlag: IllnessFlag | null,
@@ -287,9 +291,9 @@ function computeDeloadStrength(
     return { recommended: false, strength: 'soft', temperatureAlert: false }
   }
 
-  const r = readinessScore ?? DELOAD_READINESS_SOFT_MIN
-  if (r >= DELOAD_READINESS_SOFT_MIN) return { recommended: true, strength: 'soft', temperatureAlert: false }
-  if (r >= DELOAD_READINESS_RECOMMENDED_MIN) return { recommended: true, strength: 'recommended', temperatureAlert: false }
+  // #3824: both grades are chosen for the score's own scale (70/50 before #3778, 76/56 after).
+  if (readinessScore == null || readinessScore >= cutFor('deloadSoft', readinessModelVersion)) return { recommended: true, strength: 'soft', temperatureAlert: false }
+  if (readinessScore >= cutFor('deloadRecommended', readinessModelVersion)) return { recommended: true, strength: 'recommended', temperatureAlert: false }
   return { recommended: true, strength: 'strong', temperatureAlert: false }
 }
 
@@ -298,7 +302,7 @@ function computeDeloadStrength(
 export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionRecommendation {
   const {
     sessions, muscleAssignments, muscleRecovery, history, soreMuscles, suggestedSoreMuscles,
-    readinessScore, temperatureDeviation, temperatureBaselineDays, timezone,
+    readinessScore, readinessModelVersion, temperatureDeviation, temperatureBaselineDays, timezone,
     reminderEnabled, reminderTime, sleepTrend, energyLevel, selfReportedSick, hrvTrend, illnessFlag, stressHighMinutes,
     temperatureTrusted,
   } = input
@@ -319,8 +323,8 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
   }
 
   // Shift recovery weight up when readiness or sleep quality is low (#3778: the cut was 60 before the
-  // readiness centre moved to 75)
-  const lowReadiness = readinessScore != null && readinessScore < SESSION_LOW_READINESS_BELOW
+  // readiness centre moved to 75; #3824: a score from before the move is still judged at 60)
+  const lowReadiness = readinessScore != null && readinessScore < cutFor('sessionLowReadiness', readinessModelVersion)
   const lowSleep = sleepTrend != null && sleepTrend < 0.85
   const wRecovery  = (lowReadiness || lowSleep) ? 0.55 : 0.40
   const wBalance   = (lowReadiness || lowSleep) ? 0.25 : 0.35
@@ -348,7 +352,7 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
   const consecutiveRestDays = countConsecutiveRestDays(history, now, timezone)
 
   const deload = computeDeloadStrength(
-    consecutiveTrainingDays, readinessScore, temperatureDeviation, temperatureBaselineDays ?? 0,
+    consecutiveTrainingDays, readinessScore, readinessModelVersion, temperatureDeviation, temperatureBaselineDays ?? 0,
     illnessFlag, stressHighMinutes, temperatureTrusted ?? false,
   )
   let recommended = deload.recommended

@@ -109,7 +109,8 @@ export function HealthDetailScreen({
           score,
           trends.data?.trends
             .filter((day) => day.date < health.today)
-            .map((day) => day.readinessScore) ?? [],
+            // #3824: on the current scale, so a window spanning #3778 compares like with like.
+            .map((day) => day.readinessScoreCurrentScale) ?? [],
         )
       : null;
   return (

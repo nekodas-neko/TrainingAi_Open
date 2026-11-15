@@ -396,10 +396,15 @@ Live at the time of writing (2026-07-30):
   resting HR, HRV balance and sleep balance, and those three fall back to 75 when unscored. The TN-60
   shape is unchanged in σ (`baselineContributorCurve`); only its halves are rescaled. **Every cut that
   acts on the score moved with it** in `readiness-decision-thresholds.ts`; the band labels did not, on
-  purpose. Stored rows were not rewritten, so history before the release is on the 50-centred scale:
-  the verdict's baseline splits by scale (`readinessScaleOf`), the resilience port reads the sub-scores
-  back on the old scale (`preCentreSubScore`), and any average or chart across the release date mixes
-  the two. Never compare a stored readiness score with a fixed number without knowing its version.
+  purpose. Stored rows were not rewritten, so history before the release is on the 50-centred scale.
+  **Two rules follow (#3824):** a stored score is compared with a cut only through
+  `cutFor(key, modelVersion)`, which picks the old cut for an old-scale row; and anything that
+  averages or differences readiness across days converts each day first with
+  `toCurrentReadinessScale` (`readiness-scale.ts`, the same arithmetic as the production SQL), leaving
+  out an old row with no contributor map. The verdict, the 14-day chip, the weekly digest, the chat's
+  7-day average, the health insight and the shadow days-moved measure all do. The resilience port reads
+  the exact pre-#3778 sub-score from the stored z (`preCentreContributorScore`). Sparklines still plot
+  each day as stored.
 - **`readiness_contributors` is stored in TWO shapes under one name, and reading the wrong one is
   silent.** `oura_daily.readiness_contributors` holds Oura's `{ hrv_balance: 90 }`;
   `oura_daily_derived.readiness_contributors` — what the app writes, and what every reader prefers

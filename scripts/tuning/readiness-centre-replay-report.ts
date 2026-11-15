@@ -16,21 +16,10 @@
 // (Q-501), and is the centre 75 when the contributor was unscored. The SQL in
 // `scripts/tuning/readiness-centre-75.sql` is the same arithmetic, so the two can be checked
 // against each other on any local database.
-import {
-  baselineContributorCurve,
-  preCentreSubScore,
-  READINESS_BASELINE_CENTRE,
-  READINESS_WEIGHTS,
-} from '@trainingai/shared/health/readiness-composite'
+import { baselineContributorCurve, preCentreSubScore, READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite'
+import { centreShiftDelta } from '@trainingai/shared/health/readiness-scale'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { READINESS_DECISION_THRESHOLDS } from '@trainingai/shared/health/readiness-decision-thresholds'
-
-/** The three contributors #3778 re-centred, with the direction their stored z is read in. */
-const CENTRED = {
-  restingHeartRate: 'lower-better',
-  hrvBalance: 'higher-better',
-  sleepBalance: 'higher-better',
-} as const
 
 export interface StoredReadinessRow {
   day: string
@@ -44,32 +33,11 @@ export interface ProjectedRow {
   projected: number
 }
 
-/** The same re-centring `baselineContributorCurve` applies, for a row that stored no z. */
-function recentreStoredSubScore(s: number): number {
-  const c = READINESS_BASELINE_CENTRE
-  return s >= 50 ? c + (s - 50) * ((100 - c) / 50) : c - (50 - s) * (c / 50)
-}
-
-/** One stored row → its score under #3778, or null when the row has no contributor map to read. */
+/** One stored row → its score under #3778, or null when the row has no contributor map to read.
+ *  The arithmetic is the app's own converter (`readiness-scale.ts`), so the count and the app agree. */
 export function projectCentreShift(row: StoredReadinessRow): ProjectedRow | null {
-  const map = row.contributors
-  if (map == null || typeof map !== 'object' || Array.isArray(map)) return null
-  let delta = 0
-  let seen = 0
-  for (const [key, direction] of Object.entries(CENTRED) as [keyof typeof CENTRED, 'lower-better' | 'higher-better'][]) {
-    const c = (map as Record<string, unknown>)[key]
-    if (c == null || typeof c !== 'object') continue
-    const entry = c as { score?: unknown; input?: unknown }
-    if (typeof entry.score !== 'number' || !Number.isFinite(entry.score)) continue
-    seen++
-    const next = !('input' in entry)
-      ? recentreStoredSubScore(entry.score)
-      : typeof entry.input === 'number' && Number.isFinite(entry.input)
-        ? baselineContributorCurve(entry.input, direction)
-        : READINESS_BASELINE_CENTRE
-    delta += READINESS_WEIGHTS[key] * (Math.max(0, Math.min(100, Math.round(next))) - entry.score)
-  }
-  if (seen === 0) return null
+  const delta = centreShiftDelta(row.contributors)
+  if (delta == null) return null
   return { day: row.day, stored: row.score, projected: Math.max(0, Math.min(100, Math.round(row.score + delta))) }
 }
 

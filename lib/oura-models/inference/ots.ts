@@ -5,7 +5,7 @@
 // is the source and the .pt-captured golden is the parity proof. Ported line-for-line from
 // the vendor's `training_stress_score_0_2_1` model source (private archive)
 import { getOtsTypedConstants } from '@/lib/oura-models/constants'
-import { OTS_LOW_READINESS_BELOW } from '@trainingai/shared/health/readiness-decision-thresholds'
+import { cutFor } from '@trainingai/shared/health/readiness-decision-thresholds'
 
 export interface OtsInput {
   startTimestampMs: number
@@ -16,6 +16,8 @@ export interface OtsInput {
   noOts: 0 | 1
   tzChange: 0 | 1
   readiness: number           // 0..100 (hard-validated; NaN rejected)
+  /** The model version that scored `readiness`, so its cut matches its scale (#3824). */
+  readinessModelVersion: string | null
   vo2max: number              // may be NaN → processor uses rhr_weights
 }
 
@@ -130,6 +132,12 @@ function metIntensityWeightNorm(met: number): number {
   return Math.pow(x, C.metIntensityGamma) * (C.metIntensityM - 1) + 1
 }
 
+/** The "high training stress" bar for the day: the model's own, lowered 10% on a low-readiness day.
+ *  "Low" is chosen by the readiness score's own model version (#3824). */
+export function otsHighThreshold(base: number, readiness: number, readinessModelVersion: string | null): number {
+  return readiness < cutFor('otsLowReadiness', readinessModelVersion) ? base * 0.9 : base
+}
+
 /** Returns the day's OTS value + whether it exceeds the high threshold, or null when the
  *  model can't produce a result (validation failure, tz change, <360 valid MET minutes,
  *  no_ots short-circuit, all-NaN series). Infallible: never throws. */
@@ -166,7 +174,9 @@ export function runTrainingStressScore(input: OtsInput): { ots: number; high: bo
 
   // The model's own cut was 60 on readiness. #3778 moved our readiness centre to 75, and the caller
   // passes ours, so the cut moves with it (`readiness-decision-thresholds.ts`) to keep the same days.
-  const threshold = input.readiness < OTS_LOW_READINESS_BELOW ? C.highOtsThreshold * 0.9 : C.highOtsThreshold
+  // #3824: chosen by the score's own model version. The route reads a stored row for any date, and
+  // a pre-release row is on the old scale, so it is judged by the old cut (60), not the new one (67).
+  const threshold = otsHighThreshold(C.highOtsThreshold, input.readiness, input.readinessModelVersion)
 
   // Sliding 720-window, stride 1. Track only the LAST non-NaN OTS (the day's end-of-day
   // rolling load) — the model returns the whole masked series and callers read the last value.

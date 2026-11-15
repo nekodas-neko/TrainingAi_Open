@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { prescribeNextRun } from '../prescription'
 import type { FitnessSnapshot, RunningGoal } from '../types'
 import type { RecoveryGateInputs } from '../recovery-gate'
+import { READINESS_MODEL_VERSION } from '../../health/readiness-composite'
 
 const fitness: FitnessSnapshot = {
   maxHr: 190, restingHr: 50, vo2max: 50, thresholdHr: 168,
@@ -9,7 +10,7 @@ const fitness: FitnessSnapshot = {
 }
 const goal: RunningGoal = { kind: 'cardio_health', targetDistanceKm: null, targetDate: null }
 const fresh: RecoveryGateInputs = {
-  readiness: 82, readinessProvisional: false, hoursSinceLowerBodyStrength: 96,
+  readiness: 82, readinessModelVersion: READINESS_MODEL_VERSION, readinessProvisional: false, hoursSinceLowerBodyStrength: 96,
   lastLowerBodyVolumeKg: 0, monotony: null, acwr: 1.0, hoursSinceLastHardRun: 48, sleepHoursLastNight: 8,
 }
 const fourEasy = [

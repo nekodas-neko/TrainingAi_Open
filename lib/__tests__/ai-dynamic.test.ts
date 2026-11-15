@@ -7,6 +7,7 @@ import {
   type SessionHistory,
 } from '@trainingai/shared/ai-periodization/ai-dynamic'
 import type { ProgramSession } from '@trainingai/shared/types/program'
+import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 
 const makeSession = (name: string, position: number): ProgramSession => ({
   id: `id-${name}`,
@@ -49,6 +50,7 @@ const baseInput: AiDynamicInput = {
   history: [],
   soreMuscles: [],
   readinessScore: 80,
+  readinessModelVersion: READINESS_MODEL_VERSION,
   temperatureDeviation: null,
   timezone: 'Australia/Brisbane',
   reminderEnabled: false,
@@ -263,6 +265,48 @@ describe('computeAiDynamicNextSession', () => {
       readinessScore: 55,
     })
     expect(lowReadiness.session?.name).toBe('Push')
+  })
+
+  // #3824: every readiness cut is chosen by the model version of the score it reads.
+  describe('readiness cuts follow the score\'s own scale (#3824)', () => {
+    const twoSessions = [push, legs]
+    const pickFor = (readinessScore: number, readinessModelVersion: string | null) => computeAiDynamicNextSession({
+      ...baseInput, sessions: twoSessions, history: makeHistory(['Push', 'Legs'], [1, 7]),
+      muscleAssignments: {
+        'Push exercise': [{ muscle: 'push', role: 'main' }],
+        'Legs exercise': [{ muscle: 'legs', role: 'main' }],
+      },
+      muscleRecovery: [{ muscle: 'push', pct: 95, hoursAgo: 24 }, { muscle: 'legs', pct: 20, hoursAgo: 168 }],
+      readinessScore, readinessModelVersion,
+    }).session?.name
+    const gradeFor = (readinessScore: number, readinessModelVersion: string | null) => computeAiDynamicNextSession({
+      ...baseInput, history: makeHistory(['Push', 'Pull', 'Legs'], [1, 2, 3]), readinessScore, readinessModelVersion,
+    }).deloadStrength
+
+    it('session pick: a v18 score is low under 67', () => {
+      expect(pickFor(66, READINESS_MODEL_VERSION)).toBe('Push')
+      expect(pickFor(67, READINESS_MODEL_VERSION)).toBe('Legs')
+    })
+
+    it('session pick: a stored pre-release score is judged at 60, as it was written', () => {
+      expect(pickFor(62, 'v17:version-keyed-baselines:2026-11-04')).toBe('Legs')
+      expect(pickFor(59, 'v17:version-keyed-baselines:2026-11-04')).toBe('Push')
+      expect(pickFor(62, null)).toBe('Legs')
+    })
+
+    it('deload grade: v18 is strong under 56, recommended under 76, soft from 76', () => {
+      expect(gradeFor(55, READINESS_MODEL_VERSION)).toBe('strong')
+      expect(gradeFor(56, READINESS_MODEL_VERSION)).toBe('recommended')
+      expect(gradeFor(75, READINESS_MODEL_VERSION)).toBe('recommended')
+      expect(gradeFor(76, READINESS_MODEL_VERSION)).toBe('soft')
+    })
+
+    it('deload grade: a pre-release score keeps the 50 / 70 grading', () => {
+      const v17 = 'v17:version-keyed-baselines:2026-11-04'
+      expect(gradeFor(52, v17)).toBe('recommended')
+      expect(gradeFor(72, v17)).toBe('soft')
+      expect(gradeFor(49, v17)).toBe('strong')
+    })
   })
 
   it('shifts recovery weight when sleepTrend is below 0.85', () => {

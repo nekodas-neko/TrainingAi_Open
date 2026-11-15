@@ -1,9 +1,13 @@
-import { REST_DAY_RECOVERED_MIN, REST_DAY_REST_BELOW } from './readiness-decision-thresholds'
+import { cutFor } from './readiness-decision-thresholds'
+import { READINESS_MODEL_VERSION } from './readiness-composite'
 
 export type RestDayBand = 'recovered' | 'partial' | 'rest'
 
 export interface RestDayGuidanceInput {
   readinessScore: number | null
+  /** The model version behind `readinessScore` (#3824). The card reads `/api/readiness-score`,
+   *  which scores today in the request, so it is the current model unless a caller says otherwise. */
+  readinessModelVersion?: string | null
   soreMuscles: string[]
   sleepScore: number | null
   consecutiveRestDays: number | null | undefined
@@ -32,7 +36,7 @@ const LOW_SLEEP_SCORE = 42
 const MANY_CONSECUTIVE_REST_DAYS = 3
 
 export function restDayGuidance({
-  readinessScore, soreMuscles, sleepScore, consecutiveRestDays,
+  readinessScore, readinessModelVersion = READINESS_MODEL_VERSION, soreMuscles, sleepScore, consecutiveRestDays,
 }: RestDayGuidanceInput): RestDayGuidance {
   if (readinessScore == null) {
     return {
@@ -48,7 +52,7 @@ export function restDayGuidance({
 
   // #3778: 75 → 80 and 60 → 67 when the readiness centre moved to 75 (`readiness-decision-thresholds.ts`),
   // the same re-anchoring the sleep cut above had, so the same days are told to rest.
-  if (readinessScore >= REST_DAY_RECOVERED_MIN && !hasSoreness) {
+  if (readinessScore >= cutFor('restDayRecovered', readinessModelVersion) && !hasSoreness) {
     return {
       band: 'recovered',
       title: 'Recovered',
@@ -58,7 +62,7 @@ export function restDayGuidance({
     }
   }
 
-  if (readinessScore < REST_DAY_REST_BELOW) {
+  if (readinessScore < cutFor('restDayRest', readinessModelVersion)) {
     const suggestions = ['Prioritize sleep tonight']
     if (sleepScore != null && sleepScore < LOW_SLEEP_SCORE) {
       suggestions.push("Last night's sleep score was low — an earlier bedtime will help more than training today")

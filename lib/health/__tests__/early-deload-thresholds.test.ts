@@ -34,7 +34,7 @@ describe('early-deload thresholds (Q-173)', () => {
 
   // 45 until #3778 moved the readiness centre to 75; the cut moved with the score it reads.
   it('the readiness bound is 51, from the one module of readiness decision cuts', () => {
-    expect(read('lib/health/readiness-payload.ts')).toContain('export const EARLY_DELOAD_SCORE_MAX = EARLY_DELOAD_READINESS_BELOW')
+    expect(read('lib/health/readiness-payload.ts')).toContain("export const EARLY_DELOAD_SCORE_MAX = cutFor('earlyDeload', READINESS_MODEL_VERSION)")
     expect(EARLY_DELOAD_READINESS_BELOW).toBe(51)
   })
 

@@ -16,7 +16,7 @@ import type { Vo2MaxInputs } from '../vo2max'
  */
 
 const base: Omit<TrainingStressInputs, 'startTimestampMs' | 'metsPerMinute'> = {
-  age: 33, sex: 'male' as const, rhr: 59, readiness: 44, readinessProvisional: false, tzChange: 0,
+  age: 33, sex: 'male' as const, rhr: 59, readiness: 44, readinessModelVersion: null, readinessProvisional: false, tzChange: 0,
   vo2maxInputs: {
     restingHr: 59, measuredMaxHr: null, age: 33, sex: 'male',
     weightKg: 71.7, heightCm: 158, activityLevel: null,
