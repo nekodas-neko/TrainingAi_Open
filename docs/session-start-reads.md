@@ -21,7 +21,7 @@ them.
     -H "Authorization: Bearer $CLAUDE_DB_QUERY_SECRET" -H 'Content-Type: application/json' \
     -d '{"sql":"SELECT url, source, left(message,120) AS message, count(*) AS hits, max(created_at) AS latest FROM claude_ro.error_events WHERE created_at > now() - interval '"'"'7 days'"'"' GROUP BY 1,2,3 ORDER BY hits DESC LIMIT 30"}'
   ```
-  Anything new gets a Known-Issues row in [`docs/overview/known-issues.md`](overview/known-issues.md) or a backlog entry the same session — per **No orphaned findings**, a fault you saw and did not record is a dropped finding. *Something that stopped is not something that was fixed*: record it as unexplained rather than closed.
+  Anything new becomes a GitHub issue the same session — per **No orphaned findings**, a fault you saw and did not record is a dropped finding. *Something that stopped is not something that was fixed*: record it as unexplained rather than closed.
 - **The Orchestrator reads the in-app reports** (at release prep and on its health checks; BugFix's cloud session has no query secret, by decision — #2346) — *Report an Issue* on
   `/more` writes to `feedback_submissions`, and the read is one query on the same endpoint:
   ```
@@ -30,7 +30,7 @@ them.
     -d '{"sql":"SELECT id, type, title, description, created_at, screenshot_bytes FROM claude_ro.feedback_submissions ORDER BY created_at DESC LIMIT 25"}'
   ```
   **The capability has existed since migration 142 and nobody was using it.** The loop is **read →
-  review → file a backlog entry at the right priority with a lane → move the watermark** in
+  review → file an issue with its labels → move the watermark** in
   the **BugFix intake** issue (#2349), which is what stops the same report being re-read forever
   (owner decision 2026-09-23: a watermark, deliberately no status column and nothing the reporter
   sees in the app). A report is never answered by replying to it — it becomes a queue entry, or it

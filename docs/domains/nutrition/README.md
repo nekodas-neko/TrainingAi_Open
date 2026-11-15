@@ -307,10 +307,7 @@ See [`the journal entry`](../../overview/entries/2026-09-30-fix-rv208-date-and-b
 
 ## Open issues
 
-```bash
-grep -n '^### .*\[nutrition\]' projectOverview.md   # 6 entries today
-grep -n '\[nutrition\]' docs/implementation-backlog.md   # Q-187, Q-191, Q-196…Q-201, Q-208…Q-210 today (Q-192, Q-198, Q-207 done)
-```
+Open issues are GitHub Issues labelled `area: nutrition`.
 
 Live at the time of writing (2026-07-30):
 

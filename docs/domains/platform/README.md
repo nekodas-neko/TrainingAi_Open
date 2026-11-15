@@ -257,10 +257,7 @@ layer**) through §16. Read it before building any shared helper.
 
 ## Open issues
 
-```bash
-grep -n '^### .*\[platform\]' projectOverview.md   # 30 entries today
-grep -n '\[platform\]' docs/implementation-backlog.md   # 6 queue items today
-```
+Open issues are GitHub Issues labelled `area: platform`.
 
 Live at the time of writing (2026-07-30):
 

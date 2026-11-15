@@ -243,10 +243,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 ## Open issues
 
-```bash
-grep -n '^### .*\[app-shell\]' projectOverview.md   # 18 entries today
-grep -n '\[app-shell\]' docs/implementation-backlog.md   # 2 queue items today
-```
+Open issues are GitHub Issues labelled `area: app-shell`.
 
 Live at the time of writing (2026-07-30):
 

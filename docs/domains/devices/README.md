@@ -258,10 +258,7 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 > `oura_raw_packed` and `readRawFrames` reads both tiers.
 
 
-```bash
-grep -n '^### .*\[devices\]' projectOverview.md   # 45 entries today
-grep -n '\[devices\]' docs/implementation-backlog.md   # 5 queue items today
-```
+Open issues are GitHub Issues labelled `area: devices`.
 
 Live at the time of writing (2026-07-30):
 

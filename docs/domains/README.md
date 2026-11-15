@@ -45,9 +45,8 @@ indexes are the subject-based view over them.
 
 Domain tags are written as bracketed slugs and are **greppable** — that is the whole point.
 
-- **`projectOverview.md` Known Issues** — every `###` heading carries its tags:
-  `### [sleep][devices] 🟠 Sleep/HRV/breathing metrics changed scale at the BLE re-key`.
-  To get every issue for a pillar: `grep -n '^### .*\[sleep\]' projectOverview.md`.
+- **GitHub Issues** — the pillar is the `area: <pillar>` label (`.github/labels.yml`); filter the
+  issue list by it. The bracketed tags in the archived `projectOverview.md` Known Issues are history.
 - **Handoff docs** — the domain is in the filename:
   `docs/handoffs/handoff-YYYY-MM-DD-<domain>-<title>.md`. To get every sleep handoff:
   `ls docs/handoffs/handoff-*-sleep-*.md`. A handoff spanning several pillars uses its **primary**
@@ -59,8 +58,8 @@ Domain tags are written as bracketed slugs and are **greppable** — that is the
 
 - **New reference doc for a pillar** → link it from that pillar's index in the same PR. The
   index is only useful while it is complete.
-- **New pillar-specific finding** → a `projectOverview.md` Known-Issues row with the domain tag
-  (per CLAUDE.md's "No orphaned findings"), or a backlog entry.
+- **New pillar-specific finding** → a GitHub issue labelled `area: <pillar>` (a finding you do not
+  fix becomes an issue, per `CLAUDE.md`).
 - **New shared module** → still gets its `docs/module-map.md` row; the pillar index points at
   module-map rather than restating it, so there is one authority for "where does this live".
 - **Do not copy content into an index.** These files are maps. A map that restates the

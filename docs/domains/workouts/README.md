@@ -182,10 +182,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 ## Open issues
 
-```bash
-grep -n '^### .*\[workouts\]' projectOverview.md   # 39 entries today — the largest pillar
-grep -n '\[workouts\]' docs/implementation-backlog.md   # 3 queue items today
-```
+Open issues are GitHub Issues labelled `area: workouts`.
 
 Live at the time of writing (2026-07-30):
 

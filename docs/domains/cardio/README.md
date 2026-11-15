@@ -85,10 +85,7 @@ clients render the route's
 
 ## Open issues
 
-```bash
-grep -n '^### .*\[cardio\]' projectOverview.md   # 36 entries today — the largest health pillar
-grep -n '\[cardio\]' docs/implementation-backlog.md   # 2 queue items today
-```
+Open issues are GitHub Issues labelled `area: cardio`.
 
 Live at the time of writing (2026-07-30):
 

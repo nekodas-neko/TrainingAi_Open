@@ -41,5 +41,5 @@ locally.
 
 **Green `pnpm dev` is necessary, never sufficient.** For any change touching an offline-first
 domain, a native plugin, safe-area, gestures, or notifications, the merge gate is the on-device
-smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, an
-explicit Known-Issues row in `docs/overview/known-issues.md` marking the change NOT verified on device.
+smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, a
+plain statement on the PR and its issue that the change has NOT been verified on device.
