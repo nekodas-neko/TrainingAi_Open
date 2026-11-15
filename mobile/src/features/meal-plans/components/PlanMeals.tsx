@@ -16,7 +16,6 @@ import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
-import { z } from 'zod';
 import {
   AppButton,
   AppText,

@@ -20,8 +20,15 @@ const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 const { readFilesUtf8, runMain } = require('./lib/read-sources');
 
 const root = path.join(__dirname, '..');
-const GUARDS = ['isBodyMetadataFresh', 'isWorkoutDataToday'];
-const DIRS = ['app', 'components', 'lib', 'packages'];
+// The native app (#3803) has no SQLite cache guards; its counterparts are the device-health reads,
+// which take an optional zone and decide which daily row is "today" with it
+// (`readHealth.android.ts`: `row.date === todayInTz(timezone)`). Omit it there and the phone's
+// today-tiles key to Brisbane in the same way.
+// Each guard with the position of its zone argument: the cache guards take it second, the
+// device-health reads first.
+const TZ_ARG = { isBodyMetadataFresh: 2, isWorkoutDataToday: 2, readHealthSnapshot: 1, useHealthReadings: 1 };
+const GUARDS = Object.keys(TZ_ARG);
+const DIRS = ['app', 'components', 'lib', 'packages', 'mobile/src'];
 // The definitions themselves, and the unit tests, which deliberately call both arities to prove
 // the default still holds for a Brisbane user.
 const EXEMPT = new Set(['lib/sqlite/cache.ts', 'lib/__tests__/cache-fetch.test.ts']);
@@ -66,17 +73,21 @@ runMain(async () => {
         const lineStart = src.lastIndexOf('\n', i) + 1;
         const line = src.slice(lineStart, src.indexOf('\n', i));
         if (/^\s*import\b/.test(line)) continue;
+        // Nor is the declaration (`function readHealthSnapshot(timezone = DEFAULT_TZ)`).
+        if (/\bfunction\s+$/.test(src.slice(lineStart, i))) continue;
         checked++;
         // Walk the argument list to its matching close paren, counting only top-level commas so a
         // nested call or an object literal in argument one is not mistaken for a second argument.
-        let depth = 0, comma = false, j = src.indexOf('(', i);
+        const open = src.indexOf('(', i);
+        let depth = 0, commas = 0, j = open;
         for (; j < src.length; j++) {
           const c = src[j];
           if (c === '(' || c === '[' || c === '{') depth++;
           else if (c === ')' || c === ']' || c === '}') { depth--; if (depth === 0) break; }
-          else if (c === ',' && depth === 1) comma = true;
+          else if (c === ',' && depth === 1) commas++;
         }
-        if (!comma) {
+        const args = src.slice(open + 1, j).trim() ? commas + 1 : 0;
+        if (args < TZ_ARG[guard]) {
           const lineNo = src.slice(0, i).split('\n').length;
           bad.push(`${rel}:${lineNo}  ${guard}(…) has no timezone argument\n      ${line.trim()}`);
         }
@@ -88,6 +99,7 @@ runMain(async () => {
     console.error('Timezone-blind cache guard check failed:\n');
     for (const b of bad) console.error(`  • ${b}\n`);
     console.error(`  Pass the user's timezone — \`useUserTimezone()\` in a component, \`user?.timezone\``);
+    console.error(`  (native app: \`useWorkoutContext().timezone\` or a store's \`connection.timezone\`)`);
     console.error(`  where the user object is already in scope. If there is genuinely none to pass,`);
     console.error(`  pass \`undefined\` explicitly so the choice is visible in the diff.`);
     process.exit(1);

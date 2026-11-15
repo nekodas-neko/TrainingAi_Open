@@ -1,7 +1,6 @@
 import {
   balanceZone,
   barProgress,
-  budgetProvenance,
 } from '@trainingai/shared/nutrition/calorie-balance';
 import { DEFAULT_WATER_GOAL_ML } from '@trainingai/shared/nutrition/goal-recommendation';
 import { secondsSinceLocalMidnight } from '@trainingai/shared/date-utils';

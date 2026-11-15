@@ -4,3 +4,9 @@ allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
   - expo-location@57.0.21
+# Keeps the shared package on the zod this app ships (mobile/package.json). #3808 raised
+# packages/shared to ^4.6.7 for the server; resolving that here installs a second zod, which
+# breaks the typecheck across every shared schema and changes parse results (a missing key under
+# `z.unknown().transform` gives null, not undefined). Remove once mobile moves to 4.6.x itself.
+overrides:
+  '@trainingai/shared>zod': 4.1.3

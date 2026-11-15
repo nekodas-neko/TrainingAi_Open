@@ -32,7 +32,7 @@
   "lib/data/postgres/__tests__/blood-panel-storage.test.ts": 4,
   "lib/data/postgres/__tests__/body-fat-correction-consumers.test.ts": 8,
   "lib/data/postgres/__tests__/dexa-scans.test.ts": 5,
-  "lib/data/postgres/__tests__/energy-balance-service.test.ts": 24,
+  "lib/data/postgres/__tests__/energy-balance-service.test.ts": 22,
   "lib/data/postgres/__tests__/error-events-prune.test.ts": 1,
   "lib/data/postgres/__tests__/food-item-duplicate-create.test.ts": 1,
   "lib/data/postgres/__tests__/food-item-image.test.ts": 1,

@@ -11,7 +11,8 @@
 // **A ratchet, not a ban.** 320 errors across 90 files is far too much for one diff, and they sit in
 // the highest-consequence places — the shared write path (`log-exercise.test.ts`, 25), the energy
 // balance service (24), the local store (16). So every file holding errors today is recorded at its
-// current count and may only shrink; any file NOT listed must have zero. The value is immediate for
+// current count and may only shrink — a file below its row fails until the row is lowered (#3803);
+// any file NOT listed must have zero. The value is immediate for
 // every NEW spec; the 320 come down as files are touched.
 //
 // **The split is exact, which is why the baseline can be trusted.** `npx tsc --noEmit -p
@@ -86,6 +87,7 @@ if (counts.size === 0 && Object.keys(BASELINE).length > 0) {
 
 const failures = [];
 const stale = [];
+const lower = [];
 
 for (const [rel, count] of [...counts.entries()].sort()) {
   const allowed = BASELINE[rel] ?? 0;
@@ -96,9 +98,12 @@ for (const [rel, count] of [...counts.entries()].sort()) {
 // that lets errors return to a file somebody already fixed. Same rule the sibling ratchets use.
 for (const rel of Object.keys(BASELINE)) {
   if (!counts.has(rel)) stale.push(fs.existsSync(path.join(root, rel)) ? rel : `${rel} (deleted)`);
+  // #3803: shrink-only means the row follows the count DOWN too. A file fixed from 24 to 22 that
+  // kept its 24 could take two new errors back without this check noticing.
+  else if (counts.get(rel) < BASELINE[rel]) lower.push({ rel, count: counts.get(rel), allowed: BASELINE[rel] });
 }
 
-if (failures.length > 0 || stale.length > 0) {
+if (failures.length > 0 || stale.length > 0 || lower.length > 0) {
   if (failures.length > 0) {
     console.error('Type error(s) in test files, above the recorded baseline (LB-37).');
     console.error('A spec is code: fix the type, or — if a file legitimately grew — raise its number in');
@@ -114,7 +119,12 @@ if (failures.length > 0 || stale.length > 0) {
     console.error('\nBaseline row(s) to delete — these files no longer carry the errors they are recorded for:');
     for (const s of stale) console.error(`  ${s}`);
   }
+  if (lower.length > 0) {
+    console.error('\nBaseline row(s) to lower — these files now carry fewer errors than recorded. Set each row to');
+    console.error('its new count in scripts/test-typecheck-baseline.json, so the fixed errors cannot come back:');
+    for (const l of lower) console.error(`  ${l.rel}: ${l.count} error(s), baseline ${l.allowed} — lower it to ${l.count}.`);
+  }
   process.exit(1);
 }
 
-console.log(`check-test-typecheck: ${total} type errors across ${counts.size} test files, none above baseline (${Object.keys(BASELINE).length} recorded).`);
+console.log(`check-test-typecheck: ${total} type errors across ${counts.size} test files, each exactly at its baseline (${Object.keys(BASELINE).length} recorded).`);

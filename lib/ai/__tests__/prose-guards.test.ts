@@ -33,6 +33,28 @@ const PROSE_CALL = /\b(loggedStreamText|streamText|loggedGenerateText|generateTe
 // "quote, never recompute", because several of them exist to produce numbers).
 const OBJECT_CALL = /\b(loggedGenerateObject|generateObject|streamObject)\s*\(/
 
+/**
+ * #3803: model calls made OUTSIDE a route file. The workout prescription
+ * (`packages/shared/src/ai-periodization/generate-prescription.ts`) and the meal top-up
+ * (`lib/nutrition/meal-top-up.ts`) call the model from a module the route imports, so a scan of
+ * `route.ts` alone never saw them — and the prescription's `reasoning` is shown in Preview. Found
+ * through their import of the logged chokepoint, `@/lib/ai/instrument`, which every model call
+ * must go through; `lib/ai/` itself is the chokepoint, not a caller.
+ */
+function modelModules(dir: string): string[] {
+  const out: string[] = []
+  for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${e.name}`
+    if (e.isDirectory()) {
+      if (!['__tests__', '__check_fixture__', 'node_modules'].includes(e.name) && rel !== 'lib/ai') out.push(...modelModules(rel))
+    } else if (/\.tsx?$/.test(e.name) && !(rel.startsWith('app/api/') && e.name === 'route.ts')) {
+      const src = stripComments(read(rel))
+      if (/from '@\/lib\/ai\/instrument'/.test(src) && (PROSE_CALL.test(src) || OBJECT_CALL.test(src))) out.push(rel)
+    }
+  }
+  return out
+}
+
 function routeFiles(dir: string): string[] {
   const out: string[] = []
   for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
@@ -55,11 +77,17 @@ function interpolatingFile(rel: string, constant: string): string | null {
   const src = stripComments(read(rel))
   if (interpolates(src, constant)) return rel
   const dir = rel.slice(0, rel.lastIndexOf('/'))
-  for (const m of src.matchAll(/from\s+'(\.[^']+)'/g)) {
+  // A relative sibling, or (#3803) a module reached through an alias: the prescription builds its
+  // prompt in `@trainingai/shared/ai-periodization/prompt`. The guard module itself is not a prompt.
+  for (const m of src.matchAll(/from\s+'(\.[^']+|@\/[^']+|@trainingai\/shared\/[^']+)'/g)) {
+    const base = m[1].startsWith('@/') ? m[1].slice(2)
+      : m[1].startsWith('@trainingai/shared/') ? `packages/shared/src/${m[1].slice('@trainingai/shared/'.length)}`
+      : join(dir, m[1]).split('\\').join('/')
+    if (base === 'lib/ai/prompt-guards') continue
     for (const ext of ['.ts', '.tsx', '/index.ts']) {
-      const cand = join(root, dir, m[1] + ext)
+      const cand = join(root, base + ext)
       if (existsSync(cand) && interpolates(stripComments(readFileSync(cand, 'utf8')), constant)) {
-        return `${dir}/${m[1].replace(/^\.\//, '')}${ext}`
+        return `${base}${ext}`
       }
     }
   }
@@ -67,16 +95,23 @@ function interpolatingFile(rel: string, constant: string): string | null {
 }
 
 const allRoutes = routeFiles('app/api')
+const outsideRoutes = ['app', 'lib', 'packages', 'components'].flatMap(modelModules)
+// Every file that calls the model: the routes, and the modules above. The lists below cover both.
+const allCallers = [...allRoutes, ...outsideRoutes]
 const calls = (rel: string, re: RegExp) => re.test(stripComments(read(rel)))
 // Routes that stream or generate TEXT, and routes that return an OBJECT (and no text).
-const proseRoutes = allRoutes.filter(f => calls(f, PROSE_CALL))
-const objectRoutes = allRoutes.filter(f => calls(f, OBJECT_CALL) && !calls(f, PROSE_CALL))
+const proseRoutes = allCallers.filter(f => calls(f, PROSE_CALL))
+const objectRoutes = allCallers.filter(f => calls(f, OBJECT_CALL) && !calls(f, PROSE_CALL))
 
 // Object routes that are exempt from PROSE_FIELD_GUARDS because they return no prose of their own.
 // Empty since the four routes found by this discovery (exercise generator, meal, meal plan, scan)
 // took the guard. A route belongs here only with the reason beside it: a NEW object route with
 // user-facing text fields fails outright rather than being waved through.
 const KNOWN_UNGUARDED = new Set<string>([
+  // Returns ingredient names, gram weights and per-100g values for code to scale — no sentence of
+  // its own, and grams are already the only unit it is asked for. Its prompt is not this file's to
+  // reword (#3803 added the guard to the prescription only).
+  'lib/nutrition/meal-top-up.ts',
 ])
 
 const guardedObjectRoutes = objectRoutes.filter(f => !KNOWN_UNGUARDED.has(f))
@@ -90,7 +125,11 @@ describe('the prose guards reach every route that writes prose (Q-292, PS-32, RV
     // recap — each one a model rewording facts its own handler had already computed. Lower one when
     // a route genuinely goes; never raise it to paper over a route that stopped matching.
     expect(proseRoutes.length).toBeGreaterThanOrEqual(1)
-    expect(objectRoutes.length).toBeGreaterThanOrEqual(6)
+    // 6 until #3803 counted the two model callers outside a route file.
+    expect(objectRoutes.length).toBeGreaterThanOrEqual(8)
+    // #3803: the prescription and the meal top-up. A scan outside `app/api` that finds nothing
+    // would pass silently, which is how the prescription went unguarded.
+    expect(outsideRoutes.length).toBeGreaterThanOrEqual(2)
   })
 
   it.each(proseRoutes)('%s streams or generates text and interpolates PROSE_GUARDS', rel => {

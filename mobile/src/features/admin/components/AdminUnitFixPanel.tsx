@@ -12,6 +12,8 @@ import {
   type UnitFixResult,
 } from '../data/admin-content';
 import { ConfirmSheet } from './ConfirmSheet';
+import { formatDateDisplay, toAestDay } from '@trainingai/shared/date-utils';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 
 const fmt = (n: number | null) => (n === null ? '—' : String(n));
 
@@ -19,6 +21,7 @@ const fmt = (n: number | null) => (n === null ? '—' : String(n));
 export function AdminUnitFixPanel({ exerciseNames }: { exerciseNames: readonly string[] }) {
   const resources = useWorkoutResources();
   const { theme } = useTheme();
+  const { timezone } = useWorkoutContext();
   const [selected, setSelected] = useState<string[]>([]);
   const [beforeDate, setBeforeDate] = useState('');
   const [result, setResult] = useState<UnitFixResult | null>(null);
@@ -112,7 +115,7 @@ export function AdminUnitFixPanel({ exerciseNames }: { exerciseNames: readonly s
               {result.logs.map((log) => (
                 <View key={log.exerciseLogId} style={{ gap: 2 }}>
                   <AppText variant="label">
-                    {log.exerciseName} — {new Date(log.loggedAt).toLocaleDateString('en-AU')}
+                    {log.exerciseName} — {formatDateDisplay(toAestDay(new Date(log.loggedAt), timezone))}
                   </AppText>
                   <AppText variant="caption" tone="muted">
                     Sets: {log.sets.map((s) => `${s.oldWeightKg}→${s.newWeightKg}kg×${s.reps}`).join(', ')}

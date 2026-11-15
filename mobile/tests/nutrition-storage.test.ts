@@ -612,7 +612,7 @@ test('with 90 days of check-ins and a 300-food library, one food log writes a sm
 test('the core record grows only by its list of saved days', async (t) => {
   const sizes: number[] = [];
   for (const days of [10, 90]) {
-    const { scope, saved } = await open(t);
+    const { scope } = await open(t);
     await fullHistory(make(scope, historyServer().connection), days);
     // Only the list of saved days grows, by one date per day; everything else stays the same.
     const { dayKeys, ...rest } = JSON.parse((await scope.get('nutrition-records.v3'))!);

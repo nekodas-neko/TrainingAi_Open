@@ -17,7 +17,6 @@ import {
   Sheet,
   Stack,
 } from '../../../shared/ui';
-import { useWorkoutAction } from '../data/useWorkoutAction';
 import { useSessionPreparation } from '../data/useSessionPreparation';
 
 export function PrescriptionControls({

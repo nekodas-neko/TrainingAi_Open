@@ -119,7 +119,8 @@ function findOffenderLines(content) {
   lines.forEach((line, i) => {
     // The option object can span lines; scan a small window for an explicit timeZone.
     const window = lines.slice(i, i + 6).join('\n');
-    const hasZone = /timeZone\s*:/.test(window);
+    // `timeZone,` / `timeZone }` is the shorthand property — the native app passes its zone that way.
+    const hasZone = /\btimeZone\s*(?::|,|\})/.test(window);
     if (PATTERN.test(line) && !hasZone) hit.push(i + 1);
     else if (LOCALE_STRING.test(line) && !hasZone && (NEW_DATE_RECEIVER.test(line) || DATE_OPTION.test(window))) hit.push(i + 1);
     else if (INTL_FORMAT.test(line) && !INTL_READS_ZONE.test(line) && !hasZone) hit.push(i + 1);
@@ -136,7 +137,9 @@ function scan(rel, content) {
 module.exports = { findOffenderLines };
 
 if (require.main === module) runMain(async () => {
-  for (const top of ['app', 'components', 'lib', 'packages']) {
+  // mobile/src: the native app (#3803). Its admin screens are NOT exempt — unlike the web admin console
+  // they render the user's own data, not device diagnostics.
+  for (const top of ['app', 'components', 'lib', 'packages', 'mobile/src']) {
     const dir = path.join(root, top);
     if (fs.existsSync(dir)) walk(dir);
   }

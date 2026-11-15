@@ -38,7 +38,7 @@ export type FoodEntry = Pick<
   | 'imageDataUri'
 > & { id?: string; quantityMultiplier: number };
 export function normaliseFood(input: FoodEntry, id: string) {
-  const { quantityMultiplier, ...food } = input;
+  const { quantityMultiplier: _quantityMultiplier, ...food } = input;
   // #2876: the server's rule, shared. A hand-entered food keeps its values; a scan gets the repair.
   return FoodItemPushSchema.parse({
     ...food,

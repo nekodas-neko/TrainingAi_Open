@@ -24,6 +24,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { MIN_RELIABLE_SAMPLES, CORROBORATION, computeObservedHr } from '@trainingai/shared/health/observed-hr'
+import { ageFromDob } from '@trainingai/shared/date-utils'
 
 type Row = Record<string, unknown>
 
@@ -115,7 +116,9 @@ describe('/api/hr-profile', () => {
 
   // The resolver is real here, so this is the actual age → estimate arithmetic, not a stub's echo.
   it('estimates the ceiling from age and mirrors it into the working max', async () => {
-    const age = new Date().getFullYear() - 1990
+    // Through the route's own age helper (#3803): `getFullYear() - 1990` read 2026 against a birth
+    // year that is 1989 in any zone behind UTC on 31 December, and was off by one for that day.
+    const age = ageFromDob('1990-01-01', new Date())!
     const body = await (await getProfile()).json()
 
     expect(body.estimatedMax).toBe(220 - age)

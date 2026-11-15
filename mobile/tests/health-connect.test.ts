@@ -137,7 +137,6 @@ function fixture() {
   };
 }
 // What is saved, read back through the storage layout the store writes (#3121).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const savedDisk = async (f: { storage: ConstructorParameters<typeof HealthConnectPersistence>[0] }): Promise<any> =>
   new HealthConnectPersistence(f.storage).read();
 test('Health Connect captures the change boundary before history, saves upload retries and resumes after reopening', async () => {

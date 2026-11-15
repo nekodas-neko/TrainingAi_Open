@@ -201,7 +201,6 @@ test('finishing while paused excludes the final pause, and missing sensors stay 
 
 import {
   defaultWalk,
-  walkPlan,
   fitnessResult,
 } from '../src/features/activities/data/guidance.ts';
 test('guided walk saves actual segments once across summary reopening', async () => {
@@ -478,11 +477,6 @@ async function rejecting(
   await store.saveRecord(record(second, '12:30'));
   return { f, store, refused: () => refused, offline: (value: boolean) => (down = value) };
 }
-const pendingIds = (store: ActivityStore) =>
-  store
-    .getSnapshot()
-    .rows.filter((row) => row.pending)
-    .map((row) => row.payload.id);
 test('a rejected first activity does not block the one behind it', async () => {
   const { store } = await rejecting(id);
   await store.sync();

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { ScrollView } from 'react-native';
 import {
   AppButton,
-  AppText,
   LoadingIndicator,
   PageLayout,
   SegmentedControl,

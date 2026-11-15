@@ -607,7 +607,7 @@ test('Bluetooth turned off during a workout waits, then reconnects', async () =>
 
 test('the strap card and workout readout name what blocks the link', async () => {
   const { strapBlocker, strapLinkLabel } = await import('../src/features/devices/strap/labels.ts');
-  const { session, ble, clock } = await pairedSession();
+  const { session } = await pairedSession();
   const base = session.getSnapshot();
   assert.equal(strapBlocker(base), null);
   assert.equal(strapBlocker({ ...base, available: false })?.title, 'Update TrainingAi Preview');

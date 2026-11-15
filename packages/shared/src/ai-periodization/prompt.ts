@@ -7,6 +7,8 @@ import { displayOneRm, displayOneRmDelta } from '@trainingai/shared/1rm'
 import { FEVER_TEMP_Z } from '@trainingai/shared/health/illness-radar'
 import { goalRange } from './goal-ranges'
 import { userTextBlock, USER_TEXT_NOTE } from '../ai/untrusted-text'
+// The units, superlative and no-diagnosis rules: `reasoning` is shown to the lifter (#3803).
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 
 export interface IntensityZone {
   pctMin: number; pctMax: number
@@ -181,7 +183,9 @@ reasoning entirely. Do not infer or guess from absent data.
 Output field notes:
 - session_exercise_id: copy exactly from the exercise list — never invent one.
 - reasoning: 1-2 sentences.
-- confidence: your certainty in this prescription, 0.0-1.0.`
+- confidence: your certainty in this prescription, 0.0-1.0.
+
+${PROSE_FIELD_GUARDS}`
 }
 
 export function buildUserPrompt(

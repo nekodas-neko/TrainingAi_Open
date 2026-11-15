@@ -18,9 +18,6 @@ import {
   programSpec,
   stylesSpec,
   phaseSetsSpec,
-  type SavedProgram,
-  type SavedStyle,
-  type SavedPhaseSet,
 } from '../workouts/data/models';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';

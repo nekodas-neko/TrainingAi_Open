@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { summariseRoute } from '@trainingai/shared/activity/route-summary';
-import { View } from 'react-native';
 import { toAestDay } from '@trainingai/shared/date-utils';
 import { formatDistanceKm, formatMinutes } from '@trainingai/shared/format/units';
 import { getProtocol } from '@trainingai/shared/fitness-tests/protocols';
@@ -9,10 +8,8 @@ import {
   AppText,
   Card,
   Grid,
-  KeyValueGrid,
   MetricTile,
   PageLayout,
-  ProgressBar,
   Sheet,
   Stack,
   StatusIndicator,

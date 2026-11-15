@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { z } from 'zod';
 import { recommendWalkPattern } from '@trainingai/shared/walking/recommend-walk-pattern';
