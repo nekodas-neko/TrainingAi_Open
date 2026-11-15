@@ -27,7 +27,8 @@ const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.resolve(__dirname, '..')
-const LIVE = path.join(ROOT, 'projectOverview.md')
+// The live list was archived with projectOverview.md (#3798); the check keeps the two lists apart.
+const LIVE = path.join(ROOT, 'docs/archive/projectOverview-2026-09-30.md')
 const ARCHIVE = path.join(ROOT, 'docs/overview/known-issues-resolved.md')
 
 // `Q-63…Q-69`, `Q-63...Q-69`, `Q-63-Q-69`, `Q-63 to Q-69`
