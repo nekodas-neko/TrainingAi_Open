@@ -72,7 +72,7 @@ async function generate() {
   modelObject = { name: 'Test', sessions: MODEL_SESSIONS, reasoning: 'because' }
   const { POST } = await import('@/app/api/generate-program/route')
   const res = await POST(json('http://localhost/api/generate-program', {
-    programName: 'Test', equipment: ['barbell', 'cable'], sessionsPerWeek: 3, timePerSessionMinutes: 60,
+    programName: 'Test', equipment: ['barbell', 'cable'], sessionsPerWeek: 1, timePerSessionMinutes: 60,
     musclesToFocus: ['Chest', 'Shoulders', 'Triceps'], goal: 'hypertrophy', progressionMode: 'linear',
     totalWeeks: 12, scheduleType: 'weekly', weeklyDays: [0, 2, 4],
   }))
@@ -134,7 +134,9 @@ describe('#3750 both program routes clean the same model answer the same way', (
   it('styles and the primary cap come out the same from both', async () => {
     const generated = await generate()
     const chatted = await chat()
-    expect(chatted.program.sessions).toEqual(generated.program.sessions)
+    // Exercises, not whole sessions: since #3751 the generator names its sessions from the split
+    // and the chat keeps the program's own, so only what cleaning decides is compared.
+    expect(chatted.program.sessions.map(s => s.exercises)).toEqual(generated.program.sessions.map(s => s.exercises))
     // And they are the expected ones, so "equal" cannot mean "equally wrong".
     expect(generated.program.sessions[0].exercises.map(e => [e.exerciseRole, e.progressionStyleName, e.progressionStyleId])).toEqual([
       ['primary', RULES.primary, 'style-primary'],

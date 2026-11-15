@@ -8,6 +8,9 @@ import { z } from 'zod'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
+import { getRepository } from '@/lib/data'
+import { buildExerciseNameResolver } from '@trainingai/shared/workout/exercise-name-resolver'
+import { equipmentLedByName } from '@trainingai/shared/workout/equipment'
 
 // One exercise name, capped at 120 characters by the schema below.
 const MAX_BODY_BYTES = 4 * 1024
@@ -52,6 +55,22 @@ export async function POST(req: NextRequest) {
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   try {
+    // #3751: a name the library already holds costs no model call. The resolver is the one the
+    // program routes use (exact, normalised, word order; never a subset), so "bench press" finds
+    // "Bench Press" and "Incline Bench Press" does not. Merged duplicates are not offered, as in
+    // every picker (RV-51). `libraryId` tells the caller this is an existing row, not a draft.
+    const library = (await (await getRepository()).listExerciseLibrary()).filter(ex => !ex.mergedInto)
+    const existing = buildExerciseNameResolver(library).resolve(body.data.name)
+    if (existing) {
+      return NextResponse.json({
+        normalizedName: existing.name,
+        instructions: existing.instructions ?? '',
+        muscles: existing.muscles,
+        equipment: existing.equipment,
+        libraryId: existing.id,
+      })
+    }
+
     const { object } = await loggedGenerateObject(
       { section: 'exercises-generate', userId: session.user.id, fingerprint: body.data.name },
       signal => generateObject({
@@ -63,7 +82,8 @@ export async function POST(req: NextRequest) {
         abortSignal: signal,
       }),
     )
-    return NextResponse.json(object)
+    // The prompt asks for the name's prefix equipment first; code makes it so.
+    return NextResponse.json({ ...object, equipment: equipmentLedByName(object.normalizedName, object.equipment) })
   } catch (err) {
     reportServerError(err, { url: '/api/exercises/generate' })
     return aiPausedResponse(err) ?? NextResponse.json({ error: 'Generation failed' }, { status: 500 })

@@ -26,6 +26,8 @@ import { fillGeneratedStyles } from '@/components/workout-builder/fill-generated
 interface Props {
   program: GeneratedProgram
   inputs: BuilderInputs
+  /** #3751: findings from the server's check of the generated program, appended to the opening message. */
+  checkNotes?: string[]
   onBack: () => void
   onSaved: () => void
   onProgramChange: (p: GeneratedProgram) => void
@@ -83,11 +85,16 @@ function phaseStyleShort(styleName?: string): string {
   return full.split(' · ')[0]
 }
 
-export default function BuilderReview({ program, inputs, onBack, onSaved, onProgramChange }: Props) {
+function checkNotesText(notes: readonly string[] | undefined): string {
+  if (!notes || notes.length === 0) return ''
+  return `\n\nChecked against your settings:\n${notes.map(n => `• ${n}`).join('\n')}`
+}
+
+export default function BuilderReview({ program, inputs, checkNotes, onBack, onSaved, onProgramChange }: Props) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: inputs.progressionMode === 'ai'
+      content: (inputs.progressionMode === 'ai'
         ? `Your AI Training program is ready! Here's how the block runs:\n\n` +
           `Phase 1 — Baseline\n` +
           `Week 1 uses AMRAP sets on your key lifts to find your true starting 1RM. All working weights are set from this — no guessing.\n\n` +
@@ -101,7 +108,8 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
           `The AI monitors session-to-session load and fatigue. If you're carrying too much load into the next session it will recommend a rest day or swap to a lighter muscle group to protect recovery.\n\n` +
           `No fixed duration — the AI decides when each phase is done based on your data. Typical range: 8–14 weeks.\n\n` +
           `Use the dropdowns below to swap any exercise, or ask me to make changes.`
-        : `Your program is ready! ${program.reasoning} Use the dropdowns to swap any exercise, or chat with me below to make changes.`,
+        : `Your program is ready! ${program.reasoning} Use the dropdowns to swap any exercise, or chat with me below to make changes.`)
+        + checkNotesText(checkNotes),
     },
   ])
   const [chatInput, setChatInput] = useState('')
