@@ -9,7 +9,7 @@
  *
  * `--db` opens the session with `default_transaction_read_only` and refuses to run if the server
  * says otherwise. Run it against the local database or a restored backup, never production
- * directly; production's count is the SQL in docs/reviews/2026-11-15-readiness-centre-75.md, which is
+ * directly; production's count is the SQL in scripts/tuning/readiness-centre-75.sql, which is
  * the same arithmetic.
  */
 const path = require('path')

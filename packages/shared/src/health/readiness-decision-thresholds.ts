@@ -16,7 +16,7 @@
 // the firing rate and flips the fewest days, measured by `scripts/tuning/readiness-centre-replay.cjs`
 // over its synthetic fixture under three different assumed populations; all three agreed within one
 // point, and 1–5% of days flip at each cut. The production check is the SQL in
-// `docs/reviews/2026-11-15-readiness-centre-75.md`, which reports each cut's firing count before and
+// `scripts/tuning/readiness-centre-75.sql`, which reports each cut's firing count before and
 // after and the rate-preserving value on the owner's stored days.
 //
 // **The band labels are deliberately NOT here.** High 70+ / Moderate 50+ / Low under 50

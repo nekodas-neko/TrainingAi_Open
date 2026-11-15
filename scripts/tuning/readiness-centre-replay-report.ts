@@ -14,7 +14,7 @@
 // over those three. The new sub-score comes from the stored input (z) through the shipped curve when
 // the row has one, from the stored sub-score through the same re-centring when it predates inputs
 // (Q-501), and is the centre 75 when the contributor was unscored. The SQL in
-// `docs/reviews/2026-11-15-readiness-centre-75.md` is the same arithmetic, so the two can be checked
+// `scripts/tuning/readiness-centre-75.sql` is the same arithmetic, so the two can be checked
 // against each other on any local database.
 import {
   baselineContributorCurve,

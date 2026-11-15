@@ -392,6 +392,14 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **⚑ From model v18 (#3778, owner direction A, 15 Nov) a reading at baseline scores 75, not 50,** on
+  resting HR, HRV balance and sleep balance, and those three fall back to 75 when unscored. The TN-60
+  shape is unchanged in σ (`baselineContributorCurve`); only its halves are rescaled. **Every cut that
+  acts on the score moved with it** in `readiness-decision-thresholds.ts`; the band labels did not, on
+  purpose. Stored rows were not rewritten, so history before the release is on the 50-centred scale:
+  the verdict's baseline splits by scale (`readinessScaleOf`), the resilience port reads the sub-scores
+  back on the old scale (`preCentreSubScore`), and any average or chart across the release date mixes
+  the two. Never compare a stored readiness score with a fixed number without knowing its version.
 - **`readiness_contributors` is stored in TWO shapes under one name, and reading the wrong one is
   silent.** `oura_daily.readiness_contributors` holds Oura's `{ hrv_balance: 90 }`;
   `oura_daily_derived.readiness_contributors` — what the app writes, and what every reader prefers
