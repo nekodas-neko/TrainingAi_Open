@@ -48,10 +48,11 @@ Deployed on Railway, auto-deploys from `main`.
   trend, ACWR, sleep/HRV, soreness and volume, with deterministic guards (emergency deload, phase
   ceilings) that never depend on an LLM's self-reported number.
 - **Timezone-correct.** All "today" dates use the user's timezone (AEST default) via
-  `lib/date-utils.ts`, never raw UTC.
+  `packages/shared/src/date-utils.ts`, never raw UTC.
 
-See the **Data Model** and **Oura Ring v2 API Integration** sections of `CLAUDE.md` for the full
-table list and endpoint mapping.
+The tables are in `lib/data/postgres/schema.ts` and where each module lives is in
+[`docs/module-map.md`](docs/module-map.md). The Oura Cloud connector is `lib/oura/cloud/`; how any
+source feeds the app is in [`docs/data-source-connector-guide.md`](docs/data-source-connector-guide.md).
 
 ---
 

@@ -552,11 +552,10 @@ Live at the time of writing (2026-07-30):
 
 - [`handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](../../handoffs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md) — the standing-agent model (roles, lane contract, Q bands, batons, prompts), the documentation reorganisation and its two CI guards, and six findings from a live APK reinstall + Oura re-sync: the ring key an uninstall destroys, the emulator job that could not pass, `disk_full` in production, and the clock-epoch collision behind 43 wrong sleep windows (Q-536).
 - [`handoff-2026-08-17-platform-context-warning-window.md`](../../handoffs/handoff-2026-08-17-platform-context-warning-window.md)
-  — the wrap-up warning fired at ~111% while the window was 22% full. It is a `Stop` hook
-  (`.claude/hooks/context-usage-warn.mjs`), **not** a CLAUDE.md rule — worth knowing before hunting
-  for it in the wrong file. Its window constant was 200k against a real 1M, now corrected so the
-  thresholds land at 900k/950k. Records that the transcript exposes no window size, so the hook
-  cannot self-calibrate and this constant goes stale silently.
+  — the wrap-up warning fired at ~111% while the window was 22% full. It was a `Stop` hook
+  (`.claude/hooks/context-usage-warn.mjs`), not a CLAUDE.md rule. Its window constant was 200k
+  against a real 1M. **The hook was removed in #1427** (OR-131) because it told sessions to wrap up
+  when the rule says keep working; `.claude/hooks/` now holds only `session-start.sh`. History only.
 - [`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](../../handoffs/handoff-2026-08-16-platform-public-repo-cut-a4b.md)
 - [`docs/handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md) — **Lane B, nineteen PRs, 2026-08-25.** Q-406, LB-10, Q-499, Q-467, Q-315, Q-538, Q-305, Q-281, Q-282, Q-138, Q-477 complete, E2E restored to green, and five queue-tooling fixes (LB-11, LB-12, PS-6). **The lesson worth carrying: five entries were wrong about their own premise** — Q-282 ("no a11y check in CI"; there is one), Q-305 ("never shown"; shown against a made-up band), Q-315 ("just needs a press"; nothing could press it), Q-138 (two rows already done), Q-555 (does not reproduce). A grep count is not a violator list. Nothing device-verified.
 - [`docs/handoffs/handoff-2026-08-24-platform-lane-b-nine-prs.md`](../../handoffs/handoff-2026-08-24-platform-lane-b-nine-prs.md) — **Lane B, nine PRs, 2026-08-24.** Q-486, Q-321, Q-357, Q-328, LB-3, LB-6, LB-7 and Q-359's demotion. Carries the two lessons that cost the most: read the CI *server* log before fixing a CI-only failure, and a spec stubbing an `/api/` route needs `serviceWorkers: 'block'`. **Q-555's fix is written, unmerged and unverified** on `fix/offline-tab-tap-native-fallback`.
