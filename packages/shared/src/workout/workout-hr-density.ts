@@ -9,7 +9,14 @@
 // `workout_hr_stats.hr_dense` whenever the snapshot is written (`upsertWorkoutHrStats`) and frozen
 // before the HR prune (`freezeWorkoutHrDensity`). The recap reads the same verdict to decide whether
 // per-set heart rate and one-minute recovery are shown as numbers.
+//
+// Once stored, the verdict is what the calorie gate reads (`hrDense ?? live`), from the moment it is
+// written, not only after the prune (#3839). It is re-judged only when a later write passes the
+// fuller-wins guard (as many readings or more). So a series that is edited or deduped down to fewer
+// readings keeps the verdict taken over the fuller one until such a write: the calories and the
+// recap follow the stored verdict, not the thinner live series.
 import { isDenseHrSeries, isDenseHrSpan } from '@trainingai/shared/health/intraday-hr-contributors'
+import { SET_PEAK_AFTER_MS, SET_PEAK_BEFORE_MS } from '@trainingai/shared/workout/hr-analysis'
 
 /** A workout's own series, start to end without the pads: how many readings, how many from a source
  *  the density rule does not gate, and the longest gap between consecutive ones (ms). The shape
@@ -25,13 +32,16 @@ export function workoutHrSpanVerdict(span: WorkoutHrSpan | null): boolean | null
   return isDenseHrSpan(n, span?.max_gap_ms == null ? null : Number(span.max_gap_ms))
 }
 
-/** How far either side of a set's log time its shown heart rate reaches: the peak looks 90 s back and
- *  the "end" reading is the nearest within 90 s (`analyseHrRecovery`). */
+/** How far either side of a set's log time its "End" reading may be: the nearest reading within
+ *  90 s (`nearestReading` in `analyseHrRecovery`). */
 export const SET_HR_WINDOW_MS = 90_000
 
 /** Whether one set's heart rate rests on enough readings to show: the density rule over the readings
- *  within `SET_HR_WINDOW_MS` of its log time, so a figure built on zero or one reading is never
- *  shown. A set with no log time has nothing to anchor on. */
+ *  inside the set's peak window (`SET_PEAK_BEFORE_MS` before its log time to `SET_PEAK_AFTER_MS`
+ *  after, the window `analyseHrRecovery` takes the peak over), so a peak built on zero or one reading
+ *  is never shown (#3839). "End" is shown only with the peak, so it too is shown only when two
+ *  readings or more sit around the log time, never from a lone reading. A set with no log time has
+ *  nothing to anchor on. */
 export function setHrMeasured(
   readings: readonly { timestamp: Date }[],
   loggedAt: Date | null,
@@ -40,7 +50,7 @@ export function setHrMeasured(
   const at = loggedAt.getTime()
   const times = readings
     .map(r => r.timestamp.getTime())
-    .filter(t => t >= at - SET_HR_WINDOW_MS && t <= at + SET_HR_WINDOW_MS)
+    .filter(t => t >= at - SET_PEAK_BEFORE_MS && t <= at + SET_PEAK_AFTER_MS)
   return isDenseHrSeries(times)
 }
 
@@ -49,6 +59,20 @@ export function setHrMeasured(
  *  workout with no readings has no numbers to hide); `measured` is the set's own check. */
 export function showSetHr(hrDense: boolean | null | undefined, measured: boolean | undefined): boolean {
   return hrDense !== false && measured !== false
+}
+
+/** Whether a recap shows `SPARSE_WORKOUT_HR_NOTE` (#3839): when the workout verdict is sparse, and
+ *  also when it passed but no set had enough readings around it, which is what readings every 3 to
+ *  5 minutes look like (dense by `HR_DENSE_MAX_GAP_MS`, yet never two inside one set's window).
+ *  Not with no readings at all: there is nothing sparse to explain, and the recap says there is no
+ *  trace instead. An older response without `hrMeasured` never trips the second case. */
+export function showSparseWorkoutHrNote(
+  hrDense: boolean | null | undefined,
+  readingsCount: number,
+  sets: readonly { hrMeasured?: boolean }[],
+): boolean {
+  if (hrDense === false) return true
+  return readingsCount > 0 && sets.length > 0 && sets.every(s => s.hrMeasured === false)
 }
 
 /** Shown once, in place of per-set heart rate and recovery, when the workout's heart rate is sparse. */

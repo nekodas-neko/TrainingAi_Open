@@ -88,16 +88,42 @@ describe.skipIf(!canRun)('hr_dense is stored with the workout HR stats (#3775)',
   })
 
   it('re-judges on a fuller compute (late heart rate), never on a partial one', async () => {
-    await addSession(ws(5))
+    await addSession(ws(5)); await addSession(ws(6))
     await series(2, 58, 7 * 60, 'oura_cloud')
     await write(ws(5), 9)
     expect(await stored(ws(5))).toBe(false)
     await series(0, 60, 5, 'oura_cloud') // the workout's 5-second points arrive late
     await write(ws(5), 721)
     expect(await stored(ws(5))).toBe(true)
-    await pool.query(`DELETE FROM oura_heartrate WHERE user_id = $1 AND timestamp > $2`, [USER, at(10)])
-    await write(ws(5), 120) // mid-prune: fewer readings, the guard keeps the fuller row
+    // #3839: what is left must be a series judged differently, or the step proves nothing. Thin it to
+    // one reading every seven minutes, which on its own would be judged sparse.
+    await pool.query(`DELETE FROM oura_heartrate WHERE user_id = $1`, [USER])
+    await series(2, 58, 7 * 60, 'oura_cloud')
+    const [left] = (await pool.query(`SELECT count(*)::int AS n FROM oura_heartrate WHERE user_id = $1`, [USER])).rows
+    expect(left.n).toBe(9)
+    await write(ws(6), 9); expect(await stored(ws(6))).toBe(false) // the same series, judged fresh
+    await write(ws(5), 9) // partial: fewer readings, the guard keeps the fuller row and its verdict
     expect(await stored(ws(5))).toBe(true)
+  })
+
+  it('the calorie gate reads the stored verdict from the moment it is written, not the live series (#3839)', async () => {
+    await addSession(ws(5))
+    await series(0, 60, 5, 'oura_cloud')
+    await write(ws(5), 721)
+    expect(await stored(ws(5))).toBe(true)
+    expect([...(await repo.getAvgBpmBySession(USER, [ws(5)])).keys()]).toEqual([ws(5)])
+    // The series is edited or deduped down to one reading every seven minutes. Judged live, the gate
+    // would now drop the session to METs; the stored verdict keeps its heart-rate calories until a
+    // write passes the fuller-wins guard.
+    await pool.query(`DELETE FROM oura_heartrate WHERE user_id = $1`, [USER])
+    await series(2, 58, 7 * 60, 'oura_cloud')
+    await write(ws(5), 9)
+    expect(await stored(ws(5))).toBe(true)
+    expect([...(await repo.getAvgBpmBySession(USER, [ws(5)])).keys()]).toEqual([ws(5)])
+    // A write as full as the stored one re-judges it, and the gate follows.
+    await write(ws(5), 721)
+    expect(await stored(ws(5))).toBe(false)
+    expect([...(await repo.getAvgBpmBySession(USER, [ws(5)])).keys()]).toEqual([])
   })
 
   it('moves no calorie figure: the gate answers the same before and after the verdict is stored', async () => {

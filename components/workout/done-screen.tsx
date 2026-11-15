@@ -18,7 +18,7 @@ import { TrainingStressBadge } from "@/components/workout/training-stress-badge"
 import { TimeSummaryCard } from "@/components/workout/time-summary-card";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { aggregateHrRecoveryByExercise, formatRecoveryRate } from "@trainingai/shared/health/hr-recovery-by-exercise";
-import { SPARSE_WORKOUT_HR_NOTE } from "@trainingai/shared/workout/workout-hr-density";
+import { SPARSE_WORKOUT_HR_NOTE, showSparseWorkoutHrNote } from "@trainingai/shared/workout/workout-hr-density";
 import { WORKOUT_RECAP_TTL, WORKOUT_ENERGY_TTL, WORKOUT_HR_TTL, HR_PROFILE_TTL } from "@trainingai/shared/cache-ttl";
 import { COMMON_WORKOUT_ACTIVITIES, DEFAULT_ACTIVITY_ID } from "@trainingai/shared/health/workout-activities";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -65,6 +65,8 @@ interface HrData {
   setStats: {
     exerciseName: string; setNumber: number; loggedAt: string | null
     setStartMs: number | null; setEndMs: number | null
+    /** #3775: false when too few readings sit around the set to show its heart rate. */
+    hrMeasured?: boolean
     peakBpm: number | null; hrr1: number | null; adequate: boolean | null
   }[]
 }
@@ -462,7 +464,7 @@ export function DoneScreen({
                 {/* Per exercise, not per set: set-level readings are too noisy to act on
                     (most rows carry coverage_ok=false) and six of them in a row don't say
                     anything a lifter can use. See lib/health/hr-recovery-by-exercise.ts. */}
-                {hrData.hrDense === false && (
+                {showSparseWorkoutHrNote(hrData.hrDense, hrData.readings.length, hrData.setStats) && (
                   <p className="text-2xs text-muted-foreground">{SPARSE_WORKOUT_HR_NOTE}</p>
                 )}
                 <div className="space-y-1">

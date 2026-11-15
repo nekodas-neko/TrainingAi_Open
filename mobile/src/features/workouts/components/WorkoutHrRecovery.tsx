@@ -63,7 +63,7 @@ export function WorkoutHrRecovery({ workout }: { workout: WorkoutRecord }) {
                 },
               ],
         );
-        const sparse = sparseWorkoutHrNote(data.hrDense);
+        const sparse = sparseWorkoutHrNote(data.hrDense, readings.length, data.setStats);
         return (
           <Stack>
             <AppText variant="caption" tone="muted">
@@ -115,7 +115,7 @@ export function WorkoutHrRecovery({ workout }: { workout: WorkoutRecord }) {
               </AppText>
             ))}
             {data.setStats.map((x, index) => {
-              const line = setHrLine(data.hrDense, x);
+              const line = setHrLine(data.hrDense, x, readings.length);
               return (
                 <Disclosure key={index} title={`${x.exerciseName} · set ${x.setNumber}`}>
                   {line.kind === 'figures' && <AppText variant="caption">{line.text}</AppText>}

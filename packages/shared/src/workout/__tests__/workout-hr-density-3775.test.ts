@@ -2,9 +2,11 @@
 // from the Postgres slice) and the per-set check the recap reads before it shows a figure.
 import { describe, expect, it } from 'vitest'
 import {
-  setHrMeasured, showSetHr, workoutHrSpanVerdict, SET_HR_WINDOW_MS, SPARSE_WORKOUT_HR_NOTE, SET_HR_NOT_MEASURED,
+  setHrMeasured, showSetHr, showSparseWorkoutHrNote, workoutHrSpanVerdict, SET_HR_WINDOW_MS, SPARSE_WORKOUT_HR_NOTE,
+  SET_HR_NOT_MEASURED,
 } from '../workout-hr-density'
-import { HR_DENSE_MAX_GAP_MS } from '../../health/intraday-hr-contributors'
+import { analyseHrRecovery, SET_PEAK_AFTER_MS, SET_PEAK_BEFORE_MS } from '../hr-analysis'
+import { HR_DENSE_MAX_GAP_MS, isDenseHrSeries } from '../../health/intraday-hr-contributors'
 
 const T0 = new Date('2026-11-10T02:00:00Z') // local midday in Brisbane
 const at = (ms: number) => ({ timestamp: new Date(T0.getTime() + ms) })
@@ -36,8 +38,31 @@ describe('setHrMeasured (#3775)', () => {
     expect(setHrMeasured([near(-20_000)], logged)).toBe(false)
     expect(setHrMeasured([near(-20_000), near(SET_HR_WINDOW_MS + 1000)], logged)).toBe(false)
   })
-  it('is true with two readings inside the window', () => {
-    expect(setHrMeasured([near(-SET_HR_WINDOW_MS), near(SET_HR_WINDOW_MS)], logged)).toBe(true)
+  it('is true with two readings inside the peak window, at its exact edges', () => {
+    expect(setHrMeasured([near(-SET_PEAK_BEFORE_MS), near(SET_PEAK_AFTER_MS)], logged)).toBe(true)
+  })
+  it('counts only the peak window, so a peak never rests on one reading (#3839)', () => {
+    // −80 s and +40 s are both within 90 s of the log, but only −80 s is inside the peak window:
+    // the peak shown would be that one reading.
+    expect(setHrMeasured([near(-80_000), near(40_000)], logged)).toBe(false)
+    expect(setHrMeasured([near(-SET_PEAK_BEFORE_MS - 1000), near(0)], logged)).toBe(false)
+    expect(setHrMeasured([near(-SET_HR_WINDOW_MS), near(SET_HR_WINDOW_MS)], logged)).toBe(false)
+    expect(setHrMeasured([near(-80_000), near(-10_000)], logged)).toBe(true)
+  })
+  it('agrees with the peak analyseHrRecovery shows: two readings in its window, or none shown', () => {
+    const readings = [{ ...near(-80_000), bpm: 150 }, { ...near(40_000), bpm: 160 }]
+    const [stat] = analyseHrRecovery(readings, [{ exerciseName: 'Squat', setNumber: 1, loggedAt: logged }])
+    expect(stat.peakBpm).toBe(150) // built on the −80 s reading alone
+    expect(setHrMeasured(readings, logged)).toBe(false)
+  })
+  it('one reading every 3 to 5 minutes passes the workout rule but no set (#3839)', () => {
+    for (const stepMin of [3, 4, 5]) {
+      const times = Array.from({ length: 15 }, (_, i) => T0.getTime() + i * stepMin * 60_000)
+      expect(isDenseHrSeries(times)).toBe(true)
+      for (let m = 1; m < 40; m++) {
+        expect(setHrMeasured(times.map(t => ({ timestamp: new Date(t) })), new Date(T0.getTime() + m * 60_000))).toBe(false)
+      }
+    }
   })
   it('a strap second-by-second series passes; a reading every few minutes does not', () => {
     const strap = Array.from({ length: 3600 }, (_, i) => at(i * 1000))
@@ -64,5 +89,22 @@ describe('showSetHr (#3775)', () => {
   it('says why in plain words', () => {
     expect(SPARSE_WORKOUT_HR_NOTE).toMatch(/chest strap/)
     expect(SET_HR_NOT_MEASURED).toMatch(/Too few heart-rate readings/)
+  })
+})
+
+describe('showSparseWorkoutHrNote (#3839)', () => {
+  const unmeasured = [{ hrMeasured: false }, { hrMeasured: false }]
+  it('shows on a sparse workout', () => {
+    expect(showSparseWorkoutHrNote(false, 9, [{ hrMeasured: true }])).toBe(true)
+  })
+  it('shows on a workout judged dense when no set had enough readings (3 to 5 minute spacing)', () => {
+    expect(showSparseWorkoutHrNote(true, 13, unmeasured)).toBe(true)
+    expect(showSparseWorkoutHrNote(null, 13, unmeasured)).toBe(true)
+  })
+  it('does not show when any set was measured, with no readings, with no sets, or on an older response', () => {
+    expect(showSparseWorkoutHrNote(true, 3600, [{ hrMeasured: false }, { hrMeasured: true }])).toBe(false)
+    expect(showSparseWorkoutHrNote(true, 0, unmeasured)).toBe(false)
+    expect(showSparseWorkoutHrNote(true, 13, [])).toBe(false)
+    expect(showSparseWorkoutHrNote(undefined, 13, [{}, {}])).toBe(false)
   })
 })
