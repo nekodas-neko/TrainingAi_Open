@@ -203,6 +203,7 @@ describe('the switch-over (the owner\'s program, 14 Nov)', () => {
         writes.push(args)
         stored = stored.map(r => ({ ...r, phase: args[2], phaseStartedAt: args[3], pendingTransition: args[4] })) as SessionPeriodization[]
       },
+      voidSessionPrescription: async () => undefined,
     }
     const view = await syncProgramPhase(repo, 'u', 'p', TZ, at('2026-11-23T06:00:00'))
     expect(writes).toHaveLength(1)
