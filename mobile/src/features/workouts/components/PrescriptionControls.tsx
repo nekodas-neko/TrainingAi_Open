@@ -145,7 +145,7 @@ export function PrescriptionControls({
           {['transition_recommended', 'deload_recommended'].includes(prescription.phaseAction) && (
             <AppButton
               title={
-                prescription.phaseAction === 'deload_recommended'
+                prescription.phaseAction === 'deload_recommended' || prescription.typeOnlyMove
                   ? `Move to ${prescription.phase}`
                   : `Move the program to ${prescription.phase}`
               }
@@ -189,8 +189,8 @@ export function PrescriptionControls({
         {action.error && <Notice title="Prescription" message={action.error} />}
         {confirm && (
           <ConfirmationCard
-            title={`Move the program to ${confirm}?`}
-            message="This changes the training phase for every session in the program and regenerates this session's prescription."
+            title={`Change the phase to ${confirm}?`}
+            message="This changes the program's training phase and regenerates this session's prescription. While the program's sessions are still on their own phases, only this session moves."
             confirmLabel="Change phase"
             cancelLabel="Cancel"
             busy={action.busy}

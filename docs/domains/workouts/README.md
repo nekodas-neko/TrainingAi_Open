@@ -145,7 +145,12 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
   program moves early when at least half of this week's session types agree and none asks to stay
   for recovery. A one-day deload stays the one session's (#3799). The switch-over puts every type
   in accumulation week 1 on the Monday after the last unfinished deload ends, with a 3-week first
-  block. Where it lives: the "program's phase" row in `docs/module-map.md`.
+  block. It runs once, only for a program whose types were on their own phases when the rule
+  shipped; the Monday is stored on every row as soon as it is known. Every program move marks the
+  rows (`pending_transition.programPhase`), and a marked program whose rows later disagree is
+  re-aligned to its latest move, never switched again. A move's own week counts for the new phase
+  only when no session that week came before the move. Where it lives: the "program's phase" row in
+  `docs/module-map.md`.
 - [`docs/superpowers/plans/2026-08-02-per-exercise-phase-hold.md`](../../superpowers/plans/2026-08-02-per-exercise-phase-hold.md)
   — **planned, Q-52.** Phase is per session type, so every compound in a session transitions
   together; a stalled secondary gets dragged into a heavier zone by a progressing primary. Adds a
