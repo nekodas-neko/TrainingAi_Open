@@ -34,8 +34,10 @@ export async function recomputeHrr1Best(args: { userId: string; tz: string; dryR
     `SELECT w.workout_session_id, ws.started_at, w.hrr1_best,
             (SELECT max(s.hrr1_bpm) FROM set_hr_stats s
               JOIN set_logs sl ON sl.id = s.set_log_id
+              JOIN exercise_logs el ON el.id = sl.exercise_log_id
              WHERE s.workout_session_id = w.workout_session_id AND s.user_id = $1
-               AND sl.deleted_at IS NULL) AS max_set_hrr60
+               -- #3822: the same rule as setHrStatsIsLive (slices/oura.ts); the exercise log was missing.
+               AND sl.deleted_at IS NULL AND el.deleted_at IS NULL) AS max_set_hrr60
        FROM workout_hr_stats w
        JOIN workout_sessions ws ON ws.id = w.workout_session_id
       WHERE w.user_id = $1 AND ws.deleted_at IS NULL

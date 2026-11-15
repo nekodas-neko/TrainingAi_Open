@@ -2545,6 +2545,8 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
       // correlated span subquery is never run for them. Same result, fewer series judged.
       isNotNull(s.workoutHrStats.avgBpm),
       isNotNull(s.workoutSessions.completedAt),
+      // #3822: a deleted workout costs nothing, even when a caller passes its id (the energy route).
+      isNull(s.workoutSessions.deletedAt),
     ))
   // A frozen verdict wins: it was taken over the whole series, and what is left mid-prune is a part.
   // Nothing to judge, live or frozen: the snapshot stands.
@@ -2618,7 +2620,7 @@ export async function getWorkoutHrStats(db: Db, userId: string, sessionId: strin
       source: s.workoutHrStats.source, computedAt: s.workoutHrStats.computedAt,
     })
     .from(s.workoutHrStats)
-    .where(and(eq(s.workoutHrStats.userId, userId), eq(s.workoutHrStats.workoutSessionId, sessionId)))
+    .where(and(eq(s.workoutHrStats.userId, userId), eq(s.workoutHrStats.workoutSessionId, sessionId), workoutHrStatsIsLive))
     .limit(1)
   return row ?? null
 }
@@ -2841,9 +2843,29 @@ function toSetHrStatsRow(r: typeof s.setHrStats.$inferSelect): SetHrStatsRow {
   }
 }
 
+/**
+ * #3822: the HR snapshots keep their rows when a workout, exercise or set is deleted — a delete is a
+ * `deleted_at` tombstone, so the `ON DELETE CASCADE` on their keys never fires. Every reader of
+ * `set_hr_stats` / `workout_hr_stats` that feeds a screen, the coach or a recompute keeps only rows
+ * whose set, exercise log and workout session are all live, through these two conditions. They are
+ * `EXISTS` on the primary keys, so they cost one index probe per row and need no join in the caller.
+ * Exported for the raw-SQL readers' tests and for any new reader: use these, don't hand-roll a third.
+ */
+export const setHrStatsIsLive: SQL = sql`EXISTS (
+  SELECT 1 FROM ${s.setLogs} sl
+    JOIN ${s.exerciseLogs} el ON el.id = sl.exercise_log_id
+    JOIN ${s.workoutSessions} ws ON ws.id = el.workout_session_id
+   WHERE sl.id = ${s.setHrStats.setLogId}
+     AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL)`
+
+/** #3822: a `workout_hr_stats` row whose workout session is live. See `setHrStatsIsLive`. */
+export const workoutHrStatsIsLive: SQL = sql`EXISTS (
+  SELECT 1 FROM ${s.workoutSessions} ws
+   WHERE ws.id = ${s.workoutHrStats.workoutSessionId} AND ws.deleted_at IS NULL)`
+
 export async function getSetHrStatsForSession(db: Db, userId: string, workoutSessionId: string): Promise<SetHrStatsRow[]> {
   const rows = await db.select().from(s.setHrStats)
-    .where(and(eq(s.setHrStats.userId, userId), eq(s.setHrStats.workoutSessionId, workoutSessionId)))
+    .where(and(eq(s.setHrStats.userId, userId), eq(s.setHrStats.workoutSessionId, workoutSessionId), setHrStatsIsLive))
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setNumber))
   return rows.map(toSetHrStatsRow)
 }
@@ -2863,6 +2885,7 @@ export async function getSetHrStatsForExercise(
       eq(s.setHrStats.userId, userId),
       gte(s.setHrStats.loggedAt, opts.since),
       match,
+      setHrStatsIsLive,
     ))
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setNumber))
   return rows.map(toSetHrStatsRow)
@@ -2872,7 +2895,7 @@ export async function getSetHrStatsForExercise(
  *  AI chat groups by exercise. Bounded to keep the tool payload sane. */
 export async function getSetHrStatsSince(db: Db, userId: string, since: Date, limit = 5000): Promise<SetHrStatsRow[]> {
   const rows = await db.select().from(s.setHrStats)
-    .where(and(eq(s.setHrStats.userId, userId), gte(s.setHrStats.loggedAt, since)))
+    .where(and(eq(s.setHrStats.userId, userId), gte(s.setHrStats.loggedAt, since), setHrStatsIsLive))
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setNumber))
     .limit(limit)
   return rows.map(toSetHrStatsRow)
@@ -2890,7 +2913,8 @@ export async function listSetHrStatsForHrr1Backfill(db: Db, userId: string) {
     })
     .from(s.setHrStats)
     .innerJoin(s.setLogs, eq(s.setHrStats.setLogId, s.setLogs.id))
-    .where(eq(s.setHrStats.userId, userId))
+    // #3822: a deleted set is never read again, so re-measuring it is wasted work. No path restores one.
+    .where(and(eq(s.setHrStats.userId, userId), setHrStatsIsLive))
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setLogId))
 }
 
