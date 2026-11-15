@@ -19,7 +19,7 @@ import type { PrescriptionSignals } from '../signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { isOneDayDeload, holdsOneDayDeload } from '../one-day-deload'
 import { shouldTriggerEmergencyDeload } from '../emergency-deload'
-import { applyRealisationCeiling } from '../phase-guards'
+import { applyProgramPhaseCap, programPhaseView } from '../program-phase'
 import { repCompletionFromSetLogs } from '../rep-completion'
 
 const mocks = vi.hoisted(() => ({ signals: null as unknown, modelAnswer: null as unknown }))
@@ -71,6 +71,12 @@ function harness() {
     ensureSessionPeriodization: async () => state,
     reconcileSessionsInPhase: async () => undefined,
     getSessionPeriodization: async () => state,
+    // #3766: the program's phase is read from every row of the program, and its weeks from completions.
+    listSessionPeriodizationForProgram: async () => [{ phaseStartedAt: new Date(0), ...state }],
+    listProgramCompletions: async () => [],
+    listModelPhaseAnswers: async () => [],
+    setProgramPhase: async () => undefined,
+    voidSessionPrescription: async () => undefined,
     storePrescription: async (_u: string, _s: string, prescription: AiPrescription, expiresAt: Date) => {
       stored.push(prescription)
       state.prescription = prescription
@@ -78,6 +84,7 @@ function harness() {
       state.prescriptionStatus = 'pending'
     },
     advancePhase: async (_u: string, _s: string, phase: string) => { advanced.push(phase); state.phase = phase },
+    advanceProgramPhase: async (_u: string, _s: string, phase: string) => { advanced.push(phase); state.phase = phase },
   }
   const repo = new Proxy({}, { get: (_t, prop: string) => known[prop] ?? (async () => undefined) }) as WorkoutRepository
   return { repo, stored, advanced, state, run: () => generatePrescriptionForSession(`user-3799-${++n}`, SESSION, repo, 'Australia/Brisbane') }
@@ -93,8 +100,15 @@ describe('telling a one-day deload from a planned one (#3799)', () => {
     expect(isOneDayDeload(buildWholeSessionDeloadPrescription(baseSignals(), 'Emergency deload: x.'))).toBe(true)
   })
 
-  it('the realisation ceiling\'s deload is a planned phase move, not a one-day deload', () => {
-    const planned = applyRealisationCeiling({ phase: 'realisation', phaseAction: 'stay', reasoning: '' } as AiPrescription, 'realisation', 99)
+  it('the realisation cap\'s deload is a planned phase move, not a one-day deload', () => {
+    // #3766: the cap is the program's, in training weeks. Two past weeks of realisation reach it.
+    const start = new Date('2026-11-02T00:00:00+10:00')
+    const view = programPhaseView(
+      [{ programSessionId: 'a', phase: 'realisation', phaseStartedAt: start, sessionsInPhase: 2, baselineComplete: true, pendingTransition: null }],
+      [{ programSessionId: 'a', completedAt: new Date('2026-11-03T08:00:00+10:00') }, { programSessionId: 'a', completedAt: new Date('2026-11-10T08:00:00+10:00') }],
+      'Australia/Brisbane', new Date('2026-11-17T12:00:00+10:00'),
+    )
+    const planned = applyProgramPhaseCap({ phase: 'realisation', phaseAction: 'stay', reasoning: '' } as AiPrescription, view)
     expect(planned.phase).toBe('deload')
     expect(isOneDayDeload(planned)).toBe(false)
   })

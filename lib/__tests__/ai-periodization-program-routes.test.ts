@@ -46,7 +46,16 @@ vi.mock('@/lib/data', () => {
     updatePrescriptionStatus, listPersonalRecords, getExerciseEstimates, getActiveProgram,
     listPrograms, listVolumeTargets, getWeeklySetsByMuscleGroup, reconcileSessionsInPhase,
     listSessionPeriodizationForProgram, getRecentSessionsOfType,
-  })
+      // #3766: the program's phase. A program move reaches the same spy as a per-type one; which of the
+    // two the route picks is tested in program-phase-3766.test.ts.
+    advanceProgramPhase: advancePhase,
+    listProgramCompletions: async () => [],
+    listModelPhaseAnswers: async () => [],
+    setProgramPhase: async () => true,
+    setProgramPendingTransition: async () => undefined,
+    realignProgramPhase: async () => undefined,
+    voidSessionPrescription: async () => undefined,
+})
   return { getRepository: repo, getRepositoryAsync: repo }
 })
 
@@ -249,17 +258,28 @@ describe('POST …/session/[sessionId]/transition', () => {
     expect((await transitionPost({ newPhase: 'intensification' })).status).toBe(404)
   })
 
-  it('allows the next phase in the natural cycle', async () => {
+  it('allows the next phase in the natural cycle when it is the move on offer', async () => {
     // accumulation → intensification → realisation → deload → accumulation
     for (const [from, to] of [
       ['accumulation', 'intensification'], ['intensification', 'realisation'],
       ['realisation', 'deload'], ['deload', 'accumulation'],
     ] as const) {
       advancePhase.mockClear()
-      getSessionPeriodization.mockResolvedValue(state({ phase: from }))
+      getSessionPeriodization.mockResolvedValue(state({
+        phase: from, prescription: prescription({ phaseAction: 'transition_recommended', phase: to }),
+      }))
       expect((await transitionPost({ newPhase: to })).status).toBe(200)
       expect(advancePhase.mock.calls[0][2]).toBe(to)
     }
+  })
+
+  // #3766: the phase is the program's, so the next phase alone no longer stands in for an offer — an
+  // unoffered tap from one type's screen would move every type.
+  it('refuses the next phase when it is not on offer, unless forced', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ phase: 'accumulation', prescription: prescription() }))
+    expect((await transitionPost({ newPhase: 'intensification' })).status).toBe(400)
+    expect(advancePhase).not.toHaveBeenCalled()
+    expect((await transitionPost({ newPhase: 'intensification', force: true })).status).toBe(200)
   })
 
   it('refuses a jump the engine never recommended, and names the override', async () => {
@@ -295,6 +315,15 @@ describe('POST …/session/[sessionId]/transition', () => {
   // 'none' matched nothing `isAiPrescriptionPending` keys on, so accepting a transition emptied the
   // card with nothing left to refill it (owner report, 2026-08-02).
   it('leaves the slot as consumed, so the card refills instead of emptying', async () => {
+    // The per-type move (a program still waiting for its switch-over: the other type is in a deload
+    // it has not finished). A program move leaves the slot 'consumed' itself.
+    listSessionPeriodizationForProgram.mockResolvedValueOnce([
+      state({ baselineComplete: true, phaseStartedAt: new Date('2026-09-10T08:00:00Z') }),
+      state({ programSessionId: OTHER_SESSION, baselineComplete: true, phase: 'deload', sessionsInPhase: 1, phaseStartedAt: new Date('2026-11-06T08:00:00Z') }),
+    ])
+    getSessionPeriodization.mockResolvedValue(state({
+      prescription: prescription({ phaseAction: 'transition_recommended', phase: 'intensification' }),
+    }))
     await transitionPost({ newPhase: 'intensification' })
     expect(updatePrescriptionStatus.mock.calls[0][2]).toBe('consumed')
     // Written AFTER advancePhase, which clears the slot to 'none' itself.

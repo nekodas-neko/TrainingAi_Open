@@ -103,8 +103,11 @@ describe.skipIf(!canRun)('sessions_in_phase reconcile at prescribe route (SYNC-T
     // into lib/ai-periodization/generate-prescription.ts, which the route delegates to and which
     // the workout-completion path also calls in-process. Assert the reconcile lives there and the
     // route still routes through it, so the SYNC-T2 guarantee holds on the prescribe path.
+    // #3766: generation reads the program's phase through `syncProgramPhase`, which reconciles first.
     const gen = await read('../../../../packages/shared/src/ai-periodization/generate-prescription.ts')
-    expect(gen).toMatch(/reconcileSessionsInPhase/)
+    expect(gen).toMatch(/syncProgramPhase\(repo, userId, activeProgram\.id, tz\)/)
+    const sync = await read('../../../../packages/shared/src/ai-periodization/program-phase.ts')
+    expect(sync).toMatch(/await repo\.reconcileSessionsInPhase\(userId, programId\)\n\s+let rows = /)
     const route = await read('../../../../app/api/ai-periodization/session/[sessionId]/prescribe/route.ts')
     expect(route).toMatch(/generatePrescriptionForSession/)
   })

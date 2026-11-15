@@ -156,7 +156,7 @@ export function buildRecoverySummary(
   const weekReadiness = [...liveReadinessByDayOnCurrentScale(derived).values()]
   if (weekReadiness.length >= 3) {
     const avg = Math.round(weekReadiness.reduce((s, v) => s + v, 0) / weekReadiness.length)
-    lines.push(`7-day readiness avg: ${avg}/100`)
+    lines.push(`7-day readiness avg: ${avg}/100 (current scale; older days converted)`)
   }
   const hrvWeek = sleepSessions.filter(s => s.averageHrvMs != null)
   if (hrvWeek.length >= 3) {

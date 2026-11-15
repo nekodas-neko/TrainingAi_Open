@@ -236,8 +236,8 @@ export function AiPrescriptionCard({
               {/* Once a transition has been APPLIED (auto or accepted) the action is history —
                   still calling it "suggested" would invite a tap on a decision already made. */}
               {isTransitionRecommended && (isPending
-                ? " · Phase transition suggested"
-                : ` · Moved to ${phaseLabel[prescription.phase] ?? prescription.phase}`)}
+                ? (prescription.typeOnlyMove ? " · Phase transition suggested" : " · Program phase move suggested")
+                : ` · ${prescription.typeOnlyMove ? 'Moved' : 'Program moved'} to ${phaseLabel[prescription.phase] ?? prescription.phase}`)}
               {isDeloadRecommended && isPending && " · Deload recommended"}
               {/* The prescription is still a deload; the session about to run is not. Both facts,
                   because the card describing only the first is what made the toggle read as a lie.
@@ -314,7 +314,7 @@ export function AiPrescriptionCard({
               <TrendingUpIcon className="h-3.5 w-3.5 text-brand flex-none mt-0.5" />
               <div className="space-y-1">
                 <p className="text-[11px] font-semibold text-brand">
-                  Moved to {phaseLabel[prescription.phase] ?? prescription.phase}
+                  Program moved to {phaseLabel[prescription.phase] ?? prescription.phase}
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {prescription.transitionRationale}
@@ -476,7 +476,9 @@ export function AiPrescriptionCard({
                   onClick={() => (isDeloadRecommended ? respond('accept') : executeTransition(prescription.phase))}
                 >
                   <ArrowRightIcon className="h-3.5 w-3.5 mr-1" />
-                  {isCycleRestart ? 'Continue' : 'Move'} to {phaseLabel[prescription.phase] ?? prescription.phase}
+                  {/* #3766: a planned move is the program's, so it names it; a one-day deload stays this
+                      session's, and so does a deload's way out while the program waits for its switch-over. */}
+                  {isCycleRestart ? 'Continue' : 'Move'}{isTransitionRecommended && !prescription.typeOnlyMove ? ' the program' : ''} to {phaseLabel[prescription.phase] ?? prescription.phase}
                 </Button>
                 <Button
                   size="sm"

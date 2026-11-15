@@ -221,6 +221,14 @@ async function generate() {
     ensureSessionPeriodization: async () => state,
     reconcileSessionsInPhase: async () => undefined,
     getSessionPeriodization: async () => state,
+    // #3766: the program's phase is read from every row of the program, and its weeks from completions.
+    listSessionPeriodizationForProgram: async () => [{ phaseStartedAt: new Date(0), ...state }],
+    listProgramCompletions: async () => [],
+    listModelPhaseAnswers: async () => [],
+    setProgramPhase: async () => true,
+    setProgramPendingTransition: async () => undefined,
+    realignProgramPhase: async () => undefined,
+    voidSessionPrescription: async () => undefined,
     storePrescription: async (_u: string, _s: string, p: AiPrescription) => { stored.push(p) },
   }
   const repo = new Proxy({}, { get: (_t, prop: string) => known[prop] ?? (async () => undefined) }) as WorkoutRepository

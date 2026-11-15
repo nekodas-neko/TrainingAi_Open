@@ -4694,8 +4694,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // The best surviving log that may stand as the exercise's personal record: the one rule
   // `reconcilePersonalRecord` applies, read on its own so a report can say what reconciling would
-  // do without doing it (#3801). Null when no log qualifies.
-  async bestQualifyingPersonalRecord(userId: string, exerciseName: string): Promise<{ estimated1rm: number; loggedAt: Date } | null> {
+  // do without doing it (#3801). Null when no log qualifies. `excludeSessionIds` answers as if those
+  // sessions were tombstoned, so a dry run can say what a delete would do to the record (#3802).
+  async bestQualifyingPersonalRecord(userId: string, exerciseName: string, opts: { excludeSessionIds?: string[] } = {}): Promise<{ estimated1rm: number; loggedAt: Date } | null> {
+    const excluded = opts.excludeSessionIds ?? []
     const [best] = await this.db
       .select({ estimated1rm: s.exerciseLogs.estimated1rm, loggedAt: s.exerciseLogs.loggedAt })
       .from(s.exerciseLogs)
@@ -4706,6 +4708,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         gt(s.exerciseLogs.estimated1rm, 0),
         isNull(s.exerciseLogs.deletedAt),
         isNull(s.workoutSessions.deletedAt),
+        ...(excluded.length ? [notInArray(s.workoutSessions.id, excluded)] : []),
         // Mirrors shouldCountTowardPr's per-exercise deload gate — unconditional, no
         // baseline exception (the exercise itself was cut, unlike a whole-session deload).
         eq(s.exerciseLogs.exerciseDeloaded, false),
@@ -8387,6 +8390,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean) { return period.recordBaselineAnchors(this.db, userId, programSessionId, anchors, complete) }
   async revertAutoAdoptedBaseline(userId: string, programSessionId: string) { return period.revertAutoAdoptedBaseline(this.db, userId, programSessionId) }
   async advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase) { return period.advancePhase(this.db, userId, programSessionId, newPhase) }
+  async advanceProgramPhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase, expected?: { phase: PeriodizationPhase; phaseStartedAt: Date }) { return period.advanceProgramPhase(this.db, userId, programSessionId, newPhase, expected) }
+  async setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null, opts?: import('@trainingai/shared/ai-periodization/program-phase').ProgramMoveOptions) { return period.setProgramPhase(this.db, userId, programId, phase, startedAt, pendingTransition, opts) }
+  async setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending) { return period.setProgramPendingTransition(this.db, userId, programId, decide) }
+  async realignProgramPhase(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecideTarget) { return period.realignProgramPhase(this.db, userId, programId, decide) }
+  async listProgramCompletions(userId: string, programId: string, since: Date) { return period.listProgramCompletions(this.db, userId, programId, since) }
+  async listModelPhaseAnswers(userId: string, programSessionIds: string[], since: Date) { return period.listModelPhaseAnswers(this.db, userId, programSessionIds, since) }
   async recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void> {
     await this.db.insert(s.prescriptionShadow).values({
       userId, programSessionId,
@@ -8396,9 +8405,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     })
   }
 
-  async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status) }
+  async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: { phase: PeriodizationPhase; phaseStartedAt: Date }) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor) }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
+  async voidSessionPrescription(userId: string, programSessionId: string) { return period.voidSessionPrescription(this.db, userId, programSessionId) }
   async updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription) { return period.updatePrescriptionExercisesCache(this.db, userId, programSessionId, prescription) }
   async storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null) { return period.storePendingTransition(this.db, userId, programSessionId, transition) }
   async incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date) { return period.incrementSessionsInPhase(this.db, userId, programSessionId, completedAt) }

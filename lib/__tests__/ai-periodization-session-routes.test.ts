@@ -47,7 +47,18 @@ vi.mock('@/lib/data', () => {
     wasProgramSessionTrainedSince,
     revertAutoAdoptedBaseline,
     listPersonalRecords, listPrevious1rm,
-  })
+      // #3766: the program's phase. A program move reaches the same spy as a per-type one; which of the
+    // two the route picks is tested in program-phase-3766.test.ts.
+    advanceProgramPhase: advancePhase,
+    listProgramCompletions: async () => [],
+    listModelPhaseAnswers: async () => [],
+    setProgramPhase: async () => true,
+    setProgramPendingTransition: async () => undefined,
+    realignProgramPhase: async () => undefined,
+    voidSessionPrescription: async () => undefined,
+    listSessionPeriodizationForProgram: async () => [],
+    reconcileSessionsInPhase: async () => undefined,
+})
   return { getRepository: repo, getRepositoryAsync: repo }
 })
 vi.mock('@trainingai/shared/ai-periodization/generate-prescription', () => ({
