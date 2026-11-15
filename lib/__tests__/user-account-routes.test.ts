@@ -18,11 +18,15 @@ const bcryptCompare = vi.fn(async (_p: string, _h: string) => true)
 const bcryptHash = vi.fn(async (_p: string, _r: number) => 'hashed:' + _r)
 
 let sessionUser: { id: string; email?: string } | null = { id: 'u-1', email: 'me@example.com' }
-vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
+// #3797: when the session's sign-in happened; a first password needs a recent one.
+let signedInAt: number | undefined
+const getLatestIdentityLinkedAt = vi.fn(async (_u: string) => null as Date | null)
+vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser, signedInAt } : null) }))
 vi.mock('@/lib/data', () => {
   const repo = async () => ({
     getUserCredentials, getUserById, updateUserPassword, updateUserProfile, updateUserAvatar,
     countWorkoutSessions, getUserPreferences, updateUserPreferences, getUserProviders: async () => ['google'],
+    getLatestIdentityLinkedAt,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
@@ -77,6 +81,8 @@ const freshIp = () => ({ 'x-forwarded-for': `10.0.0.${++ipSeq}` })
 beforeEach(() => {
   vi.clearAllMocks()
   freshUser()
+  signedInAt = Math.floor(Date.now() / 1000) - 60
+  getLatestIdentityLinkedAt.mockResolvedValue(null)
   getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
   sessionTokenFrom.mockResolvedValue({ userId: 'u-1', exp: Math.floor(Date.now() / 1000) + 3600 })
   getUserCredentials.mockResolvedValue(userRow())
@@ -156,6 +162,49 @@ describe('PATCH /api/user/password', () => {
     expect((await password({ newPassword: 'longenough' })).status).toBe(200)
     expect(bcryptCompare).not.toHaveBeenCalled()
     expect(updateUserPassword).toHaveBeenCalledTimes(1)
+  })
+
+  // #3797: a first password needs a sign-in from the last ten minutes, made no earlier than the
+  // newest linked sign-in method (`lib/auth/fresh-sign-in.ts`).
+  it('refuses a first password from a stale sign-in, and writes nothing', async () => {
+    getUserCredentials.mockResolvedValue(userRow({ passwordHash: null }))
+    signedInAt = Math.floor(Date.now() / 1000) - 11 * 60
+    const res = await password({ newPassword: 'longenough' })
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ code: 'reauth_required' })
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+  it('refuses a first password from a session with no sign-in stamp', async () => {
+    getUserCredentials.mockResolvedValue(userRow({ passwordHash: null }))
+    signedInAt = undefined
+    expect((await password({ newPassword: 'longenough' })).status).toBe(403)
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+  it('refuses a first password from a recent sign-in made before Google was linked (the cleared password\'s)', async () => {
+    getUserCredentials.mockResolvedValue(userRow({ passwordHash: null }))
+    signedInAt = Math.floor(Date.now() / 1000) - 120
+    getLatestIdentityLinkedAt.mockResolvedValue(new Date(Date.now() - 60_000))
+    expect((await password({ newPassword: 'longenough' })).status).toBe(403)
+    expect(getLatestIdentityLinkedAt).toHaveBeenCalledWith(me())
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+  it('accepts a first password from the sign-in that made the link', async () => {
+    getUserCredentials.mockResolvedValue(userRow({ passwordHash: null }))
+    signedInAt = Math.floor(Date.now() / 1000) - 30
+    getLatestIdentityLinkedAt.mockResolvedValue(new Date(Date.now() - 31_000))
+    expect((await password({ newPassword: 'longenough' })).status).toBe(200)
+    expect(updateUserPassword).toHaveBeenCalledTimes(1)
+  })
+  it('refuses a first password over a native bearer token, whose stamp is not a sign-in time', async () => {
+    getUserCredentials.mockResolvedValue(userRow({ passwordHash: null }))
+    const res = await send(changePassword as never, '/api/user/password', 'PATCH', { newPassword: 'longenough' }, { authorization: 'Bearer x.y.z' })
+    expect(res.status).toBe(403)
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+  it('does not ask an existing password\'s change for a fresh sign-in (the current password is the proof)', async () => {
+    signedInAt = undefined
+    expect((await password({ currentPassword: 'right', newPassword: 'longenough' })).status).toBe(200)
+    expect(getLatestIdentityLinkedAt).not.toHaveBeenCalled()
   })
 
   it('stores a hash for the session user, never the plaintext', async () => {
