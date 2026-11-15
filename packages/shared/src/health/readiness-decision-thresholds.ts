@@ -46,7 +46,7 @@ export const SESSION_LOW_READINESS_BELOW = 67
 /** Deload owed to 3+ training days stays a soft nudge at or above this (`ai-dynamic.ts`). */
 export const DELOAD_READINESS_SOFT_MIN = 76
 /** …is "recommended" at or above this, "strong" below it. */
-export const DELOAD_READINESS_RECOMMENDED_MIN = 57
+export const DELOAD_READINESS_RECOMMENDED_MIN = 56
 /** The AI prescription prompt's rest-day rule: readiness under this. */
 export const PROMPT_REST_DAY_READINESS_BELOW = 45
 /** Home early-deload card: readiness under this with ACWR over its bound (`readiness-payload.ts`). */

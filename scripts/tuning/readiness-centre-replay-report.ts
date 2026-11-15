@@ -18,6 +18,7 @@
 // against each other on any local database.
 import {
   baselineContributorCurve,
+  preCentreSubScore,
   READINESS_BASELINE_CENTRE,
   READINESS_WEIGHTS,
 } from '@trainingai/shared/health/readiness-composite'
@@ -155,4 +156,57 @@ export function summariseCentreShift(projected: ProjectedRow[]): CentreShiftRepo
     bandTransitions,
     thresholds,
   }
+}
+
+// ── The synthetic fixture ────────────────────────────────────────────────────────────────────────
+//
+// The local database seeds 14 days, too few for any normal to mature, so a replay over it moves
+// nothing and proves nothing. This fixture stands in: stored v17 rows built the way the composite
+// builds them, from z values that are standard normal by construction (v9 made every z a true σ)
+// with a shared daily factor, and pass-through inputs at plausible levels. Three populations, because
+// the shift depends on how spread the inputs are and the owner's real spread is what the production
+// SQL measures. Deterministic: the same seed gives the same rows on every machine.
+
+export interface SyntheticPopulation {
+  name: string
+  /** Mean previous-night Sleep Score, yesterday's Activity score and recovery-index score. */
+  sleep: number
+  activity: number
+  recoveryIndex: number
+  /** Correlation between the three centred z values (one shared daily factor). */
+  rho: number
+}
+
+export const SYNTHETIC_POPULATIONS: readonly SyntheticPopulation[] = [
+  { name: 'A: sleep 62, activity 62, rho 0.3', sleep: 62, activity: 62, recoveryIndex: 40, rho: 0.3 },
+  { name: 'B: sleep 70, activity 65, rho 0.3', sleep: 70, activity: 65, recoveryIndex: 40, rho: 0.3 },
+  { name: 'C: sleep 60, activity 60, rho 0.5', sleep: 60, activity: 60, recoveryIndex: 35, rho: 0.5 },
+]
+
+export function syntheticStoredRows(pop: SyntheticPopulation, n: number, seed = 3778): StoredReadinessRow[] {
+  let state = seed
+  const rnd = () => { state = (state * 1103515245 + 12345) % 2147483648; return state / 2147483648 }
+  const gauss = () => { let u = 0; while (u === 0) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()) }
+  const clamp = (x: number) => Math.max(0, Math.min(100, Math.round(x)))
+  const rows: StoredReadinessRow[] = []
+  for (let i = 0; i < n; i++) {
+    const f = gauss()
+    const z = () => Math.sqrt(pop.rho) * f + Math.sqrt(1 - pop.rho) * gauss()
+    const rhrZ = z(), hrvZ = z(), sleepZ = z(), tempZ = gauss() * 0.8
+    // The v17 sub-score: the pre-#3778 curve, which is the shipped curve read back on its old scale.
+    const v17 = (zz: number, d: 'higher-better' | 'lower-better') => clamp(preCentreSubScore(baselineContributorCurve(zz, d)))
+    const contributors = {
+      restingHeartRate: { score: v17(rhrZ, 'lower-better'), input: rhrZ, provisional: false, gap: null },
+      hrvBalance: { score: v17(hrvZ, 'higher-better'), input: hrvZ, provisional: false, gap: null },
+      sleepBalance: { score: v17(sleepZ, 'higher-better'), input: sleepZ, provisional: false, gap: null },
+      temperature: { score: clamp(baselineContributorCurve(tempZ, 'closer-better')), input: tempZ, provisional: false, gap: null },
+      previousNight: { score: clamp(pop.sleep + 18 * (0.5 * f + 0.87 * gauss())), provisional: false, gap: null },
+      activityBalance: { score: clamp(pop.activity + 15 * gauss()), provisional: false, gap: null },
+      recoveryIndex: { score: clamp(pop.recoveryIndex + 20 * gauss()), provisional: true, gap: null },
+    }
+    const score = Math.round((Object.keys(READINESS_WEIGHTS) as (keyof typeof READINESS_WEIGHTS)[])
+      .reduce((s, k) => s + contributors[k].score * READINESS_WEIGHTS[k], 0))
+    rows.push({ day: `synthetic-${i}`, score, contributors })
+  }
+  return rows
 }
