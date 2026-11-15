@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { getPool } from '@/lib/data/postgres/client'
+import { DECREMENT_SESSIONS_IN_PHASE_SQL } from '@/lib/data/postgres/slices/periodization'
 import { getRepository } from '@/lib/data'
 import { estimateOneRm, isDeloadedForEstimate, BW_REF, withPrescribedBars, type OneRmSetInput, type RMStyleSet } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
@@ -259,24 +260,21 @@ export async function deleteExerciseLog(
           [workoutSessionId],
         )
         const programSessionId = wsRows[0]?.session_id ?? null
-        const startedAt = wsRows[0]?.started_at ?? null
-        const wasCompleted = wsRows[0]?.completed_at != null
+        const completedAt = wsRows[0]?.completed_at ?? null
 
         await client.query('UPDATE workout_sessions SET deleted_at = $2, updated_at = $2 WHERE id = $1', [workoutSessionId, now])
         sessionDeleted = true
 
         // Completing a session increments sessions_in_phase, so deleting one must decrement
         // it — but only when the deleted session falls inside the current phase window
-        // (started_at >= phase_started_at) AND was actually completed (canonical definition,
+        // (completed_at >= phase_started_at, #3799) AND was actually completed (canonical definition,
         // AI-5) — an abandoned session that never completed was never counted. A session from
         // a prior phase was already excluded from the current count, so decrementing for it
         // would under-count. Floor at 0.
-        if (programSessionId && startedAt && wasCompleted) {
+        if (programSessionId && completedAt) {
           await client.query(
-            `UPDATE session_periodization
-             SET sessions_in_phase = GREATEST(sessions_in_phase - 1, 0), updated_at = now()
-             WHERE user_id = $1 AND program_session_id = $2 AND $3 >= phase_started_at`,
-            [userId, programSessionId, startedAt],
+            DECREMENT_SESSIONS_IN_PHASE_SQL,
+            [userId, programSessionId, completedAt],
           )
         }
       }

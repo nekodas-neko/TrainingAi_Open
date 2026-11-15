@@ -51,15 +51,12 @@ export async function POST(
 
   const newStatus = body.action === 'accept' ? 'accepted' : 'dismissed'
 
-  // Accepting an emergency/regular deload is the moment the phase actually flips — not
-  // when it was generated. advancePhase nulls the stored prescription as a side effect,
-  // so re-store it afterward or the accepted deload never reaches the bar.
-  const p = state.prescription
-  if (body.action === 'accept' && p.deload && p.phaseAction === 'deload_recommended' && state.phase !== 'deload') {
-    await repo.advancePhase(userId, sessionId, 'deload')
-    await repo.storePrescription(userId, sessionId, p, state.prescriptionExpiresAt ?? new Date(Date.now() + 7 * 86_400_000))
-  }
-
+  // #3799: accepting a deload offer only takes today's lighter session. It used to move the
+  // session type's phase to `deload` too, which held the loads down until two deload sessions were
+  // completed and "Move to accumulation" was tapped: two or three weeks for a weekly session, from
+  // one day's reason. The accepted prescription carries the deloaded rows itself
+  // (`prescriptionDrivesLoad`), and the next session is planned from the phase as it was. A planned
+  // deload moves the phase through the transition route instead.
   await repo.updatePrescriptionStatus(userId, sessionId, newStatus)
 
   return NextResponse.json({ prescriptionStatus: newStatus })

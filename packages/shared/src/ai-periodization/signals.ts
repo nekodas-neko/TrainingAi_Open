@@ -22,6 +22,7 @@ import { ouraDailyWear } from '@/lib/oura/cloud/readiness-signals-map'
 import { rowsOfDeviceInUse, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import type { FigureSignals, FigureSignalExercise } from '@trainingai/shared/ai-periodization/prescription-figures'
+import { repCompletionFromSetLogs } from '@trainingai/shared/ai-periodization/rep-completion'
 
 export interface PrescriptionSignals {
   trainingGoal: string
@@ -449,32 +450,15 @@ export async function aggregateSignals(
   const { soreMusclesInSession, soreMusclesOutOfSession, recentlyTrainedMusclesInSession } =
     sessionSoreness(moodLogToUse, sessionMuscleGroups)
 
-  // Rep completion rate from last session vs prescription — program-wide (emergency-deload
-  // trigger) and per-exercise (sizes the RPE-autoregulation back-off cut).
+  // Rep completion of the last session against what that session itself asked for (#3800) —
+  // program-wide (emergency-deload trigger) and per-exercise (sizes the RPE-autoregulation back-off
+  // cut). `repCompletionFromSetLogs` says why it no longer reads `state.prescription`.
   let repCompletionRate: number | null = null
-  const perExCompletion = new Map<string, number>()
-  if (state.lastSessionRanPrescription && state.sessionsInPhase > 0 && state.prescription && last5.length > 0) {
-    const lastSessionId = last5[0].id
-    const lastSetLogs = await repo.getSetLogsForSessions([lastSessionId])
-    const prescribedRepsMap: Record<string, number> = {}
-    for (const ex of state.prescription.exercises) {
-      prescribedRepsMap[ex.sessionExerciseId] = ex.sets * ex.reps
-    }
-    let totalPrescribed = 0
-    let totalActual = 0
-    for (const ex of programSession.exercises) {
-      const prescribed = prescribedRepsMap[ex.id]
-      if (!prescribed) continue
-      const actual = lastSetLogs
-        .filter(sl => sl.exerciseName === ex.exerciseName)
-        .reduce((sum, sl) => sum + sl.reps, 0)
-      totalPrescribed += prescribed
-      totalActual += actual
-      perExCompletion.set(ex.exerciseName, actual / prescribed)
-    }
-    if (totalPrescribed > 0) {
-      repCompletionRate = totalActual / totalPrescribed
-    }
+  let perExCompletion = new Map<string, number>()
+  if (state.lastSessionRanPrescription && state.sessionsInPhase > 0 && last5.length > 0) {
+    const completion = repCompletionFromSetLogs(await repo.getSetLogsForSessions([last5[0].id]))
+    repCompletionRate = completion.rate
+    perExCompletion = completion.perExercise
   }
 
   // Weekly volume

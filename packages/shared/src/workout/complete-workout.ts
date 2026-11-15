@@ -140,7 +140,7 @@ export async function completeWorkoutFromPayload(
     repo.setLastSessionRanPrescription(userId, programSessionId, ranPrescription).catch(() => {})
 
     await repo.updatePrescriptionStatus(userId, programSessionId, 'consumed')
-    repo.incrementSessionsInPhase(userId, programSessionId).catch(e =>
+    repo.incrementSessionsInPhase(userId, programSessionId, completedAt).catch(e =>
       console.error('incrementSessionsInPhase failed (advisory, workout completion unaffected):', e)
     )
 

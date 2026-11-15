@@ -1425,7 +1425,8 @@ export interface WorkoutRepository {
   updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>
   storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void>
-  incrementSessionsInPhase(userId: string, programSessionId: string): Promise<void>
+  /** #3799: `completedAt` set, the row is counted only when the phase began at or before it. */
+  incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date): Promise<void>
   setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean): Promise<void>
 
   // `program_volume_targets` has no user_id column, so these take the userId and scope through
@@ -1442,6 +1443,9 @@ export interface WorkoutRepository {
   getSetLogsForSessions(workoutSessionIds: string[]): Promise<Array<{
     workoutSessionId: string; exerciseName: string; setNumber: number;
     rpe: number | null; reps: number; intensityPct: number | null; setTimeSec: number | null
+    /** #3800: the reps the app asked for on this set, written when it was logged. Null on a freeform
+     *  or extra set, and on rows logged before the column existed. */
+    plannedReps?: number | null
     /** #2253: `rated` or the untouched pre-fill (`expected`); null before #2450 and with no RPE. */
     rpeSource?: import('@trainingai/shared/workout/rpe-source').RpeSource | null
   }>>
