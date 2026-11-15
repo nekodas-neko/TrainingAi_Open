@@ -376,8 +376,9 @@ export const loadSpec = {
     strain: n,
     interpretation: z.string(),
     baselineDaysRemaining: n,
-    // Optional: payloads cached before the field shipped lack it.
-    blockTrend: z.unknown().transform(parseBlockTrend),
+    // Optional: payloads cached before the field shipped lack it. Since zod 4.4 a bare z.unknown()
+    // key is required, so without .optional() such a payload fails the whole card (#3815).
+    blockTrend: z.unknown().optional().transform(parseBlockTrend),
   }),
 };
 export const muscleSetsSpec = {
