@@ -7320,6 +7320,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const anchorUtc = new Date()
       await this.db.insert(s.ouraBleClockAnchors)
         .values({ userId, anchorDs: batchMaxDs, anchorUtc, epoch, observedSource: 'drain' })
+      oura.dropOuraClockOffsets(userId)   // #3793 ①
       // Stamped `now`, so it is necessarily the newest by anchor_utc — same row the old
       // full-table reduce would have selected after pushing it.
       newest = { anchorDs: batchMaxDs, anchorUtcMs: anchorUtc.getTime() }

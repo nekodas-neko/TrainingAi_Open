@@ -18,6 +18,7 @@ import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from
 import { nightSourceRank, beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { isNightWindow } from '@trainingai/shared/health/sleep-night'
 import { getOuraCloudSwitchDay } from './oura-cloud-tokens'
+import { createUserReadMemo, userReadMemosEnabled } from '../user-read-memo'
 import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, observedHrFromCounts, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 import { redecodeJobKind, canFollowRunningRedecode } from '@/lib/oura-ble/redecode-job-kind'
@@ -2048,6 +2049,27 @@ export async function getHrForWindow(db: Db, userId: string, from: Date, to: Dat
  * microsecond would put the two paths a fraction apart.
  */
 export async function getOuraClockOffsets(db: Db, userId: string): Promise<ClockOffsets> {
+  if (!userReadMemosEnabled()) return computeOuraClockOffsets(db, userId)
+  // #3793 ①: the anchor log is insert-only, so the newest row names the whole set and its offsets
+  // (841 calls at 32 ms, unchanged since 17 Oct). One indexed row decides whether the kept answer
+  // still holds; the one insert (`insertOuraRawSamples`) also drops it, which covers a row committed
+  // out of `created_at` order.
+  const [newest] = await db.select({ id: s.ouraBleClockAnchors.id }).from(s.ouraBleClockAnchors)
+    .where(eq(s.ouraBleClockAnchors.userId, userId))
+    .orderBy(desc(s.ouraBleClockAnchors.createdAt), desc(s.ouraBleClockAnchors.id))
+    .limit(1)
+  const kept = await clockOffsetsMemo.get(userId, newest ? String(newest.id) : 'none', () => computeOuraClockOffsets(db, userId))
+  // A copy, so a caller that adds to its map cannot change the next caller's answer.
+  return { epoch: kept.epoch, offsets: new Map(kept.offsets) }
+}
+
+/** #3793 ①: one entry per user, cleared by a new anchor row (or the row id moving), else 6 hours. */
+const clockOffsetsMemo = createUserReadMemo<ClockOffsets>('oura-clock-offsets', { maxEntries: 64, maxAgeMs: 6 * 3_600_000 })
+
+/** Forget the user's kept clock offsets. Called after an anchor row is written. */
+export function dropOuraClockOffsets(userId: string): void { clockOffsetsMemo.drop(userId) }
+
+async function computeOuraClockOffsets(db: Db, userId: string): Promise<ClockOffsets> {
   const res = await db.execute<{ epoch: number; offset_ms: string | null }>(sql`
     WITH lags AS (
       SELECT epoch,
@@ -2463,6 +2485,10 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
     .where(and(
       eq(s.workoutHrStats.userId, userId),
       inArray(s.workoutHrStats.workoutSessionId, sessionIds),
+      // #3793 ②: the filter below discards these rows anyway, so leave them out here and the
+      // correlated span subquery is never run for them. Same result, fewer series judged.
+      isNotNull(s.workoutHrStats.avgBpm),
+      isNotNull(s.workoutSessions.completedAt),
     ))
   // A frozen verdict wins: it was taken over the whole series, and what is left mid-prune is a part.
   // Nothing to judge, live or frozen: the snapshot stands.
