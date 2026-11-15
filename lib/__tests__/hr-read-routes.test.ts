@@ -413,6 +413,16 @@ describe('/api/oura/hr-data', () => {
       expect(body.setStats[0]).toMatchObject({ hrMeasured: false, peakBpm: null, bpmAtLog: null, hrr1: 18 })
     })
 
+    it('sends a set whose peak window holds one reading as not measured (#3839)', async () => {
+      // −80 s and +40 s are both within 90 s of the log, but only −80 s falls in the peak window
+      // [−90 s, +30 s]: the peak and End would rest on that one reading.
+      getWorkoutSessionById.mockResolvedValue(completed)
+      computeWorkoutHr.mockResolvedValue(computed({ readings: [second(-80), second(40)], stats: [set] }))
+      getWorkoutHrDensity.mockResolvedValue(true)
+      const body = await (await hrData(`?sessionId=${SESSION_ID}`)).json()
+      expect(body.setStats[0]).toMatchObject({ hrMeasured: false, peakBpm: null, bpmAtLog: null })
+    })
+
     it('sends the figures for a measured set on a dense workout', async () => {
       getWorkoutSessionById.mockResolvedValue(completed)
       computeWorkoutHr.mockResolvedValue(computed({ readings: [second(-30), second(-1), second(30)], stats: [set] }))

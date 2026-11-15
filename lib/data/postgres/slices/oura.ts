@@ -2541,9 +2541,12 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
  * any reading from the ring's BLE or the strap keeps its average, as before; Oura Cloud is gated
  * since #3114, so an Oura-app workout's dense 5-second series keeps its average and a scattered
  * Oura-only session falls back to METs. Checked here, when the
- * estimate is made, so a snapshot computed before the rule is held to it too. Once the prune reaches
- * a session's series, the verdict stored just before it (`hr_dense`, `freezeWorkoutHrDensity`, #3150)
- * decides instead, so a sparse gated session stays on METs after its heart rate is gone. A session
+ * estimate is made, so a snapshot computed before the rule is held to it too. A stored verdict
+ * (`hr_dense`) decides instead of the live series from the moment it is written: by
+ * `upsertWorkoutHrStats` with every snapshot write (#3775), or by `freezeWorkoutHrDensity` just
+ * before the prune (#3150), so a sparse gated session stays on METs after its heart rate is gone.
+ * It is re-judged only by a write that passes the fuller-wins guard, so a series edited or deduped
+ * to fewer readings keeps the fuller series' verdict until then (#3839). A session
  * with neither (no reading ever, or pruned before the freeze existed) keeps its snapshot. Every
  * calorie surface reads `avg_bpm` through here, so the gate is in one place.
  */

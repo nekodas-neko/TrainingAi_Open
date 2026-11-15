@@ -68,10 +68,15 @@ export function nearestBpm(readings: HrReading[], target: Date, windowMs = 90_00
 export const HRR1_SEPARATION_MIN_MS = 45_000
 export const HRR1_SEPARATION_MAX_MS = 75_000
 
-// Max HR in the window [target - windowMs, target + 30s]
-function peakBpmBefore(readings: HrReading[], target: Date, windowMs = 90_000): number | null {
-  const from = target.getTime() - windowMs
-  const to   = target.getTime() + 30_000
+/** The window a set's peak is taken over, around its log time: 90 s before to 30 s after. Exported
+ *  so the per-set density check (`setHrMeasured`, #3839) counts readings in the same window. */
+export const SET_PEAK_BEFORE_MS = 90_000
+export const SET_PEAK_AFTER_MS = 30_000
+
+// Max HR in the window [target - SET_PEAK_BEFORE_MS, target + SET_PEAK_AFTER_MS]
+function peakBpmBefore(readings: HrReading[], target: Date): number | null {
+  const from = target.getTime() - SET_PEAK_BEFORE_MS
+  const to   = target.getTime() + SET_PEAK_AFTER_MS
   const inWindow = readings.filter(r => r.timestamp.getTime() >= from && r.timestamp.getTime() <= to)
   if (inWindow.length === 0) return null
   return Math.max(...inWindow.map(r => r.bpm))
