@@ -8,9 +8,8 @@ version: 2.0.0
 
 Produce a single, self-contained handoff doc at
 **`docs/handoffs/handoff-YYYY-MM-DD-<domain>-<descriptive-title>.md`** that lets the next session resume
-with **zero** re-discovery. It is the *per-session record* companion to the durable
-`projectOverview.md` — projectOverview is the standing index; a handoff doc says what one
-session did, decided, and left behind.
+with **zero** re-discovery. It is the *per-session record* companion to GitHub Issues and `CLAUDE.md` — the issues hold the
+standing state of the work; a handoff doc says what one session did, decided, and left behind.
 
 **There is exactly one handoff mechanism: dated, domain-tagged files in `docs/`.** Do not write a
 root `HANDOFF.md` — that convention is retired and its files were folded into `docs/`.
@@ -63,7 +62,7 @@ is a lost handoff.
 
 _Domain: `<primary>` (also touches `<other>`, `<other>`) · Branch: `<branch>` · PR: <#num + state, or "none yet">_
 
-> **Read first:** `projectOverview.md` (status + Known Issues), then
+> **Read first:** `CLAUDE.md`, then
 > `docs/domains/<primary>/README.md` (that pillar's code, docs and open issues), then
 > the open GitHub issues (`node scripts/queue.js --agent <role>`). This file covers only what *this* session did
 > and what it leaves behind.
@@ -102,10 +101,10 @@ re-discovered (device-verification gate, open PR state, anything waiting on the 
 
 ## Rules
 
-- **`projectOverview.md` and `CLAUDE.md` remain the source of standing truth** — a handoff points at one session's work; it does not duplicate the project index or the standing rules.
+- **GitHub Issues and `CLAUDE.md` remain the source of standing truth** — a handoff points at one session's work; it does not duplicate the issues or the standing rules.
 - **Honesty over optimism**: never write "fixed"/"done" for anything not in the committed diff and observed working (CLAUDE.md: "Never mark an issue fixed from intent"). Unverified device paths are called out, not omitted.
 - **A handoff doc is a durable record, not scaffolding** — it merges to `main` with the work and stays. Because the filename is dated and the content is written in the past tense of one session, it ages into history rather than becoming a stale instruction. Don't delete or blank it after the merge.
 - **Never two docs for one line of work** — update the existing file instead. If a later session continues the work, it writes its own dated doc and links back to the previous one.
 - **Running history belongs in `docs/overview/entries/`, not here.** Keep a handoff to what the next agent needs; it is not the session journal.
 - **Link the handoff from its domain index** — add a line to `docs/domains/<domain>/README.md` under History in the same commit, so the pillar index stays a complete answer.
-- When a handoff is written as part of the full **Session Wrap-Up** ritual (CLAUDE.md), the documentation-cleanup pass and the `projectOverview.md` handoff pointer are part of that ritual — this skill covers the doc itself.
+- **Write the outcome to the issue or PR as well** (`CLAUDE.md`: that is the state, for any agent). Link the handoff from there.

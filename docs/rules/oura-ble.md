@@ -4,9 +4,14 @@
 
 ## Oura Direct-BLE — the ring is on our key; the pipeline has hard rules
 
-Since 2026-07-07 the Oura Ring 5 is read **directly over BLE** (Kotlin foreground service →
-native HTTP ingest → `/api/oura-ble/samples` → `oura_raw_samples`), re-keyed onto our own auth
-key (Option A). Pipeline handoff: `docs/superpowers/plans/2026-07-07-oura-ble-phase-3-4-results.md`;
+> **History since 2026-10-17.** The ring now reads through the Oura Cloud API (#2808); the live
+> connector is `lib/oura/cloud/`. This file describes the direct-BLE pipeline that ran before the
+> switch. Its rules still bind any work on `lib/oura-ble/` and on the server's raw archive, which is
+> never pruned.
+
+From 2026-07-07 until the switch, the Oura Ring 5 was read **directly over BLE** (Kotlin foreground
+service → native HTTP ingest → `/api/oura-ble/samples` → `oura_raw_samples`), re-keyed onto our own
+auth key (Option A). Pipeline handoff: `docs/superpowers/plans/2026-07-07-oura-ble-phase-3-4-results.md`;
 the protocol knowledge base — the `oura-native-ble` skill — **is no longer in this repository**
 (Q-49 A4b removed it with the rest of Oura's material; it survives in the archived private repo, and
 `scripts/private-paths.json` records why). **Failure-point matrix, sync-cadence
@@ -15,12 +20,12 @@ policy, protocol-maintenance playbook, and the data-integrity runbook live in
 pipeline, and add a row to its §1 matrix for any new failure signature in the same PR that
 handles it. Consequences and rules:
 
-- **Until the switch-over, the Oura Cloud gets no new data from this ring.** The ring is on our own
-  key, so the Cloud's data ends at the 2026-07-07 re-key. Re-pairing it with the official Oura app
-  re-keys it, ends the direct connection and may update the firmware (which changes the BLE event
-  encoding). That is the owner's switch-over step for the Oura API (#2808), done once and on
-  purpose; an agent never does it, and never does it to "fix" staleness. Going back afterwards
-  means a factory reset and a fresh `open_oura` pairing.
+- **Before the switch-over, the Oura Cloud got no new data from this ring.** The ring was on our
+  own key, so the Cloud's data stopped at the 2026-07-07 re-key. Re-pairing it with the official
+  Oura app re-keyed it, ended the direct connection and may have updated the firmware (which changes
+  the BLE event encoding). That was the owner's switch-over step for the Oura API (#2808), done once
+  and on purpose on 2026-10-17. Going back means a factory reset and a fresh `open_oura` pairing,
+  and that is the owner's call; an agent never does it.
 - **Byte layouts come from the `open_oura` Rust source — never memory, never Oura's public
   docs** (they don't cover the BLE protocol). The `oura-native-ble` skill was the second source
   and is gone from this repo; where a code comment still cites it, the Rust source is the one to

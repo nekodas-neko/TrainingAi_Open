@@ -67,10 +67,7 @@ second copy. Same for zone thresholds.
 
 ## Open issues
 
-```bash
-grep -n '^### .*\[heart-rate\]' projectOverview.md   # 12 entries today
-grep -n '\[heart-rate\]' docs/implementation-backlog.md   # 4 queue items today (Q-522, Q-523 added)
-```
+Open issues are GitHub Issues labelled `area: heart-rate`.
 
 Live at the time of writing (2026-08-05):
 

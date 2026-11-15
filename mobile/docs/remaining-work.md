@@ -93,7 +93,7 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 - [ ] Additional Health Connect readings: body composition, oxygen, basal/total energy, nutrition, exercise/distance and cadence. [#2843](https://github.com/nekodas-neko/TrainingAi_Open/issues/2843)
 
-- [ ] Direct Oura Bluetooth capture/sync/reconnect, carrying over the existing `oura_ble.xml` pairing key and history cursor before replacement. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
+- [ ] Direct Oura Bluetooth capture/sync/reconnect, carrying over the existing `oura_ble.xml` pairing key and history cursor before replacement. The ring has read through Oura Cloud since 17 Oct (#2808), so the native app does not need this for the switch. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 
 - [x] Polar/chest-strap pairing and live heart rate. Built, device check pending. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 

@@ -95,10 +95,7 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 
 ## Open issues
 
-```bash
-grep -n '^### .*\[activity\]' projectOverview.md   # 14 entries today
-grep -n '\[activity\]' docs/implementation-backlog.md   # 3 queue items today (Q-522, Q-523, Q-524)
-```
+Open issues are GitHub Issues labelled `area: activity`.
 
 Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
 

@@ -33,12 +33,13 @@ uninstall, and before touching `android/**`, `capacitor.config.ts`, or cutting a
 
 **Most changes need no APK at all.** The APK is a WebView loading the app from Railway
 (`capacitor.config.ts` `server.url`), so JS/TypeScript/server changes under `lib/`, `app/`,
-`components/`, `packages/` reach the device through a normal Railway deploy — merging *is* the
-delivery. Only `android/**` (Kotlin), `capacitor.config.ts`, or a dependency change needs a new
+`components/`, `packages/` reach the device through a Railway deploy. **A merge deploys nothing:**
+`.github/workflows/release.yml` deploys on a `v*` tag, after the owner's "approve"
+([`docs/owner-manual.md`](../owner-manual.md)). Only `android/**` (Kotlin), `capacitor.config.ts`, or a dependency change needs a new
 APK; when one does, download the CI-published rolling release (see the doc) rather than building
 locally.
 
 **Green `pnpm dev` is necessary, never sufficient.** For any change touching an offline-first
 domain, a native plugin, safe-area, gestures, or notifications, the merge gate is the on-device
-smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, an
-explicit Known-Issues row in `docs/overview/known-issues.md` marking the change NOT verified on device.
+smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, a
+plain statement on the PR and its issue that the change has NOT been verified on device.

@@ -639,7 +639,8 @@ and [`owner-manual.md`](../owner-manual.md).
   to `main`. A migration is always its own batch.
 - **Five checks must pass:** Lint, Tests, Build, Migration Check and Custom Rules. Squash is the only
   merge method.
-- **A merge deploys nothing.** Releases are weekly on Tuesday: a `v*` tag, deployed by
+- **A merge deploys nothing.** Releases are weekly on Tuesday (on demand, each with the owner's yes, while the native app lands
+  from 2026-10-13): a `v*` tag, deployed by
   `release.yml` after the owner replies "approve". Because the WebView loads from Railway, a release
   changes the phone's app at once. A new APK is needed only when `android/**`,
   `capacitor.config.ts` or native dependencies change.

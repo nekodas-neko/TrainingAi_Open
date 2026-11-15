@@ -7,7 +7,7 @@ version: 1.0.0
 # Find Skills
 
 Skills only pay off if they fire. This repo carries eleven local skills, five slash commands, a
-domain index, a module map and a backlog — and the default failure is not a missing skill, it is a
+domain index, a module map and an issue queue — and the default failure is not a missing skill, it is a
 present skill nobody invoked.
 
 **Run this before starting a non-trivial task, not after getting stuck.**
@@ -18,7 +18,7 @@ Match the task, then read or invoke the entry point *before* touching code.
 
 | Task | Entry point |
 |---|---|
-| Starting any session | `projectOverview.md` (always first), then the pillar index |
+| Starting any session | `CLAUDE.md`, then `docs/agents/README.md`, then the issue and the pillar index |
 | Working in one area of the app | `docs/domains/<pillar>/README.md` |
 | Building a new feature or shared helper | `docs/module-map.md` — check what already exists |
 | Designing or reviewing UI | **`ui-ux-pro-max`** skill |
@@ -34,7 +34,7 @@ Match the task, then read or invoke the entry point *before* touching code.
 | Session wrapping up | **`handoff`** skill, then `task-observer` |
 | Capturing what the session learned | `task-observer` skill |
 | Oura Cloud API, endpoints, OAuth, webhooks | `oura-api` skill |
-| Direct-BLE ring work, protocol, decoders | `oura-native-ble` skill + `docs/oura-ble-operations.md` |
+| Direct-BLE ring work, protocol, decoders | `docs/rules/oura-ble.md` + `docs/oura-ble-operations.md` (the `oura-native-ble` skill was removed; the ring has read through Oura Cloud since 2026-10-17) |
 | Polar H10, chest strap, PMD/ECG, RR intervals | `polar-h10-ble` skill |
 | Reviewing your own working diff | `/code-review` |
 | Reviewing a GitHub PR | `/review` |
@@ -58,7 +58,6 @@ project, it belongs here, in the repo, not in a personal install.
 - `mobile-app-design-standards` — platform-level iOS/Android convention reference.
 - `mobile-app-ui-design` — greenfield mobile screens, flows, mockups.
 - `oura-api` — full Oura v2 Cloud API spec.
-- `oura-native-ble` — reverse-engineered direct-BLE protocol for the Ring 5.
 - `polar-h10-ble` — Polar H10 HR service, PMD/ECG streaming, RR intervals.
 - `stop-slop` — strip AI writing tells from docs, PR bodies, commit messages, UI copy.
 - `task-observer` — convert session lessons into rules, backlog entries and CI checks.
@@ -87,7 +86,7 @@ are organised by *document type*, so knowledge about one subject is scattered. T
 Domain tags are greppable on purpose:
 
 ```bash
-grep -n '^### .*\[sleep\]' projectOverview.md   # open issues for a pillar
+# open issues for a pillar: GitHub Issues labelled `area: sleep`
 ls docs/handoffs/handoff-*-sleep-*.md                     # every handoff for a pillar
 ls docs/superpowers/plans/                       # queued and past plans
 ```

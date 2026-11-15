@@ -38,15 +38,15 @@ question is never re-litigated per change.
   `pushMutations` touches `this.db` or raw `sql` directly.
 - **Do NOT delete the PWA plumbing** (`app/manifest.ts`, the service worker, the install
   affordance). The APK is a WebView loading the Railway URL remotely (`capacitor.config.ts`
-  `server.url`), so the SW is what gives the APK offline cold-start AND is the push-notification
-  transport. Removing it is a device regression, not a cleanup. Full PWA removal only makes sense
+  `server.url`), so the SW is what gives the APK offline cold-start. (It is no longer a push
+  transport: the web-push stack was deleted in #441 and migration 214.) Removing it is a device regression, not a cleanup. Full PWA removal only makes sense
   once the v2 native app replaces the WebView screens. The owner decided on 2026-10-09 that v2 is
   native, not a bundled shell; the toolkit is open in #2765. See
   `docs/superpowers/plans/2026-08-02-native-convergence-goal-layout.md`.
 - **Green `pnpm dev` is necessary, never sufficient.** For any change touching an offline-first
   domain, a native plugin, safe-area, gestures, or notifications, the merge gate is the on-device
-  smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, an
-  explicit Known-Issues row in `projectOverview.md` marking the change NOT verified on device.
+  smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, a
+  plain statement on the PR and its issue that the change has NOT been verified on device.
 
 ### Getting a new APK — CI already built it; a local Gradle build is the fallback
 

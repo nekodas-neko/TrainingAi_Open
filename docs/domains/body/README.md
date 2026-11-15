@@ -96,10 +96,7 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 
 ## Open issues
 
-```bash
-grep -n '^### .*\[body\]' projectOverview.md   # 2 entries today
-grep -n '\[body\]' docs/implementation-backlog.md   # Q-56 today
-```
+Open issues are GitHub Issues labelled `area: body`.
 
 - 🔴 **Q-56 — future-dated `body_metrics` rows** (2026-08-03, open). See the review link above.
 - ~~"Burned"/"Balance" cards read a broken, HC-only calorie source~~ **fixed 2026-08-05 (Q-96,

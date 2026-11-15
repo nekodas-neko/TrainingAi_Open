@@ -6,14 +6,15 @@ contract, prompts and batons are archived in [`../archive/agents-2026-10-05/`](.
 
 A **role** is a job description, not a single session — run as many sessions of a role as the work
 needs. The **mode** is one of those roles doing a different job for a while: release-test is the
-Implementer testing Tuesday's release instead of building.
+Implementer testing a release candidate instead of building. Releases are weekly, on Tuesday;
+**Suspended while the native app lands (from 2026-10-13):** releases go out on demand, up to daily, each with the owner's yes ([`../native-testing.md`](../native-testing.md)).
 
 | Role | Runs where | How many | Prompt |
 |---|---|---|---|
 | 🪐 **Orchestrator** | Cloud | **One** — it coordinates, so two would contradict each other | [`prompts/orchestrator.md`](prompts/orchestrator.md) |
 | 🪲 **BugFix** | Cloud **or** the owner's machine | Any number | [`prompts/bugfix.md`](prompts/bugfix.md) |
-| 🚧 **Implementer** | **The owner's machine** — Docker, the phone on USB | **One chat**, running each batch as a subagent thread in its own worktree (up to two at once, one per lane) | [`prompts/implementer.md`](prompts/implementer.md) |
-| ↳ release-test | A thread of the Implementer, on Tuesdays | One | [`prompts/release-test.md`](prompts/release-test.md) |
+| 🚧 **Implementer** | **The owner's machine** — Docker, the phone on USB | **One fresh session per batch** (`CLAUDE.md`): a thread the coordinating chat starts in its own worktree, or a `scripts/agent-runner.mjs` session. Up to two at once, one per lane | [`prompts/implementer.md`](prompts/implementer.md) |
+| ↳ release-test | A thread of the Implementer, on release day | One | [`prompts/release-test.md`](prompts/release-test.md) |
 
 **Where a role runs is decided by hardware.** Anything needing the phone, Docker or the real APK runs
 on the owner's machine; everything else may run in the cloud.
@@ -51,8 +52,9 @@ no commit message carried it and `check-commit-attribution` read only messages.
 - **Every job is claimed before work starts** — the session adds the `in progress` label to the
   issues it takes, and every other session (and `scripts/queue.js`) skips claimed work. A session
   that stops without a PR removes its label.
-- **One Implementer chat, many threads (owner, 2026-10-06).** The Implementer runs each batch as a
-  background subagent in its own git worktree, at most two at once and one per `lane:`, so they never
+- **One fresh session per batch, started from one Implementer chat (owner, 2026-10-06).** Every batch
+  starts empty and carries no context from the last one (`CLAUDE.md`). The coordinating chat starts
+  it as a background subagent in its own git worktree, at most two at once and one per `lane:`, so they never
   edit the same files. The chat itself only coordinates and does the device pass, because the phone
   is the one shared resource. A thread that dies loses only its batch; its pushed branch and draft PR
   say how far it got. `scripts/agent-runner.mjs` (one headless session per batch) remains as the
@@ -183,7 +185,7 @@ of that, the **Orchestrator can send instructions straight to a running agent** 
 4. The **Implementer** takes the oldest open batch (`node scripts/queue.js --next-batch`) and builds
    it as one PR; **BugFix** takes single small fixes labelled `agent: bugfix`. Either opens a draft PR with `Closes #N` when they start (that is the claim), and turn on
    auto-merge when it is ready.
-5. The **Orchestrator** merges agent PRs on green CI. **Every Tuesday** it prepares the release —
+5. The **Orchestrator** merges agent PRs on green CI. **Every Tuesday** (on demand while the native app lands, with the owner's yes) it prepares the release —
    everything merged since the last one — gives the owner the summary, and runs it on "approve". The
    GitHub Release it creates lists every PR it carried; that is the record of what shipped. The Implementer's
    **release-test mode** tests the candidate first. A hotfix goes out off-schedule only when
@@ -217,7 +219,9 @@ genuinely lost or the owner resets it. Titles end 🟢 while live and 🔴 when 
 runs them. So:
 
 - **The Implementer runs one fresh session per batch** (owner, 2026-10-05: *"after each PR … clear and
-  wait for further instructions"*). `node scripts/agent-runner.mjs` on the owner's machine starts a
+  wait for further instructions"*). The usual route is a thread started by the coordinating chat
+  ("Running several at once" above); the chat itself only coordinates and builds nothing, so its
+  context holds no batch. The unattended route: `node scripts/agent-runner.mjs` on the owner's machine starts a
   headless Claude session (`claude -p`), which builds the next batch, opens the PR and **exits**. The
   runner then waits until a new batch milestone exists and starts another, empty, session. Nothing
   carries over, so there is nothing to compact — the issues and the PR hold the state. Creating a

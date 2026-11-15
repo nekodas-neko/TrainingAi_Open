@@ -15,11 +15,11 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
 |---|---|
 | Oura direct BLE | `lib/oura-ble/` — `plugin.ts`, `sync.ts`, `decode.ts`, `clock.ts`, `raw-storage.ts`, `continuous-capture.ts`, `battery-soak.ts` |
 | On-device models | `lib/oura-models/` — there is no `docs/oura-models/` directory (the row named one until 2026-08-18); the operational reference is [`docs/oura-ble-operations.md`](../../oura-ble-operations.md) |
-| Oura Cloud | **Removed 2026-08-13 (Q-224).** `lib/oura/` is local-only now: `ble-freshness.ts`, `cloud-freshness.ts` (the re-key constant), `contributors.ts`, `types.ts` |
+| Oura Cloud | **The ring's live source since 2026-10-17 (#2808).** `lib/oura/cloud/` — OAuth and encrypted tokens, webhooks, backfill, renewal and reconcile. It was removed on 2026-08-13 (Q-224) and rebuilt as a connector |
 | Chest strap | `lib/polar-ble/` |
 | Scale | `lib/scale-ble/` |
 | Native bridge | `lib/native/`, `components/oura-ble/` |
-| Tables | `oura_raw_samples` (archival source of truth), `oura_daily`, `oura_daily_derived`; `oura_tokens` holds dead Cloud credentials, kept rather than dropped |
+| Tables | `oura_raw_samples` (archival source of truth), `oura_daily`, `oura_daily_derived`, `oura_cloud_daily`, `oura_cloud_sleep_periods`; `oura_tokens` holds the per-user Cloud credentials, encrypted |
 
 ## Reference docs — read in this order
 
@@ -258,10 +258,7 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 > `oura_raw_packed` and `readRawFrames` reads both tiers.
 
 
-```bash
-grep -n '^### .*\[devices\]' projectOverview.md   # 45 entries today
-grep -n '\[devices\]' docs/implementation-backlog.md   # 5 queue items today
-```
+Open issues are GitHub Issues labelled `area: devices`.
 
 Live at the time of writing (2026-07-30):
 
@@ -389,9 +386,9 @@ Live at the time of writing (2026-07-30):
   re-writes it unguarded per page, which is where `oura_raw_samples`' 306 MB of indexes came from
   (740k rows, 1.3M updates, 19 HOT — measured against production 2026-08-02, backlog Q-46). Guard
   any re-stamp with `IS DISTINCT FROM`, and never assume a no-op UPDATE is free on this table.
-- **The ring is on our own auth key; the Oura Cloud gets no new data from it, ever.** Never "fix"
-  staleness by re-onboarding the official Oura app — it can force a firmware update that changes
-  the BLE event encoding. Treat any re-onboard as a full protocol re-validation.
+- **Until 2026-10-17 the ring was on our own auth key and the Oura Cloud got no new data from it.**
+  The owner then re-paired it with the official Oura app to switch to the Cloud API (#2808). Going
+  back to direct BLE needs a factory reset and a full protocol re-validation, and is the owner's call.
 - **Byte layouts come from the `open_oura` Rust source / the `oura-native-ble` skill** — never
   memory, never Oura's public docs.
 - **`oura_raw_samples.body_hex` is the archival source of truth.** Never prune or mutate it;

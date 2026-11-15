@@ -70,7 +70,7 @@ that task, with the durable version noted in one line so the debt is on the reco
 - **Sibling-surface sweep**: when fixing or adding a pattern on one surface (a write path, a fetch+sync pairing, a display format, a scale/dial config), grep for every other surface handling the same domain and update them in the same PR — the UI analogue of the sync-push mirroring rule above. A fix applied to one surface and not its siblings is only half done.
 - **No global element-selector styling**: tap-target floors, focus rings, and similar UI defaults belong in the shared component (`components/ui/button.tsx` variants), never in a bare `button`/`a` selector in `globals.css`. Any unavoidable global rule needs its opt-outs applied in the same PR, not left for a later audit.
 - **Report-invalidation**: never dismiss a user-reported visual bug as "stale build" or "can't reproduce" without reproducing at the S25 viewport (≤640px) against freshly-pulled `main` — the mirror of "never mark an issue fixed from intent" above.
-- **No orphaned findings**: any bug or gap written into a plan, review, or journal doc gets a backlog entry or a `docs/overview/known-issues.md` Known-Issues row **in the same PR**. A documented finding without a queue entry is a dropped finding.
+- **No orphaned findings**: any bug or gap written into a plan, review, or journal doc becomes a GitHub issue **in the same session**. A documented finding without an issue is a dropped finding.
 - **Mutation-callback contract**: completion callbacks must carry the written entity (`onLogged(log)`), not fire as a parameterless "please refetch" after a local write — the latter is the pattern behind several of this project's stale-repaint bugs.
 
 ---

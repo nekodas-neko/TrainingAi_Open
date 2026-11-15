@@ -270,10 +270,7 @@ as post-dose only from the day AFTER one. It annotates and never corrects; no sc
 
 ## Open issues
 
-```bash
-grep -n '^### .*\[readiness\]' projectOverview.md   # 9 entries today
-grep -n '\[readiness\]' docs/implementation-backlog.md   # 3 queue items today
-```
+Open issues are GitHub Issues labelled `area: readiness`.
 
 Live at the time of writing (2026-07-30):
 
