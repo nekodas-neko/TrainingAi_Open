@@ -23,3 +23,32 @@ test('an exercise with no recovery reading on any set says its rest was not meas
   );
   assert.deepEqual(exercisesWithoutRest([]), []);
 });
+
+test('a sparse workout hides every per-set figure and says why once (#3775)', async () => {
+  const { setHrLine, sparseWorkoutHrNote } = await import('../src/features/workouts/data/hr-rest.ts');
+  const set = { hrMeasured: true, peakBpm: 150, bpmAtLog: 140, hrr1: 18 };
+  assert.deepEqual(setHrLine(false, set), { kind: 'none' });
+  assert.match(sparseWorkoutHrNote(false) ?? '', /Wear the chest strap for per-set heart rate/);
+  assert.equal(sparseWorkoutHrNote(true), null);
+  assert.equal(sparseWorkoutHrNote(null), null);
+});
+
+test('a set with too few readings says so instead of a figure (#3775)', async () => {
+  const { setHrLine } = await import('../src/features/workouts/data/hr-rest.ts');
+  const line = setHrLine(true, { hrMeasured: false, peakBpm: null, bpmAtLog: null, hrr1: null });
+  assert.equal(line.kind, 'note');
+  assert.match(line.kind === 'note' ? line.text : '', /Too few heart-rate readings/);
+  assert.deepEqual(setHrLine(true, { hrMeasured: true, peakBpm: 150, bpmAtLog: 140, hrr1: 18 }), {
+    kind: 'figures',
+    text: 'Peak 150 bpm · End 140 bpm · HRR60 18 bpm',
+  });
+  // An older server response carries neither field: the figures show as before.
+  assert.equal(setHrLine(undefined, { peakBpm: 150, bpmAtLog: 140, hrr1: null }).kind, 'figures');
+});
+
+test('a workout mean and peak need two readings (#3775)', async () => {
+  const { workoutHrFiguresShown } = await import('../src/features/workouts/data/hr-rest.ts');
+  assert.equal(workoutHrFiguresShown(0), false);
+  assert.equal(workoutHrFiguresShown(1), false);
+  assert.equal(workoutHrFiguresShown(2), true);
+});
