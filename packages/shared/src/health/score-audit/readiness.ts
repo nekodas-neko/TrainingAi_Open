@@ -2,6 +2,7 @@ import {
   computeReadinessComposite,
   rederiveReadinessFromStored,
   READINESS_MODEL,
+  READINESS_BASELINE_CENTRE,
   READINESS_WEIGHTS,
   BASELINE_MIN_NIGHTS,
 } from '@trainingai/shared/health/readiness-composite'
@@ -133,7 +134,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     gaps.push(
       `Baselines are still cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights). All four baseline-relative ` +
       `contributors — resting HR, HRV balance, temperature, sleep balance (${pct(BASELINE_RELATIVE_WEIGHT)} of the total weight) — are ` +
-      'pinned to a neutral 50, so the score is driven almost entirely by the sleep and activity terms.',
+      `held at their neutral (${READINESS_BASELINE_CENTRE} for resting HR, HRV and sleep balance, 50 for temperature), so the score is driven almost entirely by the sleep and activity terms.`,
     )
   }
   if (night.recoveryIndex == null) gaps.push('No Recovery Index (needs an overnight HR series) — contributor neutral at 50.')
@@ -166,7 +167,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
         note: `z = ${r3(rhrZ) ?? '—'} vs the prior night's baseline; lower-is-better.`,
       },
       subScore: c.restingHeartRate.score, provisional: c.restingHeartRate.provisional,
-      excludedReason: nHistory < BASELINE_MIN_NIGHTS ? `baseline cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights) → neutral 50` : 'no reading → neutral 50',
+      excludedReason: nHistory < BASELINE_MIN_NIGHTS ? `baseline cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights) → neutral ${READINESS_BASELINE_CENTRE}` : `no reading → neutral ${READINESS_BASELINE_CENTRE}`,
     },
     {
       key: 'previousNight', label: "Previous night's sleep score",
@@ -181,7 +182,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
         note: `z = ${r3(hrvZ) ?? '—'}; higher-is-better.`,
       },
       subScore: c.hrvBalance.score, provisional: c.hrvBalance.provisional,
-      excludedReason: nHistory < BASELINE_MIN_NIGHTS ? `baseline cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights) → neutral 50` : 'no reading → neutral 50',
+      excludedReason: nHistory < BASELINE_MIN_NIGHTS ? `baseline cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights) → neutral ${READINESS_BASELINE_CENTRE}` : `no reading → neutral ${READINESS_BASELINE_CENTRE}`,
     },
     {
       key: 'temperature', label: 'Skin temperature vs baseline',
@@ -199,7 +200,7 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
         note: `z = ${r3(sleepBalanceZ) ?? '—'} vs the prior night's sleep baseline; higher-is-better.`,
       },
       subScore: c.sleepBalance.score, provisional: c.sleepBalance.provisional,
-      excludedReason: nHistory < BASELINE_MIN_NIGHTS ? `baseline cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights) → neutral 50` : 'no prior sleep baseline → neutral 50',
+      excludedReason: nHistory < BASELINE_MIN_NIGHTS ? `baseline cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights) → neutral ${READINESS_BASELINE_CENTRE}` : `no prior sleep baseline → neutral ${READINESS_BASELINE_CENTRE}`,
     },
     {
       key: 'recoveryIndex', label: 'Recovery index',
@@ -249,7 +250,8 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       // until #2224 took `checkin` out of the model.
       notes.push(
         `The stored contributors do not include ${rederived.missing.join(', ')} at all, so this row ` +
-        'cannot be checked against its own inputs in full. The re-derivation assumes the neutral 50 ' +
+        'cannot be checked against its own inputs in full. The re-derivation assumes the neutral ' +
+        `(${READINESS_BASELINE_CENTRE} for resting HR, HRV and sleep balance, 50 otherwise) ` +
         'the model itself uses for a contributor with no input, which is the closest the row ' +
         `supports — it gives ${rederived.score} against a stored ${storedScore}. Treat any ` +
         'difference here as unexplained rather than as the model having moved.',

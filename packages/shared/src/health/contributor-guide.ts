@@ -1,3 +1,4 @@
+import { READINESS_BASELINE_CENTRE } from './readiness-composite'
 // Plain-English guide for every health-score contributor: what it measures, what it's measured
 // against, what a high vs low score means, and how to move it. Powers the tap-to-expand deep-dive
 // on the Readiness / Sleep / Activity / Heart-Rate detail screens so a bar is never just a number.
@@ -389,3 +390,17 @@ const ALIASES: Record<string, string> = {
 export function guideFor(key: string): ContributorGuide | null {
   return GUIDE[key] ?? GUIDE[ALIASES[key]] ?? null
 }
+
+/**
+ * #3778. Which of a guide's two sentences a score reads as. The `low`/`high` copy says "below your
+ * baseline" / "at or above your baseline", so the cut is where baseline sits on that contributor's
+ * scale: 75 for our three re-centred readiness contributors (`READINESS_BASELINE_CENTRE`), 50 for
+ * everything else. At a flat 50 a night up to 0.5σ worse than normal would have read "at or above
+ * your baseline". Keyed by our composite's camelCase keys only — Oura's own snake_case contributors are
+ * on Oura's scale and keep 50.
+ */
+export function guideMeaning(guide: ContributorGuide, key: string, score: number | null): string {
+  const cut = (CENTRED_READINESS_KEYS as readonly string[]).includes(key) ? READINESS_BASELINE_CENTRE : 50
+  return score != null && score < cut ? guide.low : guide.high
+}
+const CENTRED_READINESS_KEYS = ['restingHeartRate', 'hrvBalance', 'sleepBalance'] as const

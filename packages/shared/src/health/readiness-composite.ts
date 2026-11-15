@@ -181,6 +181,17 @@ export const READINESS_BASELINE_CENTRE = 75
 const NEUTRAL_CENTRED: ReadinessContributor = { ...NEUTRAL, score: READINESS_BASELINE_CENTRE }
 const AWAITING_BASELINE_CENTRED: ReadinessContributor = { ...AWAITING_BASELINE, score: READINESS_BASELINE_CENTRE }
 
+/**
+ * The inverse of the #3778 re-centring: a centred sub-score (resting HR, HRV balance, sleep balance)
+ * read back on the 50-centred scale it had before. **Only for a port whose fixed cuts were written
+ * against that scale** — the stress-resilience model bands a "sleep recovery" figure built from these
+ * sub-scores at fixed Oura-model cuts, and the owner moved readiness, not resilience. Never for display.
+ */
+export function preCentreSubScore(score: number): number {
+  const c = READINESS_BASELINE_CENTRE
+  return score >= c ? 50 + (score - c) * (50 / (100 - c)) : 50 - (c - score) * (50 / c)
+}
+
 /** Moves a score on the old 50-centred scale onto the 75-centred one: the upper half squeezed into
  *  75–100, the lower half stretched over 0–75. Monotone, and fixed at 0, 50→75 and 100. */
 function recentre(score50: number): number {

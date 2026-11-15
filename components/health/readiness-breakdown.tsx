@@ -44,7 +44,7 @@ function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }
   const contributors = readiness.readinessCompositeContributors
   const hasScores = contributors != null
   const anyLearning = contributors != null && Object.values(contributors).some(c => c != null && isLearningContributor(c))
-  // Sort worst-scoring first (surface the weak spots). A learning factor's `score` is the neutral 50
+  // Sort worst-scoring first (surface the weak spots). A learning factor's `score` is the neutral
   // placeholder, not a measurement, so it must not sort as one — learning factors go last, ordered by
   // weight, rather than interleaving at 50 among real scores. A provisional factor with a real score
   // (`gap: null`) is measured and sorts with the rest (#3029).
