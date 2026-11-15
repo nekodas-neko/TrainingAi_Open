@@ -82,9 +82,10 @@ describe('computeAiDynamicNextSession', () => {
     expect(result.deloadOrRestRecommended).toBe(false)
   })
 
+  // #3778: "high" readiness for this grading is ≥ 76 since the centre moved to 75 (it was ≥ 70).
   it('flags soft deload at 3 consecutive days with high readiness', () => {
     const history = makeHistory(['Push', 'Pull', 'Legs'], [1, 2, 3])
-    const result = computeAiDynamicNextSession({ ...baseInput, history, readinessScore: 75 })
+    const result = computeAiDynamicNextSession({ ...baseInput, history, readinessScore: 80 })
     expect(result.consecutiveTrainingDays).toBe(3)
     expect(result.deloadOrRestRecommended).toBe(true)
     expect(result.deloadStrength).toBe('soft')
@@ -300,7 +301,7 @@ describe('computeAiDynamicNextSession', () => {
     // 4 consecutive days + high readiness → 'soft'; energy 'low' bumps to 'recommended'
     const history = makeHistory(['Push', 'Pull', 'Legs', 'Push'], [1, 2, 3, 4])
     const result = computeAiDynamicNextSession({
-      ...baseInput, history, readinessScore: 75, energyLevel: 'low',
+      ...baseInput, history, readinessScore: 80, energyLevel: 'low',
     })
     expect(result.deloadStrength).toBe('recommended')
   })

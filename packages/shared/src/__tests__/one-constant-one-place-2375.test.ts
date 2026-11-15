@@ -19,8 +19,9 @@ describe('one constant, one place — #2375', () => {
     expect(CALORIE_FLOOR_KCAL).toBe(1200)
     expect(DEFAULT_RESTING_HR).toBe(60)
     expect(ACWR_THRESHOLDS.veryLowMax).toBe(0.6)
-    expect(DELOAD_READINESS_SOFT_MIN).toBe(70)
-    expect(DELOAD_READINESS_RECOMMENDED_MIN).toBe(50)
+    // Moved 70 → 76 and 50 → 56 by #3778 (owner-signed centre move), with the score they read.
+    expect(DELOAD_READINESS_SOFT_MIN).toBe(76)
+    expect(DELOAD_READINESS_RECOMMENDED_MIN).toBe(56)
   })
 
   it('kcal per kg and the calorie floor are not redefined', () => {

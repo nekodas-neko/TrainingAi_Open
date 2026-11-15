@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
+import { EARLY_DELOAD_READINESS_BELOW } from '@trainingai/shared/health/readiness-decision-thresholds'
 
 /**
  * Q-173: the "Fatigue detected" card recommended a deload week without saying why. It now states
@@ -12,12 +13,6 @@ import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 const root = join(__dirname, '..', '..', '..')
 const read = (p: string) => readFileSync(join(root, p), 'utf8')
 
-function constant(name: string): number {
-  const src = read('lib/health/readiness-payload.ts')
-  const m = src.match(new RegExp(`export const ${name} = ([\\d.]+)`))
-  if (!m) throw new Error(`${name} not found`)
-  return Number(m[1])
-}
 
 describe('early-deload thresholds (Q-173)', () => {
   it('the ACWR bound is deliberately below the optimal ceiling, not equal to it', () => {
@@ -37,8 +32,10 @@ describe('early-deload thresholds (Q-173)', () => {
       .toContain('export const EARLY_DELOAD_ACWR_MIN = ACWR_THRESHOLDS.elevatedMin')
   })
 
-  it('the readiness bound is 45', () => {
-    expect(constant('EARLY_DELOAD_SCORE_MAX')).toBe(45)
+  // 45 until #3778 moved the readiness centre to 75; the cut moved with the score it reads.
+  it('the readiness bound is 51, from the one module of readiness decision cuts', () => {
+    expect(read('lib/health/readiness-payload.ts')).toContain('export const EARLY_DELOAD_SCORE_MAX = EARLY_DELOAD_READINESS_BELOW')
+    expect(EARLY_DELOAD_READINESS_BELOW).toBe(51)
   })
 
   it('the check uses the named constants, not inline numbers', () => {

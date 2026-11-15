@@ -2,25 +2,26 @@ import { describe, it, expect } from 'vitest'
 import { restDayGuidance } from '@trainingai/shared/health/rest-day-guidance'
 
 describe('restDayGuidance', () => {
-  it('returns the recovered band at >=75 readiness with no soreness', () => {
+  // #3778 moved the cuts with the readiness centre: recovered from 80 (was 75), rest under 67 (was 60).
+  it('returns the recovered band at >=80 readiness with no soreness', () => {
     const g = restDayGuidance({ readinessScore: 80, soreMuscles: [], sleepScore: 85, consecutiveRestDays: 0 })
     expect(g.band).toBe('recovered')
     expect(g.lowConfidence).toBe(false)
   })
 
-  it('returns the partial band at 60-74 readiness even with no soreness', () => {
-    const g = restDayGuidance({ readinessScore: 65, soreMuscles: [], sleepScore: 70, consecutiveRestDays: 0 })
+  it('returns the partial band at 67-79 readiness even with no soreness', () => {
+    const g = restDayGuidance({ readinessScore: 72, soreMuscles: [], sleepScore: 70, consecutiveRestDays: 0 })
     expect(g.band).toBe('partial')
   })
 
-  it('returns the partial band at >=75 readiness when localized soreness is present, naming the muscles', () => {
+  it('returns the partial band at >=80 readiness when localized soreness is present, naming the muscles', () => {
     const g = restDayGuidance({ readinessScore: 90, soreMuscles: ['chest', 'triceps'], sleepScore: 85, consecutiveRestDays: 0 })
     expect(g.band).toBe('partial')
     expect(g.body).toContain('chest, triceps')
     expect(g.suggestions.some(s => s.includes('chest, triceps'))).toBe(true)
   })
 
-  it('returns the rest band below 60 readiness', () => {
+  it('returns the rest band below 67 readiness', () => {
     const g = restDayGuidance({ readinessScore: 40, soreMuscles: [], sleepScore: 70, consecutiveRestDays: 0 })
     expect(g.band).toBe('rest')
   })
@@ -41,7 +42,7 @@ describe('restDayGuidance', () => {
   })
 
   it('adds a momentum suggestion in the partial band after several consecutive rest days', () => {
-    const g = restDayGuidance({ readinessScore: 65, soreMuscles: [], sleepScore: 70, consecutiveRestDays: 4 })
+    const g = restDayGuidance({ readinessScore: 72, soreMuscles: [], sleepScore: 70, consecutiveRestDays: 4 })
     expect(g.suggestions.some(s => s.includes('rest days in a row'))).toBe(true)
   })
 })

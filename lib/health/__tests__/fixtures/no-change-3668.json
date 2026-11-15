@@ -9635,8 +9635,8 @@
  },
  "audit": {
   "2026-10-12 v0 switch=2026-10-17": {
-   "all": "0e688961123cedd5f2a979a2ecda95cea6d8ed0963f720fb6a9759e34e2da5db",
-   "score": 26,
+   "all": "5013316505bd63b965d5a12d869e86d20b2a01011a4ff44335004748ec887bce",
+   "score": 34,
    "temperature": {
     "value": 0.15626331218518316,
     "unit": "°C deviation",
@@ -9645,8 +9645,8 @@
    }
   },
   "2026-10-12 v0 switch=2026-09-20": {
-   "all": "fc9d6c843e14f27e780007ad1289f3fbadf89d0630ff537b4f59d5f8eb9e49d9",
-   "score": 48,
+   "all": "a3b043050c9cf5b8d67c9a89f88658c9b50228d1051b628f0e4344be1eee866d",
+   "score": 55,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9655,8 +9655,8 @@
    }
   },
   "2026-10-12 v0 switch=null": {
-   "all": "993374fd9d6b452bb2547b1f8077601124028b59018419f3dd934d308fb08aa6",
-   "score": 59,
+   "all": "8506c15aacc6fa9b8534eaa1e78ea571f62729ef359f4eff01de903407fd2332",
+   "score": 69,
    "temperature": {
     "value": 0.24937754832208156,
     "unit": "°C deviation",
@@ -9665,8 +9665,8 @@
    }
   },
   "2026-10-12 v1 switch=2026-10-17": {
-   "all": "82c30348e4dba0111a9cde14fc57b8b140fe78da72dd975da32b7c660ac33329",
-   "score": 63,
+   "all": "fad817c9392b2bc9691c6bdd3dd483f6a91a726436198bba954bc168c2abc7f6",
+   "score": 69,
    "temperature": {
     "value": 0.25,
     "unit": "°C deviation",
@@ -9675,8 +9675,8 @@
    }
   },
   "2026-10-12 v1 switch=2026-09-20": {
-   "all": "841be81ae90dd0250ccfcbcf87d7cedd0c7a0ce8ddd5aeed407da77e397722b0",
-   "score": 47,
+   "all": "2f45502b97c4bc7b7e2ff6f3567330c2b10a2dc03de3d470e67503380a0a008d",
+   "score": 56,
    "temperature": {
     "value": 0.39,
     "unit": "°C deviation",
@@ -9685,8 +9685,8 @@
    }
   },
   "2026-10-12 v1 switch=null": {
-   "all": "3b046f39471362eff8cc79622dac2511b92af16f956c5180785d84b8b74ec0cb",
-   "score": 57,
+   "all": "c6f1752ea6af73a2bcbc4a616fc2062c67cca563ad40926b82b5e5c2ed18054a",
+   "score": 63,
    "temperature": {
     "value": 0.31,
     "unit": "°C deviation",
@@ -9695,8 +9695,8 @@
    }
   },
   "2026-10-12 v2 switch=2026-10-17": {
-   "all": "9f01f60f3126f0846706e4a1cde9ec21a85f830d0e9ffe37b88148e0db1e775a",
-   "score": 64,
+   "all": "17de87cb08f9fc9fc04345dbdacbd7005e65695312ddeb5ee1837d269fbd4691",
+   "score": 72,
    "temperature": {
     "value": 0.07291729138232768,
     "unit": "°C deviation",
@@ -9705,8 +9705,8 @@
    }
   },
   "2026-10-12 v2 switch=2026-09-20": {
-   "all": "633117be5c762f24b3438c522acbcdc072a6e8e5b1e42e88ea2abcb1b0234780",
-   "score": 47,
+   "all": "f7812a442d79f28a8ce2effac7c768f5f77fa8c3977a5b9a8b93892348bf69ee",
+   "score": 55,
    "temperature": {
     "value": 0.38,
     "unit": "°C deviation",
@@ -9715,8 +9715,8 @@
    }
   },
   "2026-10-12 v2 switch=null": {
-   "all": "820c4ea8f3d9611b812637e8bfd045fe7d55fe04f90cb993a9b6add074c56d16",
-   "score": 69,
+   "all": "a8287a8ef92422d35edb44347dabbeb7b11bbda3fe474d482f0596cc9fb819b5",
+   "score": 78,
    "temperature": {
     "value": 0.023746153945103286,
     "unit": "°C deviation",
@@ -9725,8 +9725,8 @@
    }
   },
   "2026-10-12 v3 switch=2026-10-17": {
-   "all": "a99edb9c2bd74b60bc3a16c064f9c6064d9ee85a1960e12865b2387b75e6bd18",
-   "score": 56,
+   "all": "93a5409b6400e0320039225dbf6d56e48d022b2c3a34599e40db20084fb3337e",
+   "score": 59,
    "temperature": {
     "value": -0.13,
     "unit": "°C deviation",
@@ -9735,8 +9735,8 @@
    }
   },
   "2026-10-12 v3 switch=2026-09-20": {
-   "all": "d51d3b8fdfb7064f2235d3335db53eae2f52b92b984affcde8ccdeca2cec5745",
-   "score": 55,
+   "all": "7b3175bbaead88512959a250dc8f9348c96fdfc9096692a0eb07a27cdcfb9a64",
+   "score": 59,
    "temperature": {
     "value": -0.09,
     "unit": "°C deviation",
@@ -9745,8 +9745,8 @@
    }
   },
   "2026-10-12 v3 switch=null": {
-   "all": "69a50eb06c38b8be2ed146395b3785081021f863a907d49315bebaebf5775319",
-   "score": 54,
+   "all": "b6578f212f01104155df0c693c9e227c56237b4cc9d0f93da8b4735db11f04f5",
+   "score": 57,
    "temperature": {
     "value": 0.01,
     "unit": "°C deviation",
@@ -9755,8 +9755,8 @@
    }
   },
   "2026-10-12 v4 switch=2026-10-17": {
-   "all": "705fe23036475f7a8bb0a1b696db34a9a27c90d82a09dc6c4d222d918220ae03",
-   "score": 57,
+   "all": "b3ef322f90079c5496a874f8e7c69336412fab1e51af5e4aae262d911e70450d",
+   "score": 64,
    "temperature": {
     "value": -0.16815825635567308,
     "unit": "°C deviation",
@@ -9765,8 +9765,8 @@
    }
   },
   "2026-10-12 v4 switch=2026-09-20": {
-   "all": "1a5970895894043332f368f88e665f9d7992ebb4c5d22cc63369d575851efe51",
-   "score": 45,
+   "all": "9e6732dd4f90f74ebc2fc29e14878b81ebe401ede8714bc0f1f12a693c7e54c8",
+   "score": 50,
    "temperature": {
     "value": 0.3,
     "unit": "°C deviation",
@@ -9775,8 +9775,8 @@
    }
   },
   "2026-10-12 v4 switch=null": {
-   "all": "5d3528f3cecb7c5bbcb3d7d66183969477f5d4d4ff65aae07922367a7b68c8ea",
-   "score": 72,
+   "all": "202f79355feb4e903bfc12a1670d7a387ed2265fb93bc9098ef96ea7a52fae91",
+   "score": 78,
    "temperature": {
     "value": 0.07165819904766976,
     "unit": "°C deviation",
@@ -9785,8 +9785,8 @@
    }
   },
   "2026-10-12 v5 switch=2026-10-17": {
-   "all": "bf4f63d8c0e9c2ac1eaf8ed46ea9e247eea0f2212170a61c68514586875e5da5",
-   "score": 69,
+   "all": "e750089d0756c0b164efce679ce3b7d7f5af3a60af730270e325cebe854eb8b3",
+   "score": 74,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9795,8 +9795,8 @@
    }
   },
   "2026-10-12 v5 switch=2026-09-20": {
-   "all": "7b4bdffcc93310b99d7f08d8147280b431dd338762c79ee16109885b1e3d409f",
-   "score": 51,
+   "all": "fbf73c09fb9e079548e1cf9efcf311034a2424dc575e56831ff9c754458f8328",
+   "score": 59,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9805,8 +9805,8 @@
    }
   },
   "2026-10-12 v5 switch=null": {
-   "all": "4dcaf2fcd7635dbf55585eb2ad1d26726dfdb4fe41445b90a000d527794c8d5f",
-   "score": 57,
+   "all": "3c11a1917257b47ccf22ce8c91dfc4720586ff79bd90b3c51660647818b40bf7",
+   "score": 62,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9815,8 +9815,8 @@
    }
   },
   "2026-10-17 v0 switch=2026-10-17": {
-   "all": "feff9efc8ad5b5f55eb153962067bf415a68d72bde556f4c239ce491ed9edd6f",
-   "score": 62,
+   "all": "5ae0d883a914e1af315407cea91b82ad64d38f1b1440190eaa78bcd941093c9b",
+   "score": 73,
    "temperature": {
     "value": -0.11,
     "unit": "°C deviation",
@@ -9825,8 +9825,8 @@
    }
   },
   "2026-10-17 v0 switch=2026-09-20": {
-   "all": "40da853ff6ba0fea72a8583b0739b4f2fb19d2de9d2ddceb8be14ec53dd42e21",
-   "score": 61,
+   "all": "325bb57e9d1fee0d52f39e7614e93c6515c888e35c78e9f3130c5e3b04746b37",
+   "score": 68,
    "temperature": {
     "value": -0.1,
     "unit": "°C deviation",
@@ -9835,8 +9835,8 @@
    }
   },
   "2026-10-17 v0 switch=null": {
-   "all": "76f561e9ee57d5c5be56e01e64853fc0eb04fd89f5919dab9d296e2a185b6c6b",
-   "score": 53,
+   "all": "d674c9bef2ed5562628757a2ae6fb5d41405f99584af7175c3e8fa768754a011",
+   "score": 61,
    "temperature": {
     "value": 0.17798157753422855,
     "unit": "°C deviation",
@@ -9845,8 +9845,8 @@
    }
   },
   "2026-10-17 v1 switch=2026-10-17": {
-   "all": "24c6e588e98734d9c2a40f6585a8c34a13942fb7c359d6e9440de8ec91baf059",
-   "score": 55,
+   "all": "91778a22594e920fd493f540baf69ac1c47526b9495117e18d0b5ce5acbb4078",
+   "score": 66,
    "temperature": {
     "value": 0.32,
     "unit": "°C deviation",
@@ -9855,8 +9855,8 @@
    }
   },
   "2026-10-17 v1 switch=2026-09-20": {
-   "all": "a07c2a23f3e8d6be3a5284cc959c66b027f3f0835e7350f7babd0fa6f925237d",
-   "score": 64,
+   "all": "df80c6141004c7bdcc5ed3afb64e4b17551d69fa8e0c78504342c4db606c72ad",
+   "score": 72,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9865,8 +9865,8 @@
    }
   },
   "2026-10-17 v1 switch=null": {
-   "all": "3cdd304ace3d5c86fcee629ae947b8c13e1a7f5bd762ed91ae530e56e0a9b296",
-   "score": 61,
+   "all": "6e82208809aeb705a6af72df4e43ed501045b88f0bb3505131fc8e66b1b4e7f6",
+   "score": 67,
    "temperature": {
     "value": 0.09,
     "unit": "°C deviation",
@@ -9875,8 +9875,8 @@
    }
   },
   "2026-10-17 v2 switch=2026-10-17": {
-   "all": "f2f4b8fa112d54786e61a7ff2cf5e53d8425ed93b0264f8bd1d78900bd26e879",
-   "score": 54,
+   "all": "08bce9964c231d8ae6f5a572c58cec5984c4e91a119df7e17c0b1d6ef697b007",
+   "score": 65,
    "temperature": {
     "value": 0.36,
     "unit": "°C deviation",
@@ -9885,8 +9885,8 @@
    }
   },
   "2026-10-17 v2 switch=2026-09-20": {
-   "all": "16c238c4ebb238ce133f691e64969840b3fa833e2d66260fb101c1c3b43b6a0a",
-   "score": 62,
+   "all": "6bc89f1e84ab8e6b6a3b8b1a91f4e99a0706b1f8946b84d7d719725157b87306",
+   "score": 68,
    "temperature": {
     "value": 0.27,
     "unit": "°C deviation",
@@ -9895,8 +9895,8 @@
    }
   },
   "2026-10-17 v2 switch=null": {
-   "all": "e11ff3f30eed3ccde9049c34bea41403161f90fb1a1ef25998df901ce9891b0f",
-   "score": 63,
+   "all": "87239096e07cd68da3222d8356497a7ef0d324b3abdfa5ed97b325a9c53e33b4",
+   "score": 72,
    "temperature": {
     "value": 0.08971578357741236,
     "unit": "°C deviation",
@@ -9905,8 +9905,8 @@
    }
   },
   "2026-10-17 v3 switch=2026-10-17": {
-   "all": "2ea627aa3f89a20ec0f945eb194236971500fd5bf18c43065ad1ee905c6527bf",
-   "score": 61,
+   "all": "2434be0c5df7bf7604594fd5422a27ce5901cab0d50ff0f527d28ad2b4143524",
+   "score": 72,
    "temperature": {
     "value": -0.08,
     "unit": "°C deviation",
@@ -9915,8 +9915,8 @@
    }
   },
   "2026-10-17 v3 switch=2026-09-20": {
-   "all": "798fe8a96fa84c4526188a6863e64ac004938b99d94fa53616a7547b11babcab",
-   "score": 57,
+   "all": "135746340d6f5ac4f0ad41e9df7330dcc13f3708b68cf62bc2cd4811c5c61cee",
+   "score": 63,
    "temperature": {
     "value": -0.18,
     "unit": "°C deviation",
@@ -9925,8 +9925,8 @@
    }
   },
   "2026-10-17 v3 switch=null": {
-   "all": "c35b784867c887688d7a36de7306441c1ce3a28b81542a0dc7c502efd1cfd65e",
-   "score": 63,
+   "all": "b23e573d62f7d1e3b88393402d3c32f491f6c92c24ca11f6e58aa7ce577f768b",
+   "score": 68,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9935,8 +9935,8 @@
    }
   },
   "2026-10-17 v4 switch=2026-10-17": {
-   "all": "20a277a1d1f57ddc047382eed8095a741df719ce8e9dd12d09024479641e9416",
-   "score": 56,
+   "all": "aa8f43f34df98c9031c2767ef90ba455b01d7537e289934597f1c2f72bcc5dac",
+   "score": 67,
    "temperature": {
     "value": -0.25,
     "unit": "°C deviation",
@@ -9945,8 +9945,8 @@
    }
   },
   "2026-10-17 v4 switch=2026-09-20": {
-   "all": "a33f11f20783bb8005de04964200df99630cc542374f723400a37ad84745aa68",
-   "score": 52,
+   "all": "4aa7a1745114946253dfe04ba62406a6f316069f59c60478adf4e8d9f99c4d57",
+   "score": 58,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9955,8 +9955,8 @@
    }
   },
   "2026-10-17 v4 switch=null": {
-   "all": "069f122ae8548407958fbf27d3f7b9c611849d51f0127ca6f4808fe15485c455",
-   "score": 27,
+   "all": "69556317ed65efdd9f61c7fb2d5da068b4193ce7870b0b7e4f8709c6e87c17ad",
+   "score": 36,
    "temperature": {
     "value": 0.18212486640550196,
     "unit": "°C deviation",
@@ -9965,8 +9965,8 @@
    }
   },
   "2026-10-17 v5 switch=2026-10-17": {
-   "all": "a86c5ffab2bd46a2aec1f5117926b187adf28302306bf236e63626754594cd03",
-   "score": 57,
+   "all": "a917820b9ec1398f108cd3a9d1d420380849c3123d420d3821eb954cc5f2d33f",
+   "score": 68,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9975,8 +9975,8 @@
    }
   },
   "2026-10-17 v5 switch=2026-09-20": {
-   "all": "d993d084ed1edff6698f5555f0f9d34989b1b6f919fe26174df1bce41aeb4f8c",
-   "score": 53,
+   "all": "69d719cea50c8b98644d48a580d153de1c4baa50370f2fa907af555977b9936e",
+   "score": 58,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9985,8 +9985,8 @@
    }
   },
   "2026-10-17 v5 switch=null": {
-   "all": "55158efde0290f758df9ed1281f328e2551755224a6dd581f064227043d11816",
-   "score": 47,
+   "all": "7999000bbcc6eb19e833027f7defe39de5f8a24823c0c7603bbe2c812367f674",
+   "score": 52,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -9995,8 +9995,8 @@
    }
   },
   "2026-10-24 v0 switch=2026-10-17": {
-   "all": "bf8848446f9c82b618df4eb21bcdc6077e63c4543673a0b3c5e3ec1f91739965",
-   "score": 60,
+   "all": "95acd9efec8fc4a08dbce580c9406d478556cf534c9d72f156ddc8d1ef99c79a",
+   "score": 71,
    "temperature": {
     "value": -0.03,
     "unit": "°C deviation",
@@ -10005,8 +10005,8 @@
    }
   },
   "2026-10-24 v0 switch=2026-09-20": {
-   "all": "fd6aeecb09ee5385ccfde7108824dfda780d6f5bd81f7dcf0a12a7d793bd1cec",
-   "score": 54,
+   "all": "330b0255d22c593e0268e0b23ee7dbb83699103aa4ad7b6d81e45dc5dac094bd",
+   "score": 62,
    "temperature": {
     "value": 0.18,
     "unit": "°C deviation",
@@ -10015,8 +10015,8 @@
    }
   },
   "2026-10-24 v0 switch=null": {
-   "all": "bdb5624b83be1c37b8cbf60345a0a2de0df2bb37aa059639d3a90c0549517cb0",
-   "score": 65,
+   "all": "7e5ff42ebdf7da730db9e2b4a1fbfe572d6414e1327ed7d888bca17297e74cf1",
+   "score": 74,
    "temperature": {
     "value": 0.02862231549806893,
     "unit": "°C deviation",
@@ -10025,8 +10025,8 @@
    }
   },
   "2026-10-24 v1 switch=2026-10-17": {
-   "all": "bdf8831eeb6a91c993386c5d82e20d81a062b07557679b371a9d6f8a6c7fab10",
-   "score": 56,
+   "all": "0ed9fa71d13d50f7e1365fe321fe6d22af2ed76295b483ec22921e1639693aa1",
+   "score": 67,
    "temperature": {
     "value": 0.34,
     "unit": "°C deviation",
@@ -10035,8 +10035,8 @@
    }
   },
   "2026-10-24 v1 switch=2026-09-20": {
-   "all": "9ac92cd2358827fe0ac76f5f14d91bea387e011e1284a81086cfa61870db840d",
-   "score": 60,
+   "all": "a14da3b086829d8875f7c6b114587ce42b1d3e34dd832654f13dd6839cee4957",
+   "score": 63,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10045,8 +10045,8 @@
    }
   },
   "2026-10-24 v1 switch=null": {
-   "all": "747db70cbbf74bd66129b737e2704691906e8e46e4c79fd8ad5d4dddd7e25e5d",
-   "score": 67,
+   "all": "81b35a11132b850e179b38518d71b0f1a9cb0feff28f38871573a37e0db5237d",
+   "score": 73,
    "temperature": {
     "value": 0,
     "unit": "°C deviation",
@@ -10055,8 +10055,8 @@
    }
   },
   "2026-10-24 v2 switch=2026-10-17": {
-   "all": "eb7753448d29c1224f294b58b7758625f57ca08a22f879c34ca12fcda344a8f3",
-   "score": 57,
+   "all": "e0c52c4a38e3f70cc486b8ff21bcd59c85c36626c4f76982da7d811f1933de0b",
+   "score": 68,
    "temperature": {
     "value": -0.19,
     "unit": "°C deviation",
@@ -10065,8 +10065,8 @@
    }
   },
   "2026-10-24 v2 switch=2026-09-20": {
-   "all": "7bb002943f505c1b97c3d91a0a8c85b655063bfa10b5452a803bb4c99f4aac0c",
-   "score": 70,
+   "all": "52582ff33cee5bee0d3feef9b59cc7d8d8c4f4cb654705644a5c6acf97a14109",
+   "score": 75,
    "temperature": {
     "value": -0.18,
     "unit": "°C deviation",
@@ -10075,8 +10075,8 @@
    }
   },
   "2026-10-24 v2 switch=null": {
-   "all": "32cc00c59c36f9e83033cbae587c063f1618e7ff936ba9dbf376f452b77cdd4f",
-   "score": 51,
+   "all": "af12a87b413cad0a28b2f299888dd76110b0015a70821ea99ef51172108951b9",
+   "score": 60,
    "temperature": {
     "value": -0.01202584533020854,
     "unit": "°C deviation",
@@ -10085,8 +10085,8 @@
    }
   },
   "2026-10-24 v3 switch=2026-10-17": {
-   "all": "efa7c15fdf502ab5b8f9629c56052e28ad4a8088a12cac0749288fc920e70a10",
-   "score": 59,
+   "all": "4e9700f135aeb174dd673ac2d2e6d1b53b178b5456435111fab9fe0761bb8e40",
+   "score": 70,
    "temperature": {
     "value": 0.13,
     "unit": "°C deviation",
@@ -10095,8 +10095,8 @@
    }
   },
   "2026-10-24 v3 switch=2026-09-20": {
-   "all": "62ca95d8ec80ca1fc51e9eaa1014af1bdc2877fd7347d8076a3e3953774deced",
-   "score": 44,
+   "all": "bb0923a93a6c42e34e4264d8be8599debf51ce8696e9bc92821a95812936cff7",
+   "score": 49,
    "temperature": {
     "value": -0.11,
     "unit": "°C deviation",
@@ -10105,8 +10105,8 @@
    }
   },
   "2026-10-24 v3 switch=null": {
-   "all": "0f3ad235b2b7b3ca04b98772791ac32b6dfaab1df77260a8c8b01840e13712b9",
-   "score": 59,
+   "all": "bb7a08e14c551b087d1eb6189f1c2a51696a94356a57c6e47bcb81b4f8794211",
+   "score": 68,
    "temperature": {
     "value": -0.3,
     "unit": "°C deviation",
@@ -10115,8 +10115,8 @@
    }
   },
   "2026-10-24 v4 switch=2026-10-17": {
-   "all": "a4f5db1d58673aa699ebcde52dbdd2b27c324e1fb154592bb0e7f3f008d348a9",
-   "score": 61,
+   "all": "cbf8afc6586104b729e2f8f97a72ccbf84c98ef16257a18113dc79d37627e8fc",
+   "score": 72,
    "temperature": {
     "value": -0.13,
     "unit": "°C deviation",
@@ -10125,8 +10125,8 @@
    }
   },
   "2026-10-24 v4 switch=2026-09-20": {
-   "all": "d6bdf94071060135173c73a7a52202a163c7032b682c34317bfab4569fe820c1",
-   "score": 62,
+   "all": "e87206efcda59f8212fe28a12e164fe980f9999e9fa357f812f4707434ef394e",
+   "score": 66,
    "temperature": {
     "value": -0.2,
     "unit": "°C deviation",
@@ -10135,8 +10135,8 @@
    }
   },
   "2026-10-24 v4 switch=null": {
-   "all": "6837026933e47561997ad5e076bff0aa24b89b3ec6c60513afa581824bc1b0b9",
-   "score": 58,
+   "all": "f90e0ca3a8d6488331f33931e3535ee91aacdae2009489fa424cef576b18a98a",
+   "score": 66,
    "temperature": {
     "value": 0.1971818143967539,
     "unit": "°C deviation",
@@ -10145,8 +10145,8 @@
    }
   },
   "2026-10-24 v5 switch=2026-10-17": {
-   "all": "8a06a9aefe69d8cd2d778ab6164139f0d31ab66a08053ee9986adcbb9cffcb34",
-   "score": 57,
+   "all": "0f4250331a441e8037d9f4fe4bed08a86bf60e21a1c13bc6192d0c858d4eec69",
+   "score": 68,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10155,17 +10155,7 @@
    }
   },
   "2026-10-24 v5 switch=2026-09-20": {
-   "all": "225053c1170c94c946e058adb26099721ecc2db03f9f0419d7d298c583663c44",
-   "score": 57,
-   "temperature": {
-    "value": null,
-    "unit": "°C deviation",
-    "source": "oura_daily_summary.temp_dev_c",
-    "note": "z = —; closer-to-baseline-is-better (deviation either way is a fever/illness signal)."
-   }
-  },
-  "2026-10-24 v5 switch=null": {
-   "all": "5b8e4161be5524024b634d2d2e5371eacc256e83580796a7e32b5da29c6326ca",
+   "all": "ced42ae4da038cce4fc34b09b14f59822bb5da0e444763263f86b09c72886012",
    "score": 67,
    "temperature": {
     "value": null,
@@ -10174,9 +10164,19 @@
     "note": "z = —; closer-to-baseline-is-better (deviation either way is a fever/illness signal)."
    }
   },
+  "2026-10-24 v5 switch=null": {
+   "all": "616f8e962f017097e8e723e4d4df76d5c9c9bce50fa786c1a6601e8828084dcb",
+   "score": 70,
+   "temperature": {
+    "value": null,
+    "unit": "°C deviation",
+    "source": "oura_daily_summary.temp_dev_c",
+    "note": "z = —; closer-to-baseline-is-better (deviation either way is a fever/illness signal)."
+   }
+  },
   "2026-11-06 v0 switch=2026-10-17": {
-   "all": "18b66e2ecca5c5dc5ece389f77d7c76067545987f9e1a81a39db863c3b85ab3d",
-   "score": 52,
+   "all": "dc240ec21e5c1b99d46b99902aeccd3994dfe734b72ed3ac89041c3c44eb2bf5",
+   "score": 58,
    "temperature": {
     "value": -0.32,
     "unit": "°C deviation",
@@ -10185,8 +10185,8 @@
    }
   },
   "2026-11-06 v0 switch=2026-09-20": {
-   "all": "f44fcb8bda7f1cf807ffa299cb3bf05e43cba73c2225b95e6d18f196ade10556",
-   "score": 50,
+   "all": "eaf2f38e084d3d0da061e5c7dff31e23c452627ecbbd85cd55dbc741765bf47c",
+   "score": 55,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10195,8 +10195,8 @@
    }
   },
   "2026-11-06 v0 switch=null": {
-   "all": "f0237ed3db8576822fad2cb04067d3a4d81f20564f0c5d92a4f2118c43a5afe5",
-   "score": 60,
+   "all": "d2c9f6581fccb45abaf7bce1178657a8a588a8f76a3ca914d0f8bacabcef30b4",
+   "score": 70,
    "temperature": {
     "value": -0.03738941559568047,
     "unit": "°C deviation",
@@ -10205,8 +10205,8 @@
    }
   },
   "2026-11-06 v1 switch=2026-10-17": {
-   "all": "26f7b8bd7265d434e783f3408b97665b5b699f2e7461ce74e527fe55218c7299",
-   "score": 55,
+   "all": "6e90d348ef2bc7a1ffc0450ef155ab35f91195573b5056c31e7fd0ce04c1dd91",
+   "score": 61,
    "temperature": {
     "value": -0.19,
     "unit": "°C deviation",
@@ -10215,8 +10215,8 @@
    }
   },
   "2026-11-06 v1 switch=2026-09-20": {
-   "all": "68e45bb25373ee10ef8ff1c23b9bf554cb9794c48fa9582c61e76eb888d4181b",
-   "score": 56,
+   "all": "915719fc968e28fd1b2e9482db1f2ccbb2281c46f2d91ce5a6f36de14e503567",
+   "score": 66,
    "temperature": {
     "value": -0.17,
     "unit": "°C deviation",
@@ -10225,8 +10225,8 @@
    }
   },
   "2026-11-06 v1 switch=null": {
-   "all": "3c5f320bc3903c6238eaff63e2d58454b1373dd245d920fdc8f0cf0b7c738a00",
-   "score": 60,
+   "all": "7935f167b3b224021a9525d9b47e3c35adc9f4edae08379390ac578035804f78",
+   "score": 64,
    "temperature": {
     "value": -0.15,
     "unit": "°C deviation",
@@ -10235,8 +10235,8 @@
    }
   },
   "2026-11-06 v2 switch=2026-10-17": {
-   "all": "b796ba89eb0b4389ab8f79460b8f5e879cdb8f4c4e84177d2cf9e631f62c3249",
-   "score": 58,
+   "all": "0c3c4d82ebc024d73724dd351a51b189500b95f39fe8ffc9b0d47a6cc2c8fa63",
+   "score": 62,
    "temperature": {
     "value": -0.38,
     "unit": "°C deviation",
@@ -10245,8 +10245,8 @@
    }
   },
   "2026-11-06 v2 switch=2026-09-20": {
-   "all": "faca34dd237744e55557044bfe0824f69b0e1194a4de467532b3c326e34cdcbb",
-   "score": 64,
+   "all": "aef6bac9c6158cb86e6ee8561e595c4b9dbdf7e96cfba2f4c7ecdb4b0335472c",
+   "score": 68,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10255,8 +10255,8 @@
    }
   },
   "2026-11-06 v2 switch=null": {
-   "all": "beac3d33e415d0f99ef036c851336777c957c35e7098a71492a69d6b5e8923f9",
-   "score": 61,
+   "all": "3a2424dba80103d706d753aed90f70f8850eb4909e679dd842a2df00dffa5a8b",
+   "score": 70,
    "temperature": {
     "value": 0.10436294884420931,
     "unit": "°C deviation",
@@ -10265,8 +10265,8 @@
    }
   },
   "2026-11-06 v3 switch=2026-10-17": {
-   "all": "17b7c85976da929ec699365cf8ad994b66b1ab568d7f07a02ac8ba35aecff286",
-   "score": 69,
+   "all": "3d99750d5f16fdb91dbe06ecd7a74b0387204da481f36139bf79c78ca269946c",
+   "score": 76,
    "temperature": {
     "value": 0.04,
     "unit": "°C deviation",
@@ -10275,8 +10275,8 @@
    }
   },
   "2026-11-06 v3 switch=2026-09-20": {
-   "all": "eb12dc0e73383f4f9a23287637ad8166579e33c5545f081f0987bb91d6d2a281",
-   "score": 56,
+   "all": "21c189f98e0a4942efb0f69be8bf5d39f90c227a67dc9c2c7f8a5527d616ad14",
+   "score": 60,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10285,8 +10285,8 @@
    }
   },
   "2026-11-06 v3 switch=null": {
-   "all": "7aee1b50b19f159fa311d7b89c49f08ce3154fe26c43d31903a8aa410d721f40",
-   "score": 48,
+   "all": "1f6a8573c872cc76dca05d7376e6238d29372e5e558971dcd68bd6540fd79db6",
+   "score": 54,
    "temperature": {
     "value": -0.32,
     "unit": "°C deviation",
@@ -10295,8 +10295,8 @@
    }
   },
   "2026-11-06 v4 switch=2026-10-17": {
-   "all": "fb86abefb7355dde6b46eb0bff5284ec734eb318153b677cadcf86fa96b17d37",
-   "score": 50,
+   "all": "0add0746fcdba2e8a295faf58746089d495c61701d38e9846c63e485a63c2973",
+   "score": 56,
    "temperature": {
     "value": 0.01,
     "unit": "°C deviation",
@@ -10305,8 +10305,8 @@
    }
   },
   "2026-11-06 v4 switch=2026-09-20": {
-   "all": "dc5cf2beb7f9183cbd98e181dbf79766f8892a999f5f14e5d0cd328f3fb82054",
-   "score": 57,
+   "all": "e89de06a1ed4c3bff09dbd3c2f1a3049f8d80b81eb7f6e1117e930f9615e0b4d",
+   "score": 64,
    "temperature": {
     "value": 0.24,
     "unit": "°C deviation",
@@ -10315,8 +10315,8 @@
    }
   },
   "2026-11-06 v4 switch=null": {
-   "all": "82db95023426d75060b3b48c79dfba5c54c80b31c18a10ed2288c2de646f2efd",
-   "score": 56,
+   "all": "63aad8ed1edba5499ee453969391ec6093172d60323dde54713582164a96f468",
+   "score": 65,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10325,8 +10325,8 @@
    }
   },
   "2026-11-06 v5 switch=2026-10-17": {
-   "all": "9b9996d32d22704baf77ac74803871378406d79fe2dc6e4ba9f9d609126e0d3d",
-   "score": 61,
+   "all": "c78fec43972a31f20cb9afd615b20ad39cad78719a15623bce0e32c17352078e",
+   "score": 67,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10335,8 +10335,8 @@
    }
   },
   "2026-11-06 v5 switch=2026-09-20": {
-   "all": "e68ab49d770b08f05553779bb15603377326582fc499a420f46cf6ee2e50d06b",
-   "score": 57,
+   "all": "23c2742fad0fba4e863ee33a9e2aedd2dbf3dd6a6816b4d12d2f64e1f85b078f",
+   "score": 61,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10345,8 +10345,8 @@
    }
   },
   "2026-11-06 v5 switch=null": {
-   "all": "fe74cd0abcf6163ff43c48f0f907369be2f48bcd09c0e8e7deabae1fed9cc2d2",
-   "score": 58,
+   "all": "f407912ac63a94e27c72e348405d818aa064f11a4fe3e048b4beb1b331e7bfcd",
+   "score": 65,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10355,8 +10355,8 @@
    }
   },
   "2026-07-08 v0 switch=2026-10-17": {
-   "all": "0a9181e76034af8df64e4481d4f0e0a6196b67eccf4d86d1f1f039462cc4064d",
-   "score": 62,
+   "all": "f5e8cf135134f9e4f8cf4f7ca161e03eef0856c00cd2be14ae02ad0ff4e0dc64",
+   "score": 69,
    "temperature": {
     "value": 0.12370135243982076,
     "unit": "°C deviation",
@@ -10365,8 +10365,8 @@
    }
   },
   "2026-07-08 v0 switch=2026-09-20": {
-   "all": "3221510c020869cb101741ef85849dc93a21e478d2a3257679a4686cfa50a866",
-   "score": 64,
+   "all": "66d8d2a878952b97faedba64080aa77ca5d7ea3707443cbd18d3f7bcbd86edf3",
+   "score": 73,
    "temperature": {
     "value": 0.14052467001602054,
     "unit": "°C deviation",
@@ -10375,8 +10375,8 @@
    }
   },
   "2026-07-08 v0 switch=null": {
-   "all": "66b8b41918428cd1d20ed14c4d58f0326a5752b8227118d0b2f6bac61c5e48c7",
-   "score": 32,
+   "all": "0f7f02149f7bcd368d53b9c002c3406169e45706caaf60fa62bd4c6a4015de16",
+   "score": 40,
    "temperature": {
     "value": 0.021828630566596983,
     "unit": "°C deviation",
@@ -10385,8 +10385,8 @@
    }
   },
   "2026-07-08 v1 switch=2026-10-17": {
-   "all": "dda78e1797248061b5ce950c7e9ed87ed4aa223f4f06193d43278e83228cc5d2",
-   "score": 57,
+   "all": "13c661f36bac91f807f0be7417b8fdca42cd3cf9d98b753c743455e8a907a57d",
+   "score": 68,
    "temperature": {
     "value": -0.35,
     "unit": "°C deviation",
@@ -10395,8 +10395,8 @@
    }
   },
   "2026-07-08 v1 switch=2026-09-20": {
-   "all": "dc9c43a65ad9271a943d9721897af11d5e0ff1e5d536622c2d10d708f285f9d6",
-   "score": 63,
+   "all": "d3c68707c6a900ec5e7f4bd73a85f16c891edce59a34b35f8d36dbd065f4b138",
+   "score": 69,
    "temperature": {
     "value": -0.14,
     "unit": "°C deviation",
@@ -10405,8 +10405,8 @@
    }
   },
   "2026-07-08 v1 switch=null": {
-   "all": "de4da46bbaf06aeab62a69e4c9ddc8d4b62f8afed4d9f1868d528061d7f82d3b",
-   "score": 63,
+   "all": "565ad5a9684f7f39f03f39e1094e600c14edbd78ea2ef56b60be5a3478dd1afa",
+   "score": 67,
    "temperature": {
     "value": 0.4,
     "unit": "°C deviation",
@@ -10415,8 +10415,8 @@
    }
   },
   "2026-07-08 v2 switch=2026-10-17": {
-   "all": "2f126fe4d4a83eeb6475f45aaac09e10d8008f082c032d50b7f4502e4115725d",
-   "score": 51,
+   "all": "95e39f79737c3eba533ed803cfbd0558eadb6ecbbe5fed33dac964838bb27c9a",
+   "score": 57,
    "temperature": {
     "value": -0.23463468672707677,
     "unit": "°C deviation",
@@ -10425,8 +10425,8 @@
    }
   },
   "2026-07-08 v2 switch=2026-09-20": {
-   "all": "4910f508deca663757e50cd9fad9359b0b1b28a278ba48e987c68ddd1d6f0467",
-   "score": 55,
+   "all": "cccdde2a3bf5692936abd4c61131ac1a05c36041282b3089cb406424fc627498",
+   "score": 61,
    "temperature": {
     "value": -0.05979695403948426,
     "unit": "°C deviation",
@@ -10435,8 +10435,8 @@
    }
   },
   "2026-07-08 v2 switch=null": {
-   "all": "84dbf9e319ee14f58bf9d037513158d7180024ed1f4eaf453624d615ef0043ce",
-   "score": 68,
+   "all": "5edb369ab64c63f994a2566bffe19b2189b6e5503aab05affc80e7cecb29f8f4",
+   "score": 75,
    "temperature": {
     "value": -0.1468492674641311,
     "unit": "°C deviation",
@@ -10445,8 +10445,8 @@
    }
   },
   "2026-07-08 v3 switch=2026-10-17": {
-   "all": "bd0b8fbc48bf6a3269cf0f55956fb6fb5ba7277ee9cb3a345d7ed6fc770dd5c1",
-   "score": 53,
+   "all": "67432d584e44051a6aa4eeb21c315d7c56f97290aeb51a4c024799310a4abcf0",
+   "score": 62,
    "temperature": {
     "value": 0.15,
     "unit": "°C deviation",
@@ -10455,8 +10455,8 @@
    }
   },
   "2026-07-08 v3 switch=2026-09-20": {
-   "all": "b2cd7eee03b592d7634ef5e80e66a9c6260976ec45da89fafa619de7217bd844",
-   "score": 52,
+   "all": "ca69cef56e9d13cded16d6f16fd47d55d767f44c388910522e685a935feadef9",
+   "score": 57,
    "temperature": {
     "value": -0.05,
     "unit": "°C deviation",
@@ -10465,8 +10465,8 @@
    }
   },
   "2026-07-08 v3 switch=null": {
-   "all": "0fb6868513093ff364bbf996b841014a987146aaa5bdc19cffce60ab292b2cb9",
-   "score": 73,
+   "all": "1cdd94cea2501a97c14ef740e08b11e941d99f49be6e77d36e390026a23841be",
+   "score": 76,
    "temperature": {
     "value": -0.2,
     "unit": "°C deviation",
@@ -10475,8 +10475,8 @@
    }
   },
   "2026-07-08 v4 switch=2026-10-17": {
-   "all": "b0d77ed0aa483a45783757165ec8a25b281db7985ccd49731e62af8dc59dcd19",
-   "score": 34,
+   "all": "ca909f5030f414d373fa1f6684b0f4071fd63085fea46f4d28bf8ac55a9a4842",
+   "score": 41,
    "temperature": {
     "value": -0.29185466920025643,
     "unit": "°C deviation",
@@ -10485,8 +10485,8 @@
    }
   },
   "2026-07-08 v4 switch=2026-09-20": {
-   "all": "ae08669426d9ca8de884ce39c77b0bea9863e517806587dc3a163d39b53c17dd",
-   "score": 54,
+   "all": "dceba618f4cbdacfcd7eb0ae97603f3b35e2eb4c0f594073e13c73aacaa21df9",
+   "score": 63,
    "temperature": {
     "value": -0.05576189579442143,
     "unit": "°C deviation",
@@ -10495,8 +10495,8 @@
    }
   },
   "2026-07-08 v4 switch=null": {
-   "all": "54221c2878adc30876b61bdab36b8422b80099be85cf3be2bfc036537edaefb0",
-   "score": 66,
+   "all": "7ed486d96322a808b242d999db2feaf3de54bf3729ba8a16225caeab33634e2f",
+   "score": 74,
    "temperature": {
     "value": 0.2894771334249526,
     "unit": "°C deviation",
@@ -10505,8 +10505,8 @@
    }
   },
   "2026-07-08 v5 switch=2026-10-17": {
-   "all": "eab546f0ef3b1de5d2b201364508026f2dc295f97c85a1ba4352d8ad725b13a7",
-   "score": 56,
+   "all": "5f4179b0240cc0d0c08706dd9fba50bc957d003ad5f8be39353625f9edf0fb49",
+   "score": 64,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10515,8 +10515,8 @@
    }
   },
   "2026-07-08 v5 switch=2026-09-20": {
-   "all": "82be0cf72a1649cf9ecb73b469f5250cba60d2e4bebc1ca0edcdbc758ed3190f",
-   "score": 50,
+   "all": "aac33e9a0a2d3b57ac2b73702533be96ee172de1e529698d9947fd814f5612e5",
+   "score": 58,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10525,8 +10525,8 @@
    }
   },
   "2026-07-08 v5 switch=null": {
-   "all": "8ae902c65cee86ae49b23fd7fb3dc834c4750189c4eadbd358171bfa9137c339",
-   "score": 47,
+   "all": "e20d4e283b7bfde6a410c0983ae238288522682cbc5cddd52d62d25a6902f6ff",
+   "score": 53,
    "temperature": {
     "value": null,
     "unit": "°C deviation",
@@ -10537,18 +10537,18 @@
  },
  "payload": {
   "v0 switch=2026-10-17": {
-   "all": "40aa79ed153e7d8e5edf601fe76f2af78ed18059bb46e08a63d328a4cd270404",
-   "readinessDisplayScore": 60,
+   "all": "0fa33df47ec1efe9abf98a4a3ddec7810486c51967ef1183bb9bc8e3f0849008",
+   "readinessDisplayScore": 71,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -10562,7 +10562,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -10603,17 +10603,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 60,
+     "readinessScore": 71,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -10627,7 +10627,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -10656,18 +10656,18 @@
    ]
   },
   "v0 switch=2026-09-20": {
-   "all": "67a8848471a779fa5fd7d197aa27081fb3c7195d4fb4d0b8409e79166f85b9dc",
-   "readinessDisplayScore": 48,
+   "all": "b96c35fd1ce89c1e024eb4a8a6729de8472573f9d61b2723da9918879914dafe",
+   "readinessDisplayScore": 53,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 11,
+     "score": 17,
      "provisional": false,
      "input": 1.3857995003418189,
      "gap": null,
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 71,
+     "score": 85,
      "provisional": false,
      "input": 0.6183605346222207,
      "gap": null,
@@ -10680,7 +10680,7 @@
      "gap": "no_input"
     },
     "sleepBalance": {
-     "score": 27,
+     "score": 41,
      "provisional": false,
      "input": -0.6789272262831656,
      "gap": null,
@@ -10721,17 +10721,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 48,
+     "readinessScore": 53,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 11,
+       "score": 17,
        "provisional": false,
        "input": 1.3857995003418189,
        "gap": null,
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 71,
+       "score": 85,
        "provisional": false,
        "input": 0.6183605346222207,
        "gap": null,
@@ -10744,7 +10744,7 @@
        "gap": "no_input"
       },
       "sleepBalance": {
-       "score": 27,
+       "score": 41,
        "provisional": false,
        "input": -0.6789272262831656,
        "gap": null,
@@ -10773,18 +10773,18 @@
    ]
   },
   "v0 switch=null": {
-   "all": "b97cf4060eb7a0f21970a717d1ea479bd03f290c17d280e547ce724b07626567",
-   "readinessDisplayScore": 64,
+   "all": "50f77d19f9f6d26858602dd0f9097fec88d8f897792cf8ed2f2cbd25611ea38f",
+   "readinessDisplayScore": 71,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 56,
+     "score": 78,
      "provisional": false,
      "input": -0.16622595016726363,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 72,
+     "score": 86,
      "provisional": false,
      "input": 0.6482812056523282,
      "gap": null,
@@ -10798,7 +10798,7 @@
      "source": "oura_ble"
     },
     "sleepBalance": {
-     "score": 18,
+     "score": 27,
      "provisional": false,
      "input": -0.9685432029745894,
      "gap": null,
@@ -10840,17 +10840,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 64,
+     "readinessScore": 71,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 56,
+       "score": 78,
        "provisional": false,
        "input": -0.16622595016726363,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 72,
+       "score": 86,
        "provisional": false,
        "input": 0.6482812056523282,
        "gap": null,
@@ -10864,7 +10864,7 @@
        "source": "oura_ble"
       },
       "sleepBalance": {
-       "score": 18,
+       "score": 27,
        "provisional": false,
        "input": -0.9685432029745894,
        "gap": null,
@@ -10894,18 +10894,18 @@
    ]
   },
   "v1 switch=2026-10-17": {
-   "all": "2c9344d350fa65fb80bcbe96570d87097aec9ef5ccb8afdae47647344ddbf6d8",
-   "readinessDisplayScore": 54,
+   "all": "613a45b7d0dea3ed59fac93627ad20b92f59532d8c87ee17ef450c38f5c1359c",
+   "readinessDisplayScore": 65,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -10919,7 +10919,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -10960,17 +10960,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 54,
+     "readinessScore": 65,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -10984,7 +10984,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -11013,18 +11013,18 @@
    ]
   },
   "v1 switch=2026-09-20": {
-   "all": "68e773869130a164305e5ea4ae4a507c409c54d424c82e40b2780f89c86e9f73",
-   "readinessDisplayScore": 57,
+   "all": "4439d70ee5b94fe0b003c1d32b39c95c3bc7e100729faab060c4097ffcf00f55",
+   "readinessDisplayScore": 65,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 33,
+     "score": 49,
      "provisional": false,
      "input": 0.5162782452253836,
      "gap": null,
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 73,
+     "score": 87,
      "provisional": false,
      "input": 0.6900623228565322,
      "gap": null,
@@ -11038,7 +11038,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 55,
+     "score": 77,
      "provisional": false,
      "input": 0.13502661798202337,
      "gap": null,
@@ -11079,17 +11079,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 57,
+     "readinessScore": 65,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 33,
+       "score": 49,
        "provisional": false,
        "input": 0.5162782452253836,
        "gap": null,
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 73,
+       "score": 87,
        "provisional": false,
        "input": 0.6900623228565322,
        "gap": null,
@@ -11103,7 +11103,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 55,
+       "score": 77,
        "provisional": false,
        "input": 0.13502661798202337,
        "gap": null,
@@ -11132,18 +11132,18 @@
    ]
   },
   "v1 switch=null": {
-   "all": "4b1590c8ddf6f141b1f0514387461518b81f56c968bb60afe2ab8e0697f39938",
-   "readinessDisplayScore": 62,
+   "all": "fb0255abfe5c1f779965e03662c3a7ac630afe5ec3e5b54d81d6e09d14ced84d",
+   "readinessDisplayScore": 69,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 77,
+     "score": 88,
      "provisional": false,
      "input": -0.7978845608028654,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 75,
+     "score": 87,
      "provisional": false,
      "input": 0.7422181960956887,
      "gap": null,
@@ -11156,7 +11156,7 @@
      "gap": "no_input"
     },
     "sleepBalance": {
-     "score": 43,
+     "score": 65,
      "provisional": false,
      "input": -0.20285200698377934,
      "gap": null,
@@ -11197,17 +11197,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 62,
+     "readinessScore": 69,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 77,
+       "score": 88,
        "provisional": false,
        "input": -0.7978845608028654,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 75,
+       "score": 87,
        "provisional": false,
        "input": 0.7422181960956887,
        "gap": null,
@@ -11220,7 +11220,7 @@
        "gap": "no_input"
       },
       "sleepBalance": {
-       "score": 43,
+       "score": 65,
        "provisional": false,
        "input": -0.20285200698377934,
        "gap": null,
@@ -11249,18 +11249,18 @@
    ]
   },
   "v2 switch=2026-10-17": {
-   "all": "916e868d32a4c1249aa45cad553ef050dfac1368fb30ffb65144c99c41d7eaf4",
-   "readinessDisplayScore": 49,
+   "all": "3a1e3a73caab7440e77554e21b2a7c94573ec3cd7f775bddcd6f81e4c84eb659",
+   "readinessDisplayScore": 60,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -11274,7 +11274,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -11314,17 +11314,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 49,
+     "readinessScore": 60,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -11338,7 +11338,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -11366,18 +11366,18 @@
    ]
   },
   "v2 switch=2026-09-20": {
-   "all": "28429c87028d5e25cd721b92d7eddf4262ab5bafca53bf764234846cfc068659",
-   "readinessDisplayScore": 41,
+   "all": "8fafcfb3af3d7a559a5408b69af73687206d79092c5cc14876abe633af024dab",
+   "readinessDisplayScore": 47,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 13,
+     "score": 19,
      "provisional": false,
      "input": 1.25381859554736,
      "gap": null,
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 25,
+     "score": 38,
      "provisional": false,
      "input": -0.7480167757526863,
      "gap": null,
@@ -11391,7 +11391,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -11431,17 +11431,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 41,
+     "readinessScore": 47,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 13,
+       "score": 19,
        "provisional": false,
        "input": 1.25381859554736,
        "gap": null,
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 25,
+       "score": 38,
        "provisional": false,
        "input": -0.7480167757526863,
        "gap": null,
@@ -11455,7 +11455,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -11483,18 +11483,18 @@
    ]
   },
   "v2 switch=null": {
-   "all": "88ca4d71f4ceeb7cf533c91ece84a7915038abcf1367c5dbdc9869bd6efdd7d7",
-   "readinessDisplayScore": 60,
+   "all": "a623ef0825ec21d8faf76e6808e559ca4abaaa36610177204922fdc66685bcb2",
+   "readinessDisplayScore": 69,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 66,
+     "score": 83,
      "provisional": false,
      "input": -0.46543266046833814,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 54,
+     "score": 77,
      "provisional": false,
      "input": 0.11635816511708454,
      "gap": null,
@@ -11508,7 +11508,7 @@
      "source": "oura_ble"
     },
     "sleepBalance": {
-     "score": 51,
+     "score": 76,
      "provisional": false,
      "input": 0.039894228040143274,
      "gap": null,
@@ -11550,17 +11550,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 60,
+     "readinessScore": 69,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 66,
+       "score": 83,
        "provisional": false,
        "input": -0.46543266046833814,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 54,
+       "score": 77,
        "provisional": false,
        "input": 0.11635816511708454,
        "gap": null,
@@ -11574,7 +11574,7 @@
        "source": "oura_ble"
       },
       "sleepBalance": {
-       "score": 51,
+       "score": 76,
        "provisional": false,
        "input": 0.039894228040143274,
        "gap": null,
@@ -11604,18 +11604,18 @@
    ]
   },
   "v3 switch=2026-10-17": {
-   "all": "210cf3c2eee9747b5151a2a35277eb985459bf31aafdb8f48b1db06f20c9dad3",
-   "readinessDisplayScore": 55,
+   "all": "2d1efff598af43fbcc4c6a09c5da60bb1fb422991826d00a5b5d18ef74f1cfa2",
+   "readinessDisplayScore": 67,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -11629,7 +11629,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -11670,17 +11670,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 55,
+     "readinessScore": 67,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -11694,7 +11694,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -11723,18 +11723,18 @@
    ]
   },
   "v3 switch=2026-09-20": {
-   "all": "aec716e75eed38f1faa08eb38dbdf3a7e6a17da98eac74129b38bfe7d8827ebd",
-   "readinessDisplayScore": 66,
+   "all": "5de243c47022daa9683e432842e9ec4cddb2c192413cf2505a2d31a68048e0bf",
+   "readinessDisplayScore": 73,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 87,
+     "score": 94,
      "provisional": false,
      "input": -1.2466946262544774,
      "gap": null,
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 65,
+     "score": 82,
      "provisional": false,
      "input": 0.438836508441576,
      "gap": null,
@@ -11748,7 +11748,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 48,
+     "score": 72,
      "provisional": false,
      "input": -0.06721310158937181,
      "gap": null,
@@ -11789,17 +11789,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 66,
+     "readinessScore": 73,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 87,
+       "score": 94,
        "provisional": false,
        "input": -1.2466946262544774,
        "gap": null,
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 65,
+       "score": 82,
        "provisional": false,
        "input": 0.438836508441576,
        "gap": null,
@@ -11813,7 +11813,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 48,
+       "score": 72,
        "provisional": false,
        "input": -0.06721310158937181,
        "gap": null,
@@ -11842,18 +11842,18 @@
    ]
   },
   "v3 switch=null": {
-   "all": "8f5d6a03a436fd036762dde3cee78223fb6969fe87452e988ff7f2ae9a4ad75a",
-   "readinessDisplayScore": 49,
+   "all": "1cf79ee58886d41db9f742281d15f95faf7cf249b935d0b39add31c1157b98e5",
+   "readinessDisplayScore": 55,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 69,
+     "score": 84,
      "provisional": false,
      "input": -0.5632126311549639,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 11,
+     "score": 16,
      "provisional": false,
      "input": -1.402342561411097,
      "gap": null,
@@ -11867,7 +11867,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": false,
      "input": 0.007410692515196893,
      "gap": null,
@@ -11908,17 +11908,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 49,
+     "readinessScore": 55,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 69,
+       "score": 84,
        "provisional": false,
        "input": -0.5632126311549639,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 11,
+       "score": 16,
        "provisional": false,
        "input": -1.402342561411097,
        "gap": null,
@@ -11932,7 +11932,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": false,
        "input": 0.007410692515196893,
        "gap": null,
@@ -11961,18 +11961,18 @@
    ]
   },
   "v4 switch=2026-10-17": {
-   "all": "c6cf8638c93bb6aa0f51659302836e857809c72eec2a4d71bc4d32ace284d91d",
-   "readinessDisplayScore": 56,
+   "all": "9eafb313c32c452f3b6f21d8c27e21506bc52d36999afcf033674fe57fdd1cde",
+   "readinessDisplayScore": 67,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -11986,7 +11986,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -12026,17 +12026,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 56,
+     "readinessScore": 67,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -12050,7 +12050,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -12078,18 +12078,18 @@
    ]
   },
   "v4 switch=2026-09-20": {
-   "all": "666fd17d9522d435b29093aeaa2842a47a308a80285790eca64fbedd94322ed4",
-   "readinessDisplayScore": 56,
+   "all": "f2dad0ce9abdb711634300ecbe9ce628dce1a529186671ba2b152b87c580da89",
+   "readinessDisplayScore": 61,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 85,
+     "score": 93,
      "provisional": false,
      "input": -1.1081730011150908,
      "gap": null,
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 54,
+     "score": 77,
      "provisional": false,
      "input": 0.11081730011150909,
      "gap": null,
@@ -12103,7 +12103,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 12,
+     "score": 18,
      "provisional": false,
      "input": -1.3209790031549513,
      "gap": null,
@@ -12144,17 +12144,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 56,
+     "readinessScore": 61,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 85,
+       "score": 93,
        "provisional": false,
        "input": -1.1081730011150908,
        "gap": null,
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 54,
+       "score": 77,
        "provisional": false,
        "input": 0.11081730011150909,
        "gap": null,
@@ -12168,7 +12168,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 12,
+       "score": 18,
        "provisional": false,
        "input": -1.3209790031549513,
        "gap": null,
@@ -12197,18 +12197,18 @@
    ]
   },
   "v4 switch=null": {
-   "all": "034d34a6173cea542e5d22d0b02185746f225b385d5972b39f32f6c93942808b",
-   "readinessDisplayScore": 53,
+   "all": "0f6eb3ccfad6c2e5dfcfb6e6072f6adc8aae318b5f64c58f0831ea8ae6f7bca9",
+   "readinessDisplayScore": 59,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 69,
+     "score": 84,
      "provisional": false,
      "input": -0.5651682305686964,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 18,
+     "score": 26,
      "provisional": false,
      "input": -0.9807331059868554,
      "gap": null,
@@ -12222,7 +12222,7 @@
      "source": "oura_ble"
     },
     "sleepBalance": {
-     "score": 46,
+     "score": 68,
      "provisional": false,
      "input": -0.13076441413158071,
      "gap": null,
@@ -12264,17 +12264,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 53,
+     "readinessScore": 59,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 69,
+       "score": 84,
        "provisional": false,
        "input": -0.5651682305686964,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 18,
+       "score": 26,
        "provisional": false,
        "input": -0.9807331059868554,
        "gap": null,
@@ -12288,7 +12288,7 @@
        "source": "oura_ble"
       },
       "sleepBalance": {
-       "score": 46,
+       "score": 68,
        "provisional": false,
        "input": -0.13076441413158071,
        "gap": null,
@@ -12318,18 +12318,18 @@
    ]
   },
   "v5 switch=2026-10-17": {
-   "all": "60664c7a3d092a8f94ef9a355293a621b70deed894fa796181bf7af818485b55",
-   "readinessDisplayScore": 53,
+   "all": "45f99652ca4711e5a4e480010c22d9209025bfd64affa477f89bf81faf143125",
+   "readinessDisplayScore": 64,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -12342,7 +12342,7 @@
      "gap": "no_input"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -12383,17 +12383,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 53,
+     "readinessScore": 64,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -12406,7 +12406,7 @@
        "gap": "no_input"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -12435,18 +12435,18 @@
    ]
   },
   "v5 switch=2026-09-20": {
-   "all": "6c418a9138233fd93873e406437d09d8cde01cf6c2ae7dd7321ab05989bd89c8",
-   "readinessDisplayScore": 60,
+   "all": "b4b98aeba7b42563c9e04aac923f94f1d885589afbfaf8cb73358634e82e0593",
+   "readinessDisplayScore": 68,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 41,
+     "score": 62,
      "provisional": false,
      "input": 0.2659615202676218,
      "gap": null,
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 46,
+     "score": 69,
      "provisional": false,
      "input": -0.1269361801277286,
      "gap": null,
@@ -12459,7 +12459,7 @@
      "gap": "no_input"
     },
     "sleepBalance": {
-     "score": 88,
+     "score": 94,
      "provisional": false,
      "input": 1.2600895329184412,
      "gap": null,
@@ -12500,17 +12500,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 60,
+     "readinessScore": 68,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 41,
+       "score": 62,
        "provisional": false,
        "input": 0.2659615202676218,
        "gap": null,
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 46,
+       "score": 69,
        "provisional": false,
        "input": -0.1269361801277286,
        "gap": null,
@@ -12523,7 +12523,7 @@
        "gap": "no_input"
       },
       "sleepBalance": {
-       "score": 88,
+       "score": 94,
        "provisional": false,
        "input": 1.2600895329184412,
        "gap": null,
@@ -12552,17 +12552,17 @@
    ]
   },
   "v5 switch=null": {
-   "all": "1f574439c92ecfc9816dcfe48b09547f34e35432fea35b3702ed614bd157cf44",
-   "readinessDisplayScore": 57,
+   "all": "e6d180f84eb7b491c1897797e66d6730e43162072c4e50e71530c438852522b7",
+   "readinessDisplayScore": 68,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -12574,7 +12574,7 @@
      "gap": "no_input"
     },
     "sleepBalance": {
-     "score": 64,
+     "score": 82,
      "provisional": false,
      "input": 0.43451675126525474,
      "gap": null,
@@ -12615,16 +12615,16 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 57,
+     "readinessScore": 68,
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -12636,7 +12636,7 @@
        "gap": "no_input"
       },
       "sleepBalance": {
-       "score": 64,
+       "score": 82,
        "provisional": false,
        "input": 0.43451675126525474,
        "gap": null,

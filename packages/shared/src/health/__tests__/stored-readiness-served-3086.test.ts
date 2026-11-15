@@ -33,8 +33,10 @@ describe('storedReadinessMatches', () => {
   })
 })
 
-// A complete stored map whose every input is null re-derives to the model's neutral 50.
-const contributors = Object.fromEntries(Object.keys(READINESS_WEIGHTS).map(k => [k, { score: 50, provisional: false, input: null, gap: null }]))
+// A complete stored map whose every input is null re-derives to the model's neutral: 75 for resting HR,
+// HRV and sleep balance since #3778, 50 for the rest — 61 in all.
+const CENTRED = new Set(['restingHeartRate', 'hrvBalance', 'sleepBalance'])
+const contributors = Object.fromEntries(Object.keys(READINESS_WEIGHTS).map(k => [k, { score: CENTRED.has(k) ? 75 : 50, provisional: false, input: null, gap: null }]))
 const audit = (readinessScore: number, illnessFlag: string | null) => buildReadinessAudit({
   date: '2026-10-19', summary: null, priorSummary: null, sleepScore: null, activityScore: null, ouraDaily: null,
   derived: { day: '2026-10-19', readinessScore, readinessContributors: contributors, illnessFlag, modelVersions: { readiness: 'v8' } } as unknown as OuraDailyDerivedRow,
@@ -43,11 +45,11 @@ const weightsMoved = (notes: readonly string[]) => notes.some(n => n.includes('t
 
 describe('the day audit on a suppressed day (#3086)', () => {
   it('reads a served score as reproducible, before and after #3086', () => {
-    expect(weightsMoved(audit(50 - READINESS_SUPPRESSION.elevated, 'elevated').notes)).toBe(false)
-    expect(weightsMoved(audit(50, 'elevated').notes)).toBe(false)
+    expect(weightsMoved(audit(61 - READINESS_SUPPRESSION.elevated, 'elevated').notes)).toBe(false)
+    expect(weightsMoved(audit(61, 'elevated').notes)).toBe(false)
   })
 
   it('still reports a difference no stored flag explains', () => {
-    expect(weightsMoved(audit(40, null).notes)).toBe(true)
+    expect(weightsMoved(audit(51, null).notes)).toBe(true)
   })
 })

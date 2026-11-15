@@ -115,7 +115,7 @@ describe('GET /api/readiness-verdict', () => {
       baselineSameVersionDays: 0,
       contributors: CONTRIBUTORS,
       readinessModelVersion: V6,
-      modelVersion: 2,
+      modelVersion: 3,
     })
     expect(record).not.toHaveProperty('responseState')  // the upsert must never set it
   })
