@@ -1005,6 +1005,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .set(set)
       .where(eq(s.users.id, userId))
       .returning()
+    // #3793 ⑥: the switch day is dated in the user's timezone.
+    if (set.timezone) ouraCloudTokens.dropOuraCloudSwitchDay(userId)
     return this.rowToUser(r)
   }
 
@@ -7341,6 +7343,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const anchorUtc = new Date()
       await this.db.insert(s.ouraBleClockAnchors)
         .values({ userId, anchorDs: batchMaxDs, anchorUtc, epoch, observedSource: 'drain' })
+      oura.dropOuraClockOffsets(userId)   // #3793 ①
       // Stamped `now`, so it is necessarily the newest by anchor_utc — same row the old
       // full-table reduce would have selected after pushing it.
       newest = { anchorDs: batchMaxDs, anchorUtcMs: anchorUtc.getTime() }
@@ -7375,6 +7378,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       })))
       .onConflictDoNothing()
       .returning({ id: s.ouraRawSamples.id })
+    // #3793 ⑥: the switch day reads the newest frame.
+    if (inserted.length > 0) ouraCloudTokens.dropOuraCloudSwitchDay(userId)
 
     // **There is no `measured_at` backfill here any more, and the invariant above is why.**
     // RV-182 — an idempotent `UPDATE … WHERE measured_at IS NULL` ran on every ingest to date rows

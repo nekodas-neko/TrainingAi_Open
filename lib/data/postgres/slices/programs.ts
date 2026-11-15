@@ -68,15 +68,29 @@ async function cycleAnchorFromHistory(db: Db, userId: string, phaseSetId: string
 
 // ── Programs ─────────────────────────────────────────────────────────────────
 
+/**
+ * The active program, else the oldest. #3793 ⑤: this used to load every program with all its
+ * sessions, exercises and schedule days and keep one (3,203 calls, 7% of all statements). The row is
+ * now chosen first, by the same rule (`is_active` first, then oldest by `created_at`, as
+ * `listPrograms` orders them, with the id breaking a tie so the pick is stable), and only its children are loaded.
+ */
 export async function getActiveProgram(db: Db, userId: string): Promise<Program | null> {
-  const programs = await listPrograms(db, userId)
-  return programs.find(p => p.isActive) ?? programs[0] ?? null
+  const pRows = await db.select().from(s.programs)
+    .where(eq(s.programs.userId, userId))
+    .orderBy(desc(s.programs.isActive), asc(s.programs.createdAt), asc(s.programs.id))
+    .limit(1)
+  return (await programsWithChildren(db, pRows))[0] ?? null
 }
 
 export async function listPrograms(db: Db, userId: string): Promise<Program[]> {
   const pRows = await db.select().from(s.programs)
     .where(eq(s.programs.userId, userId))
     .orderBy(asc(s.programs.createdAt))
+  return programsWithChildren(db, pRows)
+}
+
+/** Program rows → `Program`s with their sessions, exercises and schedule, in the rows' order. */
+async function programsWithChildren(db: Db, pRows: (typeof s.programs.$inferSelect)[]): Promise<Program[]> {
   if (!pRows.length) return []
 
   const programIds = pRows.map(p => p.id)

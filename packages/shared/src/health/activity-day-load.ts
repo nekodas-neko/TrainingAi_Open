@@ -28,9 +28,22 @@ export interface LoadActivityDayOptions {
   /** The day's HR rows (`getHrForWindow` over the local day), or the pending read of them, when the
    *  caller has fetched them already: the day is then read once, not twice. Leave out to read here. */
   hrRows?: HrRows | Promise<HrRows>
+  /** The day's activity logs (`listActivityLogs(date, date)`), or the pending read, when the caller
+   *  reads them too (#3793 ⑧). Leave out to read here. */
+  activityLogs?: ActivityLogs | Promise<ActivityLogs>
+  /** The body metrics over `activityDayBodyMetricsWindow(date)`, or the pending read, when the caller
+   *  reads that window too (#3793 ⑧). Leave out to read here. */
+  bodyMetrics?: BodyMetricsRows | Promise<BodyMetricsRows>
 }
 
 type HrRows = Awaited<ReturnType<WorkoutRepository['getHrForWindow']>>
+type ActivityLogs = Awaited<ReturnType<WorkoutRepository['listActivityLogs']>>
+type BodyMetricsRows = Awaited<ReturnType<WorkoutRepository['listBodyMetrics']>>
+
+/** The `listBodyMetrics` window a day's score reads, `[from, to]`, for a caller passing `bodyMetrics`. */
+export function activityDayBodyMetricsWindow(date: string): [string, string] {
+  return [shiftDateStr(date, -HISTORY_DAYS), date]
+}
 
 /** Scores one local day from its own inputs. Read-only. */
 export async function loadActivityDay(
@@ -44,7 +57,7 @@ export async function loadActivityDay(
   // the input for this read.
   const finished = date < todayInTz(tz)
   const [bodyMetrics, sleepSessions, sessions, hrRows, program, user, userGoals, movementSeries, activityLogs, hrProfile] = await Promise.all([
-    repo.listBodyMetrics(userId, fromIso, date),
+    options.bodyMetrics ?? repo.listBodyMetrics(userId, ...activityDayBodyMetricsWindow(date)),
     // #3612: the same window's sleep, for each resting-HR reading's algorithm version. Thrown for a
     // finished day like the reads below, so a day is never stored final on a mean keyed differently from
     // the HR zones'; today only loses the version keying (per source, as before).
@@ -66,7 +79,10 @@ export async function loadActivityDay(
     }),
     // The day's treadmill steps join its step count (#3134). Thrown for a finished day like the reads
     // above; today only loses the treadmill part.
-    finished ? repo.listActivityLogs(userId, date, date) : repo.listActivityLogs(userId, date, date).catch(() => []),
+    (async () => {
+      const logs = options.activityLogs ?? repo.listActivityLogs(userId, date, date)
+      return finished ? logs : Promise.resolve(logs).catch(() => [])
+    })(),
     // #2182: the same zone ceiling the live score uses.
     options.maxHr !== undefined
       ? Promise.resolve({ maxHr: options.maxHr })

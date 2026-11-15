@@ -16,7 +16,9 @@ vi.mock('@/lib/observability', () => ({ reportServerError: vi.fn() }))
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
     getDayLog: async () => [],
-    listBodyMetrics: async (_u: string, from: string) => [{ date: from, steps: repo.steps, weightKg: 80 }],
+    // The day's row, within whatever window is asked for (#3793: today's is read from a wider window).
+    listBodyMetrics: async (_u: string, from: string, to: string) =>
+      [{ date: todayInTz(TZ), steps: repo.steps, weightKg: 80 }].filter(m => m.date >= from && m.date <= to),
     getBodyFatCalibration: async () => null,
     listSleepSessions: async () => [],
     getDerivedScoresForDay: async () => null,
