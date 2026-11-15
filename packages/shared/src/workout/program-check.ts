@@ -11,9 +11,11 @@
  *    accessories are trimmed in the order the prompt already states: small-muscle isolation first,
  *    then large-muscle isolation, never a compound. Still over after that is said, not fixed.
  *  - **weekly sets** per large muscle, from each exercise's style (main 1, secondary 0.5, the
- *    `roleWeight` the volume tallies use), against the goal's MEV from `volumeLandmarks`.
+ *    `roleWeight` the volume tallies use), times how often its session runs in a week
+ *    (`sessionRunsPerWeek`), against the goal's MEV from `volumeLandmarks`.
  *  - **neighbours**: sessions that run on consecutive days, from the schedule, sharing a muscle
- *    their compounds lead with.
+ *    their compounds lead with. Not checked for a full-body split, whose sessions share muscles
+ *    by design (#3840).
  *
  * A miss comes back as a plain sentence for the builder screen. The model is never asked again.
  */
@@ -85,6 +87,24 @@ export function backToBackPairs(sessionCount: number, schedule: ProgramSchedule)
   return pairs
 }
 
+/**
+ * How many times each session (by index) runs in an average week (#3840). A rotation trains
+ * `restAfterN` days in every `restAfterN + 1` and cycles through the sessions evenly, so 3 sessions
+ * with a rest after every 3 run 7 × 3/4 ÷ 3 = 1.75 times a week each. Weekly days map the k-th day to
+ * session k mod n, as `backToBackPairs` does, so a session with no day runs 0 times.
+ */
+export function sessionRunsPerWeek(sessionCount: number, schedule: ProgramSchedule): number[] {
+  if (sessionCount < 1) return []
+  if (schedule.type === 'rotation') {
+    const n = Math.max(1, schedule.restAfterN)
+    return Array(sessionCount).fill((7 * n) / (n + 1) / sessionCount)
+  }
+  const runs = Array(sessionCount).fill(0)
+  const days = new Set(schedule.days).size
+  for (let k = 0; k < days; k++) runs[k % sessionCount] += 1
+  return runs
+}
+
 function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b) }
 function lcm(a: number, b: number): number { return (a / gcd(a, b)) * b }
 
@@ -100,6 +120,11 @@ export interface ProgramCheckInput {
   equipmentOf: (exerciseName: string) => string[] | undefined
   /** Lowercased focus muscles. A large muscle is only held to its range when the user asked for it. */
   focusMuscles: ReadonlySet<string>
+  /**
+   * Every session is meant to train the whole body (`SplitSession.fullBody`). Neighbours then share
+   * muscles by design, so that is not reported: the user could not act on it.
+   */
+  fullBodySplit?: boolean
 }
 
 export interface TrimmedExercise { session: string; exercise: string }
@@ -165,10 +190,16 @@ function trimToBudget(
   return { session: current, removed, sec }
 }
 
-function weeklySets(sessions: readonly GeneratedSession[], input: ProgramCheckInput, muscles: readonly string[]): number {
+function weeklySets(
+  sessions: readonly GeneratedSession[],
+  runsPerWeek: readonly number[],
+  input: ProgramCheckInput,
+  muscles: readonly string[],
+): number {
   const group = new Set(muscles)
   let total = 0
-  for (const session of sessions) {
+  for (const [index, session] of sessions.entries()) {
+    const runs = runsPerWeek[index] ?? 0
     for (const ex of session.exercises) {
       const sets = ex.progressionStyleId ? input.styleSetsById.get(ex.progressionStyleId)?.length ?? 0 : 0
       if (sets === 0) continue
@@ -179,7 +210,7 @@ function weeklySets(sessions: readonly GeneratedSession[], input: ProgramCheckIn
         : ex.secondaryMuscles.some(m => group.has(normalizeMuscle(m)))
           ? roleWeight('secondary')
           : 0
-      total += sets * weight
+      total += sets * weight * runs
     }
   }
   return total
@@ -216,17 +247,20 @@ export function checkGeneratedProgram(input: ProgramCheckInput): ProgramCheckRes
     return result.session
   })
 
+  const runsPerWeek = sessionRunsPerWeek(sessions.length, input.schedule)
   const askedForAll = input.focusMuscles.has('full body')
   const underRange: MuscleUnderRange[] = []
   for (const group of LARGE_MUSCLE_GROUPS) {
     if (!askedForAll && !group.muscles.some(m => input.focusMuscles.has(m))) continue
-    const sets = weeklySets(sessions, input, group.muscles)
+    // Rounded to a tenth so a note never reads "6.999 sets".
+    const sets = Math.round(weeklySets(sessions, runsPerWeek, input, group.muscles) * 10) / 10
     const minimum = volumeLandmarks(input.goal, group.key).mev
     if (sets < minimum) underRange.push({ label: group.label, sets, minimum })
   }
 
   const sharedNeighbours: SharedNeighbours[] = []
-  for (const [a, b] of backToBackPairs(sessions.length, input.schedule)) {
+  const pairs = input.fullBodySplit ? [] : backToBackPairs(sessions.length, input.schedule)
+  for (const [a, b] of pairs) {
     const second = new Set(leadMuscles(sessions[b]))
     const muscles = leadMuscles(sessions[a]).filter(m => second.has(m))
     if (muscles.length > 0) sharedNeighbours.push({ first: sessions[a].name, second: sessions[b].name, muscles })
