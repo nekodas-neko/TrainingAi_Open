@@ -71,6 +71,9 @@ export class SocialActions {
           cleanup.push(
             this.resources.replace(feedSpec, {
               events: feed.events.filter((event) => event.userId !== row.otherUser.id),
+              users: Object.fromEntries(
+                Object.entries(feed.users).filter(([id]) => id !== row.otherUser.id),
+              ),
             }),
           );
         }

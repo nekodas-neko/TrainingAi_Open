@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { useTransitionRouter } from "@/lib/view-transition";
 import Image from "next/image";
-import type { FeedEvent } from "@trainingai/shared/types/friends";
+import type { FeedEvent, FeedResponse, FeedUser } from "@trainingai/shared/types/friends";
 import { TITLES } from "@trainingai/shared/types/friends";
 import { timeAgo } from "@trainingai/shared/format/time-ago";
 import { Dumbbell, Trophy, TrendingUp, UserCircle } from "lucide-react";
@@ -11,9 +11,15 @@ import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { TTL_SHORT } from '@trainingai/shared/cache-ttl';
 import { useRefreshOnTabShow } from "@/components/shell/tab-visibility";
 
-function FeedItem({ event }: { event: FeedEvent }) {
+// The friend is sent once in `users`; an event cached before that carried its own fields.
+type FeedUsers = Partial<Record<string, FeedUser>>;
+
+function FeedItem({ event, user }: { event: FeedEvent; user: FeedUser | undefined }) {
   const router = useTransitionRouter();
-  const title = event.equippedTitle ? TITLES[event.equippedTitle] : null;
+  const displayName = user?.displayName ?? event.displayName;
+  const avatar = user?.avatar ?? event.avatar;
+  const equippedTitle = user?.equippedTitle ?? event.equippedTitle;
+  const title = equippedTitle ? TITLES[equippedTitle] : null;
 
   const iconEl = event.type === 'pr'
     ? <TrendingUp className="w-4 h-4 text-purple-400" />
@@ -28,9 +34,9 @@ function FeedItem({ event }: { event: FeedEvent }) {
       onClick={() => router.push(`/profile/${event.userId}`)}
       className="flex items-start gap-3 py-3 border-b border-border/30 last:border-0 cursor-pointer active:opacity-70 transition-opacity"
     >
-      {event.avatar ? (
-        <Image src={event.avatar} alt="" width={32} height={32}
-          unoptimized={event.avatar.startsWith('data:')}
+      {avatar ? (
+        <Image src={avatar} alt="" width={32} height={32}
+          unoptimized={avatar.startsWith('data:')}
           className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5" />
       ) : (
         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -39,7 +45,7 @@ function FeedItem({ event }: { event: FeedEvent }) {
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="font-semibold text-sm text-shadow-bg">{event.displayName}</span>
+          <span className="font-semibold text-sm text-shadow-bg">{displayName}</span>
           {title && (
             <span className="text-xs font-medium text-shadow-bg" style={{ color: 'var(--color-brand)' }}>· {title.display}</span>
           )}
@@ -58,12 +64,15 @@ function FeedItem({ event }: { event: FeedEvent }) {
 
 export function FriendFeed() {
   const [events, setEvents] = useState<FeedEvent[]>([]);
+  const [users, setUsers] = useState<FeedUsers>({});
   const [loading, setLoading] = useState(true);
   // Seed synchronously from cache before paint — in a useLayoutEffect, never a useState lazy
   // initializer (cache reads in initializers caused hydration mismatches, session 165).
   useLayoutEffect(() => {
-    const seeded = readCacheSync<{ events: FeedEvent[] }>('friends-feed')?.events;
-    if (seeded && seeded.length > 0) { setEvents(seeded); setLoading(false); }
+    const seeded = readCacheSync<Partial<FeedResponse>>('friends-feed');
+    if (seeded?.events && seeded.events.length > 0) {
+      setEvents(seeded.events); setUsers(seeded.users ?? {}); setLoading(false);
+    }
   }, []);
   // K9: a failed fetch used to land on the "No friend activity yet" empty state,
   // indistinguishable from genuinely having none. Track it and offer a retry.
@@ -71,9 +80,9 @@ export function FriendFeed() {
 
   const load = useCallback(() => {
     setError(false);
-    cachedFetch<{ events: FeedEvent[] }>(
+    cachedFetch<Partial<FeedResponse>>(
       'friends-feed', '/api/friends/feed', TTL_SHORT,
-      d => { if (d?.events) setEvents(d.events); },
+      d => { if (d?.events) { setEvents(d.events); setUsers(d.users ?? {}); } },
       { onError: () => setError(true) },
     ).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -116,7 +125,7 @@ export function FriendFeed() {
 
   return (
     <div>
-      {events.map((e, i) => <FeedItem key={i} event={e} />)}
+      {events.map((e, i) => <FeedItem key={i} event={e} user={users[e.userId]} />)}
     </div>
   );
 }

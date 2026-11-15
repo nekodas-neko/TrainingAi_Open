@@ -1102,6 +1102,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // ── Progression Styles ────────────────────────────────────────────────────
   async listProgressionStyles(userId: string): Promise<ProgressionStyle[]> { return prog.listProgressionStyles(this.db, userId) }
+  async programSessionIdOwned(userId: string, id: string): Promise<boolean> { return prog.programSessionIdOwned(this.db, userId, id) }
+  async phaseSetIdOwned(userId: string, id: string | null | undefined): Promise<boolean> { return prog.phaseSetIdOwned(this.db, userId, id) }
   async progressionStyleIdsOwned(userId: string, ids: (string | null | undefined)[]): Promise<boolean> { return prog.progressionStyleIdsOwned(this.db, userId, ids) }
   async saveProgressionStyle(userId: string, style: ProgressionStyle): Promise<ProgressionStyle> { return prog.saveProgressionStyle(this.db, userId, style) }
   async deleteProgressionStyle(userId: string, styleId: string): Promise<void> { return prog.deleteProgressionStyle(this.db, userId, styleId) }
@@ -1440,7 +1442,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sessionName: sql<string>`COALESCE(${s.programSessions.name}, ${s.workoutSessions.sessionName})`,
     })
       .from(s.workoutSessions)
-      .leftJoin(s.programSessions, eq(s.workoutSessions.programSessionId, s.programSessions.id))
+      // The current name is taken only from a session in one of the caller's own programs; a link
+      // to any other session falls back to the stored name.
+      .leftJoin(s.programSessions, and(
+        eq(s.workoutSessions.programSessionId, s.programSessions.id),
+        sql`EXISTS (SELECT 1 FROM ${s.programs} WHERE ${s.programs.id} = ${s.programSessions.programId} AND ${s.programs.userId} = ${userId})`,
+      ))
       // Only include sessions that have at least one logged exercise
       .innerJoin(s.exerciseLogs, eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id))
       .where(and(
@@ -3353,7 +3360,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate): Promise<PrescribedRun | null> {
     const set: Record<string, unknown> = { updatedAt: new Date() }
     if (patch.status !== undefined) set.status = patch.status
-    if (patch.activityLogId !== undefined) set.activityLogId = patch.activityLogId
+    if (patch.activityLogId !== undefined) {
+      // The link is client-supplied (the PATCH route and the outbox push both pass it through), so
+      // it is stored only when it names one of the caller's own activity logs. An id that is not is
+      // stored as null rather than refused: the status change is what matters, and a 4xx on a
+      // queued push would quarantine it over one link column.
+      let activityLogId = patch.activityLogId
+      if (activityLogId) {
+        const [owned] = await this.db.select({ id: s.activityLogs.id })
+          .from(s.activityLogs)
+          .where(and(eq(s.activityLogs.id, activityLogId), eq(s.activityLogs.userId, userId)))
+          .limit(1)
+        if (!owned) activityLogId = null
+      }
+      set.activityLogId = activityLogId
+    }
     // LB-179: every status write says how it was satisfied. A client that does not send it predates
     // walks completing a prescription, so its completion was a run (null). Leaving the old value
     // would let a 'walk' from before a regeneration outlive it.

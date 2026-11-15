@@ -127,6 +127,7 @@ test('successful removal clears profile and foreign feed even when refresh fails
     accepted = { ...incoming, status: 'accepted' as const };
   await f.resources.replace(friendsSpec, { friendships: [accepted] });
   await f.resources.replace(feedSpec, {
+    users: { [friend]: { displayName: 'Alex', avatar: 'data:image/jpeg;base64,AAAA', equippedTitle: null } },
     events: [
       {
         type: 'achievement',
@@ -177,6 +178,7 @@ test('successful removal clears profile and foreign feed even when refresh fails
   await f.service.change('remove', accepted.id, accepted);
   assert.deepEqual(f.resources.state(friendsSpec).data!.friendships, []);
   assert.deepEqual(f.resources.state(feedSpec).data!.events, []);
+  assert.deepEqual(f.resources.state(feedSpec).data!.users, {});
   assert.equal(f.resources.state(profile).data, null);
   assert.deepEqual(f.resources.state(leaderboardSpec).data!.entries, []);
   const reopened = new WorkoutResources(
@@ -185,6 +187,26 @@ test('successful removal clears profile and foreign feed even when refresh fails
   );
   await reopened.load(friendsSpec, false, true);
   assert.deepEqual(reopened.state(friendsSpec).data!.friendships, []);
+});
+test('feed reads each friend once from users, and a feed cached before users still parses', () => {
+  const event = {
+    type: 'pr' as const,
+    userId: friend,
+    displayName: 'Alex',
+    avatar: null,
+    equippedTitle: null,
+    occurredAt: '2026-10-12T00:00:00Z',
+    payload: { exerciseName: 'Bench Press', weightKg: 100 },
+  };
+  const current = feedSpec.schema.parse({
+    events: [event, { ...event, occurredAt: '2026-10-11T00:00:00Z' }],
+    users: { [friend]: { displayName: 'Alex', avatar: 'data:image/jpeg;base64,AAAA', equippedTitle: null } },
+  });
+  assert.equal(current.users[friend].avatar, 'data:image/jpeg;base64,AAAA');
+  assert.equal(current.events.length, 2);
+  const cached = feedSpec.schema.parse({ events: [{ ...event, avatar: 'data:image/jpeg;base64,BBBB' }] });
+  assert.deepEqual(cached.users, {});
+  assert.equal(cached.events[0].avatar, 'data:image/jpeg;base64,BBBB');
 });
 test('weekly streak ranks use weeks and all-time streaks use days', () => {
   const row = { weeklyStreak: 3, allTimeStreak: 9 } as Parameters<typeof rankValue>[0];

@@ -135,47 +135,52 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
               />
             ) : view === 'feed' ? (
               feed.data?.events.length ? (
-                feed.data.events.map((event, index) => (
-                  <Pressable
-                    key={`${event.userId}:${event.occurredAt}:${index}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${event.displayName}: ${feedText(event)}`}
-                    onPress={() => openProfile(event.userId)}
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: theme.colors.border,
-                      paddingVertical: theme.spacing.md,
-                    }}
-                  >
-                    <Stack direction="row" align="flex-start">
-                      <Avatar
-                        name={event.displayName}
-                        uri={event.avatar}
-                        size={theme.sizes.touchTarget}
-                      />
-                      <Stack style={{ flex: 1 }} gap="xs">
-                        <Stack direction="row" align="center" wrap>
-                          <AppText variant="label">{event.displayName}</AppText>
-                          {event.equippedTitle && (
-                            <Badge label={titleLabel(event.equippedTitle)!} />
-                          )}
-                        </Stack>
-                        <Stack direction="row" align="center">
-                          <Icon
-                            name={feedIconName(event.type)}
-                            color={event.type === 'pr' ? theme.friends.purple : theme.friends.gold}
-                          />
-                          <AppText variant="caption" style={{ flex: 1 }}>
-                            {feedText(event)}
+                feed.data.events.map((event, index) => {
+                  const user = feed.data!.users[event.userId];
+                  const displayName = user?.displayName ?? event.displayName;
+                  const equippedTitle = user?.equippedTitle ?? event.equippedTitle;
+                  return (
+                    <Pressable
+                      key={`${event.userId}:${event.occurredAt}:${index}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${displayName}: ${feedText(event)}`}
+                      onPress={() => openProfile(event.userId)}
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.colors.border,
+                        paddingVertical: theme.spacing.md,
+                      }}
+                    >
+                      <Stack direction="row" align="flex-start">
+                        <Avatar
+                          name={displayName}
+                          uri={user?.avatar ?? event.avatar}
+                          size={theme.sizes.touchTarget}
+                        />
+                        <Stack style={{ flex: 1 }} gap="xs">
+                          <Stack direction="row" align="center" wrap>
+                            <AppText variant="label">{displayName}</AppText>
+                            {equippedTitle && (
+                              <Badge label={titleLabel(equippedTitle)!} />
+                            )}
+                          </Stack>
+                          <Stack direction="row" align="center">
+                            <Icon
+                              name={feedIconName(event.type)}
+                              color={event.type === 'pr' ? theme.friends.purple : theme.friends.gold}
+                            />
+                            <AppText variant="caption" style={{ flex: 1 }}>
+                              {feedText(event)}
+                            </AppText>
+                          </Stack>
+                          <AppText variant="micro" tone="muted">
+                            {relative(event.occurredAt)}
                           </AppText>
                         </Stack>
-                        <AppText variant="micro" tone="muted">
-                          {relative(event.occurredAt)}
-                        </AppText>
                       </Stack>
-                    </Stack>
-                  </Pressable>
-                ))
+                    </Pressable>
+                  );
+                })
               ) : (
                 <StateCard
                   title="No friend activity yet"

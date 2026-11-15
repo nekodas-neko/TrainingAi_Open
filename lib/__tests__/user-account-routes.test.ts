@@ -330,11 +330,29 @@ describe('POST /api/user/avatar', () => {
     expect(updateUserAvatar).not.toHaveBeenCalled()
   })
 
-  it('rejects a decoded image over the size cap', async () => {
-    const big = 'data:image/png;base64,' + 'A'.repeat(7_100_000)
-    const res = await avatar({ avatar: big })
+  // #3796: an avatar is sent to every friend who sees it, so it is capped at 200 KB decoded.
+  // `iVBORw0KGgoAAAAN` is 16 base64 characters (12 bytes), so each padding block of 4 adds 3 bytes.
+  const pngOfBytes = (bytes: number) =>
+    'data:image/png;base64,iVBORw0KGgoAAAAN' + 'AAAA'.repeat(Math.ceil((bytes - 12) / 3))
+
+  it('accepts an image just under the 200 KB cap', async () => {
+    expect((await avatar({ avatar: pngOfBytes(199 * 1024) })).status).toBe(200)
+    expect(updateUserAvatar).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a decoded image over the 200 KB cap, saying what the cap is', async () => {
+    const res = await avatar({ avatar: pngOfBytes(201 * 1024) })
     expect(res.status).toBe(400)
-    expect((await res.json()).error).toContain('too large')
+    const { error } = await res.json()
+    expect(error).toContain('too large')
+    expect(error).toContain('200 KB')
+    expect(updateUserAvatar).not.toHaveBeenCalled()
+  })
+
+  it('refuses a body far over the cap before decoding it', async () => {
+    const res = await avatar({ avatar: pngOfBytes(5 * 1024 * 1024) })
+    expect(res.status).toBe(413)
+    expect((await res.json()).error).toContain('200 KB')
     expect(updateUserAvatar).not.toHaveBeenCalled()
   })
 

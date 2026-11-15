@@ -3,6 +3,7 @@ import { recommendExerciseRole, UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/s
 import { isLighterRole } from '@trainingai/shared/ai-periodization/role-plausibility'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
 import * as s from '@/lib/data/postgres/schema'
+import { progressionStyleIdsOwned } from '@/lib/data/postgres/slices/programs'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { FIELD_LABEL, type PatchChange } from '../patch'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
@@ -299,6 +300,13 @@ export const sessionExerciseHandler: DomainHandler = {
         if (entry.mergedInto) return { ok: false, reason: 'invalid', detail: `"${swap.to}" has been merged into another exercise` }
         replacement = { id: entry.id, muscles: (entry.muscles as { muscle: string }[] | null) ?? [] }
       }
+    }
+
+    // `styleId` is written verbatim onto the exercise row, so it must name one of the caller's own
+    // progression styles — the same check the program save route makes (RV-32).
+    const styleChange = accepted.find(c => c.field === 'styleId')
+    if (styleChange && !(await progressionStyleIdsOwned(db, userId, [styleChange.to as string | null]))) {
+      return { ok: false, reason: 'invalid', detail: 'That progression style is not one of yours' }
     }
 
     const beforeState = captureBefore(accepted, row)
