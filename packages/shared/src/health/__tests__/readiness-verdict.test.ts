@@ -39,13 +39,13 @@ const day = (over: Partial<ReadinessVerdictDay> = {}): ReadinessVerdictDay => ({
 })
 
 describe('the calibrated multiplier (#2430)', () => {
-  it('is the owner-approved 0.65, under verdict version 2', () => {
+  it('is the owner-approved 0.65, under verdict version 3 (#3778 split the baseline by scale)', () => {
     // Signed off 2026-10-06 from a sweep over his real scores (about five prompts a month). Its own
     // constant, not sleep's, so a later sleep recalibration cannot move this rule silently, and any
     // change here moves the version so a stored rating can still be paired with the rule that
     // prompted it. Re-check after 30 more days of scores: the owner's note says confidence is low.
     expect(READINESS_VERDICT_IQR_MULTIPLIER).toBe(0.65)
-    expect(READINESS_VERDICT_MODEL_VERSION).toBe(2)
+    expect(READINESS_VERDICT_MODEL_VERSION).toBe(3)
     expect(READINESS_VERDICT_BASELINE_DAYS).toBe(28)
   })
 

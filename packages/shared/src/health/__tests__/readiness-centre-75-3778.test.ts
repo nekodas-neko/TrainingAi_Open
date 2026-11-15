@@ -205,3 +205,19 @@ describe('the stored-day replay', () => {
     }
   })
 })
+
+describe('the "is today unusual?" verdict does not mix the two scales', () => {
+  it('judges a v18 day only against v18 days, and stays silent until 28 exist', async () => {
+    const { readinessVerdictForDay, readinessScaleOf } = await import('../readiness-verdict')
+    expect(readinessScaleOf('v17:version-keyed-baselines:2026-11-04')).toBe('centre-50')
+    expect(readinessScaleOf(null)).toBe('centre-50')
+    expect(readinessScaleOf(READINESS_MODEL_VERSION)).toBe('centre-75')
+    const day = (i: number) => `2026-10-${String(i).padStart(2, '0')}`
+    const old = Array.from({ length: 28 }, (_, i) => ({ date: day(i + 1), score: 52 + (i % 5), modelVersion: 'v17:x' }))
+    const target = { date: '2026-10-30', score: 61, modelVersion: READINESS_MODEL_VERSION }
+    expect(readinessVerdictForDay(target, old)).toBeNull()
+    const fresh = old.map(d => ({ ...d, score: d.score + 6, modelVersion: READINESS_MODEL_VERSION }))
+    expect(readinessVerdictForDay(target, fresh)?.verdict).toBe('normal')
+    expect(readinessVerdictForDay({ ...target, modelVersion: 'v17:x', score: 54 }, old)?.verdict).toBe('normal')
+  })
+})

@@ -39,8 +39,25 @@ export const READINESS_VERDICT_IQR_MULTIPLIER = 0.65
 
 /** Bumped whenever the verdict rule changes, so a stored snapshot says which rule produced it.
  *  v1: trailing 28 scored days, median ± 1.00 × IQR, strict inequality at the band edges.
- *  v2: the same, with the multiplier calibrated to 0.65 (#2430). */
-export const READINESS_VERDICT_MODEL_VERSION = 2
+ *  v2: the same, with the multiplier calibrated to 0.65 (#2430).
+ *  v3: the baseline holds only days on the target's readiness SCALE (#3778). */
+export const READINESS_VERDICT_MODEL_VERSION = 3
+
+/** Readiness model v18 moved the centre to 75 (#3778). */
+const CENTRE_75_FROM_MODEL = 18
+
+/**
+ * #3778. Which scale a stored score is on: readiness v18 moved the centre from 50 to 75, which lifts
+ * an ordinary day by about 6 points. A v18 day judged against 28 days of the old scale reads "better
+ * than usual" for four weeks for no reason in the person, so the baseline keeps only days on the
+ * target's scale and the verdict is silent until 28 of them exist, as it is for any short baseline.
+ * Unstamped rows predate the stamp (Q-273), so they are on the old scale. Other version bumps do not
+ * split the baseline; `baselineSameVersionDays` still reports those.
+ */
+export function readinessScaleOf(modelVersion: string | null): 'centre-50' | 'centre-75' {
+  const n = modelVersion == null ? NaN : Number(/^v(\d+):/.exec(modelVersion)?.[1])
+  return Number.isFinite(n) && n >= CENTRE_75_FROM_MODEL ? 'centre-75' : 'centre-50'
+}
 
 export type ReadinessVerdict = 'normal' | 'poor' | 'good'
 
@@ -117,8 +134,10 @@ export function readinessVerdictForDay(
   const score = target.score
   if (score === null || !Number.isFinite(score)) return null
 
+  const scale = readinessScaleOf(target.modelVersion)
   const baseline = history
     .filter(d => d.date < target.date && d.score !== null && Number.isFinite(d.score))
+    .filter(d => readinessScaleOf(d.modelVersion) === scale)
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
     .slice(0, READINESS_VERDICT_BASELINE_DAYS)
   if (baseline.length < READINESS_VERDICT_BASELINE_DAYS) return null
