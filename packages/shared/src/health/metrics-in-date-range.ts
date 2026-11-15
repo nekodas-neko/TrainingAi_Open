@@ -10,7 +10,9 @@
  */
 export function metricsInDateRange<T extends { date: string }>(rows: readonly T[], from: string, to: string): T[] {
   for (const bound of [from, to]) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(bound)) throw new Error(`metricsInDateRange: bound must be YYYY-MM-DD, got ${bound}`)
+    if (bound.length !== 10 || bound[4] !== '-' || bound[7] !== '-') {
+      throw new Error(`metricsInDateRange: bound must be YYYY-MM-DD, got ${bound}`)
+    }
   }
   return rows.filter(r => r.date >= from && r.date <= to)
 }

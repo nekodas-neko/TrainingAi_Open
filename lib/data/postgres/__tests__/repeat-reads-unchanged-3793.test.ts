@@ -102,11 +102,11 @@ describe.skipIf(!canRun)('#3793: the same reads give the same answers', () => {
     })
 
     it('the raw-frame insert, which writes the anchor, drops it', async () => {
-      await repo.insertOuraRawSamples(USER, [{ ringTimestampDs: 5_000_000, tag: 0x46, eventName: 'TEST', bodyHex: '00' }])
+      await repo.insertOuraRawSamples(USER, [{ ringTimestampDs: 5_000_000, tag: 0x46, eventName: 'TEST', bodyHex: '00', decoded: null }])
       const first = await viaMemo()
       expect(first).toEqual(await viaDirect())
       await anchor(USER, 1, 4, new Date(Date.now() - DAY))
-      await repo.insertOuraRawSamples(USER, [{ ringTimestampDs: 5_100_000, tag: 0x46, eventName: 'TEST', bodyHex: '01' }])
+      await repo.insertOuraRawSamples(USER, [{ ringTimestampDs: 5_100_000, tag: 0x46, eventName: 'TEST', bodyHex: '01', decoded: null }])
       expect(await viaMemo()).toEqual(await viaDirect())
     })
   })
@@ -328,7 +328,7 @@ describe.skipIf(!canRun)('#3793: the same reads give the same answers', () => {
       await save(USER) // a refresh rewrites the row
       await same()
       expect(await viaMemo()).toBe(shiftDateStr(todayInTz(TZ), -9))
-      await repo.insertOuraRawSamples(USER, [{ ringTimestampDs: 7_000_000, tag: 0x46, eventName: 'TEST', bodyHex: '02' }])
+      await repo.insertOuraRawSamples(USER, [{ ringTimestampDs: 7_000_000, tag: 0x46, eventName: 'TEST', bodyHex: '02', decoded: null }])
       await same() // the newest frame's day
       await repo.updateUserProfile(USER, { timezone: 'Pacific/Kiritimati' })
       await same() // dated in the new zone
