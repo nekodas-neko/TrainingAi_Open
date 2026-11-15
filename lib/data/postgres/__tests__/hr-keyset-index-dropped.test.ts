@@ -59,12 +59,18 @@ describe.skipIf(!canRun)('oura_heartrate indexes after BF-55', () => {
    * Since #2079 that survivor is the primary key: the old unique index and the never-scanned `id`
    * key were folded into one.
    */
-  it('the (user_id, timestamp) index the planner uses is the primary key, and the only index', async () => {
+  /**
+   * #3793 added the second, and so far only other, index: `(user_id, source, timestamp)` for the
+   * connected-source probes. Anything beyond these two is a new index on the app's highest-volume
+   * insert and should have to change this list on purpose.
+   */
+  it('the (user_id, timestamp) index the planner uses is the primary key, beside only the source-probe index', async () => {
     const { rows } = await pool.query<{ indexname: string; indexdef: string }>(
       `SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'oura_heartrate' ORDER BY indexname`
     )
-    expect(rows.map(r => r.indexname)).toEqual(['oura_heartrate_pkey'])
+    expect(rows.map(r => r.indexname)).toEqual(['oura_heartrate_pkey', 'oura_heartrate_user_source_ts_idx'])
     expect(rows[0].indexdef).toMatch(/UNIQUE INDEX oura_heartrate_pkey .*\(user_id, "timestamp"\)/)
+    expect(rows[1].indexdef).toMatch(/INDEX oura_heartrate_user_source_ts_idx .*\(user_id, source, "timestamp"\)/)
     const { getPrimaryKeyColumns } = await import('@/lib/export/db-snapshot')
     expect(await getPrimaryKeyColumns(pool, 'oura_heartrate')).toEqual(['user_id', 'timestamp'])
   })

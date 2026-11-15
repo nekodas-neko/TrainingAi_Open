@@ -465,8 +465,10 @@ export async function hasOuraBleSamples(db: Db, userId: string): Promise<boolean
 /**
  * The recent-source facts behind `connectedSources` (issue 2613): existence checks, each a
  * `LIMIT 1` probe scoped by `user_id` and bounded by `since`. The ring fact is `hasOuraBleSamples`, so it is
- * not repeated here. `oura_heartrate`'s primary key leads `(user_id, timestamp)`, so the window is a
- * range scan on the user's own rows and each check stops at its first match.
+ * not repeated here. The two heart-rate probes use `oura_heartrate_user_source_ts_idx`
+ * `(user_id, source, timestamp)` (#3793, migration 202611150713): one descent per source value, and
+ * the first entry at or after `since` answers the check. On the primary key `(user_id, timestamp)`
+ * alone, a window with no match was read row by row, or the whole table seq-scanned.
  */
 export async function getRecentSourceFacts(db: Db, userId: string, since: Date) {
   const hr = s.ouraHeartrate
