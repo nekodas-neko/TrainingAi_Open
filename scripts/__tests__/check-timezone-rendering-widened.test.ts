@@ -17,6 +17,10 @@ describe('findOffenderLines', () => {
     expect(findOffenderLines(`const a = d.toLocaleTimeString('en-AU')`)).toEqual([1])
     expect(findOffenderLines(`const a = d.toLocaleDateString('en-AU', { timeZone: tz })`)).toEqual([])
     expect(findOffenderLines(`const a = d.toLocaleDateString('en-AU', {\n  day: 'numeric',\n  timeZone: tz,\n})`)).toEqual([])
+    // #3803: the native app passes its zone as a shorthand property.
+    expect(findOffenderLines(`p = new Intl.DateTimeFormat('en-US', {\n  month: 'short',\n  timeZone,\n}).formatToParts(at)`)).toEqual([])
+    expect(findOffenderLines(`p = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone }).format(at)`)).toEqual([])
+    expect(findOffenderLines(`p = new Intl.DateTimeFormat('en-US', { month: 'short', timeZoneName: 'short' }).format(at)`)).toEqual([1])
   })
 
   describe('.toLocaleString on a date', () => {
