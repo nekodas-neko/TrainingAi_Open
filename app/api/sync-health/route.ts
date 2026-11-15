@@ -9,6 +9,7 @@ import { isPlausibleStepWindow } from "@trainingai/shared/health/step-estimate";
 import { isPlausibleCadence, MIN_PLAUSIBLE_SPM, MAX_PLAUSIBLE_SPM } from "@trainingai/shared/health/cadence";
 import { ingestDayRejection, INGEST_FUTURE_TOLERANCE_MS } from "@trainingai/shared/validation/ingest-clock";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { settleWalkingPlanSoon } from '@/lib/health/walking-plan-service';
 import {
   HR_UPLOAD_CHUNK, INTERVAL_UPLOAD_CHUNK, SYNC_DAYS_COLD, type ActivityInterval,
   historyDayRejection, importPastToleranceStartMs,
@@ -416,6 +417,9 @@ export async function POST(req: NextRequest) {
   const enrichmentCandidates = recent
     .filter(a => a.avgHr == null && a.distanceKm == null && a.caloriesBurned == null && a.startTime && a.endTime)
     .map(a => ({ id: a.id, date: a.date, startTime: a.startTime, endTime: a.endTime }));
+
+  // #3779: Health Connect's steps, workouts and heart rate may finish a walking-plan day.
+  settleWalkingPlanSoon(repo, userId, tz);
 
   return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateAccepted, intervalsAccepted, exercisesTombstoned, exercisesRevived });
 }

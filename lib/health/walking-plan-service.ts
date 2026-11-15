@@ -122,7 +122,7 @@ export async function measureWalkingDays(
   const rest = new Set(restDays.map((d) => d.replace(/\//g, '-')))
   const sick = new Set<string>()
   for (const c of checkins) if (resolveSelfReportedSick(undefined, c.illnessContext)) sick.add(c.logDate.replace(/\//g, '-'))
-  for (const m of moods) if (resolveSelfReportedSick(m.bodyState, null)) sick.add(m.date.replace(/\//g, '-'))
+  for (const m of moods) if (resolveSelfReportedSick(m.bodyState, null)) sick.add(m.logDate.replace(/\//g, '-'))
 
   // #3646, as the heart-health service: a Health Connect copy of an in-app log is the same workout,
   // so it is measured once.

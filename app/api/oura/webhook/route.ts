@@ -10,6 +10,7 @@ import { hasOuraTokenKey } from '@/lib/oura/cloud/token-cipher'
 import { reportOuraCloudIssue } from '@/lib/oura/cloud/report'
 import { workoutHrReattributor } from '@/lib/workout/post-completion-hr'
 import { stillRhrRefresher } from '@/lib/oura/cloud/still-rhr'
+import { settleWalkingPlanSoon } from '@/lib/health/walking-plan-service'
 import {
   OuraWebhookEvent, handleOuraWebhookEvent, isOurVerificationToken, isRetryableOuraError, ouraWebhookConfig, verifyOuraSignature,
 } from '@/lib/oura/cloud/webhook'
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
       repo, config: config.oauth, rescore: repo,
       workoutHr: workoutHrReattributor(repo),
       stillRhr: stillRhrRefresher(repo),
+      afterWrite: (u) => settleWalkingPlanSoon(repo, u),
     }, event.data)
     // Only the outcome's name goes back; no user id, no health data.
     return json({ received: true, result: outcome.result })
