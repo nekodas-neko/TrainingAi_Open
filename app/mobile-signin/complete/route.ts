@@ -33,6 +33,9 @@ export async function GET() {
   // #3797: the browser's session was only the way to this bridge code; the code already carries its
   // value (`mintMobileBridgeToken`). Left in place it stays signed in to the web app on the phone's
   // browser, is not listed under Signed-in devices, and revoking the phone does not end it.
+  // `auth()` above re-issues the cookie (Auth.js slides its expiry), and Next sends that Set-Cookie
+  // ahead of the response's own; a browser applies them in order (RFC 6265 §5.3), so this deletion,
+  // last, is what sticks. Checked on `pnpm dev`: the next request carries no session.
   clearSessionCookies({ cookies: store }, response);
   response.headers.set('Cache-Control', 'private, no-store');
   return response;
