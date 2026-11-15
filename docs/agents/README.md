@@ -6,14 +6,15 @@ contract, prompts and batons are archived in [`../archive/agents-2026-10-05/`](.
 
 A **role** is a job description, not a single session — run as many sessions of a role as the work
 needs. The **mode** is one of those roles doing a different job for a while: release-test is the
-Implementer testing Tuesday's release instead of building.
+Implementer testing a release candidate instead of building. Releases are weekly, on Tuesday;
+**Suspended while the native app lands (from 2026-10-13):** releases go out on demand, up to daily, each with the owner's yes ([`../native-testing.md`](../native-testing.md)).
 
 | Role | Runs where | How many | Prompt |
 |---|---|---|---|
 | 🪐 **Orchestrator** | Cloud | **One** — it coordinates, so two would contradict each other | [`prompts/orchestrator.md`](prompts/orchestrator.md) |
 | 🪲 **BugFix** | Cloud **or** the owner's machine | Any number | [`prompts/bugfix.md`](prompts/bugfix.md) |
 | 🚧 **Implementer** | **The owner's machine** — Docker, the phone on USB | **One chat**, running each batch as a subagent thread in its own worktree (up to two at once, one per lane) | [`prompts/implementer.md`](prompts/implementer.md) |
-| ↳ release-test | A thread of the Implementer, on Tuesdays | One | [`prompts/release-test.md`](prompts/release-test.md) |
+| ↳ release-test | A thread of the Implementer, on release day | One | [`prompts/release-test.md`](prompts/release-test.md) |
 
 **Where a role runs is decided by hardware.** Anything needing the phone, Docker or the real APK runs
 on the owner's machine; everything else may run in the cloud.
@@ -183,7 +184,7 @@ of that, the **Orchestrator can send instructions straight to a running agent** 
 4. The **Implementer** takes the oldest open batch (`node scripts/queue.js --next-batch`) and builds
    it as one PR; **BugFix** takes single small fixes labelled `agent: bugfix`. Either opens a draft PR with `Closes #N` when they start (that is the claim), and turn on
    auto-merge when it is ready.
-5. The **Orchestrator** merges agent PRs on green CI. **Every Tuesday** it prepares the release —
+5. The **Orchestrator** merges agent PRs on green CI. **Every Tuesday** (on demand while the native app lands, with the owner's yes) it prepares the release —
    everything merged since the last one — gives the owner the summary, and runs it on "approve". The
    GitHub Release it creates lists every PR it carried; that is the record of what shipped. The Implementer's
    **release-test mode** tests the candidate first. A hotfix goes out off-schedule only when

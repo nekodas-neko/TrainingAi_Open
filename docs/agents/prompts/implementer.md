@@ -69,7 +69,7 @@ and the Custom Rules job fails a PR that has them (#2700).
 > each issue what was done. Report back the PR number and the device-check list. Never merge by
 > hand, release, touch production data, or edit files outside this worktree.
 
-## Release day (Tuesday)
+## Release day (Tuesday; on demand while the native app lands, `docs/native-testing.md`)
 When the inbox names a release issue, run the release test as **one more thread** in a worktree at
 the **exact candidate commit** (`docs/agents/prompts/release-test.md`), then do its device pass
 yourself (step 4). It does not count toward the two-thread limit; pause starting new batches until
