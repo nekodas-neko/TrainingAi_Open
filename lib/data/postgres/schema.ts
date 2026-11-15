@@ -1652,7 +1652,11 @@ export const ouraHeartrate = pgTable('oura_heartrate', {
   context:   text('context'),
   // migration 130 (Phase-2 B1) — cursor for the dedicated Track-B timeseries backup sync.
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [primaryKey({ name: 'oura_heartrate_pkey', columns: [t.userId, t.timestamp] })])
+}, t => [
+  primaryKey({ name: 'oura_heartrate_pkey', columns: [t.userId, t.timestamp] }),
+  // #3793 (migration 202611150713): the "is this source connected" probes in `getRecentSourceFacts`.
+  index('oura_heartrate_user_source_ts_idx').on(t.userId, t.source, t.timestamp),
+])
 
 // Server mirror of the on-device `oura_bucket` coarse-tier RRD trend ladder (migration 137,
 // Phase-2 B1). Durable backup destination for Track-B — device-computed, never server-computed.
