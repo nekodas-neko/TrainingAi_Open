@@ -5,6 +5,7 @@ import { SECONDS_PER_REP, SET_SETUP_SEC, fitBudgetMin } from '@trainingai/shared
 import { PCT_BANDS } from '@trainingai/shared/workout/time-profile'
 import { displayOneRm, displayOneRmDelta } from '@trainingai/shared/1rm'
 import { FEVER_TEMP_Z } from '@trainingai/shared/health/illness-radar'
+import { PROMPT_REST_DAY_READINESS_BELOW } from '@trainingai/shared/health/readiness-decision-thresholds'
 import { goalRange } from './goal-ranges'
 import { userTextBlock, USER_TEXT_NOTE } from '../ai/untrusted-text'
 // The units, superlative and no-diagnosis rules: `reasoning` is shown to the lifter (#3803).
@@ -168,7 +169,7 @@ phase_action rules:
   soreness alone.
 - "rest_day_recommended": multiple systemic stress indicators simultaneously poor
   (sleep_score_trend < 0.75 AND hrv_trend < 0.75 — use sleep_trend in place of
-  sleep_score_trend when the quality trend is not given; OR external_readiness < 40,
+  sleep_score_trend when the quality trend is not given; OR external_readiness < ${PROMPT_REST_DAY_READINESS_BELOW},
   OR spo2_trend < 0.97, OR temp_z >= ${FEVER_TEMP_Z} [skin temperature fever-consistent
   vs personal baseline]),
   OR the illness radar is elevated or fever (temperature/RHR/HRV moving together against the

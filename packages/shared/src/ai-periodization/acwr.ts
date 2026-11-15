@@ -286,7 +286,7 @@ export interface AcwrBand {
 //   optimalMax  1.3  band ceiling — above is amber. The running recovery gate holds back here.
 //   elevatedMin 1.2  the ONE deliberate exception, and it is inside the optimal band: the
 //                    early-deload card fires before the band turns amber because it is paired
-//                    with a readiness score under 45 — the pair is the signal, not the number.
+//                    with a readiness score under EARLY_DELOAD_SCORE_MAX (51 since #3778) — the pair is the signal, not the number.
 //                    Aligning it to optimalMax would change who sees the card.
 //   highMax     1.5  where the two HARD actions fire — the emergency-deload trigger and the
 //                    Activity-score over-exertion taper. Both were 1.5 by coincidence of typing.

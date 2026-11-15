@@ -5,6 +5,7 @@
 // is the source and the .pt-captured golden is the parity proof. Ported line-for-line from
 // the vendor's `training_stress_score_0_2_1` model source (private archive)
 import { getOtsTypedConstants } from '@/lib/oura-models/constants'
+import { OTS_LOW_READINESS_BELOW } from '@trainingai/shared/health/readiness-decision-thresholds'
 
 export interface OtsInput {
   startTimestampMs: number
@@ -163,7 +164,9 @@ export function runTrainingStressScore(input: OtsInput): { ots: number; high: bo
     categoryWeight = C.vo2maxWeights[vo2maxCategory]
   }
 
-  const threshold = input.readiness < 60 ? C.highOtsThreshold * 0.9 : C.highOtsThreshold
+  // The model's own cut was 60 on readiness. #3778 moved our readiness centre to 75, and the caller
+  // passes ours, so the cut moves with it (`readiness-decision-thresholds.ts`) to keep the same days.
+  const threshold = input.readiness < OTS_LOW_READINESS_BELOW ? C.highOtsThreshold * 0.9 : C.highOtsThreshold
 
   // Sliding 720-window, stride 1. Track only the LAST non-NaN OTS (the day's end-of-day
   // rolling load) — the model returns the whole masked series and callers read the last value.

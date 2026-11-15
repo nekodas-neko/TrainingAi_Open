@@ -1,5 +1,6 @@
 import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { targetsForRunType } from './hr-targets'
+import { RUNNING_REST_READINESS_BELOW, RUNNING_SOFTEN_READINESS_BELOW } from '@trainingai/shared/health/readiness-decision-thresholds'
 import type { FitnessSnapshot, Prescription, RunType } from './types'
 
 export type GateAction = 'proceed' | 'soften' | 'rest'
@@ -24,8 +25,9 @@ export interface RecoveryGateResult {
 // Thresholds — this module's calibration constants (deterministic, documented).
 const HEAVY_LEG_VOLUME_KG = 3000        // a session above this counts as a "heavy" leg day
 const LEG_INTERFERENCE_HOURS = 24       // hard running within 24h of heavy legs is downgraded
-const READINESS_REST = 50               // below this → rest
-const READINESS_SOFTEN = 65             // below this → soften
+// #3778: 50 → 57 and 65 → 72 when the readiness centre moved to 75 (`readiness-decision-thresholds.ts`).
+const READINESS_REST = RUNNING_REST_READINESS_BELOW       // below this → rest
+const READINESS_SOFTEN = RUNNING_SOFTEN_READINESS_BELOW   // below this → soften
 const SHORT_SLEEP_HOURS = 5.5
 // Foster training monotony (mean/SD of the week's daily load). >2.0 is the documented "high
 // monotony" band (Foster 1998) associated with elevated overtraining/illness risk — a portable,

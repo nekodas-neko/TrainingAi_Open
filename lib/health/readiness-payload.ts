@@ -44,12 +44,13 @@ import { scoreAvailability, metricAvailability, type ReadinessInputKey, type Sco
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
 import { ouraCloudDeliveredTypes } from '@/lib/oura/cloud/config'
 import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, readinessSourceLabel, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
+import { EARLY_DELOAD_READINESS_BELOW } from '@trainingai/shared/health/readiness-decision-thresholds'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
  *
  * The ACWR bound is deliberately **not** `ACWR_THRESHOLDS.optimalMax` (1.3). This fires while load
- * is still inside the optimal band, because it is paired with a readiness score under 45 — the
+ * is still inside the optimal band, because it is paired with a readiness score under 51 (45 before #3778) — the
  * pair is the signal, not either number on its own. Aligning it to 1.3 would change who sees the
  * card.
  *
@@ -58,7 +59,9 @@ import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, 
  * this name so the card can state the threshold it tripped instead of asserting "your readiness is
  * low" with no number, which is what the owner asked for (Q-173).
  */
-export const EARLY_DELOAD_SCORE_MAX = 45
+// #3778: 45 → 51 when the readiness centre moved to 75, so the card reaches the same days
+// (`readiness-decision-thresholds.ts`). The paired-signal reasoning above is unchanged.
+export const EARLY_DELOAD_SCORE_MAX = EARLY_DELOAD_READINESS_BELOW
 export const EARLY_DELOAD_ACWR_MIN = ACWR_THRESHOLDS.elevatedMin
 
 /** One pillar's contribution to the `oura_daily_derived` write at the end of a readiness computation. */

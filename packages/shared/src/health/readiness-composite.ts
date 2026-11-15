@@ -141,6 +141,55 @@ const NEUTRAL: ReadinessContributor = { score: 50, provisional: true, input: nul
  *  and same `provisional` as NEUTRAL — only the reason differs, which is the whole point. */
 const AWAITING_BASELINE: ReadinessContributor = { score: 50, provisional: true, input: null, gap: 'awaiting_baseline' }
 
+/**
+ * #3778 (owner, 15 Nov, direction A): **a reading exactly at the person's own baseline scores 75**,
+ * not 50, on the three contributors judged higher- or lower-is-better against a normal (resting HR,
+ * HRV balance, sleep balance).
+ *
+ * At 50, half of all ordinary days scored under 50 on each of those three by definition, and the
+ * composite of an ordinary recovered day landed in the low-to-mid 50s, the bottom edge of Moderate:
+ * production reached High on 1 of 36 days. Moving the centre fixes where an ordinary day lands
+ * without inventing a new model.
+ *
+ * **The maths is kept: the TN-60 shape is unchanged in σ, only its two halves are rescaled.** The old
+ * curve (linear ±0.9σ, algebraic tails, see `compressTails`) is computed first, on its own 0–100
+ * scale centred at 50. Its upper half (50→100) is then squeezed into 75→100 and its lower half
+ * (0→50) stretched over 0→75. So:
+ * - every σ value keeps its ordering and the knees stay at ±0.9σ;
+ * - the top still bends toward 100 without reaching it (+1.5σ → 95, +3σ → 98, rounding to 100
+ *   needs ~8σ), so great days do not pile onto a rail;
+ * - the bottom still reaches low scores (−1.5σ → 15, −3σ → 7), so a genuinely poor night is Low.
+ *
+ * The price, stated so nobody rediscovers it: above baseline each σ is worth half the points it was
+ * (16.7 instead of 33.3 in the linear region), below baseline one and a half times as many (50).
+ * That asymmetry is what "centre at 75 on a 0–100 scale" means; a symmetric slope would either rail
+ * at 100 by +0.75σ or never get below 25.
+ *
+ * Temperature is untouched: it is closer-is-better and already scores 100 at baseline. The pass-
+ * through inputs (sleep score, yesterday's activity) and the recovery index have no baseline to be
+ * at, so they are untouched too.
+ *
+ * Decisions that read the composite were re-anchored in the same change so the same days are told
+ * to rest: `readiness-decision-thresholds.ts`.
+ */
+export const READINESS_BASELINE_CENTRE = 75
+
+/** A centred contributor with no input, or a normal too young to score it, stands at the centre — the
+ *  same "assume an ordinary night" it stood at when the centre was 50. Left at 50 it would read 25
+ *  points below an ordinary night for the 14 nights every new device or algorithm version spends
+ *  learning its normal (#2984, #3601). */
+const NEUTRAL_CENTRED: ReadinessContributor = { ...NEUTRAL, score: READINESS_BASELINE_CENTRE }
+const AWAITING_BASELINE_CENTRED: ReadinessContributor = { ...AWAITING_BASELINE, score: READINESS_BASELINE_CENTRE }
+
+/** Moves a score on the old 50-centred scale onto the 75-centred one: the upper half squeezed into
+ *  75–100, the lower half stretched over 0–75. Monotone, and fixed at 0, 50→75 and 100. */
+function recentre(score50: number): number {
+  const c = READINESS_BASELINE_CENTRE
+  return score50 >= 50
+    ? c + (score50 - 50) * ((100 - c) / 50)
+    : c - (50 - score50) * (c / 50)
+}
+
 // Points added per z-unit around the neutral 50. Recalibrated 2026-07-22 (W-D): 50/1.5 ≈ 33.3, so a
 // contributor reaches a full 100 at +1.5σ (a realistically-great day) rather than the former +2.5σ
 // (which needed a 2.5-sigma day on every axis at once — statistically unreachable, capping readiness
@@ -210,29 +259,57 @@ function compressLowTail(raw: number): number {
 
 /** Maps a personal-baseline z-score to a 0-100 sub-score. Linear through the middle; past the knee
  *  the tails compress, so extreme days keep their ordering instead of collapsing onto 0/100 (TN-60).
- *  - higher/lower-better: neutral 50 at baseline (z=0), approaching 100 beyond ~+1.5σ *in the good direction*.
+ *  - higher/lower-better: 75 at baseline (z=0) since #3778, approaching 100 beyond ~+1.5σ *in the good
+ *    direction* and falling toward 0 beyond ~−1.5σ (see `baselineContributorCurve`).
  *  - closer-better (temperature): 100 at baseline (a stable temp is ideal — no fever/illness) and
  *    falling to 0 by ~1.5σ of deviation either way. (Previously it peaked at 50, which meant a
  *    perfectly-stable temperature could only ever be "neutral" and structurally capped readiness ~95.) */
+export type BaselineDirection = 'higher-better' | 'lower-better' | 'closer-better'
+
+/**
+ * THE readiness curve for a baseline-relative contributor: z (standard deviations from the person's
+ * own normal) → an unrounded 0–100 sub-score. The one definition; the composite, the re-derivation of
+ * stored rows and the tests all read it.
+ *
+ * | z (good direction) | −3 | −1.5 | −0.9 | −0.5 | 0 | +0.5 | +0.9 | +1.5 | +3 |
+ * |---|---|---|---|---|---|---|---|---|---|
+ * | before #3778 | 4.4 | 10 | 20 | 33.3 | 50 | 66.7 | 80 | 90 | 95.6 |
+ * | from #3778 (v18) | 6.7 | 15 | 30 | 50 | 75 | 83.3 | 90 | 95 | 97.8 |
+ *
+ * Temperature (closer-better) is the same before and after: 100 at baseline, falling either way.
+ */
+export function baselineContributorCurve(z: number, direction: BaselineDirection): number {
+  if (direction === 'closer-better') {
+    // Closer-better compresses only the BAD end (#2359). Its good end is z = 0, a single point that
+    // cannot be exceeded, so there is no rail up there for a tail to stop extreme days piling onto: the
+    // compression just pulled "exactly at baseline" down to 90 (raw 100 bends to 100 − 20/2) and cost
+    // readiness about 1.1 points on every day with a normal temperature. The bad end, where a fever
+    // pushes the raw score toward 0, keeps the TN-60 shape so extreme days stay ordered.
+    return compressLowTail(100 - Math.abs(z) * (2 * Z_POINTS_PER_UNIT))
+  }
+  const raw = 50 + (direction === 'higher-better' ? z : -z) * Z_POINTS_PER_UNIT
+  return recentre(compressTails(raw))
+}
+
+/** The sub-score a baseline-relative contributor falls back to with no input or a cold normal: the
+ *  centre for the two centred directions, the plain neutral 50 for temperature (unchanged by #3778). */
+export function baselineFallbackScore(direction: BaselineDirection): number {
+  return direction === 'closer-better' ? NEUTRAL.score : READINESS_BASELINE_CENTRE
+}
+
 function zToScore(
   z: number | null,
-  direction: 'higher-better' | 'lower-better' | 'closer-better',
+  direction: BaselineDirection,
   nHistory: number,
   /** #2984: a value exists tonight, so a cold normal is `awaiting_baseline` even without a z. */
   valuePresent = false,
 ): ReadinessContributor {
-  if (z == null && !valuePresent) return NEUTRAL
-  if (nHistory < BASELINE_MIN_NIGHTS) return AWAITING_BASELINE
-  if (z == null) return NEUTRAL
-  const raw = direction === 'closer-better'
-    ? 100 - Math.abs(z) * (2 * Z_POINTS_PER_UNIT)
-    : 50 + (direction === 'higher-better' ? z : -z) * Z_POINTS_PER_UNIT
-  // Closer-better compresses only the BAD end (#2359). Its good end is z = 0, a single point that
-  // cannot be exceeded, so there is no rail up there for a tail to stop extreme days piling onto: the
-  // compression just pulled "exactly at baseline" down to 90 (raw 100 bends to 100 − 20/2) and cost
-  // readiness about 1.1 points on every day with a normal temperature. The bad end, where a fever
-  // pushes the raw score toward 0, keeps the TN-60 shape so extreme days stay ordered.
-  const shaped = direction === 'closer-better' ? compressLowTail(raw) : compressTails(raw)
+  const centred = direction !== 'closer-better'
+  const neutral = centred ? NEUTRAL_CENTRED : NEUTRAL
+  if (z == null && !valuePresent) return neutral
+  if (nHistory < BASELINE_MIN_NIGHTS) return centred ? AWAITING_BASELINE_CENTRED : AWAITING_BASELINE
+  if (z == null) return neutral
+  const shaped = baselineContributorCurve(z, direction)
   return { score: Math.max(0, Math.min(100, Math.round(shaped))), provisional: false, input: z, gap: null }
 }
 
@@ -281,8 +358,12 @@ function plainScore(v: number | null): ReadinessContributor {
  *  the fallback score and early-deload check that read them) are of the newest reading's (source, algorithm
  *  version), the version read from the same night's sleep. One version per source scores exactly as v16;
  *  stored rows keep their v16 stamp.
+ *  v18: a reading at baseline scores 75, not 50, on resting HR, HRV balance and sleep balance, and those
+ *  three fall back to 75 when unscored (#3778, `READINESS_BASELINE_CENTRE`). Each σ keeps its ordering;
+ *  an ordinary day's composite rises by about 11 points (0.44 × 25) and a day with those three far off
+ *  baseline barely moves. Stored rows are not rewritten and keep their v17 (or older) stamp.
  */
-export const READINESS_MODEL_VERSION = 'v17:version-keyed-baselines:2026-11-04'
+export const READINESS_MODEL_VERSION = 'v18:baseline-centre-75:2026-11-15'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.
@@ -344,6 +425,8 @@ export const READINESS_MODEL = {
   recoveryIndexOptimalHours: RECOVERY_INDEX_OPTIMAL_HOURS,
   modelVersion: READINESS_MODEL_VERSION,
   neutralScore: NEUTRAL.score,
+  /** #3778: what resting HR, HRV balance and sleep balance score at baseline, and fall back to. */
+  baselineCentre: READINESS_BASELINE_CENTRE,
   directions: {
     restingHeartRate: 'lower-better',
     hrvBalance: 'higher-better',
@@ -357,7 +440,7 @@ export const READINESS_MODEL = {
 
 export function computeReadinessComposite(input: ReadinessCompositeInputs): ReadinessCompositeResult {
   const nights = input.baselineNights ?? {}
-  const baseline = (key: BaselineContributorKey, z: number | null, direction: 'higher-better' | 'lower-better' | 'closer-better') =>
+  const baseline = (key: BaselineContributorKey, z: number | null, direction: BaselineDirection) =>
     nights[key] != null ? zToScore(z, direction, nights[key]!, true) : zToScore(z, direction, input.nHistory)
   const contributors: ReadinessCompositeResult['contributors'] = {
     restingHeartRate: baseline('restingHeartRate', input.rhrZ, 'lower-better'),
@@ -421,12 +504,16 @@ export interface ReadinessRederivation {
    * written before #2224 carries `checkin`) is ignored, and `score` is what the current model gives.
    * That is a model change, which `model_versions.readiness` on the row already records.
    *
-   * A missing key now contributes the model's own NEUTRAL 50, which is what
+   * A missing key now contributes the model's own neutral (75 for the three centred keys since #3778, 50 for the rest), which is what
    * `computeReadinessComposite` uses for a contributor with no input — so `score` is the closest
    * the stored row can support. It is still an ASSUMPTION, which is why the key is reported: a
    * caller must not claim a row reproduces cleanly while this is non-empty.
    */
   missing: (keyof typeof READINESS_WEIGHTS)[]
+}
+
+function isBaselineDirection(d: (typeof READINESS_MODEL.directions)[keyof typeof READINESS_WEIGHTS]): d is BaselineDirection {
+  return d === 'higher-better' || d === 'lower-better' || d === 'closer-better'
 }
 
 /** Re-derive one persisted contributor's score from the input stored beside it, under the current
@@ -437,8 +524,9 @@ function rederiveContributor(
 ): number | null {
   if (!('input' in stored)) return null
   const value = stored.input
-  if (value == null) return NEUTRAL.score      // no input → the model's neutral, by definition
   const direction = READINESS_MODEL.directions[key]
+  // No input → the model's neutral, by definition — which for the centred three is the centre (#3778).
+  if (value == null) return isBaselineDirection(direction) ? baselineFallbackScore(direction) : NEUTRAL.score
   if (direction === 'passthrough') return plainScore(value).score
   if (stored.scale === 'oura_contributor') return recoveryIndexContributorScore(value).score
   if (direction === 'hours-curve') return recoveryIndexScore(value).score
@@ -505,7 +593,8 @@ export function rederiveReadinessFromStored(stored: unknown): ReadinessRederivat
     // `weight × 50` and read as a disagreement the row did not have.
     if (entry === undefined) {
       missing.push(key)
-      weighted += NEUTRAL.score * READINESS_WEIGHTS[key]
+      const direction = READINESS_MODEL.directions[key]
+      weighted += (isBaselineDirection(direction) ? baselineFallbackScore(direction) : NEUTRAL.score) * READINESS_WEIGHTS[key]
       continue
     }
 

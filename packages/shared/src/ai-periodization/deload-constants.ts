@@ -61,10 +61,11 @@ export function deloadStyleForGoal(trainingGoal: string): { pct: number; reps: n
 // How `computeDeloadStrength` grades a deload owed to consecutive training days: readiness at or
 // above SOFT_MIN keeps it a soft nudge, at or above RECOMMENDED_MIN it is recommended, below that
 // strong. The session-select "Why this recommendation?" list names readiness as a reason from the
-// same SOFT_MIN, so the explanation and the decision cannot drift (#2375). Not the < 60 used by
+// same SOFT_MIN, so the explanation and the decision cannot drift (#2375). Not the cut used by
 // rest-day guidance and session weighting — those ask a different question.
-export const DELOAD_READINESS_SOFT_MIN = 70
-export const DELOAD_READINESS_RECOMMENDED_MIN = 50
+// #3778: 70 → 76 and 50 → 57 when the readiness centre moved to 75; defined with every other
+// readiness decision cut in `readiness-decision-thresholds.ts` and re-exported here.
+export { DELOAD_READINESS_SOFT_MIN, DELOAD_READINESS_RECOMMENDED_MIN } from '../health/readiness-decision-thresholds'
 
 // ── Temperature thresholds ───────────────────────────────────────────────────
 //

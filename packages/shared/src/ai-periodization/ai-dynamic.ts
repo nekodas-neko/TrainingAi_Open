@@ -4,6 +4,7 @@ import { normalizeMuscle, moodMuscleMatches } from '@trainingai/shared/muscles'
 import type { ProgramSession, MuscleAssignment, NextSessionRecommendation } from '@trainingai/shared/types/program'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { loggedAsSession, programSessionFor } from '@trainingai/shared/workout/session-identity'
+import { SESSION_LOW_READINESS_BELOW } from '@trainingai/shared/health/readiness-decision-thresholds'
 
 export interface MuscleRecovery {
   muscle: string
@@ -317,8 +318,9 @@ export function computeAiDynamicNextSession(input: AiDynamicInput): NextSessionR
     if (sess) return { isRestDay: false, session: sess, reason: `Already trained: ${sess.name}`, ...rem }
   }
 
-  // Shift recovery weight up when readiness or sleep quality is low
-  const lowReadiness = readinessScore != null && readinessScore < 60
+  // Shift recovery weight up when readiness or sleep quality is low (#3778: the cut was 60 before the
+  // readiness centre moved to 75)
+  const lowReadiness = readinessScore != null && readinessScore < SESSION_LOW_READINESS_BELOW
   const lowSleep = sleepTrend != null && sleepTrend < 0.85
   const wRecovery  = (lowReadiness || lowSleep) ? 0.55 : 0.40
   const wBalance   = (lowReadiness || lowSleep) ? 0.25 : 0.35

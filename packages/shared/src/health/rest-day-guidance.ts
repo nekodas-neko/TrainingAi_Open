@@ -1,3 +1,5 @@
+import { REST_DAY_RECOVERED_MIN, REST_DAY_REST_BELOW } from './readiness-decision-thresholds'
+
 export type RestDayBand = 'recovered' | 'partial' | 'rest'
 
 export interface RestDayGuidanceInput {
@@ -44,7 +46,9 @@ export function restDayGuidance({
 
   const hasSoreness = soreMuscles.length > 0
 
-  if (readinessScore >= 75 && !hasSoreness) {
+  // #3778: 75 → 80 and 60 → 67 when the readiness centre moved to 75 (`readiness-decision-thresholds.ts`),
+  // the same re-anchoring the sleep cut above had, so the same days are told to rest.
+  if (readinessScore >= REST_DAY_RECOVERED_MIN && !hasSoreness) {
     return {
       band: 'recovered',
       title: 'Recovered',
@@ -54,7 +58,7 @@ export function restDayGuidance({
     }
   }
 
-  if (readinessScore < 60) {
+  if (readinessScore < REST_DAY_REST_BELOW) {
     const suggestions = ['Prioritize sleep tonight']
     if (sleepScore != null && sleepScore < LOW_SLEEP_SCORE) {
       suggestions.push("Last night's sleep score was low — an earlier bedtime will help more than training today")
@@ -68,7 +72,7 @@ export function restDayGuidance({
     }
   }
 
-  // 60-74, or >=75 with localized soreness.
+  // Between the two cuts, or recovered with localized soreness.
   const suggestions = ['Easy walk', hasSoreness ? `Light mobility work for ${soreMuscles.join(', ')}` : 'Light mobility work']
   if (consecutiveRestDays != null && consecutiveRestDays >= MANY_CONSECUTIVE_REST_DAYS) {
     suggestions.push("You've had several rest days in a row — a short walk today can help maintain momentum")
