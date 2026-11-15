@@ -209,8 +209,8 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
       return { result: 'unknown_user' }
     }
     const read = await fetchOuraDocument(token, event.data_type, event.object_id, { timeoutMs: WEBHOOK_DOCUMENT_TIMEOUT_MS })
-    if (read.missing === 'not_found') return { result: 'not_found' }
-    if (read.missing === 'invalid') {
+    if (!read.doc) {
+      if (read.missing === 'not_found') return { result: 'not_found' }
       // A field changed at Oura (as in #3033): a retry would get the same document. The type only, never the body.
       reportOuraCloudIssue(`webhook:parse-failed:${event.data_type}`, `a ${event.data_type} document did not match the spec's model and was not stored`, { userId })
       return { result: 'invalid_document' }
