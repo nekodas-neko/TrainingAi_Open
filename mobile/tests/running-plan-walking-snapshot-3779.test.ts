@@ -31,3 +31,8 @@ test('a running plan payload keeps its fitness snapshot', () => {
 test('a malformed running snapshot is still refused', () => {
   assert.throws(() => schema.parse({ ...base, plan: { id: 'p-r', frameworkKey: 'zone2-base', fitnessSnapshot: { maxHr: 'high' } } }));
 });
+
+test('a walking plan whose state has not been written yet ({}) parses as no running fitness', () => {
+  const parsed = schema.parse({ ...base, plan: { id: 'p-w0', frameworkKey: 'walking-heart-health', goalKind: 'walking', fitnessSnapshot: {} } });
+  assert.equal(parsed.plan?.fitnessSnapshot, null);
+});

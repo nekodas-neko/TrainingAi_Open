@@ -133,6 +133,8 @@ export const runningPlanSpec = (today: string) => ({
               .object({ walkingPlan: z.object({ version: z.number() }).passthrough() })
               .passthrough()
               .transform(() => null),
+            // A walking plan whose first state write hasn't landed yet stores `{}`: nothing to read.
+            z.object({}).strict().transform(() => null),
           ])
           .nullish(),
       })
