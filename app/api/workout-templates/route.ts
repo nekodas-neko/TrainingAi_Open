@@ -64,11 +64,8 @@ export async function POST(req: NextRequest) {
     // there is no shared or global set, so any id the caller does not own is either a mistake or an
     // attempt to mount someone else's phase structure onto their own program (Q-129). Same
     // validate-against-the-owned-list shape as phase-sets/[id]/route.ts does for style ids.
-    if (body.program.phaseSetId) {
-      const ownedPhaseSetIds = new Set((await repo.listPhaseSets(userId)).map(ps => ps.id))
-      if (!ownedPhaseSetIds.has(body.program.phaseSetId)) {
-        return NextResponse.json({ error: 'Invalid phaseSetId' }, { status: 400 })
-      }
+    if (!(await repo.phaseSetIdOwned(userId, body.program.phaseSetId))) {
+      return NextResponse.json({ error: 'Invalid phaseSetId' }, { status: 400 })
     }
 
     // RV-32: `session_exercises.style_id` is the same client-supplied FK into the same strictly

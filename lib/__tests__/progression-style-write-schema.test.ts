@@ -24,6 +24,7 @@ const saveProgressionStyle = vi.fn(async (_userId: string, st: Record<string, un
 const listPhaseSets = vi.fn(async () => [] as Array<{ id: string }>)
 const listPrograms = vi.fn(async () => [] as Array<{ id: string; phaseSetId?: string }>)
 const progressionStyleIdsOwned = vi.fn(async () => true)
+const phaseSetIdOwned = vi.fn(async () => true)
 const autoRecalibrateCycleAnchor = vi.fn(async () => undefined)
 const updateProgramPhaseSettings = vi.fn(async () => undefined)
 const listProgressionStyles = vi.fn(async () => [])
@@ -37,7 +38,7 @@ vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u-1' } }) }))
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
     saveProgram, saveProgressionStyle, listPhaseSets, listPrograms,
-    progressionStyleIdsOwned, autoRecalibrateCycleAnchor, updateProgramPhaseSettings,
+    progressionStyleIdsOwned, phaseSetIdOwned, autoRecalibrateCycleAnchor, updateProgramPhaseSettings,
     listProgressionStyles, clearProgramPrescriptions, linkPhaseSetOwnership,
     listVolumeTargets, replaceVolumeTargets, deleteProgram,
   }),

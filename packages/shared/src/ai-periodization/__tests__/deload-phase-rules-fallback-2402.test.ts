@@ -71,7 +71,7 @@ describe('the fallback in a deload phase prescribes the deload the phase runs (#
   it('stays in the deload phase and does not re-offer a deload', () => {
     const p = build()
     expect(p.phase).toBe('deload')
-    // `deload_recommended` on a stored prescription is what the accept route flips the phase on.
+    // `deload_recommended` marks a one-day offer to accept (#3799).
     // The phase is already a deload; there is nothing to offer.
     expect(p.phaseAction).toBe('stay')
   })

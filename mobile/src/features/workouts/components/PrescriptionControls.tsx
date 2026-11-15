@@ -145,7 +145,14 @@ export function PrescriptionControls({
             <AppButton
               title={`Move to ${prescription.phase}`}
               variant="secondary"
-              onPress={() => setConfirm(prescription.phase)}
+              onPress={() => {
+                // #3799: a one-day deload offer is taken for this session only; the phase stays.
+                if (prescription.phaseAction === 'deload_recommended') {
+                  void action.run(() => preparation.respond('accept'));
+                } else {
+                  setConfirm(prescription.phase);
+                }
+              }}
             />
           )}
           <AppButton
@@ -187,10 +194,11 @@ export function PrescriptionControls({
                 .run(() =>
                   preparation.transition(
                     confirm,
+                    // Only the recommended transition goes unforced. Everything else here is
+                    // the lifter's own pick from the phase list, which moves the phase even over a
+                    // one-day deload offer (#3799).
                     prescription?.phase !== confirm ||
-                      !['transition_recommended', 'deload_recommended'].includes(
-                        prescription?.phaseAction ?? '',
-                      ),
+                      prescription?.phaseAction !== 'transition_recommended',
                   ),
                 )
                 .then((saved) => {

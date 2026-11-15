@@ -15,7 +15,7 @@ import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, or, inArray, notInArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull, getTableColumns } from 'drizzle-orm'
 import { getDb, getPool } from './client'
 import { withUserLock } from './user-lock'
-import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
+import { estWorkoutKcal, plausibleSessionActiveMin } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
 import { errorLog } from '@trainingai/shared/logger'
@@ -1102,6 +1102,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // ── Progression Styles ────────────────────────────────────────────────────
   async listProgressionStyles(userId: string): Promise<ProgressionStyle[]> { return prog.listProgressionStyles(this.db, userId) }
+  async programSessionIdOwned(userId: string, id: string): Promise<boolean> { return prog.programSessionIdOwned(this.db, userId, id) }
+  async phaseSetIdOwned(userId: string, id: string | null | undefined): Promise<boolean> { return prog.phaseSetIdOwned(this.db, userId, id) }
   async progressionStyleIdsOwned(userId: string, ids: (string | null | undefined)[]): Promise<boolean> { return prog.progressionStyleIdsOwned(this.db, userId, ids) }
   async saveProgressionStyle(userId: string, style: ProgressionStyle): Promise<ProgressionStyle> { return prog.saveProgressionStyle(this.db, userId, style) }
   async deleteProgressionStyle(userId: string, styleId: string): Promise<void> { return prog.deleteProgressionStyle(this.db, userId, styleId) }
@@ -1440,7 +1442,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sessionName: sql<string>`COALESCE(${s.programSessions.name}, ${s.workoutSessions.sessionName})`,
     })
       .from(s.workoutSessions)
-      .leftJoin(s.programSessions, eq(s.workoutSessions.programSessionId, s.programSessions.id))
+      // The current name is taken only from a session in one of the caller's own programs; a link
+      // to any other session falls back to the stored name.
+      .leftJoin(s.programSessions, and(
+        eq(s.workoutSessions.programSessionId, s.programSessions.id),
+        sql`EXISTS (SELECT 1 FROM ${s.programs} WHERE ${s.programs.id} = ${s.programSessions.programId} AND ${s.programs.userId} = ${userId})`,
+      ))
       // Only include sessions that have at least one logged exercise
       .innerJoin(s.exerciseLogs, eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id))
       .where(and(
@@ -1687,18 +1694,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async getYearReviewTotals(userId: string, from: Date): Promise<YearReviewTotals> {
-    const [sessionRow] = await this.db
-      .select({
-        sessionCount: sql<number>`COUNT(*)`,
-        // #3266: less the time paused, never more than the span itself.
-        totalMinutes: sql<number>`COALESCE(SUM(
-          EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60
-          - LEAST(COALESCE(${s.workoutSessions.pausedSec}, 0) / 60.0,
-                  GREATEST(EXTRACT(EPOCH FROM (${s.workoutSessions.completedAt} - ${s.workoutSessions.startedAt})) / 60, 0))
-        ), 0)`,
-      })
+    // #3801: only completed workouts count, and only a span the shared plausibility rule accepts
+    // adds minutes (less the time paused, #3266). A workout never finished, or one whose start or
+    // end was stored wrongly, used to count and carry its whole span.
+    const sessions = await this.db
+      .select({ startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt, pausedSec: s.workoutSessions.pausedSec })
       .from(s.workoutSessions)
-      .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from), isNull(s.workoutSessions.deletedAt)))
+      .where(and(eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from),
+        isNull(s.workoutSessions.deletedAt), isNotNull(s.workoutSessions.completedAt)))
+    const totalMinutes = sessions.reduce(
+      (sum, r) => sum + (plausibleSessionActiveMin(r.startedAt, r.completedAt, r.pausedSec) ?? 0), 0)
 
     const [setRow] = await this.db
       .select({
@@ -1714,10 +1719,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
 
     return {
-      sessionCount: Number(sessionRow?.sessionCount ?? 0),
+      sessionCount: sessions.length,
       totalSets: Number(setRow?.totalSets ?? 0),
       totalVolumeKg: Number(setRow?.totalVolumeKg ?? 0),
-      totalMinutes: Math.round(Number(sessionRow?.totalMinutes ?? 0)),
+      totalMinutes: Math.round(totalMinutes),
     }
   }
 
@@ -3355,7 +3360,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate): Promise<PrescribedRun | null> {
     const set: Record<string, unknown> = { updatedAt: new Date() }
     if (patch.status !== undefined) set.status = patch.status
-    if (patch.activityLogId !== undefined) set.activityLogId = patch.activityLogId
+    if (patch.activityLogId !== undefined) {
+      // The link is client-supplied (the PATCH route and the outbox push both pass it through), so
+      // it is stored only when it names one of the caller's own activity logs. An id that is not is
+      // stored as null rather than refused: the status change is what matters, and a 4xx on a
+      // queued push would quarantine it over one link column.
+      let activityLogId = patch.activityLogId
+      if (activityLogId) {
+        const [owned] = await this.db.select({ id: s.activityLogs.id })
+          .from(s.activityLogs)
+          .where(and(eq(s.activityLogs.id, activityLogId), eq(s.activityLogs.userId, userId)))
+          .limit(1)
+        if (!owned) activityLogId = null
+      }
+      set.activityLogId = activityLogId
+    }
     // LB-179: every status write says how it was satisfied. A client that does not send it predates
     // walks completing a prescription, so its completion was a run (null). Leaving the old value
     // would let a 'walk' from before a regeneration outlive it.
@@ -4656,6 +4675,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // deload sessions — mirrors the log path's PR gate) after an edit or delete may have
   // invalidated the row personal_records currently points at. Corrects PRs downward.
   async reconcilePersonalRecord(userId: string, exerciseName: string): Promise<void> {
+    const best = await this.bestQualifyingPersonalRecord(userId, exerciseName)
+    if (!best) {
+      await this.db.delete(s.personalRecords).where(and(
+        eq(s.personalRecords.userId, userId), eq(s.personalRecords.exerciseName, exerciseName)))
+      return
+    }
+    await this.upsertPersonalRecord(userId, exerciseName, best.estimated1rm, best.loggedAt)
+  }
+
+  // The best surviving log that may stand as the exercise's personal record: the one rule
+  // `reconcilePersonalRecord` applies, read on its own so a report can say what reconciling would
+  // do without doing it (#3801). Null when no log qualifies.
+  async bestQualifyingPersonalRecord(userId: string, exerciseName: string): Promise<{ estimated1rm: number; loggedAt: Date } | null> {
     const [best] = await this.db
       .select({ estimated1rm: s.exerciseLogs.estimated1rm, loggedAt: s.exerciseLogs.loggedAt })
       .from(s.exerciseLogs)
@@ -4682,13 +4714,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
       .orderBy(desc(s.exerciseLogs.estimated1rm), asc(s.exerciseLogs.loggedAt))
       .limit(1)
-
-    if (!best?.estimated1rm) {
-      await this.db.delete(s.personalRecords).where(and(
-        eq(s.personalRecords.userId, userId), eq(s.personalRecords.exerciseName, exerciseName)))
-      return
-    }
-    await this.upsertPersonalRecord(userId, exerciseName, best.estimated1rm, best.loggedAt ?? new Date())
+    if (!best?.estimated1rm) return null
+    return { estimated1rm: best.estimated1rm, loggedAt: best.loggedAt ?? new Date() }
   }
 
   // personal_records holds one row per exercise (the all-time best). This returns
@@ -8363,7 +8390,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
   async updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription) { return period.updatePrescriptionExercisesCache(this.db, userId, programSessionId, prescription) }
   async storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null) { return period.storePendingTransition(this.db, userId, programSessionId, transition) }
-  async incrementSessionsInPhase(userId: string, programSessionId: string) { return period.incrementSessionsInPhase(this.db, userId, programSessionId) }
+  async incrementSessionsInPhase(userId: string, programSessionId: string, completedAt?: Date) { return period.incrementSessionsInPhase(this.db, userId, programSessionId, completedAt) }
   async setLastSessionRanPrescription(userId: string, programSessionId: string, ranPrescription: boolean) { return period.setLastSessionRanPrescription(this.db, userId, programSessionId, ranPrescription) }
   async listSessionPeriodizationForProgram(userId: string, programId: string) { return period.listSessionPeriodizationForProgram(this.db, userId, programId) }
   async reconcileSessionsInPhase(userId: string, programId: string) { return period.reconcileSessionsInPhase(this.db, userId, programId) }

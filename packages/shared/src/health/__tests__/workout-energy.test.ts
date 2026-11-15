@@ -9,6 +9,7 @@ import {
   estSessionKcal,
   isKnownActivity,
   isPlausibleSessionDuration,
+  plausibleSessionActiveMin,
   MAX_PLAUSIBLE_SESSION_MIN,
   DEFAULT_ACTIVITY_ID,
 } from '../workout-energy'
@@ -150,5 +151,22 @@ describe('implausible session durations are culled, not clamped', () => {
     expect(estWorkoutKcal({ ...base, durationMin: -5 })).toBeNull()
     expect(isPlausibleSessionDuration(null)).toBe(false)
     expect(isPlausibleSessionDuration(NaN)).toBe(false)
+  })
+})
+
+describe('plausibleSessionActiveMin (#3801)', () => {
+  const start = new Date('2026-05-10T02:00:00Z')
+  const at = (min: number) => new Date(start.getTime() + min * 60_000)
+  it('returns the active minutes of a completed, plausible span', () => {
+    expect(plausibleSessionActiveMin(start, at(60))).toBe(60)
+    expect(plausibleSessionActiveMin(start, at(60), 600)).toBe(50)
+    expect(plausibleSessionActiveMin(start, at(MAX_PLAUSIBLE_SESSION_MIN))).toBe(MAX_PLAUSIBLE_SESSION_MIN)
+  })
+  it('is null for an unfinished session, a zero span and a span over the bound', () => {
+    expect(plausibleSessionActiveMin(start, null)).toBeNull()
+    expect(plausibleSessionActiveMin(start, undefined)).toBeNull()
+    expect(plausibleSessionActiveMin(start, start)).toBeNull()
+    expect(plausibleSessionActiveMin(start, at(MAX_PLAUSIBLE_SESSION_MIN + 1))).toBeNull()
+    expect(plausibleSessionActiveMin(start, at(600))).toBeNull()
   })
 })

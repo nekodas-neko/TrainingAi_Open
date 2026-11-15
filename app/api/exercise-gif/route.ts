@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { getDb, ensureSchema } from "@/lib/data/postgres/client";
 import { exerciseGifCache, exerciseMedia } from "@/lib/data/postgres/schema";
 import { ilike, and, eq, sql } from "drizzle-orm";
@@ -19,6 +20,11 @@ export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: StatusCodes.UNAUTHORIZED });
+  }
+  // Per user. A screen asks once per exercise it shows and the client caches each answer, so this
+  // sits well above a full program list.
+  if (!rateLimit(`exercise-gif:${session.user.id}`, 120, 60_000)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: StatusCodes.TOO_MANY_REQUESTS });
   }
 
   const { searchParams } = new URL(req.url);
@@ -73,6 +79,10 @@ export async function GET(req: Request) {
     gifUrl = match ? `${DATASET_BASE}/${match.gif_url}` : null;
     imageUrl = match ? `${DATASET_BASE}/${match.image}` : null;
   }
+
+  // A miss is not cached: the table is shared by every user, and a row that holds nothing saves no
+  // work (the read above already skips one), so only a found URL is stored.
+  if (!gifUrl && !imageUrl) return NextResponse.json({ gifUrl, imageUrl });
 
   await db
     .insert(exerciseGifCache)

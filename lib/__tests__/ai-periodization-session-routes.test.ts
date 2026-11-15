@@ -7,9 +7,9 @@
  *
  * Two behaviours carry live incidents and are the reason this file exists:
  *
- *   · **Accepting a deload is the moment the phase flips**, and `advancePhase` nulls the stored
- *     prescription as a side effect — so the route re-stores it afterwards or the deload the user
- *     just accepted never reaches the bar.
+ *   · **Accepting a deload lightens that session and leaves the phase alone** (#3799). It used to
+ *     move the phase to `deload`, which held the loads down for two or three weeks from one day's
+ *     reason. Only a planned move (the realisation ceiling, or the phase list) moves it.
  *   · **The GET normalises what it read.** A generation-time floor cannot reach a row already
  *     stored, and those live up to seven days: four single-set prescriptions were live on
  *     2026-07-28, one of them `auto_applied` and actually loading the bar, and an accessory was
@@ -60,6 +60,7 @@ vi.mock('@trainingai/shared/ai-periodization/refit-prescription', () => ({
 import { POST as prescribe } from '@/app/api/ai-periodization/session/[sessionId]/prescribe/route'
 import { POST as respond } from '@/app/api/ai-periodization/session/[sessionId]/respond/route'
 import { GET as readSession } from '@/app/api/ai-periodization/session/[sessionId]/route'
+import { POST as transition } from '@/app/api/ai-periodization/session/[sessionId]/transition/route'
 
 const SESSION_ID = '00000000-0000-4000-8000-0000000000aa'
 const SQUAT = '00000000-0000-4000-8000-000000000001'
@@ -109,6 +110,7 @@ const post = (handler: typeof prescribe, path: string, body: unknown, id = SESSI
   }) as never, ctx(id) as never)
 const prescribePost = (body?: unknown, id = SESSION_ID) => post(prescribe, 'prescribe', body, id)
 const respondPost = (body?: unknown, id = SESSION_ID) => post(respond, 'respond', body, id)
+const transitionPost = (body?: unknown, id = SESSION_ID) => post(transition, 'transition', body, id)
 const getSession = (id = SESSION_ID) =>
   readSession(new Request(`http://localhost/api/ai-periodization/session/${id}`) as never, ctx(id) as never)
 
@@ -385,19 +387,16 @@ describe('POST …/session/[sessionId]/respond', () => {
     expect(advancePhase).not.toHaveBeenCalled()
   })
 
-  // The load-bearing one. `advancePhase` nulls the stored prescription as a side effect, so an
-  // accepted deload that is not re-stored never reaches the bar.
-  it('flips the phase on accepting a deload AND re-stores it, because advancePhase clears it', async () => {
-    const expires = new Date('2026-09-15T00:00:00Z')
+  // #3799, option A. A deload offered for one day's reason lightens that session only.
+  it('accepting a deload offer leaves the phase where it is and keeps the plan', async () => {
     getSessionPeriodization.mockResolvedValue(state({
-      prescription: prescription({ deload: true, phaseAction: 'deload_recommended' }),
-      prescriptionExpiresAt: expires,
+      prescription: prescription({ phase: 'deload', deload: true, phaseAction: 'deload_recommended' }),
+      prescriptionStatus: 'pending',
     }))
-    await respondPost({ action: 'accept' })
-    expect(advancePhase.mock.calls[0][2]).toBe('deload')
-    expect(storePrescription).toHaveBeenCalledTimes(1)
-    expect((storePrescription.mock.calls[0][2] as Row).deload).toBe(true)
-    expect(storePrescription.mock.calls[0][3]).toBe(expires)  // its own expiry, not a fresh week
+    const res = await respondPost({ action: 'accept' })
+    expect(res.status).toBe(200)
+    expect(advancePhase).not.toHaveBeenCalled()
+    expect(storePrescription).not.toHaveBeenCalled()
     expect(updatePrescriptionStatus.mock.calls[0][2]).toBe('accepted')
   })
 
@@ -418,6 +417,60 @@ describe('POST …/session/[sessionId]/respond', () => {
     await respondPost({ action: 'dismiss' })
     expect(advancePhase).not.toHaveBeenCalled()
     expect(updatePrescriptionStatus.mock.calls[0][2]).toBe('dismissed')
+  })
+})
+
+// #3799: only a planned deload moves the phase. A deload offered for one day's reason is taken for
+// that session by "Move to Deload", the same as accepting it.
+describe('POST …/session/[sessionId]/transition — one-day vs planned deload (#3799)', () => {
+  const oneDay = () => prescription({ phase: 'deload', deload: true, phaseAction: 'deload_recommended' })
+
+  it('"Move to Deload" on a one-day deload offer accepts it and leaves the phase', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ prescription: oneDay(), prescriptionStatus: 'pending' }))
+    const res = await transitionPost({ newPhase: 'deload' })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.phaseMoved).toBe(false)
+    expect(body.prescriptionStatus).toBe('accepted')
+    expect(advancePhase).not.toHaveBeenCalled()
+    expect(updatePrescriptionStatus.mock.calls[0][2]).toBe('accepted')
+  })
+
+  it('a one-day offer in realisation (deload is the adjacent phase) still leaves the phase', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ phase: 'realisation', prescription: oneDay(), prescriptionStatus: 'pending' }))
+    await transitionPost({ newPhase: 'deload' })
+    expect(advancePhase).not.toHaveBeenCalled()
+  })
+
+  it('an unforced "Move to Deload" over a one-day deload already trained is refused, phase unchanged', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ phase: 'realisation', prescription: oneDay(), prescriptionStatus: 'consumed' }))
+    const res = await transitionPost({ newPhase: 'deload' })
+    expect(res.status).toBe(409)
+    expect(advancePhase).not.toHaveBeenCalled()
+    expect(updatePrescriptionStatus).not.toHaveBeenCalled()
+  })
+
+  it('the realisation ceiling\'s planned deload moves the phase', async () => {
+    getSessionPeriodization.mockResolvedValue(state({
+      phase: 'realisation',
+      prescription: prescription({ phase: 'deload', phaseAction: 'transition_recommended' }),
+      prescriptionStatus: 'pending',
+    }))
+    const res = await transitionPost({ newPhase: 'deload' })
+    expect(res.status).toBe(200)
+    expect(advancePhase.mock.calls[0][2]).toBe('deload')
+  })
+
+  it('the lifter choosing Deload from the phase list moves the phase, even over a one-day offer', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ prescription: oneDay(), prescriptionStatus: 'pending' }))
+    await transitionPost({ newPhase: 'deload', force: true })
+    expect(advancePhase.mock.calls[0][2]).toBe('deload')
+  })
+
+  it('the lifter choosing Deload from the phase list with no offer moves the phase', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ prescription: prescription(), prescriptionStatus: 'auto_applied' }))
+    await transitionPost({ newPhase: 'deload', force: true })
+    expect(advancePhase.mock.calls[0][2]).toBe('deload')
   })
 })
 

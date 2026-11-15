@@ -137,7 +137,8 @@ describe('POST …/respond refuses an aged-out prescription (#3716)', () => {
     getSessionPeriodization.mockResolvedValue(live(illnessDeload(), 'pending'))
     const res = await respondPost('accept')
     expect(res.status).toBe(200)
-    expect(advancePhase).toHaveBeenCalledWith('u-3716', SESSION_ID, 'deload')
+    // #3799: accepting a deload no longer moves the phase.
+    expect(advancePhase).not.toHaveBeenCalled()
     expect(updatePrescriptionStatus).toHaveBeenCalledWith('u-3716', SESSION_ID, 'accepted')
   })
 })

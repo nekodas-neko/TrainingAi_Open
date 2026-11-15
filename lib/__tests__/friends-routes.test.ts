@@ -65,6 +65,20 @@ vi.mock('@/lib/data/postgres/client', () => ({
 vi.mock('@/lib/achievements', () => ({
   computeAchievements: (u: string, tz: string) => computeAchievements(u, tz),
 }))
+let rateAllowed = true
+const rateLimitCalls: string[] = []
+// The real limiter, recorded, with a switch to refuse: the friend-request test below counts
+// through the real window.
+vi.mock('@/lib/rate-limit', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/rate-limit')>()
+  return {
+    ...actual,
+    rateLimit: (key: string, limit: number, windowMs: number) => {
+      rateLimitCalls.push(key)
+      return rateAllowed && actual.rateLimit(key, limit, windowMs)
+    },
+  }
+})
 vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 
 import { GET as listFriends, POST as requestFriend } from '@/app/api/friends/route'
@@ -75,6 +89,8 @@ import { GET as friendProfile } from '@/app/api/profile/[userId]/route'
 const ME = '00000000-0000-4000-8000-00000000000a'
 const FRIEND = '00000000-0000-4000-8000-00000000000b'
 const STRANGER = '00000000-0000-4000-8000-00000000000c'
+const OTHER_FRIEND = '00000000-0000-4000-8000-00000000000d'
+const QUIET_FRIEND = '00000000-0000-4000-8000-00000000000e'
 const REQUEST_ID = '00000000-0000-4000-8000-0000000000f1'
 
 const achievements = (over: Row = {}) => ({
@@ -119,6 +135,8 @@ const freshUser = () => { sessionUser = { id: `${ME}-${++seq}`, timezone: 'Austr
 beforeEach(() => {
   vi.clearAllMocks()
   sessionUser = { id: ME, timezone: 'Australia/Brisbane' }
+  rateAllowed = true
+  rateLimitCalls.length = 0
   listFriendships.mockResolvedValue([])
   sendFriendRequest.mockResolvedValue({ id: 'fr-1', status: 'pending' })
   acceptFriendRequest.mockResolvedValue({ id: 'fr-1', status: 'accepted' })
@@ -249,7 +267,7 @@ describe('GET /api/friends/feed', () => {
 
   it('answers an empty feed without querying at all when there are no friends', async () => {
     const res = await friendsFeed()
-    expect(await res.json()).toEqual({ events: [] })
+    expect(await res.json()).toEqual({ events: [], users: {} })
     expect(dbSelect).not.toHaveBeenCalled()
     expect(res.headers.get('Cache-Control')).toBe('private, no-store')
   })
@@ -270,6 +288,40 @@ describe('GET /api/friends/feed', () => {
     expect(body.events[1]).toMatchObject({
       userId: FRIEND, displayName: 'Sam', payload: { exerciseName: 'Squat', weightKg: 140 },
     })
+  })
+
+  // #3796: an avatar is a data URI of up to its cap, so it is sent once per friend in `users`
+  // rather than on every event.
+  it('sends each friend once in users, and no avatar on the events', async () => {
+    getFriendIds.mockResolvedValue([FRIEND, OTHER_FRIEND])
+    const at = (h: number) => new Date(Date.UTC(2026, 8, 8, h))
+    dbResults = [
+      [1, 2, 3].map(h => ({ userId: FRIEND, exerciseName: 'Squat', estimated1rm: 140, achievedAt: at(h) })),
+      [{ userId: OTHER_FRIEND, startedAt: at(4), completedAt: at(5) }],
+      [
+        { id: FRIEND, displayName: 'Sam', name: null, avatar: 'data:image/jpeg;base64,SAM', equippedTitle: 'Lifter' },
+        { id: OTHER_FRIEND, displayName: 'Kai', name: null, avatar: null, equippedTitle: null },
+        { id: QUIET_FRIEND, displayName: 'Lee', name: null, avatar: 'data:image/jpeg;base64,LEE', equippedTitle: null },
+      ],
+    ]
+    const body = await (await friendsFeed()).json()
+    expect(body.events).toHaveLength(4)
+    expect(body.events.every((e: Row) => e.avatar === null)).toBe(true)
+    expect(body.users).toEqual({
+      [FRIEND]: { displayName: 'Sam', avatar: 'data:image/jpeg;base64,SAM', equippedTitle: 'Lifter' },
+      [OTHER_FRIEND]: { displayName: 'Kai', avatar: null, equippedTitle: null },
+    })
+    // A friend with no event in the feed is not sent at all.
+    expect(JSON.stringify(body)).not.toContain('LEE')
+    expect(JSON.stringify(body).split('base64,SAM')).toHaveLength(2)
+  })
+
+  it('is rate limited per user', async () => {
+    rateAllowed = false
+    const res = await friendsFeed()
+    expect(res.status).toBe(429)
+    expect(getFriendIds).not.toHaveBeenCalled()
+    expect(rateLimitCalls).toContain(`friends-feed:${ME}`)
   })
 
   it('drops an event whose author is not in the friend set', async () => {

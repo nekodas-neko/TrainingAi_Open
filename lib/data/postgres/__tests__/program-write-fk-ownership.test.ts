@@ -180,6 +180,44 @@ describe.skipIf(!canRun)('program-config write FKs (RV-32, RV-34)', () => {
     expect(saved.sessions[0].id).toBe(fresh)
   })
 
+  // #3796: a schedule day's session id is client-supplied too. One that is not a session this save
+  // leaves on the program is stored as a rest day (null) rather than refusing the whole save.
+  it("saveProgram stores a schedule day naming another user's session as a rest day", async () => {
+    const own = crypto.randomUUID()
+    const saved = await repo.saveProgram(USER_A, {
+      id: '', userId: USER_A, name: 'A Schedule Ids', isActive: false,
+      createdAt: new Date(), updatedAt: new Date(),
+      sessions: [{ id: own, name: 'Push', position: 0, exercises: [] }],
+      schedule: {
+        id: '', programId: '', type: 'weekly',
+        days: [{ dayOfWeek: 1, sessionId: own }, { dayOfWeek: 3, sessionId: bSessionId }],
+      },
+    } as never)
+    const { rows } = await pool.query(
+      `SELECT sd.day_of_week, sd.session_id FROM schedule_days sd
+         JOIN schedules sc ON sc.id = sd.schedule_id
+        WHERE sc.program_id = $1 ORDER BY sd.day_of_week`, [saved.id])
+    expect(rows).toEqual([
+      { day_of_week: 1, session_id: own },
+      { day_of_week: 3, session_id: null },
+    ])
+  })
+
+  it('phaseSetIdOwned accepts only the caller\'s own phase set (#3796)', async () => {
+    const own = await pool.query(`INSERT INTO phase_sets (user_id, name) VALUES ($1, 'A Own Set') RETURNING id`, [USER_A])
+    const other = await pool.query(`INSERT INTO phase_sets (user_id, name) VALUES ($1, 'B Own Set') RETURNING id`, [USER_B])
+    expect(await repo.phaseSetIdOwned(USER_A, own.rows[0].id)).toBe(true)
+    expect(await repo.phaseSetIdOwned(USER_A, other.rows[0].id)).toBe(false)
+    expect(await repo.phaseSetIdOwned(USER_A, 'not-a-uuid')).toBe(false)
+    expect(await repo.phaseSetIdOwned(USER_A, null)).toBe(true)
+  })
+
+  it('programSessionIdOwned accepts only a session of the caller\'s own programs (#3796)', async () => {
+    expect(await repo.programSessionIdOwned(USER_B, bSessionId)).toBe(true)
+    expect(await repo.programSessionIdOwned(USER_A, bSessionId)).toBe(false)
+    expect(await repo.programSessionIdOwned(USER_A, 'not-a-uuid')).toBe(false)
+  })
+
   it('saveProgram refuses a malformed session id instead of 22P02-ing at the driver', async () => {
     await expect(repo.saveProgram(USER_A, {
       id: '', userId: USER_A, name: 'A Malformed Id', isActive: false,
