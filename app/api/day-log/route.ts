@@ -9,7 +9,8 @@ import { toZonedTime } from "date-fns-tz";
 import type { ActivityLog } from "@trainingai/shared/types";
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { reportServerError } from '@/lib/observability'
-import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
+import { activityDayBodyMetricsWindow, loadActivityDay } from '@trainingai/shared/health/activity-day-load'
+import { metricsInDateRange } from '@trainingai/shared/health/metrics-in-date-range'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 import { dayStepCount } from '@trainingai/shared/health/activity-steps'
 import { sessionActiveMin } from '@trainingai/shared/workout/active-duration'
@@ -229,12 +230,22 @@ export async function GET(req: NextRequest) {
   }
 
   const pgDate = date.replace(/\//g, "-");
+  // #3793 ⑧: today's live Activity score (below) reads the day's activity logs and 28 days of body
+  // metrics. This route reads the same logs and the one day of metrics, so for today each is read
+  // once and shared. The `.catch` marks them handled: each is still awaited, and fails, where it was.
+  const isToday = pgDate === todayInTz(session.user.timezone ?? DEFAULT_TZ);
+  const sharedActivityLogs = isToday ? repo.listActivityLogs(userId, pgDate, pgDate) : null;
+  const sharedBodyMetrics = isToday ? repo.listBodyMetrics(userId, ...activityDayBodyMetricsWindow(pgDate)) : null;
+  sharedActivityLogs?.catch(() => {});
+  sharedBodyMetrics?.catch(() => {});
 
   // Body metadata from Postgres
   let bodyMeta: DayBodyMeta | null = null;
   try {
     const [metricRows, bodyFatCalibration] = await Promise.all([
-      repo.listBodyMetrics(userId, pgDate, pgDate),
+      sharedBodyMetrics
+        ? sharedBodyMetrics.then(rows => metricsInDateRange(rows, pgDate, pgDate))
+        : repo.listBodyMetrics(userId, pgDate, pgDate),
       repo.getBodyFatCalibration(userId).catch(() => null),
     ]);
     if (metricRows.length > 0) {
@@ -280,8 +291,8 @@ export async function GET(req: NextRequest) {
   // cell would be blank all day. It runs inside this batch (#3388), sharing the day's HR read with
   // the trace below instead of fetching it a second time.
   const hrRead = repo.getHrForWindow(userId, dayMid, nextMid);
-  const liveRead = pgDate === todayInTz(tz)
-    ? loadActivityDay(repo, userId, tz, pgDate, { hrRows: hrRead }).then(d => d.result?.score ?? null).catch(e => {
+  const liveRead = isToday && sharedActivityLogs && sharedBodyMetrics
+    ? loadActivityDay(repo, userId, tz, pgDate, { hrRows: hrRead, activityLogs: sharedActivityLogs, bodyMetrics: sharedBodyMetrics }).then(d => d.result?.score ?? null).catch(e => {
         // A failed live score falls back to the stored value, but must leave an error_events row.
         reportServerError(e, { userId, url: '/api/day-log' })
         return null
@@ -359,7 +370,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const activityLogs = await repo.listActivityLogs(userId, pgDate, pgDate);
+  const activityLogs = await (sharedActivityLogs ?? repo.listActivityLogs(userId, pgDate, pgDate));
   // #3095: the day's steps are the device's plus indoor (treadmill) steps — whether the ring already
   // counts some of those is unknown, pending #3112 —
   // the one builder Home and the cardio week use, so the day screen reads the same figure.

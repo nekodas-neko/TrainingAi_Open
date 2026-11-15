@@ -3,6 +3,7 @@ import type { getDb } from '../client'
 import { resolveClaudeRoOwner } from '../claude-ro-owner'
 import { judgeProtectedTarget, sameUserId } from '@/lib/admin-owner'
 import { userWriteLockKey } from '../user-write-barrier'
+import { dropUserReadMemos } from '../user-read-memo'
 
 type Db = ReturnType<typeof getDb>
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
@@ -280,6 +281,13 @@ interface EraseOpts {
  * identities first and puts them back, under the same id, before the transaction ends.
  */
 async function erase(db: Db, userId: string, opts: EraseOpts): Promise<AccountDeletionResult> {
+  const result = await eraseInTransaction(db, userId, opts)
+  // #3793: after the commit, so a read between the erase and here cannot refill from the old rows.
+  dropUserReadMemos(userId)
+  return result
+}
+
+function eraseInTransaction(db: Db, userId: string, opts: EraseOpts): Promise<AccountDeletionResult> {
   return db.transaction(async tx => {
     // The row lock serialises two deletions of the same account, and it makes every concurrent
     // write that references this user wait for the outcome: an FK insert takes KEY SHARE on the

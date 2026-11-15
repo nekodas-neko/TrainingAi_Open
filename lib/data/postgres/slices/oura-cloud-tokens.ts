@@ -11,6 +11,7 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import { toAestDay } from '@trainingai/shared/date-utils'
 import type { getDb } from '../client'
 import * as s from '../schema'
+import { createUserReadMemo } from '../user-read-memo'
 import type { EncryptedOuraToken } from '@/lib/oura/cloud/token-cipher'
 
 type Db = ReturnType<typeof getDb>
@@ -76,6 +77,7 @@ export async function saveOuraCloudTokens(db: Db, userId: string, input: SaveOur
     ...(input.ouraUserId !== undefined ? { ouraUserId: input.ouraUserId } : {}),
   }
   await db.insert(t).values({ userId, ...values }).onConflictDoUpdate({ target: t.userId, set: values })
+  dropOuraCloudSwitchDay(userId)
 }
 
 /**
@@ -113,6 +115,7 @@ export async function touchOuraCloudData(db: Db, userId: string): Promise<void> 
 /** True when the caller had a row and it is gone now. */
 export async function deleteOuraCloudTokens(db: Db, userId: string): Promise<boolean> {
   const deleted = await db.delete(t).where(eq(t.userId, userId)).returning({ userId: t.userId })
+  dropOuraCloudSwitchDay(userId)
   return deleted.length > 0
 }
 
@@ -156,6 +159,22 @@ export async function listOuraCloudConnectedUserIds(db: Db): Promise<string[]> {
  * no connection.
  */
 export async function getOuraCloudSwitchDay(db: Db, userId: string): Promise<string | null> {
+  return switchDayMemo.get(userId, 'switch-day', () => readOuraCloudSwitchDay(db, userId))
+}
+
+/**
+ * #3793 ⑥: the switch day was looked up again inside many reads and writes, about 19,500 statements
+ * (9% of all). It is a function of the token row, the newest raw frame and the user's timezone, so
+ * each user's answer is kept until one of those is written: `saveOuraCloudTokens`,
+ * `deleteOuraCloudTokens`, the raw-frame insert and pack (`dropOuraCloudSwitchDay`), a timezone
+ * change (`updateUserProfile`), an account erase. One hour as the backstop; bounded at 64 users.
+ */
+const switchDayMemo = createUserReadMemo<string | null>('oura-cloud-switch-day', { maxEntries: 64, maxAgeMs: 3_600_000 })
+
+/** Forget the user's kept switch day. Call after a write to the token row, the raw frames or the timezone. */
+export function dropOuraCloudSwitchDay(userId: string): void { switchDayMemo.drop(userId) }
+
+async function readOuraCloudSwitchDay(db: Db, userId: string): Promise<string | null> {
   const [row] = await db
     .select({ createdAt: t.createdAt, pat: t.personalAccessToken, access: t.accessToken, timezone: s.users.timezone })
     .from(t)
