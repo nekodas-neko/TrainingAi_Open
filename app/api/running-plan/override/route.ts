@@ -74,7 +74,9 @@ export async function POST(req: Request) {
   const { prescription, gateAction, gateReasons } = prescribeOverride(ctx, gate, base)
 
   const today = todayInTz(tz)
-  const existing = (await repo.getPrescribedRuns(userId, today, today))[0]
+  // This plan's row only (the upsert below is keyed on plan and date): an earlier plan's row for
+  // today must not lend its id or link to this one.
+  const existing = (await repo.getPrescribedRuns(userId, today, today)).find((r) => r.planId === plan.id)
   // Overriding always re-commits to running today — an earlier skip is superseded by picking
   // a different structure, so status resets to pending regardless of what it was.
   const run = await repo.upsertPrescribedRun(userId, {

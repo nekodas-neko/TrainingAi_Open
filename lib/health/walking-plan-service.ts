@@ -3,7 +3,7 @@ import { daysBetweenDateStrs, DEFAULT_TZ, shiftDateStr, todayInTz, toAestDay, we
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
-import { budgetActivityLogs, HEALTH_CONNECT_SOURCE } from '@trainingai/shared/health/health-connect-workouts'
+import { budgetActivityLogs } from '@trainingai/shared/health/health-connect-workouts'
 import { resolveSelfReportedSick } from '@trainingai/shared/ai-periodization/signals'
 import { activityLogWindow, heartHealthFloorBpm } from '@trainingai/shared/running/heart-health'
 import { cardioPlanKind } from '@trainingai/shared/running/cardio-goals'
@@ -12,15 +12,16 @@ import {
   type ActiveMinuteBasis, type ActiveMinutesBySource, type ActivityActiveMinutes,
 } from '@trainingai/shared/running/walking-minutes'
 import {
-  dailyMinutesShare, initialWalkingState, judgeWeek, MINUTES_BASELINE_WEEKS, MINUTES_CEILING_PLUS, parseWalkingState,
-  stepBackOffers, stepsCeiling, STEPS_BASELINE_DAYS, walkingDayRationale, walkingDayVerdict, weeksToJudge,
+  dailyMinutesShare, initialWalkingState, MINUTES_BASELINE_WEEKS, MINUTES_CEILING_PLUS, parseWalkingState,
+  settleWeeks, stepBackOffers, stepsCeiling, STEPS_BASELINE_DAYS, walkingDayRationale, walkingDayVerdict, weeksInGrace, weeksToJudge,
   type DayExclusion, type StepBackOffer, type WalkingDayMeasure, type WalkingPlanState, type WalkingWeekRecord,
 } from '@trainingai/shared/running/walking-plan'
 import { readEveningBefore } from '@/lib/health/oura-budget-activities'
 
 /**
  * Issue 3779. The server half of the walking plan: measures each day's steps and active minutes,
- * judges every week that has ended (which moves the targets), and marks the plan's days done
+ * judges every week that has ended (re-judged through its two-day grace, then frozen into the
+ * stored state, which is what moves the targets), and marks the plan's days done
  * itself — on the server, whenever it runs, so a walked day is done without a screen being open
  * (#3801 item 4: the heart-health completion only ever ran while the Cardio screen was mounted).
  *
@@ -124,11 +125,11 @@ export async function measureWalkingDays(
   for (const c of checkins) if (resolveSelfReportedSick(undefined, c.illnessContext)) sick.add(c.logDate.replace(/\//g, '-'))
   for (const m of moods) if (resolveSelfReportedSick(m.bodyState, null)) sick.add(m.logDate.replace(/\//g, '-'))
 
-  // #3646, as the heart-health service: a Health Connect copy of an in-app log is the same workout,
-  // so it is measured once.
-  const eveningBefore = logs.some((l) => l.externalSource === HEALTH_CONNECT_SOURCE)
-    ? await readEveningBefore(repo, userId, from)
-    : []
+  // #3646, as the heart-health service: a copy of an in-app log imported from another source is the
+  // same workout, so it is measured once (`budgetActivityLogs` decides which logs are copies). The
+  // evening before is always read rather than only when some log names a given source: one more
+  // query a pass, and no source id in this file.
+  const eveningBefore = await readEveningBefore(repo, userId, from)
   const counted = budgetActivityLogs(logs, [], tz, eveningBefore)
   const measured = await Promise.all(counted.map(async (l): Promise<[string, ActivityActiveMinutes]> => {
     const window = activityLogWindow(l, tz)
@@ -201,7 +202,9 @@ async function initialState(
   return initialWalkingState({ startDate, ownStepsGoal, recentDailySteps, recentWeeklyMinutes, fallbackStepGoal })
 }
 
-// One settle per user at a time: two at once could both create the same day's row.
+// One settle per user at a time in this process: two at once could both create the same day's row,
+// or one could write the state another had just changed. Across processes the state write is a
+// compare-and-set on the plan's `updated_at` (`writeSnapshot`).
 const inFlight = new Map<string, Promise<unknown>>()
 
 function serialized<T>(userId: string, run: () => Promise<T>): Promise<T> {
@@ -211,21 +214,128 @@ function serialized<T>(userId: string, run: () => Promise<T>): Promise<T> {
   return next.finally(() => { if (inFlight.get(userId) === next) inFlight.delete(userId) })
 }
 
-/**
- * Bring the active walking plan up to date and return what a screen shows. Null when the user has
- * no active walking plan. Writes: the plan's state when a week was judged (or on its first run),
- * a pending day row for each day of this and last week that has none, and `completed` on each
- * pending day the rules say is done.
- */
-export function settleWalkingPlan(
-  repo: Repo, userId: string, tz: string, opts: { plan?: RunningPlan | null } = {},
-): Promise<WalkingPlanView | null> {
-  return serialized(userId, () => settle(repo, userId, tz, opts))
+function snapshotOf(plan: RunningPlan): Record<string, unknown> {
+  return (plan.fitnessSnapshot && typeof plan.fitnessSnapshot === 'object' ? plan.fitnessSnapshot : {}) as Record<string, unknown>
 }
 
-async function settle(repo: Repo, userId: string, tz: string, opts: { plan?: RunningPlan | null }): Promise<WalkingPlanView | null> {
-  const plan = opts.plan !== undefined ? opts.plan : await repo.getActiveRunningPlan(userId)
-  if (!plan || !plan.isActive || cardioPlanKind(plan) !== 'walking') return null
+function updatedAtOf(plan: RunningPlan): Date {
+  return plan.updatedAt instanceof Date ? plan.updatedAt : new Date(plan.updatedAt)
+}
+
+async function readWalkingPlan(repo: Repo, userId: string): Promise<RunningPlan | null> {
+  const plan = await repo.getActiveRunningPlan(userId)
+  return plan && plan.isActive && cardioPlanKind(plan) === 'walking' ? plan : null
+}
+
+/**
+ * Write the walking state onto the plan only if the row is unchanged since `plan` was read. On a
+ * conflict, re-read and rebuild once (`rebuild` gets the fresh plan; null from it means nothing to
+ * write). Returns the plan as written, or null when it was not (no plan, or a second conflict).
+ */
+async function writeSnapshot(
+  repo: Repo, userId: string, plan: RunningPlan, state: WalkingPlanState,
+  rebuild: (fresh: RunningPlan) => Promise<WalkingPlanState | null>,
+): Promise<RunningPlan | null> {
+  let current = plan
+  let next: WalkingPlanState | null = state
+  for (let attempt = 0; attempt < 2 && next; attempt++) {
+    const written = await repo.updateRunningPlanSnapshot(
+      userId, current.id, { ...snapshotOf(current), [WALKING_STATE_KEY]: next }, { ifUpdatedAt: updatedAtOf(current) },
+    )
+    if (written) return written
+    if (attempt === 1) break
+    const fresh = await readWalkingPlan(repo, userId)
+    if (!fresh || fresh.id !== current.id) return null
+    current = fresh
+    next = await rebuild(fresh)
+  }
+  return null
+}
+
+/**
+ * Bring the active walking plan up to date and return what a screen shows. Null when the user has
+ * no active walking plan. The plan is always read inside the per-user lock, so a settle queued
+ * behind another never writes from a stale copy. Writes: the stored (frozen) state when a week
+ * passed its grace (or on its first run), a pending day row for each day of this and last week that
+ * has none and was never deleted, and `completed` on each pending day the rules say is done.
+ */
+export function settleWalkingPlan(repo: Repo, userId: string, tz: string): Promise<WalkingPlanView | null> {
+  return serialized(userId, () => settle(repo, userId, tz))
+}
+
+export type WalkingChoiceResult =
+  | { ok: true; walking: WalkingPlanView | null }
+  | { ok: false; reason: 'no_plan' | 'not_on_offer' | 'conflict' }
+
+/**
+ * Apply one of the person's choices (`choose` returns the new state, or null when it is not on
+ * offer) to the settled state, inside the same lock as every settle, with the same compare-and-set.
+ */
+export function applyWalkingChoice(
+  repo: Repo, userId: string, tz: string, choose: (state: WalkingPlanState) => WalkingPlanState | null,
+): Promise<WalkingChoiceResult> {
+  return serialized(userId, async (): Promise<WalkingChoiceResult> => {
+    // Settle first, so the choice applies to the state with every frozen week judged.
+    await settle(repo, userId, tz)
+    const plan = await readWalkingPlan(repo, userId)
+    const state = plan ? parseWalkingState(snapshotOf(plan)[WALKING_STATE_KEY]) : null
+    if (!plan || !state) return { ok: false, reason: 'no_plan' }
+    const next = choose(state)
+    if (!next) return { ok: false, reason: 'not_on_offer' }
+    let refused = false
+    const written = await writeSnapshot(repo, userId, plan, next, async (fresh) => {
+      const freshState = parseWalkingState(snapshotOf(fresh)[WALKING_STATE_KEY])
+      const again = freshState ? choose(freshState) : null
+      if (!again) refused = true
+      return again
+    })
+    if (!written) return { ok: false, reason: refused ? 'not_on_offer' : 'conflict' }
+    return { ok: true, walking: await settle(repo, userId, tz) }
+  })
+}
+
+interface SettleContext {
+  today: string
+  ownStepsGoal: number | null
+  fallbackStepGoal: number
+  floorBpm: number
+}
+
+/** The frozen state to store and the current one to show, for one read of the plan. */
+async function judgeOnPlan(
+  repo: Repo, userId: string, tz: string, plan: RunningPlan, ctx: SettleContext,
+): Promise<{ frozen: WalkingPlanState; current: WalkingPlanState; changed: boolean; days: Map<string, MeasuredWalkingDay>; completeFrom: string }> {
+  const startDate = walkingPlanStartDate(plan, tz)
+  let state = parseWalkingState(snapshotOf(plan)[WALKING_STATE_KEY])
+  let changed = false
+  if (!state) {
+    state = await initialState(repo, userId, tz, startDate, ctx.floorBpm, ctx.ownStepsGoal, ctx.fallbackStepGoal)
+    changed = true
+  }
+
+  const pending = weeksToJudge(state, ctx.today)
+  if (pending.length > MAX_WEEKS_JUDGED_PER_PASS) {
+    state = { ...state, nextWeekToJudge: pending[pending.length - MAX_WEEKS_JUDGED_PER_PASS] }
+    changed = true
+  }
+
+  // One measurement covers the weeks to judge, the week in its grace, and the days to complete.
+  const currentWeek = weekStartForDay(ctx.today)
+  const completeFrom = [state.startDate, shiftDateStr(currentWeek, -7)].sort().at(-1)!
+  const toJudge = [...weeksToJudge(state, ctx.today), ...weeksInGrace(state, ctx.today)]
+  const measureFrom = toJudge.length > 0 && toJudge[0] < completeFrom ? toJudge[0] : completeFrom
+  const days = await measureWalkingDays(repo, userId, tz, measureFrom, ctx.today, ctx.floorBpm)
+
+  // Days before the plan began are not the plan's: they count as having no reading.
+  const planStart = state.startDate
+  const planDays = [...days.values()].filter((d) => d.date >= planStart)
+  const settled = settleWeeks(state, planDays, ctx.today, { ownStepsGoal: ctx.ownStepsGoal })
+  return { frozen: settled.frozen, current: settled.current, changed: changed || settled.judged.length > 0, days, completeFrom }
+}
+
+async function settle(repo: Repo, userId: string, tz: string): Promise<WalkingPlanView | null> {
+  const plan = await readWalkingPlan(repo, userId)
+  if (!plan) return null
 
   const today = todayInTz(tz)
   const [user, goals, profile] = await Promise.all([
@@ -234,42 +344,27 @@ async function settle(repo: Repo, userId: string, tz: string, opts: { plan?: Run
     resolveHrProfile(repo, userId, tz),
   ])
   const ownStepsGoal = goals?.stepsGoal != null && goals.stepsGoal > 0 ? goals.stepsGoal : null
-  const fallbackStepGoal = getDailyGoals({ activityLevel: user?.activityLevel ?? null, stepsGoal: null }).stepGoal
-  const floorBpm = heartHealthFloorBpm({ maxHr: profile.maxHr, restingHr: profile.restingHr })
-
-  const snapshot = (plan.fitnessSnapshot && typeof plan.fitnessSnapshot === 'object' ? plan.fitnessSnapshot : {}) as Record<string, unknown>
-  const startDate = walkingPlanStartDate(plan, tz)
-  let state = parseWalkingState(snapshot[WALKING_STATE_KEY])
-  let changed = false
-  if (!state) {
-    state = await initialState(repo, userId, tz, startDate, floorBpm, ownStepsGoal, fallbackStepGoal)
-    changed = true
+  const ctx: SettleContext = {
+    today,
+    ownStepsGoal,
+    fallbackStepGoal: getDailyGoals({ activityLevel: user?.activityLevel ?? null, stepsGoal: null }).stepGoal,
+    floorBpm: heartHealthFloorBpm({ maxHr: profile.maxHr, restingHr: profile.restingHr }),
   }
+  const floorBpm = ctx.floorBpm
 
-  let pending = weeksToJudge(state, today)
-  if (pending.length > MAX_WEEKS_JUDGED_PER_PASS) {
-    pending = pending.slice(-MAX_WEEKS_JUDGED_PER_PASS)
-    state = { ...state, nextWeekToJudge: pending[0] }
-    changed = true
+  let judged = await judgeOnPlan(repo, userId, tz, plan, ctx)
+  if (judged.changed) {
+    const written = await writeSnapshot(repo, userId, plan, judged.frozen, async (fresh) => {
+      judged = await judgeOnPlan(repo, userId, tz, fresh, ctx)
+      return judged.changed ? judged.frozen : null
+    })
+    // Not written (the plan went, or changed twice under us): show what was judged; the next
+    // settle stores it.
+    if (!written) console.warn('[walking-plan] state not stored this pass (plan changed or gone)')
   }
-
-  // One measurement covers the weeks to judge and the days to complete (this week and last).
+  const { current: finalState, days, completeFrom } = judged
   const currentWeek = weekStartForDay(today)
-  const completeFrom = [state.startDate, shiftDateStr(currentWeek, -7)].sort().at(-1)!
-  const measureFrom = pending.length > 0 && pending[0] < completeFrom ? pending[0] : completeFrom
-  const days = await measureWalkingDays(repo, userId, tz, measureFrom, today, floorBpm)
 
-  for (const w of pending) {
-    // Days before the plan began are not the plan's: they count as having no reading.
-    const weekDays = [...days.values()].filter((d) => d.date >= state!.startDate)
-    state = judgeWeek(state, w, weekDays, { ownStepsGoal })
-    changed = true
-  }
-  if (changed) {
-    await repo.updateRunningPlanSnapshot(userId, plan.id, { ...snapshot, [WALKING_STATE_KEY]: state })
-  }
-
-  const finalState = state
   const levelsFor = (date: string) => {
     const rec = finalState.weeks.find((r) => r.weekStart === weekStartForDay(date))
     return rec
@@ -277,15 +372,17 @@ async function settle(repo: Repo, userId: string, tz: string, opts: { plan?: Run
       : { stepsTarget: finalState.stepsTarget, minutesTarget: finalState.minutesTarget }
   }
 
-  const rows = (await repo.getPrescribedRuns(userId, completeFrom, today)).filter((r) => r.planId === plan.id)
-  const rowByDate = new Map<string, PrescribedRun>(rows.map((r) => [r.date, r]))
+  // Tombstones are read too: a day the person deleted is never recreated.
+  const allRows = (await repo.getPrescribedRuns(userId, completeFrom, today, { includeDeleted: true })).filter((r) => r.planId === plan.id)
+  const deletedDates = new Set(allRows.filter((r) => r.deletedAt != null).map((r) => r.date))
+  const rowByDate = new Map<string, PrescribedRun>(allRows.filter((r) => r.deletedAt == null).map((r) => [r.date, r]))
   const views: WalkingDayView[] = []
   for (const date of completeFrom <= today ? datesBetween(completeFrom, today) : []) {
     const d = days.get(date)!
     const levels = levelsFor(date)
     const verdict = walkingDayVerdict(d, levels)
     let row = rowByDate.get(date) ?? null
-    if (!row && d.excluded == null) {
+    if (!row && d.excluded == null && !deletedDates.has(date)) {
       const share = dailyMinutesShare(levels.minutesTarget)
       row = await repo.upsertPrescribedRun(userId, {
         id: crypto.randomUUID(), planId: plan.id, date, runType: WALK_DAY_RUN_TYPE,
@@ -296,9 +393,11 @@ async function settle(repo: Repo, userId: string, tz: string, opts: { plan?: Run
       })
     }
     if (row && row.status === 'pending' && verdict.done) {
-      row = (await repo.updatePrescribedRun(userId, row.id, {
+      // Only over a live pending row: a skip or delete since the read is never overwritten.
+      const completed = await repo.updatePrescribedRun(userId, row.id, {
         status: 'completed', activityLogId: verdict.minutesMet ? d.creditedId : null, completedAs: 'walk',
-      })) ?? row
+      }, { onlyIfPending: true })
+      if (completed) row = completed
     }
     if (date >= currentWeek) {
       views.push({
@@ -354,34 +453,61 @@ async function settle(repo: Repo, userId: string, tz: string, opts: { plan?: Run
       days: views,
     },
     history: finalState.weeks,
-    stepBackOffers: stepBackOffers(finalState),
+    // Offered from the frozen state: a step back follows two settled weeks, never a provisional one,
+    // so what is offered is exactly what `applyWalkingChoice` can apply.
+    stepBackOffers: stepBackOffers(judged.frozen),
   }
 }
 
 // After data lands: at most one settle per user a minute, never awaited by the write it follows.
+// Trailing: a call inside the window is not dropped but runs once when the window closes, so the
+// last data of a burst (the Oura webhook's heart-rate catch-up after its activity) is always seen.
 const SOON_MIN_INTERVAL_MS = 60_000
 const lastSoon = new Map<string, number>()
+const trailing = new Map<string, { timer: ReturnType<typeof setTimeout>; tz: string | null | undefined }>()
 
-/**
- * Fire-and-forget settle for the ingest routes, so a walked day is marked done when its steps,
- * activity or heart rate arrive. Never throws and never delays the response; the timezone is the
- * user's own when not given. A user without a walking plan costs one plan read.
- */
-export function settleWalkingPlanSoon(repo: Repo, userId: string, tz?: string | null, now: number = Date.now()): void {
-  const last = lastSoon.get(userId)
-  if (last != null && now - last < SOON_MIN_INTERVAL_MS) return
-  lastSoon.set(userId, now)
+function runSoon(repo: Repo, userId: string, tz: string | null | undefined): void {
   void (async () => {
-    const plan = await repo.getActiveRunningPlan(userId)
-    if (!plan || cardioPlanKind(plan) !== 'walking') return
+    const plan = await readWalkingPlan(repo, userId)
+    if (!plan) return
     const zone = tz ?? (await repo.getUserById(userId).catch(() => null))?.timezone ?? DEFAULT_TZ
-    await settleWalkingPlan(repo, userId, zone, { plan })
+    await settleWalkingPlan(repo, userId, zone)
   })().catch((err) => {
     console.warn(`[walking-plan] settle after ingest failed: ${err instanceof Error ? err.message : 'unknown'}`)
   })
 }
 
-/** Test hook: forget the per-user throttle. */
+/**
+ * Fire-and-forget settle for the ingest routes, so a walked day is marked done when its steps,
+ * activity or heart rate arrive. Never throws and never delays the response; the timezone is the
+ * user's own when not given. A user without a walking plan costs one plan read. The first call
+ * runs at once; calls within the next minute fold into one run at the end of that minute.
+ */
+export function settleWalkingPlanSoon(repo: Repo, userId: string, tz?: string | null, now: number = Date.now()): void {
+  const last = lastSoon.get(userId)
+  if (last != null && now - last < SOON_MIN_INTERVAL_MS) {
+    const queued = trailing.get(userId)
+    if (queued) { queued.tz = tz ?? queued.tz; return }
+    const entry = {
+      tz,
+      timer: setTimeout(() => {
+        trailing.delete(userId)
+        lastSoon.set(userId, Date.now())
+        runSoon(repo, userId, entry.tz)
+      }, Math.max(0, SOON_MIN_INTERVAL_MS - (now - last))),
+    }
+    // Never hold a server process open for a settle.
+    if (typeof entry.timer === 'object' && entry.timer && 'unref' in entry.timer) entry.timer.unref()
+    trailing.set(userId, entry)
+    return
+  }
+  lastSoon.set(userId, now)
+  runSoon(repo, userId, tz)
+}
+
+/** Test hook: forget the per-user throttle and any queued trailing settle. */
 export function resetWalkingSettleThrottle(): void {
   lastSoon.clear()
+  for (const { timer } of trailing.values()) clearTimeout(timer)
+  trailing.clear()
 }

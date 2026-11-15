@@ -346,6 +346,8 @@ export interface PrescribedRun {
   activityLogId: string | null; updatedAt: Date
   /** LB-179: how it was satisfied; null = before this was tracked, i.e. a run. */
   completedAs: 'run' | 'walk' | null
+  /** Present only on a read with `includeDeleted`: the tombstone, null for a live row. */
+  deletedAt?: Date | null
 }
 export interface PrescribedRunUpdate {   // Zod-whitelisted PATCH body — never a raw request body into .set()
   status?: 'completed' | 'skipped'
@@ -838,10 +840,12 @@ export interface WorkoutRepository {
   saveRunningPlan(userId: string, plan: Omit<RunningPlan, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<RunningPlan>
   /** #3779: replaces the plan's `fitness_snapshot` jsonb (where a walking plan keeps its targets and
    *  judged weeks), scoped to the user. Null when no such plan is theirs. */
-  updateRunningPlanSnapshot(userId: string, planId: string, fitnessSnapshot: Record<string, unknown>): Promise<RunningPlan | null>
-  getPrescribedRuns(userId: string, from: string, to: string): Promise<PrescribedRun[]>
+  /** With `ifUpdatedAt`, writes only if the row is unchanged since that read; null when it was not written. */
+  updateRunningPlanSnapshot(userId: string, planId: string, fitnessSnapshot: Record<string, unknown>, opts?: { ifUpdatedAt?: Date }): Promise<RunningPlan | null>
+  getPrescribedRuns(userId: string, from: string, to: string, opts?: { includeDeleted?: boolean }): Promise<PrescribedRun[]>
   upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt' | 'completedAs'>): Promise<PrescribedRun>
-  updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate): Promise<PrescribedRun | null>
+  /** With `onlyIfPending`, changes only a live pending row; null when no row changed. */
+  updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate, opts?: { onlyIfPending?: boolean }): Promise<PrescribedRun | null>
   listActivityTypes(): Promise<ActivityType[]>
   createActivityType(data: { label: string; icon: string; isDistanceBased: boolean; sortOrder: number }): Promise<ActivityType>
   updateActivityType(id: string, patch: Partial<{ label: string; icon: string; isDistanceBased: boolean; sortOrder: number }>): Promise<ActivityType>

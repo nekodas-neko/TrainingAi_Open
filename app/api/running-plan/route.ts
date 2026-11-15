@@ -45,9 +45,13 @@ async function weekHeartHealth(repo: Awaited<ReturnType<typeof getRepository>>, 
  */
 async function walkingPayload(
   repo: Awaited<ReturnType<typeof getRepository>>, userId: string, tz: string,
-  plan: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getRepository>>['getActiveRunningPlan']>>>,
+  initialPlan: NonNullable<Awaited<ReturnType<Awaited<ReturnType<typeof getRepository>>['getActiveRunningPlan']>>>,
 ) {
-  const walking = await settleWalkingPlan(repo, userId, tz, { plan })
+  let plan = initialPlan
+  const walking = await settleWalkingPlan(repo, userId, tz)
+  // The settle may have stored new state on the plan: return the row as it is now.
+  const settled = await repo.getActiveRunningPlan(userId)
+  if (settled && settled.id === plan.id) plan = settled
   const today = todayInTz(tz)
   const run = (await repo.getPrescribedRuns(userId, today, today)).find((r) => r.planId === plan.id) ?? null
   const goalMeta = CARDIO_GOALS[plan.goalKind as GoalKind] ?? CARDIO_GOALS.walking
@@ -94,7 +98,8 @@ export async function GET() {
   // authoritative until the day rolls over (getPrescribedRuns is date-scoped) or the run
   // completes. gateReasons (never persisted) come back empty — the override already ran
   // through the recovery gate once, and its outcome (gateAction) is what's persisted.
-  const existingBeforeCompute = (await repo.getPrescribedRuns(userId, today, today))[0]
+  // This plan's row only: a row left by an earlier plan on the same day is not today's prescription.
+  const existingBeforeCompute = (await repo.getPrescribedRuns(userId, today, today)).find((r) => r.planId === plan.id)
   if (existingBeforeCompute?.rationale?.startsWith(OVERRIDE_RATIONALE_PREFIX)) {
     const prescription: Prescription = {
       type: existingBeforeCompute.runType as RunType,

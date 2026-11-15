@@ -7,10 +7,10 @@
  * in-memory fake; the heart-rate profile is fixed so the moderate floor is 112 bpm
  * (60 + 40% × (190 − 60)).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fromZonedTime } from 'date-fns-tz'
 import { shiftDateStr, todayInTz, weekStartForDay } from '@trainingai/shared/date-utils'
-import { firstJudgedWeek, parseWalkingState } from '@trainingai/shared/running/walking-plan'
+import { firstJudgedWeek, MINUTES_CEILING_PLUS, parseWalkingState, setMinutesCeiling } from '@trainingai/shared/running/walking-plan'
 
 vi.mock('@trainingai/shared/health/hr-profile', async (orig) => ({
   ...(await orig() as object),
@@ -18,7 +18,7 @@ vi.mock('@trainingai/shared/health/hr-profile', async (orig) => ({
 }))
 
 import {
-  resetWalkingSettleThrottle, settleWalkingPlan, settleWalkingPlanSoon, walkingPlanStartDate, WALK_DAY_RUN_TYPE, WALKING_STATE_KEY,
+  applyWalkingChoice, resetWalkingSettleThrottle, settleWalkingPlan, settleWalkingPlanSoon, walkingPlanStartDate, WALK_DAY_RUN_TYPE, WALKING_STATE_KEY,
 } from '../walking-plan-service'
 import { heartHealthDays } from '../heart-health-service'
 
@@ -42,6 +42,9 @@ function fakeRepo(tz: string, opts: { planStart: string; stepsGoal?: number | nu
     hr: [] as { timestamp: Date; bpm: number; source: string | null }[],
     runs: [] as Row[],
     snapshotWrites: 0,
+    snapshotConflicts: 0,
+    /** Runs once, just before the next snapshot write is checked: another process's write. */
+    beforeNextSnapshotWrite: null as null | (() => void),
   }
   const inRange = (d: string, f: string, t: string) => d >= f && d <= t
   const repo = {
@@ -54,22 +57,30 @@ function fakeRepo(tz: string, opts: { planStart: string; stepsGoal?: number | nu
     listDayCheckins: vi.fn(async (_u: string, f: string, t: string) => db.checkins.filter((c) => inRange(c.logDate, f, t))),
     listMoodLogs: vi.fn(async (_u: string, f: string, t: string) => db.moods.filter((m) => inRange(m.logDate, f, t))),
     getHrForWindow: vi.fn(async (_u: string, from: Date, to: Date) => db.hr.filter((r) => r.timestamp >= from && r.timestamp <= to)),
-    updateRunningPlanSnapshot: vi.fn(async (_u: string, id: string, snap: Row) => {
+    updateRunningPlanSnapshot: vi.fn(async (_u: string, id: string, snap: Row, o: { ifUpdatedAt?: Date } = {}) => {
+      const hook = db.beforeNextSnapshotWrite
+      db.beforeNextSnapshotWrite = null
+      hook?.()
       if (id !== db.plan.id) return null
+      if (o.ifUpdatedAt && o.ifUpdatedAt.getTime() !== db.plan.updatedAt.getTime()) { db.snapshotConflicts++; return null }
       db.snapshotWrites++
       db.plan.fitnessSnapshot = JSON.parse(JSON.stringify(snap))
+      db.plan.updatedAt = new Date(db.plan.updatedAt.getTime() + 1)
       return { ...db.plan }
     }),
-    getPrescribedRuns: vi.fn(async (_u: string, f: string, t: string) => db.runs.filter((r) => inRange(r.date, f, t)).map((r) => ({ ...r }))),
+    getPrescribedRuns: vi.fn(async (_u: string, f: string, t: string, o: { includeDeleted?: boolean } = {}) => db.runs
+      .filter((r) => inRange(r.date, f, t) && (o.includeDeleted || r.deletedAt == null))
+      .map((r) => (o.includeDeleted ? { ...r, deletedAt: r.deletedAt ?? null } : { ...r }))),
     upsertPrescribedRun: vi.fn(async (_u: string, r: Row) => {
       const row = { ...r, userId: USER, completedAs: null, updatedAt: new Date() }
       db.runs = db.runs.filter((x) => !(x.planId === r.planId && x.date === r.date))
       db.runs.push(row)
       return { ...row }
     }),
-    updatePrescribedRun: vi.fn(async (_u: string, id: string, patch: Row) => {
+    updatePrescribedRun: vi.fn(async (_u: string, id: string, patch: Row, o: { onlyIfPending?: boolean } = {}) => {
       const row = db.runs.find((r) => r.id === id)
       if (!row) return null
+      if (o.onlyIfPending && (row.status !== 'pending' || row.deletedAt != null)) return null
       Object.assign(row, patch)
       return { ...row }
     }),
@@ -89,16 +100,27 @@ function fakeRepo(tz: string, opts: { planStart: string; stepsGoal?: number | nu
   return { db, repo: repo as never, log, steps, denseHr }
 }
 
+/** Pin the clock (Date only; timers stay real) to local midday on `date` in `tz`. */
+function pinClock(tz: string, date: string) {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(fromZonedTime(`${date}T12:00:00`, tz))
+}
+
 describe.each(['Australia/Brisbane', 'America/Los_Angeles'])('the walking plan on the server, in %s', (tz) => {
   let today: string
   let thisMonday: string
   let lastMonday: string
   beforeEach(() => {
+    // Thursday of the current local week: last week is past its two-day grace, whatever day the
+    // suite runs on. Derived from the clock, then pinned, so both sides of every window agree.
+    const thursday = shiftDateStr(weekStartForDay(todayInTz(tz)), 3)
+    pinClock(tz, thursday)
     today = todayInTz(tz)
     thisMonday = weekStartForDay(today)
     lastMonday = shiftDateStr(thisMonday, -7)
     resetWalkingSettleThrottle()
   })
+  afterEach(() => { vi.useRealTimers() })
 
   it('sets its starting targets from the person\'s own history, and stores them on the plan', async () => {
     const f = fakeRepo(tz, { planStart: today })
@@ -223,14 +245,128 @@ describe.each(['Australia/Brisbane', 'America/Los_Angeles'])('the walking plan o
     expect(await heartHealthDays(f.repo, USER, tz, today, today, { maxHr: 190, restingHr: 60 })).toEqual([])
   })
 
-  it('settles after data lands, at most once a minute per user', async () => {
+  it('settles after data lands at once, and folds a burst into one more settle at the end of the minute', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(fromZonedTime(`${today}T12:00:00`, tz))
     const f = fakeRepo(tz, { planStart: today })
-    f.log(today)
+    f.log(today, { distanceKm: 1.5 }) // 3 km/h: nothing counts until the heart rate lands
+    const flush = async () => { for (let i = 0; i < 50; i++) await new Promise((r) => setImmediate(r)) }
     const t = Date.now()
-    settleWalkingPlanSoon(f.repo, USER, tz, t)
+    settleWalkingPlanSoon(f.repo, USER, tz, t) // the activity lands
+    await flush()
+    expect(f.db.runs.find((r) => r.date === today)?.status).toBe('pending')
+    f.denseHr(today, 125) // the Oura webhook's heart-rate catch-up, a second later
     settleWalkingPlanSoon(f.repo, USER, tz, t + 1000)
-    await vi.waitFor(() => expect(f.db.runs.find((r) => r.date === today)?.status).toBe('completed'))
-    expect((f.repo as unknown as { getActiveRunningPlan: { mock: { calls: unknown[] } } }).getActiveRunningPlan.mock.calls.length).toBe(1) // the second call, a second later, never ran
+    settleWalkingPlanSoon(f.repo, USER, tz, t + 2000)
+    await flush()
+    expect(f.db.runs.find((r) => r.date === today)?.status).toBe('pending') // inside the window
+    await vi.advanceTimersByTimeAsync(60_000)
+    await flush()
+    expect(f.db.runs.find((r) => r.date === today)?.status).toBe('completed') // the trailing run saw it
+    const reads = (f.repo as unknown as { getActiveRunningPlan: { mock: { calls: unknown[] } } }).getActiveRunningPlan.mock.calls.length
+    expect(reads).toBe(4) // two runs, each a check and the settle's own read: the third call folded in
+  })
+
+  describe('a week is re-judged until two days after its Sunday', () => {
+    it('Sunday\'s steps landing on Monday, after a first settle, change the verdict; after the grace they do not', async () => {
+      const f = fakeRepo(tz, { planStart: lastMonday, stepsGoal: 8000 })
+      for (let i = 0; i < 6; i++) f.steps(shiftDateStr(lastMonday, i), i < 4 ? 8500 : 3000)
+      // Monday of this week: last week has just ended.
+      pinClock(tz, thisMonday)
+      const first = await settleWalkingPlan(f.repo, USER, tz)
+      expect(first!.history.at(-1)).toMatchObject({ weekStart: lastMonday, stepDaysMet: 4, stepsMet: false, provisional: true })
+      expect(parseWalkingState(f.db.plan.fitnessSnapshot[WALKING_STATE_KEY])!.weeks).toHaveLength(0) // nothing frozen
+
+      // Sunday's steps sync later on Monday.
+      f.steps(shiftDateStr(lastMonday, 6), 9000)
+      const second = await settleWalkingPlan(f.repo, USER, tz)
+      expect(second!.history.at(-1)).toMatchObject({ stepDaysMet: 5, stepsMet: true, provisional: true })
+
+      // Wednesday: frozen with what was there.
+      pinClock(tz, shiftDateStr(thisMonday, 2))
+      await settleWalkingPlan(f.repo, USER, tz)
+      const frozen = parseWalkingState(f.db.plan.fitnessSnapshot[WALKING_STATE_KEY])!
+      expect(frozen.weeks.at(-1)).toMatchObject({ weekStart: lastMonday, stepDaysMet: 5, stepsMet: true })
+      expect(frozen.stepsStreak).toBe(1)
+
+      // A late correction to Monday's steps on Thursday changes nothing stored or shown.
+      f.db.metrics = f.db.metrics.filter((m) => m.date !== lastMonday)
+      f.steps(lastMonday, 1000)
+      pinClock(tz, shiftDateStr(thisMonday, 3))
+      const late = await settleWalkingPlan(f.repo, USER, tz)
+      expect(late!.history.at(-1)).toMatchObject({ stepDaysMet: 5, stepsMet: true })
+      expect(late!.history.at(-1)!.provisional).toBeUndefined()
+      expect(parseWalkingState(f.db.plan.fitnessSnapshot[WALKING_STATE_KEY])).toEqual(frozen)
+    })
+  })
+
+  describe('no write is lost', () => {
+    it('a settle queued behind the person\'s choice reads the plan after it, so the choice stands', async () => {
+      const f = fakeRepo(tz, { planStart: lastMonday })
+      await settleWalkingPlan(f.repo, USER, tz)
+      const choice = applyWalkingChoice(f.repo, USER, tz, (s) => setMinutesCeiling(s, MINUTES_CEILING_PLUS))
+      settleWalkingPlanSoon(f.repo, USER, tz) // its plan read happens while the choice holds the lock
+      const queued = settleWalkingPlan(f.repo, USER, tz)
+      expect((await choice).ok).toBe(true)
+      await queued
+      await vi.waitFor(() => expect(f.db.snapshotWrites).toBeGreaterThan(0))
+      await new Promise((r) => setTimeout(r, 20))
+      expect(parseWalkingState(f.db.plan.fitnessSnapshot[WALKING_STATE_KEY])!.minutesCeiling).toBe(MINUTES_CEILING_PLUS)
+    })
+
+    it('another process writing between the read and the write: the write is refused, re-read and redone once', async () => {
+      const f = fakeRepo(tz, { planStart: lastMonday })
+      f.log(lastMonday)
+      // Another server process stores the "heart health plus" choice just before this settle writes.
+      f.db.beforeNextSnapshotWrite = () => {
+        f.db.plan.fitnessSnapshot = { other: 'kept', [WALKING_STATE_KEY]: { ...(f.db.plan.fitnessSnapshot[WALKING_STATE_KEY] ?? {}) } }
+        f.db.plan.updatedAt = new Date(f.db.plan.updatedAt.getTime() + 5)
+      }
+      await settleWalkingPlan(f.repo, USER, tz)
+      expect(f.db.snapshotConflicts).toBe(1)
+      expect(f.db.snapshotWrites).toBe(1)
+      expect(f.db.plan.fitnessSnapshot.other).toBe('kept')
+      expect(parseWalkingState(f.db.plan.fitnessSnapshot[WALKING_STATE_KEY])!.weeks.map((w) => w.weekStart)).toEqual([lastMonday])
+    })
+
+    it('a choice that loses the race to another process is re-applied to what that process stored', async () => {
+      const f = fakeRepo(tz, { planStart: lastMonday })
+      await settleWalkingPlan(f.repo, USER, tz)
+      const stored = parseWalkingState(f.db.plan.fitnessSnapshot[WALKING_STATE_KEY])!
+      f.db.beforeNextSnapshotWrite = () => {
+        f.db.plan.fitnessSnapshot = { [WALKING_STATE_KEY]: { ...stored, stepsTarget: stored.stepsTarget + 500 } }
+        f.db.plan.updatedAt = new Date(f.db.plan.updatedAt.getTime() + 5)
+      }
+      const r = await applyWalkingChoice(f.repo, USER, tz, (s) => setMinutesCeiling(s, MINUTES_CEILING_PLUS))
+      expect(r.ok).toBe(true)
+      const after = parseWalkingState(f.db.plan.fitnessSnapshot[WALKING_STATE_KEY])!
+      expect([after.minutesCeiling, after.stepsTarget]).toEqual([MINUTES_CEILING_PLUS, stored.stepsTarget + 500])
+    })
+
+    it('a day skipped after the settle read it stays skipped', async () => {
+      const f = fakeRepo(tz, { planStart: today })
+      f.db.runs.push({ id: 'r-1', planId: 'plan-w', date: today, runType: WALK_DAY_RUN_TYPE, status: 'pending', activityLogId: null })
+      f.log(today)
+      const repo = f.repo as unknown as { getPrescribedRuns: { mockImplementationOnce: (fn: (...a: unknown[]) => unknown) => void } }
+      repo.getPrescribedRuns.mockImplementationOnce(async () => {
+        const copy = f.db.runs.map((r) => ({ ...r, deletedAt: null }))
+        f.db.runs.find((r) => r.id === 'r-1')!.status = 'skipped' // the person's skip lands mid-settle
+        return copy
+      })
+      await settleWalkingPlan(f.repo, USER, tz)
+      expect(f.db.runs.find((r) => r.id === 'r-1')!.status).toBe('skipped')
+    })
+
+    it('a walk day the person deleted is never recreated or rewritten', async () => {
+      const f = fakeRepo(tz, { planStart: today })
+      f.db.runs.push({ id: 'r-del', planId: 'plan-w', date: today, runType: WALK_DAY_RUN_TYPE, status: 'pending', activityLogId: null, deletedAt: new Date() })
+      f.log(today)
+      await settleWalkingPlan(f.repo, USER, tz)
+      await settleWalkingPlan(f.repo, USER, tz)
+      expect((f.repo as unknown as { upsertPrescribedRun: { mock: { calls: unknown[] } } }).upsertPrescribedRun.mock.calls).toHaveLength(0)
+      expect(f.db.runs).toHaveLength(1)
+      expect(f.db.runs[0]).toMatchObject({ id: 'r-del', status: 'pending' })
+    })
   })
 })
 

@@ -6,8 +6,8 @@ import { z } from 'zod'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { cardioPlanKind } from '@trainingai/shared/running/cardio-goals'
-import { applyStepBack, MINUTES_CEILING, MINUTES_CEILING_PLUS, parseWalkingState, setMinutesCeiling } from '@trainingai/shared/running/walking-plan'
-import { settleWalkingPlan, WALKING_STATE_KEY } from '@/lib/health/walking-plan-service'
+import { applyStepBack, MINUTES_CEILING, MINUTES_CEILING_PLUS, setMinutesCeiling } from '@trainingai/shared/running/walking-plan'
+import { applyWalkingChoice } from '@/lib/health/walking-plan-service'
 
 // #3779 — the two choices the walking plan leaves to the person: accept an offered step back (a
 // target never drops on its own), and the weekly minutes ceiling (150, or 300 for "heart health
@@ -41,20 +41,16 @@ export async function POST(req: Request) {
   const plan = await repo.getActiveRunningPlan(userId)
   if (!plan || cardioPlanKind(plan) !== 'walking') return NextResponse.json({ error: 'No active walking plan' }, { status: 404 })
 
-  // Settle first, so the choice applies to the state with every ended week judged.
-  await settleWalkingPlan(repo, userId, tz, { plan })
-  const fresh = await repo.getActiveRunningPlan(userId)
-  const snapshot = (fresh?.fitnessSnapshot && typeof fresh.fitnessSnapshot === 'object' ? fresh.fitnessSnapshot : {}) as Record<string, unknown>
-  const state = parseWalkingState(snapshot[WALKING_STATE_KEY])
-  if (!fresh || !state) return NextResponse.json({ error: 'No active walking plan' }, { status: 404 })
-
-  const next = parsed.data.action === 'step-back'
-    ? applyStepBack(state, parsed.data.target)
-    : setMinutesCeiling(state, parsed.data.ceiling)
-  if (!next) return NextResponse.json({ error: 'No step back is on offer for that target' }, { status: 409 })
-
-  const updated = await repo.updateRunningPlanSnapshot(userId, fresh.id, { ...snapshot, [WALKING_STATE_KEY]: next })
-  if (!updated) return NextResponse.json({ error: 'No active walking plan' }, { status: 404 })
-  const walking = await settleWalkingPlan(repo, userId, tz, { plan: updated })
-  return NextResponse.json({ walking }, { headers: { 'Cache-Control': NO_STORE } })
+  // The settle, the read and the write run in one per-user lock, and the write is a compare-and-set,
+  // so a settle queued behind this request, or another server process, cannot lose the choice.
+  const choice = parsed.data
+  const result = await applyWalkingChoice(repo, userId, tz, (state) => (
+    choice.action === 'step-back' ? applyStepBack(state, choice.target) : setMinutesCeiling(state, choice.ceiling)
+  ))
+  if (!result.ok) {
+    if (result.reason === 'not_on_offer') return NextResponse.json({ error: 'No step back is on offer for that target' }, { status: 409 })
+    if (result.reason === 'conflict') return NextResponse.json({ error: 'The plan changed; try again' }, { status: 409 })
+    return NextResponse.json({ error: 'No active walking plan' }, { status: 404 })
+  }
+  return NextResponse.json({ walking: result.walking }, { headers: { 'Cache-Control': NO_STORE } })
 }
