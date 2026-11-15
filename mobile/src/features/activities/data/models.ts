@@ -115,15 +115,25 @@ export const runningPlanSpec = (today: string) => ({
       .object({
         id: z.string(),
         frameworkKey: z.string(),
+        // A running plan stores its fitness here; a walking plan (#3779) stores only its own state
+        // under `walkingPlan`, which the screens read from the payload's `walking` block instead.
+        // So a walking snapshot parses to null rather than failing the whole payload, and a running
+        // one is still checked field by field.
         fitnessSnapshot: z
-          .object({
-            maxHr: number,
-            restingHr: number,
-            vo2max: number.nullable(),
-            thresholdHr: number.nullable(),
-            weeklyBaseMinutes: number,
-            source: z.enum(['baseline', 'age-estimate']),
-          })
+          .union([
+            z.object({
+              maxHr: number,
+              restingHr: number,
+              vo2max: number.nullable(),
+              thresholdHr: number.nullable(),
+              weeklyBaseMinutes: number,
+              source: z.enum(['baseline', 'age-estimate']),
+            }),
+            z
+              .object({ walkingPlan: z.object({ version: z.number() }).passthrough() })
+              .passthrough()
+              .transform(() => null),
+          ])
           .nullish(),
       })
       .passthrough()
