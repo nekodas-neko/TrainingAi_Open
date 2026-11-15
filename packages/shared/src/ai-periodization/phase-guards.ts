@@ -22,80 +22,14 @@ export function canAutoApplyTransition(
   )
 }
 
-// Hard cap on accumulation sessions. With ambiguous signals the AI can keep
-// recommending "stay" indefinitely; this forces a transition recommendation once the
-// cap is reached so an accumulation block can't run forever (~6 weeks at one
-// accumulation session per week).
-export const ACCUMULATION_CEILING = 6
+// The caps on each phase are the PROGRAM's, in training weeks (#3766): `PROGRAM_PHASE_CAP_WEEKS` and
+// `applyProgramPhaseCap` in `program-phase.ts`. The per-session-type ceilings that lived here
+// (accumulation 6, intensification 5, realisation 2 sessions of one type) were replaced by them.
 
-// Once the user has logged at least ACCUMULATION_CEILING sessions in the accumulation
-// phase and the AI still wants to stay, override the prescription to recommend moving on
-// to intensification. Only a plain "stay" is overridden — genuine recovery actions
-// (deload / rest day / session swap) are left untouched.
-export function applyAccumulationCeiling(
-  prescription: AiPrescription,
-  phase: PeriodizationPhase,
-  sessionsInPhase: number,
-): AiPrescription {
-  if (phase !== 'accumulation' || sessionsInPhase < ACCUMULATION_CEILING || prescription.phaseAction !== 'stay') {
-    return prescription
-  }
-  return {
-    ...prescription,
-    phase: 'intensification',
-    phaseAction: 'transition_recommended',
-    reasoning: `You've completed ${sessionsInPhase} accumulation sessions (cap ${ACCUMULATION_CEILING}) — time to move to intensification (heavier loads, lower reps). ${prescription.reasoning}`.trim(),
-  }
-}
-
-// Hard cap on intensification sessions, mirroring the accumulation ceiling. The prompt
-// allows a transition from 3+ sessions; the ceiling is the hard stop above that minimum.
-export const INTENSIFICATION_CEILING = 5
-
-// Once the user has logged at least INTENSIFICATION_CEILING sessions in the
-// intensification phase and the AI still wants to stay, override the prescription to
-// recommend moving on to realisation. Only a plain "stay" is overridden.
-export function applyIntensificationCeiling(
-  prescription: AiPrescription,
-  phase: PeriodizationPhase,
-  sessionsInPhase: number,
-): AiPrescription {
-  if (phase !== 'intensification' || sessionsInPhase < INTENSIFICATION_CEILING || prescription.phaseAction !== 'stay') {
-    return prescription
-  }
-  return {
-    ...prescription,
-    phase: 'realisation',
-    phaseAction: 'transition_recommended',
-    reasoning: `You've completed ${sessionsInPhase} intensification sessions (cap ${INTENSIFICATION_CEILING}) — time to move to realisation (peak loads, lowest reps). ${prescription.reasoning}`.trim(),
-  }
-}
-
-// Hard cap on realisation sessions — matches the prompt's own "realisation→deload: always
-// after 2 sessions" rule, which nothing previously enforced.
-export const REALISATION_CEILING = 2
-
-// Once the user has logged at least REALISATION_CEILING sessions in the realisation phase
-// and the AI still wants to stay, override the prescription to recommend a deload. Only a
-// plain "stay" is overridden.
-export function applyRealisationCeiling(
-  prescription: AiPrescription,
-  phase: PeriodizationPhase,
-  sessionsInPhase: number,
-): AiPrescription {
-  if (phase !== 'realisation' || sessionsInPhase < REALISATION_CEILING || prescription.phaseAction !== 'stay') {
-    return prescription
-  }
-  return {
-    ...prescription,
-    phase: 'deload',
-    phaseAction: 'transition_recommended',
-    reasoning: `You've completed ${sessionsInPhase} realisation sessions (cap ${REALISATION_CEILING}) — time to deload and recover. ${prescription.reasoning}`.trim(),
-  }
-}
-
-// Number of deload sessions after which the recovery block is considered complete and a
-// new cycle should begin.
+// Number of deload sessions after which one session type's deload is complete. Since #3766 this is
+// only the switch-over's test: a program still on per-type phases waits for each type in a deload to
+// finish it, and such a type keeps this way out while it waits. An aligned program's deload is a
+// training week (`PROGRAM_PHASE_CAP_WEEKS.deload`).
 export const DELOAD_FLOOR = 2
 
 // Once the user has logged at least DELOAD_FLOOR deload sessions and the AI still wants to

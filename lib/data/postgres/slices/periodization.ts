@@ -4,6 +4,11 @@ import type { getDb } from '../client'
 import * as s from '../schema'
 import { shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
+import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
+import {
+  joiningPhaseFor, programMoveMark,
+  type ProgramCompletion, type PhaseAnswer, type ProgramMoveOptions, type DecidePending, type DecideTarget,
+} from '@trainingai/shared/ai-periodization/program-phase'
 import type { TimingRow } from '@trainingai/shared/workout/time-profile'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
@@ -11,6 +16,7 @@ import type {
 } from '@trainingai/shared/types/ai-periodization'
 
 type Db = ReturnType<typeof getDb>
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 
 // ── Row Mappers ────────────────────────────────────────────────────────────────
 
@@ -60,23 +66,76 @@ export async function ensureSessionPeriodization(db: Db, userId: string, program
   return existing!
 }
 
-export async function setBaselineComplete(db: Db, userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>): Promise<SessionPeriodization> {
-  const [row] = await db
-    .update(s.sessionPeriodization)
-    .set({
-      baselineComplete: true,
-      baseline1rm,
-      phase: 'accumulation',
-      phaseStartedAt: new Date(),
-      sessionsInPhase: 0,
-      updatedAt: new Date(),
-    })
+/**
+ * The program's rows, locked for the rest of the transaction, in id order (so two writers lock them
+ * in the same order). A program move, the switch-over, a re-align and a baseline joining the program
+ * all take this lock first, so none of them reads rows another is about to change (#3766).
+ */
+async function lockProgramRows(tx: Tx, userId: string, programId: string): Promise<SessionPeriodization[]> {
+  const rows = await tx
+    .select({ sp: s.sessionPeriodization })
+    .from(s.sessionPeriodization)
+    .innerJoin(s.programSessions, eq(s.sessionPeriodization.programSessionId, s.programSessions.id))
     .where(and(
       eq(s.sessionPeriodization.userId, userId),
-      eq(s.sessionPeriodization.programSessionId, programSessionId),
+      eq(s.programSessions.programId, programId),
+      isNull(s.programSessions.deletedAt),
     ))
-    .returning()
-  return mapPeriodization(row)
+    .orderBy(asc(s.sessionPeriodization.id))
+    .for('update', { of: s.sessionPeriodization })
+  return rows.map(r => mapPeriodization(r.sp))
+}
+
+/** `phase_started_at` equals a JS Date, at the Date's millisecond precision. A start written by SQL
+ *  `now()` (the column default) has microseconds, which a JS Date read back from it has lost, so an
+ *  exact comparison with that Date never matches. */
+function phaseStartedAtIs(at: Date) {
+  return sql`date_trunc('milliseconds', ${s.sessionPeriodization.phaseStartedAt}) = ${at.toISOString()}::timestamptz`
+}
+
+async function programIdOf(db: Db | Tx, programSessionId: string): Promise<string | null> {
+  const [own] = await db.select({ programId: s.programSessions.programId }).from(s.programSessions)
+    .where(eq(s.programSessions.id, programSessionId)).limit(1)
+  return own?.programId ?? null
+}
+
+/**
+ * The phase a session type takes when its baseline completes (#3766, `joiningPhaseFor`): the
+ * program's, so it joins the program where it is. Read under the program's row lock, so two
+ * baselines finishing together, or one finishing during a program move, see each other's writes.
+ * `sessions_in_phase` starts at 0 and the next reconcile counts it.
+ */
+async function joiningPhase(tx: Tx, userId: string, programSessionId: string): Promise<{
+  phase: PeriodizationPhase; phaseStartedAt: Date; pendingTransition: PendingTransition | null
+}> {
+  const programId = await programIdOf(tx, programSessionId)
+  const siblings = programId
+    ? (await lockProgramRows(tx, userId, programId)).filter(r => r.programSessionId !== programSessionId)
+    : []
+  return joiningPhaseFor(siblings, new Date())
+}
+
+export async function setBaselineComplete(db: Db, userId: string, programSessionId: string, baseline1rm: Record<string, Baseline1rmEntry>): Promise<SessionPeriodization> {
+  return db.transaction(async tx => {
+    const joining = await joiningPhase(tx, userId, programSessionId)
+    const [row] = await tx
+      .update(s.sessionPeriodization)
+      .set({
+        baselineComplete: true,
+        baseline1rm,
+        phase: joining.phase,
+        phaseStartedAt: joining.phaseStartedAt,
+        pendingTransition: joining.pendingTransition as unknown as Record<string, unknown> | null,
+        sessionsInPhase: 0,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(s.sessionPeriodization.userId, userId),
+        eq(s.sessionPeriodization.programSessionId, programSessionId),
+      ))
+      .returning()
+    return mapPeriodization(row)
+  })
 }
 
 /**
@@ -138,24 +197,205 @@ export async function recordBaselineAnchors(
   if (!current || current.baselineComplete) return current ? mapPeriodization(current) : null
 
   const merged = { ...((current.baseline1rm ?? {}) as Record<string, Baseline1rmEntry>), ...anchors }
-  const [row] = await db
-    .update(s.sessionPeriodization)
-    .set(complete
-      ? {
-          baseline1rm: merged, baselineComplete: true, phase: 'accumulation',
-          phaseStartedAt: new Date(), sessionsInPhase: 0, updatedAt: new Date(),
-        }
-      // Still in `baseline`: the phase clock and the session counter are untouched, because the
-      // lifter has not left the phase and `sessions_in_phase` is already advanced by the completion.
-      : { baseline1rm: merged, updatedAt: new Date() })
-    .where(and(
-      eq(s.sessionPeriodization.userId, userId),
-      eq(s.sessionPeriodization.programSessionId, programSessionId),
-    ))
-    .returning()
-  return row ? mapPeriodization(row) : null
+  return db.transaction(async tx => {
+    const joining = complete ? await joiningPhase(tx, userId, programSessionId) : null
+    const [row] = await tx
+      .update(s.sessionPeriodization)
+      .set(joining
+        ? {
+            baseline1rm: merged, baselineComplete: true, phase: joining.phase,
+            phaseStartedAt: joining.phaseStartedAt,
+            pendingTransition: joining.pendingTransition as unknown as Record<string, unknown> | null,
+            sessionsInPhase: 0, updatedAt: new Date(),
+          }
+        // Still in `baseline`: the phase clock and the session counter are untouched, because the
+        // lifter has not left the phase and `sessions_in_phase` is already advanced by the completion.
+        : { baseline1rm: merged, updatedAt: new Date() })
+      .where(and(
+        eq(s.sessionPeriodization.userId, userId),
+        eq(s.sessionPeriodization.programSessionId, programSessionId),
+      ))
+      .returning()
+    return row ? mapPeriodization(row) : null
+  })
 }
 
+/**
+ * Move the WHOLE program's phase (#3766): every session type whose baseline is done gets the same
+ * phase and the same start, in one transaction, and loses its stored plan so the next open plans it
+ * in the new phase. Two plans survive: `voidAll` (none by default) and any slot holding an
+ * unexpired one-day deload (#3799), which belongs to that day, not to the phase. Every row gets the
+ * program's mark (`programMoveMark`), with the scheduled short block when one is given.
+ *
+ * The rows are read and written under one lock. With `expect`, nothing is written unless the program
+ * is still where the caller saw it, and the call resolves false: a second tap, a second generation's
+ * auto-apply, or a second switch-over racing the first finds the program already moved and leaves
+ * it (and the plans regenerated since) alone.
+ */
+export async function setProgramPhase(
+  db: Db, userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date,
+  pendingTransition: PendingTransition | null,
+  opts: ProgramMoveOptions = {},
+): Promise<boolean> {
+  const mark = programMoveMark(phase, pendingTransition)
+  return db.transaction(async tx => {
+    const rows = await lockProgramRows(tx, userId, programId)
+    const phased = rows.filter(r => r.baselineComplete && r.phase !== 'baseline')
+    if (phased.length === 0) return false
+    const expect = opts.expect
+    if (expect === 'switch-over' && phased.some(r => r.pendingTransition?.programPhase === true)) return false
+    if (expect != null && expect !== 'switch-over') {
+      // Compared in the database, at millisecond precision (`phaseStartedAtIs`).
+      const [{ off }] = await tx
+        .select({ off: sql<number>`count(*)::int` })
+        .from(s.sessionPeriodization)
+        .where(and(
+          inArray(s.sessionPeriodization.id, phased.map(r => r.id)),
+          sql`NOT (${eq(s.sessionPeriodization.phase, expect.phase)} AND ${phaseStartedAtIs(expect.phaseStartedAt)})`,
+        ))
+      if (off > 0) return false
+    }
+    const voidAll = new Set(opts.voidAll ?? [])
+    const toVoid = phased.filter(r => voidAll.has(r.programSessionId) || !holdsOneDayDeload(r)).map(r => r.id)
+    const now = new Date()
+    await tx.update(s.sessionPeriodization)
+      .set({
+        phase,
+        phaseStartedAt: startedAt,
+        sessionsInPhase: 0,
+        pendingTransition: mark as unknown as Record<string, unknown>,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(s.sessionPeriodization.userId, userId),
+        inArray(s.sessionPeriodization.id, phased.map(r => r.id)),
+      ))
+    if (toVoid.length > 0) await voidPlans(tx, userId, toVoid, now)
+    return true
+  })
+}
+
+/** 'consumed' + no plan is what the open-time trigger regenerates from (as `clearProgramPrescriptions`). */
+async function voidPlans(tx: Tx, userId: string, rowIds: string[], now: Date): Promise<void> {
+  await tx.update(s.sessionPeriodization)
+    .set({ prescription: null, prescriptionStatus: 'consumed', prescriptionGeneratedAt: null, prescriptionExpiresAt: null, updatedAt: now })
+    .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, rowIds)))
+}
+
+/**
+ * Put a program on one phase whose rows have come to disagree after its switch-over (#3766): every
+ * phased row takes the target `decide` works out from the LOCKED rows (`realignTargetFor`: the
+ * program's latest move), so a move landing after the caller's read is not undone. Only a row that
+ * was not already there has its count reset and its plan voided (a held one-day deload excepted);
+ * the others keep their plans and just get the mark.
+ */
+export async function realignProgramPhase(db: Db, userId: string, programId: string, decide: DecideTarget): Promise<void> {
+  await db.transaction(async tx => {
+    const locked = await lockProgramRows(tx, userId, programId)
+    const target = decide(locked)
+    if (target == null) return
+    const phased = locked.filter(r => r.baselineComplete && r.phase !== 'baseline')
+    const behind = phased.filter(r => r.phase !== target.phase || r.phaseStartedAt.getTime() !== target.phaseStartedAt.getTime())
+    if (behind.length === 0 && phased.every(r => r.pendingTransition?.programPhase === true)) return
+    const now = new Date()
+    const pending = target.pendingTransition as unknown as Record<string, unknown>
+    if (behind.length > 0) {
+      await tx.update(s.sessionPeriodization)
+        .set({ phase: target.phase, phaseStartedAt: target.phaseStartedAt, sessionsInPhase: 0, pendingTransition: pending, updatedAt: now })
+        .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, behind.map(r => r.id))))
+      const toVoid = behind.filter(r => !holdsOneDayDeload(r)).map(r => r.id)
+      if (toVoid.length > 0) await voidPlans(tx, userId, toVoid, now)
+    }
+    await tx.update(s.sessionPeriodization)
+      .set({ pendingTransition: pending, updatedAt: now })
+      .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, phased.map(r => r.id))))
+  })
+}
+
+/** A scheduled move on every phased row of the program, phase, start and plans untouched: the
+ *  program's mark on its first read, or the switch-over's waiting stamp and date (#3766). `decide`
+ *  works it out from the LOCKED rows, so a switch-over landing after the caller's read is not
+ *  overwritten by a waiting stamp; null writes nothing. */
+export async function setProgramPendingTransition(db: Db, userId: string, programId: string, decide: DecidePending): Promise<void> {
+  await db.transaction(async tx => {
+    const locked = await lockProgramRows(tx, userId, programId)
+    const phased = locked.filter(r => r.baselineComplete && r.phase !== 'baseline')
+    if (phased.length === 0) return
+    const pending = decide(locked)
+    if (pending == null) return
+    await tx.update(s.sessionPeriodization)
+      .set({ pendingTransition: pending as unknown as Record<string, unknown>, updatedAt: new Date() })
+      .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, phased.map(r => r.id))))
+  })
+}
+
+/** The program move made from one session type's screen or generation: moves the program that
+ *  session belongs to, now, and returns that session's row. With `expected` (the phase and start the
+ *  caller planned from), a program that has moved since is left as it is. */
+export async function advanceProgramPhase(
+  db: Db, userId: string, programSessionId: string, newPhase: PeriodizationPhase,
+  expected?: { phase: PeriodizationPhase; phaseStartedAt: Date },
+): Promise<SessionPeriodization> {
+  const programId = await programIdOf(db, programSessionId)
+  if (!programId) throw new NotFoundError('Program session')
+  await setProgramPhase(db, userId, programId, newPhase, new Date(), null, { voidAll: [programSessionId], expect: expected })
+  const row = await getSessionPeriodization(db, userId, programSessionId)
+  if (!row) throw new NotFoundError('Session periodization')
+  return row
+}
+
+/**
+ * Completed sessions of a program since `since`: completed, not deleted, with logged sets (the same
+ * test `reconcileSessionsInPhase` uses). Training weeks are counted from these (#3766). Sessions of a
+ * tombstoned session type still count: the training happened.
+ */
+export async function listProgramCompletions(db: Db, userId: string, programId: string, since: Date): Promise<ProgramCompletion[]> {
+  const rows = await db.execute(sql`
+    SELECT ws.session_id AS program_session_id, ws.completed_at
+    FROM workout_sessions ws
+    JOIN program_sessions ps ON ps.id = ws.session_id
+    WHERE ws.user_id = ${userId}
+      AND ps.program_id = ${programId}
+      AND ws.deleted_at IS NULL
+      AND ws.completed_at IS NOT NULL
+      AND ws.completed_at >= ${since.toISOString()}
+      AND EXISTS (SELECT 1 FROM exercise_logs el WHERE el.workout_session_id = ws.id AND el.deleted_at IS NULL)
+    ORDER BY ws.completed_at
+  `)
+  return (rows.rows as Array<{ program_session_id: string; completed_at: Date | string }>).map(r => ({
+    programSessionId: r.program_session_id,
+    completedAt: new Date(r.completed_at),
+  }))
+}
+
+/** Every MODEL phase answer of these session types since `since` (`prescription_shadow` keeps the
+ *  raw answer before any guard), newest first, for the program's early-move vote (#3766). The vote
+ *  picks each type's answer for the session it trained (`collectVotes`). */
+export async function listModelPhaseAnswers(db: Db, userId: string, programSessionIds: string[], since: Date): Promise<PhaseAnswer[]> {
+  if (programSessionIds.length === 0) return []
+  const rows = await db
+    .select({
+      programSessionId: s.prescriptionShadow.programSessionId,
+      phase: s.prescriptionShadow.modelPhase,
+      phaseAction: s.prescriptionShadow.modelPhaseAction,
+      createdAt: s.prescriptionShadow.createdAt,
+    })
+    .from(s.prescriptionShadow)
+    .where(and(
+      eq(s.prescriptionShadow.userId, userId),
+      inArray(s.prescriptionShadow.programSessionId, programSessionIds),
+      gte(s.prescriptionShadow.createdAt, since),
+    ))
+    .orderBy(desc(s.prescriptionShadow.createdAt))
+  return rows.flatMap(r => (r.programSessionId
+    ? [{ programSessionId: r.programSessionId, phase: r.phase, phaseAction: r.phaseAction, createdAt: r.createdAt }]
+    : []))
+}
+
+/** One session type's own phase move, kept for a program still on per-type phases while it waits
+ *  for the switch-over (#3766). An aligned program moves through `advanceProgramPhase`. The row keeps
+ *  the switch-over's waiting stamp and date (a deload left early must not lose the switch Monday);
+ *  any other scheduled move, the program's mark included, is cleared. */
 export async function advancePhase(db: Db, userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization> {
   const [row] = await db
     .update(s.sessionPeriodization)
@@ -163,7 +403,7 @@ export async function advancePhase(db: Db, userId: string, programSessionId: str
       phase: newPhase,
       phaseStartedAt: new Date(),
       sessionsInPhase: 0,
-      pendingTransition: null,
+      pendingTransition: sql`CASE WHEN ${s.sessionPeriodization.pendingTransition} ->> 'switchOverPending' = 'true' THEN ${s.sessionPeriodization.pendingTransition} ELSE NULL END`,
       prescription: null,
       prescriptionStatus: 'none',
       prescriptionGeneratedAt: null,
@@ -186,8 +426,16 @@ export async function advancePhase(db: Db, userId: string, programSessionId: str
 // status. One statement makes that unrepresentable — the row is always some single run's content
 // AND that same run's status. It does not stop the two runs racing; last writer still wins, which
 // is correct and was never the defect (Q-54).
-export async function storePrescription(db: Db, userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status: PrescriptionStatus = 'pending'): Promise<void> {
-  await db
+//
+// `generatedFor` (#3766): the phase and start the plan was made in. A program move during the
+// generation (another session's tap or auto-apply) voids this slot and moves its phase; a plan made
+// for the old phase is then not stored, so the slot stays voided and regenerates in the new one.
+export async function storePrescription(
+  db: Db, userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date,
+  status: PrescriptionStatus = 'pending',
+  generatedFor?: { phase: PeriodizationPhase; phaseStartedAt: Date },
+): Promise<boolean> {
+  const stored = await db
     .update(s.sessionPeriodization)
     .set({
       prescription: prescription as unknown as Record<string, unknown>,
@@ -199,7 +447,12 @@ export async function storePrescription(db: Db, userId: string, programSessionId
     .where(and(
       eq(s.sessionPeriodization.userId, userId),
       eq(s.sessionPeriodization.programSessionId, programSessionId),
+      ...(generatedFor
+        ? [eq(s.sessionPeriodization.phase, generatedFor.phase), phaseStartedAtIs(generatedFor.phaseStartedAt)]
+        : []),
     ))
+    .returning({ id: s.sessionPeriodization.id })
+  return stored.length > 0
 }
 
 // Void the cached AI prescription for every session in a program, WITHOUT resetting
@@ -227,6 +480,18 @@ export async function clearProgramPrescriptions(db: Db, userId: string, programI
     .where(and(
       eq(s.sessionPeriodization.userId, userId),
       inArray(s.sessionPeriodization.programSessionId, sessionIds),
+    ))
+}
+
+/** One session's stored plan voided to 'consumed' + no plan, which the open-time trigger regenerates
+ *  from (as `clearProgramPrescriptions`, for one session). Phase and counts are untouched. */
+export async function voidSessionPrescription(db: Db, userId: string, programSessionId: string): Promise<void> {
+  await db
+    .update(s.sessionPeriodization)
+    .set({ prescription: null, prescriptionStatus: 'consumed', prescriptionGeneratedAt: null, prescriptionExpiresAt: null, updatedAt: new Date() })
+    .where(and(
+      eq(s.sessionPeriodization.userId, userId),
+      eq(s.sessionPeriodization.programSessionId, programSessionId),
     ))
 }
 

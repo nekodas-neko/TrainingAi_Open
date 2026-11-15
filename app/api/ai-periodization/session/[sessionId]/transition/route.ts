@@ -8,6 +8,8 @@ import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { isOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
 import { prescriptionAgedOut } from '@trainingai/shared/ai-periodization/prescription-expiry'
+import { syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 // One phase transition.
 const MAX_BODY_BYTES = 16 * 1024
@@ -16,18 +18,6 @@ const BodySchema = z.object({
   newPhase: z.enum(['accumulation', 'intensification', 'realisation', 'deload']),
   force: z.boolean().optional(),
 }).strict()
-
-// Natural cycle order the AI periodization engine progresses through — matches
-// lib/ai-periodization/prompt.ts's documented transitions (accumulation→intensification→
-// realisation→deload→accumulation). Deload is reachable from any phase (fatigue-driven
-// early deload, not just the end of a realisation block).
-const NEXT_PHASE: Record<PeriodizationPhase, PeriodizationPhase> = {
-  baseline: 'accumulation',
-  accumulation: 'intensification',
-  intensification: 'realisation',
-  realisation: 'deload',
-  deload: 'accumulation',
-}
 
 export async function POST(
   req: NextRequest,
@@ -54,6 +44,14 @@ export async function POST(
   const badId = invalidUuidResponse(sessionId)
   if (badId) return badId
   const repo = await getRepository()
+
+  // #3766: read the program's phase first (running the switch-over if it is due), so the state below
+  // is the one the move starts from.
+  const program = await repo.getActiveProgram(userId)
+  const onProgram = program?.sessions.some(ps => ps.id === sessionId) ?? false
+  const programPhase = program && onProgram
+    ? await syncProgramPhase(repo, userId, program.id, session.user?.timezone ?? DEFAULT_TZ)
+    : null
 
   const state = await repo.getSessionPeriodization(userId, sessionId)
   if (!state) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -83,13 +81,26 @@ export async function POST(
     return NextResponse.json({ state: unchanged, prescriptionStatus: 'accepted', phaseMoved: false })
   }
 
-  const isAdjacent = NEXT_PHASE[state.phase] === body.newPhase
-  if (!isRecommended && !isAdjacent && !body.force) {
+  // #3766: a move is either the one on offer or an explicit `force` (the phase list). The next phase
+  // alone used to be enough; with the phase now the program's, an unoffered move from one type's
+  // screen would move every type.
+  if (!isRecommended && !body.force) {
     return NextResponse.json({ error: 'Transition not recommended — pass force:true to override' }, { status: 400 })
   }
 
-  await repo.advancePhase(userId, sessionId, body.newPhase as PeriodizationPhase)
-  await repo.updatePrescriptionStatus(userId, sessionId, POST_TRANSITION_STATUS)
+  // #3766: the phase is the program's, so one tap moves every session type. A program still waiting
+  // for its switch-over moves only this session type, as before. The program move carries the phase
+  // and start this request saw: a second tap (or another session's auto-apply) landing after the
+  // first finds the program moved and changes nothing, so it cannot void the plans regenerated since.
+  // That move leaves this slot 'consumed' itself, so the status write is only the per-type path's.
+  if (programPhase?.aligned) {
+    await repo.advanceProgramPhase(userId, sessionId, body.newPhase as PeriodizationPhase, {
+      phase: state.phase, phaseStartedAt: state.phaseStartedAt,
+    })
+  } else {
+    await repo.advancePhase(userId, sessionId, body.newPhase as PeriodizationPhase)
+    await repo.updatePrescriptionStatus(userId, sessionId, POST_TRANSITION_STATUS)
+  }
   const updated = await repo.getSessionPeriodization(userId, sessionId)
 
   // Regeneration is fired by the CLIENT (see ai-prescription-card.tsx's executeTransition) — a

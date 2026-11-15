@@ -125,14 +125,19 @@ Intensity zones for ${trainingGoal}:${zones}${secondaryNote}
 
 Pick a neutral pct inside the phase zone for each exercise. do NOT pre-emptively lower pct for fatigue, RPE, soreness or recovery signals — a deterministic autoregulation layer applies those cuts after you, and lowering it yourself double-applies the reduction.
 
+The phase belongs to the whole program, not to this session: every session type trains in it,
+and time in it is counted in training weeks (a Monday-to-Sunday week with at least one completed
+session of the program). Your phase_action is this session type's vote; the program moves when at
+least half of the session types trained this week agree.
+
 Phase transition rules. These are ELIGIBILITY FLOORS, not triggers — meeting the minimum
-session count does not by itself mean the block is finished. Default to "stay" and only
+does not by itself mean the block is finished. Default to "stay" and only
 recommend a transition when the current phase's work is genuinely complete (the strength
 signal has stopped improving within the phase, or the phase is at its documented cap):
-- accumulation→intensification: eligible from 4+ sessions in phase, RPE delta ≤+0.3, 1RM trending up
-- intensification→realisation: eligible from 3+ sessions, RPE delta ≤+0.5, 1RM flat or up
-- realisation→deload: always after 2 sessions
-- deload→accumulation: after 2 sessions with low soreness
+- accumulation→intensification: eligible from 4+ training weeks in phase, RPE delta ≤+0.3, 1RM trending up
+- intensification→realisation: eligible from 3+ training weeks, RPE delta ≤+0.5, 1RM flat or up
+- realisation→deload: always after 2 training weeks
+- deload→accumulation: after 1 training week with low soreness
 
 When phase_action is "transition_recommended", the "phase" field MUST be the phase you are
 moving TO, and it must differ from current_phase. A transition to the phase already in
@@ -186,6 +191,15 @@ Output field notes:
 - confidence: your certainty in this prescription, 0.0-1.0.
 
 ${PROSE_FIELD_GUARDS}`
+}
+
+/** #3766: the program's phase and its training weeks, beside this type's own sessions in it. */
+function phaseLine(signals: PrescriptionSignals): string {
+  const own = `${signals.sessionsInPhase} session${signals.sessionsInPhase === 1 ? '' : 's'} of this type in it`
+  const p = signals.programPhase
+  if (!p) return `${signals.phase} (${own})`
+  const cap = p.capWeeks != null ? `, cap ${p.capWeeks}` : ''
+  return `${signals.phase} for the whole program (training week ${p.trainingWeeksDone + 1}; ${p.trainingWeeksDone} training weeks done${cap}; ${own})`
 }
 
 export function buildUserPrompt(
@@ -304,7 +318,7 @@ export function buildUserPrompt(
 Program goal: ${signals.trainingGoal}
 Time budget: ${fitBudgetMin(signals) === 0 ? 'No time limit. Choose appropriate training volume; do not trim or add work to fit a duration.' : `${Math.floor(fitBudgetMin(signals))} min`}
 
-Phase: ${signals.phase} (${signals.sessionsInPhase} sessions in this phase)
+Phase: ${phaseLine(signals)}
 
 Session exercises:
 ${exerciseLines}

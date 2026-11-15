@@ -16,9 +16,6 @@ import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole } from '@train
 import { accessoryTargetRpe, settleAccessory } from '@trainingai/shared/ai-periodization/goal-ranges'
 import { expectedRpe, pctForExpectedRpe } from '@trainingai/shared/ai-periodization/expected-rpe'
 import {
-  applyAccumulationCeiling,
-  applyIntensificationCeiling,
-  applyRealisationCeiling,
   applyDeloadFloor,
   canAutoApplyTransition,
 } from '@trainingai/shared/ai-periodization/phase-guards'
@@ -33,6 +30,7 @@ import { shouldTriggerEmergencyDeload, emergencyDeloadTrigger } from '@traininga
 import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
 import { buildTransitionRationale } from '@trainingai/shared/ai-periodization/transition-rationale'
+import { syncProgramPhase, applyProgramPhaseCap, programMoveTarget, collectVotes } from '@trainingai/shared/ai-periodization/program-phase'
 import { DELOAD_LOWER_PCT, DELOAD_REPS, DELOAD_SETS, DELOAD_REST } from '@trainingai/shared/ai-periodization/deload-constants'
 import { generateObject } from 'ai'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
@@ -326,8 +324,15 @@ async function runPrescriptionGeneration(
   // program-overview read site, so a drifted count (over-count on re-sync, no
   // decrement on delete, direct-edit inflation) could mis-gate auto-deload /
   // cycle progression here.
-  await repo.reconcileSessionsInPhase(userId, activeProgram.id)
+  //
+  // #3766: the program's phase is read (and the switch-over run, when it is due) in the same step,
+  // which reconciles first.
+  const programPhase = await syncProgramPhase(repo, userId, activeProgram.id, tz)
   state = (await repo.getSessionPeriodization(userId, programSessionId)) ?? state
+  // #3766: the phase this plan is made in. A program move while it is being made (another session's
+  // tap or auto-apply) voids this slot; the plan is then not stored (`storePrescription` checks the
+  // slot is still in this phase and start), so the slot regenerates in the new phase.
+  const generatedFor = { phase: state.phase, phaseStartedAt: state.phaseStartedAt }
 
   if (state.phase === 'baseline' && !state.baselineComplete) {
     return { ok: false, error: 'Baseline not complete', status: 400 }
@@ -373,6 +378,9 @@ async function runPrescriptionGeneration(
     : undefined
   const signals = await aggregateSignals(userId, programSessionId, repo, tz, excludeSessionId, budgetOverrideMin)
   if (!signals) return { ok: false, error: 'Could not aggregate signals', status: 404 }
+  if (programPhase.aligned && programPhase.phase != null) {
+    signals.programPhase = { trainingWeeksDone: programPhase.trainingWeeksDone, capWeeks: programPhase.capWeeks }
+  }
 
   // If a one-day deload is already offered or accepted and unexpired, return it as-is rather than
   // regenerating — the trigger below is stateless and would otherwise re-fire on every
@@ -406,7 +414,7 @@ async function runPrescriptionGeneration(
     // next local midnight and the next open asks again. The other triggers describe the block and
     // keep the week.
     const expiresAt = prescriptionExpiresAt(prescription, tz, startedAt, { illnessTriggered: trigger?.kind === 'illness' })
-    await repo.storePrescription(userId, programSessionId, prescription, expiresAt)
+    if (await repo.storePrescription(userId, programSessionId, prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
 
     return {
       ok: true,
@@ -442,7 +450,7 @@ async function runPrescriptionGeneration(
     // gets a fresh decision. It was `now + 24h`, which kept an evening deload alive through the
     // next day's morning check-in (#3700).
     const expiresAt = nextMidnightInTz(tz, startedAt)
-    await repo.storePrescription(userId, programSessionId, prescription, expiresAt)
+    if (await repo.storePrescription(userId, programSessionId, prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
     return {
       ok: true,
       prescription,
@@ -510,9 +518,10 @@ async function runPrescriptionGeneration(
         : 'Your AI coach could not be reached, so this is your program as written.',
     )
     if (rules) {
-      await repo.storePrescription(
-        userId, programSessionId, rules, new Date(Date.now() + RULES_PRESCRIPTION_TTL_MS),
+      const stored = await repo.storePrescription(
+        userId, programSessionId, rules, new Date(Date.now() + RULES_PRESCRIPTION_TTL_MS), 'pending', generatedFor,
       )
+      if (stored === false) return PHASE_MOVED
       return {
         ok: true,
         prescription: rules,
@@ -528,6 +537,24 @@ async function runPrescriptionGeneration(
   // BF-199 Phase 1: the model's own phase answer, before reconciliation rewrites `parsed`.
   const modelPhase = String(parsed.phase)
   const modelPhaseAction = String(parsed.phase_action)
+
+  // #3766: the phase belongs to the program, and this answer is one session type's vote. The move
+  // stands only when at least half of the session types trained this week agree (each with its answer
+  // for the session it trained) and none asks to stay for a recovery reason; otherwise it is a stay,
+  // settled HERE so the loads below are clamped to the phase the program is actually in. This answer
+  // joins the vote once this type has trained this week. A program still waiting for its switch-over
+  // moves nothing.
+  const votedMove = parsed.phase_action === 'transition_recommended' && parsed.phase !== state.phase
+  let programMove: PeriodizationPhase | null = null
+  if (programPhase.aligned && programPhase.phase != null) {
+    const answers = await repo.listModelPhaseAnswers(userId, [...programPhase.trainedThisWeek], state.phaseStartedAt)
+    programMove = programMoveTarget(collectVotes(programPhase, answers), state.phase)
+  }
+  if (votedMove && programMove !== parsed.phase) {
+    parsed.phase_action = 'stay'
+    parsed.phase = state.phase as typeof parsed.phase
+    parsed.reasoning = `${parsed.reasoning} The phase belongs to the whole program: it moves when at least half of this week's session types agree, so this session stays in ${state.phase} for now.`.trim()
+  }
   // OR-209. And its per-exercise numbers, copied now because the loop below overwrites
   // `parsed.exercises` in place. This is the only moment the raw answer exists.
   const modelExercises = parsed.exercises.map(ex => ({
@@ -747,21 +774,13 @@ async function runPrescriptionGeneration(
     ...(droppedIdSet.size > 0 && { droppedExerciseIds: [...droppedIdSet] }),
   }
 
-  // Phase guards: force a transition recommendation at each phase's ceiling/floor so
-  // ambiguous signals can't keep a "stay" running forever. Mutually exclusive by phase.
-  const prescription = applyDeloadFloor(
-    applyRealisationCeiling(
-      applyIntensificationCeiling(
-        applyAccumulationCeiling(aiPrescription, state.phase, state.sessionsInPhase),
-        state.phase,
-        state.sessionsInPhase,
-      ),
-      state.phase,
-      state.sessionsInPhase,
-    ),
-    state.phase,
-    state.sessionsInPhase,
-  )
+  // Phase guards: force a transition recommendation at the phase's cap so ambiguous signals can't
+  // keep a "stay" running forever. #3766: the cap is the program's, in training weeks. Other session
+  // types' agreement can also carry the move to a session whose own answer was a plain stay. A
+  // program still waiting for its switch-over keeps only the old per-type way out of a deload.
+  const prescription = programPhase.aligned
+    ? withProgramMove(applyProgramPhaseCap(aiPrescription, programPhase), programMove, state.phase)
+    : typeOnly(applyDeloadFloor(aiPrescription, state.phase, state.sessionsInPhase))
 
   // A transition may only be auto-applied when the MODEL chose it — `parsed` still holds the
   // pre-guard answer, and the exercise percentages were clamped against `parsed.phase`. When a
@@ -793,6 +812,7 @@ async function runPrescriptionGeneration(
   // intensification loads (prod audit 2026-08-02). advancePhase must run BEFORE
   // storePrescription: it nulls the stored prescription and resets the status as a side effect.
   const applyingTransition = prescriptionStatus === 'auto_applied' && modelEarnedTransition
+  let storeFor = generatedFor
   if (applyingTransition) {
     // There is no session-level 1RM trend — it is per exercise. Summarise by majority so the
     // rationale never claims a direction the underlying lifts do not support.
@@ -803,12 +823,14 @@ async function runPrescriptionGeneration(
       prescription.phase,
       signals.trainingGoal,
       {
-        sessionsInPhase: state.sessionsInPhase,
+        trainingWeeksInPhase: programPhase.trainingWeeksDone,
         rm1Trend: ups > downs ? 'up' : downs > ups ? 'down' : 'flat',
         rpeDelta: signals.rpeTrend?.delta ?? null,
       },
     ) ?? undefined
-    await repo.advancePhase(userId, programSessionId, prescription.phase)
+    // With the phase it was planned from: a program another session moved meanwhile is left alone.
+    const moved = await repo.advanceProgramPhase(userId, programSessionId, prescription.phase, generatedFor)
+    storeFor = { phase: prescription.phase, phaseStartedAt: moved?.phaseStartedAt ?? generatedFor.phaseStartedAt }
   }
 
   // #3700: a rest-day recommendation is sized on today's readiness and ends at the next local
@@ -818,7 +840,9 @@ async function runPrescriptionGeneration(
   // status to 'pending') and then set 'auto_applied' in a second statement; two concurrent
   // generations for this session could interleave between them and leave the status describing the
   // other run's prescription (Q-54).
-  await repo.storePrescription(userId, programSessionId, prescription, expiresAt, prescriptionStatus)
+  if (await repo.storePrescription(userId, programSessionId, prescription, expiresAt, prescriptionStatus, storeFor) === false) {
+    return PHASE_MOVED
+  }
 
   // BF-199 Phase 1: record what the rules prescriber would have said beside what was given.
   // Best-effort and after the store: evidence must never cost the lifter a plan.
@@ -827,6 +851,34 @@ async function runPrescriptionGeneration(
   })))().catch(err => console.error('[prescribe] shadow record failed (ignored):', err))
 
   return { ok: true, prescription, prescriptionStatus, estimatedSessionDurationMin }
+}
+
+/** #3766: while the program waits for its switch-over, a move on offer is this type's alone (the
+ *  route moves only this type), and the screens say so. */
+function typeOnly(prescription: AiPrescription): AiPrescription {
+  return prescription.phaseAction === 'transition_recommended' ? { ...prescription, typeOnlyMove: true } : prescription
+}
+
+/** #3766: the program moved while this plan was being made, so it was not stored. The slot was voided
+ *  by that move, and the next open (or the client's retry) plans it in the new phase. */
+const PHASE_MOVED = {
+  ok: false as const,
+  error: 'The program moved to another phase while this plan was being made. Reopen the session for a fresh one.',
+  status: 409,
+}
+
+/** #3766: the other session types already carry a program move this session's answer did not ask
+ *  for. Offered like a cap: the loads are the current phase's, so it waits for a tap. */
+function withProgramMove(
+  prescription: AiPrescription, move: PeriodizationPhase | null, currentPhase: PeriodizationPhase,
+): AiPrescription {
+  if (move == null || move === currentPhase || prescription.phaseAction !== 'stay') return prescription
+  return {
+    ...prescription,
+    phase: move,
+    phaseAction: 'transition_recommended',
+    reasoning: `At least half of this week's session types point to moving the program to ${move}. ${prescription.reasoning}`.trim(),
+  }
 }
 
 /** #3764: a neutral "Trained recently" note rides in `autoregNote`, the one note field the card

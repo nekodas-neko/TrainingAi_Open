@@ -4,11 +4,11 @@ import { intensityZone } from '../prompt'
 import { canAutoApplyTransition } from '../phase-guards'
 
 describe('buildTransitionRationale', () => {
-  const evidence = { sessionsInPhase: 5, rm1Trend: 'up' as const, rpeDelta: -0.3 }
+  const evidence = { trainingWeeksInPhase: 5, rm1Trend: 'up' as const, rpeDelta: -0.3 }
 
   it('quotes the eligibility floor the engine actually gates on', () => {
     const text = buildTransitionRationale('accumulation', 'intensification', 'powerbuilding', evidence)!
-    expect(text).toContain('5 accumulation sessions logged')
+    expect(text).toContain('5 training weeks of accumulation for the program')
     expect(text).toContain('eligibility floor 4')
     expect(text).toContain('threshold ≤ +0.3')
   })
@@ -30,7 +30,7 @@ describe('buildTransitionRationale', () => {
 
   it('states the physiological mechanism, not just the numbers', () => {
     const text = buildTransitionRationale('intensification', 'realisation', 'strength', {
-      sessionsInPhase: 3, rm1Trend: 'flat', rpeDelta: 0.1,
+      trainingWeeksInPhase: 3, rm1Trend: 'flat', rpeDelta: 0.1,
     })!
     expect(text).toContain('fitness-fatigue')
     expect(text.length).toBeGreaterThan(200)
@@ -38,11 +38,11 @@ describe('buildTransitionRationale', () => {
 
   it('omits signals that are unavailable rather than inventing them', () => {
     const text = buildTransitionRationale('accumulation', 'intensification', 'strength', {
-      sessionsInPhase: 4, rm1Trend: null, rpeDelta: null,
+      trainingWeeksInPhase: 4, rm1Trend: null, rpeDelta: null,
     })!
     expect(text).not.toContain('1RM trending')
     expect(text).not.toContain('RPE running')
-    expect(text).toContain('4 accumulation sessions logged')
+    expect(text).toContain('4 training weeks of accumulation for the program')
   })
 
   it('never claims a direction the lifts do not support', () => {
@@ -59,7 +59,7 @@ describe('buildTransitionRationale', () => {
 
   it('covers deload→accumulation, the cycle restart', () => {
     const text = buildTransitionRationale('deload', 'accumulation', 'powerbuilding', {
-      sessionsInPhase: 2, rm1Trend: 'flat', rpeDelta: null,
+      trainingWeeksInPhase: 2, rm1Trend: 'flat', rpeDelta: null,
     })!
     expect(text).toContain('dissipated accumulated fatigue')
     // No documented floor for this transition — it must not fabricate one.
@@ -76,7 +76,7 @@ describe('canAutoApplyTransition — which transitions may skip the lifter', () 
   })
 
   it('refuses a ceiling-forced transition — the loads are still the old phase’s', () => {
-    // Model said "stay" in accumulation; applyAccumulationCeiling rewrote the result.
+    // Model said "stay" in accumulation; the program cap (applyProgramPhaseCap) rewrote the result.
     expect(canAutoApplyTransition(
       'stay', 'accumulation',
       'transition_recommended', 'intensification',

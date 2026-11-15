@@ -1424,12 +1424,31 @@ export interface WorkoutRepository {
   /** BF-143: undo a baseline auto-completed from personal records. Null when nothing matched. */
   revertAutoAdoptedBaseline(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
   advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization>
-  /** `status` is written atomically with the prescription — see the slice for why (Q-54). */
-  storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus): Promise<void>
+  /** #3766: move the whole program the session belongs to (every session type, one start). */
+  /** With `expected`, a program that has moved since the caller read it is left as it is. */
+  advanceProgramPhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase, expected?: { phase: PeriodizationPhase; phaseStartedAt: Date }): Promise<SessionPeriodization>
+  /** #3766: put every phased row of the program on one phase and start (the switch-over, and moves).
+   *  False when `opts.expect` no longer held and nothing was written. */
+  setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null, opts?: import('@trainingai/shared/ai-periodization/program-phase').ProgramMoveOptions): Promise<boolean>
+  /** #3766: write on every phased row the scheduled move `decide` works out from the locked rows
+   *  (the program's mark, or the switch-over's wait); null writes nothing. */
+  setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending): Promise<void>
+  /** #3766: re-align a program on one phase whose rows have come to disagree, to the target `decide`
+   *  works out from the locked rows. */
+  realignProgramPhase(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecideTarget): Promise<void>
+  /** #3766: completed sessions of the program since `since`, the input to training weeks. */
+  listProgramCompletions(userId: string, programId: string, since: Date): Promise<import('@trainingai/shared/ai-periodization/program-phase').ProgramCompletion[]>
+  /** #3766: every raw model phase answer of these session types since `since`, with when it was given. */
+  listModelPhaseAnswers(userId: string, programSessionIds: string[], since: Date): Promise<import('@trainingai/shared/ai-periodization/program-phase').PhaseAnswer[]>
+  /** `status` is written atomically with the prescription — see the slice for why (Q-54). With
+   *  `generatedFor`, stored only while the slot is still in that phase and start (#3766); false if not. */
+  storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: { phase: PeriodizationPhase; phaseStartedAt: Date }): Promise<boolean>
   /** BF-199 Phase 1. Evidence only: nothing reads it to decide anything. */
   recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void>
   clearProgramPrescriptions(userId: string, programId: string): Promise<void>
   updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void>
+  /** #3766: void one session's stored plan so the next open regenerates it. */
+  voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>
   storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void>
   /** #3799: `completedAt` set, the row is counted only when the phase began at or before it. */

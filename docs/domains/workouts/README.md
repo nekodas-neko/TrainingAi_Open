@@ -138,6 +138,19 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
   — 3 workouts findings (Q-53/54/55), all queued: prescription-flow cache staleness after a
   mutation, a prescription-generation write race under concurrent triggers, and a third unfixed
   instance of the bodyweight-1RM-as-kg bug (`overview-screen.tsx:484`).
+- **One phase for the whole program (#3766, owner-signed 15 Nov).** The program holds the phase and
+  every session type follows it: all of the program's `session_periodization` rows share `phase` and
+  `phase_started_at`, and every move writes them all. Time is counted in **training weeks** (a local
+  Mon–Sun week with at least one completed session of the program); caps 6 / 5 / 2 / 1 weeks. The
+  program moves early when at least half of this week's session types agree and none asks to stay
+  for recovery. A one-day deload stays the one session's (#3799). The switch-over puts every type
+  in accumulation week 1 on the Monday after the last unfinished deload ends, with a 3-week first
+  block. It runs once, only for a program whose types were on their own phases when the rule
+  shipped; the Monday is stored on every row as soon as it is known. Every program move marks the
+  rows (`pending_transition.programPhase`), and a marked program whose rows later disagree is
+  re-aligned to its latest move, never switched again. A move's own week counts for the new phase
+  only when no session that week came before the move. Where it lives: the "program's phase" row in
+  `docs/module-map.md`.
 - [`docs/superpowers/plans/2026-08-02-per-exercise-phase-hold.md`](../../superpowers/plans/2026-08-02-per-exercise-phase-hold.md)
   — **planned, Q-52.** Phase is per session type, so every compound in a session transitions
   together; a stalled secondary gets dragged into a heavier zone by a progressing primary. Adds a
