@@ -22,6 +22,7 @@ import { getDb } from '@/lib/data/postgres/client'
 import { mergeLookAlikeFoods } from '@/lib/nutrition/merge-look-alike-foods'
 import { reconcilePersonalRecords } from '@/lib/workout/reconcile-personal-records'
 import { heartHealthRescoreReport } from '@/lib/health/heart-health-rescore-report'
+import { cleanOwnerHistory3802 } from '@/lib/workout/clean-owner-history-3802'
 
 /**
  * The agent key's allow-list (issue 2381, part b). A job is reachable with the key only if it is
@@ -99,6 +100,17 @@ const RescoreHeartHealthParams = z.object({
   to: DateParam,
   dryRun: z.boolean(),
 }).strict()
+
+const GroupCount = z.number().int().min(0).max(1000)
+const CleanOwnerHistoryParams = z.object({
+  dryRun: z.boolean(),
+  /** The per-group counts the dry run reported (`report.counts`). A write refuses unless they still hold. */
+  expect: z.object({
+    '1': GroupCount, '2': GroupCount, '3a': GroupCount, '3b': GroupCount, '3c': GroupCount, '4': GroupCount, '5': GroupCount,
+  }).strict().optional(),
+}).strict().refine(p => p.dryRun || p.expect != null, {
+  message: 'a write needs expect: the counts its dry run reported', path: ['expect'],
+})
 
 export const AGENT_JOBS = {
   /**
@@ -443,6 +455,39 @@ export const AGENT_JOBS = {
       }
     },
   } satisfies AgentJobDef<z.infer<typeof RescoreHeartHealthParams>>,
+
+  /**
+   * #3802 (owner's yes, 15 Nov). The one-off clean-up of the owner's old bad rows, groups 1 to 5 of
+   * the spec comment: tombstones dead, empty and zero-length workouts (through the app's own session
+   * delete, with their logs) and seven named duplicate or stub activities, re-times 11 early
+   * workouts, and deletes the all-zero `daily_zone_minutes` cache rows (`cleanOwnerHistory3802`).
+   * A dry run reports each group's count and row ids and writes nothing. A write tombstones and
+   * deletes, so it needs an approval and the dry run's counts in `expect`; it refuses, writing
+   * nothing, if any group's count has moved. A second run finds 0 in every group.
+   */
+  'clean-owner-history-3802': {
+    params: CleanOwnerHistoryParams,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await cleanOwnerHistory3802(
+        { connect: () => getPool().connect(), reconcilePersonalRecord: (u, n) => ctx.repo.reconcilePersonalRecord(u, n) },
+        ctx.userId, ctx.tz,
+        p.dryRun ? { dryRun: true, expect: p.expect } : { dryRun: false, expect: p.expect! },
+      )
+      if (!result.ok) {
+        return {
+          status: 409,
+          body: { error: 'A group\'s count differs from the dry run\'s; nothing was written. Dry-run again.', expected: result.expected, found: result.found },
+          finish: { outcome: 'refused', error: 'counts_changed' },
+        }
+      }
+      return {
+        status: 200,
+        body: { report: result.report },
+        finish: { outcome: 'succeeded', affectedRows: result.affectedRows, daysMoved: result.daysMoved },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof CleanOwnerHistoryParams>>,
 } as const
 
 export type AgentJobId = keyof typeof AGENT_JOBS
@@ -494,6 +539,7 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('merge-look-alike-foods'),
   requestSchema('reconcile-personal-records'),
   requestSchema('rescore-heart-health'),
+  requestSchema('clean-owner-history-3802'),
 ])
 export type AgentActionRequest = z.infer<typeof AgentActionRequest>
 
