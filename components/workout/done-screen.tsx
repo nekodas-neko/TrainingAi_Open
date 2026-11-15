@@ -18,6 +18,7 @@ import { TrainingStressBadge } from "@/components/workout/training-stress-badge"
 import { TimeSummaryCard } from "@/components/workout/time-summary-card";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { aggregateHrRecoveryByExercise, formatRecoveryRate } from "@trainingai/shared/health/hr-recovery-by-exercise";
+import { SPARSE_WORKOUT_HR_NOTE } from "@trainingai/shared/workout/workout-hr-density";
 import { WORKOUT_RECAP_TTL, WORKOUT_ENERGY_TTL, WORKOUT_HR_TTL, HR_PROFILE_TTL } from "@trainingai/shared/cache-ttl";
 import { COMMON_WORKOUT_ACTIVITIES, DEFAULT_ACTIVITY_ID } from "@trainingai/shared/health/workout-activities";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,6 +57,8 @@ interface DoneScreenProps {
 
 interface HrData {
   hasData: boolean
+  /** #3775: false when the workout's heart rate was too sparse for per-set figures. */
+  hrDense?: boolean | null
   workoutHrvMs?: number | null
   startedAt: string
   readings: { timestamp: string; bpm: number }[]
@@ -459,6 +462,9 @@ export function DoneScreen({
                 {/* Per exercise, not per set: set-level readings are too noisy to act on
                     (most rows carry coverage_ok=false) and six of them in a row don't say
                     anything a lifter can use. See lib/health/hr-recovery-by-exercise.ts. */}
+                {hrData.hrDense === false && (
+                  <p className="text-2xs text-muted-foreground">{SPARSE_WORKOUT_HR_NOTE}</p>
+                )}
                 <div className="space-y-1">
                   {aggregateHrRecoveryByExercise(hrData.setStats).map(ex => (
                     <div key={ex.exerciseName} className="flex items-center justify-between text-[10px]">

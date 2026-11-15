@@ -6,7 +6,13 @@ import {
   formatRecoveryRate,
 } from '@trainingai/shared/health/hr-recovery-by-exercise';
 import { workoutHrSpec } from '../data/models';
-import { exercisesWithoutRest, REST_NOT_MEASURED } from '../data/hr-rest';
+import {
+  exercisesWithoutRest,
+  REST_NOT_MEASURED,
+  setHrLine,
+  sparseWorkoutHrNote,
+  workoutHrFiguresShown,
+} from '../data/hr-rest';
 import { ResourceCard } from './ResourceCard';
 import type { WorkoutRecord } from '../logging/workout';
 
@@ -57,6 +63,7 @@ export function WorkoutHrRecovery({ workout }: { workout: WorkoutRecord }) {
                 },
               ],
         );
+        const sparse = sparseWorkoutHrNote(data.hrDense);
         return (
           <Stack>
             <AppText variant="caption" tone="muted">
@@ -69,7 +76,7 @@ export function WorkoutHrRecovery({ workout }: { workout: WorkoutRecord }) {
                 ? 'saved summary; full trace unavailable'
                 : `${readings.length} recorded readings`}
             </AppText>
-            {data.summary && (
+            {data.summary && workoutHrFiguresShown(data.summary.readingsCount) && (
               <AppText variant="caption">
                 Mean {data.summary.avgBpm ?? '—'} bpm · Peak {data.summary.peakBpm ?? '—'}{' '}
                 bpm
@@ -91,41 +98,51 @@ export function WorkoutHrRecovery({ workout }: { workout: WorkoutRecord }) {
                 No recorded HR trace is available for this workout.
               </AppText>
             )}
+            {sparse && (
+              <AppText variant="caption" tone="muted">
+                {sparse}
+              </AppText>
+            )}
             {aggregateHrRecoveryByExercise(data.setStats).map((x) => (
               <AppText key={x.exerciseName} variant="caption">
                 {x.exerciseName} · {formatRecoveryRate(x.medianHrr1)} · {x.sampleCount}/
                 {x.totalSets} sets measured
               </AppText>
             ))}
-            {exercisesWithoutRest(data.setStats).map((name) => (
+            {(sparse ? [] : exercisesWithoutRest(data.setStats)).map((name) => (
               <AppText key={name} variant="caption" tone="muted">
                 {name} · {REST_NOT_MEASURED}
               </AppText>
             ))}
-            {data.setStats.map((x, index) => (
-              <Disclosure key={index} title={`${x.exerciseName} · set ${x.setNumber}`}>
-                <AppText variant="caption">
-                  Peak {x.peakBpm ?? '—'} bpm · End {x.bpmAtLog ?? '—'} bpm
-                  {x.hrr1 === null ? '' : ` · HRR60 ${x.hrr1} bpm`}
-                </AppText>
-                {x.hrr1 === null && (
+            {data.setStats.map((x, index) => {
+              const line = setHrLine(data.hrDense, x);
+              return (
+                <Disclosure key={index} title={`${x.exerciseName} · set ${x.setNumber}`}>
+                  {line.kind === 'figures' && <AppText variant="caption">{line.text}</AppText>}
+                  {line.kind === 'note' && (
+                    <AppText variant="caption" tone="muted">
+                      {line.text}
+                    </AppText>
+                  )}
+                  {line.kind === 'figures' && x.hrr1 === null && (
+                    <AppText variant="micro" tone="muted">
+                      {REST_NOT_MEASURED}
+                    </AppText>
+                  )}
                   <AppText variant="micro" tone="muted">
-                    {REST_NOT_MEASURED}
+                    {x.setStartMs === null
+                      ? 'Start time unavailable'
+                      : `Start ${formatDuration((x.setStartMs - origin) / 1000)}`}{' '}
+                    ·{' '}
+                    {x.setEndMs === null
+                      ? 'End time unavailable'
+                      : `End ${formatDuration((x.setEndMs - origin) / 1000)}`}
+                    . Set shading identifies effort, including superset partners. Gaps stay
+                    disconnected.
                   </AppText>
-                )}
-                <AppText variant="micro" tone="muted">
-                  {x.setStartMs === null
-                    ? 'Start time unavailable'
-                    : `Start ${formatDuration((x.setStartMs - origin) / 1000)}`}{' '}
-                  ·{' '}
-                  {x.setEndMs === null
-                    ? 'End time unavailable'
-                    : `End ${formatDuration((x.setEndMs - origin) / 1000)}`}
-                  . Set shading identifies effort, including superset partners. Gaps stay
-                  disconnected.
-                </AppText>
-              </Disclosure>
-            ))}
+                </Disclosure>
+              );
+            })}
           </Stack>
         );
       }}

@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { computeWorkoutHr } from '@trainingai/shared/workout/compute-workout-hr'
 import { reportServerError } from '@/lib/observability'
+import { setHrMeasured, showSetHr } from '@trainingai/shared/workout/workout-hr-density'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -39,6 +40,11 @@ export async function GET(req: NextRequest) {
       .catch(err => reportServerError(err, { userId: session.user.id, url: '/api/oura/hr-data#set-hr-stats' }))
   }
 
+  // #3775: whether the workout's heart rate is dense enough for per-set figures — the verdict the
+  // calorie gate reads, stored with the snapshot. Read here rather than from `readings`, so the
+  // recap, the stored column and the calories can never disagree about one workout.
+  const hrDense = await repo.getWorkoutHrDensity(session.user.id, workoutSessionId)
+
   let snapshot: Awaited<ReturnType<typeof repo.getWorkoutHrStats>> | null = null
   if (readings.length === 0 || workoutHrvMs == null) {
     snapshot = await repo.getWorkoutHrStats(session.user.id, workoutSessionId)
@@ -59,17 +65,26 @@ export async function GET(req: NextRequest) {
         ? { avgBpm: snapshot.avgBpm, peakBpm: snapshot.peakBpm, hrr1Best: snapshot.hrr1Best, workoutHrvMs: snapshot.workoutHrvMs, readingsCount: snapshot.readingsCount, source: snapshot.source, fromSnapshot: true }
         : null,
     startedAt: ws.startedAt.toISOString(),
+    // null: nothing to judge; false: sparse, so no per-set heart rate or recovery below is a number.
+    hrDense,
     readings: readings.map(r => ({ timestamp: r.timestamp.toISOString(), bpm: r.bpm })),
-    setStats: stats.map(s => ({
-      exerciseName: s.exerciseName,
-      setNumber:    s.setNumber,
-      loggedAt:     s.loggedAt?.toISOString() ?? null,
-      setStartMs:   s.setStartMs ?? null,
-      setEndMs:     s.setEndMs ?? null,
-      peakBpm:      s.peakBpm,
-      bpmAtLog:     s.bpmAtLog,
-      hrr1:         s.hrr1,
-      adequate:     s.adequate,
-    })),
+    // A per-set figure that rests on zero or one reading, or comes from a sparse workout, is sent as
+    // null, so no client can show it; `hrMeasured` tells a client which line to say instead.
+    setStats: stats.map(s => {
+      const hrMeasured = setHrMeasured(readings, s.loggedAt)
+      const show = showSetHr(hrDense, hrMeasured)
+      return {
+        exerciseName: s.exerciseName,
+        setNumber:    s.setNumber,
+        loggedAt:     s.loggedAt?.toISOString() ?? null,
+        setStartMs:   s.setStartMs ?? null,
+        setEndMs:     s.setEndMs ?? null,
+        hrMeasured,
+        peakBpm:      show ? s.peakBpm : null,
+        bpmAtLog:     show ? s.bpmAtLog : null,
+        hrr1:         hrDense === false ? null : s.hrr1,
+        adequate:     hrDense === false ? null : s.adequate,
+      }
+    }),
   }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

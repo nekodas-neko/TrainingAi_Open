@@ -345,6 +345,7 @@ export const workoutHrSpec = (id: string) => ({
       })
       .nullable()
       .optional(),
+    hrDense: z.boolean().nullable().optional(),
     readings: z.array(z.object({ timestamp: text, bpm: finite })).default([]),
     setStats: z
       .array(
@@ -354,6 +355,7 @@ export const workoutHrSpec = (id: string) => ({
           loggedAt: text.nullable(),
           setStartMs: finite.nullable(),
           setEndMs: finite.nullable(),
+          hrMeasured: z.boolean().optional(),
           peakBpm: finite.nullable(),
           bpmAtLog: finite.nullable().optional(),
           hrr1: finite.nullable(),

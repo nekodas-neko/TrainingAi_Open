@@ -1657,6 +1657,8 @@ export interface WorkoutRepository {
   // 180d oura_heartrate / 90d rr_intervals prunes.
   upsertWorkoutHrStats(userId: string, sessionId: string, stats: WorkoutHrStatsInput): Promise<void>
   getWorkoutHrStats(userId: string, sessionId: string): Promise<WorkoutHrStatsRow | null>
+  /** #3775: `workout_hr_stats.hr_dense` when stored, else the live verdict; null with nothing to judge. */
+  getWorkoutHrDensity(userId: string, sessionId: string): Promise<boolean | null>
   /** `sessionId → avgBpm` for the sessions that have one (Q-421). Absent = no usable HR. */
   getAvgBpmBySession(userId: string, sessionIds: string[]): Promise<Map<string, number>>
   listSessionsMissingHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>

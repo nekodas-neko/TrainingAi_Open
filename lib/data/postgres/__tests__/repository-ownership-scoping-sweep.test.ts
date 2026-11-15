@@ -383,6 +383,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getDaytimeHrvModel', r => r.getDaytimeHrvModel(USER_A)],
     ['getAvgBpmBySession', r => r.getAvgBpmBySession(USER_A, [bId('workout_sessions')])],
     ['getWorkoutHrStats', r => r.getWorkoutHrStats(USER_A, bId('workout_sessions'))],
+    ['getWorkoutHrDensity', r => r.getWorkoutHrDensity(USER_A, bId('workout_sessions'))],
     ['listSessionsMissingHrStats', r => r.listSessionsMissingHrStats(USER_A, FROM_TS, 50)],
     ['getSetDetailsForSession', r => r.getSetDetailsForSession(USER_A, bId('workout_sessions'))],
     ['getSetHrStatsForSession', r => r.getSetHrStatsForSession(USER_A, bId('workout_sessions'))],

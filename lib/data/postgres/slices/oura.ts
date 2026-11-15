@@ -1,4 +1,5 @@
-import { dropSparseHrHours, isDenseHrSpan, DENSITY_GATED_HR_SOURCES } from '@trainingai/shared/health/intraday-hr-contributors'
+import { dropSparseHrHours, DENSITY_GATED_HR_SOURCES } from '@trainingai/shared/health/intraday-hr-contributors'
+import { workoutHrSpanVerdict, type WorkoutHrSpan } from '@trainingai/shared/workout/workout-hr-density'
 import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { getPool } from '../client'
@@ -2479,11 +2480,24 @@ export async function upsertDaytimeHrvModel(db: Db, userId: string, model: {
  *  later compute that gained a value (rr arrived, so workout_hrv_ms goes non-null) fills the gap
  *  without wiping fields it lost. */
 export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: string, stats: WorkoutHrStatsInput): Promise<void> {
+  // #3775: the density verdict is stored with the stats, not only at the 180-day prune, so a recap
+  // and anything downstream can tell a strap workout from a sparse one. Judged by the same query and
+  // rule the calorie gate reads live (`workoutHrSpanSql`, `workoutHrSpanVerdict`), so storing it
+  // changes no calorie figure: at the moment it is written it equals what the gate would decide.
+  // It rides the fuller-wins guard below, so a later, fuller compute (late Oura Cloud heart rate,
+  // `reattributeWorkoutsHrInWindow`) re-judges it and a partial one mid-prune never does.
+  const [spanRow] = await db
+    .select({ span: workoutHrSpanSql(userId) })
+    .from(s.workoutSessions)
+    .where(and(eq(s.workoutSessions.id, sessionId), eq(s.workoutSessions.userId, userId), isNotNull(s.workoutSessions.completedAt)))
+    .limit(1)
+  const hrDense = workoutHrSpanVerdict(spanRow?.span ?? null)
   await db.insert(s.workoutHrStats)
     .values({
       workoutSessionId: sessionId,
       userId,
       ...stats,
+      hrDense,
       // `workout_hrv_ms` is the only integer HRV column in the schema — every sibling
       // (sleep_sessions.average_hrv_ms, oura_daily_derived.hrv_rmssd_ms, …) is doublePrecision.
       // rmssdFromRr returns Math.sqrt(mean), so the value arrives fractional and node-postgres
@@ -2504,6 +2518,8 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
         workoutHrvMs:  sql`COALESCE(excluded.workout_hrv_ms, ${s.workoutHrStats.workoutHrvMs})`,
         readingsCount: sql`GREATEST(excluded.readings_count, ${s.workoutHrStats.readingsCount})`,
         source:        sql`COALESCE(excluded.source, ${s.workoutHrStats.source})`,
+        // Nothing to judge (no reading inside the session itself) keeps what is stored.
+        hrDense:       sql`COALESCE(excluded.hr_dense, ${s.workoutHrStats.hrDense})`,
         computedAt:    new Date(),
       },
       setWhere: sql`excluded.readings_count >= ${s.workoutHrStats.readingsCount}`,
@@ -2561,7 +2577,6 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
  *  from a source #2437 does not gate, and the longest gap between consecutive ones. Correlated on
  *  `workout_sessions`; `userId` is a bound id or the session's own `user_id` column. The calorie gate
  *  and the prune-time freeze both read this one query (#3150). */
-type WorkoutHrSpan = { n: number; ungated: number; max_gap_ms: number | null }
 /** Exported for `repeat-reads-unchanged-3793.test.ts`, which runs the calorie gate's previous query. */
 export function workoutHrSpanSql(userId: string | SQLWrapper): SQL<WorkoutHrSpan | null> {
   const gated = sql.join([...DENSITY_GATED_HR_SOURCES].map(g => sql`${g}`), sql`, `)
@@ -2574,15 +2589,9 @@ export function workoutHrSpanSql(userId: string | SQLWrapper): SQL<WorkoutHrSpan
     ) g)`
 }
 
-/** The calorie gate's verdict on one series (#3078): `null` with no reading to judge, `true` when any
- *  reading comes from a source #2437 does not gate, else `isDenseHrSpan`. Read live by
- *  `getAvgBpmBySession`, and stored by `freezeWorkoutHrDensity` before the prune deletes the series. */
-export function workoutHrSpanVerdict(span: WorkoutHrSpan | null): boolean | null {
-  const n = Number(span?.n ?? 0)
-  if (n === 0) return null
-  if (Number(span?.ungated ?? 0) > 0) return true
-  return isDenseHrSpan(n, span?.max_gap_ms == null ? null : Number(span.max_gap_ms))
-}
+/** The calorie gate's verdict on one series (#3078) lives in `@trainingai/shared/workout/workout-hr-density`
+ *  (#3775), so the recap's per-set gate reads the same rule. Re-exported for the callers here. */
+export { workoutHrSpanVerdict }
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 
@@ -2625,6 +2634,24 @@ export async function getWorkoutHrStats(db: Db, userId: string, sessionId: strin
     .where(and(eq(s.workoutHrStats.userId, userId), eq(s.workoutHrStats.workoutSessionId, sessionId), workoutHrStatsIsLive))
     .limit(1)
   return row ?? null
+}
+
+/** The density verdict for one completed session (#3775), decided as the calorie gate decides it:
+ *  the stored `hr_dense` when there is one, else the live series. `null` when there is nothing to
+ *  judge (no snapshot and no reading inside the session). The recap reads it to decide whether
+ *  per-set heart rate and one-minute recovery are shown. */
+export async function getWorkoutHrDensity(db: Db, userId: string, sessionId: string): Promise<boolean | null> {
+  const [row] = await db
+    .select({ stored: s.workoutHrStats.hrDense, span: workoutHrSpanSql(userId) })
+    .from(s.workoutSessions)
+    .leftJoin(s.workoutHrStats, eq(s.workoutHrStats.workoutSessionId, s.workoutSessions.id))
+    .where(and(
+      eq(s.workoutSessions.id, sessionId), eq(s.workoutSessions.userId, userId),
+      isNotNull(s.workoutSessions.completedAt), isNull(s.workoutSessions.deletedAt),
+    ))
+    .limit(1)
+  if (!row) return null
+  return row.stored ?? workoutHrSpanVerdict(row.span)
 }
 
 /** Completed sessions (inside the retention window) that still have no *usable* snapshot — the
