@@ -161,7 +161,7 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
 
 ## Production reads
 
-At release prep (Orchestrator) and for the feedback inbox (BugFix):
+At release prep and for the feedback inbox, both the Orchestrator's (#2346):
 [`docs/session-start-reads.md`](docs/session-start-reads.md). Every `claude_ro` view is row-scoped
 to the owner — a zero means none of the owner's, never nobody's. `error_events` prunes at 30 days.
 

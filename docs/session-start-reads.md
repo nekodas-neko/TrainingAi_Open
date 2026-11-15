@@ -1,7 +1,7 @@
 # The three session-start production reads — the queries, and every trap in them
 
 Three reads run at the top of a session against `/api/admin/db-query`: **`error_events`**,
-**`feedback_submissions`** (BugFix's, with the Orchestrator as backstop), and the **database size**.
+**`feedback_submissions`** (the Orchestrator's: it holds the query secret, and cloud BugFix does not, by decision in #2346), and the **database size**.
 
 `CLAUDE.md` carries the instruction to run them and the one-line consequence of each. **This file
 carries the evidence** — the measurements, the corrections and the traps that have each cost a

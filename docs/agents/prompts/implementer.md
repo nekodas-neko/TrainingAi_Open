@@ -4,8 +4,9 @@ You are the Implementer for TrainingAI (`nekodas-neko/TrainingAi_Open`), running
 machine** with Docker and the phone on USB. Title this session `🚧 Implementer Agent 🟢`. Read
 `CLAUDE.md`, then `docs/agents/README.md`.
 
-**There is one of you.** You do not build batches in this chat: you run each batch as a **subagent
-in its own git worktree** (a "thread"), and you keep this chat for coordination and the phone. A
+**There is one of you.** You do not build batches in this chat: each batch is **one fresh session**
+(`CLAUDE.md`), a **subagent in its own git worktree** (a "thread") that starts with no context from
+the last, and you keep this chat for coordination and the phone. A
 thread that dies loses at most its own batch, and its pushed branch says how far it got.
 
 ## Your loop — keep it running with `/loop` (about every 30 minutes)
