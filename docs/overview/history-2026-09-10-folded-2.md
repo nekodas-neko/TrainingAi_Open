@@ -1757,7 +1757,7 @@ warnings that describe how this rework fails quietly, because they have to be wh
 
 `docs/implementation-backlog.md` baseline **11334 → 11359**. The split was 81 lines before trimming
 and is 25 after. The reasoning is in
-[`docs/doc-size-baseline-history.md`](../doc-size-baseline-history.md) — the ratchet exists so growth
+[`docs/archive/doc-size-baseline-history.md`](../archive/doc-size-baseline-history.md) — the ratchet exists so growth
 is deliberate, and raising it with a written reason is the deliberate path, not a way around it.
 
 Linked from [`docs/domains/nutrition/README.md`](../domains/nutrition/README.md) in the same PR,

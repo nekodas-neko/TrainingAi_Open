@@ -59,7 +59,7 @@ final 63…69). Q-70 is the next free Q number.
    grant flow silently fails and `rec.onerror` fires the instant `VoiceLogButton`
    (`components/workout/set-card.tsx`) calls `.start()`; and even with the permission declared,
    embedded Android WebView (unlike Chrome) doesn't reliably implement real STT — `voice logging`
-   is still listed as an unplanned Batch O item in `docs/planned_upgrades.md` for exactly this
+   is still listed as an unplanned Batch O item in `docs/archive/planned_upgrades.md` for exactly this
    reason. Real fix needs a native Android speech-recognition plugin, not a manifest tweak alone.
 3. **Q-65.** `components/workout-screen.tsx:1696-1705` — the PiP branch for `mode ===
    "exercise-summary"` is a static `<div>` placeholder that never reads `lastSetRestStartMs`/
@@ -152,7 +152,7 @@ final 63…69). Q-70 is the next free Q number.
 
 - **Don't assume "voice logging exists in the code" means it was ever verified working** — the
   Web Speech API path in `set-card.tsx` was added without ever being tested against the real
-  (WebView, not Chrome) target; `docs/planned_upgrades.md` still lists it as an unplanned/unbuilt
+  (WebView, not Chrome) target; `docs/archive/planned_upgrades.md` still lists it as an unplanned/unbuilt
   Batch O item despite the button existing in the tree. Code presence ≠ shipped-working.
   (Q-64)
 - **The AD-2 "fix" from 2026-07-23 only fixed the notify gate for the path it replaced (AD-1

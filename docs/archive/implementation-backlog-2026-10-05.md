@@ -213,7 +213,7 @@ no check read. It had also drifted eleven behind the directory once, and five be
 > wrong individually, the branch was simply cut before the removals landed. **A heading with no body
 > under it is the specific tell.**
 >
-> `docs/owner-action-required.md` is **not** kept current — treat it as historical unless you have
+> `docs/archive/owner-action-required.md` is **not** kept current — treat it as historical unless you have
 > just re-verified it.
 
 ---
@@ -7906,7 +7906,7 @@ drift.
   - `prep_time_sec` is present on 104 of 104 exercise logs.
 - **Amend:** the stale claims in §4. The heading that says "ALL QUEUED (fixes not yet shipped)" is
   the worst one, because a reader believes it.
-- **Retire `docs/device-verification-queue.md`** to a pointer at `next-item.js --sittings`. Its five
+- **Retire `docs/archive/device-verification-queue.md`** to a pointer at `next-item.js --sittings`. Its five
   still-owed rows are now in RV-155 §A (S7) and RV-157 (BF-11d, BF-31, LA-37/BF-66). S1 is folded
   into RV-131.
 
@@ -7916,7 +7916,7 @@ drift.
 - **Added:** 2026-09-24 · Review sweep 55, §5 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](../reviews/2026-09-24-sweep-55-device-verification-debt.md).
 - **The gap:** writing *"NOT device-verified"* in a Known-Issues row was how a device check was owed
   before the device agent existed. The agent reads only the backlog, so 155 such rows fell out of
-  every list. The same thing happened a second time with `docs/device-verification-queue.md`.
+  every list. The same thing happened a second time with `docs/archive/device-verification-queue.md`.
 - **The guard:** fail CI on a **new** Known-Issues heading that says it is not device-verified and
   names no id with a `### ` heading in the backlog. Baseline today's rows shrink-only, as the
   done-headings were (OR's first sweep). Add one line to CLAUDE.md's device-gate paragraph: an owed
@@ -8604,7 +8604,7 @@ drift.
   overstates what is unverified, which is the same drift this entry was created to fix.
 - **Added:** 2026-09-24 · Review sweep 55. The station list is §1 of [`docs/reviews/2026-09-24-sweep-55-device-verification-debt.md`](../reviews/2026-09-24-sweep-55-device-verification-debt.md).
 - **Why DV has never seen these:** each lives only in a `projectOverview.md` Known-Issues row
-  saying *"NOT device-verified"*, or in `docs/device-verification-queue.md`. `next-item.js` reads
+  saying *"NOT device-verified"*, or in `docs/archive/device-verification-queue.md`. `next-item.js` reads
   neither. 155 such rows were triaged. About 60 are checks the phone alone can run, under the
   standing write permissions, on three-button navigation.
 - **The stations, cheapest first:**
@@ -10361,7 +10361,7 @@ why the count of affected entries always understated the harm.
 
 - **⚑ MEASURED 2026-09-20: EIGHT drifts in roughly two hours, every one a docs-only PR.** Landing
   OR-118 (#1333) took **six resolve-and-push cycles**, and the collision was the same three files
-  every single time: `docs/implementation-backlog.md`, `docs/doc-size-baseline-history.md` and
+  every single time: `docs/implementation-backlog.md`, `docs/archive/doc-size-baseline-history.md` and
   `docs/doc-size/docs/implementation-backlog.md.size`. Nothing was lost — the resolutions are
   mechanical and entry integrity was checked after each one — but the cost is real and it is
   structural rather than unlucky: **every agent that finishes anything writes to those three files,
@@ -10370,7 +10370,7 @@ why the count of affected entries always understated the harm.
   loop was resolving and merging inside the same minute, not waiting for a sixth full run.
 - **✓ TWO OF THOSE THREE FILES ARE NOW GONE, 2026-09-26 (OR-178) — re-measure before building
   anything further here.** `docs/doc-size/docs/implementation-backlog.md.size` no longer exists
-  (LA-129 reports the backlog rather than ratcheting it), and `docs/doc-size-baseline-history.md` is
+  (LA-129 reports the backlog rather than ratcheting it), and `docs/archive/doc-size-baseline-history.md` is
   no longer written by a finishing PR (LB-130 shipped the per-change note directory, the same shape
   as `docs/overview/entries/`). **What remains is `docs/implementation-backlog.md` itself, and that
   one is irreducible** — two agents removing two finished entries is a genuine concurrent edit, not
@@ -11521,7 +11521,7 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
 - **Keep:** **nothing buildable — one observation is owed and it waits on the weather.** The line has
   never been seen on a **real** `watch` day: there have been exactly two ever (08-27, 09-16) and none
   since, so every render is from an overlaid payload. Recorded in
-  [`known-issues.md`](../overview/known-issues.md) rather than kept as work, because it is an event to
+  [`known-issues.md`](known-issues.md) rather than kept as work, because it is an event to
   observe and not a task — and `LB-166`'s lesson is that a residue waiting on an event blocks rather
   than waits.
 - **⚠ What the engine half deliberately did NOT do:** no threshold moved, no readiness penalty
@@ -22871,7 +22871,7 @@ This matters more than tidiness. With the lane path lists replaced by a rule, a 
 paths** section is the only record of who holds a file the rule cannot place — and nobody reads a
 412-line file before starting an item, which means the mechanism is not doing its job.
 
-All five are now in `docs/doc-size-baseline.json`, shrink-only, so they cannot grow further. The
+All five are now in `docs/archive/doc-size-baseline.json`, shrink-only, so they cannot grow further. The
 work is to bring them down, and **it is not a separate task**: a baton is rewritten in full at every
 handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
 Close this when all five are under ~150 lines.
@@ -29805,7 +29805,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   **The decision — where the open Known Issues live — is structural, so it is mine** (owner, 2026-09-22:
   *"I'd like it if you could take a lot of these structural questions"*), and the scheduling half is
   mine to pick rather than his to grant.
-  **The call: move the Known Issues & Risks tables whole into `docs/overview/known-issues.md`, and
+  **The call: move the Known Issues & Risks tables whole into `docs/archive/known-issues.md`, and
   leave `projectOverview.md` as the lean index it already claims to be, pointing at that file.**
   - **Why this and not per-pillar files.** The multi-tag visibility risk this entry names is real and
     per-pillar files are where it bites: an issue tagged `[sleep][platform]` has to live in one file
@@ -31683,7 +31683,7 @@ the goal layout's §7 off-ramp says is missing.
 > [`docs/overview/overview/history-2026-07-30.md`](../overview/history-2026-07-30.md).
 > Journal: [`docs/overview/overview/history-2026-07-30.md`](../overview/history-2026-07-30.md).
 
-- **Runbook (start here):** [`public-repo-cut-runbook.md`](../public-repo-cut-runbook.md) — the
+- **Runbook (start here):** [`public-repo-cut-runbook.md`](public-repo-cut-runbook.md) — the
   ordered checklist, who does each step, and how each one is checked.
 - **Plan:** [`2026-08-02-public-repo-migration-roadmap.md`](../superpowers/plans/2026-08-02-public-repo-migration-roadmap.md)
 - **Depends on:** [`2026-08-02-oura-ip-triage.md`](../superpowers/plans/2026-08-02-oura-ip-triage.md) (#999) — the
@@ -32667,7 +32667,7 @@ repo's production path is unaffected until then.
 > **50** across the entire database on 2026-09-01, so any real movement is unmissable.
 >
 > **Surfaced 2026-09-01 on the owner's actual worklist** —
-> [`device-verification-queue.md`](../device-verification-queue.md) — because a gate that reads
+> [`device-verification-queue.md`](device-verification-queue.md) — because a gate that reads
 > "owner decision" when the decision is already **yes** is invisible in the one place the owner
 > looks. Nothing here needs deciding: it needs one night with the strap on. Consent was given
 > almost a month ago and the entry has not moved since.
@@ -34154,4 +34154,4 @@ don't bolt onto the existing single-episode-per-workout detector.
   fire without the app ever having been opened that day. The shipped proactive
   recaps reuse client-scheduled local notifications, not real server-side push.
 - **Batch O remainder** — progress photos, warm-up protocol customization, voice
-  logging, mesocycle retrospective. See `docs/planned_upgrades.md` § Batch O.
+  logging, mesocycle retrospective. See `docs/archive/planned_upgrades.md` § Batch O.

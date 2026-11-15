@@ -58,7 +58,7 @@ The review was written against the pre-#575 code. Re-read of current `main` (`15
 - `lib/ai-chat/tools.ts` — `getRecoveryData` gains `daytimeStress`.
 - `app/api/weekly-digest/route.ts` — one stress context line.
 - `components/body-battery-card.tsx` — mount `<StressStrip/>` (replaces the inline #571 drain line).
-- `docs/implementation-backlog.md` + `docs/planned_upgrades.md` — P-E annotation + S5 tick (Task 9).
+- `docs/implementation-backlog.md` + `docs/archive/planned_upgrades.md` — P-E annotation + S5 tick (Task 9).
 - `package.json` + `lib/changelog.ts` + `projectOverview.md` + `docs/overview/history-newest.md` (final task).
 
 **No migration.** Columns exist since `123_oura_daily_derived.sql`; `upsertOuraDailyDerived`'s `DERIVED_COLS` map (`lib/data/postgres/slices/oura.ts:630-641`) already includes all three keys. No repository interface change anywhere.
@@ -620,7 +620,7 @@ git commit -m "Show the intraday stress strip and stress-high time on the Body B
 
 **Files:**
 - Modify: `docs/implementation-backlog.md` (P-E entry, lines ~256-257)
-- Modify: `docs/planned_upgrades.md` (Batch S, S5 bullet, line ~139)
+- Modify: `docs/archive/planned_upgrades.md` (Batch S, S5 bullet, line ~139)
 
 - [ ] **Step 1: Annotate P-E.** In the P-E entry, extend the closing `**P2/P3:**` sentence to:
 
@@ -633,7 +633,7 @@ git commit -m "Show the intraday stress strip and stress-high time on the Body B
   `resilience_level` still unwritten).
 ```
 
-- [ ] **Step 2: Tick S5.** In `docs/planned_upgrades.md` Batch S, mark the S5 bullet:
+- [ ] **Step 2: Tick S5.** In `docs/archive/planned_upgrades.md` Batch S, mark the S5 bullet:
 
 ```markdown
 - **S5 (High/M):** ✅ done 2026-07-16 — daytime stress persisted + wired (deload override,
@@ -648,7 +648,7 @@ Also remove this plan's own entry from the `docs/implementation-backlog.md` queu
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/implementation-backlog.md docs/planned_upgrades.md
+git add docs/implementation-backlog.md docs/archive/planned_upgrades.md
 git commit -m "Reconcile backlog: daytime-stress wiring done, chronic stress stays P-E P3"
 ```
 

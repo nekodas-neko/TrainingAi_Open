@@ -2,7 +2,7 @@
 
 **Agent:** Device Verification · **Written:** 2026-10-05 from a full read of every `Lane: DV` entry (31)
 and `next-item.js --sittings` (131 checks owed elsewhere, 10 blocked) · **Target:** web v1.486.11 (prod =
-`main`). **Supersedes** the Orchestrator's `docs/device-sitting-plan-2026-09-28.md`, which predates a
+`main`). **Supersedes** the Orchestrator's `docs/archive/device-sitting-plan-2026-09-28.md`, which predates a
 week of fixes (DV-21, DV-22, RV-208, RV-210, the DV-8 heal, the OR-162 per-switch fix).
 
 Six sittings of 45–60 minutes, per `CLAUDE.md`. **Each is ordered failure-first**, so a FAIL at minute 5

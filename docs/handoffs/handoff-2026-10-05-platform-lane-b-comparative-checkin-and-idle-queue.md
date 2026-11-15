@@ -87,7 +87,7 @@ asserts the pair: it reads the picker's own text and fails if `CURRENT_VS_QUESTI
   and re-seeding the neutral over it shows the owner's screen agreeing with itself.
 - `packages/shared/src/types/day-checkin.ts` — `VS_QUESTION` and `CURRENT_VS_QUESTION`, the single
   switch. Lane A's file.
-- `docs/device-sweep-5-plan.md` — **the unblock for this lane.** Six sittings, failure-first, and it
+- `docs/archive/device-sweep-5-plan.md` — **the unblock for this lane.** Six sittings, failure-first, and it
   already covers fifteen of Lane B's owed looks: `BF-204`, `BF-206`, `BF-208`, `LB-5`, `LB-53`,
   `LB-61`, `LB-129`, `LB-162`, `OR-162`, `RV-114`, `RV-115`, `RV-208`, `RV-209`, `RV-210`, `TN-85`.
 
@@ -144,7 +144,7 @@ Constraints you would otherwise rediscover:
   - pnpm check:rules is the custom-rules gate. Quote its `Ran N of N` count, never the word
     "pass". It was 86 of 86 on 2026-10-01.
   - Nothing this lane shipped since 2026-09-26 has been seen on the S25. Device sweep 5
-    (docs/device-sweep-5-plan.md) is planned and covers fifteen of Lane B's owed looks; it is the
+    (docs/archive/device-sweep-5-plan.md) is planned and covers fifteen of Lane B's owed looks; it is the
     unblock for most of the KEEP list.
   - The morning check-in's prompt and its vs_question marker move together, forever. The guard is
     components/checkin/__tests__/tn58-vs-normal-control.test.ts. The seeded neutral was the

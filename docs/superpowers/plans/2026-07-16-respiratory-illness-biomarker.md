@@ -42,7 +42,7 @@ Data-efficiency review **S4 / §1.2** (`docs/reviews/2026-07-16-data-efficiency-
 - `lib/data/postgres/schema.ts`, `lib/data/repository.ts`, `lib/data/postgres/slices/oura.ts` — column + row type + persist/read mappings.
 - `app/api/readiness-score/route.ts` — destructure + pass `breathZ` (live consumer).
 - Tests: `lib/health/__tests__/daily-summary.test.ts`, `lib/health/__tests__/illness-radar.test.ts`, `lib/data/postgres/__tests__/oura-ble-daily-summary.test.ts`.
-- Final task: `package.json` + `lib/changelog.ts` (minor bump), `projectOverview.md` (ledger + status), journal (`docs/overview/history-*.md`), `docs/module-map.md` (baseline row lists metrics), `docs/planned_upgrades.md` (S4), `docs/implementation-backlog.md` (remove this plan's entry).
+- Final task: `package.json` + `lib/changelog.ts` (minor bump), `projectOverview.md` (ledger + status), journal (`docs/overview/history-*.md`), `docs/module-map.md` (baseline row lists metrics), `docs/archive/planned_upgrades.md` (S4), `docs/implementation-backlog.md` (remove this plan's entry).
 
 **Repo-rule notes for the implementer:** repository pattern (all DB access through `repo.*`/slices — no raw SQL at call sites); **One Formula, One Place** — `illnessZScores`/`illnessFromSummaries` stay the single shared implementation, never fork or inline the z math anywhere; **sibling-surface sweep** — both illness consumers (route + rollup) land in the same PR (Task 4 verifies); stored-counter rule N/A (baselines are replayed, not incremented); migration number claimed against the directory AND open plans AND the projectOverview ledger (Task 2).
 
@@ -463,7 +463,7 @@ SQL
 - `lib/changelog.ts`: "The illness radar now watches your breathing rate as a fourth biomarker — your nightly respiratory rate (which the ring already measures) gets its own personal baseline, and a sustained rise now counts toward the illness flag alongside skin temperature, resting heart rate and HRV. Fully backfilled from your existing ring history."
 - `projectOverview.md`: update the migration ledger line ("Next free Postgres migration number: **126**", noting 125 = `breathing_baseline`; keep the 120-pencilled note), tick/annotate the roadmap item, note in Current Status.
 - `docs/module-map.md`: the personal-baseline row (`:189`) lists "(HRV/RHR/temp/sleep/MET)" — add breathing (sibling-surface sweep on docs).
-- `docs/planned_upgrades.md`: mark Batch S item **S4** shipped by this PR; `docs/implementation-backlog.md`: **remove this plan's entry**.
+- `docs/archive/planned_upgrades.md`: mark Batch S item **S4** shipped by this PR; `docs/implementation-backlog.md`: **remove this plan's entry**.
 - Append the session journal entry to the most recent `docs/overview/history-*.md`.
 
 - [ ] **Step 4: Push + PR**

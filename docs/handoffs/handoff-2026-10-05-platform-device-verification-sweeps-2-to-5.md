@@ -6,7 +6,7 @@ _Domain: `platform` (also touches `app-shell`, `nutrition`, `devices`, `workouts
 
 > **Read first:** `projectOverview.md`, then [`docs/agents/README.md`](../agents/README.md) (the DV
 > role), then the baton [`docs/agents/state/device-verification.md`](../archive/agents-2026-10-05/state/device-verification.md),
-> then the current plan [`docs/device-sweep-5-plan.md`](../device-sweep-5-plan.md). This file
+> then the current plan [`docs/archive/device-sweep-5-plan.md`](../archive/device-sweep-5-plan.md). This file
 > covers what this session did and leaves behind; the findings themselves live on their backlog
 > entries.
 
@@ -93,7 +93,7 @@ the owner's only. Captures never go in the repo.
 
 ## Files to look at
 
-- `docs/device-sweep-5-plan.md` — the next work, in order.
+- `docs/archive/device-sweep-5-plan.md` — the next work, in order.
 - `docs/agents/state/device-verification.md` — the baton (state and rules).
 - `scripts/device/README.md` — the runbook and every lesson above in full.
 - `scripts/device/pw.js`, `scripts/device/cdp.js`, `scripts/device/perf.js` — the harness.
@@ -118,13 +118,13 @@ in / leave plugged).
 
 1. git fetch origin main && git checkout -B device/<work> origin/main
 2. Read, in order: projectOverview.md · docs/agents/README.md (the DV role) ·
-   docs/agents/state/device-verification.md (your baton) · docs/device-sweep-5-plan.md ·
+   docs/agents/state/device-verification.md (your baton) · docs/archive/device-sweep-5-plan.md ·
    docs/handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md ·
    scripts/device/README.md (the runbook).
 3. Run `node scripts/next-item.js --lane DV --all` and `--sittings`; reconcile against the sweep 5
    plan (the queue moves).
 4. First action: ask the owner whether to install APK 1.481.3 (phone is on 1.465.52), then ask him
-   to plug in, and run Sitting 1 of docs/device-sweep-5-plan.md.
+   to plug in, and run Sitting 1 of docs/archive/device-sweep-5-plan.md.
 
 Constraints that bind: never uninstall or clear app data (destroys the ring key); never open
 /admin/oura-ble until DV-13 closes; never page.reload(); raw input only via pw.js

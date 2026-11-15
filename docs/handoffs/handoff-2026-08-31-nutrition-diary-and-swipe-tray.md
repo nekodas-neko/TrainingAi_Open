@@ -141,7 +141,7 @@ the previous session was working.
 When you do have a PR open, expect to lose merge races: six landed under this session's, and the
 conflict is always the same two files. Take `--theirs` for `docs/doc-size/*.size` and then
 re-derive the numbers from the merged documents; keep BOTH notes in
-`docs/doc-size-baseline-history.md` chronologically, since it is append-only; and rebuild
+`docs/archive/doc-size-baseline-history.md` chronologically, since it is append-only; and rebuild
 `package.json` / `packages/shared/src/changelog.ts` from `git show origin/main:...` rather than
 splicing a conflict hunk.
 

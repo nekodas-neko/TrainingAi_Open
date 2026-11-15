@@ -47,7 +47,7 @@ To avoid re-introducing shared-line conflicts, do **not** edit these in a featur
 updated in the periodic docs sweep instead:
 
 - The serial-track **"Next on the track: …"** pointer line in `docs/implementation-backlog.md`.
-- `docs/planned_upgrades.md` batch **tick marks** (✅) for shipped review findings.
+- `docs/archive/planned_upgrades.md` batch **tick marks** (✅) for shipped review findings.
 
 (Striking the shipped **backlog queue entry** itself stays in the feature PR — that's the
 non-conflicting removal above. Only the shared *pointer/tick* lines defer.)
@@ -180,7 +180,7 @@ because entries are *well cited* by durable docs, which is the habit this file s
 above establishing. Punishing that is backwards. The unlinked guard already catches the real failure
 mode, and the four foldable entries at the time were all written in the preceding two days, so
 folding them would have deleted the newest rather than the oldest. Reversal is one number in
-`docs/doc-size-baseline.json`; if the floor ever rises from something other than journal citations,
+`docs/archive/doc-size-baseline.json`; if the floor ever rises from something other than journal citations,
 that is the signal to do the real compaction instead of raising it again.
 
 **The older framing, kept for the record:** this used to be described as an undecided choice between

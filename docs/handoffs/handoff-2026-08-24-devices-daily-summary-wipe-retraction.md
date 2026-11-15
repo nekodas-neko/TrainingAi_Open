@@ -109,7 +109,7 @@ recomputed in memory by design and **nothing persists a reason for the null**.
   (`lib/data/postgres/slices/oura-raw-frames.ts`), the **two-tier** reader that consults both. I
   chased this as a starvation hypothesis for a while before checking the reader; do not repeat it.
 - **The doc-size baseline conflicts on every parallel docs PR** (this is Q-424, already filed). Resolve
-  by taking `git show origin/main:docs/doc-size-baseline.json` and re-applying your raises on top —
+  by taking `git show origin/main:docs/archive/doc-size-baseline.json` and re-applying your raises on top —
   never by splicing the conflict hunks. It happened once here and that is the procedure that worked.
 
 ## Files to look at

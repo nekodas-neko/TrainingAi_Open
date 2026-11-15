@@ -84,7 +84,7 @@ git push -u origin security/dependency-overrides
 
 ### Task 5: Record any deferrals
 
-- [ ] If anything was deliberately left unfixed (expected candidate: PrismJS), append a line to `docs/planned_upgrades.md` Batch D with the package, advisory link, why it was deferred, and the follow-up (e.g. "revisit when react-syntax-highlighter releases against Prism 2").
+- [ ] If anything was deliberately left unfixed (expected candidate: PrismJS), append a line to `docs/archive/planned_upgrades.md` Batch D with the package, advisory link, why it was deferred, and the follow-up (e.g. "revisit when react-syntax-highlighter releases against Prism 2").
 
 ## Self-review
 

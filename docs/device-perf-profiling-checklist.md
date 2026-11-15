@@ -32,7 +32,7 @@ foregrounded first.
 > WebView**, so the DevTools target disconnects; the relaunch is a *new* target you would have to
 > re-attach to, by which time the cold start is over. No recording can span the kill.
 >
-> **Use [`docs/device-runsheet-2026-08-04.md`](device-runsheet-2026-08-04.md) Step 1** — three
+> **Use [`docs/archive/device-runsheet-2026-08-04.md`](archive/device-runsheet-2026-08-04.md) Step 1** — three
 > approaches that do work:
 >
 > 1. **A screen recording** for the wall-clock number, which is what the thresholds below are

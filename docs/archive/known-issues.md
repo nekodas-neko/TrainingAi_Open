@@ -6,12 +6,12 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did against
+> `grep -n '^### .*\[sleep\]' docs/archive/known-issues.md` works exactly as it did against
 > `projectOverview.md`, and the standing rule depends on it. Per-pillar files would have forced an
 > issue tagged `[sleep][platform]` to live in one and go missing from the other.
 >
 > **Resolved issues are NOT here** — they live in
-> [`known-issues-resolved.md`](known-issues-resolved.md). **Grep the archive before concluding
+> [`known-issues-resolved.md`](../overview/known-issues-resolved.md). **Grep the archive before concluding
 > something has never been looked at.** An entry moves there only when nothing is still owed: no
 > open work, no pending owner or device check, no un-run follow-up. A fix that shipped but is not
 > device-verified stays in this file, because that check is the outstanding thing.
@@ -4479,7 +4479,7 @@ the next device change.
   type picker and the bail-out toasts. Guarded by `e2e/activity-untyped-entry.spec.ts`, but only the
   web fallback has run — **the SQLite + outbox branch on the device is still owed** (RV-155 station E).
 - The rest of the 2026-08-17 sweep (Q-451…Q-455, Q-351, Q-353) has shipped and is archived in
-  [`known-issues-resolved.md`](known-issues-resolved.md) (#2140).
+  [`known-issues-resolved.md`](../overview/known-issues-resolved.md) (#2140).
 ### [devices][heart-rate] 🔴 The ring records SpO₂ and daytime HR permanently — ~3.5× stock battery drain (Q-388, 2026-08-17)
 
 - Owner: stock ring lasts 7 days; on our build it loses ~20% overnight and needs charging every 2
@@ -7180,7 +7180,7 @@ and `main` red on E2E for ten hours of every day from a UTC-vs-Brisbane seed bug
 [`entries/2026-08-16-public-repo-snapshot-pushed.md`](../overview/history-2026-08-15.md).
 
 **What remains is Phase B steps 9–14**, and all but one are the owner's:
-[`docs/public-repo-cut-runbook.md`](../public-repo-cut-runbook.md). Branch protection on the new
+[`docs/archive/public-repo-cut-runbook.md`](public-repo-cut-runbook.md). Branch protection on the new
 repo cannot be set from a session (no MCP tool for it). Rollback stays available throughout — the old
 repo remains a working Railway target until the final step, and that step archives rather than
 deletes it.

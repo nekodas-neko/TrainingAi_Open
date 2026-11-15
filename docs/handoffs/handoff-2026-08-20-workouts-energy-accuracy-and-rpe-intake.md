@@ -23,7 +23,7 @@ entries good enough to implement from. **No product code was written and none sh
 - **All five intake PRs merged.** Nothing left open, nothing mid-triage, nothing received-but-unfiled.
 - **The queue moved underneath this doc while it was being written** — Q-391, Q-419 and Q-421 shipped,
   the agent ID scheme changed from bands to `BF-` prefixes, and the doc-size baselines moved into
-  `docs/doc-size-baseline.json`. All three are reflected below; anything that still reads as stale is a
+  `docs/archive/doc-size-baseline.json`. All three are reflected below; anything that still reads as stale is a
   miss, not a deliberate record.
 
 ## What shipped
@@ -154,7 +154,7 @@ Paired sessions (both a session RPE and rated sets), n = 20:
   `git checkout --theirs scripts/check-doc-index-size.js` (keeps main's whole file, preserving checks
   other lanes added) → `node scripts/check-doc-index-size.js` → set the baseline to **exactly** the
   count it prints → re-run `pnpm check:rules`.
-  **Note the baselines moved to `docs/doc-size-baseline.json` on 2026-08-19 (#254)**, which removes the
+  **Note the baselines moved to `docs/archive/doc-size-baseline.json` on 2026-08-19 (#254)**, which removes the
   conflict-frequency half of this — the script had reached 1,091 lines with 955 of them prose. The
   order-dependence it does not remove is Q-424.
 - **`wc -l` reports one lower than the check does.** A baseline set from `wc -l` leaves the branch
@@ -235,8 +235,8 @@ Constraints that would otherwise be re-discovered:
   - pnpm check:rules is the only custom-rules gate. It is 50 of 50 right now; quote the count
     the runner prints, never a remembered number.
   - Every intake PR trips check-doc-index-size, because intake adds an entry per report. Raise
-    the baseline in the same PR — it lives in docs/doc-size-baseline.json now, with the
-    reasoning in docs/doc-size-baseline-history.md. Take the number from
+    the baseline in the same PR — it lives in docs/archive/doc-size-baseline.json now, with the
+    reasoning in docs/archive/doc-size-baseline-history.md. Take the number from
     `node scripts/check-doc-index-size.js`, NOT from `wc -l`, which reads one lower.
   - Expect the baseline to conflict; it did four times on 2026-08-19. Resolve with
     `git merge origin/main`, then `git checkout --theirs scripts/check-doc-index-size.js`, then

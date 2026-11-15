@@ -8,7 +8,7 @@ queued below (plans for the big batches, pointer entries for the rest — see §
 
 **Method:** every finding cites file:line and is marked CONFIRMED (code-verified, failure traced)
 or PLAUSIBLE (needs runtime/device check). Findings already tracked in `projectOverview.md`
-Known Issues, `docs/implementation-backlog.md`, `docs/planned_upgrades.md`, or the five prior
+Known Issues, `docs/implementation-backlog.md`, `docs/archive/planned_upgrades.md`, or the five prior
 reviews were treated as DUPs and not re-raised. All 10 critical/high candidates went through an
 adversarial verify pass (verdicts in the appendix): 7 sustained (1 critical, 6 high after merges),
 4 downgraded to medium, 0 refuted outright. Baseline: `tsc --noEmit` clean; `pnpm test`

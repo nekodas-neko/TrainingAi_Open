@@ -90,8 +90,8 @@ the only one of the three with no evidence behind it.**
   is real, unlike Next's HTML 404, which is indistinguishable from an access-control rejection by
   status alone. Sweep 39 learned the HTML-vs-JSON tell; this run learned that a wrong-verb probe
   confirms reachability for free.
-- **`main` moved three times mid-PR**, twice conflicting on `docs/doc-size-baseline.json` and
-  `docs/doc-size-baseline-history.md`. Resolve those by **rebuilding from `origin/main` and
+- **`main` moved three times mid-PR**, twice conflicting on `docs/archive/doc-size-baseline.json` and
+  `docs/archive/doc-size-baseline-history.md`. Resolve those by **rebuilding from `origin/main` and
   re-applying your own numbers**, never by splicing conflict hunks — and re-measure the line counts
   after every merge, because another session's archive sweep can shrink the file under you (it did:
   `projectOverview.md` 7910 → 7838 between two of my own commits).

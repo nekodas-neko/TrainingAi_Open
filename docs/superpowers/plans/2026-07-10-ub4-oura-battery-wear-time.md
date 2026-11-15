@@ -12,7 +12,7 @@ body/health tab I don't think the ring battery and wear time are accurate"). Gro
   first.
 - **Chunk 3 is native** — surfacing the real ring battery reads the BLE plugin and (for the fuller
   battery-health time-series) needs a native POST path + **owner APK rebuild**, verifiable
-  **on-device only**. It folds into ongoing Oura BLE work (`docs/oura-ble-remaining-work.md`,
+  **on-device only**. It folds into ongoing Oura BLE work (`docs/archive/oura-ble-remaining-work.md`,
   spec Part A).
 
 **Two governing invariants (CLAUDE.md):**
@@ -232,7 +232,7 @@ spec-Part-A project. Cross-reference:
 `docs/superpowers/specs/2026-07-07-extended-metrics-capture-and-analysis-design.md` **Part A**
 (A2 "Average charging time" / "battery drain" / "battery-health"; A3 native-vs-server table; A4
 caveats — opportunistic sampling, the observer effect, epoch resets) and
-`docs/oura-ble-remaining-work.md` item 8 ("Battery time-series … needs a POST path + APK rebuild").
+`docs/archive/oura-ble-remaining-work.md` item 8 ("Battery time-series … needs a POST path + APK rebuild").
 
 **3a — Surface the live BLE battery in the Body/Health card (JS in the WebView; on-device-verify
 only, likely no rebuild).** The plugin already exposes the latest polled battery to JS
@@ -254,7 +254,7 @@ then derive charging-time / drain-rate / degradation server-side, stitching acro
 ingest route + a migration (claim the next free number against the directory *and* open plans).
 **Native — owner APK rebuild (`npx cap sync android && ./gradlew assembleDebug`), on-device
 verification only.** Recommend folding this into the next batched native BLE rebuild alongside
-`docs/oura-ble-remaining-work.md` items 2/6/8, not shipping it standalone.
+`docs/archive/oura-ble-remaining-work.md` items 2/6/8, not shipping it standalone.
 
 **Verify (Chunk 3):**
 - **3a on-device (APK):** with the ring connected, the card's battery matches the ring's actual

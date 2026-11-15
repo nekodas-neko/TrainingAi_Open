@@ -53,7 +53,7 @@ are now in `e2e/README.md`. **Read the CI server log before pushing a fix for a 
 
 **2. `projectOverview.md` and the doc ratchets.** The file sits exactly on its shrink-only baseline
 and *two* sessions raised it on the same day. Three rounds of shaving prose to fit a four-line note is
-a file past its maintenance point — recorded in `docs/doc-size-baseline-history.md` with the note that
+a file past its maintenance point — recorded in `docs/archive/doc-size-baseline-history.md` with the note that
 the next session needing room should **compact the shipped-notes section rather than raise again**.
 Filed for Orchestrator. Related: I started a compaction sweep of `docs/overview/entries/` and dropped
 it as a duplicate of another session's #381, which folded 60 against my 30 and caught a fourth link

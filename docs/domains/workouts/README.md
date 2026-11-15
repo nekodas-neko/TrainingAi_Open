@@ -317,7 +317,7 @@ Live at the time of writing (2026-07-30):
   seven existing tests all passed and none of them **could** have failed: every case was adjacent
   numbers or an explicit keyword. **Not device-verified** — no transcript has ever come out of
   Android's recogniser in any test, so the parser is proven on strings, not on speech; the press is
-  W4 in [`device-verification-queue.md`](../../device-verification-queue.md), sharing a sitting with
+  W4 in [`device-verification-queue.md`](../../archive/device-verification-queue.md), sharing a sitting with
   LA-37.
 - **[`docs/handoffs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoffs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)**
   — 🆕 the workout-energy intake cluster (Q-391 · Q-419 · ~~Q-423~~ · Q-420 · Q-421 · Q-422), from one

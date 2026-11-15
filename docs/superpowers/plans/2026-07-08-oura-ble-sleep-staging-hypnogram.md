@@ -63,7 +63,7 @@ labels, the legend, and the `lg` caption. Consume `hypnogramSegments`/`sleepCycl
 verify at the S25 viewport (≤640px). Keep the file well under the size budget.
 
 ### 4. Doc corrections + backlog
-- `docs/oura-ble-remaining-work.md` item 8: replace "the ring sends no hypnogram over BLE" with
+- `docs/archive/oura-ble-remaining-work.md` item 8: replace "the ring sends no hypnogram over BLE" with
   the corrected position (staging IS emitted per open_oura; we simply haven't captured a full
   night — needs the drain/cursor check), linking the findings doc.
 - `projectOverview.md`: soften the "stages null by design" rows to "stages unconfirmed over BLE —

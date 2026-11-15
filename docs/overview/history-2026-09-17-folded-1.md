@@ -185,7 +185,7 @@ later, tracked as backlog entries rather than built inline):
 - `pnpm check:rules` — **75/75 Custom Rules steps pass**, including the doc-link and orientation-doc
   size checks this session's own additions tripped (two broken relative links inside the new plan
   docs, and the backlog file's size baseline needing a ratchet — both are fixed in this branch, with
-  the baseline raise recorded in `docs/doc-size-baseline-history.md`).
+  the baseline raise recorded in `docs/archive/doc-size-baseline-history.md`).
 - `node scripts/check-index-doc-paths.js` and `node scripts/check-backlog-pointers.js` run clean
   after every addition across the session, not just at the end.
 - No `pnpm dev` run — this PR touches no runtime code, so there is nothing to smoke-test on the local

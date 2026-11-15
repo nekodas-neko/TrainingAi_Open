@@ -182,7 +182,7 @@ Kotlin/native, goes on the device checklist.
 
 ## Owner device checklist
 
-> **▶ For a single sitting, use [`docs/device-runsheet-2026-08-04.md`](../device-runsheet-2026-08-04.md)
+> **▶ For a single sitting, use [`docs/archive/device-runsheet-2026-08-04.md`](../archive/device-runsheet-2026-08-04.md)
 > instead.** It merges every unchecked item below with the cold-start profiling into one ordered
 > pass — install, profile, admin checks, airplane-mode items, strap + walk, Railway console — so
 > nothing gets set up twice. This list stays the master record; the runsheet is the running order.

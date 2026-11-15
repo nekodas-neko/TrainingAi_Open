@@ -1,6 +1,6 @@
 # H5 — Perceived-performance & haptics sweep
 
-> Source: `docs/planned_upgrades.md` § H5 (session-178 audit). Two PR-sized chunks: chunk 1 is standalone S-effort work, chunk 2 depends on H2/H4 primitives — do not start it before those land (or fold the needed primitive in explicitly). Re-grep anchors before editing.
+> Source: `docs/archive/planned_upgrades.md` § H5 (session-178 audit). Two PR-sized chunks: chunk 1 is standalone S-effort work, chunk 2 depends on H2/H4 primitives — do not start it before those land (or fold the needed primitive in explicitly). Re-grep anchors before editing.
 
 ## Chunk 1 — Standalone sweep (one PR, all S effort)
 

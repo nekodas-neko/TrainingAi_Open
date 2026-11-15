@@ -261,5 +261,5 @@ cumulative stress, resilience, baseline reconcile — covers §1.4's persistence
 (vascular age), **item 16** (cross-domain correlations), **Polar H10 Chunk B** (workout HRV),
 the **apnea validation handoff** (owner-run night dump), and the standing **Body Battery
 tuning** nice-to-have. The new findings above are queued as **Batch S** in
-`docs/planned_upgrades.md` (this review is their source doc) — they graduate to
+`docs/archive/planned_upgrades.md` (this review is their source doc) — they graduate to
 `docs/implementation-backlog.md` when a planning session writes their implementation plans.

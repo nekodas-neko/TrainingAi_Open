@@ -121,7 +121,7 @@ Other traps:
 - `packages/shared/src/nutrition/log-meal.ts` — `logMealItems`, five scale sites.
 - `lib/data/postgres/slices/nutrition.ts` — `recentFoodItems` shared body; `listSavedMeals` above it
   is the derived-recency precedent.
-- `scripts/lib/entries-verdict.js` + `docs/doc-size-baseline.json` — the ceiling and its two guards.
+- `scripts/lib/entries-verdict.js` + `docs/archive/doc-size-baseline.json` — the ceiling and its two guards.
 
 ## Open questions / blockers
 
