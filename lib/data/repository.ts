@@ -1427,10 +1427,12 @@ export interface WorkoutRepository {
   /** #3766: put every phased row of the program on one phase and start (the switch-over, and moves).
    *  False when `opts.expect` no longer held and nothing was written. */
   setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null, opts?: import('@trainingai/shared/ai-periodization/program-phase').ProgramMoveOptions): Promise<boolean>
-  /** #3766: write `pending` on every phased row (the program's mark, or the switch-over's wait). */
-  setProgramPendingTransition(userId: string, programId: string, pending: PendingTransition): Promise<void>
-  /** #3766: re-align a program on one phase whose rows have come to disagree. */
-  realignProgramPhase(userId: string, programId: string, target: import('@trainingai/shared/ai-periodization/program-phase').ProgramTarget): Promise<void>
+  /** #3766: write on every phased row the scheduled move `decide` works out from the locked rows
+   *  (the program's mark, or the switch-over's wait); null writes nothing. */
+  setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending): Promise<void>
+  /** #3766: re-align a program on one phase whose rows have come to disagree, to the target `decide`
+   *  works out from the locked rows. */
+  realignProgramPhase(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecideTarget): Promise<void>
   /** #3766: completed sessions of the program since `since`, the input to training weeks. */
   listProgramCompletions(userId: string, programId: string, since: Date): Promise<import('@trainingai/shared/ai-periodization/program-phase').ProgramCompletion[]>
   /** #3766: every raw model phase answer of these session types since `since`, with when it was given. */

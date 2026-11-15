@@ -6,10 +6,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { AiPrescription, PendingTransition, SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import type { PrescriptionSignals } from '../signals'
+import { shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import {
   trainingWeekOf, programPhaseView, applyProgramPhaseCap, programMoveTarget, collectVotes,
-  planSwitchOver, syncProgramPhase, isProgramAligned, programMoveMark, PROGRAM_PHASE_CAP_WEEKS,
+  planSwitchOver, syncProgramPhase, isProgramAligned, programMoveMark, switchOverPendingTransition, PROGRAM_PHASE_CAP_WEEKS,
   type PhaseRow, type ProgramCompletion, type PhaseVote, type PhaseAnswer, type ProgramPhaseRepo,
 } from '../program-phase'
 
@@ -219,6 +220,9 @@ function memoryProgram(initial: PhaseRow[], completions: ProgramCompletion[]) {
   let rows = initial.map(r => ({ ...r, prescription: null, prescriptionStatus: 'none' })) as unknown as SessionPeriodization[]
   const writes: string[] = []
   const phased = (r: SessionPeriodization) => r.baselineComplete && r.phase !== 'baseline'
+  /** Runs once, between the caller's read and the next lock: a write racing the sync. */
+  let race: (() => void) | null = null
+  const lock = () => { const r = race; race = null; r?.() }
   const repo: ProgramPhaseRepo = {
     reconcileSessionsInPhase: async () => {
       rows = rows.map(r => ({
@@ -229,17 +233,24 @@ function memoryProgram(initial: PhaseRow[], completions: ProgramCompletion[]) {
     listSessionPeriodizationForProgram: async () => rows.map(r => ({ ...r })),
     listProgramCompletions: async (_u, _p, since) => completions.filter(c => c.completedAt >= since),
     setProgramPhase: async (_u, _p, phase, startedAt, pending, opts) => {
+      lock()
       if (opts?.expect === 'switch-over' && rows.some(r => phased(r) && r.pendingTransition?.programPhase)) return false
       writes.push(`switch ${phase} ${startedAt.toISOString()}`)
       const mark = programMoveMark(phase, pending)
       rows = rows.map(r => (phased(r) ? { ...r, phase, phaseStartedAt: startedAt, pendingTransition: mark } : r))
       return true
     },
-    setProgramPendingTransition: async (_u, _p, pending) => {
+    setProgramPendingTransition: async (_u, _p, decide) => {
+      lock()
+      const pending = decide(rows)
+      if (pending == null) return
       writes.push(`pending ${pending.programPhase ? 'mark' : `wait ${pending.switchOverOn ?? '-'}`}`)
       rows = rows.map(r => (phased(r) ? { ...r, pendingTransition: pending } : r))
     },
-    realignProgramPhase: async (_u, _p, target) => {
+    realignProgramPhase: async (_u, _p, decide) => {
+      lock()
+      const target = decide(rows)
+      if (target == null) return
       writes.push(`realign ${target.phase} ${target.phaseStartedAt.toISOString()}`)
       rows = rows.map(r => (phased(r)
         ? { ...r, phase: target.phase, phaseStartedAt: target.phaseStartedAt, pendingTransition: target.pendingTransition }
@@ -258,6 +269,13 @@ function memoryProgram(initial: PhaseRow[], completions: ProgramCompletion[]) {
         : r))
     },
     complete(id: string, local: string) { completions.push(done(id, local)) },
+    /** A write that lands after the sync's read and before its lock. */
+    raceNextLock(fn: () => void) { race = fn },
+    /** The program move (`setProgramPhase`), as another session's tap. */
+    programMove(phase: SessionPeriodization['phase'], when: Date, pending: PendingTransition | null = null) {
+      const mark = programMoveMark(phase, pending)
+      rows = rows.map(r => (phased(r) ? { ...r, phase, phaseStartedAt: when, pendingTransition: mark } : r))
+    },
   }
 }
 
@@ -327,7 +345,7 @@ describe('the switch-over (the owner\'s program, 14 Nov)', () => {
       listSessionPeriodizationForProgram: async () => stored,
       listProgramCompletions: async () => history(),
       setProgramPhase: async () => { throw new Error('no switch while Lower is in its deload') },
-      setProgramPendingTransition: async (_u, _p, pending) => { stamps.push(pending) },
+      setProgramPendingTransition: async (_u, _p, decide) => { const pending = decide(stored); if (pending) stamps.push(pending) },
       realignProgramPhase: async () => { throw new Error('a waiting program is not re-aligned') },
       voidSessionPrescription: async (_u: string, id: string) => { voided.push(id) },
     }
@@ -366,6 +384,53 @@ describe('the switch-over (the owner\'s program, 14 Nov)', () => {
     const view = await syncProgramPhase(p.repo, 'u', 'p', TZ, at('2026-11-23T06:00:00'))
     expect(p.writes.filter(w => w.startsWith('switch'))).toEqual([`switch accumulation ${at('2026-11-23T00:00:00').toISOString()}`])
     expect(view).toMatchObject({ aligned: true, phase: 'accumulation', capWeeks: 3 })
+  })
+
+  describe('whenever the release ships, the program gets the signed switch-over (review 2, A)', () => {
+    // Until this code runs, `main`'s per-type moves keep landing: Upper to intensification on Mon 16,
+    // Pull to realisation on Thu 19, Legs out of its deload on Sat 21, Lower out of its deload on Wed
+    // 25 (its deload done on Wed 18). Push never moves. After the release, the program waits and
+    // only a deload's own way out is still offered.
+    const moves: Array<[string, SessionPeriodization['phase'], string]> = [
+      ['upper', 'intensification', '2026-11-16T12:00:00'],
+      ['pull', 'realisation', '2026-11-19T12:00:00'],
+      ['legs', 'accumulation', '2026-11-21T12:00:00'],
+      ['lower', 'accumulation', '2026-11-25T19:00:00'],
+    ]
+    const ship = async (shipDay: string) => {
+      const p = memoryProgram(rows(1), [...history(), done('lower', '2026-11-18T18:00:00')])
+      const shipAt = at(`${shipDay}T12:00:00`)
+      for (const [id, phase, when] of moves) {
+        if (at(when) < shipAt) p.typeMove(id, phase, at(when))
+      }
+      const views = []
+      for (let day = shipDay; day <= '2026-11-30'; day = shiftDateStr(day, 1)) {
+        for (const [id, phase, when] of moves) {
+          const w = at(when)
+          const row = p.rows().find(r => r.programSessionId === id)!
+          // After the release, only a type still in its deload takes its own move.
+          if (w >= shipAt && toAestDay(w, TZ) === day && row.phase === 'deload' && !row.pendingTransition?.programPhase) p.typeMove(id, phase, w)
+        }
+        views.push(await syncProgramPhase(p.repo, 'u', 'p', TZ, at(`${day}T${day === shipDay ? '12:30' : '06:00'}:00`)))
+      }
+      return { p, views }
+    }
+
+    for (const shipDay of ['2026-11-18', '2026-11-22', '2026-11-26']) {
+      it(`shipped on ${shipDay}: every type starts accumulation on Mon 23 Nov, with the 3-week block`, async () => {
+        const { p, views } = await ship(shipDay)
+        expect(p.writes.filter(w => w.startsWith('realign'))).toEqual([])
+        expect(p.writes.filter(w => w.startsWith('switch'))).toEqual([`switch accumulation ${at('2026-11-23T00:00:00').toISOString()}`])
+        expect(p.rows().every(r => r.phase === 'accumulation' && r.phaseStartedAt.getTime() === at('2026-11-23T00:00:00').getTime()
+          && r.pendingTransition?.afterTrainingWeeks === 3 && r.pendingTransition.programPhase)).toBe(true)
+        expect(views.at(-1)).toMatchObject({ aligned: true, phase: 'accumulation', capWeeks: 3 })
+      })
+    }
+
+    it('shipped on 26 Nov, the program is in week 1 of that block, not backdated to 16 Nov', async () => {
+      const { views } = await ship('2026-11-26')
+      expect(views[0]).toMatchObject({ aligned: true, phase: 'accumulation', weekNumber: 1, capWeeks: 3 })
+    })
   })
 })
 
@@ -424,6 +489,41 @@ describe('after the switch-over, rows that come to disagree are re-aligned, neve
     p.typeMove('b', 'realisation', at('2026-11-17T12:00:00'))
     await syncProgramPhase(p.repo, 'u', 'p', TZ, at('2026-11-18T12:00:00'))
     expect(p.writes).toEqual(['pending mark', `realign intensification ${since.toISOString()}`])
+  })
+
+  it('a program move landing between the read and the re-align\'s lock is not undone (review 2, C)', async () => {
+    const p = memoryProgram([
+      row('legs', 'accumulation', switchedAt, 0, { pendingTransition: block }),
+      row('pull', 'accumulation', switchedAt, 0, { pendingTransition: block }),
+    ], [])
+    p.typeMove('pull', 'intensification', at('2026-11-25T12:00:00'))
+    const movedAt = at('2026-11-26T11:59:00')
+    p.raceNextLock(() => p.programMove('intensification', movedAt))
+    await syncProgramPhase(p.repo, 'u', 'p', TZ, at('2026-11-26T12:00:00'))
+    // The locked rows are aligned on the move: nothing to re-align, the move stands.
+    expect(p.writes).toEqual([])
+    expect(p.rows().every(r => r.phase === 'intensification' && r.phaseStartedAt.getTime() === movedAt.getTime())).toBe(true)
+  })
+
+  it('a waiting stamp decided after the switch-over landed does not overwrite its 3-week block (review 2, C)', async () => {
+    // Legs in a deload (1 of 2 done), Push in accumulation: the read sees a program waiting.
+    const p = memoryProgram([
+      row('legs', 'deload', at('2026-11-10T18:00:00'), 1),
+      row('push', 'accumulation', at('2026-10-24T18:00:00'), 3),
+    ], [done('legs', '2026-11-11T18:00:00')])
+    p.raceNextLock(() => p.programMove('accumulation', at('2026-11-16T00:00:00'), switchOverPendingTransition()))
+    await syncProgramPhase(p.repo, 'u', 'p', TZ, at('2026-11-16T10:00:00'))
+    expect(p.writes.filter(w => w.startsWith('pending'))).toEqual([])
+    expect(p.rows().every(r => r.pendingTransition?.afterTrainingWeeks === 3 && r.pendingTransition.programPhase)).toBe(true)
+  })
+
+  it('a first-read mark decided after a move keeps that move\'s mark', async () => {
+    const since = at('2026-10-05T12:00:00')
+    const p = memoryProgram([row('a', 'intensification', since), row('b', 'intensification', since)], [])
+    p.raceNextLock(() => p.programMove('realisation', at('2026-11-16T11:00:00')))
+    await syncProgramPhase(p.repo, 'u', 'p', TZ, at('2026-11-16T12:00:00'))
+    expect(p.writes).toEqual([])
+    expect(p.rows().every(r => r.phase === 'realisation' && r.pendingTransition?.newPhase === 'deload')).toBe(true)
   })
 
   it('the switch-over itself refuses to run on a program that has switched', async () => {

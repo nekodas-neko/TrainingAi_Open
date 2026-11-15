@@ -300,15 +300,17 @@ function laterDay(a: string | null | undefined, b: string | null | undefined): s
 
 /**
  * The switch-over is for a program whose types were on their own phases when the rule shipped, and
- * runs once. That is a program already stamped as waiting, or (on its first read) one whose rows
- * that have not moved since `earliest` disagree. A program whose rows only disagree later (two
- * baselines finishing together, a read racing a move, a per-type move on a program that was not
- * active) is re-aligned to its own phase instead.
+ * runs once. The caller has already found the program unaligned and without the program's mark, so
+ * it is due when it is stamped as waiting, or when any of its phased rows started before `earliest`:
+ * that row is from before the rule. It does not ask that two such rows disagree. Until this code
+ * ships, the per-type moves keep landing (Upper on 16 Nov, Pull on 19, Legs on 21, Lower on 25), and
+ * a release late enough would leave one unmoved row and re-align the program to the latest move,
+ * with no Monday start and no 3-week block. A program whose rows all started after `earliest` (two
+ * baselines finishing together on a new program) is re-aligned instead.
  */
 function switchOverDue(phased: PhaseRow[], tz: string, earliest: string): boolean {
   if (phased.some(r => r.pendingTransition?.switchOverPending === true)) return true
-  const unmoved = phased.filter(r => toAestDay(r.phaseStartedAt, tz) < earliest)
-  return unmoved.length >= 2 && !isProgramAligned(unmoved)
+  return phased.some(r => toAestDay(r.phaseStartedAt, tz) < earliest)
 }
 
 export type SwitchOverPlan =
@@ -329,6 +331,11 @@ export type SwitchOverPlan =
  * The Monday is stored on every row (`switchOverOn`) as soon as a finished deload gives it, and read
  * back: a type that then leaves its deload (the per-type "Move to accumulation") no longer shows when
  * its deload finished, and the date must not fall back to `earliest`.
+ *
+ * With no Monday known and no type in a deload (no deload finished since the last one began, or the
+ * release came after every type had left its deload, so no row shows the finish), the switch starts
+ * on the Monday of the current week, never before `earliest`. A release on Thu 26 Nov, after Lower
+ * left its deload on the 25th, starts the program on Mon 23 Nov, not backdated to 16 Nov.
  */
 export function planSwitchOver(
   rows: PhaseRow[],
@@ -363,7 +370,7 @@ export function planSwitchOver(
   if (phased.some(r => r.phase === 'deload' && r.sessionsInPhase < DELOAD_FLOOR)) {
     return { kind: 'waiting', reason: 'deload_in_progress', stamp }
   }
-  const startDay = laterDay(knownDay, earliest)!
+  const startDay = laterDay(knownDay ?? trainingWeekOf(now, tz), earliest)!
   if (toAestDay(now, tz) < startDay) return { kind: 'waiting', reason: 'before_start', startDay, stamp }
   return { kind: 'switch', startDay, startsAt: dateStrMidnightInTz(startDay, tz) }
 }
@@ -410,6 +417,37 @@ export interface ProgramMoveOptions {
   expect?: ProgramMoveExpectation
 }
 
+/** Worked out from the rows read under the program's row lock, never from an earlier read: a move
+ *  landing between that read and the lock is then not undone, and a waiting stamp written after the
+ *  switch-over cannot overwrite the switch's mark and 3-week block. */
+export type DecidePending = (lockedRows: PhaseRow[]) => PendingTransition | null
+export type DecideTarget = (lockedRows: PhaseRow[]) => ProgramTarget | null
+
+/** The program's first-read mark, when the locked rows still share one phase without it. */
+export function firstReadMark(rows: PhaseRow[]): PendingTransition | null {
+  const phased = phasedRows(rows)
+  if (phased.length === 0 || !isProgramAligned(rows) || isProgramSwitched(rows)) return null
+  return programMoveMark(phased[0].phase, phased[0].pendingTransition)
+}
+
+/** The waiting stamp, when the locked rows still wait for the switch-over and lack it. */
+export function waitingStampFor(completions: ProgramCompletion[], tz: string, now: Date): DecidePending {
+  return rows => {
+    const plan = planSwitchOver(rows, completions, tz, now)
+    return plan.kind === 'waiting' ? plan.stamp : null
+  }
+}
+
+/** The re-align target, when the locked rows still call for a re-align. */
+export function realignTargetFor(completions: ProgramCompletion[], tz: string, now: Date): DecideTarget {
+  return rows => {
+    const plan = planSwitchOver(rows, completions, tz, now)
+    if (plan.kind === 'realign') return plan.target
+    // Aligned but some row lacks the mark (a move in between wrote it on all): nothing to do.
+    return null
+  }
+}
+
 /** The repository calls the program phase needs (a subset of `WorkoutRepository`). */
 export interface ProgramPhaseRepo {
   reconcileSessionsInPhase(userId: string, programId: string): Promise<void>
@@ -420,10 +458,12 @@ export interface ProgramPhaseRepo {
     userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date,
     pendingTransition: PendingTransition | null, opts?: ProgramMoveOptions,
   ): Promise<boolean | void>
-  /** Writes `pending` on every phased row, leaving phase, start and plans alone. */
-  setProgramPendingTransition(userId: string, programId: string, pending: PendingTransition): Promise<void>
-  /** Puts every phased row on `target`; only rows that differed lose their plans. */
-  realignProgramPhase(userId: string, programId: string, target: ProgramTarget): Promise<void>
+  /** Under the program's row lock, writes `decide(lockedRows)` on every phased row, leaving phase,
+   *  start and plans alone; writes nothing when it returns null. */
+  setProgramPendingTransition(userId: string, programId: string, decide: DecidePending): Promise<void>
+  /** Under the program's row lock, puts every phased row on `decide(lockedRows)` (nothing when
+   *  null); only rows that differed lose their plans. */
+  realignProgramPhase(userId: string, programId: string, decide: DecideTarget): Promise<void>
   voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
 }
 
@@ -452,18 +492,18 @@ export async function syncProgramPhase(
   let rows = await repo.listSessionPeriodizationForProgram(userId, programId)
   let completions = await completionsFor(repo, userId, programId, rows, tz)
   const plan = planSwitchOver(rows, completions, tz, now)
+  // Every write below re-decides from the rows it locks (`DecidePending`, `DecideTarget`, the
+  // switch's `expect`); this read only says which write to try.
   if (plan.kind === 'aligned' && plan.mark) {
-    const [first] = phasedRows(rows)
-    const mark = programMoveMark(first.phase, first.pendingTransition)
-    await repo.setProgramPendingTransition(userId, programId, mark)
-    rows = rows.map(r => (isPhased(r) ? { ...r, pendingTransition: mark } : r))
+    await repo.setProgramPendingTransition(userId, programId, firstReadMark)
+    rows = await repo.listSessionPeriodizationForProgram(userId, programId)
   }
   if (plan.kind === 'waiting') {
-    if (plan.stamp) await repo.setProgramPendingTransition(userId, programId, plan.stamp)
+    if (plan.stamp) await repo.setProgramPendingTransition(userId, programId, waitingStampFor(completions, tz, now))
     for (const r of phasedRows(rows).filter(staleTypeMoveOffer)) await repo.voidSessionPrescription(userId, r.programSessionId)
   }
   if (plan.kind === 'realign' || plan.kind === 'switch') {
-    if (plan.kind === 'realign') await repo.realignProgramPhase(userId, programId, plan.target)
+    if (plan.kind === 'realign') await repo.realignProgramPhase(userId, programId, realignTargetFor(completions, tz, now))
     else await repo.setProgramPhase(userId, programId, 'accumulation', plan.startsAt, switchOverPendingTransition(), { expect: 'switch-over' })
     await repo.reconcileSessionsInPhase(userId, programId)
     rows = await repo.listSessionPeriodizationForProgram(userId, programId)

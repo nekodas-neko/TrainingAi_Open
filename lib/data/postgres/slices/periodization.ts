@@ -7,7 +7,7 @@ import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
 import {
   joiningPhaseFor, programMoveMark,
-  type ProgramCompletion, type PhaseAnswer, type ProgramMoveOptions, type ProgramTarget,
+  type ProgramCompletion, type PhaseAnswer, type ProgramMoveOptions, type DecidePending, type DecideTarget,
 } from '@trainingai/shared/ai-periodization/program-phase'
 import type { TimingRow } from '@trainingai/shared/workout/time-profile'
 import type {
@@ -84,6 +84,13 @@ async function lockProgramRows(tx: Tx, userId: string, programId: string): Promi
     .orderBy(asc(s.sessionPeriodization.id))
     .for('update', { of: s.sessionPeriodization })
   return rows.map(r => mapPeriodization(r.sp))
+}
+
+/** `phase_started_at` equals a JS Date, at the Date's millisecond precision. A start written by SQL
+ *  `now()` (the column default) has microseconds, which a JS Date read back from it has lost, so an
+ *  exact comparison with that Date never matches. */
+function phaseStartedAtIs(at: Date) {
+  return sql`date_trunc('milliseconds', ${s.sessionPeriodization.phaseStartedAt}) = ${at.toISOString()}::timestamptz`
 }
 
 async function programIdOf(db: Db | Tx, programSessionId: string): Promise<string | null> {
@@ -237,9 +244,16 @@ export async function setProgramPhase(
     if (phased.length === 0) return false
     const expect = opts.expect
     if (expect === 'switch-over' && phased.some(r => r.pendingTransition?.programPhase === true)) return false
-    if (expect != null && expect !== 'switch-over'
-      && !phased.every(r => r.phase === expect.phase && r.phaseStartedAt.getTime() === expect.phaseStartedAt.getTime())) {
-      return false
+    if (expect != null && expect !== 'switch-over') {
+      // Compared in the database, at millisecond precision (`phaseStartedAtIs`).
+      const [{ off }] = await tx
+        .select({ off: sql<number>`count(*)::int` })
+        .from(s.sessionPeriodization)
+        .where(and(
+          inArray(s.sessionPeriodization.id, phased.map(r => r.id)),
+          sql`NOT (${eq(s.sessionPeriodization.phase, expect.phase)} AND ${phaseStartedAtIs(expect.phaseStartedAt)})`,
+        ))
+      if (off > 0) return false
     }
     const voidAll = new Set(opts.voidAll ?? [])
     const toVoid = phased.filter(r => voidAll.has(r.programSessionId) || !holdsOneDayDeload(r)).map(r => r.id)
@@ -270,13 +284,17 @@ async function voidPlans(tx: Tx, userId: string, rowIds: string[], now: Date): P
 
 /**
  * Put a program on one phase whose rows have come to disagree after its switch-over (#3766): every
- * phased row takes `target` (`programTarget`: the program's latest move). Only a row that was not
- * already there has its count reset and its plan voided (a held one-day deload excepted); the others
- * keep their plans and just get the mark.
+ * phased row takes the target `decide` works out from the LOCKED rows (`realignTargetFor`: the
+ * program's latest move), so a move landing after the caller's read is not undone. Only a row that
+ * was not already there has its count reset and its plan voided (a held one-day deload excepted);
+ * the others keep their plans and just get the mark.
  */
-export async function realignProgramPhase(db: Db, userId: string, programId: string, target: ProgramTarget): Promise<void> {
+export async function realignProgramPhase(db: Db, userId: string, programId: string, decide: DecideTarget): Promise<void> {
   await db.transaction(async tx => {
-    const phased = (await lockProgramRows(tx, userId, programId)).filter(r => r.baselineComplete && r.phase !== 'baseline')
+    const locked = await lockProgramRows(tx, userId, programId)
+    const target = decide(locked)
+    if (target == null) return
+    const phased = locked.filter(r => r.baselineComplete && r.phase !== 'baseline')
     const behind = phased.filter(r => r.phase !== target.phase || r.phaseStartedAt.getTime() !== target.phaseStartedAt.getTime())
     if (behind.length === 0 && phased.every(r => r.pendingTransition?.programPhase === true)) return
     const now = new Date()
@@ -294,12 +312,17 @@ export async function realignProgramPhase(db: Db, userId: string, programId: str
   })
 }
 
-/** `pending` on every phased row of the program, phase, start and plans untouched: the program's
- *  mark on its first read, or the switch-over's waiting stamp and date (#3766). */
-export async function setProgramPendingTransition(db: Db, userId: string, programId: string, pending: PendingTransition): Promise<void> {
+/** A scheduled move on every phased row of the program, phase, start and plans untouched: the
+ *  program's mark on its first read, or the switch-over's waiting stamp and date (#3766). `decide`
+ *  works it out from the LOCKED rows, so a switch-over landing after the caller's read is not
+ *  overwritten by a waiting stamp; null writes nothing. */
+export async function setProgramPendingTransition(db: Db, userId: string, programId: string, decide: DecidePending): Promise<void> {
   await db.transaction(async tx => {
-    const phased = (await lockProgramRows(tx, userId, programId)).filter(r => r.baselineComplete && r.phase !== 'baseline')
+    const locked = await lockProgramRows(tx, userId, programId)
+    const phased = locked.filter(r => r.baselineComplete && r.phase !== 'baseline')
     if (phased.length === 0) return
+    const pending = decide(locked)
+    if (pending == null) return
     await tx.update(s.sessionPeriodization)
       .set({ pendingTransition: pending as unknown as Record<string, unknown>, updatedAt: new Date() })
       .where(and(eq(s.sessionPeriodization.userId, userId), inArray(s.sessionPeriodization.id, phased.map(r => r.id))))
@@ -425,7 +448,7 @@ export async function storePrescription(
       eq(s.sessionPeriodization.userId, userId),
       eq(s.sessionPeriodization.programSessionId, programSessionId),
       ...(generatedFor
-        ? [eq(s.sessionPeriodization.phase, generatedFor.phase), eq(s.sessionPeriodization.phaseStartedAt, generatedFor.phaseStartedAt)]
+        ? [eq(s.sessionPeriodization.phase, generatedFor.phase), phaseStartedAtIs(generatedFor.phaseStartedAt)]
         : []),
     ))
     .returning({ id: s.sessionPeriodization.id })
