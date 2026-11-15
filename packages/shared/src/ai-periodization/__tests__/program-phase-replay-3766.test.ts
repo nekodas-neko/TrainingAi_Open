@@ -114,13 +114,13 @@ describe('#3766 replay of the owner\'s program from 15 Nov', () => {
       const cell = (ev: Event[], w: string) => ev.filter(e => e.type === t && weekStartForDay(e.day) === w).map(e => e.ran.slice(0, 5)).join('')
       return `${t.padEnd(6)} before: ${weeks.map(w => cell(before, w).padEnd(5)).join(' ')}\n${''.padEnd(6)}  after: ${weeks.map(w => cell(after, w).padEnd(5)).join(' ')}`
     })
-    console.log(`weeks:         ${weeks.map(w => w.slice(5)).join(' ')}\n${table.join('\n')}`)
-    console.log('next move, before:', TYPES.map(t => `${t} ${nextMove(before, t)?.day} → ${nextMove(before, t)?.moved}`).join('; '))
+    console.info(`weeks:         ${weeks.map(w => w.slice(5)).join(' ')}\n${table.join('\n')}`)
+    console.info('next move, before:', TYPES.map(t => `${t} ${nextMove(before, t)?.day} → ${nextMove(before, t)?.moved}`).join('; '))
     const pairs = before.map(b => [b, after.find(a => a.type === b.type && a.day === b.day)!] as const)
     const changed = pairs.filter(([b, a]) => b.ran !== a.ran)
-    console.log(`future sessions planned in a different phase: ${changed.length} of ${pairs.length}; by type:`,
+    console.info(`future sessions planned in a different phase: ${changed.length} of ${pairs.length}; by type:`,
       TYPES.map(t => `${t} ${changed.filter(([b]) => b.type === t).length}`).join(', '))
-    console.log('moves after:', after.filter(e => e.moved).map(e => `${e.day} ${e.type} → ${e.moved}`).join('; '))
+    console.info('moves after:', after.filter(e => e.moved).map(e => `${e.day} ${e.type} → ${e.moved}`).join('; '))
   })
 
   it('after: every type starts accumulation on Mon 23 Nov and the program is offered intensification on Mon 14 Dec', () => {
