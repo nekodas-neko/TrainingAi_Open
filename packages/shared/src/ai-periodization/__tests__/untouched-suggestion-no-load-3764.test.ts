@@ -226,6 +226,7 @@ async function generate() {
     listProgramCompletions: async () => [],
     listModelPhaseAnswers: async () => [],
     setProgramPhase: async () => undefined,
+    voidSessionPrescription: async () => undefined,
     storePrescription: async (_u: string, _s: string, p: AiPrescription) => { stored.push(p) },
   }
   const repo = new Proxy({}, { get: (_t, prop: string) => known[prop] ?? (async () => undefined) }) as WorkoutRepository

@@ -262,6 +262,15 @@ export interface ProgramPhaseRepo {
     userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date,
     pendingTransition: PendingTransition | null,
   ): Promise<void>
+  voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
+}
+
+/** While a program waits for its switch-over, an unanswered per-type move offer from before the
+ *  rule (Upper's overdue move, Pull's realisation) is no longer a move the program will make: the
+ *  signed switch-over puts every type in accumulation instead. Only a type in a deload keeps its own
+ *  way out, so its offer stays. */
+export function staleTypeMoveOffer(r: Pick<SessionPeriodization, 'phase' | 'prescription' | 'prescriptionStatus'>): boolean {
+  return r.phase !== 'deload' && r.prescriptionStatus === 'pending' && r.prescription?.phaseAction === 'transition_recommended'
 }
 
 /**
@@ -280,6 +289,9 @@ export async function syncProgramPhase(
   const since = earliestStart(rows)
   let completions = since ? await repo.listProgramCompletions(userId, programId, since) : []
   const plan = planSwitchOver(rows, completions, tz, now)
+  if (plan.kind === 'waiting') {
+    for (const r of phasedRows(rows).filter(staleTypeMoveOffer)) await repo.voidSessionPrescription(userId, r.programSessionId)
+  }
   if (plan.kind === 'switch') {
     await repo.setProgramPhase(userId, programId, 'accumulation', plan.startsAt, switchOverPendingTransition())
     await repo.reconcileSessionsInPhase(userId, programId)

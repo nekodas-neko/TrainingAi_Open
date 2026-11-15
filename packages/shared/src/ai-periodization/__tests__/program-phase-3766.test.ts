@@ -171,6 +171,27 @@ describe('the switch-over (the owner\'s program, 14 Nov)', () => {
     expect(plan).toEqual({ kind: 'waiting', reason: 'before_start', startDay: '2026-11-16' })
   })
 
+  it('while it waits, an old per-type move offer is voided; a deload\'s way out is kept', async () => {
+    const offer = (phase: string) => ({ prescriptionStatus: 'pending', prescription: { phase, phaseAction: 'transition_recommended' } })
+    const stored = rows(1).map(r => ({
+      ...r,
+      ...(r.programSessionId === 'upper' && offer('intensification')),
+      ...(r.programSessionId === 'pull' && offer('realisation')),
+      ...(r.programSessionId === 'legs' && offer('accumulation')),
+    })) as unknown as SessionPeriodization[]
+    const voided: string[] = []
+    const repo = {
+      reconcileSessionsInPhase: async () => undefined,
+      listSessionPeriodizationForProgram: async () => stored,
+      listProgramCompletions: async () => history,
+      setProgramPhase: async () => { throw new Error('no switch while Lower is in its deload') },
+      voidSessionPrescription: async (_u: string, id: string) => { voided.push(id) },
+    }
+    const view = await syncProgramPhase(repo, 'u', 'p', TZ, at('2026-11-16T10:00:00'))
+    expect(view.aligned).toBe(false)
+    expect(voided.sort()).toEqual(['pull', 'upper'])
+  })
+
   it('writes one phase, one start and the 3-week block on every row, once', async () => {
     let stored = rows(2) as unknown as SessionPeriodization[]
     const writes: unknown[][] = []
@@ -241,6 +262,7 @@ function harness(opts: { answers?: PhaseVote[]; trainedThisWeek?: string[]; alig
     listProgramCompletions: async () => (opts.trainedThisWeek ?? []).map(id => ({ programSessionId: id, completedAt: new Date(Date.now() - 60_000) })),
     listModelPhaseAnswers: async () => opts.answers ?? [],
     setProgramPhase: async () => undefined,
+    voidSessionPrescription: async () => undefined,
     storePrescription: async (_u: string, _s: string, p: AiPrescription) => { stored.push(p) },
     advanceProgramPhase: async (_u: string, _s: string, phase: string) => { programMoves.push(phase) },
     advancePhase: async (_u: string, _s: string, phase: string) => { typeMoves.push(phase) },

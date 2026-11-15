@@ -1435,6 +1435,8 @@ export interface WorkoutRepository {
   recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void>
   clearProgramPrescriptions(userId: string, programId: string): Promise<void>
   updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void>
+  /** #3766: void one session's stored plan so the next open regenerates it. */
+  voidSessionPrescription(userId: string, programSessionId: string): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>
   storePendingTransition(userId: string, programSessionId: string, transition: PendingTransition | null): Promise<void>
   /** #3799: `completedAt` set, the row is counted only when the phase began at or before it. */

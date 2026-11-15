@@ -31,6 +31,7 @@ vi.mock('@/lib/data', () => {
     listSessionPeriodizationForProgram: rows,
     listProgramCompletions: async () => [],
     setProgramPhase: async () => undefined,
+    voidSessionPrescription: async () => undefined,
     advancePhase, advanceProgramPhase, updatePrescriptionStatus,
   })
   return { getRepository: repo, getRepositoryAsync: repo }

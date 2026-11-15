@@ -374,6 +374,18 @@ export async function clearProgramPrescriptions(db: Db, userId: string, programI
     ))
 }
 
+/** One session's stored plan voided to 'consumed' + no plan, which the open-time trigger regenerates
+ *  from (as `clearProgramPrescriptions`, for one session). Phase and counts are untouched. */
+export async function voidSessionPrescription(db: Db, userId: string, programSessionId: string): Promise<void> {
+  await db
+    .update(s.sessionPeriodization)
+    .set({ prescription: null, prescriptionStatus: 'consumed', prescriptionGeneratedAt: null, prescriptionExpiresAt: null, updatedAt: new Date() })
+    .where(and(
+      eq(s.sessionPeriodization.userId, userId),
+      eq(s.sessionPeriodization.programSessionId, programSessionId),
+    ))
+}
+
 export async function updatePrescriptionStatus(db: Db, userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void> {
   await db
     .update(s.sessionPeriodization)

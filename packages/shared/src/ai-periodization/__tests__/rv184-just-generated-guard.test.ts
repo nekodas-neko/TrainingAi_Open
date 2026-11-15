@@ -24,6 +24,7 @@ function repoWith(state: Record<string, unknown>, budget = 60): WorkoutRepositor
     listProgramCompletions: async () => [],
     listModelPhaseAnswers: async () => [],
     setProgramPhase: async () => undefined,
+    voidSessionPrescription: async () => undefined,
   }
   return new Proxy({}, {
     get: (_t, prop: string) => known[prop] ?? (async () => { throw new Error(`reached generation (${prop})`) }),
