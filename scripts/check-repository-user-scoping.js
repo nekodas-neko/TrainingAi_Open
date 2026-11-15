@@ -66,7 +66,9 @@ const SIGNATURE = /(?:export\s+(?:async\s+)?function\s+|^\s{2}(?:(?:private|publ
 // The floor (#3803): 368 methods when this check was written, 663 under the old async-only scan, 672
 // once plain builders and optional `userId?` parameters were counted. Lower it only when methods
 // are genuinely removed; never to make a scan that stopped matching pass.
-const MIN_CHECKED = 670;
+// The fixture tests in repository-user-scoping-check.test.ts run a three-method tree and lower it
+// through this variable; nothing else sets it.
+const MIN_CHECKED = Number(process.env.USER_SCOPING_MIN_CHECKED ?? 670);
 
 const SCOPING_CALLS = new Set(['where', 'eq', 'and', 'or', 'inArray', 'values', 'set']);
 // A call that only reports the id: passing `userId` here scopes nothing.
