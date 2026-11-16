@@ -1940,7 +1940,8 @@ SELECT
   t.timing_baseline_date,
   t.preferences,
   t.sessions_valid_from,
-  t.trophy_pins
+  t.trophy_pins,
+  t.sign_ins_valid_from
 FROM public.users t
 WHERE t.id = current_setting('app.claude_ro_owner', true)::uuid;
 

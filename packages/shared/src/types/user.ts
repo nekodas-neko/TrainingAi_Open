@@ -26,4 +26,7 @@ export interface User {
   lastGoalReviewAt?: Date | null
   /** #3369: a sign-in older than this is refused. Set by an admin's data reset; absent for everyone else. */
   sessionsValidFrom?: Date | null
+  /** #3829: a sign-in older than this is refused, and nothing else (not the data epoch). Set when a
+   *  Google link clears the password; absent for everyone else. */
+  signInsValidFrom?: Date | null
 }
