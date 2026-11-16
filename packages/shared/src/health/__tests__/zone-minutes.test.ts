@@ -28,7 +28,7 @@ describe('accumulateZoneSeconds', () => {
       { timestamp: t(0), bpm: 140 },     // Z2
       { timestamp: t(60), bpm: 140 },    // 1h gap → capped to 120s
     ]
-    const secs = accumulateZoneSeconds(readings, zones, 120)
+    const secs = accumulateZoneSeconds(readings, zones, { maxGapSec: 120 })
     expect(secs[1]).toBe(120)
   })
 

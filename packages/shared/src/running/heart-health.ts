@@ -1,7 +1,7 @@
 import { fromZonedTime } from 'date-fns-tz'
 import { shiftDateStr } from '../date-utils'
 import { moderateIntensityBpm } from '../health/hr-zones'
-import { DEFAULT_MAX_GAP_SEC, type HrReading } from '../health/zone-minutes'
+import { forEachCreditedInterval, type GapOptions, type HrReading } from '../health/zone-minutes'
 
 /**
  * Issue 2093. The day's prescription is a heart-health activity, and this file is the ONE place
@@ -29,18 +29,19 @@ export function heartHealthFloorBpm(profile: { maxHr: number; restingHr: number 
 
 /** Whole minutes at or above `floorBpm` across a heart-rate series. Counted minute by minute, so a
  *  walk earns its brisk stretches and not its slow ones. Each interval belongs to its EARLIER
- *  reading and is capped at `maxGapSec`, the same accounting as `accumulateZoneSeconds`, so a gap
- *  in the data never inflates the count. A reading exactly at the floor counts. */
+ *  reading and is credited by the same gap rule as `accumulateZoneSeconds` (`creditGap`), so a gap
+ *  in the data never inflates the count. A series that is one activity's own readings passes
+ *  `{ windows: 'all' }`: its gaps count up to 5½ min, not 2 (#3775). A reading exactly at the floor
+ *  counts. */
 export function heartHealthMinutes(
   readings: readonly HrReading[],
   floorBpm: number,
-  maxGapSec = DEFAULT_MAX_GAP_SEC,
+  options: GapOptions = {},
 ): number {
   let sec = 0
-  for (let i = 0; i + 1 < readings.length; i++) {
-    const dt = Math.min((readings[i + 1].timestamp - readings[i].timestamp) / 1000, maxGapSec)
-    if (dt > 0 && readings[i].bpm >= floorBpm) sec += dt
-  }
+  forEachCreditedInterval(readings, options, (r, dt) => {
+    if (r.bpm >= floorBpm) sec += dt
+  })
   return Math.round(sec / 60)
 }
 

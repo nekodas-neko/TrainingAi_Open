@@ -61,6 +61,7 @@ import {
 } from '../observed-hr-day-cache'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
 import { accumulateZoneSeconds, type HrReading } from '@trainingai/shared/health/zone-minutes'
+import { activityHrWindows } from '@trainingai/shared/health/activity-hr-windows'
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 
 type Db = ReturnType<typeof getDb>
@@ -2304,7 +2305,36 @@ export async function computeDayZoneSeconds(
     bpm: r.bpm,
   }))
   const zones = computeHrZones(profile)
-  return accumulateZoneSeconds(readings, zones) as [number, number, number, number, number]
+  const windows = activityHrWindows(await dayActivityWindowInputs(db, userId, day, from, to), tz)
+  return accumulateZoneSeconds(readings, zones, { windows }) as [number, number, number, number, number]
+}
+
+/** The workouts and activity logs that can fall on a local day [from, to], for its heart-rate
+ *  windows (#3775): inside one, a gap counts up to 5½ min. Tombstoned rows are not workouts. A log
+ *  from the day before is read too, since one that starts before midnight runs into the day. */
+async function dayActivityWindowInputs(db: Db, userId: string, day: string, from: Date, to: Date) {
+  const [sessions, activityLogs] = await Promise.all([
+    db.select({ startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt })
+      .from(s.workoutSessions)
+      .where(and(
+        eq(s.workoutSessions.userId, userId),
+        isNull(s.workoutSessions.deletedAt),
+        lte(s.workoutSessions.startedAt, to),
+        gte(s.workoutSessions.completedAt, from),
+      )),
+    db.select({
+      date: s.activityLogs.date, startTime: s.activityLogs.startTime,
+      endTime: s.activityLogs.endTime, durationMin: s.activityLogs.durationMin,
+    })
+      .from(s.activityLogs)
+      .where(and(
+        eq(s.activityLogs.userId, userId),
+        isNull(s.activityLogs.deletedAt),
+        gte(s.activityLogs.date, shiftDateStr(day, -1)),
+        lte(s.activityLogs.date, day),
+      )),
+  ])
+  return { sessions, activityLogs }
 }
 
 // Inclusive YYYY-MM-DD day iterator using Date.UTC overflow normalisation (never string-splice

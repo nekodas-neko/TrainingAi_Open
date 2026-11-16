@@ -5,6 +5,7 @@ import { getDailyGoals, type DailyGoals, type GoalProfile } from './daily-goals'
 import { hrMaxFromAge } from './hr-zones'
 import { latestWeightKg } from './latest-weight'
 import { intradayHrContributors, type MetGridInput } from './intraday-hr-contributors'
+import { activityHrWindows } from './activity-hr-windows'
 import { excludeLowWearDays, type WearByDate } from './wear-confidence'
 import { rowsOfDeviceInUse } from './per-device-normal'
 import { dayStepCount } from './activity-steps'
@@ -60,13 +61,17 @@ export interface ActivityDayInput {
   /** The HR profile's ceiling; null falls back to the age formula. */
   maxHr: number | null
   /** Workout sessions covering at least the 28 days before `date`; later ones are ignored. */
-  sessions: readonly { startedAt: string | Date; exercises: { volume?: number | null }[] }[]
+  sessions: readonly { startedAt: string | Date; completedAt?: string | Date | null; exercises: { volume?: number | null }[] }[]
   program: ProgramAgeInput | null
   user: { dateOfBirth?: string | null; heightCm?: number | null; sex?: string | null; activityLevel?: GoalProfile['activityLevel'] } | null
   stepsGoal: number | null
   /** The day's logged activities (`date` and `YYYY-MM-DD`); the treadmill ones add their steps to the
    *  device count (`dayStepCount`, #3134). Left out, the day's steps are the device's alone. */
-  activityLogs?: readonly { date: string; activityType: string; steps?: number | null }[]
+  activityLogs?: readonly {
+    date: string; activityType: string; steps?: number | null
+    /** Clock times placing the activity (#3775): inside it a heart-rate gap counts up to 5½ min. */
+    startTime?: string | null; endTime?: string | null; durationMin?: number | null
+  }[]
 }
 
 export interface ActivityDay {
@@ -145,6 +150,8 @@ export function scoreActivityForDay(input: ActivityDayInput): ActivityDay {
       dateIso: date,
       metGrid: input.metGrid ?? null,
       dayIsOver: date < todayInTz(tz),
+      // #3775: a gap inside a workout or activity counts up to 5½ min, all-day time up to 2.
+      activityWindows: activityHrWindows({ sessions: sessionsToDay, activityLogs: input.activityLogs }, tz),
     })
     zoneMinutes = c.zoneMinutes
     moveHours = c.moveHours

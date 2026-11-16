@@ -32,17 +32,17 @@ describe('the vigorous-intensity line (#2198)', () => {
   it('counts an effort between 60% and 70% of reserve double in the readings roll-up', () => {
     // 140 bpm: above the vigorous line (134), below the Zone 3 floor (148). This band is the whole
     // change: it counted once before.
-    expect(activeMinutesFromReadings(steady(140, 10), floors, 600)).toBe(20)
+    expect(activeMinutesFromReadings(steady(140, 10), floors, { maxGapSec: 600 })).toBe(20)
     // Just under the line it is moderate, once.
-    expect(activeMinutesFromReadings(steady(133, 10), floors, 600)).toBe(10)
+    expect(activeMinutesFromReadings(steady(133, 10), floors, { maxGapSec: 600 })).toBe(10)
     // Inclusive at the line.
-    expect(activeMinutesFromReadings(steady(134, 10), floors, 600)).toBe(20)
+    expect(activeMinutesFromReadings(steady(134, 10), floors, { maxGapSec: 600 })).toBe(20)
   })
 
   it('reads the vigorous edge it is given, not a zone edge', () => {
     // With the line moved above the effort, the same readings count once: the function does not
     // fall back to Zone 3 or any other band.
-    expect(activeMinutesFromReadings(steady(140, 10), { ...floors, vigorousFloorBpm: 150 }, 600)).toBe(10)
+    expect(activeMinutesFromReadings(steady(140, 10), { ...floors, vigorousFloorBpm: 150 }, { maxGapSec: 600 })).toBe(10)
   })
 
   it('weights zones the same way in every per-zone roll-up', () => {
