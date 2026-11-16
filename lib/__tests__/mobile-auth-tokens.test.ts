@@ -61,6 +61,10 @@ describe('Apple identity proof', () => {
     expect(await verifyAppleIdentityToken(await sign(), hash, async () => publicKey)).toEqual({
       subject: 'apple-subject',
       email: 'hidden@privaterelay.appleid.com',
+      // #3830: the claims the invite rule reads. No `is_private_email` claim reads as false; the
+      // relay domain is caught by `appleEmailIsAuthoritative` instead.
+      emailVerified: true,
+      privateRelay: false,
     });
     await expect(
       verifyAppleIdentityToken(
