@@ -120,8 +120,7 @@ describe('#3775 the Activity score reads its day’s windows', () => {
 })
 
 describe('activityHrWindows keeps only spans the app believes (#3775, #3801)', () => {
-  it('a session over 4 hours gives no window; one under does', async () => {
-    const { activityHrWindows } = await import('../activity-hr-windows')
+  it('a session over 4 hours gives no window; one under does', () => {
     const start = new Date('2026-11-10T07:00:00Z')
     const ok = { startedAt: start, completedAt: new Date(start.getTime() + 60 * 60_000) }
     const tooLong = { startedAt: start, completedAt: new Date(start.getTime() + 12 * 60 * 60_000) }

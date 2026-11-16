@@ -234,7 +234,10 @@ export async function GET(req: NextRequest) {
   // metrics. This route reads the same logs and the one day of metrics, so for today each is read
   // once and shared. The `.catch` marks them handled: each is still awaited, and fails, where it was.
   const isToday = pgDate === todayInTz(session.user.timezone ?? DEFAULT_TZ);
-  const sharedActivityLogs = isToday ? repo.listActivityLogs(userId, pgDate, pgDate) : null;
+  // From the day before as well (#3775): the live score lets an activity that started before
+  // midnight cover today's first minutes, as the finalised score does. The day's own list below
+  // keeps only today's.
+  const sharedActivityLogs = isToday ? repo.listActivityLogs(userId, shiftDateStr(pgDate, -1), pgDate) : null;
   const sharedBodyMetrics = isToday ? repo.listBodyMetrics(userId, ...activityDayBodyMetricsWindow(pgDate)) : null;
   sharedActivityLogs?.catch(() => {});
   sharedBodyMetrics?.catch(() => {});
@@ -292,16 +295,7 @@ export async function GET(req: NextRequest) {
   // the trace below instead of fetching it a second time.
   const hrRead = repo.getHrForWindow(userId, dayMid, nextMid);
   const liveRead = isToday && sharedActivityLogs && sharedBodyMetrics
-    ? loadActivityDay(repo, userId, tz, pgDate, {
-        hrRows: hrRead,
-        // #3775: yesterday's logs too, so an activity across midnight covers today's first minutes,
-        // as the readiness payload's live score and the finalised score read it.
-        activityLogs: Promise.all([
-          repo.listActivityLogs(userId, shiftDateStr(pgDate, -1), shiftDateStr(pgDate, -1)).catch(() => []),
-          sharedActivityLogs,
-        ]).then(([before, day]) => [...before, ...day]),
-        bodyMetrics: sharedBodyMetrics,
-      }).then(d => d.result?.score ?? null).catch(e => {
+    ? loadActivityDay(repo, userId, tz, pgDate, { hrRows: hrRead, activityLogs: sharedActivityLogs, bodyMetrics: sharedBodyMetrics }).then(d => d.result?.score ?? null).catch(e => {
         // A failed live score falls back to the stored value, but must leave an error_events row.
         reportServerError(e, { userId, url: '/api/day-log' })
         return null
@@ -379,7 +373,9 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const activityLogs = await (sharedActivityLogs ?? repo.listActivityLogs(userId, pgDate, pgDate));
+  const activityLogs = sharedActivityLogs
+    ? (await sharedActivityLogs).filter(a => a.date === pgDate)
+    : await repo.listActivityLogs(userId, pgDate, pgDate);
   // #3095: the day's steps are the device's plus indoor (treadmill) steps — whether the ring already
   // counts some of those is unknown, pending #3112 —
   // the one builder Home and the cardio week use, so the day screen reads the same figure.
