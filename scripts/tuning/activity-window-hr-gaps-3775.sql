@@ -45,6 +45,7 @@ raw_windows AS (
   SELECT w.started_at AS w_from, w.completed_at AS w_to
   FROM claude_ro.workout_sessions w
   WHERE w.deleted_at IS NULL AND w.completed_at IS NOT NULL AND w.completed_at > w.started_at
+    AND w.completed_at - w.started_at <= interval '240 minutes'
   UNION ALL
   SELECT a.w_from, a.w_to FROM (
     SELECT l.id,
@@ -103,7 +104,7 @@ gaps AS (
 ), credited AS (
   SELECT day, bpm,
          least(gap_s, 120) AS old_s,
-         CASE WHEN inside_s <= 0 THEN least(gap_s, 120)
+         CASE WHEN inside_s <= 0 OR gap_s > 330 THEN least(gap_s, 120)
               ELSE least(least(inside_s, 330) + least(gap_s - inside_s, 120), 330) END AS new_s
   FROM gap_inside
 ),
@@ -141,7 +142,7 @@ hh_logs AS (
 ), hh_log_min AS (
   SELECT day, target_min, log_id,
          round(sum(CASE WHEN bpm >= (SELECT moderate_bpm FROM floors) THEN least(gap_s, 120) ELSE 0 END) / 60.0) AS old_min,
-         round(sum(CASE WHEN bpm >= (SELECT moderate_bpm FROM floors) THEN least(gap_s, 330) ELSE 0 END) / 60.0) AS new_min
+         round(sum(CASE WHEN bpm >= (SELECT moderate_bpm FROM floors) THEN (CASE WHEN gap_s <= 330 THEN gap_s ELSE least(gap_s, 120) END) ELSE 0 END) / 60.0) AS new_min
   FROM hh_gaps WHERE gap_s > 0
   GROUP BY day, target_min, log_id
 ), hh_day AS (

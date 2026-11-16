@@ -84,12 +84,15 @@ function insideSec(t0: number, t1: number, windows: PreparedWindows): number {
  * - wholly inside a window: the gap, capped at `ACTIVITY_WINDOW_MAX_GAP_SEC` (5½ min);
  * - across a window's edge: the part inside counts up to 5½ min and the part outside up to 2 min,
  *   and the two together never more than 5½ min, so a gap that touches a window never counts more
- *   than one wholly inside it would.
+ *   than one wholly inside it would;
+ * - longer than 5½ min, anywhere: 2 min, as before. The owner's proposal counts in full only the gaps
+ *   the density rule accepts (`HR_DENSE_MAX_GAP_MS`); a longer one is the ring off, not a workout.
  * A non-positive gap credits nothing.
  */
 function creditGap(t0: number, t1: number, windows: PreparedWindows, maxGapSec: number): number {
   const gap = (t1 - t0) / 1000
   if (!(gap > 0)) return 0
+  if (gap > ACTIVITY_WINDOW_MAX_GAP_SEC) return Math.min(gap, maxGapSec)
   const inside = Math.min(insideSec(t0, t1, windows), gap)
   if (inside <= 0) return Math.min(gap, maxGapSec)
   const outside = gap - inside

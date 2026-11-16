@@ -292,7 +292,16 @@ export async function GET(req: NextRequest) {
   // the trace below instead of fetching it a second time.
   const hrRead = repo.getHrForWindow(userId, dayMid, nextMid);
   const liveRead = isToday && sharedActivityLogs && sharedBodyMetrics
-    ? loadActivityDay(repo, userId, tz, pgDate, { hrRows: hrRead, activityLogs: sharedActivityLogs, bodyMetrics: sharedBodyMetrics }).then(d => d.result?.score ?? null).catch(e => {
+    ? loadActivityDay(repo, userId, tz, pgDate, {
+        hrRows: hrRead,
+        // #3775: yesterday's logs too, so an activity across midnight covers today's first minutes,
+        // as the readiness payload's live score and the finalised score read it.
+        activityLogs: Promise.all([
+          repo.listActivityLogs(userId, shiftDateStr(pgDate, -1), shiftDateStr(pgDate, -1)).catch(() => []),
+          sharedActivityLogs,
+        ]).then(([before, day]) => [...before, ...day]),
+        bodyMetrics: sharedBodyMetrics,
+      }).then(d => d.result?.score ?? null).catch(e => {
         // A failed live score falls back to the stored value, but must leave an error_events row.
         reportServerError(e, { userId, url: '/api/day-log' })
         return null

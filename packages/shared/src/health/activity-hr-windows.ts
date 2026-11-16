@@ -1,5 +1,6 @@
 import { activityLogWindow } from '../running/heart-health'
 import type { HrWindow } from './zone-minutes'
+import { isPlausibleSessionDuration } from './workout-energy'
 
 /**
  * Issue 3775 item 3 (owner, 16 Nov 2026). The workout and activity windows an all-day heart-rate
@@ -30,7 +31,11 @@ export function activityHrWindows(
     if (s.completedAt == null) continue
     const fromMs = new Date(s.startedAt).getTime()
     const toMs = new Date(s.completedAt).getTime()
-    if (Number.isFinite(fromMs) && Number.isFinite(toMs) && toMs > fromMs) out.push({ fromMs, toMs })
+    // A span the app does not believe is one session (over 4 h, #3801) gives no window: it would
+    // count hours of all-day time at 5½ min a gap.
+    if (Number.isFinite(fromMs) && Number.isFinite(toMs) && isPlausibleSessionDuration((toMs - fromMs) / 60_000)) {
+      out.push({ fromMs, toMs })
+    }
   }
   for (const log of input.activityLogs ?? []) {
     const w = activityLogWindow(log, tz)

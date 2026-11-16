@@ -35,7 +35,8 @@ describe('#3775 creditedGapSec — the one gap rule', () => {
   it('wholly inside a window a gap counts in full up to 5½ min', () => {
     expect(creditedGapSec(at(10), at(15), { windows: [win(0, 60)] })).toBe(300)
     expect(creditedGapSec(at(10), at(15.5), { windows: [win(0, 60)] })).toBe(330)
-    expect(creditedGapSec(at(10), at(30), { windows: [win(0, 60)] })).toBe(330) // a long gap still caps
+    expect(creditedGapSec(at(10), at(30), { windows: [win(0, 60)] })).toBe(120) // over 5½ min: the ring was off, 2 min as before
+    expect(creditedGapSec(at(10), at(16), { windows: [win(0, 60)] })).toBe(120)
     expect(creditedGapSec(at(10), at(15), { windows: 'all' })).toBe(300)
   })
 
@@ -44,8 +45,8 @@ describe('#3775 creditedGapSec — the one gap rule', () => {
     expect(creditedGapSec(at(0), at(5), { windows: [win(4, 60)] })).toBe(180)
     // 5 min gap, 4 min inside, 1 outside → 240 + 60.
     expect(creditedGapSec(at(0), at(5), { windows: [win(1, 60)] })).toBe(300)
-    // A long gap touching a window never beats one wholly inside it.
-    expect(creditedGapSec(at(0), at(20), { windows: [win(10, 60)] })).toBe(330)
+    // A gap over 5½ min keeps the 2-minute cap, inside or across a window.
+    expect(creditedGapSec(at(0), at(20), { windows: [win(10, 60)] })).toBe(120)
   })
 
   it('overlapping windows are not counted twice', () => {
@@ -115,5 +116,16 @@ describe('#3775 the Activity score reads its day’s windows', () => {
     }).signals.zoneMinutes
     expect(without).not.toBeNull()
     expect(withLog!).toBeGreaterThan(without!)
+  })
+})
+
+describe('activityHrWindows keeps only spans the app believes (#3775, #3801)', () => {
+  it('a session over 4 hours gives no window; one under does', async () => {
+    const { activityHrWindows } = await import('../activity-hr-windows')
+    const start = new Date('2026-11-10T07:00:00Z')
+    const ok = { startedAt: start, completedAt: new Date(start.getTime() + 60 * 60_000) }
+    const tooLong = { startedAt: start, completedAt: new Date(start.getTime() + 12 * 60 * 60_000) }
+    expect(activityHrWindows({ sessions: [ok] }, 'Australia/Brisbane')).toHaveLength(1)
+    expect(activityHrWindows({ sessions: [tooLong] }, 'Australia/Brisbane')).toEqual([])
   })
 })
