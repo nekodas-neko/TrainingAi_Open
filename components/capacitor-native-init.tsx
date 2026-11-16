@@ -189,14 +189,9 @@ export function CapacitorNativeInit() {
           visibility: 1,
           vibration: false,
         });
-        await LocalNotifications.createChannel({
-          id: ACTIVITY_DETECTION_CHANNEL,
-          name: 'Activity detection',
-          description: 'Alerts when a walk or run is detected and recording',
-          importance: 3,
-          visibility: 1,
-          vibration: false,
-        });
+        // #3844: nothing posts to this channel since the live walk detector was removed, so the
+        // channel a device already made is deleted rather than left empty in the app's settings.
+        await LocalNotifications.deleteChannel({ id: ACTIVITY_DETECTION_CHANNEL }).catch(() => {});
         // DV-21: this one was missing for the whole life of the feature, and Android drops a post
         // to a channel that does not exist without a word — every layer above it looked healthy.
         //

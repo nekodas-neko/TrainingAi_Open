@@ -42,7 +42,7 @@ export interface RawFrame {
 // signal. The column-index constant lives in steps-motion-decoder.ts (the module that owns that
 // output shape) rather than here, since this file also imports runStepCounter/onnxruntime-node —
 // a client-side consumer that only needs the column index (lib/health/gait-classifier.ts's
-// caller, lib/activity/auto-detection-service.ts) must never have to pull that ONNX dependency
+// callers) must never have to pull that ONNX dependency
 // into its bundle just to read a constant.
 
 // CRITICAL: steps_motion_decoder's 11 output columns are in a DIFFERENT order than step_counter's

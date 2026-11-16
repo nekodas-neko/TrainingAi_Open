@@ -227,7 +227,6 @@ function scan() {
 const BASELINE = {
   'app/health/health-sections.tsx': 4,
   'app/session-select/components/week-strip-card.tsx': 1, // inactive future day, WCAG-exempt; see NOTES
-  'components/activity/background-location-card.tsx': 1,
   'components/admin/calibration-card.tsx': 1,
   'components/config-screen.tsx': 1,
   'components/config/phase-editor.tsx': 1,

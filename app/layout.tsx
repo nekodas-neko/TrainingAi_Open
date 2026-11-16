@@ -13,7 +13,7 @@ import { OfflineIndicator } from "@/components/shell/offline-indicator";
 import { LocalStoreDeadBanner } from "@/components/shell/local-store-dead-banner";
 import { CapacitorNativeInit } from "@/components/capacitor-native-init";
 import { LiveHrAmbientProvider } from "@/components/live-hr-ambient-provider";
-import { AutoDetectionProvider } from "@/components/auto-detection-provider";
+import { WalkOfferProvider } from "@/components/walk-offer-provider";
 import { DynamicBackground } from "@/components/dynamic-background/dynamic-background";
 import { ErrorReporter } from "@/components/error-reporter";
 import { NavTimingProbe } from "@/components/perf/nav-timing-probe";
@@ -185,7 +185,7 @@ export default async function RootLayout({
               <TabSwipeNavigator />
               <WorkoutDayRollover />
               <CapacitorNativeInit />
-              <AutoDetectionProvider />
+              <WalkOfferProvider />
               <LiveHrAmbientProvider />
               </MotionConfig>
             </LocalDayProvider>
