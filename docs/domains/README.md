@@ -69,9 +69,9 @@ Domain tags are written as bracketed slugs and are **greppable** — that is the
 
 `projectOverview.md` (status + known issues) · [`docs/module-map.md`](../module-map.md) (what
 exists and where) · [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md) (the queue)
-· [`docs/planned_upgrades.md`](../planned_upgrades.md) (open ideas) ·
+· [`docs/archive/planned_upgrades.md`](../archive/planned_upgrades.md) (archived) ·
 [`docs/device-smoke-checklist.md`](../device-smoke-checklist.md) (the on-device merge gate) ·
-[`docs/owner-action-required.md`](../owner-action-required.md) ·
+[`docs/archive/owner-action-required.md`](../archive/owner-action-required.md) (archived) ·
 [`docs/public-launch-checklist.md`](../public-launch-checklist.md) ·
 [`docs/overview/entries/`](../overview/entries/) (session journal) ·
 [`docs/runbooks/`](../runbooks/) (ops).

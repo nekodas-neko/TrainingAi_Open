@@ -4,15 +4,20 @@ One page, ~5-minute pass on the Samsung Galaxy S25 Ultra. Run after any merge th
 touches a screen layout, an offline-sync domain, a gesture handler, a card/SVG grid,
 or a notification/reminder — i.e. anything CLAUDE.md flags as unverifiable in the
 web sandbox. Not every merge needs every section; use judgement, but default to
-running the sections relevant to what changed. Per CLAUDE.md's Canonical Runtime section, this
+running the sections relevant to what changed. Per CLAUDE.md's mobile and runtime rules, this
 checklist is the **merge gate** for anything the web sandbox can't exercise — green `pnpm dev`
 alone is never sufficient for offline-first domains, native plugins, safe-area, gestures, or
 notifications.
 
-**For the specific checks currently owed to the owner**, see
-[`docs/device-verification-queue.md`](device-verification-queue.md) — the running list of items
-that shipped without a device run, each with the screen, the action, and what a pass looks like.
-This file is the generic pass; that one is what a given device session should actually work through.
+**For the specific checks currently owed to the owner**, see the open
+[`type: device-check` issues](https://github.com/nekodas-neko/TrainingAi_Open/issues?q=is%3Aopen+label%3A%22type%3A+device-check%22).
+Each names the screen, the action and what a pass looks like. This file is the generic pass; those
+issues are what a given device session should work through.
+
+**The native app (`mobile/`) has its own loop.** Sections 0–7 below are for the current Capacitor
+app. For TrainingAi Preview and native release builds, follow
+[`native-testing.md`](native-testing.md#the-loop): which build to install, which phone, and where
+results go. Native device checks go on the device-check issue.
 
 ## 0. Which app
 

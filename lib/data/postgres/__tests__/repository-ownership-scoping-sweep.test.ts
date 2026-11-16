@@ -383,6 +383,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getDaytimeHrvModel', r => r.getDaytimeHrvModel(USER_A)],
     ['getAvgBpmBySession', r => r.getAvgBpmBySession(USER_A, [bId('workout_sessions')])],
     ['getWorkoutHrStats', r => r.getWorkoutHrStats(USER_A, bId('workout_sessions'))],
+    ['getWorkoutHrDensity', r => r.getWorkoutHrDensity(USER_A, bId('workout_sessions'))],
     ['listSessionsMissingHrStats', r => r.listSessionsMissingHrStats(USER_A, FROM_TS, 50)],
     ['getSetDetailsForSession', r => r.getSetDetailsForSession(USER_A, bId('workout_sessions'))],
     ['getSetHrStatsForSession', r => r.getSetHrStatsForSession(USER_A, bId('workout_sessions'))],
@@ -519,6 +520,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['persistBodyCompFromMetrics', r => r.persistBodyCompFromMetrics(USER_A), v => { expect(v).toBe(0) }],
     ['deleteMealPlan', r => r.deleteMealPlan(bId('meal_plans'), USER_A)],
     ['updateMealPlan', r => r.updateMealPlan(bId('meal_plans'), USER_A, { name: 'OVERWRITTEN BY A' })],
+    ['updateRunningPlanSnapshot', r => r.updateRunningPlanSnapshot(USER_A, bId('running_plans'), { walkingPlan: 'OVERWRITTEN BY A' }), v => { expect(v).toBeNull() }],
     ['setMealPlanActive', r => r.setMealPlanActive(bId('meal_plans'), USER_A, true)],
     ['markMealPlanReviewed', r => r.markMealPlanReviewed(bId('meal_plans'), USER_A)],
     ['replaceMealPlanStructure', r => r.replaceMealPlanStructure(bId('meal_plans'), USER_A, {

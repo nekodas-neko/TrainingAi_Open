@@ -114,7 +114,7 @@ against the working tree** — `git status` is blind to a file that has already 
 
 ## Not exercised
 
-- **The device**, filed rather than claimed — [`known-issues.md`](../known-issues.md) carries both
+- **The device**, filed rather than claimed — [`known-issues.md`](../../archive/known-issues.md) carries both
   pass/fails. ④'s risk is that **Samsung WebView's font metrics are not Chromium's** and a wrap puts
   `BF-24`'s header back to two bands; ⑤'s is that **no real branded food has ever been drawn** here.
 - **A real branded food, anywhere.** `food_items` is **empty in the local seed** (`count(*)`, not

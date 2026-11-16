@@ -3,7 +3,7 @@
 > **Archived 2026-07-05 (session 210 documentation cleanup).** This is the complete session-176
 > eight-dimension review ledger and all follow-up audit batches (A–O), preserved verbatim for
 > later review. The **active, open-items-only** version lives in
-> [`../planned_upgrades.md`](../planned_upgrades.md); ready-to-build work is queued in
+> [`../planned_upgrades.md`](../archive/planned_upgrades.md); ready-to-build work is queued in
 > [`../implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md).
 >
 > Most items below shipped (marked ✅ inline). Kept here so the shipped rationale, file:line

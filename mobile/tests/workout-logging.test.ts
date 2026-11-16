@@ -1323,6 +1323,18 @@ test('an unreadable uploaded workout is dropped, an unreadable unsent one set as
   assert.deepEqual(journal.setAside[0].record, JSON.parse(JSON.stringify(badUnsent)));
 });
 
+test('a set-aside entry saved without its record still opens the journal (#3815)', async (t) => {
+  const { f } = await finishedJournal(t);
+  const now = f.clock();
+  const raw = JSON.stringify({
+    ...emptyJournal(f.connection),
+    setAside: [{ id: wid(6), date: '2026-10-01', error: 'unreadable', at: now }],
+  });
+  const journal = readJournal(raw, f.connection, now);
+  assert.equal(journal.setAside.length, 1);
+  assert.equal(journal.setAside[0].record, undefined);
+});
+
 test('a journal with an unreadable workout opens, logs, and lists it in Sync health with Retry and Discard (#3671)', async (t) => {
   const { f, finished } = await finishedJournal(t);
   const badUnsent = { ...finished, timezone: '' };

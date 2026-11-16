@@ -2778,7 +2778,7 @@ interval walk, native) and 3 (chest-strap source) remain in the backlog.
 
 ## Session 220 — Workout HR chart: set/rest shading from BLE HR, v1.120.5 (`claude/workout-hr-chart-lt0lw8`)
 
-Took **item 1** of `docs/oura-ble-remaining-work.md` (the workout HR chart). Discovery: it wasn't a
+Took **item 1** of `docs/archive/oura-ble-remaining-work.md` (the workout HR chart). Discovery: it wasn't a
 fresh build — a done-screen **"HR Recovery"** card already existed (`components/workout/hr-recovery-chart.tsx`
 + `/api/oura/hr-data` → `getHrForWindow` + `analyseHrRecovery`), and since `getHrForWindow` returns every
 `oura_heartrate` row in the window it already renders the BLE HR (`source='ble'`). The genuinely-missing

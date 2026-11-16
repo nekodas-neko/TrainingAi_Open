@@ -281,8 +281,8 @@ Live at the time of writing (2026-07-30):
   `components/home/cat-sprite.tsx`, with the glyph as fallback. **Owner's look at 56 px owed.**
   The v2 rules are planned in
   [`2026-09-26-cat-collection-rules-v2.md`](../../superpowers/plans/2026-09-26-cat-collection-rules-v2.md)
-  (PS-48 owner questions, answered 2026-10-05; PS-49 engine, with the Rogue added by #2085; the
-  surface switch to v2 is #2187; PS-50 Android widget).
+  (PS-48 owner questions, answered 2026-10-05; PS-49 engine, with the Rogue added by #2085, closed
+  6 Oct; the surface switch to v2, #2187, closed 9 Oct; PS-50 Android widget).
 - ⚠️ **The three exercise roles are named once** (BF-124/BF-125, 2026-09-07, v1.436.40) —
   `components/workout/exercise-role-labels.ts`, as Main / Secondary / Accessory. The editor's role
   row wraps and marks the chosen option in `bg-brand`; the near-white `bg-primary` selected slab is
@@ -314,8 +314,8 @@ Live at the time of writing (2026-07-30):
 - **Screen transition timing + prefetch** (v1.241.1) — not device-verified.
 - **Q-1, the native-feel performance push, is the live owner-directed initiative** — the network
   side is exhausted; remaining wins come from device Performance profiles, which only the owner can
-  capture. **The v2 architecture is native screens, not a bundled shell** (owner, 2026-10-09;
-  toolkit open in #2765).
+  capture. **The v2 architecture is native screens, not a bundled shell** (owner, 2026-10-09).
+  The toolkit question, #2765, closed 14 Oct: Expo / React Native in `mobile/` (#2836).
 - **Home-day-timeline reads server-only** — a documented, sanctioned exception to offline-first.
 
 ## Decided

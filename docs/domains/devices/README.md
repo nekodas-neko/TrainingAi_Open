@@ -93,7 +93,7 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
    Read it before believing any doc that calls `body_hex` the source of truth.
 3. [`docs/oura-ble-feature-playbook.md`](../../oura-ble-feature-playbook.md) — how to enable a new
    ring feature over the wire.
-4. [`docs/oura-ble-remaining-work.md`](../../oura-ble-remaining-work.md) — what's left in the BLE
+4. [`docs/archive/oura-ble-remaining-work.md`](../../archive/oura-ble-remaining-work.md) — archived; what was left in the BLE
    programme.
 5. [`docs/oura-ring-data-reference.md`](../../oura-ring-data-reference.md) — the Cloud v2 field
    reference (still the authority for field *names*).

@@ -1,6 +1,6 @@
 # Oura BLE Phase 5 — Own Readiness / Sleep / Activity Scores (home-screen health pills)
 
-**Source review:** `docs/oura-ble-remaining-work.md` item 5, `docs/implementation-backlog.md`'s
+**Source review:** `docs/archive/oura-ble-remaining-work.md` item 5, `docs/implementation-backlog.md`'s
 former "Not yet queued" Phase-5 bullet, `.agents/skills/oura-native-ble/SKILL.md` §9–11 (formula
 inventory + why we don't touch Oura's encrypted models), and a fresh audit of the home screen
 (2026-07-08) triggered by the user noticing the four score chips are gone since the BLE re-key.
@@ -25,7 +25,7 @@ expect them to diverge from historical Oura numbers, and say so in the UI.
 
 **Sequencing note:** Chunk 1 (sleep) and Chunk 2 (readiness wiring fix) need no new data and can
 ship immediately. Chunk 3 (activity) is meaningfully better once the ring-steps feature-enable
-(`docs/oura-ble-remaining-work.md` item 2) lands, but doesn't need to wait — it can run on
+(`docs/archive/oura-ble-remaining-work.md` item 2) lands, but doesn't need to wait — it can run on
 Health-Connect `body_metrics.steps`/`activeCalories` plus logged training volume from day one.
 
 ---
@@ -102,14 +102,14 @@ This chunk gives it a real base that doesn't depend on Oura Cloud.
 1. New `lib/health/activity-score.ts`: `computeActivityScore(input): number | null` — a 0–100
    composite from data available without Oura Cloud today:
    - Movement: `body_metrics.steps` / `activeCalories` for the day (Health-Connect sourced,
-     already flowing per `docs/oura-ble-remaining-work.md` item 2's "steps chart runs on
+     already flowing per `docs/archive/oura-ble-remaining-work.md` item 2's "steps chart runs on
      phone/Health-Connect steps" note) vs. the user's own trailing personal average — relative,
      not an absolute step target.
    - Training credit: reuse the `TRAIN_CREDIT_BASE`/`TRAIN_CREDIT_VOL` shape from
      `blend-activity.ts` but anchored to *this* base instead of Oura's, so a lifting-only day
      (low steps, real training stimulus) doesn't score as "sedentary."
    - Leave a documented extension point for ring MET bins (`activity_information` 0x50) once
-     `docs/oura-ble-remaining-work.md` item 2b's decoder work lands — do not block this chunk on
+     `docs/archive/oura-ble-remaining-work.md` item 2b's decoder work lands — do not block this chunk on
      it; MET data is explicitly "best-effort" per the skill.
 2. In `app/api/readiness-score/route.ts`, change the `blendActivityScore` call (line 161) to
    pass `ouraActivityScore: ouraToday?.activityScore ?? computeActivityScore(...)` so

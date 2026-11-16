@@ -46,6 +46,7 @@ export type GoalKind =
   | 'heart_health'   // general cardiovascular health
   | 'recovery'       // improve heart-rate recovery / resting HR
   | 'intervals'      // Norwegian 4×4 — structured VO₂max interval protocol
+  | 'walking'        // #3779 — the walking and heart-health plan: steps + active minutes, never a run
   | 'cardio_health'  // legacy alias → heart_health-style
   | 'distance_event' // legacy alias → endurance-style
 export interface RunningGoal {

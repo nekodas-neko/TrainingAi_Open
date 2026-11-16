@@ -1,6 +1,6 @@
 # B6 — Data-store follow-up fixes
 
-> Source: `docs/planned_upgrades.md` § B6 (session-178 audit, verified post-#99). Three PR-sized chunks, in order — chunk 1 is the user-visible one. Every item has file:line detail in the B6 section; this plan adds sequencing, shared design decisions, and verification. Re-grep anchors before editing.
+> Source: `docs/archive/planned_upgrades.md` § B6 (session-178 audit, verified post-#99). Three PR-sized chunks, in order — chunk 1 is the user-visible one. Every item has file:line detail in the B6 section; this plan adds sequencing, shared design decisions, and verification. Re-grep anchors before editing.
 
 ## Chunk 1 — Invalidation & cache-layer semantics (one PR)
 

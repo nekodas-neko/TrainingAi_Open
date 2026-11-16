@@ -10,7 +10,7 @@ reviewed against source on `main` (b7ecb15)._
 · [`handoff-2026-08-02-platform-batch-queue-drain.md`](../handoffs/handoff-2026-08-02-platform-batch-queue-drain.md)
 · [`handoff-phase-3-bundled-shell.md`](../handoffs/handoff-phase-3-bundled-shell.md)
 · [`public-launch-checklist.md`](../public-launch-checklist.md)
-· [`planned_upgrades.md`](../planned_upgrades.md) · `projectOverview.md` · `CLAUDE.md`.
+· [`planned_upgrades.md`](../archive/planned_upgrades.md) · `projectOverview.md` · `CLAUDE.md`.
 
 ---
 

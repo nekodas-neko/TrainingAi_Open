@@ -137,7 +137,9 @@ const setAsideWorkoutSchema = z.object({
   date: z.string(),
   error: z.string(),
   at: z.number(),
-  record: z.unknown(),
+  // .optional(): since zod 4.4 a bare z.unknown() key is required, and one entry without it would
+  // fail the whole journal read (#3815).
+  record: z.unknown().optional(),
 });
 export type SetAsideWorkout = z.infer<typeof setAsideWorkoutSchema>;
 const journalSchema = z.object({

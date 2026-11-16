@@ -21,6 +21,25 @@ export const BuilderInputSchema = z.object({
 });
 export type BuilderInputs = z.infer<typeof BuilderInputSchema>;
 export type GeneratedProgram = z.infer<typeof GeneratedProgramSchema>;
+/**
+ * Training days in week order, once each (#3840). The k-th day runs session k mod n, so the order
+ * decides which session lands on which day; the server's neighbour check sorts the same way, and
+ * the web builder keeps its list sorted. A draft saved before this kept the order days were tapped.
+ */
+export function sortedWeekDays(days: readonly number[]): number[] {
+  return [...new Set(days)].sort((a, b) => a - b);
+}
+/**
+ * The `/api/generate-program` reply: the program and the plain-sentence notes from the server's
+ * check (#3751). A reply without notes, or with a malformed entry, keeps the program.
+ */
+export const GenerateProgramResponseSchema = z.object({
+  program: GeneratedProgramSchema,
+  notes: z
+    .array(z.unknown())
+    .optional()
+    .transform((notes) => (notes ?? []).filter((n): n is string => typeof n === 'string')),
+});
 export function builderSteps(mode: BuilderInputs['progressionMode']) {
   return mode === 'ai'
     ? [1, 2, 3, 4, 5, 6, 7]
@@ -116,7 +135,7 @@ export function generatedDraft(
           ? { type: 'rotation', restAfterN: inputs.rotationRestAfterN }
           : {
               type: 'weekly',
-              days: inputs.weeklyDays.map((dayOfWeek, index) => ({
+              days: sortedWeekDays(inputs.weeklyDays).map((dayOfWeek, index) => ({
                 dayOfWeek,
                 sessionId: sessions[index % sessions.length].id,
               })),

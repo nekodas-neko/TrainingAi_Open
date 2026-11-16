@@ -39,6 +39,7 @@ const getWorkoutSessionById = vi.fn(async (..._a: unknown[]) => null as Row | nu
 const upsertWorkoutHrStats = vi.fn(async (..._a: unknown[]) => undefined)
 const upsertSetHrStats = vi.fn(async (..._a: unknown[]) => undefined)
 const getWorkoutHrStats = vi.fn(async (..._a: unknown[]) => null as Row | null)
+const getWorkoutHrDensity = vi.fn(async (..._a: unknown[]) => null as boolean | null)
 
 const computeWorkoutHr = vi.fn(async (..._a: unknown[]) => null as Row | null)
 const reportServerError = vi.fn((..._a: unknown[]) => undefined)
@@ -54,7 +55,7 @@ vi.mock('@/lib/data', () => {
   const repo = async () => ({
     getUserById, listBodyMetrics, getHrForWindow, getObservedHrProfile, getSetHrStatsSince, getOuraWorkouts,
     getSetHrStatsForExercise, getWorkoutSessionById, upsertWorkoutHrStats, upsertSetHrStats,
-    getWorkoutHrStats,
+    getWorkoutHrStats, getWorkoutHrDensity,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
@@ -103,6 +104,7 @@ beforeEach(() => {
   getSetHrStatsForExercise.mockResolvedValue([])
   getWorkoutSessionById.mockResolvedValue(null)
   getWorkoutHrStats.mockResolvedValue(null)
+  getWorkoutHrDensity.mockResolvedValue(null)
   upsertWorkoutHrStats.mockResolvedValue(undefined)
   upsertSetHrStats.mockResolvedValue(undefined)
   computeWorkoutHr.mockResolvedValue(null)
@@ -384,6 +386,51 @@ describe('/api/oura/hr-data', () => {
     await hrData(`?sessionId=${SESSION_ID}`)
     expect(upsertWorkoutHrStats).not.toHaveBeenCalled()
     expect(upsertSetHrStats).not.toHaveBeenCalled()
+  })
+
+  // #3775: a sparse workout's per-set heart rate and recovery are never sent as numbers, and a set
+  // with zero or one reading around it is not either, whatever the workout's verdict.
+  describe('per-set heart rate on a sparse workout (#3775)', () => {
+    const LOG = new Date('2026-09-01T02:30:00Z')
+    const set = { exerciseName: 'Bench', setNumber: 1, loggedAt: LOG, setStartMs: null, setEndMs: null, peakBpm: 150, bpmAtLog: 140, hrr1: 18, adequate: true }
+    const second = (s: number) => ({ timestamp: new Date(LOG.getTime() + s * 1000), bpm: 140, source: 'chest_strap' })
+
+    it('sends nulls and the verdict when the workout is sparse', async () => {
+      getWorkoutSessionById.mockResolvedValue(completed)
+      computeWorkoutHr.mockResolvedValue(computed({ readings: [second(-30), second(30)], stats: [set] }))
+      getWorkoutHrDensity.mockResolvedValue(false)
+      const body = await (await hrData(`?sessionId=${SESSION_ID}`)).json()
+      expect(getWorkoutHrDensity).toHaveBeenCalledWith(sessionUser!.id, SESSION_ID)
+      expect(body.hrDense).toBe(false)
+      expect(body.setStats[0]).toMatchObject({ hrMeasured: true, peakBpm: null, bpmAtLog: null, hrr1: null, adequate: null })
+    })
+
+    it('sends a set resting on one reading as not measured, even on a dense workout', async () => {
+      getWorkoutSessionById.mockResolvedValue(completed)
+      computeWorkoutHr.mockResolvedValue(computed({ readings: [second(-30)], stats: [set] }))
+      getWorkoutHrDensity.mockResolvedValue(true)
+      const body = await (await hrData(`?sessionId=${SESSION_ID}`)).json()
+      expect(body.setStats[0]).toMatchObject({ hrMeasured: false, peakBpm: null, bpmAtLog: null, hrr1: 18 })
+    })
+
+    it('sends a set whose peak window holds one reading as not measured (#3839)', async () => {
+      // −80 s and +40 s are both within 90 s of the log, but only −80 s falls in the peak window
+      // [−90 s, +30 s]: the peak and End would rest on that one reading.
+      getWorkoutSessionById.mockResolvedValue(completed)
+      computeWorkoutHr.mockResolvedValue(computed({ readings: [second(-80), second(40)], stats: [set] }))
+      getWorkoutHrDensity.mockResolvedValue(true)
+      const body = await (await hrData(`?sessionId=${SESSION_ID}`)).json()
+      expect(body.setStats[0]).toMatchObject({ hrMeasured: false, peakBpm: null, bpmAtLog: null })
+    })
+
+    it('sends the figures for a measured set on a dense workout', async () => {
+      getWorkoutSessionById.mockResolvedValue(completed)
+      computeWorkoutHr.mockResolvedValue(computed({ readings: [second(-30), second(-1), second(30)], stats: [set] }))
+      getWorkoutHrDensity.mockResolvedValue(true)
+      const body = await (await hrData(`?sessionId=${SESSION_ID}`)).json()
+      expect(body.hrDense).toBe(true)
+      expect(body.setStats[0]).toMatchObject({ hrMeasured: true, peakBpm: 150, bpmAtLog: 140, hrr1: 18, adequate: true })
+    })
   })
 
   // Lever W: the scalars survive the prune even though the trace does not.

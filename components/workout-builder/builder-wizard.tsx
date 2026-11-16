@@ -102,6 +102,9 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard, us
   const [inputs, setInputs] = useState<BuilderInputs>(INITIAL_INPUTS)
   const [generating, setGenerating] = useState(false)
   const [program, setProgram] = useState<GeneratedProgram | null>(null)
+  // #3751: what the server's check of the generated program found (trims, short volume, back-to-back
+  // muscles). Plain sentences, shown once in the review's opening message.
+  const [checkNotes, setCheckNotes] = useState<string[]>([])
   const [confirmExit, setConfirmExit] = useState(false)
   /**
    * BF-67 step 3. Held HERE rather than in `BuilderInputs`, and the reason is the lane split:
@@ -203,6 +206,7 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard, us
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Generation failed'); return }
       setProgram(data.program)
+      setCheckNotes(Array.isArray(data.notes) ? data.notes.filter((n: unknown): n is string => typeof n === 'string') : [])
       setStep(10)
     } catch {
       toast.error('Failed to generate program. Please try again.')
@@ -256,6 +260,7 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard, us
         <BuilderReview
           program={program}
           inputs={inputs}
+          checkNotes={checkNotes}
           onBack={() => { setProgram(null); setStep(lastQuestionStep) }}
           onSaved={onSaved}
           onProgramChange={setProgram}

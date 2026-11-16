@@ -55,3 +55,34 @@ it('returns to the approved client and clears all transient bridge cookies', asy
   ])
     expect(response.cookies.get(name)?.value).toBe('');
 });
+
+// #3797 item 2: the browser's session cookie is cleared with the name, path and flags Auth.js set
+// it with, chunks included, so the phone's browser is not left signed in.
+it('clears the web session cookie on the complete response', async () => {
+  values.set(NATIVE_CONSENT_COOKIE, await signNativeConsent(transaction, 'user'));
+  values.set('authjs.session-token.0', 'chunk-0');
+  values.set('authjs.session-token.1', 'chunk-1');
+  const response = await GET();
+  expect(response.status).toBe(307);
+  const setCookie = response.headers.getSetCookie();
+  for (const name of [
+    'authjs.session-token',
+    'authjs.session-token.0',
+    'authjs.session-token.1',
+    '__Secure-authjs.session-token',
+  ]) {
+    const line = setCookie.find((c) => c.startsWith(`${name}=;`));
+    expect(line, name).toBeDefined();
+    expect(line).toMatch(/Path=\//);
+    expect(line).toMatch(/Max-Age=0/);
+    expect(line).toMatch(/HttpOnly/);
+    expect(line).toMatch(/SameSite=lax/i);
+    expect(line).not.toMatch(/Domain=/i);
+  }
+  expect(setCookie.find((c) => c.startsWith('__Secure-authjs.session-token=;'))).toMatch(/Secure/);
+});
+it('leaves the session cookie alone when it refuses', async () => {
+  const response = await GET();
+  expect(response.status).toBe(401);
+  expect(response.headers.getSetCookie().some((c) => c.includes('session-token'))).toBe(false);
+});

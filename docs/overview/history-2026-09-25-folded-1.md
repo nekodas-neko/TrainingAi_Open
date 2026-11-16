@@ -1211,7 +1211,7 @@ read-only agents triaged the rows, one chunk each; production reads were run her
     Lane DV.
   - About 55 need the owner. They are grouped into six sittings as **RV-157**, Lane O.
   - About 30 are already answered, or state something no longer true. They are **RV-156**, Lane O.
-- **`docs/device-verification-queue.md` holds 5 live rows of 41.** Nothing points DV at it. RV-156
+- **`docs/archive/device-verification-queue.md` holds 5 live rows of 41.** Nothing points DV at it. RV-156
   retires it, and its live rows move into RV-155, RV-157 and RV-131.
 - **Seven backlog entries were misfiled behind the device gate.**
   - LB-129, BF-49, Q-104 and BF-11 are shipped work owed a look, so they now carry

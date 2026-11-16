@@ -31,7 +31,7 @@ fact. Keeping them separate is what stops the baton growing into another accrete
 - **Never claim something is done unless it is in a committed diff and was observed working.** Name
   the failure surfaces you did not exercise.
 - **Keep it short.** If it is over a screen, the narrative has leaked in — move that to a handoff
-  doc. Batons are size-ratcheted in `docs/doc-size-baseline.json`, shrink-only: they are what the
+  doc. Batons are size-ratcheted in `docs/archive/doc-size-baseline.json`, shrink-only: they are what the
   other lane reads before claiming a path, and one nobody finishes reading is not doing that job.
 
 ## Template

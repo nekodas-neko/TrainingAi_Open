@@ -120,3 +120,119 @@ Optional:
 - `APK_RELEASE_REPO` — which repo `lib/github-release.ts` reads releases from. Set to
   `nekodas-neko/TrainingAi_Open`. The code falls back to the pre-cut repo, which is archived, so
   leaving it unset means reading a release whose version never changes again.
+
+## Also read by the server
+
+Found by a `process.env` sweep of `app`, `lib`, `packages`, `scripts`, `mobile`, `instrumentation*`
+and the config files on 15 Nov 2026 (#3798). **Secret** means a credential: set it in Railway or a
+CI secret, never in a file.
+
+- `ADMIN_EMAIL` — `instrumentation-node.ts` (`bootstrapAdmin`). At every boot, sets
+  `users.is_admin = true` for the account with this email. Unset: nothing happens; there is no
+  fallback email. Not secret, but it is a personal detail, so it stays out of the repo.
+- `TRUSTED_PROXY_COUNT` — `packages/shared/src/http/client-ip.ts`. How many proxies sit in front of
+  the app, which decides which `X-Forwarded-For` hop is the client's IP for rate limits. Default `1`
+  (Railway's edge). A malformed value or `0` falls back to `1`, never to "trust the leftmost hop".
+- `PG_POOL_MAX` — `lib/data/postgres/client.ts`. Lowers the pool size below the default of 10; a
+  value outside 1–9 is ignored, so it can never raise the connection budget. Only the BLE rollup
+  worker sets it (to 2). Leave it unset on Railway.
+- `DATABASE_SSL` — `lib/data/postgres/client.ts` and `readonly-client.ts`. `true` turns on TLS
+  outside production; in production TLS is always on. Default off.
+- `OURA_AUTOPACK` — `lib/data/postgres/slices/oura-raw-pack.ts`. `off` stops the automatic packing of
+  raw Oura rows without a deploy. Unset: packing runs, at most once per user every 6 hours.
+- `OURA_CONSTANTS_DIR` — `lib/oura-models/constants/index.ts`. Where the model constants are read
+  from. Boot sets it after downloading them; do not set it by hand. Without it the loader falls back
+  to the cache directory, then the tree.
+- `APPLE_NATIVE_CLIENT_ID` — `lib/auth/apple.ts`. The audience a native Sign in with Apple token must
+  carry. Default `com.fitnessai.training`.
+- `RAILWAY_GIT_COMMIT_SHA` — set by Railway. `lib/build-sha.ts` reads it as the build's commit, with
+  the `BUILD_SHA` file as fallback; `next.config.ts` turns it into `NEXT_PUBLIC_BUILD_ID`.
+- `RAILWAY_ENVIRONMENT_NAME` / `RAILWAY_ENVIRONMENT_ID` — set by Railway. `lib/ai/dev-call-budget.ts`
+  reads either as "this is Railway" and switches the dev call cap off.
+- `NEXT_RUNTIME` — set by Next. `instrumentation.ts` picks the Node or edge setup from it.
+
+**Exercise media storage** (`lib/exercise-storage.ts`, also `scripts/upload-model-assets.js` and
+`scripts/archive-private-paths.js`). An S3-compatible bucket. Each setting has an `AWS_*` name and a
+`STORAGE_*` name; the `AWS_*` one wins. An empty string counts as unset, because Railway writes one
+for a blank variable. Without endpoint, key id and secret, uploads return null and media falls back
+to inline storage.
+- `AWS_ENDPOINT_URL` / `STORAGE_ENDPOINT` — the bucket's endpoint. No default.
+- `AWS_ACCESS_KEY_ID` / `STORAGE_ACCESS_KEY_ID` — **secret.**
+- `AWS_SECRET_ACCESS_KEY` / `STORAGE_SECRET_ACCESS_KEY` — **secret.**
+- `AWS_DEFAULT_REGION` / `STORAGE_REGION` — default `auto`.
+- `AWS_S3_BUCKET_NAME` / `STORAGE_BUCKET_NAME` — default `trainingai`.
+- `STORAGE_PUBLIC_URL` — the public base URL for media links. Default: endpoint + `/` + bucket
+  (path-style).
+
+**Error reporting (Sentry).**
+- `SENTRY_DSN` — `sentry.server.config.ts`, `sentry.edge.config.ts`. Server and edge reporting.
+  Unset: those report nothing, and the boot log says `server DSN MISSING`.
+- `NEXT_PUBLIC_SENTRY_DSN` — `instrumentation-client.ts`. Browser reporting; inlined into the
+  client bundle at build time. A DSN is not a secret.
+- `SENTRY_AUTH_TOKEN` — `next.config.ts`, build time only. **Secret.** Uploads source maps and
+  creates the release; unset, the build skips both.
+- `NEXT_PUBLIC_APP_VERSION` / `NEXT_PUBLIC_BUILD_ID` — not set by hand: `next.config.ts` derives them
+  from `package.json` and the build's commit. Sentry's release name and the app-load report read them.
+
+**Client build-time.**
+- `NEXT_PUBLIC_THUNDERFOREST_API_KEY` — `packages/shared/src/map-tiles.ts`. Map tiles for routes.
+  Inlined into the client bundle, so it is public by nature; restrict it by referrer in the
+  Thunderforest dashboard where the plan allows. Unset: OpenStreetMap tiles.
+
+## The native app (`mobile/`)
+
+Read at build time by Expo and EAS. `EXPO_PUBLIC_*` values are inlined into the app, so none of them
+may be a secret.
+
+- `EXPO_PUBLIC_API_URL` — the server origin the app talks to (`useAccount`, `AboutScreen`,
+  `TooOldNotice`). Set per profile in `mobile/eas.json` to the production Railway URL;
+  `mobile/.env.example` holds the same. No code default. **Never point the real app at a local
+  server** (`CLAUDE.md`).
+- `EXPO_PUBLIC_BUILD_SHA` — `mobile/src/integrations/app-info/`. The commit the build came from;
+  default `dev`.
+- `EXPO_PUBLIC_DEV_REPORT_URL` / `EXPO_PUBLIC_DEV_REPORT_KEY` — development builds only.
+  `mobile/src/development/diagnostics/client.ts` posts diagnostics there, and
+  `mobile/scripts/receive-diagnostics.mjs` receives them. The key is a shared token between your own
+  build and your own receiver; it ships inside the build, so never reuse a real credential for it.
+- `APP_VARIANT` — `mobile/app.config.js`. `side-by-side` builds `com.trainingai.app.preview`, the
+  build that installs beside the real app.
+- `EAS_BUILD_PROFILE` — set by EAS. Unset, `development` or `android-development` means a dev build
+  (`com.trainingai.app.dev`); any other profile builds the real ID, `com.trainingai.app`.
+- `ANDROID_VERSION_CODE` — `mobile/app.config.js`. The Android version code for non-development
+  builds; CI passes a rising number. Unset: the config's default.
+- `EAS_BUILD` — set by EAS. `mobile/src/development/build/shared-package.mjs` restores the shared
+  package only inside an EAS build.
+- **Signing** (`mobile/scripts/android-signing.mjs`, CI secrets, all **secret**): `KEYSTORE_B64`,
+  `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`. Without `KEYSTORE_B64`, `LEGACY_KEYSTORE_B64`
+  is used with the debug key's alias and password. `ANDROID_EXPECTED_CERT_SHA256`
+  (`check-android-signing.mjs`) is the certificate fingerprint a build must match; a fingerprint is
+  not secret. **Never install over the app with a differently signed APK** (`CLAUDE.md`).
+- `AAPT2`, `APKANALYZER`, `APKSIGNER` — paths to the Android build tools for
+  `verify-release-apk.mjs` and `verify-android-upgrade.mjs`. Default: the bare command name.
+
+## Scripts, tests and CI
+
+None of these is read by the running app. None is secret unless marked.
+
+| Variable | Read by | Default / meaning |
+|---|---|---|
+| `LOCAL_DATABASE_URL` | `scripts/generate-claude-ro-views.js`, `scripts/local-db/rebuild.js` | The local Postgres the views are generated from; rebuild refuses a non-local target |
+| `LOCAL_DB_PORT` | `scripts/local-db/snapshot.js`, `scripts/backfill-baseline-phase-tag.mjs` | `5433`; the only port those scripts accept as local |
+| `SNAPSHOT_URL` | `scripts/local-db/snapshot.js` | The production `/api/admin/db-snapshot` URL; sent with `ADMIN_SNAPSHOT_SECRET` |
+| `CI_LOCAL_PG_PORT` | `scripts/ci-local.mjs` | `5439` |
+| `RUN_LIVE_AI_TESTS` | `lib/ai/dev-call-budget.ts` | `1` lets a test make live Gemini calls; otherwise tests make none |
+| `VITEST` | `lib/data/postgres/user-read-memo.ts`, `observed-hr-day-cache.ts` | Set by Vitest; turns those per-process caches off in tests |
+| `TZ` | `mobile/tests/` | Two native test files set it to pin the process timezone; the app never reads it |
+| `E2E_BASE_URL`, `E2E_PORT`, `E2E_CHROMIUM_CHANNEL` | `playwright.config.ts` | Port `3100`; with a base URL set, Playwright starts no server |
+| `SCAN_CHECK_FIXTURES` | `scripts/lib/fixture-dirs.js` | Lets the custom-rule checks scan their own fixtures |
+| `USER_SCOPING_MIN_CHECKED` | `scripts/check-repository-user-scoping.js` | `670`; the check fails if it inspects fewer functions |
+| `OWNERSHIP_MUTATION_FILE`, `_INDEX`, `_MARKER` | `scripts/ownership-mutation-sweep/vitest.config.mjs` | Which mutation the sweep applies |
+| `PR_NUMBER`, `GITHUB_REPOSITORY`, `GITHUB_API_URL`, `GH_TOKEN` / `GITHUB_TOKEN` | `scripts/check-commit-attribution.js` | Set by CI to read a PR's commits; the token is **secret** |
+| `GH_REPO` | `scripts/queue.js`, `sync-labels.js`, `sync-title-prefixes.js` | `nekodas-neko/TrainingAi_Open` |
+| `GITHUB_ACTIONS` | `scripts/native-switch-over/install.mjs` | Set by Actions; with `CI`, makes the installer refuse to run |
+| `APP_URL`, `EXPECT_SHA` / `GITHUB_SHA`, `DEADLINE_SECONDS`, `POLL_SECONDS` | `scripts/check-deploy-landed.js` | The production URL; the commit to wait for; `1500` s; `20` s |
+| `AGENT_RUNNER_PROMPT` | `scripts/agent-runner.mjs` | Overrides the role's built-in prompt |
+| `ADB_PATH`, `DEVICE_CDP_PORT`, `DEVICE_CDP_URL`, `DEVICE_PROBE_OUT`, `TRAININGAI_APP_ID`, `CHROME_PATH` | `scripts/device/` | `adb`; `9222`; derived from the port; `./device-probe`; `com.trainingai.app`; found on the machine |
+| `SERIAL`, `CHUNKS`, `RTT_MS` | `scripts/load-test/sync-fanout.js` | Off, `0`, `0` |
+| `ACCEL_MET_DIR`, `BB_REPLAY_DIR`, `CAL_REPLAY_DIR` | `scripts/tuning/` replays | Working directories under `/tmp` |
+| `PGOPTIONS` | `scripts/tuning/activity-finalise-replay-2435.cjs` | The script appends `default_transaction_read_only=on`, so the replay cannot write |

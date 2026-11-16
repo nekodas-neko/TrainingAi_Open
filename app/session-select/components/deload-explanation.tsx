@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDownIcon, ThermometerIcon, HeartPulseIcon, MoonIcon, FlameIcon, BatteryLowIcon, CalendarClockIcon, ActivityIcon } from "lucide-react";
+import { ChevronDownIcon, ThermometerIcon, HeartPulseIcon, MoonIcon, BatteryLowIcon, CalendarClockIcon, ActivityIcon } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn } from "@trainingai/shared/utils";
 import type { NextSessionRecommendation } from "@trainingai/shared/types/program";
@@ -17,7 +17,7 @@ interface Signal {
 
 // Turn the recommendation's raw signal fields into a plain-English list of *why* recovery is
 // being suggested — the home card only shows a one-line summary, which the owner found too thin.
-function buildSignals(rec: NextSessionRecommendation): Signal[] {
+export function buildSignals(rec: NextSessionRecommendation): Signal[] {
   const out: Signal[] = [];
   const s = rec.signals;
 
@@ -63,12 +63,10 @@ function buildSignals(rec: NextSessionRecommendation): Signal[] {
       text: `You checked in feeling ${s.energyLevel === "drained" ? "drained" : "low on energy"} this morning.`,
     });
   }
-  if (s?.soreMuscles && s.soreMuscles.length > 0) {
-    out.push({
-      icon: <FlameIcon className="h-3.5 w-3.5" />,
-      text: `Still sore: ${s.soreMuscles.join(", ")}.`,
-    });
-  }
+  // No soreness line (#3804). Sore ticks change which session is picked, not whether to ease off:
+  // computeDeloadStrength and the sick/energy checks in ai-dynamic.ts never read them. And the
+  // check-in pre-ticks recently trained muscles, so the line mostly read the app's own guess back
+  // as a reason.
   return out;
 }
 

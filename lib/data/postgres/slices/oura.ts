@@ -1,4 +1,5 @@
-import { dropSparseHrHours, isDenseHrSpan, DENSITY_GATED_HR_SOURCES } from '@trainingai/shared/health/intraday-hr-contributors'
+import { dropSparseHrHours, DENSITY_GATED_HR_SOURCES } from '@trainingai/shared/health/intraday-hr-contributors'
+import { workoutHrSpanVerdict, type WorkoutHrSpan } from '@trainingai/shared/workout/workout-hr-density'
 import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { getPool } from '../client'
@@ -465,8 +466,10 @@ export async function hasOuraBleSamples(db: Db, userId: string): Promise<boolean
 /**
  * The recent-source facts behind `connectedSources` (issue 2613): existence checks, each a
  * `LIMIT 1` probe scoped by `user_id` and bounded by `since`. The ring fact is `hasOuraBleSamples`, so it is
- * not repeated here. `oura_heartrate`'s primary key leads `(user_id, timestamp)`, so the window is a
- * range scan on the user's own rows and each check stops at its first match.
+ * not repeated here. The two heart-rate probes use `oura_heartrate_user_source_ts_idx`
+ * `(user_id, source, timestamp)` (#3793, migration 202611150713): one descent per source value, and
+ * the first entry at or after `since` answers the check. On the primary key `(user_id, timestamp)`
+ * alone, a window with no match was read row by row, or the whole table seq-scanned.
  */
 export async function getRecentSourceFacts(db: Db, userId: string, since: Date) {
   const hr = s.ouraHeartrate
@@ -2477,11 +2480,24 @@ export async function upsertDaytimeHrvModel(db: Db, userId: string, model: {
  *  later compute that gained a value (rr arrived, so workout_hrv_ms goes non-null) fills the gap
  *  without wiping fields it lost. */
 export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: string, stats: WorkoutHrStatsInput): Promise<void> {
+  // #3775: the density verdict is stored with the stats, not only at the 180-day prune, so a recap
+  // and anything downstream can tell a strap workout from a sparse one. Judged by the same query and
+  // rule the calorie gate reads live (`workoutHrSpanSql`, `workoutHrSpanVerdict`), so storing it
+  // changes no calorie figure: at the moment it is written it equals what the gate would decide.
+  // It rides the fuller-wins guard below, so a later, fuller compute (late Oura Cloud heart rate,
+  // `reattributeWorkoutsHrInWindow`) re-judges it and a partial one mid-prune never does.
+  const [spanRow] = await db
+    .select({ span: workoutHrSpanSql(userId) })
+    .from(s.workoutSessions)
+    .where(and(eq(s.workoutSessions.id, sessionId), eq(s.workoutSessions.userId, userId), isNotNull(s.workoutSessions.completedAt)))
+    .limit(1)
+  const hrDense = workoutHrSpanVerdict(spanRow?.span ?? null)
   await db.insert(s.workoutHrStats)
     .values({
       workoutSessionId: sessionId,
       userId,
       ...stats,
+      hrDense,
       // `workout_hrv_ms` is the only integer HRV column in the schema — every sibling
       // (sleep_sessions.average_hrv_ms, oura_daily_derived.hrv_rmssd_ms, …) is doublePrecision.
       // rmssdFromRr returns Math.sqrt(mean), so the value arrives fractional and node-postgres
@@ -2502,6 +2518,8 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
         workoutHrvMs:  sql`COALESCE(excluded.workout_hrv_ms, ${s.workoutHrStats.workoutHrvMs})`,
         readingsCount: sql`GREATEST(excluded.readings_count, ${s.workoutHrStats.readingsCount})`,
         source:        sql`COALESCE(excluded.source, ${s.workoutHrStats.source})`,
+        // Nothing to judge (no reading inside the session itself) keeps what is stored.
+        hrDense:       sql`COALESCE(excluded.hr_dense, ${s.workoutHrStats.hrDense})`,
         computedAt:    new Date(),
       },
       setWhere: sql`excluded.readings_count >= ${s.workoutHrStats.readingsCount}`,
@@ -2523,9 +2541,12 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
  * any reading from the ring's BLE or the strap keeps its average, as before; Oura Cloud is gated
  * since #3114, so an Oura-app workout's dense 5-second series keeps its average and a scattered
  * Oura-only session falls back to METs. Checked here, when the
- * estimate is made, so a snapshot computed before the rule is held to it too. Once the prune reaches
- * a session's series, the verdict stored just before it (`hr_dense`, `freezeWorkoutHrDensity`, #3150)
- * decides instead, so a sparse gated session stays on METs after its heart rate is gone. A session
+ * estimate is made, so a snapshot computed before the rule is held to it too. A stored verdict
+ * (`hr_dense`) decides instead of the live series from the moment it is written: by
+ * `upsertWorkoutHrStats` with every snapshot write (#3775), or by `freezeWorkoutHrDensity` just
+ * before the prune (#3150), so a sparse gated session stays on METs after its heart rate is gone.
+ * It is re-judged only by a write that passes the fuller-wins guard, so a series edited or deduped
+ * to fewer readings keeps the fuller series' verdict until then (#3839). A session
  * with neither (no reading ever, or pruned before the freeze existed) keeps its snapshot. Every
  * calorie surface reads `avg_bpm` through here, so the gate is in one place.
  */
@@ -2545,6 +2566,8 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
       // correlated span subquery is never run for them. Same result, fewer series judged.
       isNotNull(s.workoutHrStats.avgBpm),
       isNotNull(s.workoutSessions.completedAt),
+      // #3822: a deleted workout costs nothing, even when a caller passes its id (the energy route).
+      isNull(s.workoutSessions.deletedAt),
     ))
   // A frozen verdict wins: it was taken over the whole series, and what is left mid-prune is a part.
   // Nothing to judge, live or frozen: the snapshot stands.
@@ -2557,7 +2580,6 @@ export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: str
  *  from a source #2437 does not gate, and the longest gap between consecutive ones. Correlated on
  *  `workout_sessions`; `userId` is a bound id or the session's own `user_id` column. The calorie gate
  *  and the prune-time freeze both read this one query (#3150). */
-type WorkoutHrSpan = { n: number; ungated: number; max_gap_ms: number | null }
 /** Exported for `repeat-reads-unchanged-3793.test.ts`, which runs the calorie gate's previous query. */
 export function workoutHrSpanSql(userId: string | SQLWrapper): SQL<WorkoutHrSpan | null> {
   const gated = sql.join([...DENSITY_GATED_HR_SOURCES].map(g => sql`${g}`), sql`, `)
@@ -2570,15 +2592,9 @@ export function workoutHrSpanSql(userId: string | SQLWrapper): SQL<WorkoutHrSpan
     ) g)`
 }
 
-/** The calorie gate's verdict on one series (#3078): `null` with no reading to judge, `true` when any
- *  reading comes from a source #2437 does not gate, else `isDenseHrSpan`. Read live by
- *  `getAvgBpmBySession`, and stored by `freezeWorkoutHrDensity` before the prune deletes the series. */
-export function workoutHrSpanVerdict(span: WorkoutHrSpan | null): boolean | null {
-  const n = Number(span?.n ?? 0)
-  if (n === 0) return null
-  if (Number(span?.ungated ?? 0) > 0) return true
-  return isDenseHrSpan(n, span?.max_gap_ms == null ? null : Number(span.max_gap_ms))
-}
+/** The calorie gate's verdict on one series (#3078) lives in `@trainingai/shared/workout/workout-hr-density`
+ *  (#3775), so the recap's per-set gate reads the same rule. Re-exported for the callers here. */
+export { workoutHrSpanVerdict }
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 
@@ -2618,9 +2634,27 @@ export async function getWorkoutHrStats(db: Db, userId: string, sessionId: strin
       source: s.workoutHrStats.source, computedAt: s.workoutHrStats.computedAt,
     })
     .from(s.workoutHrStats)
-    .where(and(eq(s.workoutHrStats.userId, userId), eq(s.workoutHrStats.workoutSessionId, sessionId)))
+    .where(and(eq(s.workoutHrStats.userId, userId), eq(s.workoutHrStats.workoutSessionId, sessionId), workoutHrStatsIsLive))
     .limit(1)
   return row ?? null
+}
+
+/** The density verdict for one completed session (#3775), decided as the calorie gate decides it:
+ *  the stored `hr_dense` when there is one, else the live series. `null` when there is nothing to
+ *  judge (no snapshot and no reading inside the session). The recap reads it to decide whether
+ *  per-set heart rate and one-minute recovery are shown. */
+export async function getWorkoutHrDensity(db: Db, userId: string, sessionId: string): Promise<boolean | null> {
+  const [row] = await db
+    .select({ stored: s.workoutHrStats.hrDense, span: workoutHrSpanSql(userId) })
+    .from(s.workoutSessions)
+    .leftJoin(s.workoutHrStats, eq(s.workoutHrStats.workoutSessionId, s.workoutSessions.id))
+    .where(and(
+      eq(s.workoutSessions.id, sessionId), eq(s.workoutSessions.userId, userId),
+      isNotNull(s.workoutSessions.completedAt), isNull(s.workoutSessions.deletedAt),
+    ))
+    .limit(1)
+  if (!row) return null
+  return row.stored ?? workoutHrSpanVerdict(row.span)
 }
 
 /** Completed sessions (inside the retention window) that still have no *usable* snapshot — the
@@ -2841,9 +2875,29 @@ function toSetHrStatsRow(r: typeof s.setHrStats.$inferSelect): SetHrStatsRow {
   }
 }
 
+/**
+ * #3822: the HR snapshots keep their rows when a workout, exercise or set is deleted — a delete is a
+ * `deleted_at` tombstone, so the `ON DELETE CASCADE` on their keys never fires. Every reader of
+ * `set_hr_stats` / `workout_hr_stats` that feeds a screen, the coach or a recompute keeps only rows
+ * whose set, exercise log and workout session are all live, through these two conditions. They are
+ * `EXISTS` on the primary keys, so they cost one index probe per row and need no join in the caller.
+ * Exported for the raw-SQL readers' tests and for any new reader: use these, don't hand-roll a third.
+ */
+export const setHrStatsIsLive: SQL = sql`EXISTS (
+  SELECT 1 FROM ${s.setLogs} sl
+    JOIN ${s.exerciseLogs} el ON el.id = sl.exercise_log_id
+    JOIN ${s.workoutSessions} ws ON ws.id = el.workout_session_id
+   WHERE sl.id = ${s.setHrStats.setLogId}
+     AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL)`
+
+/** #3822: a `workout_hr_stats` row whose workout session is live. See `setHrStatsIsLive`. */
+export const workoutHrStatsIsLive: SQL = sql`EXISTS (
+  SELECT 1 FROM ${s.workoutSessions} ws
+   WHERE ws.id = ${s.workoutHrStats.workoutSessionId} AND ws.deleted_at IS NULL)`
+
 export async function getSetHrStatsForSession(db: Db, userId: string, workoutSessionId: string): Promise<SetHrStatsRow[]> {
   const rows = await db.select().from(s.setHrStats)
-    .where(and(eq(s.setHrStats.userId, userId), eq(s.setHrStats.workoutSessionId, workoutSessionId)))
+    .where(and(eq(s.setHrStats.userId, userId), eq(s.setHrStats.workoutSessionId, workoutSessionId), setHrStatsIsLive))
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setNumber))
   return rows.map(toSetHrStatsRow)
 }
@@ -2863,6 +2917,7 @@ export async function getSetHrStatsForExercise(
       eq(s.setHrStats.userId, userId),
       gte(s.setHrStats.loggedAt, opts.since),
       match,
+      setHrStatsIsLive,
     ))
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setNumber))
   return rows.map(toSetHrStatsRow)
@@ -2872,7 +2927,7 @@ export async function getSetHrStatsForExercise(
  *  AI chat groups by exercise. Bounded to keep the tool payload sane. */
 export async function getSetHrStatsSince(db: Db, userId: string, since: Date, limit = 5000): Promise<SetHrStatsRow[]> {
   const rows = await db.select().from(s.setHrStats)
-    .where(and(eq(s.setHrStats.userId, userId), gte(s.setHrStats.loggedAt, since)))
+    .where(and(eq(s.setHrStats.userId, userId), gte(s.setHrStats.loggedAt, since), setHrStatsIsLive))
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setNumber))
     .limit(limit)
   return rows.map(toSetHrStatsRow)
@@ -2890,7 +2945,8 @@ export async function listSetHrStatsForHrr1Backfill(db: Db, userId: string) {
     })
     .from(s.setHrStats)
     .innerJoin(s.setLogs, eq(s.setHrStats.setLogId, s.setLogs.id))
-    .where(eq(s.setHrStats.userId, userId))
+    // #3822: a deleted set is never read again, so re-measuring it is wasted work. No path restores one.
+    .where(and(eq(s.setHrStats.userId, userId), setHrStatsIsLive))
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setLogId))
 }
 

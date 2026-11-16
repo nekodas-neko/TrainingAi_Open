@@ -48,7 +48,8 @@ describe('RV-76 — muscles leave the model schemas and stay in the request sche
   for (const file of ['app/api/generate-program/route.ts', 'app/api/builder-chat/route.ts']) {
     it(`${file} asks the model for the shared shape and declares no exercise schema of its own`, () => {
       const src = read(file)
-      expect(src).toContain('sessions: z.array(ModelSessionSchema)')
+      // generate-program omits the session name since #3751 (code names the sessions from the split).
+      expect(src).toMatch(/sessions: z\.array\(ModelSessionSchema(\.omit\(\{ name: true \}\))?\)/)
       expect(src).not.toMatch(/exerciseRole: z\.enum/)
     })
   }

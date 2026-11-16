@@ -12,7 +12,7 @@
 > verify anything below against `main` before acting on it.
 
 **Context.** Every backlog item that can be **built and verified in the cloud sandbox is done** (see
-`docs/implementation-backlog.md` and `docs/planned_upgrades.md`). The 2026-07-20 session shipped the
+`docs/implementation-backlog.md` and `docs/archive/planned_upgrades.md`). The 2026-07-20 session shipped the
 full **wiring & caching-perf audit batch (W1–W7)**, **cumulative-stress (ChronicStress) rollup wiring
 Chunk 1**, and the two W4 surface items (run-explain narration + prescription volume pills, v1.185.0).
 The 2026-07-21 session then shipped the **exercise-history deload badge** (W4 §5.7, v1.186.0), the
@@ -24,7 +24,7 @@ is time-sensitive.
 
 > How to read this: each item says **what**, **why it's blocked here**, and **what you do**. Where a
 > feature merely needs confirmation it works on-device, run the relevant sections of
-> [`docs/device-smoke-checklist.md`](device-smoke-checklist.md) (a ~5-minute pass).
+> [`docs/device-smoke-checklist.md`](../device-smoke-checklist.md) (a ~5-minute pass).
 
 ---
 

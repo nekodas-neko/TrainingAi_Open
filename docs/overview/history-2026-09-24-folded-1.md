@@ -847,7 +847,7 @@ repo-wide source scan must exclude the file making the claim.
 
 S25 Ultra, APK 1.460.4, owner's account, **three-button navigation** (`navigation_mode` 0, so every
 gesture-inset check was void). Stations C–G ran on web v1.465.10. Station A and the rechecks ran on
-**v1.465.16** after production caught up and the app was restarted. Plan: `docs/device-sweep-2-plan.md`.
+**v1.465.16** after production caught up and the app was restarted. Plan: `docs/archive/device-sweep-2-plan.md`.
 The phone showed 🔴 throughout and 🟢 at the end.
 
 ## The pause: production went down, then turned out not to be deploying

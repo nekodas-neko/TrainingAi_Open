@@ -1,7 +1,7 @@
 # 2026-08-25 — nutrition photo-scan latency: the whole investigation (BF-4)
 
 **Extracted from `docs/implementation-backlog.md` on 2026-08-25**, per the compaction chore recorded
-in [`docs/doc-size-baseline-history.md`](../doc-size-baseline-history.md). BF-4 stays in the queue as
+in [`docs/archive/doc-size-baseline-history.md`](../archive/doc-size-baseline-history.md). BF-4 stays in the queue as
 a decision plus a pointer here; nothing below is lost, and nothing below is startable work.
 
 **The state, in one line:** every hypothesis has been measured and retired, and the entry now waits

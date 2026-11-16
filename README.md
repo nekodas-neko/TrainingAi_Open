@@ -48,10 +48,11 @@ Deployed on Railway, auto-deploys from `main`.
   trend, ACWR, sleep/HRV, soreness and volume, with deterministic guards (emergency deload, phase
   ceilings) that never depend on an LLM's self-reported number.
 - **Timezone-correct.** All "today" dates use the user's timezone (AEST default) via
-  `lib/date-utils.ts`, never raw UTC.
+  `packages/shared/src/date-utils.ts`, never raw UTC.
 
-See the **Data Model** and **Oura Ring v2 API Integration** sections of `CLAUDE.md` for the full
-table list and endpoint mapping.
+The tables are in `lib/data/postgres/schema.ts` and where each module lives is in
+[`docs/module-map.md`](docs/module-map.md). The Oura Cloud connector is `lib/oura/cloud/`; how any
+source feeds the app is in [`docs/data-source-connector-guide.md`](docs/data-source-connector-guide.md).
 
 ---
 
@@ -122,7 +123,7 @@ commented as such at its definition. No value in this repository grants access t
 | [`CLAUDE.md`](CLAUDE.md) | Authoritative architecture, data model, key files, conventions, Oura integration |
 | [`projectOverview.md`](projectOverview.md) | Lean index — current status, Known Issues & Risks, What's Left To Do |
 | [`docs/implementation-backlog.md`](docs/archive/implementation-backlog-2026-10-05.md) | Priority-ordered queue of ready-to-build work |
-| [`docs/planned_upgrades.md`](docs/planned_upgrades.md) | Open uplift ideas/findings |
+| [`docs/archive/planned_upgrades.md`](docs/archive/planned_upgrades.md) | Archived uplift ideas/findings (no longer maintained) |
 | [`docs/overview/`](docs/overview/) | Session journal (completed work, batched) + shipped-uplift archive |
 | [`docs/oura-ring-data-reference.md`](docs/oura-ring-data-reference.md) | Oura v2 field reference |
 | [`docs/device-smoke-checklist.md`](docs/device-smoke-checklist.md) | On-device verification steps (Samsung S25) |

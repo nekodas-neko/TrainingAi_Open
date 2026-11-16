@@ -346,6 +346,8 @@ export interface PrescribedRun {
   activityLogId: string | null; updatedAt: Date
   /** LB-179: how it was satisfied; null = before this was tracked, i.e. a run. */
   completedAs: 'run' | 'walk' | null
+  /** Present only on a read with `includeDeleted`: the tombstone, null for a live row. */
+  deletedAt?: Date | null
 }
 export interface PrescribedRunUpdate {   // Zod-whitelisted PATCH body — never a raw request body into .set()
   status?: 'completed' | 'skipped'
@@ -624,6 +626,8 @@ export interface WorkoutRepository {
   getUserByOAuthSub(oauthSub: string): Promise<User | null>
   getUserByProvider(provider: AuthProvider, subject: string): Promise<User | null>
   getUserProviders(userId: string): Promise<AuthProvider[]>
+  /** #3797: when the newest sign-in method was linked onto the account, or null when none is. */
+  getLatestIdentityLinkedAt(userId: string): Promise<Date | null>
   linkIdentity(userId: string, provider: AuthProvider, subject: string, email?: string): Promise<boolean>
   createProviderUser(provider: AuthProvider, subject: string, email: string, name?: string): Promise<User>
   createAppleAuthAttempt(nonceHash: string, userId: string | null): Promise<AppleAuthAttempt>
@@ -692,7 +696,8 @@ export interface WorkoutRepository {
   touchLastGoalReviewAt(userId: string): Promise<void>
   updateUserAvatar(userId: string, avatar: string): Promise<User>
   updateUserPassword(userId: string, passwordHash: string): Promise<void>
-  linkOAuthAccount(userId: string, oauthSub: string): Promise<boolean>
+  /** #3797: a password it clears ends that password's native sign-ins; `activate` for a verified, invited address. */
+  linkOAuthAccount(userId: string, oauthSub: string, opts?: { activate?: boolean }): Promise<boolean>
   getTimingBaselineDate(userId: string): Promise<string | null>
   setTimingBaselineDate(userId: string, date: string | null): Promise<void>
   createEmailUser(email: string, passwordHash: string, name?: string, isActive?: boolean): Promise<User>
@@ -836,9 +841,14 @@ export interface WorkoutRepository {
   deleteFitnessTest(userId: string, id: string): Promise<void>
   getActiveRunningPlan(userId: string): Promise<RunningPlan | null>
   saveRunningPlan(userId: string, plan: Omit<RunningPlan, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<RunningPlan>
-  getPrescribedRuns(userId: string, from: string, to: string): Promise<PrescribedRun[]>
+  /** #3779: replaces the plan's `fitness_snapshot` jsonb (where a walking plan keeps its targets and
+   *  judged weeks), scoped to the user. Null when no such plan is theirs. */
+  /** With `ifUpdatedAt`, writes only if the row is unchanged since that read; null when it was not written. */
+  updateRunningPlanSnapshot(userId: string, planId: string, fitnessSnapshot: Record<string, unknown>, opts?: { ifUpdatedAt?: Date }): Promise<RunningPlan | null>
+  getPrescribedRuns(userId: string, from: string, to: string, opts?: { includeDeleted?: boolean }): Promise<PrescribedRun[]>
   upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt' | 'completedAs'>): Promise<PrescribedRun>
-  updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate): Promise<PrescribedRun | null>
+  /** With `onlyIfPending`, changes only a live pending row; null when no row changed. */
+  updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate, opts?: { onlyIfPending?: boolean }): Promise<PrescribedRun | null>
   listActivityTypes(): Promise<ActivityType[]>
   createActivityType(data: { label: string; icon: string; isDistanceBased: boolean; sortOrder: number }): Promise<ActivityType>
   updateActivityType(id: string, patch: Partial<{ label: string; icon: string; isDistanceBased: boolean; sortOrder: number }>): Promise<ActivityType>
@@ -1647,6 +1657,8 @@ export interface WorkoutRepository {
   // 180d oura_heartrate / 90d rr_intervals prunes.
   upsertWorkoutHrStats(userId: string, sessionId: string, stats: WorkoutHrStatsInput): Promise<void>
   getWorkoutHrStats(userId: string, sessionId: string): Promise<WorkoutHrStatsRow | null>
+  /** #3775: `workout_hr_stats.hr_dense` when stored, else the live verdict; null with nothing to judge. */
+  getWorkoutHrDensity(userId: string, sessionId: string): Promise<boolean | null>
   /** `sessionId → avgBpm` for the sessions that have one (Q-421). Absent = no usable HR. */
   getAvgBpmBySession(userId: string, sessionIds: string[]): Promise<Map<string, number>>
   listSessionsMissingHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>

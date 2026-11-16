@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Harden the security posture per Batch D of `docs/planned_upgrades.md`: bind the mobile-auth deep-link token to a PKCE verifier so an interceptor app can't redeem it (D2); make the rate limiter survive deploys and span replicas with a Postgres-backed shared store while keeping the sync `rateLimit(key, limit, windowMs)` signature (D3); bound builder-chat's `program: z.any()` (also fixing its 500 on malformed input) (D3); add an Oura OAuth `state` param via a signed cookie, guard nutrition/scan's body parse before `req.json()`, clamp AI-chat weight writes and body-metadata POST numbers, enforce CSP, and return proper 403s from admin routes (D4); allowlist + URL-encode `fetchDocumentById` and regression-test inactive-by-default registration (D5).
+**Goal:** Harden the security posture per Batch D of `docs/archive/planned_upgrades.md`: bind the mobile-auth deep-link token to a PKCE verifier so an interceptor app can't redeem it (D2); make the rate limiter survive deploys and span replicas with a Postgres-backed shared store while keeping the sync `rateLimit(key, limit, windowMs)` signature (D3); bound builder-chat's `program: z.any()` (also fixing its 500 on malformed input) (D3); add an Oura OAuth `state` param via a signed cookie, guard nutrition/scan's body parse before `req.json()`, clamp AI-chat weight writes and body-metadata POST numbers, enforce CSP, and return proper 403s from admin routes (D4); allowlist + URL-encode `fetchDocumentById` and regression-test inactive-by-default registration (D5).
 
 **Architecture:** No new services. The rate limiter keeps its in-memory `Map` as a synchronous L1 fast-path and adds a fire-and-forget atomic upsert into a new `rate_limits` Postgres table (migration `104_rate_limits.sql`); the DB count is written back into the L1 entry so the shared store is authoritative within one request of lag — all ~15 call sites keep `if (!rateLimit(...))` unchanged. PKCE: the Capacitor WebView (which loads the remote site per `capacitor.config.ts` `server.url`, so **no APK rebuild**) generates a verifier, stores it in its own `localStorage`, and passes the SHA-256 challenge through `/mobile-signin` → next-auth `callbackUrl` → `/auth-mobile-bridge`; the server stores the challenge with the one-time token and `exchange-mobile-token` refuses to redeem without the matching verifier. Oura CSRF state rides a short-lived HS256 JWT (jose, signed with `AUTH_SECRET`) in an httpOnly cookie. Validation logic (PKCE, state, clamps, body-limit, mime allowlist, program schema) lives in small pure modules under `lib/` with vitest unit tests mirroring the existing `lib/**/__tests__/*.test.ts` style (`pnpm test` = `vitest run`, `@` alias configured in `vitest.config.ts`).
 
@@ -1345,14 +1345,14 @@ describe('register route — accounts must start inactive/pending', () => {
 ### Task 12: Final verification, docs, PR
 
 **Files:**
-- `projectOverview.md`, `docs/planned_upgrades.md`, `package.json`, `lib/changelog.ts`
+- `projectOverview.md`, `docs/archive/planned_upgrades.md`, `package.json`, `lib/changelog.ts`
 
 **Steps:**
 
 - [ ] Full suite: `pnpm test` (all suites incl. the ~9 new files), `pnpm lint`, `npx tsc --noEmit`, `pnpm build` — all green.
 - [ ] Full local dev pass (`pnpm dev`): re-run every manual verification block above end-to-end in one session (register 429 + `rate_limits` row, builder-chat 400, exchange-mobile-token 400/401, oura connect state cookie + callback mismatch, scan 413/415, body-metadata 400/success, admin 403s, register inactive). Fix anything broken before proceeding.
 - [ ] Bump `package.json` version (minor — new security behaviour) and add a `lib/changelog.ts` entry: "Security hardening: PKCE-bound mobile sign-in, durable rate limits, Oura OAuth CSRF protection, enforced CSP, stricter input validation."
-- [ ] Tick the shipped Batch D items in `docs/planned_upgrades.md` (D2, D3 [limiter + builder-chat], D4 [state, scan, clamps, CSP, admin], D5 [fetchDocumentById, register-verified]) — leave D1 + supplement-scope to the quick-wins plan. Mark the App Links follow-up as tracked in `projectOverview.md` (done in Task 10).
+- [ ] Tick the shipped Batch D items in `docs/archive/planned_upgrades.md` (D2, D3 [limiter + builder-chat], D4 [state, scan, clamps, CSP, admin], D5 [fetchDocumentById, register-verified]) — leave D1 + supplement-scope to the quick-wins plan. Mark the App Links follow-up as tracked in `projectOverview.md` (done in Task 10).
 - [ ] Push branch `security/batch-d-hardening`, open a PR describing the changes and the two **post-deploy checks**: (1) phone sign-in round-trip (PKCE — no APK rebuild needed), (2) CSP watch on WebView surfaces (scanner, maps, Google sign-in). **Do not merge** — this deploys to production; wait for explicit user confirmation per the standing workflow.
 
 ---

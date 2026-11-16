@@ -345,6 +345,7 @@ export const workoutHrSpec = (id: string) => ({
       })
       .nullable()
       .optional(),
+    hrDense: z.boolean().nullable().optional(),
     readings: z.array(z.object({ timestamp: text, bpm: finite })).default([]),
     setStats: z
       .array(
@@ -354,6 +355,7 @@ export const workoutHrSpec = (id: string) => ({
           loggedAt: text.nullable(),
           setStartMs: finite.nullable(),
           setEndMs: finite.nullable(),
+          hrMeasured: z.boolean().optional(),
           peakBpm: finite.nullable(),
           bpmAtLog: finite.nullable().optional(),
           hrr1: finite.nullable(),
@@ -460,6 +462,16 @@ export const periodizationSchema = z.object({
     .nullable(),
   signals: z.unknown().optional(),
 });
+/** /api/workout-data for one session, as Start reads it before a workout. */
+export const sessionPreparationSchema = z
+  .object({
+    // .optional(): since zod 4.4 a bare z.unknown() key is required (#3815).
+    program: z.unknown().optional(),
+    session: z.unknown().optional(),
+    exercises: z.array(z.unknown()),
+    aiPrescriptionPending: z.boolean(),
+  })
+  .passthrough();
 export const periodizationSpec = (
   id: string,
 ): ResourceSpec<z.infer<typeof periodizationSchema>> => ({

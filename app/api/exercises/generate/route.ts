@@ -8,12 +8,22 @@ import { z } from 'zod'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
+import { getRepository } from '@/lib/data'
+import { buildExerciseNameResolver } from '@trainingai/shared/workout/exercise-name-resolver'
+import { equipmentLedByName } from '@trainingai/shared/workout/equipment'
+import { isAdminUser } from '@/lib/admin'
 
 // One exercise name, capped at 120 characters by the schema below.
 const MAX_BODY_BYTES = 4 * 1024
 
 const RequestSchema = z.object({
   name: z.string().min(1).max(120),
+  /**
+   * #3840: skip the library lookup and ask the model, to refresh an existing entry's instructions
+   * and muscles. Only the admin exercise editor sends it, and only an admin may: anyone else would
+   * spend a model call on every name the library already answers for free.
+   */
+  refresh: z.literal(true).optional(),
 }).strict()
 
 const MUSCLES = ['Chest', 'Shoulders', 'Triceps', 'Biceps', 'Forearms', 'Upper Back', 'Lats', 'Lower Back', 'Traps', 'Core', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Adductors'] as const
@@ -52,6 +62,29 @@ export async function POST(req: NextRequest) {
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   try {
+    // Fails closed: a refresh from anyone but an active admin is refused, and a failed lookup is a 500.
+    if (body.data.refresh && !await isAdminUser(session.user.id)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // #3751: a name the library already holds costs no model call. The resolver is the one the
+    // program routes use (exact, normalised, word order; never a subset), so "bench press" finds
+    // "Bench Press" and "Incline Bench Press" does not. Merged duplicates are not offered, as in
+    // every picker (RV-51). `libraryId` tells the caller this is an existing row, not a draft.
+    // An admin's refresh skips it on purpose (#3840).
+    const existing = body.data.refresh ? null : buildExerciseNameResolver(
+      (await (await getRepository()).listExerciseLibrary()).filter(ex => !ex.mergedInto),
+    ).resolve(body.data.name)
+    if (existing) {
+      return NextResponse.json({
+        normalizedName: existing.name,
+        instructions: existing.instructions ?? '',
+        muscles: existing.muscles,
+        equipment: existing.equipment,
+        libraryId: existing.id,
+      })
+    }
+
     const { object } = await loggedGenerateObject(
       { section: 'exercises-generate', userId: session.user.id, fingerprint: body.data.name },
       signal => generateObject({
@@ -63,7 +96,8 @@ export async function POST(req: NextRequest) {
         abortSignal: signal,
       }),
     )
-    return NextResponse.json(object)
+    // The prompt asks for the name's prefix equipment first; code makes it so.
+    return NextResponse.json({ ...object, equipment: equipmentLedByName(object.normalizedName, object.equipment) })
   } catch (err) {
     reportServerError(err, { url: '/api/exercises/generate' })
     return aiPausedResponse(err) ?? NextResponse.json({ error: 'Generation failed' }, { status: 500 })

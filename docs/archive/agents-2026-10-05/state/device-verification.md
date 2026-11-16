@@ -10,7 +10,7 @@
 ## For the Orchestrator — read this part
 
 - **Assign me work with `Lane: DV`** (OR-129); I read `--lane DV` first, then `--sittings`.
-- **The current plan is [`docs/device-sweep-5-plan.md`](../../../device-sweep-5-plan.md)** (2026-10-05).
+- **The current plan is [`docs/archive/device-sweep-5-plan.md`](../../device-sweep-5-plan.md)** (2026-10-05).
   It has six 45–60 min sittings, failure-first, and supersedes the 2026-09-28 sitting plan.
 - **The session narrative is
   [`handoff-2026-10-05-platform-device-verification-sweeps-2-to-5`](../../../handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md)**

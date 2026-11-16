@@ -1332,7 +1332,7 @@ service worker's requests on this WebView is unknown.
 **Branch:** `device/sweep-1` · **Agent:** Device Verification · **Docs + `scripts/device/**`.**
 
 S25 Ultra, web v1.465.10, APK 1.460.4, gesture navigation, owner's account. Run on his go-ahead with
-his decisions recorded in `docs/device-sweep-1-plan.md`: weigh-in and mood overwrite accepted, only
+his decisions recorded in `docs/archive/device-sweep-1-plan.md`: weigh-in and mood overwrite accepted, only
 the writes the checks need, the owner-present OS block skipped. The phone showed 🔴 throughout and 🟢
 at the end.
 
@@ -1387,7 +1387,7 @@ Light theme, landscape, real airplane mode, and anything needing hardware.
 
 The owner asked what could be combined into a larger device pass. Re-reading the queue against sweep
 1's table: of the checks the phone alone can settle, **~45 automatable and 8 write checks** group into
-**eight stations** — one screen and at most one write cycle each — in `docs/device-sweep-2-plan.md`.
+**eight stations** — one screen and at most one write cycle each — in `docs/archive/device-sweep-2-plan.md`.
 The largest is Nutrition: about sixteen entries share one visit and one food + one saved-meal
 log/delete. About 3 h 45 min in all. Everything that needs a morning before check-in, the owner
 changing phone settings, hardware, a declined write or a design judgement is listed as out of the
@@ -1405,7 +1405,7 @@ The removal refused any entry whose span held a `## ` line, the shape that split
 
 **Branch:** `device/sweep-3-plan` · **Agent:** Device Verification · **Docs only.**
 
-`docs/device-sweep-3-plan.md`: six stations, about 2 h 30 min. They cover the three shell probes and
+`docs/archive/device-sweep-3-plan.md`: six stations, about 2 h 30 min. They cover the three shell probes and
 DV-12's profile, RV-125's write half, DV-8, the sweep-2 nutrition leftovers (BF-95, BF-61, BF-12,
 BF-161, BF-49), the workout cards (Q-300, OR-118, Q-305) and BF-147. `/admin/oura-ble` stays closed
 until DV-13 is closed. The phone is on three-button navigation, so inset checks are left out rather
@@ -1420,7 +1420,7 @@ phone was unplugged throughout; nothing here touched it.
 
 The owner asked for everything needed to run one large sweep, and to wait for his go-ahead.
 
-## The plan — `docs/device-sweep-1-plan.md`
+## The plan — `docs/archive/device-sweep-1-plan.md`
 
 Every one of the **116** entries `next-item.js --sittings` lists was read against its backlog text
 and bucketed by what the sitting can actually settle: **53 automatable, 9 pre-approved writes, 9
@@ -1858,7 +1858,7 @@ navigation reports the inset as 0.
 most likely to need tuning: how the gradient composes with `DynamicBackground`'s sky, in both
 themes. Also not exercised: Samsung WebView compositing of a fixed, animated-opacity layer.
 
-Also filed: **LB-130** — `docs/doc-size-baseline-history.md` is now the guaranteed-conflict file
+Also filed: **LB-130** — `docs/archive/doc-size-baseline-history.md` is now the guaranteed-conflict file
 that `.size` used to be, on the same append-to-one-shared-file shape LA-33 and RV-134 already
 fixed twice. Measured across five re-merges of #1449 in an hour.
 

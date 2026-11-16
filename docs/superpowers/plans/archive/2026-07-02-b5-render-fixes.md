@@ -1,6 +1,6 @@
 # B5 — Render fixes (plan 2 of 3)
 
-> Source: `docs/planned_upgrades.md` § B5 "Render storms" (audit 2026-07-02). One PR. Line refs verified against `main` @ post-#98 — re-grep anchors before editing.
+> Source: `docs/archive/planned_upgrades.md` § B5 "Render storms" (audit 2026-07-02). One PR. Line refs verified against `main` @ post-#98 — re-grep anchors before editing.
 >
 > Goal: the workout screen stops re-rendering ~1,000 lines every second, and the home screen's card grid stops re-rendering on every one of its ~54 state updates. Pure render-path work — zero behaviour change, so verification is "everything looks and works identical, but profiled renders shrink".
 
@@ -46,4 +46,4 @@
 - `pnpm tsc --noEmit && pnpm lint && pnpm test`; full manual pass of the workout flow (pre → warmup → sets → rest → summary → done) and home on `pnpm dev` — this PR touches the hottest screen in the app, so exercise every mode transition.
 - Not exercisable in sandbox (declare in PR): real WebView frame timing on the S25 — profiler evidence is from desktop Chrome.
 - Version: patch bump + `lib/changelog.ts` entry ("workout screen render performance").
-- On ship: tick the five B5 render bullets in `docs/planned_upgrades.md`.
+- On ship: tick the five B5 render bullets in `docs/archive/planned_upgrades.md`.

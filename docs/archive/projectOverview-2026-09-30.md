@@ -19,7 +19,7 @@
 |---|---|
 | **Who does what** | [`docs/agents/README.md`](../agents/README.md) — the six standing agents, their authority, and the two-lane file-ownership contract. Read this before starting a session. |
 | **Upcoming — ready to build** | [`docs/implementation-backlog.md`](implementation-backlog-2026-10-05.md) — a priority-ordered queue; implementer sessions take the top item per the protocol in that file |
-| **Upcoming — ideas/findings** | [`docs/planned_upgrades.md`](../planned_upgrades.md) — open uplift ideas; they graduate to the backlog once a session writes their implementation plan |
+| **Upcoming — ideas/findings** | [`docs/archive/planned_upgrades.md`](planned_upgrades.md) — open uplift ideas; they graduate to the backlog once a session writes their implementation plan |
 | **Completed — session journal** | `docs/overview/entries/` (current window, one file per PR) then the batched `docs/overview/history-*.md` |
 | **Completed — shipped plans/specs** | `docs/superpowers/plans/archive/` and `docs/superpowers/specs/archive/` |
 | **Completed — shipped uplift ideas** | `docs/overview/uplift-archive.md` |
@@ -132,10 +132,10 @@ its own document. The append-only session journal and the batched archives live 
 | File | Contents |
 |------|----------|
 | [`docs/overview/history-2026-09-27-status-narrative.md`](../overview/history-2026-09-27-status-narrative.md) | **The narrative `Current Status` used to hold** — 281 paragraphs moved whole out of this file 2026-09-27 (OR-197), 292 KB of the 309 KB it then was. Nothing was edited or dropped, so **date any claim in it against the journal before trusting it**. 152 of the 281 duplicate a journal entry; **129 have no pointer and exist nowhere else**, which is why it was relocated rather than curated |
-| `docs/overview/known-issues.md` | **OPEN Known Issues & Risks** — 451 entries, moved out of this file 2026-09-27 (Q-220). Grep it by domain tag: `grep -n '^### .*\[sleep\]' docs/overview/known-issues.md` |
+| `docs/archive/known-issues.md` | **OPEN Known Issues & Risks** — 451 entries, moved out of this file 2026-09-27 (Q-220). Grep it by domain tag: `grep -n '^### .*\[sleep\]' docs/archive/known-issues.md` |
 | `docs/overview/known-issues-resolved.md` | **Completed Known Issues** — entries archived out of this file once nothing was still owed (53 moved 2026-08-13). Grep it before concluding something has never been looked at. Striking an issue means *moving* it here — see `CLAUDE.md` Session Wrap-Up step 2 |
 | `docs/implementation-backlog.md` | **Upcoming (ready)** — priority-ordered queue; implementers take the top item |
-| `docs/planned_upgrades.md` | **Upcoming (ideas)** — open uplift findings, batched by data/structure |
+| `docs/archive/planned_upgrades.md` | **Upcoming (ideas)** — open uplift findings, batched by data/structure |
 | `docs/overview/uplift-archive.md` | **Completed** — shipped uplift batches split out of `planned_upgrades.md` |
 | `docs/overview/entries/` | **Recent journal (uncompacted)** — one file per PR/session (`YYYY-MM-DD-<slug>.md`); read these + the newest history file for "what happened lately". Folded into the batched history by the compaction sweep — see the README there. **Corrected 2026-07-30:** this line said "near-empty (compacted 2026-07-20)" but the directory holds ~179 files from 07-20→07-29 — the compaction sweep is overdue; a future session should run it. |
 | [`docs/agents/README.md`](../agents/README.md) | **The standing agents** — the four roles, their authority, the two-lane file-ownership contract, the Q-number bands, and the handoff protocol. Cold-start prompts in `docs/agents/prompts/`, live batons in `docs/agents/state/` |
@@ -160,7 +160,7 @@ its own document. The append-only session journal and the batched archives live 
 exists and where** — read before building any new feature or helper; documents the
 no-cron-layer scheduling patterns), `docs/oura-ring-data-reference.md` (Oura v2 field
 reference), `docs/device-smoke-checklist.md` (on-device verification steps),
-`docs/owner-action-required.md` (**everything left that the sandbox can't do** — owner-run
+`docs/archive/owner-action-required.md` (**everything left that the sandbox can't do** — owner-run
 device/APK/data/decision items, grouped by action type; read when asking "what's left"),
 `docs/body-battery-tuning.md` (Body Battery model methodology),
 `docs/sleep-system.md` (**sleep reference** — staging pipeline, scoring, what's
@@ -178,6 +178,6 @@ credentials and Google OAuth).
 was the most frequent multi-PR merge conflict; per-entry files take it to zero). See
 [`docs/overview/entries/README.md`](../overview/entries/README.md) for the convention and the
 compaction chore. **Keep this index to current status, Waiting on the owner, and What's Left** — a
-new Known Issue goes in `docs/overview/known-issues.md`, not here, or the 79% grows back. The
+new Known Issue goes in `docs/archive/known-issues.md`, not here, or the 79% grows back. The
 compaction sweep folds loose entries into the newest `history-*.md`, starting a new one when it
 approaches ~250 KB and adding it to this table.

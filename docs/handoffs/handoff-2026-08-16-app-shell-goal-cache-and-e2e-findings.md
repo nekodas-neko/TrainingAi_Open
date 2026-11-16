@@ -130,7 +130,7 @@ license skipping invalidation, but it is the one change here that shapes how fut
 
 The public snapshot has been pushed (#1399) and the cut is at Phase B —
 [`docs/handoffs/handoff-2026-08-16-platform-public-repo-cut-a4b.md`](handoff-2026-08-16-platform-public-repo-cut-a4b.md)
-and [`docs/public-repo-cut-runbook.md`](../public-repo-cut-runbook.md) own that work. Nothing in this
+and [`docs/archive/public-repo-cut-runbook.md`](../archive/public-repo-cut-runbook.md) own that work. Nothing in this
 session's cluster is Oura-adjacent or vendor-coupled, so **all of it carries over unmodified**: the
 code changes, both E2E specs, the audit, and the CLAUDE.md rule.
 

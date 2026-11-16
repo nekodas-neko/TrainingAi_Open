@@ -7,7 +7,7 @@ import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { prescribeOverride, OVERRIDE_RATIONALE_PREFIX } from '@trainingai/shared/running/prescription'
 import { targetsForRunType } from '@trainingai/shared/running/hr-targets'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
-import { CARDIO_GOALS } from '@trainingai/shared/running/cardio-goals'
+import { CARDIO_GOALS, cardioPlanKind } from '@trainingai/shared/running/cardio-goals'
 import type { GoalKind, Prescription, RunType } from '@trainingai/shared/running/types'
 import { assembleInputs, resolveSnapshot } from '@trainingai/shared/running/assemble-plan-context'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -54,6 +54,8 @@ export async function POST(req: Request) {
 
   const plan = await repo.getActiveRunningPlan(userId)
   if (!plan) return NextResponse.json({ error: 'No active running plan' }, { status: 404 })
+  // #3779: a walking plan never prescribes a run, so there is no run to override.
+  if (cardioPlanKind(plan) === 'walking') return NextResponse.json({ error: 'A walking plan has no run to override' }, { status: 409 })
 
   const fitness = await resolveSnapshot(repo, userId, tz)
   const { ctx, gate } = await assembleInputs(repo, userId, tz, fitness, plan)
@@ -72,7 +74,9 @@ export async function POST(req: Request) {
   const { prescription, gateAction, gateReasons } = prescribeOverride(ctx, gate, base)
 
   const today = todayInTz(tz)
-  const existing = (await repo.getPrescribedRuns(userId, today, today))[0]
+  // This plan's row only (the upsert below is keyed on plan and date): an earlier plan's row for
+  // today must not lend its id or link to this one.
+  const existing = (await repo.getPrescribedRuns(userId, today, today)).find((r) => r.planId === plan.id)
   // Overriding always re-commits to running today — an earlier skip is superseded by picking
   // a different structure, so status resets to pending regardless of what it was.
   const run = await repo.upsertPrescribedRun(userId, {

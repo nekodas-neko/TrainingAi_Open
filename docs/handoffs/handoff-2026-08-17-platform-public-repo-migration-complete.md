@@ -82,7 +82,7 @@ Verify what a check actually covers before trusting it.
   holding the vendor's files, which since A4b is not a session.
 
 **Two owner decisions from 2026-08-12 are recorded but unimplemented** —
-[`owner-decisions-2026-08-12.md`](../owner-decisions-2026-08-12.md): prescribe from the last non-deload
+[`owner-decisions-2026-08-12.md`](../archive/owner-decisions-2026-08-12.md): prescribe from the last non-deload
 session, and lighten *every* exercise during an ai_dynamic deload. Read that file before touching
 either; the owner was offered a smoothed middle on the first and explicitly chose the strict version.
 

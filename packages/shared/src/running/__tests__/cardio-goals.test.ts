@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CARDIO_GOALS, SELECTABLE_CARDIO_GOALS, defaultFrameworkForGoal } from '../cardio-goals'
+import { CARDIO_GOALS, SELECTABLE_CARDIO_GOALS, WALKING_FRAMEWORK_KEY, cardioPlanKind, defaultFrameworkForGoal } from '../cardio-goals'
 import { weeklyZoneTargets } from '../zone-targets'
 import { getFramework } from '../framework'
 import type { FitnessSnapshot, FrameworkContext, RunType } from '../types'
@@ -33,10 +33,20 @@ describe('cardio goal registry', () => {
     expect(CARDIO_GOALS.cardio_health.selectable).toBe(false)
   })
 
-  it('every framework a goal points to is registered', () => {
+  it('every framework a running goal points to is registered', () => {
     for (const g of Object.values(CARDIO_GOALS)) {
+      if (cardioPlanKind({ goalKind: g.key }) === 'walking') continue
       expect(() => getFramework(g.defaultFrameworkKey)).not.toThrow()
     }
+  })
+
+  // #3779: the walking plan never prescribes a run, so no run framework may answer for its key.
+  it('the walking goal is the walking plan, has no run framework, and is not in the one-list picker', () => {
+    expect(cardioPlanKind({ goalKind: 'walking' })).toBe('walking')
+    expect(cardioPlanKind({ goalKind: 'other', frameworkKey: WALKING_FRAMEWORK_KEY })).toBe('walking')
+    expect(cardioPlanKind({ goalKind: 'heart_health', frameworkKey: 'zone2-base' })).toBe('running')
+    expect(CARDIO_GOALS.walking.defaultFrameworkKey).toBe(WALKING_FRAMEWORK_KEY)
+    expect(CARDIO_GOALS.walking.selectable).toBe(false)
   })
 })
 

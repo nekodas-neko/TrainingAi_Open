@@ -2280,7 +2280,7 @@ Client `pushMutations` (`lib/local-store/sync-engine.ts`) does `if (!res.ok) bre
 ## Session 170 — Full App Review / Overview + Backlog Archive (2026-06-30) ✅ Docs-only
 
 ### Headline
-At a stable point with the backlog cleared, ran a complete review/overview of the app and reorganised the planning docs. No code shipped — review + documentation only. Output: `docs/planned_upgrades.md` (a batched, cleared-of-completed list of new uplift work) plus an archive of the entire shipped plan/spec backlog. Merged via PR #49 (squash, auto-merge).
+At a stable point with the backlog cleared, ran a complete review/overview of the app and reorganised the planning docs. No code shipped — review + documentation only. Output: `docs/archive/planned_upgrades.md` (a batched, cleared-of-completed list of new uplift work) plus an archive of the entire shipped plan/spec backlog. Merged via PR #49 (squash, auto-merge).
 
 ### What was done
 1. **Documentation reconciliation.** Audited all 96 plans + 29 specs against the version history and live code — the entire backlog is shipped. Moved every plan to `docs/superpowers/plans/archive/` and every spec to `docs/superpowers/specs/archive/` (git-renamed, history preserved) so the active planning surface is clean. The only genuinely-open items were already tracked: device-only verifications, the muscle-volume-target setter UI, Phase 10 tier-borders (partial), and Body Battery tuning.
@@ -2295,7 +2295,7 @@ At a stable point with the backlog cleared, ran a complete review/overview of th
 - **Muscle-name matching inconsistent across 3 layers** ("Quads"/"quadriceps"/"quads" silently fail to join).
 - Plus: Oura OAuth missing `state` (CSRF), in-memory per-replica rate limiter, AI-chat libs shipped eagerly on 4 screens, 1Hz timer re-rendering the whole workout orchestrator, sync filtering on un-indexed `updated_at` + un-batched `applyDelta`, `body_metrics.steps` never written from Oura, sleep hypnogram unbuilt despite stored `sleepPhase5Min`, 3 near-identical health detail pages, reduced-motion/tap-target a11y gaps.
 
-### The 8 batches (see `docs/planned_upgrades.md` for full detail)
+### The 8 batches (see `docs/archive/planned_upgrades.md` for full detail)
 1. Periodization & strength-calc engine (densest correctness cluster) · 2. Biometric & recovery model (Body Battery/Oura) · 3. Sync & DB performance (migration 101) · 4. Client caching & bundle perf · 5. Security hardening · 6. Health data-viz & detail pages · 7. AI chat & proactive push · 8. Workout & nutrition UX features.
 
 ### Status
@@ -2385,7 +2385,7 @@ Specs: `docs/superpowers/specs/2026-07-01-end-of-day-review-design.md`, `2026-07
 - **Animations:** Health carousel inline/non-reusable; second hand-rolled swipe in workout-select; `@use-gesture` + Radix `Collapsible` installed but unused; `useReducedMotion` used nowhere; recommended architecture = extract `<SwipeCarousel>` + edge-swipe between the 5 tabs via `document.startViewTransition` (routes kept).
 
 **Deliverables (all on the branch, merged via PR):**
-1. `docs/planned_upgrades.md` **v2** — supersedes the session-170 list; exec summary, quick-wins table, batches A–I (I restores the v1 Batch-8 features that the rewrite had dropped: injury-aware substitution, dynamic TDEE, supersets, year-in-review).
+1. `docs/archive/planned_upgrades.md` **v2** — supersedes the session-170 list; exec summary, quick-wins table, batches A–I (I restores the v1 Batch-8 features that the rewrite had dropped: injury-aware substitution, dynamic TDEE, supersets, year-in-review).
 2. **Ten task-by-task implementation plans** in `docs/superpowers/plans/`: `2026-07-01-quick-wins.md` + `batch-a-offline-first-integrity` + `batch-b-caching-performance` + `batch-c-training-engine-logic` + `batch-d-security-hardening` + `batch-e-ai-usage` + `batch-f-data-analytics` + `batch-g-ui-system` + `batch-h-animations-navigation` + `batch-i-workout-nutrition-features`. Quick-wins + A–F were written by plan agents (session hit the usage limit mid-run — 7 of 10 survived complete); G/H/I were written inline afterwards, one commit each, to keep token usage trackable.
 3. Suggested execution order: quick wins → A → B → C → D → E → F → G/H → I.
 

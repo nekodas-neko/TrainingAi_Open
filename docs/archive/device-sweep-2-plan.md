@@ -3,7 +3,7 @@
 **Owner:** 📱 Device Verification · **Written:** 2026-09-23, phone unplugged · **Runs:** only on the
 owner's go-ahead, 🔴 before the first input and 🟢 when the phone may be unplugged.
 
-Sweep 1 (`docs/device-sweep-1-plan.md`, journal `2026-09-23-device-sweep-1.md`) ran the performance
+Sweep 1 (`docs/archive/device-sweep-1-plan.md`, journal `2026-09-23-device-sweep-1.md`) ran the performance
 probes and the approved writes. This plan takes **what is left** and groups it by **what one visit
 settles**: a station is one screen (and at most one write cycle), and every entry that screen can
 answer is run while there. The per-entry detail — what to do and what passes — is in sweep 1's

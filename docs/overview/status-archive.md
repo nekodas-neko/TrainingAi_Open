@@ -3356,7 +3356,7 @@ queued **seven scoped fix plans W1–W7** in `docs/implementation-backlog.md` (c
 wiring & load-performance audit (`docs/reviews/2026-07-20-wiring-caching-perf-audit.md`) shipped its
 seven W1–W7 fix plans (see the entries below). **Corrected 2026-07-30:** this paragraph used to claim
 "every previously-open backlog task buildable in the sandbox is done" and pointed at
-`docs/owner-action-required.md` as the authoritative what's-left list — both were stale by the time of
+`docs/archive/owner-action-required.md` as the authoritative what's-left list — both were stale by the time of
 a fresh audit (a 3,000-line backlog had accumulated real, non-device-gated open items alongside ~2,300
 lines of unremoved shipped work; `owner-action-required.md` hadn't tracked most of the last 9 days).
 `docs/implementation-backlog.md` was trimmed and corrected 2026-07-30 and is the current source for

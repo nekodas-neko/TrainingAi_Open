@@ -60,3 +60,30 @@ export function buildEquipmentSet(selected: string[]): Set<string> {
 export function equipmentEligible(exerciseEquipment: string[], owned: Set<string>): boolean {
   return exerciseEquipment.some(e => owned.has(e.toLowerCase()))
 }
+
+/**
+ * The equipment a name's first word says, or null when it names none (#3751). The exercise
+ * generator asks the model to prefix a name with its equipment ("Barbell Hip Thrust") and to list
+ * that equipment first; the prefix is what the lifter reads, so code makes the list agree with it
+ * rather than trusting the model to. Abbreviations are included because a lifter types them.
+ */
+const PREFIX_EQUIPMENT: Record<string, string> = {
+  barbell: 'barbell', bb: 'barbell',
+  dumbbell: 'dumbbell', dumbbells: 'dumbbell', db: 'dumbbell',
+  cable: 'cable', cables: 'cable',
+  kettlebell: 'kettlebell', kettlebells: 'kettlebell', kb: 'kettlebell',
+  machine: 'machine', smith: 'machine',
+  bodyweight: 'bodyweight',
+}
+
+export function equipmentFromNamePrefix(name: string): string | null {
+  const first = name.trim().split(/[\s-]+/)[0]?.toLowerCase() ?? ''
+  return PREFIX_EQUIPMENT[first] ?? null
+}
+
+/** `equipment` with the name's prefix equipment first, once. Unchanged when the name has no prefix. */
+export function equipmentLedByName<T extends string>(name: string, equipment: readonly T[]): T[] {
+  const lead = equipmentFromNamePrefix(name) as T | null
+  if (!lead) return [...equipment]
+  return [lead, ...equipment.filter(e => e !== lead)]
+}

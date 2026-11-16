@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
-import { reportError } from '../../../core/reporting/index.ts';
 import {
   alertPermission,
   alertPermissionAskable,
@@ -18,14 +17,10 @@ import {
 import {
   clearWorkoutStatus,
   createWorkoutStatusReporter,
-  promotionDiagnostic,
 } from './workout-status';
 
 // A burst of journal writes (a set logged, its rest started) becomes one update.
 const DEBOUNCE_MS = 250;
-// How long after the app's first post to read back what the system did with it.
-const PROMOTION_CHECK_MS = 2_000;
-let promotionReported = false;
 
 /**
  * Clears the notification when the account goes: signed out, or a different one. It sits above
@@ -73,7 +68,6 @@ export function WorkoutStatusSync({
     const send = () => {
       reconciled.current = true;
       reporter.update(active);
-      if (active) checkPromotionOnce();
     };
     const delay = statusDelay(AppState.currentState, reconciled.current, DEBOUNCE_MS);
     if (delay === null) {
@@ -163,16 +157,4 @@ export function WorkoutStatusSync({
     if (request) route(request);
   }, [journal.ready]);
   return null;
-}
-
-/** Once per app start, shortly after the first post, reports what the system did with it. */
-function checkPromotionOnce() {
-  if (promotionReported || !workoutStatus) return;
-  promotionReported = true;
-  setTimeout(() => {
-    try {
-      const report = workoutStatus?.promotion();
-      if (report) reportError(new Error(promotionDiagnostic(report)));
-    } catch {}
-  }, PROMOTION_CHECK_MS);
 }

@@ -3,7 +3,7 @@
 **Branch:** `device/sweep-4a` · **Agent:** Device Verification · **Docs + `scripts/device/**`.**
 
 S25 Ultra, **APK 1.465.52** (updated by the owner that morning), web v1.465.66, **gesture navigation**,
-owner's account. Plan: `docs/device-sweep-4-plan.md`, sitting 4a. Production was watched throughout
+owner's account. Plan: `docs/archive/device-sweep-4-plan.md`, sitting 4a. Production was watched throughout
 (72 checks, all 200, none over 5 s). The phone showed 🔴 throughout and 🟢 at the end.
 
 ## Verified and closed

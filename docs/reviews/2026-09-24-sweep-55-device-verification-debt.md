@@ -11,7 +11,7 @@ looked at the three places a device check can hide from them:
 |---|---:|---|
 | backlog entries parked behind the device gate | 21 | `--sittings` lists them since RV-143. Seven were misfiled, and this PR fixes them |
 | `projectOverview.md` Known-Issues rows saying "NOT device-verified" | **155** | **not at all** — `next-item.js` never reads `projectOverview.md` |
-| `docs/device-verification-queue.md` (owner's hand-run list, last edited 2026-09-01) | 41 | **not at all** — nothing in DV's baton or the agents README names it |
+| `docs/archive/device-verification-queue.md` (owner's hand-run list, last edited 2026-09-01) | 41 | **not at all** — nothing in DV's baton or the agents README names it |
 
 Six read-only agents triaged the 155 rows and the old queue file, one chunk each. Every verdict
 below came from reading the row and the current code, and each cites its evidence. The
@@ -221,7 +221,7 @@ that mode are live.
 A Known-Issues row saying "NOT device-verified" was the **pre-agent** mechanism for owing a check:
 the owner read `projectOverview.md` and ran what he could. The device agent replaced him as the
 runner and reads only the backlog, so every such row written before 2026-09-22, and several
-written after, fell into a list nobody runs. `docs/device-verification-queue.md` is the same
+written after, fell into a list nobody runs. `docs/archive/device-verification-queue.md` is the same
 mechanism a second time: 5 of its 41 rows are still owed and invisible (§1 A, §2.6).
 
 **The rule this sweep recommends:** an owed device check lives on a backlog line (`Verify: device`,
@@ -229,5 +229,5 @@ a `Keep:` naming the device, or `Lane: DV`). A Known-Issues row may *point at* t
 not be the only place the check is written. Mechanise it the way RV-143 was: have
 `check-backlog-pointers.js` fail on a new Known-Issues heading that says not device-verified and
 names no queued id. Baseline the existing rows shrink-only, the way the done-headings were. Retire
-`docs/device-verification-queue.md` to a pointer at `--sittings` once §1 A and §2.6 have taken its
+`docs/archive/device-verification-queue.md` to a pointer at `--sittings` once §1 A and §2.6 have taken its
 five live rows.
