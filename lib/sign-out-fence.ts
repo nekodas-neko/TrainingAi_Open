@@ -30,8 +30,11 @@ let installed = false
 const live = new Set<AbortController>()
 const MAX_TRACKED = 200
 
+/** The message every refused request rejects with, so error reporters can tell it apart. */
+export const SIGN_OUT_ABORT_MESSAGE = 'Signed out while the request was in flight'
+
 function abortError(): DOMException {
-  return new DOMException('Signed out while the request was in flight', 'AbortError')
+  return new DOMException(SIGN_OUT_ABORT_MESSAGE, 'AbortError')
 }
 
 function isServerAction(input: RequestInfo | URL, init?: RequestInit): boolean {
@@ -76,6 +79,20 @@ export function installSignOutFence(): void {
   if (installed || typeof window === 'undefined' || typeof window.fetch !== 'function') return
   installed = true
   window.fetch = fencedFetch(window.fetch.bind(window))
+}
+
+/**
+ * True while a sign-out runs. Senders that do not go through `fetch` (a beacon, Sentry's own
+ * transport) check it and stay quiet: their response would carry the old session cookie back.
+ */
+export function isSigningOut(): boolean {
+  return fencing
+}
+
+/** A rejection the fence itself caused: expected, never an error worth reporting. */
+export function isSignOutAbort(reason: unknown): boolean {
+  return typeof reason === 'object' && reason !== null
+    && (reason as { message?: unknown }).message === SIGN_OUT_ABORT_MESSAGE
 }
 
 /** Step 1: refuse and abort everything this page has in flight. */

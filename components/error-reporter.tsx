@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { startAppLoadReporting } from "@/lib/app-load-metrics"
 import { reportRenderProcessDeaths } from "@/lib/renderer-recovery"
+import { isSigningOut, isSignOutAbort } from "@/lib/sign-out-fence"
 
 const MAX_REPORTS_PER_MINUTE = 5
 const THROTTLE_WINDOW_MS = 60_000
@@ -17,6 +18,9 @@ export function ErrorReporter() {
     let reportTimestamps: number[] = []
 
     function report(message: string, stack?: string | null) {
+      // #3806. A beacon is not `fetch`, so the sign-out fence cannot abort it, and its response
+      // would carry the old session cookie back after the sign-out cleared it.
+      if (isSigningOut()) return
       if (seenMessages.has(message)) return
       seenMessages.add(message)
 
@@ -38,6 +42,8 @@ export function ErrorReporter() {
     }
     function onRejection(event: PromiseRejectionEvent) {
       const reason = event.reason
+      // The fence rejects every request it refuses; a caller that does not catch that is expected.
+      if (isSignOutAbort(reason)) return
       const message = reason instanceof Error ? reason.message : String(reason)
       report(message, reason instanceof Error ? reason.stack : undefined)
     }

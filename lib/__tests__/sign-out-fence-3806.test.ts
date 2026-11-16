@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   __resetSignOutFenceForTests, allowSignOutRequest, beginSignOut, endSignOut, fencedFetch,
+  isSigningOut, isSignOutAbort,
 } from '@/lib/sign-out-fence'
 
 type Pending = { url: string; signal: AbortSignal | undefined; resolve: (r: Response) => void }
@@ -95,5 +96,20 @@ describe('signOutAndClearDevice ordering', () => {
     expect(order).toEqual(['fence', 'latch', 'clear-local', 'clear-cache', 'clear-storage', 'allow', 'server', 'unfence'])
     vi.doUnmock('@/lib/local-store'); vi.doUnmock('@/lib/sqlite/cache'); vi.doUnmock('@/lib/sign-out-storage')
     vi.doUnmock('@/lib/sign-out-fence'); vi.doUnmock('@/app/actions')
+  })
+
+  // Senders that bypass fetch (the error reporter's beacon, Sentry's transport) read these.
+  it('says when a sign-out runs, and recognises its own refusals', async () => {
+    const net = fakeNetwork()
+    expect(isSigningOut()).toBe(false)
+    const late = net.fetch('/api/user/trophy-pins')
+    beginSignOut()
+    expect(isSigningOut()).toBe(true)
+    const reason = await late.catch((e: unknown) => e)
+    expect(isSignOutAbort(reason)).toBe(true)
+    expect(isSignOutAbort(new Error('network down'))).toBe(false)
+    expect(isSignOutAbort(null)).toBe(false)
+    endSignOut()
+    expect(isSigningOut()).toBe(false)
   })
 })
