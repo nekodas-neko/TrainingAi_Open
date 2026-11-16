@@ -69,7 +69,14 @@ export async function createProviderUser(db: Db, provider: AuthProvider, subject
         throw new IdentityConflict()
       }
       const hadPassword = user.passwordHash !== null
-      ;[user] = await x.update(users).set({ passwordHash: null }).where(eq(users.id, user.id)).returning()
+      // #3830: the link applies the invite as Google's does (`linkOAuthAccount`): `isActive` is the
+      // caller's verdict (an authoritative, invited address), and it only ever activates.
+      const updated = await x.update(users).set({ passwordHash: null, ...(isActive ? { isActive: true } : {}) })
+        .where(eq(users.id, user.id)).returning()
+      if (updated.length !== 1) {
+        throw new IdentityConflict()
+      }
+      ;[user] = updated
       // #3797: a cleared password ends that password's native sign-ins, as a Google link does
       // (`linkOAuthAccount`). Only an inactive account reaches here, and an inactive account is not
       // issued or rotated native sign-ins, so the user row is locked before the families without

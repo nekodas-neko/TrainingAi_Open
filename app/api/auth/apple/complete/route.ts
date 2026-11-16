@@ -6,7 +6,8 @@ import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { clientIp } from '@trainingai/shared/http/client-ip'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { verifyAppleIdentityToken } from '@/lib/auth/apple'
+import { appleEmailIsAuthoritative, verifyAppleIdentityToken } from '@/lib/auth/apple'
+import { inviteActivates } from '@/lib/auth/sign-in'
 import { appleResponse } from '@/lib/auth/apple-response'
 import { IdentityConflict } from '@/lib/auth/identity'
 import { issueNativeSession, presentedNativeFamily } from '@/lib/auth/mobile/session'
@@ -59,7 +60,10 @@ export async function POST(req: NextRequest) {
       if (!identity.email) {
         return appleResponse({ error: 'Allow Apple to share an email address, then try again.' }, 400)
       }
-      user = await repository.createProviderUser('apple', identity.subject, identity.email, body.data.name)
+      // #3830: the invite applies, on a new account or a link onto a pending one, only to a verified,
+      // non-relay address.
+      const activate = await inviteActivates(repository, identity.email, appleEmailIsAuthoritative(identity))
+      user = await repository.createProviderUser('apple', identity.subject, identity.email, body.data.name, { activate })
     }
     if (!user?.isActive) {
       return appleResponse({ error: 'account_pending' }, 403)

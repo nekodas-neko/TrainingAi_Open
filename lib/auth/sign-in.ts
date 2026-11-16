@@ -15,6 +15,15 @@ async function approvalRedirect(provider: 'google' | 'credentials', mobileState?
   return `${nativeSignInPath(transaction)}?error=account_pending`
 }
 
+/**
+ * One rule for every provider's link and new-account paths (#3797 item 3, #3830): an invite activates
+ * the account only when the provider is authoritative for the address. The caller decides what
+ * "authoritative" means for its provider; an unauthoritative address never reaches the invite list.
+ */
+export async function inviteActivates(repository: { isInvited(email: string): Promise<boolean> }, email: string, authoritativeEmail: boolean) {
+  return authoritativeEmail && await repository.isInvited(email)
+}
+
 async function googleUser(email: string, name: string | null | undefined, oauthSub: string, authoritativeEmail: boolean) {
   const repository = await getRepositoryAsync()
   const linked = await repository.getUserByOAuthSub(oauthSub)
@@ -23,7 +32,7 @@ async function googleUser(email: string, name: string | null | undefined, oauthS
   }
   // One rule for both paths below (#3797 item 3): an invite activates the account only when Google
   // is authoritative for the address (`authorizeSignIn` has already required `email_verified`).
-  const invited = async () => authoritativeEmail && await repository.isInvited(email)
+  const invited = () => inviteActivates(repository, email, authoritativeEmail)
   const existing = await repository.getUserByEmail(email)
   if (existing) {
     if (existing.oauthSub || !authoritativeEmail) {

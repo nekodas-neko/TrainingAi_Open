@@ -629,7 +629,7 @@ export interface WorkoutRepository {
   /** #3797: when the newest sign-in method was linked onto the account, or null when none is. */
   getLatestIdentityLinkedAt(userId: string): Promise<Date | null>
   linkIdentity(userId: string, provider: AuthProvider, subject: string, email?: string): Promise<boolean>
-  createProviderUser(provider: AuthProvider, subject: string, email: string, name?: string): Promise<User>
+  createProviderUser(provider: AuthProvider, subject: string, email: string, name?: string, opts?: { activate?: boolean }): Promise<User>
   createAppleAuthAttempt(nonceHash: string, userId: string | null): Promise<AppleAuthAttempt>
   getAppleAuthAttempt(id: string): Promise<AppleAuthAttempt | null>
   consumeAppleAuthAttempt(id: string): Promise<AppleAuthAttempt | null>

@@ -21,5 +21,20 @@ export async function verifyAppleIdentityToken(identityToken: string, nonceHash:
   const verifiedEmail = payload.email_verified === true || payload.email_verified === 'true'
   const email = verifiedEmail && typeof payload.email === 'string' && payload.email.length <= 320
     && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email) ? payload.email : undefined
-  return { subject: payload.sub, email }
+  const privateRelay = payload.is_private_email === true || payload.is_private_email === 'true'
+  return { subject: payload.sub, email, emailVerified: verifiedEmail, privateRelay }
+}
+
+export const APPLE_PRIVATE_RELAY_DOMAIN = 'privaterelay.appleid.com'
+
+/**
+ * #3830: whether Apple vouches for the address enough for an invite to activate the account. Only a
+ * verified, real address does: a private-relay address is Apple's forwarder, not the invited inbox.
+ * Fails closed: anything missing or unclear is false.
+ */
+export function appleEmailIsAuthoritative(identity: { email?: string; emailVerified?: boolean; privateRelay?: boolean }) {
+  if (!identity.email || identity.emailVerified !== true || identity.privateRelay !== false) {
+    return false
+  }
+  return !identity.email.trim().toLowerCase().endsWith(`@${APPLE_PRIVATE_RELAY_DOMAIN}`)
 }
