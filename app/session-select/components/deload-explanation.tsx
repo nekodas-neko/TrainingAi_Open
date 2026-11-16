@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDownIcon, ThermometerIcon, HeartPulseIcon, MoonIcon, BatteryLowIcon, CalendarClockIcon, ActivityIcon } from "lucide-react";
+import { ChevronDownIcon, ThermometerIcon, BatteryLowIcon, CalendarClockIcon, ActivityIcon } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn } from "@trainingai/shared/utils";
 import type { NextSessionRecommendation } from "@trainingai/shared/types/program";
@@ -39,18 +39,6 @@ export function buildSignals(rec: NextSessionRecommendation): Signal[] {
       text: `Readiness ${Math.round(s.ouraReadiness)} — below the ${softMin}+ range where hard training is well tolerated.`,
     });
   }
-  if (rec.hrvWarning || (s?.hrvTrend != null && s.hrvTrend < 0.85)) {
-    out.push({
-      icon: <HeartPulseIcon className="h-3.5 w-3.5" />,
-      text: "HRV is trending down versus your recent baseline — a reliable marker that your nervous system is still recovering.",
-    });
-  }
-  if (s?.sleepTrend != null && s.sleepTrend < 0.85) {
-    out.push({
-      icon: <MoonIcon className="h-3.5 w-3.5" />,
-      text: "Recent sleep is short of your typical amount, so recovery capacity is reduced today.",
-    });
-  }
   if (rec.consecutiveTrainingDays != null && rec.consecutiveTrainingDays >= 3) {
     out.push({
       icon: <CalendarClockIcon className="h-3.5 w-3.5" />,
@@ -67,6 +55,9 @@ export function buildSignals(rec: NextSessionRecommendation): Signal[] {
   // computeDeloadStrength and the sick/energy checks in ai-dynamic.ts never read them. And the
   // check-in pre-ticks recently trained muscles, so the line mostly read the app's own guess back
   // as a reason.
+  // No HRV or sleep-trend line either (#3837). hrvWarning is computed after the deload decision and
+  // only returned, and sleepTrend only shifts the session-scoring weights, so neither is a reason
+  // to ease off.
   return out;
 }
 
