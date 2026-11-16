@@ -65,6 +65,18 @@ describe('GET /api/activity-detection/walks (#2471)', () => {
     expect(repo.getOuraWorkouts).toHaveBeenLastCalledWith('u1', { from: '2026-10-06', to: '2026-10-08' })
   })
 
+  it('leaves out the whole walk when the source workout covers only its middle', async () => {
+    // Oura recorded 09:20–09:24 of the 09:10–09:32 walk. Excluding those minutes would offer
+    // 09:10–09:20 and 09:24–09:32 as two walks, each long enough to count; neither is offered.
+    repo.getOuraWorkouts.mockImplementation(async () => [{ startDatetime: new Date(T0 + 20 * MIN), endDatetime: new Date(T0 + 24 * MIN) }])
+    expect((await (await get()).json()).walks).toEqual([])
+  })
+
+  it('still offers a walk that only touches a source workout end to end', async () => {
+    repo.getOuraWorkouts.mockImplementation(async () => [{ startDatetime: new Date(T0 + 32 * MIN), endDatetime: new Date(T0 + 50 * MIN) }])
+    expect((await (await get()).json()).walks).toHaveLength(1)
+  })
+
   it('still offers the walk when the source workouts cannot be read', async () => {
     repo.getOuraWorkouts.mockImplementation(async () => { throw new Error('db down') })
     const res = await get()

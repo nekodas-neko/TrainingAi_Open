@@ -19,11 +19,10 @@ interface Props {
  * **Q-231 removed the Oura half, not this card.** It used to ingest `/api/oura/workouts?unreviewed=true`
  * into `pendingSessions` as well, and the entry's scope said to retire the card outright on the grounds
  * that *"retiring this card removes nothing he currently sees working"*. That was measured and is not so:
- * `pendingSessions` has a second writer, the **live phone-GPS detector** — `AutoDetectionProvider` is
- * mounted in `app/layout.tsx` and calls `startAutoDetection()` unconditionally on native, `endSession()`
- * turns a qualifying walk into a pending session, and **this card is the only surface that renders one**
- * (the review sheet resolves a session by an id only this card supplies). Removing it would have orphaned
- * that pipeline silently.
+ * `pendingSessions` then had a second writer, the live phone-GPS detector, and **this card is the only
+ * surface that renders one** (the review sheet resolves a session by an id only this card supplies).
+ * #3844 removed that detector; a phone walk it left in the persisted store still shows here until
+ * answered.
  *
  * So what went is the Cloud plumbing the owner actually asked about — the unreviewed fetch, the ingest,
  * and the server-side mark-reviewed PATCH. Dismissal is now purely local, which is all a phone session

@@ -77,14 +77,16 @@ export async function GET(req: NextRequest) {
           ?? (a.durationMin != null ? new Date(start.getTime() + a.durationMin * 60_000) : null)
         return end && end > start ? [{ startMs: start.getTime(), endMs: end.getTime() }] : []
       }),
-      // #3844: a walk the source already recorded as a workout is not offered again. Read as a plain
-      // interval, whatever the source labelled it: any recorded workout covers that time.
-      ...sourceWorkouts.flatMap(w => {
-        const startMs = w.startDatetime.getTime()
-        const endMs = w.endDatetime.getTime()
-        return endMs > startMs ? [{ startMs, endMs }] : []
-      }),
     ]
+    // #3844: a walk the source already recorded as a workout is not offered again. Read as a plain
+    // interval, whatever the source labelled it. A source's workout often starts after the walk does
+    // and ends before it, so these are not exclusions (which would offer the walk's two ends as two
+    // short walks): any detected walk that overlaps one is dropped whole.
+    const sourceSpans = sourceWorkouts.flatMap(w => {
+      const startMs = w.startDatetime.getTime()
+      const endMs = w.endDatetime.getTime()
+      return endMs > startMs ? [{ startMs, endMs }] : []
+    })
 
     const grid = deviceMetGrid(
       metGridFromDaytimeSamples(daytime.met),
@@ -93,6 +95,7 @@ export async function GET(req: NextRequest) {
     )
     const walks = detectWalksFromMet(grid, exclusions)
       .filter(w => w.startMs >= dayStart.getTime() && w.startMs < dayEnd.getTime())
+      .filter(w => !sourceSpans.some(x => w.startMs < x.endMs && w.endMs > x.startMs))
 
     return NextResponse.json({ date, walks } satisfies WalkCandidatesResponse, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
