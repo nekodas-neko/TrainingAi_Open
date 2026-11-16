@@ -147,6 +147,30 @@ describe.skipIf(!canRun)('#3797 — linking Google ends the cleared password\'s 
     expect(await live(ME)).toBe(0)
   })
 
+  // #3830: the Apple link applies the invite only when the caller says it may.
+  it('Apple\'s link activates a pending invited account when told to, and only then', async () => {
+    await passwordAccount(ME, EMAIL, false)
+    const pending = await repo.createProviderUser('apple', 'apple-sub-3830a', EMAIL, undefined, { activate: false })
+    expect(pending.id).toBe(ME)
+    expect(pending.isActive).toBe(false)
+    expect((await repo.getUserById(ME))?.isActive).toBe(false)
+
+    await raw(`DELETE FROM users WHERE id = $1`, [ME])
+    await passwordAccount(ME, EMAIL, false)
+    const active = await repo.createProviderUser('apple', 'apple-sub-3830b', EMAIL, undefined, { activate: true })
+    expect(active.id).toBe(ME)
+    expect(active.isActive).toBe(true)
+    expect((await repo.getUserById(ME))?.isActive).toBe(true)
+  })
+
+  it('Apple\'s path leaves an already-active account unchanged', async () => {
+    await passwordAccount(ME, EMAIL, true)
+    await expect(repo.createProviderUser('apple', 'apple-sub-3830c', EMAIL, undefined, { activate: true })).rejects.toThrow()
+    const row = (await raw(`SELECT is_active, password_hash FROM users WHERE id = $1`, [ME])).rows[0]
+    expect(row).toEqual({ is_active: true, password_hash: 'a-hash' })
+    expect((await raw(`SELECT count(*)::int AS n FROM auth_identities WHERE user_id = $1`, [ME])).rows[0].n).toBe(0)
+  })
+
   it('reports when the newest sign-in method was linked', async () => {
     await passwordAccount(ME, EMAIL)
     expect(await repo.getLatestIdentityLinkedAt(ME)).toBeNull()

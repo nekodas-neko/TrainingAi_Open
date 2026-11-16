@@ -912,8 +912,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async linkIdentity(userId: string, provider: AuthProvider, subject: string, email?: string) {
     return authData.linkIdentity(this.db, userId, provider, subject, email)
   }
-  async createProviderUser(provider: AuthProvider, subject: string, email: string, name?: string): Promise<User> {
-    const row = await authData.createProviderUser(this.db, provider, subject, email, name, await this.isInvited(email))
+  async createProviderUser(provider: AuthProvider, subject: string, email: string, name?: string, opts: { activate?: boolean } = {}): Promise<User> {
+    // #3830: whether the invite applies is the caller's call (it knows how far the provider vouches
+    // for the address); absent, nothing is activated.
+    const row = await authData.createProviderUser(this.db, provider, subject, email, name, opts.activate === true)
     return this.ensureUserDefaults(this.rowToUser(row))
   }
   async createAppleAuthAttempt(nonceHash: string, userId: string | null) { return authData.createAppleAuthAttempt(this.db, nonceHash, userId) }
