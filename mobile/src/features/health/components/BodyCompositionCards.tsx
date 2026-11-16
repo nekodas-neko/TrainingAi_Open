@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { bodyComposition } from '@trainingai/shared/health/body-composition';
 import {
@@ -13,7 +13,7 @@ import {
   Stack,
 } from '../../../shared/ui';
 import { layoutMotion } from '../../../shared/ui/layoutMotion';
-import { PRESSED_OPACITY } from '../../../shared/ui/pressFeedback';
+import { Pressable } from '../../../shared/ui/Pressable';
 import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
 import { bodyCardColors } from '../../../shared/theme/tokens';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -172,11 +172,7 @@ export function ScaleCompositionCard({ rows, today }: { rows: readonly BodyRow[]
               layoutMotion(reduced);
               setOpen(!open);
             }}
-            style={({ pressed }) => ({
-              minHeight: theme.sizes.touchTarget,
-              justifyContent: 'center',
-              opacity: pressed ? PRESSED_OPACITY : 1,
-            })}
+            style={{ minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}
           >
             <Stack direction="row" align="center" gap="xs">
               <Stack gap="xxs" style={{ flex: 1, minWidth: 0 }}>
