@@ -127,4 +127,11 @@ describe('activityHrWindows keeps only spans the app believes (#3775, #3801)', (
     expect(activityHrWindows({ sessions: [ok] }, 'Australia/Brisbane')).toHaveLength(1)
     expect(activityHrWindows({ sessions: [tooLong] }, 'Australia/Brisbane')).toEqual([])
   })
+
+  it('a log whose end equals its start (read as a 24-hour span) gives no window', () => {
+    const log = { date: '2026-07-01', startTime: '15:50:00', endTime: '15:50:00', durationMin: 0.2 }
+    expect(activityHrWindows({ activityLogs: [log] }, 'Australia/Brisbane')).toEqual([])
+    const real = { date: '2026-07-01', startTime: '15:50:00', endTime: '16:30:00', durationMin: 40 }
+    expect(activityHrWindows({ activityLogs: [real] }, 'Australia/Brisbane')).toHaveLength(1)
+  })
 })

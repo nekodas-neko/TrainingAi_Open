@@ -60,7 +60,7 @@ raw_windows AS (
     FROM claude_ro.activity_logs l CROSS JOIN floors f
     WHERE l.deleted_at IS NULL AND l.start_time IS NOT NULL
   ) a
-  WHERE a.w_to IS NOT NULL AND a.w_to > a.w_from
+  WHERE a.w_to IS NOT NULL AND a.w_to > a.w_from AND a.w_to - a.w_from <= interval '240 minutes'
 ),
 -- Merged so an overlap of two windows is never counted twice (`prepareWindows`).
 win_marked AS (
