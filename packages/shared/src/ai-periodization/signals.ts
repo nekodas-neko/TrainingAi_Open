@@ -7,7 +7,7 @@ import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared
 import { latestIllnessFromDerived, type IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
 import { loadNightTemperature } from '@/lib/health/night-temperature'
-import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
+import { liveReadinessReadingForDay } from '@trainingai/shared/health/live-readiness'
 import { sleepDurationTrend, sleepScoreTrend } from '@trainingai/shared/health/sleep-trend'
 import { moodMuscleMatches, normalizeMuscle } from '@trainingai/shared/muscles'
 import { sessionsRemainingThisWeek } from '@trainingai/shared/schedule-utils'
@@ -127,6 +127,10 @@ export interface PrescriptionSignals {
   // Hook for external readiness data (e.g. Oura). Treated as one signal among
   // many — not a source of truth. null when no integration is active.
   externalReadiness: number | null
+  /** `model_versions.readiness` of the row `externalReadiness` came from (#3824). Today's row can
+   *  still hold a pre-#3778 score on release day, so the prompt states the cut for its scale.
+   *  Omitted only by fixtures; omitted reads as the current model. */
+  externalReadinessModelVersion?: string | null
   // Own whole-day training-stress (OTS) state for today — the purpose-built overtraining
   // signal (F9). null when the model gated (insufficient MET / learning).
   trainingLoadOts: number | null
@@ -581,6 +585,8 @@ export async function aggregateSignals(
   const illness = latestIllness ? { flag: latestIllness.flag, score: latestIllness.score } : null
   // Today's derived row (OTS is a whole-day signal keyed to today, unlike illness's latest-available).
   const todayDerived = derivedRows.find(r => r.day === today) ?? null
+  // #3824: the score with the model version that produced it, so the prompt can state its cut.
+  const todayReading = liveReadinessReadingForDay(today, derivedRows)
 
   // Skin-temp z from readiness v8's own per-input choice (`loadNightTemperature`), so
   // prescription/readiness/illness can never disagree about last night's temperature. On a night
@@ -648,7 +654,8 @@ export async function aggregateSignals(
     illness,
     // Live composite (our BLE-derived readiness), never the frozen Cloud column. `today` is
     // always post-re-key, so no Cloud fallback is needed — derivedRows is already in scope.
-    externalReadiness: liveReadinessForDay(today, derivedRows),
+    externalReadiness: todayReading?.score ?? null,
+    externalReadinessModelVersion: todayReading?.modelVersion ?? null,
     trainingLoadOts: todayDerived?.trainingLoadOts ?? null,
     trainingLoadHigh: todayDerived?.trainingLoadHigh ?? null,
     // #3077: the ring's 1-5 level stands only before the switch day; from it the ring's rows are

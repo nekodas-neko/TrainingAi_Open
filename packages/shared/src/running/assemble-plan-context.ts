@@ -10,7 +10,7 @@ import { computeVolumeAcwr, computeMonotonyStrain, acwrBaselineDaysRemaining } f
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
 import { isLowerBodyMuscle } from '@trainingai/shared/running/lower-body'
 import { isPushSession, inferEnvironment } from '@trainingai/shared/running/push-sessions'
-import { liveReadinessForDay, isOwnReadinessSource } from '@trainingai/shared/health/live-readiness'
+import { liveReadinessReadingForDay, isOwnReadinessSource } from '@trainingai/shared/health/live-readiness'
 import { BASELINE_MIN_NIGHTS, storedReadinessLearning } from '@trainingai/shared/health/readiness-composite'
 import { meanRestingHr, restingHrWindow } from '@trainingai/shared/health/resting-hr-mean'
 import { nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
@@ -48,7 +48,9 @@ export async function assembleInputs(
   ])
 
   // Readiness + provisional flag. Readiness is the own BLE-derived composite (source-checked).
-  const readiness = liveReadinessForDay(todayIso, derivedRows)
+  // #3824: with the version that scored it — today's row can predate #3778 on release day.
+  const reading = liveReadinessReadingForDay(todayIso, derivedRows)
+  const readiness = reading?.score ?? null
   // "Provisional" means the baseline is genuinely still LEARNING (a summary row exists but n_history
   // is immature) — NOT that today's summary is simply absent (rollup not run yet). Absent data must
   // degrade to neutral, not silently soften the run (E2-8).
@@ -123,6 +125,7 @@ export async function assembleInputs(
   // The gate itself applies the heavy-leg volume threshold — pass the raw computed volume.
   const gate: RecoveryGateInputs = {
     readiness,
+    readinessModelVersion: reading?.modelVersion ?? null,
     readinessProvisional,
     hoursSinceLowerBodyStrength,
     lastLowerBodyVolumeKg,

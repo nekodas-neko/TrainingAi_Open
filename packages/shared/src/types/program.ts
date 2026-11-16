@@ -144,6 +144,9 @@ export interface NextSessionRecommendation {
      *  separate call sites to render this value as "Oura readiness" (BF-178). Call it
      *  "Readiness", matching Home. */
     ouraReadiness: number | null
+    /** The model version that scored `ouraReadiness`, so the explain page grades it on its own
+     *  scale (#3824). Absent on a response from before the field existed. */
+    ouraReadinessModelVersion?: string | null
     sleepTrend: number | null
     hrvTrend: number | null
     energyLevel: string | null

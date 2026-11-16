@@ -302,6 +302,7 @@ export const trendsSpec = (date: string) => ({
         date: z.string(),
         ...numericFields([
           'readinessScore',
+          'readinessScoreCurrentScale',
           'sleepScore',
           'activityScore',
           'hrvMs',

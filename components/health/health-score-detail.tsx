@@ -215,7 +215,8 @@ export function HealthScoreDetail({
   const pageGradient = usePageGradient(theme);
   // Live score against the trend days before today, through the helper Preview shares (#3006).
   const avg = averageContext
-    ? scoreAverageChip(score, (trends?.trends ?? []).filter(t => t.date < today).map(t => t[trendField]))
+    // #3824: readiness averages the days on the current scale, so a window spanning #3778 compares like with like.
+    ? scoreAverageChip(score, (trends?.trends ?? []).filter(t => t.date < today).map(t => trendField === "readinessScore" ? t.readinessScoreCurrentScale : t[trendField]))
     : null;
   // #2435: today's Activity score is live-only (a day is stored once it has ended), so the trend has
   // no stored point for today. Show the live score there, the number the hero above is showing.

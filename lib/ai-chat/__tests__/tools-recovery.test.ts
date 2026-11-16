@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildChatTools } from '@/lib/ai-chat/tools'
 import type { WorkoutRepository } from '@/lib/data/repository'
+import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 
 // Stub only what getRecoveryData touches — the tool must surface spo2Pct, which
 // body_metrics has carried all along while the chat payload silently dropped it.
@@ -64,7 +65,7 @@ describe("recovery chat tools never send Oura's scores as ours (#3000)", () => {
 
   it('getRecoveryData: our scores are the ones sent', async () => {
     const tools = buildChatTools(withDerived([
-      { day: '2026-10-17', readinessScore: 55, readinessSource: 'ble-derived', sleepScore: 64, activityScore: 40 },
+      { day: '2026-10-17', readinessScore: 55, readinessSource: 'ble-derived', modelVersions: { readiness: READINESS_MODEL_VERSION }, sleepScore: 64, activityScore: 40 },
     ]), 'u1', 'Australia/Brisbane', '2026-10-18')
     const out = await plain(tools.getRecoveryData.execute!({ fromDate: '2026-10-11', toDate: '2026-10-18' }, ctx))
     expect(out.daily).toEqual([{ date: '2026-10-17', readiness: 55, sleepScore: 64, activityScore: 40, tempDeviationC: 0.2 }])
@@ -75,7 +76,7 @@ describe("recovery chat tools never send Oura's scores as ours (#3000)", () => {
     const none = await plain(tools.getRecoveryVsPerformance.execute!({ days: 30 }, ctx))
     expect(none.readinessDatesAvailable).toBe(0)
     const ours = buildChatTools(withDerived([
-      { day: '2026-10-17', readinessScore: 55, readinessSource: 'ble-derived' },
+      { day: '2026-10-17', readinessScore: 55, readinessSource: 'ble-derived', modelVersions: { readiness: READINESS_MODEL_VERSION } },
     ]), 'u1', 'Australia/Brisbane', '2026-10-18')
     expect((await plain(ours.getRecoveryVsPerformance.execute!({ days: 30 }, ctx))).readinessDatesAvailable).toBe(1)
   })

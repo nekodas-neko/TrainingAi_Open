@@ -83,7 +83,7 @@ describe.skipIf(!canRun)('training-stress persists its OTS once the gates pass (
       startTimestampMs: grid.metsPerMinute.length > 0 ? grid.startTimestampMs : dayStartMs,
       metsPerMinute: grid.metsPerMinute,
       age: 33, sex: 'male', rhr: 52,
-      readiness: 74, readinessProvisional: false,
+      readiness: 74, readinessModelVersion: null, readinessProvisional: false,
       vo2maxInputs: { restingHr: 52, measuredMaxHr: null, age: 33, sex: 'male', weightKg: 72, heightCm: 175, activityLevel: 'moderate' },
       tzChange: 0,
     })
@@ -99,7 +99,7 @@ describe.skipIf(!canRun)('training-stress persists its OTS once the gates pass (
       startTimestampMs: grid.startTimestampMs || dayStartMs,
       metsPerMinute: grid.metsPerMinute,
       age: 33, sex: 'male', rhr: 52,
-      readiness: 74, readinessProvisional: false,
+      readiness: 74, readinessModelVersion: null, readinessProvisional: false,
       vo2maxInputs: { restingHr: 52, measuredMaxHr: null, age: 33, sex: 'male', weightKg: 72, heightCm: 175, activityLevel: 'moderate' },
       tzChange: 0,
     })

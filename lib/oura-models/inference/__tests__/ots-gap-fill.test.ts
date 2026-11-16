@@ -116,7 +116,7 @@ describe('agrees with the vendored scorer', () => {
   const c = otsFillConstants()
   const score = (mets: number[]) => runTrainingStressScore({
     startTimestampMs: Date.parse('2026-10-05T14:00:00Z'), mets: Float32Array.from(mets),
-    age: 33, biologicalSex: 1, rhr: 58, noOts: 0, tzChange: 0, readiness: 70, vo2max: 45,
+    age: 33, biologicalSex: 1, rhr: 58, noOts: 0, tzChange: 0, readiness: 70, readinessModelVersion: null, vo2max: 45,
   })?.ots ?? NaN
 
   it("restates the scorer's intensity curve: score ratios equal factor ratios", () => {

@@ -44,12 +44,13 @@ import { scoreAvailability, metricAvailability, type ReadinessInputKey, type Sco
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
 import { ouraCloudDeliveredTypes } from '@/lib/oura/cloud/config'
 import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, readinessSourceLabel, readinessWindowStarts } from '@/lib/health/readiness-night-inputs'
+import { cutFor } from '@trainingai/shared/health/readiness-decision-thresholds'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
  *
  * The ACWR bound is deliberately **not** `ACWR_THRESHOLDS.optimalMax` (1.3). This fires while load
- * is still inside the optimal band, because it is paired with a readiness score under 45 — the
+ * is still inside the optimal band, because it is paired with a readiness score under 51 (45 before #3778) — the
  * pair is the signal, not either number on its own. Aligning it to 1.3 would change who sees the
  * card.
  *
@@ -58,8 +59,17 @@ import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields, 
  * this name so the card can state the threshold it tripped instead of asserting "your readiness is
  * low" with no number, which is what the owner asked for (Q-173).
  */
-export const EARLY_DELOAD_SCORE_MAX = 45
+// #3778: 45 → 51 when the readiness centre moved to 75, so the card reaches the same days
+// (`readiness-decision-thresholds.ts`). The paired-signal reasoning above is unchanged.
+// #3824: through `cutFor` like every readiness cut. `score` here is scored in this request, so it is
+// always the current model's.
+export const EARLY_DELOAD_SCORE_MAX = cutFor('earlyDeload', READINESS_MODEL_VERSION)
 export const EARLY_DELOAD_ACWR_MIN = ACWR_THRESHOLDS.elevatedMin
+
+/** The early-deload pair on today's score, which is scored in this request (current model). */
+export function earlyDeloadFires(score: number, acwr: number): boolean {
+  return score < EARLY_DELOAD_SCORE_MAX && acwr > EARLY_DELOAD_ACWR_MIN
+}
 
 /** One pillar's contribution to the `oura_daily_derived` write at the end of a readiness computation. */
 export interface DerivedPersist {
@@ -778,7 +788,7 @@ export async function buildReadinessPayload(
     // issue 2151: early deload is gated on the HRV baseline alone. Oura's readiness score used to be
     // a second way in, but it is permanently null, so it never opened this gate.
     if (!inDeloadPhase && baselineHrv != null && acwr != null) {
-      earlyDeloadRecommended = score < EARLY_DELOAD_SCORE_MAX && acwr > EARLY_DELOAD_ACWR_MIN
+      earlyDeloadRecommended = earlyDeloadFires(score, acwr)
       if (earlyDeloadRecommended) {
         earlyDeload = {
           score,

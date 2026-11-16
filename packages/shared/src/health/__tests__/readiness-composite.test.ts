@@ -14,11 +14,13 @@ describe('computeReadinessComposite', () => {
     // was NOT computed from it, so recording it would make the row look re-derivable when it is not.
     // Q-278: the z EXISTED here (nHistory 3 is a cold baseline, not missing data), so the gap must
     // read `awaiting_baseline`. Reading `no_input` would be the collapse this field exists to undo.
+    // #3778: the three centred contributors stand at their centre (75), temperature at its neutral 50.
     const cold = { score: 50, provisional: true, input: null, gap: 'awaiting_baseline' }
-    expect(result.contributors.restingHeartRate).toEqual(cold)
-    expect(result.contributors.hrvBalance).toEqual(cold)
+    const coldCentred = { ...cold, score: 75 }
+    expect(result.contributors.restingHeartRate).toEqual(coldCentred)
+    expect(result.contributors.hrvBalance).toEqual(coldCentred)
     expect(result.contributors.temperature).toEqual(cold)
-    expect(result.contributors.sleepBalance).toEqual(cold)
+    expect(result.contributors.sleepBalance).toEqual(coldCentred)
     // Non-baseline contributors are unaffected by cold history.
     expect(result.contributors.previousNight.provisional).toBe(false)
   })
@@ -84,13 +86,15 @@ describe('computeReadinessComposite', () => {
     expect(result.contributors.activityBalance.score).toBe(0)
   })
 
-  it('an all-neutral input composites to exactly 50', () => {
+  // #3778 moved this invariant on purpose: the three centred contributors fall back to their centre,
+  // 75, so an all-neutral day is 0.444 × 75 + 0.556 × 50 = 61, not 50.
+  it('an all-neutral input composites to exactly 61', () => {
     const result = computeReadinessComposite({
       rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
       previousNightScore: null, activityBalanceScore: null,
       nHistory: 0,
     })
-    expect(result.score).toBe(50)
+    expect(result.score).toBe(61)
   })
 
   // 2026-07-22 (W-D) moved the rail from ±2.5σ to ±1.5σ so a great day could reach a true 100.
@@ -102,14 +106,15 @@ describe('computeReadinessComposite', () => {
   // mutation run proved this was worth writing separately: deleting the lower tail outright, so the
   // floor hard-clips exactly as before, passed all 1004 tests in this package. Every case here
   // exercised the ceiling.
-  it('scores 10 at −1.5σ and keeps FALLING beyond it, instead of railing at 0', () => {
+  // #3778: the lower half is stretched over 0–75, so −1.5σ scores 15 (it was 10 on the 50-centred scale).
+  it('scores 15 at −1.5σ and keeps FALLING beyond it, instead of railing at 0', () => {
     const at = (z: number) => computeReadinessComposite({
       rhrZ: null, hrvZ: z, tempZ: null, sleepBalanceZ: null,
       previousNightScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     }).contributors.hrvBalance.score
 
-    expect(at(-1.5)).toBe(10)
+    expect(at(-1.5)).toBe(15)
 
     // The seven worst days the entry measured. Under the old clip all seven read 0.
     const worst = [-1.63, -1.9, -2.2, -2.6, -3.1, -3.6, -4.37].map(at)
@@ -128,16 +133,17 @@ describe('computeReadinessComposite', () => {
     expect(Math.min(...worst), `something still railed at 0: ${worst.join(',')}`).toBeGreaterThan(0)
   })
 
-  it('scores 90 at +1.5σ and keeps rising beyond it, instead of railing', () => {
+  // #3778: the upper half is squeezed into 75–100, so +1.5σ scores 95 (it was 90).
+  it('scores 95 at +1.5σ and keeps rising beyond it, instead of railing', () => {
     const at = (z: number) => computeReadinessComposite({
       rhrZ: -z, hrvZ: z, tempZ: 0, sleepBalanceZ: z,
       previousNightScore: null, activityBalanceScore: null,
       nHistory: FULL_HISTORY,
     })
     const edge = at(1.5)
-    expect(edge.contributors.restingHeartRate.score).toBe(90)
-    expect(edge.contributors.hrvBalance.score).toBe(90)
-    expect(edge.contributors.sleepBalance.score).toBe(90)
+    expect(edge.contributors.restingHeartRate.score).toBe(95)
+    expect(edge.contributors.hrvBalance.score).toBe(95)
+    expect(edge.contributors.sleepBalance.score).toBe(95)
 
     // The point of the change: past the old rail, worse/better days remain distinguishable.
     const scores = [1.6, 2.0, 2.6, 3.4, 4.4].map(z => at(z).contributors.hrvBalance.score)
@@ -157,6 +163,7 @@ describe('computeReadinessComposite', () => {
   // check-in held 0.10 at 100; #2224 renormalised the other eight over that share. It read 94 until
   // #2359, which stopped the temperature contributor compressing its good end: a temperature at
   // baseline is 100, so this day gains the two points that contributor had been losing.
+  // #3778: the three centred contributors read 95 at +1.5σ instead of 90, so this day is 98.
   it('puts a genuinely perfect day just under the ceiling rather than on it', () => {
     const r = computeReadinessComposite({
       rhrZ: -1.5, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 1.5,
@@ -164,7 +171,7 @@ describe('computeReadinessComposite', () => {
       recoveryIndexHours: 6,
       nHistory: FULL_HISTORY,
     })
-    expect(r.score).toBe(96)
+    expect(r.score).toBe(98)
   })
 
   it('still rewards a day better than 1.5σ on every axis — the ceiling is approached, not hit', () => {
@@ -206,14 +213,15 @@ describe('computeReadinessComposite', () => {
       }
     })
 
-    it('an all-neutral day still maps to exactly 50', () => {
-      // One of the invariants the 2026-08-18 range review found the composite genuinely holds.
+    it('an all-neutral day maps to exactly 61', () => {
+      // One of the invariants the 2026-08-18 range review found the composite genuinely holds — moved
+      // from 50 to 61 by #3778, whose three centred contributors fall back to 75.
       const r = computeReadinessComposite({
         rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
         previousNightScore: null, activityBalanceScore: null,
         nHistory: FULL_HISTORY,
       })
-      expect(r.score).toBe(50)
+      expect(r.score).toBe(61)
     })
   })
 
@@ -285,14 +293,14 @@ describe('the temperature contributor scores 100 at baseline (#2359)', () => {
     expect(temp(3)).toBeGreaterThan(0)
   })
 
-  it('leaves the other contributors\' curves alone: hrv at +1.5σ is still 90', () => {
+  it('leaves the other contributors\' curves alone: hrv at +1.5σ is still 95 (90 before #3778)', () => {
     const r = computeReadinessComposite({
       rhrZ: 0, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 0,
       previousNightScore: 80, activityBalanceScore: 80,
       recoveryIndexHours: 5,
       nHistory: FULL_HISTORY,
     })
-    expect(r.contributors.hrvBalance.score).toBe(90)
+    expect(r.contributors.hrvBalance.score).toBe(95)
   })
 
   it('a normal temperature lifts readiness by about the weight it carries, about a point', () => {

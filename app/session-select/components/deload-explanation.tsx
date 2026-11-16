@@ -5,7 +5,9 @@ import { ChevronDownIcon, ThermometerIcon, HeartPulseIcon, MoonIcon, BatteryLowI
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn } from "@trainingai/shared/utils";
 import type { NextSessionRecommendation } from "@trainingai/shared/types/program";
-import { TEMP_BASELINE_MIN_DAYS, DELOAD_READINESS_SOFT_MIN } from "@trainingai/shared/ai-periodization/deload-constants";
+import { TEMP_BASELINE_MIN_DAYS } from "@trainingai/shared/ai-periodization/deload-constants";
+import { cutFor } from "@trainingai/shared/health/readiness-decision-thresholds";
+import { READINESS_MODEL_VERSION } from "@trainingai/shared/health/readiness-composite";
 import { temperatureBaselineProgress } from "./temperature-baseline-progress";
 
 interface Signal {
@@ -28,10 +30,13 @@ export function buildSignals(rec: NextSessionRecommendation): Signal[] {
       : "Body temperature is above your baseline — often an early sign of illness, incomplete recovery, or heat/alcohol stress.";
     out.push({ icon: <ThermometerIcon className="h-3.5 w-3.5" />, text });
   }
-  if (s?.ouraReadiness != null && s.ouraReadiness < DELOAD_READINESS_SOFT_MIN) {
+  // #3824: graded on the score's own scale, the same cut the deload decision used. A response from
+  // before the version rode along is from the current server, so it is on the current scale.
+  const softMin = cutFor("deloadSoft", s?.ouraReadinessModelVersion === undefined ? READINESS_MODEL_VERSION : s.ouraReadinessModelVersion);
+  if (s?.ouraReadiness != null && s.ouraReadiness < softMin) {
     out.push({
       icon: <ActivityIcon className="h-3.5 w-3.5" />,
-      text: `Readiness ${Math.round(s.ouraReadiness)} — below the ${DELOAD_READINESS_SOFT_MIN}+ range where hard training is well tolerated.`,
+      text: `Readiness ${Math.round(s.ouraReadiness)} — below the ${softMin}+ range where hard training is well tolerated.`,
     });
   }
   if (rec.hrvWarning || (s?.hrvTrend != null && s.hrvTrend < 0.85)) {

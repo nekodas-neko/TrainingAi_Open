@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { computeAiDynamicNextSession, type AiDynamicInput } from '../ai-dynamic'
 import { loggedAsSession, programSessionFor } from '../../workout/session-identity'
 import type { ProgramSession } from '../../types/program'
+import { READINESS_MODEL_VERSION } from '../../health/readiness-composite'
 
 // Issue 3665: the next-session pick matched history by name, so renaming Lower to Legs the day
 // after training it made Legs look never done and recommended it again.
@@ -18,7 +19,7 @@ const NOW = Date.parse('2026-11-04T12:00:00+10:00')
 const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000)
 
 const base: Omit<AiDynamicInput, 'sessions' | 'history'> = {
-  muscleAssignments: {}, muscleRecovery: [], soreMuscles: [], readinessScore: 80,
+  muscleAssignments: {}, muscleRecovery: [], soreMuscles: [], readinessScore: 80, readinessModelVersion: READINESS_MODEL_VERSION,
   temperatureDeviation: null, timezone: 'Australia/Brisbane', reminderEnabled: false,
   reminderTime: null, sleepTrend: null, energyLevel: null, hrvTrend: null, illnessFlag: null,
   stressHighMinutes: null,

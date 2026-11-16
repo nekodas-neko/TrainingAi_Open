@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { View } from 'react-native';
 import { Pressable } from '../../../shared/ui/Pressable';
-import { guideFor } from '@trainingai/shared/health/contributor-guide';
+import { guideFor, guideMeaning } from '@trainingai/shared/health/contributor-guide';
 import { scoreBand } from '@trainingai/shared/health/score-band';
 import { contributorNote } from '@trainingai/shared/health/score-gap-copy';
 import { AppText, Card, Icon, Legend, ProgressBar, Stack } from '../../../shared/ui';
@@ -49,7 +49,7 @@ export function ContributorDetails({
                 against={guide.against}
                 meaning={
                   (f.provisional ? contributorNote(f) : null) ??
-                  (f.score != null && f.score < 50 ? guide.low : guide.high)
+                  guideMeaning(guide, f.key, f.score ?? null)
                 }
                 extra={f.extra}
                 remediate={guide.remediate}

@@ -177,7 +177,7 @@ describe('normals re-learn per device', () => {
     }))
     expect(r.inputs.hrvBalance).toEqual({ z: null, nights: 0, source: 'oura_cloud' })
     const c = computeReadinessComposite({ ...compositeNightFields(r), previousNightScore: null, activityBalanceScore: null, nHistory: 61 })
-    expect(c.contributors.hrvBalance).toMatchObject({ score: 50, provisional: true, gap: 'awaiting_baseline', source: 'oura_cloud' })
+    expect(c.contributors.hrvBalance).toMatchObject({ score: 75, provisional: true, gap: 'awaiting_baseline', source: 'oura_cloud' })
   })
 
   it('stays awaiting its baseline until the device has BASELINE_MIN_NIGHTS nights, then scores', () => {

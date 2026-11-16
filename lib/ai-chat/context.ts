@@ -8,7 +8,7 @@ import { illnessAdvisory, type LatestIllness } from '@trainingai/shared/health/i
 import type { Injury } from '@trainingai/shared/types/injury'
 import { activeInjuries, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
 import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
-import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
+import { liveReadinessByDay, liveReadinessByDayOnCurrentScale } from '@trainingai/shared/health/live-readiness'
 
 // Builds an explicit Mon–today schedule so the AI doesn't have to infer rest days from gaps.
 export function buildWeekSchedule(sessions: WorkoutSession[], tz: string, todayIso: string): string {
@@ -151,10 +151,12 @@ export function buildRecoverySummary(
     if (advisory) lines.push(`Illness radar (${illness.day}): ${illness.flag}, score ${illness.score}/100 — ${advisory}`)
   }
 
-  const weekReadiness = [...readinessMap.values()]
+  // #3824: the average is over days on the current scale, so a week spanning #3778 is not a blend of
+  // two scales. Today's line above shows the score as stored.
+  const weekReadiness = [...liveReadinessByDayOnCurrentScale(derived).values()]
   if (weekReadiness.length >= 3) {
     const avg = Math.round(weekReadiness.reduce((s, v) => s + v, 0) / weekReadiness.length)
-    lines.push(`7-day readiness avg: ${avg}/100`)
+    lines.push(`7-day readiness avg: ${avg}/100 (current scale; older days converted)`)
   }
   const hrvWeek = sleepSessions.filter(s => s.averageHrvMs != null)
   if (hrvWeek.length >= 3) {

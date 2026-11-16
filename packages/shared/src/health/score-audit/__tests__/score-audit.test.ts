@@ -222,10 +222,11 @@ describe('buildReadinessAudit', () => {
   it('marks the four baseline-relative contributors provisional while baselines are cold', () => {
     const cold = summary({ nHistory: 3 })
     const audit = buildReadinessAudit({ ...common, summary: cold, priorSummary: summary({ date: '2026-07-23', nHistory: 2 }) })
-    for (const key of ['restingHeartRate', 'hrvBalance', 'temperature', 'sleepBalance']) {
+    // #3778: the centred three hold at their centre, 75; temperature at its neutral 50.
+    for (const [key, neutral] of [['restingHeartRate', 75], ['hrvBalance', 75], ['temperature', 50], ['sleepBalance', 75]] as const) {
       const c = audit.contributors.find(x => x.key === key)!
       expect(c.provisional).toBe(true)
-      expect(c.subScore).toBe(50)
+      expect(c.subScore).toBe(neutral)
     }
     expect(audit.gaps.join(' ')).toContain('3/14 nights')
   })
@@ -357,7 +358,9 @@ describe('buildReadinessAudit', () => {
         restingHeartRate: 0.15, previousNight: 0.16, hrvBalance: 0.15, temperature: 0.10,
         sleepBalance: 0.10, recoveryIndex: 0.09, activityBalance: 0.06,
       }
-      const checkin = { score: 88, provisional: false, input: 88, gap: null }
+      // 40, not the 88 it was: under #3778's curve an 88 happened to land the old total exactly on the
+      // new one, which would make the weights change invisible in this one case.
+      const checkin = { score: 40, provisional: false, input: 40, gap: null }
       // The row also carries `prevDayActivity`, which left the model in #3358 (v15).
       const prevDayActivity = { score: 61, provisional: false, input: 61, gap: null }
       const oldScore = Math.round(

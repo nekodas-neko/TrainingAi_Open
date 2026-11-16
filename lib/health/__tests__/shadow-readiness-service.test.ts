@@ -156,7 +156,7 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
       { shadowReadiness: 70, liveComposite: 68 },
       { shadowReadiness: null, liveComposite: 50 },
       { shadowReadiness: 40, liveComposite: null },
-    ])).toEqual({ compared: 2, moved: 1, medianAbsDiff: 4, maxAbsDiff: 6, excluded: { clamped: 0, 'unknown-era': 0 } })
+    ])).toEqual({ compared: 2, moved: 1, medianAbsDiff: 4, maxAbsDiff: 6, excluded: { clamped: 0, 'unknown-era': 0, 'old-scale': 0 } })
   })
 
   describe('live composite before illness suppression (#3170)', () => {
@@ -190,7 +190,7 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
       const live = liveCompositeOf(day, 0, 'fever', FROM)
       expect(live).toEqual({ liveComposite: null, liveGap: 'clamped' })
       expect(daysMoved([{ shadowReadiness: 20, ...live }])).toEqual({
-        compared: 0, moved: 0, medianAbsDiff: null, maxAbsDiff: null, excluded: { clamped: 1, 'unknown-era': 0 },
+        compared: 0, moved: 0, medianAbsDiff: null, maxAbsDiff: null, excluded: { clamped: 1, 'unknown-era': 0, 'old-scale': 0 },
       })
     })
 

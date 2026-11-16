@@ -1,4 +1,6 @@
 import type { OuraDailyDerivedRow } from '@/lib/data/repository'
+import { toCurrentReadinessScale } from './readiness-scale'
+import { readinessModelVersionOf } from './readiness-decision-thresholds'
 
 // The live composite readiness — One Formula, One Place. The app's own composite is persisted to
 // `oura_daily_derived.readiness_score` (`OWN_READINESS_SOURCES` below). Every AI surface (prescribe signals,
@@ -36,4 +38,38 @@ export function liveReadinessByDay(derived: DerivedReadiness[]): Map<string, num
 /** Live readiness for a single day, or null. */
 export function liveReadinessForDay(day: string, derived: DerivedReadiness[]): number | null {
   return liveReadinessByDay(derived).get(day) ?? null
+}
+
+type DerivedReadinessWithModel = DerivedReadiness & Pick<OuraDailyDerivedRow, 'modelVersions'>
+
+/** A day's live readiness with the model version that scored it, so a decision cut can be chosen
+ *  for the scale the score is on (`cutFor`, #3824). Null when the day has none. */
+export interface LiveReadinessReading {
+  score: number
+  /** `model_versions.readiness` on the row; null on rows written before the stamp existed. */
+  modelVersion: string | null
+}
+
+/** {@link liveReadinessForDay} with the row's model version beside the score. */
+export function liveReadinessReadingForDay(day: string, derived: DerivedReadinessWithModel[]): LiveReadinessReading | null {
+  const row = derived.find(d => d.day === day && isOwnReadinessSource(d.readinessSource) && d.readinessScore != null)
+  if (!row) return null
+  return { score: row.readinessScore!, modelVersion: readinessModelVersionOf(row.modelVersions) }
+}
+
+/**
+ * Live readiness per day, every day on the CURRENT scale (#3824), for anything that averages or
+ * differences readiness across days. A pre-v18 day is converted by `toCurrentReadinessScale`; one
+ * whose row has no contributor map cannot be, and is left out rather than mixed in.
+ */
+export function liveReadinessByDayOnCurrentScale(
+  derived: (DerivedReadinessWithModel & Pick<OuraDailyDerivedRow, 'readinessContributors'>)[],
+): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const d of derived) {
+    if (!isOwnReadinessSource(d.readinessSource)) continue
+    const v = toCurrentReadinessScale(d.readinessScore, readinessModelVersionOf(d.modelVersions), d.readinessContributors)
+    if (v != null) out.set(d.day, v)
+  }
+  return out
 }

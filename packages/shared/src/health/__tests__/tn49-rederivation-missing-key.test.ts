@@ -19,8 +19,9 @@
 import { describe, it, expect } from 'vitest'
 import { rederiveReadinessFromStored, READINESS_WEIGHTS } from '../readiness-composite'
 
-/** A contributor whose stored input is null rederives to the model's neutral 50 — so this shape is
- *  only honest at score 50, where stored and rederived agree and nothing drifts. */
+/** A contributor whose stored input is null rederives to the model's neutral — so this shape is only
+ *  honest at that neutral, where stored and rederived agree and nothing drifts. Since #3778 the
+ *  neutral is 75 for resting HR, HRV and sleep balance and 50 for the rest. */
 const neutral = (score: number) => ({ score, provisional: false, input: null, gap: null })
 
 /** The pre-Q-501 shape: a score with no `input` beside it. It cannot be re-derived, so it is
@@ -28,8 +29,10 @@ const neutral = (score: number) => ({ score, provisional: false, input: null, ga
  *  below use scores other than 50 without inventing inputs that would have to rederive to them. */
 const stored = (score: number) => ({ score, provisional: false })
 
-const completeMap = (score = 50) =>
-  Object.fromEntries(Object.keys(READINESS_WEIGHTS).map(k => [k, neutral(score)]))
+const CENTRED = new Set(['restingHeartRate', 'hrvBalance', 'sleepBalance'])
+/** Every key at its own neutral: 0.444 × 75 + 0.556 × 50 = 61 (#3778; it was 50). */
+const completeMap = () =>
+  Object.fromEntries(Object.keys(READINESS_WEIGHTS).map(k => [k, neutral(CENTRED.has(k) ? 75 : 50)]))
 
 describe('TN-49 — a contributor key absent from the stored map', () => {
   it('sums the weights to 1.00, which is why a dropped key shows up as a score change', () => {
@@ -44,23 +47,23 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
    * the fix was not allowed to move.
    */
   it('leaves a complete map exactly as it was', () => {
-    const r = rederiveReadinessFromStored(completeMap(50))
-    expect(r?.score).toBe(50)
+    const r = rederiveReadinessFromStored(completeMap())
+    expect(r?.score).toBe(61)
     expect(r?.drifted).toEqual([])
     expect(r?.uncheckable).toEqual([])
   })
 
   it('reports nothing missing for a complete map', () => {
-    expect(rederiveReadinessFromStored(completeMap(50))?.missing).toEqual([])
+    expect(rederiveReadinessFromStored(completeMap())?.missing).toEqual([])
   })
 
   it('does not drop the weight of a key that is absent', () => {
-    const seven = completeMap(50)
+    const seven = completeMap()
     delete seven.temperature
 
     const r = rederiveReadinessFromStored(seven)
-    // Skipping the key left 8/9 of the weight and gave 44. The row's own score was 50.
-    expect(r?.score).toBe(50)
+    // Skipping the key left 8/9 of the weight and gave 56. The row's own score was 61.
+    expect(r?.score).toBe(61)
     expect(r?.missing).toEqual(['temperature'])
   })
 
@@ -83,7 +86,7 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
    * re-derived. A key that is ABSENT has no score at all.
    */
   it('separates a key that is absent from one that is present without an input', () => {
-    const map = completeMap(50) as Record<string, unknown>
+    const map = completeMap() as Record<string, unknown>
     map.sleepBalance = { score: 64, provisional: false }  // present, no `input` → uncheckable
     delete map.temperature                                // absent → missing
 
@@ -93,7 +96,7 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
   })
 
   it('still detects a contributor whose stored score does not follow from its stored input', () => {
-    const map = completeMap(50) as Record<string, unknown>
+    const map = completeMap() as Record<string, unknown>
     // previousNight passes its input through, so a stored score of 50 against an input of 90 is
     // drift by definition.
     map.previousNight = { score: 50, provisional: false, input: 90, gap: null }
@@ -116,14 +119,14 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
    * ever been in that state and the alternative is overturning a deliberate decision on no evidence.
    */
   it('treats a present-but-unusable score differently from an absent key', () => {
-    const present = completeMap(50) as Record<string, unknown>
+    const present = completeMap() as Record<string, unknown>
     present.temperature = { score: null, provisional: false }   // present, unreadable → skipped
-    const absent = completeMap(50)
+    const absent = completeMap()
     delete absent.temperature                                   // absent → neutral 50 stands in
 
-    // Skipped: 8/9 of the weight at 50 = 44. Stood in for: the full 1.00 at 50 = 50.
-    expect(rederiveReadinessFromStored(present)?.score).toBe(44)
-    expect(rederiveReadinessFromStored(absent)?.score).toBe(50)
+    // Skipped: temperature's 1/9 is missing from the sum, 56. Stood in for: the full 1.00, 61.
+    expect(rederiveReadinessFromStored(present)?.score).toBe(56)
+    expect(rederiveReadinessFromStored(absent)?.score).toBe(61)
     // And only the absent one is reported as missing — the skipped one is not claimed either way.
     expect(rederiveReadinessFromStored(present)?.missing).toEqual([])
     expect(rederiveReadinessFromStored(absent)?.missing).toEqual(['temperature'])

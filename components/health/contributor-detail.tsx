@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { guideFor } from '@trainingai/shared/health/contributor-guide'
+import { guideFor, guideMeaning } from '@trainingai/shared/health/contributor-guide'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { contributorNote, isLearningContributor } from '@trainingai/shared/health/score-gap-copy'
 
@@ -34,7 +34,7 @@ export function ContributorDetail({
 
   const band = score != null ? scoreBand(score) : null
   const learning = isLearningContributor({ provisional, gap })
-  const meaning = score != null && score < 50 ? guide.low : guide.high
+  const meaning = guideMeaning(guide, contributorKey, score ?? null)
 
   return (
     <div className="space-y-2.5 pt-2 text-[11px] leading-snug">

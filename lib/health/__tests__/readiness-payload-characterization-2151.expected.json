@@ -114,8 +114,8 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > sleep only": {
-    "score": 51,
-    "readinessDisplayScore": 51,
+    "score": 62,
+    "readinessDisplayScore": 62,
     "label": "Moderate",
     "components": {
       "sleep": 21,
@@ -197,8 +197,8 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > generic HRV and RHR with sleep": {
-    "score": 58,
-    "readinessDisplayScore": 58,
+    "score": 63,
+    "readinessDisplayScore": 63,
     "label": "Moderate",
     "components": {
       "sleep": 21,
@@ -268,9 +268,9 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > RHR baseline only, no sleep: recovery signal without sleep": {
-    "score": 64,
-    "readinessDisplayScore": 64,
-    "label": "Moderate",
+    "score": 72,
+    "readinessDisplayScore": 72,
+    "label": "High",
     "components": {
       "sleep": 0,
       "hrv": 0,
@@ -347,9 +347,9 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > ring rollup composite": {
-    "score": 69,
-    "readinessDisplayScore": 69,
-    "label": "Moderate",
+    "score": 77,
+    "readinessDisplayScore": 77,
+    "label": "High",
     "components": {
       "sleep": 21,
       "hrv": 30,
@@ -409,8 +409,8 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > ring day with a Cloud row whose frozen readiness score is null": {
-    "score": 58,
-    "readinessDisplayScore": 58,
+    "score": 63,
+    "readinessDisplayScore": 63,
     "label": "Moderate",
     "components": {
       "sleep": 21,
@@ -537,9 +537,9 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > HRV baseline, poor sleep, high load: early deload fires (ai_dynamic)": {
-    "score": 43,
-    "readinessDisplayScore": 43,
-    "label": "Low",
+    "score": 50,
+    "readinessDisplayScore": 50,
+    "label": "Moderate",
     "components": {
       "sleep": 0,
       "hrv": 23,
@@ -549,9 +549,9 @@
     "hasSufficientData": false,
     "earlyDeloadRecommended": true,
     "earlyDeload": {
-      "score": 43,
+      "score": 50,
       "acwr": 3.3594470046082954,
-      "scoreThreshold": 45,
+      "scoreThreshold": 51,
       "acwrThreshold": 1.2
     },
     "source": "custom",
@@ -617,8 +617,8 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > HRV baseline and high load but a healthy score: gate open, no recommendation (automatic)": {
-    "score": 59,
-    "readinessDisplayScore": 59,
+    "score": 63,
+    "readinessDisplayScore": 63,
     "label": "Moderate",
     "components": {
       "sleep": 21,
@@ -688,9 +688,9 @@
     ]
   },
   "buildReadinessPayload characterization (issue 2151) > HRV baseline, poor sleep, high load, but manual mode: never recommended": {
-    "score": 43,
-    "readinessDisplayScore": 43,
-    "label": "Low",
+    "score": 50,
+    "readinessDisplayScore": 50,
+    "label": "Moderate",
     "components": {
       "sleep": 0,
       "hrv": 23,

@@ -36,6 +36,9 @@ export interface TrainingStressInputs {
   sex: string | null
   rhr: number | null                   // body_metrics.resting_heart_rate
   readiness: number | null             // persisted oura_daily_derived.readiness_score
+  /** `model_versions.readiness` on the same row: the readiness cut is chosen for its scale (#3824).
+   *  Null on an unstamped row, which is on the old scale. */
+  readinessModelVersion: string | null
   readinessProvisional: boolean        // true while composite baseline still learning
   vo2maxInputs: Vo2MaxInputs
   tzChange: 0 | 1
@@ -117,7 +120,7 @@ export function computeTrainingStress(i: TrainingStressInputs): TrainingStressRe
     startTimestampMs: i.startTimestampMs,
     mets: Float32Array.from(filled.mets),
     age: i.age, biologicalSex, rhr: i.rhr, noOts: 0, tzChange: i.tzChange,
-    readiness: i.readiness, vo2max: vo2.value ?? NaN,
+    readiness: i.readiness, readinessModelVersion: i.readinessModelVersion, vo2max: vo2.value ?? NaN,
   })
   // TN-79: this used to answer `insufficient_met` as well, and that one shared string cost five
   // weeks. `training_load_ots` has been NULL on all 130 days while `training_load_gate` read

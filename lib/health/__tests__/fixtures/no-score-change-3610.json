@@ -16614,8 +16614,8 @@
  },
  "audit": {
   "2026-10-12 v0 switch=2026-10-17": {
-   "all": "ffa32bd35a414e2f150ee1ea596222020103fe770edaa02c6c87c3df7be5d77a",
-   "score": 57,
+   "all": "35f031d10a7bb7d483177fff54b8decead21bf0afffe27e2d6d6c10098151a2a",
+   "score": 64,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16632,8 +16632,8 @@
    "notes": []
   },
   "2026-10-12 v0 switch=null": {
-   "all": "d031ea0d864ce3d118d55c795b03b40864cb2a8ce4a9eba56e226401b1d7da22",
-   "score": 63,
+   "all": "68eb7a250b287fd16c7cbdbbead6d749332b1a145e5d57378dd226f7bb70b25e",
+   "score": 71,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16650,8 +16650,8 @@
    "notes": []
   },
   "2026-10-12 v1 switch=2026-10-17": {
-   "all": "b263670a61c8b99fed9e98ab7addef231fd4afd98a3d7d068c7d5e133dd658f6",
-   "score": 63,
+   "all": "856d29dcd1977a1b1424f6a2aed266291d17a755b80d1f1952ca4e77449e0f0e",
+   "score": 70,
    "recoveryIndex": {
     "value": 4.65,
     "unit": "h",
@@ -16670,8 +16670,8 @@
    ]
   },
   "2026-10-12 v1 switch=null": {
-   "all": "82d20d3c1c22e2cb75d52cfae63fb5a2f5d17deaea6f91d2b51e5d5c7a35e2ba",
-   "score": 68,
+   "all": "533c4898834cb9d38ccec8061b819556603c9e14ca8758b5310f275776de8424",
+   "score": 71,
    "recoveryIndex": {
     "value": 5.44,
     "unit": "h",
@@ -16690,8 +16690,8 @@
    ]
   },
   "2026-10-12 v2 switch=2026-10-17": {
-   "all": "4edea4cdfc6c29280f1241298324d502c9ce01942c81db806e43243f7668bb6c",
-   "score": 61,
+   "all": "f1c8cdba8ef618669aa76a337f88d80adb26189d2c4f98220fa5f1bdff9c1d38",
+   "score": 66,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16708,8 +16708,8 @@
    "notes": []
   },
   "2026-10-12 v2 switch=null": {
-   "all": "cbebe3e2b70d219569a7bd2016c12c4bf79d92d730b4781500320309440e7be3",
-   "score": 69,
+   "all": "31ae02bedd39af511e4770c5b6544624c6235ddfb2dcfc758dab07ff57b5161a",
+   "score": 77,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16726,8 +16726,8 @@
    "notes": []
   },
   "2026-10-12 v3 switch=2026-10-17": {
-   "all": "0285fc62f4aaa7cf11e5327783f72bfbafc0d6fabaf73f9a0297e53492ff7fe1",
-   "score": 64,
+   "all": "751d7c4d405491cc133fa98c9c56933d6db113f4d0c0b1d2e9867dd15af9afb1",
+   "score": 70,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16746,8 +16746,8 @@
    "notes": []
   },
   "2026-10-12 v3 switch=null": {
-   "all": "85dfb43897c154879593a1df383f7167386145540a18cc4cf0e64c10fa322b37",
-   "score": 53,
+   "all": "437a0a8746bac9133ac4b2a78c5a8b811ae33295193e58ef1ecfeb56067a0c46",
+   "score": 59,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16766,8 +16766,8 @@
    "notes": []
   },
   "2026-10-12 v4 switch=2026-10-17": {
-   "all": "53900f9e2eab49ad7b1b5c1bb4230dc7bd8a0edca21942b39333622d6ba74bd1",
-   "score": 56,
+   "all": "ba5a0386d9cc5ec9230569806cec2908d6ec7737a339745b42fe34642742417f",
+   "score": 64,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16788,8 +16788,8 @@
    ]
   },
   "2026-10-12 v4 switch=null": {
-   "all": "81c12decbac5f71131ac2555deb92719d1e6acdec01a80040fc9f398c1830fa4",
-   "score": 51,
+   "all": "a9266fbb8b895253eca44c22550f545cd44c3ecbeb4d2dafcdf6d2f763486c69",
+   "score": 55,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16810,8 +16810,8 @@
    ]
   },
   "2026-10-12 v5 switch=2026-10-17": {
-   "all": "d8e98b966f83c86b7fc16dd01be68f8766664ce19f526d9f7ba33561b1cb6f20",
-   "score": 31,
+   "all": "322169ebf1fcace32836a6a66ec7ca88a547264f13fa8d52739737f96042e87c",
+   "score": 39,
    "recoveryIndex": {
     "value": 5.427103798370808,
     "unit": "h",
@@ -16830,8 +16830,8 @@
    ]
   },
   "2026-10-12 v5 switch=null": {
-   "all": "ec5d1c188bba6ac812ebbd99a3f045dbf83c2cee63099c49feafe001540b6929",
-   "score": 64,
+   "all": "9b81170dd76ad28f820abb7313246859f8d484edb1bb9d6e7ab561493f11fe33",
+   "score": 70,
    "recoveryIndex": {
     "value": 5.398386222543195,
     "unit": "h",
@@ -16848,8 +16848,8 @@
    "notes": []
   },
   "2026-10-16 v0 switch=2026-10-17": {
-   "all": "bed20242f4d75e36ada9c58f9c885db8c556b23bc8e20ffde33e138b20a23bfc",
-   "score": 63,
+   "all": "8751264d9fa4e4b52fc9d6d73346ac07af0577501b0e37e99b686277d6cbacf3",
+   "score": 68,
    "recoveryIndex": {
     "value": 3.575177397346124,
     "unit": "h",
@@ -16866,8 +16866,8 @@
    "notes": []
   },
   "2026-10-16 v0 switch=null": {
-   "all": "901945d0a45c4312a41fe593f76b4c44f2332e5c29e984af9d17d18915222388",
-   "score": 69,
+   "all": "4b2b94cc3a942e0d5e2190cf78e54a06a98a7f1c23d413b07b328ab015cc13cd",
+   "score": 78,
    "recoveryIndex": {
     "value": 3.916737419553101,
     "unit": "h",
@@ -16884,8 +16884,8 @@
    "notes": []
   },
   "2026-10-16 v1 switch=2026-10-17": {
-   "all": "789f252d7cc375f6c10ca622e5ee93f632f9a62c984e58c711609b09c09b5535",
-   "score": 57,
+   "all": "f0eb426ac48d7f2ba96a7200fe826383c3ccef059e1f7d0fbc7c01aebc494246",
+   "score": 65,
    "recoveryIndex": {
     "value": 3.37,
     "unit": "h",
@@ -16904,8 +16904,8 @@
    ]
   },
   "2026-10-16 v1 switch=null": {
-   "all": "3cd7f74dc1d359e6d563601282ce37418fc80ac934f59e9d947a02de3c6cc1ca",
-   "score": 61,
+   "all": "9b557ec2c63cdf96f0aac99af9044d1b208543de442ee2369e42227a806f8917",
+   "score": 65,
    "recoveryIndex": {
     "value": 4.35,
     "unit": "h",
@@ -16924,8 +16924,8 @@
    ]
   },
   "2026-10-16 v2 switch=2026-10-17": {
-   "all": "a38621c7709ea99c80709539de2b7c58567d1be6e11b81c1d69880bf756de949",
-   "score": 64,
+   "all": "3eb0277f16e9b78ce4ed68c39d6828a3d35ec7e294a9539e83651976c4b592c1",
+   "score": 67,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16942,8 +16942,8 @@
    "notes": []
   },
   "2026-10-16 v2 switch=null": {
-   "all": "89a43df5c49c28dba69f7dac4f2c5aeed7ad53c3d33ee2abc7d4d2dfb968d7f5",
-   "score": 63,
+   "all": "dc446eeada79f83997180f373e6f3276e877c196097e40f621506849526b9fc6",
+   "score": 67,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16960,8 +16960,8 @@
    "notes": []
   },
   "2026-10-16 v3 switch=2026-10-17": {
-   "all": "7e72b97b8118c423761be72100edfb5f99ff1f9924012b0d09d756186d2152b9",
-   "score": 58,
+   "all": "6f5f934d0a52ae7c3fc1a85441c5a123001e4378076ce527a1150e4328f5e0c8",
+   "score": 63,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -16980,8 +16980,8 @@
    "notes": []
   },
   "2026-10-16 v3 switch=null": {
-   "all": "32639daa77a0b99774d8162c2d202c61b7177f10dc1e1594ac4c17f54b0995ea",
-   "score": 52,
+   "all": "67d6933b12368add32caa02e704c12f417c0f287d89b64877fd48680e75bb78b",
+   "score": 59,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17000,8 +17000,8 @@
    "notes": []
   },
   "2026-10-16 v4 switch=2026-10-17": {
-   "all": "7f2e54325aa2071b0c10e5704b41b0d64b383068722ae08ca54a4900321a9a3f",
-   "score": 56,
+   "all": "087c8981f4214481f1ac2263a6a95a83fed8235a4276e71ed265c6dbc926c53d",
+   "score": 63,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17022,8 +17022,8 @@
    ]
   },
   "2026-10-16 v4 switch=null": {
-   "all": "5de5166e6658aff27f56a96782ccaea9983bebf7d335ea093264674f2c38c696",
-   "score": 55,
+   "all": "cd59f9708cef73101803a6f6be1fd586b4f3c7f46ad6c489586927719cb52d5e",
+   "score": 65,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17044,8 +17044,8 @@
    ]
   },
   "2026-10-16 v5 switch=2026-10-17": {
-   "all": "0547a607db827fcbee5278e88572c669d510854f065a77f822733d86d282759f",
-   "score": 53,
+   "all": "e1315fe2fa7aef0435945184c8f0a086141ffb075c1924cdd3a476af6f105d81",
+   "score": 60,
    "recoveryIndex": {
     "value": 4.501720505766571,
     "unit": "h",
@@ -17062,8 +17062,8 @@
    "notes": []
   },
   "2026-10-16 v5 switch=null": {
-   "all": "a5c29fded6063c035036b44c941a5046f1f98675c1b2c97eeb674d72f9fd62f4",
-   "score": 55,
+   "all": "84eb41ae153b4ce8a4fcff397c2056e506cd87e4e799225a0c4d880eface4439",
+   "score": 63,
    "recoveryIndex": {
     "value": 3.5379172225948423,
     "unit": "h",
@@ -17080,8 +17080,8 @@
    "notes": []
   },
   "2026-10-17 v0 switch=2026-10-17": {
-   "all": "09b29a514fca68dfcc81f0528deb09a2960c36d6dfb2a8f87965d30a5e11dd41",
-   "score": 57,
+   "all": "c060d09d511ae577922da961f013ec0d1e81175490b99633c302407efd6d8eef",
+   "score": 68,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17098,8 +17098,8 @@
    "notes": []
   },
   "2026-10-17 v0 switch=null": {
-   "all": "ff456ab839aa14803cb1d225db7c3b9014909af7bc1ffed057db6fe8f34637a7",
-   "score": 55,
+   "all": "382361e3e07e4350815e545745e86b133aae92e9ebede3ded9308db1d8e962d7",
+   "score": 63,
    "recoveryIndex": {
     "value": 5.25530535983853,
     "unit": "h",
@@ -17116,8 +17116,8 @@
    "notes": []
   },
   "2026-10-17 v1 switch=2026-10-17": {
-   "all": "b7e1c6433a504b63c6d5168309c8456fd46dcec691c50d001c7544f8deb88a1b",
-   "score": 63,
+   "all": "0752d37dec9e2bebdad2051022981e587ae9e98a8405e059fcdd5d09c714d714",
+   "score": 74,
    "recoveryIndex": {
     "value": 4.64,
     "unit": "h",
@@ -17136,8 +17136,8 @@
    ]
   },
   "2026-10-17 v1 switch=null": {
-   "all": "8c410567ed3688b97cfa40974c2851024acc2067e762982e7ffd3ffafc4bdd6d",
-   "score": 69,
+   "all": "db8439884dc8365cd8c9bd8241643df92b2842c2d080a4e275ff916970b6f107",
+   "score": 76,
    "recoveryIndex": {
     "value": 5.01,
     "unit": "h",
@@ -17156,8 +17156,8 @@
    ]
   },
   "2026-10-17 v2 switch=2026-10-17": {
-   "all": "6122214593613b5d6d2d6547a3803e82323d510d279c4c10138ed53724a0fb12",
-   "score": 64,
+   "all": "82a88a9d072e4d91cce3a1655b8a3d8c621e461438c1c20d16fc08c6cc9da0db",
+   "score": 75,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17174,8 +17174,8 @@
    "notes": []
   },
   "2026-10-17 v2 switch=null": {
-   "all": "9a0afcaa54d80313665e1e0121093177e71b69f8b9143605467ed101ec7ae1d2",
-   "score": 57,
+   "all": "6040a1635852d6a3dbb28a5b0c5739f0337b33dc0aa0de752a3d2072b6469786",
+   "score": 62,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17192,8 +17192,8 @@
    "notes": []
   },
   "2026-10-17 v3 switch=2026-10-17": {
-   "all": "c3d711c03e3f4d2101585115db2b276f4529c2f7658f3251d099f970015967af",
-   "score": 55,
+   "all": "65099c9844be88c5cbd849495666ef2a09b6f7f6319b93052a20dcbebba51b21",
+   "score": 67,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17212,8 +17212,8 @@
    "notes": []
   },
   "2026-10-17 v3 switch=null": {
-   "all": "8748ad0af295337f332bd848a6d77ff2638babef6f84a6c4311ca0d489aafbe7",
-   "score": 45,
+   "all": "0790ae81aa41c3c80a928594c725064aa063fc1686808078e080d2588de35f65",
+   "score": 51,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17232,7 +17232,7 @@
    "notes": []
   },
   "2026-10-17 v4 switch=2026-10-17": {
-   "all": "82c04b9a65485aba5c96297b1a49d92fbc27928eacbe367e869df22f3010216f",
+   "all": "7184f63d83a1465098b66167e77beb5c83b8c9647dbaa704382b8639f0cdf904",
    "score": null,
    "recoveryIndex": null,
    "temperature": null,
@@ -17242,8 +17242,8 @@
    "notes": []
   },
   "2026-10-17 v4 switch=null": {
-   "all": "f9721bfdf8c0a92f8c6c409530c06516d7e230169e6e5f705ab0b5f51454582a",
-   "score": 58,
+   "all": "7412f203ecabce4d4ae01bfd0dd201b9ec1abf85ba1f4b25c061032f033326fd",
+   "score": 64,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17264,8 +17264,8 @@
    ]
   },
   "2026-10-17 v5 switch=2026-10-17": {
-   "all": "fc2977dd611ec0c2b099cadcc6e96ba3d742a067aae5b02af2184573822d592d",
-   "score": 58,
+   "all": "03176250ac165068eb13dfb4718c59b6bdec19130d0e2bab4932b0fa1d557518",
+   "score": 66,
    "recoveryIndex": {
     "value": 3.4784597216639668,
     "unit": "h",
@@ -17282,8 +17282,8 @@
    "notes": []
   },
   "2026-10-17 v5 switch=null": {
-   "all": "5d94e2d95c318e12ce117ecd66dd0a764da55b677a929de2ebc812cba004c659",
-   "score": 50,
+   "all": "a38b6323e28c2e20d2a4238482e2d2931e5b15f1a80c41abe61a8c4c29ff684f",
+   "score": 60,
    "recoveryIndex": {
     "value": 3,
     "unit": "h",
@@ -17300,8 +17300,8 @@
    "notes": []
   },
   "2026-10-18 v0 switch=2026-10-17": {
-   "all": "e8f3b96914d6ac2c2db9dc3cbca339738ee4ef4e5c9f13b6cf8b0ab1ab7e7cfa",
-   "score": 61,
+   "all": "48b4e6852abe737c6913b5e27b1620b5aa213fef7695d7a67b115f571b2aae56",
+   "score": 72,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17318,8 +17318,8 @@
    "notes": []
   },
   "2026-10-18 v0 switch=null": {
-   "all": "1e481d2002e333f28bbfb853787c0211e33b509b6b825d202e26ac8b01d2c842",
-   "score": 57,
+   "all": "10f7d8ef69e1c21a56b95673a77e9b75c0d1b196e15c97eefa549f3c183c03bb",
+   "score": 65,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17336,8 +17336,8 @@
    "notes": []
   },
   "2026-10-18 v1 switch=2026-10-17": {
-   "all": "fcb749069b35bc6d6f318bc87ec231f430518f97d36a176a2e076d7f535f9e06",
-   "score": 60,
+   "all": "3ddd8c18e6d54874a410115d0fbc77d71e7956cf2d109a3f935c001b89a2d714",
+   "score": 72,
    "recoveryIndex": {
     "value": 4.32,
     "unit": "h",
@@ -17356,8 +17356,8 @@
    ]
   },
   "2026-10-18 v1 switch=null": {
-   "all": "8c94e42f359b6bb4faa01ee7c0ece30343755a07771e64d7fcaf3e5d73d60a2a",
-   "score": 67,
+   "all": "ab388bb104514756fce358d2703258f3e4ffe7de24a54450cf6d254483d777ec",
+   "score": 74,
    "recoveryIndex": {
     "value": 2.18,
     "unit": "h",
@@ -17376,8 +17376,8 @@
    ]
   },
   "2026-10-18 v2 switch=2026-10-17": {
-   "all": "53eb621de79ed461d5aacc35f707e5d4eca6ac63a9e3ead29859161f4f033563",
-   "score": 58,
+   "all": "0ea9de62ea441b255092e940cb19c3270db6b79781d1115c22404f9d5ef48de2",
+   "score": 69,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17394,8 +17394,8 @@
    "notes": []
   },
   "2026-10-18 v2 switch=null": {
-   "all": "28b5baace4e2505aea89287dfcebce382810fb26e47978a347375239e2a8c6ac",
-   "score": 62,
+   "all": "2eb70cf40214e25097b17cd66f5aaffbfcded63af76b55154af390b2eec5dc70",
+   "score": 66,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17412,8 +17412,8 @@
    "notes": []
   },
   "2026-10-18 v3 switch=2026-10-17": {
-   "all": "c0aa71a566108c9ffae1e8ac8ee96f01ef0200795d856dcdcf94ebadffb74281",
-   "score": 53,
+   "all": "1d1f37b620819f7391741cb6659d40c4e4b9d5bde3381a1487e386ba08d489e2",
+   "score": 64,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17432,8 +17432,8 @@
    "notes": []
   },
   "2026-10-18 v3 switch=null": {
-   "all": "8f6fe93998fa97cf05d1717db90e383664befed46e7f23d3cf9f5b7c96674c83",
-   "score": 47,
+   "all": "50c1f4708c8b47de1e9e4a396f3a5cabdf6fe672f29df423635b1a9997fc8517",
+   "score": 52,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17452,8 +17452,8 @@
    "notes": []
   },
   "2026-10-18 v4 switch=2026-10-17": {
-   "all": "c85de07c7674d023d7839e4f1aba3b7fc046a954a02a8d7e897f1a19f11bcbc8",
-   "score": 57,
+   "all": "0c6c76bdd229e28cf0ccd452d43e7bc45e9bbf1489cff8034687fca75b142c9f",
+   "score": 68,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17474,8 +17474,8 @@
    ]
   },
   "2026-10-18 v4 switch=null": {
-   "all": "a918f4c0fb90ef5fbb679435417c3795c5b9d79f85796bb45effe8bb3aeb00a0",
-   "score": 51,
+   "all": "4eb4b262adfe6762f38d8caaf61f331217fd5753478d28acfd66e2cb226f75aa",
+   "score": 59,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17496,8 +17496,8 @@
    ]
   },
   "2026-10-18 v5 switch=2026-10-17": {
-   "all": "bbdb45b6edc18dc0ad09d196e7d05f8e404351301bb747c59f90d2c8d6704b90",
-   "score": 64,
+   "all": "fe6736e8401ec8b5e6efb52c7b088b7988336697db66aa414f848fc7d3abcdf4",
+   "score": 75,
    "recoveryIndex": {
     "value": 4.1310166558250785,
     "unit": "h",
@@ -17514,8 +17514,8 @@
    "notes": []
   },
   "2026-10-18 v5 switch=null": {
-   "all": "33bffb8de4b9af7e2a202072af0b0e8a503b7c3ff2762581f6fc02250dd31cb7",
-   "score": 72,
+   "all": "6130d5a353cc1885453f37fefdc39c625e0b31c4cee9aeb38d750f67a4c192d2",
+   "score": 80,
    "recoveryIndex": {
     "value": 5.5136411734856665,
     "unit": "h",
@@ -17532,8 +17532,8 @@
    "notes": []
   },
   "2026-10-24 v0 switch=2026-10-17": {
-   "all": "1bcd6390851eb35652d53f9220c9b10909dd09e806779c431794d3035f323ea8",
-   "score": 56,
+   "all": "5cbc51ba777c14b0efe3f2d4bc9fe80f4d06c38acd0a068fa82050d50ccdd662",
+   "score": 67,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17550,8 +17550,8 @@
    "notes": []
   },
   "2026-10-24 v0 switch=null": {
-   "all": "adde4220cc9d135828e081be43c34f03859b0162792ee75f708e159dd9d9af78",
-   "score": 65,
+   "all": "8cf0db3250f5690f060e80475ef3d37e4a8d9f7da308cbfcfa2ee2d6a206c249",
+   "score": 72,
    "recoveryIndex": {
     "value": 3.8104931402485818,
     "unit": "h",
@@ -17568,8 +17568,8 @@
    "notes": []
   },
   "2026-10-24 v1 switch=2026-10-17": {
-   "all": "9424132eee0ee3f188efe4fc629c10510e990a19e242edcabd277661149350a4",
-   "score": 59,
+   "all": "02ad7d81674d1c7b5886d712f8df2b03a2bc67c10e2ee13ec922cae9b1d03598",
+   "score": 71,
    "recoveryIndex": {
     "value": 3.32,
     "unit": "h",
@@ -17588,8 +17588,8 @@
    ]
   },
   "2026-10-24 v1 switch=null": {
-   "all": "6bd100109c472ea2fbe8a703b775b0f396830252a2e9efb0a45fc70d514b7b45",
-   "score": 61,
+   "all": "a9d0f1f552d73aaf7a6977b633930bc2213c0da72270a382273c06b45158ff6b",
+   "score": 69,
    "recoveryIndex": {
     "value": 2.07,
     "unit": "h",
@@ -17608,8 +17608,8 @@
    ]
   },
   "2026-10-24 v2 switch=2026-10-17": {
-   "all": "4163ce662ad51ee96fb295fc8b9b8de59de4c8f44789789946a00fb84a46e8b7",
-   "score": 63,
+   "all": "5caefd3397330376007d1685c428ad73c212be75a993f95241cbb618d4b0daac",
+   "score": 74,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17626,8 +17626,8 @@
    "notes": []
   },
   "2026-10-24 v2 switch=null": {
-   "all": "dab36fa23a63b6d0078a6fe86635942734167728195d28dc10d1dbf1bf67c683",
-   "score": 55,
+   "all": "7184a1c3f4e770fcb108ae49a6747b87b6032fb67db16e4b935e6878186a3d7c",
+   "score": 62,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17644,8 +17644,8 @@
    "notes": []
   },
   "2026-10-24 v3 switch=2026-10-17": {
-   "all": "9cd7e72b7e5c69d2e3b7c01dd6ef06470ae36a64ceb8422e8849be66a5e47d4a",
-   "score": 56,
+   "all": "e1f047aee91fedbd2278346a3f80d007e49847c2841fd74c7ae5b9cf4b49de7a",
+   "score": 67,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17664,8 +17664,8 @@
    "notes": []
   },
   "2026-10-24 v3 switch=null": {
-   "all": "c833b2b53c646790367f33065c4ae33286cb3e2cfdcd4550cd01cfa890dbb89c",
-   "score": 54,
+   "all": "9853099db11de0fac66c3ef8cbdd1fa29ed6544d4432fb28e2987984d889ebef",
+   "score": 64,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17684,8 +17684,8 @@
    "notes": []
   },
   "2026-10-24 v4 switch=2026-10-17": {
-   "all": "b766921cfcc2989da7efa1a83cc822d44f5377152d565e134bf213520919902f",
-   "score": 57,
+   "all": "83df21f514916cce26ef49f8ed2c4642b6fbd06af1bbe63b021af9172b0d755a",
+   "score": 68,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17706,8 +17706,8 @@
    ]
   },
   "2026-10-24 v4 switch=null": {
-   "all": "8b2121e56c85afc8ed559a2d072eafcbd9d52a5db0864529aa81a416d27eb55a",
-   "score": 65,
+   "all": "ee8d4b9db6ee7d4e55227b095b04e36394353590362d074b1c4445d0d7413867",
+   "score": 71,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17728,8 +17728,8 @@
    ]
   },
   "2026-10-24 v5 switch=2026-10-17": {
-   "all": "ad56bcb79ae5da43644b1c508813ea347edab8e0507c1c5d407719967ea2ce60",
-   "score": 58,
+   "all": "c8b55cadb6147062f0abf52c49b16b2a9261941f18e08cf52f72e193041651d5",
+   "score": 70,
    "recoveryIndex": {
     "value": 5.7231712869834155,
     "unit": "h",
@@ -17746,8 +17746,8 @@
    "notes": []
   },
   "2026-10-24 v5 switch=null": {
-   "all": "eac4131342dd5bff452d712f190040ce43911a386c1bf56f3d82ffaed3b2aa6f",
-   "score": 71,
+   "all": "d66fba9199f10d2e79540cef88679cccf9e690df9fd8d0152a2a03b44a6dbaa5",
+   "score": 78,
    "recoveryIndex": {
     "value": 5.342519010649994,
     "unit": "h",
@@ -17764,8 +17764,8 @@
    "notes": []
   },
   "2026-07-05 v0 switch=2026-10-17": {
-   "all": "73bcf432a428c59f84d110894fb6fb5973cefb5769f2e2cbb0d2f8dc694bfaa1",
-   "score": 66,
+   "all": "14a622e2668f2a6e1fdb4b9c25cc50cf58fb918acbd2d58f2232cddbca345303",
+   "score": 75,
    "recoveryIndex": {
     "value": 3.6146570469718426,
     "unit": "h",
@@ -17782,8 +17782,8 @@
    "notes": []
   },
   "2026-07-05 v0 switch=null": {
-   "all": "5a81abb25f7959ff5575ea158590499cbb192ce4ecb74f0dd439551c674ffab3",
-   "score": 61,
+   "all": "8fac7606b46735d9f7c294fe74088a01e7df4e8a767b3952eff228e250f1b155",
+   "score": 69,
    "recoveryIndex": {
     "value": 3.214289438445121,
     "unit": "h",
@@ -17800,8 +17800,8 @@
    "notes": []
   },
   "2026-07-05 v1 switch=2026-10-17": {
-   "all": "c61c3459b34f3768bf3db082691db03f5e3f528c056ae3cf469e8837442c78b9",
-   "score": 71,
+   "all": "d72fa3ed9c7baa23d29cb4c52e159c9317808e44f270d45b06b3506616510249",
+   "score": 75,
    "recoveryIndex": {
     "value": 2.17,
     "unit": "h",
@@ -17820,8 +17820,8 @@
    ]
   },
   "2026-07-05 v1 switch=null": {
-   "all": "aa70e26cab16a965e7b626ed455c2550f6d2e13e989cebf4d9af9978e24a4e40",
-   "score": 54,
+   "all": "2b394f0caa1b4791a4ebe75df4a916615b6555c4d4d2d399ccaec26d720350cc",
+   "score": 63,
    "recoveryIndex": {
     "value": 2.61,
     "unit": "h",
@@ -17840,8 +17840,8 @@
    ]
   },
   "2026-07-05 v2 switch=2026-10-17": {
-   "all": "f394b368df79f06d3cca2c4b1bb5b7b16f33fa5304adaf3f36e11a6415d5be9b",
-   "score": 64,
+   "all": "d8b023b22125773e9712085cf3ba3e847da648f1fb3c86034fa79288a8fdc26e",
+   "score": 71,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17858,8 +17858,8 @@
    "notes": []
   },
   "2026-07-05 v2 switch=null": {
-   "all": "37ee2b93f80ca784846a19699eb724570d3a2429470583d2bf0a1eb0406d4312",
-   "score": 52,
+   "all": "04e55aea615e5b281291771ba235ed0ad958cb4ed7a6c746fe50d9959e786253",
+   "score": 58,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17876,8 +17876,8 @@
    "notes": []
   },
   "2026-07-05 v3 switch=2026-10-17": {
-   "all": "a5bbb56dfb69cd2ef5547710fc43bf6726e98cc262248049a6fc4f618abfe7cf",
-   "score": 65,
+   "all": "0b9ca5a26d3cac25bc324335631e1f129a5361186acbfed2b0e8153450d1dadf",
+   "score": 72,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17896,8 +17896,8 @@
    "notes": []
   },
   "2026-07-05 v3 switch=null": {
-   "all": "5308ed426361280a4ede0317fc6af524c86d4f2fe0498a7dab9425f06427da3a",
-   "score": 54,
+   "all": "e65c93bd424f38d47f3c764771e7d72d9d8c01dc774840ac6387756b1b92df25",
+   "score": 60,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17916,8 +17916,8 @@
    "notes": []
   },
   "2026-07-05 v4 switch=2026-10-17": {
-   "all": "870e1d02e3f129a82848daebd8b8b905eecb945fbcd41129d78aeeebbe8b45c7",
-   "score": 67,
+   "all": "10e93cd8d62fb66286c350fd97726e2269945fbf048eea8f41b0bf83eb7c978a",
+   "score": 70,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17938,8 +17938,8 @@
    ]
   },
   "2026-07-05 v4 switch=null": {
-   "all": "ecba6865ca5750e3743699693d7fe80a5b460226e73e1e5c47455768edd3a0c8",
-   "score": 55,
+   "all": "5dbdc83a68933a9bc4022f38d783460f6cd269d9b92f1520a3186517c0d61ba1",
+   "score": 59,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -17960,8 +17960,8 @@
    ]
   },
   "2026-07-05 v5 switch=2026-10-17": {
-   "all": "cb7862126ffea09c39b0dc066a621761473c955670f95296e68935669530c7bd",
-   "score": 28,
+   "all": "3dff18350064197d7df585015c7b77a7aa42ca82366e8e6209b126d34a5f664a",
+   "score": 34,
    "recoveryIndex": {
     "value": 5.509553220123053,
     "unit": "h",
@@ -17980,8 +17980,8 @@
    ]
   },
   "2026-07-05 v5 switch=null": {
-   "all": "99bb61ec214431227f3c95bb6342049e826c1671163568c713cdb5a40979a0a5",
-   "score": 62,
+   "all": "c642e5f0cd0f852b592d832faf55b76b7c944b95c6535ddbb350c4b38920a70c",
+   "score": 71,
    "recoveryIndex": {
     "value": 5.6781511309091,
     "unit": "h",
@@ -17998,8 +17998,8 @@
    "notes": []
   },
   "2026-07-07 v0 switch=2026-10-17": {
-   "all": "50e4257e58aa6b41bf02fd5a90345572283fdceeef5f2107a520db59d646c01b",
-   "score": 56,
+   "all": "f48ff14ddba7fb4c7d1e225526f7defe5495bef83aa4073e862b09a4633a29b5",
+   "score": 64,
    "recoveryIndex": {
     "value": 3.184787634992972,
     "unit": "h",
@@ -18016,8 +18016,8 @@
    "notes": []
   },
   "2026-07-07 v0 switch=null": {
-   "all": "27277151ce4a53a944ba040cc7698a10dc1b7072bb6316a7c793512c0e8177fa",
-   "score": 50,
+   "all": "ac9390201bb3b71d69712d7d0f8ed9a8e7092aa5f6e70f38b750db314948578e",
+   "score": 55,
    "recoveryIndex": {
     "value": 4.734089817618951,
     "unit": "h",
@@ -18034,8 +18034,8 @@
    "notes": []
   },
   "2026-07-07 v1 switch=2026-10-17": {
-   "all": "6d5825fb76a9a635e35a4c5553a012212e2e8bb67ec26924c3101abc8d8ff137",
-   "score": 65,
+   "all": "5b681563d7678490a8ab2d87c663f6faaaac3d709f627b57309edb30e75a5659",
+   "score": 73,
    "recoveryIndex": {
     "value": 4.26,
     "unit": "h",
@@ -18054,8 +18054,8 @@
    ]
   },
   "2026-07-07 v1 switch=null": {
-   "all": "2ceeb1781be5d0f15e6282b005b745fe7da7d571a40ff8f3c6519653dcf9c996",
-   "score": 51,
+   "all": "162ad649c9811a1ba3937aa4e1d0d3bbae72557b9b0e4c39e9f914762aacf000",
+   "score": 59,
    "recoveryIndex": {
     "value": 2.15,
     "unit": "h",
@@ -18074,8 +18074,8 @@
    ]
   },
   "2026-07-07 v2 switch=2026-10-17": {
-   "all": "6ad1a66e09814adfd9eb41a062c2a8665e2e62af13be7ca7a73f0c8792329ebf",
-   "score": 59,
+   "all": "8202a980e2ca6b56e9a7d2ab31c0c58f68def6721099b8e4e8090e3bb265755c",
+   "score": 63,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18092,8 +18092,8 @@
    "notes": []
   },
   "2026-07-07 v2 switch=null": {
-   "all": "eb8da5b8c6c200e94bf0087417e745c9547e271da8dec9ac9c4dc818eb688954",
-   "score": 65,
+   "all": "06dc6977623bbc6c71901b3d9fc68b540ab1dd63c4831caef845104f75cff85f",
+   "score": 71,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18110,8 +18110,8 @@
    "notes": []
   },
   "2026-07-07 v3 switch=2026-10-17": {
-   "all": "5c7098a067fd970910a1455b336a8cf6e6eca1f57a2d1356c554e4a5a2cf4fcf",
-   "score": 61,
+   "all": "35825401b9f86ea4b2ea1325102780c3bb5d31baa9c6dd45c2745d9898be29f8",
+   "score": 64,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18130,8 +18130,8 @@
    "notes": []
   },
   "2026-07-07 v3 switch=null": {
-   "all": "dbebedb927f342719c1af25e90e608805950c76b51f98f17ace955572447349c",
-   "score": 56,
+   "all": "a681f4cc878efb98dbc8f99c7ae4eb8d0041608aa057a982724bdcc871d2b683",
+   "score": 65,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18150,8 +18150,8 @@
    "notes": []
   },
   "2026-07-07 v4 switch=2026-10-17": {
-   "all": "84c4065b3deb2c51d958ad3733048522c17f5341ad0243f520faae33af1632f9",
-   "score": 53,
+   "all": "9376d171859cfb4bd1687d8c17d5032d3dca310b1936cd17ca19c7ae2681d928",
+   "score": 61,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18172,8 +18172,8 @@
    ]
   },
   "2026-07-07 v4 switch=null": {
-   "all": "9dddf4c2b70bcc72c4ff5ebb341697fd0cff97176f72233a91fc0ac948e5ef22",
-   "score": 56,
+   "all": "849f4e06c994d2cbb40bbdbb509af66f6f985926ebcad6d4e73f0a56fbbea35a",
+   "score": 62,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18194,8 +18194,8 @@
    ]
   },
   "2026-07-07 v5 switch=2026-10-17": {
-   "all": "9bb3b8de3251456d3a611ed4269fae81c39a2708e034f275bce9cf92e137d5d9",
-   "score": 63,
+   "all": "4ef02d72034753791bd6898aa88d34ad8415002ead6ba9f22ccf588e75b62ad0",
+   "score": 69,
    "recoveryIndex": {
     "value": 4.863395037828013,
     "unit": "h",
@@ -18212,8 +18212,8 @@
    "notes": []
   },
   "2026-07-07 v5 switch=null": {
-   "all": "a1ef9dc25a49789b9852c7494571352adf7da687073ea8fef994e311272036cc",
-   "score": 65,
+   "all": "0a8e2984963b5db54b39b9bba3f0452e9c66f7874da3bac1bc15281d63e9d37e",
+   "score": 72,
    "recoveryIndex": {
     "value": 5.52304427116178,
     "unit": "h",
@@ -18230,8 +18230,8 @@
    "notes": []
   },
   "2026-07-08 v0 switch=2026-10-17": {
-   "all": "111aaea054c5f157ebc43a663092ff58ea819a22d76979d901055fc6e6a2f03e",
-   "score": 63,
+   "all": "29dc0d73d590bcfddf6876057d55736c4ec382ac89e9ba8fa77e46da5ff1e36a",
+   "score": 70,
    "recoveryIndex": {
     "value": 3.4537471916992217,
     "unit": "h",
@@ -18248,8 +18248,8 @@
    "notes": []
   },
   "2026-07-08 v0 switch=null": {
-   "all": "8eddb5dcca861003d7780274cb6ab631e26d7c6eff6d306c445cb833c0e29cc3",
-   "score": 71,
+   "all": "3f5024d46fc890062184d2d2be93455c8a5bd085282cfb9d0f5aeed45ce2b082",
+   "score": 80,
    "recoveryIndex": {
     "value": 5.964621466118842,
     "unit": "h",
@@ -18266,8 +18266,8 @@
    "notes": []
   },
   "2026-07-08 v1 switch=2026-10-17": {
-   "all": "ac3730d94741e7d0295d9f12f7f6ab142add12e4dcf98f20d621fec0f154f427",
-   "score": 51,
+   "all": "70e3d46368142d537b16425a100d02213a66bf447f412f4008ef59e0466a12de",
+   "score": 59,
    "recoveryIndex": {
     "value": 2.24,
     "unit": "h",
@@ -18286,8 +18286,8 @@
    ]
   },
   "2026-07-08 v1 switch=null": {
-   "all": "846a9ee12a6306f8b5414ad469c7d29d3f203492a856d1efc766beec56d2f86d",
-   "score": 60,
+   "all": "0945f9ba71559c459f70cbbf8dfd2a98d80d505fbfc1ce58c3b8d30b4b26d587",
+   "score": 66,
    "recoveryIndex": {
     "value": 3.15,
     "unit": "h",
@@ -18306,8 +18306,8 @@
    ]
   },
   "2026-07-08 v2 switch=2026-10-17": {
-   "all": "b2783602c70c9c53f34be1b67c948d2181a8e5ef05b946f03a0328ed6c91cf28",
-   "score": 60,
+   "all": "086d737c23a4e5ae0b19e1b217c2d7f24ca8522d323c1a610a1db60fd07b4592",
+   "score": 66,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18324,8 +18324,8 @@
    "notes": []
   },
   "2026-07-08 v2 switch=null": {
-   "all": "8afeeeaa64724e431605a7e3046a5fd009cd7f77fd59c6bcd9e00dcb434d86d8",
-   "score": 62,
+   "all": "21249b9dcee32246fc59c4fe32a6a3cf2775db514c28526e8cbeddb29fc55c26",
+   "score": 71,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18342,8 +18342,8 @@
    "notes": []
   },
   "2026-07-08 v3 switch=2026-10-17": {
-   "all": "52bafe27e30eeb96a438fe3cf60c76688f6a0750aa35d169b2e6ffad2d67cddf",
-   "score": 56,
+   "all": "291db10307f7147143a262238588e66aa8f0698e064561b63ba4ad2c2e56a990",
+   "score": 63,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18362,8 +18362,8 @@
    "notes": []
   },
   "2026-07-08 v3 switch=null": {
-   "all": "6a235a3d3855d0f93669f99941af2c0e8563187635b9b470004c3b8681701a11",
-   "score": 58,
+   "all": "966426ba32c172864e4dbbf6bc22da69e6d4fbb4ce4e8f72b3e1bafde940bafb",
+   "score": 63,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18382,8 +18382,8 @@
    "notes": []
   },
   "2026-07-08 v4 switch=2026-10-17": {
-   "all": "7c81aa4cb775d4a1a059236f59d76cd0fddc013689f99e4637f1f55ff5fb1d8f",
-   "score": 49,
+   "all": "81b220aa0d73eb32e8e68ddbb9bf6c6929552aa7383a2eed41965cd99ef30175",
+   "score": 55,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18404,8 +18404,8 @@
    ]
   },
   "2026-07-08 v4 switch=null": {
-   "all": "87ef463ca4c5a834c40e4c9dd9e1886a5583b131f279a5bd22e6588ce362058d",
-   "score": 48,
+   "all": "e2ea259b5141b32a52d3324c56e56671396796335e145c58f0c1e32313477b88",
+   "score": 53,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18426,8 +18426,8 @@
    ]
   },
   "2026-07-08 v5 switch=2026-10-17": {
-   "all": "1c38d822b255dd8bff87e43b22264237ecbf067f271b0fcefeb42cd657df1b2a",
-   "score": 54,
+   "all": "667c0a072015c9a68cae1aa277ddeed3f196d7b5fac960b087bc88626d53fe38",
+   "score": 61,
    "recoveryIndex": {
     "value": 3.821446028072387,
     "unit": "h",
@@ -18444,8 +18444,8 @@
    "notes": []
   },
   "2026-07-08 v5 switch=null": {
-   "all": "0779cf827e657ef3c639b1fc03fd5605a6463f6da81e82fa0ff7c16d2536115f",
-   "score": 67,
+   "all": "2a2d9fa4f317ed54f65ed3af1f23e570e26511742126bcc0af8a8d8c9ff89074",
+   "score": 71,
    "recoveryIndex": {
     "value": 4.191560238366947,
     "unit": "h",
@@ -18462,8 +18462,8 @@
    "notes": []
   },
   "2026-07-20 v0 switch=2026-10-17": {
-   "all": "c53054e34869554c542c4968876024e126fbc111de1717e732db9691cd3f30f1",
-   "score": 63,
+   "all": "2ee4f44db77cfb34886615d704068d22aa0d083707e71d9feec3e88244d3f99c",
+   "score": 71,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18480,8 +18480,8 @@
    "notes": []
   },
   "2026-07-20 v0 switch=null": {
-   "all": "a8f3df42da13dafe1221d8a8681f712275b66b226e6371599d871a1da12658b0",
-   "score": 62,
+   "all": "9331b0a0b4df363a6d37e04dfe87a6b2d98b4e20177c40c88072444d737e5697",
+   "score": 68,
    "recoveryIndex": {
     "value": 5.716261072084308,
     "unit": "h",
@@ -18498,8 +18498,8 @@
    "notes": []
   },
   "2026-07-20 v1 switch=2026-10-17": {
-   "all": "e5d257e68799b0029c5eac0d72ed01fed87e7bb7118f5091ca1ffa1ac007678b",
-   "score": 53,
+   "all": "08390fb3c794cab80c39ccf3aa60c32e06086d085e7e9486d8402e2059e93a29",
+   "score": 60,
    "recoveryIndex": {
     "value": 4.46,
     "unit": "h",
@@ -18518,8 +18518,8 @@
    ]
   },
   "2026-07-20 v1 switch=null": {
-   "all": "ae2c140c310b7598051f5a216ad63b849f310c9e5043bdece44b511f0138bb56",
-   "score": 57,
+   "all": "ca75d26a9ec97afe1991147febb0ac801db780c82138ee4ecf059500462d6208",
+   "score": 67,
    "recoveryIndex": {
     "value": 2.39,
     "unit": "h",
@@ -18538,8 +18538,8 @@
    ]
   },
   "2026-07-20 v2 switch=2026-10-17": {
-   "all": "76ccce50cbcf8475bc84cfcfb6e6b6cc6007d9d62573c1b40d6c24896b73b3e5",
-   "score": 56,
+   "all": "7d20885869921eb8cb4fa99f2adcf4c606236d1c25cf81b2c227b7bbeb253ff7",
+   "score": 62,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18556,8 +18556,8 @@
    "notes": []
   },
   "2026-07-20 v2 switch=null": {
-   "all": "a41da045de8a9eb027fdbde3fae7b6e6944db0c17afe1cbbc5fc4e6a43211381",
-   "score": 61,
+   "all": "1b286089f652d05387ba479f4ba9d0b64d5c8eaad7e0227edb18daf8f19aa6d8",
+   "score": 71,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18574,8 +18574,8 @@
    "notes": []
   },
   "2026-07-20 v3 switch=2026-10-17": {
-   "all": "242c3c6847921e9d29964e13666d0b02f48f73db678d52edad1b6bddb597c59d",
-   "score": 49,
+   "all": "d6b57fb65a51a785f51cd576cba2145ca229608906918eeedbe8bd64e304c354",
+   "score": 57,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18594,8 +18594,8 @@
    "notes": []
   },
   "2026-07-20 v3 switch=null": {
-   "all": "6771bc0737f2876637ffd02320253e350817f0c729cc15621dd1f9c4ef866591",
-   "score": 54,
+   "all": "bea588afa8775e7e0727d0adab9f3792e3a3a71de3b8fef119cc10688bc24590",
+   "score": 59,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18614,8 +18614,8 @@
    "notes": []
   },
   "2026-07-20 v4 switch=2026-10-17": {
-   "all": "1b14fc4733ab433f2469133dd1c77fc0e62a846ad73eb8dfeae8acca9a97cb34",
-   "score": 58,
+   "all": "92e9b812b797500a5d8f3601f5deb467cd1cc23ced8465862435e080e5548528",
+   "score": 63,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18636,8 +18636,8 @@
    ]
   },
   "2026-07-20 v4 switch=null": {
-   "all": "9efda0d3e20e3607a250a92591e25a3808ac7996ae9744c352893117ebaab63c",
-   "score": 63,
+   "all": "7bd9fffdb5dedc525ad5c46a6ee8f1acb81ed9799b756fbc8f9a21e3e517b93c",
+   "score": 67,
    "recoveryIndex": {
     "value": null,
     "unit": "h",
@@ -18658,8 +18658,8 @@
    ]
   },
   "2026-07-20 v5 switch=2026-10-17": {
-   "all": "34781966956a749e066564732f752636df991eba36ad02e906d91a4f66188077",
-   "score": 68,
+   "all": "7ef97f7b6137e539cc1dfeea651397a1c99de797c1222db2e40039af40b3a39a",
+   "score": 77,
    "recoveryIndex": {
     "value": 5.870390511117876,
     "unit": "h",
@@ -18676,8 +18676,8 @@
    "notes": []
   },
   "2026-07-20 v5 switch=null": {
-   "all": "9f81535e550b2d72cc62859425ae482ba920b424c910389122195e61175eeab4",
-   "score": 63,
+   "all": "c3af59284e1bf0caafbcdf9db301c6ee6810b6c0e77de3d1383ce1e3f9081929",
+   "score": 73,
    "recoveryIndex": {
     "value": 5.516434502089396,
     "unit": "h",
@@ -18696,17 +18696,17 @@
  },
  "payload": {
   "v0 switch=2026-10-17": {
-   "readinessDisplayScore": 49,
+   "readinessDisplayScore": 60,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -18720,7 +18720,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -18766,18 +18766,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 49,
+     "readinessScore": 60,
      "readinessSource": "generic-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -18791,7 +18791,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -18821,17 +18821,17 @@
    ]
   },
   "v0 switch=null": {
-   "readinessDisplayScore": 50,
+   "readinessDisplayScore": 59,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 58,
+     "score": 79,
      "provisional": false,
      "input": -0.23271633023416907,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 35,
+     "score": 53,
      "provisional": false,
      "input": -0.4488100654516118,
      "gap": null,
@@ -18845,7 +18845,7 @@
      "source": "oura_ble"
     },
     "sleepBalance": {
-     "score": 41,
+     "score": 62,
      "provisional": false,
      "input": -0.2637451742653916,
      "gap": null,
@@ -18903,18 +18903,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 50,
+     "readinessScore": 59,
      "readinessSource": "ble-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 58,
+       "score": 79,
        "provisional": false,
        "input": -0.23271633023416907,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 35,
+       "score": 53,
        "provisional": false,
        "input": -0.4488100654516118,
        "gap": null,
@@ -18928,7 +18928,7 @@
        "source": "oura_ble"
       },
       "sleepBalance": {
-       "score": 41,
+       "score": 62,
        "provisional": false,
        "input": -0.2637451742653916,
        "gap": null,
@@ -18958,17 +18958,17 @@
    ]
   },
   "v1 switch=2026-10-17": {
-   "readinessDisplayScore": 52,
+   "readinessDisplayScore": 64,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -18982,7 +18982,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -19027,18 +19027,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 52,
+     "readinessScore": 64,
      "readinessSource": "generic-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -19052,7 +19052,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -19081,17 +19081,17 @@
    ]
   },
   "v1 switch=null": {
-   "readinessDisplayScore": 46,
+   "readinessDisplayScore": 51,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 18,
+     "score": 27,
      "provisional": false,
      "input": 0.9751922409812799,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 18,
+     "score": 27,
      "provisional": false,
      "input": -0.9574614729634385,
      "gap": null,
@@ -19105,7 +19105,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -19158,18 +19158,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 46,
+     "readinessScore": 51,
      "readinessSource": "ble-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 18,
+       "score": 27,
        "provisional": false,
        "input": 0.9751922409812799,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 18,
+       "score": 27,
        "provisional": false,
        "input": -0.9574614729634385,
        "gap": null,
@@ -19183,7 +19183,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -19212,17 +19212,17 @@
    ]
   },
   "v2 switch=2026-10-17": {
-   "readinessDisplayScore": 55,
+   "readinessDisplayScore": 66,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -19236,7 +19236,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -19282,18 +19282,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 55,
+     "readinessScore": 66,
      "readinessSource": "generic-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -19307,7 +19307,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -19337,17 +19337,17 @@
    ]
   },
   "v2 switch=null": {
-   "readinessDisplayScore": 57,
+   "readinessDisplayScore": 65,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 65,
+     "score": 83,
      "provisional": false,
      "input": -0.4619331667806063,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 77,
+     "score": 89,
      "provisional": false,
      "input": 0.8145071558195918,
      "gap": null,
@@ -19361,7 +19361,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -19415,18 +19415,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 57,
+     "readinessScore": 65,
      "readinessSource": "ble-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 65,
+       "score": 83,
        "provisional": false,
        "input": -0.4619331667806063,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 77,
+       "score": 89,
        "provisional": false,
        "input": 0.8145071558195918,
        "gap": null,
@@ -19440,7 +19440,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -19470,16 +19470,16 @@
    ]
   },
   "v3 switch=2026-10-17": {
-   "readinessDisplayScore": 50,
+   "readinessDisplayScore": 61,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -19492,7 +19492,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -19536,17 +19536,17 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 50,
+     "readinessScore": 61,
      "readinessSource": "generic-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -19559,7 +19559,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -19587,17 +19587,17 @@
    ]
   },
   "v3 switch=null": {
-   "readinessDisplayScore": 55,
+   "readinessDisplayScore": 63,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 52,
+     "score": 76,
      "provisional": false,
      "input": -0.061375735446374265,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 76,
+     "score": 88,
      "provisional": false,
      "input": 0.7784239617588932,
      "gap": null,
@@ -19611,7 +19611,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -19663,18 +19663,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 55,
+     "readinessScore": 63,
      "readinessSource": "ble-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 52,
+       "score": 76,
        "provisional": false,
        "input": -0.061375735446374265,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 76,
+       "score": 88,
        "provisional": false,
        "input": 0.7784239617588932,
        "gap": null,
@@ -19688,7 +19688,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -19716,17 +19716,17 @@
    ]
   },
   "v4 switch=2026-10-17": {
-   "readinessDisplayScore": 53,
+   "readinessDisplayScore": 64,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -19739,7 +19739,7 @@
      "gap": "no_input"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -19778,18 +19778,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 53,
+     "readinessScore": 64,
      "readinessSource": "generic-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -19802,7 +19802,7 @@
        "gap": "no_input"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -19830,17 +19830,17 @@
    ]
   },
   "v4 switch=null": {
-   "readinessDisplayScore": 59,
+   "readinessDisplayScore": 65,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 89,
+     "score": 94,
      "provisional": false,
      "input": -1.3829999053916333,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 42,
+     "score": 62,
      "provisional": false,
      "input": -0.25076371910947204,
      "gap": null,
@@ -19853,7 +19853,7 @@
      "gap": "no_input"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -19901,18 +19901,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 59,
+     "readinessScore": 65,
      "readinessSource": "ble-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 89,
+       "score": 94,
        "provisional": false,
        "input": -1.3829999053916333,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 42,
+       "score": 62,
        "provisional": false,
        "input": -0.25076371910947204,
        "gap": null,
@@ -19925,7 +19925,7 @@
        "gap": "no_input"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -19953,17 +19953,17 @@
    ]
   },
   "v5 switch=2026-10-17": {
-   "readinessDisplayScore": 63,
+   "readinessDisplayScore": 74,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
      "source": "oura_cloud"
     },
     "hrvBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "awaiting_baseline",
@@ -19977,7 +19977,7 @@
      "source": "oura_cloud"
     },
     "sleepBalance": {
-     "score": 50,
+     "score": 75,
      "provisional": true,
      "input": null,
      "gap": "no_input"
@@ -20022,18 +20022,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 63,
+     "readinessScore": 74,
      "readinessSource": "generic-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
        "source": "oura_cloud"
       },
       "hrvBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "awaiting_baseline",
@@ -20047,7 +20047,7 @@
        "source": "oura_cloud"
       },
       "sleepBalance": {
-       "score": 50,
+       "score": 75,
        "provisional": true,
        "input": null,
        "gap": "no_input"
@@ -20076,17 +20076,17 @@
    ]
   },
   "v5 switch=null": {
-   "readinessDisplayScore": 59,
+   "readinessDisplayScore": 64,
    "readinessCompositeContributors": {
     "restingHeartRate": {
-     "score": 73,
+     "score": 87,
      "provisional": false,
      "input": -0.6981489907025072,
      "gap": null,
      "source": "oura_ble"
     },
     "hrvBalance": {
-     "score": 30,
+     "score": 45,
      "provisional": false,
      "input": -0.5984134206021491,
      "gap": null,
@@ -20100,7 +20100,7 @@
      "source": "oura_ble"
     },
     "sleepBalance": {
-     "score": 12,
+     "score": 18,
      "provisional": false,
      "input": -1.2743989512823546,
      "gap": null,
@@ -20158,18 +20158,18 @@
     },
     {
      "day": "2026-10-24",
-     "readinessScore": 59,
+     "readinessScore": 64,
      "readinessSource": "ble-derived",
      "readinessContributors": {
       "restingHeartRate": {
-       "score": 73,
+       "score": 87,
        "provisional": false,
        "input": -0.6981489907025072,
        "gap": null,
        "source": "oura_ble"
       },
       "hrvBalance": {
-       "score": 30,
+       "score": 45,
        "provisional": false,
        "input": -0.5984134206021491,
        "gap": null,
@@ -20183,7 +20183,7 @@
        "source": "oura_ble"
       },
       "sleepBalance": {
-       "score": 12,
+       "score": 18,
        "provisional": false,
        "input": -1.2743989512823546,
        "gap": null,

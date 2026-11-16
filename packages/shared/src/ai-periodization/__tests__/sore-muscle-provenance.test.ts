@@ -5,6 +5,7 @@ import {
 } from '@trainingai/shared/ai-periodization/ai-dynamic'
 import { RECOVERED_PCT } from '@trainingai/shared/checkin/suggested-soreness'
 import type { ProgramSession } from '@trainingai/shared/types/program'
+import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 
 // BF-173. `suggestedSoreMuscles` pre-ticks any muscle trained within 48 h and under RECOVERED_PCT,
 // reading the same recovery feed `sessionRecoveryScore` then scores — so clamping an accepted
@@ -44,6 +45,7 @@ const base: AiDynamicInput = {
   history: [],
   soreMuscles: [],
   readinessScore: 80,
+  readinessModelVersion: READINESS_MODEL_VERSION,
   temperatureDeviation: null,
   timezone: 'Australia/Brisbane',
   reminderEnabled: false,

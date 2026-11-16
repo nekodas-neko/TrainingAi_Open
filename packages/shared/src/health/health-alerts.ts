@@ -4,6 +4,8 @@
 // of what already fired.
 import { STRESS_HIGH_LEVEL } from './daytime-stress-thresholds'
 import type { IllnessFlag } from './illness-radar'
+import { cutFor } from './readiness-decision-thresholds'
+import { READINESS_MODEL_VERSION } from './readiness-composite'
 
 export const HEALTH_ALERTS_CHANNEL = 'health-alerts'
 export const HEALTH_ALERT_ROUTE = '/health/readiness'
@@ -18,6 +20,9 @@ export interface HealthAlertInput {
   illnessFlag: IllnessFlag | null
   illnessAdvisory: string | null       // reuse the radar's own copy for the body
   readinessLabel: 'High' | 'Moderate' | 'Low' | null
+  /** Today's score from `/api/readiness-score`, scored in that request on the current model. When
+   *  present, the push fires on `LOW_READINESS_ALERT_BELOW` (#3824); absent, on the Low label. */
+  readinessScore?: number | null
   readinessHasData: boolean            // false → the chip hides itself; don't alert on it
   stressHighMinutes: number | null     // preferred (daytime-stress-wiring); null pre-merge
   stressCurrent: number | null         // fallback: latest bucket level, [-1,+1], neg = stressed
@@ -33,6 +38,7 @@ export interface HealthAlertSources {
     illnessFlag?: string | null
     illnessAdvisory?: string | null
     label?: string | null
+    score?: number | null
     hasSufficientData?: boolean | null
   } | null
   battery?: { stress?: { highMinutes?: number | null; current?: number | null } | null } | null
@@ -49,6 +55,7 @@ export function healthAlertInput({ readiness, battery }: HealthAlertSources): He
     illnessFlag: flag != null && ILLNESS_FLAGS.includes(flag) ? (flag as IllnessFlag) : null,
     illnessAdvisory: readiness?.illnessAdvisory ?? null,
     readinessLabel: label != null && READINESS_LABELS.includes(label) ? (label as HealthAlertInput['readinessLabel']) : null,
+    readinessScore: typeof readiness?.score === 'number' && Number.isFinite(readiness.score) ? readiness.score : null,
     readinessHasData: readiness?.hasSufficientData ?? false,
     stressHighMinutes: battery?.stress?.highMinutes ?? null,
     stressCurrent: battery?.stress?.current ?? null,
@@ -104,10 +111,19 @@ export function computeHealthAlertActions(
   // Keyed on the anomaly, not on the alert firing this pass: the once-a-day dedup turns the more
   // specific alert into a skip on a second open, which used to let "Readiness is low" through
   // after the owner had already been told about the fever (#3536).
+  //
+  // #3824: it fires on a named cut, not on the Low label. #3778 raised the score and kept the labels
+  // at 70/50, so following the label would have reached the owner on 10 fewer of 118 stored days.
+  // The cut (`LOW_READINESS_ALERT_BELOW`) keeps the old rate and is the owner's to confirm. The score
+  // is scored in the readiness request itself, so it is always on the current model's scale. The
+  // body no longer names the band, since a score of 50–56 is "low" here and "Moderate" on the label.
   const moreSpecificPresent = illnessTriggered || stressTriggered
-  const readinessTriggered = input.readinessHasData && input.readinessLabel === 'Low' && !moreSpecificPresent
+  const readinessLow = input.readinessScore != null
+    ? input.readinessScore < cutFor('lowReadinessAlert', READINESS_MODEL_VERSION)
+    : input.readinessLabel === 'Low'
+  const readinessTriggered = input.readinessHasData && readinessLow && !moreSpecificPresent
   const readiness = readinessTriggered
-    ? fire('readiness', 'Readiness is low', 'Your readiness is Low today. Consider a lighter session, a deload, or a rest day.')
+    ? fire('readiness', 'Readiness is low', 'Your readiness is low today. Consider a lighter session, a deload, or a rest day.')
     : skip('readiness')
 
   return [illness, stress, readiness]

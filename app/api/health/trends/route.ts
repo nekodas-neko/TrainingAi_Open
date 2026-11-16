@@ -8,10 +8,17 @@ import { ouraDailyWear, ouraTemperatureDeviations } from '@/lib/oura/cloud/readi
 import { aggregateWorkoutDay, type DaySession } from '@trainingai/shared/health/workout-density'
 import { rollupDailyBestHrr, setHrr60Values } from '@trainingai/shared/workout/hrr-trend'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
+import { toCurrentReadinessScale } from '@trainingai/shared/health/readiness-scale'
+import { readinessModelVersionOf } from '@trainingai/shared/health/readiness-decision-thresholds'
 
 export interface HealthTrendDay {
   date: string            // YYYY-MM-DD
   readinessScore: number | null
+  /** The day's readiness on the current scale (#3824): as stored for a v18 day, converted for an
+   *  older one, null when an older row has no contributor map to convert. The "vs your 14-day
+   *  average" chip averages this, so a window spanning #3778 does not read the move as a change in
+   *  the person. The sparkline keeps `readinessScore`, the number shown that day. */
+  readinessScoreCurrentScale: number | null
   sleepScore: number | null
   activityScore: number | null
   hrvMs: number | null
@@ -103,6 +110,9 @@ export async function GET() {
     trends.push({
       date: d,
       readinessScore: derived?.readinessScore ?? null,
+      readinessScoreCurrentScale: derived
+        ? toCurrentReadinessScale(derived.readinessScore, readinessModelVersionOf(derived.modelVersions), derived.readinessContributors)
+        : null,
       sleepScore: derived?.sleepScore ?? null,
       activityScore: derived?.activityScore ?? null,
       hrvMs: body?.hrvMs ?? null,

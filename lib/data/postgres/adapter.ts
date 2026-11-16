@@ -46,7 +46,7 @@ import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
 import { dayStepCountsByDate } from '@trainingai/shared/health/activity-steps'
 import { rowsOfDeviceInUse, fillMissingNightSources, nightAlgorithmVersion } from '@trainingai/shared/health/per-device-normal'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
-import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
+import { liveReadinessReadingForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
 import { sleepDurationTrend } from '@trainingai/shared/health/sleep-trend'
 import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers, resolveVsAnswer } from '@trainingai/shared/validation/day-checkin'
@@ -2299,7 +2299,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // Live BLE-derived readiness, never Oura's own readiness score (#3000). Computed once and reused for BOTH the scoring engine and
       // the signals block below, so the "Why this?" explain page shows the same number the
       // recommendation was actually computed from (W3 §3.2 — the signals read the dead column).
-      const liveReadiness = liveReadinessForDay(todayIso, derivedRows)
+      // #3824: today's row may still hold a score from before #3778 (release day, before it is
+      // recomputed), so its model version rides beside it and the cuts are chosen for its scale.
+      const liveReading = liveReadinessReadingForDay(todayIso, derivedRows)
+      const liveReadiness = liveReading?.score ?? null
+      const liveReadinessModelVersion = liveReading?.modelVersion ?? null
 
       // Last night's deviation as readiness v8 takes it (#3077): the ring's where it has tonight,
       // else Oura's own. Only TODAY's night counts — a stale night must never feed a deload banner.
@@ -2328,6 +2332,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // Live BLE-derived readiness, never the frozen Cloud column (dead since the 2026-07-07
         // re-key — the readiness-graded deloads were unreachable, E2-12).
         readinessScore: liveReadiness,
+        readinessModelVersion: liveReadinessModelVersion,
         temperatureDeviation,
         temperatureBaselineDays,
         temperatureTrusted,
@@ -2349,6 +2354,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         signals: {
           muscleRecovery,
           ouraReadiness: liveReadiness,
+          ouraReadinessModelVersion: liveReadinessModelVersion,
           sleepTrend,
           hrvTrend,
           energyLevel: moodLog?.energyLevel ?? null,

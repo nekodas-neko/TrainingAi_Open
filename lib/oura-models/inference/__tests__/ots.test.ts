@@ -22,6 +22,7 @@ function inputFromGolden(over: Partial<OtsInput> = {}): OtsInput {
     noOts: golden.noOts,
     tzChange: golden.tzChange,
     readiness: golden.readiness,
+    readinessModelVersion: null,
     vo2max: golden.vo2max,
     ...over,
   }

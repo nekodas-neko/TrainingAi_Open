@@ -99,11 +99,11 @@ describe('healthAlertInput', () => {
         battery: { stress: { highMinutes: 90, current: -0.5 } },
       }),
     ).toEqual({
-      illnessFlag: 'fever', illnessAdvisory: 'x', readinessLabel: 'Low', readinessHasData: true,
+      illnessFlag: 'fever', illnessAdvisory: 'x', readinessLabel: 'Low', readinessScore: null, readinessHasData: true,
       stressHighMinutes: 90, stressCurrent: -0.5,
     })
     expect(healthAlertInput({})).toEqual({
-      illnessFlag: null, illnessAdvisory: null, readinessLabel: null, readinessHasData: false,
+      illnessFlag: null, illnessAdvisory: null, readinessLabel: null, readinessScore: null, readinessHasData: false,
       stressHighMinutes: null, stressCurrent: null,
     })
   })

@@ -17,6 +17,7 @@ function inputs(over: Partial<TrainingStressInputs> = {}): TrainingStressInputs 
     sex: 'male',
     rhr: golden.rhr,
     readiness: golden.readiness,
+    readinessModelVersion: null,
     readinessProvisional: false,
     // measuredMaxHr 170 / rhr 55 → Uth 15.3×170/55 = 47.3, which buckets to the SAME
     // VO₂max category (2) as the golden's raw vo2max=45, so the derived-input path matches it.

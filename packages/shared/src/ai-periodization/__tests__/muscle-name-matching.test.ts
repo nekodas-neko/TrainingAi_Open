@@ -4,6 +4,7 @@ import {
   type AiDynamicInput,
 } from '@trainingai/shared/ai-periodization/ai-dynamic'
 import type { ProgramSession, MuscleAssignment } from '@trainingai/shared/types/program'
+import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 
 // BF-171. `sessionRecoveryScore` was the only soreness/recovery consumer in the repo matching raw
 // names; the other six go through `moodMuscleMatches`. Two limbs, and they cancelled in one place,
@@ -41,6 +42,7 @@ const base: AiDynamicInput = {
   soreMuscles: [],
   suggestedSoreMuscles: [],   // everything below is a LIFTER-ADDED tick, so BF-173 lets it clamp
   readinessScore: 80,
+  readinessModelVersion: READINESS_MODEL_VERSION,
   temperatureDeviation: null,
   timezone: 'Australia/Brisbane',
   reminderEnabled: false,

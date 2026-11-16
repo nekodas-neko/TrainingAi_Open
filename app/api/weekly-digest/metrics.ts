@@ -9,7 +9,7 @@ import { getRepository } from '@/lib/data'
 import { formatInTimeZone } from 'date-fns-tz'
 import { todayMidnightUtc, todayDayOfWeek } from '@trainingai/shared/date-utils'
 import { normalizeMuscle, roleWeight } from '@trainingai/shared/muscles'
-import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
+import { liveReadinessByDayOnCurrentScale } from '@trainingai/shared/health/live-readiness'
 import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
 import { nightSessions, canonicalNightsByDate, recordsSleep } from '@trainingai/shared/health/sleep-night'
@@ -161,7 +161,9 @@ export async function computeWeeklyDigestMetrics(
   // Readiness: the app's own BLE-derived composite (the frozen Cloud column is dead since the
   // 2026-07-07 re-key, so the digest's readiness line silently vanished — F8). Recap-week avg vs
   // the week before.
-  const readinessByDay = liveReadinessByDay(derivedRows)
+  // #3824: every day on the current scale, so a recap whose two weeks straddle #3778 compares the
+  // person, not the two scales. A pre-v18 row with no contributor map is left out.
+  const readinessByDay = liveReadinessByDayOnCurrentScale(derivedRows)
   const readinessEntries = [...readinessByDay.entries()]
   const readinessOf = (from: string, to: string) =>
     meanOrNull(readinessEntries.filter(([d]) => d >= from && d <= to).map(([, v]) => v))

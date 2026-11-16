@@ -22,7 +22,7 @@ import { computeHrv5MinSeries } from '@trainingai/shared/health/hrv-5min'
 import { computeChronicStress, chronicStressScoreToInt, chronicStressDiagnostics, usableGranularNights, CHRONIC_STRESS_MIN_DAYS, type ChronicStressDiagnostics, type ChronicStressNightSignals } from '@trainingai/shared/health/chronic-stress-assembly'
 import { illnessFromSummaries, illnessZScores } from '@trainingai/shared/health/illness-radar'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
-import { computeReadinessComposite } from '@trainingai/shared/health/readiness-composite'
+import { computeReadinessComposite, preCentreContributorScore } from '@trainingai/shared/health/readiness-composite'
 import { collectStressInputs, buildDayStressSeries, nightHrvMsOf } from './stress-series'
 import { computeResilienceForDay, type DailyIndices } from '@/lib/health/stress-resilience'
 import type { SleepSession } from '@trainingai/shared/types'
@@ -1193,9 +1193,11 @@ export async function runOuraRollup(
           // A provisional (learning-period) baseline contributor falls back to a fabricated 50 —
           // pass null so it doesn't invent a daily index. hrvBalance null → the model's hrv-free
           // path; recovery-index is a real derived value whenever its hours are present.
-          hrvBalance: comp.contributors.hrvBalance.provisional ? null : comp.contributors.hrvBalance.score,
+          // #3778: on the 50-centred scale the resilience model's fixed cuts were written for, so moving
+          // the readiness centre does not move anyone's resilience level.
+          hrvBalance: comp.contributors.hrvBalance.provisional ? null : preCentreContributorScore(comp.contributors.hrvBalance, 'higher-better'),
           recoveryIndex: latest.recoveryIndexHours != null ? comp.contributors.recoveryIndex.score : null,
-          restingHeartRate: comp.contributors.restingHeartRate.provisional ? null : comp.contributors.restingHeartRate.score,
+          restingHeartRate: comp.contributors.restingHeartRate.provisional ? null : preCentreContributorScore(comp.contributors.restingHeartRate, 'lower-better'),
           stressSeries: series,
           nightHrvBaselineMs: nightHrvMs,
         }, priorIndices)
