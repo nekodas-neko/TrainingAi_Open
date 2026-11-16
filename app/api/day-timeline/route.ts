@@ -11,8 +11,9 @@ import {
 import type { SleepSession } from '@trainingai/shared/types/body'
 import { gradedNightForDate } from '@trainingai/shared/health/sleep-night'
 import { sessionActiveMin } from '@trainingai/shared/workout/active-duration'
+import { doseTimelineText, vialStanding } from '@trainingai/shared/nutrition/vial-plan'
 
-export type TimelineEventType = 'wakeup' | 'sleep' | 'workout' | 'meal' | 'walk' | 'bedtime' | 'tag'
+export type TimelineEventType = 'wakeup' | 'sleep' | 'workout' | 'meal' | 'walk' | 'bedtime' | 'tag' | 'dose'
 
 export interface TimelineEvent {
   type: TimelineEventType
@@ -38,6 +39,8 @@ export interface TimelineEvent {
   sleepScore?: number
   latencyMin?: number
   tagSource?: string
+  /** A dose row's supplement, so a tap opens that supplement's vial sheet (#2185). */
+  supplementId?: string
 }
 
 // Through the one formatter every other clock time uses (RV-208 ①). This route formatted `h:mm a`
@@ -82,7 +85,7 @@ export async function GET(req: Request) {
 
   const repo = await getRepository()
 
-  const [sleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraTags, ouraSessions, derivedRows] = await Promise.all([
+  const [sleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraTags, ouraSessions, derivedRows, doses] = await Promise.all([
     // From the day before yesterday: a night is grouped by its windows, and a fragment that ended
     // before midnight carries the earlier date.
     repo.listSleepSessions(userId, shiftDateStr(yesterday, -1), date),
@@ -94,6 +97,7 @@ export async function GET(req: Request) {
     repo.listOuraTags(userId, yesterday, date),
     repo.listOuraSessions(userId, yesterday, date),
     repo.getOuraDailyDerived(userId, yesterday, date),
+    repo.listTimedVialDoses(userId, yesterday, date),
   ])
 
   const events: TimelineEvent[] = []
@@ -317,6 +321,36 @@ export async function GET(req: Request) {
       day: 'today',  // recomputed below from timeMs
       tagSource: t.source,
     })
+  }
+
+  // ── Doses (#2185, option A) ──────────────────────────────────────────────
+  // A row at the tick's stored time: the amount, and where it sat in its vial. A logged fact,
+  // never linked to any other figure on the day.
+  if (doses.length > 0) {
+    const ids = [...new Set(doses.map(d => d.supplementId))]
+    const vialsById = new Map(await Promise.all(
+      ids.map(async id => [id, await repo.listSupplementVials(userId, id)] as const),
+    ))
+    const opened = [...vialsById.values()].flat().map(v => v.openedOn).filter(d => d <= date).sort()
+    const history = opened.length > 0 ? (await repo.listDoseHistory(userId, opened[0], date)).logs : []
+    for (const dose of doses) {
+      const t = Date.parse(dose.takenAt)
+      if (!Number.isFinite(t) || t < yDayStart.getTime() || t > dayEnd.getTime()) continue
+      const standing = vialStanding(
+        dose,
+        vialsById.get(dose.supplementId) ?? [],
+        history.filter(l => l.supplementId === dose.supplementId),
+      )
+      events.push({
+        type: 'dose',
+        time: fmtTime(new Date(t), tz),
+        timeMs: t,
+        ...doseTimelineText(dose, standing),
+        icon: 'Syringe',
+        day: 'today',  // recomputed below from timeMs
+        supplementId: dose.supplementId,
+      })
+    }
   }
 
   // Assign the day group from each event's timestamp (handles a "fell asleep" after

@@ -42,6 +42,9 @@ const listActivityLogs = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listOuraTags = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listOuraSessions = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getOuraDailyDerived = vi.fn(async (..._a: unknown[]) => [] as Row[])
+const listTimedVialDoses = vi.fn(async (..._a: unknown[]) => [] as Row[])
+const listSupplementVials = vi.fn(async (..._a: unknown[]) => [] as Row[])
+const listDoseHistory = vi.fn(async (..._a: unknown[]) => ({ logs: [] as Row[], courses: [] as Row[] }))
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
@@ -50,6 +53,7 @@ vi.mock('@/lib/data', () => {
   const repo = async () => ({
     listSleepSessions, getWorkoutSessionsFrom, listFoodLogs, listMealTypes,
     getOuraWorkouts, getOuraDaily, listActivityLogs, listOuraTags, listOuraSessions, getOuraDailyDerived,
+    listTimedVialDoses, listSupplementVials, listDoseHistory,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
@@ -104,6 +108,9 @@ beforeEach(() => {
   listOuraTags.mockResolvedValue([])
   listOuraSessions.mockResolvedValue([])
   getOuraDailyDerived.mockResolvedValue([])
+  listTimedVialDoses.mockResolvedValue([])
+  listSupplementVials.mockResolvedValue([])
+  listDoseHistory.mockResolvedValue({ logs: [], courses: [] })
 })
 
 describe('/api/day-timeline — the guards', () => {
@@ -444,5 +451,52 @@ describe('/api/day-timeline — tags and ordering', () => {
     expect([...times].sort((a, b) => b - a)).toEqual(times)
     expect(events[0].type).toBe('workout')   // 17:00, the latest
     expect(events[events.length - 1].type).toBe('sleep')  // 22:00 yesterday, the earliest
+  })
+})
+
+// #2185 option A: a dose is a row at the tick's stored time, with where it sat in its vial.
+describe('/api/day-timeline — doses', () => {
+  const tick = (over: Row = {}) => ({
+    supplementId: 'sup-1', date: DAY, amount: 2, unit: 'mg',
+    takenAt: bne(DAY, '08:15').toISOString(), ...over,
+  })
+
+  it('places the dose at its stored time with the vial week and doses left', async () => {
+    listTimedVialDoses.mockResolvedValue([tick()])
+    listSupplementVials.mockResolvedValue([{ id: 'v-1', strengthMg: 10, openedOn: '2026-08-04' }])
+    listDoseHistory.mockResolvedValue({
+      logs: [
+        { supplementId: 'sup-1', date: '2026-09-01', amount: 2, unit: 'mg', takenAt: null },
+        { supplementId: 'sup-1', date: DAY, amount: 2, unit: 'mg', takenAt: bne(DAY, '08:15').toISOString() },
+        { supplementId: 'other', date: DAY, amount: 2, unit: 'mg', takenAt: null },
+      ],
+      courses: [],
+    })
+    const [dose] = await eventsOf('dose')
+    expect(dose).toMatchObject({
+      time: '8:15 am', timeMs: bne(DAY, '08:15').getTime(), day: 'today', date: DAY,
+      title: 'Dose · 2 mg', subtitle: 'Week 6 of this vial · 3 doses left', supplementId: 'sup-1',
+    })
+    expect(listDoseHistory).toHaveBeenCalledWith(expect.any(String), '2026-08-04', DAY)
+  })
+
+  it('shows the title alone when no vial covers the day', async () => {
+    listTimedVialDoses.mockResolvedValue([tick()])
+    const [dose] = await eventsOf('dose')
+    expect(dose.title).toBe('Dose · 2 mg')
+    expect(dose.subtitle).toBeUndefined()
+    expect(listDoseHistory).not.toHaveBeenCalled()
+  })
+
+  it('files yesterday\'s dose under yesterday and asks for none it will not draw', async () => {
+    listTimedVialDoses.mockResolvedValue([tick({ date: YESTERDAY, takenAt: bne(YESTERDAY, '21:00').toISOString() })])
+    const [dose] = await eventsOf('dose')
+    expect(dose).toMatchObject({ day: 'yesterday', date: YESTERDAY })
+    expect(listTimedVialDoses).toHaveBeenCalledWith(expect.any(String), YESTERDAY, DAY)
+  })
+
+  it('draws nothing on a day with no dose', async () => {
+    expect(await eventsOf('dose')).toEqual([])
+    expect(listSupplementVials).not.toHaveBeenCalled()
   })
 })
