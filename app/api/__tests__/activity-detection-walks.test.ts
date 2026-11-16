@@ -17,6 +17,7 @@ const repo = {
   listSleepSessions: vi.fn(async () => [] as { sleepStart: Date; sleepEnd: Date }[]),
   getDaySessionSummaries: vi.fn(async () => [] as { startedAt: Date; completedAt?: Date }[]),
   listActivityLogs: vi.fn(async () => [] as { date: string; startTime?: string; endTime?: string; durationMin?: number }[]),
+  getOuraWorkouts: vi.fn(async (): Promise<{ startDatetime: Date; endDatetime: Date }[]> => []),
 }
 vi.mock('@/lib/data', () => ({ getRepositoryAsync: vi.fn(async () => repo) }))
 
@@ -29,6 +30,7 @@ beforeEach(() => {
   rateLimit.mockImplementation(() => true)
   repo.listActivityLogs.mockImplementation(async () => [])
   repo.getDaySessionSummaries.mockImplementation(async () => [])
+  repo.getOuraWorkouts.mockImplementation(async () => [])
 })
 
 describe('GET /api/activity-detection/walks (#2471)', () => {
@@ -54,6 +56,20 @@ describe('GET /api/activity-detection/walks (#2471)', () => {
   it('leaves out motion during a lifting session', async () => {
     repo.getDaySessionSummaries.mockImplementation(async () => [{ startedAt: new Date(T0), completedAt: new Date(T0 + 50 * MIN) }])
     expect((await (await get()).json()).walks).toEqual([])
+  })
+
+  // #3844: the source's own recorded workout already counts the walk.
+  it('leaves out a walk that overlaps a workout the source recorded', async () => {
+    repo.getOuraWorkouts.mockImplementation(async () => [{ startDatetime: new Date(T0 + 8 * MIN), endDatetime: new Date(T0 + 34 * MIN) }])
+    expect((await (await get()).json()).walks).toEqual([])
+    expect(repo.getOuraWorkouts).toHaveBeenLastCalledWith('u1', { from: '2026-10-06', to: '2026-10-08' })
+  })
+
+  it('still offers the walk when the source workouts cannot be read', async () => {
+    repo.getOuraWorkouts.mockImplementation(async () => { throw new Error('db down') })
+    const res = await get()
+    expect(res.status).toBe(200)
+    expect((await res.json()).walks).toHaveLength(1)
   })
 
   it('passes each read the date in the form it takes', async () => {

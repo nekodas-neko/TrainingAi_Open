@@ -2,12 +2,16 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { RoutePoint } from '@/lib/activity/route-encoding'
-import { computeTotalDistanceKm, haversineDistanceKm } from '@/lib/activity/activity-metrics'
-import { encodeRoute, simplifyRoute } from '@/lib/activity/route-encoding'
-import { MIN_DISTANCE_M, MIN_AVG_SPEED_MS, MIN_DURATION_SEC } from '@/lib/activity/detection-thresholds'
 import { recordDetectionEvent, newDetectionId } from '@/lib/activity/detection-events'
 
+/**
+ * Walks waiting on the "detected" card.
+ *
+ * #3844 (owner, 16 Nov): the phone's live GPS and motion detector is gone. Walks now come from the
+ * day's movement data (`lib/activity/ring-walks.ts`, which asks `/api/activity-detection/walks`) and
+ * from the workouts the source records itself, which reach the energy budget and the day timeline
+ * without this store. What is left here is the offer: what is pending, and what was answered.
+ */
 export interface PendingSession {
   id: string
   startMs: number
@@ -17,12 +21,13 @@ export interface PendingSession {
   durationMin: number
   activityType: 'walk' | 'run'
   /**
-   * `'phone'`: the live GPS detector, with a route. `'ring'` (#2471): a walk found after the fact in
-   * the ring's MET, with no route and no distance (`lib/activity/ring-walks.ts`).
+   * `'ring'` (#2471): a walk found after the fact in the day's MET, with no route and no distance
+   * (`lib/activity/ring-walks.ts`). `'phone'`: the live GPS detector removed in #3844, with a route.
+   * Nothing writes `'phone'` now, but **this store is persisted**, so a device can still hold one
+   * offered before that change; it stays reviewable until answered.
    *
-   * Q-231 retired the `'oura'` source with the Cloud sync that wrote it. **This store is persisted**,
-   * so a device can still hold a pending session stamped `'oura'` from before that change, and
-   * `onRehydrateStorage` drops those rather than letting them render with no route.
+   * Q-231 retired the `'oura'` source with the Cloud sync that wrote it, and `onRehydrateStorage`
+   * drops any such session still persisted rather than letting it render with no route.
    */
   source: 'phone' | 'ring'
   /** #2478. The detection this session came from, for the funnel events its save or dismissal
@@ -30,27 +35,8 @@ export interface PendingSession {
   detectionId?: string
 }
 
-export interface DetectionDiag {
-  gateState: string
-  gpsSinceMs: number | null
-  lastPointMs: number | null
-  trigger: 'ring' | 'sensor'
-}
-
 interface AutoDetectionState {
-  isDetecting: boolean
-  sessionStartMs: number | null
-  sessionPoints: RoutePoint[]
   pendingSessions: PendingSession[]
-  detectionError: string | null
-  detectionDiag: DetectionDiag | null
-  // AD-2: the ring-cadence confirm's classified type, threaded through to endSession so it wins
-  // over the GPS-avg-speed guess below. Null when the session started via the ring-disconnected
-  // GPS-speed fallback (AD-1), which still derives the type from avg speed as before.
-  pendingActivityType: 'walk' | 'run' | null
-  /** #2478. The in-flight session's detection id (telemetry only; see detection-events.ts). Persisted
-   *  so a session finalized on rehydrate still reports which gate ended it. */
-  sessionDetectionId: string | null
   /** #2471. Start times of ring walks the user already answered (saved or dismissed), so the next
    *  sync does not offer them again. Kept for RING_WALK_MEMORY_MS, longer than the server's window. */
   answeredRingWalks: number[]
@@ -67,47 +53,10 @@ export interface RingWalkOffer {
 const RING_WALK_MEMORY_MS = 3 * 24 * 60 * 60 * 1000
 
 interface AutoDetectionActions {
-  setDetecting(v: boolean): void
-  startSession(ms: number, activityType?: 'walk' | 'run', detectionId?: string | null): void
-  addPoint(point: RoutePoint): void
-  endSession(): void
-  /** Throw an in-flight session away without finalizing it. Distinct from `endSession`, which
-   *  turns the session into a `pendingSessions` entry — i.e. into a confirm sheet. Used when the
-   *  app learns the motion belonged to a session it already knows about (a Guided Walk, a manual
-   *  activity, a lifting workout), where the right outcome is that the detection never happened. */
-  discardSession(): void
   dismissSession(id: string): void
   removeSession(id: string): void
   /** #2471. Offer the ring walks the server found, minus any already answered or already pending. */
   offerRingWalks(walks: readonly RingWalkOffer[]): void
-  setDetectionError(message: string | null): void
-  setDetectionDiag(diag: DetectionDiag | null): void
-}
-
-// avg speed >= 2.08 m/s == run (8 min/km threshold)
-const RUN_SPEED_THRESHOLD_MS = 2.08
-// Discard sessions shorter than the shared minimum duration (Balanced: 7 min)
-const MIN_DURATION_MS = MIN_DURATION_SEC * 1000
-// Discard sessions with avg speed above 7.5 m/s (27 km/h) — these are driving, not walking/running
-const MAX_SPEED_MS = 7.5
-// Trains/buses still average under MAX_SPEED_MS due to station stops, but their GPS segments
-// between stops show 15-25 m/s. We use the 80th-percentile segment speed to detect this:
-// city-walk GPS jitter produces occasional high-speed spikes but can't lift the 80th percentile,
-// whereas a train running at speed between stops will push the 80th percentile well above
-// the threshold even after accounting for the slow station-dwell segments.
-const MOTORISED_P80_SPEED_MS = 8.0  // 28.8 km/h — no walk/run sustains this at the 80th pct
-
-function segmentSpeedP80(points: import('@/lib/activity/route-encoding').RoutePoint[]): number {
-  if (points.length < 2) return 0
-  const speeds: number[] = []
-  for (let i = 1; i < points.length; i++) {
-    const dtSec = (points[i].t - points[i - 1].t) / 1000
-    if (dtSec <= 0) continue
-    speeds.push((haversineDistanceKm(points[i - 1], points[i]) * 1000) / dtSec)
-  }
-  if (!speeds.length) return 0
-  speeds.sort((a, b) => a - b)
-  return speeds[Math.floor(speeds.length * 0.80)]
 }
 
 /** The answered-walks patch for a session leaving the card: only ring walks are remembered. */
@@ -120,111 +69,8 @@ function rememberAnswered(s: { answeredRingWalks: number[] }, session: PendingSe
 export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionActions>()(
   persist(
     (set, get) => ({
-      isDetecting: false,
-      sessionStartMs: null,
-      sessionPoints: [],
       pendingSessions: [],
-      detectionError: null,
-      detectionDiag: null,
-      pendingActivityType: null,
-      sessionDetectionId: null,
       answeredRingWalks: [],
-
-      setDetecting: (v) => set({ isDetecting: v }),
-      setDetectionError: (message) => set({ detectionError: message }),
-      setDetectionDiag: (diag) => set({ detectionDiag: diag }),
-
-      startSession: (ms, activityType, detectionId) => set({
-        sessionStartMs: ms, sessionPoints: [], pendingActivityType: activityType ?? null, sessionDetectionId: detectionId ?? null,
-      }),
-
-      addPoint: (point) => set(s => ({ sessionPoints: [...s.sessionPoints, point] })),
-
-      discardSession: () => {
-        const { sessionStartMs, sessionDetectionId } = get()
-        if (sessionStartMs !== null) recordDetectionEvent(sessionDetectionId, 'dismissed', 'session_owned', { sessionStartAt: sessionStartMs })
-        set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null, sessionDetectionId: null })
-      },
-
-      endSession: () => {
-        const { sessionStartMs, sessionPoints, pendingActivityType, sessionDetectionId } = get()
-        // #2478: every return below reports the gate that decided it. Telemetry only — the gates
-        // themselves are unchanged, and recordDetectionEvent never throws.
-        const reject = (gate: string, detail: Parameters<typeof recordDetectionEvent>[3] = {}) => {
-          if (sessionStartMs) {
-            recordDetectionEvent(sessionDetectionId, 'dismissed', gate, {
-              sessionStartAt: sessionStartMs, pointCount: sessionPoints.length, activityType: pendingActivityType, ...detail,
-            })
-          }
-          set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null, sessionDetectionId: null })
-        }
-        if (!sessionStartMs || sessionPoints.length < 2) {
-          reject('too_few_points')
-          return
-        }
-        const endMs = sessionPoints[sessionPoints.length - 1].t
-        if (endMs - sessionStartMs < MIN_DURATION_MS) {
-          reject('min_duration', { elapsedSec: (endMs - sessionStartMs) / 1000 })
-          return
-        }
-
-        const simplified = simplifyRoute(sessionPoints, 5)
-        const distanceKm = computeTotalDistanceKm(sessionPoints)
-        const durationMin = (endMs - sessionStartMs) / 60000
-        const avgSpeedMs = distanceKm > 0
-          ? (distanceKm * 1000) / ((endMs - sessionStartMs) / 1000)
-          : 0
-
-        // Lower-bound quality gates (Balanced) — the phone path previously had only upper
-        // bounds, so a slow short shuffle around the house qualified as a walk. Discard
-        // anything under the shared minimum distance or pace.
-        const measured = { distanceM: distanceKm * 1000, elapsedSec: (endMs - sessionStartMs) / 1000, avgSpeedMs }
-        if (distanceKm * 1000 < MIN_DISTANCE_M || avgSpeedMs < MIN_AVG_SPEED_MS) {
-          reject(distanceKm * 1000 < MIN_DISTANCE_M ? 'min_distance' : 'min_avg_speed', measured)
-          return
-        }
-
-        // Above MAX_SPEED_MS this is driving/cycling, not a walk or run — discard
-        if (avgSpeedMs > MAX_SPEED_MS) {
-          reject('max_avg_speed', measured)
-          return
-        }
-        // Trains/buses average under MAX_SPEED_MS due to station stops, but their 80th-percentile
-        // GPS segment speed is still well above walking pace. GPS jitter spikes can't lift the
-        // 80th percentile on a genuine walk, so this filter is robust to city multipath noise.
-        if (segmentSpeedP80(sessionPoints) > MOTORISED_P80_SPEED_MS) {
-          reject('motorised_p80', measured)
-          return
-        }
-
-        // AD-2: the ring-cadence confirm's classified type wins when present (real signal, not a
-        // speed guess). GPS avg-speed stays the type source only for the ring-disconnected
-        // fallback (AD-1), where no cadence classification exists.
-        const activityType: 'walk' | 'run' = pendingActivityType ?? (avgSpeedMs >= RUN_SPEED_THRESHOLD_MS ? 'run' : 'walk')
-
-        const session: PendingSession = {
-          id: crypto.randomUUID(),
-          startMs: sessionStartMs,
-          endMs,
-          routePolyline: encodeRoute(simplified),
-          distanceKm,
-          durationMin,
-          activityType,
-          source: 'phone',
-          ...(sessionDetectionId ? { detectionId: sessionDetectionId } : {}),
-        }
-
-        recordDetectionEvent(sessionDetectionId, 'offered', 'quality_gates', {
-          ...measured, sessionStartAt: sessionStartMs, pointCount: sessionPoints.length, activityType,
-        })
-        set(s => ({
-          pendingSessions: [...s.pendingSessions, session],
-          sessionStartMs: null,
-          sessionPoints: [],
-          pendingActivityType: null,
-          sessionDetectionId: null,
-        }))
-      },
 
       // The confirm card's Dismiss / Dismiss all. The review sheet's own Dismiss goes through
       // removeSession and reports itself (exercise-review-sheet.tsx).
@@ -250,7 +96,7 @@ export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionAc
         const { pendingSessions, answeredRingWalks } = get()
         const fresh = walks.filter(w =>
           !answeredRingWalks.includes(w.startMs)
-          // A walk the phone already recorded with a route, or one already on offer, is the same walk.
+          // One already on offer (or a phone walk persisted from before #3844) is the same walk.
           && !pendingSessions.some(p => p.startMs < w.endMs && p.endMs > w.startMs))
         if (fresh.length === 0) return
         const added: PendingSession[] = fresh.map(w => {
@@ -279,23 +125,23 @@ export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionAc
         }
         return localStorage
       }),
-      // detectionError is a transient runtime signal from the current watcher —
-      // never worth surviving a reload as stale state ahead of the next real check.
+      // #3844: only the offer is persisted. A store written before then also holds the removed
+      // detector's in-flight GPS session; `merge` drops it on the way in and the next write leaves
+      // it out.
       partialize: (s) => ({
-        isDetecting: s.isDetecting,
-        sessionStartMs: s.sessionStartMs,
-        sessionPoints: s.sessionPoints,
         pendingSessions: s.pendingSessions,
-        pendingActivityType: s.pendingActivityType,
-        sessionDetectionId: s.sessionDetectionId,
         answeredRingWalks: s.answeredRingWalks,
       }),
-      // isDetecting reflects whether a live background watcher is currently
-      // running — that watcher can't possibly still be running after a fresh
-      // app launch, so a persisted `true` is always stale.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<AutoDetectionState>
+        return {
+          ...current,
+          ...(Array.isArray(p.pendingSessions) ? { pendingSessions: p.pendingSessions } : {}),
+          ...(Array.isArray(p.answeredRingWalks) ? { answeredRingWalks: p.answeredRingWalks } : {}),
+        }
+      },
       onRehydrateStorage: () => (state) => {
         if (!state) return
-        state.isDetecting = false
         // Q-231: a session persisted before the Oura Cloud ingest was removed carries `source:
         // 'oura'` and an empty `routePolyline`. Nothing can mark it reviewed server-side any more, so
         // it would sit in the card forever offering a route-less review. Drop it on the way in.
@@ -304,17 +150,6 @@ export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionAc
         )
         // Absent on a store persisted before #2471.
         state.answeredRingWalks = (state.answeredRingWalks ?? []).filter(t => t > Date.now() - RING_WALK_MEMORY_MS)
-        // A persisted in-flight session whose last point is stale means the
-        // app died mid/after-walk. Finalize it — endSession's own quality
-        // gates decide whether it becomes a pending session — instead of
-        // letting it linger and contaminate the next walk. A FRESH session
-        // (reload mid-walk, e.g. a deploy) is left in place so tracking can
-        // resume seamlessly.
-        const pts = state.sessionPoints
-        const lastT = pts.length ? pts[pts.length - 1].t : 0
-        if (state.sessionStartMs !== null && Date.now() - lastT > 3 * 60 * 1000) {
-          queueMicrotask(() => useAutoDetectionStore.getState().endSession())
-        }
       },
     }
   )

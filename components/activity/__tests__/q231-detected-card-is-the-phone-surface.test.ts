@@ -9,6 +9,7 @@ const CARD = read('components/activity/exercise-detected-card.tsx')
 const SHEET = read('components/activity/exercise-review-sheet.tsx')
 const STORE = read('lib/stores/auto-detection-store.ts')
 const LAYOUT = read('app/layout.tsx')
+const PROVIDER = read('components/walk-offer-provider.tsx')
 const BANNER_STACK = read('components/home/home-banner-stack.tsx')
 
 /**
@@ -22,19 +23,26 @@ const BANNER_STACK = read('components/home/home-banner-stack.tsx')
  * no compile error and no failing test anywhere else.
  *
  * What Q-231 legitimately removed is the Cloud plumbing: the unreviewed fetch, the ingest, and the
- * mark-reviewed PATCH. The card and the phone path stay.
+ * mark-reviewed PATCH. The card and the phone path stayed.
+ *
+ * **#3844 (owner, 16 Nov) then removed the phone-GPS detector.** The card stays because the walk
+ * offer from the day's movement data writes `pendingSessions` too, and the root layout now starts
+ * only that offer.
  */
-describe('Q-231 — the detected card is the phone detector’s only surface', () => {
-  it('the phone detector is started unconditionally from the root layout', () => {
-    expect(LAYOUT).toContain('<AutoDetectionProvider />')
+describe('Q-231 — the detected card is the walk offer’s only surface', () => {
+  it('the root layout starts the walk offer, and nothing starts a live detector (#3844)', () => {
+    expect(LAYOUT).toContain('<WalkOfferProvider />')
+    expect(PROVIDER).toContain('offerRingWalks()')
+    expect(PROVIDER).not.toMatch(/startAutoDetection|auto-detection-service/)
   })
 
-  it('the store still finalizes a phone session into pendingSessions', () => {
-    expect(STORE).toMatch(/source: 'phone'/)
-    expect(STORE).toMatch(/pendingSessions: \[\.\.\.s\.pendingSessions, session\]/)
+  it('the store\'s writer is the walk offer', () => {
+    expect(STORE).toMatch(/offerRingWalks: \(walks\) =>/)
+    expect(STORE).toMatch(/set\(\{ pendingSessions: \[\.\.\.pendingSessions, \.\.\.added\] \}\)/)
+    expect(STORE).not.toMatch(/endSession|startSession|sessionPoints/)
   })
 
-  it('⛔ the card renders pendingSessions — removing it orphans the phone detector', () => {
+  it('⛔ the card renders pendingSessions — removing it orphans the walk offer', () => {
     expect(CARD).toContain('useAutoDetectionStore(s => s.pendingSessions)')
     expect(BANNER_STACK).toContain('<ExerciseDetectedCard')
   })

@@ -12,6 +12,10 @@ interface Props {
 /**
  * The confirm card for a detected walk or run.
  *
+ * **#3844 removed the live phone-GPS detector** described below. The card's writer now is the walk
+ * offer (`lib/activity/ring-walks.ts`, from the day's movement data); a phone session persisted
+ * before then still renders here until answered.
+ *
  * **Q-231 removed the Oura half, not this card.** It used to ingest `/api/oura/workouts?unreviewed=true`
  * into `pendingSessions` as well, and the entry's scope said to retire the card outright on the grounds
  * that *"retiring this card removes nothing he currently sees working"*. That was measured and is not so:

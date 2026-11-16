@@ -11,7 +11,7 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 
 | Area | Where |
 |---|---|
-| Detection | `lib/activity/auto-detection-service.ts`, `detection-thresholds.ts`, `motion-detection.ts`, `motion-gate.ts`, `blend-activity.ts` |
+| Detection | Walks from the day's MET: `packages/shared/src/health/walk-detection.ts`, `app/api/activity-detection/walks/route.ts`, `lib/activity/ring-walks.ts`, `lib/stores/auto-detection-store.ts`; `detection-thresholds.ts`, `blend-activity.ts`. The phone's live GPS detector was removed in #3844 |
 | Metrics | `packages/shared/src/health/activity-score.ts`, `hourly-movement.ts`, `zone-minutes.ts`, `daily-goals.ts`; `packages/shared/src/health/step-estimate.ts`, `daily-summary.ts`, `daily-medians.ts` |
 | Step capture (border with `devices`) | `lib/oura-ble/step-counter-pipeline.ts`, `step-orchestrator.ts`, `step-orchestrator-core.ts`, `step-day-buckets.ts`, `step-features.ts`, `gait-step-count.ts` |
 | UI | `app/activity/`, `components/activity/` |

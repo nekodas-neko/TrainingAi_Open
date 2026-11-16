@@ -19,6 +19,10 @@ import { perMinuteMovementGrid } from '@trainingai/shared/health/per-minute-move
 // Computed on read, never stored: the MET is already on the server, so a candidate is a
 // function of it and of what the user has logged, and a saved walk drops out by being logged. The
 // phone remembers what it dismissed (`auto-detection-store`). The rule is `detectWalksFromMet`.
+//
+// #3844: since the phone's live GPS detector was removed, this offer and the source's own recorded
+// workouts are where walks come from. A walk that overlaps one of those workouts is left out: the
+// workout already counts it (`lib/health/oura-budget-activities.ts`, the day timeline).
 const QuerySchema = z.object({
   date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).optional(),
 }).strict()
@@ -45,7 +49,7 @@ export async function GET(req: NextRequest) {
     const repo = await getRepositoryAsync()
     const dayStart = dateStrMidnightInTz(date, tz)
     const dayEnd = dateStrMidnightInTz(shiftDateStr(date, 1), tz)
-    const [daytime, movementSeries, sleepRows, lifting, activities] = await Promise.all([
+    const [daytime, movementSeries, sleepRows, lifting, activities, sourceWorkouts] = await Promise.all([
       repo.getOuraDaytimeSignals(userId, dayStart, dayEnd),
       // #2985: a connector's movement series where the ring has none. A source's day may start before
       // local midnight (Oura's at 4 a.m.), hence the day before.
@@ -55,6 +59,10 @@ export async function GET(req: NextRequest) {
       // This one takes the date slash-separated.
       repo.getDaySessionSummaries(userId, date.replace(/-/g, '/'), tz),
       repo.listActivityLogs(userId, date, date),
+      // #3844: the workouts a connected source recorded itself (Oura's, today). A source files a
+      // workout under its own day, so the read is widened a day each side. Best-effort: a failed read
+      // offers what the MET alone finds, as before.
+      repo.getOuraWorkouts(userId, { from: shiftDateStr(date, -1), to: shiftDateStr(date, 1) }).catch(() => []),
     ])
 
     const exclusions = [
@@ -68,6 +76,13 @@ export async function GET(req: NextRequest) {
         const end = localClockTimeToDate(a.date, a.endTime?.slice(0, 5), tz)
           ?? (a.durationMin != null ? new Date(start.getTime() + a.durationMin * 60_000) : null)
         return end && end > start ? [{ startMs: start.getTime(), endMs: end.getTime() }] : []
+      }),
+      // #3844: a walk the source already recorded as a workout is not offered again. Read as a plain
+      // interval, whatever the source labelled it: any recorded workout covers that time.
+      ...sourceWorkouts.flatMap(w => {
+        const startMs = w.startDatetime.getTime()
+        const endMs = w.endDatetime.getTime()
+        return endMs > startMs ? [{ startMs, endMs }] : []
       }),
     ]
 
