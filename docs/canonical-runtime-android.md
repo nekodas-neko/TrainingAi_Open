@@ -83,6 +83,10 @@ past that.
 
 > ### ⛔ Before telling anyone to uninstall the app, read this
 >
+> **Since the Oura Cloud switch (17 Oct, #2808) the reason that still holds is the last one below:
+> an uninstall wipes the on-device store and every change not yet synced.** The ring key is no
+> longer in use; the history below is kept for the day direct BLE returns (owner, 16 Nov).
+>
 > **An uninstall destroys the Oura ring key, and it is not recoverable from this repository, the
 > server, or any log.** `OuraBlePlugin.kt` keeps it in Android SharedPreferences and says so in its
 > own comment — *"the key never leaves SharedPreferences; never logged"*. That is deliberate and

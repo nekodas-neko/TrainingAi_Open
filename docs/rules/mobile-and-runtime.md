@@ -26,8 +26,8 @@ web build exists solely as a dev/QA surface (`pnpm dev` pre-merge testing) and m
 (pure fetch → render pass-through, no defaults/derivations/write semantics the device path lacks).
 **When behaviour must diverge, the device wins** — never add web-only product features. Full
 signing/release mechanics, the local Gradle build fallback, and — most importantly — the
-uninstall/ring-key recovery warning (an uninstall destroys the Oura ring's BLE key, which is **not**
-recoverable from this repo, the server, or any log) now live in
+uninstall warning (an uninstall wipes the on-device store and every change not yet synced to the
+server; it also destroys the Oura ring's BLE key, unused since the Oura Cloud switch on 17 Oct) now live in
 [`docs/canonical-runtime-android.md`](../canonical-runtime-android.md) — **read it before any
 uninstall, and before touching `android/**`, `capacitor.config.ts`, or cutting a release.**
 

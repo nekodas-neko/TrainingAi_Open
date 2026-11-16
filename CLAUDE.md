@@ -134,8 +134,10 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
 - `mobile/` (the native app) is bound by this file except its web-only lines (cache groups,
   `lib/local-store/`, Capacitor, `pb-safe-action`); [`mobile/AGENTS.md`](mobile/AGENTS.md) has
   the native equivalents.
-- **Never uninstall the app or install over it with a differently signed APK** — it destroys the
-  ring's BLE key, which cannot be recovered. **Never point the real app at a local server.**
+- **Never uninstall the app or install over it with a differently signed APK** — it wipes the
+  on-device store, and with it every change not yet synced to the server. (The ring's BLE key it
+  also held is no longer in use since the Oura Cloud switch.) **Never point the real app at a
+  local server.**
   [`docs/canonical-runtime-android.md`](docs/canonical-runtime-android.md).
 
 **Git, safety, packages** → [`docs/rules/git-safety-and-packages.md`](docs/rules/git-safety-and-packages.md)
