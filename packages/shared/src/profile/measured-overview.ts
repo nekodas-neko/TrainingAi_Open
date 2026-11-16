@@ -37,20 +37,15 @@ export interface ReadingGroup {
 }
 
 
+/** The overview group for the scale figures that are fixed ratios of weight, height, age and sex. */
+export const ESTIMATED_GROUP_TITLE = 'Estimated from weight, height, age and sex'
+
 export const METRIC_GROUPS: MetricGroup[] = [
   {
     title: 'Body composition',
     specs: [
       { field: 'weightKg', label: 'Weight', unit: 'kg', dp: 1 },
       { field: 'bodyFatPct', label: 'Body fat', unit: '%', dp: 1 },
-      { field: 'skeletalMusclePct', label: 'Skeletal muscle', unit: '%', dp: 1 },
-      { field: 'muscleMassKg', label: 'Muscle mass', unit: 'kg', dp: 1 },
-      { field: 'fatFreeMassKg', label: 'Fat-free mass', unit: 'kg', dp: 1 },
-      { field: 'bodyWaterPct', label: 'Body water', unit: '%', dp: 1 },
-      { field: 'boneMassKg', label: 'Bone mass', unit: 'kg', dp: 1 },
-      { field: 'proteinPct', label: 'Protein', unit: '%', dp: 1 },
-      { field: 'subcutaneousFatPct', label: 'Subcutaneous fat', unit: '%', dp: 1 },
-      { field: 'visceralFatIndex', label: 'Visceral fat index', dp: 1 },
     ],
   },
   {
@@ -61,9 +56,19 @@ export const METRIC_GROUPS: MetricGroup[] = [
       { field: 'spo2Pct', label: 'Blood oxygen', unit: '%' },
     ],
   },
+  // #3770: the scale works these out from weight, height, age and sex, not from its impedance
+  // reading, so they are grouped as estimates and never listed beside the measured figures.
   {
-    title: 'Metabolism',
+    title: ESTIMATED_GROUP_TITLE,
     specs: [
+      { field: 'skeletalMusclePct', label: 'Skeletal muscle', unit: '%', dp: 1 },
+      { field: 'muscleMassKg', label: 'Muscle mass', unit: 'kg', dp: 1 },
+      { field: 'fatFreeMassKg', label: 'Fat-free mass', unit: 'kg', dp: 1 },
+      { field: 'bodyWaterPct', label: 'Body water', unit: '%', dp: 1 },
+      { field: 'boneMassKg', label: 'Bone mass', unit: 'kg', dp: 1 },
+      { field: 'proteinPct', label: 'Protein', unit: '%', dp: 1 },
+      { field: 'subcutaneousFatPct', label: 'Subcutaneous fat', unit: '%', dp: 1 },
+      { field: 'visceralFatIndex', label: 'Visceral fat index', dp: 1 },
       {
         field: 'bmrKcal',
         label: 'Resting rate',

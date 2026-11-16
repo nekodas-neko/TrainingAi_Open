@@ -1,10 +1,25 @@
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { bodyComposition } from '@trainingai/shared/health/body-composition';
-import { AppText, Card, Disclosure, Grid, LineChart, MetricTile, Stack } from '../../../shared/ui';
+import {
+  AppText,
+  Card,
+  Disclosure,
+  DisclosureIcon,
+  Grid,
+  LineChart,
+  MetricTile,
+  Stack,
+} from '../../../shared/ui';
+import { layoutMotion } from '../../../shared/ui/layoutMotion';
+import { PRESSED_OPACITY } from '../../../shared/ui/pressFeedback';
+import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
 import { bodyCardColors } from '../../../shared/theme/tokens';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { displayFat, latestMetric, type BodyRow } from '../data/models';
 import { useCueColor } from './RangeBar';
+import { scaleEstimates, weighInDay } from '../data/scale-composition';
 
 const round1 = (x: number) => parseFloat(x.toFixed(1));
 
@@ -79,32 +94,23 @@ export function LeanMassCard({ rows }: { rows: readonly BodyRow[] }) {
   );
 }
 
-const fmt = (value: number | null, unit: string) => (value === null ? null : `${value}${unit}`);
-
-/** Body Composition (Scale): every tile from the last weigh-in and the skeletal-muscle trend. */
-export function ScaleCompositionCard({ rows }: { rows: readonly BodyRow[] }) {
+/**
+ * Body Composition (Scale), option A of #3770: weight and body fat from the last weigh-in, a body
+ * fat trend, and the figures estimated from weight, height, age and sex in a closed section.
+ */
+export function ScaleCompositionCard({ rows, today }: { rows: readonly BodyRow[]; today: string }) {
   const { theme } = useTheme();
+  const reduced = useReducedMotion();
+  const [open, setOpen] = useState(false);
+  // A scale weigh-in is the row that carries the scale's own figures.
   const latest = latestMetric([...rows], 'skeletalMusclePct');
   if (!latest) return null;
-  const series = [...rows]
-    .reverse()
-    .flatMap((row, index) =>
-      row.skeletalMusclePct === null
-        ? []
-        : [{ label: row.date, value: row.skeletalMusclePct, x: index }],
-    );
-  const tiles: { label: string; value: string | null; note?: string }[] = [
-    { label: 'Skeletal Muscle', value: fmt(latest.skeletalMusclePct, '%') },
-    { label: 'Fat-Free Mass', value: fmt(latest.fatFreeMassKg, ' kg') },
-    { label: 'Muscle Mass', value: fmt(latest.muscleMassKg, ' kg') },
-    { label: 'Bone Mass', value: fmt(latest.boneMassKg, ' kg') },
-    { label: 'Body Water', value: fmt(latest.bodyWaterPct, '%') },
-    { label: 'Subcutaneous Fat', value: fmt(latest.subcutaneousFatPct, '%') },
-    { label: 'Visceral Fat', value: fmt(latest.visceralFatIndex, ''), note: 'from BMI & age' },
-    { label: 'Protein', value: fmt(latest.proteinPct, '%') },
-    { label: 'BMR', value: fmt(latest.bmrKcal, ' kcal'), note: 'from weight & height' },
-    { label: 'Metabolic Age', value: fmt(latest.metabolicAge, ' yrs') },
-  ].filter((tile) => tile.value !== null);
+  const fat = displayFat(latest);
+  const series = [...rows].reverse().flatMap((row, index) => {
+    const value = displayFat(row);
+    return value === null ? [] : [{ label: row.date, value, x: index }];
+  });
+  const estimates = scaleEstimates(latest);
   return (
     <Card accent={bodyCardColors.composition}>
       <Stack gap="xxs">
@@ -112,14 +118,28 @@ export function ScaleCompositionCard({ rows }: { rows: readonly BodyRow[] }) {
           Body Composition (Scale)
         </AppText>
         <AppText variant="caption" tone="muted">
-          From your last weigh-in
+          From your weigh-in {weighInDay(latest.date, today)}
         </AppText>
       </Stack>
+      <Grid columns={2}>
+        <MetricTile
+          compact
+          label="Weight"
+          value={latest.weightKg === null ? null : `${round1(latest.weightKg)} kg`}
+          caption="measured"
+        />
+        <MetricTile
+          compact
+          label="Body Fat"
+          value={fat === null ? null : `${round1(fat)}%`}
+          caption="measured, with a formula"
+        />
+      </Grid>
       {series.length >= 2 && (
         <Stack gap="xxs">
           <LineChart
             points={series}
-            label="Skeletal muscle percent trend"
+            label="Body fat percent trend"
             readable
             fill
             gaps="connect"
@@ -131,23 +151,69 @@ export function ScaleCompositionCard({ rows }: { rows: readonly BodyRow[] }) {
             ]}
           />
           <AppText variant="caption" tone="muted">
-            Skeletal muscle % trend
+            Body fat % trend
           </AppText>
         </Stack>
       )}
-      <Grid columns={2}>
-        {tiles.map((tile) => (
-          <MetricTile key={tile.label} label={tile.label} value={tile.value} caption={tile.note} />
-        ))}
-      </Grid>
+      {estimates.length > 0 && (
+        <View
+          style={{
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: theme.colors.border,
+            paddingTop: theme.spacing.xs,
+            gap: theme.spacing.xs,
+          }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: open }}
+            accessibilityLabel={`Estimated from weight, height, age and sex, ${estimates.length} figures`}
+            onPress={() => {
+              layoutMotion(reduced);
+              setOpen(!open);
+            }}
+            style={({ pressed }) => ({
+              minHeight: theme.sizes.touchTarget,
+              justifyContent: 'center',
+              opacity: pressed ? PRESSED_OPACITY : 1,
+            })}
+          >
+            <Stack direction="row" align="center" gap="xs">
+              <Stack gap="xxs" style={{ flex: 1, minWidth: 0 }}>
+                <AppText variant="label">
+                  Estimated from weight, height, age and sex · {estimates.length}
+                </AppText>
+                <AppText variant="caption" tone="muted">
+                  Muscle, water, bone, protein, visceral fat, BMR, metabolic age and the rest. They
+                  move only when your weight moves.
+                </AppText>
+              </Stack>
+              <DisclosureIcon expanded={open} collapsed="right" />
+            </Stack>
+          </Pressable>
+          {open && (
+            <Grid columns={2}>
+              {estimates.map((tile) => (
+                <MetricTile
+                  key={tile.label}
+                  compact
+                  label={tile.label}
+                  value={tile.value}
+                  color={theme.colors.muted}
+                />
+              ))}
+            </Grid>
+          )}
+        </View>
+      )}
       <Disclosure title="About this card">
         <AppText variant="caption" tone="muted">
-          Measured directly by your body-composition scale (bioelectrical impedance), so it only
-          updates from an actual weigh-in with bare-foot skin contact, not calculated from weight
-          and body fat like the Body Composition card above. Two exceptions, marked on their tiles:
-          BMR is the Mifflin-St Jeor equation and Visceral Fat is derived from BMI and age, so
-          neither uses impedance. Your calorie targets prefer a clinically measured resting rate
-          when you have one, which is why the two figures can differ.
+          Your scale measures two things: your weight and an impedance reading. Weight is measured
+          directly. Body fat % comes from a formula on your height, weight, age and sex, adjusted a
+          little by the impedance reading. The figures under “Estimated” are fixed ratios of weight,
+          height, age and sex, so they move only when your weight does: BMR is the Mifflin-St Jeor
+          equation and Visceral Fat comes from BMI and age. Your calorie targets prefer a clinically
+          measured resting rate when you have one, which is why the two figures can differ.
         </AppText>
       </Disclosure>
     </Card>

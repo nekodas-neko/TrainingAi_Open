@@ -14,6 +14,7 @@ import { recordedIntake } from '../src/features/nutrition/data/recorded-intake.t
 import { explanationSpec, explanationData } from '../src/features/workouts/data/explanation.ts';
 import {
   readingGroups,
+  ESTIMATED_GROUP_TITLE,
   circularMeanMinutes,
 } from '@trainingai/shared/profile/measured-overview';
 import { performanceGroups } from '@trainingai/shared/profile/performance-overview';
@@ -124,7 +125,7 @@ test('profile summaries find each metric independently and distinguish daily est
   );
   assert.ok(!groups.some((x) => x.title === 'Vitals'));
   assert.ok(
-    groups.find((x) => x.title === 'Metabolism')!.readings[0].note?.includes('estimated'),
+    groups.find((x) => x.title === ESTIMATED_GROUP_TITLE)!.readings[0].note?.includes('estimated'),
   );
   assert.equal(
     performanceGroups({ measuredRmr: [{ measuredOn: '2026-08-01', rmrKcal: 1800 }] }).length,
