@@ -42,7 +42,7 @@ const listActivityLogs = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listOuraTags = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listOuraSessions = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getOuraDailyDerived = vi.fn(async (..._a: unknown[]) => [] as Row[])
-const listTimedVialDoses = vi.fn(async (..._a: unknown[]) => [] as Row[])
+const listTimedDoses = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listSupplementVials = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listDoseHistory = vi.fn(async (..._a: unknown[]) => ({ logs: [] as Row[], courses: [] as Row[] }))
 
@@ -53,7 +53,7 @@ vi.mock('@/lib/data', () => {
   const repo = async () => ({
     listSleepSessions, getWorkoutSessionsFrom, listFoodLogs, listMealTypes,
     getOuraWorkouts, getOuraDaily, listActivityLogs, listOuraTags, listOuraSessions, getOuraDailyDerived,
-    listTimedVialDoses, listSupplementVials, listDoseHistory,
+    listTimedDoses, listSupplementVials, listDoseHistory,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
@@ -108,7 +108,7 @@ beforeEach(() => {
   listOuraTags.mockResolvedValue([])
   listOuraSessions.mockResolvedValue([])
   getOuraDailyDerived.mockResolvedValue([])
-  listTimedVialDoses.mockResolvedValue([])
+  listTimedDoses.mockResolvedValue([])
   listSupplementVials.mockResolvedValue([])
   listDoseHistory.mockResolvedValue({ logs: [], courses: [] })
 })
@@ -462,7 +462,7 @@ describe('/api/day-timeline — doses', () => {
   })
 
   it('places the dose at its stored time with the vial week and doses left', async () => {
-    listTimedVialDoses.mockResolvedValue([tick()])
+    listTimedDoses.mockResolvedValue([tick()])
     listSupplementVials.mockResolvedValue([{ id: 'v-1', strengthMg: 10, openedOn: '2026-08-04' }])
     listDoseHistory.mockResolvedValue({
       logs: [
@@ -481,7 +481,7 @@ describe('/api/day-timeline — doses', () => {
   })
 
   it('shows the title alone when no vial covers the day', async () => {
-    listTimedVialDoses.mockResolvedValue([tick()])
+    listTimedDoses.mockResolvedValue([tick()])
     const [dose] = await eventsOf('dose')
     expect(dose.title).toBe('Dose · 2 mg')
     expect(dose.subtitle).toBeUndefined()
@@ -489,10 +489,15 @@ describe('/api/day-timeline — doses', () => {
   })
 
   it('files yesterday\'s dose under yesterday and asks for none it will not draw', async () => {
-    listTimedVialDoses.mockResolvedValue([tick({ date: YESTERDAY, takenAt: bne(YESTERDAY, '21:00').toISOString() })])
+    listTimedDoses.mockResolvedValue([tick({ date: YESTERDAY, takenAt: bne(YESTERDAY, '21:00').toISOString() })])
     const [dose] = await eventsOf('dose')
     expect(dose).toMatchObject({ day: 'yesterday', date: YESTERDAY })
-    expect(listTimedVialDoses).toHaveBeenCalledWith(expect.any(String), YESTERDAY, DAY)
+    expect(listTimedDoses).toHaveBeenCalledWith(expect.any(String), YESTERDAY, DAY)
+  })
+
+  it('leaves a tick that is not milligram-dosed off', async () => {
+    listTimedDoses.mockResolvedValue([tick({ unit: 'capsules' }), tick({ unit: null })])
+    expect(await eventsOf('dose')).toEqual([])
   })
 
   it('draws nothing on a day with no dose', async () => {

@@ -158,6 +158,10 @@ export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
     case 'tag':
       if (subtitle) metrics.push({ text: subtitle });
       break;
+    case 'dose':
+      // #2185 option A: "Week 6 of this vial · 3 doses left", or the title alone.
+      if (subtitle) metrics.push({ text: subtitle });
+      break;
     default: {
       // walk, cardio and anything logged by hand: the current app's WalkCard.
       title =
@@ -181,7 +185,7 @@ export function timelineCardContent(event: TimelineEvent): TimelineCardContent {
   return {
     title,
     titleTime: event.type === 'wakeup',
-    tight: ['meal', 'sleep', 'tag'].includes(event.type),
+    tight: ['meal', 'sleep', 'tag', 'dose'].includes(event.type),
     metrics,
   };
 }

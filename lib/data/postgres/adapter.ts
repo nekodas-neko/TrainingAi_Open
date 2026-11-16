@@ -8399,11 +8399,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   /**
-   * #2185 — the doses Home's timeline draws: live MANUAL ticks of a vial-dosed supplement in
-   * [from, to] that carry the time they were taken and an amount. Vial-dosed is the frozen vial
-   * stamp, as `listDoseEvents` decides it, so a daily oral supplement never becomes a timeline row.
+   * #2185 — the candidates for Home's dose rows: live MANUAL ticks in [from, to] that carry the
+   * time they were taken and an amount. The route keeps the milligram-dosed ones
+   * (`isMilligramDosed`, the rule the syringe control and the phone's own overlay use), so the
+   * phone and the server agree on which ticks are doses.
    */
-  async listTimedVialDoses(userId: string, from: string, to: string) {
+  async listTimedDoses(userId: string, from: string, to: string) {
     const rows = await this.db
       .select({
         supplementId: s.supplementLogs.supplementId, date: s.supplementLogs.logDate,
@@ -8420,7 +8421,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         isNull(s.supplements.deletedAt),
         isNotNull(s.supplementLogs.takenAt),
         isNotNull(s.supplementLogs.amount),
-        isNotNull(s.supplementLogs.vialStrengthMg),
       ))
       .orderBy(asc(s.supplementLogs.takenAt))
     return rows.map(r => ({
