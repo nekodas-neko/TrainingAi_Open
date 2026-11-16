@@ -154,6 +154,8 @@ export class AccountSession {
   private session: SavedSession | null = null;
   private pending: Pending | null = null;
   private generation = 0;
+  /** #3806: bumped by every sign-out; a reader response started before one is discarded. */
+  private signOuts = 0;
   private browserTimeout: ReturnType<typeof setTimeout> | null = null;
   private staleTimeout: ReturnType<typeof setTimeout> | null = null;
   private returnTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -374,6 +376,22 @@ export class AccountSession {
       this.epochOptions(),
     );
     const readTimezone = () => this.session?.timezone ?? null;
+    // #3806: a response is the account's only while the same sign-in is live. Comparing the user id
+    // alone let a response from before a sign-out through when the same account signed back in.
+    const begin = () => this.signOuts;
+    const ensure = (since: number) => {
+      if (this.session?.userId !== userId || this.signOuts !== since) {
+        throw new Error('The account changed during the request.');
+      }
+    };
+    const guarded =
+      <A extends unknown[], R>(call: (...args: A) => Promise<R>) =>
+      async (...args: A): Promise<R> => {
+        const since = begin();
+        const value = await call(...args);
+        ensure(since);
+        return value;
+      };
     this.reader = {
       origin: this.origin,
       userId,
@@ -381,66 +399,28 @@ export class AccountSession {
         return readTimezone();
       },
       streamExport: async (write) => {
+        const since = begin();
         await api.streamExport(async (bytes) => {
-          if (this.session?.userId !== userId) {
-            throw new Error('The account changed during the request.');
-          }
+          ensure(since);
           await write(bytes);
         });
-        if (this.session?.userId !== userId) {
-          throw new Error('The account changed during the request.');
-        }
+        ensure(since);
       },
       coachStream: async (body, signal) => {
+        const since = begin();
         const response = await api.coachStream(body, signal);
-        if (this.session?.userId !== userId) {
+        if (this.session?.userId !== userId || this.signOuts !== since) {
           await response.body?.cancel();
-          throw new Error('The account changed during the request.');
         }
+        ensure(since);
         return response;
       },
-      get: async (path, query) => {
-        const value = await api.get(path, query);
-        if (this.session?.userId !== userId) {
-          throw new Error('The account changed during the request.');
-        }
-        return value;
-      },
-      post: async (path, body, query) => {
-        const value = await api.post(path, body, query);
-        if (this.session?.userId !== userId) {
-          throw new Error('The account changed during the request.');
-        }
-        return value;
-      },
-      put: async (path, body) => {
-        const value = await api.put(path, body);
-        if (this.session?.userId !== userId) {
-          throw new Error('The account changed during the request.');
-        }
-        return value;
-      },
-      patch: async (path, body) => {
-        const value = await api.patch(path, body);
-        if (this.session?.userId !== userId) {
-          throw new Error('The account changed during the request.');
-        }
-        return value;
-      },
-      delete: async (path, body, query) => {
-        const value = await api.delete(path, body, query);
-        if (this.session?.userId !== userId) {
-          throw new Error('The account changed during the request.');
-        }
-        return value;
-      },
-      media: async (source) => {
-        const value = await api.media(source);
-        if (this.session?.userId !== userId) {
-          throw new Error('The account changed during the request.');
-        }
-        return value;
-      },
+      get: guarded((path: string, query?: Record<string, string>) => api.get(path, query)),
+      post: guarded((path: string, body: unknown, query?: Record<string, string>) => api.post(path, body, query)),
+      put: guarded((path: string, body: unknown) => api.put(path, body)),
+      patch: guarded((path: string, body: unknown) => api.patch(path, body)),
+      delete: guarded((path: string, body: unknown, query?: Record<string, string>) => api.delete(path, body, query)),
+      media: guarded((source: string) => api.media(source)),
     };
     return this.reader;
   }
@@ -919,6 +899,7 @@ export class AccountSession {
   }
   async signOut(message: string | null = null) {
     const previous = this.session;
+    this.signOuts += 1;
     const generation = ++this.generation;
     this.session = null;
     this.pending = null;

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { installDataEpochFetchGuard } from '@/lib/data-epoch-fetch';
+import { installSignOutFence } from '@/lib/sign-out-fence';
 import { initSQLite } from '@/lib/sqlite/sqlite-service';
 import { MIGRATIONS } from '@/lib/sqlite/migrations';
 import { getCached, mirrorToSessionCache, cachedFetch, cachedFetchToday } from '@/lib/sqlite/cache';
@@ -35,6 +36,8 @@ import { waitForRollup, type RollupState } from '@/lib/oura-ble/rollup-wait';
 
 // Module scope, not an effect: installed once per page load, before any upload can fire; a no-op off the browser.
 installDataEpochFetchGuard();
+// #3806: every request on the page is one a sign-out can abort (`lib/sign-out-fence.ts`).
+installSignOutFence();
 
 interface CacheTask {
   key: string;
