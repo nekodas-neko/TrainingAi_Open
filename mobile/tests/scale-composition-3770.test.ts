@@ -7,7 +7,7 @@ import type { BodyRow } from '../src/features/health/data/models.ts';
 const row = (o: Partial<BodyRow>) => ({ date: '2026-11-10', ...o }) as BodyRow;
 const full = row({
   weightKg: 80,
-  bodyFatPct: 20,
+  bodyFat: 20,
   skeletalMusclePct: 40,
   fatFreeMassKg: 64,
   muscleMassKg: 48,

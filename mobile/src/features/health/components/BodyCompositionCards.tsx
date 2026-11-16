@@ -108,7 +108,7 @@ export function ScaleCompositionCard({ rows, today }: { rows: readonly BodyRow[]
   const fat = displayFat(latest);
   const series = [...rows].reverse().flatMap((row, index) => {
     const value = displayFat(row);
-    return value === null ? [] : [{ label: row.date, value, x: index }];
+    return value == null ? [] : [{ label: row.date, value, x: index }];
   });
   const estimates = scaleEstimates(latest);
   return (
@@ -125,13 +125,13 @@ export function ScaleCompositionCard({ rows, today }: { rows: readonly BodyRow[]
         <MetricTile
           compact
           label="Weight"
-          value={latest.weightKg === null ? null : `${round1(latest.weightKg)} kg`}
+          value={latest.weightKg == null ? null : `${round1(latest.weightKg)} kg`}
           caption="measured"
         />
         <MetricTile
           compact
           label="Body Fat"
-          value={fat === null ? null : `${round1(fat)}%`}
+          value={fat == null ? null : `${round1(fat)}%`}
           caption="measured, with a formula"
         />
       </Grid>
