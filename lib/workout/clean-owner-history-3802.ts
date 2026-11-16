@@ -110,6 +110,11 @@ export interface CleanDeps {
   reconcilePersonalRecord: (userId: string, exerciseName: string) => Promise<unknown>
   bestQualifyingPersonalRecord: (userId: string, exerciseName: string, opts: { excludeSessionIds: string[] }) =>
     Promise<{ estimated1rm: number } | null>
+  /** #3850. After commit: drop the cached zone-minutes days the retimed and tombstoned rows covered,
+   *  before and after. Optional, so a test can leave the cache as the spec's step 5 left it. */
+  dropZoneMinutes?: (userId: string, touched: {
+    sessionIds: string[]; spans: { startedAt: Date; completedAt: Date | null }[]; activityDates: string[]
+  }) => Promise<unknown>
 }
 
 async function plan(client: Pick<PoolClient, 'query'>, deps: CleanDeps, userId: string): Promise<Plan> {
@@ -317,6 +322,7 @@ export async function cleanOwnerHistory3802(
     let p: Plan
     const w = { retimed: 0, sessions: 0, exerciseLogs: 0, setLogs: 0, phase: 0, activities: 0, zoneDays: 0 }
     let exerciseNames: string[] = []
+    const touched = { sessionIds: [] as string[], spans: [] as { startedAt: Date; completedAt: Date | null }[], activityDates: [] as string[] }
     try {
       // Lock everything a group can draw from, so nothing moves between the plan and the writes.
       await client.query(`SELECT id FROM workout_sessions WHERE user_id = $1 AND deleted_at IS NULL FOR UPDATE`, [userId])
@@ -336,6 +342,11 @@ export async function cleanOwnerHistory3802(
       }
 
       const at = new Date().toISOString()
+      // #3850: the spans the retimed sessions have now, for the zone-minutes days they leave.
+      const retimedIds = [...p.startFix, ...p.endFix].map(c => c.id)
+      touched.spans = (await client.query<{ started_at: Date; completed_at: Date | null }>(
+        `SELECT started_at, completed_at FROM workout_sessions WHERE user_id = $1 AND id = ANY($2::uuid[])`,
+        [userId, retimedIds])).rows.map(r => ({ startedAt: r.started_at, completedAt: r.completed_at }))
       // 3b and 3c first, so a row is never both corrected and tombstoned (the groups are disjoint
       // by rule; the order is the spec's belt and braces).
       for (const c of p.startFix) {
@@ -358,6 +369,7 @@ export async function cleanOwnerHistory3802(
       }
 
       const sessions = [...new Set([...p.tombstone['1'], ...p.tombstone['2'], ...p.tombstone['3a']])]
+      touched.sessionIds = [...retimedIds, ...sessions]
       const names = new Set<string>()
       for (const id of sessions) {
         const done = await tombstoneWorkoutSessionInTx(client, userId, id, at, { liveChildrenOnly: true })
@@ -375,8 +387,10 @@ export async function cleanOwnerHistory3802(
 
       const a = await client.query(
         `UPDATE activity_logs SET deleted_at = $3, deleted_reason = 'app', updated_at = $3
-         WHERE user_id = $1 AND id = ANY($2::uuid[]) AND deleted_at IS NULL`,
+         WHERE user_id = $1 AND id = ANY($2::uuid[]) AND deleted_at IS NULL
+         RETURNING date::text AS date`,
         [userId, p.activities, at])
+      touched.activityDates = a.rows.map((r: { date: string }) => r.date)
       expectRows('4', a.rowCount, p.activities.length)
       w.activities = a.rowCount ?? 0
 
@@ -397,6 +411,13 @@ export async function cleanOwnerHistory3802(
     // After commit, as deleteWorkoutSessionAndReconcile does: a record may cite a log just
     // tombstoned. The write stands whatever happens here, so a failure is reported, not thrown.
     const failed: { error: string }[] = []
+    if (deps.dropZoneMinutes) {
+      try {
+        await deps.dropZoneMinutes(userId, touched)
+      } catch (e) {
+        failed.push({ error: `zone_minutes ${errorCode(e)}` })
+      }
+    }
     let reconciled = 0
     for (const name of exerciseNames) {
       try {

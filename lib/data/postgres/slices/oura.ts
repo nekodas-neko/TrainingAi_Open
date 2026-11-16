@@ -2383,10 +2383,81 @@ export async function deleteZoneMinutesFrom(db: Db, userId: string, fromDay: str
   ))
 }
 
+// ── #3850: the workout and activity writers' half of the same invalidation ────────────────
+// A day's split also depends on the workouts and activity logs that fall on it (#3775: inside one, a
+// heart-rate gap counts up to 5½ min). So a writer of either drops the days it can move, exactly the
+// days `dayActivityWindowInputs` would read the row for. Deleting is the cheap direction: the next
+// read recomputes, and a day it drops for nothing just costs one recompute.
+
+/** The local days a completed workout session's windows fall on: every day its span touches. A
+ *  session that was never completed has no window (`dayActivityWindowInputs` needs `completed_at`),
+ *  so it moves no day. */
+export function zoneDaysOfSession(startedAt: Date, completedAt: Date | null, tz: string): string[] {
+  if (!completedAt) return []
+  const first = formatInTimeZone(startedAt, tz, 'yyyy-MM-dd')
+  const last = formatInTimeZone(completedAt, tz, 'yyyy-MM-dd')
+  return last < first ? [first] : eachDay(first, last)
+}
+
+/** The local days an activity log dated `date` is read for: its own day and the next, since a log
+ *  that starts before midnight runs into the day after (the reader looks one day back). */
+export function zoneDaysOfActivityDate(date: string): string[] {
+  return [date, shiftDateStr(date, 1)]
+}
+
+async function userZoneTz(db: Db, userId: string): Promise<string> {
+  const [u] = await db.select({ timezone: s.users.timezone }).from(s.users).where(eq(s.users.id, userId)).limit(1)
+  return u?.timezone ?? DEFAULT_TZ
+}
+
+/** Drop the cached rows for exactly these local days, never one past HR retention (#2828 N1: it
+ *  could not be recomputed). Today is never cached, so it needs nothing. */
+async function deleteZoneMinutesDays(db: Db, userId: string, days: Iterable<string>, tz: string): Promise<void> {
+  const cutoff = zoneRetentionCutoff(formatInTimeZone(new Date(), tz, 'yyyy-MM-dd'))
+  const keep = [...new Set(days)].filter(d => d >= cutoff)
+  if (keep.length === 0) return
+  await db.delete(s.dailyZoneMinutes).where(and(
+    eq(s.dailyZoneMinutes.userId, userId),
+    inArray(s.dailyZoneMinutes.day, keep),
+  ))
+}
+
+/** A workout session writer's invalidation. `spans` are spans the session no longer has (read before
+ *  a write that moves its times); `sessionIds` are read as stored now, tombstoned rows included,
+ *  since a tombstone takes its window off the days it covered. */
+export async function deleteZoneMinutesForWorkoutSessions(
+  db: Db, userId: string, sessionIds: readonly string[],
+  spans: readonly { startedAt: Date; completedAt: Date | null }[] = [],
+): Promise<void> {
+  if (sessionIds.length === 0 && spans.length === 0) return
+  const tz = await userZoneTz(db, userId)
+  const rows = sessionIds.length === 0 ? [] : await db
+    .select({ startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt })
+    .from(s.workoutSessions)
+    .where(and(eq(s.workoutSessions.userId, userId), inArray(s.workoutSessions.id, [...sessionIds])))
+  const days = [...rows, ...spans].flatMap(r => zoneDaysOfSession(r.startedAt, r.completedAt, tz))
+  await deleteZoneMinutesDays(db, userId, days, tz)
+}
+
+/** An activity log writer's invalidation: pass every date the row had before and after the write. */
+export async function deleteZoneMinutesForActivityDates(db: Db, userId: string, dates: readonly (string | null | undefined)[]): Promise<void> {
+  const real = dates.filter((d): d is string => typeof d === 'string' && d.length > 0)
+  if (real.length === 0) return
+  const tz = await userZoneTz(db, userId)
+  await deleteZoneMinutesDays(db, userId, real.flatMap(zoneDaysOfActivityDate), tz)
+}
+
+/** When the current zone-minutes rule took effect (#3851: a heart-rate gap inside a workout or
+ *  activity window counts up to 5½ min). A cached row computed before it holds the old split, so a
+ *  day still inside HR retention is recomputed once and restamped; one past retention is the frozen
+ *  record and is served as stored. Moving this forward rebuilds every cached day in retention once,
+ *  so it moves only with a change to how a day's zone seconds are counted (#3850). */
+export const ZONE_RULE_EFFECTIVE_AT = new Date('2026-11-16T00:00:00Z')
+
 /** Range of daily zone-seconds with reconcile-on-read caching. `today` (user-local) is always
  *  recomputed (partial day). A cached past day is trusted only when its stamped profile matches the
- *  caller's — a mismatch is recomputed for days still inside HR retention, else served as-is
- *  (frozen-profile record). Missing/stale days are computed concurrently. */
+ *  caller's and it was computed under the current rule (`ZONE_RULE_EFFECTIVE_AT`) — otherwise it is
+ *  recomputed for days still inside HR retention, else served as-is (frozen record). Missing/stale days are computed concurrently. */
 export async function getZoneMinutesRange(
   db: Db, userId: string, fromDay: string, toDay: string, tz: string,
   profile: { maxHr: number; restingHr: number },
@@ -2402,6 +2473,9 @@ export async function getZoneMinutesRange(
 
   const profileMatches = (row: { maxHr: number | null; restingHr: number | null }) =>
     row.maxHr === profile.maxHr && row.restingHr === profile.restingHr
+  // #3850: a row computed before the current gap rule was split under the old one, so it is stale
+  // the same way a drifted profile is.
+  const ruleCurrent = (row: { computedAt: Date }) => row.computedAt.getTime() >= ZONE_RULE_EFFECTIVE_AT.getTime()
 
   const days = eachDay(fromDay, toDay)
   // Resolve each day concurrently (the cold path was a serial round-trip per day — C-5 perf face).
@@ -2416,7 +2490,7 @@ export async function getZoneMinutesRange(
       // missing at any age (#3801), never as a real zero. The row itself is left as it is.
       const allZero = cachedSeconds.every(v => v === 0)
       if (allZero && day < retentionCutoff) return null
-      if ((profileMatches(row) || day < retentionCutoff) && !allZero) {
+      if (((profileMatches(row) && ruleCurrent(row)) || day < retentionCutoff) && !allZero) {
         return { day, seconds: cachedSeconds }
       }
     }

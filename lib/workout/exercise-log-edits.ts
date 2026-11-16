@@ -288,6 +288,8 @@ export async function deleteExerciseLog(
     client.release()
   }
   const repo = await getRepository()
+  // #3850: deleting the last exercise tombstones the session, which takes its window off its days.
+  if (sessionDeleted && workoutSessionId) await repo.dropZoneMinutesForWorkoutSessions(userId, [workoutSessionId])
   if (exerciseName) await repo.reconcilePersonalRecord(userId, exerciseName)
   return { found: true, sessionDeleted }
 }

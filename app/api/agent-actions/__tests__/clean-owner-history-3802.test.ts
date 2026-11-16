@@ -430,7 +430,16 @@ describe.skipIf(!canRun)('clean-owner-history-3802 (#3802)', () => {
     expect(al[ids.actKept]).toMatchObject({ deleted_at: null, deleted_reason: null })
 
     const zm = (await pool.query(`SELECT user_id, day::text AS day FROM daily_zone_minutes WHERE user_id = ANY($1) ORDER BY user_id, day`, [[OWNER, OTHER]])).rows
-    expect(zm).toEqual([{ user_id: OWNER, day: '2026-06-02' }, { user_id: OWNER, day: '2026-06-22' }, { user_id: OTHER, day: '2026-06-03' }])
+    // #3850: the job then drops the cached days its retimed and tombstoned rows covered, so the
+    // non-zero 22 Jun row goes too while it is still inside HR retention; past it, it is kept.
+    const { zoneRetentionCutoff } = await import('@/lib/data/postgres/slices/oura')
+    const { todayInTz } = await import('@trainingai/shared/date-utils')
+    const jun22Kept = '2026-06-22' < zoneRetentionCutoff(todayInTz(STORED_TZ))
+    expect(zm).toEqual([
+      { user_id: OWNER, day: '2026-06-02' },
+      ...(jun22Kept ? [{ user_id: OWNER, day: '2026-06-22' }] : []),
+      { user_id: OTHER, day: '2026-06-03' },
+    ])
 
     // PRESS follows the best live log; SQUAT had none left.
     const pr = (await pool.query(`SELECT exercise_name, estimated_1rm FROM personal_records WHERE user_id = $1 ORDER BY exercise_name`, [OWNER])).rows

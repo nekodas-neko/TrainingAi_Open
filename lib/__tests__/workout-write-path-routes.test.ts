@@ -27,6 +27,7 @@ const logExerciseFromPayload = vi.fn(async (_u: string, _p: Row, _tz: string) =>
 const deleteWorkoutSession = vi.fn(async (_u: string, _id: string) =>
   ({ deleted: true, exerciseNames: ['Squat', 'Bench Press'] }) as Row)
 const reconcilePersonalRecord = vi.fn(async (_u: string, _n: string) => undefined)
+const dropZoneMinutesForWorkoutSessions = vi.fn(async (_u: string, _ids: readonly string[]) => undefined)
 const getDaySessionSummaries = vi.fn(async (_u: string, _d: string, _tz: string) => [] as Row[])
 const reportServerError = vi.fn()
 
@@ -34,7 +35,7 @@ let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezon
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
 vi.mock('@/lib/data', () => {
   // Built inside the returned function: `vi.mock` is hoisted above the consts above.
-  const repo = async () => ({ reconcilePersonalRecord, getDaySessionSummaries })
+  const repo = async () => ({ reconcilePersonalRecord, dropZoneMinutesForWorkoutSessions, getDaySessionSummaries })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
 vi.mock('@trainingai/shared/workout/log-exercise', async (orig) => ({
@@ -201,6 +202,8 @@ describe('DELETE /api/workout-sessions', () => {
     expect(deleteWorkoutSession).toHaveBeenCalledWith(sessionUser!.id, WS)
     expect(reconcilePersonalRecord.mock.calls.map(c => c[1])).toEqual(['Squat', 'Bench Press'])
     expect(reconcilePersonalRecord.mock.calls.every(c => c[0] === sessionUser!.id)).toBe(true)
+    // #3850: the tombstone takes the session's window off the cached zone-minutes days it covered.
+    expect(dropZoneMinutesForWorkoutSessions).toHaveBeenCalledWith(sessionUser!.id, [WS])
   })
 
   it('reports a failed delete as a fault without leaking the driver message', async () => {
