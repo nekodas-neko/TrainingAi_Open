@@ -18,7 +18,8 @@ export const ZoneBreakdown = memo(function ZoneBreakdown({ readings, profile }: 
     if (!profile || readings.length < 2) return null
     const zones = computeHrZones(profile)
     const hr: HrReading[] = readings.map(r => ({ timestamp: new Date(r.timestamp).getTime(), bpm: r.bpm }))
-    return zoneBreakdownFromReadings(hr, zones)
+    // One workout's or activity's own readings, so every gap is inside it (#3775).
+    return zoneBreakdownFromReadings(hr, zones, { windows: 'all' })
   }, [readings, profile])
 
   if (!breakdown || breakdown.totalSec <= 0) return null

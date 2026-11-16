@@ -28,7 +28,7 @@
 //     leaves the goal, once the day is over or the device has been worn later in it (an hour that has
 //     not arrived yet stays in);
 //   - the workout calorie estimate holds gated sources to the same rule (`getAvgBpmBySession`).
-import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes';
+import { activeMinutesFromReadings, HR_DENSE_MAX_GAP_MS, type HrWindow } from '@trainingai/shared/health/zone-minutes';
 import {
   hourlyHrActivity,
   moveHoursGoal,
@@ -40,8 +40,9 @@ import { sourceCapabilities, sourcesWith } from '@trainingai/shared/health/sourc
 import { MET_ACTIVE_THRESHOLD } from '@trainingai/shared/health/daily-medians';
 import { moderateIntensityBpm, vigorousIntensityBpm } from '@trainingai/shared/health/hr-zones';
 
-/** The ring's own cadence, with 30 s of slack: the longest gap a dense hour may have. */
-export const HR_DENSE_MAX_GAP_MS = 5 * 60_000 + 30_000;
+/** The ring's own cadence, with 30 s of slack: the longest gap a dense hour may have. Defined in
+ *  `zone-minutes.ts`, beside the gap cap it also sets inside activity windows (#3775). */
+export { HR_DENSE_MAX_GAP_MS };
 /** The declared sources held to the density rule, for a reader that has to name them (the workout
  *  calorie SQL). A source not listed is dense by construction. Read from each source's capabilities. */
 export const DENSITY_GATED_HR_SOURCES: ReadonlySet<string> = new Set(
@@ -167,6 +168,9 @@ export function intradayHrContributors(input: {
   dateIso: string;
   metGrid?: MetGridInput | null;
   dayIsOver?: boolean;
+  /** The day's workout and activity windows (`activityHrWindows`): a heart-rate gap inside one
+   *  counts up to 5½ minutes toward zone minutes, every other gap up to 2 (#3775). */
+  activityWindows?: readonly HrWindow[];
 }): IntradayHrContributors {
   const { maxHr, restingHr, tz, dateIso, metGrid, dayIsOver = false } = input;
   const { rows, sparseHours } = dropSparseHrHours(input.hrRows, tz);
@@ -180,6 +184,7 @@ export function intradayHrContributors(input: {
             moderateFloorBpm: moderateIntensityBpm({ maxHr, restingHr }),
             vigorousFloorBpm: vigorousIntensityBpm({ maxHr, restingHr }),
           },
+          { windows: input.activityWindows ?? [] },
         );
 
   // A source that declares its heart rate cannot decide a moved hour is left to the movement series.

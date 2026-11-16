@@ -35,6 +35,8 @@ export function activityZoneModel({
       ? zoneBreakdownFromReadings(
           readings.map((p) => ({ timestamp: Date.parse(p.timestamp), bpm: p.bpm })),
           hrZones,
+          // The activity's own readings: a gap inside it counts up to 5½ min, not 2 (#3775).
+          { windows: 'all' },
         )
       : null;
   const zoneSegments =

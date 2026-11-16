@@ -48,7 +48,8 @@ async function activityEffortMin(
     timestamp: (r.timestamp instanceof Date ? r.timestamp : new Date(r.timestamp)).getTime(),
     bpm: r.bpm,
   }))
-  return heartHealthMinutes(readings, floorBpm)
+  // The readings are this activity's own window, so every gap is inside it (#3775).
+  return heartHealthMinutes(readings, floorBpm, { windows: 'all' })
 }
 
 /** Every prescription day in [from, to] with its activities, their counted minutes and the verdict. */
