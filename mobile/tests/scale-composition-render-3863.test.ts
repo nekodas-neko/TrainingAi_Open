@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { test } from 'node:test';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement, type ReactElement } from 'react';
 import type { BodyRow } from '../src/features/health/data/models.ts';
 
 // #3863: the scale composition card, rendered. The card's React Native layer is swapped for the
@@ -30,6 +29,11 @@ registerHooks({
     return next(specifier, context);
   },
 });
+// react-dom ships no types here, and no dependency is added for one function.
+const server = 'react-dom/server';
+const { renderToStaticMarkup } = (await import(server)) as {
+  renderToStaticMarkup: (element: ReactElement) => string;
+};
 const { ScaleCompositionCard } = await import(card);
 const { pressed } = await import(stubs);
 const { held } = await import(hookState);
