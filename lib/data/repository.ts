@@ -1619,6 +1619,13 @@ export interface WorkoutRepository {
    *  (#2439). The rollup and the aggregator upsert do it inline; the chest-strap route uses this.
    *  Never drops a day past HR retention in `tz`: it can't be recomputed (#2828 N1). */
   dropZoneMinutesFrom(userId: string, fromDay: string, tz: string): Promise<void>
+  /** #3850. Drops the cached zone-minutes days a workout session's windows fall on, read as stored
+   *  now (tombstones included), plus any `spans` the session had before a write moved its times. Call
+   *  after a write commits. Never past HR retention. */
+  dropZoneMinutesForWorkoutSessions(userId: string, sessionIds: readonly string[], spans?: readonly { startedAt: Date; completedAt: Date | null }[]): Promise<void>
+  /** #3850. Drops the cached zone-minutes days an activity log dated on each of `dates` is read for
+   *  (its day and the next). Pass the dates the row had before and after the write. */
+  dropZoneMinutesForActivityDates(userId: string, dates: readonly (string | null | undefined)[]): Promise<void>
   /** #2462. Health Connect steps / active kcal per record and cadence per sample, upserted by
    *  `(kind, recordId, startAt)` so a re-read window is idempotent. Returns rows written after the
    *  in-batch collapse. Overlap between apps is kept and resolved by the reader. */

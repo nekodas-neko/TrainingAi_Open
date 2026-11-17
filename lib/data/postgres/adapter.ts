@@ -1246,6 +1246,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         isNull(s.workoutSessions.completedAt),
       ))
       .returning({ id: s.workoutSessions.id })
+    // #3850: completing is what gives the session its heart-rate window, so a past day it falls on
+    // (a workout finished offline and synced later) recomputes its zone minutes.
+    if (rows.length > 0) await this.dropZoneMinutesForWorkoutSessions(userId, [workoutSessionId])
     return rows.length > 0
   }
 
@@ -2882,6 +2885,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
 
     if (opts?.overwrite) {
+      // #3850: an edit can move the log to another date, so the day it leaves recomputes too.
+      const [before] = id
+        ? await this.db.select({ date: s.activityLogs.date }).from(s.activityLogs)
+            .where(and(eq(s.activityLogs.id, id), eq(s.activityLogs.userId, userId))).limit(1)
+        : []
       // Outbox replay: the user's own explicit save wins (last-write-wins), and the
       // updated_at bump makes the merge visible to getSyncDelta. activity_logs has two
       // unique constraints — the PK on `id` and a partial index on
@@ -2939,6 +2947,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             set,
             setWhere: eq(s.activityLogs.userId, userId),
           }).returning()
+      await this.dropZoneMinutesForActivityDates(userId, [before?.date, r?.date ?? data.date])
       return this.rowToActivityLog(r)
     }
 
@@ -2948,6 +2957,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .values(values)
       .onConflictDoNothing()
       .returning()
+    // #3850: a log stored for a past day (a Health Connect or source import, or a late manual entry).
+    if (r) await this.dropZoneMinutesForActivityDates(userId, [r.date])
 
     if (!r) {
       const [existing] = await this.db.select().from(s.activityLogs)
@@ -3175,7 +3186,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const rows = await this.db.update(s.activityLogs)
       .set({ deletedAt: new Date(), deletedReason: 'app', updatedAt: new Date() })
       .where(and(eq(s.activityLogs.id, id), eq(s.activityLogs.userId, userId)))
-      .returning({ id: s.activityLogs.id })
+      .returning({ id: s.activityLogs.id, date: s.activityLogs.date })
+    await this.dropZoneMinutesForActivityDates(userId, rows.map(r => r.date))
     return rows.length > 0
   }
 
@@ -3217,7 +3229,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // stored without an id), which keeps it, or a concurrent sync that stored this record first.
         .onConflictDoNothing()
         .returning({ id: s.activityLogs.id })
-      if (r) return 'inserted'
+      // #3850 (and below): every outcome that stores or moves a Health Connect session drops the days it touches.
+      if (r) { await this.dropZoneMinutesForActivityDates(userId, [log.date]); return 'inserted' }
       // The `(user, date, start_time)` index covers tombstones. When Health Connect replaces a record
       // with a new one at the same minute, the sweep tombstones the old row, and the new record could
       // otherwise never be stored. It takes over that row instead. Only a tombstoned Health Connect
@@ -3233,6 +3246,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           isNotNull(s.activityLogs.deletedAt),
         ))
         .returning({ id: s.activityLogs.id })
+      if (taken.length) await this.dropZoneMinutesForActivityDates(userId, [log.date])
       return taken.length ? 'inserted' : 'taken'
     }
     const distanceKm = log.distanceKm ?? existing.distanceKm
@@ -3272,6 +3286,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
     // No row: it was deleted between the read above and this write, and a delete wins.
     if (!updated.length) return 'deleted'
+    await this.dropZoneMinutesForActivityDates(userId, [existing.date, log.date])
     return revive ? 'revived' : 'updated'
   }
 
@@ -3300,7 +3315,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               ...(scope.keep.length ? [notInArray(s.activityLogs.externalId, [...scope.keep])] : []),
             ]),
       ))
-      .returning({ id: s.activityLogs.id })
+      .returning({ id: s.activityLogs.id, date: s.activityLogs.date })
+    await this.dropZoneMinutesForActivityDates(userId, rows.map(r => r.date))
     return rows.length
   }
 
@@ -8603,6 +8619,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
   async dropZoneMinutesFrom(userId: string, fromDay: string, tz: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay, tz) }
+  async dropZoneMinutesForWorkoutSessions(userId: string, sessionIds: readonly string[], spans?: readonly { startedAt: Date; completedAt: Date | null }[]) { return oura.deleteZoneMinutesForWorkoutSessions(this.db, userId, sessionIds, spans) }
+  async dropZoneMinutesForActivityDates(userId: string, dates: readonly (string | null | undefined)[]) { return oura.deleteZoneMinutesForActivityDates(this.db, userId, dates) }
   async upsertHealthConnectIntervals(userId: string, rows: readonly import('../repository').HealthConnectIntervalRow[]) { return hcIntervals.upsertHealthConnectIntervals(this.db, userId, rows) }
   async getHealthConnectHistoryOldest(userId: string) { return hcHistory.getHealthConnectHistoryOldest(this.db, userId) }
   async advanceHealthConnectHistoryOldest(userId: string, date: string) { return hcHistory.advanceHealthConnectHistoryOldest(this.db, userId, date) }

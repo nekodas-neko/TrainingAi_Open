@@ -475,6 +475,10 @@ export const AGENT_JOBS = {
           connect: () => getPool().connect(),
           reconcilePersonalRecord: (u, n) => ctx.repo.reconcilePersonalRecord(u, n),
           bestQualifyingPersonalRecord: (u, n, o) => ctx.repo.bestQualifyingPersonalRecord(u, n, o),
+          dropZoneMinutes: async (u, t) => {
+            await ctx.repo.dropZoneMinutesForWorkoutSessions(u, t.sessionIds, t.spans)
+            await ctx.repo.dropZoneMinutesForActivityDates(u, t.activityDates)
+          },
         },
         ctx.userId,
         p.dryRun ? { dryRun: true } : { dryRun: false, digests: p.digests! },
