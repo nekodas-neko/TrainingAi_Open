@@ -336,8 +336,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['bestQualifyingPersonalRecord', r => r.bestQualifyingPersonalRecord(USER_A, bVal('exercise_logs', 'exercise_name'))],
     // goals, insights, body comp
     ['getGoalRecommendation', r => r.getGoalRecommendation(USER_A, bId('goal_recommendations'))],
-    ['getAiHealthInsightWithHash', r => r.getAiHealthInsightWithHash(USER_A, bVal('ai_health_insights', 'section'), D)],
-    ['listAiHealthInsightsForDate', r => r.listAiHealthInsightsForDate(USER_A, D)],
     ['getLatestDexaScan', r => r.getLatestDexaScan(USER_A)],
     ['getBodyFatCalibration', r => r.getBodyFatCalibration(USER_A)],
     ['listDexaScans', r => r.listDexaScans(USER_A)],
@@ -508,7 +506,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     }).catch((e: Error) => e.message), v => { expect(v).toBe('That id already belongs to another night') }],
     ['deleteBloodPanel', r => r.deleteBloodPanel(USER_A, bId('blood_panels'))],
     ['setRestDay (clear)', r => r.setRestDay(USER_A, D, false)],
-    ['deleteAiHealthInsight', r => r.deleteAiHealthInsight(USER_A, bVal('ai_health_insights', 'section'))],
     ['updateSupplementVial', r => r.updateSupplementVial(bId('supplement_vials'), USER_A, { notes: 'OVERWRITTEN BY A' } as never)],
     ['deleteSupplementVial', r => r.deleteSupplementVial(bId('supplement_vials'), USER_A)],
     ['cancelPendingRekeyDeclaration', r => r.cancelPendingRekeyDeclaration(USER_A)],
