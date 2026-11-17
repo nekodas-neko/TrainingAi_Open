@@ -23,6 +23,8 @@
 // Its ingest route is `POST /api/app-load`. The admin report route was retired in #2862; the rows
 // are still written and can be read from the table.
 
+import { isSigningOut } from '@/lib/sign-out-fence'
+
 /** Sub-millisecond floats are noise at the resolution this is read. Negative clamps to 0. */
 function ms(value: number | undefined | null): number | null {
   if (value == null || !Number.isFinite(value) || value < 0) return null
@@ -95,6 +97,11 @@ export function reportAppLoad(buildId?: string): void {
   if (reported) return
   if (typeof navigator === 'undefined' || !navigator.onLine) return
   if (typeof window === 'undefined') return
+  // #3854. A beacon is not `fetch`, so the sign-out fence cannot refuse it, and its response would
+  // carry the old session cookie back after the sign-out cleared it (measured on the native sign-in
+  // page: a `load` landing mid-sign-out signed the browser back in). Not consumed: the page the
+  // sign-out lands on reports its own load.
+  if (isSigningOut()) return
 
   const timing = readNavigationTiming()
   if (!timing) return
