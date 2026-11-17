@@ -55,3 +55,26 @@ describe('rotateNativeSession and the reset cut-off', () => {
     expect((await sessionTokenFrom(new Headers({ authorization: `Bearer ${out.body.accessToken}` })))?.dataEpoch).toBe(0)
   })
 })
+
+// #3829: the sign-in cut-off, compared in whole seconds. The row's time is the database clock and the
+// cut-off the app's; a token issued in the same second as the link must survive a few ms of skew.
+describe('rotateNativeSession and the sign-in cut-off (#3829)', () => {
+  const signInCut = new Date('2026-11-16T23:00:00.500Z')
+  it('keeps a token created a few milliseconds before the cut-off, in the same second', async () => {
+    repo.user = { ...repo.user!, sessionsValidFrom: null, signInsValidFrom: signInCut }
+    repo.stored = { ...repo.stored!, createdAt: new Date('2026-11-16T23:00:00.495Z') }
+    const { rotateNativeSession } = await import('../mobile/session')
+    expect((await rotateNativeSession(RAW)).ok).toBe(true)
+  })
+
+  it('refuses one from an earlier second, and fails closed on an invalid cut-off', async () => {
+    repo.user = { ...repo.user!, sessionsValidFrom: null, signInsValidFrom: signInCut }
+    repo.stored = { ...repo.stored!, createdAt: new Date('2026-11-16T22:59:59.900Z') }
+    const { rotateNativeSession } = await import('../mobile/session')
+    expect(await rotateNativeSession(RAW)).toEqual({ ok: false, reason: 'invalid' })
+    repo.user = { ...repo.user!, signInsValidFrom: new Date('not a date') }
+    repo.stored = { ...repo.stored!, createdAt: new Date('2026-11-17T00:00:00Z') }
+    expect(await rotateNativeSession(RAW)).toEqual({ ok: false, reason: 'invalid' })
+    expect(repo.rotate).not.toHaveBeenCalled()
+  })
+})

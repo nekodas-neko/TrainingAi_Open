@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server'
 const user = {
   id: 'u1', email: 'a@b.c', displayName: 'A', timezone: 'Australia/Brisbane',
   sessionsValidFrom: new Date('2026-10-26T01:00:00Z'),
+  signInsValidFrom: new Date('2026-11-16T23:00:00Z'),
 }
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u1' } }) }))
 vi.mock('@/lib/data', () => ({
@@ -24,6 +25,7 @@ describe('/api/user/profile (#3435)', () => {
     const body = await (await GET()).json()
     expect(body.user.id).toBe('u1')
     expect(body.user).not.toHaveProperty('sessionsValidFrom')
+    expect(body.user).not.toHaveProperty('signInsValidFrom') // #3829
     expect(body.user).not.toHaveProperty('passwordHash')
     expect(body.hasPassword).toBe(true)
   })
@@ -35,5 +37,6 @@ describe('/api/user/profile (#3435)', () => {
     const body = await res.json()
     expect(body.user.id).toBe('u1')
     expect(body.user).not.toHaveProperty('sessionsValidFrom')
+    expect(body.user).not.toHaveProperty('signInsValidFrom') // #3829
   })
 })
