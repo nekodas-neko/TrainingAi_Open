@@ -12,6 +12,10 @@ const ALLOWED = new Set([
   'components/more/sign-out-flow.tsx',   // the flow: "Sign out anyway" and a clean sync
   'lib/sign-out.ts',                     // the definition
   'lib/account/delete-account.ts',       // deletion's own server-first sign-out, after the sheet's prepare step
+  // Issue 3854: the native sign-in page's "Use another account". It signs out the system browser the
+  // native app borrows for sign-in, which holds no unsynced app data to warn about; before this it
+  // signed out with no fence and cleared nothing.
+  'app/mobile-signin/native/consent-form.tsx',
 ])
 
 function walk(dir: string, out: string[] = []): string[] {

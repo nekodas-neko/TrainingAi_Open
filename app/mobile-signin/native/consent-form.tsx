@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { signOut } from 'next-auth/react';
+import { signOutInPlace } from '@/app/actions';
+import { signOutAndClearDevice } from '@/lib/sign-out';
 import { Button } from '@/components/ui/button';
 export function NativeConsentForm({ action }: { action: () => Promise<string | null> }) {
   const [busy, setBusy] = useState(false);
@@ -19,7 +20,15 @@ export function NativeConsentForm({ action }: { action: () => Promise<string | n
   }
   async function switchAccount() {
     setBusy(true);
-    await signOut({ redirect: false });
+    setError(null);
+    // #3854: the same fenced sign-out as More, so no request in flight can sign this browser back in.
+    try {
+      await signOutAndClearDevice(signOutInPlace);
+    } catch {
+      setBusy(false);
+      setError('Could not sign out. Close this window and start again from the app.');
+      return;
+    }
     window.location.reload();
   }
   return <div className="space-y-3">
