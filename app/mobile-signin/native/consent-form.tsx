@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { signOutInPlace } from '@/app/actions';
 import { signOutAndClearDevice } from '@/lib/sign-out';
 import { Button } from '@/components/ui/button';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 export function NativeConsentForm({ action }: { action: () => Promise<string | null> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,13 @@ export function NativeConsentForm({ action }: { action: () => Promise<string | n
     // #3854: the same fenced sign-out as More, so no request in flight can sign this browser back in.
     try {
       await signOutAndClearDevice(signOutInPlace);
-    } catch {
+    } catch (e) {
+      // A successful sign-out ends in the action's redirect, which reaches the client as a
+      // rejection. The cookie is cleared by then: keep the buttons disabled and reload.
+      if (isRedirectError(e)) {
+        window.location.reload();
+        return;
+      }
       setBusy(false);
       setError('Could not sign out. Close this window and start again from the app.');
       return;

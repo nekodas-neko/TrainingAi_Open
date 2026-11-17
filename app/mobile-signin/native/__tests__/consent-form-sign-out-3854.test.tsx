@@ -49,4 +49,14 @@ describe('Issue 3854 consent form sign-out', () => {
     expect(host.querySelector('[role="alert"]')?.textContent).toMatch(/Could not sign out/)
     expect([...host.querySelectorAll('button')].every(b => !b.disabled)).toBe(true)
   })
+
+  // In use, a successful sign-out ends in the action's redirect, which the client sees as a rejection.
+  it('a sign-out that ends in its redirect reloads, shows no error and keeps the buttons disabled', async () => {
+    const { getRedirectError } = await import('next/dist/client/components/redirect')
+    mocks.signOutAndClearDevice.mockRejectedValue(getRedirectError('/mobile-signin/native', 'replace' as never))
+    await tapUseAnotherAccount()
+    expect(reload).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    expect([...host.querySelectorAll('button')].every(b => b.disabled)).toBe(true)
+  })
 })
