@@ -16,12 +16,10 @@ vi.mock('@/auth', () => ({
 }))
 
 let readingsScore = 80
-const cacheReads: string[] = []
 const written: unknown[] = []
 
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
-    getAiHealthInsightWithHash: async () => { cacheReads.push('read'); return null },
     upsertAiHealthInsight: async (...args: unknown[]) => { written.push(args) },
     getOuraDaily: async () => [{ date: '2026-08-18', sleepScore: null, readinessContributors: null, sleepContributors: null, temperatureDeviation: null }],
     // Our own sleep score (#3000: the insight reads ours, never Oura's).
@@ -47,7 +45,7 @@ const call = async () => {
 }
 
 describe('the insight always describes the current readings (Q-293, RV-201)', () => {
-  beforeEach(() => { cacheReads.length = 0; written.length = 0; readingsScore = 80 })
+  beforeEach(() => { written.length = 0; readingsScore = 80 })
 
   it('names the reading it was given', async () => {
     expect((await call()).insight).toContain('80/100')
@@ -63,9 +61,9 @@ describe('the insight always describes the current readings (Q-293, RV-201)', ()
     expect(after).not.toContain('80/100')
   })
 
-  it('neither reads nor writes a stored insight row', async () => {
+  // The read method is gone from the repository (#3787), so only the write is left to watch.
+  it('writes no stored insight row', async () => {
     await call()
-    expect(cacheReads).toEqual([])
     expect(written).toEqual([])
   })
 

@@ -66,7 +66,7 @@ describe.skipIf(!canRun)('full export (Q-288)', () => {
 
   it('exports the tables that used to be missing entirely', async () => {
     // A sample of the 56 absent-by-accident tables, chosen across the domains the entry named.
-    for (const t of ['oura_daily_derived', 'oura_daily_summary', 'ai_health_insights', 'meal_plans',
+    for (const t of ['oura_daily_derived', 'oura_daily_summary', 'meal_plans',
                      'fitness_tests', 'running_plans', 'user_stats', 'users']) {
       expect(Object.keys(EXPORTED)).toContain(t)
     }

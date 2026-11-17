@@ -1232,14 +1232,6 @@ export interface WorkoutRepository {
   // ── Seasons ────────────────────────────────────────────────────────────────
   listSeasonsWithResults(userId: string): Promise<Season[]>
 
-  // ── AI Health Insights ─────────────────────────────────────────────────────
-  // There is deliberately NO hash-less read. One existed and every section but daily-digest used
-  // it, so an insight written before the ring synced was served for the rest of the day (Q-293).
-  // contextHash lets a non-forced request recompute the cheap deterministic context and only
-  // serve the cache when it matches — see NUT-7 (daily-digest staleness).
-  getAiHealthInsightWithHash(userId: string, section: string, date: string): Promise<{ insight: string; contextHash: string | null } | null>
-  listAiHealthInsightsForDate(userId: string, date: string): Promise<{ section: string; insight: string }[]>
-
   /** BF-41 / BF-2: a DEXA scan. Upserts on `(userId, scannedOn)` — the same day is a correction,
    *  not a second scan — and replaces the region rows wholesale in the same transaction. */
   saveDexaScan(userId: string, input: DexaScanInput): Promise<void>
@@ -1256,7 +1248,6 @@ export interface WorkoutRepository {
   saveMeasuredRmr(userId: string, input: MeasuredRmrInput): Promise<void>
   getLatestMeasuredRmr(userId: string): Promise<MeasuredRmrRow | null>
   listMeasuredRmr(userId: string): Promise<MeasuredRmrRow[]>
-  deleteAiHealthInsight(userId: string, section: string): Promise<void>
 
   // ── Sync ───────────────────────────────────────────────────────────────────
   // windowDays: number = recent floor (default 90); null = full history (restore path), honouring `since`.

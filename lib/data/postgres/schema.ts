@@ -1117,16 +1117,6 @@ export const seasonResults = pgTable('season_results', {
   badgeLabel: text('badge_label').notNull(),
 }, t => [unique().on(t.seasonId, t.userId)])
 
-export const aiHealthInsights = pgTable('ai_health_insights', {
-  id:          uuid('id').primaryKey().defaultRandom(),
-  userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  section:     text('section').notNull(),
-  date:        date('date', { mode: 'string' }).notNull(),
-  insight:     text('insight').notNull(),
-  contextHash: text('context_hash'),
-  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [unique().on(t.userId, t.section, t.date)])
-
 // BF-33: clinically measured resting metabolic rate (indirect calorimetry). Its own table rather
 // than a `body_metrics` column because a second test must sit BESIDE the first — see migration 225.
 export const measuredRmr = pgTable('measured_rmr', {

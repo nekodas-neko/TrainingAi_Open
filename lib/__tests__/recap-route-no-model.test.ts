@@ -16,7 +16,6 @@ const getRecentSessionsOfType = vi.fn(async (..._a: unknown[]) => [] as unknown[
 const listProgressionStyles = vi.fn(async (_u: string) => [] as unknown[])
 const listRecentPersonalRecords = vi.fn(async (..._a: unknown[]) => [] as unknown[])
 const upsertAiHealthInsight = vi.fn(async () => undefined)
-const getAiHealthInsightWithHash = vi.fn(async () => null)
 const generateText = vi.fn(async (_o: unknown) => ({ text: 'a model wrote this' }))
 const loggedGenerateText = vi.fn(async (..._a: unknown[]) => ({ text: 'a model wrote this' }))
 const rateLimit = vi.fn((..._a: unknown[]) => false)
@@ -28,7 +27,7 @@ vi.mock('@/auth', () => ({
 }))
 const repo = () => ({
   getWorkoutSessionDetail, getRecentSessionsOfType, listProgressionStyles,
-  listRecentPersonalRecords, upsertAiHealthInsight, getAiHealthInsightWithHash,
+  listRecentPersonalRecords, upsertAiHealthInsight,
 })
 vi.mock('@/lib/data', () => ({
   getRepository: async () => repo(),
@@ -64,7 +63,7 @@ const get = (id = SESSION_ID) =>
 
 beforeEach(() => {
   for (const m of [getWorkoutSessionDetail, getRecentSessionsOfType, listProgressionStyles,
-                   listRecentPersonalRecords, upsertAiHealthInsight, getAiHealthInsightWithHash,
+                   listRecentPersonalRecords, upsertAiHealthInsight,
                    generateText, loggedGenerateText, rateLimit, reportServerError]) m.mockClear()
   getRecentSessionsOfType.mockResolvedValue([])
   listProgressionStyles.mockResolvedValue([])
@@ -118,7 +117,6 @@ describe('nothing on this route reaches a model', () => {
     for (let i = 0; i < 25; i++) expect((await get()).status).toBe(200)
     expect(generateText).not.toHaveBeenCalled()
     expect(loggedGenerateText).not.toHaveBeenCalled()
-    expect(getAiHealthInsightWithHash).not.toHaveBeenCalled()
     expect(upsertAiHealthInsight).not.toHaveBeenCalled()
     expect(rateLimit).not.toHaveBeenCalled()
   })
