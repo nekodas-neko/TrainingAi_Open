@@ -69,8 +69,8 @@ export async function POST(request: NextRequest) {
         return !reason;
       });
     if (deleted.size)
-      await repo.tombstoneHealthConnectActivityLogs(userId, { ids: [...deleted] });
-    const { revived: exercisesRevived } = await storeHealthConnectWorkouts(repo, userId, workouts, workoutNotes);
+      await repo.tombstoneHealthConnectActivityLogs(userId, { ids: [...deleted] }, timezone);
+    const { revived: exercisesRevived } = await storeHealthConnectWorkouts(repo, userId, workouts, workoutNotes, timezone);
     return NextResponse.json({ ...result, deferred, rejected: batch!.rejected, workoutNotes, exercisesRevived });
   } catch (error) {
     reportServerError(error, { userId, url: '/api/health-connect/sync' });

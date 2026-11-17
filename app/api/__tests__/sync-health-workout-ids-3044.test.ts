@@ -41,7 +41,7 @@ describe('exercise sessions with a record id', () => {
   it('upserts on the record id, not on date and minute', async () => {
     const { status } = await post({ exerciseSessions: [session({ recordId: 'hc-1' })] })
     expect(status).toBe(200)
-    expect(repo.upsertHealthConnectActivityLog).toHaveBeenCalledWith('u1', 'hc-1', expect.objectContaining({ date: day, startTime: '12:00', activityType: 'walk' }))
+    expect(repo.upsertHealthConnectActivityLog).toHaveBeenCalledWith('u1', 'hc-1', expect.objectContaining({ date: day, startTime: '12:00', activityType: 'walk' }), 'Australia/Brisbane')
     expect(repo.saveActivityLog).not.toHaveBeenCalled()
     // No `date|HH:MM` lookup is needed when every session carries its id.
     expect(repo.listActivityLogs).not.toHaveBeenCalledWith('u1', day, day)
@@ -56,7 +56,7 @@ describe('exercise sessions with a record id', () => {
 
   it('stores a watch strength session as strength', async () => {
     await post({ exerciseSessions: [session({ recordId: 'hc-2', activityType: 'strength', title: 'Gym' })] })
-    expect(repo.upsertHealthConnectActivityLog).toHaveBeenCalledWith('u1', 'hc-2', expect.objectContaining({ activityType: 'strength' }))
+    expect(repo.upsertHealthConnectActivityLog).toHaveBeenCalledWith('u1', 'hc-2', expect.objectContaining({ activityType: 'strength' }), 'Australia/Brisbane')
   })
 })
 
@@ -65,7 +65,7 @@ describe('an older bundle without record ids', () => {
     repo.listActivityLogs.mockResolvedValueOnce([{ date: day, startTime: '12:00' }])
     await post({ exerciseSessions: [session(), session({ startTime: '15:00', endTime: '15:30', durationMin: 30 })] })
     expect(repo.saveActivityLog).toHaveBeenCalledTimes(1)
-    expect(repo.saveActivityLog).toHaveBeenCalledWith('u1', expect.objectContaining({ startTime: '15:00' }))
+    expect(repo.saveActivityLog).toHaveBeenCalledWith('u1', expect.objectContaining({ startTime: '15:00' }), { tz: 'Australia/Brisbane' })
     expect(repo.upsertHealthConnectActivityLog).not.toHaveBeenCalled()
     expect(repo.tombstoneHealthConnectActivityLogs).not.toHaveBeenCalled()
   })
@@ -80,7 +80,7 @@ describe('deletions in a fully read window', () => {
     expect(json.rejected).toEqual([expect.stringMatching(/^exercise .*durationMin/)])
     expect(repo.tombstoneHealthConnectActivityLogs).toHaveBeenCalledWith('u1', {
       from: shiftDateStr(today, -6), to: today, keep: ['kept', 'refused', 'oura-copy'],
-    })
+    }, 'Australia/Brisbane')
   })
 
   it('a read the phone reports as failed or part-way sweeps nothing, however short its list', async () => {
@@ -121,7 +121,7 @@ describe('deletions in a fully read window', () => {
 
   it('takes either date separator', async () => {
     await post({ exerciseSessions: [session({ recordId: 'hc-1' })], exerciseWindow: window({ from: shiftDateStr(today, -6).replace(/-/g, '/') }) })
-    expect(repo.tombstoneHealthConnectActivityLogs).toHaveBeenCalledWith('u1', expect.objectContaining({ from: shiftDateStr(today, -6) }))
+    expect(repo.tombstoneHealthConnectActivityLogs).toHaveBeenCalledWith('u1', expect.objectContaining({ from: shiftDateStr(today, -6) }), 'Australia/Brisbane')
   })
 
   it('without a window, nothing is swept', async () => {

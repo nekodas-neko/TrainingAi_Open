@@ -314,12 +314,12 @@ export async function POST(req: NextRequest) {
         // read that has one.
         rejected.push('exerciseWindow: no sessions came back, so none were swept')
       } else {
-        exercisesTombstoned = await repo.tombstoneHealthConnectActivityLogs(userId, { ...window, keep });
+        exercisesTombstoned = await repo.tombstoneHealthConnectActivityLogs(userId, { ...window, keep }, tz);
       }
     }
   }
 
-  const { revived: exercisesRevived } = await storeHealthConnectWorkouts(repo, userId, usableSessions, rejected);
+  const { revived: exercisesRevived } = await storeHealthConnectWorkouts(repo, userId, usableSessions, rejected, tz);
 
   // ── Sleep sessions (dedup handled by UNIQUE(user_id, sleep_start)) ────────
   const sleepRecords = usableRecords(body.sleepRecords, SleepRecordSchema, 'sleep', rejected);
