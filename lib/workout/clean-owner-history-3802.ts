@@ -78,7 +78,7 @@ export const CACHES_3802 = [
   'device: invalidateWorkoutSummaries (pull flag `workouts`) — sessions tombstoned or re-timed',
   'device: invalidateActivityWrites (pull flag `activity`) — activities tombstoned',
   'server: personal_records — reconciled for every exercise in a tombstoned session',
-  'server: daily_zone_minutes — the all-zero rows are the deleted cache; a read recomputes a day from heart rate',
+  'server: daily_zone_minutes — the all-zero rows, plus the cached day of every session or activity it tombstones or re-times (#3850); a read recomputes each from heart rate',
 ] as const
 
 interface TimeChange { id: string; before: string; after: string }

@@ -143,14 +143,17 @@ describe.skipIf(!canRun)('cached zone minutes follow workouts written later, and
     const got = await total(day)
     expect(got).not.toBe(1)
     const row = await cachedRow(day)
-    expect(row!.computed_at.getTime()).toBeGreaterThanOrEqual(ZONE_RULE_EFFECTIVE_AT.getTime())
-    // Restamped, so the next read trusts it.
+    // Restamped. The constant is set a little late on purpose, so until it passes the next read
+    // recomputes again (and gets the same answer); after it, the restamped row is trusted.
+    expect(row!.computed_at.getTime()).not.toBe(old.getTime())
     expect(await total(day)).toBe(got)
   })
 
   it('a row computed under the current rule with a matching profile is served as stored', async () => {
+    const { ZONE_RULE_EFFECTIVE_AT } = await import('@/lib/data/postgres/slices/oura')
     await pool.query(
-      `INSERT INTO daily_zone_minutes (user_id, day, zone2_sec, max_hr, resting_hr) VALUES ($1, $2, 7, 190, 60)`, [USER, day])
+      `INSERT INTO daily_zone_minutes (user_id, day, zone2_sec, max_hr, resting_hr, computed_at) VALUES ($1, $2, 7, 190, 60, $3)`,
+      [USER, day, new Date(ZONE_RULE_EFFECTIVE_AT.getTime() + 3_600_000)])
     expect(await total(day)).toBe(7)
   })
 

@@ -2451,8 +2451,13 @@ export async function deleteZoneMinutesForActivityDates(db: Db, userId: string, 
  *  activity window counts up to 5½ min). A cached row computed before it holds the old split, so a
  *  day still inside HR retention is recomputed once and restamped; one past retention is the frozen
  *  record and is served as stored. Moving this forward rebuilds every cached day in retention once,
- *  so it moves only with a change to how a day's zone seconds are counted (#3850). */
-export const ZONE_RULE_EFFECTIVE_AT = new Date('2026-11-16T00:00:00Z')
+ *  so it moves only with a change to how a day's zone seconds are counted (#3850).
+ *
+ *  It must not be earlier than the deploy of the release that ships the rule: a row the old build
+ *  caches after this instant would be trusted for good. So it is set a little late, on purpose: until
+ *  it passes, a past day is recomputed on every read (the cold path, slower, never wrong). If the
+ *  release that carries #3851 deploys after this instant, move it to that deploy first. */
+export const ZONE_RULE_EFFECTIVE_AT = new Date('2026-11-20T00:00:00Z')
 
 /** Range of daily zone-seconds with reconcile-on-read caching. `today` (user-local) is always
  *  recomputed (partial day). A cached past day is trusted only when its stamped profile matches the
