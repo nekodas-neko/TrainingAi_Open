@@ -2977,7 +2977,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             set,
             setWhere: eq(s.activityLogs.userId, userId),
           }).returning()
-      await this.dropZoneMinutesForActivityDates(userId, [before?.date, r?.date ?? data.date])
+      await this.dropZoneMinutesForActivityDates(userId, [r?.date ?? data.date])
       return this.rowToActivityLog(r)
     }
 
