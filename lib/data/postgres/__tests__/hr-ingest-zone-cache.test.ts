@@ -38,12 +38,12 @@ describe.skipIf(!canRun)('POST /api/hr-ingest and the zone-minutes cache (#2439)
   beforeEach(async () => {
     await pool.query('DELETE FROM daily_zone_minutes WHERE user_id = $1', [USER])
     for (const n of [6, 4, 3, 2, 1]) {
-      await pool.query('INSERT INTO daily_zone_minutes (user_id, day, zone2_sec) VALUES ($1, $2, 600)', [USER, dayAgo(n)])
+      await pool.query('INSERT INTO daily_zone_minutes (user_id, day, zone2_sec, max_hr, resting_hr) VALUES ($1, $2, 600, 190, 60)', [USER, dayAgo(n)])
     }
   })
 
   const cachedDays = async () =>
-    (await pool.query<{ day: string }>('SELECT day::text AS day FROM daily_zone_minutes WHERE user_id = $1 ORDER BY day', [USER]))
+    (await pool.query<{ day: string }>('SELECT day::text AS day FROM daily_zone_minutes WHERE user_id = $1 AND max_hr IS NOT NULL ORDER BY day', [USER]))
       .rows.map(r => r.day)
 
   const flush = (samples: { at: number; bpm: number }[]) => POST(new Request('http://x/api/hr-ingest', {

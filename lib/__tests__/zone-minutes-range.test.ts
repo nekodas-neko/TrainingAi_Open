@@ -80,7 +80,8 @@ describe.skipIf(!canRun)('getZoneMinutesRange — dash-form iteration + cache co
     const before = await pool.query(`SELECT count(*)::int n FROM daily_zone_minutes WHERE user_id = $1`, [TEST_USER_ID])
     expect(before.rows[0].n).toBeGreaterThan(0)
     await deleteZoneMinutesFrom(getDb(), TEST_USER_ID, from, TZ)
-    const after = await pool.query(`SELECT count(*)::int n FROM daily_zone_minutes WHERE user_id = $1`, [TEST_USER_ID])
+    // #3862: dropped means marked stale (max_hr NULL), never deleted.
+    const after = await pool.query(`SELECT count(*)::int n FROM daily_zone_minutes WHERE user_id = $1 AND day >= $2 AND max_hr IS NOT NULL`, [TEST_USER_ID, from])
     expect(after.rows[0].n).toBe(0)
   })
 
@@ -89,8 +90,9 @@ describe.skipIf(!canRun)('getZoneMinutesRange — dash-form iteration + cache co
   // Every day below is derived from the retention constant and the user's local today.
   describe('retention guard (#2828 N1)', () => {
     let cutoff: string, frozen: string[], live: string[]
+    // The days still trusted: a drop marks a day stale (max_hr NULL, #3862) instead of deleting it.
     const cachedDays = async () => (await pool.query(
-      `SELECT day::text AS day FROM daily_zone_minutes WHERE user_id = $1 ORDER BY day`, [TEST_USER_ID],
+      `SELECT day::text AS day FROM daily_zone_minutes WHERE user_id = $1 AND max_hr IS NOT NULL ORDER BY day`, [TEST_USER_ID],
     )).rows.map((r: { day: string }) => r.day)
 
     beforeEach(async () => {

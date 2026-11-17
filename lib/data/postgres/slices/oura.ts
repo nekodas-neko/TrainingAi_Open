@@ -1,6 +1,7 @@
 import { dropSparseHrHours, DENSITY_GATED_HR_SOURCES } from '@trainingai/shared/health/intraday-hr-contributors'
 import { workoutHrSpanVerdict, type WorkoutHrSpan } from '@trainingai/shared/workout/workout-hr-density'
-import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
+import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, getTableColumns, type SQL, type SQLWrapper } from 'drizzle-orm'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
@@ -2360,34 +2361,73 @@ function eachDay(fromDay: string, toDay: string): string[] {
 const ZONE_HR_RETENTION_DAYS = HR_RETENTION_DAYS
 
 /** The first day whose zone split can still be recomputed from raw HR, given the user's local
- *  `today`. A cached day before it is the permanent record. The read and the delete below both use
- *  this, so they can't disagree about which days are frozen. */
+ *  `today`. A cached day before it is the permanent record. The read and the writers' invalidation
+ *  below both use this, so they can't disagree about which days are frozen.
+ *
+ *  It is `today − (retention − 1)`, not `today − retention` (#3862 item 2): the HR prune cuts at
+ *  `now() − 180 d`, a clock time, so by the time anyone reads it the day `today − 180` has already
+ *  lost its morning. A recompute there would count part of a day and stamp it as final, so that day
+ *  is treated as past retention too. */
 export function zoneRetentionCutoff(today: string): string {
-  return shiftDateStr(today, -ZONE_HR_RETENTION_DAYS)
+  return shiftDateStr(today, -(ZONE_HR_RETENTION_DAYS - 1))
 }
 
-/** Delete cached daily_zone_minutes rows for `userId` on/after `fromDay` (inclusive). Called by the
- *  BLE rollup after it delete-and-reinserts oura_heartrate across its window, and by the Health
- *  Connect and Oura Cloud HR writers, so those days are recomputed on the next read instead of
- *  serving the pre-rewrite (often partial) split forever (review J-1/C-5 — the owns-its-rows
- *  analogue of a cache-group invalidation).
+// ── Invalidation: a writer marks a day stale, it never deletes the row (#3862 item 1) ─────────────
+// A read loads the day's heart rate and workout windows, computes, then writes the row back. If a
+// writer DELETED the row in between, the read's upsert would find nothing to conflict with and cache
+// the stale value again. So a writer leaves a stale marker instead: the row stays (or is inserted, for
+// a day not cached yet) with `max_hr` NULL, which no profile matches, and a fresh `computed_at`. The
+// read only writes back over the exact row version it loaded (`computed_at` unchanged) or, if it
+// loaded none, only where none exists yet. Postgres serialises both on the row's lock and the
+// primary key, so this holds across every server process without a lock or a clock comparison, and
+// also when the writer runs inside its own transaction.
+//
+// A marker keeps the day's old seconds. A marked day that ages past retention before anyone reads it
+// is served as stored, the same as any frozen row; a marker inserted for an uncached day is all-zero,
+// which reads as missing (#3801).
+
+type ZoneMarkerDb = Pick<Db, 'insert'>
+
+/** Mark these local days stale, for the next read to recompute. Skips any day past HR retention
+ *  (#2828 N1: it could not be recomputed). Today is marked too, though a read never trusts it: a
+ *  row for it can exist after a timezone change, and must not be trusted once the day is past. */
+export async function markZoneMinutesStale(db: ZoneMarkerDb, userId: string, days: Iterable<string>, tz: string): Promise<void> {
+  const today = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
+  const cutoff = zoneRetentionCutoff(today)
+  const keep = [...new Set(days)].filter(d => d >= cutoff).sort()
+  if (keep.length === 0) return
+  // clock_timestamp(), not now(): inside a transaction now() is the transaction's start, and two
+  // markers in one transaction must still differ from whatever a read loaded before it.
+  await db.insert(s.dailyZoneMinutes)
+    .values(keep.map(day => ({ userId, day, maxHr: null, restingHr: null, computedAt: sql`clock_timestamp()` })))
+    .onConflictDoUpdate({
+      target: [s.dailyZoneMinutes.userId, s.dailyZoneMinutes.day],
+      set: { maxHr: null, computedAt: sql`clock_timestamp()` },
+    })
+}
+
+/** Mark cached daily_zone_minutes days for `userId` stale on/after `fromDay` (inclusive), up to
+ *  today. Called by the BLE rollup after it delete-and-reinserts oura_heartrate across its
+ *  window, and by the Health Connect and Oura Cloud HR writers, so those days are recomputed on the
+ *  next read instead of serving the pre-rewrite (often partial) split forever (review J-1/C-5 — the
+ *  owns-its-rows analogue of a cache-group invalidation).
  *
  *  Never reaches past HR retention (#2828 N1). A cached day older than `zoneRetentionCutoff` can't
- *  be recomputed because its raw HR is already pruned, so deleting it would lose the day for good.
- *  A history import can start 3,650 days back, so `fromDay` is clamped here for every caller. */
+ *  be recomputed because its raw HR is already pruned. A history import can start 3,650 days back,
+ *  so `fromDay` is clamped here for every caller: at most 180 days are marked. */
 export async function deleteZoneMinutesFrom(db: Db, userId: string, fromDay: string, tz: string): Promise<void> {
-  const cutoff = zoneRetentionCutoff(formatInTimeZone(new Date(), tz, 'yyyy-MM-dd'))
-  await db.delete(s.dailyZoneMinutes).where(and(
-    eq(s.dailyZoneMinutes.userId, userId),
-    gte(s.dailyZoneMinutes.day, fromDay > cutoff ? fromDay : cutoff),
-  ))
+  const today = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
+  const cutoff = zoneRetentionCutoff(today)
+  const first = fromDay > cutoff ? fromDay : cutoff
+  if (first > today) return
+  await markZoneMinutesStale(db, userId, eachDay(first, today), tz)
 }
 
 // ── #3850: the workout and activity writers' half of the same invalidation ────────────────
 // A day's split also depends on the workouts and activity logs that fall on it (#3775: inside one, a
-// heart-rate gap counts up to 5½ min). So a writer of either drops the days it can move, exactly the
-// days `dayActivityWindowInputs` would read the row for. Deleting is the cheap direction: the next
-// read recomputes, and a day it drops for nothing just costs one recompute.
+// heart-rate gap counts up to 5½ min). So a writer of either marks the days it can move, exactly the
+// days `dayActivityWindowInputs` would read the row for. Marking is the cheap direction: the next
+// read recomputes, and a day it marks for nothing just costs one recompute.
 
 /** The local days a completed workout session's windows fall on: every day its span touches. A
  *  session that was never completed has no window (`dayActivityWindowInputs` needs `completed_at`),
@@ -2410,41 +2450,101 @@ async function userZoneTz(db: Db, userId: string): Promise<string> {
   return u?.timezone ?? DEFAULT_TZ
 }
 
-/** Drop the cached rows for exactly these local days, never one past HR retention (#2828 N1: it
- *  could not be recomputed). Today is never cached, so it needs nothing. */
-async function deleteZoneMinutesDays(db: Db, userId: string, days: Iterable<string>, tz: string): Promise<void> {
-  const cutoff = zoneRetentionCutoff(formatInTimeZone(new Date(), tz, 'yyyy-MM-dd'))
-  const keep = [...new Set(days)].filter(d => d >= cutoff)
-  if (keep.length === 0) return
-  await db.delete(s.dailyZoneMinutes).where(and(
-    eq(s.dailyZoneMinutes.userId, userId),
-    inArray(s.dailyZoneMinutes.day, keep),
-  ))
+type SessionSpan = { startedAt: Date; completedAt: Date | null }
+
+/** The drops one `batchZoneMinutesDrops` call has collected, flushed once when it ends. */
+interface ZoneDropBatch { userId: string; tz: string; sessionIds: Set<string>; spans: SessionSpan[]; activityDates: Set<string>; closed: boolean }
+
+// Module-level, not per adapter: a helper that fetches its own repository (the session delete, the
+// exercise-log delete) still lands in the batch of the push that called it.
+const zoneDropBatch = new AsyncLocalStorage<ZoneDropBatch>()
+
+function batchFor(userId: string): ZoneDropBatch | undefined {
+  const b = zoneDropBatch.getStore()
+  // A closed batch has flushed. Work started inside it but not awaited (the post-completion HR
+  // pipeline) still sees it as its context, and must write its own drops rather than join a flush
+  // that already ran.
+  return b && b.userId === userId && !b.closed ? b : undefined
+}
+
+/** Run `fn` with every workout and activity zone drop for `userId` collected and written once when
+ *  it ends (#3862 item 3), instead of a timezone read and a write per changed row. Marking later is
+ *  still safe under the race above: a read that cached between a write and the flush is overwritten
+ *  by the flush's marker. The flush runs even when `fn` throws. A failed flush is thrown when `fn`
+ *  succeeded, so the push fails and the device sends it again (every mutation replays idempotently,
+ *  and the replay marks the days); when `fn` already threw, its own error is the one kept. */
+export async function batchZoneMinutesDrops<T>(db: Db, userId: string, tz: string, fn: () => Promise<T>): Promise<T> {
+  if (batchFor(userId)) return fn()
+  const batch: ZoneDropBatch = { userId, tz, sessionIds: new Set(), spans: [], activityDates: new Set(), closed: false }
+  let threw = false
+  try {
+    return await zoneDropBatch.run(batch, fn)
+  } catch (err) {
+    threw = true
+    throw err
+  } finally {
+    batch.closed = true
+    try {
+      await markZoneMinutesForWorkoutSessions(db, userId, [...batch.sessionIds], batch.spans, tz)
+      await markZoneMinutesForActivityDates(db, userId, [...batch.activityDates], tz)
+    } catch (err) {
+      errorLog('[zone-minutes] batched invalidation failed', err)
+      // Before batching, a failed drop failed its own mutation and the device retried it. Keep that:
+      // a push whose writes landed but whose invalidation did not is reported as failed.
+      if (!threw) throw err
+    }
+  }
 }
 
 /** A workout session writer's invalidation. `spans` are spans the session no longer has (read before
  *  a write that moves its times); `sessionIds` are read as stored now, tombstoned rows included,
- *  since a tombstone takes its window off the days it covered. */
+ *  since a tombstone takes its window off the days it covered. `tz` saves the user's timezone read
+ *  where the caller already has it. */
 export async function deleteZoneMinutesForWorkoutSessions(
   db: Db, userId: string, sessionIds: readonly string[],
-  spans: readonly { startedAt: Date; completedAt: Date | null }[] = [],
+  spans: readonly SessionSpan[] = [], tz?: string,
 ): Promise<void> {
   if (sessionIds.length === 0 && spans.length === 0) return
-  const tz = await userZoneTz(db, userId)
+  const batch = batchFor(userId)
+  if (batch) {
+    for (const id of sessionIds) batch.sessionIds.add(id)
+    batch.spans.push(...spans)
+    return
+  }
+  await markZoneMinutesForWorkoutSessions(db, userId, sessionIds, spans, tz)
+}
+
+async function markZoneMinutesForWorkoutSessions(
+  db: Db, userId: string, sessionIds: readonly string[], spans: readonly SessionSpan[], tz?: string,
+): Promise<void> {
+  if (sessionIds.length === 0 && spans.length === 0) return
+  const zone = tz ?? await userZoneTz(db, userId)
   const rows = sessionIds.length === 0 ? [] : await db
     .select({ startedAt: s.workoutSessions.startedAt, completedAt: s.workoutSessions.completedAt })
     .from(s.workoutSessions)
     .where(and(eq(s.workoutSessions.userId, userId), inArray(s.workoutSessions.id, [...sessionIds])))
-  const days = [...rows, ...spans].flatMap(r => zoneDaysOfSession(r.startedAt, r.completedAt, tz))
-  await deleteZoneMinutesDays(db, userId, days, tz)
+  const days = [...rows, ...spans].flatMap(r => zoneDaysOfSession(r.startedAt, r.completedAt, zone))
+  await markZoneMinutesStale(db, userId, days, zone)
 }
 
 /** An activity log writer's invalidation: pass every date the row had before and after the write. */
-export async function deleteZoneMinutesForActivityDates(db: Db, userId: string, dates: readonly (string | null | undefined)[]): Promise<void> {
+export async function deleteZoneMinutesForActivityDates(
+  db: Db, userId: string, dates: readonly (string | null | undefined)[], tz?: string,
+): Promise<void> {
   const real = dates.filter((d): d is string => typeof d === 'string' && d.length > 0)
   if (real.length === 0) return
-  const tz = await userZoneTz(db, userId)
-  await deleteZoneMinutesDays(db, userId, real.flatMap(zoneDaysOfActivityDate), tz)
+  const batch = batchFor(userId)
+  if (batch) {
+    for (const d of real) batch.activityDates.add(d)
+    return
+  }
+  await markZoneMinutesForActivityDates(db, userId, real, tz)
+}
+
+async function markZoneMinutesForActivityDates(db: Db, userId: string, dates: readonly string[], tz?: string): Promise<void> {
+  if (dates.length === 0) return
+  const zone = tz ?? await userZoneTz(db, userId)
+  await markZoneMinutesStale(db, userId, dates.flatMap(zoneDaysOfActivityDate), zone)
 }
 
 /** When the current zone-minutes rule took effect (#3851: a heart-rate gap inside a workout or
@@ -2462,14 +2562,20 @@ export const ZONE_RULE_EFFECTIVE_AT = new Date('2026-11-20T00:00:00Z')
 /** Range of daily zone-seconds with reconcile-on-read caching. `today` (user-local) is always
  *  recomputed (partial day). A cached past day is trusted only when its stamped profile matches the
  *  caller's and it was computed under the current rule (`ZONE_RULE_EFFECTIVE_AT`) — otherwise it is
- *  recomputed for days still inside HR retention, else served as-is (frozen record). Missing/stale days are computed concurrently. */
+ *  recomputed for days still inside HR retention, else served as-is (frozen record). Missing/stale days are computed concurrently.
+ *  A recompute is written back only over the row version this read loaded (#3862), and never for a
+ *  day past retention (`zoneRetentionCutoff`, which already counts the partly pruned day as past). */
 export async function getZoneMinutesRange(
   db: Db, userId: string, fromDay: string, toDay: string, tz: string,
   profile: { maxHr: number; restingHr: number },
 ): Promise<DayZoneSeconds[]> {
   const today = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
   const retentionCutoff = zoneRetentionCutoff(today)
-  const cached = await db.select().from(s.dailyZoneMinutes).where(and(
+  // `stamp` is `computed_at` exactly as stored (microseconds), for the conditional write-back below.
+  const cached = await db.select({
+    ...getTableColumns(s.dailyZoneMinutes),
+    stamp: sql<string>`${s.dailyZoneMinutes.computedAt}::text`,
+  }).from(s.dailyZoneMinutes).where(and(
     eq(s.dailyZoneMinutes.userId, userId),
     gte(s.dailyZoneMinutes.day, fromDay),
     lte(s.dailyZoneMinutes.day, toDay),
@@ -2503,18 +2609,28 @@ export async function getZoneMinutesRange(
     // No heart rate: the day is left out, so a reader sees it missing (a week needing all seven
     // days drops out). Not cached, so HR that lands later is read on the next call.
     if (seconds == null) return null
-    if (day !== today) {
-      // Cache past days only (today is partial and re-derived each read). Stamp the profile so a
-      // later read under a drifted profile recomputes instead of trusting stale bands.
+    // Cache past days inside retention only: today is partial and re-derived each read, and a day
+    // past retention has lost some or all of its heart rate, so its split must never be stamped as
+    // final (#3862 item 2). Stamp the profile so a later read under a drifted profile recomputes.
+    if (day !== today && day >= retentionCutoff) {
       const cols = {
         zone1Sec: Math.round(seconds[0]), zone2Sec: Math.round(seconds[1]), zone3Sec: Math.round(seconds[2]),
         zone4Sec: Math.round(seconds[3]), zone5Sec: Math.round(seconds[4]),
         maxHr: profile.maxHr, restingHr: profile.restingHr,
       }
-      await db.insert(s.dailyZoneMinutes).values({ userId, day, ...cols }).onConflictDoUpdate({
-        target: [s.dailyZoneMinutes.userId, s.dailyZoneMinutes.day],
-        set: { ...cols, computedAt: new Date() },
-      })
+      // #3862: write back only over the row this read loaded. A writer that marked the day stale since
+      // then changed `computed_at` (or inserted the row), so this read's value, from windows loaded
+      // before that write, is dropped and the next read recomputes.
+      const insert = db.insert(s.dailyZoneMinutes).values({ userId, day, ...cols })
+      if (row) {
+        await insert.onConflictDoUpdate({
+          target: [s.dailyZoneMinutes.userId, s.dailyZoneMinutes.day],
+          set: { ...cols, computedAt: new Date() },
+          setWhere: sql`${s.dailyZoneMinutes.computedAt} = ${row.stamp}::timestamptz`,
+        })
+      } else {
+        await insert.onConflictDoNothing()
+      }
     }
     return { day, seconds }
   }))

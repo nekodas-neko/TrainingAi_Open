@@ -824,7 +824,7 @@ export interface WorkoutRepository {
   confirmScaleSample(userId: string, id: number): Promise<ScalePendingSample | null>
   /** Ownership-checked; returns whether a matching pending row was found and dismissed. */
   dismissScaleSample(userId: string, id: number): Promise<boolean>
-  saveActivityLog(userId: string, log: Omit<ActivityLog, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { overwrite?: boolean }): Promise<ActivityLog>
+  saveActivityLog(userId: string, log: Omit<ActivityLog, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { overwrite?: boolean; tz?: string }): Promise<ActivityLog>
   listActivityLogs(userId: string, from: string, to: string): Promise<ActivityLog[]>
   /** Ownership-checked single row; the metrics PATCH needs the stored duration to rate-check a patch. */
   getActivityLogById(userId: string, id: string): Promise<ActivityLog | null>
@@ -832,10 +832,10 @@ export interface WorkoutRepository {
   /** `false` when the (id, user) pair matched no row — absent or not yours (Q-556). */
   deleteActivityLog(userId: string, id: string): Promise<boolean>
   /** #3044. Insert or update the session Health Connect calls `externalId`; see the adapter. */
-  upsertHealthConnectActivityLog(userId: string, externalId: string, log: HealthConnectActivityLogInput): Promise<HealthConnectActivityLogOutcome>
+  upsertHealthConnectActivityLog(userId: string, externalId: string, log: HealthConnectActivityLogInput, tz?: string): Promise<HealthConnectActivityLogOutcome>
   /** #3044. Tombstone Health Connect sessions by record id, or every one dated `from`–`to` whose id
    *  is not in `keep`. Returns how many rows it tombstoned. */
-  tombstoneHealthConnectActivityLogs(userId: string, scope: { ids: readonly string[] } | { from: string; to: string; keep: readonly string[] }): Promise<number>
+  tombstoneHealthConnectActivityLogs(userId: string, scope: { ids: readonly string[] } | { from: string; to: string; keep: readonly string[] }, tz?: string): Promise<number>
   saveFitnessTest(userId: string, test: Omit<FitnessTest, 'userId'>): Promise<FitnessTest>
   listFitnessTests(userId: string, from: string, to: string): Promise<FitnessTest[]>
   deleteFitnessTest(userId: string, id: string): Promise<void>
@@ -1618,10 +1618,12 @@ export interface WorkoutRepository {
   /** #3850. Drops the cached zone-minutes days a workout session's windows fall on, read as stored
    *  now (tombstones included), plus any `spans` the session had before a write moved its times. Call
    *  after a write commits. Never past HR retention. */
-  dropZoneMinutesForWorkoutSessions(userId: string, sessionIds: readonly string[], spans?: readonly { startedAt: Date; completedAt: Date | null }[]): Promise<void>
+  dropZoneMinutesForWorkoutSessions(userId: string, sessionIds: readonly string[], spans?: readonly { startedAt: Date; completedAt: Date | null }[], tz?: string): Promise<void>
   /** #3850. Drops the cached zone-minutes days an activity log dated on each of `dates` is read for
-   *  (its day and the next). Pass the dates the row had before and after the write. */
-  dropZoneMinutesForActivityDates(userId: string, dates: readonly (string | null | undefined)[]): Promise<void>
+   *  (its day and the next). Pass the dates the row had before and after the write. Both take the
+   *  user's `tz` where the caller has it, saving a read (#3862). "Drop" marks the day stale; the row
+   *  stays, so a read racing the write can't cache the old split back. */
+  dropZoneMinutesForActivityDates(userId: string, dates: readonly (string | null | undefined)[], tz?: string): Promise<void>
   /** #2462. Health Connect steps / active kcal per record and cadence per sample, upserted by
    *  `(kind, recordId, startAt)` so a re-read window is idempotent. Returns rows written after the
    *  in-batch collapse. Overlap between apps is kept and resolved by the reader. */
