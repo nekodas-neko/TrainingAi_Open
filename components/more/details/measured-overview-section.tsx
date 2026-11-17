@@ -64,7 +64,7 @@ export function MeasuredOverviewSection({ userId, serverRecent }: Props) {
   // rather than a latest reading, so it is built beside the groups rather than inside them.
   // RV-150: without `onError` a failed load is indistinguishable from "nothing measured yet", and
   // the section's empty branch is `return null` — so on a cold start with the route down the whole
-  // of "What the app has measured" was simply absent, with nothing anywhere saying why.
+  // of "What the app has recorded" was simply absent, with nothing anywhere saying why.
   const [failed, setFailed] = useState(false)
   const serverNights = useCachedValue<SleepNight[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
     { onError: () => setFailed(true) })
@@ -105,7 +105,7 @@ export function MeasuredOverviewSection({ userId, serverRecent }: Props) {
     if (!failed) return null
     return (
       <section className="space-y-1">
-        <h2 className="text-sm font-semibold">What the app has measured</h2>
+        <h2 className="text-sm font-semibold">What the app has recorded</h2>
         <p className="text-xs text-muted-foreground">
           Couldn&rsquo;t load your readings. Check your connection and reopen this screen.
         </p>
@@ -116,7 +116,8 @@ export function MeasuredOverviewSection({ userId, serverRecent }: Props) {
   return (
     <section className="space-y-4">
       <div className="space-y-1">
-        <h2 className="text-sm font-semibold">What the app has measured</h2>
+        {/* "Recorded", not "measured": the scale's estimates sit in this section (#3770). */}
+        <h2 className="text-sm font-semibold">What the app has recorded</h2>
         <p className="text-xs text-muted-foreground">
           The most recent reading of each, and when it was taken. Nothing here is editable — these
           come from your scale, ring and phone.
