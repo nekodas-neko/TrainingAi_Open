@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { isSigningOut } from "@/lib/sign-out-fence";
 import { TriangleAlertIcon, WifiOffIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/shell/bottom-nav";
@@ -50,7 +51,9 @@ export default function RootError({
     }
     // Only report genuine (online) errors — an offline chunk-load failure is
     // expected, and the report fetch would fail anyway.
-    if (!isOffline) {
+    // #3854: no beacon while a sign-out runs: it bypasses the fence, and its response would re-set
+    // the cleared session cookie.
+    if (!isOffline && !isSigningOut()) {
       console.error("Root error boundary caught:", error);
       const body = JSON.stringify({ message: error.message, stack: error.stack, url: window.location.href });
       if (navigator.sendBeacon) {
