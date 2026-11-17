@@ -2453,7 +2453,7 @@ async function userZoneTz(db: Db, userId: string): Promise<string> {
 type SessionSpan = { startedAt: Date; completedAt: Date | null }
 
 /** The drops one `batchZoneMinutesDrops` call has collected, flushed once when it ends. */
-interface ZoneDropBatch { userId: string; tz: string; sessionIds: Set<string>; spans: SessionSpan[]; activityDates: Set<string> }
+interface ZoneDropBatch { userId: string; tz: string; sessionIds: Set<string>; spans: SessionSpan[]; activityDates: Set<string>; closed: boolean }
 
 // Module-level, not per adapter: a helper that fetches its own repository (the session delete, the
 // exercise-log delete) still lands in the batch of the push that called it.
@@ -2461,26 +2461,37 @@ const zoneDropBatch = new AsyncLocalStorage<ZoneDropBatch>()
 
 function batchFor(userId: string): ZoneDropBatch | undefined {
   const b = zoneDropBatch.getStore()
-  return b && b.userId === userId ? b : undefined
+  // A closed batch has flushed. Work started inside it but not awaited (the post-completion HR
+  // pipeline) still sees it as its context, and must write its own drops rather than join a flush
+  // that already ran.
+  return b && b.userId === userId && !b.closed ? b : undefined
 }
 
 /** Run `fn` with every workout and activity zone drop for `userId` collected and written once when
  *  it ends (#3862 item 3), instead of a timezone read and a write per changed row. Marking later is
  *  still safe under the race above: a read that cached between a write and the flush is overwritten
- *  by the flush's marker. The flush runs even when `fn` throws; a failed flush is logged, never
- *  thrown, since every write it covers has already landed (the next HR write or profile drift
- *  marks the days again). */
+ *  by the flush's marker. The flush runs even when `fn` throws. A failed flush is thrown when `fn`
+ *  succeeded, so the push fails and the device sends it again (every mutation replays idempotently,
+ *  and the replay marks the days); when `fn` already threw, its own error is the one kept. */
 export async function batchZoneMinutesDrops<T>(db: Db, userId: string, tz: string, fn: () => Promise<T>): Promise<T> {
   if (batchFor(userId)) return fn()
-  const batch: ZoneDropBatch = { userId, tz, sessionIds: new Set(), spans: [], activityDates: new Set() }
+  const batch: ZoneDropBatch = { userId, tz, sessionIds: new Set(), spans: [], activityDates: new Set(), closed: false }
+  let threw = false
   try {
     return await zoneDropBatch.run(batch, fn)
+  } catch (err) {
+    threw = true
+    throw err
   } finally {
+    batch.closed = true
     try {
       await markZoneMinutesForWorkoutSessions(db, userId, [...batch.sessionIds], batch.spans, tz)
       await markZoneMinutesForActivityDates(db, userId, [...batch.activityDates], tz)
     } catch (err) {
       errorLog('[zone-minutes] batched invalidation failed', err)
+      // Before batching, a failed drop failed its own mutation and the device retried it. Keep that:
+      // a push whose writes landed but whose invalidation did not is reported as failed.
+      if (!threw) throw err
     }
   }
 }
