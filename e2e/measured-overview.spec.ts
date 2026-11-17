@@ -13,7 +13,7 @@ test('the measured card dates every reading and omits what was never measured', 
   await page.goto('/more/details')
   await settleRouteBoundary(page)
 
-  const heading = page.getByRole('heading', { name: 'What the app has measured' })
+  const heading = page.getByRole('heading', { name: 'What the app has recorded' })
   await expect(heading).toBeVisible({ timeout: 60_000 })
 
   const section = page.locator('section').filter({ has: heading })
