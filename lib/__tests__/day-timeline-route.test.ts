@@ -480,6 +480,16 @@ describe('/api/day-timeline — doses', () => {
     expect(listDoseHistory).toHaveBeenCalledWith(expect.any(String), '2026-08-04', DAY)
   })
 
+  it('reads dose history from the dose\'s own vial, not the first vial ever opened', async () => {
+    listTimedDoses.mockResolvedValue([tick()])
+    listSupplementVials.mockResolvedValue([
+      { id: 'v-2', strengthMg: 10, openedOn: '2026-08-04' },
+      { id: 'v-1', strengthMg: 10, openedOn: '2026-03-01' },
+    ])
+    await eventsOf('dose')
+    expect(listDoseHistory).toHaveBeenCalledWith(expect.any(String), '2026-08-04', DAY)
+  })
+
   it('shows the title alone when no vial covers the day', async () => {
     listTimedDoses.mockResolvedValue([tick()])
     const [dose] = await eventsOf('dose')
