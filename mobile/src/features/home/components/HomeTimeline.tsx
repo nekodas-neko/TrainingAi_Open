@@ -165,7 +165,7 @@ export function HomeTimeline({
       });
     }
   }
-  events = withLocalDoses(events, n.operations, today, health.timezone);
+  events = withLocalDoses(events, n.operations, today, health.timezone, n.view.supplements);
   if (!events.length && !state.loading && !state.error && !selected && !vial) {
     return null;
   }

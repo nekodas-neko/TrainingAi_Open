@@ -17,11 +17,14 @@ import { Pressable } from '../../../shared/ui/Pressable';
 import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
 import { bodyCardColors } from '../../../shared/theme/tokens';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { isCorrectedReading } from '@trainingai/shared/health/body-fat-display';
 import { displayFat, latestMetric, type BodyRow } from '../data/models';
 import { useCueColor } from './RangeBar';
 import { scaleEstimates, weighInDay } from '../data/scale-composition';
 
 const round1 = (x: number) => parseFloat(x.toFixed(1));
+/** A scale weigh-in is the row that carries the scale's own figures. */
+const isWeighIn = (row: BodyRow) => typeof row.skeletalMusclePct === 'number';
 
 /**
  * Body Composition from weight and body fat: lean mass with its change since the oldest reading,
@@ -102,14 +105,30 @@ export function ScaleCompositionCard({ rows, today }: { rows: readonly BodyRow[]
   const { theme } = useTheme();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
-  // A scale weigh-in is the row that carries the scale's own figures.
   const latest = latestMetric([...rows], 'skeletalMusclePct');
   if (!latest) return null;
   const fat = displayFat(latest);
-  const series = [...rows].reverse().flatMap((row, index) => {
-    const value = displayFat(row);
-    return value == null ? [] : [{ label: row.date, value, x: index }];
-  });
+  // #3863: the scale's own readings only, so a manual body-fat entry is never a weigh-in point.
+  const series = [...rows]
+    .reverse()
+    .filter(isWeighIn)
+    .flatMap((row) => {
+      const value = displayFat(row);
+      return value == null ? [] : [{ label: row.date, value, corrected: isCorrectedReading(row) }];
+    })
+    .map((point, x) => ({ ...point, x }));
+  // Where corrected and uncorrected readings meet (BF-113), a dashed line marks the change.
+  const seams = series.flatMap((point, i) =>
+    i > 0 && point.corrected !== series[i - 1].corrected
+      ? [
+          {
+            x: point.x - 0.5,
+            label: 'Correction changes',
+            color: theme.colors.muted,
+          },
+        ]
+      : [],
+  );
   const estimates = scaleEstimates(latest);
   return (
     <Card accent={bodyCardColors.composition}>
@@ -145,6 +164,7 @@ export function ScaleCompositionCard({ rows, today }: { rows: readonly BodyRow[]
             gaps="connect"
             tone="nutrition"
             color={theme.tones.nutrition.foreground}
+            markers={seams}
             axisLabels={[
               formatDateDisplay(series[0].label, 'short'),
               formatDateDisplay(series[series.length - 1].label, 'short'),
@@ -152,6 +172,10 @@ export function ScaleCompositionCard({ rows, today }: { rows: readonly BodyRow[]
           />
           <AppText variant="caption" tone="muted">
             Body fat % trend
+            {seams.length > 0 &&
+              (series[series.length - 1].corrected
+                ? ' · corrected from the dashed line'
+                : ' · corrected up to the dashed line')}
           </AppText>
         </Stack>
       )}

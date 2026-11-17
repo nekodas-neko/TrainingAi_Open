@@ -148,21 +148,43 @@ export type DoseOperation = {
   date: string;
   payload: Record<string, unknown>;
 };
+/** The part of today's local supplement log the dose overlay reads (#3863). */
+export type LocalDose = {
+  id: string;
+  loggedToday?: boolean;
+  loggedDose?: { amount?: number | null; unit?: string | null; takenAt?: string | null } | null;
+};
 /**
  * #2185 option A. A dose ticked on this phone and not yet synced is on the timeline at once, and
  * an unsynced un-tick takes the server's row away; the latest queued change per supplement and day
  * wins. A local row has no vial facts (the vial list is the server's), so it shows the title alone.
  * Milligram-dosed only, as the route decides it.
+ *
+ * #3863: today's local supplement log is the base, so a dose stays once its upload is confirmed and
+ * leaves the outbox, while the timeline refetch is pending or the phone is offline. Queued changes
+ * still apply on top of it.
  */
 export function withLocalDoses(
   events: readonly TimelineEvent[],
   operations: readonly DoseOperation[],
   today: string,
   timezone: string,
+  logged: readonly LocalDose[] = [],
 ) {
   const yesterday = shiftDateStr(today, -1);
+  const base: DoseOperation[] = logged.flatMap((s) =>
+    s.loggedToday && s.loggedDose
+      ? [
+          {
+            domain: 'supplement_logs',
+            date: today,
+            payload: { supplementId: s.id, logDate: today, ...s.loggedDose, local: true },
+          },
+        ]
+      : [],
+  );
   const latest = new Map<string, DoseOperation>();
-  for (const op of operations) {
+  for (const op of [...base, ...operations]) {
     const id = op.payload.supplementId;
     if (op.domain !== 'supplement_logs' || typeof id !== 'string') continue;
     if (op.date !== today && op.date !== yesterday) continue;
@@ -181,8 +203,10 @@ export function withLocalDoses(
     const timeMs = typeof p.takenAt === 'string' ? Date.parse(p.takenAt) : NaN;
     const dose =
       !p.deleted && amount != null && isMilligramDosed({ unit }) && Number.isFinite(timeMs);
-    // The server already has this very tick: keep its row, which carries the vial line.
-    if (dose && rows.some((row) => isThis(row) && row.timeMs === timeMs)) continue;
+    // The server already has this very tick: keep its row, which carries the vial line. For the
+    // settled local log, any server row for that supplement and day is the same dose.
+    if (dose && rows.some((row) => isThis(row) && (p.local === true || row.timeMs === timeMs)))
+      continue;
     rows = rows.filter((row) => !isThis(row));
     if (!dose) continue;
     const date = formatLocalDate(timeMs, timezone);
@@ -196,7 +220,8 @@ export function withLocalDoses(
       date,
       supplementId,
       logDate: op.date,
-      subtitle: 'Saved on this phone',
+      // A settled local dose is already on the server; only a queued one is phone-only.
+      ...(p.local === true ? {} : { subtitle: 'Saved on this phone' }),
     });
   }
   return rows.sort((a, b) => b.timeMs - a.timeMs);
