@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { currentAppTimelineEvents } from "@/lib/hooks/use-day-timeline";
 import { TTL_SHORT } from "@trainingai/shared/cache-ttl";
 import type { TimelineEvent } from "@/app/api/day-timeline/route";
 import { useTransitionRouter } from "@/lib/view-transition";
@@ -240,7 +241,8 @@ function HomeDayTimelineComponent() {
     "home-day-timeline", "/api/day-timeline", TTL_SHORT,
     { today: true, onError: () => setFailed(true) },
   );
-  const events = payload?.events ?? null;
+  // A dose row is Preview's alone (#2185); the current app has no card for it.
+  const events = payload?.events ? currentAppTimelineEvents(payload.events) : null;
 
   // **The `ta:oura-ble-synced` listener that used to sit here is gone, and that is the point of the
   // conversion.** Q-91 added it because this widget, mounted in the shell, never learned to refetch

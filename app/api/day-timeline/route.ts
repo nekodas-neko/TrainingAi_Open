@@ -335,8 +335,14 @@ export async function GET(req: Request) {
     const vialsById = new Map(await Promise.all(
       ids.map(async id => [id, await repo.listSupplementVials(userId, id)] as const),
     ))
-    const opened = [...vialsById.values()].flat().map(v => v.openedOn).filter(d => d <= date).sort()
-    const history = opened.length > 0 ? (await repo.listDoseHistory(userId, opened[0], date)).logs : []
+    // A dose's standing reads its own vial, the newest opened on or before the dose's day
+    // (`vialStanding`). So the history reaches back to the oldest of those vials, not to the first
+    // vial ever opened: a retired vial would make every Home load read every tick since it.
+    const doseVialOpened = doses
+      .map(d => (vialsById.get(d.supplementId) ?? []).map(v => v.openedOn).filter(o => o <= d.date).sort().at(-1))
+      .filter((o): o is string => o != null)
+      .sort()
+    const history = doseVialOpened.length > 0 ? (await repo.listDoseHistory(userId, doseVialOpened[0], date)).logs : []
     for (const dose of doses) {
       const t = Date.parse(dose.takenAt)
       if (!Number.isFinite(t) || t < yDayStart.getTime() || t > dayEnd.getTime()) continue
