@@ -6,6 +6,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.524.0",
+    date: "2026-11-17",
+    changes: [
+      "Both apps: readiness is re-centred so a normal day reads about 75 instead of about 50. Every rest and deload rule moved with it, and older days keep the decisions they had; the \"Readiness is low\" notification fires about as often as before.",
+      "Both apps: the program now holds one training phase and every session type follows it, counted in training weeks, so one muscle group no longer gets high-volume and near-maximal work in the same week.",
+      "Both apps: since the ring moved to Oura Cloud a workout gets a heart-rate reading every few minutes. Inside a workout or activity, the time between readings now counts in full (up to 5½ minutes), so a workout no longer counts only about 40% of its zone minutes. All-day time is counted as before.",
+      "Both apps: the daily deload explanation lists only what drives it; the soreness, HRV and sleep-trend lines are gone. A set's heart rate is judged over its peak window, and per-set heart rate is hidden when the readings were too sparse to trust.",
+      "Both apps: signing out stays signed out, even when a request was still in flight. Linking Google ends the old password's phone sign-ins, and an Apple sign-in activates an invited account only when Apple confirms the email.",
+      "Both apps: an AI-built program is checked in code for set totals, time budget and back-to-back muscles, and typing an exercise the library already has no longer asks the AI.",
+      "Current app: the phone's own walk detector is gone (it raised 898 possible walks since 17 Oct and saved none). Walks are offered from the day's movement data, and not when Oura already recorded that workout.",
+      "TrainingAi Preview: the body composition card leads with what the scale measures, weight and body fat, with a body-fat trend; the other figures are folded into a section that says they are estimated from weight, height, age and sex.",
+      "TrainingAi Preview: each dose shows on Home's day timeline at the time you logged it, with where it sits in its vial; a tap opens the vial sheet.",
+      "Behind the scenes: the walking plan's engine (targets, how a minute counts, marking a walked day done), a faster heart-rate index, fewer repeated database reads, deleted workouts left out of heart-rate summaries, Preview start-up timings, an approval-gated clean-up job for old bad rows, a new sign-in cut-off column that nothing reads yet, and docs and checks brought in line with the code.",
+    ],
+  },
+  {
     version: "1.523.0",
     date: "2026-11-15",
     changes: [
