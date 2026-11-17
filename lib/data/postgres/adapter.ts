@@ -2885,11 +2885,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
 
     if (opts?.overwrite) {
-      // #3850: an edit can move the log to another date, so the day it leaves recomputes too.
+      // #3859: look the id up for any user, so another user's id is refused rather than
+      // falling through to an insert that dies on the primary key.
       const [before] = id
-        ? await this.db.select({ date: s.activityLogs.date }).from(s.activityLogs)
-            .where(and(eq(s.activityLogs.id, id), eq(s.activityLogs.userId, userId))).limit(1)
+        ? await this.db.select({ userId: s.activityLogs.userId, date: s.activityLogs.date })
+            .from(s.activityLogs).where(eq(s.activityLogs.id, id)).limit(1)
         : []
+      if (before && before.userId !== userId) throw new Error('Activity log not found')
       // Outbox replay: the user's own explicit save wins (last-write-wins), and the
       // updated_at bump makes the merge visible to getSyncDelta. activity_logs has two
       // unique constraints — the PK on `id` and a partial index on
@@ -2920,6 +2922,34 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         cadenceSource: values.cadenceSource,
         segments: values.segments,
         updatedAt: new Date(),
+      }
+      if (before) {
+        // #3859: an edit to a row that already exists updates it by id. The natural-key upsert
+        // below found no conflict when the edit moved the date, so its insert hit the primary key
+        // and the mutation dead-lettered; and the id-keyed branch never set `date` at all, so an
+        // untimed date move silently stayed on the old day.
+        //
+        // Moving onto the minute of a DIFFERENT row of the user's is refused, not merged. Both
+        // rows have their own id, which devices and prescribed runs point at, so a merge would
+        // have to delete one of them; the natural-key merge further down is for a new id, where
+        // nothing is lost. Tombstones are included because the unique index covers them too.
+        if (data.startTime) {
+          const [clash] = await this.db.select({ id: s.activityLogs.id }).from(s.activityLogs)
+            .where(and(
+              eq(s.activityLogs.userId, userId),
+              eq(s.activityLogs.date, data.date),
+              eq(s.activityLogs.startTime, data.startTime),
+              ne(s.activityLogs.id, id!),
+            )).limit(1)
+          if (clash) throw new Error(`Another activity is already logged on ${data.date} at ${data.startTime}`)
+        }
+        const updated = await this.db.update(s.activityLogs)
+          .set({ ...set, date: values.date })
+          .where(and(eq(s.activityLogs.id, id!), eq(s.activityLogs.userId, userId)))
+          .returning()
+        if (updated.length !== 1) throw new Error('Activity log not found')
+        await this.dropZoneMinutesForActivityDates(userId, [before.date, updated[0].date])
+        return this.rowToActivityLog(updated[0])
       }
       const [r] = data.startTime
         ? await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
