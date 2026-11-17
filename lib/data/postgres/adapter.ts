@@ -8417,6 +8417,37 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   /**
+   * #2185 — the candidates for Home's dose rows: live MANUAL ticks in [from, to] that carry the
+   * time they were taken and an amount. The route keeps the milligram-dosed ones
+   * (`isMilligramDosed`, the rule the syringe control and the phone's own overlay use), so the
+   * phone and the server agree on which ticks are doses.
+   */
+  async listTimedDoses(userId: string, from: string, to: string) {
+    const rows = await this.db
+      .select({
+        supplementId: s.supplementLogs.supplementId, date: s.supplementLogs.logDate,
+        amount: s.supplementLogs.amount, unit: s.supplementLogs.unit, takenAt: s.supplementLogs.takenAt,
+      })
+      .from(s.supplementLogs)
+      .innerJoin(s.supplements, eq(s.supplements.id, s.supplementLogs.supplementId))
+      .where(and(
+        eq(s.supplementLogs.userId, userId),
+        eq(s.supplementLogs.source, 'manual'),
+        gte(s.supplementLogs.logDate, from),
+        lte(s.supplementLogs.logDate, to),
+        isNull(s.supplementLogs.deletedAt),
+        isNull(s.supplements.deletedAt),
+        isNotNull(s.supplementLogs.takenAt),
+        isNotNull(s.supplementLogs.amount),
+      ))
+      .orderBy(asc(s.supplementLogs.takenAt))
+    return rows.map(r => ({
+      supplementId: r.supplementId, date: r.date, amount: Number(r.amount), unit: r.unit,
+      takenAt: r.takenAt!.toISOString(),
+    }))
+  }
+
+  /**
    * #2184 — every live dose log of EVERY supplement in [from, to], plus the definitions that were
    * stopped in that span, for the maintenance recommendation's dose-change caveat. Unlike
    * `listDoseEvents` this is not vial-only and keeps null amounts: creatine through a meal and a

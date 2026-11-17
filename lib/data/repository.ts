@@ -1414,6 +1414,11 @@ export interface WorkoutRepository {
    *  `amount`/`unit`, never `supplements.dose` (the vial). Vial-dosed only, so a daily oral
    *  supplement does not annotate every day. */
   listDoseEvents(userId: string, from: string, to: string): Promise<import('@trainingai/shared/health/dose-context').DoseEvent[]>
+  /** #2185: live manual ticks in [from, to] with a `takenAt` (ISO) and an amount — the candidates
+   *  for the dose rows on Home's timeline. */
+  listTimedDoses(userId: string, from: string, to: string): Promise<{
+    supplementId: string; date: string; amount: number; unit: string | null; takenAt: string
+  }[]>
   /** #2184: every live dose log of ANY supplement in [from, to] (null amounts kept), and the
    *  definitions whose `stoppedOn` falls in it — the inputs to the maintenance dose-change caveat. */
   listDoseHistory(userId: string, from: string, to: string): Promise<{

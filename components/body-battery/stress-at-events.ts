@@ -43,7 +43,8 @@ export interface PlacedEvent extends DayEvent {
  * Cloud, removed 2026-08-13 and never to be re-added — so rendering the lane would promise a marker
  * mechanism that does not exist.
  */
-const EXCLUDED_TYPES = new Set(['tag'])
+// A dose is never placed against the stress level (#2185: association, never attribution).
+const EXCLUDED_TYPES = new Set(['tag', 'dose'])
 
 /** The level of the bucket covering `minute`, or `null` if the nearest measured point is further
  *  than half a bucket away — which is what a gap looks like from here. */

@@ -111,3 +111,11 @@ describe('measuredCount', () => {
     expect(measuredCount(placeEvents([ev('workout', 9)], segments, TZ))).toBe(1)
   })
 })
+
+// #2185: a dose is never placed against the stress level: association, never attribution.
+describe('placeEvents and doses (#2185)', () => {
+  it('leaves a dose out, like a tag', () => {
+    const placed = placeEvents([ev('dose', 8, 'Dose · 2 mg'), ev('meal', 9)], seg([8, 9]), TZ)
+    expect(placed.map(p => p.type)).toEqual(['meal'])
+  })
+})

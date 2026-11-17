@@ -19,7 +19,14 @@ import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { scaleAlpha } from '../../../shared/theme/alpha';
 import { timelineHues } from '../../../shared/theme/tokens';
-import { localTimeline, timelineSchema, type TimelineEvent } from '../data/timeline';
+import {
+  localTimeline,
+  timelineSchema,
+  withLocalDoses,
+  type TimelineEvent,
+} from '../data/timeline';
+import { VialSheet } from '../../nutrition/components/VialSheet';
+import type { Supplement } from '../../nutrition/data/models';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
 import {
   isSleepEvent,
@@ -47,6 +54,7 @@ export function HomeTimeline({
   const today = health.today;
   const [selected, setSelected] = useState<TimelineEvent | null>(null);
   const [closing, setClosing] = useState(false);
+  const [vial, setVial] = useState<Supplement | null>(null);
   const pendingNavigation = useRef<(() => void) | null>(null);
   const state = useWorkoutResource({
     path: '/api/day-timeline',
@@ -157,8 +165,8 @@ export function HomeTimeline({
       });
     }
   }
-  events.sort((a, b) => b.timeMs - a.timeMs);
-  if (!events.length && !state.loading && !state.error && !selected) {
+  events = withLocalDoses(events, n.operations, today, health.timezone);
+  if (!events.length && !state.loading && !state.error && !selected && !vial) {
     return null;
   }
   function destination(event: TimelineEvent) {
@@ -175,6 +183,7 @@ export function HomeTimeline({
     if (event.type === 'workout') return { icon: 'workout', color: theme.colors.brand };
     if (event.type === 'walk') return { icon: 'legs', color: hues.walk };
     if (event.type === 'cardio') return { icon: 'cardio', color: theme.tones.recovery.foreground };
+    if (event.type === 'dose') return { icon: 'syringe', color: hues.sleep };
     return { icon: event.type === 'tag' ? 'info' : 'activity', color: theme.colors.muted };
   }
   const iconColors = { success: hues.ready, sleep: hues.sleep };
@@ -248,6 +257,15 @@ export function HomeTimeline({
                 last={index === events.length - 1}
                 tight={card.tight}
                 onPress={() => {
+                  // #2185: a dose opens its supplement's vial sheet, which has the weight response.
+                  const supplement =
+                    event.type === 'dose'
+                      ? n.data.supplements.find((row) => row.id === event.supplementId)
+                      : undefined;
+                  if (supplement) {
+                    setVial(supplement);
+                    return;
+                  }
                   pendingNavigation.current = null;
                   setClosing(false);
                   setSelected({
@@ -302,6 +320,7 @@ export function HomeTimeline({
           />
         )}
       </Sheet>
+      {vial && <VialSheet supplement={vial} onClose={() => setVial(null)} />}
     </Stack>
   );
 }
