@@ -98,13 +98,12 @@ describe.skipIf(!canRun)('cached zone minutes follow workouts written later, and
   })
 
   it('an outbox edit that moves a log to another date drops the day it left', async () => {
-    // No start time: an edit that moves a timed log's date conflicts on the natural-key index
-    // before this code runs (#3859), so the id-keyed branch is the one that can move a date today.
-    const log = await repo.saveActivityLog(USER, { date: day, activityType: 'other', title: 'Walk', durationMin: 40 })
+    // A timed log: before #3859 this move hit the primary key and never reached this code.
+    const log = await repo.saveActivityLog(USER, { date: day, activityType: 'other', title: 'Walk', startTime: '08:00', durationMin: 40 })
     await pool.query(
       `INSERT INTO daily_zone_minutes (user_id, day, zone2_sec, max_hr, resting_hr) VALUES ($1, $2, 1, 190, 60)`, [USER, day])
     await repo.saveActivityLog(USER, {
-      id: log.id, date: shift(day, -5), activityType: 'other', title: 'Walk', durationMin: 40,
+      id: log.id, date: shift(day, -5), activityType: 'other', title: 'Walk', startTime: '08:00', durationMin: 40,
     }, { overwrite: true })
     expect(await cachedRow(day)).toBeUndefined()
   })
