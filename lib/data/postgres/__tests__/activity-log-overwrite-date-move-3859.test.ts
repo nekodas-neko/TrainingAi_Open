@@ -26,7 +26,8 @@ describe.skipIf(!canRun)('outbox edit that moves a timed activity log to another
        FROM activity_logs WHERE user_id = $1 ORDER BY date, id`, [user],
   )).rows
   const cacheDays = async () => (await pool.query(
-    `SELECT day::text AS day FROM daily_zone_minutes WHERE user_id = $1 ORDER BY day`, [USER],
+    // The days still trusted: a drop marks a day stale (max_hr NULL, #3862) rather than deleting it.
+    `SELECT day::text AS day FROM daily_zone_minutes WHERE user_id = $1 AND max_hr IS NOT NULL ORDER BY day`, [USER],
   )).rows.map(r => r.day as string)
   const seedCache = async (...days: string[]) => {
     for (const d of days) {

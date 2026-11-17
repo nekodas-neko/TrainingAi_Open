@@ -2389,11 +2389,12 @@ export function zoneRetentionCutoff(today: string): string {
 type ZoneMarkerDb = Pick<Db, 'insert'>
 
 /** Mark these local days stale, for the next read to recompute. Skips any day past HR retention
- *  (#2828 N1: it could not be recomputed) and today and later (today is never cached). */
+ *  (#2828 N1: it could not be recomputed). Today is marked too, though a read never trusts it: a
+ *  row for it can exist after a timezone change, and must not be trusted once the day is past. */
 export async function markZoneMinutesStale(db: ZoneMarkerDb, userId: string, days: Iterable<string>, tz: string): Promise<void> {
   const today = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
   const cutoff = zoneRetentionCutoff(today)
-  const keep = [...new Set(days)].filter(d => d >= cutoff && d < today).sort()
+  const keep = [...new Set(days)].filter(d => d >= cutoff).sort()
   if (keep.length === 0) return
   // clock_timestamp(), not now(): inside a transaction now() is the transaction's start, and two
   // markers in one transaction must still differ from whatever a read loaded before it.
@@ -2406,21 +2407,20 @@ export async function markZoneMinutesStale(db: ZoneMarkerDb, userId: string, day
 }
 
 /** Mark cached daily_zone_minutes days for `userId` stale on/after `fromDay` (inclusive), up to
- *  yesterday. Called by the BLE rollup after it delete-and-reinserts oura_heartrate across its
+ *  today. Called by the BLE rollup after it delete-and-reinserts oura_heartrate across its
  *  window, and by the Health Connect and Oura Cloud HR writers, so those days are recomputed on the
  *  next read instead of serving the pre-rewrite (often partial) split forever (review J-1/C-5 — the
  *  owns-its-rows analogue of a cache-group invalidation).
  *
  *  Never reaches past HR retention (#2828 N1). A cached day older than `zoneRetentionCutoff` can't
  *  be recomputed because its raw HR is already pruned. A history import can start 3,650 days back,
- *  so `fromDay` is clamped here for every caller: at most 179 days are marked. */
+ *  so `fromDay` is clamped here for every caller: at most 180 days are marked. */
 export async function deleteZoneMinutesFrom(db: Db, userId: string, fromDay: string, tz: string): Promise<void> {
   const today = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
   const cutoff = zoneRetentionCutoff(today)
   const first = fromDay > cutoff ? fromDay : cutoff
-  const yesterday = shiftDateStr(today, -1)
-  if (first > yesterday) return
-  await markZoneMinutesStale(db, userId, eachDay(first, yesterday), tz)
+  if (first > today) return
+  await markZoneMinutesStale(db, userId, eachDay(first, today), tz)
 }
 
 // ── #3850: the workout and activity writers' half of the same invalidation ────────────────

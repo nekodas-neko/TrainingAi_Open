@@ -106,7 +106,7 @@ describe.skipIf(!canRun)('upsertAggregatorHeartrate', () => {
     const days = [3, 2, 1, 0].map(n => shiftDateStr(todayInTz(TZ), -n))
     for (const userId of [USER, OTHER]) {
       for (const day of days) {
-        await pool.query(`INSERT INTO daily_zone_minutes (user_id, day, zone2_sec) VALUES ($1, $2, 600)`, [userId, day])
+        await pool.query(`INSERT INTO daily_zone_minutes (user_id, day, zone2_sec, max_hr, resting_hr) VALUES ($1, $2, 600, 190, 60)`, [userId, day])
       }
     }
     await oura.upsertAggregatorHeartrate(db, USER, [
@@ -115,7 +115,8 @@ describe.skipIf(!canRun)('upsertAggregatorHeartrate', () => {
     ], 'health_connect', TZ)
 
     const left = async (userId: string) => (await pool.query<{ day: string }>(
-      `SELECT day::text AS day FROM daily_zone_minutes WHERE user_id = $1 ORDER BY day`, [userId])).rows.map(r => r.day)
+      // Still trusted: a drop marks a day stale (max_hr NULL, #3862) rather than deleting it.
+      `SELECT day::text AS day FROM daily_zone_minutes WHERE user_id = $1 AND max_hr IS NOT NULL ORDER BY day`, [userId])).rows.map(r => r.day)
     expect(await left(USER)).toEqual([days[0]])
     expect(await left(OTHER)).toEqual(days)
   })
