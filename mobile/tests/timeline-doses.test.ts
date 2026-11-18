@@ -107,3 +107,57 @@ test('a change older than yesterday leaves the timeline alone', () => {
     server,
   ]);
 });
+
+// #3863: once the upload is confirmed the op leaves the outbox; the local supplement log keeps the row.
+const logged = (o: Record<string, unknown> = {}) => ({
+  id: 'sup-1',
+  loggedToday: true,
+  loggedDose: {
+    amount: 2,
+    unit: 'mg',
+    takenAt: new Date(at(TODAY, '09:00')).toISOString(),
+  },
+  ...o,
+});
+
+test('#3863: a confirmed upload, offline, with no server row yet: the dose row stays', () => {
+  const ticked = withLocalDoses(
+    [],
+    [
+      tick({
+        amount: 2,
+        unit: 'mg',
+        takenAt: new Date(at(TODAY, '09:00')).toISOString(),
+      }),
+    ],
+    TODAY,
+    TZ,
+    [logged()],
+  );
+  // The op is confirmed and removed; the timeline refetch has not landed (offline).
+  const confirmed = withLocalDoses([], [], TODAY, TZ, [logged()]);
+  assert.equal(confirmed.length, 1);
+  assert.equal(confirmed[0]?.title, 'Dose · 2 mg');
+  assert.equal(confirmed[0]?.time, ticked[0]?.time);
+  assert.equal(confirmed[0]?.subtitle, undefined);
+});
+
+test('#3863: the server row wins over the local log, and a queued un-tick still removes it', () => {
+  assert.deepEqual(withLocalDoses([server], [], TODAY, TZ, [logged()]), [server]);
+  assert.deepEqual(withLocalDoses([server], [tick({ deleted: true })], TODAY, TZ, [logged()]), []);
+});
+
+test('#3863: an untaken, untimed or non-mg local log adds no row', () => {
+  const none = [
+    logged({ loggedToday: false }),
+    logged({ loggedDose: { amount: 2, unit: 'mg', takenAt: null } }),
+    logged({
+      loggedDose: {
+        amount: 1,
+        unit: 'capsules',
+        takenAt: new Date(at(TODAY, '09:00')).toISOString(),
+      },
+    }),
+  ];
+  for (const s of none) assert.deepEqual(withLocalDoses([], [], TODAY, TZ, [s]), []);
+});
