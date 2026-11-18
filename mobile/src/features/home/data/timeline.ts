@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
+import { doseTimelineText, isMilligramDosed } from '@trainingai/shared/nutrition/vial-plan';
 import { activeElapsedMs, type WorkoutRecord } from '../../workouts/logging/workout.ts';
 import { sleepWokeEnd } from '../../health/data/body-view.ts';
 import type { SleepRow } from '../../health/data/models.ts';
@@ -23,6 +24,9 @@ export const timelineEventSchema = z
     sleepScore: z.number().optional(),
     readinessScore: z.number().optional(),
     latencyMin: z.number().optional(),
+    // #2185: a dose row's supplement and the day it was logged against.
+    supplementId: z.string().optional(),
+    logDate: z.string().optional(),
   })
   .passthrough();
 export type TimelineEvent = z.infer<typeof timelineEventSchema>;
@@ -137,4 +141,88 @@ function formatLocalDate(at: number, timezone: string) {
   }).formatToParts(new Date(at));
   const value = (type: string) => parts.find((part) => part.type === type)!.value;
   return `${value('year')}-${value('month')}-${value('day')}`;
+}
+/** The part of a queued supplement tick the dose overlay reads (#2185). */
+export type DoseOperation = {
+  domain: string;
+  date: string;
+  payload: Record<string, unknown>;
+};
+/** The part of today's local supplement log the dose overlay reads (#3863). */
+export type LocalDose = {
+  id: string;
+  loggedToday?: boolean;
+  loggedDose?: { amount?: number | null; unit?: string | null; takenAt?: string | null } | null;
+};
+/**
+ * #2185 option A. A dose ticked on this phone and not yet synced is on the timeline at once, and
+ * an unsynced un-tick takes the server's row away; the latest queued change per supplement and day
+ * wins. A local row has no vial facts (the vial list is the server's), so it shows the title alone.
+ * Milligram-dosed only, as the route decides it.
+ *
+ * #3863: today's local supplement log is the base, so a dose stays once its upload is confirmed and
+ * leaves the outbox, while the timeline refetch is pending or the phone is offline. Queued changes
+ * still apply on top of it.
+ */
+export function withLocalDoses(
+  events: readonly TimelineEvent[],
+  operations: readonly DoseOperation[],
+  today: string,
+  timezone: string,
+  logged: readonly LocalDose[] = [],
+) {
+  const yesterday = shiftDateStr(today, -1);
+  const base: DoseOperation[] = logged.flatMap((s) =>
+    s.loggedToday && s.loggedDose
+      ? [
+          {
+            domain: 'supplement_logs',
+            date: today,
+            payload: { supplementId: s.id, logDate: today, ...s.loggedDose, local: true },
+          },
+        ]
+      : [],
+  );
+  const latest = new Map<string, DoseOperation>();
+  for (const op of [...base, ...operations]) {
+    const id = op.payload.supplementId;
+    if (op.domain !== 'supplement_logs' || typeof id !== 'string') continue;
+    if (op.date !== today && op.date !== yesterday) continue;
+    latest.set(id + ':' + op.date, op);
+  }
+  let rows = events.slice();
+  for (const op of latest.values()) {
+    const p = op.payload;
+    const supplementId = p.supplementId as string;
+    const isThis = (row: TimelineEvent) =>
+      row.type === 'dose' &&
+      row.supplementId === supplementId &&
+      (typeof row.logDate === 'string' ? row.logDate : row.date) === op.date;
+    const amount = typeof p.amount === 'number' && Number.isFinite(p.amount) ? p.amount : null;
+    const unit = typeof p.unit === 'string' ? p.unit : null;
+    const timeMs = typeof p.takenAt === 'string' ? Date.parse(p.takenAt) : NaN;
+    const dose =
+      !p.deleted && amount != null && isMilligramDosed({ unit }) && Number.isFinite(timeMs);
+    // The server already has this very tick: keep its row, which carries the vial line. For the
+    // settled local log, any server row for that supplement and day is the same dose.
+    if (dose && rows.some((row) => isThis(row) && (p.local === true || row.timeMs === timeMs)))
+      continue;
+    rows = rows.filter((row) => !isThis(row));
+    if (!dose) continue;
+    const date = formatLocalDate(timeMs, timezone);
+    if (date !== today && date !== yesterday) continue;
+    rows.push({
+      type: 'dose',
+      title: doseTimelineText({ amount, unit }, null).title,
+      timeMs,
+      time: formatTimeOfDay(timeMs, timezone),
+      day: date === today ? 'today' : 'yesterday',
+      date,
+      supplementId,
+      logDate: op.date,
+      // A settled local dose is already on the server; only a queued one is phone-only.
+      ...(p.local === true ? {} : { subtitle: 'Saved on this phone' }),
+    });
+  }
+  return rows.sort((a, b) => b.timeMs - a.timeMs);
 }

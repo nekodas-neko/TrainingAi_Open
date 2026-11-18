@@ -21,6 +21,8 @@ export async function deleteWorkoutSessionAndReconcile(
   const { deleted, exerciseNames } = await deleteWorkoutSession(userId, workoutSessionId)
   if (!deleted) return { deleted }
   const repo = await getRepository()
+  // #3850: the tombstone takes the session's window off the days it covered.
+  await repo.dropZoneMinutesForWorkoutSessions(userId, [workoutSessionId])
   for (const name of exerciseNames) {
     await repo.reconcilePersonalRecord(userId, name)
   }

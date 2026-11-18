@@ -118,12 +118,12 @@ export function ProfileOverview({
   });
   return (
     <>
-      <AppText variant="subheading">What the app has measured</AppText>
+      <AppText variant="subheading">What the app has recorded</AppText>
       <AppText variant="caption" tone="muted">
         The latest reading of each metric and when it was taken.
       </AppText>
       <StatusIndicator
-        label="Measured readings"
+        label="Recorded readings"
         busy={history.refreshing}
         error={history.error}
         onRetry={history.refresh}

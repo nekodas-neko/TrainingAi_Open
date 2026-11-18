@@ -79,8 +79,11 @@ const STRENGTH_FREQ_CURVE = [[0, 0], [0.34, 50], [0.67, 80], [1.0, 100], [1.5, 1
  * algorithm version), so a source that changes its algorithm restarts the zone lane's resting HR with
  * the HR zones and Body Battery. No day moves until a source sends a second version; stored v2 rows
  * stay as written.
+ * 2026-11-16 (#3775 item 3, signed by the owner): inside a workout or activity window a heart-rate gap
+ * counts up to 5½ min toward zone minutes, all-day time up to 2 (`creditedGapSec`). Stored v3 rows
+ * stay as written; the moved-day count is `scripts/tuning/activity-window-hr-gaps-3775.sql`.
  */
-export const ACTIVITY_MODEL_VERSION = 'v3:version-keyed-resting-hr:2026-11-04'
+export const ACTIVITY_MODEL_VERSION = 'v4:activity-window-hr-gaps:2026-11-16'
 
 /**
  * The Activity Score model in serialisable form — lane weights, the over-exertion taper constants

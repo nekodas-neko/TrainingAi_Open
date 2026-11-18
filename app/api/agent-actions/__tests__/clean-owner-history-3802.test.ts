@@ -379,6 +379,7 @@ describe.skipIf(!canRun)('clean-owner-history-3802 (#3802)', () => {
 
   it('a write changes exactly the spec\'s rows and counts what it wrote', async () => {
     const digests = await dryDigests()
+    const writeStart = new Date()
     const { status, body } = await post({ dryRun: false, digests }, { approval: APPROVAL })
     expect(status).toBe(200)
     expect(body.report.written).toEqual({
@@ -429,8 +430,23 @@ describe.skipIf(!canRun)('clean-owner-history-3802 (#3802)', () => {
     for (const id of ACTIVITY_IDS_3802) expect(al[id].deleted_at).not.toBeNull()
     expect(al[ids.actKept]).toMatchObject({ deleted_at: null, deleted_reason: null })
 
-    const zm = (await pool.query(`SELECT user_id, day::text AS day FROM daily_zone_minutes WHERE user_id = ANY($1) ORDER BY user_id, day`, [[OWNER, OTHER]])).rows
-    expect(zm).toEqual([{ user_id: OWNER, day: '2026-06-02' }, { user_id: OWNER, day: '2026-06-22' }, { user_id: OTHER, day: '2026-06-03' }])
+    const zm = (await pool.query(
+      `SELECT user_id, day::text AS day, computed_at >= $2 AS marked FROM daily_zone_minutes WHERE user_id = ANY($1) ORDER BY user_id, day`,
+      [[OWNER, OTHER], writeStart])).rows
+    // #3850: the job then drops the cached days its retimed and tombstoned rows covered. Since #3862 a
+    // drop marks the day stale (a fresh `computed_at`) rather than deleting it, so the non-zero 22 Jun
+    // row is marked while it is still inside HR retention; past it, it is left as it was. Every other
+    // row the job leaves is the seed's, untouched, and every marker is the owner's.
+    const { zoneRetentionCutoff } = await import('@/lib/data/postgres/slices/oura')
+    const { todayInTz } = await import('@trainingai/shared/date-utils')
+    const jun22Frozen = '2026-06-22' < zoneRetentionCutoff(todayInTz(STORED_TZ))
+    expect(zm.filter(r => !r.marked).map(({ user_id, day }) => ({ user_id, day }))).toEqual([
+      { user_id: OWNER, day: '2026-06-02' },
+      ...(jun22Frozen ? [{ user_id: OWNER, day: '2026-06-22' }] : []),
+      { user_id: OTHER, day: '2026-06-03' },
+    ])
+    expect(zm.filter(r => r.marked).every(r => r.user_id === OWNER)).toBe(true)
+    expect(zm.some(r => r.marked && r.day === '2026-06-22')).toBe(!jun22Frozen)
 
     // PRESS follows the best live log; SQUAT had none left.
     const pr = (await pool.query(`SELECT exercise_name, estimated_1rm FROM personal_records WHERE user_id = $1 ORDER BY exercise_name`, [OWNER])).rows
@@ -440,7 +456,9 @@ describe.skipIf(!canRun)('clean-owner-history-3802 (#3802)', () => {
   it('a second run finds nothing to do, and its write is refused', async () => {
     const zero = { '1': 0, '2': 0, '3a': 0, '3b': 0, '3c': 0, '4': 0, '5': 0 }
     const dry = await post({ dryRun: true })
-    expect(dry.body.report.counts).toEqual(zero)
+    // Group 5 counts all-zero rows in its window, which now includes the stale markers the first run's
+    // own drops left (#3862); every other group has nothing left.
+    expect({ ...dry.body.report.counts, '5': 0 }).toEqual(zero)
     expect(dry.body.report.matchesSpec).toBe(false)
     const before = await snapshot()
     const { status, body } = await post({ dryRun: false, digests: dry.body.report.digests }, { approval: APPROVAL })

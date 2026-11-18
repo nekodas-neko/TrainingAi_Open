@@ -31,9 +31,20 @@ export function dayTimelineKey(date: string): string {
  * screen needs so a PAST day can be opened, which is what TN-35's pass test requires.
  */
 export function useDayTimeline(date: string): { events: TimelineEvent[] } | null {
-  return useCachedValue<{ events: TimelineEvent[] }>(
+  const payload = useCachedValue<{ events: TimelineEvent[] }>(
     dayTimelineKey(date),
     `/api/day-timeline?date=${date}`,
     TTL_SHORT,
   ) ?? null
+  return payload ? { ...payload, events: currentAppTimelineEvents(payload.events) } : null
+}
+
+/**
+ * The events the current app draws. A dose row (#2185) is TrainingAi Preview's alone: the current app
+ * has no card for it, and its day screen would list the dose beside the stress level at that minute,
+ * which ties a dose to a figure (#2185: association, never attribution). The route sends it for
+ * Preview; the current app leaves it out.
+ */
+export function currentAppTimelineEvents(events: readonly TimelineEvent[]): TimelineEvent[] {
+  return events.filter(e => e.type !== 'dose')
 }

@@ -73,8 +73,11 @@ describe('clearLocalStoreData (Q-172)', () => {
     const src = read('lib/sign-out.ts')
     // #2453: clearAccountStorage after clearAllCache, so the cache's mirror keys are already gone and
     // the classified sweep takes the rest; before serverSignOut, which navigates away.
-    const order = ['clearLocalStoreData', 'clearAllCache', 'clearAccountStorage', 'serverSignOut']
-      .map(name => src.indexOf(`${name}(`, src.indexOf('export async function signOutAndClearDevice')))
+    // Issue 3854: the two async clears run bounded, and the server sign-out is the `serverAction`
+    // parameter (it defaults to `serverSignOut`).
+    expect(src).toContain('serverAction: () => Promise<void> = serverSignOut')
+    const order = ['bounded(clearLocalStoreData', 'bounded(clearAllCache', 'clearAccountStorage(', 'serverAction(']
+      .map(name => src.indexOf(name, src.indexOf('export async function signOutAndClearDevice')))
     expect(order[0]).toBeGreaterThan(-1)
     expect(order[1]).toBeGreaterThan(order[0])
     expect(order[2]).toBeGreaterThan(order[1])

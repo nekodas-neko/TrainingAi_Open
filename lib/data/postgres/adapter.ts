@@ -195,6 +195,10 @@ import { LBS_TO_KG } from '@trainingai/shared/workout/units'
 /** #3044. How long a Health Connect session is safe from a window sweep after it is stored. */
 const SWEEP_MIN_AGE_MS = 15 * 60_000
 
+/** The push domains whose writes can move a day's workout windows, so drop cached zone minutes
+ *  (#3850). A push holding any of them collects its drops into one write (#3862). */
+const ZONE_DROP_DOMAINS: ReadonlySet<string> = new Set(['activity_logs', 'complete_workout', 'workout_session_delete', 'exercise_log_delete'])
+
 interface LbsToKgLogRow {
   id: string
   exerciseName: string
@@ -1252,6 +1256,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         isNull(s.workoutSessions.completedAt),
       ))
       .returning({ id: s.workoutSessions.id })
+    // #3850: completing is what gives the session its heart-rate window, so a past day it falls on
+    // (a workout finished offline and synced later) recomputes its zone minutes.
+    if (rows.length > 0) await this.dropZoneMinutesForWorkoutSessions(userId, [workoutSessionId])
     return rows.length > 0
   }
 
@@ -2851,7 +2858,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rounded > 0 ? rounded : null
   }
 
-  async saveActivityLog(userId: string, log: Omit<ActivityLog, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { overwrite?: boolean }): Promise<ActivityLog> {
+  async saveActivityLog(userId: string, log: Omit<ActivityLog, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { overwrite?: boolean; tz?: string }): Promise<ActivityLog> {
     const { id, ...data } = log
     const caloriesBurned = data.caloriesBurned ?? await this.deriveActivityKcal(userId, data.activityType, data.durationMin ?? null)
     // Q-307: pace was read from the column and never derived, so it was absent on 32 of 39 logs
@@ -2888,6 +2895,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
 
     if (opts?.overwrite) {
+      // #3859: look the id up for any user, so another user's id is refused rather than
+      // falling through to an insert that dies on the primary key.
+      const [before] = id
+        ? await this.db.select({ userId: s.activityLogs.userId, date: s.activityLogs.date })
+            .from(s.activityLogs).where(eq(s.activityLogs.id, id)).limit(1)
+        : []
+      if (before && before.userId !== userId) throw new Error('Activity log not found')
       // Outbox replay: the user's own explicit save wins (last-write-wins), and the
       // updated_at bump makes the merge visible to getSyncDelta. activity_logs has two
       // unique constraints — the PK on `id` and a partial index on
@@ -2919,6 +2933,34 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         segments: values.segments,
         updatedAt: new Date(),
       }
+      if (before) {
+        // #3859: an edit to a row that already exists updates it by id. The natural-key upsert
+        // below found no conflict when the edit moved the date, so its insert hit the primary key
+        // and the mutation dead-lettered; and the id-keyed branch never set `date` at all, so an
+        // untimed date move silently stayed on the old day.
+        //
+        // Moving onto the minute of a DIFFERENT row of the user's is refused, not merged. Both
+        // rows have their own id, which devices and prescribed runs point at, so a merge would
+        // have to delete one of them; the natural-key merge further down is for a new id, where
+        // nothing is lost. Tombstones are included because the unique index covers them too.
+        if (data.startTime) {
+          const [clash] = await this.db.select({ id: s.activityLogs.id }).from(s.activityLogs)
+            .where(and(
+              eq(s.activityLogs.userId, userId),
+              eq(s.activityLogs.date, data.date),
+              eq(s.activityLogs.startTime, data.startTime),
+              ne(s.activityLogs.id, id!),
+            )).limit(1)
+          if (clash) throw new Error(`Another activity is already logged on ${data.date} at ${data.startTime}`)
+        }
+        const updated = await this.db.update(s.activityLogs)
+          .set({ ...set, date: values.date })
+          .where(and(eq(s.activityLogs.id, id!), eq(s.activityLogs.userId, userId)))
+          .returning()
+        if (updated.length !== 1) throw new Error('Activity log not found')
+        await this.dropZoneMinutesForActivityDates(userId, [before.date, updated[0].date], opts?.tz)
+        return this.rowToActivityLog(updated[0])
+      }
       const [r] = data.startTime
         ? await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
             target: [s.activityLogs.userId, s.activityLogs.date, s.activityLogs.startTime],
@@ -2945,6 +2987,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             set,
             setWhere: eq(s.activityLogs.userId, userId),
           }).returning()
+      await this.dropZoneMinutesForActivityDates(userId, [r?.date ?? data.date], opts?.tz)
       return this.rowToActivityLog(r)
     }
 
@@ -2954,6 +2997,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .values(values)
       .onConflictDoNothing()
       .returning()
+    // #3850: a log stored for a past day (a Health Connect or source import, or a late manual entry).
+    if (r) await this.dropZoneMinutesForActivityDates(userId, [r.date], opts?.tz)
 
     if (!r) {
       const [existing] = await this.db.select().from(s.activityLogs)
@@ -3181,7 +3226,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const rows = await this.db.update(s.activityLogs)
       .set({ deletedAt: new Date(), deletedReason: 'app', updatedAt: new Date() })
       .where(and(eq(s.activityLogs.id, id), eq(s.activityLogs.userId, userId)))
-      .returning({ id: s.activityLogs.id })
+      .returning({ id: s.activityLogs.id, date: s.activityLogs.date })
+    await this.dropZoneMinutesForActivityDates(userId, rows.map(r => r.date))
     return rows.length > 0
   }
 
@@ -3195,7 +3241,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // (every one from before the column) reads as an app delete and stays deleted. A different record
   // at the minute of a tombstoned Health Connect row takes the row over (see below).
   async upsertHealthConnectActivityLog(
-    userId: string, externalId: string, log: HealthConnectActivityLogInput,
+    userId: string, externalId: string, log: HealthConnectActivityLogInput, tz?: string,
   ): Promise<HealthConnectActivityLogOutcome> {
     const [existing] = await this.db.select().from(s.activityLogs)
       .where(and(
@@ -3223,7 +3269,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // stored without an id), which keeps it, or a concurrent sync that stored this record first.
         .onConflictDoNothing()
         .returning({ id: s.activityLogs.id })
-      if (r) return 'inserted'
+      // #3850 (and below): every outcome that stores or moves a Health Connect session drops the days it touches.
+      if (r) { await this.dropZoneMinutesForActivityDates(userId, [log.date], tz); return 'inserted' }
       // The `(user, date, start_time)` index covers tombstones. When Health Connect replaces a record
       // with a new one at the same minute, the sweep tombstones the old row, and the new record could
       // otherwise never be stored. It takes over that row instead. Only a tombstoned Health Connect
@@ -3239,6 +3286,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           isNotNull(s.activityLogs.deletedAt),
         ))
         .returning({ id: s.activityLogs.id })
+      if (taken.length) await this.dropZoneMinutesForActivityDates(userId, [log.date], tz)
       return taken.length ? 'inserted' : 'taken'
     }
     const distanceKm = log.distanceKm ?? existing.distanceKm
@@ -3278,6 +3326,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
     // No row: it was deleted between the read above and this write, and a delete wins.
     if (!updated.length) return 'deleted'
+    await this.dropZoneMinutesForActivityDates(userId, [existing.date, log.date], tz)
     return revive ? 'revived' : 'updated'
   }
 
@@ -3287,7 +3336,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // a row stored or changed in the last SWEEP_MIN_AGE_MS alone: a sync that read Health Connect just
   // before another stored a session must not sweep it.
   async tombstoneHealthConnectActivityLogs(
-    userId: string, scope: { ids: readonly string[] } | { from: string; to: string; keep: readonly string[] },
+    userId: string, scope: { ids: readonly string[] } | { from: string; to: string; keep: readonly string[] }, tz?: string,
   ): Promise<number> {
     if ('ids' in scope && scope.ids.length === 0) return 0
     const rows = await this.db.update(s.activityLogs)
@@ -3306,7 +3355,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               ...(scope.keep.length ? [notInArray(s.activityLogs.externalId, [...scope.keep])] : []),
             ]),
       ))
-      .returning({ id: s.activityLogs.id })
+      .returning({ id: s.activityLogs.id, date: s.activityLogs.date })
+    await this.dropZoneMinutesForActivityDates(userId, rows.map(r => r.date), tz)
     return rows.length
   }
 
@@ -5137,35 +5187,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async updateTrophyPins(userId: string, pins: string[] | null) { return social.updateTrophyPins(this.db, userId, pins) }
   async listSeasonsWithResults(userId: string) { return social.listSeasonsWithResults(this.db, userId) }
 
-  // ── AI Health Insights ────────────────────────────────────────────────────
-
-  async getAiHealthInsightWithHash(userId: string, section: string, date: string): Promise<{ insight: string; contextHash: string | null } | null> {
-    const [row] = await this.db.select({ insight: s.aiHealthInsights.insight, contextHash: s.aiHealthInsights.contextHash })
-      .from(s.aiHealthInsights)
-      .where(and(
-        eq(s.aiHealthInsights.userId, userId),
-        eq(s.aiHealthInsights.section, section),
-        eq(s.aiHealthInsights.date, date),
-      ))
-      .limit(1)
-    return row ?? null
-  }
-
-  /**
-   * Every insight already written for this user on this day, so one AI surface can see what another
-   * has said (Q-291). Ordered by section for a stable prompt — an unordered read would change the
-   * caller's context hash on row order alone and regenerate an unchanged insight.
-   */
-  async listAiHealthInsightsForDate(userId: string, date: string): Promise<{ section: string; insight: string }[]> {
-    return this.db.select({ section: s.aiHealthInsights.section, insight: s.aiHealthInsights.insight })
-      .from(s.aiHealthInsights)
-      .where(and(
-        eq(s.aiHealthInsights.userId, userId),
-        eq(s.aiHealthInsights.date, date),
-      ))
-      .orderBy(s.aiHealthInsights.section)
-  }
-
   /**
    * BF-41 / BF-2. One transaction: upsert the scan, then replace its region rows.
    *
@@ -5391,14 +5412,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       provider: r.provider,
       notes: r.notes,
     }
-  }
-
-  async deleteAiHealthInsight(userId: string, section: string): Promise<void> {
-    await this.db.delete(s.aiHealthInsights)
-      .where(and(
-        eq(s.aiHealthInsights.userId, userId),
-        eq(s.aiHealthInsights.section, section),
-      ))
   }
 
   // ── Sync ─────────────────────────────────────────────────────────────────
@@ -5915,6 +5928,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async pushMutations(userId: string, mutations: IncomingMutation[]): Promise<PushResult> {
+    // #3862 item 3: the zone-minutes drops of a whole push are written once at its end, instead of a
+    // timezone read and a write per changed workout or activity log. Only a push that can drop any.
+    if (!mutations.some(m => ZONE_DROP_DOMAINS.has(m.domain))) return this.pushMutationsUnbatched(userId, mutations)
+    let tz = DEFAULT_TZ
+    try {
+      tz = (await this.getUserById(userId))?.timezone ?? DEFAULT_TZ
+    } catch (err) {
+      console.error('[pushMutations] getUserById failed; defaulting timezone', err)
+    }
+    return oura.batchZoneMinutesDrops(this.db, userId, tz, () => this.pushMutationsUnbatched(userId, mutations, tz))
+  }
+
+  private async pushMutationsUnbatched(userId: string, mutations: IncomingMutation[], knownTz?: string): Promise<PushResult> {
     let processed = 0
     const errors: PushResult['errors'] = []
     // Q-485: values the server accepted the mutation for but silently discarded. Separate from
@@ -5925,12 +5951,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // Resolve the user's timezone once — used by the workout_log branch.
     // Non-fatal: a transient DB error here must not 500 the whole batch
     // before any mutation is even tried.
-    let userTz: string = DEFAULT_TZ
+    let userTz: string = knownTz ?? DEFAULT_TZ
     // `manual_sleep` needs it too: a typed night's date is its wake date in the user's timezone.
     // `body_metrics` needs it for the future-day guard below.
     // So does `mood_logs`: a check-in sent without its suggested list falls back to deriving one,
     // and that reads the day's recovery in the user's timezone (#3669 item 6).
-    if (mutations.some(m =>
+    if (knownTz === undefined && mutations.some(m =>
       m.domain === 'workout_log' || m.domain === 'manual_sleep' || m.domain === 'body_metrics' || m.domain === 'mood_logs')) {
       try {
         const user = await this.getUserById(userId)
@@ -8407,6 +8433,37 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   /**
+   * #2185 — the candidates for Home's dose rows: live MANUAL ticks in [from, to] that carry the
+   * time they were taken and an amount. The route keeps the milligram-dosed ones
+   * (`isMilligramDosed`, the rule the syringe control and the phone's own overlay use), so the
+   * phone and the server agree on which ticks are doses.
+   */
+  async listTimedDoses(userId: string, from: string, to: string) {
+    const rows = await this.db
+      .select({
+        supplementId: s.supplementLogs.supplementId, date: s.supplementLogs.logDate,
+        amount: s.supplementLogs.amount, unit: s.supplementLogs.unit, takenAt: s.supplementLogs.takenAt,
+      })
+      .from(s.supplementLogs)
+      .innerJoin(s.supplements, eq(s.supplements.id, s.supplementLogs.supplementId))
+      .where(and(
+        eq(s.supplementLogs.userId, userId),
+        eq(s.supplementLogs.source, 'manual'),
+        gte(s.supplementLogs.logDate, from),
+        lte(s.supplementLogs.logDate, to),
+        isNull(s.supplementLogs.deletedAt),
+        isNull(s.supplements.deletedAt),
+        isNotNull(s.supplementLogs.takenAt),
+        isNotNull(s.supplementLogs.amount),
+      ))
+      .orderBy(asc(s.supplementLogs.takenAt))
+    return rows.map(r => ({
+      supplementId: r.supplementId, date: r.date, amount: Number(r.amount), unit: r.unit,
+      takenAt: r.takenAt!.toISOString(),
+    }))
+  }
+
+  /**
    * #2184 — every live dose log of EVERY supplement in [from, to], plus the definitions that were
    * stopped in that span, for the maintenance recommendation's dose-change caveat. Unlike
    * `listDoseEvents` this is not vial-only and keeps null amounts: creatine through a meal and a
@@ -8609,6 +8666,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
   async dropZoneMinutesFrom(userId: string, fromDay: string, tz: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay, tz) }
+  async dropZoneMinutesForWorkoutSessions(userId: string, sessionIds: readonly string[], spans?: readonly { startedAt: Date; completedAt: Date | null }[], tz?: string) { return oura.deleteZoneMinutesForWorkoutSessions(this.db, userId, sessionIds, spans, tz) }
+  async dropZoneMinutesForActivityDates(userId: string, dates: readonly (string | null | undefined)[], tz?: string) { return oura.deleteZoneMinutesForActivityDates(this.db, userId, dates, tz) }
   async upsertHealthConnectIntervals(userId: string, rows: readonly import('../repository').HealthConnectIntervalRow[]) { return hcIntervals.upsertHealthConnectIntervals(this.db, userId, rows) }
   async getHealthConnectHistoryOldest(userId: string) { return hcHistory.getHealthConnectHistoryOldest(this.db, userId) }
   async advanceHealthConnectHistoryOldest(userId: string, date: string) { return hcHistory.advanceHealthConnectHistoryOldest(this.db, userId, date) }

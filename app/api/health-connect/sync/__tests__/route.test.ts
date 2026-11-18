@@ -154,8 +154,9 @@ it('#2843: an exercise session becomes an activity log keyed on its record id, a
     userId,
     'hc-gym',
     expect.objectContaining({ activityType: 'strength', title: 'Gym', startTime: '12:00', endTime: '12:45', durationMin: 45 }),
+    'Australia/Brisbane',
   );
-  expect(mocks.tombstone).toHaveBeenCalledWith(userId, { ids: ['hc-old'] });
+  expect(mocks.tombstone).toHaveBeenCalledWith(userId, { ids: ['hc-old'] }, 'Australia/Brisbane');
 });
 
 it('a replacement session at the same minute is stored after the old one is tombstoned, so it can take the row over', async () => {
@@ -169,8 +170,8 @@ it('a replacement session at the same minute is stored after the old one is tomb
   mocks.apply.mockResolvedValue({ accepted: 1, deleted: 1 });
   const response = await POST(request({ records: [replacement], deleted: ['hc-old'] }));
   expect(response.status).toBe(200);
-  expect(mocks.tombstone).toHaveBeenCalledWith(userId, { ids: ['hc-old'] });
-  expect(mocks.upsert).toHaveBeenCalledWith(userId, 'hc-new', expect.anything());
+  expect(mocks.tombstone).toHaveBeenCalledWith(userId, { ids: ['hc-old'] }, 'Australia/Brisbane');
+  expect(mocks.upsert).toHaveBeenCalledWith(userId, 'hc-new', expect.anything(), 'Australia/Brisbane');
   expect(mocks.tombstone.mock.invocationCallOrder[0]).toBeLessThan(mocks.upsert.mock.invocationCallOrder[0]);
 });
 

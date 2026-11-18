@@ -185,7 +185,7 @@ describe('sign-out itself is unchanged', () => {
     const src = readFileSync(join(__dirname, '..', 'sign-out.ts'), 'utf8')
     expect(src).not.toContain('sign-out-pending')
     // Nothing is kept across a sign-out: the sequence still ends in the all-but-device-settings clear.
-    expect(src).toContain('await clearLocalStoreData()')
+    expect(src).toContain('await bounded(clearLocalStoreData, SIGN_OUT_CLEAR_TIMEOUT_MS)')
     expect(src).toContain('clearAccountStorage()')
   })
 })

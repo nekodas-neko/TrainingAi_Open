@@ -42,7 +42,9 @@ export async function POST(req: NextRequest) {
   const endTime = deriveEndTime(startTime, durationMin, providedEndTime)
 
   const repo = await getRepository()
-  const activityLog = await repo.saveActivityLog(session.user.id, { ...body.data, endTime })
+  // The session's timezone saves the zone-minutes drop its own read of it (#3862).
+  const tz = session.user.timezone
+  const activityLog = await repo.saveActivityLog(session.user.id, { ...body.data, endTime }, tz ? { tz } : undefined)
   return NextResponse.json({ activityLog }, { status: 201 })
 }
 

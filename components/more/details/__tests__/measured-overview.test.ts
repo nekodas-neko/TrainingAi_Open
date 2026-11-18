@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { latestReading, readingGroups, METRIC_GROUPS, type MetricRow } from '../measured-overview'
+import { latestReading, readingGroups, METRIC_GROUPS, ESTIMATED_GROUP_TITLE, type MetricRow } from '../measured-overview'
 
 const rows: MetricRow[] = [
   { date: '2026-09-01', weightKg: 90.4, bodyFatPct: 22.1, steps: 8000, waistCm: null },
@@ -51,7 +51,7 @@ describe('readingGroups — BF-133', () => {
     expect(titles).toContain('Daily movement')
     // Nothing in `rows` carries a vital or a metabolic figure.
     expect(titles).not.toContain('Vitals')
-    expect(titles).not.toContain('Metabolism')
+    expect(titles).not.toContain(ESTIMATED_GROUP_TITLE)
   })
 
   it('drops the absent metrics inside a group it keeps', () => {
@@ -61,6 +61,16 @@ describe('readingGroups — BF-133', () => {
 
   it('returns nothing at all when there are no rows', () => {
     expect(readingGroups([])).toEqual([])
+  })
+
+  it('never lists a scale estimate under the measured body composition group (#3770)', () => {
+    const measured = METRIC_GROUPS.find(g => g.title === 'Body composition')!
+    expect(measured.specs.map(s => s.field)).toEqual(['weightKg', 'bodyFatPct'])
+    const estimated = METRIC_GROUPS.find(g => g.title === ESTIMATED_GROUP_TITLE)!
+    expect(estimated.specs.map(s => s.field)).toEqual([
+      'skeletalMusclePct', 'muscleMassKg', 'fatFreeMassKg', 'bodyWaterPct', 'boneMassKg',
+      'proteinPct', 'subcutaneousFatPct', 'visceralFatIndex', 'bmrKcal', 'metabolicAge',
+    ])
   })
 
   it('says which resting rate the scale one is, since the app holds two', () => {

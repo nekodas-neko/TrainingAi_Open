@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { signOutAndClearDevice } from "@/lib/sign-out";
 import { prepareSignOut, type PrepareSignOutResult, type SignOutSyncOutcome, type UnsentLine } from "@/lib/sign-out-pending";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 /**
  * Issue 2532, surface half. Owner decision (2026-10-07): sync first, then warn; nothing is discarded
@@ -53,7 +54,10 @@ export function useSignOutFlow(userId: string | undefined): {
     setPhase("signing-out");
     try {
       await signOutAndClearDevice();
-    } catch {
+    } catch (e) {
+      // The sign-out's redirect to /sign-in arrives as a rejection; it is the success path, so
+      // the button stays in its signing-out state until the page changes.
+      if (isRedirectError(e)) return;
       setPhase("idle");
     }
   }, []);

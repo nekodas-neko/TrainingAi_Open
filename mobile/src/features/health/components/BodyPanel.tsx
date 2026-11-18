@@ -96,7 +96,7 @@ export function BodyPanel({
         onLog={() => setLog('bodyFat')}
       />
       <LeanMassCard rows={rows} />
-      <ScaleCompositionCard rows={rows} />
+      <ScaleCompositionCard rows={rows} today={health.today} />
       <Grid columns={2}>
         <HealthMetricCard
           compact

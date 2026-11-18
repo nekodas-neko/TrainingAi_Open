@@ -80,7 +80,9 @@ export async function loadActivityDay(
     // The day's treadmill steps join its step count (#3134). Thrown for a finished day like the reads
     // above; today only loses the treadmill part.
     (async () => {
-      const logs = options.activityLogs ?? repo.listActivityLogs(userId, date, date)
+      // From the day before as well (#3775): an activity that started before midnight still covers
+      // this day's first minutes, as the live score reads it. Steps count only this date's logs.
+      const logs = options.activityLogs ?? repo.listActivityLogs(userId, shiftDateStr(date, -1), date)
       return finished ? logs : Promise.resolve(logs).catch(() => [])
     })(),
     // #2182: the same zone ceiling the live score uses.

@@ -49,12 +49,12 @@ describe('the moderate-intensity floor (TN-78)', () => {
     // 120 bpm sits between the moderate floor (106) and the Light floor (134): the exact effort
     // the WHO goal is about, and worth nothing before.
     const walk = [{ timestamp: t(0), bpm: 120 }, { timestamp: t(10), bpm: 120 }]
-    expect(activeMinutesFromReadings(walk, floors, 600)).toBe(10)
+    expect(activeMinutesFromReadings(walk, floors, { maxGapSec: 600 })).toBe(10)
   })
 
   it('credits moderate once and vigorous double', () => {
     const run = [{ timestamp: t(0), bpm: 150 }, { timestamp: t(10), bpm: 150 }]
-    expect(activeMinutesFromReadings(run, floors, 600)).toBe(20)
+    expect(activeMinutesFromReadings(run, floors, { maxGapSec: 600 })).toBe(20)
   })
 
   it('is inclusive at the floor and excludes the bpm below it', () => {

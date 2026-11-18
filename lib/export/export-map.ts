@@ -76,7 +76,6 @@ export const EXPORTED: Record<string, ExportScope> = {
   // ── Directly user-scoped ────────────────────────────────────────────────────
   activity_logs: { kind: 'user_id' },
   apple_health_samples: { kind: 'user_id' },
-  ai_health_insights: { kind: 'user_id' },
   body_battery_daily: { kind: 'user_id' },
   body_metrics: { kind: 'user_id' },
   coach_changes: { kind: 'user_id' },

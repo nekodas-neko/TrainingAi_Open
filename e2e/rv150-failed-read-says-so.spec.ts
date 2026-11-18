@@ -55,7 +55,7 @@ test('Profile details names both sections that failed rather than dropping them'
 
   // Both sections end in `return null` when they have nothing, so a failed load used to remove
   // them from the page entirely — the heading included, which is what made it unreportable.
-  for (const heading of ['What the app has measured', 'Tests and scans']) {
+  for (const heading of ['What the app has recorded', 'Tests and scans']) {
     await expect(page.getByRole('heading', { name: heading })).toBeVisible({ timeout: 30_000 })
   }
   await expect(page.getByText(/Couldn.t load your readings/)).toBeVisible()
@@ -67,7 +67,7 @@ test('a healthy cold start shows the real account, not the failure lines', async
   // a component that always rendered them would pass both tests above.
   await coldStart(page)
   await page.goto('/more/details')
-  await expect(page.getByRole('heading', { name: 'What the app has measured' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { name: 'What the app has recorded' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/Couldn.t load your readings/)).toHaveCount(0)
   await expect(page.getByText(/Couldn.t load your tests and scans/)).toHaveCount(0)
 })

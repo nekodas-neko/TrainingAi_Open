@@ -64,8 +64,6 @@ const repo = {
   getActiveProgram: async () => null,
   getDayCheckin: async () => null,
   listExerciseLibrary: async () => [],
-  getAiHealthInsightWithHash: async () => null,
-  listAiHealthInsightsForDate: async () => [],
   upsertAiHealthInsight: async () => {},
 }
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo }))

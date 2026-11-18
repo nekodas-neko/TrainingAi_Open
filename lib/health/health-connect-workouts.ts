@@ -26,10 +26,12 @@ const MAX_SESSION_MIN = 1_440
  *   stored is skipped, and anything else is saved first-write-wins.
  *
  * A reason for every session not stored goes into `rejected`; one bad session never costs the rest.
- * Returns how many swept sessions came back (#3309), for the route to report.
+ * Returns how many swept sessions came back (#3309), for the route to report. `tz` is the user's
+ * timezone, passed on so each stored session's zone-minutes drop skips its own read (#3862).
  */
 export async function storeHealthConnectWorkouts(
   repo: Repo, userId: string, sessions: readonly IncomingHealthConnectWorkout[], rejected: string[],
+  tz?: string,
 ): Promise<{ revived: number }> {
   let revived = 0
   if (!sessions.length) return { revived }
@@ -74,10 +76,10 @@ export async function storeHealthConnectWorkouts(
       caloriesBurned: s.caloriesBurned, avgHr: s.avgHr, maxHr: s.maxHr,
     }
     if (s.recordId) {
-      const outcome = await repo.upsertHealthConnectActivityLog(userId, s.recordId, log)
+      const outcome = await repo.upsertHealthConnectActivityLog(userId, s.recordId, log, tz)
       if (outcome === 'taken') rejected.push(`exercise ${s.date} ${s.startTime}: another session already holds this start time`)
       if (outcome === 'revived') revived++
-    } else await repo.saveActivityLog(userId, log)
+    } else await repo.saveActivityLog(userId, log, tz ? { tz } : undefined)
   }
   return { revived }
 }

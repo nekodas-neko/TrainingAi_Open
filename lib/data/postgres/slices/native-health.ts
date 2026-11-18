@@ -4,7 +4,7 @@ import { DEFAULT_TZ, shiftDateStr, todayInTz } from '@trainingai/shared/date-uti
 import { projectDeviceHealth } from '@trainingai/shared/health/device-health-projection';
 import { groupSleepPeriods } from '@trainingai/shared/health/sleep-night';
 import { HEALTH_IMPORT_MAX_INTERVAL_DAYS } from '@trainingai/shared/health/import-limits';
-import { HR_RETENTION_DAYS, dropObservedHrDayFor, settleNights } from './oura';
+import { HR_RETENTION_DAYS, dropObservedHrDayFor, markZoneMinutesStale, settleNights } from './oura';
 import { initialSourceMap, mergeSet, type SourceColumn } from '../../health-source';
 import type { getDb } from '../client';
 import * as s from '../schema';
@@ -278,17 +278,11 @@ export async function rebuildNativeHealth(
         });
 
     if (keys.length) {
+      // #3862: the shared stale marker, so a read racing this write can't cache the old split back,
+      // and the retention day is the zone cache's own (the partly pruned cutoff day is frozen).
+      await markZoneMinutesStale(tx, userId, keys, timezone);
       const recoverable = keys.filter((day) => day >= shiftDateStr(todayInTz(timezone), -HR_RETENTION_DAYS));
       if (recoverable.length) {
-        await tx
-          .update(s.dailyZoneMinutes)
-          .set({ maxHr: null })
-          .where(
-            and(
-              eq(s.dailyZoneMinutes.userId, userId),
-              inArray(s.dailyZoneMinutes.day, recoverable),
-            ),
-          );
         await tx
           .update(s.ouraDailyDerived)
           // #3163 review: the illness radar's fields are stored beside readiness from the same inputs
