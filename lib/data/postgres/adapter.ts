@@ -574,6 +574,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       fitnessGoal: (r.fitnessGoal as FitnessGoal | null) ?? undefined,
       lastGoalReviewAt: r.lastGoalReviewAt ?? undefined,
       sessionsValidFrom: r.sessionsValidFrom ?? null,
+      signInsValidFrom: r.signInsValidFrom ?? null,
     }
   }
 
@@ -647,6 +648,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
       if (prior?.passwordHash && r.id === prior.id && r.passwordHash === null) {
         await nativeRefreshTokens.revokeEveryNativeSignIn(x, r.id)
+        await authData.endSignInsBefore(x, r.id) // #3829: and its web sessions
       }
       if (user.oauthSub) {
         await x.insert(s.authIdentities).values({ userId: r.id, provider: 'google', subject: user.oauthSub, email }).onConflictDoNothing()
@@ -1065,7 +1067,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * the registrant owned the address (RV-192), Google just did. #3797: whoever signed in with that
    * password is signed out in the same transaction, so a sign-in the address's owner never made
    * cannot outlive the link. Every native sign-in is revoked (`revokeEveryNativeSignIn`). Web
-   * sessions are stateless cookies; the request making this link is the one that gets the next
+   * sessions are stateless cookies: `users.sign_ins_valid_from` is set to now (#3829), so a cookie
+   * signed in before the link is refused; the request making this link is the one that gets the next
    * cookie, and a first password then needs a sign-in no older than this link
    * (`app/api/user/password/route.ts`). When the password is kept (another method was linked
    * already), nobody is signed out.
@@ -1094,6 +1097,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       }
       if (before.passwordHash !== null && rows[0].passwordHash === null) {
         await nativeRefreshTokens.revokeEveryNativeSignIn(x, userId)
+        // #3829: and its web sessions, which are stateless cookies: refused from here on by their
+        // `signedInAt`. The sign-in making this link is stamped after it and keeps its session.
+        await authData.endSignInsBefore(x, userId)
       }
       const linked = await x.insert(s.authIdentities)
         .values({ userId, provider: 'google', subject: oauthSub, email: rows[0].email })

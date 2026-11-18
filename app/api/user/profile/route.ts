@@ -34,8 +34,9 @@ export async function GET() {
   const userWithHash = await repo.getUserCredentials(session.user.id)
   if (!userWithHash) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // `sessionsValidFrom` is the server's own cutoff (the client reads `/api/account/data-epoch`); it is not sent (#3435).
-  const { passwordHash, sessionsValidFrom: _cutoff, ...user } = userWithHash
+  // `sessionsValidFrom` and `signInsValidFrom` are the server's own cutoffs (the client reads
+  // `/api/account/data-epoch`); neither is sent (#3435, #3829).
+  const { passwordHash, sessionsValidFrom: _cutoff, signInsValidFrom: _signInCutoff, ...user } = userWithHash
   return NextResponse.json(
     { user, hasPassword: !!passwordHash, signInProviders: await repo.getUserProviders(user.id) },
     { headers: { "Cache-Control": "private, no-store" } },
@@ -73,6 +74,6 @@ export async function PATCH(req: NextRequest) {
   }
 
   const repo = await getRepository()
-  const { sessionsValidFrom: _cutoff, ...user } = await repo.updateUserProfile(session.user.id, patch)
+  const { sessionsValidFrom: _cutoff, signInsValidFrom: _signInCutoff, ...user } = await repo.updateUserProfile(session.user.id, patch)
   return NextResponse.json({ user })
 }

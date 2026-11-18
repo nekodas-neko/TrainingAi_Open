@@ -62,6 +62,10 @@ export const users = pgTable('users', {
    *  which Auth.js re-issues as a cookie ages) is earlier than this is refused. NULL = no cut-off. An
    *  admin's "reset data" sets it, so a device still holding the old rows cannot push them back. */
   sessionsValidFrom: timestamp('sessions_valid_from', { withTimezone: true }),
+  /** #3829: a session or native access token signed in (`signedInAt`) before this is refused, and
+   *  nothing else: unlike `sessionsValidFrom` it is not the data epoch, so no device wipes its store.
+   *  Set when a Google link clears the password. NULL = no cut-off. */
+  signInsValidFrom: timestamp('sign_ins_valid_from', { withTimezone: true }),
 })
 
 export const authIdentities = pgTable('auth_identities', {

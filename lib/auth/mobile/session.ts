@@ -149,6 +149,16 @@ export async function rotateNativeSession(rawRefreshToken: string): Promise<Nati
   if (user.sessionsValidFrom && stored.createdAt.getTime() < user.sessionsValidFrom.getTime()) {
     return { ok: false, reason: 'invalid' };
   }
+  // #3829, the same for the sign-in cut-off: the link that sets it revokes every refresh token in the
+  // same transaction, so this only catches a row that raced it. Compared in whole seconds with the
+  // cut-off floored, as `signedInBeforeCutoff` does: the row's time is the database clock and the
+  // cut-off the app's, and a token issued in the same second as the link (an Apple link onto a
+  // pending account) must not be refused for a few milliseconds of skew. Fails closed on an invalid
+  // date.
+  if (user.signInsValidFrom
+    && !(Math.floor(stored.createdAt.getTime() / 1000) >= Math.floor(user.signInsValidFrom.getTime() / 1000))) {
+    return { ok: false, reason: 'invalid' };
+  }
   const next = newRefreshToken();
   if (stored.rotatedAt) {
     const regranted = await repo.regrantNativeRefreshToken({

@@ -8,6 +8,25 @@ import type { AuthProvider } from '@/lib/auth/identity'
 
 type Db = ReturnType<typeof getDb>
 
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
+
+/**
+ * #3829: end every sign-in of the account made before `at`, web cookies included, without touching
+ * the data epoch (`sessions_valid_from`), so no device wipes its store. Compared with each token's
+ * `signedInAt` in `refreshIsActiveClaim`. `at` is the app server's clock, not the database's: the
+ * sign-in making the link is stamped by this server right after, and must land at or after it.
+ * The cut-off only moves forward (GREATEST ignores the NULL of an account that has none), so a later
+ * caller (a "sign out everywhere") can share the column. Throws unless exactly one row was set, so
+ * the caller's transaction rolls back rather than link with the old sign-ins still valid.
+ */
+export async function endSignInsBefore(tx: Tx | Db, userId: string, at: Date = new Date()): Promise<void> {
+  const rows = await tx.update(users)
+    .set({ signInsValidFrom: sql`GREATEST(${users.signInsValidFrom}, ${at.toISOString()}::timestamptz)` })
+    .where(eq(users.id, userId))
+    .returning({ id: users.id })
+  if (rows.length !== 1) throw new Error('sign-in cut-off was not recorded')
+}
+
 export async function getUserByProvider(db: Db, provider: AuthProvider, subject: string) {
   const [row] = await db.select({ user: users }).from(authIdentities)
     .innerJoin(users, eq(authIdentities.userId, users.id))
@@ -81,7 +100,10 @@ export async function createProviderUser(db: Db, provider: AuthProvider, subject
       // (`linkOAuthAccount`). Only an inactive account reaches here, and an inactive account is not
       // issued or rotated native sign-ins, so the user row is locked before the families without
       // the deadlock the Google link orders against.
-      if (hadPassword) await revokeEveryNativeSignIn(x, user.id)
+      if (hadPassword) {
+        await revokeEveryNativeSignIn(x, user.id)
+        await endSignInsBefore(x, user.id) // #3829: and its web sessions
+      }
     }
     await x.insert(authIdentities).values({ userId: user.id, provider, subject, email: normalized })
     return user
