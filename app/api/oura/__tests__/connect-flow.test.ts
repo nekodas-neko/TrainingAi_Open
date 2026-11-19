@@ -250,6 +250,16 @@ describe('Oura connect routes (#2858)', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('Oura refusing a permission (#3873) returns "failed", not "denied", and logs the code', async () => {
+    const { url, cookie } = await startAndOpen('android')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await callback(callbackReq({ error: 'invalid_scope', state: url.searchParams.get('ticket')! }, cookie))
+    expect(res.headers.get('location')).toBe('com.trainingai.app:/oura/callback?oura=error&reason=failed')
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(log).toHaveBeenCalledWith('[oura] connect refused by Oura:', 'invalid_scope')
+    log.mockRestore()
+  })
+
   it('a deactivated account connects nothing', async () => {
     const { ticket, nonce } = await createConnectTicket(USER, 'web')
     user.isActive = false
