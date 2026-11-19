@@ -354,6 +354,64 @@ describe('GET /api/workout-data — the two deload entry points converge (Q-175)
   })
 })
 
+// #3876: a deload ends at generation (owner, 19 Nov: by itself after its two sessions). The read path
+// regenerated only a consumed or aged-out slot, so an unexpired deload plan, or the floor's offer to
+// move out, was served as it was and the type trained another deload. Through the route, not by
+// calling generation.
+describe('GET /api/workout-data — a deload that has done its two sessions (#3876)', () => {
+  beforeEach(() => { getActiveProgram.mockResolvedValue(program({ phaseMode: 'ai_dynamic' })) })
+  const deloadPlan = (over: Row = {}) => prescription({
+    phase: 'deload', deload: true,
+    exercises: [{ sessionExerciseId: SQUAT, name: 'Squat', sets: 2, reps: 5, pct: 55, restSec: 120, deloaded: true }],
+    ...over,
+  })
+
+  it.each([
+    ['an unexpired deload plan', deloadPlan()],
+    ['the floor\'s offer to move out', deloadPlan({ phase: 'accumulation', phaseAction: 'transition_recommended', typeOnlyMove: true })],
+  ])('regenerates %s instead of serving it', async (_label, plan) => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      phase: 'deload', sessionsInPhase: 2, prescriptionStatus: 'pending', prescription: plan,
+    }))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(body.aiPrescriptionPending).toBe(true)
+    expect(buildOptsFor()!.aiDrivesLoad).toBe(false)
+    expect(regeneratePrescriptionSingleFlight).toHaveBeenCalledTimes(1)
+  })
+
+  it('also when the day\'s inputs were already re-evaluated (the fingerprint skip)', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      phase: 'deload', sessionsInPhase: 2, prescriptionStatus: 'accepted',
+      prescription: deloadPlan({ reevaluatedInputsKey: `${todayInTz('Australia/Brisbane')}|none|none|none` }),
+    }))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(body.aiPrescriptionPending).toBe(true)
+    expect(regeneratePrescriptionSingleFlight).toHaveBeenCalledTimes(1)
+  })
+
+  it('a poll reports it without firing generation', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      phase: 'deload', sessionsInPhase: 2, prescriptionStatus: 'pending', prescription: deloadPlan(),
+    }))
+    const body = await (await get('?tab=' + SESSION_ID + '&poll=1')).json()
+    expect(body.aiPrescriptionPending).toBe(true)
+    expect(regeneratePrescriptionSingleFlight).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['one deload session done', { sessionsInPhase: 1, prescription: deloadPlan() }],
+    // Generation already ran the exit at this count (an aligned program's deload short of its cap
+    // stays), so regenerating again would only repeat it on every read.
+    ['a plan made at this count', { sessionsInPhase: 2, prescription: deloadPlan({ sessionsInPhaseAtPlan: 2 }) }],
+  ])('serves the plan: %s', async (_label, over) => {
+    getSessionPeriodization.mockResolvedValue(periodization({ phase: 'deload', prescriptionStatus: 'pending', ...over }))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(body.aiPrescriptionPending).toBe(false)
+    expect(buildOptsFor()!.aiDrivesLoad).toBe(true)
+    expect(regeneratePrescriptionSingleFlight).not.toHaveBeenCalled()
+  })
+})
+
 describe('GET /api/workout-data — what drives the bar', () => {
   beforeEach(() => { getActiveProgram.mockResolvedValue(program({ phaseMode: 'ai_dynamic' })) })
 

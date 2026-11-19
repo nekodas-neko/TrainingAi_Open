@@ -207,6 +207,25 @@ describe('logExerciseFromPayload — a deload overridden to full weight (#3877)'
     expect(createWorkoutSession).toHaveBeenCalledWith('u1', 'ps-1', 'Push', expect.any(Date), undefined, undefined, false)
   })
 
+  // The three payload shapes that reach the server for an override to full weight: native sends
+  // `'full'`, the WebView omits the field (it sends `intensityMode` only for a deload), and an outbox
+  // replay of a full session carries null.
+  it.each([
+    ['native: intensityMode full', { intensityMode: 'full' as const }],
+    ['web: intensityMode omitted', {}],
+    ['outbox replay: intensityMode null', { intensityMode: null }],
+  ])('an override to full weight keeps its 1RM — %s', async (_label, mode) => {
+    const result = await logExerciseFromPayload('u1', { ...basePayload, ...mode, wasOverride: true } as never, TZ)
+    expect(result.estimated1rm).toBeGreaterThan(0)
+    expect(result.isPR).toBe(true)
+  })
+
+  it('no override and no mode (the web\'s plain deload session) is still the phase\'s deload', async () => {
+    const result = await logExerciseFromPayload('u1', { ...basePayload }, TZ)
+    expect(result.estimated1rm).toBe(0)
+    expect(result.isPR).toBe(false)
+  })
+
   it('full weight without an override (the plan itself) is still the phase\'s deload', async () => {
     const result = await logExerciseFromPayload('u1', { ...basePayload, intensityMode: 'full', wasOverride: false }, TZ)
     expect(result.estimated1rm).toBe(0)

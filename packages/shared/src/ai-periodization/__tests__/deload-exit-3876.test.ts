@@ -16,6 +16,7 @@ import type { PrescriptionSignals } from '../signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { planSwitchOver, programMoveMark, switchOverWait, type PhaseRow, type ProgramCompletion } from '../program-phase'
 import { deloadExitPhase, isDeloadPlan, typeDeloadFinished, DELOAD_FLOOR } from '../phase-guards'
+import { isAiPrescriptionPending } from '../prescription-pending'
 
 const mocks = vi.hoisted(() => ({ signals: null as unknown, modelAnswer: null as unknown }))
 vi.mock('../signals', async importOriginal => ({
@@ -26,7 +27,7 @@ vi.mock('@/lib/ai/instrument', () => ({
   aiModel: () => ({}),
   loggedGenerateObject: async () => ({ object: structuredClone(mocks.modelAnswer) }),
 }))
-const { generatePrescriptionForSession } = await import('../generate-prescription')
+const { generatePrescriptionForSession, buildProgramAsWrittenPrescription } = await import('../generate-prescription')
 
 const TZ = 'Australia/Brisbane'
 const at = (local: string) => new Date(`${local}+10:00`)
@@ -178,7 +179,10 @@ type Slot = SessionPeriodization
  * was entered from, `setProgramPhase` refuses a program move on a program that has not switched,
  * and `storePrescription` stores only into the phase and start the plan was made for.
  */
-function memoryProgram(initial: PhaseRow[], completions: ProgramCompletion[], pre: Record<string, PeriodizationPhase | null> = {}) {
+function memoryProgram(
+  initial: PhaseRow[], completions: ProgramCompletion[], pre: Record<string, PeriodizationPhase | null> = {},
+  opts: { failStore?: boolean } = {},
+) {
   let rows: Slot[] = initial.map(r => ({
     ...r, prescription: null, prescriptionStatus: 'consumed', prescriptionExpiresAt: null, prescriptionGeneratedAt: null,
     preEmergencyDeloadPhase: pre[r.programSessionId] ?? null,
@@ -207,7 +211,9 @@ function memoryProgram(initial: PhaseRow[], completions: ProgramCompletion[], pr
       if (expect && expect !== 'switch-over'
         && !rowsPhased.every(r => r.phase === expect.phase && r.phaseStartedAt.getTime() === expect.phaseStartedAt.getTime())) return false
       const mark = programMoveMark(phase, pending)
-      rows = rows.map(r => (phased(r) ? { ...r, phase, phaseStartedAt: startedAt, pendingTransition: mark, prescription: null } : r))
+      rows = rows.map(r => (phased(r)
+        ? { ...r, phase, phaseStartedAt: startedAt, sessionsInPhase: 0, pendingTransition: mark, prescription: null, prescriptionStatus: 'consumed' } as Slot
+        : r))
       return true
     },
     setProgramPendingTransition: async (_u: string, _p: string, decide: (r: Slot[]) => PendingTransition | null) => {
@@ -228,12 +234,28 @@ function memoryProgram(initial: PhaseRow[], completions: ProgramCompletion[], pr
         : r))
       return { ...find(id) }
     },
+    // The slice's conditional exit: moves the row only while it is the deload that started then, and
+    // leaves the slot 'consumed'.
+    exitDeload: async (_u: string, id: string, phase: PeriodizationPhase, deloadStartedAt: Date) => {
+      const r = find(id)
+      if (r.phase !== 'deload' || r.phaseStartedAt.getTime() !== deloadStartedAt.getTime()) return false
+      typeMoves.push([id, phase])
+      rows = rows.map(x => (x.programSessionId === id
+        ? {
+            ...x, phase, phaseStartedAt: new Date(), sessionsInPhase: 0,
+            pendingTransition: x.pendingTransition?.switchOverPending ? x.pendingTransition : null,
+            preEmergencyDeloadPhase: null, prescription: null, prescriptionStatus: 'consumed',
+          } as Slot
+        : x))
+      return true
+    },
     advanceProgramPhase: async (_u: string, id: string, phase: PeriodizationPhase, expected?: { phase: string; phaseStartedAt: Date }) => {
       programMoves.push([id, phase])
       await (known.setProgramPhase as (...a: unknown[]) => Promise<boolean>)('u', 'prog', phase, new Date(), null, { expect: expected })
       return { ...find(id) }
     },
     storePrescription: async (_u: string, id: string, prescription: AiPrescription, _e: Date, status: string, generatedFor?: { phase: string; phaseStartedAt: Date }) => {
+      if (opts.failStore) throw new Error('connection lost')
       const r = find(id)
       if (generatedFor && (r.phase !== generatedFor.phase || r.phaseStartedAt.getTime() !== generatedFor.phaseStartedAt.getTime())) return false
       stored.push({ id, prescription, status })
@@ -295,18 +317,58 @@ describe('a deload ends by itself after its two sessions (#3876, owner 19 Nov)',
     expect(r.ok && r.prescription.phase).toBe('intensification')
   })
 
-  it('an aligned program\'s deload is left to the program\'s rules', async () => {
+  // #3876 after the switch-over: the owner's decision holds once the program is aligned too. The
+  // program's deload ends at its cap (1 training week) by itself, with auto-apply off, and the plan is
+  // made in accumulation. It used to be offered (ceiling-forced), which never auto-applies.
+  it('an aligned program\'s deload ends by itself at its cap, with auto-apply off', async () => {
     const mark = programMoveMark('deload')
     const start = at('2026-11-09T00:00:00')
     const p = memoryProgram(
       [row('a', 'deload', start, 2, { pendingTransition: mark }), row('b', 'deload', start, 2, { pendingTransition: mark })],
       [done('a', '2026-11-10T12:00:00'), done('a', '2026-11-12T12:00:00'), done('b', '2026-11-11T12:00:00'), done('b', '2026-11-13T12:00:00')],
     )
-    mocks.modelAnswer = stayAnswer('deload')
+    mocks.modelAnswer = stayAnswer('accumulation')
     const r = await p.plan('b')
     expect(p.typeMoves).toEqual([])
-    // The program's cap (1 training week of deload) offers the move instead.
-    expect(r.ok && r.prescription.phaseAction).toBe('transition_recommended')
+    expect(p.programMoves).toEqual([['b', 'accumulation']])
+    expect(p.row('a').phase).toBe('accumulation')
+    expect(p.row('b').phase).toBe('accumulation')
+    expect(r.ok && r.prescription.phase).toBe('accumulation')
+    expect(r.ok && r.prescription.phaseAction).toBe('stay')
+    expect(r.ok && r.prescription.deload).toBe(false)
+  })
+
+  it('an aligned program\'s deload short of its cap stays, and its plan is not a move', async () => {
+    const mark = programMoveMark('deload')
+    const start = at('2026-11-16T00:00:00')
+    const p = memoryProgram(
+      [row('a', 'deload', start, 2, { pendingTransition: mark }), row('b', 'deload', start, 2, { pendingTransition: mark })],
+      [done('a', '2026-11-17T12:00:00'), done('a', '2026-11-19T12:00:00'), done('b', '2026-11-18T12:00:00'), done('b', '2026-11-19T13:00:00')],
+    )
+    mocks.modelAnswer = stayAnswer('deload')
+    const r = await p.plan('b')
+    expect(p.programMoves).toEqual([])
+    expect(p.row('b').phase).toBe('deload')
+    expect(r.ok && r.prescription.phaseAction).toBe('stay')
+    // Stamped with the count it was made at, so workout-data does not regenerate it again.
+    expect(p.stored.at(-1)?.prescription.sessionsInPhaseAtPlan).toBe(2)
+  })
+
+  it('two generations of a finished deload at once: one exit, and both plans store', async () => {
+    const p = memoryProgram(productionRows(legacyStamp('2026-11-23')), productionHistory())
+    const [r1, r2] = await Promise.all([p.plan('b'), p.plan('b')])
+    expect(p.typeMoves).toEqual([['b', 'accumulation']])
+    expect(r1.ok && r2.ok).toBe(true)
+    expect(p.row('b').phase).toBe('accumulation')
+    expect(p.row('b').prescription?.phase).toBe('accumulation')
+  })
+
+  it('a generation that fails after the exit leaves a consumed slot, which the next open refills', async () => {
+    const p = memoryProgram(productionRows(legacyStamp('2026-11-23')), productionHistory(), {}, { failStore: true })
+    await expect(p.plan('b')).rejects.toThrow('connection lost')
+    expect(p.typeMoves).toEqual([['b', 'accumulation']])
+    expect(p.row('b')).toMatchObject({ phase: 'accumulation', prescription: null, prescriptionStatus: 'consumed' })
+    expect(isAiPrescriptionPending(p.row('b'), { isAiDynamic: true, isBaselinePhase: false })).toBe(true)
   })
 })
 
@@ -332,6 +394,13 @@ describe('generation, #3877', () => {
     const r = await p.plan('c')
     expect(r.ok && r.prescription.deload).toBe(false)
     expect(p.stored.at(-1)?.prescription.deload).toBe(false)
+  })
+
+  // The rules path works its flag out the same way: the program-as-written plan in a deload phase
+  // (the shadow's rules plan, `Full`'s revert) said `deload: false`.
+  it('the program-as-written plan is a deload in a deload phase, and only there', () => {
+    expect(buildProgramAsWrittenPrescription(signals({ phase: 'deload' }), '')?.deload).toBe(true)
+    expect(buildProgramAsWrittenPrescription(signals({ phase: 'accumulation' }), '')?.deload).toBe(false)
   })
 
   it('a plan in a deload phase is a deload even when the model says it is not', async () => {

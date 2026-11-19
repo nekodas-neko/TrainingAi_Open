@@ -148,6 +148,88 @@ describe.skipIf(!canRun)('batch 251: records keep the plausibility check, the ye
     })
   })
 
+  describe('#3878: the 1RM history keeps the plausibility check', () => {
+    it('an implausible stored estimate is not a point of the trend', async () => {
+      const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
+      await log('Plaus Trend', IMPLAUSIBLE, day(10))
+      await log('Plaus Trend', 100, day(5))
+      const history = await repo.getExercise1rmHistory(USER, ['Plaus Trend'], TZ)
+      expect(history['Plaus Trend'].map(p => p.rm)).toEqual([100])
+    })
+  })
+
+  describe('#3876: the end of a finished deload', () => {
+    async function deloadRow(): Promise<{ id: string; programId: string; startedAt: Date }> {
+      const prog = await pool.query(`INSERT INTO programs (user_id, name, phase_mode) VALUES ($1, 'Batch 251 exit', 'ai_dynamic') RETURNING id`, [USER])
+      const ps = await pool.query(`INSERT INTO program_sessions (program_id, name, position) VALUES ($1, 'Type B', 0) RETURNING id`, [prog.rows[0].id])
+      const stamp = { newPhase: 'accumulation', reasoning: 'wait', urgency: 'normal', switchOverPending: true, switchOverOn: '2026-11-23' }
+      const startedAt = new Date('2026-11-08T02:00:00.123Z')
+      await pool.query(
+        `INSERT INTO session_periodization (user_id, program_session_id, phase, phase_started_at, sessions_in_phase, baseline_complete,
+           pending_transition, pre_emergency_deload_phase, prescription, prescription_status)
+         VALUES ($1, $2, 'deload', $3, 2, true, $4, 'intensification', $5, 'pending')`,
+        [USER, ps.rows[0].id, startedAt.toISOString(), JSON.stringify(stamp), JSON.stringify({ phase: 'deload', phaseAction: 'stay', exercises: [] })],
+      )
+      return { id: ps.rows[0].id, programId: prog.rows[0].id, startedAt }
+    }
+
+    it('two exits of the same deload at once: one moves it, the other writes nothing', async () => {
+      const { getDb } = await import('@/lib/data/postgres/client')
+      const period = await import('@/lib/data/postgres/slices/periodization')
+      const db = getDb()
+      const r = await deloadRow()
+      try {
+        const results = await Promise.all([
+          period.exitDeload(db, USER, r.id, 'intensification', r.startedAt),
+          period.exitDeload(db, USER, r.id, 'intensification', r.startedAt),
+        ])
+        expect(results.filter(Boolean)).toHaveLength(1)
+        const after = await period.getSessionPeriodization(db, USER, r.id)
+        expect(after?.phase).toBe('intensification')
+        const firstStart = after!.phaseStartedAt.getTime()
+        // A third, late exit with the deload's old start is a no-op too: the new block is not restarted.
+        expect(await period.exitDeload(db, USER, r.id, 'intensification', r.startedAt)).toBe(false)
+        expect((await period.getSessionPeriodization(db, USER, r.id))?.phaseStartedAt.getTime()).toBe(firstStart)
+      } finally {
+        await pool.query('DELETE FROM programs WHERE id = $1', [r.programId])
+      }
+    })
+
+    it('leaves the slot consumed with no plan, so a failure after it is refilled; the waiting stamp stays', async () => {
+      const { getDb } = await import('@/lib/data/postgres/client')
+      const period = await import('@/lib/data/postgres/slices/periodization')
+      const { isAiPrescriptionPending } = await import('@trainingai/shared/ai-periodization/prescription-pending')
+      const db = getDb()
+      const r = await deloadRow()
+      try {
+        expect(await period.exitDeload(db, USER, r.id, 'intensification', r.startedAt)).toBe(true)
+        // Nothing else runs: this is the row a generation that failed after the exit leaves.
+        const after = await period.getSessionPeriodization(db, USER, r.id)
+        expect(after).toMatchObject({
+          phase: 'intensification', sessionsInPhase: 0, prescription: null, prescriptionStatus: 'consumed',
+          preEmergencyDeloadPhase: null,
+        })
+        expect(after?.pendingTransition).toMatchObject({ switchOverPending: true, switchOverOn: '2026-11-23' })
+        expect(isAiPrescriptionPending(after, { isAiDynamic: true, isBaselinePhase: false })).toBe(true)
+      } finally {
+        await pool.query('DELETE FROM programs WHERE id = $1', [r.programId])
+      }
+    })
+
+    it('a row no longer in that deload is left alone', async () => {
+      const { getDb } = await import('@/lib/data/postgres/client')
+      const period = await import('@/lib/data/postgres/slices/periodization')
+      const db = getDb()
+      const r = await deloadRow()
+      try {
+        expect(await period.exitDeload(db, USER, r.id, 'accumulation', new Date('2026-11-01T00:00:00Z'))).toBe(false)
+        expect((await period.getSessionPeriodization(db, USER, r.id))).toMatchObject({ phase: 'deload', prescriptionStatus: 'pending' })
+      } finally {
+        await pool.query('DELETE FROM programs WHERE id = $1', [r.programId])
+      }
+    })
+  })
+
   describe('#3801: the year review counts finished workouts only', () => {
     it('an unfinished workout adds no sets, volume or top exercise', async () => {
       const from = new Date('2026-03-01T00:00:00Z')
