@@ -23,6 +23,7 @@ import { PersonalRecords } from '../components/PersonalRecords';
 import { activeElapsedMs } from '../logging/workout';
 import { WorkoutLayout } from '../components/WorkoutLayout';
 import { RecapCard } from '../components/RecapCard';
+import { localRecap } from '../logging/local-recap';
 import { NextPrescription } from '../components/NextPrescription';
 import { WorkoutTiming } from '../components/WorkoutTiming';
 import { WorkoutHrRecovery } from '../components/WorkoutHrRecovery';
@@ -208,7 +209,7 @@ export function WorkoutLogScreen({
           variant="ghost"
           busy={journal.syncing}
           onPress={() => {
-            void journal.controller?.sync();
+            void journal.controller?.retryWorkout(workout.id);
           }}
         />
       )}
@@ -230,7 +231,12 @@ export function WorkoutLogScreen({
           ))}
         </Grid>
       </View>
-      <RecapCard workoutId={workout.id} disabled={workout.pending.length > 0} />
+      <RecapCard
+        workoutId={workout.id}
+        local={
+          workout.pending.length > 0 ? localRecap(workout, journal.data.workouts) : undefined
+        }
+      />
       <WorkoutTiming workout={workout} />
       <WorkoutEnergy workout={workout} />
       <View style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>

@@ -18,7 +18,7 @@ import { ResourceStatus } from '../components/ResourceStatus';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { daySpec, type DayExercise } from '../data/models';
 import { useHistoryQueue } from '../data/HistoryQueueProvider';
-import { overlayHistory } from '../data/HistoryOutbox';
+import { dayHistory } from '../data/workout-view';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { useWorkoutAction } from '../data/useWorkoutAction';
 import { formatSetLoad } from '../logging/targets';
@@ -50,7 +50,14 @@ export function HistoryDay({
     workoutSessionId?: string;
     name: string;
   } | null>(null);
-  const entries = overlayHistory(state.data?.exercises ?? [], queue.operations);
+  // The server's day, plus this phone's finished workouts it doesn't have yet (#3880).
+  const entries = dayHistory(
+    date,
+    state.data?.exercises ?? [],
+    journal.data.workouts,
+    queue.operations,
+    Date.now(),
+  );
   const sessionIds = [...new Set(entries.map((entry) => entry.workoutSessionId))];
   function awaitingUpload(id: string) {
     return journal.data.workouts.some(

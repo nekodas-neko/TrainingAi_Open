@@ -1215,6 +1215,24 @@ export class WorkoutJournalStore {
     }));
     await this.sync();
   };
+  // #3880: the done screen's Retry upload. A plain sync passes over a write set aside (#3638), so
+  // this clears the refusals on every write of this one workout and sends them again.
+  retryWorkout = async (workoutId: string) => {
+    await this.write((data) => ({
+      ...data,
+      workouts: data.workouts.map((workout) =>
+        workout.id !== workoutId
+          ? workout
+          : {
+              ...workout,
+              pending: workout.pending.map((item) =>
+                deadLettered(item) ? { ...item, rejected: undefined } : item,
+              ),
+            },
+      ),
+    }));
+    await this.sync();
+  };
   // Discard: that one write is not sent. The workout stays on this phone; once nothing is left to
   // send it counts as uploaded, so it can be deleted from this phone's history.
   discardRejected = async (id: string) => {
