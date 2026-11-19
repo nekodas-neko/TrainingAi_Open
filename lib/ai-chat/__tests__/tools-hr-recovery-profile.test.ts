@@ -17,7 +17,7 @@ function setRow(over: Partial<SetHrStatsRow>): SetHrStatsRow {
 
 const repo = {
   getSetHrStatsSince: async () => [setRow({}), setRow({ loggedAt: new Date('2026-06-10T00:00:00Z'), drop120s: 50 })],
-  getOuraWorkouts: async () => [],
+  getSourceActivitySessions: async () => [],
   getHrForWindow: async () => [],
   getObservedHrProfile: async () => computeObservedHr([]),
   getUserById: async () => null,

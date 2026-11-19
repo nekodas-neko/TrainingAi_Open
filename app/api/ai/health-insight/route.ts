@@ -17,6 +17,7 @@ import { metric, splitMeasured, type MetricLine } from './metrics'
 import { buildInsightText, type RecentComparison } from './insight-text'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { beforeSourceSwitch } from '@trainingai/shared/health/source-rank'
+import { ouraTemperatureDeviations } from '@/lib/oura/cloud/readiness-signals-map'
 
 // An enum, a date and a boolean.
 const MAX_BODY_BYTES = 4 * 1024
@@ -129,6 +130,9 @@ export async function POST(req: Request) {
       values: ouraRows.filter(r => r.date !== date).map(r => onCurrentScale.get(r.date)).filter((v): v is number => v != null),
       today: todayReadiness == null ? null : onCurrentScale.get(todayDay) ?? null,
     }
+    // The source's own deviation through the generic shape (#3875), never its field name. The text the
+    // model reads is unchanged: Oura is the only source that fills it today.
+    const sourceTemp = todayOura ? ouraTemperatureDeviations([todayOura])[0] ?? null : null
     entries = [
       ...(todayReadiness == null ? [metric('Readiness score', null)] : []),
       `Contributors: ${formatContributors(contributors)}`,
@@ -136,8 +140,8 @@ export async function POST(req: Request) {
       // rollup has stopped, and the last ring row would otherwise stand for a week of nights.
       todaySummary?.tempDevC != null
         ? metric('Body temp deviation (vs personal ring baseline)', `${todaySummary.tempDevC > 0 ? '+' : ''}${todaySummary.tempDevC.toFixed(1)}°C`)
-        : metric('Body temp deviation', todayOura?.temperatureDeviation != null
-          ? `${todayOura.temperatureDeviation > 0 ? '+' : ''}${todayOura.temperatureDeviation.toFixed(1)}°C (Oura's reading)`
+        : metric('Body temp deviation', sourceTemp != null
+          ? `${sourceTemp.deviationC > 0 ? '+' : ''}${sourceTemp.deviationC.toFixed(1)}°C (Oura's reading)`
           : null),
       metric('Illness radar', latestIllness ? `${latestIllness.flag} (score ${latestIllness.score}/100, vs personal baseline)` : null),
     ]

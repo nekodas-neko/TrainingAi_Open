@@ -18,7 +18,12 @@ export const OURA_API_BASE = 'https://api.ouraring.com'
  * back with no SpO2 scope at all). `heart_health` is new in v1.42 and covers cardiovascular age and
  * VO2 max, which Oura refused under `daily`. `ring_configuration` is not in the spec at all: Oura's own
  * 401 named it for `ring_battery_level` (#3578, #3565), so a grant stored before it was added lacks it
- * and the ring battery reads as not shared until the user connects again. `email` and `tag` are left out: nothing in #2808 reads
+ * and the ring battery reads as not shared until the user connects again. `stress` is not in the spec
+ * either: Oura refused `daily_resilience` under every scope we guessed (`daily`, then `heart_health`)
+ * with "Token is not authorized access stress scope", so it is asked for on the same precedent
+ * (#3873, owner yes 19 Nov). Whether Oura's consent screen accepts it is known only from a real
+ * connect; if it refuses, removing it restores the old list. A grant stored before it lacks it, and
+ * resilience is skipped as not shared, not reported. `email` and `tag` are left out: nothing in #2808 reads
  * them. A change here reaches a user only on their next connect.
  *
  * `personal` is kept although nothing stores what it shares (age, sex, height, weight; #3081). The
@@ -27,7 +32,7 @@ export const OURA_API_BASE = 'https://api.ouraring.com'
  * Dropping it could make Oura refuse that read, which would leave every event `unknown_user`, and
  * only a real reconnect could show it does not. We read `id` alone and store nothing else from it.
  */
-export const OURA_SCOPES = ['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health', 'ring_configuration'] as const
+export const OURA_SCOPES = ['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health', 'ring_configuration', 'stress'] as const
 export type OuraScope = (typeof OURA_SCOPES)[number]
 
 /**

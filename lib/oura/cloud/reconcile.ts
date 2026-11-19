@@ -11,8 +11,9 @@
 //
 // What a pass did not store is reported (#3795 item 2): documents that failed the spec, types Oura
 // refused with a 403, and types refused although the grant covers them, each at most once a day.
-// `daily_resilience` refused despite the grant is expected (#3212) and kept apart, so it neither
-// makes noise nor hides a new type being refused.
+// A type on `EXPECTED_REFUSED_DESPITE_GRANT` is kept apart, so it neither makes noise nor hides a new
+// type being refused; `daily_resilience` was the one (#3212) until it was mapped to `stress` (#3873).
+// The ring's battery is read too (#3875), so a day with no webhook event still records a level.
 //
 // Webhooks are the primary feed, but Oura retries a failed delivery only about ten times over an
 // hour, so a missed event used to be recovered only by a manual backfill. Oura also revises a night
@@ -42,8 +43,13 @@ export const RECONCILE_DAYS = 3
 export const RECONCILE_WEEKLY_DAYS = 14
 /** The user's local weekday (0 Sunday … 6 Saturday) whose pass reaches back `RECONCILE_WEEKLY_DAYS`: clear of Tuesday's release. */
 export const RECONCILE_WEEKLY_WEEKDAY = 3
-/** Types Oura refuses although the grant covers them by our scope map, known and accepted (#3212). */
-export const EXPECTED_REFUSED_DESPITE_GRANT: ReadonlySet<string> = new Set(['daily_resilience'])
+/**
+ * Types Oura refuses although the grant covers them by our scope map, known and accepted. Empty since
+ * #3873: resilience was here (#3212) while it was mapped to `heart_health`, a scope Oura does not
+ * serve it under. Mapped to `stress` now, a grant without that scope skips it as not shared, and a
+ * refusal under a grant that has it is a real problem, reported as one.
+ */
+export const EXPECTED_REFUSED_DESPITE_GRANT: ReadonlySet<string> = new Set<string>()
 export const RECONCILE_INTERVAL_MS = 24 * 60 * 60 * 1000
 /** Clear of the renewal's first pass (5 min) and of a deploy's first minutes of traffic. */
 export const FIRST_PASS_DELAY_MS = 20 * 60 * 1000
@@ -110,7 +116,9 @@ export async function reconcileOuraCloud(deps: ReconcileDeps): Promise<Reconcile
       // Loaded here, as `runOuraReconcile` loads `@/lib/data`: this module is reached from the boot timer.
       const { workoutHrReattributor } = await import('@/lib/workout/post-completion-hr')
       const result = await backfill({ repo: deps.repo, config: deps.config, rescore: deps.repo, workoutHr: workoutHrReattributor(deps.repo), stillRhr: stillRhrRefresher(deps.repo) }, userId, {
-        from, to, dryRun: false, heartRate: true, tz, tombstoneAbsent: true, stampData: false,
+        // #3875: the battery too, so a quiet day with no sleep, activity or workout event still
+        // records a level. Its own 401 or 403 is a per-type refusal and never stops the pass.
+        from, to, dryRun: false, heartRate: true, ringBattery: true, tz, tombstoneAbsent: true, stampData: false,
       })
       const outcome = outcomeOf(result)
       out.push({ userId, from, to, result: outcome })

@@ -1,6 +1,7 @@
 // #3087: the energy-balance service counts Oura's own workouts, except the ones a saved log covers.
 import { describe, it, expect } from 'vitest'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
+import { ouraActivitySessions } from '@/lib/oura/cloud/activity-sessions-map'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
 const TZ = 'Australia/Brisbane'
@@ -18,7 +19,8 @@ function repo(opts: { oura: unknown[]; logs?: unknown[] }) {
     listFoodLogsSummary: async () => [],
     listActivityLogs: async () => opts.logs ?? [],
     getWorkoutSessionsFrom: async () => [],
-    getOuraWorkouts: async () => opts.oura,
+    // #3875: the budget reads the generic session; the Oura rows go through the connector's mapping.
+    getSourceActivitySessions: async () => ouraActivitySessions(opts.oura as never),
     getNutritionTargets: async () => null,
     getUserGoals: async () => null,
     getUserById: async () => ({ heightCm: 180, sex: 'male', dateOfBirth: '1993-01-01', fitnessGoal: 'maintain' }),

@@ -78,6 +78,8 @@ import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { sleepShapeFromHypnogram } from '@trainingai/shared/health/oura-sleep-detail'
 import { restlessnessFromMovement } from '@trainingai/shared/health/sleep-recording'
 import { perMinuteMovementSeries } from './slices/movement-series'
+import { sourceActivitySessions } from './slices/activity-sessions'
+import { ouraDaytimeHighStress } from '@/lib/oura/cloud/readiness-signals-map'
 import { overnightRecoveryHours, recoveryContributors } from './slices/readiness-signals'
 import { ouraMovementSeries, ouraRecordingIncomplete, ouraAlgorithmVersion } from '@/lib/oura/cloud/sleep-recording-map'
 import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
@@ -2274,11 +2276,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // [yesterday, today] ASC-sorted. (Illness above intentionally keeps its
       // latest-available fallback.) Mirrors the readiness route's `find(day === todayIso)`.
       const todayDerived = derivedRows.find(r => r.day === todayIso) ?? null
-      // #3077: the ring's daytime stress stands only before the switch day; Oura's `stress_high`
-      // (seconds) is read for a day the ring has none, as the coach and weekly digest do. Input only:
-      // the scorer's stress arm is unwired (TN-34), so no recommendation moves with it.
+      // #3077: the ring's daytime stress stands only before the switch day; the source's own
+      // high-stress minutes are read for a day the ring has none, as the coach and weekly digest do,
+      // through the generic shape (#3875, as #3620 did for those two). Input only: the scorer's
+      // stress arm is unwired (TN-34), so no recommendation moves with it.
       const ringStressMinutes = beforeSourceSwitch(todayIso, switchDay) ? todayDerived?.stressHighMinutes ?? null : null
-      const ouraStressMinutes = ouraToday?.stressHigh != null && !isPreRekey(ouraToday.date) ? Math.round(ouraToday.stressHigh / 60) : null
+      const sourceStress = ouraToday && !isPreRekey(ouraToday.date) ? ouraDaytimeHighStress([ouraToday])[0] : undefined
+      const ouraStressMinutes = sourceStress ? Math.round(sourceStress.minutes) : null
       const stressHighMinutes = ringStressMinutes ?? ouraStressMinutes
       const history: AiDynamicInput['history'] = recentWsWithName.map(w => ({
         sessionName: w.sessionName ?? '',
@@ -8589,7 +8593,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async finishAgentAction(id: string, result: agentActions.FinishAgentActionInput) { return agentActions.finishAgentAction(this.db, id, result) }
   async getAgentAction(id: string) { return agentActions.getAgentAction(this.db, id) }
   async listAgentActions(filter?: agentActions.ListAgentActionsFilter) { return agentActions.listAgentActions(this.db, filter) }
-  async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
   async listOuraSessions(userId: string, startDay: string, endDay: string) { return oura.listOuraSessions(this.db, userId, startDay, endDay) }
   // Colmi R09, learning mode (PS-8). Reads/writes only the colmi_* tables.
   async insertColmiReadings(userId: string, rows: import('./slices/colmi').ColmiReadingInput[]) { return colmi.insertColmiReadings(this.db, userId, rows) }
@@ -8658,6 +8661,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async tombstoneOuraSessionsAbsent(userId: string, range: { from: string; to: string; keepIds: string[]; dryRun?: boolean }) { return oura.tombstoneOuraSessionsAbsent(this.db, userId, range) }
   async getOuraCloudActivitySeries(userId: string, from: string, to: string) { return oura.getOuraCloudActivitySeries(this.db, userId, from, to) }
   async getPerMinuteMovementSeries(userId: string, from: string, to: string) { return perMinuteMovementSeries(this.db, userId, from, to) }
+  async getSourceActivitySessions(userId: string, range: { from: string; to: string }) { return sourceActivitySessions(this.db, userId, range) }
   async getOuraCloudMetChangedAt(userId: string, from: string, to: string) { return oura.getOuraCloudMetChangedAt(this.db, userId, from, to) }
   async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }
   async getLatestOuraCloudBatteryAt(userId: string, since: Date) { return oura.getLatestOuraCloudBatteryAt(this.db, userId, since) }
@@ -8699,7 +8703,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listSetHrStatsForHrr1Backfill(userId: string) { return oura.listSetHrStatsForHrr1Backfill(this.db, userId) }
   async writeSetHrr1(userId: string, updates: readonly oura.SetHrr1Write[]) { return oura.writeSetHrr1(this.db, userId, updates) }
   async getOuraWorkouts(userId: string, opts: { unreviewed?: boolean; from?: string; to?: string; timezone?: string }) { return oura.getOuraWorkouts(this.db, userId, opts) }
-  async markOuraWorkoutReviewed(userId: string, id: string) { return oura.markOuraWorkoutReviewed(this.db, userId, id) }
   async getSetTimestampsForSession(userId: string, workoutSessionId: string) { return oura.getSetTimestampsForSession(this.db, userId, workoutSessionId) }
   async markHrSynced(userId: string, workoutSessionId: string) { return oura.markHrSynced(this.db, userId, workoutSessionId) }
   async getUnsyncedHrSessionsForDay(userId: string, day: string, timezone = DEFAULT_TZ) { return oura.getUnsyncedHrSessionsForDay(this.db, userId, day, timezone) }

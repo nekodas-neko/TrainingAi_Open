@@ -19,7 +19,7 @@ function setRow(over: Partial<SetHrStatsRow>): SetHrStatsRow {
 function stubRepo(over: Partial<WorkoutRepository>): WorkoutRepository {
   return {
     getSetHrStatsSince: async () => [],
-    getOuraWorkouts: async () => [],
+    getSourceActivitySessions: async () => [],
     getUserById: async () => null,
     listBodyMetrics: async () => [],
     getHrForWindow: async () => [],
@@ -51,10 +51,9 @@ describe('computeHrRecoveryProfile', () => {
     ]
     const repo = stubRepo({
       getSetHrStatsSince: async () => [setRow({})],
-      getOuraWorkouts: async () => [{
-        id: 'wk1', day: '2026-05-15', activity: 'running',
-        startDatetime: workoutStart, endDatetime: workoutEnd,
-        calories: null, distanceM: null, intensity: null, source: 'oura', reviewed: false,
+      getSourceActivitySessions: async () => [{
+        day: '2026-05-15', activityType: 'run', start: workoutStart, end: workoutEnd,
+        distanceKm: null, dismissed: false, source: 'oura_cloud',
       }],
       getHrForWindow: async () => readings,
       getUserById: async () => ({ dateOfBirth: null } as never),
@@ -81,7 +80,7 @@ describe('computeHrRecoveryProfile window (local midnight)', () => {
     let workoutRange: { from: string; to: string } | null = null
     const repo = stubRepo({
       getSetHrStatsSince: async (_u: string, since: Date) => { setsSince = since; return [] },
-      getOuraWorkouts: async (_u: string, range: { from: string; to: string }) => { workoutRange = range; return [] },
+      getSourceActivitySessions: async (_u: string, range: { from: string; to: string }) => { workoutRange = range; return [] },
     } as Partial<WorkoutRepository>)
     await computeHrRecoveryProfile(repo, 'u1', tz, 30)
     const { todayInTz, shiftDateStr } = await import('@trainingai/shared/date-utils')

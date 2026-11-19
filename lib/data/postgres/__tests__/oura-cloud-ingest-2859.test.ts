@@ -309,7 +309,8 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
 
   it('keeps a workout\'s reviewed flag when Oura re-sends it', async () => {
     await webhookAll()
-    expect(await repo.markOuraWorkoutReviewed(USER, 'wo-1')).toBe(true)
+    // The review card that set it is gone (#3875); the flag still marks a dismissal the budget honours.
+    expect((await pool.query(`UPDATE oura_workouts SET reviewed = true WHERE user_id = $1 AND id = 'wo-1'`, [USER])).rowCount).toBe(1)
     await webhookAll()
     expect((await one(`SELECT reviewed FROM oura_workouts WHERE user_id = $1`)).reviewed).toBe(true)
   })
