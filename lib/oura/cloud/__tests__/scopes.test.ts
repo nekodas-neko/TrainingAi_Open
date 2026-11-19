@@ -8,7 +8,13 @@ import { FirstHandFilter, OURA_APP_PACKAGE } from '@trainingai/shared/health/hea
 
 describe('Oura scopes (#3026)', () => {
   it('asks for v1.42\'s names: spo2, not spo2Daily, and heart_health', () => {
-    expect(OURA_SCOPES).toEqual(['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health', 'ring_configuration'])
+    expect(OURA_SCOPES).toEqual(['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health', 'ring_configuration', 'stress'])
+  })
+
+  it('asks for stress at connect, which Oura\'s 401 named for resilience (#3873)', () => {
+    const url = new URL(buildAuthorizeUrl({ clientId: 'cid', clientSecret: 'cs', redirectUri: 'https://app.example/api/oura/callback' }, 'state'))
+    expect(url.searchParams.get('scope')!.split(' ')).toContain('stress')
+    expect(OURA_SCOPE_FOR.daily_resilience).toBe('stress')
   })
 
   it('asks for ring_configuration at connect, which Oura\'s 401 named for the ring battery (#3578)', () => {
@@ -21,11 +27,11 @@ describe('Oura scopes (#3026)', () => {
     for (const scope of Object.values(OURA_SCOPE_FOR)) expect(OURA_SCOPES).toContain(scope)
   })
 
-  it('files SpO2 under spo2 and the heart-health scores under heart_health', () => {
+  it('files SpO2 under spo2, the heart-health scores under heart_health and resilience under stress', () => {
     expect(OURA_SCOPE_FOR.daily_spo2).toBe('spo2')
     expect(OURA_SCOPE_FOR.daily_cardiovascular_age).toBe('heart_health')
     expect(OURA_SCOPE_FOR.vo2_max).toBe('heart_health')
-    expect(OURA_SCOPE_FOR.daily_resilience).toBe('heart_health')
+    expect(OURA_SCOPE_FOR.daily_resilience).toBe('stress')
     expect(OURA_SCOPE_FOR.daily_stress).toBe('daily')
   })
 })
@@ -51,7 +57,7 @@ describe('grantedOuraScopes', () => {
     expect(grantedOuraScopes('   ')).toBeNull()
   })
 
-  it('covers SpO2 under either spelling, and the heart-health scores only with heart_health', () => {
+  it('covers SpO2 under either spelling, the heart-health scores only with heart_health, resilience only with stress', () => {
     for (const grant of ['extapi:daily extapi:spo2', 'extapi:daily extapi:spo2Daily']) {
       const granted = grantedOuraScopes(grant)
       expect(isOuraTypeShared(granted, 'daily_spo2')).toBe(true)
@@ -62,7 +68,9 @@ describe('grantedOuraScopes', () => {
     }
     const withHeart = grantedOuraScopes('extapi:heart_health')
     expect(isOuraTypeShared(withHeart, 'vo2_max')).toBe(true)
-    expect(isOuraTypeShared(withHeart, 'daily_resilience')).toBe(true)
+    // #3873: heart_health never brought resilience; only stress does.
+    expect(isOuraTypeShared(withHeart, 'daily_resilience')).toBe(false)
+    expect(isOuraTypeShared(grantedOuraScopes('extapi:heart_health extapi:stress'), 'daily_resilience')).toBe(true)
     expect(isOuraTypeShared(withHeart, 'daily_cardiovascular_age')).toBe(true)
     expect(isOuraTypeShared(withHeart, 'daily_spo2')).toBe(false)
   })

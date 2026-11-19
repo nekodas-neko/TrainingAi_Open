@@ -119,7 +119,7 @@ describe('Oura connect routes (#2858)', () => {
     expect(opened.status).toBe(302)
     const to = new URL(opened.headers.get('location')!)
     expect(`${to.origin}${to.pathname}`).toBe(OURA_AUTHORIZE_URL)
-    expect(to.searchParams.get('scope')).toBe('personal daily heartrate workout session spo2 heart_health ring_configuration')
+    expect(to.searchParams.get('scope')).toBe('personal daily heartrate workout session spo2 heart_health ring_configuration stress')
     expect(to.searchParams.get('redirect_uri')).toBe(ENV.OURA_REDIRECT_URI)
     expect(to.searchParams.get('state')).toBe(url.searchParams.get('ticket'))
     expect(cookie).toMatch(/^[A-Za-z0-9_-]{43}$/)
@@ -248,6 +248,16 @@ describe('Oura connect routes (#2858)', () => {
     const res = await callback(callbackReq({ error: 'access_denied', state: url.searchParams.get('ticket')! }, cookie))
     expect(res.headers.get('location')).toBe('com.trainingai.app:/oura/callback?oura=error&reason=denied')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('Oura refusing a permission (#3873) returns "failed", not "denied", and logs the code', async () => {
+    const { url, cookie } = await startAndOpen('android')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await callback(callbackReq({ error: 'invalid_scope', state: url.searchParams.get('ticket')! }, cookie))
+    expect(res.headers.get('location')).toBe('com.trainingai.app:/oura/callback?oura=error&reason=failed')
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(log).toHaveBeenCalledWith('[oura] connect refused by Oura:', 'invalid_scope')
+    log.mockRestore()
   })
 
   it('a deactivated account connects nothing', async () => {

@@ -39,7 +39,6 @@ const listMealTypes = vi.fn(async (_u: string) => [] as Row[])
 const getOuraWorkouts = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getOuraDaily = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listActivityLogs = vi.fn(async (..._a: unknown[]) => [] as Row[])
-const listOuraTags = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listOuraSessions = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getOuraDailyDerived = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listTimedDoses = vi.fn(async (..._a: unknown[]) => [] as Row[])
@@ -52,7 +51,7 @@ vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
     listSleepSessions, getWorkoutSessionsFrom, listFoodLogs, listMealTypes,
-    getOuraWorkouts, getOuraDaily, listActivityLogs, listOuraTags, listOuraSessions, getOuraDailyDerived,
+    getOuraWorkouts, getOuraDaily, listActivityLogs, listOuraSessions, getOuraDailyDerived,
     listTimedDoses, listSupplementVials, listDoseHistory,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -105,7 +104,6 @@ beforeEach(() => {
   getOuraWorkouts.mockResolvedValue([])
   getOuraDaily.mockResolvedValue([])
   listActivityLogs.mockResolvedValue([])
-  listOuraTags.mockResolvedValue([])
   listOuraSessions.mockResolvedValue([])
   getOuraDailyDerived.mockResolvedValue([])
   listTimedDoses.mockResolvedValue([])
@@ -406,17 +404,16 @@ describe('/api/day-timeline — walks', () => {
 })
 
 describe('/api/day-timeline — tags and ordering', () => {
-  it('labels a known tag type, and falls back to its raw name', async () => {
-    listOuraTags.mockResolvedValue([
-      { startTime: bne(DAY, '10:00'), endTime: null, tagType: 'rest_mode', customName: null, comment: null, mood: null, source: 'oura' },
-      { startTime: bne(DAY, '11:00'), endTime: null, tagType: 'tag_generic_stress', customName: null, comment: null, mood: null, source: 'oura' },
-      { startTime: bne(DAY, '12:00'), endTime: null, tagType: 'nap', customName: 'Afternoon kip', comment: null, mood: null, source: 'oura' },
+  it('labels a known session type, and falls back to its raw name', async () => {
+    listOuraSessions.mockResolvedValue([
+      { ouraId: 't1', sessionType: 'rest_mode', mood: null, startDatetime: bne(DAY, '10:00'), endDatetime: null },
+      { ouraId: 't2', sessionType: 'breathing_exercise', mood: null, startDatetime: bne(DAY, '11:00'), endDatetime: null },
     ])
-    expect((await eventsOf('tag')).map((t: Row) => t.title)).toEqual(['Afternoon kip', 'Stress', 'Rest mode'])
+    expect((await eventsOf('tag')).map((t: Row) => t.title)).toEqual(['Breathing exercise', 'Rest mode'])
   })
 
-  // #3077: `oura_tags` has had no writer since the ring moved to the Oura API; its sessions arrive as
-  // Oura's `session` documents, and the timeline shows them the way it showed a tag.
+  // #3077: Oura's sessions arrive as its `session` documents, and the timeline shows them the way it
+  // showed a tag. `oura_tags` had no writer after the switch and is no longer read (#3875).
   it('shows Oura\'s sessions from the API as tag events, with Oura\'s type and mood', async () => {
     listOuraSessions.mockResolvedValue([
       { ouraId: 's1', sessionType: 'meditation', mood: 'good', startDatetime: bne(DAY, '12:00'), endDatetime: bne(DAY, '12:10') },
@@ -431,19 +428,12 @@ describe('/api/day-timeline — tags and ordering', () => {
     expect(listOuraSessions).toHaveBeenCalledWith(expect.any(String), '2026-09-07', DAY)
   })
 
-  it('skips a tag with no start time rather than sorting it to the epoch', async () => {
-    listOuraTags.mockResolvedValue([
-      { startTime: null, tagType: 'nap', customName: null, comment: null, mood: null, source: 'oura' },
-    ])
-    expect(await eventsOf('tag')).toEqual([])
-  })
-
   it('sorts every event newest first across all the domains it merges', async () => {
     listSleepSessions.mockResolvedValue([sleep()])
     getWorkoutSessionsFrom.mockResolvedValue([workout()])
     listActivityLogs.mockResolvedValue([activity()])
-    listOuraTags.mockResolvedValue([
-      { startTime: bne(DAY, '14:00'), endTime: null, tagType: 'nap', customName: null, comment: null, mood: null, source: 'oura' },
+    listOuraSessions.mockResolvedValue([
+      { ouraId: 's1', sessionType: 'nap', mood: null, startDatetime: bne(DAY, '14:00'), endDatetime: null },
     ])
 
     const { events } = await body()

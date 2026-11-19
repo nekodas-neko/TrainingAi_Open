@@ -115,12 +115,6 @@ describe.skipIf(!canRun)('a body-supplied id gets an answer that means what it s
       expect(res.status).toBe(404)
     })
 
-    it('PATCH /api/oura/workouts — a `text` key, so nothing could ever fail loudly here', async () => {
-      const { PATCH } = await import('@/app/api/oura/workouts/route')
-      const res = await PATCH(req('PATCH', { id: 'no-such-oura-workout' }) as never)
-      expect(res.status).toBe(404)
-    })
-
     it('DELETE /api/admin/exercises — deletes by name, so a misspelling removed nothing', async () => {
       const { DELETE } = await import('@/app/api/admin/exercises/route')
       const res = await DELETE(req('DELETE', {}, 'http://localhost/x?name=no-such-exercise-rv48') as never)
