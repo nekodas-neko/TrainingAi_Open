@@ -4,6 +4,7 @@ import { shouldTriggerEmergencyDeload, type EmergencySignals, type EmergencyStat
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { recostPrescription, rowNumbersMoved, type FigureSignals } from './prescription-figures'
 import { prescriptionAgedOut } from './prescription-expiry'
+import { deloadEndDue } from './phase-guards'
 
 // Cheap fresh-signals subset for consumption-day re-evaluation — deliberately NOT the full
 // 30-signal aggregation (aggregateSignals), which is too expensive to run on every
@@ -96,10 +97,14 @@ export interface ReevaluationResult {
 // so existing imports keep working.
 export { prescriptionAgedOut } from './prescription-expiry'
 
+// `deloadEndDue` (#3876) lives beside the deload floor it reads; re-exported for the read path.
+export { deloadEndDue } from './phase-guards'
+
 export function reevaluatePrescriptionForToday(
   prescription: AiPrescription,
   signals: ReevaluationSignals,
-  state: EmergencyState,
+  // `sessionsInPhase` (#3876): absent, a finished deload is not checked (`deloadEndDue`).
+  state: EmergencyState & { sessionsInPhase?: number },
   now = new Date(),
   // Issue 2592: the inputs `prescriptionFigures` costs a row with. Present, a deload or revert that
   // moves a row's numbers re-costs the two whole-session figures through that one function; absent
@@ -133,6 +138,9 @@ export function reevaluatePrescriptionForToday(
   // deload, so ageing an expired offer out cannot race it, and the exemption left every expired offer
   // in place: a week-old rest day (#3700) and a pending stay, which drives load (#3714).
   if (prescriptionAgedOut(state, now)) {
+    return { prescription, changed: false, needsRegenerate: true }
+  }
+  if (deloadEndDue(prescription, state)) {
     return { prescription, changed: false, needsRegenerate: true }
   }
 

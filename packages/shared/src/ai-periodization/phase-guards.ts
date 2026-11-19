@@ -88,3 +88,22 @@ export function typeDeloadFinished(
 ): boolean {
   return !programAligned && state.phase === 'deload' && state.sessionsInPhase >= DELOAD_FLOOR
 }
+
+/**
+ * #3876: the stored plan is in a deload that has done its `DELOAD_FLOOR` sessions, and it was made
+ * before the count got there. A deload ends at generation (owner, 19 Nov: by itself, no tap), and
+ * `workout-data` regenerated only a consumed or aged-out slot, so an unexpired deload plan or floor
+ * offer was served as it was and the type trained another deload. Regenerating runs the exit. Read as "pending" (`isAiPrescriptionPending`), so the screen shows
+ * "preparing" rather than the deload, and by `reevaluatePrescriptionForToday`.
+ *
+ * Only once per count: a plan generation stored at or after this count (`sessionsInPhaseAtPlan`) has
+ * already been through the exit, which an aligned program's deload short of its cap does not take, so
+ * it is served. A plan stored before the field existed has no count and is regenerated once.
+ */
+export function deloadEndDue(
+  prescription: Pick<AiPrescription, 'sessionsInPhaseAtPlan'>,
+  state: { phase: string; sessionsInPhase?: number },
+): boolean {
+  if (state.phase !== 'deload' || state.sessionsInPhase == null || state.sessionsInPhase < DELOAD_FLOOR) return false
+  return prescription.sessionsInPhaseAtPlan == null || prescription.sessionsInPhaseAtPlan < state.sessionsInPhase
+}

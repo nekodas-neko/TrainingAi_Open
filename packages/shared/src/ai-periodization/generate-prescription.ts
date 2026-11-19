@@ -33,7 +33,7 @@ import { shouldTriggerEmergencyDeload, emergencyDeloadTrigger } from '@traininga
 import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
 import { buildTransitionRationale } from '@trainingai/shared/ai-periodization/transition-rationale'
-import { syncProgramPhase, applyProgramPhaseCap, programMoveTarget, collectVotes } from '@trainingai/shared/ai-periodization/program-phase'
+import { syncProgramPhase, applyProgramPhaseCap, programMoveTarget, collectVotes, programDeloadFinished, NEXT_PROGRAM_PHASE } from '@trainingai/shared/ai-periodization/program-phase'
 import { DELOAD_LOWER_PCT, DELOAD_REPS, DELOAD_SETS, DELOAD_REST } from '@trainingai/shared/ai-periodization/deload-constants'
 import { generateObject } from 'ai'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
@@ -247,7 +247,9 @@ export function buildProgramAsWrittenPrescription(
     exercises,
     estimatedSessionDurationMin,
     weeklyVolumeContribution,
-    deload: false,
+    // #3877(b): worked out from the phase, as the model path does, never a constant. In a deload phase
+    // this plan is a deload's (the shadow's rules plan, `Full`'s revert) and said `false`.
+    deload: isDeloadPlan(signals.phase as PeriodizationPhase, 'stay'),
     reasoning,
     confidence: 0.3,
     sessionTimeBudgetMinutes: signals.sessionTimeBudgetMinutes,
@@ -332,17 +334,36 @@ async function runPrescriptionGeneration(
   // which reconciles first.
   let programPhase = await syncProgramPhase(repo, userId, activeProgram.id, tz)
   state = (await repo.getSessionPeriodization(userId, programSessionId)) ?? state
-  // #3876 (owner, 19 Nov): a session type that has completed its deload sessions leaves the deload at
-  // its next plan, with no tap and whether or not auto-apply is on. It used to wait for "Move to
-  // accumulation", which was easy to miss and cost a week each time. Only while the program waits for
-  // its switch-over: an aligned program's deload ends by the program's rules. The switch-over date
-  // was stamped by the sync above, so leaving the deload cannot lose it; the sync runs again because
-  // a type leaving its deload can make the switch-over due.
+  // #3876 (owner, 19 Nov): a deload ends by itself after its two sessions, with no tap and whether or
+  // not auto-apply is on. It used to wait for "Move to accumulation", which was easy to miss and cost
+  // a week each time. The exit runs before planning, so the plan is made in the phase the type moves
+  // to and its loads are that phase's.
+  //  - While the program waits for its switch-over, the type's own deload ends (`typeDeloadFinished`).
+  //    The switch-over date was stamped by the sync above, so leaving cannot lose it; the sync runs
+  //    again because a type leaving its deload can make the switch-over due.
+  //  - Once aligned, the deload is the program's and it ends at its cap (`programDeloadFinished`).
+  //    `applyProgramPhaseCap` would only offer that move, ceiling-forced, so it waited for a tap and the
+  //    owner's decision did not hold after the switch-over. Any other capped move still needs one.
+  // Both exits move only the deload this call read: a racing generation that moved it first leaves
+  // this one a no-op, and it plans in the phase that one moved to.
   if (typeDeloadFinished(state, programPhase.aligned)) {
-    await repo.advancePhase(userId, programSessionId, deloadExitPhase(state.preEmergencyDeloadPhase, programPhase.phase))
+    await repo.exitDeload(
+      userId, programSessionId, deloadExitPhase(state.preEmergencyDeloadPhase, programPhase.phase), state.phaseStartedAt,
+    )
+    programPhase = await syncProgramPhase(repo, userId, activeProgram.id, tz)
+    state = (await repo.getSessionPeriodization(userId, programSessionId)) ?? state
+  } else if (programDeloadFinished(programPhase)) {
+    await repo.advanceProgramPhase(
+      userId, programSessionId, NEXT_PROGRAM_PHASE.deload, { phase: 'deload', phaseStartedAt: programPhase.phaseStartedAt! },
+    )
     programPhase = await syncProgramPhase(repo, userId, activeProgram.id, tz)
     state = (await repo.getSessionPeriodization(userId, programSessionId)) ?? state
   }
+  // The deload count this plan was made at, stored on it: `workout-data` regenerates a plan in a
+  // finished deload only when it was made before the count got there (`deloadEndDue`), so a plan made
+  // after this exit check does not ask for another generation on every read.
+  const store = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: { phase: PeriodizationPhase; phaseStartedAt: Date }) =>
+    repo.storePrescription(userId, programSessionId, { ...p, sessionsInPhaseAtPlan: state.sessionsInPhase }, expiresAt, status, storeFor)
   // #3766: the phase this plan is made in. A program move while it is being made (another session's
   // tap or auto-apply) voids this slot; the plan is then not stored (`storePrescription` checks the
   // slot is still in this phase and start), so the slot regenerates in the new phase.
@@ -428,7 +449,7 @@ async function runPrescriptionGeneration(
     // next local midnight and the next open asks again. The other triggers describe the block and
     // keep the week.
     const expiresAt = prescriptionExpiresAt(prescription, tz, startedAt, { illnessTriggered: trigger?.kind === 'illness' })
-    if (await repo.storePrescription(userId, programSessionId, prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
+    if (await store(prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
 
     return {
       ok: true,
@@ -464,7 +485,7 @@ async function runPrescriptionGeneration(
     // gets a fresh decision. It was `now + 24h`, which kept an evening deload alive through the
     // next day's morning check-in (#3700).
     const expiresAt = nextMidnightInTz(tz, startedAt)
-    if (await repo.storePrescription(userId, programSessionId, prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
+    if (await store(prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
     return {
       ok: true,
       prescription,
@@ -532,9 +553,7 @@ async function runPrescriptionGeneration(
         : 'Your AI coach could not be reached, so this is your program as written.',
     )
     if (rules) {
-      const stored = await repo.storePrescription(
-        userId, programSessionId, rules, new Date(Date.now() + RULES_PRESCRIPTION_TTL_MS), 'pending', generatedFor,
-      )
+      const stored = await store(rules, new Date(Date.now() + RULES_PRESCRIPTION_TTL_MS), 'pending', generatedFor)
       if (stored === false) return PHASE_MOVED
       return {
         ok: true,
@@ -859,7 +878,7 @@ async function runPrescriptionGeneration(
   // status to 'pending') and then set 'auto_applied' in a second statement; two concurrent
   // generations for this session could interleave between them and leave the status describing the
   // other run's prescription (Q-54).
-  if (await repo.storePrescription(userId, programSessionId, prescription, expiresAt, prescriptionStatus, storeFor) === false) {
+  if (await store(prescription, expiresAt, prescriptionStatus, storeFor) === false) {
     return PHASE_MOVED
   }
 

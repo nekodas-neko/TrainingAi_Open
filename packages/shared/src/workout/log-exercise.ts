@@ -121,7 +121,9 @@ export async function logExerciseFromPayload(
     // used to be recorded as one, so every exercise of it stored an estimate of 0 and could set no
     // record (production, 26 Oct). Decided here, where the workout session's phase type is first
     // written; a session already stored keeps its type (read back below), so past rows are as they were.
-    const overriddenToFull = wasOverride === true && intensityMode === 'full';
+    // Only native sends `'full'`: the WebView sends `intensityMode` only for a deload and omits it for
+    // full weight, and an outbox replay carries null. So anything but an explicit deload counts as full.
+    const overriddenToFull = wasOverride === true && intensityMode !== 'deload';
     if (periodizationState?.phase === 'deload' && !overriddenToFull) {
       currentPhaseType = 'deload';
     } else if (periodizationState?.phase === 'baseline' && !periodizationState.baselineComplete) {

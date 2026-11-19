@@ -173,6 +173,13 @@ export function programPhaseCapWeeks(phase: PeriodizationPhase, pending: Pending
   return PROGRAM_PHASE_CAP_WEEKS[phase]
 }
 
+/** #3876 (owner, 19 Nov): an aligned program's deload has reached its cap, so it ends by itself at
+ *  the next plan, with no tap, like a type's own deload while the program waits. */
+export function programDeloadFinished(view: ProgramPhaseView): boolean {
+  return view.aligned && view.phase === 'deload' && view.phaseStartedAt != null
+    && view.capWeeks != null && view.trainingWeeksDone >= view.capWeeks
+}
+
 /**
  * At the cap, a plain "stay" becomes the program's move to the next phase. Recovery actions are
  * left alone, as the per-type ceilings did. The loads stay the current phase's, so (as with the old

@@ -163,6 +163,10 @@ export interface AiPrescription {
   // then log how you feel) could never take effect. Absent on a freshly-generated
   // prescription (generation already evaluated the current inputs).
   reevaluatedInputsKey?: string
+  /** #3876: the type's `sessionsInPhase` when generation stored this plan. A plan in a finished
+   *  deload made before the count got there is regenerated (`deloadEndDue`); absent on plans
+   *  stored before this field, which are regenerated once. */
+  sessionsInPhaseAtPlan?: number
 }
 
 export interface SessionPeriodization {

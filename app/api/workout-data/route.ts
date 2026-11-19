@@ -560,6 +560,7 @@ async function handleWorkoutData(req: NextRequest) {
         prescription: aiPeriodizationState.prescription,
         prescriptionStatus: aiPeriodizationState.prescriptionStatus,
         prescriptionExpiresAt: aiPeriodizationState.prescriptionExpiresAt,
+        sessionsInPhase: aiPeriodizationState.sessionsInPhase,
       }
       let reevalResult = reevaluatePrescriptionForToday(aiPrescription, reevalSignals, reevalState)
 

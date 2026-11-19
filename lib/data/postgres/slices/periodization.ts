@@ -5,6 +5,7 @@ import * as s from '../schema'
 import { shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { holdsOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
+import { oneRmImplausible, MAX_PLAUSIBLE_ONE_RM_KG } from '@trainingai/shared/validation/plausibility'
 import {
   joiningPhaseFor, programMoveMark,
   type ProgramCompletion, type PhaseAnswer, type ProgramMoveOptions, type DecidePending, type DecideTarget,
@@ -423,6 +424,48 @@ export async function advancePhase(db: Db, userId: string, programSessionId: str
   return mapPeriodization(row)
 }
 
+/**
+ * #3876: the end of a session type's finished deload, at its next plan (`typeDeloadFinished`). Unlike
+ * `advancePhase` it is conditional: it moves the row only while it is still the deload the caller read
+ * (`phase = 'deload'` and the same start), so two generations racing for the same slot move it once.
+ * The loser writes nothing and resolves false; it re-reads the row and plans in the phase the winner
+ * moved it to. Before, both called `advancePhase`: the second restarted the new block, and the first's
+ * plan, made for the start it had just written, was refused with PHASE_MOVED.
+ *
+ * The move and the slot's status are one statement, and the status is `'consumed'` with no plan: the
+ * state the open-time trigger regenerates from. A generation that fails after the exit (the model, the
+ * store) leaves a slot `workout-data` refills, where `advancePhase`'s `'none'` was read by nothing.
+ * The switch-over's waiting stamp and date are kept, as in `advancePhase`; the pre-deload phase is
+ * spent, so it is cleared.
+ */
+export async function exitDeload(
+  db: Db, userId: string, programSessionId: string, newPhase: PeriodizationPhase, deloadStartedAt: Date,
+): Promise<boolean> {
+  const now = new Date()
+  const moved = await db
+    .update(s.sessionPeriodization)
+    .set({
+      phase: newPhase,
+      phaseStartedAt: now,
+      sessionsInPhase: 0,
+      pendingTransition: sql`CASE WHEN ${s.sessionPeriodization.pendingTransition} ->> 'switchOverPending' = 'true' THEN ${s.sessionPeriodization.pendingTransition} ELSE NULL END`,
+      preEmergencyDeloadPhase: null,
+      prescription: null,
+      prescriptionStatus: 'consumed',
+      prescriptionGeneratedAt: null,
+      prescriptionExpiresAt: null,
+      updatedAt: now,
+    })
+    .where(and(
+      eq(s.sessionPeriodization.userId, userId),
+      eq(s.sessionPeriodization.programSessionId, programSessionId),
+      eq(s.sessionPeriodization.phase, 'deload'),
+      phaseStartedAtIs(deloadStartedAt),
+    ))
+    .returning({ id: s.sessionPeriodization.id })
+  return moved.length > 0
+}
+
 // `status` is written in the SAME statement as the prescription, deliberately. It used to be a
 // second `updatePrescriptionStatus` call after this one, which opened a window: two concurrent
 // generations for the same session (the duration-preset picker and the auto-fire trigger use
@@ -816,6 +859,10 @@ export async function getExercise1rmHistory(db: Db, userId: string, exerciseName
       AND el.exercise_name IN (${sql.join(exerciseNames.map(n => sql`${n}`), sql`, `)})
       AND el.estimated_1rm IS NOT NULL
       AND el.estimated_1rm > 0
+      -- #3878: the record path's plausibility gate (oneRmImplausible), so a stored estimate the log
+      -- path refused as a record is not a point of the 1RM trend either. NaN and Infinity fail <=
+      -- here as they fail the function, which the rows are checked with again below.
+      AND el.estimated_1rm <= ${MAX_PLAUSIBLE_ONE_RM_KG}
       -- Mirrors getLastRealOneRmBatch's two-marker gate (LA-96). The estimated_1rm > 0
       -- predicate alone trusts the write-time invariant that a deload always stores 0, and
       -- that invariant has been violated in production in both directions.
@@ -829,7 +876,9 @@ export async function getExercise1rmHistory(db: Db, userId: string, exerciseName
   const byExercise: Record<string, { date: string; rm: number }[]> = {}
   for (const row of result.rows) {
     const arr = byExercise[row.exercise_name] ?? []
-    arr.push({ date: row.session_date, rm: Number(row.rm) })
+    const rm = Number(row.rm)
+    if (oneRmImplausible(rm)) continue
+    arr.push({ date: row.session_date, rm })
     byExercise[row.exercise_name] = arr
   }
   return byExercise
