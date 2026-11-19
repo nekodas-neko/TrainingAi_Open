@@ -5,7 +5,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useClock, formatDuration } from '../../../shared/hooks/useClock';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { workoutActivity } from '../logging/activity-summary';
-import { activeElapsedMs, type WorkoutRecord } from '../logging/workout';
+import { activeElapsedMs, workoutClockAt, type WorkoutRecord } from '../logging/workout';
 
 function WorkoutBar({
   workout,
@@ -16,8 +16,8 @@ function WorkoutBar({
 }) {
   const { theme } = useTheme();
   const clock = useClock(workout.pausedAt === null);
-  // Under a pause every clock stands where it stopped.
-  const now = workout.pausedAt ?? clock;
+  // Under a pause every clock stands where it stopped; a stale workout's at its last activity.
+  const now = workoutClockAt(workout, clock);
   const activity = workoutActivity(workout, now);
   return (
     <TouchSurface

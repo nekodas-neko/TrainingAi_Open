@@ -303,6 +303,8 @@ export function overlayHistory<
     workoutSessionId: string;
     setWeights: number[];
     reps: number[];
+    weightKg?: number | null;
+    sets?: number | null;
   },
 >(entries: T[], operations: HistoryOperation[]): T[] {
   return entries.flatMap((entry) => {
@@ -321,10 +323,15 @@ export function overlayHistory<
         return [];
       }
       if (operation.domain === 'exercise_log_edit') {
+        const weights = operation.payload.weights as number[];
         value = {
           ...value,
-          setWeights: operation.payload.weights as number[],
+          setWeights: weights,
           reps: operation.payload.reps as number[],
+          // As the day log derives them from the edited sets (#3880): the first set's weight and
+          // the set count, so the card doesn't show the old top weight beside the new volume.
+          ...('weightKg' in value ? { weightKg: weights[0] ?? null } : {}),
+          ...('sets' in value ? { sets: weights.length || null } : {}),
         };
       }
     }

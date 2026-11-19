@@ -9,7 +9,7 @@ import {
   Icon,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
+import { useLocalOnlyWorkouts } from '../data/useWorkoutView';
 import type { SessionPreview, WorkoutCatalog } from '../catalog';
 import { sessionTrainingStatus } from '../catalog';
 import { SessionGlyph } from './SessionGlyph';
@@ -32,10 +32,11 @@ export function SessionSelectionCard({
   active?: boolean;
 }) {
   const { theme } = useTheme();
-  const journal = useWorkoutJournal();
+  const localOnly = useLocalOnlyWorkouts();
   const palette = theme.sessions[session.position % theme.sessions.length];
-  const completedDates = journal.data.workouts
-    .filter((workout) => workout.sessionId === session.id && workout.status === 'completed')
+  // The server's done date, plus this phone's finished workouts it doesn't have yet (#3880).
+  const completedDates = localOnly
+    .filter((workout) => workout.sessionId === session.id)
     .map((workout) => workout.date);
   const { completed, lastTrained } = sessionTrainingStatus(session, completedDates, timezone);
   const assignments =

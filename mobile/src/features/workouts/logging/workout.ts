@@ -739,6 +739,14 @@ export function isStaleWorkout(workout: WorkoutRecord, now: number): boolean {
 }
 
 /**
+ * The moment a workout's clocks read at `now`: a pause holds them where it began, and a stale
+ * workout's stop at its last activity (#3880), so a workout left overnight doesn't count the night.
+ */
+export function workoutClockAt(workout: WorkoutRecord, now: number): number {
+  return workout.pausedAt ?? (isStaleWorkout(workout, now) ? lastActivityAt(workout) : now);
+}
+
+/**
  * Finishes a stale workout as it stood at its last recorded set: the set in progress, the rest
  * and the pause that followed it are dropped, so neither the gap nor today lands in its duration.
  */
