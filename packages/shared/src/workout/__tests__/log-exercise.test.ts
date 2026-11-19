@@ -197,7 +197,7 @@ describe('logExerciseFromPayload — a deload overridden to full weight (#3877)'
   beforeEach(() => {
     getActiveProgramWithPhases.mockResolvedValue(null)
     getActiveProgram.mockResolvedValue({ id: 'p1', phaseMode: 'ai_dynamic' })
-    getSessionPeriodization.mockResolvedValue({ phase: 'deload' })
+    getSessionPeriodization.mockResolvedValue({ phase: 'deload' } as never)
   })
 
   it('estimates the 1RM, can set a record, and is not recorded as a deload', async () => {
