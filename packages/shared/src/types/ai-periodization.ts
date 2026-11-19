@@ -58,6 +58,9 @@ export interface PendingTransition {
   /** #3766: while waiting, the local Monday ("YYYY-MM-DD") the switch-over starts on, fixed as soon as
    *  the last deload finishes, so a type leaving its deload afterwards cannot lose it. */
   switchOverOn?: string
+  /** #3876: when `switchOverOn` was first known (ISO instant). A type that enters or restarts a
+   *  deload after it no longer holds the switch-over or moves its date later. */
+  switchOverKnownAt?: string
 }
 
 /** A prescription's two whole-session figures (`prescriptionFigures` computes both). */

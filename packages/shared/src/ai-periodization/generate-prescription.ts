@@ -18,6 +18,9 @@ import { expectedRpe, pctForExpectedRpe } from '@trainingai/shared/ai-periodizat
 import {
   applyDeloadFloor,
   canAutoApplyTransition,
+  deloadExitPhase,
+  isDeloadPlan,
+  typeDeloadFinished,
 } from '@trainingai/shared/ai-periodization/phase-guards'
 import { fitToBudget } from '@trainingai/shared/ai-periodization/time-budget'
 import { applyBudgetStage } from '@trainingai/shared/ai-periodization/budget-stage'
@@ -327,8 +330,19 @@ async function runPrescriptionGeneration(
   //
   // #3766: the program's phase is read (and the switch-over run, when it is due) in the same step,
   // which reconciles first.
-  const programPhase = await syncProgramPhase(repo, userId, activeProgram.id, tz)
+  let programPhase = await syncProgramPhase(repo, userId, activeProgram.id, tz)
   state = (await repo.getSessionPeriodization(userId, programSessionId)) ?? state
+  // #3876 (owner, 19 Nov): a session type that has completed its deload sessions leaves the deload at
+  // its next plan, with no tap and whether or not auto-apply is on. It used to wait for "Move to
+  // accumulation", which was easy to miss and cost a week each time. Only while the program waits for
+  // its switch-over: an aligned program's deload ends by the program's rules. The switch-over date
+  // was stamped by the sync above, so leaving the deload cannot lose it; the sync runs again because
+  // a type leaving its deload can make the switch-over due.
+  if (typeDeloadFinished(state, programPhase.aligned)) {
+    await repo.advancePhase(userId, programSessionId, deloadExitPhase(state.preEmergencyDeloadPhase, programPhase.phase))
+    programPhase = await syncProgramPhase(repo, userId, activeProgram.id, tz)
+    state = (await repo.getSessionPeriodization(userId, programSessionId)) ?? state
+  }
   // #3766: the phase this plan is made in. A program move while it is being made (another session's
   // tap or auto-apply) voids this slot; the plan is then not stored (`storePrescription` checks the
   // slot is still in this phase and start), so the slot regenerates in the new phase.
@@ -761,7 +775,8 @@ async function runPrescriptionGeneration(
     estimatedSessionDurationMin,
     weeklyVolumeContribution,
     ...(budget.fullSession && { fullSession: budget.fullSession }),
-    deload: parsed.deload,
+    // #3877: from the phase and the action, not the model's flag.
+    deload: isDeloadPlan(state.phase, parsed.phase_action),
     reasoning: parsed.reasoning,
     // The LLM's self-reported confidence is input only — a hallucinated 0.85 must never
     // auto-apply a prescription. The deterministic engine score is the only number that
@@ -802,7 +817,11 @@ async function runPrescriptionGeneration(
   // Deloads deliberately stay manual (owner call 2026-08-02): cutting to ~50% for 2 sets is
   // disruptive enough that it should be a decision, not a surprise.
   let prescriptionStatus: 'pending' | 'auto_applied' = 'pending'
-  if (autoEligible && (prescription.phaseAction === 'stay' || modelEarnedTransition)) {
+  // #3877: a program still waiting for its switch-over has no program phase to move, so an earned
+  // transition there is offered rather than applied. Applying it went through the program move,
+  // which a waiting program refuses, and the plan was then not stored at all (a 409 and no plan).
+  // The offer's tap moves this type alone (`typeOnly`).
+  if (autoEligible && (prescription.phaseAction === 'stay' || (modelEarnedTransition && programPhase.aligned))) {
     prescriptionStatus = 'auto_applied'
   }
 

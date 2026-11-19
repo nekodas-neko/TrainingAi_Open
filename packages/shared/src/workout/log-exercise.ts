@@ -117,7 +117,12 @@ export async function logExerciseFromPayload(
     // shouldCountTowardPr's isAnyDeload gate never fires and a deload set can mint a PR off a
     // deliberately submaximal load.
     const periodizationState = await repo.getSessionPeriodization(userId, sessionId).catch(() => null);
-    if (periodizationState?.phase === 'deload') {
+    // #3877: a session the lifter overrode to full weight is not a deload, whatever the phase. It
+    // used to be recorded as one, so every exercise of it stored an estimate of 0 and could set no
+    // record (production, 26 Oct). Decided here, where the workout session's phase type is first
+    // written; a session already stored keeps its type (read back below), so past rows are as they were.
+    const overriddenToFull = wasOverride === true && intensityMode === 'full';
+    if (periodizationState?.phase === 'deload' && !overriddenToFull) {
       currentPhaseType = 'deload';
     } else if (periodizationState?.phase === 'baseline' && !periodizationState.baselineComplete) {
       // TN-75: the same test `workout-data` uses for `isAiDynamicBaseline`, so the server agrees

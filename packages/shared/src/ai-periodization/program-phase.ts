@@ -279,8 +279,9 @@ export function programTarget(rows: PhaseRow[]): ProgramTarget | null {
   }
 }
 
-/** The waiting stamp: the program is waiting for its switch-over, which starts on `day` once known. */
-export function switchOverWait(day: string | null): PendingTransition {
+/** The waiting stamp: the program is waiting for its switch-over, which starts on `day` once known
+ *  (`knownAt`: when the day was first known, #3876). */
+export function switchOverWait(day: string | null, knownAt: string | null = null): PendingTransition {
   return {
     newPhase: 'accumulation',
     reasoning: day
@@ -289,7 +290,23 @@ export function switchOverWait(day: string | null): PendingTransition {
     urgency: 'normal',
     switchOverPending: true,
     ...(day != null && { switchOverOn: day }),
+    ...(day != null && knownAt != null && { switchOverKnownAt: knownAt }),
   }
+}
+
+/**
+ * When the switch-over's date was first known (#3876), or null while it is not. Read from the stamp;
+ * a stamp written before #3876 has the date without the instant, and is read as known from the
+ * Monday of the week before the date: the week whose finished deload gave it.
+ */
+function switchOverKnownAt(phased: PhaseRow[], tz: string): Date | null {
+  const instants = phased
+    .map(r => r.pendingTransition?.switchOverKnownAt)
+    .filter((v): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v)))
+    .map(v => new Date(v))
+  if (instants.length > 0) return instants.reduce((a, b) => (b < a ? b : a))
+  const stored = phased.reduce<string | null>((d, r) => laterDay(d, r.pendingTransition?.switchOverOn), null)
+  return stored != null ? dateStrMidnightInTz(shiftDateStr(stored, -7), tz) : null
 }
 
 function laterDay(a: string | null | undefined, b: string | null | undefined): string | null {
@@ -350,9 +367,14 @@ export function planSwitchOver(
     return { kind: 'realign', target: programTarget(phased)! }
   }
 
+  // #3876: once the date is known, a type that enters or restarts a deload after it neither holds the
+  // switch-over nor moves the date later. Production restarted a finished deload on 18 Nov and the
+  // switch, due on the 23rd, would have waited for two more sessions of it. A deload already under
+  // way when the date became known still counts, as the signed rule says.
+  const knownAt = switchOverKnownAt(phased, tz)
+  const counting = phased.filter(r => r.phase === 'deload' && (knownAt == null || r.phaseStartedAt.getTime() < knownAt.getTime()))
   let lastFinish: Date | null = null
-  for (const r of phased) {
-    if (r.phase !== 'deload') continue
+  for (const r of counting) {
     const done = completions
       .filter(c => c.programSessionId === r.programSessionId && c.completedAt.getTime() >= r.phaseStartedAt.getTime())
       .map(c => c.completedAt)
@@ -362,12 +384,15 @@ export function planSwitchOver(
   }
   const stored = phased.reduce<string | null>((d, r) => laterDay(d, r.pendingTransition?.switchOverOn), null)
   const knownDay = laterDay(stored, lastFinish ? shiftDateStr(trainingWeekOf(lastFinish, tz), 7) : null)
-  const wait = switchOverWait(knownDay)
-  const stamp = phased.every(r => r.pendingTransition?.switchOverPending === true && (r.pendingTransition.switchOverOn ?? null) === knownDay)
+  const knownAtIso = knownDay == null ? null : (knownAt ?? now).toISOString()
+  const wait = switchOverWait(knownDay, knownAtIso)
+  const stamp = phased.every(r => r.pendingTransition?.switchOverPending === true
+    && (r.pendingTransition.switchOverOn ?? null) === knownDay
+    && (knownDay == null || r.pendingTransition.switchOverKnownAt === knownAtIso))
     ? null
     : wait
 
-  if (phased.some(r => r.phase === 'deload' && r.sessionsInPhase < DELOAD_FLOOR)) {
+  if (counting.some(r => r.sessionsInPhase < DELOAD_FLOOR)) {
     return { kind: 'waiting', reason: 'deload_in_progress', stamp }
   }
   const startDay = laterDay(knownDay ?? trainingWeekOf(now, tz), earliest)!

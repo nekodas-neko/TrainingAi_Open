@@ -393,7 +393,7 @@ export async function listModelPhaseAnswers(db: Db, userId: string, programSessi
 }
 
 /** One session type's own phase move, kept for a program still on per-type phases while it waits
- *  for the switch-over (#3766). An aligned program moves through `advanceProgramPhase`. The row keeps
+ *  for the switch-over (#3766), and the per-type end of a finished deload (#3876). An aligned program moves through `advanceProgramPhase`. The row keeps
  *  the switch-over's waiting stamp and date (a deload left early must not lose the switch Monday);
  *  any other scheduled move, the program's mark included, is cleared. */
 export async function advancePhase(db: Db, userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization> {
@@ -404,6 +404,11 @@ export async function advancePhase(db: Db, userId: string, programSessionId: str
       phaseStartedAt: new Date(),
       sessionsInPhase: 0,
       pendingTransition: sql`CASE WHEN ${s.sessionPeriodization.pendingTransition} ->> 'switchOverPending' = 'true' THEN ${s.sessionPeriodization.pendingTransition} ELSE NULL END`,
+      // #3876: the phase a deload was entered from, so the deload can end by itself back there
+      // (`deloadExitPhase`). Kept across a move from deload to deload; cleared by any other move.
+      preEmergencyDeloadPhase: newPhase === 'deload'
+        ? sql`CASE WHEN ${s.sessionPeriodization.phase} <> 'deload' THEN ${s.sessionPeriodization.phase} ELSE ${s.sessionPeriodization.preEmergencyDeloadPhase} END`
+        : null,
       prescription: null,
       prescriptionStatus: 'none',
       prescriptionGeneratedAt: null,

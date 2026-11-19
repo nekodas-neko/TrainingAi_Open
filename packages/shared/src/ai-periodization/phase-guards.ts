@@ -51,3 +51,40 @@ export function applyDeloadFloor(
     reasoning: `You've completed ${sessionsInPhase} deload sessions — recovery is done. Start a fresh accumulation block, or build a new program to keep adapting. ${prescription.reasoning}`.trim(),
   }
 }
+
+/**
+ * Whether a plan is a deload (#3877). Worked out from the session's phase and the action, never
+ * taken from the model's own `deload` flag: production held a plan in accumulation, with a plain
+ * stay, flagged `deload: true`, and Preview's Deload toggle adopts the flag and lightens every
+ * exercise. True only when the session is in a deload phase or the plan is a deload offer.
+ */
+export function isDeloadPlan(sessionPhase: PeriodizationPhase, phaseAction: string): boolean {
+  return sessionPhase === 'deload' || phaseAction === 'deload_recommended'
+}
+
+/**
+ * Where a session type goes when its deload ends by itself (#3876, owner 19 Nov): back to the phase
+ * it was in before the deload, as recorded when it entered (`preEmergencyDeloadPhase`, written by
+ * `advancePhase`). A deload entered from realisation is the cycle's planned close, so it goes on to
+ * accumulation (`NEXT_PROGRAM_PHASE`'s order) rather than back to realisation. With nothing
+ * recorded (a deload entered before #3876), the program's phase; with none of that, accumulation.
+ */
+export function deloadExitPhase(
+  preDeloadPhase: PeriodizationPhase | null | undefined,
+  programPhase: PeriodizationPhase | null | undefined,
+): PeriodizationPhase {
+  if (preDeloadPhase === 'accumulation' || preDeloadPhase === 'intensification') return preDeloadPhase
+  if (preDeloadPhase === 'realisation') return 'accumulation'
+  if (programPhase === 'accumulation' || programPhase === 'intensification' || programPhase === 'realisation') return programPhase
+  return 'accumulation'
+}
+
+/** A session type's own deload is over: it has completed `DELOAD_FLOOR` deload sessions. Only a
+ *  program still waiting for its switch-over ends a deload per type; an aligned program's deload is
+ *  the program's (`applyProgramPhaseCap`). */
+export function typeDeloadFinished(
+  state: { phase: PeriodizationPhase; sessionsInPhase: number },
+  programAligned: boolean,
+): boolean {
+  return !programAligned && state.phase === 'deload' && state.sessionsInPhase >= DELOAD_FLOOR
+}

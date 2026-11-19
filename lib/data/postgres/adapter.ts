@@ -73,7 +73,7 @@ import {
   validWaterMlOrNull,
   validWaterMlDeltaOrNull,
 } from '@trainingai/shared/validation/body-metrics'
-import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
+import { sleepImplausibleReason, oneRmImplausible, MAX_PLAUSIBLE_ONE_RM_KG } from '@trainingai/shared/validation/plausibility'
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { sleepShapeFromHypnogram } from '@trainingai/shared/health/oura-sleep-detail'
 import { restlessnessFromMovement } from '@trainingai/shared/health/sleep-recording'
@@ -1781,7 +1781,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
       .where(and(
         eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from),
-        isNull(s.workoutSessions.deletedAt), isNull(s.exerciseLogs.deletedAt), isNull(s.setLogs.deletedAt),
+        // #3801: finished workouts only, as the session count above.
+        isNull(s.workoutSessions.deletedAt), isNotNull(s.workoutSessions.completedAt),
+        isNull(s.exerciseLogs.deletedAt), isNull(s.setLogs.deletedAt),
       ))
 
     return {
@@ -1816,7 +1818,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .leftJoin(s.exerciseLibrary, eq(s.exerciseLibrary.id, s.exerciseLogs.exerciseId))
       .where(and(
         eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from),
-        isNull(s.workoutSessions.deletedAt), isNull(s.exerciseLogs.deletedAt), isNull(s.setLogs.deletedAt),
+        // #3801: finished workouts only, as the session count above.
+        isNull(s.workoutSessions.deletedAt), isNotNull(s.workoutSessions.completedAt),
+        isNull(s.exerciseLogs.deletedAt), isNull(s.setLogs.deletedAt),
       ))
       .groupBy(s.exerciseLogs.exerciseName)
       .orderBy(desc(sql`COUNT(${s.setLogs.id})`))
@@ -4839,6 +4843,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.workoutSessions.userId, userId),
         eq(s.exerciseLogs.exerciseName, exerciseName),
         gt(s.exerciseLogs.estimated1rm, 0),
+        // #3878: shouldCountTowardPr's plausibility gate (`oneRmImplausible`). An estimate it refused
+        // at log time is still stored on the log, and without this one edit to the exercise made it
+        // the all-time record. NaN and Infinity fail `<=` in Postgres, as they fail the function.
+        lte(s.exerciseLogs.estimated1rm, MAX_PLAUSIBLE_ONE_RM_KG),
         isNull(s.exerciseLogs.deletedAt),
         isNull(s.workoutSessions.deletedAt),
         ...(excluded.length ? [notInArray(s.workoutSessions.id, excluded)] : []),
@@ -4858,7 +4866,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
       .orderBy(desc(s.exerciseLogs.estimated1rm), asc(s.exerciseLogs.loggedAt))
       .limit(1)
-    if (!best?.estimated1rm) return null
+    if (!best?.estimated1rm || oneRmImplausible(best.estimated1rm)) return null
     return { estimated1rm: best.estimated1rm, loggedAt: best.loggedAt ?? new Date() }
   }
 

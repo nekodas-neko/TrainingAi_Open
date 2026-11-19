@@ -81,6 +81,24 @@ export async function POST(
     return NextResponse.json({ state: unchanged, prescriptionStatus: 'accepted', phaseMoved: false })
   }
 
+  // #3876: a move to the phase this session type is already in changes nothing. It used to fall
+  // through to `advancePhase`, which wrote a new start and 0 sessions, so a deload already two
+  // sessions in started again. The plan on offer is taken (as the one-day deload path takes it);
+  // with none left to take, the call answers with the state unchanged. `force` does not change this:
+  // picking the current phase from the phase list is not a restart either.
+  if (body.newPhase === state.phase) {
+    const onOffer = state.prescription != null
+      && !prescriptionAgedOut(state)
+      && state.prescriptionStatus === 'pending'
+    if (onOffer) await repo.updatePrescriptionStatus(userId, sessionId, 'accepted')
+    const unchanged = onOffer ? await repo.getSessionPeriodization(userId, sessionId) : state
+    return NextResponse.json({
+      state: unchanged,
+      prescriptionStatus: onOffer ? 'accepted' : state.prescriptionStatus,
+      phaseMoved: false,
+    })
+  }
+
   // #3766: a move is either the one on offer or an explicit `force` (the phase list). The next phase
   // alone used to be enough; with the phase now the program's, an unoffered move from one type's
   // screen would move every type.
