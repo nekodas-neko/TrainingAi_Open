@@ -107,6 +107,8 @@ export function HistoryDay({
       );
       if (remove.workoutSessionId) {
         await journal.controller?.removeCompleted(remove.workoutSessionId);
+      } else if (sessionId && remove.exerciseLogId) {
+        await journal.controller?.removeCompletedExercise(sessionId, remove.exerciseLogId);
       }
       setRemove(null);
     });

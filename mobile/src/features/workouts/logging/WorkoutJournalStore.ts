@@ -1077,6 +1077,27 @@ export class WorkoutJournalStore {
       };
     });
 
+  /**
+   * Drops one exercise from an uploaded workout's two-week copy, once its delete is queued. The
+   * history view counts a just-uploaded workout from this copy for `UPLOAD_GRACE_MS`, and the queued
+   * delete leaves the outbox as soon as it is sent, so without this the exercise would show again
+   * until the grace ran out (#3880 review).
+   */
+  removeCompletedExercise = (workoutId: string, exerciseLogId: string) =>
+    this.action((data) => {
+      const workout = data.workouts.find((workout) => workout.id === workoutId);
+      if (!workout) {
+        return data;
+      }
+      if (workout.status !== 'completed' || workout.pending.length) {
+        throw new Error('Upload this workout before deleting its history.');
+      }
+      return replaceWorkout(data, workoutId, (current) => ({
+        ...current,
+        exercises: current.exercises.filter((exercise) => exercise.logId !== exerciseLogId),
+      }));
+    });
+
   sync = (): Promise<void> => {
     if (!this.current.ready || this.current.busy) {
       return Promise.resolve();

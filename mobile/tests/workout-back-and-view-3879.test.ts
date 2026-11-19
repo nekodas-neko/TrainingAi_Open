@@ -267,3 +267,32 @@ test('#3880: picture-in-picture Next on a re-logged exercise summary returns to 
     type: 'session',
   });
 });
+
+test('#3880 review: an exercise deleted just after upload does not come back during the grace', async (t) => {
+  const f = await setup(t);
+  const id = await f.toSummary();
+  await f.controller.finish(id);
+  await f.controller.sync();
+  const uploaded = f.workout();
+  assert.equal(uploaded.status, 'completed');
+  assert.equal(uploaded.pending.length, 0);
+  assert.ok(uploaded.syncedAt !== null);
+  const now = uploaded.syncedAt! + 1000;
+  const logId = uploaded.exercises[0].logId;
+  // Inside the grace the phone's copy still counts, as designed.
+  assert.equal(dayHistory(uploaded.date, [], [uploaded], [], now).length, 1);
+  // The delete is queued and then sent: it leaves the outbox, and the server no longer lists it.
+  await f.controller.removeCompletedExercise(id, logId);
+  const after = f.workout();
+  assert.ok(after.exercises.every((exercise) => exercise.logId !== logId));
+  assert.equal(dayHistory(after.date, [], [after], [], now).length, 0);
+  assert.equal(localOnlyWorkouts([after], [], now).length, 0);
+});
+
+test('#3880 review: an exercise of a workout still uploading cannot be removed from the copy', async (t) => {
+  const { f, workout } = await finishedOffline(t);
+  const ok = await f.controller.removeCompletedExercise(workout.id, workout.exercises[0].logId);
+  assert.equal(ok, false);
+  assert.match(f.controller.getSnapshot().message ?? '', /Upload this workout/);
+  assert.equal(f.workout().exercises.length, workout.exercises.length);
+});
