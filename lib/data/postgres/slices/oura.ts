@@ -3621,10 +3621,20 @@ export async function clearNightDerivedScores(
   if (pillars.readiness) {
     // #3086: the illness radar's fields are stored beside readiness from the same night inputs, so
     // they go with it: a re-scored day must not keep a flag from the night it no longer has.
-    Object.assign(set, { readinessScore: null, readinessContributors: null, illnessFlag: null, illnessScore: null, illnessBiomarkers: null })
+    // #3872: and so does the score's provenance. The source label, the readiness model stamp and the
+    // ACWR are written in the same persist as the score; left behind, the row claimed a score it no
+    // longer held. Only the `readiness` key leaves `model_versions`: the other pillars' stamps, and a
+    // `readinessNightRevisedAt` mark, are not this score's.
+    Object.assign(set, {
+      readinessScore: null, readinessContributors: null, illnessFlag: null, illnessScore: null, illnessBiomarkers: null,
+      readinessSource: null, acwr: null,
+      modelVersions: sql`${s.ouraDailyDerived.modelVersions} - 'readiness'`,
+    })
     present.push(
       isNotNull(s.ouraDailyDerived.readinessScore), isNotNull(s.ouraDailyDerived.readinessContributors),
       isNotNull(s.ouraDailyDerived.illnessFlag), isNotNull(s.ouraDailyDerived.illnessScore), isNotNull(s.ouraDailyDerived.illnessBiomarkers),
+      isNotNull(s.ouraDailyDerived.readinessSource), isNotNull(s.ouraDailyDerived.acwr),
+      sql`${s.ouraDailyDerived.modelVersions} ? 'readiness'`,
     )
   }
   if (present.length === 0) return false

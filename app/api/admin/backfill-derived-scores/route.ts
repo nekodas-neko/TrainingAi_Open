@@ -5,7 +5,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
 import { buildDayAudit } from '@trainingai/shared/health/score-audit/build-day-audit'
-import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
+import { readinessPatchFromAudit } from '@/lib/health/night-readiness'
 
 /**
  * Backfill the persisted Sleep and Readiness scores across history (audit finding F-2).
@@ -120,22 +120,10 @@ export async function POST(req: NextRequest) {
       if (readiness?.persist) {
         outcome.readiness.action = outcome.readiness.stored === readiness.persist.score ? 'unchanged' : 'written'
         if (!dryRun && outcome.readiness.action === 'written') {
-          await repo.upsertOuraDailyDerived(userId, d, {
-            readinessScore: readiness.persist.score,
-            readinessContributors: readiness.persist.contributors,
-            // #3086: the served score's explanation, as the live route stores it.
-            illnessFlag: readiness.persist.illnessFlag,
-            illnessScore: readiness.persist.illnessScore,
-            illnessBiomarkers: readiness.persist.illnessBiomarkers,
-            readinessSource: readiness.persist.readinessSource ?? 'ble-derived',
-            // The point of Q-273's stamp is that a later model change leaves a readable step in the
-            // trend rather than an unmarked one. A backfill writes across history in one pass, so an
-            // unstamped backfilled score is the exact case it was added for — and this route was
-            // producing them: measured 2026-09-04, 27 of the owner's rows carry a readiness score
-            // with no readiness stamp, against 10 that carry both, and only this route writes the
-            // first shape.
-            modelVersions: { readiness: READINESS_MODEL_VERSION },
-          })
+          // #3872: the same patch the late-night path stores (`readinessPatchFromAudit`). It stamps
+          // `model_versions.readiness`: measured 2026-09-04, 27 of the owner's rows carried a readiness
+          // score with no stamp, and only this route wrote that shape before the stamp was added here.
+          await repo.upsertOuraDailyDerived(userId, d, readinessPatchFromAudit(readiness.persist))
         }
       }
 

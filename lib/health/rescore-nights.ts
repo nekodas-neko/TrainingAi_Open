@@ -12,13 +12,21 @@
  * - **Sleep Score: recomputed now**, for any changed day in the window. It is a function of the
  *   night and the nights before it, so it is rebuilt by the readiness read's own scorer
  *   (`scoreSleepForDate`, one night window for both). A day left with no night is cleared.
- * - **Readiness, today: cleared**, with the illness radar's fields stored beside it (#3086). The
- *   readiness read rewrites today on its next read once today's night exists (it persists on every
- *   read), and leaves it empty if the night is gone.
- * - **Readiness, a finished day: kept and marked** (`model_versions.readinessNightRevisedAt`). A
- *   finished day's readiness is what it said that morning, built from that morning's activity, load
- *   and illness inputs, which no later read can rebuild. Clearing it would turn a revised value into a
- *   gap; the marker lets the Orchestrator find and re-derive it from a verified snapshot.
+ * - **Readiness, today: cleared, then scored now** (#3872), with the illness radar's fields stored
+ *   beside it (#3086). The clear takes the score's provenance with it; the readiness read itself
+ *   (`buildReadinessPayload`, through `night-readiness.ts`) then runs and stores today's score under
+ *   its own rule, so a night arriving after the day's last read, or on a day the app is never
+ *   opened, still leaves a score. With today's night gone it writes no readiness and the day stays
+ *   empty.
+ * - **Readiness, a finished day with a score: kept and marked**
+ *   (`model_versions.readinessNightRevisedAt`). A finished day's readiness is what it said that
+ *   morning, built from that morning's activity, load and illness inputs, which no later read can
+ *   rebuild. Clearing it would turn a revised value into a gap; the marker lets the Orchestrator find
+ *   and re-derive it from a verified snapshot.
+ * - **Readiness, a finished day with no score: scored now** (#3872). Its night arrived after local
+ *   midnight, or nothing scored it while it was today. It is scored by the per-day scorer the admin
+ *   backfill uses (`buildDayAudit`), since the read can only score today. It fills a gap and replaces
+ *   nothing.
  * - **Body Battery, today: released only when the night ARRIVED in this write.** A readiness anchor
  *   is frozen for its day, and a revision of a night that was already there must not move it: on
  *   18 Oct Oura revised the night at 22:23 local, and releasing then would have shifted that whole
@@ -51,6 +59,7 @@ import { DEFAULT_TZ, shiftDateStr, todayInTz } from '@trainingai/shared/date-uti
 import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
+import { scoreTodayReadiness, scoreFinishedDayReadiness } from '@/lib/health/night-readiness'
 
 /** How many days back a changed night is re-scored. Matches the training-stress look-back. */
 export const RESCORE_WINDOW_DAYS = 7
@@ -75,6 +84,8 @@ export interface RescoreOutcome {
   sleepRescored: string[]
   sleepCleared: string[]
   readinessCleared: string[]
+  /** Days whose readiness was scored in this re-score (#3872). */
+  readinessScored: string[]
   readinessMarked: string[]
   batteryReleased: string[]
 }
@@ -148,7 +159,7 @@ export async function rescoreChangedNights(
   const sessions = await repo.listSleepSessions(userId, shiftDateStr(earliest, -SLEEP_SCORE_HISTORY_DAYS), today)
   const after = nightFingerprints(sessions, tz, from, today)
   const changed = [...new Set([...changedNightDates(watch.before, after), ...ownerDates])].sort()
-  const out: RescoreOutcome = { changed, sleepRescored: [], sleepCleared: [], readinessCleared: [], readinessMarked: [], batteryReleased: [] }
+  const out: RescoreOutcome = { changed, sleepRescored: [], sleepCleared: [], readinessCleared: [], readinessScored: [], readinessMarked: [], batteryReleased: [] }
   if (changed.length === 0) return out
 
   const stored = new Map((await repo.getOuraDailyDerived(userId, changed[0], today)).map(r => [r.day, r]))
@@ -174,12 +185,34 @@ export async function rescoreChangedNights(
       // #2265: the owner's mark on today's night changes what today's anchor was built from.
       const ownerMarked = ownerDates.includes(day) && after.has(day)
       if ((arrived || ownerMarked) && await repo.releaseBodyBatteryAnchor(userId, day)) out.batteryReleased.push(day)
+      // #3872: score today now rather than waiting for a read that may never come. The read's own
+      // function, so its rule (only today's night writes) and its patch are the ones that apply.
+      if (after.has(day) && await scoreReadiness(day, async () => {
+        await scoreTodayReadiness(userId, tz)
+        return (await repo.getOuraDailyDerived(userId, day, day)).some(r => r.readinessScore != null)
+      })) out.readinessScored.push(day)
     } else if (stored.get(day)?.readinessScore != null) {
       await repo.upsertOuraDailyDerived(userId, day, { modelVersions: { readinessNightRevisedAt: now.toISOString() } })
       out.readinessMarked.push(day)
+    } else if (after.has(day) && await scoreReadiness(day, () => scoreFinishedDayReadiness(userId, day, tz))) {
+      // #3872: a finished day that never got a score, its night late. Filling the gap moves no value.
+      out.readinessScored.push(day)
     }
   }
   return out
+}
+
+/**
+ * One day's readiness scoring, best-effort: a failure is logged and the remaining days still run,
+ * as the sleep score's and the battery's do.
+ */
+async function scoreReadiness(day: string, run: () => Promise<boolean>): Promise<boolean> {
+  try {
+    return await run()
+  } catch (err) {
+    console.error(`[rescore-nights] scoring readiness for ${day} failed:`, err)
+    return false
+  }
 }
 
 /**

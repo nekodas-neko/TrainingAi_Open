@@ -14,6 +14,13 @@ import {
   withNightRescore, changedNightDates, scoreNightForDate, RESCORE_WINDOW_DAYS, partialNightRescore, type NightRescoreRepo,
 } from '@/lib/health/rescore-nights'
 
+// #3872: the readiness scorers reach the real repository; their own behaviour is pinned in
+// rescore-nights-readiness-3872.test.ts. Here they score nothing, so this file pins the rest.
+vi.mock('@/lib/health/night-readiness', () => ({
+  scoreTodayReadiness: vi.fn(async () => {}),
+  scoreFinishedDayReadiness: vi.fn(async () => false),
+}))
+
 const TZ = 'Australia/Brisbane'
 const HOUR = 3_600_000
 
