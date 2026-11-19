@@ -485,6 +485,53 @@ describe('POST …/session/[sessionId]/transition — one-day vs planned deload 
   })
 })
 
+// #3876: a move to the phase the type is already in changes nothing. A type two sessions into its
+// deload (production: 5 and 12 Nov) got "Move to Deload" on 18 Nov and its deload started again.
+describe('POST …/session/[sessionId]/transition — a move to the phase it is already in (#3876)', () => {
+  const deloadStart = new Date('2026-11-04T08:00:00Z')
+  const inDeload = (over: Row = {}) => state({
+    phase: 'deload', phaseStartedAt: deloadStart, sessionsInPhase: 2,
+    prescription: prescription({ phase: 'deload', deload: true, phaseAction: 'deload_recommended' }),
+    prescriptionStatus: 'pending', ...over,
+  })
+
+  for (const force of [false, true]) {
+    it(`"Move to Deload" ${force ? 'with' : 'without'} force takes the plan and leaves the start and count`, async () => {
+      getSessionPeriodization.mockResolvedValue(inDeload())
+      const res = await transitionPost({ newPhase: 'deload', ...(force && { force: true }) })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.phaseMoved).toBe(false)
+      expect(body.prescriptionStatus).toBe('accepted')
+      expect(body.state.phaseStartedAt).toBe(deloadStart.toISOString())
+      expect(body.state.sessionsInPhase).toBe(2)
+      expect(advancePhase).not.toHaveBeenCalled()
+      expect(updatePrescriptionStatus.mock.calls.map(c => c[2])).toEqual(['accepted'])
+    })
+  }
+
+  it('with no plan on offer it changes nothing at all', async () => {
+    getSessionPeriodization.mockResolvedValue(inDeload({ prescriptionStatus: 'consumed' }))
+    const res = await transitionPost({ newPhase: 'deload', force: true })
+    expect(res.status).toBe(200)
+    expect((await res.json()).phaseMoved).toBe(false)
+    expect(advancePhase).not.toHaveBeenCalled()
+    expect(updatePrescriptionStatus).not.toHaveBeenCalled()
+  })
+
+  it('the same holds for any phase: accumulation to accumulation is not a restart', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ prescription: prescription(), prescriptionStatus: 'pending' }))
+    await transitionPost({ newPhase: 'accumulation', force: true })
+    expect(advancePhase).not.toHaveBeenCalled()
+  })
+
+  it('a move to another phase still moves it', async () => {
+    getSessionPeriodization.mockResolvedValue(inDeload())
+    await transitionPost({ newPhase: 'accumulation', force: true })
+    expect(advancePhase.mock.calls[0][2]).toBe('accumulation')
+  })
+})
+
 describe('GET …/session/[sessionId]', () => {
   it('refuses without a session and on a malformed id', async () => {
     sessionUser = null

@@ -191,6 +191,44 @@ describe('logExerciseFromPayload — ai_dynamic deload PR gate (AI-8)', () => {
   })
 })
 
+// #3877: a session the lifter overrode to full weight inside a deload phase is not a deload. Production
+// had one (26 Oct: phase deload, mode full, override on) that stored an estimate of 0 on every exercise.
+describe('logExerciseFromPayload — a deload overridden to full weight (#3877)', () => {
+  beforeEach(() => {
+    getActiveProgramWithPhases.mockResolvedValue(null)
+    getActiveProgram.mockResolvedValue({ id: 'p1', phaseMode: 'ai_dynamic' })
+    getSessionPeriodization.mockResolvedValue({ phase: 'deload' })
+  })
+
+  it('estimates the 1RM, can set a record, and is not recorded as a deload', async () => {
+    const result = await logExerciseFromPayload('u1', { ...basePayload, intensityMode: 'full', wasOverride: true }, TZ)
+    expect(result.estimated1rm).toBeGreaterThan(0)
+    expect(result.isPR).toBe(true)
+    expect(createWorkoutSession).toHaveBeenCalledWith('u1', 'ps-1', 'Push', expect.any(Date), undefined, undefined, false)
+  })
+
+  it('full weight without an override (the plan itself) is still the phase\'s deload', async () => {
+    const result = await logExerciseFromPayload('u1', { ...basePayload, intensityMode: 'full', wasOverride: false }, TZ)
+    expect(result.estimated1rm).toBe(0)
+    expect(result.isPR).toBe(false)
+  })
+
+  it('an override to the deload stays a deload', async () => {
+    const result = await logExerciseFromPayload('u1', { ...basePayload, intensityMode: 'deload', wasOverride: true }, TZ)
+    expect(result.estimated1rm).toBe(0)
+    expect(result.isPR).toBe(false)
+  })
+
+  it('a session already stored as a deload keeps its type: past rows are not rewritten', async () => {
+    ensureWorkoutSession.mockResolvedValue({ wasInserted: false, phaseId: undefined, phaseType: 'deload', isEarlyDeload: false })
+    const result = await logExerciseFromPayload('u1', {
+      ...basePayload, workoutSessionId: '00000000-0000-4000-8000-000000003877', intensityMode: 'full', wasOverride: true,
+    }, TZ)
+    expect(result.estimated1rm).toBe(0)
+    expect(result.isPR).toBe(false)
+  })
+})
+
 describe('logExerciseFromPayload — planned snapshot (set-log planned_pct/planned_rest_sec)', () => {
   beforeEach(() => {
     getActiveProgramWithPhases.mockResolvedValue(null)
