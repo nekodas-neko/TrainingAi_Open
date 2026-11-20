@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.525.0",
+    date: "2026-11-20",
+    changes: [
+      "Both apps: a deload ends by itself. Once a session type has done its deload sessions, the next plan takes it back to the phase it was in before, with no tap, and once the program is aligned its deload ends after the program's deload week. A move to the phase a session type is already in no longer restarts it.",
+      "Both apps: choosing Full on a deload week keeps that session's 1RM estimate and personal records. Personal records and the year review now skip implausible 1RMs and unfinished workouts.",
+      "Both apps: readiness is scored as soon as Oura sends the night, so days you don't open the app have a readiness score too, and the score is the same whichever of Oura's documents arrives first. Body Battery follows the updated score.",
+      "Both apps: Oura is asked for every permission it offers, including the stress permission resilience needs. Reconnect Oura once after this release to grant them. The ring battery is read on quiet days too.",
+      "Both apps: linking Google onto a password account now also ends the old password's web sign-ins, and signing out from the phone's sign-in page or with a slow clear always finishes.",
+      "TrainingAi Preview: the Android Back key on a workout's summary goes back to the workout instead of finishing it, and history, the day screen, the workout card and the calendar agree with workouts still on the phone.",
+      "TrainingAi Preview: the body-fat trend plots weigh-ins only, and a dose logged offline stays on Home's timeline while it uploads.",
+      "Behind the scenes: an outbox edit that moves an activity to another date reaches the server, cached zone minutes stay right when a sync lands mid-read, and code for an unused AI insights table is removed ahead of dropping the table.",
+    ],
+  },
+  {
     version: "1.524.0",
     date: "2026-11-17",
     changes: [
