@@ -16,6 +16,7 @@ import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { HomeStore, emptyHome } from './HomeStore';
 import { homeWritePaths } from './models';
+import { onResume } from '../../../core/sync/resume';
 
 const Context = createContext<HomeStore | null>(null);
 const noSubscribe = () => () => {};
@@ -49,15 +50,13 @@ export function HomeStoreProvider({
 }: PropsWithChildren<{ store: HomeStore | null }>) {
   useEffect(() => {
     void store?.initialize().then(() => store.sync());
-    const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void store?.sync();
-        const day = todayInTz(
-          store?.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-        );
-        void store?.refresh('preferences', day);
-        void store?.refresh('mood', day);
-      }
+    const listener = onResume(() => {
+      void store?.sync();
+      const day = todayInTz(
+        store?.connection.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+      );
+      void store?.refresh('preferences', day);
+      void store?.refresh('mood', day);
     });
     const timer = setInterval(() => {
       if (AppState.currentState === 'active') {

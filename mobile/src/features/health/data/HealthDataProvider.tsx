@@ -18,6 +18,7 @@ import { HealthStore, emptyHealthState, overlayBody, overlaySleep } from './Heal
 import { manualHealthWritePaths } from './manual-write-paths';
 import { useAppleSleep } from '../HealthProvider';
 import { mergeAppleSleep } from '../../../integrations/apple-health/sleep-data';
+import { onResume } from '../../../core/sync/resume';
 
 const Context = createContext<{
   store: HealthStore | null;
@@ -85,11 +86,9 @@ export function HealthStoreProvider({
   }, [timezone]);
   useEffect(() => {
     void store?.initialize().then(() => store.sync());
-    const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void store?.sync();
-        void store?.refresh();
-      }
+    const listener = onResume(() => {
+      void store?.sync();
+      void store?.refresh();
     });
     const retry = setInterval(() => {
       if (AppState.currentState === 'active') {
