@@ -30,8 +30,9 @@ Full spec: `.claude/skills/oura-api/references/openapi-v1.42.json` (the version 
 | `spo2` | SpO2 average recorded during sleep (v1.34 spelled it `spo2Daily`; Oura drops that name silently) |
 | `heart_health` | "Heart health data": cardiovascular age and VO2 max. New in v1.42 |
 | `ring_configuration` | Not in the spec. Oura's own 401 named it for `ring_battery_level` (3 Nov 2026, #3578) |
+| `stress` | Not in the spec. Oura's refusal of `daily_resilience` named it ("Token is not authorized access stress scope", #3873) |
 
-Our app requests: `personal daily heartrate workout session spo2 heart_health ring_configuration` (`lib/oura/cloud/config.ts` → `OURA_SCOPES`). A grant stored under the old name says `spo2Daily`; `grantedOuraScopes` reads it as `spo2`. The spec maps no route to a scope (every operation just lists `OAuth2`), so the per-route scopes below are inferred from the scope descriptions and from what Oura refused (#3026): Oura refused resilience, cardiovascular age and VO2 max under `daily`. Resilience under `heart_health` is a guess, since no other scope is left for it.
+Our app requests every scope: `email personal daily heartrate workout tag session spo2 heart_health ring_configuration stress` (`lib/oura/cloud/config.ts` → `OURA_SCOPES`; `stress` is not in the spec either and was added for resilience, #3873). A grant stored under the old name says `spo2Daily`; `grantedOuraScopes` reads it as `spo2`. The spec maps no route to a scope (every operation just lists `OAuth2`), so the per-route scopes below are inferred from the scope descriptions and from what Oura refused (#3026): Oura refused resilience, cardiovascular age and VO2 max under `daily`. Resilience was refused under `daily` and `heart_health` too; Oura's refusal named `stress`, which is now asked for (#3873).
 
 ## Base URL
 
