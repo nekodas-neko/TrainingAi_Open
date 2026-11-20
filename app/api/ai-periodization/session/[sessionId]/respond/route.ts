@@ -4,7 +4,8 @@ import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { prescriptionAgedOut } from '@trainingai/shared/ai-periodization/prescription-expiry'
+import { serveStoredPrescription } from '@trainingai/shared/ai-periodization/program-phase'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 // One response to a prescription.
 const MAX_BODY_BYTES = 16 * 1024
@@ -45,7 +46,12 @@ export async function POST(
   // #3716: an aged-out prescription is no longer shown, so an Accept that reaches it was made on a
   // plan the lifter never saw (a stale screen, a queued tap). Refused; opening the session makes a
   // fresh one. A Dismiss would only bury a plan that is already being replaced, so it is refused too.
-  if (prescriptionAgedOut(state)) {
+  // #3907: the same served-plan check as the card's read, so a plan whose deload has ended (#3876),
+  // which the card no longer shows, is refused as well.
+  const program = await repo.getActiveProgram(userId)
+  const owner = program?.sessions.some(s => s.id === sessionId) ? program : null
+  const served = await serveStoredPrescription(repo, userId, owner, state, session?.user?.timezone ?? DEFAULT_TZ)
+  if (served.prescriptionAgedOut) {
     return NextResponse.json({ error: 'This prescription has expired. Reopen the session for a fresh one.' }, { status: 409 })
   }
 

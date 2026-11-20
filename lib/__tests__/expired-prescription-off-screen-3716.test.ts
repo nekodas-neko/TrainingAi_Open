@@ -183,3 +183,45 @@ describe('GET /api/next-session — the Home card (#3716)', () => {
     expect(body.estimatedDurationMin).toBe(25)
   })
 })
+
+// #3907: respond and next-session ran only `prescriptionAgedOut`, so a plan whose deload had ended
+// (#3876), which the card no longer shows, could still be accepted by a queued or stale tap, and
+// Home took its duration and drops. Both now make the card's served-plan check.
+describe('a plan whose deload has ended (#3907)', () => {
+  const endedDeload = () => state({
+    phase: 'deload', sessionsInPhase: 2, prescriptionStatus: 'pending',
+    prescriptionExpiresAt: new Date(Date.now() + 5 * 86_400_000),
+    prescription: prescription({ phase: 'deload', deload: true, phaseAction: 'deload_recommended', sessionsInPhaseAtPlan: 1 }),
+  })
+  // Waiting for its switch-over (two types on different phases), so the type's own count decides.
+  beforeEach(() => {
+    listSessionPeriodizationForProgram.mockResolvedValue([
+      state({ phase: 'deload', phaseStartedAt: new Date(Date.now() - 9 * 86_400_000) }),
+      state({ programSessionId: 'other', phase: 'accumulation' }),
+    ])
+  })
+
+  it('refuses an Accept, and writes nothing', async () => {
+    getSessionPeriodization.mockResolvedValue(endedDeload())
+    const res = await respondPost('accept')
+    expect(res.status).toBe(409)
+    expect(updatePrescriptionStatus).not.toHaveBeenCalled()
+  })
+
+  it('still accepts a deload plan made at the current count (control)', async () => {
+    getSessionPeriodization.mockResolvedValue({ ...endedDeload(), prescription: prescription({
+      phase: 'deload', deload: true, phaseAction: 'deload_recommended', sessionsInPhaseAtPlan: 2,
+    }) })
+    const res = await respondPost('accept')
+    expect(res.status).toBe(200)
+    expect(updatePrescriptionStatus).toHaveBeenCalledWith('u-3716', SESSION_ID, 'accepted')
+  })
+
+  it('Home takes neither its duration nor its drops', async () => {
+    getSessionPeriodization.mockResolvedValue({ ...endedDeload(), prescriptionStatus: 'accepted',
+      prescription: prescription({ phase: 'deload', deload: true, sessionsInPhaseAtPlan: 1 }) })
+    const body = await (await nextSession()).json()
+    expect(body.session.exercises.map((e: Row) => e.id)).toEqual([SQUAT, CURL])
+    expect(body.estimatedDurationMin).not.toBe(25)
+  })
+})

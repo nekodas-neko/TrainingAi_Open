@@ -1584,6 +1584,8 @@ export interface WorkoutRepository {
   upsertOuraCloudSleepPeriods(userId: string, rows: import('./postgres/slices/oura').OuraCloudSleepPeriodRow[]): Promise<number>
   /** #2982: Oura's per-day series, goals, contributors and stress label; sets only the fields each row carries. */
   upsertOuraCloudDaily(userId: string, rows: import('./postgres/slices/oura').OuraCloudDailyRow[]): Promise<number>
+  /** #3905: Oura's stored readiness contributors per day in `[from, to]`, for the webhook's duplicate check. */
+  getOuraCloudReadinessContributors(userId: string, from: string, to: string): Promise<{ date: string; readinessContributors: Record<string, number | null> | null }[]>
   /** #2985: Oura's stored MET series and 5-minute activity class per day, for the MET cascade. */
   getOuraCloudActivitySeries(userId: string, from: string, to: string): Promise<import('./postgres/slices/oura').OuraCloudActivitySeries[]>
   /** #3597: every per-minute movement series for the days in `[from, to]`, from each connector that
