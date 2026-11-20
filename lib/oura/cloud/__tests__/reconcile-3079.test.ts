@@ -51,7 +51,9 @@ describe('reconcileOuraCloud', () => {
       // #3087, #3153: and tombstones a workout or session gone from Oura's list for a day it re-read.
       // #3875: and the ring's battery, so a quiet day still records a level.
       expect(opts).toEqual({ from: shiftDateStr(to, -(RECONCILE_DAYS - 1)), to, dryRun: false, heartRate: true, ringBattery: true, tz, tombstoneAbsent: true, stampData: false })
-      expect(deps.rescore).toBe(repo)
+      // #3872: with today's readiness scorer injected, the data layer never imports the readiness read.
+      expect(deps.rescore).toEqual({ repo: expect.anything(), scoreToday: expect.any(Function) })
+      expect((deps.rescore as { repo: unknown }).repo).toBe(repo)
       // #3078: the reconciliation's heart rate re-attributes the workouts it changed.
       expect(deps.workoutHr).toBeTypeOf('function')
     }

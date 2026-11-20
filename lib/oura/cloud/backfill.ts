@@ -20,7 +20,7 @@ import { NO_WRITES, plannedCounts, reattributeAfterHeartRate, refreshStillRhrAft
 import { stampOuraData } from './freshness'
 import { stillRhrRefresher, type StillRhrRefresh } from './still-rhr'
 import { reportOuraCloudIssue } from './report'
-import type { NightRescoreRepo } from '@/lib/health/rescore-nights'
+import type { NightRescoreTarget } from '@/lib/health/rescore-nights'
 import { confirmOuraTokenRefused, getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraRefusalVerdict, type OuraTokenStore } from './tokens'
 
 /** How far back a new connection reads. Inside the 180-day heart-rate retention. */
@@ -101,7 +101,7 @@ export type OuraBackfillDeps = {
   /** How a Retry-After is waited out; replaceable for tests. */
   wait?: (ms: number) => Promise<void>
   /** #3079: re-scores a recent night the read changed (`rescore-nights.ts`). */
-  rescore?: NightRescoreRepo
+  rescore?: NightRescoreTarget
   /** #3078: re-attributes the workouts each heart-rate chunk changed (`workoutHrReattributor`). */
   workoutHr?: OuraWorkoutHrReattribute
   /** #2634: refreshes the still-period resting HR of the days each write could change (`stillRhrRefresher`). */
@@ -371,7 +371,8 @@ export function startOuraConnectBackfill(userId: string): void {
       const tz = user?.timezone ?? DEFAULT_TZ
       const to = todayInTz(tz)
       const { workoutHrReattributor } = await import('@/lib/workout/post-completion-hr')
-      const result = await backfillOuraCloud({ repo, config, rescore: repo, workoutHr: workoutHrReattributor(repo), stillRhr: stillRhrRefresher(repo) }, userId, {
+      const { rescoreWithTodayReadiness } = await import('@/lib/health/today-readiness-scorer')
+      const result = await backfillOuraCloud({ repo, config, rescore: rescoreWithTodayReadiness(repo), workoutHr: workoutHrReattributor(repo), stillRhr: stillRhrRefresher(repo) }, userId, {
         from: shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1)), to, dryRun: false, heartRate: true, ringBattery: true, tz,
       })
       // A connect whose history did not arrive is otherwise invisible: the account reads connected.

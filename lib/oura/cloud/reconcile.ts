@@ -115,7 +115,8 @@ export async function reconcileOuraCloud(deps: ReconcileDeps): Promise<Reconcile
     try {
       // Loaded here, as `runOuraReconcile` loads `@/lib/data`: this module is reached from the boot timer.
       const { workoutHrReattributor } = await import('@/lib/workout/post-completion-hr')
-      const result = await backfill({ repo: deps.repo, config: deps.config, rescore: deps.repo, workoutHr: workoutHrReattributor(deps.repo), stillRhr: stillRhrRefresher(deps.repo) }, userId, {
+      const { rescoreWithTodayReadiness } = await import('@/lib/health/today-readiness-scorer')
+      const result = await backfill({ repo: deps.repo, config: deps.config, rescore: rescoreWithTodayReadiness(deps.repo), workoutHr: workoutHrReattributor(deps.repo), stillRhr: stillRhrRefresher(deps.repo) }, userId, {
         // #3875: the battery too, so a quiet day with no sleep, activity or workout event still
         // records a level. Its own 401 or 403 is a per-type refusal and never stops the pass.
         from, to, dryRun: false, heartRate: true, ringBattery: true, tz, tombstoneAbsent: true, stampData: false,

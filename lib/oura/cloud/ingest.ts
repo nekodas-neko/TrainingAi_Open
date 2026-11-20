@@ -17,7 +17,7 @@
 //
 // The BLE raw archive (`oura_raw_samples`, `oura_raw_packed`) is never touched here.
 import type { OuraCloudHeartrateWrite, WorkoutRepository } from '@/lib/data/repository'
-import { withNightRescore, rescoreReadinessDocuments, readinessDocumentChanged, type NightRescoreTarget } from '@/lib/health/rescore-nights'
+import { withNightRescore, rescoreReadinessDocuments, readinessDocumentChanged, unpackRescoreTarget, type NightRescoreTarget } from '@/lib/health/rescore-nights'
 import type { OuraCloudWrites } from './documents'
 import { reportOuraCloudIssue } from './report'
 import { stillRhrDaysBetween, stillRhrDaysForDocuments, type StillRhrRefresh } from './still-rhr'
@@ -125,8 +125,8 @@ export async function writeOuraCloudData(
   let temperatureArrived: string[] = []
   let priorReadiness = new Map<string, number | null>()
   if (rescore && readinessDays.length > 0) {
-    const deferred = 'deferReadiness' in rescore
-    const repo = deferred ? rescore.repo : rescore
+    const { repo, scoring } = unpackRescoreTarget(rescore)
+    const deferred = scoring.deferReadiness != null
     const [from, to] = [readinessDays[0], readinessDays[readinessDays.length - 1]]
     try {
       const [daily, derived] = await Promise.all([repo.getOuraDaily(userId, from, to), repo.getOuraDailyDerived(userId, from, to)])
