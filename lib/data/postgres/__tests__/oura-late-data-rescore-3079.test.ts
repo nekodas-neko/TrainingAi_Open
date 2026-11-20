@@ -67,6 +67,34 @@ describe.skipIf(!canRun)('Oura late data re-scores its day (#3079)', () => {
     expect(row.activity_score).toBe(60)
   })
 
+  // #3872: the score's provenance is written in the same persist as the score, so it goes with it.
+  // Left behind, the row claimed a readiness score it no longer held.
+  it("clears readiness's source, model stamp and ACWR with it, and leaves the other pillars' stamps", async () => {
+    await repo.upsertOuraDailyDerived(USER, today, {
+      sleepScore: 80, readinessScore: 70, readinessSource: 'generic-derived', acwr: 1.1,
+      modelVersions: { readiness: 'v-test', sleep: 's-test', readinessNightRevisedAt: '2026-01-01T00:00:00.000Z' },
+    })
+    expect(await repo.clearNightDerivedScores(USER, today, { sleep: false, readiness: true })).toBe(true)
+    const row = (await pool.query(
+      `SELECT readiness_score, readiness_source, acwr, sleep_score, model_versions FROM oura_daily_derived WHERE user_id = $1 AND day = $2`,
+      [USER, today])).rows[0]
+    expect(row.readiness_score).toBeNull()
+    expect(row.readiness_source).toBeNull()
+    expect(row.acwr).toBeNull()
+    expect(row.sleep_score).toBe(80)
+    expect(row.model_versions).toEqual({ sleep: 's-test', readinessNightRevisedAt: '2026-01-01T00:00:00.000Z' })
+    // A row holding only the provenance still counts as changed, and once clean it does not.
+    await repo.upsertOuraDailyDerived(USER, today, { readinessSource: 'generic-derived', modelVersions: { readiness: 'v-test' } })
+    expect(await repo.clearNightDerivedScores(USER, today, { sleep: false, readiness: true })).toBe(true)
+    expect(await repo.clearNightDerivedScores(USER, today, { sleep: false, readiness: true })).toBe(false)
+    // Clearing sleep alone leaves readiness's provenance where it is.
+    await repo.upsertOuraDailyDerived(USER, today, { sleepScore: 80, readinessScore: 70, readinessSource: 'generic-derived', modelVersions: { readiness: 'v-test' } })
+    await repo.clearNightDerivedScores(USER, today, { sleep: true, readiness: false })
+    const kept = (await pool.query(`SELECT readiness_source, model_versions FROM oura_daily_derived WHERE user_id = $1 AND day = $2`, [USER, today])).rows[0]
+    expect(kept.readiness_source).toBe('generic-derived')
+    expect(kept.model_versions.readiness).toBe('v-test')
+  })
+
   // #3086: the illness radar's fields are stored beside readiness from the same night, so they go
   // with it, and a day holding only them still counts as changed.
   it('clears the illness fields with readiness, never with sleep alone', async () => {

@@ -27,7 +27,7 @@ import { isRingBatteryBackedOff, markRingBatteryRefused, resetRingBatteryBackoff
 import { stampOuraData, stampOuraWebhook } from './freshness'
 import { reattributeAfterHeartRate, refreshStillRhrAfterHeartRate, writeOuraCloudData, type OuraBatteryStore, type OuraCloudWriteCounts, type OuraCloudWriter, type OuraWorkoutHrReattribute } from './ingest'
 import type { StillRhrRefresh } from './still-rhr'
-import { withNightRescore, type NightRescoreRepo } from '@/lib/health/rescore-nights'
+import { withNightRescore, type NightRescoreTarget } from '@/lib/health/rescore-nights'
 import { confirmOuraTokenRefused, getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraRefusalVerdict, type OuraTokenStore } from './tokens'
 
 /** The webhook settings, from the environment. `null` when any is missing: the route answers 503. */
@@ -142,7 +142,7 @@ export type OuraWebhookDeps = {
   /** #3069: starts the ring-battery read for a user; replaceable for tests. Default: `startOuraCloudRingBatteryCatchUp`. */
   ringBattery?: (userId: string) => void
   /** #3079: re-scores a recent night a sleep event changed or deleted (`rescore-nights.ts`). */
-  rescore?: NightRescoreRepo
+  rescore?: NightRescoreTarget
   /**
    * #3078: re-attributes completed workouts whose window the heart-rate catch-up just changed
    * (`workoutHrReattributor`). Without it the catch-up writes heart rate and nothing else.

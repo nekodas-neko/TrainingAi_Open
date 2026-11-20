@@ -3569,6 +3569,20 @@ export async function upsertOuraDailyDerived(db: Db, userId: string, day: string
 }
 
 /**
+ * The columns a readiness clear nulls: the score, the illness radar's fields stored beside it
+ * (#3086), and its provenance (#3872): the source label, the ACWR and the `readiness` key of
+ * `model_versions`, which are written in the same persist. Shared by every statement that clears a
+ * day's readiness, so none leaves a row claiming a score it no longer holds.
+ */
+export function readinessClearSet() {
+  return {
+    readinessScore: null, readinessContributors: null, illnessFlag: null, illnessScore: null, illnessBiomarkers: null,
+    readinessSource: null, acwr: null,
+    modelVersions: sql`${s.ouraDailyDerived.modelVersions} - 'readiness'`,
+  }
+}
+
+/**
  * #3079. Nulls a day's stored Sleep Score and/or readiness when the night they were scored from has
  * changed or gone (an Oura revision or delete). `upsertOuraDailyDerived` COALESCEs, so it can never
  * clear a column; this is the one statement that does, and only the named pillar's columns.
@@ -3587,10 +3601,16 @@ export async function clearNightDerivedScores(
   if (pillars.readiness) {
     // #3086: the illness radar's fields are stored beside readiness from the same night inputs, so
     // they go with it: a re-scored day must not keep a flag from the night it no longer has.
-    Object.assign(set, { readinessScore: null, readinessContributors: null, illnessFlag: null, illnessScore: null, illnessBiomarkers: null })
+    // #3872: and so does the score's provenance. The source label, the readiness model stamp and the
+    // ACWR are written in the same persist as the score; left behind, the row claimed a score it no
+    // longer held. Only the `readiness` key leaves `model_versions`: the other pillars' stamps, and a
+    // `readinessNightRevisedAt` mark, are not this score's.
+    Object.assign(set, readinessClearSet())
     present.push(
       isNotNull(s.ouraDailyDerived.readinessScore), isNotNull(s.ouraDailyDerived.readinessContributors),
       isNotNull(s.ouraDailyDerived.illnessFlag), isNotNull(s.ouraDailyDerived.illnessScore), isNotNull(s.ouraDailyDerived.illnessBiomarkers),
+      isNotNull(s.ouraDailyDerived.readinessSource), isNotNull(s.ouraDailyDerived.acwr),
+      sql`${s.ouraDailyDerived.modelVersions} ? 'readiness'`,
     )
   }
   if (present.length === 0) return false

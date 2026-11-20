@@ -816,10 +816,10 @@ export async function buildReadinessPayload(
   // first item), so a suppressed day stays explainable without a new column: the composite before
   // the radar is the stored score plus `READINESS_SUPPRESSION[illness_flag]` (unless clamped at 0),
   // and the contributors are the composite's own, unchanged. The
-  // route still computes live for display (read-first is perf-gated and not adopted). Writes only the
-  // readiness_* columns (COALESCE upsert) — never the shared source/model_versions, which the upsert
-  // replaces wholesale and would clobber body_comp/illness provenance on the same row. Best-effort:
-  // a persist failure must never fail the read.
+  // route still computes live for display (read-first is perf-gated and not adopted). Writes the
+  // readiness columns, the illness radar's fields, `readiness_source`, `acwr` and its own
+  // `model_versions.readiness` key (COALESCE upsert; `model_versions` is merged with `||`, so no
+  // other pillar's stamp is touched). Best-effort: a persist failure must never fail the read.
   // The generic branch keys on today rather than a rollup's wake day (it has no rollup) — that is
   // the day the trend surfaces read, and it is what stops a Health Connect user's readiness trend
   // from being empty every day (Q-43). It only ever back-fills forward: days before this shipped
