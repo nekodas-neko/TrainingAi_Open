@@ -19,10 +19,11 @@ import { deloadExitPhase, isDeloadPlan, typeDeloadFinished, DELOAD_FLOOR } from 
 import { isAiPrescriptionPending } from '../prescription-pending'
 import { hidePrescriptionAgedOutOnScreen, prescribedDeloadDefault, servePrescriptionState } from '../prescription-expiry'
 
-const mocks = vi.hoisted(() => ({ signals: null as unknown, modelAnswer: null as unknown }))
+const mocks = vi.hoisted(() => ({ signals: null as unknown, modelAnswer: null as unknown, whileBuilding: null as null | (() => void) }))
 vi.mock('../signals', async importOriginal => ({
   ...(await importOriginal<typeof import('../signals')>()),
-  aggregateSignals: async () => mocks.signals,
+  // `whileBuilding` runs while the plan is being made: a change another request makes meanwhile.
+  aggregateSignals: async () => { mocks.whileBuilding?.(); return mocks.signals },
 }))
 vi.mock('@/lib/ai/instrument', () => ({
   aiModel: () => ({}),
@@ -182,7 +183,7 @@ type Slot = SessionPeriodization
  */
 function memoryProgram(
   initial: PhaseRow[], completions: ProgramCompletion[], pre: Record<string, PeriodizationPhase | null> = {},
-  opts: { failStore?: boolean } = {},
+  opts: { failStore?: boolean; structure?: { value: string } } = {},
 ) {
   let rows: Slot[] = initial.map(r => ({
     ...r, prescription: null, prescriptionStatus: 'consumed', prescriptionExpiresAt: null, prescriptionGeneratedAt: null,
@@ -223,6 +224,8 @@ function memoryProgram(
     },
     realignProgramPhase: async () => undefined,
     voidSessionPrescription: async () => undefined,
+    // The slice's structure stamp (#3895): what the session is made of right now.
+    getSessionStructureStamp: async () => opts.structure?.value ?? null,
     advancePhase: async (_u: string, id: string, phase: PeriodizationPhase) => {
       typeMoves.push([id, phase])
       rows = rows.map(r => (r.programSessionId === id
@@ -255,10 +258,11 @@ function memoryProgram(
       await (known.setProgramPhase as (...a: unknown[]) => Promise<boolean>)('u', 'prog', phase, new Date(), null, { expect: expected })
       return { ...find(id) }
     },
-    storePrescription: async (_u: string, id: string, prescription: AiPrescription, _e: Date, status: string, generatedFor?: { phase: string; phaseStartedAt: Date }) => {
+    storePrescription: async (_u: string, id: string, prescription: AiPrescription, _e: Date, status: string, generatedFor?: { phase: string; phaseStartedAt: Date; structure?: string | null }) => {
       if (opts.failStore) throw new Error('connection lost')
       const r = find(id)
       if (generatedFor && (r.phase !== generatedFor.phase || r.phaseStartedAt.getTime() !== generatedFor.phaseStartedAt.getTime())) return false
+      if (generatedFor?.structure != null && generatedFor.structure !== opts.structure?.value) return false
       stored.push({ id, prescription, status })
       rows = rows.map(x => (x.programSessionId === id ? { ...x, prescription, prescriptionStatus: status } as Slot : x))
       return true
@@ -510,5 +514,38 @@ describe('generation, #3877', () => {
     expect(p.stored).toHaveLength(1)
     expect(p.row('c').phase).toBe('accumulation')
     expect(p.row('c').prescription).not.toBeNull()
+  })
+})
+
+// #3895 review: a Coach change (or its undo, or an editor save) while a plan is being made voids the
+// slot, but the running generation read the session before the change. It must store nothing, so the
+// voided slot regenerates against the session as it now is.
+describe('generation, a session changed while its plan was being made (#3895)', () => {
+  const NOW = at('2026-11-20T12:00:00')
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
+    mocks.signals = signals()
+    mocks.modelAnswer = stayAnswer('accumulation')
+  })
+  afterEach(() => { vi.useRealTimers(); mocks.whileBuilding = null })
+
+  const rows = (): PhaseRow[] => [row('c', 'accumulation', at('2026-11-10T12:00:00'), 2)]
+
+  it('stores nothing when the session changed after the generation started, and says to reopen', async () => {
+    const structure = { value: 'squat' }
+    const p = memoryProgram(rows(), [], {}, { structure })
+    mocks.whileBuilding = () => { structure.value = 'front-squat' }
+    const r = await p.plan('c')
+    expect(r).toMatchObject({ ok: false, status: 409 })
+    expect(p.stored).toEqual([])
+    expect(p.row('c').prescription).toBeNull()
+  })
+
+  it('stores the plan when the session is as it was at the start', async () => {
+    const p = memoryProgram(rows(), [], {}, { structure: { value: 'squat' } })
+    const r = await p.plan('c')
+    expect(r.ok).toBe(true)
+    expect(p.stored).toHaveLength(1)
   })
 })

@@ -8558,7 +8558,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     })
   }
 
-  async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: { phase: PeriodizationPhase; phaseStartedAt: Date }) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor) }
+  async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus, generatedFor?: import('@trainingai/shared/types/ai-periodization').PrescriptionGeneratedFor) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status, generatedFor) }
+  async getSessionStructureStamp(userId: string, programSessionId: string) { return period.getSessionStructureStamp(this.db, userId, programSessionId) }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }
   async voidSessionPrescription(userId: string, programSessionId: string) { return period.voidSessionPrescription(this.db, userId, programSessionId) }
