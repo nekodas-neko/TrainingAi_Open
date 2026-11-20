@@ -41,7 +41,26 @@ describe('GET /api/activity-detection/walks (#2471)', () => {
     expect(await res.json()).toEqual({
       date: '2026-10-07',
       walks: [{ startMs: T0 + 10 * MIN, endMs: T0 + 32 * MIN, durationMin: 22, meanMet: 3 }],
+      covered: [],
     })
+  })
+
+  // #3625: a phone holding an earlier offer drops it once the walk is logged or recorded elsewhere.
+  it('lists the logged activities and source workouts that now cover the day, and nothing else', async () => {
+    repo.listActivityLogs.mockImplementation(async () => [{ date: '2026-10-07', startTime: '09:10:00', endTime: '09:32:00', durationMin: 22 }])
+    repo.getOuraWorkouts.mockImplementation(async () => [
+      { startDatetime: new Date(T0 + 40 * MIN), endDatetime: new Date(T0 + 50 * MIN) },
+      // The day before, read because a source files workouts under its own day: not this day's.
+      { startDatetime: new Date(T0 - 24 * 60 * MIN), endDatetime: new Date(T0 - 23 * 60 * MIN) },
+    ])
+    // A lifting session is not a recorded walk: it stops new offers but covers nothing.
+    repo.getDaySessionSummaries.mockImplementation(async () => [{ startedAt: new Date(T0 + 52 * MIN), completedAt: new Date(T0 + 58 * MIN) }])
+    const body = await (await get()).json()
+    expect(body.walks).toEqual([])
+    expect(body.covered).toEqual([
+      { startMs: T0 + 10 * MIN, endMs: T0 + 32 * MIN },
+      { startMs: T0 + 40 * MIN, endMs: T0 + 50 * MIN },
+    ])
   })
 
   it('leaves out a walk the user already logged, so a saved card does not come back', async () => {

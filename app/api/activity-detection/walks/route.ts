@@ -30,6 +30,10 @@ const QuerySchema = z.object({
 export interface WalkCandidatesResponse {
   date: string
   walks: { startMs: number; endMs: number; durationMin: number; meanMet: number }[]
+  /** #3625: the day's logged activities and source-recorded workouts, as plain spans. A phone that
+   *  keeps an earlier offer until it is answered (as the current app's store does) drops one that a
+   *  span here now covers, so a walk logged elsewhere since is not offered twice. */
+  covered: { startMs: number; endMs: number }[]
 }
 
 export async function GET(req: NextRequest) {
@@ -65,18 +69,19 @@ export async function GET(req: NextRequest) {
       repo.getOuraWorkouts(userId, { from: shiftDateStr(date, -1), to: shiftDateStr(date, 1) }).catch(() => []),
     ])
 
+    // Stored as HH:MM:SS (Postgres time); the parser takes HH:MM.
+    const loggedSpans = activities.flatMap(a => {
+      const start = localClockTimeToDate(a.date, a.startTime?.slice(0, 5), tz)
+      if (!start) return []
+      const end = localClockTimeToDate(a.date, a.endTime?.slice(0, 5), tz)
+        ?? (a.durationMin != null ? new Date(start.getTime() + a.durationMin * 60_000) : null)
+      return end && end > start ? [{ startMs: start.getTime(), endMs: end.getTime() }] : []
+    })
     const exclusions = [
       ...sleepRows.map(r => ({ startMs: new Date(r.sleepStart).getTime(), endMs: new Date(r.sleepEnd).getTime() })),
       // A session still open is excluded to now: the user is lifting, not walking.
       ...lifting.map(s => ({ startMs: s.startedAt.getTime(), endMs: (s.completedAt ?? new Date()).getTime() })),
-      // Stored as HH:MM:SS (Postgres time); the parser takes HH:MM.
-      ...activities.flatMap(a => {
-        const start = localClockTimeToDate(a.date, a.startTime?.slice(0, 5), tz)
-        if (!start) return []
-        const end = localClockTimeToDate(a.date, a.endTime?.slice(0, 5), tz)
-          ?? (a.durationMin != null ? new Date(start.getTime() + a.durationMin * 60_000) : null)
-        return end && end > start ? [{ startMs: start.getTime(), endMs: end.getTime() }] : []
-      }),
+      ...loggedSpans,
     ]
     // #3844: a walk the source already recorded as a workout is not offered again. Read as a plain
     // interval, whatever the source labelled it. A source's workout often starts after the walk does
@@ -97,7 +102,10 @@ export async function GET(req: NextRequest) {
       .filter(w => w.startMs >= dayStart.getTime() && w.startMs < dayEnd.getTime())
       .filter(w => !sourceSpans.some(x => w.startMs < x.endMs && w.endMs > x.startMs))
 
-    return NextResponse.json({ date, walks } satisfies WalkCandidatesResponse, { headers: { 'Cache-Control': 'private, no-store' } })
+    const covered = [...loggedSpans, ...sourceSpans]
+      .filter(x => x.startMs < dayEnd.getTime() && x.endMs > dayStart.getTime())
+
+    return NextResponse.json({ date, walks, covered } satisfies WalkCandidatesResponse, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     errorLog(error, 'API /activity-detection/walks')
     return NextResponse.json({ error: 'Could not read walks' }, { status: 500 })
