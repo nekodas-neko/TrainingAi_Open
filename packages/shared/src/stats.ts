@@ -46,8 +46,8 @@ export function iqrBand(values: number[], multiplier: number): { median: number;
  * actually-observed value rather than one invented between two. Empty → null.
  *
  * Not a lesser `median`, and not a copy that drifted: callers want exactly this and each
- * has a reason (LA-151). `lib/oura-models/daily-baselines.ts` and `lib/oura-models/cumulative-stress.ts`
- * mirror an external model whose goldens pin it — 46.923 over 14 symmetric values only comes out
+ * has a reason (LA-151). `lib/oura-models/daily-baselines.ts` mirrors an external model whose goldens
+ * pin it (as `cumulative-stress.ts` did until #2860 retired it) — 46.923 over 14 symmetric values only comes out
  * of the lower middle. (A third, the step-counter export console, was retired in #2862.)
  *
  * **Use `median` unless you can say which of those two reasons applies.** Where the number is a
