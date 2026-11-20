@@ -8,7 +8,7 @@ import { readPushAnswer } from '../../../core/sync/push-answer.ts';
 import { isCalendarDate } from '@trainingai/shared/date-utils';
 import { moodSchema, preferencesSchema, type HomePreferences, type Mood } from './models.ts';
 import { failureNotice } from '../../../core/reporting/index.ts';
-import { rememberAnswered } from './detected-walks.ts';
+import { rememberAnswered, sameWalks, type DetectedWalk } from './detected-walks.ts';
 
 const dateSchema = z
   .string()
@@ -39,6 +39,15 @@ const diskSchema = z.object({
   markers: z.record(z.string(), z.boolean()).default({}),
   setAside: z.string().nullable().default(null),
   answeredWalks: z.array(z.number()).default([]),
+  offeredWalks: z
+    .array(
+      z.object({
+        startMs: z.number().finite(),
+        endMs: z.number().finite(),
+        durationMin: z.number().finite(),
+      }),
+    )
+    .default([]),
 });
 type Operation = z.infer<typeof operationSchema>;
 export type HomeChange = Operation['kind'];
@@ -59,6 +68,8 @@ export type HomeState = {
   setAside: string | null;
   /** Start times of detected walks the person saved or dismissed, kept three days (#3625). */
   answeredWalks: number[];
+  /** Today's detected walks as last offered, held until answered as the current app does (#3625). */
+  offeredWalks: DetectedWalk[];
 };
 export const emptyHome: HomeState = {
   ready: false,
@@ -75,6 +86,7 @@ export const emptyHome: HomeState = {
   markers: {},
   setAside: null,
   answeredWalks: [],
+  offeredWalks: [],
 };
 function sameFields(actual: Record<string, unknown>, expected: Record<string, unknown>) {
   return Object.entries(expected).every(
@@ -229,6 +241,15 @@ export class HomeStore {
         ? rememberAnswered(state.answeredWalks, startMs, this.now())
         : state.answeredWalks.filter((t) => t !== startMs),
     }));
+  }
+  /** Remembers today's offered walks (`offeredToday`); nothing is written while they are unchanged. */
+  async holdWalks(walks: readonly DetectedWalk[]) {
+    if (!this.current.ready || this.current.denied || sameWalks(walks, this.current.offeredWalks)) {
+      return;
+    }
+    await this.write((state) =>
+      sameWalks(walks, state.offeredWalks) ? {} : { offeredWalks: walks.map((walk) => ({ ...walk })) },
+    );
   }
   async postponeGoals(date: string) {
     this.guard();
