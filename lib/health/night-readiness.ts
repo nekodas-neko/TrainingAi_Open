@@ -6,12 +6,13 @@
  * the day's last read, after local midnight, or on a day the app was never opened left the day with
  * no score at all (8 of 34 days after the Oura API switch, 7 of them with a full night).
  *
- * `rescoreChangedNights` calls the two functions here for a day whose night changed:
+ * `rescoreChangedNights` scores a day whose night changed:
  *
- * - **Today:** the readiness read itself, `buildReadinessPayload`. It persists under its own rule
- *   (only when the newest night is today's, #3079), so this is the same score, the same patch and the
- *   same gate a read would have written. Nothing is restated.
- * - **A finished day with no stored score:** the read cannot score a past day (it is built around
+ * - **Today:** the readiness read itself, `buildReadinessPayload`, through `scoreTodayReadiness` in
+ *   `today-readiness-scorer.ts`, which the callers outside the data layer inject. It persists under
+ *   its own rule (only when the newest night is today's, #3079), so this is the same score, the same
+ *   patch and the same gate a read would have written. Nothing is restated.
+ * - **A finished day with no stored score**, here: the read cannot score a past day (it is built around
  *   "today": today's HR window, yesterday's finished activity, the current phase). The per-day
  *   scorer is `buildDayAudit`, the one the admin backfill (`app/api/admin/backfill-derived-scores`)
  *   writes with, which calls the same `computeReadinessComposite` and illness radar on that day's
@@ -20,8 +21,10 @@
  * A finished day's score filled here carries {@link READINESS_FILLED_ON_ARRIVAL}, so the document that
  * completes its inputs later may replace it. One stored by a read keeps its score.
  *
- * Both load their modules lazily: `readiness-payload` reaches `@/lib/data`, and the Postgres adapter
- * imports `rescore-nights`, so a static import here would be a module cycle.
+ * This module is reached from the data layer (Postgres adapter → `rescore-nights` → here), so it must
+ * never import `readiness-payload`, which reaches `@/lib/data`, not even lazily: on `pnpm dev`
+ * Turbopack served the route's `@/lib/data` with no exports through that cycle (1.525.0 release test;
+ * guarded by `data-layer-readiness-cycle.test.ts`). `buildDayAudit` is loaded lazily, as before.
  */
 import type { OuraDailyDerivedPatch, WorkoutRepository } from '@/lib/data/repository'
 import type { PillarAudit } from '@trainingai/shared/health/score-audit/types'
@@ -46,16 +49,6 @@ export function readinessPatchFromAudit(persist: ReadinessPersist): OuraDailyDer
     // leaves a readable step in the trend.
     modelVersions: { readiness: READINESS_MODEL_VERSION },
   }
-}
-
-/**
- * Runs the readiness read for today, which persists today's readiness when today's night exists and
- * writes nothing for readiness otherwise. The caller reads the row back to see which. Throws on
- * failure; the caller logs it.
- */
-export async function scoreTodayReadiness(userId: string, tz: string): Promise<void> {
-  const { buildReadinessPayload } = await import('@/lib/health/readiness-payload')
-  await buildReadinessPayload(userId, tz)
 }
 
 /**
