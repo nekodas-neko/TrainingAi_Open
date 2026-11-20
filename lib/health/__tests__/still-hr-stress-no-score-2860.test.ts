@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, posix } from 'node:path'
 import { dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import type { MovementIntervalSeries } from '@trainingai/shared/health/per-minute-movement'
 
@@ -140,8 +140,21 @@ describe('no score reads the re-based daytime stress series (#2860 F1 step 1)', 
     }
     ROOTS.forEach(r => walk(join(REPO, r)))
     expect(files.length).toBeGreaterThan(1000)
-    const importers = (re: RegExp) => files.filter(f => re.test(readFileSync(join(REPO, f), 'utf8'))).sort()
-    expect(importers(/from ['"][^'"]*still-hr-stress['"]/)).toEqual(['lib/health/stress-day.ts'])
-    expect(importers(/from ['"]@\/lib\/health\/stress-day['"]/)).toEqual(['app/api/body-battery/stress-day/route.ts'])
+    // Any way of pulling a module in: `from '…'`, a dynamic `import('…')` or `require('…')`, by alias or
+    // by relative path. Each specifier is resolved to a repo path, because `components/body-battery/`
+    // has a `stress-day` of its own (the chart's segment maths) that is not the reader.
+    const SPEC = /(?:from|import\(|require\()\s*['"]([^'"]+)['"]/g
+    const resolved = (file: string, spec: string) =>
+      spec.startsWith('@/') ? spec.slice(2)
+        : spec.startsWith('@trainingai/shared/') ? `packages/shared/src/${spec.slice('@trainingai/shared/'.length)}`
+          : spec.startsWith('.') ? posix.normalize(posix.join(posix.dirname(file), spec))
+            : spec
+    const importers = (target: string) => files.filter(f =>
+      [...readFileSync(join(REPO, f), 'utf8').matchAll(SPEC)].some(m => resolved(f, m[1]) === target)).sort()
+    expect(importers('packages/shared/src/health/still-hr-stress')).toEqual(['lib/health/stress-day.ts'])
+    expect(importers('lib/health/stress-day')).toEqual(['app/api/body-battery/stress-day/route.ts'])
+    // The resolver itself: a relative import from beside the reader would be caught.
+    expect(resolved('lib/health/body-battery-day.ts', './stress-day')).toBe('lib/health/stress-day')
+    expect(resolved('components/body-battery/stress-at-events.ts', './stress-day')).toBe('components/body-battery/stress-day')
   })
 })

@@ -54,6 +54,18 @@ describe('stillHrStressSeries (#2860 F1)', () => {
     expect(stillHrStressSeries({ ...base, met, hr, normalBpm: 60 })).toEqual([])
   })
 
+  it('a dense source counts once a minute, so a strap left on does not outvote the ring', () => {
+    // The ring: one still reading every 5 minutes at 60 bpm. A strap: one a second for a single minute at 110.
+    const met = Array.from({ length: 30 }, (_, i) => ({ tsMs: at(9) + i * MET_MINUTE_MS, value: 1.0 }))
+    const ring = Array.from({ length: 5 }, (_, i) => ({ tsMs: at(9, 3 + i * 5) + 30_000, bpm: 60 }))
+    const strap = Array.from({ length: 60 }, (_, i) => ({ tsMs: at(9, 14) + i * 1000, bpm: 110 }))
+    const s = stillHrStressSeries({ ...base, met, hr: [...ring, ...strap], normalBpm: 60 })
+    expect(s).toHaveLength(1)
+    expect(s[0]).toMatchObject({ level: 0, readings: 6 })
+    // And sixty readings inside one minute are one minute, not enough for a level on their own.
+    expect(stillHrStressSeries({ ...base, met, hr: strap, normalBpm: 60 })).toEqual([])
+  })
+
   it('draws nothing without a normal', () => {
     const d = span(at(9), 30, 1.0, 60)
     expect(stillHrStressSeries({ ...base, ...d, normalBpm: Number.NaN })).toEqual([])

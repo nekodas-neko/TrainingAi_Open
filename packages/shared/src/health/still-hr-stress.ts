@@ -23,6 +23,11 @@ export const STILL_HR_STRESS_BUCKET_MS = 30 * MET_MINUTE_MS
 /**
  * Still readings a half hour needs before it gets a level. Three is the floor the proposal counted
  * coverage with; below it one reading would decide a bucket.
+ *
+ * Counted in distinct MINUTES that hold a still reading, not in raw readings: `getHrForWindow` merges
+ * every source, so a chest strap at one reading a second would otherwise meet the floor in three seconds
+ * and outvote the ring's reading every five minutes sixty to one. Each minute stands as one value (its
+ * own median) before the half hour's median is taken.
  */
 export const STILL_HR_STRESS_MIN_READINGS = 3
 
@@ -52,7 +57,7 @@ export interface StillHrStressPoint {
   t: number
   /** [−1, +1]; negative is stressed (heart rate above the normal), as the ring-era series. */
   level: number
-  /** Still readings behind the level. */
+  /** Distinct minutes holding a still reading behind the level. */
   readings: number
 }
 
@@ -71,29 +76,34 @@ export function stillHrNormal(days: readonly (number | null | undefined)[]): num
 
 /**
  * The day's half-hour stress levels from heart rate while still, ascending. A half hour with fewer than
- * `STILL_HR_STRESS_MIN_READINGS` still readings is left out (no level, never 0). Buckets start at
- * `dayStartMs`, every 30 minutes.
+ * `STILL_HR_STRESS_MIN_READINGS` minutes holding a still reading is left out (no level, never 0). Buckets
+ * start at `dayStartMs`, every 30 minutes.
  */
 export function stillHrStressSeries(inp: Omit<StillRhrInput, 'hrCoverMs'> & { normalBpm: number }): StillHrStressPoint[] {
   if (!Number.isFinite(inp.normalBpm) || inp.normalBpm <= 0) return []
   const still = stillReadings({ ...inp, hrCoverMs: STILL_HR_STRESS_COVER_MS })
-  const byBucket = new Map<number, number[]>()
+  // bucket → minute → that minute's readings, so a dense source counts once per minute.
+  const byBucket = new Map<number, Map<number, number[]>>()
   for (const r of still) {
     const k = Math.floor((r.tsMs - inp.dayStartMs) / STILL_HR_STRESS_BUCKET_MS)
-    const list = byBucket.get(k)
+    const minute = Math.floor(r.tsMs / MET_MINUTE_MS)
+    let minutes = byBucket.get(k)
+    if (!minutes) byBucket.set(k, (minutes = new Map()))
+    const list = minutes.get(minute)
     if (list) list.push(r.bpm)
-    else byBucket.set(k, [r.bpm])
+    else minutes.set(minute, [r.bpm])
   }
   const out: StillHrStressPoint[] = []
-  for (const [k, bpms] of [...byBucket.entries()].sort((a, b) => a[0] - b[0])) {
-    if (bpms.length < STILL_HR_STRESS_MIN_READINGS) continue
+  for (const [k, minutes] of [...byBucket.entries()].sort((a, b) => a[0] - b[0])) {
+    if (minutes.size < STILL_HR_STRESS_MIN_READINGS) continue
+    const bpms = [...minutes.values()].map(v => median(v)).filter((v): v is number => v != null)
     const m = median(bpms)
     if (m == null) continue
     const raw = (inp.normalBpm - m) / STILL_HR_STRESS_FULL_SCALE_BPM
     out.push({
       t: inp.dayStartMs + k * STILL_HR_STRESS_BUCKET_MS + STILL_HR_STRESS_BUCKET_MS / 2,
       level: Math.round(Math.max(-1, Math.min(1, raw)) * 1000) / 1000,
-      readings: bpms.length,
+      readings: minutes.size,
     })
   }
   return out

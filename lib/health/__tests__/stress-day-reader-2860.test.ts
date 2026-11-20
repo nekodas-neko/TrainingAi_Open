@@ -26,8 +26,21 @@ function heartRate() {
   return out
 }
 
-function repo(opts: { stored?: { bucketMid: Date; level: number }[]; switchDay?: string | null; normalDays?: number } = {}) {
+type DerivedRow = { day: string; stillRhrBpm: number | null }
+
+function repo(opts: {
+  stored?: { bucketMid: Date; level: number }[]; switchDay?: string | null; normalDays?: number
+  /** Rows returned whatever range is asked for, as a repo that ignored its arguments would. */
+  derivedIgnoringRange?: DerivedRow[]
+} = {}) {
   const normalDays = opts.normalDays ?? 10
+  // What is stored: `normalDays` prior days at 60 bpm, then outliers on the day itself and on every day
+  // older than the fortnight. A read that asks for the wrong range picks an outlier up.
+  const storedDays: DerivedRow[] = [
+    { day: DAY, stillRhrBpm: 200 },
+    ...Array.from({ length: normalDays }, (_, i) => ({ day: shiftDateStr(DAY, -(i + 1)), stillRhrBpm: 60 })),
+    ...Array.from({ length: 30 }, (_, i) => ({ day: shiftDateStr(DAY, -(15 + i)), stillRhrBpm: 200 })),
+  ]
   const r = {
     getOuraDaytimeStressBuckets: vi.fn(async () => opts.stored ?? []),
     getOuraCloudSwitchDay: vi.fn(async () => (opts.switchDay === undefined ? SWITCH : opts.switchDay)),
@@ -35,8 +48,8 @@ function repo(opts: { stored?: { bucketMid: Date; level: number }[]; switchDay?:
       heartRate().filter(h => h.timestamp >= from && h.timestamp < to)),
     getPerMinuteMovementSeries: vi.fn(async () => movement()),
     listSleepSessions: vi.fn(async () => [{ sleepStart: new Date(at(-2)), sleepEnd: new Date(at(6, 30)) }]),
-    getOuraDailyDerived: vi.fn(async () =>
-      Array.from({ length: normalDays }, (_, i) => ({ day: shiftDateStr(DAY, -(i + 1)), stillRhrBpm: 60 }))),
+    getOuraDailyDerived: vi.fn(async (_u: string, from: string, to: string) =>
+      opts.derivedIgnoringRange ?? storedDays.filter(r => r.day >= from && r.day <= to)),
   }
   return r as typeof r & StressDayRepo
 }
@@ -78,6 +91,22 @@ describe('readStressDay (#2860 F1 step 1)', () => {
 
   it('draws nothing until the still-time normal has enough prior days', async () => {
     expect(await readStressDay(repo({ normalDays: 2 }), 'u', DAY, TZ, NOW)).toEqual({ series: [], method: null })
+  })
+
+  it('the normal is the fortnight before the day, never the day itself', async () => {
+    const r = repo()
+    const out = await readStressDay(r, 'u', DAY, TZ, NOW)
+    expect(r.getOuraDailyDerived).toHaveBeenCalledWith('u', shiftDateStr(DAY, -14), shiftDateStr(DAY, -1))
+    // 60 bpm against a normal of 60: level 0. An outlier in the normal would move it.
+    expect(out.series.find(p => p.t === at(9, 15))!.level).toBe(0)
+
+    // A repo that hands back the day's own row anyway: it is dropped before the median.
+    const sloppy = repo({ derivedIgnoringRange: [
+      { day: shiftDateStr(DAY, -3), stillRhrBpm: 58 }, { day: shiftDateStr(DAY, -2), stillRhrBpm: 60 },
+      { day: shiftDateStr(DAY, -1), stillRhrBpm: 62 }, { day: DAY, stillRhrBpm: 200 },
+    ] })
+    const kept = await readStressDay(sloppy, 'u', DAY, TZ, NOW)
+    expect(kept.series.find(p => p.t === at(9, 15))!.level).toBe(0)
   })
 
   it('today reads heart rate only up to now', async () => {

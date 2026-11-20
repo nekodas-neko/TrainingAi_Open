@@ -297,8 +297,8 @@ StressDaySeries { series: { t /* bucket midpoint, ms */, level /* −1..+1, nega
 - **Computed on read, never stored, never filled by a connector.** `still_hr` is ours, from two shapes
   any wearable sends: the heart-rate series (§3a, `getHrForWindow`, every source merged) and the
   per-minute movement series (`MovementIntervalSeries`, `getPerMinuteMovementSeries`). For each waking
-  half hour, the median heart rate of its still readings (the still gate of `still-rhr.ts`) is set
-  against the person's still-time normal, the median of up to 14 prior days' stored still resting heart
+  half hour, the median heart rate of its still readings (the still gate of `still-rhr.ts`; a dense
+  source such as a chest strap counts once a minute) is set against the person's still-time normal, the median of up to 14 prior days' stored still resting heart
   rate (`packages/shared/src/health/still-hr-stress.ts`).
 - **`ring_dhrv`** is the ring-era series in `oura_daytime_stress_buckets` (estimated daytime HRV), served
   as stored for the days that have it. The two are different rulers: a day carries one method, and a
@@ -307,8 +307,13 @@ StressDaySeries { series: { t /* bucket midpoint, ms */, level /* −1..+1, nega
   heart-rate day chart and the stress beside the day's events. **No score reads it** (Body Battery,
   readiness, resilience), pinned by `lib/health/__tests__/still-hr-stress-no-score-2860.test.ts`. Making
   it an input is a tuning sign-off of its own.
-- **Who else could fill it:** nobody needs to. A source that sends heart rate and per-minute movement
-  gets the series with no new code.
+- **Who else could fill it:** the series itself is source-agnostic, but two of its inputs are not yet,
+  so a non-Oura source does **not** get it today:
+  - the day it starts from is `getOuraCloudSwitchDay` (`lib/health/stress-day.ts`), which is null with
+    no Oura Cloud connection, and the reader then returns nothing;
+  - the still-time normal reads `stillRhrBpm`, which only the Oura Cloud path writes
+    (`lib/oura/cloud/still-rhr.ts`).
+  Both need a generic form before a second wearable gets the chart.
 
 ---
 
@@ -322,7 +327,7 @@ table it reads.
 |---|---|---|---|---|
 | **Readiness composite** | `packages/shared/src/health/readiness-composite.ts` + `lib/health/readiness-payload.ts` | none — always returns a score | RHR z-score, HRV-balance z-score, sleep-duration z-score, previous-night Sleep Score, previous/today Activity Score, recovery-index hours, daily check-in energy — each missing input → neutral 50, not a blank card | **temperature contributor** (0.10 weight) — generic path passes `tempZ: null` always, never approximated; **recovery-index** needs a continuous overnight HR series (ring/strap only) |
 | **Sleep score** | `packages/shared/src/health/sleep-score.ts` | `durationHours` (returns `null` without it) | restfulness, efficiency, REM, deep, latency, schedule, HRV, HR — each conditionally added and the blend **renormalizes over whichever weights are present** | none — genuinely source-agnostic by design; REM/deep/HRV/HR are all suppliable by Health Connect's own record types |
-| **Chronic/daytime stress, resilience, daytime-HRV** | `packages/shared/src/health/chronic-stress-assembly.ts`, `lib/health/stress-resilience.ts`, `packages/shared/src/health/daytime-hrv-model.ts` | — | — | **all of it.** 30-sec hypnogram array, per-5-min HRV/HR, raw skin-temp samples, raw MET events — every input reads `getOuraDaytimeSignals` → raw BLE frame tables (`readRawFrames`, tags `0x46`/`0x69`/`0x50`). Returns empty arrays with no ring anchor; **zero fallback branches anywhere in the call chain** |
+| **Chronic/daytime stress, resilience, daytime-HRV** | `lib/health/stress-resilience.ts`, `packages/shared/src/health/daytime-hrv-model.ts` (the chronic-stress model was retired in #2860: it never produced a value) | — | — | **all of it.** 30-sec hypnogram array, per-5-min HRV/HR, raw skin-temp samples, raw MET events — every input reads `getOuraDaytimeSignals` → raw BLE frame tables (`readRawFrames`, tags `0x46`/`0x69`/`0x50`). Returns empty arrays with no ring anchor; **zero fallback branches anywhere in the call chain** |
 | **Body Battery** | `packages/shared/src/health/body-battery-walk.ts` + `app/api/body-battery/route.ts` | — | — | continuous intraday HR (`oura_heartrate`), resolved HR-max, and the stress model above — **no generic/fallback branch in the route** |
 | **Illness radar** | `packages/shared/src/health/illness-radar.ts` | — | temperature (0.40), breathing (0.25), RHR (0.20), HRV-balance (0.15) — each optional, formula renormalizes over what's present | **not a formula limitation — a wiring gap.** The formula itself degrades gracefully, but its only caller (`readiness-payload.ts`) computes it *only if* an `oura_daily_summary` row exists — a Health-Connect-only user gets no illness computation at all, degraded or otherwise. Filed as PS-42 below |
 | **Training load / ACWR** | `packages/shared/src/ai-periodization/acwr.ts` (`computeVolumeAcwr`) | logged workout volume (`AcwrSession[]`, user-entered tonnage) | — | none — entirely source-agnostic, doesn't touch wearable data at all |
@@ -498,7 +503,7 @@ ourselves." Verified against the decode/model code directly (`lib/oura-ble/decod
 | **Respiratory rate** | **We compute it**, from the ring's IBI. | `breathingFromIbi` per 5-min epoch, night figure = median of per-epoch breaths/min — our algorithm on the ring's beat-interval output |
 | **RHR** | **We compute it** — an aggregation over our own bpm-from-IBI values. | `nightlyHeartRate()`: lowest 5-min *bin average*, MET-gated, never the raw per-beat minimum. No RHR scalar is ever transmitted by the ring |
 | **SpO2** | **We compute it, and it's uncalibrated.** | The Ring 5 "never emits the firmware-calibrated `spo2_event` over BLE" (confirmed overnight, per code comment) — only raw R ratio-of-ratios + perfusion index (`0x8b`), run through a borrowed-coefficient quadratic explicitly flagged `calibrated: false`. Worth knowing this is already weak for Oura, not a regression a new device would introduce |
-| **Chronic/daytime stress, resilience, daytime-HRV** | **Our own models — but fed by ring-computed intermediates, not raw PPG/accelerometer.** | `cumulative-stress.ts`, `stress-resilience.ts`, `daytime-hrv-model.ts` all consume the ring's own per-epoch outputs: `0x5d` HRV samples, `0x46`/`0x69` temp samples, `0x50` MET bins — never raw waveform data directly. The daytime-HRV replacement is explicit about this: `HRV_TAG = 0x5d`, `TEMP_TAGS = [0x46, 0x69]`, fit by OLS against the ring's own paired samples |
+| **Chronic/daytime stress, resilience, daytime-HRV** | **Our own models — but fed by ring-computed intermediates, not raw PPG/accelerometer.** | `stress-resilience.ts` and `daytime-hrv-model.ts` (and `cumulative-stress.ts`, retired in #2860) all consume the ring's own per-epoch outputs: `0x5d` HRV samples, `0x46`/`0x69` temp samples, `0x50` MET bins — never raw waveform data directly. The daytime-HRV replacement is explicit about this: `HRV_TAG = 0x5d`, `TEMP_TAGS = [0x46, 0x69]`, fit by OLS against the ring's own paired samples |
 | **Body Battery** | **Entirely our own model.** No BLE tag carries a Body Battery figure — inputs are our own derived HR/RHR values (above) plus the stress model |
 | **Training Stress Score (OTS)** | **Our own algorithm, on a ring-computed input.** | `runTrainingStressScore` is our port of a vendored formula, run over the ring's own `0x50` MET series (`decodeActivityInfo` — ring firmware computes MET per bin) plus RHR/readiness/profile |
 
@@ -838,5 +843,5 @@ Connect / a future HealthKit connector), not a rewrite of any formula in §4.
 - `lib/data/health-source.ts`, `packages/shared/src/health/source-rank.ts` — the provenance
   mechanism in code.
 - `packages/shared/src/health/readiness-composite.ts`, `sleep-score.ts`, `activity-score.ts`,
-  `chronic-stress-assembly.ts`, `illness-radar.ts`, `body-battery-walk.ts`,
+  `illness-radar.ts`, `body-battery-walk.ts`,
   `ai-periodization/acwr.ts`, `training-stress.ts` — the calculation source files behind §4.
