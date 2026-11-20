@@ -311,47 +311,6 @@ export function getResilienceConstants(): ResilienceConstants {
   }
 }
 
-export interface CumulativeStressConstants {
-  feverLimit: number            // 38 — °C fever gate
-  lutealPhaseCorrection: number // 0.2 — added to temp-dev baseline in luteal phase
-  minHrvCoverage: number        // 0.2 — min fraction of non-NaN hrv_items for norm IQR
-  minDaysRequired: number       // 21 — per-feature non-NaN count for can_produce_score
-  faModelMean: number[]         // [9]
-  faModelStd: number[]          // [9]
-  faModelWeights: number[]      // [9*6] row-major (9 features → 6 factors)
-  dimToDrop: number             // 0 — factor index dropped before clustering
-  clusterCentroids: number[]    // [5*5] row-major (5 clusters × 5 factors)
-  positiveClusters: number[]    // [1, 3] — cluster indices summed into the score
-  contributorMeans: number[]    // [5]
-  contributor01p: number[]      // [5]
-  contributor99p: number[]      // [5]
-  contributorLevels: number[]   // [5*6] row-major — piecewise-linear UI level table
-}
-
-/** `cumulative_stress_1_2_2` (ChronicStress) — factor-analysis weights, cluster centroids,
- *  contributor scaling percentiles + UI level table. Consumed by lib/oura-models/cumulative-stress.ts.
- *  Tensor buffers were extracted from the `.pt` into the constants JSON (see the port's header). */
-export function getCumulativeStressConstants(): CumulativeStressConstants {
-  const a = getAttributes('cumulative_stress_1_2_2')
-  const vec = (k: string): number[] => (a[k] as { values: number[] }).values
-  return {
-    feverLimit: a['fever_limit'] as number,
-    lutealPhaseCorrection: a['luteal_phase_correction'] as number,
-    minHrvCoverage: a['min_hrv_coverage'] as number,
-    minDaysRequired: a['min_days_required'] as number,
-    faModelMean: vec('processor.fa_model_mean'),
-    faModelStd: vec('processor.fa_model_std'),
-    faModelWeights: vec('processor.fa_model_weights'),
-    dimToDrop: a['processor.dim_to_drop'] as number,
-    clusterCentroids: vec('processor.cluster_centroids'),
-    positiveClusters: vec('processor.positive_clusters'),
-    contributorMeans: vec('processor.contributor_means'),
-    contributor01p: vec('processor.contributor_01p'),
-    contributor99p: vec('processor.contributor_99p'),
-    contributorLevels: (a['contributor_levels'] as { values: number[] }).values,
-  }
-}
-
 export interface SleepStagingConstants {
   /** HRV power bands (millihertz when `useMillihz`). */
   hrvBands: { vlf: [number, number]; lf: [number, number]; hf: [number, number] }

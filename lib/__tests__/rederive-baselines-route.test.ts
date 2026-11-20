@@ -32,7 +32,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { updateBaseline, seedOrUpdateBaseline, type Baseline } from '@trainingai/shared/health/personal-baseline'
 import { temperatureDeviationCentiC } from '@trainingai/shared/health/temperature-baseline'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
-import { TEMP_DEV_FEVER_LIMIT_C } from '@trainingai/shared/health/chronic-stress-assembly'
 import type { OuraDailySummaryRow } from '@/lib/data/repository'
 
 const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Record<string, unknown> | null)
@@ -242,6 +241,9 @@ describe('what it writes', () => {
     }
   })
 })
+
+/** The fever mask the retired chronic-stress model used (#2860 F2), kept as TN-8's yardstick. */
+const TEMP_DEV_FEVER_LIMIT_C = 1.0
 
 describe("TN-8's mask premise, asserted here because that entry asked for it here", () => {
   it('turns a permanently-positive deviation into a centred one, below the fever mask', async () => {
