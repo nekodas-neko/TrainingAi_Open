@@ -135,6 +135,10 @@ const generationAnswer = (preset: DurationPreset) => applyBudgetStage(
   SESSION_BUDGET,
   preset,
   new Set<string>(),
+  undefined,
+  // The stored plan's phase, which a generation passes and a re-fit reads back: since #3713 the
+  // phase caps the sets, so leaving it out would compare two different sessions.
+  'accumulation',
 )
 
 const setsOf = (p: AiPrescription) =>
@@ -260,7 +264,9 @@ describe('a standard session is sized to its budget (#2133)', () => {
     const run = (phase: string) => [...applyBudgetStage(stageExercises(2, 2), stageSignals(90, 2) as never, 60, 'standard', new Set(), undefined, phase).sets.values()]
     expect(run('intensification')).toEqual([3, 2])
     expect(run('realisation')).toEqual([3, 2])
-    expect(run('accumulation')).toEqual([6, 4])
+    // #3713: hypertrophy accumulation allows 3-4 sets, so the surplus fills to 4, not the primary's
+    // role ceiling of 6.
+    expect(run('accumulation')).toEqual([4, 4])
   })
 
   it('drops whole exercises when even the minimums overrun, keeping the main lift and at least two', () => {
@@ -349,4 +355,29 @@ it('turning the time limit off restores work and full rests from the saved basel
   expect(unlimited.prescription.exercises.every(ex => ex.restSec === 120)).toBe(true)
   expect(unlimited.prescription.reasoning).not.toContain('0-min')
   expect(unlimited.prescription.durationPreset).toBe(0)
+})
+
+// #3713 review follow-up: a cap guard rewrites `phase` to the NEXT phase on an offer while the loads
+// stay the old phase's. A re-fit capped against `stored.phase` would hand a pending "move to deload"
+// deload's 3 sets at accumulation's loads. It caps against the phase the loads were written for.
+describe('a re-fit caps sets against the phase the loads were written for (#3713)', () => {
+  const offer = (over: Partial<AiPrescription> = {}) => storedPrescription({
+    phase: 'deload', phaseAction: 'transition_recommended', ...over,
+  })
+  const maxSets = (p: AiPrescription) => Math.max(...p.exercises.map(e => e.sets))
+
+  it('a pending move to deload re-fits at accumulation\'s cap (hypertrophy: 4), not deload\'s (3)', async () => {
+    const res = await refit('long', periodizationState({ prescription: offer() }))
+    if (!res.ok) throw new Error(res.reason)
+    expect(maxSets(res.prescription)).toBe(4)
+    // The offer itself is untouched: still a move to deload.
+    expect(res.prescription.phase).toBe('deload')
+  })
+
+  it('reads the phase generation recorded, whatever the stored phase and the session phase say', async () => {
+    const recorded = offer({ refitBaseline: { sets: { ...BASELINE_SETS }, reasoning: 'r', phase: 'deload' } })
+    const res = await refit('long', periodizationState({ prescription: recorded }))
+    if (!res.ok) throw new Error(res.reason)
+    expect(maxSets(res.prescription)).toBe(3)
+  })
 })

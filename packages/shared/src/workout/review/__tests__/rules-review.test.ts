@@ -200,3 +200,30 @@ describe('summary after reconcile', () => {
     expect(summarizeReconciledReview(proposal)).not.toContain('dropped')
   })
 })
+
+// #3713 review follow-up. The review starts from the program's own sets, the lifter's choice, and
+// the rules-fallback plan leaves those uncapped. A review that applied the phase cap reported the cut
+// as a time trim ("trimmed to fit the 200-min working budget"), so it applies role ceilings only.
+describe('the program\'s own sets are not phase-capped in the review (#3713)', () => {
+  const SIX = EXERCISES.map(ex => ex.sessionExerciseId === SQUAT ? { ...ex, sets: 6 } : ex)
+
+  it('a 6-set main lift in hypertrophy accumulation (phase max 4) is left alone on a roomy budget', () => {
+    const r = buildRulesReview({ exercises: SIX, signals: signals({ trainingGoal: 'hypertrophy', effectiveTimeBudgetMin: 200 }), budgetMin: 200 })
+    expect(r.modelExercises).toEqual([])
+    expect(r.reasoning).not.toContain('trimmed')
+    expect(r.reasoning).toContain('already fits')
+  })
+
+  it('agrees with the rules-fallback plan, which keeps the program\'s 6 sets too', async () => {
+    const { buildRulesPrescription } = await import('@trainingai/shared/ai-periodization/generate-prescription')
+    const six = { pct: 75, reps: 5, restSec: 180 }
+    const sig = signals({
+      trainingGoal: 'hypertrophy', effectiveTimeBudgetMin: 0,
+      exercises: [{ ...signalExercise(SQUAT, 'Squat', 'primary', 'quads'), baseSets: Array.from({ length: 6 }, () => six) }],
+    })
+    const rules = buildRulesPrescription(sig, 'r')!
+    expect(rules.exercises.find(e => e.sessionExerciseId === SQUAT)!.sets).toBe(6)
+    const r = buildRulesReview({ exercises: [SIX[0]], signals: sig, budgetMin: 0 })
+    expect(r.modelExercises).toEqual([])
+  })
+})
