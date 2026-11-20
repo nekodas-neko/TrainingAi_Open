@@ -7,6 +7,7 @@ import { test } from 'node:test';
 // react-native-svg rejects ".5": a number string needs a leading zero.
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
+    if (name === '__check_fixture__' || name === 'node_modules') return [];
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return sourceFiles(path);
     return path.endsWith('.tsx') ? [path] : [];
