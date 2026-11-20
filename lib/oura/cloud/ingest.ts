@@ -106,8 +106,9 @@ export function plannedCounts(writes: OuraCloudWrites): OuraCloudWriteCounts {
  * resting HR once the rows are in.
  * `rescore` (#3079): with it, a sleep write that changes, adds or removes a recent night re-scores
  * that night's day (`rescore-nights.ts`), and a `daily_readiness` document re-scores the recent
- * day's readiness it feeds (#3872). Production passes the repository (the webhook, a deferred one);
- * tests that only count writes leave it out.
+ * day's readiness it feeds (#3872). Production passes a scoring target from
+ * `rescoreWithTodayReadiness` (`lib/health/today-readiness-scorer.ts`), so today's readiness is scored too;
+ * a bare repository re-scores sleep but skips today's readiness. Tests that only count writes leave it out.
  */
 export async function writeOuraCloudData(
   writer: OuraCloudWriter, userId: string, writes: OuraCloudWrites, rescore?: NightRescoreTarget, stillRhr?: StillRhrRefresh,
