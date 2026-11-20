@@ -116,3 +116,6 @@ __check_fixture__/
 
 # Switch-over backups of the installed APK (scripts/native-switch-over/install.mjs)
 native-switch-over-backups/
+
+# Model constants a deploy downloads at boot; the production route smoke copies fixtures here (#3933)
+/.oura-constants/

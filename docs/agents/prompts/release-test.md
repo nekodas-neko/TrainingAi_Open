@@ -12,6 +12,19 @@ whether it is safe to ship. You run on the owner's machine.
    in as the seeded user, GETs the main pages and read routes, and fails on an unexpected status or
    an error in the server log (#3919). CI runs the same script on every code PR (`Route smoke`).
    Then walk every user-visible change the release issue lists.
+4a. **The same smoke against a production build** (#3933), once the dev server is stopped (`next
+   build` beside a running `pnpm dev` runs out of memory). A production server needs Postgres over
+   SSL and reads the model constants from `.oura-constants/`; the scripts provide both and leave
+   both guards as they are:
+   ```
+   export DATABASE_URL=$(scripts/ci/start-ssl-postgres.sh)   # Docker, port 5434, SSL on
+   node scripts/local-db/migrate.js && psql "$DATABASE_URL" -f scripts/local-db/seed.sql
+   scripts/ci/route-smoke-prod.sh                            # build, next start, smoke
+   docker rm -f trainingai-ssl-postgres
+   ```
+   `route-smoke-prod.sh` refuses a non-local `DATABASE_URL`. CI runs it after every merge to `main`
+   (`Route smoke (production build)`); quote that run for the candidate commit if it is green, and
+   run it here when it is not, or when the candidate has no run.
 5. **Device pass**, for the checks the release issue lists and any open `type: device-check`
    issues touched by the release. Name the screen, orientation and navigation mode for each — three-button
    navigation reports every safe-area inset as `0`, which hides clearance bugs. Run it in
