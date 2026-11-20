@@ -32,13 +32,15 @@ export async function computeHrRecoveryProfile(
 
   const [setRows, workouts, { restingHr }] = await Promise.all([
     repo.getSetHrStatsSince(userId, since),
-    repo.getOuraWorkouts(userId, { from: fromDay, to: today }),
+    // #3875: every source's activity sessions through the generic shape, never a source's table.
+    repo.getSourceActivitySessions(userId, { from: fromDay, to: today }),
     resolveHrProfile(repo, userId, tz),
   ])
 
   const setEpisodes = setRows.map(episodeFromSetHrStats).filter((e): e is RecoveryEpisode => e != null)
 
   const boundedWorkouts = workouts
+    .map(w => ({ startDatetime: w.start, endDatetime: w.end }))
     .filter(w => w.endDatetime.getTime() > w.startDatetime.getTime())
     .slice(0, MAX_WORKOUTS)
   const workoutEpisodes = (await Promise.all(boundedWorkouts.map(async w => {

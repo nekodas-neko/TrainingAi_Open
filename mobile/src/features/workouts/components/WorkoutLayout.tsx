@@ -11,6 +11,7 @@ export function WorkoutLayout({
   subtitleNode,
   detail,
   onBack,
+  onSystemBack,
   backIcon = 'back',
   backLabel = 'Back to session',
   workout,
@@ -30,6 +31,8 @@ export function WorkoutLayout({
   subtitleNode?: ReactNode;
   detail?: string;
   onBack?: () => void;
+  /** Android Back, when it must differ from the header button (the summary, #3879). */
+  onSystemBack?: () => void;
   backIcon?: 'back' | 'forward';
   backLabel?: string;
   workout?: WorkoutRecord;
@@ -47,7 +50,7 @@ export function WorkoutLayout({
   return (
     <PageLayout
       title={title}
-      onBack={onBack}
+      onBack={onSystemBack ?? onBack}
       scroll
       reorderable={reorderable}
       fillBottom={fillBottom}

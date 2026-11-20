@@ -6,7 +6,7 @@ import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
 import { overnightHrvFromSeries, overnightRecoveryIndexHoursFromSeries, sleepShapeFromHypnogram, type OuraSleepShape } from '@trainingai/shared/health/oura-sleep-detail'
-import type { OuraCloudHeartrateWrite, OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
+import type { OuraCloudHeartrateWrite, OuraDailyRow, OuraSleepUpsertRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { WORKOUT_HR_PAD_MS } from '@trainingai/shared/workout/hr-summary'
 import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/shared/date-utils'
@@ -540,30 +540,6 @@ export async function getLatestOuraBleMeasuredAt(db: Db, userId: string): Promis
   }))
   const ms = resolveDsToMs(Math.max(...candidates), anchors)
   return ms != null ? new Date(ms) : null
-}
-
-export async function listOuraTags(db: Db, userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]> {
-  const rows = await db
-    .select()
-    .from(s.ouraTags)
-    .where(and(
-      eq(s.ouraTags.userId, userId),
-      gte(s.ouraTags.startDay, startDay),
-      lte(s.ouraTags.startDay, endDay),
-    ))
-    .orderBy(asc(s.ouraTags.startTime))
-  return rows.map(r => ({
-    ouraId:     r.ouraId,
-    source:     r.source as OuraTagRow['source'],
-    tagType:    r.tagType,
-    customName: r.customName,
-    comment:    r.comment,
-    mood:       r.mood,
-    startDay:   r.startDay,
-    endDay:     r.endDay,
-    startTime:  r.startTime,
-    endTime:    r.endTime,
-  }))
 }
 
 // ── Sleep ──────────────────────────────────────────────────────────────────────
@@ -3263,16 +3239,6 @@ export async function getOuraWorkouts(db: Db, userId: string, opts: { unreviewed
     calories: r.calories, distanceM: r.distanceM,
     intensity: r.intensity, source: r.source, reviewed: r.reviewed,
   }))
-}
-
-// RV-48: returns whether a row was actually marked. `oura_workouts.id` is `text`, not `uuid`, so a
-// wrong id can never raise a cast error — a ghost id was indistinguishable from a real review.
-export async function markOuraWorkoutReviewed(db: Db, userId: string, id: string): Promise<boolean> {
-  const rows = await db.update(s.ouraWorkouts)
-    .set({ reviewed: true })
-    .where(and(eq(s.ouraWorkouts.userId, userId), eq(s.ouraWorkouts.id, id)))
-    .returning({ id: s.ouraWorkouts.id })
-  return rows.length > 0
 }
 
 // ── HR Sync (workout sessions) ─────────────────────────────────────────────────

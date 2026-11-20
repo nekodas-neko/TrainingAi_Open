@@ -87,7 +87,7 @@ export async function GET(req: Request) {
 
   const repo = await getRepository()
 
-  const [sleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraTags, ouraSessions, derivedRows, doseRows] = await Promise.all([
+  const [sleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraSessions, derivedRows, doseRows] = await Promise.all([
     // From the day before yesterday: a night is grouped by its windows, and a fragment that ended
     // before midnight carries the earlier date.
     repo.listSleepSessions(userId, shiftDateStr(yesterday, -1), date),
@@ -96,7 +96,6 @@ export async function GET(req: Request) {
     repo.listMealTypes(userId),
     repo.getOuraWorkouts(userId, { from: yesterday, to: date }),
     repo.listActivityLogs(userId, yesterday, date),
-    repo.listOuraTags(userId, yesterday, date),
     repo.listOuraSessions(userId, yesterday, date),
     repo.getOuraDailyDerived(userId, yesterday, date),
     repo.listTimedDoses(userId, yesterday, date),
@@ -288,8 +287,8 @@ export async function GET(req: Request) {
     rest_mode: 'Rest mode', nap: 'Nap', meditation: 'Meditation', breathing: 'Breathing',
     relaxation: 'Relaxation', rest: 'Rest', body_status: 'Body status',
   }
-  // #3077: Oura's sessions come from the API's `session` collection now; `oura_tags` has had no
-  // writer since the ring moved to the Oura API. Same event as a tag, so the timeline reads the same.
+  // #3077: Oura's sessions come from the API's `session` collection now. `oura_tags` had no writer
+  // after the ring moved to the Oura API, and its read was removed (#3875).
   for (const ses of ouraSessions) {
     const startMs = ses.startDatetime?.getTime()
     if (startMs == null || !Number.isFinite(startMs)) continue
@@ -304,24 +303,6 @@ export async function GET(req: Request) {
       icon: 'Tag',
       day: 'today',  // recomputed below from timeMs
       tagSource: 'oura_cloud',
-    })
-  }
-  for (const t of ouraTags) {
-    const startMs = t.startTime?.getTime()
-    if (startMs == null || !Number.isFinite(startMs)) continue
-    const label = t.customName
-      ?? TAG_LABEL[t.tagType ?? '']
-      ?? (t.tagType ? t.tagType.replace(/^tag_(generic_)?/, '').replace(/_/g, ' ') : 'Tag')
-    events.push({
-      type: 'tag',
-      time: fmtTime(new Date(startMs), tz),
-      endTime: t.endTime ? fmtTime(t.endTime, tz) : undefined,
-      timeMs: startMs,
-      title: capitalize(label),
-      subtitle: t.comment ?? (t.mood ? `mood: ${t.mood}` : undefined),
-      icon: 'Tag',
-      day: 'today',  // recomputed below from timeMs
-      tagSource: t.source,
     })
   }
 

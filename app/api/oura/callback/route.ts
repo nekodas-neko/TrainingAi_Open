@@ -61,7 +61,14 @@ export async function GET(req: NextRequest) {
 
   const cookieNonce = req.cookies.get(CONNECT_NONCE_COOKIE)?.value
   if (!cookieNonce || !safeCompare(cookieNonce, ticket.nonce)) return finish({ status: 'error', error: 'expired' })
-  if (query.data.error || !query.data.code) return finish({ status: 'error', error: 'denied' })
+  if (query.data.error || !query.data.code) {
+    // The OAuth error code is a short public word (RFC 6749 §4.1.2.1), never a token. Logged so a
+    // refused permission (`invalid_scope`, e.g. a new scope Oura doesn't accept, #3873) can be told
+    // apart from the person tapping Deny, and shown as a failure rather than as their own choice.
+    const code = (query.data.error ?? 'missing_code').replace(/[^a-z_]/gi, '').slice(0, 64)
+    if (code !== 'access_denied') console.error('[oura] connect refused by Oura:', code)
+    return finish({ status: 'error', error: code === 'access_denied' ? 'denied' : 'failed' })
+  }
 
   const sessionUserId = (await auth().catch(() => null))?.user?.id ?? null
   if (ticket.client === 'web') {

@@ -89,7 +89,8 @@ export type PipCommand =
   | { type: 'reps'; exerciseId: string; setId: string; value: string }
   | { type: 'record'; exerciseId: string; setId: string }
   | { type: 'start'; exerciseId: string; setId: string }
-  | { type: 'advance' };
+  | { type: 'advance' }
+  | { type: 'session' };
 
 /** What a window button does, as the current app's usePipActions handlers. */
 export function pipCommand(workout: WorkoutRecord | null, action: PipAction): PipCommand | null {
@@ -116,6 +117,7 @@ export function pipCommand(workout: WorkoutRecord | null, action: PipAction): Pi
     const next = exercise.sets.find((set) => set.completedAt === null);
     return next ? { type: 'start', exerciseId: exercise.id, setId: next.id } : null;
   }
-  // "Complete" and "Next" both move on from a finished exercise.
-  return { type: 'advance' };
+  // "Complete" and "Next" both move on from a finished exercise. A re-logged exercise goes back to
+  // the session, as its summary's own button does (#3880).
+  return workout.soloExerciseId ? { type: 'session' } : { type: 'advance' };
 }

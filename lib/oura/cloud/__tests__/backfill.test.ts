@@ -22,7 +22,7 @@ const CONFIG: OuraOAuthConfig = { clientId: 'cid', clientSecret: 'cs', redirectU
 const fetchMock = vi.fn<typeof fetch>()
 
 /** Everything we ask for, as Oura spells it in the token answer. */
-const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health extapi:ring_configuration'
+const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health extapi:ring_configuration extapi:stress'
 
 function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
   const calls: string[] = []
@@ -216,7 +216,7 @@ describe('backfillOuraCloud (#2859)', () => {
 
   it('skips the heart-rate pass when heartrate is not shared', async () => {
     oura()
-    const { repo, calls } = fakeRepo(true, 'extapi:daily extapi:workout extapi:spo2 extapi:heart_health')
+    const { repo, calls } = fakeRepo(true, 'extapi:daily extapi:workout extapi:spo2 extapi:heart_health extapi:stress')
     const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
     // `session` too: this grant leaves it out (#2982 reads sessions).
     expect(out.ok && out.report.notShared).toEqual(['session', 'heartrate'])
@@ -678,5 +678,51 @@ describe('a re-read does not count as new data (#2861)', () => {
     expect(out.map(o => o.result)).toEqual(['ok'])
     expect(calls).toContain('sleep:1')
     expect(calls).not.toContain('stamp:data')
+  })
+
+  // #3875: before, only the webhook catch-up and the connect backfill read the battery, so a day with
+  // no sleep, activity or workout event recorded no level. The reconcile now reads it too.
+  it('the daily reconcile records a battery level on a quiet day with no documents', async () => {
+    const battery = [{ timestamp: '2026-10-18T23:00:00+00:00', timestamp_unix: 1, level: 70, charging: false, in_charger: false }]
+    oura(path => {
+      if (path === 'ring_battery_level') return jsonResponse({ data: battery, next_token: null })
+      if (path === 'heartrate' || path === 'personal_info') return null
+      return jsonResponse({ data: [], next_token: null })
+    })
+    const stored: number[] = []
+    const quiet = (scope: string) => {
+      const { repo, calls } = fakeRepo(true, scope)
+      return {
+        calls,
+        repo: {
+          ...repo,
+          getLatestOuraCloudBatteryAt: async () => null,
+          insertOuraCloudBatteryReadings: async (_u: string, r: unknown[]) => { stored.push(r.length); return r.length },
+          listOuraCloudConnectedUserIds: async () => [USER],
+          getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }),
+          withOuraSleepWriteLock: async (_u: string, run: () => Promise<unknown>) => run(),
+          listSleepSessions: async () => [],
+          listDeletedOuraCloudSleepDates: async () => [],
+          getOuraDailyDerived: async () => null,
+          upsertOuraDailyDerived: async () => {},
+          clearNightDerivedScores: async () => {},
+          releaseBodyBatteryAnchor: async () => {},
+        } as unknown as Parameters<typeof reconcileOuraCloud>[0]['repo'],
+      }
+    }
+    const { repo, calls } = quiet(FULL_SCOPE)
+    const out = await reconcileOuraCloud({ repo, config: CONFIG, now: () => new Date('2026-10-19T02:00:00.000Z') })
+    expect(out.map(o => o.result)).toEqual(['ok'])
+    expect(calls.filter(c => /^(sleep|workouts|daily|cloudDaily):[1-9]/.test(c))).toEqual([])
+    expect(stored).toEqual([1])
+
+    // A grant from before ring_configuration skips the read without a request, and the pass is still ok.
+    stored.length = 0
+    fetchMock.mockClear()
+    const old = quiet(FULL_SCOPE.replace(' extapi:ring_configuration', ''))
+    const again = await reconcileOuraCloud({ repo: old.repo, config: CONFIG, now: () => new Date('2026-10-19T02:00:00.000Z') })
+    expect(again.map(o => o.result)).toEqual(['ok'])
+    expect(fetchMock.mock.calls.some(c => String(c[0]).includes('ring_battery_level'))).toBe(false)
+    expect(stored).toEqual([])
   })
 })

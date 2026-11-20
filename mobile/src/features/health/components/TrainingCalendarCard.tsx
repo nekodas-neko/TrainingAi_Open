@@ -4,7 +4,7 @@ import { Card, Legend, MonthCalendar } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { calendarSpec } from '../../workouts/data/models';
-import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
+import { useLocalOnlyWorkouts } from '../../workouts/data/useWorkoutView';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { useSessionColors } from '../../workouts/useSessionColors';
 import { useActivities } from '../../activities/data/ActivityProvider';
@@ -21,7 +21,7 @@ export function TrainingCalendarCard({ openDay }: { openDay: (date: string) => v
   const [selected, setSelected] = useState<string | null>(null);
   const [year, number] = month.split('-').map(Number);
   const state = useWorkoutResource(calendarSpec(year, number));
-  const journal = useWorkoutJournal();
+  const localOnly = useLocalOnlyWorkouts();
   const activities = useActivities();
   const activityColor = theme.training.activity;
   const { markers, dots } = calendarMarks({
@@ -29,7 +29,8 @@ export function TrainingCalendarCard({ openDay }: { openDay: (date: string) => v
     trainedDays: state.data?.trainedDays ?? {},
     activityDays: state.data?.activityDays ?? {},
     activities: activities.rows.map((row) => row.payload),
-    workouts: journal.data.workouts,
+    // Only the phone's workouts the server doesn't list yet (#3880).
+    workouts: localOnly,
     sessionColor: color,
     activityColor,
   });

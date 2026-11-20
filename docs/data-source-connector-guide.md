@@ -229,6 +229,12 @@ provenance bug before it was made required).
   in `lib/health-connect-sync.ts` is the reference) — every new source needs its own, vendors don't
   share a vocabulary. Unmapped types fall through to `'other'` server-side.
 - **Table:** `activity_logs`, via `saveActivityLog`.
+- **A session the source recorded itself** (Oura's workouts, #3875) is read as a
+  `SourceActivitySession` (`packages/shared/src/health/activity-sessions.ts`: day, app activity type
+  or the source's unmapped name, start, end, distance, `dismissed`, source) through
+  `repo.getSourceActivitySessions`, one reader per connector in
+  `lib/data/postgres/slices/activity-sessions.ts`. The energy budget and the heart-rate recovery
+  profile read only that; Oura's mapping is `lib/oura/cloud/activity-sessions-map.ts`.
 - Distinct from **workout sessions** — structured strength-training data the app's own UI writes. A
   source cannot populate a workout, only enrich one after the fact.
 

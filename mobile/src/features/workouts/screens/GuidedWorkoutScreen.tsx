@@ -21,6 +21,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { workoutFlow } from '../logging/flow';
+import { workoutBack } from '../logging/back';
 import { recordedSets, type WorkoutRecord } from '../logging/workout';
 import { SetEntry, SetActions } from '../components/SetEntry';
 import { PausedBanner, RestCard, canPauseWorkout } from '../components/WorkoutClocks';
@@ -161,6 +162,16 @@ export function GuidedWorkoutScreen({
       await controller.advanceExercise(workout.id);
     }
   }
+  function goBack(source: 'header' | 'system') {
+    const action = workoutBack(flow.stage, ready, source);
+    if (action === 'next') {
+      void next();
+    } else if (action === 'session') {
+      void controller.showSession(workout.id);
+    } else {
+      setPanel('leave');
+    }
+  }
   async function confirm(decision: ConfirmationKind) {
     let saved = false;
     if (decision === 'discard') {
@@ -267,17 +278,8 @@ export function GuidedWorkoutScreen({
         workout={workout}
         ring={flow.stage === 'exercise'}
         fillBottom={flow.stage === 'exercise' && !ready && !resting}
-        onBack={
-          flow.stage === 'summary'
-            ? () => {
-                void next();
-              }
-            : flow.stage === 'warmup' || ready
-              ? () => {
-                  void controller.showSession(workout.id);
-                }
-              : () => setPanel('leave')
-        }
+        onBack={() => goBack('header')}
+        onSystemBack={() => goBack('system')}
         backIcon={flow.stage === 'summary' ? 'forward' : 'back'}
         backLabel={
           flow.stage === 'summary' ? 'Continue to next exercise' : 'Back to session'
