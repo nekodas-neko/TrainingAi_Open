@@ -6,6 +6,7 @@ import { PartialNightPayloadSchema } from "@trainingai/shared/health/partial-nig
 import { rateLimit } from "@/lib/rate-limit"
 import { invalidBodyResponse, withRouteErrors } from "@/lib/api/route-errors"
 import { withNightRescore, partialNightRescore } from "@/lib/health/rescore-nights"
+import { rescoreWithTodayReadiness } from "@/lib/health/today-readiness-scorer"
 
 const MAX_BODY_BYTES = 1024
 
@@ -26,7 +27,7 @@ const MAX_BODY_BYTES = 1024
  *   so does a night the caller typed: a typed night's hours are not a measurement to distrust.
  *
  * The re-score is the one an Oura revision gets: the recent days whose night changed have their stored
- * Sleep Score rebuilt (or cleared), and today's readiness is cleared to be read again.
+ * Sleep Score rebuilt (or cleared), and today's readiness is cleared and scored again (#3872).
  */
 export async function POST(req: Request) {
   const session = await auth()
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
 
   return withRouteErrors(async () => {
     const repo = await getRepositoryAsync()
-    const outcome = await withNightRescore(repo, userId, () =>
+    const outcome = await withNightRescore(rescoreWithTodayReadiness(repo), userId, () =>
       repo.setPartialNight(userId, parsed.data.id, parsed.data.partial ? new Date() : null),
     partialNightRescore)
     if (outcome === 'not_found') return NextResponse.json({ error: "Night not found" }, { status: 404 })

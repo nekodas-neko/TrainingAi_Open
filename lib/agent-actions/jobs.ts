@@ -15,6 +15,7 @@ import type { FinishAgentActionInput } from '@/lib/data/postgres/slices/agent-ac
 import { ouraOAuthConfig } from '@/lib/oura/cloud/config'
 import { backfillOuraCloud, CONNECT_BACKFILL_DAYS, validBackfillRange, type OuraBackfillResult } from '@/lib/oura/cloud/backfill'
 import { stillRhrRefresher } from '@/lib/oura/cloud/still-rhr'
+import { rescoreWithTodayReadiness } from '@/lib/health/today-readiness-scorer'
 import { runOuraWebhookRenewal } from '@/lib/oura/cloud/renewal'
 import { forceOuraTokenRefresh } from '@/lib/oura/cloud/tokens'
 import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
@@ -306,7 +307,7 @@ export const AGENT_JOBS = {
       const from = p.from ? normalizeDateParamIso(p.from) : to && shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1))
       if (!from || !to) return { status: 400, body: { error: 'Invalid date' }, finish: { outcome: 'refused', error: 'invalid date' } }
       if (!validBackfillRange(from, to)) return { status: 400, body: { error: 'invalid_range' }, finish: { outcome: 'refused', error: 'invalid_range' } }
-      const run = backfillOuraCloud({ repo: ctx.repo, config, rescore: ctx.repo, workoutHr: workoutHrReattributor(ctx.repo), stillRhr: stillRhrRefresher(ctx.repo) }, ctx.userId, {
+      const run = backfillOuraCloud({ repo: ctx.repo, config, rescore: rescoreWithTodayReadiness(ctx.repo), workoutHr: workoutHrReattributor(ctx.repo), stillRhr: stillRhrRefresher(ctx.repo) }, ctx.userId, {
         from, to, dryRun: p.dryRun, heartRate: p.heartRate ?? true, tz: ctx.tz, tombstoneAbsent: true, stampData: false,
       })
       const finish = (result: OuraBackfillResult): FinishAgentActionInput => {

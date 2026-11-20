@@ -14,10 +14,14 @@
  *   (`scoreSleepForDate`, one night window for both). A day left with no night is cleared.
  * - **Readiness, today: cleared, then scored now** (#3872), with the illness radar's fields stored
  *   beside it (#3086). The clear takes the score's provenance with it; the readiness read itself
- *   (`buildReadinessPayload`, through `night-readiness.ts`) then runs and stores today's score under
- *   its own rule, so a night arriving after the day's last read, or on a day the app is never
- *   opened, still leaves a score. With today's night gone it writes no readiness and the day stays
- *   empty.
+ *   (`buildReadinessPayload`) then runs and stores today's score under its own rule, so a night
+ *   arriving after the day's last read, or on a day the app is never opened, still leaves a score.
+ *   With today's night gone it writes no readiness and the day stays empty. The read is the caller's
+ *   to hand in (`scoreToday`, from `today-readiness-scorer.ts`): it reaches `@/lib/data`, and this
+ *   module is reached from the data layer, so it must not import the read, not even lazily (the
+ *   1.525.0 release test: Turbopack served `@/lib/data` empty through that cycle). A bare repository
+ *   target (the adapter's `partial_night` outbox op) clears today's readiness and leaves the score
+ *   to the next read.
  * - **Readiness, a finished day with a score: kept and marked**
  *   (`model_versions.readinessNightRevisedAt`). A finished day's readiness is what it said that
  *   morning, built from that morning's activity, load and illness inputs, which no later read can
@@ -70,7 +74,7 @@ import { DEFAULT_TZ, shiftDateStr, todayInTz } from '@trainingai/shared/date-uti
 import { nightSessions, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { sleepComponentsToContributors } from '@trainingai/shared/health/sleep-score'
 import { scoreSleepForDate, SLEEP_SCORE_HISTORY_DAYS } from '@trainingai/shared/health/sleep-score-for-date'
-import { scoreTodayReadiness, scoreFinishedDayReadiness, readinessFilledOnArrival } from '@/lib/health/night-readiness'
+import { scoreFinishedDayReadiness, readinessFilledOnArrival } from '@/lib/health/night-readiness'
 
 /** How many days back a changed night is re-scored. Matches the training-stress look-back. */
 export const RESCORE_WINDOW_DAYS = 7
@@ -181,30 +185,45 @@ export async function watchNights(repo: NightRescoreRepo, userId: string): Promi
  */
 export type ReadinessScoringDefer = (job: () => Promise<void>) => void
 
-/** A re-score target whose readiness scoring runs after the caller answers. */
-export interface DeferredNightRescore { repo: NightRescoreRepo; deferReadiness: ReadinessScoringDefer }
+/**
+ * Runs the readiness read for today, which stores today's readiness when today's night exists and
+ * writes nothing for readiness otherwise. Injected (`scoreTodayReadiness` in
+ * `today-readiness-scorer.ts`) because the read reaches `@/lib/data` and this module is reached from
+ * it. Throws on failure; the caller logs it.
+ */
+export type TodayReadinessScorer = (userId: string, tz: string) => Promise<void>
 
-/** What an Oura write re-scores with: the repository (readiness scored inline), or a deferred one. */
-export type NightRescoreTarget = NightRescoreRepo | DeferredNightRescore
+/** How readiness is scored after a re-score. Without `scoreToday`, today's readiness is left to the next read. */
+export interface ReadinessScoring { scoreToday?: TodayReadinessScorer; deferReadiness?: ReadinessScoringDefer }
+
+/** A re-score target that scores today's readiness, inline or (with `deferReadiness`) after the caller answers. */
+export interface ScoringNightRescore extends ReadinessScoring { repo: NightRescoreRepo }
+
+/** What an Oura write re-scores with: the bare repository (today's readiness left to the read), or a scoring target. */
+export type NightRescoreTarget = NightRescoreRepo | ScoringNightRescore
 
 /**
  * The webhook's target: the night's Sleep Score and clears inside the write, readiness right after
  * the answer. A long-running server (Railway), so the job outlives the response.
  */
-export function rescoreReadinessAfterAnswer(repo: NightRescoreRepo): DeferredNightRescore {
-  return { repo, deferReadiness: job => { void job().catch(err => console.error('[rescore-nights] deferred readiness scoring failed:', err)) } }
+export function rescoreReadinessAfterAnswer(repo: NightRescoreRepo, scoreToday: TodayReadinessScorer): ScoringNightRescore {
+  return { repo, scoreToday, deferReadiness: job => { void job().catch(err => console.error('[rescore-nights] deferred readiness scoring failed:', err)) } }
 }
 
-function unpack(target: NightRescoreTarget): { repo: NightRescoreRepo; defer: ReadinessScoringDefer | null } {
-  return 'deferReadiness' in target ? { repo: target.repo, defer: target.deferReadiness } : { repo: target, defer: null }
+/** The repository and readiness scoring a target carries. */
+export function unpackRescoreTarget(target: NightRescoreTarget): { repo: NightRescoreRepo; scoring: ReadinessScoring } {
+  return 'repo' in target
+    ? { repo: target.repo, scoring: { scoreToday: target.scoreToday, deferReadiness: target.deferReadiness } }
+    : { repo: target, scoring: {} }
 }
 
 /** After the write: re-scores every recent day whose night changed. See the file header for what each pillar gets. */
 export async function rescoreChangedNights(
   repo: NightRescoreRepo, watch: NightWatch, now: Date = new Date(), ownerChanged: readonly string[] = [],
-  /** Given, readiness is scored by a job handed to it instead of before this returns. */
-  deferReadiness?: ReadinessScoringDefer,
+  /** `scoreToday` scores today's readiness; `deferReadiness` runs the scoring as a job handed to it instead of before this returns. */
+  scoring: ReadinessScoring = {},
 ): Promise<RescoreOutcome> {
+  const { scoreToday, deferReadiness } = scoring
   const { userId, tz, today } = watch
   const from = windowFrom(today)
   const ownerDates = ownerChanged.filter(d => d <= today)
@@ -246,7 +265,7 @@ export async function rescoreChangedNights(
 
   // #3872: readiness for each changed day, after its night's own scores, decided on the state the
   // job finds when it runs (so a deferred job that runs after a later write still scores right).
-  const job = () => scoreReadinessForDays(repo, userId, tz, changed, { markRevised: true, now })
+  const job = () => scoreReadinessForDays(repo, userId, tz, changed, { markRevised: true, now, scoreToday })
   if (deferReadiness) {
     deferReadiness(() => repo.withOuraSleepWriteLock(userId, async () => logReadiness(await job())))
   } else {
@@ -266,8 +285,8 @@ function logReadiness(r: ReadinessScoringOutcome): void {
 /**
  * Scores readiness for `days` (#3872), each on its own night, best-effort per day:
  *
- * - **Today** (by the read's own clock): the readiness read (`scoreTodayReadiness`), which stores a
- *   score only when today's night exists. With `releaseAnchorOnChange` holding today, a frozen Body
+ * - **Today** (by the read's own clock): the readiness read (`opts.scoreToday`), which stores a
+ *   score only when today's night exists. Without it, today is left to the next read. With `releaseAnchorOnChange` holding today, a frozen Body
  *   Battery anchor is released when the score moved, so the battery re-anchors on the score the
  *   readiness card shows (Q-39).
  * - **A finished day** with no score, or with one this path filled itself
@@ -283,6 +302,8 @@ export async function scoreReadinessForDays(
     markRevised?: boolean; releaseAnchorOnChange?: ReadonlySet<string>; now?: Date
     /** Day → readiness stored before the write that started this; the anchor's change test compares against it. */
     priorScores?: ReadonlyMap<string, number | null>
+    /** The readiness read for today; without it, today is skipped. */
+    scoreToday?: TodayReadinessScorer
   } = {},
 ): Promise<ReadinessScoringOutcome> {
   const out: ReadinessScoringOutcome = { scored: [], marked: [], batteryReleased: [] }
@@ -300,12 +321,13 @@ export async function scoreReadinessForDays(
     const hasNight = canonicalNightForDate(nights, day, tz) != null
     const row = stored.get(day)
     if (day === today) {
-      if (!hasNight) continue
+      const scoreToday = opts.scoreToday
+      if (!hasNight || !scoreToday) continue
       // The score before the document's write, when the caller took it: a read can store the new
       // score between the write and this job, and then the row alone shows no change.
       const before = opts.priorScores?.get(day) ?? row?.readinessScore ?? null
       const after = await bestEffort(day, async () => {
-        await scoreTodayReadiness(userId, tz)
+        await scoreToday(userId, tz)
         return (await repo.getOuraDailyDerived(userId, day, day))[0]?.readinessScore ?? null
       }, null)
       if (after == null) continue
@@ -347,14 +369,15 @@ export async function rescoreReadinessDocuments(
   priorScores?: ReadonlyMap<string, number | null>,
 ): Promise<void> {
   if (days.length === 0) return
-  const { repo, defer } = unpack(target)
+  const { repo, scoring } = unpackRescoreTarget(target)
+  const defer = scoring.deferReadiness
   const job = () => repo.withOuraSleepWriteLock(userId, async () => {
     const user = await repo.getUserById(userId)
     const tz = user?.timezone ?? DEFAULT_TZ
     const from = windowFrom(todayInTz(tz))
     const recent = days.filter(d => d >= from)
     if (recent.length === 0) return
-    logReadiness(await scoreReadinessForDays(repo, userId, tz, recent, { releaseAnchorOnChange: new Set(temperatureArrived), priorScores }))
+    logReadiness(await scoreReadinessForDays(repo, userId, tz, recent, { releaseAnchorOnChange: new Set(temperatureArrived), priorScores, scoreToday: scoring.scoreToday }))
   })
   const run = async () => {
     try { await job() } catch (err) { console.error('[rescore-nights] re-scoring readiness for a readiness document failed:', err) }
@@ -386,7 +409,7 @@ export async function withNightRescore<T>(
   ownerChanged?: (result: T) => string[],
 ): Promise<T> {
   if (!target) return write()
-  const { repo, defer } = unpack(target)
+  const { repo, scoring } = unpackRescoreTarget(target)
   return repo.withOuraSleepWriteLock(userId, async () => {
     let watch: NightWatch | null = null
     try {
@@ -397,7 +420,7 @@ export async function withNightRescore<T>(
     const result = await write()
     if (watch) {
       try {
-        const outcome = await rescoreChangedNights(repo, watch, new Date(), ownerChanged?.(result) ?? [], defer ?? undefined)
+        const outcome = await rescoreChangedNights(repo, watch, new Date(), ownerChanged?.(result) ?? [], scoring)
         if (outcome.changed.length > 0) console.info(`[rescore-nights] nights changed: ${JSON.stringify(outcome)}`)
       } catch (err) {
         console.error('[rescore-nights] re-scoring the changed nights failed:', err)

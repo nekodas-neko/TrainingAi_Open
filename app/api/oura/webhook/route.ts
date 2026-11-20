@@ -12,6 +12,7 @@ import { workoutHrReattributor } from '@/lib/workout/post-completion-hr'
 import { stillRhrRefresher } from '@/lib/oura/cloud/still-rhr'
 import { settleWalkingPlanSoon } from '@/lib/health/walking-plan-service'
 import { rescoreReadinessAfterAnswer } from '@/lib/health/rescore-nights'
+import { scoreTodayReadiness } from '@/lib/health/today-readiness-scorer'
 import {
   OuraWebhookEvent, handleOuraWebhookEvent, isOurVerificationToken, isRetryableOuraError, ouraWebhookConfig, verifyOuraSignature,
 } from '@/lib/oura/cloud/webhook'
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
     const repo = await getRepositoryAsync()
     const outcome = await handleOuraWebhookEvent({
       // #3872 review: readiness is scored after the answer; Oura allows the webhook 10 s.
-      repo, config: config.oauth, rescore: rescoreReadinessAfterAnswer(repo),
+      repo, config: config.oauth, rescore: rescoreReadinessAfterAnswer(repo, scoreTodayReadiness),
       workoutHr: workoutHrReattributor(repo),
       stillRhr: stillRhrRefresher(repo),
       afterWrite: (u) => settleWalkingPlanSoon(repo, u),
