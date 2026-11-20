@@ -43,6 +43,8 @@ const SHARED_EXPORTS = [
   'isOpenedOnValid',
   'weatherCondition',
   'mapWeatherCode',
+  // #2218: the shared-meal copy arithmetic, used by the current app's scan copy and Preview's friend library
+  'sharedIngredientToEntry',
   // shared before #3041; listed so they stay that way
   'rangeStats',
   'actualSleepWindow',

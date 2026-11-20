@@ -21,6 +21,7 @@ export function ListRow({
   density = 'normal',
   divider = true,
   checked,
+  expanded,
 }: {
   title: string;
   /** 'danger' draws the title red, for a destructive row. */
@@ -38,6 +39,8 @@ export function ListRow({
   density?: 'normal' | 'snug' | 'compact';
   divider?: boolean;
   checked?: boolean;
+  /** For a row that opens and closes something beneath it: read out as expanded or collapsed. */
+  expanded?: boolean;
 }) {
   const { theme } = useTheme();
   const gesture = useContext(RowGestureContext);
@@ -86,7 +89,7 @@ export function ListRow({
       accessibilityRole={checked === undefined ? 'button' : 'checkbox'}
       accessibilityLabel={title}
       accessibilityHint={disabled ? 'Coming soon' : [subtitle, warning].filter(Boolean).join('. ') || undefined}
-      accessibilityState={{ disabled, checked }}
+      accessibilityState={{ disabled, checked, expanded }}
       disabled={disabled}
       onPress={() => {
         if (!gesture?.suppressPress()) onPress();

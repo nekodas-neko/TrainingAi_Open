@@ -19,6 +19,7 @@ export function backgroundScene(
             'profile-goals',
             'year-review',
             'friend-profile',
+            'friend-meals',
           ].includes(detail ?? '')
         ? 'more'
         : section;
