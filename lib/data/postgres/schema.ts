@@ -280,6 +280,11 @@ export const exerciseLogs = pgTable('exercise_logs', {
   // Issue 2721: when this row's content was last decided — the phone's clock for a stamped push, the
   // server's for a web route or a fix. A push stamped older than it is skipped (`isSupersededEdit`).
   clientEditedAt:       timestamp('client_edited_at', { withTimezone: true }),
+  // #3892: the per-exercise answer to "how did it feel against the plan?" — -1 easier, 0 as
+  // expected, +1 harder; NULL where the question was not shown. `effort_source` is 'tapped' or
+  // 'default' (left on "as expected"). Both CHECK-constrained in migration 202611200539.
+  effortVsPlan:         smallint('effort_vs_plan'),
+  effortSource:         text('effort_source').$type<'tapped' | 'default'>(),
 })
 
 export const setLogs = pgTable('set_logs', {

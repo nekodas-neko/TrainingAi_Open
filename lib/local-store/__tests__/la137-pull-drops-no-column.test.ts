@@ -57,6 +57,8 @@ const FIXED: Record<string, Record<string, unknown>> = {
   plan_meal_answers: { answer: 'estimated' },
   // LB-190: vs_question must be 1 or 2 whenever vs_normal holds an answer.
   day_checkins: { vs_question: 1 },
+  // #3892: effort_vs_plan is -1, 0 or 1; the generic number (3) would break its CHECK.
+  exercise_logs: { effort_vs_plan: 1 },
 }
 
 describe.skipIf(!canRun)('a sync pull drops no column applyDelta writes (LA-137)', () => {
