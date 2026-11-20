@@ -17,7 +17,7 @@
 //
 // The BLE raw archive (`oura_raw_samples`, `oura_raw_packed`) is never touched here.
 import type { OuraCloudHeartrateWrite, WorkoutRepository } from '@/lib/data/repository'
-import { withNightRescore, rescoreReadinessDocuments, readinessDocumentChanged, type NightRescoreTarget } from '@/lib/health/rescore-nights'
+import { withNightRescore, rescoreReadinessDocuments, readinessDocumentChanged, unpackRescoreTarget, type NightRescoreTarget } from '@/lib/health/rescore-nights'
 import type { OuraCloudWrites } from './documents'
 import { reportOuraCloudIssue } from './report'
 import { stillRhrDaysBetween, stillRhrDaysForDocuments, type StillRhrRefresh } from './still-rhr'
@@ -106,8 +106,9 @@ export function plannedCounts(writes: OuraCloudWrites): OuraCloudWriteCounts {
  * resting HR once the rows are in.
  * `rescore` (#3079): with it, a sleep write that changes, adds or removes a recent night re-scores
  * that night's day (`rescore-nights.ts`), and a `daily_readiness` document re-scores the recent
- * day's readiness it feeds (#3872). Production passes the repository (the webhook, a deferred one);
- * tests that only count writes leave it out.
+ * day's readiness it feeds (#3872). Production passes a scoring target from
+ * `rescoreWithTodayReadiness` (`lib/health/today-readiness-scorer.ts`), so today's readiness is scored too;
+ * a bare repository re-scores sleep but skips today's readiness. Tests that only count writes leave it out.
  */
 export async function writeOuraCloudData(
   writer: OuraCloudWriter, userId: string, writes: OuraCloudWrites, rescore?: NightRescoreTarget, stillRhr?: StillRhrRefresh,
@@ -125,8 +126,8 @@ export async function writeOuraCloudData(
   let temperatureArrived: string[] = []
   let priorReadiness = new Map<string, number | null>()
   if (rescore && readinessDays.length > 0) {
-    const deferred = 'deferReadiness' in rescore
-    const repo = deferred ? rescore.repo : rescore
+    const { repo, scoring } = unpackRescoreTarget(rescore)
+    const deferred = scoring.deferReadiness != null
     const [from, to] = [readinessDays[0], readinessDays[readinessDays.length - 1]]
     try {
       const [daily, derived] = await Promise.all([repo.getOuraDaily(userId, from, to), repo.getOuraDailyDerived(userId, from, to)])

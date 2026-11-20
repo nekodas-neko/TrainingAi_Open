@@ -14,11 +14,11 @@ import {
   withNightRescore, changedNightDates, scoreNightForDate, RESCORE_WINDOW_DAYS, partialNightRescore, type NightRescoreRepo,
 } from '@/lib/health/rescore-nights'
 
-// #3872: the readiness scorers reach the real repository; their own behaviour is pinned in
-// rescore-nights-readiness-3872.test.ts. Here they score nothing, so this file pins the rest.
+// #3872: the finished-day scorer reaches the real repository; its behaviour is pinned in
+// rescore-nights-readiness-3872.test.ts. Here it scores nothing, and the bare repository target
+// injects no today scorer, so this file pins the rest.
 vi.mock('@/lib/health/night-readiness', async (importActual) => ({
   ...(await importActual<typeof import('@/lib/health/night-readiness')>()),
-  scoreTodayReadiness: vi.fn(async () => {}),
   scoreFinishedDayReadiness: vi.fn(async () => false),
 }))
 
