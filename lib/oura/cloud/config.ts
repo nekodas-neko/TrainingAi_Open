@@ -23,8 +23,10 @@ export const OURA_API_BASE = 'https://api.ouraring.com'
  * with "Token is not authorized access stress scope", so it is asked for on the same precedent
  * (#3873, owner yes 19 Nov). Whether Oura's consent screen accepts it is known only from a real
  * connect; if it refuses, removing it restores the old list. A grant stored before it lacks it, and
- * resilience is skipped as not shared, not reported. `email` and `tag` are left out: nothing in #2808 reads
- * them. A change here reaches a user only on their next connect.
+ * resilience is skipped as not shared, not reported. `email` and `tag` are asked for too (owner, 20 Nov:
+ * every permission Oura offers, so the one reconnect #3873 needs covers whatever is used later). Nothing
+ * reads either yet: tags and rest mode are fetched in a later batch, and the email is never read or stored.
+ * A change here reaches a user only on their next connect.
  *
  * `personal` is kept although nothing stores what it shares (age, sex, height, weight; #3081). The
  * one `personal_info` read we make, for the account `id` every webhook is routed by
@@ -32,7 +34,7 @@ export const OURA_API_BASE = 'https://api.ouraring.com'
  * Dropping it could make Oura refuse that read, which would leave every event `unknown_user`, and
  * only a real reconnect could show it does not. We read `id` alone and store nothing else from it.
  */
-export const OURA_SCOPES = ['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health', 'ring_configuration', 'stress'] as const
+export const OURA_SCOPES = ['email', 'personal', 'daily', 'heartrate', 'workout', 'tag', 'session', 'spo2', 'heart_health', 'ring_configuration', 'stress'] as const
 export type OuraScope = (typeof OURA_SCOPES)[number]
 
 /**

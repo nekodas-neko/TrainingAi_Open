@@ -8,7 +8,7 @@ import { FirstHandFilter, OURA_APP_PACKAGE } from '@trainingai/shared/health/hea
 
 describe('Oura scopes (#3026)', () => {
   it('asks for v1.42\'s names: spo2, not spo2Daily, and heart_health', () => {
-    expect(OURA_SCOPES).toEqual(['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2', 'heart_health', 'ring_configuration', 'stress'])
+    expect(OURA_SCOPES).toEqual(['email', 'personal', 'daily', 'heartrate', 'workout', 'tag', 'session', 'spo2', 'heart_health', 'ring_configuration', 'stress'])
   })
 
   it('asks for stress at connect, which Oura\'s 401 named for resilience (#3873)', () => {
