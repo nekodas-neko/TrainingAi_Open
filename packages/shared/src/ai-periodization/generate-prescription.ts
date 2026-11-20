@@ -362,7 +362,7 @@ async function runPrescriptionGeneration(
   // The deload count this plan was made at, stored on it: `workout-data` regenerates a plan in a
   // finished deload only when it was made before the count got there (`deloadEndDue`), so a plan made
   // after this exit check does not ask for another generation on every read.
-  const store = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: { phase: PeriodizationPhase; phaseStartedAt: Date }) =>
+  const storePrescription = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: { phase: PeriodizationPhase; phaseStartedAt: Date }) =>
     repo.storePrescription(userId, programSessionId, { ...p, sessionsInPhaseAtPlan: state.sessionsInPhase }, expiresAt, status, storeFor)
   // #3766: the phase this plan is made in. A program move while it is being made (another session's
   // tap or auto-apply) voids this slot; the plan is then not stored (`storePrescription` checks the
@@ -449,7 +449,7 @@ async function runPrescriptionGeneration(
     // next local midnight and the next open asks again. The other triggers describe the block and
     // keep the week.
     const expiresAt = prescriptionExpiresAt(prescription, tz, startedAt, { illnessTriggered: trigger?.kind === 'illness' })
-    if (await store(prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
+    if (await storePrescription(prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
 
     return {
       ok: true,
@@ -485,7 +485,7 @@ async function runPrescriptionGeneration(
     // gets a fresh decision. It was `now + 24h`, which kept an evening deload alive through the
     // next day's morning check-in (#3700).
     const expiresAt = nextMidnightInTz(tz, startedAt)
-    if (await store(prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
+    if (await storePrescription(prescription, expiresAt, 'pending', generatedFor) === false) return PHASE_MOVED
     return {
       ok: true,
       prescription,
@@ -553,7 +553,7 @@ async function runPrescriptionGeneration(
         : 'Your AI coach could not be reached, so this is your program as written.',
     )
     if (rules) {
-      const stored = await store(rules, new Date(Date.now() + RULES_PRESCRIPTION_TTL_MS), 'pending', generatedFor)
+      const stored = await storePrescription(rules, new Date(Date.now() + RULES_PRESCRIPTION_TTL_MS), 'pending', generatedFor)
       if (stored === false) return PHASE_MOVED
       return {
         ok: true,
@@ -878,7 +878,7 @@ async function runPrescriptionGeneration(
   // status to 'pending') and then set 'auto_applied' in a second statement; two concurrent
   // generations for this session could interleave between them and leave the status describing the
   // other run's prescription (Q-54).
-  if (await store(prescription, expiresAt, prescriptionStatus, storeFor) === false) {
+  if (await storePrescription(prescription, expiresAt, prescriptionStatus, storeFor) === false) {
     return PHASE_MOVED
   }
 
