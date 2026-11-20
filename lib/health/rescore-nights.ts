@@ -117,6 +117,19 @@ function fingerprint(night: object): string {
 }
 
 /**
+ * #3872 review: whether a `daily_readiness` document's mapped day row differs from the stored one on
+ * any value it carries. Oura's own readiness score is left out, as `fingerprint` leaves out its sleep
+ * score: it is never ours (#3000). The webhook skips an unchanged document, the usual duplicate, so
+ * it starts no readiness scoring on the per-user lock the morning's sleep writes wait on.
+ */
+export function readinessDocumentChanged(incoming: object, stored: object | undefined): boolean {
+  const prior = (stored ?? {}) as Record<string, unknown>
+  return Object.entries(incoming)
+    .filter(([k]) => k !== 'date' && k !== 'readinessScore')
+    .some(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(prior[k] ?? null))
+}
+
+/**
  * Wake date → fingerprint of its canonical night, for every date in `[from, to]` that has one. Built
  * from the sessions dated in the window only, so the before and after sides group the same rows.
  */
@@ -266,7 +279,11 @@ function logReadiness(r: ReadinessScoringOutcome): void {
  */
 export async function scoreReadinessForDays(
   repo: NightRescoreRepo, userId: string, tz: string, days: readonly string[],
-  opts: { markRevised?: boolean; releaseAnchorOnChange?: ReadonlySet<string>; now?: Date } = {},
+  opts: {
+    markRevised?: boolean; releaseAnchorOnChange?: ReadonlySet<string>; now?: Date
+    /** Day → readiness stored before the write that started this; the anchor's change test compares against it. */
+    priorScores?: ReadonlyMap<string, number | null>
+  } = {},
 ): Promise<ReadinessScoringOutcome> {
   const out: ReadinessScoringOutcome = { scored: [], marked: [], batteryReleased: [] }
   const today = todayInTz(tz)
@@ -284,7 +301,9 @@ export async function scoreReadinessForDays(
     const row = stored.get(day)
     if (day === today) {
       if (!hasNight) continue
-      const before = row?.readinessScore ?? null
+      // The score before the document's write, when the caller took it: a read can store the new
+      // score between the write and this job, and then the row alone shows no change.
+      const before = opts.priorScores?.get(day) ?? row?.readinessScore ?? null
       const after = await bestEffort(day, async () => {
         await scoreTodayReadiness(userId, tz)
         return (await repo.getOuraDailyDerived(userId, day, day))[0]?.readinessScore ?? null
@@ -316,10 +335,16 @@ export async function scoreReadinessForDays(
  * recent days it covers, so the stored score is the same whichever document came first.
  * `temperatureArrived`: days that had no temperature before this write; only there may a frozen Body
  * Battery anchor move (an anchor frozen on a readiness without its temperature, like one frozen
- * before the night, #3085). Best-effort; never throws.
+ * before the night, #3085), and only when the score moved from `priorScores`, the score stored
+ * before the write. The webhook passes only the days whose document changed
+ * ({@link readinessDocumentChanged}). A deferred job lost to a restart is caught by the daily
+ * reconcile (`reconcile.ts` → `backfillOuraCloud` → here, inline), which passes every recent day it
+ * re-reads, changed or not. Best-effort; never throws.
  */
 export async function rescoreReadinessDocuments(
   target: NightRescoreTarget, userId: string, days: readonly string[], temperatureArrived: readonly string[] = [],
+  /** Day → readiness stored before the document was written (`writeOuraCloudData` reads it). */
+  priorScores?: ReadonlyMap<string, number | null>,
 ): Promise<void> {
   if (days.length === 0) return
   const { repo, defer } = unpack(target)
@@ -329,7 +354,7 @@ export async function rescoreReadinessDocuments(
     const from = windowFrom(todayInTz(tz))
     const recent = days.filter(d => d >= from)
     if (recent.length === 0) return
-    logReadiness(await scoreReadinessForDays(repo, userId, tz, recent, { releaseAnchorOnChange: new Set(temperatureArrived) }))
+    logReadiness(await scoreReadinessForDays(repo, userId, tz, recent, { releaseAnchorOnChange: new Set(temperatureArrived), priorScores }))
   })
   const run = async () => {
     try { await job() } catch (err) { console.error('[rescore-nights] re-scoring readiness for a readiness document failed:', err) }

@@ -17,7 +17,7 @@
 //
 // The BLE raw archive (`oura_raw_samples`, `oura_raw_packed`) is never touched here.
 import type { OuraCloudHeartrateWrite, WorkoutRepository } from '@/lib/data/repository'
-import { withNightRescore, rescoreReadinessDocuments, type NightRescoreTarget } from '@/lib/health/rescore-nights'
+import { withNightRescore, rescoreReadinessDocuments, readinessDocumentChanged, type NightRescoreTarget } from '@/lib/health/rescore-nights'
 import type { OuraCloudWrites } from './documents'
 import { reportOuraCloudIssue } from './report'
 import { stillRhrDaysBetween, stillRhrDaysForDocuments, type StillRhrRefresh } from './still-rhr'
@@ -113,17 +113,31 @@ export async function writeOuraCloudData(
   writer: OuraCloudWriter, userId: string, writes: OuraCloudWrites, rescore?: NightRescoreTarget, stillRhr?: StillRhrRefresh,
 ): Promise<OuraCloudWriteCounts> {
   // #3872 review: the days a `daily_readiness` document covers (only it maps the temperature
-  // fields), and which of them had no temperature until now, read before the write.
-  const readinessDays = writes.daily.filter(r => 'temperatureDeviation' in r).map(r => r.date).sort()
+  // fields), all read before the write: which of them the document changed, which had no
+  // temperature until now, and the readiness each had stored. Only the webhook (a deferred target)
+  // skips an unchanged document, so a duplicate starts no job on the per-user lock the morning's
+  // sleep writes wait on. The daily reconcile scores inline and re-scores even an identical
+  // document: it is the backstop for a webhook job lost to a restart. The stored score is taken
+  // here, not when the job runs: a readiness read can persist the new score in between, and the job
+  // would then see no change and leave a Body Battery anchor frozen on the old one.
+  const readinessDocs = writes.daily.filter(r => 'temperatureDeviation' in r)
+  let readinessDays = readinessDocs.map(r => r.date).sort()
   let temperatureArrived: string[] = []
+  let priorReadiness = new Map<string, number | null>()
   if (rescore && readinessDays.length > 0) {
-    const repo = 'deferReadiness' in rescore ? rescore.repo : rescore
+    const deferred = 'deferReadiness' in rescore
+    const repo = deferred ? rescore.repo : rescore
+    const [from, to] = [readinessDays[0], readinessDays[readinessDays.length - 1]]
     try {
-      const prior = new Map((await repo.getOuraDaily(userId, readinessDays[0], readinessDays[readinessDays.length - 1])).map(r => [r.date, r]))
-      temperatureArrived = writes.daily
+      const [daily, derived] = await Promise.all([repo.getOuraDaily(userId, from, to), repo.getOuraDailyDerived(userId, from, to)])
+      const prior = new Map(daily.map(r => [r.date, r]))
+      if (deferred) readinessDays = readinessDocs.filter(r => readinessDocumentChanged(r, prior.get(r.date))).map(r => r.date).sort()
+      temperatureArrived = readinessDocs
         .filter(r => r.temperatureDeviation != null && prior.get(r.date)?.temperatureDeviation == null)
         .map(r => r.date)
+      priorReadiness = new Map(derived.map(r => [r.day, r.readinessScore ?? null]))
     } catch (err) {
+      // Unknown, so every day is treated as changed: one extra scoring beats a missed one.
       console.error('[oura] could not read the days before a readiness document write:', err)
     }
   }
@@ -152,7 +166,7 @@ export async function writeOuraCloudData(
     return { sleep, sleepTombstoned, sleepPeriods }
   })
   // After the night's own re-score, so a batch carrying both scores the day on both.
-  if (rescore) await rescoreReadinessDocuments(rescore, userId, readinessDays, temperatureArrived)
+  if (rescore) await rescoreReadinessDocuments(rescore, userId, readinessDays, temperatureArrived, priorReadiness)
   // #3080: a period a higher-ranked night keeps out is reported, counts only, never silent.
   if (sleep.skippedOverlap > 0) {
     reportOuraCloudIssue('sleep:skipped-overlap', `${sleep.skippedOverlap} Oura sleep period(s) kept out by a higher-ranked night`, { userId })
