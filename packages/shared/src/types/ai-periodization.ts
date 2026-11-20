@@ -13,6 +13,15 @@ export type PrescriptionStatus =
   | 'dismissed'
   | 'consumed'
 
+/** What a generation's plan was made for, checked when it is stored: the slot's phase and start
+ *  (#3766) and, when given, the session's structure stamp (#3895). A plan whose slot moved on, or
+ *  whose session was changed while it was being made, is not stored. */
+export interface PrescriptionGeneratedFor {
+  phase: PeriodizationPhase
+  phaseStartedAt: Date
+  structure?: string | null
+}
+
 export type TrainingGoal = 'strength' | 'hypertrophy' | 'power' | 'endurance'
 
 export interface Baseline1rmEntry {

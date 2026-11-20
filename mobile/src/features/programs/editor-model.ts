@@ -116,3 +116,9 @@ export function normalizeSupersets<T extends { supersetGroup?: number | null }>(
       : item,
   );
 }
+
+/** #3895: under the AI plan the exercise's progression set reaches the bar only when the plan is
+ *  off, so the picker says so. Replacing it with a rep range is a later owner decision (D7, #3896). */
+export function progressionSetLabel(phaseMode: string | undefined): string {
+  return phaseMode === 'ai_dynamic' ? 'Used when the AI plan is off' : 'Progression set';
+}

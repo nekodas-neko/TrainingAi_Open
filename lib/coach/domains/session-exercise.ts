@@ -4,6 +4,7 @@ import { isLighterRole } from '@trainingai/shared/ai-periodization/role-plausibi
 import type { ExerciseRole } from '@trainingai/shared/types/program'
 import * as s from '@/lib/data/postgres/schema'
 import { progressionStyleIdsOwned } from '@/lib/data/postgres/slices/programs'
+import { voidSessionPrescription } from '@/lib/data/postgres/slices/periodization'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { FIELD_LABEL, type PatchChange } from '../patch'
 import type { Consequence, DomainHandler, Db, PreviewResult } from './types'
@@ -20,6 +21,22 @@ interface TargetRow {
   exerciseRole: ExerciseRole
   sessionName: string
   programId: string
+  phaseMode: 'manual' | 'automatic' | 'ai_dynamic'
+  /** The program's Accessory phase has a primary style, which an accessory uses over its own. */
+  accessoryPhaseStyled: boolean
+}
+
+/** Under `ai_dynamic` the stored AI plan replaces the exercise's style whenever it drives the bar,
+ *  and the rules fallback is the only reader left, so a style change has nothing to act on (#3895). */
+const STYLE_UNUSED_UNDER_AI = 'The progression style is not used while the AI plan is on'
+
+/** Whether an exercise's own progression style can reach the bar. `automatic` lets the phase's style
+ *  override it for primary and secondary lifts (`resolveStyleForExercise`); an accessory keeps its
+ *  own style only when the Accessory phase has none. */
+function styleCanApply(row: TargetRow): boolean {
+  if (row.phaseMode === 'ai_dynamic') return false
+  if (row.phaseMode === 'automatic') return row.exerciseRole === 'accessory' && !row.accessoryPhaseStyled
+  return true
 }
 
 /** A program only enters the pull delta when its `updated_at` moves, and the delta is what carries
@@ -44,6 +61,9 @@ async function loadTarget(db: Db, userId: string, id: string): Promise<TargetRow
       exerciseRole: s.sessionExercises.exerciseRole,
       sessionName: s.programSessions.name,
       programId: s.programs.id,
+      phaseMode: s.programs.phaseMode,
+      accessoryPhaseStyled: sql<boolean>`EXISTS (SELECT 1 FROM program_phases pp
+        WHERE pp.phase_set_id = ${s.programs.phaseSetId} AND pp.phase_type = 'accessory' AND pp.primary_style_id IS NOT NULL)`,
     })
     .from(s.sessionExercises)
     .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
@@ -253,10 +273,36 @@ export const sessionExerciseHandler: DomainHandler = {
       }
     }
 
-    consequences.push({
-      kind: 'good',
-      text: `Takes effect next time you train ${row.sessionName} — no logged history changes`,
-    })
+    // Only claim an effect the change has (#3895). A style change under the AI plan has none, and
+    // apply refuses it; under `automatic` the phase's style wins for primary and secondary lifts.
+    const styleChange = patch.changes.find(c => c.field === 'styleId')
+    if (styleChange && row.phaseMode === 'ai_dynamic') {
+      consequences.push({ kind: 'warn', text: `${STYLE_UNUSED_UNDER_AI}, so this change cannot be applied` })
+    } else if (styleChange && !styleCanApply(row)) {
+      consequences.push({
+        kind: 'warn',
+        text: row.exerciseRole === 'accessory'
+          ? 'The Accessory phase\'s progression style is used for this accessory, so its own style has no effect while phases run automatically'
+          : `The phase's progression style is used for this ${row.exerciseRole} lift, so its own style has no effect while phases run automatically`,
+      })
+    }
+    const hasEffect = !!(swap || removal)
+      || patch.changes.some(c => c.field === 'position')
+      || (!!styleChange && styleCanApply(row))
+    if (hasEffect) {
+      consequences.push({
+        kind: 'good',
+        text: `Takes effect next time you train ${row.sessionName} — no logged history changes`,
+      })
+    }
+    // The stored AI plan is voided by the apply and again by an undo; an undo puts the exercise back,
+    // not the old plan (#3895 review). Said before the tap, in the words the lifter will see.
+    if (hasEffect && row.phaseMode === 'ai_dynamic') {
+      consequences.push({
+        kind: 'info',
+        text: 'Your plan for this session will be rebuilt. Undo puts the exercise back, and the plan is rebuilt again',
+      })
+    }
 
     return { consequences, drift, target: { id: row.id, label: `${row.exerciseName} in ${row.sessionName}` } }
   },
@@ -273,6 +319,17 @@ export const sessionExerciseHandler: DomainHandler = {
 
     const drift = driftAgainst(accepted, row as unknown as Record<string, unknown>, c => c.field === 'removed')
     if (drift.length > 0) return { ok: false, reason: 'stale', drift }
+
+    // `styleId` is written verbatim onto the exercise row, so it must name one of the caller's own
+    // progression styles — the same check the program save route makes (RV-32). Checked before the
+    // swap below, which can create a library row: a refused change leaves nothing behind.
+    const styleChange = accepted.find(c => c.field === 'styleId')
+    if (styleChange && row.phaseMode === 'ai_dynamic') {
+      return { ok: false, reason: 'invalid', detail: STYLE_UNUSED_UNDER_AI }
+    }
+    if (styleChange && !(await progressionStyleIdsOwned(db, userId, [styleChange.to as string | null]))) {
+      return { ok: false, reason: 'invalid', detail: 'That progression style is not one of yours' }
+    }
 
     // Resolve a swap before writing anything, so a bad name fails the whole apply rather than
     // leaving a half-applied patch behind.
@@ -302,13 +359,6 @@ export const sessionExerciseHandler: DomainHandler = {
       }
     }
 
-    // `styleId` is written verbatim onto the exercise row, so it must name one of the caller's own
-    // progression styles — the same check the program save route makes (RV-32).
-    const styleChange = accepted.find(c => c.field === 'styleId')
-    if (styleChange && !(await progressionStyleIdsOwned(db, userId, [styleChange.to as string | null]))) {
-      return { ok: false, reason: 'invalid', detail: 'That progression style is not one of yours' }
-    }
-
     const beforeState = captureBefore(accepted, row)
 
     if (accepted.some(c => c.field === 'removed')) {
@@ -331,6 +381,11 @@ export const sessionExerciseHandler: DomainHandler = {
       await db.update(s.sessionExercises).set(set).where(eq(s.sessionExercises.id, row.id))
     }
 
+    // #3895: the stored AI plan was made for the session as it was, and keeps driving the bar until
+    // it expires. Void it, as the program editor's save does (`clearProgramPrescriptions`), so the
+    // next open regenerates against the changed session. Phase and counts are untouched.
+    await voidSessionPrescription(db, userId, row.sessionId)
+
     return { ok: true, summary: summarize(accepted, row), beforeState, targetId: row.id }
   },
 
@@ -347,6 +402,7 @@ export const sessionExerciseHandler: DomainHandler = {
         .returning({ id: s.sessionExercises.id })
       if (lifted) {
         await bumpProgramOfSession(db, r.sessionId as string)
+        await voidSessionPrescription(db, userId, r.sessionId as string)
         return { ok: true }
       }
       // A change applied before LB-66 hard-deleted its row, and its undo window can still be open.
@@ -360,6 +416,7 @@ export const sessionExerciseHandler: DomainHandler = {
         exerciseRole: (r.exerciseRole as ExerciseRole | undefined) ?? UNCLASSIFIED_EXERCISE_ROLE,
       })
       await bumpProgramOfSession(db, r.sessionId as string)
+      await voidSessionPrescription(db, userId, r.sessionId as string)
       return { ok: true }
     }
 
@@ -379,6 +436,8 @@ export const sessionExerciseHandler: DomainHandler = {
     if ('styleId' in before) set.styleId = before.styleId
     if ('position' in before) set.position = before.position
     await db.update(s.sessionExercises).set(set).where(eq(s.sessionExercises.id, targetId))
+    // A plan regenerated since the apply was made for the changed session, so it goes too.
+    await voidSessionPrescription(db, userId, row.sessionId)
     return { ok: true }
   },
 }

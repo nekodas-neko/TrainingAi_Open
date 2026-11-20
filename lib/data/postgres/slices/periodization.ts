@@ -14,6 +14,7 @@ import type { TimingRow } from '@trainingai/shared/workout/time-profile'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
   Baseline1rmEntry, PendingTransition, PrescriptionStatus, ProgramVolumeTarget,
+  PrescriptionGeneratedFor as GeneratedFor,
 } from '@trainingai/shared/types/ai-periodization'
 
 type Db = ReturnType<typeof getDb>
@@ -92,6 +93,37 @@ async function lockProgramRows(tx: Tx, userId: string, programId: string): Promi
  *  exact comparison with that Date never matches. */
 function phaseStartedAtIs(at: Date) {
   return sql`date_trunc('milliseconds', ${s.sessionPeriodization.phaseStartedAt}) = ${at.toISOString()}::timestamptz`
+}
+
+/**
+ * What a session's plan is made from, as one string: its time budget and every live exercise's id,
+ * name, catalogue link, style, position, role, superset and muscles. #3895 review: the Coach and
+ * the program editor void a stored plan when they change a session, but a generation already running
+ * read the session before the change and stored after the void, so its plan drove the changed (or
+ * restored) session for up to seven days. A generation reads this at its start and stores only while
+ * it is unchanged (`storePrescription`), in the same statement as the store. `updated_at` is left
+ * out, so a write that changes nothing the plan reads does not void it.
+ */
+function sessionStructureSql(programSessionId: string) {
+  return sql`(SELECT md5(ps.time_budget_minutes::text || '#' || coalesce((
+      SELECT string_agg(
+        se.id::text || ':' || se.exercise_name || ':' || coalesce(se.exercise_id::text, '') || ':' ||
+        coalesce(se.style_id::text, '') || ':' || se.position::text || ':' || se.exercise_role || ':' ||
+        coalesce(se.superset_group::text, '') || ':' || array_to_string(se.muscle_groups, ','),
+        '|' ORDER BY se.position, se.id)
+      FROM session_exercises se WHERE se.session_id = ps.id AND se.deleted_at IS NULL), ''))
+    FROM program_sessions ps WHERE ps.id = ${programSessionId})`
+}
+
+/** The session's structure stamp (`sessionStructureSql`), null when the session is not the user's. */
+export async function getSessionStructureStamp(db: Db, userId: string, programSessionId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ stamp: sql<string | null>`${sessionStructureSql(programSessionId)}` })
+    .from(s.programSessions)
+    .innerJoin(s.programs, eq(s.programSessions.programId, s.programs.id))
+    .where(and(eq(s.programSessions.id, programSessionId), eq(s.programs.userId, userId)))
+    .limit(1)
+  return row?.stamp ?? null
 }
 
 async function programIdOf(db: Db | Tx, programSessionId: string): Promise<string | null> {
@@ -478,10 +510,13 @@ export async function exitDeload(
 // `generatedFor` (#3766): the phase and start the plan was made in. A program move during the
 // generation (another session's tap or auto-apply) voids this slot and moves its phase; a plan made
 // for the old phase is then not stored, so the slot stays voided and regenerates in the new one.
+// `generatedFor.structure` (#3895 review): the session's structure stamp read at the generation's
+// start. A Coach change, its undo or an editor save while the plan was being made voids the slot;
+// the plan, made for the session as it was, is then not stored either.
 export async function storePrescription(
   db: Db, userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date,
   status: PrescriptionStatus = 'pending',
-  generatedFor?: { phase: PeriodizationPhase; phaseStartedAt: Date },
+  generatedFor?: GeneratedFor,
 ): Promise<boolean> {
   const stored = await db
     .update(s.sessionPeriodization)
@@ -497,6 +532,9 @@ export async function storePrescription(
       eq(s.sessionPeriodization.programSessionId, programSessionId),
       ...(generatedFor
         ? [eq(s.sessionPeriodization.phase, generatedFor.phase), phaseStartedAtIs(generatedFor.phaseStartedAt)]
+        : []),
+      ...(generatedFor?.structure != null
+        ? [sql`${sessionStructureSql(programSessionId)} = ${generatedFor.structure}`]
         : []),
     ))
     .returning({ id: s.sessionPeriodization.id })

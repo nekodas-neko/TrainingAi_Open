@@ -1,5 +1,6 @@
 import { toAestDay, weekStartForDay, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { DELOAD_FLOOR, type ProgramDeloadCheck } from '@trainingai/shared/ai-periodization/phase-guards'
+import { servePrescriptionState, type ServedPrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
 import type {
   AiPrescription, PendingTransition, PeriodizationPhase, SessionPeriodization,
 } from '@trainingai/shared/types/ai-periodization'
@@ -562,6 +563,27 @@ export async function readProgramDeloadCheck(
   const rows = await repo.listSessionPeriodizationForProgram(userId, programId)
   if (!isProgramAligned(rows)) return { aligned: false, deloadFinished: false, trainingWeeksDone: 0 }
   return programDeloadCheckOf(programPhaseView(rows, await completionsFor(repo, userId, programId, rows, tz), tz, now))
+}
+
+/**
+ * #3907: one stored state as every route that serves or acts on a stored plan must see it
+ * (`servePrescriptionState`): an aged-out plan, or one whose deload has ended, comes back as `null`
+ * with `prescriptionAgedOut`. On an `ai_dynamic` program an aligned program's cap decides the deload
+ * (`readProgramDeloadCheck`); with no such program, or a failed read, the type's own count does.
+ */
+export async function serveStoredPrescription<T extends Pick<SessionPeriodization, 'prescriptionStatus' | 'prescriptionExpiresAt'>
+  & Partial<Pick<SessionPeriodization, 'prescription' | 'phase' | 'sessionsInPhase'>>>(
+  repo: Pick<ProgramPhaseRepo, 'listSessionPeriodizationForProgram' | 'listProgramCompletions'>,
+  userId: string,
+  program: { id: string; phaseMode: string } | null | undefined,
+  state: T,
+  tz: string,
+  now: Date = new Date(),
+): Promise<ServedPrescriptionState<T>> {
+  const programDeload = program?.phaseMode === 'ai_dynamic' && state.phase != null
+    ? await readProgramDeloadCheck(repo, userId, program.id, { phase: state.phase }, tz, now).catch(() => null)
+    : null
+  return servePrescriptionState(state, now, programDeload)
 }
 
 /** `deloadEndDue`'s program side from a view already read (`syncProgramPhase` returns one). */

@@ -17,7 +17,7 @@
 //
 // The BLE raw archive (`oura_raw_samples`, `oura_raw_packed`) is never touched here.
 import type { OuraCloudHeartrateWrite, WorkoutRepository } from '@/lib/data/repository'
-import { withNightRescore, rescoreReadinessDocuments, readinessDocumentChanged, unpackRescoreTarget, type NightRescoreTarget } from '@/lib/health/rescore-nights'
+import { withNightRescore, rescoreReadinessDocuments, readinessDocumentChanged, unpackRescoreTarget, holdDeferredReadiness, type NightRescoreTarget } from '@/lib/health/rescore-nights'
 import type { OuraCloudWrites } from './documents'
 import { reportOuraCloudIssue } from './report'
 import { stillRhrDaysBetween, stillRhrDaysForDocuments, type StillRhrRefresh } from './still-rhr'
@@ -113,6 +113,19 @@ export function plannedCounts(writes: OuraCloudWrites): OuraCloudWriteCounts {
 export async function writeOuraCloudData(
   writer: OuraCloudWriter, userId: string, writes: OuraCloudWrites, rescore?: NightRescoreTarget, stillRhr?: StillRhrRefresh,
 ): Promise<OuraCloudWriteCounts> {
+  // #3905: the webhook's deferred readiness jobs start only once every write below is awaited. Each
+  // used to start the moment it was handed over, racing the writes after it (the contributors).
+  const held = holdDeferredReadiness(rescore)
+  try {
+    return await writeHeld(writer, userId, writes, held.target, stillRhr)
+  } finally {
+    held.release()
+  }
+}
+
+async function writeHeld(
+  writer: OuraCloudWriter, userId: string, writes: OuraCloudWrites, rescore?: NightRescoreTarget, stillRhr?: StillRhrRefresh,
+): Promise<OuraCloudWriteCounts> {
   // #3872 review: the days a `daily_readiness` document covers (only it maps the temperature
   // fields), all read before the write: which of them the document changed, which had no
   // temperature until now, and the readiness each had stored. Only the webhook (a deferred target)
@@ -130,9 +143,19 @@ export async function writeOuraCloudData(
     const deferred = scoring.deferReadiness != null
     const [from, to] = [readinessDays[0], readinessDays[readinessDays.length - 1]]
     try {
-      const [daily, derived] = await Promise.all([repo.getOuraDaily(userId, from, to), repo.getOuraDailyDerived(userId, from, to)])
+      const [daily, derived, storedContributors] = await Promise.all([
+        repo.getOuraDaily(userId, from, to), repo.getOuraDailyDerived(userId, from, to),
+        deferred ? repo.getOuraCloudReadinessContributors(userId, from, to) : Promise.resolve([]),
+      ])
       const prior = new Map(daily.map(r => [r.date, r]))
-      if (deferred) readinessDays = readinessDocs.filter(r => readinessDocumentChanged(r, prior.get(r.date))).map(r => r.date).sort()
+      // #3905: the contributors are part of the document, so a revision of only them is a change.
+      const priorContributors = new Map(storedContributors.map(r => [r.date, r.readinessContributors]))
+      const incomingContributors = new Map(writes.cloudDaily.filter(r => 'readinessContributors' in r).map(r => [r.date, r.readinessContributors]))
+      if (deferred) {
+        readinessDays = readinessDocs.filter(r => readinessDocumentChanged(r, prior.get(r.date), {
+          incoming: incomingContributors.get(r.date), stored: priorContributors.get(r.date) ?? null,
+        })).map(r => r.date).sort()
+      }
       temperatureArrived = readinessDocs
         .filter(r => r.temperatureDeviation != null && prior.get(r.date)?.temperatureDeviation == null)
         .map(r => r.date)
@@ -144,6 +167,9 @@ export async function writeOuraCloudData(
   }
   await writer.upsertOuraDaily(userId, writes.daily, 'oura_cloud')
   await writer.upsertBodyMetrics(userId, writes.body, 'oura_cloud')
+  // #3905: before any scoring below. Readiness reads the `recovery_index` contributor from these rows
+  // when a night has no recovery hours; written after, the score used the previous document's.
+  const cloudDays = await writer.upsertOuraCloudDaily(userId, writes.cloudDaily)
   // The period rows go first and inside the re-score window: `listSleepSessions` reads each
   // period's type from them, and the type decides which periods make the night (#3061). Written
   // after the sleep rows, a new night was scored before its types existed, so a short `sleep`
@@ -181,7 +207,6 @@ export async function writeOuraCloudData(
       `values outside the pinned spec, documents kept: ${unknown.map(([field, n]) => `${field} ×${n}`).join(', ')}`, { userId })
   }
   const workouts = await writer.upsertOuraWorkouts(userId, writes.workouts)
-  const cloudDays = await writer.upsertOuraCloudDaily(userId, writes.cloudDaily)
   const sessions = await writer.upsertOuraSessions(userId, writes.sessions)
   // #2634: a day's activity document is what makes its still-period resting HR computable.
   if (stillRhr) await stillRhr(userId, stillRhrDaysForDocuments(writes.cloudDaily))

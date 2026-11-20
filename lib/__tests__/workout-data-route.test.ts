@@ -27,8 +27,8 @@
  * `isAiPrescriptionPending` and `normalizeStoredPrescription` are real: they are the decisions.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { todayInTz } from '@trainingai/shared/date-utils'
-import { programMoveMark, trainingWeekStartOf } from '@trainingai/shared/ai-periodization/program-phase'
+import { todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
+import { programMoveMark, trainingWeekOf } from '@trainingai/shared/ai-periodization/program-phase'
 
 type Row = Record<string, unknown>
 
@@ -428,8 +428,12 @@ describe('GET /api/workout-data — a deload that has done its two sessions (#38
 // was made at the type's current count, so the type's check served it and Monday was another deload.
 describe('GET /api/workout-data — an aligned program\'s deload at its cap (#3876)', () => {
   const TZ = 'Australia/Brisbane'
-  const lastMonday = () => trainingWeekStartOf(new Date(Date.now() - 7 * 86_400_000), TZ)
-  const at = (days: number) => new Date(lastMonday().getTime() + days * 86_400_000 + 12 * 3_600_000)
+  // #3907: days are counted on the local calendar and anchored to local midday (the dates rule), not
+  // added as 24-hour blocks, which drift by an hour across a DST change outside Brisbane.
+  const middayOf = (day: string) => new Date(dateStrMidnightInTz(day, TZ).getTime() + 12 * 3_600_000)
+  const lastWeek = () => trainingWeekOf(middayOf(shiftDateStr(todayInTz(TZ), -7)), TZ)
+  const lastMonday = () => dateStrMidnightInTz(lastWeek(), TZ)
+  const at = (days: number) => middayOf(shiftDateStr(lastWeek(), days))
   const deloadRow = (id: string, over: Row = {}) => periodization({
     programSessionId: id, phase: 'deload', phaseStartedAt: lastMonday(), sessionsInPhase: 2,
     pendingTransition: programMoveMark('deload'), prescriptionStatus: 'pending',

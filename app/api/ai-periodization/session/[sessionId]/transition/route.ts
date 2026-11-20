@@ -7,8 +7,7 @@ import { POST_TRANSITION_STATUS } from './status'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { isOneDayDeload } from '@trainingai/shared/ai-periodization/one-day-deload'
-import { prescriptionAgedOut } from '@trainingai/shared/ai-periodization/prescription-expiry'
-import { syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
+import { serveStoredPrescription, syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 // One phase transition.
@@ -47,14 +46,19 @@ export async function POST(
 
   // #3766: read the program's phase first (running the switch-over if it is due), so the state below
   // is the one the move starts from.
+  const tz = session.user?.timezone ?? DEFAULT_TZ
   const program = await repo.getActiveProgram(userId)
   const onProgram = program?.sessions.some(ps => ps.id === sessionId) ?? false
   const programPhase = program && onProgram
-    ? await syncProgramPhase(repo, userId, program.id, session.user?.timezone ?? DEFAULT_TZ)
+    ? await syncProgramPhase(repo, userId, program.id, tz)
     : null
 
   const state = await repo.getSessionPeriodization(userId, sessionId)
   if (!state) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  // #3907: the plan as the card serves it (`serveStoredPrescription`, as `respond` and `next-session`
+  // read it). An aged-out plan, or one whose deload has ended (#3876), is not on the card, so a stale
+  // tap on it takes nothing.
+  const served = await serveStoredPrescription(repo, userId, onProgram ? program : null, state, tz)
 
   // The recommendation lives on the stored prescription (pendingTransition is currently
   // never written) — the card only offers this transition when phaseAction is
@@ -70,7 +74,7 @@ export async function POST(
   // the phase as before. An offer already trained or turned down has nothing left to accept, and
   // is never a reason to move the phase either.
   if (body.newPhase === 'deload' && !body.force && state.phase !== 'deload' && isOneDayDeload(state.prescription)) {
-    if (prescriptionAgedOut(state)) {
+    if (served.prescriptionAgedOut) {
       return NextResponse.json({ error: 'This prescription has expired. Reopen the session for a fresh one.' }, { status: 409 })
     }
     if (state.prescriptionStatus !== 'pending' && state.prescriptionStatus !== 'accepted') {
@@ -87,8 +91,8 @@ export async function POST(
   // with none left to take, the call answers with the state unchanged. `force` does not change this:
   // picking the current phase from the phase list is not a restart either.
   if (body.newPhase === state.phase) {
-    const onOffer = state.prescription != null
-      && !prescriptionAgedOut(state)
+    const onOffer = served.prescription != null
+      && !served.prescriptionAgedOut
       && state.prescriptionStatus === 'pending'
     if (onOffer) await repo.updatePrescriptionStatus(userId, sessionId, 'accepted')
     const unchanged = onOffer ? await repo.getSessionPeriodization(userId, sessionId) : state

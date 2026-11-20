@@ -140,7 +140,8 @@ describe('backfillOuraCloud (#2859)', () => {
       dailyRows: 1, bodyRows: 1, sleepWritten: 1, workouts: 1, heartRatePoints: 4, sleepPeriods: 1, cloudDays: 1, sessions: 1,
     })
     // The default stamps data received: once after the documents, and once per heart-rate window that wrote.
-    expect(calls).toEqual(['daily:1', 'body:1', 'periods:1', 'sleep:1', 'workouts:1', 'cloudDaily:1', 'sessions:1', 'stamp:data', 'hr:2', 'stamp:data', 'hr:2', 'stamp:data'])
+    // The contributors (`cloudDaily`) go before the sleep rows, so nothing is scored before them (#3905).
+    expect(calls).toEqual(['daily:1', 'body:1', 'cloudDaily:1', 'periods:1', 'sleep:1', 'workouts:1', 'sessions:1', 'stamp:data', 'hr:2', 'stamp:data', 'hr:2', 'stamp:data'])
     const first = new URL(String(fetchMock.mock.calls[0][0]))
     expect(first.href.startsWith(`${OURA_API_BASE}/v2/usercollection/daily_readiness`)).toBe(true)
     expect(Object.fromEntries(first.searchParams)).toEqual({ start_date: '2026-10-01', end_date: '2026-10-12' })

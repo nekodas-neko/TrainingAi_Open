@@ -245,6 +245,8 @@ function makeIngestFor(today: string, opts: { omit?: string[]; scored?: string[]
   const target = opts.deferred ? { ...ctx.target, deferReadiness: (job: () => Promise<void>) => { jobs.push(job) } } : ctx.target
   const runJobs = async () => { for (const job of jobs.splice(0)) await job() }
   const daily = new Map<string, { date: string; temperatureDeviation?: number | null }>()
+  // `oura_cloud_daily.readiness_contributors`, which readiness reads `recovery_index` from (#3905).
+  const contributors = new Map<string, Record<string, number | null> | null>()
   for (const d of ctx.temperature) daily.set(d, { date: d, temperatureDeviation: 0.1 })
   Object.assign(ctx.repo, {
     getOuraDaily: vi.fn(async (_u: string, from: string, to: string) => [...daily.values()].filter(r => r.date >= from && r.date <= to)),
@@ -263,15 +265,26 @@ function makeIngestFor(today: string, opts: { omit?: string[]; scored?: string[]
     tombstoneOuraCloudSleep: vi.fn(async () => 0),
     syncOuraMainSleepBodyMetrics: vi.fn(async () => {}),
     upsertOuraWorkouts: vi.fn(async () => 0),
-    upsertOuraCloudDaily: vi.fn(async () => 0),
+    upsertOuraCloudDaily: vi.fn(async (_u: string, rows: { date: string; readinessContributors?: Record<string, number | null> | null }[]) => {
+      for (const r of rows) if (r.readinessContributors !== undefined) contributors.set(r.date, r.readinessContributors)
+      return rows.length
+    }),
+    // #3905: as Postgres `jsonb` returns them, keys in its own order rather than the document's.
+    getOuraCloudReadinessContributors: vi.fn(async (_u: string, from: string, to: string) =>
+      [...contributors.entries()].filter(([d]) => d >= from && d <= to).map(([date, c]) => ({
+        date, readinessContributors: c && Object.fromEntries(Object.entries(c).reverse()),
+      }))),
     upsertOuraSessions: vi.fn(async () => 0),
   })
   const empty: OuraCloudWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], retypedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] } as unknown as OuraCloudWrites
   const write = (w: Partial<OuraCloudWrites>) =>
     writeOuraCloudData(ctx.repo as unknown as Parameters<typeof writeOuraCloudData>[0], 'u1', { ...empty, ...w }, target)
   const sleepDoc = (date: string) => write({ sleep: [{ date } as unknown as OuraCloudWrites['sleep'][number]] })
-  const readinessDoc = (date: string, temperatureDeviation = 0.2) =>
-    write({ daily: [{ date, readinessScore: 80, temperatureDeviation, temperatureTrendDeviation: 0.1 }] })
+  const readinessDoc = (date: string, temperatureDeviation = 0.2, readinessContributors?: Record<string, number | null>) =>
+    write({
+      daily: [{ date, readinessScore: 80, temperatureDeviation, temperatureTrendDeviation: 0.1 }],
+      ...(readinessContributors ? { cloudDaily: [{ date, readinessContributors }] as OuraCloudWrites['cloudDaily'] } : {}),
+    })
   /** A Body Battery read of today: anchors on stored readiness and freezes it (`resolveAnchor`). */
   const readBattery = () => {
     const r = resolveAnchor({
@@ -282,7 +295,7 @@ function makeIngestFor(today: string, opts: { omit?: string[]; scored?: string[]
     if (r.anchorSource === 'readiness') ctx.battery.anchor = r.anchor
     return r.anchor
   }
-  return { ...ctx, sleepDoc, readinessDoc, readBattery, jobs, runJobs }
+  return { ...ctx, sleepDoc, readinessDoc, readBattery, jobs, runJobs, contributors, write }
 }
 
 // #3872 review: today's temperature input, and the illness radar's, come only from the
@@ -476,6 +489,97 @@ describe("the readiness document's deferred job (#3872 second review)", () => {
     await c.readinessDoc(today)
     await c.readinessDoc(today)
     expect(scoreTodayReadiness).toHaveBeenCalledTimes(2)
+  })
+})
+
+// #3905: Oura's readiness contributors are part of the `daily_readiness` document, stored apart from
+// the day row. Readiness falls back on their `recovery_index` when a night has no recovery hours, so
+// they count as a change, are written before anything is scored, and the webhook's deferred job
+// starts only once the batch's writes are in.
+describe("a readiness document's contributors (#3905)", () => {
+  let today: string
+  const C1 = { recovery_index: 70, hrv_balance: 80, resting_heart_rate: 90 }
+  const C2 = { ...C1, recovery_index: 55 }
+  beforeEach(() => {
+    vi.mocked(scoreTodayReadiness).mockClear()
+    vi.mocked(scoreFinishedDayReadiness).mockClear()
+    today = todayInTz(TZ)
+  })
+  /** The scorer, recording the `recovery_index` it would read, then scoring as before. */
+  const recordRecoveryIndex = (c: ReturnType<typeof makeIngestFor>, seen: (number | null | undefined)[]) => {
+    const real = vi.mocked(scoreTodayReadiness).getMockImplementation()!
+    vi.mocked(scoreTodayReadiness).mockImplementation(async (u, tz) => {
+      seen.push(c.contributors.get(todayInTz(tz))?.recovery_index)
+      return real(u, tz)
+    })
+    return () => vi.mocked(scoreTodayReadiness).mockImplementation(real)
+  }
+
+  it('a revision that changes only the contributors starts a job; a true duplicate does not', async () => {
+    const c = makeIngestFor(today, { deferred: true })
+    await c.readinessDoc(today, 0.2, C1)
+    await c.runJobs()
+
+    // Same day fields, same contributors (stored back in another key order): the usual duplicate.
+    await c.readinessDoc(today, 0.2, { ...C1 })
+    expect(c.jobs).toHaveLength(0)
+
+    await c.readinessDoc(today, 0.2, C2)
+    expect(c.jobs).toHaveLength(1)
+  })
+
+  it('a document without contributors is judged on its day fields alone', async () => {
+    const c = makeIngestFor(today, { deferred: true })
+    await c.readinessDoc(today, 0.2, C1)
+    await c.runJobs()
+    await c.readinessDoc(today)
+    expect(c.jobs).toHaveLength(0)
+  })
+
+  it('the reconcile (inline) scores on the contributors of the document it is writing', async () => {
+    const c = makeIngestFor(today)
+    const seen: (number | null | undefined)[] = []
+    const restore = recordRecoveryIndex(c, seen)
+    try {
+      await c.readinessDoc(today, 0.2, C1)
+      await c.readinessDoc(today, 0.2, C2)
+    } finally { restore() }
+    expect(seen).toEqual([70, 55])
+  })
+
+  it.each([
+    ['sleep first, then the readiness document', ['sleep', 'readiness']],
+    ['the readiness document first, then sleep', ['readiness', 'sleep']],
+  ] as const)('webhook, %s: every job starts after its batch is written, and sees the contributors', async (_l, order) => {
+    const c = makeIngestFor(today, { omit: [today] })
+    const events: string[] = []
+    const seen: (number | null | undefined)[] = []
+    const restore = recordRecoveryIndex(c, seen)
+    // The webhook's real defer starts the job at once (`void job()`); the job then runs past the write.
+    const started: Promise<void>[] = []
+    const target = { ...c.target, deferReadiness: (job: () => Promise<void>) => { events.push('job'); started.push(job()) } }
+    vi.mocked(c.repo.upsertOuraSessions).mockImplementation(async () => { events.push('last write'); return 0 })
+    const empty = { daily: [], body: [], sleep: [], deletedSleepIds: [], retypedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] }
+    const docs = {
+      sleep: { ...empty, sleep: [{ date: today }] },
+      readiness: {
+        ...empty,
+        daily: [{ date: today, readinessScore: 80, temperatureDeviation: 0.2, temperatureTrendDeviation: 0.1 }],
+        cloudDaily: [{ date: today, readinessContributors: C1 }],
+      },
+    }
+    try {
+      for (const d of order) {
+        await writeOuraCloudData(c.repo as unknown as Parameters<typeof writeOuraCloudData>[0], 'u1', docs[d] as unknown as OuraCloudWrites, target)
+      }
+      await Promise.all(started)
+    } finally { restore() }
+
+    // Each batch's job, where it has one, comes after that batch's last write.
+    for (let i = 0; i < events.length; i++) if (events[i] === 'job') expect(events[i - 1]).toBe('last write')
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.at(-1)).toBe(70)
+    expect(storedReadiness(c.derived, today)).toBe(READ_SCORE)
   })
 })
 
