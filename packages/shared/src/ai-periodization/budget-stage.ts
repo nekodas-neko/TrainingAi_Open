@@ -21,6 +21,7 @@ import { durationDirection, fitBudgetMin, type DurationPreset } from '@traininga
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 import { prescriptionFigures } from '@trainingai/shared/ai-periodization/prescription-figures'
+import { phaseSetsMax } from '@trainingai/shared/ai-periodization/prompt'
 import type { PrescriptionFigures } from '@trainingai/shared/types/ai-periodization'
 
 /** One exercise as the budget stage receives it — its PRE-budget shape. The stage changes `sets`,
@@ -44,6 +45,9 @@ export interface BudgetStageResult {
   droppedIds: Set<string>
   estimatedSessionDurationMin: number
   weeklyVolumeContribution: Record<string, number>
+  /** The work time, in whole minutes, the plan was fitted against — the one budget the plan's
+   *  text names (#3767). 0 when the session has no time limit. */
+  fittedBudgetMin: number
   /** Appended verbatim to the model's reasoning. Empty when the plan fits with nothing
    *  dropped — kept as a separate return value so a RE-fit replaces the previous note
    *  instead of stacking a second one onto it. */
@@ -157,7 +161,9 @@ export function applyBudgetStage(
   // Role plausibility on volume runs BEFORE the budget passes, so every preset gets it and the
   // plan is already the right shape when trimming/expansion start — rather than relying on them
   // to repair a shape the model chose blind.
-  const plausible = applyRoleSetPlausibility(timedExercises, muscleVolume)
+  // #3713: the phase's set range is held in code, not just stated in the prompt.
+  const setsCap = phaseSetsMax(signals.trainingGoal, phase)
+  const plausible = applyRoleSetPlausibility(timedExercises, muscleVolume, setsCap)
 
   //
   const mrvByMuscle = new Map<string, number>(
@@ -170,6 +176,7 @@ export function applyBudgetStage(
     muscleVolume,
     mrvByMuscle,
     phase,
+    phaseSetsMax: setsCap,
   })
   const sized = allocated.exercises
   const droppedIds = new Set(allocated.droppedIds)
@@ -204,6 +211,17 @@ export function applyBudgetStage(
   }))
   const { estimatedSessionDurationMin, weeklyVolumeContribution } = prescriptionFigures(asStaged, signals)
 
+  // #3767: the plan names ONE time budget, and it is the one the fit above actually used. Naming
+  // the working budget here (51 on a 60-minute session) while fitting against the planning budget
+  // (51 less the lifter's p75 margin, e.g. 39) is how a plan said "to fit the 51-min working
+  // budget, X was dropped" while estimating itself at 35 — true of neither number. The estimate is
+  // the same median-pace figure the fit compared against `fitMin`, so it can never exceed this one.
+  const fittedBudgetMin = fitMin > 0 ? Math.round(fitMin) : 0
+  const marginTaken = fitMin < signals.effectiveTimeBudgetMin
+  const budgetPhrase = marginTaken
+    ? `about ${fittedBudgetMin} min of work (the session's time less warm-up, and less a margin so a slower-than-usual day still finishes on time)`
+    : `about ${fittedBudgetMin} min of work (the session's time less warm-up)`
+
   const notes: string[] = []
   const shortened = activeExercises.filter(ex => (restSec.get(ex.sessionExerciseId) ?? ex.restSec) < ex.restSec)
   if (shortened.length > 0) {
@@ -212,12 +230,12 @@ export function applyBudgetStage(
   if (droppedIds.size > 0) {
     const names = exercises
       .filter(ex => droppedIds.has(ex.sessionExerciseId)).map(ex => ex.name).join(', ')
-    notes.push(`To fit the ${signals.effectiveTimeBudgetMin}-min working budget, ${names} ${droppedIds.size === 1 ? 'was' : 'were'} dropped for today — accessories go first, then whatever trains the muscles furthest ahead of their weekly target — so the remaining work keeps more of its sets rather than every exercise being cut to a token two.`)
+    notes.push(`To keep today's plan to ${budgetPhrase}, ${names} ${droppedIds.size === 1 ? 'was' : 'were'} dropped for today — accessories go first, then whatever trains the muscles furthest ahead of their weekly target — so the remaining work keeps more of its sets rather than every exercise being cut to a token two.`)
   }
-  if (signals.effectiveTimeBudgetMin > 0 && estimatedSessionDurationMin > signals.effectiveTimeBudgetMin) {
+  if (fittedBudgetMin > 0 && estimatedSessionDurationMin > fittedBudgetMin) {
     notes.push(droppedIds.size > 0
-      ? `Even so, the ${activeExercises.length} exercises kept are estimated at ${estimatedSessionDurationMin} min — a session is never cut below ${activeExercises.length}, so expect to run over.`
-      : `Note: even at minimum sets this session is estimated at ${estimatedSessionDurationMin} min against the ${signals.effectiveTimeBudgetMin}-min working budget — it has more exercises than the time budget fits. Consider removing an accessory from this session or raising its time budget.`)
+      ? `Even so, the ${activeExercises.length} exercises kept are estimated at ${estimatedSessionDurationMin} min of work against the ${fittedBudgetMin} planned — a session is never cut below ${activeExercises.length}, so expect to run over.`
+      : `Note: even at minimum sets this session is estimated at ${estimatedSessionDurationMin} min of work against the ${fittedBudgetMin} planned — it has more exercises than the time budget fits. Consider removing an accessory from this session or raising its time budget.`)
   }
   const budgetNote = notes.map(n => ` ${n}`).join('')
 
@@ -232,7 +250,23 @@ export function applyBudgetStage(
     : undefined
 
   return {
-    sets, restSec, droppedIds, estimatedSessionDurationMin, weeklyVolumeContribution, budgetNote,
+    sets, restSec, droppedIds, estimatedSessionDurationMin, weeklyVolumeContribution, fittedBudgetMin, budgetNote,
     ...(fullSession && { fullSession }),
   }
+}
+
+// A sentence of model reasoning that names a duration in minutes — "within the 39-minute budget",
+// "about 45 min". Code owns the one sentence about time (`budgetNote`), so any such sentence the
+// model wrote is removed whole (#3767). Seconds ("90 s rest") are not durations of the session.
+const MINUTES_FIGURE = /\b\d+(?:\.\d+)?\s*-?\s*(?:min|mins|minute|minutes)\b/i
+
+/**
+ * The model's reasoning with every sentence that states minutes removed, then the code-owned
+ * budget note appended. The one place a plan's reasoning is assembled, for generation and re-fit
+ * alike, so a re-fit of a plan stored before #3767 drops the model's minutes too.
+ */
+export function reasoningWithBudgetNote(modelReasoning: string, budgetNote: string): string {
+  // Split on sentence-ending punctuation followed by space, so "72.5%" stays one sentence.
+  const kept = modelReasoning.trim().split(/(?<=[.!?])\s+/).filter(s => s && !MINUTES_FIGURE.test(s)).join(' ')
+  return `${kept}${budgetNote}`.trim()
 }

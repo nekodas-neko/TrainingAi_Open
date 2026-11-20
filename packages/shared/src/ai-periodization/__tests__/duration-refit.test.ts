@@ -135,6 +135,10 @@ const generationAnswer = (preset: DurationPreset) => applyBudgetStage(
   SESSION_BUDGET,
   preset,
   new Set<string>(),
+  undefined,
+  // The stored plan's phase, which a generation passes and a re-fit reads back: since #3713 the
+  // phase caps the sets, so leaving it out would compare two different sessions.
+  'accumulation',
 )
 
 const setsOf = (p: AiPrescription) =>
@@ -260,7 +264,9 @@ describe('a standard session is sized to its budget (#2133)', () => {
     const run = (phase: string) => [...applyBudgetStage(stageExercises(2, 2), stageSignals(90, 2) as never, 60, 'standard', new Set(), undefined, phase).sets.values()]
     expect(run('intensification')).toEqual([3, 2])
     expect(run('realisation')).toEqual([3, 2])
-    expect(run('accumulation')).toEqual([6, 4])
+    // #3713: hypertrophy accumulation allows 3-4 sets, so the surplus fills to 4, not the primary's
+    // role ceiling of 6.
+    expect(run('accumulation')).toEqual([4, 4])
   })
 
   it('drops whole exercises when even the minimums overrun, keeping the main lift and at least two', () => {

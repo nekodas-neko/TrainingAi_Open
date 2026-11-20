@@ -10,6 +10,7 @@ import {
   type BudgetStageExercise,
 } from '@trainingai/shared/ai-periodization/budget-stage'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
+import { phaseSetsMax } from '@trainingai/shared/ai-periodization/prompt'
 import type { ReviewModelExercise, ReviewProposal, ReviewProposalExercise } from '@trainingai/shared/workout/review/reconcile'
 
 
@@ -73,7 +74,7 @@ export function buildRulesReview(params: {
   const muscleVolume = buildBudgetMuscleVolume(signals)
   const beforeSets = new Map(exercises.map(ex => [ex.sessionExerciseId, ex.sets]))
 
-  const plausible = applyRoleSetPlausibility(buildTimedExercises(exercises, signals), muscleVolume)
+  const plausible = applyRoleSetPlausibility(buildTimedExercises(exercises, signals), muscleVolume, phaseSetsMax(signals.trainingGoal, signals.phase))
 
   const dropped = dropToBudget(plausible, budgetMin, new Set(), muscleVolume, { refit: subset => subset.map(e => ({ ...e })) })
   const kept = estimateSessionDurationSec(dropped.exercises) > budgetMin * 60

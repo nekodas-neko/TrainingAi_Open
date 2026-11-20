@@ -68,6 +68,16 @@ export function intensityZone(trainingGoal: string, phase: string): IntensityZon
   return goalZones[phase as Phase] ?? goalZones.accumulation
 }
 
+/**
+ * The most sets any exercise may carry in `phase` (#3713) — the zone's `setsMax`, which is the
+ * same for every role (`intensityZoneForRole` passes it through unchanged). Null when the phase is
+ * unknown, so the caller falls back to the role ceiling alone rather than guessing a phase.
+ */
+export function phaseSetsMax(trainingGoal: string, phase: string | null | undefined): number | null {
+  if (!phase) return null
+  return intensityZone(trainingGoal, phase).setsMax
+}
+
 // Goals where a SECONDARY compound is prescribed a moderate step below the primary anchor
 // (lighter load, a couple more reps) instead of at the same near-max band. Powerbuilding's
 // "building" half should be hypertrophy-leaning volume — one heavy anchor per session, not
@@ -189,7 +199,8 @@ reasoning entirely. Do not infer or guess from absent data.
 
 Output field notes:
 - session_exercise_id: copy exactly from the exercise list — never invent one.
-- reasoning: 1-2 sentences.
+- reasoning: 1-2 sentences. Never state a time budget or any duration in minutes: the app adds
+  the sentence about time itself, and removes any minutes figure you write.
 - confidence: your certainty in this prescription, 0.0-1.0.
 
 ${PROSE_FIELD_GUARDS}`
