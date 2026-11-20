@@ -6494,8 +6494,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           }
           processed++
         } else if (mut.domain === 'workout_log') {
-          const { logExerciseFromPayload, LogExercisePayloadSchema } =
-            await import('@trainingai/shared/workout/log-exercise')
+          // #3916: the `*-core` modules take this repository and never import `@/lib/data`, so the
+          // data layer does not reach back into itself (the guard is data-layer-readiness-cycle.test.ts).
+          const { logExerciseWithRepo } = await import('@trainingai/shared/workout/log-exercise-core')
+          const { LogExercisePayloadSchema } = await import('@trainingai/shared/workout/log-payload')
           const parsed = LogExercisePayloadSchema.safeParse(mut.payload)
           if (!parsed.success) {
             console.error('[pushMutations] workout_log safeParse failed:', JSON.stringify(parsed.error.flatten()))
@@ -6503,7 +6505,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             continue
           }
           const stamp = editStampFromPayload(parsed.data)
-          const logged = await logExerciseFromPayload(userId, parsed.data, userTz, stamp)
+          const logged = await logExerciseWithRepo(this, userId, parsed.data, userTz, stamp)
           // Issue 2721: a superseded write is still `processed`, so the client confirms and drops it —
           // an `errors` entry would retry it and then dead-letter a copy that was never wanted.
           // Both warnings are added only once the write has gone through, so a failed mutation never
@@ -6512,9 +6514,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           if (logged.superseded) warnings.push({ id: mut.id, domain: mut.domain, date: mut.date, warning: SUPERSEDED_WARNING })
           processed++
         } else if (mut.domain === 'exercise_log_edit') {
-          // RV-175. The same function PATCH /api/workout-entry calls. Lazy import for the reason
-          // post-completion-hr below gives: the module reaches back into `@/lib/data`.
-          const { ExerciseLogEditSchema, editExerciseLog } = await import('@/lib/workout/exercise-log-edits')
+          // RV-175. The same write PATCH /api/workout-entry runs, given this repository (#3916).
+          const { ExerciseLogEditSchema, editExerciseLogWithRepo } = await import('@/lib/workout/exercise-log-edits-core')
           const parsed = ExerciseLogEditSchema.safeParse(mut.payload)
           if (!parsed.success) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid exercise_log_edit payload' })
@@ -6524,7 +6525,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // being in the outbox behind a failed push, which a later attempt resolves. The client's
           // bounded retries then dead-letter a genuinely orphaned edit (see session_rpe below).
           const stamp = editStampFromPayload(parsed.data)
-          const edited = await editExerciseLog(userId, parsed.data, stamp)
+          const edited = await editExerciseLogWithRepo(this, userId, parsed.data, stamp)
           if (!edited.found) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'No matching exercise log for exercise_log_edit' })
             continue
@@ -6533,7 +6534,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           if (edited.superseded) warnings.push({ id: mut.id, domain: mut.domain, date: mut.date, warning: SUPERSEDED_WARNING })
           processed++
         } else if (mut.domain === 'exercise_log_delete') {
-          const { ExerciseLogDeleteSchema, deleteExerciseLog } = await import('@/lib/workout/exercise-log-edits')
+          const { ExerciseLogDeleteSchema, deleteExerciseLogWithRepo } = await import('@/lib/workout/exercise-log-edits-core')
           const parsed = ExerciseLogDeleteSchema.safeParse(mut.payload)
           if (!parsed.success) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid exercise_log_delete payload' })
@@ -6543,17 +6544,17 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // confirmation never landed finds nothing, and the row is gone either way.
           // Issue 2721: a delete is never superseded — see `deleteExerciseLog`. It is still counted
           // when it arrives unstamped, so the old-client tally covers all three domains.
-          await deleteExerciseLog(userId, parsed.data.exerciseLogId)
+          await deleteExerciseLogWithRepo(this, userId, parsed.data.exerciseLogId)
           if (editStampFromPayload(parsed.data).kind === 'unstamped') warnings.push({ id: mut.id, domain: mut.domain, date: mut.date, warning: UNSTAMPED_WARNING })
           processed++
         } else if (mut.domain === 'workout_session_delete') {
-          const { WorkoutSessionDeleteSchema, deleteWorkoutSessionAndReconcile } = await import('@/lib/workout/delete-session-reconcile')
+          const { WorkoutSessionDeleteSchema, deleteWorkoutSessionAndReconcileWithRepo } = await import('@/lib/workout/delete-session-reconcile-core')
           const parsed = WorkoutSessionDeleteSchema.safeParse(mut.payload)
           if (!parsed.success) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid workout_session_delete payload' })
             continue
           }
-          await deleteWorkoutSessionAndReconcile(userId, parsed.data.workoutSessionId)
+          await deleteWorkoutSessionAndReconcileWithRepo(this, userId, parsed.data.workoutSessionId)
           processed++
         } else if (mut.domain === 'session_rpe') {
           const rpeCheck = SessionRpeSchema.safeParse(mut.payload)
@@ -6577,23 +6578,23 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           }
           processed++
         } else if (mut.domain === 'complete_workout') {
-          const { CompleteWorkoutPayloadSchema, completeWorkoutFromPayload } =
-            await import('@trainingai/shared/workout/complete-workout')
+          const { completeWorkoutWithRepo } = await import('@trainingai/shared/workout/complete-workout-core')
+          const { CompleteWorkoutPayloadSchema } = await import('@trainingai/shared/workout/complete-payload')
           const parsed = CompleteWorkoutPayloadSchema.safeParse(mut.payload)
           if (!parsed.success) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid complete_workout payload' })
             continue
           }
-          await completeWorkoutFromPayload(userId, parsed.data)
+          await completeWorkoutWithRepo(this, userId, parsed.data)
           // Same post-completion HR pipeline the web route runs — sync the Oura window, then
           // attribute it to the workout and its sets. This branch used to fire only the sync
           // half, and only when `ctx` carried an origin+cookie, so an offline-completed workout
           // never got per-set attribution: a silent regression of the Q-11 Defect B fix, which
           // landed on the web route alone. Sharing one function is what stops the two write
-          // paths drifting again (Q-123a). Lazy import — this module reaches back into
-          // `@/lib/data`, which is what constructs this adapter.
-          const { syncAndAttributeSessionHr } = await import('@/lib/workout/post-completion-hr')
-          syncAndAttributeSessionHr(userId, parsed.data.workoutSessionId, userTz).catch(() => {})
+          // paths drifting again (Q-123a). Given this repository, so the data layer never imports
+          // `@/lib/data` back (#3916).
+          const { syncAndAttributeSessionHrWithRepo } = await import('@/lib/workout/post-completion-hr-core')
+          syncAndAttributeSessionHrWithRepo(this, userId, parsed.data.workoutSessionId, userTz).catch(() => {})
           // The next prescription is generated on demand when the session is next opened,
           // not eagerly here — see app/api/complete-workout/route.ts for why.
           processed++
