@@ -1390,6 +1390,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           interExerciseRestSec: log.interExerciseRestSec ?? null,
           prepTimeSec: log.prepTimeSec ?? null,
           exerciseDeloaded: log.exerciseDeloaded ?? false,
+          effortVsPlan: log.effortVsPlan ?? null,
+          effortSource: log.effortSource ?? null,
           clientEditedAt,
         })
         .onConflictDoUpdate({
@@ -1411,6 +1413,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             interExerciseRestSec: sql`EXCLUDED.inter_exercise_rest_sec`,
             prepTimeSec: sql`EXCLUDED.prep_time_sec`,
             exerciseDeloaded: sql`EXCLUDED.exercise_deloaded`,
+            // #3745: a replay without an answer (an older build, or a re-push from a store that
+            // never held one) keeps the stored pair; one with an answer replaces it, both halves
+            // together so a value never sits beside another answer's source.
+            effortVsPlan: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.exerciseLogs.effortVsPlan} ELSE EXCLUDED.effort_vs_plan END`,
+            effortSource: sql`CASE WHEN EXCLUDED.effort_vs_plan IS NULL THEN ${s.exerciseLogs.effortSource} ELSE EXCLUDED.effort_source END`,
           },
         })
         .returning()
@@ -5601,6 +5608,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // server-side. Nothing in `lib/local-store/` names it, so there is no local value to
         // overwrite and sending it would be payload for no reader.
         exerciseDeloaded:     s.exerciseLogs.exerciseDeloaded,
+        // #3745: the after-the-last-set answer, so a device that pulls the workout gets it back.
+        // No local store keeps it yet (nothing reads it), and the upload keeps the stored pair
+        // on a push without one, so a device that drops it cannot wipe it.
+        effortVsPlan:         s.exerciseLogs.effortVsPlan,
+        effortSource:         s.exerciseLogs.effortSource,
         updatedAt:            s.exerciseLogs.updatedAt,
         deletedAt:            s.exerciseLogs.deletedAt,
       }).from(s.exerciseLogs)

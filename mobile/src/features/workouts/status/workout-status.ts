@@ -61,6 +61,14 @@ function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload
     pausedAt: null,
     setColors: null,
     hr: null,
+    exerciseIndex: 0,
+    exerciseCount: 0,
+    workoutFrom: workout.startedAt + workout.pausedMs,
+    nextUpIndex: 0,
+    nextUpSets: 0,
+    nextUpLoad: null,
+    effortAsk: null,
+    accent: null,
   };
   if (phase === 'idle') return null;
   if (phase === 'pre') return { ...base, phase: 'ready', label: 'Warm-up' };
@@ -68,8 +76,10 @@ function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload
   const flow = workoutFlow(workout);
   const exercise = workout.exercises.find((x) => x.id === flow.exerciseId);
   if (!exercise) return { ...base, phase: 'ready' };
+  const place = sessionPlace(workout, exercise.relogOf ?? exercise.id);
   const named = {
     ...base,
+    ...place,
     exerciseName: exercise.name,
     sets: exercise.sets.length,
     setsDone: exercise.sets.filter((set) => set.completedAt !== null).length,
@@ -89,6 +99,10 @@ function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload
   const finished = next === -1;
   const resting = workout.rest !== null;
   const after = phase === 'summary' && !workout.soloExerciseId ? nextExerciseFlow(workout) : null;
+  const upNext =
+    after && after.stage !== 'review'
+      ? workout.exercises.find((x) => x.id === after.exerciseId)
+      : undefined;
   return {
     ...named,
     phase: resting ? 'resting' : 'ready',
@@ -98,11 +112,18 @@ function statusWhileRunning(workout: WorkoutRecord | null): WorkoutStatusPayload
     label: finished ? 'Exercise done' : null,
     // With no rest timed, the window counts up from the last set (the current app's rest anchor).
     restStartedAt: workout.rest?.startedAt ?? workout.restAnchor?.startedAt ?? null,
-    nextUp:
-      after && after.stage !== 'review'
-        ? (workout.exercises.find((x) => x.id === after.exerciseId)?.name ?? null)
-        : null,
+    nextUp: upNext?.name ?? null,
+    nextUpIndex: upNext ? sessionPlace(workout, upNext.id).exerciseIndex : 0,
+    nextUpSets: upNext?.sets.length ?? 0,
+    nextUpLoad: upNext ? knownLoad(upNext, upNext.sets[0]) : null,
   };
+}
+
+/** "Exercise 2 of 5", counted as the workout screen counts: re-logs and swapped-out ones aside. */
+function sessionPlace(workout: WorkoutRecord, exerciseId: string) {
+  const listed = workout.exercises.filter((x) => !x.retired && !x.relogOf);
+  const index = listed.findIndex((x) => x.id === exerciseId);
+  return { exerciseIndex: index + 1, exerciseCount: listed.length };
 }
 
 /** Never throws: a missing notification must never break the workout that asked for it. */

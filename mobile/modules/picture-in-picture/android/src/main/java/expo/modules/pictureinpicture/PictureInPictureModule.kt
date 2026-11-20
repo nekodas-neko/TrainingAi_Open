@@ -24,8 +24,9 @@ import expo.modules.kotlin.modules.ModuleDefinition
 
 // Picture-in-picture for an active workout (#3064, #3266). JS reports the phase whenever the workout
 // screen changes it and sends "idle" when the screen closes, so leaving the app with no workout open
-// never shrinks it into a window (#2908). The window changes with the workout (the phase card): a
-// 3:4 card while a set runs, a square for a rest or a pause, each with its own three buttons.
+// never shrinks it into a window (#2908). The window is one 3:4 card in every state (#3734, option
+// A), with each phase's own buttons, and for the first seconds of an exercise's last rest the three
+// answers to "how did it feel?" (#3745).
 //
 // While a set, a rest or a pause is on, the system enters the window itself (auto-enter), shrinking
 // the screen into it from the on-screen card (the source rect JS reports). The other active phases
@@ -83,6 +84,7 @@ class PictureInPictureModule : Module() {
       val activity = appContext.currentActivity ?: return@Function
       watch(activity)
       pushParams(activity)
+      scheduleEffortEnd()
     }
 
     // The on-screen card the window shrinks out of, in dp from the window's top left, or nulls for
@@ -112,6 +114,7 @@ class PictureInPictureModule : Module() {
       watched?.removeOnPictureInPictureModeChangedListener(modeListener)
       watched = null
       inPip = false
+      main.removeCallbacks(effortEnd)
       main.post { removeWindow() }
     }
 
@@ -134,6 +137,20 @@ class PictureInPictureModule : Module() {
       watch(activity)
       if (runCatching { activity.enterPictureInPictureMode(params) }.getOrDefault(false)) report(true)
     }
+  }
+
+  // #3745: the window offers the three answers only for the first seconds of the last rest. JS
+  // timers stop in the window, so the main looper puts the usual buttons back when they run out.
+  private val effortEnd = Runnable {
+    appContext.currentActivity?.let { pushParams(it) }
+    runCatching { windowView?.render() }
+  }
+
+  private fun scheduleEffortEnd() {
+    main.removeCallbacks(effortEnd)
+    val until = status?.effortUntil ?: return
+    val wait = until - System.currentTimeMillis()
+    if (wait > 0) main.postDelayed(effortEnd, wait + 50)
   }
 
   private fun watch(activity: Activity) {
@@ -259,6 +276,9 @@ class PictureInPictureModule : Module() {
     "start" -> R.drawable.pip_start
     "pause" -> R.drawable.pip_pause
     "resume" -> R.drawable.pip_resume
+    "easier" -> R.drawable.pip_easier
+    "expected" -> R.drawable.pip_expected
+    "harder" -> R.drawable.pip_harder
     else -> R.drawable.pip_log
   }
 
@@ -269,11 +289,15 @@ class PictureInPictureModule : Module() {
     private const val REST_PLUS = "com.trainingai.pip.REST_PLUS"
     private const val PAUSE = "com.trainingai.pip.PAUSE"
     private const val RESUME = "com.trainingai.pip.RESUME"
+    private const val EFFORT_EASIER = "com.trainingai.pip.EFFORT_EASIER"
+    private const val EFFORT_AS_EXPECTED = "com.trainingai.pip.EFFORT_AS_EXPECTED"
+    private const val EFFORT_HARDER = "com.trainingai.pip.EFFORT_HARDER"
 
     // The action JS is told, by the intent that carries it.
     private val INTENTS = linkedMapOf(
       "repsDown" to REPS_DOWN, "repsUp" to REPS_UP, "log" to LOG,
       "restPlus" to REST_PLUS, "pause" to PAUSE, "resume" to RESUME,
+      "effortEasier" to EFFORT_EASIER, "effortAsExpected" to EFFORT_AS_EXPECTED, "effortHarder" to EFFORT_HARDER,
     )
     private val ACTIONS = INTENTS.entries.associate { (action, intent) -> intent to action }
   }

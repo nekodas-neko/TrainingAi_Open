@@ -13,6 +13,8 @@ import { ApiError } from '../../account/api/client.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { readSessionResponse, type SessionPreview } from '../catalog.ts';
 import { nextExerciseFlow, supersetNext, workoutFlow } from './flow.ts';
+import { answerEffort, askEffort } from './effort.ts';
+import type { EffortVsPlan } from '@trainingai/shared/workout/effort-vs-plan';
 import {
   expectedRpe,
   initialWeight,
@@ -544,6 +546,12 @@ export class WorkoutJournalStore {
       }),
     );
 
+  /** #3745: the lifter's answer on the rest card or in the window, marked `tapped`. */
+  answerEffort = (workoutId: string, exerciseId: string, vsPlan: EffortVsPlan) =>
+    this.edit((data) =>
+      replaceWorkout(data, workoutId, (workout) => answerEffort(workout, exerciseId, vsPlan)),
+    );
+
   rateSet = (workoutId: string, exerciseId: string, setId: string, rpe: number) =>
     this.edit((data) =>
       replaceWorkout(data, workoutId, (workout) =>
@@ -672,7 +680,7 @@ export class WorkoutJournalStore {
           0,
           effectiveRestSec(restSeconds) + workout.restAdjustmentSeconds,
         );
-        return {
+        const recorded: WorkoutRecord = {
           ...next,
           flow: {
             stage: summary ? 'summary' : 'exercise',
@@ -713,6 +721,8 @@ export class WorkoutJournalStore {
               ? { exerciseId, setId, startedAt: now, endsAt: now + restSeconds * 1000 }
               : null,
         };
+        // #3745: the rest card opens on "how did it feel?", starting on As expected.
+        return summary ? askEffort(recorded, exerciseId) : recorded;
       }),
     );
   };
@@ -839,6 +849,8 @@ export class WorkoutJournalStore {
           relogOf: source.relogOf ?? source.id,
           supersetGroup: null,
           readyStartedAt: now,
+          effortVsPlan: null,
+          effortSource: null,
           sets: source.sets.map((set) => ({
             ...set,
             id: setIds.get(set.id)!,
@@ -907,6 +919,9 @@ export class WorkoutJournalStore {
               relogOf: source.relogOf ?? source.id,
               retired: true,
               sets: recorded,
+              // Left before its last set: no answer (#3745).
+              effortVsPlan: null,
+              effortSource: null,
             }
           : null;
         const basis = { ...source, ...alternative, target80: null, latestWeight: null };
@@ -920,6 +935,8 @@ export class WorkoutJournalStore {
           lastDate: alternative.lastDate ?? null,
           // #3671: the swapped-out exercise's record is not this one's.
           allTimePr1rm: alternative.allTimePr1rm ?? null,
+          effortVsPlan: null,
+          effortSource: null,
           prevFromBaseline: alternative.prevFromBaseline ?? false,
           latestWeight: null,
           target80: null,

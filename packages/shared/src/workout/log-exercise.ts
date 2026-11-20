@@ -56,7 +56,7 @@ export async function logExerciseFromPayload(
     localDate, timeToCompleteSet, setTimes, restTimes,
     setStartTimes, setEndTimes, interExerciseRestSec, prepTimeSec,
     progressionStyle, plannedWeights, prescriptionBasisKg, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
-    rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded,
+    rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded, effort,
   } = payload;
 
   // Lazy import: `@/lib/data` compiles as a Turbopack async module (it pulls in pg /
@@ -325,6 +325,9 @@ export async function logExerciseFromPayload(
     // takes `isAnyDeload` separately and already gates on it. This changes what is STORED, not what
     // is decided, so no PR behaviour moves.
     exerciseDeloaded: deloadedForEstimate,
+    // #3745: stored only, read by nothing yet. Absent (an older build) writes nothing over a stored one.
+    effortVsPlan: effort?.vsPlan ?? null,
+    effortSource: effort?.source ?? null,
   }, setData.map((s, i) => ({ ...s, id: clientSetLogIds?.[i] })), stamp);
   const superseded = logged.superseded === true;
 

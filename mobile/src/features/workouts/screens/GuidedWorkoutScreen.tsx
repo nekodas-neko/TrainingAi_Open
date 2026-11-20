@@ -28,6 +28,7 @@ import { PausedBanner, RestCard, canPauseWorkout } from '../components/WorkoutCl
 import { PipHeartRate } from '../components/PipHeartRate';
 import { LiveHrCard } from '../components/LiveHrCard';
 import { useWorkoutPip } from '../pip/usePictureInPicture';
+import { pipAccent } from '../pip/pip-accent';
 import { usePipSourceRect } from '../pip/usePipSourceRect';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { hrProfileSpec } from '../../health/data/models';
@@ -67,9 +68,9 @@ export function GuidedWorkoutScreen({
 }) {
   const journal = useWorkoutJournal();
   const controller = journal.controller!;
-  const pip = useWorkoutPip(workout, controller);
+  const { theme, brand, customHue } = useTheme();
+  const pip = useWorkoutPip(workout, controller, pipAccent(brand, customHue));
   const setSource = usePipSourceRect();
-  const { theme } = useTheme();
   // Read once for the screen, not per rest, as the current app does for its Live HR card (RV-64).
   const hrProfile = useWorkoutResource(hrProfileSpec).data;
   const zoneProfile =
@@ -327,6 +328,10 @@ export function GuidedWorkoutScreen({
             exercise={exercise}
             next={nextExercise}
             onEdit={openEdit}
+            busy={journal.busy}
+            onEffort={(exerciseId, value) => {
+              void controller.answerEffort(workout.id, exerciseId, value);
+            }}
           />
         ) : ready && set ? (
           <>

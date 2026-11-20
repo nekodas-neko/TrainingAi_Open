@@ -3,10 +3,15 @@ import { DEFAULT_TZ, toAestDay, isCalendarDate } from '@trainingai/shared/date-u
 import { LogExercisePayloadSchema } from '@trainingai/shared/workout/log-payload';
 import { CompleteWorkoutPayloadSchema } from '@trainingai/shared/workout/complete-payload';
 import { EditedAtSchema } from '@trainingai/shared/sync/edited-at';
+import {
+  EffortSourceSchema,
+  EffortVsPlanSchema,
+} from '@trainingai/shared/workout/effort-vs-plan';
 import type { PendingWrite } from '../../../core/sync/pushMutation.ts';
 import { rejectionSchema } from '../../../core/sync/set-aside.ts';
 import type { CatalogIdentity, SessionPreview } from '../catalog.ts';
 import { workoutFlow } from './flow.ts';
+import { dropOpenDefaults, effortPayload } from './effort.ts';
 import { measuredExerciseTiming } from './timing.ts';
 import { expectedRpe, initialWeight, prescribedWeight } from './targets.ts';
 import {
@@ -69,6 +74,10 @@ const exerciseSchema = z.object({
   relogOf: z.uuid().nullable().default(null),
   retired: z.boolean().default(false),
   skipped: z.boolean().default(false),
+  // #3745: the answer to "how did this exercise feel?" after its last set (logging/effort.ts).
+  // Null until the rest card asks; a workout saved before this build reads as never asked.
+  effortVsPlan: EffortVsPlanSchema.nullable().default(null),
+  effortSource: EffortSourceSchema.nullable().default(null),
   sets: z.array(setSchema).min(1).max(20),
 });
 const reference = z.object({ exerciseId: z.uuid(), setId: z.uuid() });
@@ -540,6 +549,7 @@ export function mutationFor(
   const rpeValues = prefix(sets, (set) => set.rpe);
   const plannedWeights = sets.map((set) => set.plannedWeight);
   const measured = measuredExerciseTiming(workout, exercise);
+  const effort = effortPayload(exercise);
   const payload = LogExercisePayloadSchema.parse({
     ...(exercise.supersetGroup == null
       ? {
@@ -592,6 +602,7 @@ export function mutationFor(
     ...(exercise.styleId === null ? {} : { styleId: exercise.styleId }),
     muscleGroups: exercise.muscles,
     exerciseDeloaded: exercise.deloaded,
+    ...(effort ? { effort } : {}),
     intensityMode: workout.intensityMode,
     wasOverride: workout.wasOverride,
     // A finished workout's sets no longer change, so finishing is its edit time (issue 2721).
@@ -756,14 +767,16 @@ export function finishStaleWorkout(workout: WorkoutRecord): WorkoutRecord {
     throw new Error('This workout has no recorded sets to save. Discard it instead.');
   }
   const endedAt = Math.max(...recorded.map((set) => set.completedAt!));
+  // #3745: a rest card left open was never moved on from, so its untouched answer goes too.
+  const left = dropOpenDefaults(workout);
   return finishWorkout(
     {
-      ...workout,
+      ...left,
       pausedAt: null,
       runningSet: null,
       rest: null,
       restAnchor: null,
-      exercises: workout.exercises.map((exercise) => ({
+      exercises: left.exercises.map((exercise) => ({
         ...exercise,
         sets: exercise.sets.map((set) =>
           set.completedAt === null ? { ...set, startedAt: null } : set,
