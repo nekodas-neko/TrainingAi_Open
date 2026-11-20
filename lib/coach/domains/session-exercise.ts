@@ -22,6 +22,8 @@ interface TargetRow {
   sessionName: string
   programId: string
   phaseMode: 'manual' | 'automatic' | 'ai_dynamic'
+  /** The program's Accessory phase has a primary style, which an accessory uses over its own. */
+  accessoryPhaseStyled: boolean
 }
 
 /** Under `ai_dynamic` the stored AI plan replaces the exercise's style whenever it drives the bar,
@@ -30,10 +32,10 @@ const STYLE_UNUSED_UNDER_AI = 'The progression style is not used while the AI pl
 
 /** Whether an exercise's own progression style can reach the bar. `automatic` lets the phase's style
  *  override it for primary and secondary lifts (`resolveStyleForExercise`); an accessory keeps its
- *  own style only when the Accessory phase has none, so it may. */
+ *  own style only when the Accessory phase has none. */
 function styleCanApply(row: TargetRow): boolean {
   if (row.phaseMode === 'ai_dynamic') return false
-  if (row.phaseMode === 'automatic') return row.exerciseRole === 'accessory'
+  if (row.phaseMode === 'automatic') return row.exerciseRole === 'accessory' && !row.accessoryPhaseStyled
   return true
 }
 
@@ -60,6 +62,8 @@ async function loadTarget(db: Db, userId: string, id: string): Promise<TargetRow
       sessionName: s.programSessions.name,
       programId: s.programs.id,
       phaseMode: s.programs.phaseMode,
+      accessoryPhaseStyled: sql<boolean>`EXISTS (SELECT 1 FROM program_phases pp
+        WHERE pp.phase_set_id = ${s.programs.phaseSetId} AND pp.phase_type = 'accessory' AND pp.primary_style_id IS NOT NULL)`,
     })
     .from(s.sessionExercises)
     .innerJoin(s.programSessions, eq(s.sessionExercises.sessionId, s.programSessions.id))
@@ -277,7 +281,9 @@ export const sessionExerciseHandler: DomainHandler = {
     } else if (styleChange && !styleCanApply(row)) {
       consequences.push({
         kind: 'warn',
-        text: `The phase's progression style is used for this ${row.exerciseRole} lift, so its own style has no effect while phases run automatically`,
+        text: row.exerciseRole === 'accessory'
+          ? 'The Accessory phase\'s progression style is used for this accessory, so its own style has no effect while phases run automatically'
+          : `The phase's progression style is used for this ${row.exerciseRole} lift, so its own style has no effect while phases run automatically`,
       })
     }
     const hasEffect = !!(swap || removal)
@@ -287,6 +293,14 @@ export const sessionExerciseHandler: DomainHandler = {
       consequences.push({
         kind: 'good',
         text: `Takes effect next time you train ${row.sessionName} — no logged history changes`,
+      })
+    }
+    // The stored AI plan is voided by the apply and again by an undo; an undo puts the exercise back,
+    // not the old plan (#3895 review). Said before the tap, in the words the lifter will see.
+    if (hasEffect && row.phaseMode === 'ai_dynamic') {
+      consequences.push({
+        kind: 'info',
+        text: 'Your plan for this session will be rebuilt. Undo puts the exercise back, and the plan is rebuilt again',
       })
     }
 
@@ -305,6 +319,17 @@ export const sessionExerciseHandler: DomainHandler = {
 
     const drift = driftAgainst(accepted, row as unknown as Record<string, unknown>, c => c.field === 'removed')
     if (drift.length > 0) return { ok: false, reason: 'stale', drift }
+
+    // `styleId` is written verbatim onto the exercise row, so it must name one of the caller's own
+    // progression styles — the same check the program save route makes (RV-32). Checked before the
+    // swap below, which can create a library row: a refused change leaves nothing behind.
+    const styleChange = accepted.find(c => c.field === 'styleId')
+    if (styleChange && row.phaseMode === 'ai_dynamic') {
+      return { ok: false, reason: 'invalid', detail: STYLE_UNUSED_UNDER_AI }
+    }
+    if (styleChange && !(await progressionStyleIdsOwned(db, userId, [styleChange.to as string | null]))) {
+      return { ok: false, reason: 'invalid', detail: 'That progression style is not one of yours' }
+    }
 
     // Resolve a swap before writing anything, so a bad name fails the whole apply rather than
     // leaving a half-applied patch behind.
@@ -332,16 +357,6 @@ export const sessionExerciseHandler: DomainHandler = {
         if (entry.mergedInto) return { ok: false, reason: 'invalid', detail: `"${swap.to}" has been merged into another exercise` }
         replacement = { id: entry.id, muscles: (entry.muscles as { muscle: string }[] | null) ?? [] }
       }
-    }
-
-    // `styleId` is written verbatim onto the exercise row, so it must name one of the caller's own
-    // progression styles — the same check the program save route makes (RV-32).
-    const styleChange = accepted.find(c => c.field === 'styleId')
-    if (styleChange && row.phaseMode === 'ai_dynamic') {
-      return { ok: false, reason: 'invalid', detail: STYLE_UNUSED_UNDER_AI }
-    }
-    if (styleChange && !(await progressionStyleIdsOwned(db, userId, [styleChange.to as string | null]))) {
-      return { ok: false, reason: 'invalid', detail: 'That progression style is not one of yours' }
     }
 
     const beforeState = captureBefore(accepted, row)
