@@ -791,6 +791,83 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
         run: node scripts/check-catalogue-equipment.js
 
+  # #3919. A signed-in GET of the main pages and read routes against a running dev server, on every
+  # PR that changes code, server-only changes included. #3883 made /api/readiness-score answer 500
+  # on the dev server and merged green: the unit tests mock around the module graph, and the E2E
+  # shards are skipped by design when no browser-reached file changes (`scripts/e2e-ui-touched.js`).
+  # This job is that gap's floor, not a second E2E: no browser, ~22 requests, and a scan of the
+  # server log for the errors a 200 can hide (`/api/body-battery` answered 200 while its readiness
+  # read threw). Same Postgres service, migrations, seed and AUTH_SECRET as the E2E shards.
+  #
+  # 0 Gemini calls: the key is blank and the dev call budget is 0 (`lib/ai/dev-call-budget.ts`).
+  # Not a required check yet; adding it to branch protection is the owner's call.
+  route-smoke:
+    name: Route smoke
+    needs: changes
+    if: ${{ !cancelled() && github.event_name != 'schedule' && needs.changes.outputs.code != 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trainingai_ci
+        # `-U postgres` is load-bearing (LB-54, see the E2E shards), and this comment must stay above
+        # `options: >-`: a `#` line inside the folded scalar becomes part of the docker arguments.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+      # The same throwaway signing key as the E2E shards (Q-311): it signs cookies for a server and a
+      # database that are both destroyed with the runner.
+      AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
+      GOOGLE_GENERATIVE_AI_API_KEY: ''
+      AI_DEV_DAILY_CALL_LIMIT: '0'
+      PORT: '3100'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Apply all migrations
+        run: node scripts/local-db/migrate.js
+      - name: Seed the test user and program
+        run: psql "$DATABASE_URL" -f scripts/local-db/seed.sql
+      # `pnpm dev`, as the E2E shards run it (playwright.config.ts explains why not `next start`:
+      # a production server turns pool SSL on and cannot reach this Postgres).
+      - name: Start the dev server
+        run: |
+          nohup pnpm dev --port "$PORT" > "$RUNNER_TEMP/server.log" 2>&1 &
+          started=$(date +%s)
+          for _ in $(seq 1 90); do
+            if curl -sf -o /dev/null --max-time 120 "http://localhost:$PORT/api/version"; then
+              echo "dev server answered /api/version after $(( $(date +%s) - started ))s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "dev server did not answer /api/version within 3 minutes"
+          tail -50 "$RUNNER_TEMP/server.log"
+          exit 1
+      - name: Smoke the main pages and read routes
+        run: |
+          BASE_URL="http://localhost:$PORT" SERVER_LOG="$RUNNER_TEMP/server.log" \
+            node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/ci/route-smoke.mjs
+      - name: The server's log, on failure
+        if: ${{ failure() }}
+        run: tail -200 "$RUNNER_TEMP/server.log"
+
   # LB-166. Split out of the E2E job so the UI-paths diff is computed ONCE rather than four times:
   # it needs `fetch-depth: 0`, and four full clones to answer the same question is the cheapest part
   # of this change to get wrong. Its output gates the shards below.
