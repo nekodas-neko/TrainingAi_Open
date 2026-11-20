@@ -62,7 +62,7 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     await repo.saveOuraCloudTokens(USER, {
       accessToken: encryptOuraToken('acc', USER, 'access_token'),
       refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-      expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health', ouraUserId: OURA_USER,
+      expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health extapi:stress', ouraUserId: OURA_USER,
     })
     vi.stubGlobal('fetch', fakeOura())
   })
@@ -309,7 +309,8 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
 
   it('keeps a workout\'s reviewed flag when Oura re-sends it', async () => {
     await webhookAll()
-    expect(await repo.markOuraWorkoutReviewed(USER, 'wo-1')).toBe(true)
+    // The review card that set it is gone (#3875); the flag still marks a dismissal the budget honours.
+    expect((await pool.query(`UPDATE oura_workouts SET reviewed = true WHERE user_id = $1 AND id = 'wo-1'`, [USER])).rowCount).toBe(1)
     await webhookAll()
     expect((await one(`SELECT reviewed FROM oura_workouts WHERE user_id = $1`)).reviewed).toBe(true)
   })

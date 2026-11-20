@@ -332,7 +332,7 @@ export const OURA_DELETE_TYPES: readonly OuraDocumentType[] = ['sleep', 'workout
  * collection whose scope the user did not grant, the same status as a dead token, so the callers
  * check the grant first. The spec (v1.42) maps no route to a scope; these follow its scope
  * descriptions and what Oura refused (#3026). It names no scope for stress; `daily` has been
- * accepted for it.
+ * accepted for it, and resilience needs Oura's own `stress` scope (#3873).
  */
 /** The time series read by a time window, not a day range, that are not documents. */
 export type OuraSeriesType = 'heartrate' | 'ring_battery'
@@ -343,9 +343,12 @@ export const OURA_SCOPE_FOR: Record<OuraDocumentType | OuraSeriesType, OuraScope
   daily_activity: 'daily',
   daily_spo2: 'spo2',
   daily_stress: 'daily',
-  // A guess. The spec names no scope for resilience; Oura refused it under `daily` while it took
-  // stress, and `heart_health` is the only scope left that could cover it (#3026).
-  daily_resilience: 'heart_health',
+  // Named by Oura itself, not the spec (which lists no `stress` scope). The first guess was `daily`,
+  // refused while it took stress; the second, `heart_health` (#3026), was refused on every day from
+  // the switch with "Token is not authorized access stress scope" (#3212, #3873), the way Oura named
+  // `ring_configuration` for the battery below. A grant stored before `stress` was requested lacks
+  // it, so resilience is skipped as not shared (backfill `notShared`) until the user connects again.
+  daily_resilience: 'stress',
   daily_cardiovascular_age: 'heart_health',
   vo2_max: 'heart_health',
   // A guess, as for resilience: the spec names no scope for it, and it is a sleep product.

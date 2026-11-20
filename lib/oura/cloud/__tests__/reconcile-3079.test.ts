@@ -6,7 +6,7 @@ import { shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import type { OuraBackfillResult, backfillOuraCloud } from '../backfill'
 import { NO_WRITES } from '../ingest'
-import { reconcileDaysFor, reconcileOuraCloud, reportReconcileGaps, startOuraReconcile, RECONCILE_DAYS, RECONCILE_WEEKLY_DAYS, RECONCILE_WEEKLY_WEEKDAY } from '../reconcile'
+import { reconcileDaysFor, reconcileOuraCloud, reportReconcileGaps, startOuraReconcile, EXPECTED_REFUSED_DESPITE_GRANT, RECONCILE_DAYS, RECONCILE_WEEKLY_DAYS, RECONCILE_WEEKLY_WEEKDAY } from '../reconcile'
 import { OURA_DAILY_REPORT_INTERVAL_MS, reportOuraCloudIssue, resetOuraCloudReportThrottle } from '../report'
 
 const reportServerError = vi.hoisted(() => vi.fn())
@@ -49,7 +49,8 @@ describe('reconcileOuraCloud', () => {
       expect(userId).toBe(`u${i + 1}`)
       // #2861: and a re-read is not new data from the ring, so it never stamps last_data_at.
       // #3087, #3153: and tombstones a workout or session gone from Oura's list for a day it re-read.
-      expect(opts).toEqual({ from: shiftDateStr(to, -(RECONCILE_DAYS - 1)), to, dryRun: false, heartRate: true, tz, tombstoneAbsent: true, stampData: false })
+      // #3875: and the ring's battery, so a quiet day still records a level.
+      expect(opts).toEqual({ from: shiftDateStr(to, -(RECONCILE_DAYS - 1)), to, dryRun: false, heartRate: true, ringBattery: true, tz, tombstoneAbsent: true, stampData: false })
       expect(deps.rescore).toBe(repo)
       // #3078: the reconciliation's heart rate re-attributes the workouts it changed.
       expect(deps.workoutHr).toBeTypeOf('function')
@@ -136,7 +137,7 @@ describe('the reconcile reports what it did not store (#3795)', () => {
     expect(reportServerError).not.toHaveBeenCalled()
   })
 
-  it('reports the expected daily_resilience refusal at most once a day, apart from a new type', async () => {
+  it('throttles an expected refusal to once a day', async () => {
     reportServerError.mockClear()
     const t0 = Date.parse('2026-10-19T02:00:00Z')
     const expected = (now: number) => reportOuraCloudIssue('reconcile:refused-despite-grant-expected', 'x', { intervalMs: OURA_DAILY_REPORT_INTERVAL_MS }, now)
@@ -144,16 +145,17 @@ describe('the reconcile reports what it did not store (#3795)', () => {
     expect(expected(t0 + 3 * 60 * 60 * 1000)).toBe(false)
     expect(expected(t0 + OURA_DAILY_REPORT_INTERVAL_MS)).toBe(true)
     await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(2))
+  })
 
+  // #3873: resilience is mapped to `stress` now, so a refusal under a grant that has it is a real
+  // problem, reported with every other type, not set apart as expected.
+  it('reports a resilience refusal despite the grant as a real problem', async () => {
+    expect(EXPECTED_REFUSED_DESPITE_GRANT.size).toBe(0)
     resetOuraCloudReportThrottle()
     reportServerError.mockClear()
     reportReconcileGaps('u1', '2026-10-17', '2026-10-19', gaps({ refusedDespiteGrant: ['daily_resilience'] }))
-    reportReconcileGaps('u1', '2026-10-17', '2026-10-19', gaps({ refusedDespiteGrant: ['daily_resilience', 'daily_stress'] }))
-    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(2))
-    expect(messages()).toEqual([
-      expect.stringContaining('reconcile:refused-despite-grant-expected: Oura refused daily_resilience'),
-      expect.stringContaining('reconcile:refused-despite-grant: Oura refused daily_stress'),
-    ])
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(1))
+    expect(messages()).toEqual([expect.stringContaining('reconcile:refused-despite-grant: Oura refused daily_resilience')])
+    expect(messages().join(' ')).not.toContain('expected')
   })
 })
-

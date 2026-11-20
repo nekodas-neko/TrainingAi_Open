@@ -33,7 +33,7 @@ const listBodyMetrics = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getHrForWindow = vi.fn(async (..._a: unknown[]) => [] as { bpm: number }[])
 const getObservedHrProfile = vi.fn(async (..._a: unknown[]) => computeObservedHr([]))
 const getSetHrStatsSince = vi.fn(async (..._a: unknown[]) => [] as Row[])
-const getOuraWorkouts = vi.fn(async (..._a: unknown[]) => [] as Row[])
+const getSourceActivitySessions = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getSetHrStatsForExercise = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getWorkoutSessionById = vi.fn(async (..._a: unknown[]) => null as Row | null)
 const upsertWorkoutHrStats = vi.fn(async (..._a: unknown[]) => undefined)
@@ -53,7 +53,7 @@ vi.mock('@trainingai/shared/workout/compute-workout-hr', () => ({
 vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
-    getUserById, listBodyMetrics, getHrForWindow, getObservedHrProfile, getSetHrStatsSince, getOuraWorkouts,
+    getUserById, listBodyMetrics, getHrForWindow, getObservedHrProfile, getSetHrStatsSince, getSourceActivitySessions,
     getSetHrStatsForExercise, getWorkoutSessionById, upsertWorkoutHrStats, upsertSetHrStats,
     getWorkoutHrStats, getWorkoutHrDensity,
   })
@@ -100,7 +100,7 @@ beforeEach(() => {
   getHrForWindow.mockResolvedValue([])
   getObservedHrProfile.mockResolvedValue(computeObservedHr([]))
   getSetHrStatsSince.mockResolvedValue([])
-  getOuraWorkouts.mockResolvedValue([])
+  getSourceActivitySessions.mockResolvedValue([])
   getSetHrStatsForExercise.mockResolvedValue([])
   getWorkoutSessionById.mockResolvedValue(null)
   getWorkoutHrStats.mockResolvedValue(null)

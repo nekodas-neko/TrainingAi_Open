@@ -1,7 +1,8 @@
 // #3087: Oura's own workouts were missing from the energy budget. These pin which ones now count,
 // how they are typed, and that nothing already counted is paid for twice.
 import { describe, it, expect } from 'vitest'
-import { ouraWorkoutActivities, type OuraWorkoutRow } from '../oura-workout-activities'
+import { sourceSessionActivities, type CountedMovement } from '../oura-workout-activities'
+import { ouraActivitySessions, type OuraWorkoutRow } from '@/lib/oura/cloud/activity-sessions-map'
 import { computeActiveEnergy, stepEnergyKcal, WALKING_CADENCE_SPM } from '../daily-energy'
 import { metIdForOuraActivity, OURA_ON_FOOT_ACTIVITIES } from '../workout-energy'
 import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '../../date-utils'
@@ -11,7 +12,10 @@ const day = shiftDateStr(todayInTz(TZ), -1)
 // Anchored to local midday, so the local day cannot flip on a zone edge.
 const at = (hour: number, min = 0) => new Date(dateStrMidnightInTz(day, TZ).getTime() + (hour * 60 + min) * 60_000)
 const workout = (activity: string, from: Date, to: Date, over: Partial<OuraWorkoutRow> = {}): OuraWorkoutRow =>
-  ({ activity, startDatetime: from, endDatetime: to, distanceM: null, reviewed: false, ...over })
+  ({ day, activity, startDatetime: from, endDatetime: to, distanceM: null, reviewed: false, ...over })
+// #3875: the rules read the generic session; Oura's rows go through the connector's mapping first.
+const ouraWorkoutActivities = (rows: OuraWorkoutRow[], counted: CountedMovement, tz: string) =>
+  sourceSessionActivities(ouraActivitySessions(rows), counted, tz)
 const none = { activityLogs: [], sessions: [] }
 
 describe('ouraWorkoutActivities (#3087)', () => {

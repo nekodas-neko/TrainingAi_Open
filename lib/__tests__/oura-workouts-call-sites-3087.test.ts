@@ -18,7 +18,8 @@ vi.mock('@/lib/data', () => {
     getWorkoutSessionsFrom: async () => [],
     getBodyFatCalibration: async () => null,
     getAvgBpmBySession: async () => new Map(),
-    getOuraWorkouts: async () => state.oura,
+    // #3875: the budget reads the generic session; the Oura rows go through the connector's mapping.
+    getSourceActivitySessions: async () => (await import('@/lib/oura/cloud/activity-sessions-map')).ouraActivitySessions(state.oura as never),
     getUserById: async () => ({ heightCm: 180, sex: 'male', dateOfBirth: '1993-01-01', fitnessGoal: 'maintain' }),
     getUserGoals: async () => null,
     listMeasuredRmr: async () => [],

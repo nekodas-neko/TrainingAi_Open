@@ -7,31 +7,53 @@ import { recapSpec } from '../data/models';
 
 /**
  * The written recap on the done screen. It is written only when asked for (#2111): the stat block
- * above it is the screen, and a recap is a Gemini call, so nothing here fetches until the button is
+ * above it is the screen, so nothing here fetches until the button is
  * pressed.
+ *
+ * `local`, while the workout's upload is pending (#3880): the recap written from the phone's copy
+ * (`localRecap`), shown without asking the server, which doesn't have the workout yet. `null` means
+ * the phone couldn't write one, and the button waits for the upload.
  */
 export function RecapCard({
   workoutId,
-  disabled = false,
+  local,
 }: {
   workoutId: string;
-  disabled?: boolean;
+  local?: string | null;
 }) {
   const [asked, setAsked] = useState(false);
   const { theme } = useTheme();
-  const state = useWorkoutResource(recapSpec(workoutId), asked && !disabled);
+  const pending = local !== undefined;
+  const disabled = local === null;
+  const state = useWorkoutResource(recapSpec(workoutId), asked && !pending);
   const width = { width: '100%' as const, maxWidth: theme.sizes.summaryWidth };
-  if (state.data) {
+  const recap = pending ? (asked ? local : null) : state.data ? (state.data.recap ?? null) : undefined;
+  if (recap !== undefined && recap !== null) {
     return (
       <Card style={width}>
         <AppText variant="eyebrow" tone="muted">
           Session recap
         </AppText>
-        <AppText>{state.data.recap ?? 'No recap is available yet.'}</AppText>
+        <AppText>{recap}</AppText>
+        {pending && (
+          <AppText variant="micro" tone="muted">
+            From this phone's copy. The workout hasn't uploaded yet.
+          </AppText>
+        )}
       </Card>
     );
   }
-  const failed = asked && !!state.error;
+  if (!pending && state.data) {
+    return (
+      <Card style={width}>
+        <AppText variant="eyebrow" tone="muted">
+          Session recap
+        </AppText>
+        <AppText>No recap is available yet.</AppText>
+      </Card>
+    );
+  }
+  const failed = asked && !pending && !!state.error;
   return (
     <View style={width}>
       <Stack>
@@ -39,7 +61,7 @@ export function RecapCard({
         <AppButton
           title={failed ? 'Try again' : 'Write me a recap'}
           variant="secondary"
-          busy={asked && state.loading}
+          busy={asked && !pending && state.loading}
           disabled={disabled}
           onPress={() => (asked ? state.refresh() : setAsked(true))}
         />

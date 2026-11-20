@@ -90,7 +90,14 @@ export function runPipAction(
   workout: WorkoutRecord,
   controller: Pick<
     WorkoutJournalStore,
-    'updateSet' | 'recordSet' | 'startSet' | 'advanceExercise' | 'adjustRest' | 'pause' | 'resume'
+    | 'updateSet'
+    | 'recordSet'
+    | 'startSet'
+    | 'advanceExercise'
+    | 'showSession'
+    | 'adjustRest'
+    | 'pause'
+    | 'resume'
   >,
   action: PipAction,
 ) {
@@ -105,5 +112,6 @@ export function runPipAction(
     void controller.recordSet(workout.id, command.exerciseId, command.setId);
   else if (command.type === 'start')
     void controller.startSet(workout.id, command.exerciseId, command.setId);
+  else if (command.type === 'session') void controller.showSession(workout.id);
   else void controller.advanceExercise(workout.id);
 }

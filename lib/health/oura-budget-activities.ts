@@ -1,14 +1,15 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
-import { ouraWorkoutActivities, type CountedMovement, type OuraBudgetActivity } from '@trainingai/shared/health/oura-workout-activities'
+import { sourceSessionActivities, type CountedMovement, type OuraBudgetActivity } from '@trainingai/shared/health/oura-workout-activities'
 import { budgetActivityLogs, HEALTH_CONNECT_SOURCE } from '@trainingai/shared/health/health-connect-workouts'
 import type { ActivityLog } from '@trainingai/shared/types/body'
 
 /**
- * Oura's own workouts on `[from, to]` as energy-budget activities, minus what the caller already
- * counts (#3087; the rules are `ouraWorkoutActivities`). The read is widened a day each side because
- * Oura files a workout under its own day while the budget keys it by the local day of its start.
- * A failed read costs the Oura workouts, never the budget: it degrades to what was counted before.
+ * The sources' own activity sessions on `[from, to]` as energy-budget activities, minus what the
+ * caller already counts (#3087; the rules are `sourceSessionActivities`). Read through the generic
+ * shape (#3875), never a source's table. The read is widened a day each side because a source files
+ * a session under its own day while the budget keys it by the local day of its start.
+ * A failed read costs those sessions, never the budget: it degrades to what was counted before.
  *
  * The logs of the evening before `from` join the overlap check: a 23:30-00:30 log is dated the day
  * it started, outside the caller's range, yet its Oura copy starts after midnight and lands inside
@@ -16,7 +17,7 @@ import type { ActivityLog } from '@trainingai/shared/types/body'
  * (`eveningBefore`); a log in it is never costed here, only matched.
  */
 export async function ouraBudgetActivities(
-  repo: Pick<WorkoutRepository, 'getOuraWorkouts' | 'listActivityLogs'>,
+  repo: Pick<WorkoutRepository, 'getSourceActivitySessions' | 'listActivityLogs'>,
   userId: string,
   from: string,
   to: string,
@@ -24,16 +25,16 @@ export async function ouraBudgetActivities(
   counted: CountedMovement,
   eveningBefore?: CountedMovement['activityLogs'],
 ): Promise<OuraBudgetActivity[]> {
-  let rows: Awaited<ReturnType<WorkoutRepository['getOuraWorkouts']>>
+  let rows: Awaited<ReturnType<WorkoutRepository['getSourceActivitySessions']>>
   try {
-    rows = await repo.getOuraWorkouts(userId, { from: shiftDateStr(from, -1), to: shiftDateStr(to, 1) })
+    rows = await repo.getSourceActivitySessions(userId, { from: shiftDateStr(from, -1), to: shiftDateStr(to, 1) })
   } catch {
     return []
   }
   if (rows.length === 0) return []
   const earlier = eveningBefore ?? await readEveningBefore(repo, userId, from)
   const withEveningBefore = { ...counted, activityLogs: [...earlier, ...counted.activityLogs] }
-  return ouraWorkoutActivities(rows, withEveningBefore, tz).filter(a => a.date >= from && a.date <= to)
+  return sourceSessionActivities(rows, withEveningBefore, tz).filter(a => a.date >= from && a.date <= to)
 }
 
 /** The in-app logs of the day before `from`, matched against a range's first day and never counted
@@ -55,7 +56,7 @@ export async function readEveningBefore(repo: Pick<WorkoutRepository, 'listActiv
  * logs, so a dropped copy cannot also keep out an Oura workout.
  */
 export async function budgetMovement<T extends ActivityLog>(
-  repo: Pick<WorkoutRepository, 'getOuraWorkouts' | 'listActivityLogs'>,
+  repo: Pick<WorkoutRepository, 'getSourceActivitySessions' | 'listActivityLogs'>,
   userId: string,
   from: string,
   to: string,

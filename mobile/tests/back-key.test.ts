@@ -84,7 +84,12 @@ test('layouts that take onBack register the Android Back handler', async () => {
     resolve(root, 'features', 'workouts', 'components', 'WorkoutLayout.tsx'),
     'utf8',
   );
-  assert.match(workout, /<PageLayout[^>]*onBack=\{onBack\}/s, 'WorkoutLayout must pass onBack on');
+  // #3879: a screen may give the gesture its own action (the summary); otherwise it is onBack.
+  assert.match(
+    workout,
+    /<PageLayout[^>]*onBack=\{onSystemBack \?\? onBack\}/s,
+    'WorkoutLayout must pass onBack on',
+  );
 });
 
 test('the screen registry is found', async () => {

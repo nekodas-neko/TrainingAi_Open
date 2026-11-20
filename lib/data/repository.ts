@@ -1538,7 +1538,6 @@ export interface WorkoutRepository {
   getAgentAction(id: string): Promise<import('./postgres/slices/agent-actions').AgentActionRecord | null>
   /** Newest first; default 50 rows, at most 500. */
   listAgentActions(filter?: import('./postgres/slices/agent-actions').ListAgentActionsFilter): Promise<import('./postgres/slices/agent-actions').AgentActionRecord[]>
-  listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
   /** #3077: Oura's sessions on local days `[startDay, endDay]` (`oura_sessions`). */
   listOuraSessions(userId: string, startDay: string, endDay: string): Promise<{ ouraId: string; sessionType: string | null; mood: string | null; startDatetime: Date | null; endDatetime: Date | null }[]>
 
@@ -1591,6 +1590,8 @@ export interface WorkoutRepository {
    *  declares `perMinuteMovement`, already in the generic shape. A source's day may start before
    *  local midnight, so a caller wanting a local day asks from the day before. */
   getPerMinuteMovementSeries(userId: string, from: string, to: string): Promise<import('@trainingai/shared/health/per-minute-movement').MovementIntervalSeries[]>
+  /** #3875: every connector's activity sessions filed under a day in `[from, to]`, in the generic shape (connector guide §3d), newest day first. */
+  getSourceActivitySessions(userId: string, range: { from: string; to: string }): Promise<import('@trainingai/shared/health/activity-sessions').SourceActivitySession[]>
   /** #3079: when each day's Oura MET series last changed; days without MET are left out. */
   getOuraCloudMetChangedAt(userId: string, from: string, to: string): Promise<{ date: string; changedAt: Date }[]>
   /** #2982: Oura's sessions (breathing, meditation …) with their series and mood. */
@@ -1689,8 +1690,6 @@ export interface WorkoutRepository {
     calories: number | null; distanceM: number | null; intensity: string | null;
     source: string | null; reviewed: boolean;
   }[]>
-  /** True when the workout existed and belonged to this user. */
-  markOuraWorkoutReviewed(userId: string, id: string): Promise<boolean>
   getSetTimestampsForSession(userId: string, workoutSessionId: string): Promise<{ exerciseName: string; setNumber: number; setStartMs: number | null; setEndMs: number | null; loggedAt: Date | null }[]>
   markHrSynced(userId: string, workoutSessionId: string): Promise<void>
   getUnsyncedHrSessionsForDay(userId: string, day: string, timezone?: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
@@ -1796,19 +1795,6 @@ export interface OuraDailyRow {
   highActivityMetMinutes?: number | null
   mediumActivityMetMinutes?: number | null
   lowActivityMetMinutes?: number | null
-}
-
-export interface OuraTagRow {
-  ouraId: string
-  source: 'enhanced_tag' | 'session' | 'rest_mode'
-  tagType: string | null
-  customName: string | null
-  comment: string | null
-  mood: string | null
-  startDay: string
-  endDay: string | null
-  startTime: Date | null
-  endTime: Date | null
 }
 
 export interface OuraSleepUpsertRow {

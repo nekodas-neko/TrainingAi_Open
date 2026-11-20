@@ -28,6 +28,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { HistoryDay } from '../../workouts/screens/WorkoutHistoryScreen';
+import { useLocalOnlyWorkouts } from '../../workouts/data/useWorkoutView';
 import { hrTracePoints } from '../data/hr-trace';
 import { useHealthData } from '../data/HealthDataProvider';
 import {
@@ -184,12 +185,16 @@ export function DayReadThrough({
   const parsed = healthDaySchema.safeParse(state.data);
   const data = parsed.success ? parsed.data : null;
   const body = data?.bodyMeta;
+  // A workout finished on this phone shows on its day before it uploads (#3880).
+  const day = date.replace(/\//g, '-');
+  const localWorkout = useLocalOnlyWorkouts().some((workout) => workout.date === day);
   if (!data) {
     return (
       <>
         <AppText tone="muted">
           The day's server records could not be loaded. Use the header to retry.
         </AppText>
+        {localWorkout && <HistoryDay compact readOnly={readOnly} embedded date={date} />}
         <ActivityDay logs={[]} date={date} />
       </>
     );
@@ -235,7 +240,7 @@ export function DayReadThrough({
   const tempDeviation = ouraTemperatureDeviationRow(data.bodyTemp);
   return (
     <>
-      {!!data.exercises.length && (
+      {(!!data.exercises.length || localWorkout) && (
         <HistoryDay
           compact
           readOnly={readOnly}
@@ -315,6 +320,7 @@ export function DayReadThrough({
         </Card>
       )}
       {!data.exercises.length &&
+        !localWorkout &&
         !data.activityLogs.length &&
         !body &&
         !data.sleep &&
