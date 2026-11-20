@@ -6,7 +6,9 @@
 // lib/data/postgres/__tests__/exercise-log-effort-vs-plan-upload.test.ts.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const logExerciseAndSets = vi.fn(async () => ({ exerciseLog: { id: 'el-1' } }))
+const logExerciseAndSets = vi.fn(
+  async (_userId: string, _log: Record<string, unknown>, _sets: Record<string, unknown>[]) => ({ exerciseLog: { id: 'el-1' } }),
+)
 
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
@@ -80,14 +82,14 @@ describe('the upload schema takes the answer, and only the answer (#3745)', () =
 describe('logExerciseFromPayload carries the answer to the exercise log (#3745)', () => {
   it('stores a tapped answer as the answer itself', async () => {
     await logExerciseFromPayload('u1', { ...oldBuildPayload, effort: { vsPlan: 1, source: 'tapped' } }, TZ)
-    const [, log] = logExerciseAndSets.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    const [, log] = logExerciseAndSets.mock.calls[0]
     expect(log.effortVsPlan).toBe(1)
     expect(log.effortSource).toBe('tapped')
   })
 
   it('stores a default answer with its source', async () => {
     await logExerciseFromPayload('u1', { ...oldBuildPayload, effort: { vsPlan: 0, source: 'default' } }, TZ)
-    const [, log] = logExerciseAndSets.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    const [, log] = logExerciseAndSets.mock.calls[0]
     expect(log.effortVsPlan).toBe(0)
     expect(log.effortSource).toBe('default')
   })
@@ -95,7 +97,7 @@ describe('logExerciseFromPayload carries the answer to the exercise log (#3745)'
   it('an older build still logs, with no answer (the upsert then keeps any stored one)', async () => {
     await logExerciseFromPayload('u1', oldBuildPayload, TZ)
     expect(logExerciseAndSets).toHaveBeenCalledTimes(1)
-    const [, log, sets] = logExerciseAndSets.mock.calls[0] as unknown as [string, Record<string, unknown>, Record<string, unknown>[]]
+    const [, log, sets] = logExerciseAndSets.mock.calls[0]
     expect(log.effortVsPlan).toBeNull()
     expect(log.effortSource).toBeNull()
     // The per-set effort is untouched by the answer: still the pre-fill, still `expected`.

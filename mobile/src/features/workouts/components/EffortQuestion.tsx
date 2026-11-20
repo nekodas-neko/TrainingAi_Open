@@ -6,10 +6,12 @@ import {
 import { AppText, ChoiceScale, Stack } from '../../../shared/ui';
 import type { WorkoutExercise } from '../logging/workout';
 
+// What a screen reader adds after the label.
+const descriptions = { [-1]: 'lighter than planned', 0: 'as planned', 1: 'heavier than planned' };
 const options = EFFORT_VS_PLAN_VALUES.map((value) => ({
   value,
   label: EFFORT_VS_PLAN_LABELS[value],
-  description: EFFORT_VS_PLAN_LABELS[value],
+  description: descriptions[value],
 }));
 
 /**
