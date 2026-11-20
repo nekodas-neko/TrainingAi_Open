@@ -125,3 +125,19 @@ export interface ProgramDeloadCheck {
   deloadFinished: boolean
   trainingWeeksDone: number
 }
+
+/**
+ * The phase a plan's sets and loads were written for (#3713), which caps its sets on every path that
+ * re-derives them (re-fit, a deload's revert). Not `prescription.phase`: `applyProgramPhaseCap`,
+ * `applyDeloadFloor` and a program move rewrite that to the NEXT phase on a plain stay, while the
+ * loads stay the current phase's. Generation records the stage's own phase on `refitBaseline.phase`.
+ * A plan from before that: a stay was written for its own phase; any move on offer, for the phase
+ * the session is in (`sessionPhase`), which is what the guards that rewrite it leave the loads in.
+ */
+export function phaseOfLoads(
+  prescription: Pick<AiPrescription, 'phase' | 'phaseAction' | 'refitBaseline'>,
+  sessionPhase: PeriodizationPhase,
+): PeriodizationPhase {
+  if (prescription.refitBaseline?.phase) return prescription.refitBaseline.phase
+  return prescription.phaseAction === 'stay' ? prescription.phase : sessionPhase
+}

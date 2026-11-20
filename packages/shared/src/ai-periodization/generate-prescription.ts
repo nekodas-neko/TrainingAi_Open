@@ -23,7 +23,7 @@ import {
   typeDeloadFinished,
 } from '@trainingai/shared/ai-periodization/phase-guards'
 import { fitToBudget } from '@trainingai/shared/ai-periodization/time-budget'
-import { applyBudgetStage } from '@trainingai/shared/ai-periodization/budget-stage'
+import { applyBudgetStage, reasoningWithBudgetNote } from '@trainingai/shared/ai-periodization/budget-stage'
 import { prescriptionFigures, rowUnderFull, hasFullSessionRevert } from '@trainingai/shared/ai-periodization/prescription-figures'
 import { capLoadToAnchor } from '@trainingai/shared/ai-periodization/role-plausibility'
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
@@ -751,6 +751,8 @@ async function runPrescriptionGeneration(
     sets: Object.fromEntries(parsed.exercises.map(ex => [ex.session_exercise_id, ex.sets])),
     reasoning: parsed.reasoning,
     ...(autoreg.earnedSetIds.size > 0 && { earnedSetIds: [...autoreg.earnedSetIds] }),
+    // #3713: the phase the stage below caps against. A cap guard may rewrite `phase` after it.
+    phase: parsed.phase as PeriodizationPhase,
   }
 
   const budget = applyBudgetStage(
@@ -784,7 +786,7 @@ async function runPrescriptionGeneration(
   const droppedIdSet = budget.droppedIds
   const estimatedSessionDurationMin = budget.estimatedSessionDurationMin
   const weeklyVolumeContribution = budget.weeklyVolumeContribution
-  parsed.reasoning = `${refitBaseline.reasoning}${budget.budgetNote}`
+  parsed.reasoning = reasoningWithBudgetNote(refitBaseline.reasoning, budget.budgetNote)
 
   const aiPrescription: AiPrescription = {
     phase: parsed.phase as PeriodizationPhase,

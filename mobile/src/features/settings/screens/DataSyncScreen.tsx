@@ -23,6 +23,7 @@ import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared
 import { HISTORY_DOWNLOAD_DAYS } from '../data/history-domains';
 import { HISTORY_WINDOW_DAYS, dataSyncCopy, importCaption } from '../data/data-sync-copy';
 import { useHistoryDownload } from '../data/HistoryDownloadProvider';
+import { importPermissionNote, importStatusError } from '../../health/data/device-import';
 export function DataSyncScreen({ onBack }: { onBack: () => void }) {
   const actions = useNativeDataActions(),
     account = useAccountContext(),
@@ -59,7 +60,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
         <StatusIndicator
           label="Data & Sync"
           busy={busy || actions.busy || health.busy || history.status === 'running'}
-          error={error ?? actions.error ?? health.error ?? history.error}
+          error={error ?? actions.error ?? importStatusError(health) ?? history.error}
           message={actions.message}
         />
       }
@@ -191,8 +192,8 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
               onChange={setDays}
             />
             <AppText variant="caption" tone="muted">
-              Reads permitted records and resumes across app opens. Records already imported are
-              not added twice.
+              {importPermissionNote(health, deviceHealthName) ??
+                'Reads permitted records and resumes across app opens. Records already imported are not added twice.'}
             </AppText>
             <AppButton
               title="Import history"

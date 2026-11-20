@@ -33,6 +33,7 @@ import { activityHistorySpec, hrProfileSpec } from '../../health/data/models';
 import { overlayCalories, walkSegmentStatsSpec } from './models';
 import { failedItems, waitingCount } from './sync-health';
 import type { HealthActivity } from '../../health/components/ActivityDetails';
+import { onResume } from '../../../core/sync/resume';
 
 const Context = createContext<ActivityStore | null>(null);
 const noSubscribe = () => () => {};
@@ -78,10 +79,8 @@ export function ActivityStateProvider({
 }: PropsWithChildren<{ store: ActivityStore | null }>) {
   useEffect(() => {
     void store?.initialize();
-    const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void store?.sync();
-      }
+    const listener = onResume(() => {
+      void store?.sync();
     });
     const timer = setInterval(() => {
       if (AppState.currentState === 'active') {

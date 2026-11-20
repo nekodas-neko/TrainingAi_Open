@@ -15,6 +15,10 @@ import { useHistoryDownload } from './HistoryDownloadProvider';
 import { useStrapSession } from '../../devices/strap/StrapProvider';
 import { useScaleSession } from '../../devices/scale/ScaleProvider';
 import { deviceUploadsWaiting, useQueued } from './device-uploads';
+import type { WorkoutResources } from '../../workouts/data/WorkoutResources';
+import { importPermissionNote, importStatusError } from '../../health/data/device-import';
+import { deviceHealthName } from '../../../integrations/device-health/platform';
+import { syncNowRunner } from '../../../core/sync/deadline';
 export function useNativeDataActions() {
   const health = useHealthData(),
     home = useHome(),
@@ -29,6 +33,7 @@ export function useNativeDataActions() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [message, setMessage] = useState<string | null>(null);
+  const [runSync] = useState(() => syncNowRunner({ setBusy, setError, setMessage }));
   const activities = useActivities(),
     history = useHistoryQueue(),
     download = useHistoryDownload().download;
@@ -51,59 +56,56 @@ export function useNativeDataActions() {
     if (busy || !resources) {
       return;
     }
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await Promise.all([
-        health.store?.sync(),
-        home.store?.sync(),
-        nutrition.store?.sync(),
-        training.store?.sync(),
-        journal.controller?.sync(),
-        imported.refresh(),
-        activities.store?.sync(),
-        history.queue?.sync(),
-      ]);
-      // Counted above, so sent here too; each publishes its own count when its upload settles.
-      strap?.sync();
-      scale?.sync();
-      await Promise.all([
-        health.store?.refresh(true),
-        home.store?.refresh('preferences', health.today, true),
-        home.store?.refresh('mood', health.today, true),
-      ]);
-      if (restore) {
-        await Promise.all(
-          (['mealTypes', 'foods', 'meals', 'supplements', 'targets', 'logs'] as const).map(
-            (kind) => nutrition.store?.refresh(kind, health.today, true),
-          ),
-        );
-      }
-      workouts.refresh();
-      await refreshAccountViews(resources, restore);
-      const failure =
-        health.store?.getSnapshot().error ??
-        home.store?.getSnapshot().error ??
-        nutrition.store?.getSnapshot().error ??
-        imported.store?.getSnapshot().error ??
-        activities.store?.getSnapshot().error ??
-        history.queue?.getSnapshot().error;
-      if (failure) {
-        throw new Error(failure);
-      }
-      setMessage(
-        restore
-          ? 'Account data refreshed. Your history is now saving to this phone for offline use.'
-          : 'Sync finished. Any changes still waiting to upload remain saved on this phone.',
+    await runSync(() => run(resources, restore));
+  }
+  async function run(resources: WorkoutResources, restore: boolean): Promise<string> {
+    await Promise.all([
+      health.store?.sync(),
+      home.store?.sync(),
+      nutrition.store?.sync(),
+      training.store?.sync(),
+      journal.controller?.sync(),
+      imported.refresh(),
+      activities.store?.sync(),
+      history.queue?.sync(),
+    ]);
+    // Counted above, so sent here too; each publishes its own count when its upload settles.
+    strap?.sync();
+    scale?.sync();
+    await Promise.all([
+      health.store?.refresh(true),
+      home.store?.refresh('preferences', health.today, true),
+      home.store?.refresh('mood', health.today, true),
+    ]);
+    if (restore) {
+      await Promise.all(
+        (['mealTypes', 'foods', 'meals', 'supplements', 'targets', 'logs'] as const).map(
+          (kind) => nutrition.store?.refresh(kind, health.today, true),
+        ),
       );
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Could not sync. Your saved records are kept.',
-      );
-    } finally {
-      setBusy(false);
     }
+    workouts.refresh();
+    await refreshAccountViews(resources, restore);
+    const failure =
+      health.store?.getSnapshot().error ??
+      home.store?.getSnapshot().error ??
+      nutrition.store?.getSnapshot().error ??
+      (imported.store ? importStatusError(imported.store.getSnapshot()) : null) ??
+      activities.store?.getSnapshot().error ??
+      history.queue?.getSnapshot().error;
+    if (failure) {
+      throw new Error(failure);
+    }
+    // #3906: switched on with no permission is a note on a finished sync, not a failed one.
+    const note = imported.store
+      ? importPermissionNote(imported.store.getSnapshot(), deviceHealthName)
+      : null;
+    return (
+      (restore
+        ? 'Account data refreshed. Your history is now saving to this phone for offline use.'
+        : 'Sync finished. Any changes still waiting to upload remain saved on this phone.') +
+      (note ? ` ${note}` : '')
+    );
   }
   async function clearAccount() {
     const connection = account.dataReader;

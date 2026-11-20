@@ -15,6 +15,7 @@ import { useWorkoutResources } from './WorkoutDataProvider';
 import { HistoryOutbox, type HistoryQueueState } from './HistoryOutbox';
 import { healthReadPaths } from '../../../core/sync/health-invalidation';
 import { calendarSpec, daySpec } from './models';
+import { onResume } from '../../../core/sync/resume';
 
 const Context = createContext<HistoryOutbox | null>(null);
 const empty: HistoryQueueState = { ready: false, operations: [], syncing: false, error: null };
@@ -74,10 +75,8 @@ export function HistoryQueueStateProvider({
 }: PropsWithChildren<{ queue: HistoryOutbox | null }>) {
   useEffect(() => {
     void queue?.initialize();
-    const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void queue?.sync();
-      }
+    const listener = onResume(() => {
+      void queue?.sync();
     });
     const retry = setInterval(() => {
       if (AppState.currentState === 'active') {
