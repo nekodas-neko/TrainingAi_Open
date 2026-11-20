@@ -4,6 +4,8 @@ import { getRepository } from '@/lib/data'
 import { buildCardExerciseSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { servePrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
+import { readProgramDeloadCheck } from '@trainingai/shared/ai-periodization/program-phase'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import type { Baseline1rmEntry } from '@trainingai/shared/types/ai-periodization'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 
@@ -84,7 +86,14 @@ export async function GET(
   // #3716: an aged-out prescription is not the plan on any read (#3700), so the card must not show
   // it, nor the Deload toggle adopt its flag. It goes out as `null` with `prescriptionAgedOut`; the
   // workout-data read the same screen makes regenerates it and shows "preparing".
-  const served = servePrescriptionState(state)
+  //
+  // #3876: so does a plan whose deload has ended. Served, its `deload: true` was adopted by the
+  // Deload toggle, and Preview trained a third deload session after the exit. On an aligned program
+  // the program's cap decides that (`readProgramDeloadCheck`); a failed read falls back to the type's count.
+  const programDeload = program?.phaseMode === 'ai_dynamic'
+    ? await readProgramDeloadCheck(repo, userId, program.id, state, session?.user?.timezone ?? DEFAULT_TZ).catch(() => null)
+    : null
+  const served = servePrescriptionState(state, new Date(), programDeload)
 
   // A stored prescription can carry a no-op transition (target phase === current phase)
   // from before the generation-time guard landed; those rows live up to 7 days. Normalise

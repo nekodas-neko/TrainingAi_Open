@@ -135,6 +135,35 @@ export function isFullOverride(chosen: boolean, prescribedDeload: boolean | unde
 }
 
 /**
+ * The session-level intensity fields a log carries, and whether this screen scores it as a deload.
+ *
+ * #3877(a). The server records a full-weight override inside an AI deload phase as full
+ * (`log-exercise.ts`, `wasOverride === true && intensityMode !== 'deload'`), but the WebView only
+ * ever sent `wasOverride` from the `?wasOverride=1` URL param, which Session Select sets only when
+ * readiness recommends a deload or rest. The in-screen Full toggle — the main way to override a
+ * planned deload — never reached the payload, so that session still stored a 1RM of 0 and no record.
+ * Either source of the override counts, and a session the user switched back to Deload is a deload.
+ *
+ * `isAnyDeload` mirrors the server so the local estimate and the optimistic record agree with what
+ * gets stored: an override drops the AI deload phase's contribution (only an AI-dynamic session has
+ * that branch on the server; a static program's deload phase still counts).
+ */
+export function sessionIntensityForLog(a: {
+  deload: boolean
+  urlOverride: boolean
+  overrideFull: boolean
+  phaseDeloadActive: boolean
+  isAiDynamic: boolean
+}): { fields: { intensityMode?: 'deload'; wasOverride?: true }; isAnyDeload: boolean } {
+  const overriddenToFull = !a.deload && (a.urlOverride || a.overrideFull)
+  const fields: { intensityMode?: 'deload'; wasOverride?: true } = {}
+  if (a.deload) fields.intensityMode = 'deload'
+  if (a.urlOverride || overriddenToFull) fields.wasOverride = true
+  const phaseCounts = a.phaseDeloadActive && !(overriddenToFull && a.isAiDynamic)
+  return { fields, isAnyDeload: a.deload || phaseCounts }
+}
+
+/**
  * The exercises to revert this render: the per-exercise reverts the user picked, plus — under a
  * session-level `Full` override — every deloaded exercise the prescription recorded pre-deload
  * numbers for (BF-64).

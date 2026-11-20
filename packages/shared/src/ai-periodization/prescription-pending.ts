@@ -1,6 +1,6 @@
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import { prescriptionAgedOut } from './prescription-expiry'
-import { deloadEndDue } from './phase-guards'
+import { deloadEndDue, type ProgramDeloadCheck } from './phase-guards'
 
 // True when a fresh AI prescription is being (re)generated for an ai_dynamic session:
 // the prescription slot was consumed (by a completed session, a phase transition, or a
@@ -32,7 +32,8 @@ import { deloadEndDue } from './phase-guards'
 export function isAiPrescriptionPending(
   state: (Pick<SessionPeriodization, 'prescription' | 'prescriptionStatus'>
     & Partial<Pick<SessionPeriodization, 'prescriptionExpiresAt' | 'phase' | 'sessionsInPhase'>>) | null | undefined,
-  opts: { isAiDynamic: boolean; isBaselinePhase: boolean },
+  // `programDeload` (`readProgramDeloadCheck`): an aligned program's deload ends at the program's cap.
+  opts: { isAiDynamic: boolean; isBaselinePhase: boolean; programDeload?: ProgramDeloadCheck | null },
   now: Date = new Date(),
 ): boolean {
   return opts.isAiDynamic
@@ -42,6 +43,6 @@ export function isAiPrescriptionPending(
       state.prescription != null
       && (prescriptionAgedOut({ ...state, prescriptionExpiresAt: state.prescriptionExpiresAt ?? null }, now)
         // #3876: a plan in a deload that has done its sessions; regenerating ends the deload.
-        || (state.phase != null && deloadEndDue(state.prescription, { phase: state.phase, sessionsInPhase: state.sessionsInPhase })))
+        || (state.phase != null && deloadEndDue(state.prescription, { phase: state.phase, sessionsInPhase: state.sessionsInPhase }, opts.programDeload)))
     ))
 }

@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, toAestDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
 import { servePrescriptionState } from '@trainingai/shared/ai-periodization/prescription-expiry'
-import { syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
+import { programDeloadCheckOf, syncProgramPhase } from '@trainingai/shared/ai-periodization/program-phase'
 
 export async function GET() {
   const session = await auth()
@@ -18,7 +18,7 @@ export async function GET() {
   // Self-heal the per-session phase counts from the real workout history before reading
   // them, so directly-inserted/deleted test sessions can't leave a stale "N sessions". #3766: the
   // same step runs the switch-over to one program phase when it is due, so the list shows it.
-  await syncProgramPhase(repo, userId, program.id, tz)
+  const programDeload = programDeloadCheckOf(await syncProgramPhase(repo, userId, program.id, tz))
   const states = await repo.listSessionPeriodizationForProgram(userId, program.id)
 
   const today = todayInTz(tz)
@@ -28,8 +28,9 @@ export async function GET() {
 
   const sessions = program.sessions.map((ps, i) => {
     const stored = states.find(s => s.programSessionId === ps.id) ?? null
-    // #3716: an aged-out prescription is not the session's plan, here as on every other read.
-    const state = stored && servePrescriptionState(stored)
+    // #3716: an aged-out prescription is not the session's plan, here as on every other read. Nor is
+    // one whose deload has ended (#3876).
+    const state = stored && servePrescriptionState(stored, new Date(), programDeload)
     const lastCompleted = recentBySession[i].find(s => s.completedAt != null)
     const lastTrainedDaysAgo = lastCompleted?.completedAt != null
       ? daysBetweenDateStrs(toAestDateStr(lastCompleted.completedAt, tz), today)

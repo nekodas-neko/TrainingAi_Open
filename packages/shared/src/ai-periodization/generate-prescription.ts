@@ -247,9 +247,7 @@ export function buildProgramAsWrittenPrescription(
     exercises,
     estimatedSessionDurationMin,
     weeklyVolumeContribution,
-    // #3877(b): worked out from the phase, as the model path does, never a constant. In a deload phase
-    // this plan is a deload's (the shadow's rules plan, `Full`'s revert) and said `false`.
-    deload: isDeloadPlan(signals.phase as PeriodizationPhase, 'stay'),
+    deload: false,
     reasoning,
     confidence: 0.3,
     sessionTimeBudgetMinutes: signals.sessionTimeBudgetMinutes,
@@ -363,7 +361,13 @@ async function runPrescriptionGeneration(
   // finished deload only when it was made before the count got there (`deloadEndDue`), so a plan made
   // after this exit check does not ask for another generation on every read.
   const storePrescription = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: { phase: PeriodizationPhase; phaseStartedAt: Date }) =>
-    repo.storePrescription(userId, programSessionId, { ...p, sessionsInPhaseAtPlan: state.sessionsInPhase }, expiresAt, status, storeFor)
+    repo.storePrescription(userId, programSessionId, {
+      ...p,
+      sessionsInPhaseAtPlan: state.sessionsInPhase,
+      // An aligned program's deload ends at its cap, not the type's count: the same once-only stamp,
+      // in the program's weeks.
+      ...(programPhase.aligned && { programWeeksDoneAtPlan: programPhase.trainingWeeksDone }),
+    }, expiresAt, status, storeFor)
   // #3766: the phase this plan is made in. A program move while it is being made (another session's
   // tap or auto-apply) voids this slot; the plan is then not stored (`storePrescription` checks the
   // slot is still in this phase and start), so the slot regenerates in the new phase.

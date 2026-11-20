@@ -1,5 +1,5 @@
 import { toAestDay, weekStartForDay, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
-import { DELOAD_FLOOR } from '@trainingai/shared/ai-periodization/phase-guards'
+import { DELOAD_FLOOR, type ProgramDeloadCheck } from '@trainingai/shared/ai-periodization/phase-guards'
 import type {
   AiPrescription, PendingTransition, PeriodizationPhase, SessionPeriodization,
 } from '@trainingai/shared/types/ai-periodization'
@@ -544,10 +544,35 @@ export async function syncProgramPhase(
   return programPhaseView(rows, completions, tz, now)
 }
 
+/**
+ * #3876: the program's side of `deloadEndDue`, for a read that serves a stored plan. Read-only: it
+ * neither reconciles nor stamps, so a poll can call it (generation runs `syncProgramPhase`, which
+ * does both, before it decides the exit). Only a type in a deload needs it; any other returns null
+ * without a query.
+ */
+export async function readProgramDeloadCheck(
+  repo: Pick<ProgramPhaseRepo, 'listSessionPeriodizationForProgram' | 'listProgramCompletions'>,
+  userId: string,
+  programId: string,
+  state: { phase: string } | null | undefined,
+  tz: string,
+  now: Date = new Date(),
+): Promise<ProgramDeloadCheck | null> {
+  if (state?.phase !== 'deload') return null
+  const rows = await repo.listSessionPeriodizationForProgram(userId, programId)
+  if (!isProgramAligned(rows)) return { aligned: false, deloadFinished: false, trainingWeeksDone: 0 }
+  return programDeloadCheckOf(programPhaseView(rows, await completionsFor(repo, userId, programId, rows, tz), tz, now))
+}
+
+/** `deloadEndDue`'s program side from a view already read (`syncProgramPhase` returns one). */
+export function programDeloadCheckOf(view: ProgramPhaseView): ProgramDeloadCheck {
+  return { aligned: view.aligned, deloadFinished: programDeloadFinished(view), trainingWeeksDone: view.trainingWeeksDone }
+}
+
 /** The program's completions from the start of the training week its earliest phase began in: the
  *  sessions before a move in its own week decide whether that week counts. */
 async function completionsFor(
-  repo: ProgramPhaseRepo, userId: string, programId: string, rows: PhaseRow[], tz: string,
+  repo: Pick<ProgramPhaseRepo, 'listProgramCompletions'>, userId: string, programId: string, rows: PhaseRow[], tz: string,
 ): Promise<ProgramCompletion[]> {
   const starts = phasedRows(rows).map(r => r.phaseStartedAt.getTime())
   if (starts.length === 0) return []

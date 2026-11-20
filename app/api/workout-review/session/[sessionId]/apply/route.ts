@@ -123,6 +123,7 @@ export async function POST(
       // #3876: the deload count the plan was generated at carries over; the review edits the plan, it
       // does not run generation's deload exit (`deloadEndDue`).
       ...(existing?.sessionsInPhaseAtPlan != null && { sessionsInPhaseAtPlan: existing.sessionsInPhaseAtPlan }),
+      ...(existing?.programWeeksDoneAtPlan != null && { programWeeksDoneAtPlan: existing.programWeeksDoneAtPlan }),
       phase: existing?.phase ?? (state.phase === 'baseline' ? 'accumulation' : state.phase),
       phaseAction: 'stay',
       exercises: [...exerciseById.values()],

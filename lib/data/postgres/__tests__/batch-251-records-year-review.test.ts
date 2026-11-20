@@ -10,6 +10,7 @@
 //
 // #3876: a per-type move into a deload records the phase it came from, so the deload can end there.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { dateStrMidnightInTz, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-000000003878'
@@ -150,7 +151,9 @@ describe.skipIf(!canRun)('batch 251: records keep the plausibility check, the ye
 
   describe('#3878: the 1RM history keeps the plausibility check', () => {
     it('an implausible stored estimate is not a point of the trend', async () => {
-      const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
+      // Local midday n days before the user's today (dates rule: a fixture sits at local midday).
+      const day = (n: number) =>
+        new Date(dateStrMidnightInTz(shiftDateStr(todayInTz(TZ), -n), TZ).getTime() + 12 * 3_600_000).toISOString()
       await log('Plaus Trend', IMPLAUSIBLE, day(10))
       await log('Plaus Trend', 100, day(5))
       const history = await repo.getExercise1rmHistory(USER, ['Plaus Trend'], TZ)

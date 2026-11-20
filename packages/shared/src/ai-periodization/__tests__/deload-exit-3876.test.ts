@@ -14,9 +14,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { AiPrescription, PendingTransition, PeriodizationPhase, SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import type { PrescriptionSignals } from '../signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { planSwitchOver, programMoveMark, switchOverWait, type PhaseRow, type ProgramCompletion } from '../program-phase'
+import { planSwitchOver, programMoveMark, readProgramDeloadCheck, switchOverWait, type PhaseRow, type ProgramCompletion } from '../program-phase'
 import { deloadExitPhase, isDeloadPlan, typeDeloadFinished, DELOAD_FLOOR } from '../phase-guards'
 import { isAiPrescriptionPending } from '../prescription-pending'
+import { hidePrescriptionAgedOutOnScreen, prescribedDeloadDefault, servePrescriptionState } from '../prescription-expiry'
 
 const mocks = vi.hoisted(() => ({ signals: null as unknown, modelAnswer: null as unknown }))
 vi.mock('../signals', async importOriginal => ({
@@ -27,7 +28,7 @@ vi.mock('@/lib/ai/instrument', () => ({
   aiModel: () => ({}),
   loggedGenerateObject: async () => ({ object: structuredClone(mocks.modelAnswer) }),
 }))
-const { generatePrescriptionForSession, buildProgramAsWrittenPrescription } = await import('../generate-prescription')
+const { generatePrescriptionForSession } = await import('../generate-prescription')
 
 const TZ = 'Australia/Brisbane'
 const at = (local: string) => new Date(`${local}+10:00`)
@@ -372,6 +373,95 @@ describe('a deload ends by itself after its two sessions (#3876, owner 19 Nov)',
   })
 })
 
+// ── A stored plan in a deload that has ended is not served (#3876, review of acd5f2d) ──────────
+
+describe('a stored deload plan stops being the plan once the deload has ended', () => {
+  afterEach(() => vi.useRealTimers())
+  const setNow = (d: Date) => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(d) }
+
+  // (c) The deload week's Sunday is a rest day; Home's warm generates Monday's plan then. On Monday,
+  // the week after the cap, no session has been trained since, so the type's count says nothing.
+  it('aligned: a plan made on the deload week\'s Sunday is due on Monday, and regenerating ends the deload', async () => {
+    mocks.signals = signals()
+    mocks.modelAnswer = stayAnswer('deload')
+    const mark = programMoveMark('deload')
+    const start = at('2026-11-16T00:00:00')
+    const p = memoryProgram(
+      [row('a', 'deload', start, 2, { pendingTransition: mark }), row('b', 'deload', start, 2, { pendingTransition: mark })],
+      [done('a', '2026-11-17T12:00:00'), done('a', '2026-11-19T12:00:00'), done('b', '2026-11-18T12:00:00'), done('b', '2026-11-20T12:00:00')],
+    )
+    setNow(at('2026-11-22T12:00:00'))
+    await p.plan('b')
+    expect(p.row('b')).toMatchObject({ phase: 'deload', prescriptionStatus: 'pending' })
+    expect(p.row('b').prescription).toMatchObject({ deload: true, programWeeksDoneAtPlan: 0 })
+
+    setNow(at('2026-11-23T08:00:00'))
+    const stored = p.row('b')
+    const program = await readProgramDeloadCheck(p.repo, 'u', 'prog', stored, TZ)
+    expect(program).toEqual({ aligned: true, deloadFinished: true, trainingWeeksDone: 1 })
+    // Without the program's view the type's count decides, and the plan was made at this count.
+    expect(isAiPrescriptionPending(stored, { isAiDynamic: true, isBaselinePhase: false })).toBe(false)
+    expect(isAiPrescriptionPending(stored, { isAiDynamic: true, isBaselinePhase: false, programDeload: program })).toBe(true)
+    expect(servePrescriptionState(stored, new Date(), program)).toMatchObject({ prescription: null, prescriptionAgedOut: true })
+
+    mocks.modelAnswer = stayAnswer('accumulation')
+    const r = await p.plan('b')
+    expect(p.programMoves).toEqual([['b', 'accumulation']])
+    expect(r.ok && r.prescription).toMatchObject({ phase: 'accumulation', deload: false })
+  })
+
+  it('aligned: a plan made once the cap was reached is served, so a failed exit does not regenerate on every read', async () => {
+    const start = at('2026-11-16T00:00:00')
+    const p = memoryProgram([row('b', 'deload', start, 2, { pendingTransition: programMoveMark('deload') })],
+      [done('b', '2026-11-18T12:00:00'), done('b', '2026-11-20T12:00:00')])
+    setNow(at('2026-11-23T08:00:00'))
+    const program = await readProgramDeloadCheck(p.repo, 'u', 'prog', p.row('b'), TZ)
+    const plan = { deload: true, sessionsInPhaseAtPlan: 2, programWeeksDoneAtPlan: 1 } as AiPrescription
+    const state = { ...p.row('b'), prescription: plan, prescriptionStatus: 'pending' as const }
+    expect(isAiPrescriptionPending(state, { isAiDynamic: true, isBaselinePhase: false, programDeload: program })).toBe(false)
+    expect(servePrescriptionState(state, new Date(), program).prescription).toBe(plan)
+  })
+
+  it('aligned, short of the cap: the type\'s count does not end it, even on a plan with no count', async () => {
+    const start = at('2026-11-16T00:00:00')
+    const p = memoryProgram([row('b', 'deload', start, 2, { pendingTransition: programMoveMark('deload') })],
+      [done('b', '2026-11-17T12:00:00'), done('b', '2026-11-19T12:00:00')])
+    setNow(at('2026-11-20T12:00:00'))
+    const program = await readProgramDeloadCheck(p.repo, 'u', 'prog', p.row('b'), TZ)
+    expect(program).toEqual({ aligned: true, deloadFinished: false, trainingWeeksDone: 0 })
+    const state = { ...p.row('b'), prescription: { deload: true } as AiPrescription, prescriptionStatus: 'pending' as const }
+    expect(isAiPrescriptionPending(state, { isAiDynamic: true, isBaselinePhase: false, programDeload: program })).toBe(false)
+  })
+
+  it('a type not in a deload costs no program read', async () => {
+    const list = vi.fn()
+    expect(await readProgramDeloadCheck({ listSessionPeriodizationForProgram: list, listProgramCompletions: list }, 'u', 'prog', { phase: 'accumulation' }, TZ)).toBeNull()
+    expect(list).not.toHaveBeenCalled()
+  })
+
+  // (b) Preview adopted the stale `deload: true` and its Start trained a third deload session. Served
+  // without it, neither app's toggle adopts Deload, and a client copy of the served state stays hidden.
+  it('waiting program: a finished type deload\'s plan is served as no plan, and the toggle adopts Full', async () => {
+    const p = memoryProgram(productionRows(legacyStamp('2026-11-23')), productionHistory())
+    const program = await readProgramDeloadCheck(p.repo, 'u', 'prog', p.row('b'), TZ)
+    expect(program?.aligned).toBe(false)
+    const stale = {
+      ...p.row('b'), prescriptionStatus: 'auto_applied' as const, prescriptionExpiresAt: at('2026-11-25T12:00:00'),
+      prescription: { deload: true, phase: 'deload', phaseAction: 'stay', sessionsInPhaseAtPlan: 1 } as AiPrescription,
+    }
+    const now = at('2026-11-20T12:00:00')
+    expect(prescribedDeloadDefault(stale, now)).toBe(true) // what both toggles adopted before
+    const served = servePrescriptionState(stale, now, program)
+    expect(served).toMatchObject({ prescription: null, prescriptionAgedOut: true })
+    const wire = JSON.parse(JSON.stringify(served))
+    expect(prescribedDeloadDefault(wire, now)).toBe(false)
+    expect(hidePrescriptionAgedOutOnScreen(wire, now).prescription).toBeNull()
+    // A plan made at the current count has been through the exit and is served.
+    const current = { ...stale, prescription: { ...stale.prescription, sessionsInPhaseAtPlan: 2 } }
+    expect(servePrescriptionState(current, now, program).prescription).toBe(current.prescription)
+  })
+})
+
 describe('generation, #3877', () => {
   const NOW = at('2026-11-20T12:00:00')
   beforeEach(() => {
@@ -394,13 +484,6 @@ describe('generation, #3877', () => {
     const r = await p.plan('c')
     expect(r.ok && r.prescription.deload).toBe(false)
     expect(p.stored.at(-1)?.prescription.deload).toBe(false)
-  })
-
-  // The rules path works its flag out the same way: the program-as-written plan in a deload phase
-  // (the shadow's rules plan, `Full`'s revert) said `deload: false`.
-  it('the program-as-written plan is a deload in a deload phase, and only there', () => {
-    expect(buildProgramAsWrittenPrescription(signals({ phase: 'deload' }), '')?.deload).toBe(true)
-    expect(buildProgramAsWrittenPrescription(signals({ phase: 'accumulation' }), '')?.deload).toBe(false)
   })
 
   it('a plan in a deload phase is a deload even when the model says it is not', async () => {

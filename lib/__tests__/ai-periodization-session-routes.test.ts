@@ -35,6 +35,7 @@ const revertAutoAdoptedBaseline = vi.fn(async (_u: string, _s: string) => null a
 const listPersonalRecords = vi.fn(async (_u: string) => new Map<string, number>())
 const listPrevious1rm = vi.fn(async (_u: string) => new Map<string, number>())
 const generatePrescriptionForSession = vi.fn(async (..._a: unknown[]) => generated() as Row)
+const listSessionPeriodizationForProgram = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const refitPrescriptionToBudget = vi.fn(async (..._a: unknown[]) => ({ ok: false, reason: 'no_baseline' }) as Row)
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
@@ -56,7 +57,7 @@ vi.mock('@/lib/data', () => {
     setProgramPendingTransition: async () => undefined,
     realignProgramPhase: async () => undefined,
     voidSessionPrescription: async () => undefined,
-    listSessionPeriodizationForProgram: async () => [],
+    listSessionPeriodizationForProgram: (...a: unknown[]) => listSessionPeriodizationForProgram(...a),
     reconcileSessionsInPhase: async () => undefined,
 })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -596,6 +597,40 @@ describe('GET …/session/[sessionId]', () => {
     }))
     const body = await (await getSession()).json()
     expect(body.state.prescription.phaseAction).toBe('stay')
+  })
+})
+
+// #3876, review of acd5f2d: the card's read served a stored plan in a deload that had done its two
+// sessions. Its `deload: true` was adopted by both toggles, and Preview trained a third deload.
+describe('GET …/session/[sessionId] — a deload that has ended (#3876)', () => {
+  const deloadPlan = (atPlan: number) => state({
+    phase: 'deload', sessionsInPhase: 2, prescriptionStatus: 'auto_applied',
+    prescriptionExpiresAt: new Date(Date.now() + 5 * 86_400_000),
+    prescription: prescription({ phase: 'deload', deload: true, sessionsInPhaseAtPlan: atPlan }),
+  })
+
+  // Waiting for its switch-over (two types on different phases), so the type's own count decides.
+  beforeEach(() => {
+    listSessionPeriodizationForProgram.mockResolvedValue([
+      state({ phase: 'deload', phaseStartedAt: new Date(Date.now() - 9 * 86_400_000) }),
+      state({ programSessionId: 'other', phase: 'accumulation' }),
+    ])
+    return () => { listSessionPeriodizationForProgram.mockResolvedValue([]) }
+  })
+
+  it('serves a plan made before the deload\'s second session as no plan', async () => {
+    getActiveProgram.mockResolvedValue(program({ phaseMode: 'ai_dynamic' }))
+    ensureSessionPeriodization.mockResolvedValue(deloadPlan(1))
+    const body = await (await getSession()).json()
+    expect(body.state).toMatchObject({ prescription: null, prescriptionAgedOut: true, phase: 'deload' })
+  })
+
+  it('serves a plan made at the current count, which has been through the exit', async () => {
+    getActiveProgram.mockResolvedValue(program({ phaseMode: 'ai_dynamic' }))
+    ensureSessionPeriodization.mockResolvedValue(deloadPlan(2))
+    const body = await (await getSession()).json()
+    expect(body.state.prescription).toMatchObject({ deload: true })
+    expect(body.state.prescriptionAgedOut).toBeUndefined()
   })
 })
 

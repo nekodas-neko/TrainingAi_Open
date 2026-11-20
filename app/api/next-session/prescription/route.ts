@@ -5,6 +5,7 @@ import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { prescriptionDrivesLoad, prescriptionStyleForExercise } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { normalizeStoredPrescription } from "@trainingai/shared/ai-periodization/reconcile-prescription";
 import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
+import { readProgramDeloadCheck } from "@trainingai/shared/ai-periodization/program-phase";
 import { resolveBodyweightStyle, resolveWorkingBasis } from "@trainingai/shared/1rm";
 import { mroundStepUp, weightStepFor } from "@trainingai/shared/workout/load-rounding";
 import { rateLimit } from "@/lib/rate-limit";
@@ -96,7 +97,11 @@ export async function GET() {
     : null;
   // An ai_dynamic program has no phase rows, so its baseline is this pair alone (workout-data).
   const isBaselinePhase = periodization?.phase === 'baseline' && !periodization.baselineComplete;
-  const pending = prescription == null || isAiPrescriptionPending(periodization, { isAiDynamic, isBaselinePhase });
+  // #3876: an aligned program's deload ends at the program's cap, not the type's count.
+  const programDeload = isAiDynamic
+    ? await readProgramDeloadCheck(repo, userId, program.id, periodization, tz).catch(() => null)
+    : null;
+  const pending = prescription == null || isAiPrescriptionPending(periodization, { isAiDynamic, isBaselinePhase, programDeload });
   // An aged-out prescription is made again when the session is opened, so the preview shows it as
   // pending rather than previewing the expired one (#3700).
   const drives = isAiDynamic && prescription != null && periodization != null && !pending

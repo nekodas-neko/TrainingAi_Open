@@ -28,6 +28,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { todayInTz } from '@trainingai/shared/date-utils'
+import { programMoveMark, trainingWeekStartOf } from '@trainingai/shared/ai-periodization/program-phase'
 
 type Row = Record<string, unknown>
 
@@ -51,6 +52,13 @@ const getRecentSessionsOfType = vi.fn(async (_u: string, _s: string, _n: number)
 const getExerciseMuscleAssignments = vi.fn(async (_n: string[]) => ({}) as Record<string, Row[]>)
 const getOuraDailyDerived = vi.fn(async (_u: string, _f: string, _t: string) => [] as Row[])
 const updatePrescriptionExercisesCache = vi.fn(async (_u: string, _s: string, _p: Row) => undefined)
+// #3876: the program's rows and completions, read only for a type in a deload. By default the
+// program waits for its switch-over (two types on different phases), so the type's count decides.
+const waitingRows = () => [
+  periodization({ phase: 'deload' }), periodization({ programSessionId: OTHER_SESSION, phase: 'accumulation' }),
+]
+const listSessionPeriodizationForProgram = vi.fn(async (_u: string, _p: string) => waitingRows() as Row[])
+const listProgramCompletions = vi.fn(async (_u: string, _p: string, _since: Date) => [] as Row[])
 
 const buildWorkoutExercises = vi.fn((_s: unknown, _o: unknown) => [] as Row[])
 const buildAutomaticPhaseStatus = vi.fn((..._a: unknown[]) => phaseStatus() as Row)
@@ -67,6 +75,7 @@ vi.mock('@/lib/data', () => {
     getDayExerciseNames, listPersonalRecords, getExerciseEstimates, getSessionPeriodization,
     reconcileSessionsInPhase, getMoodLog, getDayCheckin, listInjuries, getRecentSessionsOfType,
     getExerciseMuscleAssignments, getOuraDailyDerived, updatePrescriptionExercisesCache,
+    listSessionPeriodizationForProgram, listProgramCompletions,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
@@ -144,6 +153,8 @@ const freshUser = (over: { timezone?: string } = {}) => {
 beforeEach(() => {
   vi.clearAllMocks()
   getActiveProgram.mockResolvedValue(program())
+  listSessionPeriodizationForProgram.mockImplementation(async () => waitingRows() as Row[])
+  listProgramCompletions.mockResolvedValue([])
   listProgressionStyles.mockResolvedValue([])
   listExerciseLibrary.mockResolvedValue([])
   listProgramPhases.mockResolvedValue([])
@@ -408,6 +419,49 @@ describe('GET /api/workout-data — a deload that has done its two sessions (#38
     const body = await (await get('?tab=' + SESSION_ID)).json()
     expect(body.aiPrescriptionPending).toBe(false)
     expect(buildOptsFor()!.aiDrivesLoad).toBe(true)
+    expect(regeneratePrescriptionSingleFlight).not.toHaveBeenCalled()
+  })
+})
+
+// #3876, review of acd5f2d (c): an aligned program's deload is the program's and ends at its cap,
+// which a Monday reaches with no new session. A plan the Home warm stored on the deload week's Sunday
+// was made at the type's current count, so the type's check served it and Monday was another deload.
+describe('GET /api/workout-data — an aligned program\'s deload at its cap (#3876)', () => {
+  const TZ = 'Australia/Brisbane'
+  const lastMonday = () => trainingWeekStartOf(new Date(Date.now() - 7 * 86_400_000), TZ)
+  const at = (days: number) => new Date(lastMonday().getTime() + days * 86_400_000 + 12 * 3_600_000)
+  const deloadRow = (id: string, over: Row = {}) => periodization({
+    programSessionId: id, phase: 'deload', phaseStartedAt: lastMonday(), sessionsInPhase: 2,
+    pendingTransition: programMoveMark('deload'), prescriptionStatus: 'pending',
+    // Made on the deload week's Sunday: the type's count then, the program's first week not yet done.
+    prescription: prescription({ phase: 'deload', deload: true, sessionsInPhaseAtPlan: 2, programWeeksDoneAtPlan: 0 }),
+    ...over,
+  })
+  beforeEach(() => {
+    getActiveProgram.mockResolvedValue(program({ phaseMode: 'ai_dynamic' }))
+    listProgramCompletions.mockResolvedValue([
+      { programSessionId: SESSION_ID, completedAt: at(1) }, { programSessionId: SESSION_ID, completedAt: at(3) },
+      { programSessionId: OTHER_SESSION, completedAt: at(2) }, { programSessionId: OTHER_SESSION, completedAt: at(4) },
+    ])
+  })
+
+  it('regenerates the stored, not-consumed plan once the cap is reached', async () => {
+    listSessionPeriodizationForProgram.mockImplementation(async () => [deloadRow(SESSION_ID), deloadRow(OTHER_SESSION)] as Row[])
+    getSessionPeriodization.mockResolvedValue(deloadRow(SESSION_ID))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(body.aiPrescriptionPending).toBe(true)
+    expect(buildOptsFor()!.aiDrivesLoad).toBe(false)
+    expect(regeneratePrescriptionSingleFlight).toHaveBeenCalledTimes(1)
+  })
+
+  it('serves a plan made once the cap was reached: the exit already ran for it', async () => {
+    const made = (id: string) => deloadRow(id, {
+      prescription: prescription({ phase: 'deload', deload: true, sessionsInPhaseAtPlan: 2, programWeeksDoneAtPlan: 1 }),
+    })
+    listSessionPeriodizationForProgram.mockImplementation(async () => [made(SESSION_ID), made(OTHER_SESSION)] as Row[])
+    getSessionPeriodization.mockResolvedValue(made(SESSION_ID))
+    const body = await (await get('?tab=' + SESSION_ID)).json()
+    expect(body.aiPrescriptionPending).toBe(false)
     expect(regeneratePrescriptionSingleFlight).not.toHaveBeenCalled()
   })
 })

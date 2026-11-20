@@ -4,7 +4,7 @@ import { shouldTriggerEmergencyDeload, type EmergencySignals, type EmergencyStat
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { recostPrescription, rowNumbersMoved, type FigureSignals } from './prescription-figures'
 import { prescriptionAgedOut } from './prescription-expiry'
-import { deloadEndDue } from './phase-guards'
+import { deloadEndDue, type ProgramDeloadCheck } from './phase-guards'
 
 // Cheap fresh-signals subset for consumption-day re-evaluation — deliberately NOT the full
 // 30-signal aggregation (aggregateSignals), which is too expensive to run on every
@@ -104,7 +104,8 @@ export function reevaluatePrescriptionForToday(
   prescription: AiPrescription,
   signals: ReevaluationSignals,
   // `sessionsInPhase` (#3876): absent, a finished deload is not checked (`deloadEndDue`).
-  state: EmergencyState & { sessionsInPhase?: number },
+  // `programDeload`: an aligned program's deload ends at the program's cap instead.
+  state: EmergencyState & { sessionsInPhase?: number; programDeload?: ProgramDeloadCheck | null },
   now = new Date(),
   // Issue 2592: the inputs `prescriptionFigures` costs a row with. Present, a deload or revert that
   // moves a row's numbers re-costs the two whole-session figures through that one function; absent
@@ -140,7 +141,7 @@ export function reevaluatePrescriptionForToday(
   if (prescriptionAgedOut(state, now)) {
     return { prescription, changed: false, needsRegenerate: true }
   }
-  if (deloadEndDue(prescription, state)) {
+  if (deloadEndDue(prescription, state, state.programDeload)) {
     return { prescription, changed: false, needsRegenerate: true }
   }
 

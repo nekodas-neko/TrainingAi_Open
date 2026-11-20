@@ -101,9 +101,27 @@ export function typeDeloadFinished(
  * it is served. A plan stored before the field existed has no count and is regenerated once.
  */
 export function deloadEndDue(
-  prescription: Pick<AiPrescription, 'sessionsInPhaseAtPlan'>,
+  prescription: Pick<AiPrescription, 'sessionsInPhaseAtPlan' | 'programWeeksDoneAtPlan'>,
   state: { phase: string; sessionsInPhase?: number },
+  program?: ProgramDeloadCheck | null,
 ): boolean {
-  if (state.phase !== 'deload' || state.sessionsInPhase == null || state.sessionsInPhase < DELOAD_FLOOR) return false
+  if (state.phase !== 'deload') return false
+  // An aligned program's deload is the program's: it ends at the program's cap (`programDeloadFinished`,
+  // which generation runs), never at the type's count, so the type's count says nothing here. Its cap
+  // can be reached with no new session: a plan made on the deload week's Sunday is read on Monday.
+  if (program?.aligned) {
+    if (!program.deloadFinished) return false
+    return prescription.programWeeksDoneAtPlan == null || prescription.programWeeksDoneAtPlan < program.trainingWeeksDone
+  }
+  if (state.sessionsInPhase == null || state.sessionsInPhase < DELOAD_FLOOR) return false
   return prescription.sessionsInPhaseAtPlan == null || prescription.sessionsInPhaseAtPlan < state.sessionsInPhase
+}
+
+/** What `deloadEndDue` needs to know about the program (`readProgramDeloadCheck`): whether it is
+ *  aligned and, if so, whether its deload has reached its cap. Absent, the type's own count decides,
+ *  as it does while the program waits for its switch-over. */
+export interface ProgramDeloadCheck {
+  aligned: boolean
+  deloadFinished: boolean
+  trainingWeeksDone: number
 }

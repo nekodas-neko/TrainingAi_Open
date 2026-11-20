@@ -167,6 +167,11 @@ export interface AiPrescription {
    *  deload made before the count got there is regenerated (`deloadEndDue`); absent on plans
    *  stored before this field, which are regenerated once. */
   sessionsInPhaseAtPlan?: number
+  /** #3876: on an aligned program, the program's `trainingWeeksDone` when generation stored this
+   *  plan. An aligned deload ends at the program's cap, which can be reached with no new session (a
+   *  plan made on the deload week's last day is read the week after), so a plan in a finished
+   *  program deload made before the cap is regenerated (`deloadEndDue`). */
+  programWeeksDoneAtPlan?: number
 }
 
 export interface SessionPeriodization {
