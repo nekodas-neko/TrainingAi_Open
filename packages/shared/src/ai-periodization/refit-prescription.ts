@@ -9,7 +9,8 @@
 // see `refitPrescriptionToBudget`'s `ok: false, reason` values, which are NOT errors.
 
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
-import { applyBudgetStage } from '@trainingai/shared/ai-periodization/budget-stage'
+import { applyBudgetStage, reasoningWithBudgetNote } from '@trainingai/shared/ai-periodization/budget-stage'
+import { phaseOfLoads } from '@trainingai/shared/ai-periodization/phase-guards'
 import { budgetForPreset, requestedBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import type { AiPrescription, PrescriptionStatus } from '@trainingai/shared/types/ai-periodization'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -90,7 +91,10 @@ export async function refitPrescriptionToBudget(
     // #2403: re-cost the session Full trains too, or the re-fit leaves it describing the old budget.
     new Map(stored.exercises.flatMap(ex =>
       ex.deloaded && ex.preDeload ? [[ex.sessionExerciseId, ex.preDeload] as const] : [])),
-    stored.phase,
+    // #3713: the phase the loads were written for, not `stored.phase`, which a cap guard rewrites to
+    // the next phase on an offer (a pending move to deload would re-fit to deload's 3 sets at the old
+    // phase's loads).
+    phaseOfLoads(stored, state.phase),
   )
 
   // The previous fit's drops are stripped rather than merged: an exercise dropped for a
@@ -117,7 +121,7 @@ export async function refitPrescriptionToBudget(
     estimatedSessionDurationMin: budget.estimatedSessionDurationMin,
     weeklyVolumeContribution: budget.weeklyVolumeContribution,
     ...(budget.fullSession && { fullSession: budget.fullSession }),
-    reasoning: `${baseline.reasoning}${budget.budgetNote}`,
+    reasoning: reasoningWithBudgetNote(baseline.reasoning, budget.budgetNote),
     durationPreset,
     sessionTimeBudgetMinutes: validSession.timeBudgetMinutes,
     ...(budget.droppedIds.size > 0 && { droppedExerciseIds: [...budget.droppedIds] }),

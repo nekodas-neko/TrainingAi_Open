@@ -118,7 +118,9 @@ describe('reconcilePrescription — the composed pass (the known live incident)'
     })
     const row = out.exercises.find(e => e.sessionExerciseId === 'row')
     expect(row).toMatchObject(deloadOverride)
-    expect(out.preDeloadById.get('row')).toMatchObject({ sets: 5, reps: 8, pct: 82, restSec: 90 })
+    // #3713: the full numbers carry the phase cap — hypertrophy accumulation allows 4 sets, so the
+    // model's 5 is recorded as 4 (what Full and a cleared soreness put back). Reps, load, rest as given.
+    expect(out.preDeloadById.get('row')).toMatchObject({ sets: 4, reps: 8, pct: 82, restSec: 90 })
   })
 
   it('forces the current phase on a "stay" response even if the model hallucinated a different phase', () => {

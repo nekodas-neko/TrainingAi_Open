@@ -490,9 +490,11 @@ describe('POST …/session/[sessionId]/transition — one-day vs planned deload 
 // deload (production: 5 and 12 Nov) got "Move to Deload" on 18 Nov and its deload started again.
 describe('POST …/session/[sessionId]/transition — a move to the phase it is already in (#3876)', () => {
   const deloadStart = new Date('2026-11-04T08:00:00Z')
+  // The plan was made at the deload's current count: one made before it is an ended deload's plan,
+  // which the card does not show and this route no longer takes (#3907).
   const inDeload = (over: Row = {}) => state({
     phase: 'deload', phaseStartedAt: deloadStart, sessionsInPhase: 2,
-    prescription: prescription({ phase: 'deload', deload: true, phaseAction: 'deload_recommended' }),
+    prescription: prescription({ phase: 'deload', deload: true, phaseAction: 'deload_recommended', sessionsInPhaseAtPlan: 2 }),
     prescriptionStatus: 'pending', ...over,
   })
 

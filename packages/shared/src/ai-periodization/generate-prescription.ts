@@ -23,7 +23,7 @@ import {
   typeDeloadFinished,
 } from '@trainingai/shared/ai-periodization/phase-guards'
 import { fitToBudget } from '@trainingai/shared/ai-periodization/time-budget'
-import { applyBudgetStage } from '@trainingai/shared/ai-periodization/budget-stage'
+import { applyBudgetStage, reasoningWithBudgetNote } from '@trainingai/shared/ai-periodization/budget-stage'
 import { prescriptionFigures, rowUnderFull, hasFullSessionRevert } from '@trainingai/shared/ai-periodization/prescription-figures'
 import { capLoadToAnchor } from '@trainingai/shared/ai-periodization/role-plausibility'
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
@@ -41,7 +41,7 @@ import { z } from 'zod'
 import { PrescriptionSchema } from '@trainingai/shared/ai-periodization/prescription-schema'
 import { reconcilePrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
-import type { AiPrescription, AiPrescriptionExercise, PeriodizationPhase } from '@trainingai/shared/types/ai-periodization'
+import type { AiPrescription, AiPrescriptionExercise, PeriodizationPhase, PrescriptionGeneratedFor } from '@trainingai/shared/types/ai-periodization'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { createDedupCache } from '@trainingai/shared/ai-periodization/generation-dedup'
@@ -283,6 +283,12 @@ export async function generatePrescriptionForSession(
   // durationPreset is in the key for the same reason — a 30-minute plan and a 90-minute
   // plan are different answers, and sharing a cached result would silently serve one for
   // the other within the 30s cooldown (the user switching presets is exactly that fast).
+  // #3895 review: what the session is made of, read before anything the plan is built from. A Coach
+  // change, its undo or an editor save while the plan is being made voids the slot, and the plan is
+  // then not stored (`storePrescription` re-checks this in the same statement), so the session's next
+  // read regenerates against the session as it is. Read before the dedup, so a call that joins a
+  // running generation shares its stamp along with its result.
+  const structure = await repo.getSessionStructureStamp(userId, programSessionId)
   const activeProgram = await repo.getActiveProgram(userId)
   const configuredBudget = activeProgram?.sessions.find(s => s.id === programSessionId)?.timeBudgetMinutes
   const key = `${userId}:${programSessionId}:${todayInTz(tz)}:${excludeSessionId ?? ''}:${durationPreset ?? 'standard'}:${configuredBudget}`
@@ -291,7 +297,7 @@ export async function generatePrescriptionForSession(
     // An explicit preset choice is a user action asking for a different plan — it must
     // never be answered from the read-through cooldown.
     { skipCooldown: Boolean(excludeSessionId) || durationPreset != null, cacheable: r => r.ok },
-    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, activeProgram, excludeSessionId, durationPreset),
+    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, activeProgram, structure, excludeSessionId, durationPreset),
   )
 }
 
@@ -301,6 +307,7 @@ async function runPrescriptionGeneration(
   repo: WorkoutRepository,
   tz: string,
   activeProgram: Awaited<ReturnType<WorkoutRepository['getActiveProgram']>>,
+  structure: string | null,
   // The workout session whose completion triggered this call (from complete-workout's
   // post-completion hook). Excluded from the hoursSinceLastSession gap only — it has
   // completedAt ≈ now by construction, which would otherwise spuriously satisfy the
@@ -360,7 +367,7 @@ async function runPrescriptionGeneration(
   // The deload count this plan was made at, stored on it: `workout-data` regenerates a plan in a
   // finished deload only when it was made before the count got there (`deloadEndDue`), so a plan made
   // after this exit check does not ask for another generation on every read.
-  const storePrescription = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: { phase: PeriodizationPhase; phaseStartedAt: Date }) =>
+  const storePrescription = (p: AiPrescription, expiresAt: Date, status: 'pending' | 'auto_applied', storeFor: PrescriptionGeneratedFor) =>
     repo.storePrescription(userId, programSessionId, {
       ...p,
       sessionsInPhaseAtPlan: state.sessionsInPhase,
@@ -371,7 +378,8 @@ async function runPrescriptionGeneration(
   // #3766: the phase this plan is made in. A program move while it is being made (another session's
   // tap or auto-apply) voids this slot; the plan is then not stored (`storePrescription` checks the
   // slot is still in this phase and start), so the slot regenerates in the new phase.
-  const generatedFor = { phase: state.phase, phaseStartedAt: state.phaseStartedAt }
+  // #3895 review: and the session's structure as it was when this generation started.
+  const generatedFor: PrescriptionGeneratedFor = { phase: state.phase, phaseStartedAt: state.phaseStartedAt, structure }
 
   if (state.phase === 'baseline' && !state.baselineComplete) {
     return { ok: false, error: 'Baseline not complete', status: 400 }
@@ -743,6 +751,8 @@ async function runPrescriptionGeneration(
     sets: Object.fromEntries(parsed.exercises.map(ex => [ex.session_exercise_id, ex.sets])),
     reasoning: parsed.reasoning,
     ...(autoreg.earnedSetIds.size > 0 && { earnedSetIds: [...autoreg.earnedSetIds] }),
+    // #3713: the phase the stage below caps against. A cap guard may rewrite `phase` after it.
+    phase: parsed.phase as PeriodizationPhase,
   }
 
   const budget = applyBudgetStage(
@@ -776,7 +786,7 @@ async function runPrescriptionGeneration(
   const droppedIdSet = budget.droppedIds
   const estimatedSessionDurationMin = budget.estimatedSessionDurationMin
   const weeklyVolumeContribution = budget.weeklyVolumeContribution
-  parsed.reasoning = `${refitBaseline.reasoning}${budget.budgetNote}`
+  parsed.reasoning = reasoningWithBudgetNote(refitBaseline.reasoning, budget.budgetNote)
 
   const aiPrescription: AiPrescription = {
     phase: parsed.phase as PeriodizationPhase,
@@ -872,7 +882,7 @@ async function runPrescriptionGeneration(
     ) ?? undefined
     // With the phase it was planned from: a program another session moved meanwhile is left alone.
     const moved = await repo.advanceProgramPhase(userId, programSessionId, prescription.phase, generatedFor)
-    storeFor = { phase: prescription.phase, phaseStartedAt: moved?.phaseStartedAt ?? generatedFor.phaseStartedAt }
+    storeFor = { phase: prescription.phase, phaseStartedAt: moved?.phaseStartedAt ?? generatedFor.phaseStartedAt, structure }
   }
 
   // #3700: a rest-day recommendation is sized on today's readiness and ends at the next local
@@ -902,10 +912,11 @@ function typeOnly(prescription: AiPrescription): AiPrescription {
 }
 
 /** #3766: the program moved while this plan was being made, so it was not stored. The slot was voided
- *  by that move, and the next open (or the client's retry) plans it in the new phase. */
+ *  by that move, and the next open (or the client's retry) plans it in the new phase. #3895 review: the
+ *  same answer when the session itself was changed meanwhile (`generatedFor.structure`). */
 const PHASE_MOVED = {
   ok: false as const,
-  error: 'The program moved to another phase while this plan was being made. Reopen the session for a fresh one.',
+  error: 'The program or this session changed while this plan was being made. Reopen the session for a fresh one.',
   status: 409,
 }
 

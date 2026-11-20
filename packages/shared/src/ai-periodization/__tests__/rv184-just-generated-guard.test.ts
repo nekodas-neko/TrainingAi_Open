@@ -15,6 +15,7 @@ let n = 0
 
 function repoWith(state: Record<string, unknown>, budget = 60): WorkoutRepository {
   const known: Record<string, unknown> = {
+    getSessionStructureStamp: async () => 'stamp-1',
     getActiveProgram: async () => ({ id: 'prog-1', sessions: [{ id: SESSION, timeBudgetMinutes: budget }] }),
     ensureSessionPeriodization: async () => state,
     reconcileSessionsInPhase: async () => undefined,

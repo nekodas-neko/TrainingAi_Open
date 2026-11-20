@@ -66,10 +66,15 @@ export function buildWidgetTools(
       async execute() {
         const program = await repo.getActiveProgram(userId)
         if (!program) return { program: null, note: 'No active program.' }
+        // #3895: under the AI plan an exercise's progression style reaches nothing, so it is not
+        // offered — no styleId to propose from, and a note saying why.
+        const aiPlan = program.phaseMode === 'ai_dynamic'
         return {
+          ...(aiPlan ? { note: 'The AI plan sets the sets and loads, so progression styles are not used and cannot be changed.' } : {}),
           program: {
             id: program.id,
             name: program.name,
+            phaseMode: program.phaseMode,
             sessions: program.sessions
               .slice()
               .sort((a, b) => a.position - b.position)
@@ -83,7 +88,7 @@ export function buildWidgetTools(
                     id: e.id,
                     name: e.exerciseName,
                     position: e.position,
-                    styleId: e.styleId ?? null,
+                    ...(aiPlan ? {} : { styleId: e.styleId ?? null }),
                     muscleGroups: e.muscleGroups,
                   })),
               })),
@@ -276,6 +281,8 @@ export function buildWidgetTools(
         '· "session_exercise" — fields "exerciseName", "styleId", "position", "removed".',
         '  `targetId` is the session EXERCISE id from getProgramStructure. There is NO field for',
         '  sets, reps, percentage or rest — those are not stored on the exercise.',
+        '  Never propose "styleId" when getProgramStructure gives phaseMode "ai_dynamic": the AI plan',
+        '  replaces the progression style there, and the app refuses the change.',
         '  If the user names a replacement that findSwapCandidates did NOT return and that is not',
         '  in the catalogue at all (say "Jefferson curl"), you can still swap to it: add a second',
         '  change with field "newExerciseMuscles" whose `to` is the MAIN muscles it trains, comma',

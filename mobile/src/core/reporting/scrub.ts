@@ -77,7 +77,7 @@ function schemaFailure(error: unknown): string | null {
     typeof issue.code === 'string' && /^[a-z_]{1,40}$/.test(issue.code) ? issue.code : 'invalid';
   return `unexpected data at ${path || 'root'} (${code})`;
 }
-function isNetworkFailure(error: unknown): boolean {
+export function isNetworkFailure(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return (
     error.name === 'AbortError' ||

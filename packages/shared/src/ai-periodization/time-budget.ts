@@ -232,9 +232,11 @@ export const LAGGING_RATIO = -0.25
 export function applyRoleSetPlausibility<T extends TimedExercise>(
   exercises: T[],
   muscleVolume?: Map<string, MuscleVolumeState>,
+  /** The session phase's `setsMax` (#3713) — folded into `roleCeiling`. Omitted: role ceiling only. */
+  phaseSetsMax?: number | null,
 ): T[] {
   const out = exercises.map(e => ({ ...e }))
-  for (const e of out) e.sets = Math.min(e.sets, roleCeiling(e.role))
+  for (const e of out) e.sets = Math.min(e.sets, roleCeiling(e.role, phaseSetsMax))
 
   const anchor = sessionAnchorRole(out.map(e => e.role))
   if (!anchor) return out
@@ -264,12 +266,18 @@ export function expandToBudget<T extends TimedExercise>(
   muscleVolume?: Map<string, MuscleVolumeState>,
   mrvByMuscle: Map<string, number> = new Map(),
 
-  opts: { frozenIds?: ReadonlySet<string>; sessionMuscleCap?: number; ceilingFor?: (e: T) => number } = {},
+  opts: {
+    frozenIds?: ReadonlySet<string>
+    sessionMuscleCap?: number
+    ceilingFor?: (e: T) => number
+    /** The session phase's `setsMax` (#3713): extra time never grows a set past it. */
+    phaseSetsMax?: number | null
+  } = {},
 ): T[] {
   if (budgetMin === NO_TIME_LIMIT) return exercises.map(e => ({ ...e }))
   const budgetSec = Math.max(0, budgetMin) * 60
   const out = exercises.map(e => ({ ...e }))
-  const ceiling = (e: T) => Math.min(roleCeiling(e.role), opts.ceilingFor?.(e) ?? Infinity)
+  const ceiling = (e: T) => Math.min(roleCeiling(e.role, opts.phaseSetsMax), opts.ceilingFor?.(e) ?? Infinity)
   // Upper bound: every exercise from its current sets to its ceiling. +1 guards an empty list.
   const maxIters = out.reduce((n, e) => n + Math.max(0, ceiling(e) - e.sets), 0) + 1
 
@@ -441,6 +449,9 @@ export const MODEL_SETS_CAP_PHASES: ReadonlySet<string> = new Set(['intensificat
 export interface AllocateOptions {
 
   phase?: string | null
+  /** The phase's `setsMax` (#3713). No exercise starts, keeps an earned set, or grows past
+   *  `roleCeiling(role, phaseSetsMax)`; the starting minimum is lowered to it where it is lower. */
+  phaseSetsMax?: number | null
 
   protectedIds?: ReadonlySet<string>
 
@@ -460,8 +471,9 @@ export function allocateToBudget<T extends TimedExercise>(
   const protectedIds = new Set(opts.protectedIds ?? [])
   const start = exercises.map(e => {
     if (frozen.has(e.sessionExerciseId)) return { ...e }
-    const min = allocatorMinSets(e.role)
-    return { ...e, sets: protectedIds.has(e.sessionExerciseId) ? Math.max(e.sets, min) : min }
+    const ceiling = roleCeiling(e.role, opts.phaseSetsMax)
+    const min = Math.min(allocatorMinSets(e.role), ceiling)
+    return { ...e, sets: protectedIds.has(e.sessionExerciseId) ? Math.min(ceiling, Math.max(e.sets, min)) : min }
   })
 
   const undroppable = new Set([...frozen, ...protectedIds])
@@ -491,6 +503,7 @@ export function allocateToBudget<T extends TimedExercise>(
   const grown = expandToBudget(fitted, budgetMin, opts.muscleVolume, opts.mrvByMuscle ?? new Map(), {
     frozenIds: frozen,
     sessionMuscleCap: ALLOCATOR_SESSION_MUSCLE_CAP,
+    phaseSetsMax: opts.phaseSetsMax,
     ...(modelCap && { ceilingFor: (e: T) => modelCap.get(e.sessionExerciseId) ?? Infinity }),
   })
   return { exercises: grown, droppedIds: dropped.droppedIds }

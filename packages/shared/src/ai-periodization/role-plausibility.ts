@@ -37,8 +37,21 @@ export function isLighterRole(role: string, than: string): boolean {
 // is safe to enforce on read where weekly-volume data isn't available.
 const SET_CEILING: Record<string, number> = { primary: 6, secondary: 5, accessory: 4 }
 
-export function roleCeiling(role: string): number {
-  return SET_CEILING[role] ?? SET_CEILING.accessory
+/**
+ * The most sets `role` may carry, and — when the session's phase is known — never more than that
+ * phase's `setsMax` (`intensityZone(goal, phase).setsMax`, via `phaseSetsMax` in prompt.ts).
+ *
+ * #3713 (owner, 19 Nov): the zone's set range only ever reached the model as prompt text, so in
+ * accumulation (`setsMax` 5) a main lift could still be prescribed and grown to the primary
+ * ceiling of 6 — 4 sets to 6 in one plan. The phase cap lives HERE, inside the one ceiling every
+ * generation path already applies, rather than as a second clamp beside it. It binds an earned
+ * autoregulation set too, and it has no week-to-week step limit.
+ */
+export function roleCeiling(role: string, phaseSetsMax?: number | null): number {
+  const ceiling = SET_CEILING[role] ?? SET_CEILING.accessory
+  return phaseSetsMax != null && Number.isFinite(phaseSetsMax) && phaseSetsMax > 0
+    ? Math.min(ceiling, phaseSetsMax)
+    : ceiling
 }
 
 export interface RolePricedExercise {

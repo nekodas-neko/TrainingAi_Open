@@ -391,7 +391,7 @@ function overlayDose(s: Supplement, p: Record<string, unknown>): Supplement {
   };
 }
 type Collection = keyof typeof coreSpecs;
-function nutritionRefreshError(
+export function nutritionRefreshError(
   kind: Collection | 'logs' | 'checkin' | 'answers' | 'mealStatuses',
   cause: unknown,
   olderThanKept = false,
@@ -416,7 +416,7 @@ function nutritionRefreshError(
   if (cause instanceof z.ZodError) {
     return `The server returned unreadable ${label}. Saved records have been kept.`;
   }
-  if (cause instanceof Error && cause.name === 'AbortError') {
+  if (cause instanceof Error && (cause.name === 'TimeoutError' || cause.name === 'AbortError')) {
     return `Refreshing ${label} timed out. Saved records have been kept.`;
   }
   // A day older than the window kept on the phone has nothing saved to fall back on.
