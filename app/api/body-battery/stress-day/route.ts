@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, normalizeDateParam } from '@trainingai/shared/date-utils'
-import { readStressDay, type StressDayMethod } from '@/lib/health/stress-day'
+import { readStressDay, type StressDayMethod, type StressDaySpan } from '@/lib/health/stress-day'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
 
@@ -43,6 +43,9 @@ export interface StressDayResponse {
   throughMs: number | null
   /** Which ruler the levels are on (`ring_dhrv` stored, `still_hr` computed on read); null with no series. */
   method: StressDayMethod | null
+  /** Half hours left out for movement, and the day's sleep, for the chart's strip (#3939). Empty on `ring_dhrv` days. */
+  moving: StressDaySpan[]
+  asleep: StressDaySpan[]
 }
 
 export async function GET(req: NextRequest) {
@@ -63,12 +66,14 @@ export async function GET(req: NextRequest) {
 
   try {
     const repo = await getRepositoryAsync()
-    const { series, method } = await readStressDay(repo, userId, date, tz)
+    const { series, method, moving, asleep } = await readStressDay(repo, userId, date, tz)
     const body: StressDayResponse = {
       date,
       series,
       throughMs: series.length ? series[series.length - 1].t : null,
       method,
+      moving,
+      asleep,
     }
     return NextResponse.json(body, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (err) {

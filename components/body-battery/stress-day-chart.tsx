@@ -4,7 +4,8 @@ import { useMemo } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { useStressDay } from '@/lib/hooks/use-stress-day'
 import { todayInTz, msToHHMMInTz, clockSkipOnDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
-import { toSegments, coveredMinutes } from './stress-day'
+import { elevatedAreas, stressBridges, STRESS_ELEVATED_LEVEL } from '@trainingai/shared/health/stress-day-line'
+import { toSegments, coveredMinutes, placeSpans } from './stress-day'
 import { placeEvents, measuredCount, type DayEvent } from './stress-at-events'
 
 /**
@@ -58,6 +59,15 @@ function y(level: number): number {
 
 const HOUR_TICKS = [0, 6, 12, 18, 24]
 
+/** What the line under the title says the levels are made from (#3939, owner 20 Nov: wording A). */
+const METHOD_LINE = {
+  still_hr: 'Estimated from heart rate while still',
+  ring_dhrv: 'From the ring\u2019s stress estimate',
+} as const
+
+const MOVING_COLOR = 'var(--accent-cyan)'
+const ASLEEP_COLOR = 'var(--accent-purple)'
+
 /**
  * @param date `YYYY-MM-DD`; omit for today. The day screen passes the day it is showing — which is
  *   what makes the entry's pass test runnable, since comparing days needs a past day to open.
@@ -85,6 +95,17 @@ export function StressDayChart(
   // answers WHEN a stressed window happened, and this answers what was happening then.
   const placed = useMemo(() => placeEvents(events ?? [], segments, tz), [events, segments, tz])
   const withReading = measuredCount(placed)
+  const method = data?.method ?? null
+  const stillHr = method === 'still_hr'
+  // #3939 (owner, 20 Nov: "a consistent line that shows areas of elevated stress rather than gaps").
+  // On a heart-rate day the runs are joined by dotted bridges; a bridge is never a reading, so the
+  // event list above still reads `levelAt(segments)` and says "no reading" there. A ring day keeps its
+  // gaps: those were hours the ring did not record, which a bridge would paper over.
+  const bridges = useMemo(() => (stillHr ? stressBridges(segments) : []), [segments, stillHr])
+  const areas = useMemo(() => segments.flatMap(seg => elevatedAreas(seg)), [segments])
+  const dayStartMs = dateStrMidnightInTz(day.replace(/\//g, '-'), tz).getTime()
+  const moving = useMemo(() => placeSpans(data?.moving, dayStartMs, tz), [data?.moving, dayStartMs, tz])
+  const asleep = useMemo(() => placeSpans(data?.asleep, dayStartMs, tz), [data?.asleep, dayStartMs, tz])
 
   // `cachedFetch` swallows `!res.ok`, this route's own rate limit included — without this the chart
   // would vanish on a failed request and read as "no stress recorded".
@@ -113,6 +134,7 @@ export function StressDayChart(
             complete one. */}
         <p className="text-[10px] tabular-nums text-muted-foreground">{coveredHours} h measured</p>
       </div>
+      {method && <p className="text-[10px] text-muted-foreground">{METHOD_LINE[method]}</p>}
 
       <svg
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
@@ -127,7 +149,7 @@ export function StressDayChart(
 
         {/* Zero, and the ±0.5 bands, so "high" is visible from the shape rather than only a label. */}
         <line x1={0} x2={VIEW_W} y1={y(0)} y2={y(0)} stroke="var(--border)" strokeWidth={2} />
-        {[0.5, -0.5].map(lvl => (
+        {[-STRESS_ELEVATED_LEVEL, STRESS_ELEVATED_LEVEL].map(lvl => (
           <line
             key={lvl}
             x1={0} x2={VIEW_W} y1={y(lvl)} y2={y(lvl)}
@@ -135,7 +157,31 @@ export function StressDayChart(
           />
         ))}
 
-        {/* One path per measured run. A gap is drawn by there being nothing there. */}
+        {/* Elevated: filled between the line and the threshold, under measured runs only. */}
+        {areas.map((poly, i) => (
+          <polygon
+            key={`area-${i}`}
+            points={poly.map(p => `${p.x},${y(p.level)}`).join(' ')}
+            fill={amber}
+            opacity={0.35}
+          />
+        ))}
+
+        {/* The dotted joins between runs: fainter than the measured line, and never a reading. */}
+        {bridges.map(([a, b], i) => (
+          <line
+            key={`bridge-${i}`}
+            x1={a.x} y1={y(a.level)} x2={b.x} y2={y(b.level)}
+            stroke={amber}
+            strokeWidth={2}
+            strokeDasharray="2 6"
+            strokeLinecap="round"
+            opacity={0.45}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+
+        {/* One path per measured run. */}
         {segments.map((seg, i) => (
           <polyline
             key={i}
@@ -171,15 +217,45 @@ export function StressDayChart(
         ))}
       </svg>
 
+      {/* When the person was moving or asleep, on the same axis as the chart (#3939). */}
+      {(moving.length > 0 || asleep.length > 0) && (
+        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+          {[...asleep.map(s => ({ ...s, color: ASLEEP_COLOR })), ...moving.map(s => ({ ...s, color: MOVING_COLOR }))].map((s, i) => (
+            <span
+              key={i}
+              className="absolute inset-y-0"
+              style={{ left: `${(s.from / VIEW_W) * 100}%`, width: `${((s.to - s.from) / VIEW_W) * 100}%`, background: s.color }}
+            />
+          ))}
+        </div>
+      )}
+
       <div className="flex justify-between text-[9px] tabular-nums text-muted-foreground">
         {/* The last tick is `24:00`, not a second `00:00` — one axis carrying the same label at
             both ends is ambiguous about which way it runs. */}
         {HOUR_TICKS.map(h => <span key={h}>{String(h).padStart(2, '0')}:00</span>)}
       </div>
 
+      {/* The key: only what this chart draws. */}
+      {(areas.length > 0 || moving.length > 0 || asleep.length > 0) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {[
+            ...(areas.length > 0 ? [{ label: 'Elevated', color: amber }] : []),
+            ...(moving.length > 0 ? [{ label: 'Moving', color: MOVING_COLOR }] : []),
+            ...(asleep.length > 0 ? [{ label: 'Asleep', color: ASLEEP_COLOR }] : []),
+          ].map(k => (
+            <span key={k.label} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span className="h-2 w-2 rounded-sm" style={{ background: k.color }} />
+              {k.label}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Where the day's data stops, so a chart that runs out at lunchtime does not read as a
-          calm afternoon. 24-hour to match the axis above it. */}
-      {data?.throughMs != null && (
+          calm afternoon. 24-hour to match the axis above it. Ring days only: a heart-rate day's
+          "through" sits in the caption below. */}
+      {!stillHr && data?.throughMs != null && (
         <p className="text-[10px] tabular-nums text-muted-foreground">
           Measured through <span className="font-semibold text-foreground">{msToHHMMInTz(data.throughMs, tz)}</span> —
           the last reading stored, not the end of your day.
@@ -224,11 +300,21 @@ export function StressDayChart(
         </div>
       )}
 
-      <p className="text-[10px] leading-relaxed text-muted-foreground">
-        Higher means more stress; above the top line counts as
-        <span className="font-semibold"> High</span>. Shaded hours are overnight, which runs
-        positive for everyone. Blank stretches are hours the ring did not record.
-      </p>
+      {stillHr ? (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          Higher means your heart rate sat above your usual while still. The dotted stretches join the
+          readings either side, where you were moving.
+          {data?.throughMs != null && (
+            <> Through <span className="font-semibold tabular-nums text-foreground">{msToHHMMInTz(data.throughMs, tz)}</span>.</>
+          )}
+        </p>
+      ) : (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          Higher means more stress; above the top line counts as
+          <span className="font-semibold"> High</span>. Shaded hours are overnight, which runs
+          positive for everyone. Blank stretches are hours the ring did not record.
+        </p>
+      )}
     </div>
   )
 }
