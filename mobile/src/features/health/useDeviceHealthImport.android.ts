@@ -55,10 +55,10 @@ export function useDeviceHealthImport(): DeviceImportState {
   useEffect(() => {
     void store?.run();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void store?.run(!!store.getSnapshot().pending);
+      if (state === 'active') void store?.run(store.queued());
     });
     const timer = setInterval(() => {
-      if (AppState.currentState === 'active') void store?.run(!!store.getSnapshot().pending);
+      if (AppState.currentState === 'active') void store?.run(store.queued());
     }, 60000);
     return () => {
       clearInterval(timer);

@@ -208,7 +208,10 @@ test('expired cursors restart history and reconcile records missing from a compl
   assert.equal(f.remote.size, 1);
   f.expire();
   await store.run(true);
-  assert.ok(store.getSnapshot().pending);
+  // The rescan is owed on the disk; a read not yet made is not a change waiting to upload (#3906).
+  const owed = await savedDisk(f);
+  assert.equal(owed.token, null);
+  assert.ok(owed.rescanFrom);
   f.empty();
   await store.run(true);
   assert.equal(f.remote.size, 0);

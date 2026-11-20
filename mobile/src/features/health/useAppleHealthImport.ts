@@ -45,12 +45,12 @@ export function useAppleHealthImport() {
     void store?.run();
     const listener = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
-        void store?.run(!!store.getSnapshot().pending);
+        void store?.run(store.queued());
       }
     });
     const timer = setInterval(() => {
       if (AppState.currentState === 'active') {
-        void store?.run(!!store.getSnapshot().pending);
+        void store?.run(store.queued());
       }
     }, 60000);
     return () => {

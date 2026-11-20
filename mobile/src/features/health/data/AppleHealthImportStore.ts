@@ -178,6 +178,10 @@ export class AppleHealthImportStore {
     });
     return this.run(true);
   }
+  /** Batches waiting to upload; only these let a rerun skip the throttle (#3906). */
+  queued() {
+    return this.disk.queue.length > 0;
+  }
   run(manual = false): Promise<void> {
     if (this.running) {
       return this.running;

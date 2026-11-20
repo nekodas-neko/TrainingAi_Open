@@ -119,6 +119,9 @@ export const emptyHealthConnectImport = {
   completed: null as Disk['completed'],
   skipped: 0,
   skippedFirstHand: {} as Record<string, number>,
+  /** #3906: the switch is on but no read permission is granted. Not an error, and not a change
+   *  waiting to upload; nothing can be read until a permission is granted. */
+  needsPermission: false,
 };
 const newFilter = (sources: FirstHandSources | null) =>
   new FirstHandFilter<HealthConnectRecord>(
@@ -186,11 +189,9 @@ export class HealthConnectImportStore {
       ...this.state,
       ...patch,
       enabled: this.disk.enabled,
-      pending:
-        this.disk.queue.length +
-        (this.disk.needsRebuild || this.disk.scan || (this.disk.enabled && !this.disk.token)
-          ? 1
-          : 0),
+      // #3906: a first read not yet made (`enabled && !token`) is not a change waiting to upload.
+      // Counted, it never cleared without a permission and made every rerun skip the throttle.
+      pending: this.disk.queue.length + (this.disk.needsRebuild || this.disk.scan ? 1 : 0),
       skipped: this.disk.skipped,
       skippedFirstHand: this.disk.skippedFirstHand,
       completed: this.disk.completed,
@@ -238,6 +239,23 @@ export class HealthConnectImportStore {
   cancel() {
     this.canceled = true;
   }
+  /** Batches saved and waiting to upload: the only thing that lets a rerun skip the throttle. */
+  queued() {
+    return this.disk.queue.length > 0;
+  }
+  /** The granted read types; with none and `ask`, asks for every type once more (a tap, not a sync). */
+  private async granted(ask: boolean) {
+    let types = await this.reader.permissions();
+    if (!types.length && ask && this.reader.request && !this.canceled) {
+      await this.write({
+        ...this.disk,
+        requested: [...new Set([...this.disk.requested, ...healthConnectTypes])],
+      });
+      types = (await this.reader.request([...healthConnectTypes]).catch(() => null)) ?? [];
+    }
+    if (!this.canceled) this.publish({ needsPermission: !types.length });
+    return types;
+  }
   private guard() {
     if (!this.state.ready || this.canceled)
       throw new Error('Saved Health Connect data is unavailable. Reopen the app to retry.');
@@ -248,7 +266,12 @@ export class HealthConnectImportStore {
       await this.running;
       this.guard();
       await this.write({ ...this.disk, enabled });
-      if (enabled) void this.run(true);
+      if (!enabled) {
+        // Off is off: a notice left by the last run no longer describes anything (#3906).
+        this.publish({ error: null, needsPermission: false });
+        return;
+      }
+      if ((await this.granted(true)).length) void this.run(true);
     } catch (cause) {
       if (!this.canceled)
         this.publish({
@@ -270,6 +293,8 @@ export class HealthConnectImportStore {
       if (!this.reader.historyPermission) throw new Error('Extended history is unavailable.');
       await this.reader.historyPermission();
     }
+    // #3906: without a read permission, clearing the token would only queue a read that cannot run.
+    if (!(await this.granted(true)).length) return;
     await this.write({
       ...this.disk,
       from,
@@ -526,7 +551,6 @@ export class HealthConnectImportStore {
       try {
         let types = await this.reader.permissions();
         if (this.canceled) return;
-        if (!types.length) throw new Error('No Health Connect read permissions are granted.');
         // A type this install has never been asked for, once. Recorded before asking, so a denial,
         // a dismissed sheet or a crash is not asked again; the sync carries on with what is granted.
         const unasked = healthConnectTypes.filter(
@@ -538,6 +562,9 @@ export class HealthConnectImportStore {
           if (this.canceled) return;
           if (granted?.length) types = granted;
         }
+        // #3906: nothing granted is a state to show, not a failure that fails Sync now.
+        this.publish({ needsPermission: !types.length });
+        if (!types.length) return;
         const firstHand = await this.firstHandSources().catch(() => null);
         if (this.canceled) return;
         // A new filter each run, so its counts are that sync's: a rescan reads records again and
