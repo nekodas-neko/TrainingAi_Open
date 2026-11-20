@@ -35,6 +35,7 @@ const revertAutoAdoptedBaseline = vi.fn(async (_u: string, _s: string) => null a
 const listPersonalRecords = vi.fn(async (_u: string) => new Map<string, number>())
 const listPrevious1rm = vi.fn(async (_u: string) => new Map<string, number>())
 const generatePrescriptionForSession = vi.fn(async (..._a: unknown[]) => generated() as Row)
+const listSessionPeriodizationForProgram = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const refitPrescriptionToBudget = vi.fn(async (..._a: unknown[]) => ({ ok: false, reason: 'no_baseline' }) as Row)
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
@@ -56,7 +57,7 @@ vi.mock('@/lib/data', () => {
     setProgramPendingTransition: async () => undefined,
     realignProgramPhase: async () => undefined,
     voidSessionPrescription: async () => undefined,
-    listSessionPeriodizationForProgram: async () => [],
+    listSessionPeriodizationForProgram: (...a: unknown[]) => listSessionPeriodizationForProgram(...a),
     reconcileSessionsInPhase: async () => undefined,
 })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -485,6 +486,53 @@ describe('POST …/session/[sessionId]/transition — one-day vs planned deload 
   })
 })
 
+// #3876: a move to the phase the type is already in changes nothing. A type two sessions into its
+// deload (production: 5 and 12 Nov) got "Move to Deload" on 18 Nov and its deload started again.
+describe('POST …/session/[sessionId]/transition — a move to the phase it is already in (#3876)', () => {
+  const deloadStart = new Date('2026-11-04T08:00:00Z')
+  const inDeload = (over: Row = {}) => state({
+    phase: 'deload', phaseStartedAt: deloadStart, sessionsInPhase: 2,
+    prescription: prescription({ phase: 'deload', deload: true, phaseAction: 'deload_recommended' }),
+    prescriptionStatus: 'pending', ...over,
+  })
+
+  for (const force of [false, true]) {
+    it(`"Move to Deload" ${force ? 'with' : 'without'} force takes the plan and leaves the start and count`, async () => {
+      getSessionPeriodization.mockResolvedValue(inDeload())
+      const res = await transitionPost({ newPhase: 'deload', ...(force && { force: true }) })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.phaseMoved).toBe(false)
+      expect(body.prescriptionStatus).toBe('accepted')
+      expect(body.state.phaseStartedAt).toBe(deloadStart.toISOString())
+      expect(body.state.sessionsInPhase).toBe(2)
+      expect(advancePhase).not.toHaveBeenCalled()
+      expect(updatePrescriptionStatus.mock.calls.map(c => c[2])).toEqual(['accepted'])
+    })
+  }
+
+  it('with no plan on offer it changes nothing at all', async () => {
+    getSessionPeriodization.mockResolvedValue(inDeload({ prescriptionStatus: 'consumed' }))
+    const res = await transitionPost({ newPhase: 'deload', force: true })
+    expect(res.status).toBe(200)
+    expect((await res.json()).phaseMoved).toBe(false)
+    expect(advancePhase).not.toHaveBeenCalled()
+    expect(updatePrescriptionStatus).not.toHaveBeenCalled()
+  })
+
+  it('the same holds for any phase: accumulation to accumulation is not a restart', async () => {
+    getSessionPeriodization.mockResolvedValue(state({ prescription: prescription(), prescriptionStatus: 'pending' }))
+    await transitionPost({ newPhase: 'accumulation', force: true })
+    expect(advancePhase).not.toHaveBeenCalled()
+  })
+
+  it('a move to another phase still moves it', async () => {
+    getSessionPeriodization.mockResolvedValue(inDeload())
+    await transitionPost({ newPhase: 'accumulation', force: true })
+    expect(advancePhase.mock.calls[0][2]).toBe('accumulation')
+  })
+})
+
 describe('GET …/session/[sessionId]', () => {
   it('refuses without a session and on a malformed id', async () => {
     sessionUser = null
@@ -549,6 +597,40 @@ describe('GET …/session/[sessionId]', () => {
     }))
     const body = await (await getSession()).json()
     expect(body.state.prescription.phaseAction).toBe('stay')
+  })
+})
+
+// #3876, review of acd5f2d: the card's read served a stored plan in a deload that had done its two
+// sessions. Its `deload: true` was adopted by both toggles, and Preview trained a third deload.
+describe('GET …/session/[sessionId] — a deload that has ended (#3876)', () => {
+  const deloadPlan = (atPlan: number) => state({
+    phase: 'deload', sessionsInPhase: 2, prescriptionStatus: 'auto_applied',
+    prescriptionExpiresAt: new Date(Date.now() + 5 * 86_400_000),
+    prescription: prescription({ phase: 'deload', deload: true, sessionsInPhaseAtPlan: atPlan }),
+  })
+
+  // Waiting for its switch-over (two types on different phases), so the type's own count decides.
+  beforeEach(() => {
+    listSessionPeriodizationForProgram.mockResolvedValue([
+      state({ phase: 'deload', phaseStartedAt: new Date(Date.now() - 9 * 86_400_000) }),
+      state({ programSessionId: 'other', phase: 'accumulation' }),
+    ])
+    return () => { listSessionPeriodizationForProgram.mockResolvedValue([]) }
+  })
+
+  it('serves a plan made before the deload\'s second session as no plan', async () => {
+    getActiveProgram.mockResolvedValue(program({ phaseMode: 'ai_dynamic' }))
+    ensureSessionPeriodization.mockResolvedValue(deloadPlan(1))
+    const body = await (await getSession()).json()
+    expect(body.state).toMatchObject({ prescription: null, prescriptionAgedOut: true, phase: 'deload' })
+  })
+
+  it('serves a plan made at the current count, which has been through the exit', async () => {
+    getActiveProgram.mockResolvedValue(program({ phaseMode: 'ai_dynamic' }))
+    ensureSessionPeriodization.mockResolvedValue(deloadPlan(2))
+    const body = await (await getSession()).json()
+    expect(body.state.prescription).toMatchObject({ deload: true })
+    expect(body.state.prescriptionAgedOut).toBeUndefined()
   })
 })
 

@@ -73,7 +73,7 @@ import {
   validWaterMlOrNull,
   validWaterMlDeltaOrNull,
 } from '@trainingai/shared/validation/body-metrics'
-import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
+import { sleepImplausibleReason, oneRmImplausible, MAX_PLAUSIBLE_ONE_RM_KG } from '@trainingai/shared/validation/plausibility'
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
 import { sleepShapeFromHypnogram } from '@trainingai/shared/health/oura-sleep-detail'
 import { restlessnessFromMovement } from '@trainingai/shared/health/sleep-recording'
@@ -1783,7 +1783,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
       .where(and(
         eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from),
-        isNull(s.workoutSessions.deletedAt), isNull(s.exerciseLogs.deletedAt), isNull(s.setLogs.deletedAt),
+        // #3801: finished workouts only, as the session count above.
+        isNull(s.workoutSessions.deletedAt), isNotNull(s.workoutSessions.completedAt),
+        isNull(s.exerciseLogs.deletedAt), isNull(s.setLogs.deletedAt),
       ))
 
     return {
@@ -1818,7 +1820,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .leftJoin(s.exerciseLibrary, eq(s.exerciseLibrary.id, s.exerciseLogs.exerciseId))
       .where(and(
         eq(s.workoutSessions.userId, userId), gte(s.workoutSessions.startedAt, from),
-        isNull(s.workoutSessions.deletedAt), isNull(s.exerciseLogs.deletedAt), isNull(s.setLogs.deletedAt),
+        // #3801: finished workouts only, as the session count above.
+        isNull(s.workoutSessions.deletedAt), isNotNull(s.workoutSessions.completedAt),
+        isNull(s.exerciseLogs.deletedAt), isNull(s.setLogs.deletedAt),
       ))
       .groupBy(s.exerciseLogs.exerciseName)
       .orderBy(desc(sql`COUNT(${s.setLogs.id})`))
@@ -4843,6 +4847,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.workoutSessions.userId, userId),
         eq(s.exerciseLogs.exerciseName, exerciseName),
         gt(s.exerciseLogs.estimated1rm, 0),
+        // #3878: shouldCountTowardPr's plausibility gate (`oneRmImplausible`). An estimate it refused
+        // at log time is still stored on the log, and without this one edit to the exercise made it
+        // the all-time record. NaN and Infinity fail `<=` in Postgres, as they fail the function.
+        lte(s.exerciseLogs.estimated1rm, MAX_PLAUSIBLE_ONE_RM_KG),
         isNull(s.exerciseLogs.deletedAt),
         isNull(s.workoutSessions.deletedAt),
         ...(excluded.length ? [notInArray(s.workoutSessions.id, excluded)] : []),
@@ -4862,7 +4870,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
       .orderBy(desc(s.exerciseLogs.estimated1rm), asc(s.exerciseLogs.loggedAt))
       .limit(1)
-    if (!best?.estimated1rm) return null
+    if (!best?.estimated1rm || oneRmImplausible(best.estimated1rm)) return null
     return { estimated1rm: best.estimated1rm, loggedAt: best.loggedAt ?? new Date() }
   }
 
@@ -8534,6 +8542,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean) { return period.recordBaselineAnchors(this.db, userId, programSessionId, anchors, complete) }
   async revertAutoAdoptedBaseline(userId: string, programSessionId: string) { return period.revertAutoAdoptedBaseline(this.db, userId, programSessionId) }
   async advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase) { return period.advancePhase(this.db, userId, programSessionId, newPhase) }
+  async exitDeload(userId: string, programSessionId: string, newPhase: PeriodizationPhase, deloadStartedAt: Date) { return period.exitDeload(this.db, userId, programSessionId, newPhase, deloadStartedAt) }
   async advanceProgramPhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase, expected?: { phase: PeriodizationPhase; phaseStartedAt: Date }) { return period.advanceProgramPhase(this.db, userId, programSessionId, newPhase, expected) }
   async setProgramPhase(userId: string, programId: string, phase: PeriodizationPhase, startedAt: Date, pendingTransition: PendingTransition | null, opts?: import('@trainingai/shared/ai-periodization/program-phase').ProgramMoveOptions) { return period.setProgramPhase(this.db, userId, programId, phase, startedAt, pendingTransition, opts) }
   async setProgramPendingTransition(userId: string, programId: string, decide: import('@trainingai/shared/ai-periodization/program-phase').DecidePending) { return period.setProgramPendingTransition(this.db, userId, programId, decide) }

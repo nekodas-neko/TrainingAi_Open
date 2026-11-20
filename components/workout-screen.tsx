@@ -29,6 +29,7 @@ import {
   exerciseSetCount,
   rpePrefill,
   sessionContextLabel,
+  sessionIntensityForLog,
 } from "@/components/workout/utils";
 import { estimateOneRm, isDeloadedForEstimate } from "@trainingai/shared/1rm";
 import { rpeSourcesPayload } from "@trainingai/shared/workout/rpe-source";
@@ -1199,7 +1200,11 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     const isBaseline = phaseStatus?.isBaseline ?? false;
     // Mirrors the server's deloaded gate (Q-115): a session-level static deload phase or an
     // AI per-exercise/whole-session deload must never feed the 1RM estimate, baseline excepted.
-    const isAnyDeload = deload || (phaseStatus?.isDeloadActive ?? false);
+    const { fields: intensityFields, isAnyDeload } = sessionIntensityForLog({
+      deload, urlOverride: !!wasOverride, overrideFull,
+      phaseDeloadActive: phaseStatus?.isDeloadActive ?? false,
+      isAiDynamic: periodization?.state != null,
+    });
     const { estimated1rm: newEst1rm, target80 } = estimateOneRm(
       snapWeights.map((w, i) => ({ weightKg: w, reps: snapReps[i] ?? 0 })),
       {
@@ -1267,8 +1272,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       rpeSources: rpeSourcesPayload(snapRpeValues.slice(0, snapWeights.length), snapRpeRated), // #2450
       estimated1rm: newEst1rm,
       target80,
-      ...(deload ? { intensityMode: 'deload' as const } : {}),
-      ...(wasOverride ? { wasOverride: true } : {}),
+      ...intensityFields, // #3877(a): the Full toggle's override, not only the URL's
       ...(ex.deloaded ? { exerciseDeloaded: true } : {}),
     };
 
@@ -1357,7 +1361,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   // BF-155: the timing arrays are absent on purpose — the body reads them through getState().
   }, [effectiveExercises, store.currentIdx, store.currentSet, store.sets, sessionType,
       sessionDisplayName, programSessionId, store.accumulatedRestMs, store.exerciseStartMs,
-      store.lastExerciseEndMs, store.workoutSessionId, store.workoutStartMs, store.warmupEndedMs, phaseStatus, deload]);
+      store.lastExerciseEndMs, store.workoutSessionId, store.workoutStartMs, store.warmupEndedMs, phaseStatus, deload,
+      overrideFull, wasOverride, periodization?.state]);
 
   // ── Screen keep-awake ─────────────────────────────────────────────────────
 

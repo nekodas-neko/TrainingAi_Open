@@ -1,5 +1,6 @@
 import { nextMidnightInTz } from '@trainingai/shared/date-utils'
 import type { AiPrescription, SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
+import { deloadEndDue, type ProgramDeloadCheck } from './phase-guards'
 
 // How long a stored prescription is the plan for its session, and when it stops being one (#3700).
 //
@@ -83,7 +84,8 @@ export function prescriptionAgedOut(
 }
 
 /** The stored prescription state as a route returns it to a screen (#3716): an aged-out
- *  prescription is left out, and `prescriptionAgedOut` says why. The field is optional on the wire
+ *  prescription is left out, and `prescriptionAgedOut` says why. It means "no longer the plan", and
+ *  also marks a plan whose deload has ended (#3876), so every screen that reads it hides that too. The field is optional on the wire
  *  because Preview also talks to servers from before it existed. */
 export type ServedPrescriptionState<T> = T & { prescriptionAgedOut?: boolean }
 
@@ -94,8 +96,21 @@ export type ServedPrescriptionState<T> = T & { prescriptionAgedOut?: boolean }
  * untouched; opening the session regenerates it.
  */
 export function servePrescriptionState<T extends Pick<SessionPeriodization, 'prescriptionStatus' | 'prescriptionExpiresAt'>
-  & Partial<Pick<SessionPeriodization, 'prescription'>>>(state: T, now = new Date()): ServedPrescriptionState<T> {
-  if (state.prescription == null || !prescriptionAgedOut(state, now)) return state
+  & Partial<Pick<SessionPeriodization, 'prescription' | 'phase' | 'sessionsInPhase'>>>(
+  state: T,
+  now = new Date(),
+  // #3876 (`readProgramDeloadCheck`): an aligned program's deload ends at the program's cap.
+  programDeload?: ProgramDeloadCheck | null,
+): ServedPrescriptionState<T> {
+  if (state.prescription == null) return state
+  // #3876: a plan in a deload that has ended is not the plan either. Served, its `deload: true` was
+  // adopted by both apps' Deload toggle, and Preview started a third deload session after the exit
+  // (its Start runs `/prescribe`, which exits, then re-reads workout-data with `aiDeload=1`). Hidden
+  // here, the toggle reads Full, and opening the session regenerates the plan, which runs the exit.
+  // Only the server can decide this: on an aligned program the program's cap decides it.
+  const deloadEnded = state.phase != null
+    && deloadEndDue(state.prescription, { phase: state.phase, sessionsInPhase: state.sessionsInPhase }, programDeload)
+  if (!deloadEnded && !prescriptionAgedOut(state, now)) return state
   return { ...state, prescription: null, prescriptionAgedOut: true } as ServedPrescriptionState<T>
 }
 
@@ -115,6 +130,11 @@ export interface WirePrescriptionState {
  * The server's flag wins when it is there. It is absent from servers older than the flag (Preview
  * talks to production) and from a state cached before the prescription expired, so the expiry is
  * read here too, through the same `prescriptionAgedOut` every server read uses.
+ *
+ * A plan whose deload has ended (#3876) is hidden on the server's flag alone (`servePrescriptionState`
+ * sets it). Only the server can tell: on an aligned program the program's cap decides, and a screen
+ * holds one type's state. Its count moves only on a completion, which consumes the slot, so a cached
+ * copy cannot go stale on it the way an expiry can.
  */
 export function prescriptionAgedOutOnScreen(state: WirePrescriptionState | null | undefined, now = new Date()): boolean {
   if (state == null) return false

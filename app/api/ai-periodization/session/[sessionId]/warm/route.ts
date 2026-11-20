@@ -12,6 +12,7 @@ import {
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from '@trainingai/shared/ai-periodization/regenerate-in-background'
 import { isAiPrescriptionPending } from '@trainingai/shared/ai-periodization/prescription-pending'
 import { prescriptionAgedOut } from '@trainingai/shared/ai-periodization/reevaluate'
+import { readProgramDeloadCheck } from '@trainingai/shared/ai-periodization/program-phase'
 
 /**
  * Warm today's prescription from Home, before the workout tab asks for it (#2155).
@@ -64,8 +65,13 @@ export async function POST(
   const isAiDynamic = program.phaseMode === 'ai_dynamic'
   // An ai_dynamic program has no phase rows, so its baseline is this pair alone (workout-data).
   const isBaselinePhase = state?.phase === 'baseline' && !state.baselineComplete
+  // #3876: an aligned program's deload ends at the program's cap, which a Monday reaches with no new
+  // session, so a plan the warm made on the deload week's Sunday is regenerated, which runs the exit.
+  const programDeload = isAiDynamic
+    ? await readProgramDeloadCheck(repo, userId, program.id, state, tz).catch(() => null)
+    : null
   const needed = isAiDynamic && !isBaselinePhase && state != null && (
-    isAiPrescriptionPending(state, { isAiDynamic, isBaselinePhase }) || prescriptionAgedOut(state)
+    isAiPrescriptionPending(state, { isAiDynamic, isBaselinePhase, programDeload }) || prescriptionAgedOut(state)
   )
   if (!needed) return NextResponse.json({ status: 'not_needed' })
 

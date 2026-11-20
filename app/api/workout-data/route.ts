@@ -14,6 +14,7 @@ import { resolveSelfReportedSick, loadFigureSignals } from "@trainingai/shared/a
 import { normalizeStoredPrescription } from "@trainingai/shared/ai-periodization/reconcile-prescription";
 import { latestIllnessFromDerived } from "@trainingai/shared/health/illness-radar";
 import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
+import { readProgramDeloadCheck } from "@trainingai/shared/ai-periodization/program-phase";
 import { moodMuscleMatches } from "@trainingai/shared/muscles";
 import type { AiPrescription } from "@trainingai/shared/types/ai-periodization";
 import {
@@ -199,6 +200,12 @@ async function handleWorkoutData(req: NextRequest) {
         [sess.id, isAiDynamic ? await repo.getSessionPeriodization(userId, sess.id) : null] as const,
       )),
     )
+    // #3876: an aligned program's deload ends at the program's cap, which every type shares, so one
+    // read covers them all; none when no type is in a deload. A failed read falls back to the type's count.
+    const programDeload = isAiDynamic
+      ? await readProgramDeloadCheck(repo, userId, program.id,
+          [...periodizationBySession.values()].find(s => s?.phase === 'deload'), tz).catch(() => null)
+      : null
 
     const perSession: Record<string, {
       exercises: WorkoutExercise[]
@@ -284,7 +291,7 @@ async function handleWorkoutData(req: NextRequest) {
             new Map(programSession.exercises.map(ex => [ex.id, ex.exerciseRole])),
           )
         : null
-      const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase })
+      const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase, programDeload })
       // An aged-out prescription is pending regeneration, not the plan (#3700).
       const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null && !aiPrescriptionPending
         && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
@@ -479,7 +486,12 @@ async function handleWorkoutData(req: NextRequest) {
   // Computed before the load decision: an aged-out prescription (#3700) is regenerating, so it is
   // not the plan. Serving it once more while the regeneration ran in the background put an expired
   // rest-day plan on the bar, and nothing repainted the screen when the fresh one landed.
-  const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase })
+  // #3876: an aligned program's deload ends at the program's cap, not the type's count, and the cap can
+  // be reached with no new session. A failed read falls back to the type's count.
+  const programDeload = isAiDynamic
+    ? await readProgramDeloadCheck(repo, userId, program.id, aiPeriodizationState, tz).catch(() => null)
+    : null
+  const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase, programDeload })
   const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null && !aiPrescriptionPending
     && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
 
@@ -560,6 +572,8 @@ async function handleWorkoutData(req: NextRequest) {
         prescription: aiPeriodizationState.prescription,
         prescriptionStatus: aiPeriodizationState.prescriptionStatus,
         prescriptionExpiresAt: aiPeriodizationState.prescriptionExpiresAt,
+        sessionsInPhase: aiPeriodizationState.sessionsInPhase,
+        programDeload,
       }
       let reevalResult = reevaluatePrescriptionForToday(aiPrescription, reevalSignals, reevalState)
 

@@ -1,5 +1,6 @@
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import { prescriptionAgedOut } from './prescription-expiry'
+import { deloadEndDue, type ProgramDeloadCheck } from './phase-guards'
 
 // True when a fresh AI prescription is being (re)generated for an ai_dynamic session:
 // the prescription slot was consumed (by a completed session, a phase transition, or a
@@ -25,10 +26,14 @@ import { prescriptionAgedOut } from './prescription-expiry'
 // the fresh one landed, so the lifter trained the expired plan. A one-day rest-day offer expires at
 // the next local midnight; the next open must regenerate it, show "preparing", and paint the new
 // one. Both readers (workout-data, the next-session preview) take this as "not the plan".
+//
+// #3876: so is a plan in a deload that has done its two sessions (`deloadEndDue`). The deload ends at
+// generation, and nothing regenerated an unexpired slot, so the type trained another deload.
 export function isAiPrescriptionPending(
   state: (Pick<SessionPeriodization, 'prescription' | 'prescriptionStatus'>
-    & Partial<Pick<SessionPeriodization, 'prescriptionExpiresAt'>>) | null | undefined,
-  opts: { isAiDynamic: boolean; isBaselinePhase: boolean },
+    & Partial<Pick<SessionPeriodization, 'prescriptionExpiresAt' | 'phase' | 'sessionsInPhase'>>) | null | undefined,
+  // `programDeload` (`readProgramDeloadCheck`): an aligned program's deload ends at the program's cap.
+  opts: { isAiDynamic: boolean; isBaselinePhase: boolean; programDeload?: ProgramDeloadCheck | null },
   now: Date = new Date(),
 ): boolean {
   return opts.isAiDynamic
@@ -36,6 +41,8 @@ export function isAiPrescriptionPending(
     && state != null
     && (state.prescriptionStatus === 'consumed' || (
       state.prescription != null
-      && prescriptionAgedOut({ ...state, prescriptionExpiresAt: state.prescriptionExpiresAt ?? null }, now)
+      && (prescriptionAgedOut({ ...state, prescriptionExpiresAt: state.prescriptionExpiresAt ?? null }, now)
+        // #3876: a plan in a deload that has done its sessions; regenerating ends the deload.
+        || (state.phase != null && deloadEndDue(state.prescription, { phase: state.phase, sessionsInPhase: state.sessionsInPhase }, opts.programDeload)))
     ))
 }

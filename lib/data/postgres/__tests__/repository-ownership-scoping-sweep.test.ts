@@ -536,6 +536,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['setBaselineComplete', r => r.setBaselineComplete(USER_A, bId('program_sessions'), {})],
     ['recordBaselineAnchors', r => r.recordBaselineAnchors(USER_A, bId('program_sessions'), {}, true)],
     ['advancePhase', r => r.advancePhase(USER_A, bId('program_sessions'), 'deload' as never)],
+    ['exitDeload', r => r.exitDeload(USER_A, bId('program_sessions'), 'accumulation' as never, new Date())],
     ['clearProgramPrescriptions', r => r.clearProgramPrescriptions(USER_A, bId('programs'))],
     ['updatePrescriptionStatus', r => r.updatePrescriptionStatus(USER_A, bId('program_sessions'), 'expired' as never)],
     ['storePendingTransition', r => r.storePendingTransition(USER_A, bId('program_sessions'), null)],

@@ -58,6 +58,9 @@ export interface PendingTransition {
   /** #3766: while waiting, the local Monday ("YYYY-MM-DD") the switch-over starts on, fixed as soon as
    *  the last deload finishes, so a type leaving its deload afterwards cannot lose it. */
   switchOverOn?: string
+  /** #3876: when `switchOverOn` was first known (ISO instant). A type that enters or restarts a
+   *  deload after it no longer holds the switch-over or moves its date later. */
+  switchOverKnownAt?: string
 }
 
 /** A prescription's two whole-session figures (`prescriptionFigures` computes both). */
@@ -160,6 +163,15 @@ export interface AiPrescription {
   // then log how you feel) could never take effect. Absent on a freshly-generated
   // prescription (generation already evaluated the current inputs).
   reevaluatedInputsKey?: string
+  /** #3876: the type's `sessionsInPhase` when generation stored this plan. A plan in a finished
+   *  deload made before the count got there is regenerated (`deloadEndDue`); absent on plans
+   *  stored before this field, which are regenerated once. */
+  sessionsInPhaseAtPlan?: number
+  /** #3876: on an aligned program, the program's `trainingWeeksDone` when generation stored this
+   *  plan. An aligned deload ends at the program's cap, which can be reached with no new session (a
+   *  plan made on the deload week's last day is read the week after), so a plan in a finished
+   *  program deload made before the cap is regenerated (`deloadEndDue`). */
+  programWeeksDoneAtPlan?: number
 }
 
 export interface SessionPeriodization {

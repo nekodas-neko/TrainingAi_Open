@@ -1430,6 +1430,9 @@ export interface WorkoutRepository {
   /** BF-143: undo a baseline auto-completed from personal records. Null when nothing matched. */
   revertAutoAdoptedBaseline(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
   advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization>
+  /** #3876: end a finished deload, only while the row is still the deload that started at
+   *  `deloadStartedAt`; leaves the slot 'consumed'. False when another call moved it first. */
+  exitDeload(userId: string, programSessionId: string, newPhase: PeriodizationPhase, deloadStartedAt: Date): Promise<boolean>
   /** #3766: move the whole program the session belongs to (every session type, one start). */
   /** With `expected`, a program that has moved since the caller read it is left as it is. */
   advanceProgramPhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase, expected?: { phase: PeriodizationPhase; phaseStartedAt: Date }): Promise<SessionPeriodization>
