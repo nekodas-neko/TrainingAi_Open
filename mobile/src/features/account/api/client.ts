@@ -1,5 +1,6 @@
 import { AI_PAUSED_CODE, AI_PAUSED_MESSAGE, aiPausedMessage } from '@trainingai/shared/ai-paused-notice';
 import { reportError } from '../../../core/reporting/index.ts';
+import { connectivity } from '../../../core/sync/Connectivity.ts';
 import { REFRESH_TOKEN_RE } from '@trainingai/shared/auth/refresh-token';
 import { APP_BUILD_HEADER, APP_VERSION_HEADER } from '@trainingai/shared/native-min-build';
 import { nativeAppVersion, nativeBuildCode } from '../../../integrations/app-info/platform';
@@ -211,11 +212,22 @@ export function createApiClient(
     // went on to commit, and a self-reset would never sign out.
     const wipe =
       path === '/api/admin/users/reset-data' || (path === '/api/admin/users' && method === 'DELETE');
+    // #3913: an aborted fetch does not always settle on Android, and a request that never settles
+    // holds every later load of the same view behind it until the app restarts. This settles it.
+    let expire: (error: Error) => void = () => {};
+    const expired = new Promise<never>((_, reject) => {
+      expire = reject;
+    });
     const timeout = setTimeout(
-      () => controller.abort(),
+      () => {
+        controller.abort();
+        const error = new Error('The request timed out.');
+        error.name = 'TimeoutError';
+        expire(error);
+      },
       path === '/api/export' ? 120000 : wipe ? 130_000 : slow ? 65_000 : 15_000,
     );
-    try {
+    const attempt = async () => {
       const url = new URL(path, base);
       if (query) {
         url.search = new URLSearchParams(query).toString();
@@ -242,6 +254,7 @@ export function createApiClient(
           signal: controller.signal,
         });
       let response = await send(token);
+      connectivity.reached();
       if (response.status === 401 && token && renew) {
         const fresh = await renew(token);
         if (fresh && fresh !== token) {
@@ -298,7 +311,13 @@ export function createApiClient(
         throw new Error('Expected JSON from TrainingAi.');
       }
       return await response.json();
+    };
+    try {
+      return await Promise.race([attempt(), expired]);
     } catch (error) {
+      // An error status is an answer; only a request that never got one says the network is down.
+      if (error instanceof ApiError) connectivity.reached();
+      else connectivity.failed(error);
       // Every screen's server faults pass here, so they are reported once, with their path. The
       // reporter skips offline, auth and other expected failures, and its own intake.
       if (path !== '/api/client-error') reportError(error, { apiPath: path });

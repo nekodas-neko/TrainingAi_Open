@@ -18,6 +18,7 @@ import {
   resourceKey,
   type ResourceSpec,
 } from './WorkoutResources';
+import { onResume, useConnectivityProbe } from '../../../core/sync/resume';
 
 const Context = createContext<WorkoutResources | null>(null);
 const noSubscribe = () => () => {};
@@ -39,6 +40,7 @@ export function WorkoutDataProvider({ children }: PropsWithChildren) {
         : null,
     [storage, connection, workouts.invalidate],
   );
+  useConnectivityProbe(connection);
   return <WorkoutResourcesProvider resources={resources}>{children}</WorkoutResourcesProvider>;
 }
 export function WorkoutResourcesProvider({
@@ -47,11 +49,9 @@ export function WorkoutResourcesProvider({
 }: PropsWithChildren<{ resources: WorkoutResources | null }>) {
   useEffect(() => {
     void resources?.changes.initialize().catch(() => {});
-    const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void resources?.changes.sync();
-        void resources?.refreshVisible();
-      }
+    const listener = onResume(() => {
+      void resources?.changes.sync();
+      void resources?.refreshVisible();
     });
     const retry = setInterval(() => {
       if (AppState.currentState === 'active') {

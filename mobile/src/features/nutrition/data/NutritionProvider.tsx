@@ -19,6 +19,7 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { nutritionPaths } from './models';
 import { NutritionStore, emptyNutrition } from './NutritionStore';
+import { onReconnect, onResume } from '../../../core/sync/resume';
 const Context = createContext<{
   store: NutritionStore | null;
   today: string;
@@ -60,6 +61,17 @@ export function NutritionProvider({ children }: PropsWithChildren) {
     </NutritionStoreProvider>
   );
 }
+const dayKinds = [
+  'mealTypes',
+  'foods',
+  'meals',
+  'supplements',
+  'targets',
+  'logs',
+  'answers',
+  'checkin',
+  'mealStatuses',
+] as const;
 export function NutritionStoreProvider({
   store,
   today,
@@ -68,10 +80,8 @@ export function NutritionStoreProvider({
 }: PropsWithChildren<{ store: NutritionStore | null; today: string; timezone: string }>) {
   useEffect(() => {
     void store?.initialize().then(() => store.sync());
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void store?.sync();
-      }
+    const subscription = onResume(() => {
+      void store?.sync();
     });
     const timer = setInterval(() => {
       if (AppState.currentState === 'active') {
@@ -84,6 +94,13 @@ export function NutritionStoreProvider({
       store?.cancel();
     };
   }, [store]);
+  useEffect(() => {
+    // #3913: a day that failed offline reloads once the connection is back; fresh kinds stay put.
+    const listener = onReconnect(() => {
+      for (const kind of dayKinds) void store?.refresh(kind, today);
+    });
+    return () => listener.remove();
+  }, [store, today]);
   const { value: preferences, setValue: setPreferences } = useWorkoutDraft(
     'nutrition-preferences',
     z.object({ region: z.string().max(10) }),
@@ -114,18 +131,7 @@ export function useNutrition(date?: string) {
   const day = date ?? context.today;
   const refresh = useCallback(
     async (manual = false) => {
-      const kinds = [
-        'mealTypes',
-        'foods',
-        'meals',
-        'supplements',
-        'targets',
-        'logs',
-        'answers',
-        'checkin',
-        'mealStatuses',
-      ] as const;
-      await Promise.all(kinds.map((kind) => context.store?.refresh(kind, day, manual)));
+      await Promise.all(dayKinds.map((kind) => context.store?.refresh(kind, day, manual)));
     },
     [context.store, day],
   );
