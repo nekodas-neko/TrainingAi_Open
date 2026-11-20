@@ -287,6 +287,29 @@ DaytimeHighRecovery       { date, minutes, source }               // display onl
   Garmin's rest minutes (recovery).
   A source that fills none of them leaves those inputs missing, exactly as today.
 
+### 3g. Daytime stress series — **half-hour levels, each series carrying its method** (#2860 F1)
+
+```ts
+// lib/health/stress-day.ts (served by GET /api/body-battery/stress-day)
+StressDaySeries { series: { t /* bucket midpoint, ms */, level /* −1..+1, negative = stressed */ }[], method: 'ring_dhrv' | 'still_hr' | null }
+```
+
+- **Computed on read, never stored, never filled by a connector.** `still_hr` is ours, from two shapes
+  any wearable sends: the heart-rate series (§3a, `getHrForWindow`, every source merged) and the
+  per-minute movement series (`MovementIntervalSeries`, `getPerMinuteMovementSeries`). For each waking
+  half hour, the median heart rate of its still readings (the still gate of `still-rhr.ts`) is set
+  against the person's still-time normal, the median of up to 14 prior days' stored still resting heart
+  rate (`packages/shared/src/health/still-hr-stress.ts`).
+- **`ring_dhrv`** is the ring-era series in `oura_daytime_stress_buckets` (estimated daytime HRV), served
+  as stored for the days that have it. The two are different rulers: a day carries one method, and a
+  chart never joins them.
+- **Display only.** Read by the "When the day ran stressed" chart in both apps, the stress band on the
+  heart-rate day chart and the stress beside the day's events. **No score reads it** (Body Battery,
+  readiness, resilience), pinned by `lib/health/__tests__/still-hr-stress-no-score-2860.test.ts`. Making
+  it an input is a tuning sign-off of its own.
+- **Who else could fill it:** nobody needs to. A source that sends heart rate and per-minute movement
+  gets the series with no new code.
+
 ---
 
 ## 4. Calculation inputs — what each score actually needs, and what it does without it
