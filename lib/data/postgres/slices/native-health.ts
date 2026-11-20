@@ -4,7 +4,7 @@ import { DEFAULT_TZ, shiftDateStr, todayInTz } from '@trainingai/shared/date-uti
 import { projectDeviceHealth } from '@trainingai/shared/health/device-health-projection';
 import { groupSleepPeriods } from '@trainingai/shared/health/sleep-night';
 import { HEALTH_IMPORT_MAX_INTERVAL_DAYS } from '@trainingai/shared/health/import-limits';
-import { HR_RETENTION_DAYS, dropObservedHrDayFor, markZoneMinutesStale, settleNights } from './oura';
+import { HR_RETENTION_DAYS, dropObservedHrDayFor, markZoneMinutesStale, readinessClearSet, settleNights } from './oura';
 import { initialSourceMap, mergeSet, type SourceColumn } from '../../health-source';
 import type { getDb } from '../client';
 import * as s from '../schema';
@@ -287,10 +287,8 @@ export async function rebuildNativeHealth(
           .update(s.ouraDailyDerived)
           // #3163 review: the illness radar's fields are stored beside readiness from the same inputs
           // (#3086), so a day cleared for recompute must not keep a flag the next read would not set.
-          .set({
-            readinessScore: null, sleepScore: null, activityScore: null,
-            illnessFlag: null, illnessScore: null, illnessBiomarkers: null,
-          })
+          // #3872 review: nor the score's source, ACWR or model stamp: the Oura re-score's own clear.
+          .set({ ...readinessClearSet(), sleepScore: null, activityScore: null })
           .where(
             and(
               eq(s.ouraDailyDerived.userId, userId),

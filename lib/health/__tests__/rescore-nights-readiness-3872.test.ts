@@ -8,31 +8,46 @@
 // (it stores readiness only when today's night exists, `readiness-payload.ts`), and
 // `scoreFinishedDayReadiness` stands in for the backfill's per-day scorer. Fixtures are built from
 // today's local date, each night 22:30 → 06:30 local.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import type { SleepSession } from '@trainingai/shared/types/body'
 import type { OuraDailyDerivedPatch, OuraDailyDerivedRow } from '@/lib/data/repository'
 import { withNightRescore, rescoreChangedNights, watchNights, type NightRescoreRepo } from '@/lib/health/rescore-nights'
 import { scoreTodayReadiness, scoreFinishedDayReadiness } from '@/lib/health/night-readiness'
+import { writeOuraCloudData } from '@/lib/oura/cloud/ingest'
+import type { OuraCloudWrites } from '@/lib/oura/cloud/documents'
+import { resolveAnchor } from '@/lib/health/body-battery-anchor'
 
 const TZ = 'Australia/Brisbane'
 const HOUR = 3_600_000
 const READ_SCORE = 71
 const PAST_SCORE = 64
 
-// The world the stubbed scorers see: set by `makeRepo`.
-let world: { sessions: () => SleepSession[]; derived: Map<string, Partial<OuraDailyDerivedRow>> }
+// What a score loses with today's temperature input at neutral (no `daily_readiness` document yet).
+const NO_TEMPERATURE_BONUS = 5
 
-vi.mock('@/lib/health/night-readiness', () => ({
-  // The readiness read's rule: only today's night writes today's readiness.
+// The world the stubbed scorers see: set by `makeRepo`. `temperature` holds the days a
+// `daily_readiness` document has fed (`oura_daily.temperature_deviation`).
+let world: { sessions: () => SleepSession[]; derived: Map<string, Partial<OuraDailyDerivedRow>>; temperature: Set<string> }
+
+vi.mock('@/lib/health/night-readiness', async (importActual) => ({
+  ...(await importActual<typeof import('@/lib/health/night-readiness')>()),
+  // The readiness read's rule: only today's night writes today's readiness. Without the day's
+  // temperature the score differs, as the composite's temperature input sits at neutral.
   scoreTodayReadiness: vi.fn(async (_u: string, tz: string) => {
     const today = todayInTz(tz)
     if (!world.sessions().some(s => s.date === today)) return
-    world.derived.set(today, { ...world.derived.get(today), readinessScore: READ_SCORE })
+    const score = READ_SCORE + (world.temperature.has(today) ? 0 : NO_TEMPERATURE_BONUS)
+    world.derived.set(today, { ...world.derived.get(today), readinessScore: score })
   }),
-  scoreFinishedDayReadiness: vi.fn(async (_u: string, day: string) => {
+  scoreFinishedDayReadiness: vi.fn(async (_r: unknown, _u: string, day: string, _tz: string, now: Date) => {
     if (!world.sessions().some(s => s.date === day)) return false
-    world.derived.set(day, { ...world.derived.get(day), readinessScore: PAST_SCORE })
+    const score = PAST_SCORE + (world.temperature.has(day) ? 0 : NO_TEMPERATURE_BONUS)
+    const row = world.derived.get(day)
+    world.derived.set(day, {
+      ...row, readinessScore: score,
+      modelVersions: { ...(row?.modelVersions as object), readinessFilledOnArrival: now.toISOString() },
+    })
     return true
   }),
 }))
@@ -54,7 +69,11 @@ function makeRepo(today: string, opts: { omit?: string[]; scored?: string[] } = 
     .filter(n => !opts.omit?.includes(n.date))
   const derived = new Map<string, Partial<OuraDailyDerivedRow>>()
   for (const d of opts.scored ?? []) derived.set(d, { readinessScore: 60, readinessSource: 'generic-derived' })
-  world = { sessions: () => sessions, derived }
+  // Every past day already has its readiness document; today's lands when a test says so.
+  const temperature = new Set(Array.from({ length: 19 }, (_, i) => shiftDateStr(today, -19 + i)))
+  world = { sessions: () => sessions, derived, temperature }
+  // Body Battery's frozen anchor for today, as `body_battery_daily` holds it.
+  const battery: { anchor: number | null } = { anchor: null }
   const upserts: { day: string; patch: OuraDailyDerivedPatch }[] = []
   const repo = {
     getUserById: vi.fn(async () => ({ timezone: TZ })),
@@ -70,11 +89,15 @@ function makeRepo(today: string, opts: { omit?: string[]; scored?: string[] } = 
     }),
     listDeletedOuraCloudSleepDates: vi.fn(async () => []),
     withOuraSleepWriteLock: vi.fn(async <T,>(_u: string, run: () => Promise<T>) => run()),
-    releaseBodyBatteryAnchor: vi.fn(async () => false),
+    releaseBodyBatteryAnchor: vi.fn(async () => {
+      const had = battery.anchor != null
+      battery.anchor = null
+      return had
+    }),
   }
   return {
     repo: repo as unknown as NightRescoreRepo & typeof repo,
-    derived, upserts,
+    derived, upserts, temperature, battery,
     setSessions: (f: (s: SleepSession[]) => SleepSession[]) => { sessions = f(sessions) },
   }
 }
@@ -102,7 +125,7 @@ describe("readiness is scored when a day's night arrives (#3872)", () => {
     await withNightRescore(repo, 'u1', async () => { setSessions(s => [...s, night(today)]) })
 
     expect(scoreTodayReadiness).toHaveBeenCalledTimes(2)
-    expect(storedReadiness(derived, today)).toBe(READ_SCORE)
+    expect(storedReadiness(derived, today)).toBe(READ_SCORE + NO_TEMPERATURE_BONUS)
     expect(scoreFinishedDayReadiness).not.toHaveBeenCalled()
   })
 
@@ -112,7 +135,7 @@ describe("readiness is scored when a day's night arrives (#3872)", () => {
 
     await withNightRescore(repo, 'u1', async () => { setSessions(s => [...s, night(yesterday)]) })
 
-    expect(scoreFinishedDayReadiness).toHaveBeenCalledWith('u1', yesterday, TZ)
+    expect(scoreFinishedDayReadiness).toHaveBeenCalledWith(repo, 'u1', yesterday, TZ, expect.any(Date))
     expect(storedReadiness(derived, yesterday)).toBe(PAST_SCORE)
     // Today's night did not change, so today is not re-scored by this write.
     expect(scoreTodayReadiness).not.toHaveBeenCalled()
@@ -128,7 +151,7 @@ describe("readiness is scored when a day's night arrives (#3872)", () => {
     })()
 
     expect(outcome.readinessScored).toEqual([today])
-    expect(storedReadiness(derived, today)).toBe(READ_SCORE)
+    expect(storedReadiness(derived, today)).toBe(READ_SCORE + NO_TEMPERATURE_BONUS)
   })
 
   it("a revised night today with no read after it rewrites today's readiness rather than leaving it cleared", async () => {
@@ -140,7 +163,7 @@ describe("readiness is scored when a day's night arrives (#3872)", () => {
 
     expect(outcome.readinessCleared).toEqual([today])
     expect(outcome.readinessScored).toEqual([today])
-    expect(storedReadiness(derived, today)).toBe(READ_SCORE)
+    expect(storedReadiness(derived, today)).toBe(READ_SCORE + NO_TEMPERATURE_BONUS)
   })
 
   it("a night that goes away leaves today's readiness cleared and runs no scorer", async () => {
@@ -185,6 +208,175 @@ describe("readiness is scored when a day's night arrives (#3872)", () => {
     expect(outcome.readinessScored).toEqual([today])
     expect(log).toHaveBeenCalledWith(expect.stringContaining(`scoring readiness for ${yesterday} failed`), expect.any(Error))
     log.mockRestore()
+  })
+})
+
+// #3872 review: today's temperature input, and the illness radar's, come only from the
+// `daily_readiness` document, which is not a sleep write. The stored score must not depend on which
+// of the two documents Oura sends first, and Body Battery must anchor on the score the card shows.
+describe('the stored readiness does not depend on which Oura document lands first (#3872 review)', () => {
+  let today: string
+  let yesterday: string
+  beforeEach(() => {
+    vi.mocked(scoreTodayReadiness).mockClear()
+    vi.mocked(scoreFinishedDayReadiness).mockClear()
+    today = todayInTz(TZ)
+    yesterday = shiftDateStr(today, -1)
+  })
+
+  /** The repository as both the Oura writer and the re-score target, as production passes it. */
+  function makeIngest(opts: { omit?: string[]; scored?: string[] } = {}) {
+    const ctx = makeRepo(today, opts)
+    const daily = new Map<string, { date: string; temperatureDeviation?: number | null }>()
+    for (const d of ctx.temperature) daily.set(d, { date: d, temperatureDeviation: 0.1 })
+    Object.assign(ctx.repo, {
+      getOuraDaily: vi.fn(async (_u: string, from: string, to: string) => [...daily.values()].filter(r => r.date >= from && r.date <= to)),
+      upsertOuraDaily: vi.fn(async (_u: string, rows: { date: string; temperatureDeviation?: number | null }[]) => {
+        for (const r of rows) {
+          daily.set(r.date, { ...daily.get(r.date), ...r })
+          if (r.temperatureDeviation != null) ctx.temperature.add(r.date)
+        }
+      }),
+      upsertBodyMetrics: vi.fn(async () => {}),
+      upsertOuraCloudSleepPeriods: vi.fn(async () => 0),
+      upsertOuraCloudSleep: vi.fn(async (_u: string, rows: { date: string }[]) => {
+        ctx.setSessions(s => [...s.filter(n => !rows.some(r => r.date === n.date)), ...rows.map(r => night(r.date))])
+        return { written: rows.length, skippedOverlap: 0 }
+      }),
+      tombstoneOuraCloudSleep: vi.fn(async () => 0),
+      syncOuraMainSleepBodyMetrics: vi.fn(async () => {}),
+      upsertOuraWorkouts: vi.fn(async () => 0),
+      upsertOuraCloudDaily: vi.fn(async () => 0),
+      upsertOuraSessions: vi.fn(async () => 0),
+    })
+    const empty: OuraCloudWrites = { daily: [], body: [], sleep: [], deletedSleepIds: [], retypedSleepIds: [], workouts: [], sleepPeriods: [], cloudDaily: [], sessions: [] } as unknown as OuraCloudWrites
+    const write = (w: Partial<OuraCloudWrites>) =>
+      writeOuraCloudData(ctx.repo as unknown as Parameters<typeof writeOuraCloudData>[0], 'u1', { ...empty, ...w }, ctx.repo)
+    const sleepDoc = (date: string) => write({ sleep: [{ date } as unknown as OuraCloudWrites['sleep'][number]] })
+    const readinessDoc = (date: string) => write({ daily: [{ date, readinessScore: 80, temperatureDeviation: 0.2, temperatureTrendDeviation: 0.1 }] })
+    /** A Body Battery read of today: anchors on stored readiness and freezes it (`resolveAnchor`). */
+    const readBattery = () => {
+      const r = resolveAnchor({
+        persisted: ctx.battery.anchor != null ? { anchor: ctx.battery.anchor, anchorSource: 'readiness' } : null,
+        derivedReadiness: storedReadiness(ctx.derived, today),
+        ownSleepScore: null,
+      })
+      if (r.anchorSource === 'readiness') ctx.battery.anchor = r.anchor
+      return r.anchor
+    }
+    return { ...ctx, sleepDoc, readinessDoc, readBattery }
+  }
+
+  it('sleep first then the readiness document, or the reverse: one stored score, and Body Battery anchors on it', async () => {
+    // Sleep first, with a Body Battery read between the two documents that freezes its anchor.
+    const a = makeIngest({ omit: [today] })
+    a.readBattery()
+    await a.sleepDoc(today)
+    a.readBattery()
+    await a.readinessDoc(today)
+    const anchorA = a.readBattery()
+    const storedA = storedReadiness(a.derived, today)
+
+    // The readiness document first: no night yet, so nothing is scored until the night lands.
+    const b = makeIngest({ omit: [today] })
+    await b.readinessDoc(today)
+    b.readBattery()
+    await b.sleepDoc(today)
+    const anchorB = b.readBattery()
+    const storedB = storedReadiness(b.derived, today)
+
+    expect(storedA).toBe(READ_SCORE)
+    expect(storedB).toBe(READ_SCORE)
+    expect(anchorA).toBe(storedA)
+    expect(anchorB).toBe(storedB)
+  })
+
+  it('a readiness document for a day with no night scores nothing', async () => {
+    const { derived, readinessDoc } = makeIngest({ omit: [today] })
+    await readinessDoc(today)
+    expect(scoreTodayReadiness).not.toHaveBeenCalled()
+    expect(storedReadiness(derived, today)).toBeNull()
+  })
+
+  it('a finished day this path filled is scored again when its readiness document lands', async () => {
+    // Yesterday's night arrived after midnight, before its readiness document.
+    const { derived, temperature, sleepDoc, readinessDoc } = makeIngest({ omit: [yesterday] })
+    temperature.delete(yesterday)
+    await sleepDoc(yesterday)
+    expect(storedReadiness(derived, yesterday)).toBe(PAST_SCORE + NO_TEMPERATURE_BONUS)
+
+    await readinessDoc(yesterday)
+    expect(scoreFinishedDayReadiness).toHaveBeenCalledTimes(2)
+    expect(storedReadiness(derived, yesterday)).toBe(PAST_SCORE)
+  })
+
+  it('a finished day whose score a read stored keeps it when its readiness document lands late', async () => {
+    const { derived, upserts, readinessDoc } = makeIngest({ scored: [yesterday] })
+    await readinessDoc(yesterday)
+    expect(scoreFinishedDayReadiness).not.toHaveBeenCalled()
+    expect(storedReadiness(derived, yesterday)).toBe(60)
+    // Not a night revision, so not marked for the re-derive either.
+    expect(upserts).toEqual([])
+  })
+})
+
+// #3872 review: the watch's "today" and the readiness read's own `todayInTz` differ when a write
+// straddles local midnight. The watched day has ended: it is not cleared for a read that will score
+// the next day instead.
+describe('a re-score that runs after local midnight (#3872 review)', () => {
+  const DAY = '2026-11-18'
+  beforeEach(() => {
+    vi.mocked(scoreTodayReadiness).mockClear()
+    vi.mocked(scoreFinishedDayReadiness).mockClear()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(dateStrMidnightInTz(DAY, TZ).getTime() + 24 * HOUR - 30_000))
+  })
+  afterEach(() => { vi.useRealTimers() })
+  const pastMidnight = () => vi.setSystemTime(new Date(dateStrMidnightInTz(DAY, TZ).getTime() + 24 * HOUR + 10_000))
+
+  it('keeps and marks a score the day already had, rather than clearing it', async () => {
+    const { repo, derived, setSessions } = makeRepo(DAY, { scored: [DAY] })
+    const watch = await watchNights(repo, 'u1')
+    expect(watch.today).toBe(DAY)
+    setSessions(s => s.map(n => (n.date === DAY ? { ...n, averageHrvMs: 44 } : n)))
+    pastMidnight()
+    const outcome = await rescoreChangedNights(repo, watch)
+
+    expect(outcome.readinessCleared).toEqual([])
+    expect(outcome.readinessMarked).toEqual([DAY])
+    expect(scoreTodayReadiness).not.toHaveBeenCalled()
+    expect(storedReadiness(derived, DAY)).toBe(60)
+  })
+
+  it('scores a day with no score through the finished-day path', async () => {
+    const { repo, derived, setSessions } = makeRepo(DAY, { omit: [DAY] })
+    const watch = await watchNights(repo, 'u1')
+    setSessions(s => [...s, night(DAY)])
+    pastMidnight()
+    const outcome = await rescoreChangedNights(repo, watch)
+
+    expect(outcome.readinessScored).toEqual([DAY])
+    expect(scoreFinishedDayReadiness).toHaveBeenCalledWith(repo, 'u1', DAY, TZ, expect.any(Date))
+    expect(scoreTodayReadiness).not.toHaveBeenCalled()
+    expect(storedReadiness(derived, DAY)).not.toBeNull()
+  })
+})
+
+describe("the webhook's readiness scoring runs after its answer (#3872 review)", () => {
+  it('hands the scoring to a job, which takes the lock and scores on the state it finds', async () => {
+    vi.mocked(scoreTodayReadiness).mockClear()
+    const today = todayInTz(TZ)
+    const { repo, derived, setSessions } = makeRepo(today, { omit: [today] })
+    const jobs: (() => Promise<void>)[] = []
+
+    await withNightRescore({ repo, deferReadiness: job => { jobs.push(job) } }, 'u1', async () => { setSessions(s => [...s, night(today)]) })
+    expect(scoreTodayReadiness).not.toHaveBeenCalled()
+    expect(storedReadiness(derived, today)).toBeNull()
+    expect(jobs).toHaveLength(1)
+
+    await jobs[0]()
+    expect(repo.withOuraSleepWriteLock).toHaveBeenCalledTimes(2)
+    expect(storedReadiness(derived, today)).toBe(READ_SCORE + NO_TEMPERATURE_BONUS)
   })
 })
 

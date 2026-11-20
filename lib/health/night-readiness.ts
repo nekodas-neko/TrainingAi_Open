@@ -17,10 +17,13 @@
  *   writes with, which calls the same `computeReadinessComposite` and illness radar on that day's
  *   inputs. {@link readinessPatchFromAudit} is the one patch both write.
  *
+ * A finished day's score filled here carries {@link READINESS_FILLED_ON_ARRIVAL}, so the document that
+ * completes its inputs later may replace it. One stored by a read keeps its score.
+ *
  * Both load their modules lazily: `readiness-payload` reaches `@/lib/data`, and the Postgres adapter
  * imports `rescore-nights`, so a static import here would be a module cycle.
  */
-import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
+import type { OuraDailyDerivedPatch, WorkoutRepository } from '@/lib/data/repository'
 import type { PillarAudit } from '@trainingai/shared/health/score-audit/types'
 import { READINESS_MODEL_VERSION } from '@trainingai/shared/health/readiness-composite'
 
@@ -56,18 +59,33 @@ export async function scoreTodayReadiness(userId: string, tz: string): Promise<v
 }
 
 /**
- * Scores and stores readiness for a finished `day` that has none. False when the day has no
- * scoreable night of its own. Throws on failure; the caller logs it.
+ * The `model_versions` key that says a finished day's readiness was filled by the arrival path, not
+ * stored by a read the owner saw. Only a day carrying it may be scored again when a later document
+ * for it lands (the `daily_readiness` document after the night, with the temperature input).
  */
-export async function scoreFinishedDayReadiness(userId: string, day: string, tz: string): Promise<boolean> {
-  const [{ getRepository }, { buildDayAudit }] = await Promise.all([
-    import('@/lib/data'),
-    import('@trainingai/shared/health/score-audit/build-day-audit'),
-  ])
-  const repo = await getRepository()
+export const READINESS_FILLED_ON_ARRIVAL = 'readinessFilledOnArrival'
+
+/** True when `modelVersions` carries {@link READINESS_FILLED_ON_ARRIVAL}. */
+export function readinessFilledOnArrival(modelVersions: unknown): boolean {
+  return modelVersions != null && typeof modelVersions === 'object' && READINESS_FILLED_ON_ARRIVAL in modelVersions
+}
+
+/**
+ * Scores and stores readiness for a finished `day` that has none, or whose score this path filled
+ * itself, and marks it {@link READINESS_FILLED_ON_ARRIVAL}. False when the day has no scoreable night
+ * of its own. Throws on failure; the caller logs it.
+ */
+export async function scoreFinishedDayReadiness(
+  repo: WorkoutRepository, userId: string, day: string, tz: string, now: Date = new Date(),
+): Promise<boolean> {
+  const { buildDayAudit } = await import('@trainingai/shared/health/score-audit/build-day-audit')
   const audit = await buildDayAudit({ repo, userId, date: day, tz })
   const persist = audit.pillars.find(p => p.pillar === 'readiness')?.persist
   if (!persist) return false
-  await repo.upsertOuraDailyDerived(userId, day, readinessPatchFromAudit(persist))
+  const patch = readinessPatchFromAudit(persist)
+  await repo.upsertOuraDailyDerived(userId, day, {
+    ...patch,
+    modelVersions: { ...(patch.modelVersions as Record<string, string>), [READINESS_FILLED_ON_ARRIVAL]: now.toISOString() },
+  })
   return true
 }

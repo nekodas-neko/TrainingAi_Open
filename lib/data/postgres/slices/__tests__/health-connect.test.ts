@@ -216,10 +216,11 @@ describe.skipIf(!canRun)('Health Connect ledger and projections', () => {
       JSON.stringify({ hrvBalance: { score: 60, provisional: false, input: 0.3, gap: null, ...(src ? { source: src } : {}) } });
     try {
       await engine.query(
-        `INSERT INTO oura_daily_derived(user_id,day,readiness_source,readiness_score,readiness_contributors,illness_flag,illness_score) VALUES
-         ($1,$5,'generic-derived',71,$6::jsonb,'elevated',40),($2,$5,'generic-derived',72,$7::jsonb,'elevated',40),
-         ($3,$5,'generic-derived',73,$8::jsonb,NULL,NULL),($4,$5,'ble-derived',74,$7::jsonb,'elevated',40)`,
-        [user, other, third, fourth, day, contributors('oura_cloud'), contributors('health_connect_native'), contributors(null)],
+        `INSERT INTO oura_daily_derived(user_id,day,readiness_source,readiness_score,readiness_contributors,illness_flag,illness_score,acwr,model_versions) VALUES
+         ($1,$5,'generic-derived',71,$6::jsonb,'elevated',40,1.1,$9::jsonb),($2,$5,'generic-derived',72,$7::jsonb,'elevated',40,1.1,$9::jsonb),
+         ($3,$5,'generic-derived',73,$8::jsonb,NULL,NULL,1.1,$9::jsonb),($4,$5,'ble-derived',74,$7::jsonb,'elevated',40,1.1,$9::jsonb)`,
+        [user, other, third, fourth, day, contributors('oura_cloud'), contributors('health_connect_native'), contributors(null),
+          JSON.stringify({ readiness: 'v-test', bodyBattery: 'b-test' })],
       );
       for (const id of [user, other, third, fourth]) {
         await applyHealthConnectBatch(db, id, { records: [heart], deleted: [] });
@@ -239,6 +240,16 @@ describe.skipIf(!canRun)('Health Connect ledger and projections', () => {
       expect(flags.get(user)).toEqual(['elevated', 40]);
       expect(flags.get(other)).toEqual([null, null]);
       expect(flags.get(fourth)).toEqual(['elevated', 40]);
+      // #3872 review: and so does its provenance, the Oura re-score's own clear: the source label, the
+      // ACWR and the readiness model stamp. Another pillar's stamp stays.
+      const prov = await engine.query<{ user_id: string; readiness_source: string | null; acwr: number | null; model_versions: unknown }>(
+        'SELECT user_id,readiness_source,acwr,model_versions FROM oura_daily_derived WHERE day=$1 AND user_id=ANY($2::uuid[])',
+        [day, [user, other]],
+      );
+      const provBy = new Map(prov.rows.map((r) => [r.user_id, r]));
+      expect(provBy.get(other)).toMatchObject({ readiness_source: null, acwr: null, model_versions: { bodyBattery: 'b-test' } });
+      expect(provBy.get(user)).toMatchObject({ readiness_source: 'generic-derived', model_versions: { readiness: 'v-test', bodyBattery: 'b-test' } });
+      expect(Number(provBy.get(user)?.acwr)).toBe(1.1);
     } finally {
       await getPool().query('DELETE FROM users WHERE id=ANY($1::uuid[])', [[third, fourth]]);
     }

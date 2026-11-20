@@ -16,7 +16,8 @@ import {
 
 // #3872: the readiness scorers reach the real repository; their own behaviour is pinned in
 // rescore-nights-readiness-3872.test.ts. Here they score nothing, so this file pins the rest.
-vi.mock('@/lib/health/night-readiness', () => ({
+vi.mock('@/lib/health/night-readiness', async (importActual) => ({
+  ...(await importActual<typeof import('@/lib/health/night-readiness')>()),
   scoreTodayReadiness: vi.fn(async () => {}),
   scoreFinishedDayReadiness: vi.fn(async () => false),
 }))
