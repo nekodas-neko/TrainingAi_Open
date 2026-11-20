@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { clientBackendPid, waitUntilBlockedBy } from '@/lib/__tests__/helpers/lock-wait'
 import {
   migrationTestLock, lockPidsEverHeld, lockPidsStillHeld, LOCK_PG_LOCKS_OBJID, runMigrationSql,
 } from './migration-test-lock'
@@ -113,20 +114,6 @@ describe.skipIf(!canRun)('runMigrationSql — a foreign user deleted mid-migrati
     await pool.query(`DELETE FROM users WHERE id = $1`, [FOREIGN])
   })
 
-  /** Wait until some backend running this migration is parked on a lock. */
-  async function migrationIsBlocked(): Promise<void> {
-    for (let i = 0; i < 400; i++) {
-      const { rows } = await pool.query<{ n: number }>(
-        `SELECT count(*)::int AS n FROM pg_stat_activity
-          WHERE datname = current_database()
-            AND wait_event_type = 'Lock'
-            AND query LIKE '%exercise_estimates%'`)
-      if (rows[0].n > 0) return
-      await new Promise(r => setTimeout(r, 25))
-    }
-    throw new Error('the migration never blocked — the race was not set up')
-  }
-
   it('does not fail on exercise_estimates_user_id_fkey when the user vanishes mid-statement', async () => {
     await pool.query(`DELETE FROM users WHERE id = $1`, [FOREIGN])
     await pool.query(
@@ -141,10 +128,12 @@ describe.skipIf(!canRun)('runMigrationSql — a foreign user deleted mid-migrati
     try {
       await deleter.query('BEGIN')
       await deleter.query(`DELETE FROM users WHERE id = $1`, [FOREIGN])
+      const holder = await clientBackendPid(deleter)
 
       const migrating = runMigrationSql(pool, migration163())
       const settled = migrating.then(() => 'ok' as const, e => e as Error)
-      await migrationIsBlocked()
+      // Scoped to the deleter, so another session's lock wait cannot pass for the migration's (#3929).
+      await waitUntilBlockedBy(pool, holder)
       await deleter.query('COMMIT')
 
       expect(await settled).toBe('ok')

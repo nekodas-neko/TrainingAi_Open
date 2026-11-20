@@ -18,11 +18,10 @@
  * Idempotent and cheap — every call after the first is three boolean checks — so a composition root
  * that is unsure whether boot reached it should just call it.
  */
-import { getStepsDecoderConstants, getDaytimeStressConstants, getResilienceConstants, getCumulativeStressConstants } from './constants'
+import { getStepsDecoderConstants, getDaytimeStressConstants, getResilienceConstants } from './constants'
 import { setStepsDecoderConstants, hasStepsDecoderConstants } from './steps-motion-decoder'
 import { setDaytimeStressConstants, hasDaytimeStressConstants } from '@/lib/health/daytime-stress'
 import { setResilienceConstants, hasResilienceConstants } from '@/lib/health/stress-resilience'
-import { setCumulativeStressConstants, hasCumulativeStressConstants } from '@/lib/oura-models/cumulative-stress'
 
 /**
  * Inject every constant table a server request path can reach. Throws if the constants directory is
@@ -33,7 +32,6 @@ export function ensureServerOuraConstants(): void {
   if (!hasStepsDecoderConstants()) setStepsDecoderConstants(getStepsDecoderConstants())
   if (!hasDaytimeStressConstants()) setDaytimeStressConstants(getDaytimeStressConstants())
   if (!hasResilienceConstants()) setResilienceConstants(getResilienceConstants())
-  if (!hasCumulativeStressConstants()) setCumulativeStressConstants(getCumulativeStressConstants())
 }
 
 /**

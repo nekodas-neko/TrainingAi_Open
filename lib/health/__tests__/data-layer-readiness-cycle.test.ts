@@ -1,4 +1,5 @@
-// Release test for 1.525.0 (20 Nov): `@/lib/data` must never reach `readiness-payload.ts`.
+// Release test for 1.525.0 (20 Nov): `@/lib/data` must never reach `readiness-payload.ts`, and (#3916)
+// must never reach any module that imports `@/lib/data` back.
 //
 // `readiness-payload` imports `@/lib/data`. When the data layer reached it back (adapter →
 // rescore-nights → night-readiness ⇢ readiness-payload, the last edge a dynamic import), Turbopack on
@@ -69,6 +70,38 @@ export function importPath(entry: string, target: string): string[] | null {
   return null
 }
 
+/** Every file `entry` reaches, each with the file that first imported it. */
+function reachable(entry: string): Map<string, string | null> {
+  const parent = new Map<string, string | null>([[entry, null]])
+  const queue = [entry]
+  while (queue.length > 0) {
+    const file = queue.shift()!
+    for (const spec of runtimeImports(file)) {
+      const next = resolveSpecifier(spec, file)
+      if (next && !parent.has(next)) { parent.set(next, file); queue.push(next) }
+    }
+  }
+  return parent
+}
+
+/**
+ * #3916: the whole class, not one file. Every module reachable from `from` (by default the data
+ * layer itself) that imports `lib/data/index.ts` (statically or through `import()`), each with the
+ * chain that reaches it. Walked from the data layer, any hit is a cycle.
+ */
+export function importersOfDataLayer(from: string = ENTRY): string[] {
+  const parent = reachable(from)
+  const out: string[] = []
+  for (const file of parent.keys()) {
+    if (file === ENTRY) continue
+    if (!runtimeImports(file).some(spec => resolveSpecifier(spec, file) === ENTRY)) continue
+    const chain: string[] = []
+    for (let f: string | null = file; f; f = parent.get(f) ?? null) chain.unshift(path.relative(ROOT, f))
+    out.push(`${chain.join(' → ')} ⇢ lib/data/index.ts`)
+  }
+  return out
+}
+
 describe('the data layer never reaches the readiness read', () => {
   it('finds the path when one exists (the walk works)', () => {
     expect(importPath(FORBIDDEN, ENTRY)).not.toBeNull()
@@ -76,5 +109,23 @@ describe('the data layer never reaches the readiness read', () => {
 
   it('lib/data/index.ts cannot reach lib/health/readiness-payload.ts by static or dynamic import', () => {
     expect(importPath(ENTRY, FORBIDDEN)).toBeNull()
+  })
+})
+
+describe('the data layer never reaches a module that imports it back (#3916)', () => {
+  it('finds such a module when one exists (the walk works)', () => {
+    // Walked from a route instead, the wrapper that looks the repository up is an importer, and the
+    // dynamic `import('@/lib/data')` in the log-exercise wrapper is seen too.
+    expect(importersOfDataLayer(path.join(ROOT, 'app/api/workout-sessions/route.ts')).join('\n'))
+      .toContain('lib/workout/delete-session-reconcile.ts ⇢')
+    expect(importersOfDataLayer(path.join(ROOT, 'app/api/log-exercise/route.ts')).join('\n'))
+      .toContain('packages/shared/src/workout/log-exercise.ts ⇢')
+  })
+
+  it('nothing lib/data/index.ts reaches imports @/lib/data, statically or through import()', () => {
+    // A cycle here is #3911's bug: under `pnpm dev` the route's `@/lib/data` can come up empty
+    // ("getRepository is not a function"). Pass the repository in from outside the data layer
+    // instead (the `*-core` modules in lib/workout and packages/shared/src/workout do).
+    expect(importersOfDataLayer()).toEqual([])
   })
 })

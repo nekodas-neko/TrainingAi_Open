@@ -5,6 +5,7 @@
 // CI and the local sandbox, skipped otherwise.
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { fromZonedTime } from 'date-fns-tz'
+import { txBackendPid, waitUntilBlockedBy } from './helpers/lock-wait'
 
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-000000003850'
@@ -198,6 +199,12 @@ describe.skipIf(!canRun)('cached zone minutes follow workouts written later, and
     const s = await import('@/lib/data/postgres/schema')
     const without = seedCachedRow ? await total(day) : null
     expect(!!(await cachedRow(day))).toBe(seedCachedRow)
+    // A cached row that matches the profile is served from the read's snapshot with no write-back,
+    // so nothing would race. Drift its profile so the read recomputes and its conditional write-back
+    // meets the marker (#3929: the unscoped probe hid that this case never blocked).
+    if (seedCachedRow) {
+      await pool.query(`UPDATE daily_zone_minutes SET max_hr = max_hr - 10 WHERE user_id = $1 AND day = $2`, [USER, day])
+    }
     let read: Promise<unknown> | undefined
     await getDb().transaction(async tx => {
       await tx.insert(s.activityLogs).values({
@@ -205,13 +212,11 @@ describe.skipIf(!canRun)('cached zone minutes follow workouts written later, and
       })
       await markZoneMinutesStale(tx, USER, [day], TZ)
       // The read starts while the write is uncommitted: it sees no log, and its write-back blocks.
+      // Wait for a backend blocked by this transaction itself, not any lock wait on the database:
+      // another session's wait would end the loop before the read has loaded its windows (#3929).
+      const holder = await txBackendPid(tx)
       read = total(day)
-      for (let i = 0; i < 100; i++) {
-        const { rows } = await pool.query(
-          `SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`)
-        if (rows[0].n > 0) break
-        await new Promise(r => setTimeout(r, 20))
-      }
+      await waitUntilBlockedBy(pool, holder)
     })
     const raced = await read
     return { without, raced }

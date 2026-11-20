@@ -18,8 +18,6 @@ import { type ExclusionWindow } from '@trainingai/shared/health/daily-medians'
 import { metExclusionWindows, rmssdSamples, hrvMsFromSamples, nightlyHeartRate, HR_BIN_DS, numericField as numArr } from '@trainingai/shared/health/night-vitals'
 import { clampToDenseSensing } from '@/lib/sleep/sensing-span'
 import { computeDailySummaries, type NightInput } from '@trainingai/shared/health/daily-summary'
-import { computeHrv5MinSeries } from '@trainingai/shared/health/hrv-5min'
-import { computeChronicStress, chronicStressScoreToInt, chronicStressDiagnostics, usableGranularNights, CHRONIC_STRESS_MIN_DAYS, type ChronicStressDiagnostics, type ChronicStressNightSignals } from '@trainingai/shared/health/chronic-stress-assembly'
 import { illnessFromSummaries, illnessZScores } from '@trainingai/shared/health/illness-radar'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import { computeReadinessComposite, preCentreContributorScore } from '@trainingai/shared/health/readiness-composite'
@@ -284,13 +282,6 @@ export async function runOuraRollup(
     input: NightInput
     recovery: { settledAt: Date; lowestBpm: number } | null
   }[] = []
-  const bdiByDate = new Map<string, number>()
-  /** BDI per sleep WINDOW (keyed by sleepStart ms), collapsed to one per date once the night
-   *  resolution below has decided which period actually is that date's night. */
-  const bdiByWindowStart = new Map<number, number>()
-  // Raw per-night signals for the chronic-stress model (the granular data not captured in the
-  // DailySummaryRow). Populated in the night loop; consumed by the chronic_stress step below.
-  const chronicStressSignalsByDate = new Map<string, ChronicStressNightSignals>()
   for (const w of nightWindows) {
     const inWindow = <T extends { ds: number }>(rows: T[], slackDs = 0) =>
       rows.filter(r => Number(r.ds) >= w.startDs && Number(r.ds) <= w.endDs + slackDs)
@@ -347,9 +338,6 @@ export async function runOuraRollup(
     const onsetSamples: OnsetSample[] = []
     let modelOnsetSec: number | null = null
     let foldedWakeBouts = 0
-    // BDI (breathing-disturbance index) from SleepNet's apnea head — a free byproduct of the
-    // staging pass, null on heuristic-fallback nights (no neural apnea head).
-    let sleepNetBdi: number | null = null
     let respiratoryRate: number | null = null
     if (phases.length === 0) {
       const nEpochs = Math.max(1, Math.ceil((w.endDs - w.startDs) / EPOCH_DS))
@@ -447,7 +435,6 @@ export async function runOuraRollup(
             foldedWakeBouts = 0
             const firstSleep = sn.stages.findIndex(s => s !== 'awake')
             modelOnsetSec = firstSleep > 0 ? firstSleep * EPOCH_MIN * 60 : 0
-            sleepNetBdi = sn.bdi.perHour
           }
         } catch (err) {
           console.error('[oura-ble] SleepNet staging failed, using heuristic:', err)
@@ -501,11 +488,6 @@ export async function runOuraRollup(
     const averageHrvMs = hrvMsFromSamples(nightRmssd, metExclusion)
     const avgHeartRate = nightHr.averageHrBpm
     const wakeDate = toAestDay(toDate(w.endDs), timezone)
-    // Keyed by WINDOW, not by wake-day. A wake-day can see two windows and this used to keep the
-    // last non-null BDI "matching the last-window-wins semantics of nightInputsByDate below" — but
-    // those semantics were the PS-17 bug, so the two are resolved together now: the night resolution
-    // below picks a winning period per date and lifts that period's BDI out of this map.
-    if (sleepNetBdi != null) bdiByWindowStart.set(toDate(w.startDs).getTime(), sleepNetBdi)
 
     sleepRows.push({
       ouraId: `ble:${w.startDs}`,
@@ -587,32 +569,6 @@ export async function runOuraRollup(
       recovery: recovery ? { settledAt: recovery.settledAt, lowestBpm: recovery.lowestBpm } : null,
     })
 
-    // Stash the granular raw signals the chronic-stress model needs but the DailySummaryRow does
-    // not carry (30-sec hypnogram, per-5-min HRV, skin-temp samples, bedtime). Consumed by the
-    // chronic_stress step below. The 30-sec hypnogram is up-sampled 10× from the 5-min stager
-    // output (the Ring 5 emits no native 30-sec phase events — GAP 1 fallback (b); this makes SFI
-    // transition-counting coarser, noted as a Known-Issue).
-    const phase5MinStr = phases.length > 0 ? phasesToPhase5Min(phases) : model ? stagesToPhase5Min(modelStages) : ''
-    const sleepPhase30Sec: number[] = []
-    for (const ch of phase5MinStr) {
-      const code = Number(ch)
-      for (let k = 0; k < 10; k++) sleepPhase30Sec.push(code)
-    }
-    const ibi5MinEvents = inWindow(ibiRows)
-      .filter(r => Number(r.tag) === 0x80)
-      .map(r => ({ startMs: toDate(Number(r.ds)).getTime(), ibiMs: numArr(r.decoded, 'ibi_ms'), quality: numArr(r.decoded, 'quality') }))
-    const hrv5 = computeHrv5MinSeries(ibi5MinEvents)
-    const tempSkinC = tempSamples.map(t => t.centi / 100)
-    chronicStressSignalsByDate.set(wakeDate, {
-      sleepPhase30Sec,
-      hrvItems: nightRmssd.map(s => s.value),
-      hrvMedianHR5min: hrv5.hrvMedianHR5min,
-      hrvQuality5min: hrv5.hrvQuality5min,
-      tempSkin: tempSkinC,
-      tempSkinTimestamps: tempSamples.map(t => toDate(t.ds).getTime()),
-      bedtimeStart: toDate(w.startDs).getTime(),
-      highestTemperature: tempSkinC.length ? Math.max(...tempSkinC) : NaN,
-    })
   }
   // Resolve the per-window candidates into one row per night: naps are dropped entirely (they are
   // not sleep-baseline material — their HRV/HR are measured awake) and a night broken by a wake-up
@@ -644,12 +600,6 @@ export async function runOuraRollup(
     const durs = parts.map(p => p.durationHours ?? 0)
     const totalSleep = durs.reduce((a, b) => a + b, 0)
 
-    // This period is the date's night, so its BDI is the date's BDI. Last non-null across the
-    // period's own windows — a fragmented night legitimately has several.
-    for (const part of parts) {
-      const bdi = bdiByWindowStart.get(part.sleepStart.getTime())
-      if (bdi != null) bdiByDate.set(period.date, bdi)
-    }
     const wmean = (pick: (i: NightInput) => number | null) => {
       const v = parts.map((p, i) => ({ value: pick(p.input), w: durs[i] })).filter(x => x.value != null && x.w > 0)
       const wsum = v.reduce((a, b) => a + b.w, 0)
@@ -704,9 +654,6 @@ export async function runOuraRollup(
       console.error('[oura-ble] aggregate step failed —', msg)
     }
   }
-  // Issue 2422: why chronic stress did or did not score on this pass. Returned with the result, so a
-  // Redecode's job row (`oura_redecode_jobs.result`) keeps it without a column of its own.
-  let chronicStress: ChronicStressDiagnostics | null = null
 
   if (sleepRows.length > 0) await step('sleep', async () => {
     // Own our derived rows: delete every BLE sleep row for the wake-days we're about to
@@ -1036,15 +983,6 @@ export async function runOuraRollup(
       }
     })
 
-    // BDI reclaim (Sub-plan E): persist the per-night breathing-disturbance index computed as a
-    // free byproduct of the SleepNet staging pass (apnea head), keyed by wake date. Own step
-    // (COALESCE upsert of only bdi_derived) so a failure can't block the summary/illness writes;
-    // null-BDI (heuristic-fallback) nights simply aren't in the map, so nothing is clobbered.
-    if (bdiByDate.size > 0) await step('bdi_derived', async () => {
-      for (const [day, perHour] of bdiByDate) {
-        await io.upsertDailyDerived(day, { bdiDerived: perHour })
-      }
-    })
 
     // D5 — own daytime-HRV: throttled refit (own step, isolated the same way every other step
     // here is — a refit failure or slow pass must never block the summary/illness/resilience
@@ -1208,23 +1146,11 @@ export async function runOuraRollup(
         // number exists to explain. A day that resilience skipped now records how many minutes of
         // daytime stress it actually had, so the gate can be checked against
         // `minDaytimeStressHours` from data instead of inferred.
-        // LA-140: `nightHrvMs` joins this write, and `nightHrvBaselineMs != null` joins the guard.
-        //
-        // The column was plumbed end to end — schema, `DERIVED_COLS`, the row mapper, the
-        // `pushMutations` branch, the local SQLite table, the sync delta, the validator — and no
-        // writer ever set it, so it was NULL on all 130 production rows. That is a trap rather
-        // than a nuisance: `computeResilienceForDay` gates `contributorsOk` on this exact field
-        // being non-null and falls back to a fabricated 50 for the stress scaling, so a reader who
-        // finds NULL reasonably concludes the input was missing. TN-70 hit it — it could measure
-        // the resting-heart-rate half of its regime comparison and not the HRV half.
-        //
-        // **It joins the GUARD, not just the patch, deliberately.** Gating the night's own input on
-        // the resilience score being produced is backwards: a day the score skipped is precisely a
-        // day someone needs the input for. The value comes from `latest.hrvBaseline`/`hrvAvgMs` at
-        // the top of this loop and does not depend on `res` at all.
-        if (res.dailyIndices || res.level != null || res.daytimeStressCoverageMin != null || nightHrvMs != null) {
+        // #2860 F5: the night's HRV baseline is no longer written to `night_hrv_baseline_ms`. The
+        // per-device night-HRV normal does that job for every source; the column stays until the
+        // retired columns are dropped together. Resilience still takes `nightHrvMs` in memory above.
+        if (res.dailyIndices || res.level != null || res.daytimeStressCoverageMin != null) {
           await io.upsertDailyDerived(day, {
-            nightHrvBaselineMs: nightHrvMs,
             resilienceLevel: res.level,
             resilienceGranular: res.granular,
             resilienceConfidence: res.confidence,
@@ -1235,41 +1161,6 @@ export async function runOuraRollup(
           })
         }
       }
-    })
-
-    // Chronic stress (cumulative_stress_1_2_2): assemble the trailing 31-night input for the most
-    // recent night and run the golden-verified model. Own step (COALESCE upsert of only the
-    // chronic_stress_* columns) so a failure can't block the writes above. The score is null until
-    // 21 complete nights of granular BLE signals exist in the window (the model's own gate) — skip
-    // the write entirely on null so a sparse/incremental pass never clobbers a prior good score.
-    // NOTE: the intermediate history is built from THIS pass's stashed signals, so the first score
-    // requires a wide/full rollup pass covering ≥21 nights of real ring data (owner/device-gated).
-    await step('chronic_stress', async () => {
-      if (summaryRows.length < CHRONIC_STRESS_MIN_DAYS) return
-      // TN-1: record how many nights the pass could actually feed the model BEFORE running it, and
-      // write that even when the score comes back null — which it always has. The upsert COALESCEs,
-      // so writing the count alone never clobbers a prior good score, and the early return above
-      // keeps a routine incremental pass (window ~3 nights) from writing a meaningless one.
-      const granularNights = usableGranularNights(summaryRows, chronicStressSignalsByDate)
-      const res = computeChronicStress(summaryRows, chronicStressSignalsByDate)
-      const score = res ? chronicStressScoreToInt(res.chronicStressScore) : null
-      // Read from the model's own per-series counts; changes nothing the model returned. Logged as
-      // well as returned because the ingest path keeps no job row.
-      chronicStress = chronicStressDiagnostics(summaryRows, chronicStressSignalsByDate, res)
-      if (chronicStress.reason !== 'scored') console.info('[oura-ble] chronic stress not scored —', JSON.stringify(chronicStress))
-      await io.upsertDailyDerived(summaryRows[summaryRows.length - 1].date, {
-        chronicStressGranularNights: granularNights,
-        ...(res != null && score != null ? {
-          chronicStressScore: score,
-          chronicStressContributors: {
-            fragmentation: res.uiFragmentation,
-            heart: res.uiHeart,
-            sleepMotions: res.uiSleepMotions,
-            activity: res.uiActivity,
-            temperature: res.uiTemperature,
-          },
-        } : {}),
-      })
     })
   }
   }
@@ -1299,6 +1190,5 @@ export async function runOuraRollup(
     wearDays: wearRows.length,
     stepErrors,
     debugNight,
-    chronicStress,
   }
 }

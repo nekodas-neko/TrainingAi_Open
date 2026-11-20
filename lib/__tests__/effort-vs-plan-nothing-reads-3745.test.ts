@@ -22,7 +22,7 @@ const CARRIERS: Record<string, string> = {
   'packages/shared/src/types/log.ts': 'the write shape of an exercise log',
   // The upload: schema, route helper, upsert, and the sync pull that carries it back down.
   'packages/shared/src/workout/log-payload.ts': 'the upload schema accepts it',
-  'packages/shared/src/workout/log-exercise.ts': 'passes it to the write',
+  'packages/shared/src/workout/log-exercise-core.ts': 'passes it to the write',
   'lib/data/postgres/adapter.ts': 'writes it (insert / keep-on-replay upsert) and selects it into the sync pull',
   // Preview: asks, keeps, uploads; the window offers the same three answers.
   'mobile/src/features/workouts/logging/effort.ts': 'asks, records a tap, builds the upload field',
